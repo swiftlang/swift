@@ -33,7 +33,8 @@ namespace targetinfo {
 void printTargetInfo(const CompilerInvocation &invocation,
                      llvm::raw_ostream &out);
 
-void printTripleInfo(const llvm::Triple &triple,
+void printTripleInfo(const CompilerInvocation &invocation,
+                     const llvm::Triple &triple,
                      std::optional<llvm::VersionTuple> runtimeVersion,
                      llvm::raw_ostream &out);
 } // namespace targetinfo

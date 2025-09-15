@@ -259,14 +259,14 @@ func copyableExistentials(_ a: Any, _ e1: Error, _ e2: any Error, _ ah: AnyHasha
 // ensure that associated types can't be witnessed by move-only types
 
 protocol HasType<Ty> {
-  associatedtype Ty // expected-note 3{{protocol requires nested type 'Ty'; add nested type 'Ty' for conformance}}
+  associatedtype Ty // expected-note 3{{protocol requires nested type 'Ty'}}
 }
 
-class SomeGuy: HasType { // expected-error {{type 'SomeGuy' does not conform to protocol 'HasType'}}
+class SomeGuy: HasType { // expected-error {{type 'SomeGuy' does not conform to protocol 'HasType'}} expected-note {{add stubs for conformance}}
   typealias Ty = MO // expected-note {{possibly intended match 'SomeGuy.Ty' (aka 'MO') does not conform to 'Copyable'}}
 }
 
-struct AnotherGuy: HasType { // expected-error {{type 'AnotherGuy' does not conform to protocol 'HasType'}}
+struct AnotherGuy: HasType { // expected-error {{type 'AnotherGuy' does not conform to protocol 'HasType'}} expected-note {{add stubs for conformance}}
   struct Ty: ~Copyable {} // expected-note {{possibly intended match 'AnotherGuy.Ty' does not conform to 'Copyable'}}
 }
 
@@ -274,7 +274,7 @@ protocol Gives: HasType {
   func give() -> Ty
 }
 
-struct GenerousGuy: Gives { // expected-error {{type 'GenerousGuy' does not conform to protocol 'HasType'}}
+struct GenerousGuy: Gives { // expected-error {{type 'GenerousGuy' does not conform to protocol 'HasType'}} expected-note {{add stubs for conformance}}
   typealias Ty = MO // expected-note {{possibly intended match 'GenerousGuy.Ty' (aka 'MO') does not conform to 'Copyable'}}
   func give() -> Ty {}
 }

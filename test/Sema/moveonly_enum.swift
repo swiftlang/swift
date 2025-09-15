@@ -1,21 +1,17 @@
 // RUN: %target-typecheck-verify-swift
 
-@_moveOnly
-enum Foo {
+enum Foo: ~Copyable {
     deinit {} // expected-error {{deinitializers are not yet supported on noncopyable enums}}
 }
 
-@_moveOnly
-enum Foo2 {
+enum Foo2: ~Copyable {
 }
 
-@_moveOnly
-struct Bar {
+struct Bar: ~Copyable {
     var x: Int
 }
 
-@_moveOnly
-enum Foo3 {
+enum Foo3: ~Copyable {
     case foo(Int)
     case bar(String)
     case bas

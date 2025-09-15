@@ -24,6 +24,9 @@
 // Temporarily disabled on arm64 (rdar://128522114)
 // UNSUPPORTED: CPU=arm64
 
+// And on older OS (rdar://132941962)
+// UNSUPPORTED: use_os_stdlib
+
 import Foundation
 import ArrayBridgeObjC
 import StdlibUnittest

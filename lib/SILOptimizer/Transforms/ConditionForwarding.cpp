@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "condbranch-forwarding"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -116,7 +117,7 @@ private:
       }
     }
     if (Changed) {
-      updateBorrowedFrom(getPassManager(), F);
+      updateAllGuaranteedPhis(getPassManager(), F);
       invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }
   }
@@ -125,8 +126,25 @@ private:
 
 /// Returns true if all instructions of block \p BB are safe to be moved
 /// across other code.
-static bool hasNoRelevantSideEffects(SILBasicBlock *BB) {
+static bool hasNoRelevantSideEffects(SILBasicBlock *BB, EnumInst *enumInst) {
   for (SILInstruction &I : *BB) {
+    if (BB->getParent()->hasOwnership() && &I != enumInst) {
+      // The instruction must not use any (non-trivial) value because we don't
+      // do liveness analysis. When moving the block, there is no guarantee that
+      // the operand value is still alive at the new location.
+      for (Operand *op : I.getRealOperands()) {
+        SILValue opv = op->get();
+        // The `enum` is an exception, because it's a forwarded value and we already
+        // check that it's forwarded to the `switch_enum` at the new location.
+        if (opv == enumInst)
+          continue;
+        // If the value is defined in the block it's a block-local liferange.
+        if (opv->getParentBlock() == BB)
+          continue;
+        if (opv->getOwnershipKind() != OwnershipKind::None)
+          return false;
+      }
+    }
     if (I.getMemoryBehavior() == MemoryBehavior::None)
       continue;
     if (auto *CF = dyn_cast<CondFailInst>(&I)) {
@@ -141,9 +159,6 @@ static bool hasNoRelevantSideEffects(SILBasicBlock *BB) {
       auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand());
       if (!BI || BI->getParent() != BB)
         return false;
-      continue;
-    }
-    if (isa<BeginBorrowInst>(&I) || isa<EndBorrowInst>(&I)) {
       continue;
     }
     LLVM_DEBUG(llvm::dbgs() << "Bailing out, found inst with side-effects ");
@@ -211,7 +226,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     CommonBranchBlock = PredPred;
 
     // We cannot move the block across other code if it has side-effects.
-    if (!hasNoRelevantSideEffects(Pred))
+    if (!hasNoRelevantSideEffects(Pred, EI))
       return false;
     PredBlocks.push_back(Pred);
   }
@@ -236,7 +251,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
   if (getFunction()->hasOwnership()) {
     // TODO: Currently disabled because this case may need lifetime extension
     // Disabling this conservatively for now.
-    assert(Condition->getNumOperands() == 1);
+    assert(Condition->getNumRealOperands() == 1);
     BorrowedValue conditionOp(Condition->getOperand(0));
     if (conditionOp && conditionOp.isLocalScope()) {
       return false;
@@ -289,15 +304,17 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     llvm::SmallVector<SILValue, 2> BranchArgs;
     unsigned HasEnumArg = NeedEnumArg.contains(SEDest);
     if (SEDest->getNumArguments() == 1 + HasEnumArg) {
-      // The successor block has an original argument, which is the Enum's
-      // payload.
-      BranchArgs.push_back(EI->getOperand());
+      if (SEI->hasDefault() && SEDest == SEI->getDefaultBB()) {
+        BranchArgs.push_back(EI);
+      } else {
+        // The successor block has an original argument, which is the Enum's
+        // payload.
+        BranchArgs.push_back(EI->getOperand());
+      }
     }
     if (HasEnumArg) {
       // The successor block has a new argument (which we created above) where
       // we have to pass the Enum.
-      assert(!getFunction()->hasOwnership() ||
-             EI->getType().isTrivial(*getFunction()));
       BranchArgs.push_back(EI);
     }
     B.createBranch(BI->getLoc(), SEDest, BranchArgs);

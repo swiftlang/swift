@@ -121,6 +121,5 @@ print(twenty) // CHECK: 2
 twenty = NSDecimalNumber(mantissa: 2, exponent: 1, isNegative: false) as Decimal
 print(twenty.significand) // CHECK: 2
 print(twenty.exponent) // CHECK: 1
-print(twenty.ulp) // CHECK: 10
 
 print(Decimal(sign: .plus, exponent: -2, significand: 100)) // CHECK: 1

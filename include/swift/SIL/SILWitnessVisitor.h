@@ -100,7 +100,7 @@ public:
       // If this is a new associated type (which does not override an
       // existing associated type), add it.
       if (associatedType->getOverriddenDecls().empty())
-        asDerived().addAssociatedType(AssociatedType(associatedType));
+        asDerived().addAssociatedType(associatedType);
     }
 
     if (asDerived().shouldVisitRequirementSignatureOnly())
@@ -170,15 +170,6 @@ public:
 
   void visitPatternBindingDecl(PatternBindingDecl *pbd) {
     // We only care about the contained VarDecls.
-  }
-
-  void visitIfConfigDecl(IfConfigDecl *icd) {
-    // We only care about the active members, which were already subsumed by the
-    // enclosing type.
-  }
-
-  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *pdd) {
-    // We don't care about diagnostics at this stage.
   }
 
 private:

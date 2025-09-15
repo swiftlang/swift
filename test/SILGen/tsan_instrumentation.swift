@@ -1,5 +1,5 @@
 // REQUIRES: tsan_runtime
-// RUN: %target-swift-emit-silgen -sanitize=thread %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -sanitize=thread %s | %FileCheck %s
 // RUN: %target-swift-frontend -sanitize=thread -emit-ir -primary-file %s | %FileCheck --check-prefix=CHECK-LLVM-IR %s
 
 // TSan is only supported on 64 bit.

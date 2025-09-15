@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 // None of TaskExecutor APIs are available in task-to-thread concurrency model.
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -32,25 +31,29 @@ import Swift
 ///
 /// Customizing the global concurrent executor is currently not supported.
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 public var globalConcurrentExecutor: any TaskExecutor {
   get {
-    _DefaultGlobalConcurrentExecutor.shared
+    if #available(StdlibDeploymentTarget 6.2, *) {
+      return Task.defaultExecutor
+    } else {
+      fatalError("we shouldn't get here; if we have, availability is broken")
+    }
   }
-  // TODO: introduce a set {} once we are ready to allow customizing the
-  //       default global executor. This should be done the same for main actor
 }
 
 /// A task executor which enqueues all work on the default global concurrent
 /// thread pool that is used as the default executor for Swift concurrency
 /// tasks.
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 internal final class _DefaultGlobalConcurrentExecutor: TaskExecutor {
   public static let shared: _DefaultGlobalConcurrentExecutor = .init()
 
   private init() {}
 
   public func enqueue(_ job: consuming ExecutorJob) {
-    _enqueueJobGlobal(job.context)
+    _enqueueJobGlobal(UnownedJob(job)._context)
   }
 
   public func asUnownedTaskExecutor() -> UnownedTaskExecutor {
@@ -58,7 +61,7 @@ internal final class _DefaultGlobalConcurrentExecutor: TaskExecutor {
     // We represent it as the `(0, 0)` ExecutorRef and it is handled properly
     // by the runtime, without having to call through to the
     // `_DefaultGlobalConcurrentExecutor` declared in Swift.
-    UnownedTaskExecutor(_getUndefinedTaskExecutor())
+    unsafe UnownedTaskExecutor(_getUndefinedTaskExecutor())
   }
 }
 

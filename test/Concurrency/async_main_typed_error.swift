@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-as-library -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-as-library -target %target-swift-5.1-abi-triple %s | %FileCheck %s
 
 // REQUIRES: concurrency
 

@@ -152,8 +152,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
     let replacement = builder.createUncheckedEnumData(enum: optionalReplacement,
                                                       caseIndex: someCase,
                                                       resultType: bridgeToObjcCall.type)
-    bridgeToObjcCall.uses.replaceAll(with: replacement, context)
-    context.erase(instruction: bridgeToObjcCall)
+    bridgeToObjcCall.replace(with: replacement, context)
     return true
   }
 
@@ -219,8 +218,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
   
   // Now replace the bridged value with the original value in the destination block.
   let replacement = s.makeAvailable(in: bridgeToObjcCall.parentBlock, context)
-  bridgeToObjcCall.uses.replaceAll(with: replacement, context)
-  context.erase(instruction: bridgeToObjcCall)
+  bridgeToObjcCall.replace(with: replacement, context)
   return true
 }
 
@@ -232,7 +230,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
 private func removeBridgingCodeInPredecessors(of block: BasicBlock, _ context: FunctionPassContext) {
   for pred in block.predecessors {
     let branch = pred.terminator as! BranchInst
-    let builder = Builder(after: branch, context)
+    let builder = Builder(atEndOf: branch.parentBlock, location: branch.location, context)
     builder.createBranch(to: block)
     
     let en = branch.operands[0].value as! EnumInst
@@ -250,7 +248,7 @@ private func removeBridgingCodeInPredecessors(of block: BasicBlock, _ context: F
 /// ```
 ///   switch_enum %0             // returned instruction
 /// some_bb(%1):
-///   %2 = enum #some(%1)        // only in case of ObjC -> Swift briding
+///   %2 = enum #some(%1)        // only in case of ObjC -> Swift bridging
 ///   %3 = apply %bridging(%2)   // returned by `isBridging`
 ///   %4 = enum #some(%3)
 ///   br continue_bb(%4)
@@ -340,7 +338,7 @@ func isBridgeToSwiftCall(_ value: Value) -> ApplyInst? {
   let funcName = bridgingFunc.name
   guard  bridgingFunc.hasSemanticsAttribute("bridgeFromObjectiveC") ||
          // Currently the semantics attribute is not used, so test for specific functions, too.
-         // TODO: remove those checks once the briding functions are annotate with "bridgeFromObjectiveC"
+         // TODO: remove those checks once the bridging functions are annotated with "bridgeFromObjectiveC"
          //       in Foundation.
          //
          // String._unconditionallyBridgeFromObjectiveC(_:)

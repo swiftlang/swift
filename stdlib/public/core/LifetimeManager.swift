@@ -10,6 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// Extends the lifetime of the given instance.
+///
+/// - Parameters:
+///   - x: An instance to preserve until this function returns.
+@_alwaysEmitIntoClient
+public func extendLifetime<T: ~Copyable & ~Escapable>(
+  _ x: borrowing T
+) {
+  Builtin.fixLifetime(x)
+}
+
 /// Evaluates a closure while ensuring that the given instance is not destroyed
 /// before the closure returns.
 ///
@@ -20,10 +31,14 @@
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
 @_alwaysEmitIntoClient
-public func withExtendedLifetime<T: ~Copyable, Result: ~Copyable>(
+public func withExtendedLifetime<
+  T: ~Copyable & ~Escapable,
+  E: Error,
+  Result: ~Copyable
+>(
   _ x: borrowing T,
-  _ body: () throws -> Result // FIXME: Typed throws rdar://126576356
-) rethrows -> Result {
+  _ body: () throws(E) -> Result
+) throws(E) -> Result {
   defer { _fixLifetime(x) }
   return try body()
 }
@@ -33,7 +48,7 @@ public func withExtendedLifetime<T: ~Copyable, Result: ~Copyable>(
 @usableFromInline
 internal func __abi_withExtendedLifetime<T, Result>(
   _ x: T,
-  _ body: () throws -> Result // FIXME: Typed throws rdar://126576356
+  _ body: () throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try body()
@@ -49,9 +64,14 @@ internal func __abi_withExtendedLifetime<T, Result>(
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
 @_alwaysEmitIntoClient
-public func withExtendedLifetime<T, Result: ~Copyable>(
-  _ x: T, _ body: (T) throws -> Result // FIXME: Typed throws rdar://126576356
-) rethrows -> Result {
+public func withExtendedLifetime<
+  T: ~Copyable & ~Escapable,
+  E: Error,
+  Result: ~Copyable
+>(
+  _ x: borrowing T,
+  _ body: (borrowing T) throws(E) -> Result
+) throws(E) -> Result {
   defer { _fixLifetime(x) }
   return try body(x)
 }
@@ -60,7 +80,7 @@ public func withExtendedLifetime<T, Result: ~Copyable>(
 @_silgen_name("$ss20withExtendedLifetimeyq_x_q_xKXEtKr0_lF")
 @usableFromInline
 internal func __abi_withExtendedLifetime<T, Result>(
-  _ x: T, _ body: (T) throws -> Result // FIXME: Typed throws rdar://126576356
+  _ x: T, _ body: (T) throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try body(x)
@@ -70,7 +90,7 @@ internal func __abi_withExtendedLifetime<T, Result>(
 // shorten the lifetime of x to be before this point.
 @_transparent
 @_preInverseGenerics
-public func _fixLifetime<T: ~Copyable>(_ x: borrowing T) {
+public func _fixLifetime<T: ~Copyable & ~Escapable>(_ x: borrowing T) {
   Builtin.fixLifetime(x)
 }
 
@@ -103,18 +123,17 @@ public func withUnsafeMutablePointer<
   to value: inout T,
   _ body: (UnsafeMutablePointer<T>) throws(E) -> Result
 ) throws(E) -> Result {
-  try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
+  try unsafe body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 }
 
-// FIXME(TypedThrows): Uncomment @_spi and revert rethrows
-//@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss24withUnsafeMutablePointer2to_q_xz_q_SpyxGKXEtKr0_lF")
 @usableFromInline
 internal func __abi_se0413_withUnsafeMutablePointer<T, Result>(
   to value: inout T,
   _ body: (UnsafeMutablePointer<T>) throws -> Result
-) rethrows -> Result {
-  return try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
+) throws -> Result {
+  return try unsafe body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 }
 
 /// Calls the given closure with a mutable pointer to the given argument.
@@ -130,7 +149,7 @@ public func _withUnprotectedUnsafeMutablePointer<
 ) throws(E) -> Result
 {
 #if $BuiltinUnprotectedAddressOf
-  return try body(UnsafeMutablePointer<T>(Builtin.unprotectedAddressOf(&value)))
+  return try unsafe body(UnsafeMutablePointer<T>(Builtin.unprotectedAddressOf(&value)))
 #else
   return try body(UnsafeMutablePointer<T>(Builtin.addressof(&value)))
 #endif
@@ -162,21 +181,20 @@ public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   _ body: (UnsafePointer<T>) throws(E) -> Result
 ) throws(E) -> Result
 {
-  return try body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
+  return try unsafe body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
 }
 
 /// ABI: Historical withUnsafePointer(to:_:) rethrows, expressed as "throws",
 /// which is ABI-compatible with "rethrows".
-// FIXME(TypedThrows): Uncomment @_spi and revert rethrows
-//@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss17withUnsafePointer2to_q_x_q_SPyxGKXEtKr0_lF")
 @usableFromInline
 internal func __abi_withUnsafePointer<T, Result>(
   to value: T,
   _ body: (UnsafePointer<T>) throws -> Result
-) rethrows -> Result
+) throws -> Result
 {
-  return try body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
+  return try unsafe body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
 }
 
 /// Invokes the given closure with a pointer to the given argument.
@@ -208,20 +226,19 @@ public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   to value: inout T,
   _ body: (UnsafePointer<T>) throws(E) -> Result
 ) throws(E) -> Result {
-  try body(UnsafePointer<T>(Builtin.addressof(&value)))
+  try unsafe body(UnsafePointer<T>(Builtin.addressof(&value)))
 }
 
 /// ABI: Historical withUnsafePointer(to:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
-// FIXME(TypedThrows): Uncomment @_spi and revert rethrows
-//@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
 @_silgen_name("$ss17withUnsafePointer2to_q_xz_q_SPyxGKXEtKr0_lF")
 @usableFromInline
 internal func __abi_se0413_withUnsafePointer<T, Result>(
   to value: inout T,
   _ body: (UnsafePointer<T>) throws -> Result
-) rethrows -> Result {
-  return try body(UnsafePointer<T>(Builtin.addressof(&value)))
+) throws -> Result {
+  return try unsafe body(UnsafePointer<T>(Builtin.addressof(&value)))
 }
 
 /// Invokes the given closure with a pointer to the given argument.
@@ -236,32 +253,24 @@ public func _withUnprotectedUnsafePointer<
   _ body: (UnsafePointer<T>) throws(E) -> Result
 ) throws(E) -> Result {
 #if $BuiltinUnprotectedAddressOf
-  return try body(UnsafePointer<T>(Builtin.unprotectedAddressOf(&value)))
+  return try unsafe body(UnsafePointer<T>(Builtin.unprotectedAddressOf(&value)))
 #else
   return try body(UnsafePointer<T>(Builtin.addressof(&value)))
 #endif
 }
 
-extension String {
-  /// Calls the given closure with a pointer to the contents of the string,
-  /// represented as a null-terminated sequence of UTF-8 code units.
-  ///
-  /// The pointer passed as an argument to `body` is valid only during the
-  /// execution of `withCString(_:)`. Do not store or return the pointer for
-  /// later use.
-  ///
-  /// - Parameter body: A closure with a pointer parameter that points to a
-  ///   null-terminated sequence of UTF-8 code units. If `body` has a return
-  ///   value, that value is also used as the return value for the
-  ///   `withCString(_:)` method. The pointer argument is valid only for the
-  ///   duration of the method's execution.
-  /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable // fast-path: already C-string compatible
-  public func withCString<Result>(
-    _ body: (UnsafePointer<Int8>) throws -> Result
-  ) rethrows -> Result {
-    return try _guts.withCString(body)
-  }
+/// Invokes the given closure with a pointer to the given argument.
+///
+/// This function is similar to `withUnsafePointer`, except that it
+/// doesn't trigger stack protection for the pointer.
+@_alwaysEmitIntoClient
+public func _withUnprotectedUnsafePointer<
+  T: ~Copyable, E: Error, Result: ~Copyable
+>(
+  to value: borrowing T,
+  _ body: (UnsafePointer<T>) throws(E) -> Result
+) throws(E) -> Result {
+  return try unsafe body(UnsafePointer<T>(Builtin.unprotectedAddressOfBorrow(value)))
 }
 
 @available(*, deprecated, message: "Use the copy operator")
@@ -271,4 +280,53 @@ extension String {
 @_semantics("lifetimemanagement.copy")
 public func _copy<T>(_ value: T) -> T {
   copy value
+}
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` with a lifetime dependency on the caller's
+/// borrow scope of the `source` argument.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(borrow source)
+public func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, borrowing source: borrowing U
+) -> T {
+  dependent
+}
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` that inherits all lifetime dependencies from
+/// the `source` argument.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(copy source)
+public func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
+) -> T {
+  dependent
+}
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument.
+/// Return a value identical to `dependent` with a lifetime dependency
+/// on the caller's exclusive borrow scope of the `source` argument.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(&source)
+public func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T,
+  mutating source: inout U
+) -> T {
+  dependent
 }

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxx -emit-clang-header-path %t/UseCxx.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -disable-availability-checking
+// RUN: %target-swift-frontend %t/use-cxx-types.swift -module-name UseCxx -typecheck -verify -emit-clang-header-path %t/UseCxx.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -disable-availability-checking
 
 // RUN: %target-interop-build-clangxx -std=c++20 -c %t/use-swift-cxx-types.cpp -I %t -o %t/swift-cxx-execution.o
 // RUN: %target-interop-build-swift %t/use-cxx-types.swift -o %t/swift-cxx-execution -Xlinker %t/swift-cxx-execution.o -module-name UseCxx -Xfrontend -entry-point-function-name -Xfrontend swiftMain -I %t -O -Xfrontend -disable-availability-checking
@@ -51,6 +51,20 @@ public:
 __attribute__((swift_attr("retain:immortal")))
 __attribute__((swift_attr("release:immortal")));
 
+class SharedFRT {
+public:
+  SharedFRT() {}
+  SharedFRT(int x) : x(x) {}
+  int x;
+} __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:retainShared")))
+__attribute__((swift_attr("release:releaseShared")));
+
+inline void retainShared(SharedFRT *r) { puts("retainShared"); }
+inline void releaseShared(SharedFRT *r) { puts("releaseShared"); }
+
+inline SharedFRT* createSharedFRT() { return new SharedFRT(); }
+
 //--- module.modulemap
 module CxxTest {
     header "header.h"
@@ -74,7 +88,39 @@ public struct TakesNonTrivial {
 }
 
 public func consumeImmortalFRT(_ x: consuming ImmortalFRT) {
-    print("frt x \(x.x)")
+  print("immortal frt x \(x.x)")
+}
+
+public func consumeSharedFRT(_ x : consuming SharedFRT) {
+  print("consume shared frt x \(x.x)")
+}
+
+public func takeSharedFRT(_ x : SharedFRT) {
+  print("take shared frt x \(x.x)")
+}
+
+public func genericConsumingFunc<T>(_ p: consuming T) {
+  print("generic consuming function")
+}
+
+public func returnSharedFRT(_ x : SharedFRT) -> SharedFRT {
+  print("return shared frt x \(x.x)")
+  return x
+}
+
+public func returnSharedFRT2() -> SharedFRT {
+  return createSharedFRT()
+}
+
+public struct ValueWrapper {
+  let sharedFRT: SharedFRT
+  public init(_ x: SharedFRT) {
+    self.sharedFRT = x
+  }
+}
+
+public func consumeValueWrapper(_ x: consuming  ValueWrapper) {
+  print("return shared frt x \(x.sharedFRT.x)")
 }
 
 //--- use-swift-cxx-types.cpp
@@ -91,8 +137,8 @@ int main() {
   }
 // CHECK: create NonTrivialTemplate
 // CHECK-NEXT: copy NonTrivialTemplate
-// CHECK-NEXT: x and y: 1, 2
 // CHECK-NEXT: ~NonTrivialTemplate
+// CHECK-NEXT: x and y: 1, 2
 // CHECK-NEXT: DoneCall
 // CHECK-NEXT: ~NonTrivialTemplate
   {
@@ -105,12 +151,12 @@ int main() {
 // CHECK-NEXT: create NonTrivialTemplate
 // CHECK-NEXT: call
 // CHECK-NEXT: copy NonTrivialTemplate
-// CHECK-NEXT: copy NonTrivialTemplate
+// CHECK-NEXT: move NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: DoneCall
 // CHECK-NEXT: copy NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
-// CHECK-NEXT: copy NonTrivialTemplate
+// CHECK-NEXT: move NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
@@ -119,7 +165,47 @@ int main() {
     frt.x = 2;
     UseCxx::consumeImmortalFRT(&frt);
   }
-// CHECK-NEXT: frt x 2
+  // CHECK-NEXT: immortal frt x 2
+  {
+    SharedFRT sfrt;
+    sfrt.x = 2;
+    UseCxx::takeSharedFRT(&sfrt);
+    // CHECK-NEXT: retainShared
+    // CHECK-NEXT: releaseShared
+    // CHECK-NEXT: take shared frt x 2
+    UseCxx::consumeSharedFRT(&sfrt);
+    // CHECK-NEXT: retainShared
+    // CHECK-NEXT: releaseShared
+    // CHECK-NEXT: consume shared frt x 2
+    SharedFRT *sfrtptr = UseCxx::returnSharedFRT(&sfrt);
+    // CHECK-NEXT: retainShared
+    // CHECK-NEXT: return shared frt x 2
+    SharedFRT *sfrtptr2 = UseCxx::returnSharedFRT2();
+    // No retain or release here.
+  }
+  {
+    SharedFRT sfrt;
+    sfrt.x = 4;
+    auto wrapper = UseCxx::ValueWrapper::init(&sfrt);
+    // consumeValueWrapper creates a defensive copy in the thunk.
+    UseCxx::consumeValueWrapper(wrapper);
+    // CHECK-NEXT: retainShared
+    // CHECK-NEXT: retainShared
+    // CHECK-NEXT: releaseShared
+    // CHECK-NEXT: return shared frt x 4
+    // CHECK-NEXT: releaseShared
+  }
+  {
+    SharedFRT sfrt;
+    sfrt.x = 4;
+    auto wrapper = UseCxx::ValueWrapper::init(&sfrt);
+    UseCxx::genericConsumingFunc(wrapper);
+    // CHECK-NEXT: retainShared
+    // CHECK-NEXT: retainShared
+    // CHECK-DAG: releaseShared
+    // CHECK-DAG: generic consuming function
+    // CHECK-NEXT: releaseShared
+  }
   puts("EndOfTest");
 // CHECK-NEXT: EndOfTest
   return 0;

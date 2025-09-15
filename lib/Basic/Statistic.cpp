@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Config.h"
 #include "clang/Basic/SourceLocation.h"
@@ -32,7 +33,7 @@
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
-#ifdef HAVE_SYS_RESOURCE_H
+#if HAVE_GETRUSAGE && !defined(__HAIKU__)
 #include <sys/resource.h>
 #endif
 #ifdef HAVE_PROC_PID_RUSAGE
@@ -318,9 +319,11 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef Directory,
                                            SourceManager *SM,
                                            clang::SourceManager *CSM,
+                                           bool FineGrainedTimers,
                                            bool TraceEvents,
                                            bool ProfileEvents,
-                                           bool ProfileEntities)
+                                           bool ProfileEntities,
+                                           bool PrintZeroStats)
   : UnifiedStatsReporter(ProgramName,
                          auxName(ModuleName,
                                  InputName,
@@ -328,8 +331,9 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                  OutputType,
                                  OptType),
                          Directory,
-                         SM, CSM,
-                         TraceEvents, ProfileEvents, ProfileEntities)
+                         SM, CSM, FineGrainedTimers,
+                         TraceEvents, ProfileEvents, ProfileEntities,
+                         PrintZeroStats)
 {
 }
 
@@ -338,9 +342,11 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef Directory,
                                            SourceManager *SM,
                                            clang::SourceManager *CSM,
+                                           bool FineGrainedTimers,
                                            bool TraceEvents,
                                            bool ProfileEvents,
-                                           bool ProfileEntities)
+                                           bool ProfileEntities,
+                                           bool PrintZeroStats)
   : currentProcessExitStatusSet(false),
     currentProcessExitStatus(EXIT_FAILURE),
     StatsFilename(Directory),
@@ -354,7 +360,9 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
     SourceMgr(SM),
     ClangSourceMgr(CSM),
     RecursiveTimers(std::make_unique<RecursionSafeTimers>()),
-    IsFlushingTracesAndProfiles(false)
+    FineGrainedTimers(FineGrainedTimers),
+    IsFlushingTracesAndProfiles(false),
+    IsPrintingZeroStats(PrintZeroStats)
 {
   path::append(StatsFilename, makeStatsFileName(ProgramName, AuxName));
   path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
@@ -375,7 +383,7 @@ void UnifiedStatsReporter::recordJobMaxRSS(long rss) {
 }
 
 int64_t UnifiedStatsReporter::getChildrenMaxResidentSetSize() {
-#if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
+#if HAVE_GETRUSAGE && !defined(__HAIKU__)
   struct rusage RU;
   ::getrusage(RUSAGE_CHILDREN, &RU);
   int64_t M = static_cast<int64_t>(RU.ru_maxrss);
@@ -426,7 +434,8 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
 #define FRONTEND_STATISTIC(TY, NAME)                            \
     do {                                                        \
       static Statistic Stat = {#TY, #NAME, #NAME};              \
-      Stat = 0;                                                 \
+      if (IsPrintingZeroStats)                                  \
+        Stat = 0;                                               \
       Stat += (C).NAME;                                         \
     } while (0);
 #include "swift/Basic/Statistics.def"
@@ -437,7 +446,8 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
 #define DRIVER_STATISTIC(NAME)                                       \
     do {                                                             \
       static Statistic Stat = {"Driver", #NAME, #NAME};              \
-      Stat = 0;                                                      \
+      if (IsPrintingZeroStats)                                       \
+        Stat = 0;                                                    \
       Stat += (C).NAME;                                              \
     } while (0);
 #include "swift/Basic/Statistics.def"
@@ -452,20 +462,24 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
   const char *delim = "";
   if (FrontendCounters) {
     auto &C = getFrontendCounters();
-#define FRONTEND_STATISTIC(TY, NAME)                        \
-    do {                                                    \
-      OS << delim << "\t\"" #TY "." #NAME "\": " << C.NAME; \
-      delim = ",\n";                                        \
+#define FRONTEND_STATISTIC(TY, NAME)                          \
+    do {                                                      \
+      if (C.NAME || IsPrintingZeroStats) {                    \
+        OS << delim << "\t\"" #TY "." #NAME "\": " << C.NAME; \
+        delim = ",\n";                                        \
+      }                                                       \
     } while (0);
 #include "swift/Basic/Statistics.def"
 #undef FRONTEND_STATISTIC
   }
   if (DriverCounters) {
     auto &C = getDriverCounters();
-#define DRIVER_STATISTIC(NAME)                              \
-    do {                                                    \
-      OS << delim << "\t\"Driver." #NAME "\": " << C.NAME;  \
-      delim = ",\n";                                        \
+#define DRIVER_STATISTIC(NAME)                                \
+    do {                                                      \
+      if (C.NAME || IsPrintingZeroStats) {                    \
+        OS << delim << "\t\"Driver." #NAME "\": " << C.NAME;  \
+        delim = ",\n";                                        \
+      }                                                       \
     } while (0);
 #include "swift/Basic/Statistics.def"
 #undef DRIVER_STATISTIC

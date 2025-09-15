@@ -94,9 +94,9 @@ bb0(%0 : @unowned $SwiftGizmo):
   // Call super -dealloc.
   // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s12objc_dealloc10SwiftGizmoCMa"(i64 0)
   // CHECK-NEXT: [[T0:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-  // CHECK-NEXT: [[OBJC_SUPER_RECEIVER:%[a-zA-Z0-9]+]] = getelementptr inbounds %objc_super, ptr [[OBJC_SUPER]], i32 0, i32 0
+  // CHECK-NEXT: [[OBJC_SUPER_RECEIVER:%[a-zA-Z0-9]+]] = getelementptr inbounds{{.*}} %objc_super, ptr [[OBJC_SUPER]], i32 0, i32 0
   // CHECK-NEXT: store ptr %0, ptr [[OBJC_SUPER_RECEIVER]], align 8
-  // CHECK-NEXT: [[OBJC_SUPER_CLASS:%[a-zA-Z0-9]+]] = getelementptr inbounds %objc_super, ptr [[OBJC_SUPER]], i32 0, i32 1
+  // CHECK-NEXT: [[OBJC_SUPER_CLASS:%[a-zA-Z0-9]+]] = getelementptr inbounds{{.*}} %objc_super, ptr [[OBJC_SUPER]], i32 0, i32 1
   // CHECK-NEXT: store ptr [[T0]], ptr [[OBJC_SUPER_CLASS]], align 8
   // CHECK-NEXT: [[DEALLOC_SEL:%[a-zA-Z0-9]+]] = load ptr, ptr @"\01L_selector(dealloc)", align 8
   // CHECK-NEXT: call void @objc_msgSendSuper2(ptr [[OBJC_SUPER]], ptr [[DEALLOC_SEL]])

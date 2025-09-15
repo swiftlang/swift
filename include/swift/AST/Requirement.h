@@ -187,9 +187,13 @@ public:
   /// \param subReqs An out parameter initialized to a list of simpler
   /// requirements which the caller must check to ensure this
   /// requirement is completely satisfied.
+  /// \param isolatedConformances If non-NULL, will be provided with all of the
+  /// isolated conformances that
   CheckRequirementResult checkRequirement(
       SmallVectorImpl<Requirement> &subReqs,
-      bool allowMissing = false) const;
+      bool allowMissing = false,
+      SmallVectorImpl<ProtocolConformanceRef> *isolatedConformances = nullptr
+  ) const;
 
   /// Determines if this substituted requirement can ever be satisfied,
   /// possibly with additional substitutions.
@@ -198,6 +202,10 @@ public:
   /// 'T : C' can be satisfied; however, if 'T' already has an unrelated
   /// superclass requirement, 'T : C' cannot be satisfied.
   bool canBeSatisfied() const;
+  
+  /// True if the requirement states a conformance to an invertible protocol
+  /// that is implied by default (such as `Copyable` or `Escapable`.
+  bool isInvertibleProtocolRequirement() const;
 
   /// Linear order on requirements in a generic signature.
   int compare(const Requirement &other) const;
@@ -237,8 +245,7 @@ checkRequirementsWithoutContext(ArrayRef<Requirement> requirements);
 /// Check if each requirement is satisfied after applying the given
 /// substitutions. The substitutions must replace all type parameters that
 /// appear in the requirement with concrete types or archetypes.
-CheckRequirementsResult checkRequirements(ModuleDecl *module,
-                                          ArrayRef<Requirement> requirements,
+CheckRequirementsResult checkRequirements(ArrayRef<Requirement> requirements,
                                           TypeSubstitutionFn substitutions,
                                           SubstOptions options = std::nullopt);
 

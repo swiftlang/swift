@@ -5,3 +5,5 @@
 public func test() { }
 
 // CHECK: "SDK Version", [3 x i32] [i32 10, i32 15, i32 4]
+// CHECK: "darwin.target_variant.triple", !"{{.*}}-apple-ios13.1-macabi"
+// CHECK: "darwin.target_variant.SDK Version", [2 x i32] [i32 13, i32 4]

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -swift-version 6 -emit-sil -o /dev/null -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-version 6 -emit-sil -o /dev/null -verify %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -65,7 +65,7 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
 
   // these do need await, regardless of reference or value type
   _ = await (formance as any MainCounter).counter
-  // expected-error@-1 {{non-sendable type 'any MainCounter' passed in implicitly asynchronous call to main actor-isolated property 'counter' cannot cross actor boundary}}
+  // expected-error@-1 {{non-Sendable type 'any MainCounter' cannot be sent into main actor-isolated context in call to property 'counter'}}
   _ = await ext[1]
   _ = await formance.ticker
   _ = await ext.polygon
@@ -92,6 +92,45 @@ class MainActorIsolated {
 }
 
 nonisolated func accessAcrossActors() {
-  // expected-error@+1 {{main actor-isolated static property 'shared' can not be referenced from a non-isolated context}}
+  // expected-error@+1 {{main actor-isolated static property 'shared' can not be referenced from a nonisolated context}}
   let _ = MainActorIsolated.shared
+}
+
+struct ReferenceSelfDotMethods {
+  @MainActor
+  func mainActorAffinedFunction() {}
+
+  nonisolated
+  private func testCurry() -> (Self) -> (@MainActor () -> Void) {
+    let functionRef = Self.mainActorAffinedFunction
+    return functionRef
+  }
+
+  @MainActor
+  private func callOnMainActorOk() {
+    let mainActorAffinedClosure = testCurry()(self)
+    mainActorAffinedClosure()
+  }
+
+  nonisolated
+  private func nonisolatedCallErrors() {
+    let mainActorAffinedClosure = testCurry()(self)
+    // expected-note@-1 {{calls to let 'mainActorAffinedClosure' from outside of its actor context are implicitly asynchronous}}
+    mainActorAffinedClosure()
+    // expected-error@-1 {{call to main actor-isolated let 'mainActorAffinedClosure' in a synchronous nonisolated context}}
+  }
+}
+
+actor UserDefinedActorSelfDotMethod {
+  func actorAffinedFunc() {} // expected-note {{calls to instance method 'actorAffinedFunc()' from outside of its actor context are implicitly asynchronous}}
+
+  // Unfortunately we can't express the desired isolation of this returned closure statically to
+  // be able to call it on the desired actor. This may be possible with the acceptance of
+  // https://forums.swift.org/t/closure-isolation-control/70378 but I think we need more expressivity
+  // in the type system to express this sort of curry.
+  nonisolated
+  private func testCurry() -> (UserDefinedActorSelfDotMethod) -> (@isolated(any) () -> Void) {
+    let functionRef = Self.actorAffinedFunc // expected-error {{call to actor-isolated instance method 'actorAffinedFunc()' in a synchronous nonisolated context}}
+    return functionRef // expected-error {{cannot convert return expression of type '@Sendable (isolated Self) -> @Sendable () -> ()' to return type '(UserDefinedActorSelfDotMethod) -> @isolated(any) () -> Void'}}
+  }
 }

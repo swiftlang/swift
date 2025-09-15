@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/SyntaxModel.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -357,21 +358,6 @@ class ModelASTWalker : public ASTWalker {
   /// is considered as one, e.g. object literal expression.
   uint8_t AvoidPassingSyntaxToken = 0;
 
-  class InactiveClauseRAII {
-    const bool wasInInactiveClause;
-    bool &isInInactiveClause;
-
-  public:
-    InactiveClauseRAII(bool &isInInactiveClauseArg, bool enteringInactiveClause)
-        : wasInInactiveClause(isInInactiveClauseArg),
-          isInInactiveClause(isInInactiveClauseArg) {
-      isInInactiveClause |= enteringInactiveClause;
-    }
-    ~InactiveClauseRAII() { isInInactiveClause = wasInInactiveClause; }
-  };
-  friend class InactiveClauseRAII;
-  bool inInactiveClause = false;
-
 public:
   SyntaxModelWalker &Walker;
   ArrayRef<SyntaxNode> TokenNodes;
@@ -380,7 +366,7 @@ public:
       : AllTokensInFile(File.getAllTokens()),
         LangOpts(File.getASTContext().LangOpts),
         SM(File.getASTContext().SourceMgr),
-        BufferID(File.getBufferID().value()),
+        BufferID(File.getBufferID()),
         Ctx(File.getASTContext()),
         Walker(Walker) { }
 
@@ -415,7 +401,6 @@ public:
 private:
   static bool findUrlStartingLoc(StringRef Text, unsigned &Start,
                                  std::regex& Regex);
-  bool annotateIfConfigConditionIdentifiers(Expr *Cond);
   bool handleAttrs(const ParsedDeclAttributes &Attrs);
   bool handleAttrs(ArrayRef<TypeOrCustomAttr> Attrs);
 
@@ -888,7 +873,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
                                                    AFD->getBodySourceRange());
     SN.NameRange = charSourceRangeFromSourceRange(SM,
-                        AFD->getSignatureSourceRange());
+                        AFD->getParameterListSourceRange());
     if (FD) {
       SN.TypeRange = charSourceRangeFromSourceRange(SM,
                                     FD->getResultTypeSourceRange());
@@ -1001,24 +986,6 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
       SN.Kind = SyntaxStructureKind::GlobalVariable;
     }
     pushStructureNode(SN, VD);
-
-  } else if (auto *ConfigD = dyn_cast<IfConfigDecl>(D)) {
-    for (auto &Clause : ConfigD->getClauses()) {
-      if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
-        return Action::SkipNode();
-
-      InactiveClauseRAII inactiveClauseRAII(inInactiveClause, !Clause.isActive);
-      for (auto &Element : Clause.Elements) {
-        if (auto *E = Element.dyn_cast<Expr*>()) {
-          E->walk(*this);
-        } else if (auto *S = Element.dyn_cast<Stmt*>()) {
-          S->walk(*this);
-        } else {
-          Element.get<Decl*>()->walk(*this);
-        }
-        NodesVisitedBefore.insert(Element);
-      }
-    }
 
   } else if (auto *EnumCaseD = dyn_cast<EnumCaseDecl>(D)) {
     SyntaxStructureNode SN;
@@ -1171,17 +1138,6 @@ public:
 };
 } // end anonymous namespace
 
-bool ModelASTWalker::annotateIfConfigConditionIdentifiers(Expr *Cond) {
-  if (!Cond)
-    return true;
-  auto passNode = [&](CharSourceRange R) {
-    return passNonTokenNode({ SyntaxNodeKind::BuildConfigId, R });
-  };
-
-  IdRefWalker<decltype(passNode)> Walker(passNode);
-  return Cond->walk(Walker);
-}
-
 bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
                                                 ArrayRef<Token> Toks) {
   if (!D)
@@ -1214,8 +1170,6 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
         assert(Next.Range.getStart() == D->getRange().Start &&
                "Attribute's TokenNodes already consumed?");
       }
-    } else {
-        assert(0 && "No TokenNodes?");
     }
     if (!passTokenNodesUntil(D->getRange().End,
                              IncludeNodeAtLocation).shouldContinue)
@@ -1242,7 +1196,7 @@ bool ModelASTWalker::handleAttrs(ArrayRef<TypeOrCustomAttr> Attrs) {
     if (auto CA = Attr.dyn_cast<CustomAttr*>()) {
       DeclRanges.push_back(std::make_pair(CA, CA->getRangeWithAt()));
     } else {
-      auto TA = Attr.get<TypeAttribute*>();
+      auto TA = cast<TypeAttribute *>(Attr);
       // TODO: Use the structure in the TypeAttribute
       DeclRanges.push_back(std::make_pair(nullptr, SourceRange(TA->getStartLoc())));
     }

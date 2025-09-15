@@ -188,7 +188,7 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
       }
     }
     return bool(Error);
-  } else if (auto *IRObjectFile = llvm::dyn_cast<llvm::object::IRObjectFile>(Bin)) {
+  } else if (llvm::isa<llvm::object::IRObjectFile>(Bin)) {
     // Ignore the LLVM IR files (LTO)
     return false;
   }  else {
@@ -228,30 +228,34 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
       "-lswiftCore",
       "-lswift_Concurrency",
       "-lswift_StringProcessing",
-      "-lswift_RegexBuilder",
+      "-lswiftRegexBuilder",
       "-lswift_RegexParser",
-      "-lswift_Backtracing",
+      "-lswift_Builtin_float",
+      "-lswift_math",
+      "-lswiftRuntime",
+      "-lswiftSynchronization",
       "-lswiftGlibc",
+      "-lswiftAndroid",
       "-lBlocksRuntime",
       // Dispatch-specific Swift runtime libs
       "-ldispatch",
       "-lDispatchStubs",
       "-lswiftDispatch",
       // CoreFoundation and Foundation Swift runtime libs
+      "-l_FoundationICU",
       "-lCoreFoundation",
       "-lFoundation",
+      "-lFoundationEssentials",
+      "-lFoundationInternationalization",
       "-lFoundationNetworking",
       "-lFoundationXML",
       // Foundation support libs
       "-lcurl",
       "-lxml2",
       "-luuid",
+      "-lTesting",
       // XCTest runtime libs (must be first due to http://github.com/apple/swift-corelibs-xctest/issues/432)
       "-lXCTest",
-      // ICU Swift runtime libs
-      "-licui18nswift",
-      "-licuucswift",
-      "-licudataswift",
       // Common-use ordering-agnostic Linux system libs
       "-lm",
       "-lpthread",

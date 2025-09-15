@@ -50,18 +50,18 @@ bb0(%p : $P, %q : $P):
   // CHECK-NEXT: llvm.lifetime.start
   %y = alloc_stack $@sil_unowned P
 
-  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], ptr [[X]], i32 0, i32 1
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds{{.*}} [[UREF]], ptr [[X]], i32 0, i32 1
   // CHECK-NEXT: store ptr [[PP:%1]], ptr [[T0]], align 8
-  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], ptr [[X]], i32 0, i32 0
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds{{.*}} [[UREF]], ptr [[X]], i32 0, i32 0
   // CHECK-NEXT: call ptr @swift_unknownObjectUnownedInit(ptr returned [[T0]], ptr [[PV:%0]])
   store_unowned %p to [init] %x : $*@sil_unowned P
 
   // CHECK-NEXT: call ptr @"$s12unowned_objc1P_pXoWOc"(ptr [[X]], ptr [[Y]])
   copy_addr %x to [init] %y : $*@sil_unowned P
 
-  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], ptr [[X]], i32 0, i32 0
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds{{.*}} [[UREF]], ptr [[X]], i32 0, i32 0
   // CHECK-NEXT: [[TV:%.*]] = call ptr @swift_unknownObjectUnownedLoadStrong(ptr [[T0]])
-  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], ptr [[X]], i32 0, i32 1
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds{{.*}} [[UREF]], ptr [[X]], i32 0, i32 1
   // CHECK-NEXT: [[TP:%.*]] = load ptr, ptr [[T0]], align 8
   %t0 = load_unowned %x : $*@sil_unowned P
 
@@ -71,9 +71,9 @@ bb0(%p : $P, %q : $P):
   // CHECK-NEXT: call ptr @"$s12unowned_objc1P_pXoWOf"(ptr [[X]], ptr [[Y]])
   copy_addr %x to %y : $*@sil_unowned P
 
-  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], ptr [[Y]], i32 0, i32 1
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds{{.*}} [[UREF]], ptr [[Y]], i32 0, i32 1
   // CHECK-NEXT: store ptr [[QP:%3]], ptr [[T0]], align 8
-  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], ptr [[Y]], i32 0, i32 0
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds{{.*}} [[UREF]], ptr [[Y]], i32 0, i32 0
   // CHECK-NEXT: call ptr @swift_unknownObjectUnownedAssign(ptr returned [[T0]], ptr [[QV:%2]])
   store_unowned %q to %y : $*@sil_unowned P
 
@@ -83,15 +83,15 @@ bb0(%p : $P, %q : $P):
   // CHECK-NEXT: call ptr @"$s12unowned_objc1P_pXoWOb"(ptr [[Y]], ptr [[X]])
   copy_addr [take] %y to [init] %x : $*@sil_unowned P
 
-  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], ptr [[Y]], i32 0, i32 0
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds{{.*}} [[UREF]], ptr [[Y]], i32 0, i32 0
   // CHECK-NEXT: [[TV:%.*]] = call ptr @swift_unknownObjectUnownedTakeStrong(ptr [[T0]])
-  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], ptr [[Y]], i32 0, i32 1
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds{{.*}} [[UREF]], ptr [[Y]], i32 0, i32 1
   // CHECK-NEXT: [[TP:%.*]] = load ptr, ptr [[T0]], align 8
   %t1 = load_unowned [take] %y : $*@sil_unowned P
 
-  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], ptr [[X]], i32 0, i32 1
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds{{.*}} [[UREF]], ptr [[X]], i32 0, i32 1
   // CHECK-NEXT: store ptr [[TP]], ptr [[T0]], align 8
-  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[UREF]], ptr [[X]], i32 0, i32 0
+  // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds{{.*}} [[UREF]], ptr [[X]], i32 0, i32 0
   // CHECK-NEXT: call ptr @swift_unknownObjectUnownedInit(ptr returned [[T0]], ptr [[TV]])
   store_unowned %t1 to [init] %x : $*@sil_unowned P
 
@@ -121,8 +121,8 @@ bb0(%p : $P, %q : $P):
 
 //   initializeBufferWithCopyOfBuffer
 // CHECK:    define internal ptr @"$s12unowned_objc1AVwCP"(ptr noalias [[DESTBUF:%.*]], ptr noalias [[SRCBUF:%.*]], ptr
-// CHECK: [[T0:%.*]] = getelementptr inbounds [[A]], ptr [[DESTBUF]], i32 0, i32 0
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], ptr [[SRCBUF]], i32 0, i32 0
+// CHECK: [[T0:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[DESTBUF]], i32 0, i32 0
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[SRCBUF]], i32 0, i32 0
 // CHECK-NEXT: [[T2:%.*]] = load ptr, ptr [[T1]], align 8
 // CHECK-NEXT: call ptr @swift_unownedRetain(ptr returned [[T2]])
 // CHECK-NEXT: store ptr [[T2]], ptr [[T0]], align 8
@@ -130,15 +130,15 @@ bb0(%p : $P, %q : $P):
 
 //   destroy
 // CHECK:    define internal void @"$s12unowned_objc1AVwxx"(ptr noalias [[ARG:%.*]], ptr
-// CHECK: [[T1:%.*]] = getelementptr inbounds [[A]], ptr [[ARG]], i32 0, i32 0
+// CHECK: [[T1:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[ARG]], i32 0, i32 0
 // CHECK-NEXT: [[T2:%.*]] = load ptr, ptr [[T1]], align 8
 // CHECK-NEXT: call void @swift_unownedRelease(ptr [[T2]])
 // CHECK-NEXT: ret void
 
 //   initializeWithCopy
 // CHECK:    define internal ptr @"$s12unowned_objc1AVwcp"(ptr noalias [[DEST_OPQ:%.*]], ptr noalias [[SRC_OPQ:%.*]], ptr
-// CHECK: [[T0:%.*]] = getelementptr inbounds [[A]], ptr [[DEST_OPQ]], i32 0, i32 0
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], ptr [[SRC_OPQ]], i32 0, i32 0
+// CHECK: [[T0:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[DEST_OPQ]], i32 0, i32 0
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[SRC_OPQ]], i32 0, i32 0
 // CHECK-NEXT: [[T2:%.*]] = load ptr, ptr [[T1]], align 8
 // CHECK-NEXT: call ptr @swift_unownedRetain(ptr returned [[T2]])
 // CHECK-NEXT: store ptr [[T2]], ptr [[T0]], align 8
@@ -146,8 +146,8 @@ bb0(%p : $P, %q : $P):
 
 //   assignWithCopy
 // CHECK:    define internal ptr @"$s12unowned_objc1AVwca"(ptr [[DEST_OPQ:%.*]], ptr [[SRC_OPQ:%.*]], ptr
-// CHECK: [[DEST_X:%.*]] = getelementptr inbounds [[A]], ptr [[DEST_OPQ]], i32 0, i32 0
-// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds [[A]], ptr [[SRC_OPQ]], i32 0, i32 0
+// CHECK: [[DEST_X:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[DEST_OPQ]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[SRC_OPQ]], i32 0, i32 0
 // CHECK-NEXT: [[NEW:%.*]] = load ptr, ptr [[SRC_X]], align 8
 // CHECK-NEXT: call ptr @swift_unownedRetain(ptr returned [[NEW]])
 // CHECK-NEXT: [[OLD:%.*]] = load ptr, ptr [[DEST_X]], align 8
@@ -157,8 +157,8 @@ bb0(%p : $P, %q : $P):
 
 //   assignWithTake
 // CHECK:    define internal ptr @"$s12unowned_objc1AVwta"(ptr noalias [[DEST_OPQ:%.*]], ptr noalias [[SRC_OPQ:%.*]], ptr
-// CHECK: [[DEST_X:%.*]] = getelementptr inbounds [[A]], ptr [[DEST_OPQ]], i32 0, i32 0
-// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds [[A]], ptr [[SRC_OPQ]], i32 0, i32 0
+// CHECK: [[DEST_X:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[DEST_OPQ]], i32 0, i32 0
+// CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds{{.*}} [[A]], ptr [[SRC_OPQ]], i32 0, i32 0
 // CHECK-NEXT: [[NEW:%.*]] = load ptr, ptr [[SRC_X]], align 8
 // CHECK-NEXT: [[OLD:%.*]] = load ptr, ptr [[DEST_X]], align 8
 // CHECK-NEXT: store ptr [[NEW]], ptr [[DEST_X]], align 8

@@ -29,9 +29,11 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
@@ -659,9 +661,11 @@ namespace {
       case SILDeclRef::Kind::EnumElement:
       case SILDeclRef::Kind::GlobalAccessor:
       case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+      case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
       case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
       case SILDeclRef::Kind::EntryPoint:
       case SILDeclRef::Kind::AsyncEntryPoint:
+      case SILDeclRef::Kind::IsolatedDeallocator:
         llvm_unreachable("Method does not have a selector");
 
       case SILDeclRef::Kind::Destroyer:
@@ -777,6 +781,10 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
                                   llvm::Value *selfValue,
                                   CalleeInfo &&info) {
   SILDeclRef method = methodInfo.getMethod();
+  PrettyStackTraceSILDeclRef entry("lowering reference to ObjC method", method);
+
+  // Note that isolated deallocator is never called directly, only from regular
+  // deallocator
   assert((method.kind == SILDeclRef::Kind::Initializer
           || method.kind == SILDeclRef::Kind::Allocator
           || method.kind == SILDeclRef::Kind::Func
@@ -823,8 +831,7 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
     }
   }();
 
-  messenger = llvm::ConstantExpr::getBitCast(messenger,
-                                             sig.getType()->getPointerTo());
+  messenger = llvm::ConstantExpr::getBitCast(messenger, IGF.IGM.PtrTy);
 
   // super.constructor references an instance method (even though the
   // decl is really a 'static' member). Similarly, destructors refer
@@ -870,7 +877,7 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
 
   if (self->getType() != IGF.IGM.ObjCClassPtrTy) {
     fnType = llvm::FunctionType::get(self->getType(), self->getType(), false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+    fn = llvm::ConstantExpr::getBitCast(fn, IGF.IGM.PtrTy);
   }
 
   auto call = IGF.Builder.CreateCall(fnType, fn, self);
@@ -901,7 +908,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
                            MANGLE_AS_STRING(OBJC_PARTIAL_APPLY_THUNK_SYM),
                            &IGM.Module);
   fwd->setCallingConv(expandCallingConv(
-      IGM, SILFunctionTypeRepresentation::Thick, false/*isAsync*/));
+      IGM, SILFunctionTypeRepresentation::Thick, false /*isAsync*/,
+      false /*isCalleeAllocatedCoroutine*/));
 
   fwd->setAttributes(attrs);
   // Merge initial attributes with attrs.
@@ -927,6 +935,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
     case ResultConvention::Pack:
+    case ResultConvention::GuaranteedAddress:
+    case ResultConvention::Guaranteed:
       lifetimeExtendsSelf = false;
       break;
     }
@@ -948,6 +958,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Pack_Guaranteed:
   case ParameterConvention::Pack_Owned:
   case ParameterConvention::Pack_Inout:
@@ -1692,7 +1703,7 @@ llvm::Value *IRGenFunction::emitBlockCopyCall(llvm::Value *value) {
 
   if (value->getType() != IGM.ObjCBlockPtrTy) {
     fnType = llvm::FunctionType::get(value->getType(), value->getType(), false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+    fn = llvm::ConstantExpr::getBitCast(fn, IGM.PtrTy);
   }
 
   auto call = Builder.CreateCall(fnType, fn, value);
@@ -1705,7 +1716,7 @@ void IRGenFunction::emitBlockRelease(llvm::Value *value) {
   auto fnType = IGM.getBlockReleaseFnType();
   if (value->getType() != IGM.ObjCBlockPtrTy) {
     fnType = llvm::FunctionType::get(IGM.VoidTy, value->getType(), false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+    fn = llvm::ConstantExpr::getBitCast(fn, IGM.PtrTy);
   }
   auto call = Builder.CreateCall(fnType, fn, value);
   call->setDoesNotThrow();

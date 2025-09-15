@@ -13,6 +13,8 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -I %S/Inputs/imports-clang-modules/ -I %t
 // RUN: %FileCheck -implicit-check-not BAD -check-prefix CHECK-7 %s < %t.swiftinterface
 
+// REQUIRES: swift_feature_InternalImportsByDefault
+
 //--- empty.swift
 
 //--- main.swift

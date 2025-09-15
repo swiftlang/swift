@@ -1,6 +1,6 @@
 // RUN: %sourcekitd-test -req=expand-placeholder %s | %FileCheck %s
 
-// FIXME: Make it acccept '-debug-forbid-typecheck-prefix' and ensure no typecheck happens.'
+// FIXME: Make it accept '-debug-forbid-typecheck-prefix' and ensure no typecheck happens.'
 
 protocol MyProto {}
 

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -swift-version 4 -O -Xllvm -sil-disable-pass=compute-side-effects -Xllvm -sil-disable-pass=cmo -whole-module-optimization -emit-module-path %t/LibCore.swiftmodule %S/Inputs/xref-private-type/LibCore.swift
 // RUN: %target-build-swift -swift-version 4 -O -Xllvm -sil-disable-pass=compute-side-effects -Xllvm -sil-disable-pass=cmo -I %t  -whole-module-optimization -emit-module-path %t/Lib.swiftmodule %S/Inputs/xref-private-type/Lib.swift 
-// RUN: %target-build-swift -swift-version 4 -O -I %t -emit-sil %s | %FileCheck %s
+// RUN: %target-build-swift -swift-version 4 -O -Xllvm -sil-disable-pass=copy-to-borrow-optimization -I %t -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
 import Lib
 

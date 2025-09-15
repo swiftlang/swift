@@ -56,6 +56,8 @@ public:
     const Decl *Dcl = nullptr;
     /// The range in the interface source.
     TextRange Range;
+    /// The USR, if the declaration has one
+    StringRef USR;
 
     TextDecl(const Decl *D, TextRange Range)
       : Dcl(D), Range(Range) {}
@@ -66,6 +68,8 @@ public:
     std::string Text;
     std::vector<TextReference> References;
     std::vector<TextDecl> Decls;
+    /// Do not clear the map or erase elements,
+    /// without keeping the Decls vector in sync
     llvm::StringMap<TextDecl> USRMap;
   };
 
@@ -155,8 +159,17 @@ public:
           OS << TargetUSR;
         }
         StringRef USR = OS.str();
-        Info.USRMap[USR] = Entry;
         DeclUSRs.emplace_back(VD, USR);
+        auto iterator = Info.USRMap.insert_or_assign(USR, Entry).first;
+        // Set the USR in the declarations to the key in the USRMap, because the
+        // lifetime of that matches/exceeds the lifetime of Decls. String keys
+        // in the StringMap are heap allocated and only get destroyed on
+        // explicit erase() or clear() calls, or on destructor calls (the
+        // Programmer's Manual description itself also states that StringMap
+        // "only ever copies a string if a value is inserted").
+        // Thus this never results in a dangling reference, as the USRMap is
+        // never cleared and no elements are erased in its lifetime.
+        Info.Decls.back().USR = iterator->getKey();
       }
     }
   }
@@ -234,7 +247,7 @@ static void reportSyntacticAnnotations(CompilerInstance &CI,
                                        EditorConsumer &Consumer) {
   auto SF = dyn_cast<SourceFile>(CI.getMainModule()->getFiles()[0]);
   SyntaxModelContext SyntaxContext(*SF);
-  DocSyntaxWalker SyntaxWalker(CI.getSourceMgr(), *SF->getBufferID(),
+  DocSyntaxWalker SyntaxWalker(CI.getSourceMgr(), SF->getBufferID(),
                                Consumer);
   SyntaxContext.walk(SyntaxWalker);
 }
@@ -262,6 +275,21 @@ static void reportSemanticAnnotations(const SourceTextInfo &IFaceInfo,
     unsigned Offset = Ref.Range.Offset;
     unsigned Length = Ref.Range.Length;
     Consumer.handleSemanticAnnotation(Offset, Length, Kind, IsSystem);
+  }
+}
+
+/// Create the declarations array (sourcekitd::DeclarationsArrayBuilder) from
+/// the SourceTextInfo about declarations
+static void reportDeclarations(const SourceTextInfo &IFaceInfo,
+                               EditorConsumer &Consumer) {
+  for (auto &Dcl : IFaceInfo.Decls) {
+    if (!Dcl.Dcl)
+      continue;
+    UIdent Kind = SwiftLangSupport::getUIDForDecl(Dcl.Dcl);
+    if (Kind.isInvalid())
+      continue;
+    Consumer.handleDeclaration(Dcl.Range.Offset, Dcl.Range.Length, Kind,
+                               Dcl.USR);
   }
 }
 
@@ -359,8 +387,11 @@ static bool getModuleInterfaceInfo(
       Options.SkipInlineCXXNamespace = true;
     }
   }
+  // Skip submodules but include any exported modules that have the same public
+  // module name as this module.
   ModuleTraversalOptions TraversalOptions =
-      std::nullopt; // Don't print submodules.
+      ModuleTraversal::VisitMatchingExported;
+
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(Info, OS);
@@ -593,6 +624,8 @@ void SwiftInterfaceGenContext::reportEditorInfo(EditorConsumer &Consumer) const 
   reportSyntacticAnnotations(Impl.TextCI, Consumer);
   reportDocumentStructure(Impl.TextCI, Consumer);
   reportSemanticAnnotations(Impl.Info, Consumer);
+
+  reportDeclarations(Impl.Info, Consumer);
   Consumer.finished();
 }
 
@@ -624,7 +657,7 @@ SwiftInterfaceGenContext::resolveEntityForOffset(unsigned Offset) const {
 
   SourceManager &SM = Impl.TextCI.getSourceMgr();
   auto SF = dyn_cast<SourceFile>(Impl.TextCI.getMainModule()->getFiles()[0]);
-  unsigned BufferID = *SF->getBufferID();
+  unsigned BufferID = SF->getBufferID();
   SourceLoc Loc = Lexer::getLocForStartOfToken(SM, BufferID, Offset);
   Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
 
@@ -820,6 +853,7 @@ public:
 
 void SwiftLangSupport::editorOpenSwiftSourceInterface(
     StringRef Name, StringRef SourceName, ArrayRef<const char *> Args,
+    bool CancelOnSubsequentRequest,
     SourceKitCancellationToken CancellationToken,
     std::shared_ptr<EditorConsumer> Consumer) {
   std::string Error;
@@ -831,7 +865,8 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(
   auto AstConsumer = std::make_shared<PrimaryFileInterfaceConsumer>(Name,
     SourceName, IFaceGenContexts, Consumer, Invocation);
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invocation, AstConsumer, &OncePerASTToken,
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  getASTManager()->processASTAsync(Invocation, AstConsumer, Once,
                                    CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }
@@ -851,7 +886,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   CompilerInvocation Invocation;
   std::string Error;
 
-  ArrayRef<const char *> SwiftArgs = UsingSwiftArgs ? Args : std::nullopt;
+  auto SwiftArgs = UsingSwiftArgs ? Args : ArrayRef<const char *>();
   if (getASTManager()->initCompilerInvocationNoInputs(
           Invocation, SwiftArgs, FrontendOptions::ActionType::Typecheck,
           CI.getDiags(), Error)) {
@@ -941,8 +976,12 @@ void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
     else
       addArgPair("-F", FramePath.Path);
   }
-  for (const auto &Path : SPOpts.getImportSearchPaths())
-    addArgPair("-I", Path);
+  for (const auto &Path : SPOpts.getImportSearchPaths()) {
+    if (Path.IsSystem)
+      addArgPair("-Isystem", Path.Path);
+    else
+      addArgPair("-I", Path.Path);
+  }
 
   const auto &ClangOpts = Invocation.getClangImporterOptions();
   addArgPair("-module-cache-path", ClangOpts.ModuleCachePath);

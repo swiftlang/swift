@@ -15,7 +15,7 @@
 
 #include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/RuntimeEffect.h"
-#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
 
 namespace swift {
 
@@ -68,6 +68,9 @@ SILValue stripAddressProjections(SILValue V);
 
 /// Look through any projections that transform an address -> an address.
 SILValue lookThroughAddressToAddressProjections(SILValue v);
+
+/// Look through address and value projections
+SILValue lookThroughAddressAndValueProjections(SILValue V);
 
 /// Return the underlying SILValue after stripping off all aggregate projection
 /// instructions.
@@ -126,6 +129,11 @@ bool isEndOfScopeMarker(SILInstruction *user);
 /// only used in recognizable patterns without otherwise "escaping".
 bool isIncidentalUse(SILInstruction *user);
 
+/// Returns true if this is a move only wrapper use.
+///
+/// E.x.: moveonlywrapper_to_copyable_addr, copyable_to_moveonlywrapper_value
+bool isMoveOnlyWrapperUse(SILInstruction *user);
+
 /// Return true if the given `user` instruction modifies the value's refcount
 /// without propagating the value or having any other effect aside from
 /// potentially destroying the value itself (and executing associated cleanups).
@@ -149,10 +157,6 @@ bool isInstrumentation(SILInstruction *Instruction);
 /// Check that this is a partial apply of a reabstraction thunk and return the
 /// argument of the partial apply if it is.
 SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
-
-/// Returns true if \p PAI is only used by an assign_by_wrapper instruction as
-/// init or set function.
-bool onlyUsedByAssignByWrapper(PartialApplyInst *PAI);
 
 /// Returns true if \p PAI is only used by an \c assign_or_init
 /// instruction as init or set function.
@@ -229,6 +233,22 @@ bool visitExplodedTupleType(SILType type,
 /// visited all of the tuple elements without the visitor returing false.
 bool visitExplodedTupleValue(SILValue value,
                              llvm::function_ref<SILValue(SILValue, std::optional<unsigned>)> callback);
+
+std::pair<SILFunction *, SILWitnessTable *>
+lookUpFunctionInWitnessTable(WitnessMethodInst *wmi, SILModule::LinkingMode linkingMode);
+
+/// True if a type can be expanded without a significant increase to code size.
+///
+/// False if expanding a type is invalid. For example, expanding a
+/// struct-with-deinit drops the deinit.
+bool shouldExpand(SILModule &module, SILType ty);
+
+/// Returns true if `arg` is mutated.
+/// if `ignoreDestroys` is true, `destroy_addr` instructions are ignored.
+/// `defaultIsMutating` specifies the state of instructions which are not explicitly handled.
+/// For historical reasons this utility is implemented in SILVerifier.cpp.
+bool isIndirectArgumentMutated(SILFunctionArgument *arg, bool ignoreDestroys = false,
+                               bool defaultIsMutating = false);
 
 } // end namespace swift
 

@@ -12,27 +12,17 @@ import SubE
 
 // CHECK: "mainModuleName": "deps"
 
-// CHECK:       "linkLibraries": [
-// CHECK-DAG:           "linkName": "objc",
+// CHECK:           "linkName": "objc",
+// CHECK-NEXT:          "isStatic": false,
 // CHECK-NEXT:          "isFramework": false,
 // CHECK-NEXT:          "shouldForceLoad": false
 
-// CHECK-DAG:           "linkName": "swiftCompatibilityConcurrency",
-// CHECK-NEXT:          "isFramework": false,
-// CHECK-NEXT:          "shouldForceLoad": true
-
-// CHECK-DAG:           "linkName": "swiftCompatibility56",
-// CHECK-NEXT:          "isFramework": false,
-// CHECK-NEXT:          "shouldForceLoad": true
-
-// CHECK-DAG:           "linkName": "swiftCompatibilityPacks",
-// CHECK-NEXT:          "isFramework": false,
-// CHECK-NEXT:          "shouldForceLoad": false
-
-// CHECK-DAG:           "linkName": "swiftyLibE",
-// CHECK-NEXT:          "isFramework": false,
-// CHECK-NEXT:          "shouldForceLoad": true
-
-// CHECK-DAG:           "linkName": "nonSwiftyLibC",
+// CHECK:           "linkName": "nonSwiftyLibC",
+// CHECK-NEXT:          "isStatic": false,
 // CHECK-NEXT:          "isFramework": true,
 // CHECK-NEXT:          "shouldForceLoad": false
+
+// CHECK:           "linkName": "swiftyLibE",
+// CHECK-NEXT:          "isStatic": false,
+// CHECK-NEXT:          "isFramework": false,
+// CHECK-NEXT:          "shouldForceLoad": true

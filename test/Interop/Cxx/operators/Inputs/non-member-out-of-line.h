@@ -7,4 +7,12 @@ struct LoadableIntWrapper {
 
 LoadableIntWrapper operator+(LoadableIntWrapper lhs, LoadableIntWrapper rhs);
 
+struct ClassWithOperatorEqualsParamUnnamed {};
+
+bool operator==(const ClassWithOperatorEqualsParamUnnamed &,
+                const ClassWithOperatorEqualsParamUnnamed &);
+
+bool operator!=(const ClassWithOperatorEqualsParamUnnamed &,
+                const ClassWithOperatorEqualsParamUnnamed &);
+
 #endif

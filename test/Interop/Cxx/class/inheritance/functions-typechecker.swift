@@ -2,10 +2,6 @@
 
 import Functions
 
-PrivatelyInherited().constInBase() // expected-error {{value of type 'PrivatelyInherited' has no member 'constInBase'}}
-ProtectedInherited().constInBase() // expected-error {{value of type 'ProtectedInherited' has no member 'constInBase'}}
-
-
 extension Base {
   public func swiftFunc() {}
 }

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -access-enforcement-dom %s -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -access-enforcement-dom %s -enable-sil-verify-all | %FileCheck %s
 //
 // Test AccessEnforcementDom in the presence of loops.
 // For loops with accessors, see also access_dom_call.sil.

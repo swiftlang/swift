@@ -30,6 +30,7 @@
 #include "MoveOnlyObjectCheckerUtils.h"
 #include "MoveOnlyTypeUtils.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -295,6 +296,7 @@ bool Implementation::gatherUses(SILValue value) {
     case OperandOwnership::InstantaneousUse:
     case OperandOwnership::UnownedInstantaneousUse:
     case OperandOwnership::InteriorPointer:
+    case OperandOwnership::AnyInteriorPointer:
     case OperandOwnership::BitwiseEscape: {
       // Look through copy_value of a move only value. We treat copy_value of
       // copyable values as normal uses.
@@ -475,6 +477,9 @@ bool Implementation::gatherUses(SILValue value) {
                               false /*is lifetime ending*/);
       }
       // The liveness extends to the scope-ending uses of the borrow.
+      //
+      // FIXME: this ignores visitScopeEndingUses failure, which may result from
+      // unknown uses or dead borrows.
       BorrowingOperand(nextUse).visitScopeEndingUses([&](Operand *end) -> bool {
         if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
           return false;
@@ -872,7 +877,6 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
       llvm::dbgs()
       << "    Destructuring available values in preds to smallest size for bb"
       << block->getDebugID() << '\n');
-  auto *fn = block->getFunction();
   IntervalMapAllocator::Map typeSpanToValue(getAllocator());
   for (auto *predBlock : predsSkippingBackEdges) {
     SWIFT_DEFER { typeSpanToValue.clear(); };
@@ -925,20 +929,10 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
       // smallest offset size could result in further destructuring that an
       // earlier value required. Instead, we do a final loop afterwards using
       // the interval map to update each available value.
-      auto iterType = iterValue->getType();
       auto loc = getSafeLoc(predBlock->getTerminator());
       SILBuilderWithScope builder(predBlock->getTerminator());
 
       while (smallestOffsetSize->first.size < iterOffsetSize.size) {
-        TypeOffsetSizePair childOffsetSize;
-        SILType childType;
-
-        // We are returned an optional here and should never fail... so use a
-        // force unwrap.
-        std::tie(childOffsetSize, childType) =
-            *iterOffsetSize.walkOneLevelTowardsChild(iterOffsetSize, iterType,
-                                                     fn);
-
         // Before we destructure ourselves, erase our entire value from the
         // map. We do not need to consider the possibility of there being holes
         // in our range since we always store values whole to their entire
@@ -1088,6 +1082,7 @@ static void insertEndBorrowsForNonConsumingUse(Operand *op,
     LLVM_DEBUG(llvm::dbgs() << "    -- Ending borrow after borrow scope:\n"
                                "    ";
                op->getUser()->print(llvm::dbgs()));
+    // FIXME: ignoring the visitScopeEndingUses result ignores unknown uses.
     bOp.visitScopeEndingUses([&](Operand *endScope) -> bool {
       auto *endScopeInst = endScope->getUser();
       LLVM_DEBUG(llvm::dbgs() << "       ";
@@ -1105,6 +1100,7 @@ static void insertEndBorrowsForNonConsumingUse(Operand *op,
     // End the borrow where the original borrow of the subject was ended.
     // TODO: handle if the switch isn't directly on a borrow?
     auto beginBorrow = cast<BeginBorrowInst>(swi->getOperand());
+    // FIXME: ignoring the visitScopeEndingUses result ignores unknown uses.
     BorrowingOperand(&beginBorrow->getOperandRef())
       .visitScopeEndingUses([&](Operand *endScope) -> bool {
         auto *endScopeInst = endScope->getUser();
@@ -1189,7 +1185,7 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
     LLVM_DEBUG(llvm::dbgs() << "    Computed available values for block bb"
                             << block->getDebugID() << '\n';
                availableValues.print(llvm::dbgs(), "        "));
-    // Then walk from the top to the bottom of the block rewriting as we go.
+    // Then walk from the beginning to the end of the block, rewriting as we go.
     for (auto ii = block->begin(), ie = block->end(); ii != ie;) {
       auto *inst = &*ii;
       ++ii;
@@ -1335,13 +1331,6 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 borrowBuilder.createGuaranteedMoveOnlyWrapperToCopyableValue(
                     loc, value);
           }
-          // NOTE: oldInst may be nullptr if our operand is a SILArgument
-          // which can happen with switch_enum.
-          auto *oldInst = operand.get()->getDefiningInstruction();
-          operand.set(value);
-          if (oldInst && deleter)
-            deleter->forceTrackAsDead(oldInst);
-
           // If we have a terminator that is a trivial use (e.x.: we
           // struct_extract a trivial value). Just put the end_borrow before the
           // terminator.
@@ -1350,7 +1339,7 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 operand.getOperandOwnership() == OperandOwnership::TrivialUse) {
               SILBuilderWithScope endBuilder(inst);
               endBuilder.createEndBorrow(getSafeLoc(inst), borrow);
-              continue;
+              goto update_operand;
             } else {
               // Otherwise, put the end_borrow.
               for (auto *succBlock : ti->getSuccessorBlocks()) {
@@ -1358,11 +1347,23 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 SILBuilderWithScope endBuilder(nextInst);
                 endBuilder.createEndBorrow(getSafeLoc(nextInst), borrow);
               }
-              continue;
+              goto update_operand;
             }
           }
 
           insertEndBorrowsForNonConsumingUse(&operand, borrow);
+update_operand:
+          // We update the operand after placing end_borrows, since we might
+          // need the original operand's lifetime to correctly delineate the
+          // new lifetime, such as if there is an InteriorPointerOperand.
+          
+          // NOTE: oldInst may be nullptr if our operand is a SILArgument
+          // which can happen with switch_enum.
+          auto *oldInst = operand.get()->getDefiningInstruction();
+          operand.set(value);
+          if (oldInst && deleter)
+            deleter->forceTrackAsDead(oldInst);
+
           continue;
         }
 
@@ -1389,8 +1390,8 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
 
           // Then walk one level towards our target type.
           std::tie(iterOffsetSize, iterType) =
-              *useOffsetSize.walkOneLevelTowardsChild(parentOffsetSize,
-                                                      iterType, fn);
+              *useOffsetSize.walkOneLevelTowardsChild(
+                  parentOffsetSize, iterType, unwrappedOperandType, fn);
 
           unsigned start = parentOffsetSize.startOffset;
           consumeBuilder.emitDestructureValueOperation(
@@ -1539,6 +1540,12 @@ static bool gatherBorrows(SILValue rootValue,
     // escape. Is it legal to canonicalize ForwardingUnowned?
     case OperandOwnership::ForwardingUnowned:
     case OperandOwnership::PointerEscape:
+      if (auto mdi = MarkDependenceInstruction(use->getUser())) {
+        // mark_depenence uses only keep its base value alive; they do not use
+        // the base value itself and are irrelevant for destructuring.
+        if (use->get() == mdi.getBase())
+          continue;
+      }
       return false;
 
     case OperandOwnership::InstantaneousUse:
@@ -1575,6 +1582,7 @@ static bool gatherBorrows(SILValue rootValue,
       }
       continue;
     case OperandOwnership::InteriorPointer:
+    case OperandOwnership::AnyInteriorPointer:
       // We don't care about these.
       continue;
     case OperandOwnership::GuaranteedForwarding:

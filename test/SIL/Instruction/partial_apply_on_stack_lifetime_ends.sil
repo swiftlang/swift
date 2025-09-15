@@ -1,0 +1,40 @@
+// RUN: %target-sil-opt \
+// RUN:     -test-runner \
+// RUN:     %s \
+// RUN:     -o /dev/null \
+// RUN: 2>&1 | %FileCheck %s
+
+sil_stage canonical
+
+class C {}
+
+sil @borrowC : $@convention(thin) (@guaranteed C) -> ()
+
+// CHECK-LABEL: begin running test {{.*}} on copied_partial_apply
+// CHECK-LABEL: sil [ossa] @copied_partial_apply : {{.*}} {
+// CHECK:       bb0([[C:%[^,]+]] :
+// CHECK:         [[BORROW_C:%[^,]+]] = function_ref @borrowC
+// CHECK:         [[PA:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[BORROW_C]]([[C]])
+// CHECK:         [[PA2:%[^,]+]] = copy_value [[PA]]
+// CHECK:         destroy_value [[PA]]
+// CHECK:         destroy_value [[PA2]]
+// CHECK:         destroy_value [[C]]
+// CHECK-LABEL: } // end sil function 'copied_partial_apply'
+// CHECK:       Operand.
+// CHECK:       Owner:   destroy_value [[PA2]]
+// CHECK:       returned: true
+// CHECK-LABEL: end running test {{.*}} on copied_partial_apply
+sil [ossa] @copied_partial_apply : $@convention(thin) (@owned C) -> () {
+entry(%c: @owned $C):
+  specify_test "partial_apply_print_on_stack_lifetime_ends %pa"
+
+  %callee = function_ref @borrowC : $@convention(thin) (@guaranteed C) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %callee(%c) : $@convention(thin) (@guaranteed C) -> ()
+  %pa2 = copy_value %pa
+  destroy_value %pa
+
+  destroy_value %pa2
+  destroy_value %c
+  %retval = tuple ()
+  return %retval
+}

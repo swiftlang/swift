@@ -93,13 +93,13 @@ public:
                                   ArrayRef<ManagedValue> args,
                                   ParameterConvention calleeConvention,
                                   SILFunctionTypeIsolation resultIsolation =
-                                    SILFunctionTypeIsolation::Unknown);
+                                      SILFunctionTypeIsolation::forUnknown());
   ManagedValue createPartialApply(SILLocation loc, ManagedValue fn,
                                   SubstitutionMap subs,
                                   ArrayRef<ManagedValue> args,
                                   ParameterConvention calleeConvention,
                                   SILFunctionTypeIsolation resultIsolation =
-                                    SILFunctionTypeIsolation::Unknown) {
+                                      SILFunctionTypeIsolation::forUnknown()) {
     return createPartialApply(loc, fn.getValue(), subs, args,
                               calleeConvention, resultIsolation);
   }
@@ -275,10 +275,14 @@ public:
 
   /// Create a SILArgument for an input parameter. Asserts if used to create a
   /// function argument for an out parameter.
+  ///
+  /// \arg isImplicitParameter set to true if this is an implicit parameter that
+  /// is inserted by SILGen and does not show up at the AST level.
   ManagedValue createInputFunctionArgument(
       SILType type, ValueDecl *decl, bool isNoImplicitCopy = false,
       LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None,
-      bool isClosureCapture = false, bool isFormalParameterPack = false);
+      bool isClosureCapture = false, bool isFormalParameterPack = false,
+      bool isImplicitParameter = false);
 
   /// Create a SILArgument for an input parameter. Uses \p loc to create any
   /// copies necessary. Asserts if used to create a function argument for an out
@@ -303,13 +307,16 @@ public:
                             llvm::function_ref<void(SILValue)> rvalueEmitter);
 
   using SILBuilder::createUnconditionalCheckedCast;
-  ManagedValue createUnconditionalCheckedCast(SILLocation loc,
-                                              ManagedValue op,
-                                              SILType destLoweredTy,
-                                              CanType destFormalTy);
+  ManagedValue createUnconditionalCheckedCast(
+      SILLocation loc,
+      CheckedCastInstOptions options,
+      ManagedValue op,
+      SILType destLoweredTy,
+      CanType destFormalTy);
 
   using SILBuilder::createCheckedCastBranch;
   void createCheckedCastBranch(SILLocation loc, bool isExact,
+                               CheckedCastInstOptions options,
                                ManagedValue op,
                                CanType sourceFormalTy,
                                SILType destLoweredTy,
@@ -339,6 +346,11 @@ public:
   using SILBuilder::createUncheckedReinterpretCast;
   ManagedValue createUncheckedBitCast(SILLocation loc, ManagedValue original,
                                       SILType type);
+
+  using SILBuilder::createUncheckedForwardingCast;
+  ManagedValue createUncheckedForwardingCast(SILLocation loc,
+                                             ManagedValue original,
+                                             SILType type);
 
   using SILBuilder::createOpenExistentialRef;
   ManagedValue createOpenExistentialRef(SILLocation loc, ManagedValue arg,
@@ -467,6 +479,10 @@ public:
   ManagedValue createMarkDependence(SILLocation loc, ManagedValue value,
                                     ManagedValue base,
                                     MarkDependenceKind dependencekind);
+
+  SILValue emitBeginAccess(SILLocation loc, SILValue address,
+                           SILAccessKind kind,
+                           SILAccessEnforcement enforcement);
 
   ManagedValue createOpaqueBorrowBeginAccess(SILLocation loc,
                                              ManagedValue address);

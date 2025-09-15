@@ -22,6 +22,7 @@ echo set SKIP_TESTS=%SKIP_TESTS%>> %TEMP%\call-build.cmd
 echo set SKIP_PACKAGING=%SKIP_PACKAGING%>> %TEMP%\call-build.cmd
 echo set SKIP_UPDATE_CHECKOUT=%SKIP_UPDATE_CHECKOUT%>> %TEMP%\call-build.cmd
 echo set REPO_SCHEME=%REPO_SCHEME%>> %TEMP%\call-build.cmd
+echo set WINDOWS_SDKS=%WINDOWS_SDKS%>> %TEMP%\call-build.cmd
 echo "%~f0">> %TEMP%\call-build.cmd
 start /i /b /wait cmd.exe /env=default /c "%TEMP%\call-build.cmd"
 set ec=%errorlevel%
@@ -60,13 +61,17 @@ set TMPDIR=%BuildRoot%\tmp
 set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
 
 :: Build the -Test argument, if any, by subtracting skipped tests
-set TestArg=-Test swift,dispatch,foundation,xctest,
+set TestArg=-Test lld,lldb,swift,dispatch,foundation,xctest,swift-format,sourcekit-lsp,
 for %%I in (%SKIP_TESTS%) do (call set TestArg=%%TestArg:%%I,=%%)
 if "%TestArg:~-1%"=="," (set TestArg=%TestArg:~0,-1%) else (set TestArg= )
 
 :: Build the -SkipPackaging argument, if any
 set SkipPackagingArg=-SkipPackaging
 if not "%SKIP_PACKAGING%"=="1" set "SkipPackagingArg= "
+
+:: Build the -WindowsSDKArchitectures argument, if any, otherwise build all the SDKs.
+set "WindowsSDKArchitecturesArg= "
+if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArchitecturesArg=-WindowsSDKArchitectures %WINDOWS_SDKS%"
 
 call :CloneRepositories || (exit /b 1)
 
@@ -76,8 +81,10 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -BinaryCache %BuildRoot% ^
   -ImageRoot %BuildRoot% ^
   %SkipPackagingArg% ^
+  %WindowsSDKArchitecturesArg% ^
   %TestArg% ^
-  -Stage %PackageRoot% ^
+  -SkipPackaging ^
+  -IncludeSBoM ^
   -Summary || (exit /b 1)
 
 :: Clean up the module cache
@@ -105,7 +112,6 @@ set "args=%args% --skip-repository swift"
 set "args=%args% --skip-repository ninja"
 set "args=%args% --skip-repository swift-integration-tests"
 set "args=%args% --skip-repository swift-stress-tester"
-set "args=%args% --skip-repository swift-xcode-playground-support"
 
 call "%SourceRoot%\swift\utils\update-checkout.cmd" %args% --clone --skip-history --reset-to-remote --github-comment "%ghprbCommentBody%"
 

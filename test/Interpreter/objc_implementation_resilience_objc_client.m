@@ -27,3 +27,5 @@
 // FIXME: This test fails in Swift CI simulators, but I have not been able to
 //        reproduce this locally.
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_CImplementation
+// REQUIRES: swift_feature_ObjCImplementationWithResilientStorage

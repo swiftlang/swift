@@ -153,7 +153,6 @@ llvm::Value *emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
                                          llvm::Value *object,
                                          MetatypeRepresentation rep,
                                          SILType objectType,
-                                         GenericSignature sig,
                                          bool allowArtificialSubclasses = false);
 
 /// Given a non-tagged object pointer, load a pointer to its class object.
@@ -170,7 +169,6 @@ llvm::Value *emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
 llvm::Value *emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                               llvm::Value *object,
                                               CanType objectType,
-                                              GenericSignature sig,
                                               bool suppressCast = false);
 
 /// Given a heap-object instance, with some heap-object type,
@@ -178,12 +176,10 @@ llvm::Value *emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
 llvm::Value *emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                               llvm::Value *object,
                                               SILType objectType,
-                                              GenericSignature sig,
                                               bool suppressCast = false);
 
 /// What isa-encoding mechanism does a type use?
-IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type,
-                                  GenericSignature sig);
+IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
 
 } // end namespace irgen
 } // end namespace swift

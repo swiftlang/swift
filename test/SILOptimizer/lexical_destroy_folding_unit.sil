@@ -24,7 +24,7 @@ sil [ossa] @callee_owned : $@convention(thin) (@owned C) -> ()
 // CHECK-LABEL: } // end sil function 'nofold_two_parallel_owned_uses_one_lexical___scope_ends_before_use'
 sil [ossa] @nofold_two_parallel_owned_uses_one_lexical___scope_ends_before_use : $@convention(thin) (@owned C) -> () {
 entry(%instance : @owned $C):
-  specify_test "lexical-destroy-folding @trace[0]"
+  specify_test "lexical_destroy_folding @trace[0]"
   %copy_2 = copy_value %instance : $C
   %lifetime = begin_borrow [lexical] %instance : $C
   debug_value [trace] %lifetime : $C

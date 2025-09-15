@@ -9,7 +9,7 @@
 // RUN:   -module-name main -I %t -verify
 
 // REQUIRES: objc_interop
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SendableCompletionHandlers
 
 //--- Test.h
 #define SWIFT_SENDABLE __attribute__((__swift_attr__("@Sendable")))
@@ -44,6 +44,7 @@ typedef void (^CompletionHandler)(void (^ SWIFT_SENDABLE)(void)) SWIFT_SENDABLE;
 -(void) withSendableCustom: (void (^)(MyValue *_Nullable SWIFT_SENDABLE)) handler;
 -(void) withNonSendable:(NSString *)operation completionHandler:(void (^ _Nullable NONSENDABLE)(NSString *_Nullable, NSError * _Nullable)) handler;
 -(void) withAliasCompletionHandler:(CompletionHandler)handler;
+-(void) withMainActorId: (void (MAIN_ACTOR ^)(id)) handler;
 @end
 
 // Placement of SWIFT_SENDABLE matters here
@@ -63,9 +64,42 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 -(void) testWithCallback:(NSString *)name handler:(MAIN_ACTOR void (^)(NSDictionary<NSString *, SWIFT_SENDABLE id> *, NSError * _Nullable))handler;
 @end
 
+@interface SwiftImpl : NSObject
+-(id)initWithCallback:  (void (^ SWIFT_SENDABLE)(void)) callback;
+-(void)computeWithCompletionHandler: (void (^)(void)) handler;
+@end
+
+@interface Shadowing : NSObject
+-(void)computeWithCompletion: (void (^)(void)) completion;
+-(void)updateWithCompletionHandler: (void (^_Nullable)(void)) handler;
+@end
+
+@protocol TestWitnesses
+-(void)willSendDataWithCompletion: (void (^)(void)) completion;
+@end
+
+@interface DataHandler : NSObject
++(void)sendDataWithCompletion: (void (^)(MyValue *)) completion;
+@end
+
+@interface TestDR : NSObject
+-(void) testWithCompletion: (void (^)(void)) completion;
+@end
+
 #pragma clang assume_nonnull end
 
 //--- main.swift
+
+do {
+  class SubTestNoActor : Test {
+    @objc override func withMainActorId(_: @escaping (Any) -> Void) {}
+    // expected-warning@-1 {{declaration 'withMainActorId' has a type with different global actor isolation from any potential overrides; this is an error in the Swift 6 language mode}}
+  }
+
+  class SubTestWithActor : Test {
+    @objc override func withMainActorId(_: @MainActor @escaping (Any) -> Void) {} // Ok
+  }
+}
 
 func test_sendable_attr_in_type_context(test: Test) {
   let fn: (String?, (any Error)?) -> Void = { _,_ in }
@@ -133,3 +167,51 @@ class TestConformanceWithoutStripping : InnerSendableTypes {
   func test(withCallback name: String, handler: @escaping @MainActor ([String : any Sendable], (any Error)?) -> Void) { // Ok
   }
 }
+
+@objc @implementation extension SwiftImpl {
+  @objc public required init(callback: @escaping () -> Void) {}
+  // expected-error@-1 {{initializer 'init(callback:)' should not be 'required' to match initializer declared by the header}}
+  
+  @objc func compute(completionHandler: @escaping () -> Void) {} // Ok (no warnings with minimal checking)
+}
+
+// Methods deliberately has no `@Sendable` to make sure that
+// shadowing rules are preserved when SendableCompletionHandlers feature is enabled.
+@objc extension Shadowing {
+  @objc func compute(completion: @escaping () -> Void) {}
+
+  @objc func update(completionHandler: (() -> Void)? = nil) {}
+
+  func testCompute() {
+    self.compute { } // Ok - no ambiguity
+    self.update { }  // Ok - no ambiguity
+  }
+}
+
+@objc
+class ImplicitShadowing : NSObject, TestWitnesses {
+  func willSendData(completion: @escaping () -> Void) {}
+
+  func test() {
+    (self as AnyObject).willSendData { } // Ok
+  }
+}
+
+protocol CompletionWithoutSendable {
+  associatedtype T
+  static func sendData(completion: @escaping (T) -> Void) // expected-note {{expected sendability to match requirement here}}
+}
+
+extension DataHandler : CompletionWithoutSendable {
+  // expected-warning@-1 {{sendability of function types in class method 'sendData(completion:)' does not match requirement in protocol 'CompletionWithoutSendable'}}
+  // It should be possible to infer `T` from method that mismatches on @Sendable in Swift 5 mode
+}
+
+extension TestDR {
+  @_dynamicReplacement(for: test(completion:))
+  func __replaceObjCFunc(_: @escaping () -> Void) {} // Ok
+}
+
+@MainActor
+class InvalidIsolated: NSObject, @MainActor P {}
+// expected-warning@-1 {{cannot form main actor-isolated conformance of 'InvalidIsolated' to SendableMetatype-inheriting protocol 'P'}}

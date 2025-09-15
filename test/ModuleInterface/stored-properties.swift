@@ -14,6 +14,8 @@
 // RUN: %target-swift-frontend -enable-experimental-feature StructLetDestructuring -emit-module -o %t/TestResilient.swiftmodule -module-name StoredProperties -enable-library-evolution %t-resilient.swiftinterface -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend -enable-experimental-feature StructLetDestructuring -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name StoredProperties -enable-library-evolution -emit-module-interface-path - | %FileCheck %s --check-prefix RESILIENT --check-prefix COMMON
 
+// REQUIRES: swift_feature_StructLetDestructuring
+
 // COMMON: public struct HasStoredProperties {
 public struct HasStoredProperties {
   // COMMON: public var computedGetter: Swift.Int {

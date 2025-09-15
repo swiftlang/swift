@@ -26,6 +26,7 @@
 #include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
@@ -41,7 +42,7 @@ namespace swift {
 namespace autodiff {
 
 class JVPCloner::Implementation final
-    : public TypeSubstCloner<JVPCloner::Implementation, SILOptFunctionBuilder> {
+    : public TypeSubstCloner<JVPCloner::Implementation> {
 private:
   /// The global context.
   ADContext &context;
@@ -349,7 +350,7 @@ private:
     type = witness->getDerivativeGenericSignature().getReducedType(
         type);
     return type->getAutoDiffTangentSpace(
-        LookUpConformanceInModule(getModule().getSwiftModule()));
+        LookUpConformanceInModule());
   }
 
   /// Assuming the given type conforms to `Differentiable` after remapping,
@@ -948,8 +949,9 @@ public:
     auto tanDest = getTangentBuffer(bb, uccai->getDest());
 
     diffBuilder.createUnconditionalCheckedCastAddr(
-        loc, tanSrc, tanSrc->getType().getASTType(), tanDest,
-        tanDest->getType().getASTType());
+       loc, uccai->getCheckedCastOptions(),
+        tanSrc, tanSrc->getType().getASTType(),
+        tanDest, tanDest->getType().getASTType());
   }
 
   /// Handle `begin_access` instruction (and do differentiability checks).
@@ -958,14 +960,14 @@ public:
   CLONE_AND_EMIT_TANGENT(BeginAccess, bai) {
     // Check for non-differentiable writes.
     if (bai->getAccessKind() == SILAccessKind::Modify) {
-      if (auto *gai = dyn_cast<GlobalAddrInst>(bai->getSource())) {
+      if (isa<GlobalAddrInst>(bai->getSource())) {
         context.emitNondifferentiabilityError(
             bai, invoker,
             diag::autodiff_cannot_differentiate_writes_to_global_variables);
         errorOccurred = true;
         return;
       }
-      if (auto *pbi = dyn_cast<ProjectBoxInst>(bai->getSource())) {
+      if (isa<ProjectBoxInst>(bai->getSource())) {
         context.emitNondifferentiabilityError(
             bai, invoker,
             diag::autodiff_cannot_differentiate_writes_to_mutable_captures);
@@ -1618,7 +1620,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   // binding all generic parameters to concrete types, JVP function type uses
   // all the concrete types and JVP generic signature is null.
   auto witnessCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
-  auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
+  auto lookupConformance = LookUpConformanceInModule();
 
   // Parameters of the differential are:
   // - the tangent values of the wrt parameters.
@@ -1683,7 +1685,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
     linearMapInfo->getLinearMapTupleLoweredType(origEntry).getASTType();
   dfParams.push_back({dfTupleType, ParameterConvention::Direct_Owned});
 
-  Mangle::DifferentiationMangler mangler;
+  Mangle::DifferentiationMangler mangler(module.getASTContext());
   auto diffName = mangler.mangleLinearMap(
       witness->getOriginalFunction()->getName(),
       AutoDiffLinearMapKind::Differential, witness->getConfig());

@@ -26,6 +26,18 @@ extension Protocol {
   }
 }
 
+struct Struct: Differentiable {
+  func identityDerivativeAttr() -> Self { self }
+
+  // Test cross-file `@derivative` attribute.
+  @derivative(of: identityDerivativeAttr)
+  func vjpIdentityDerivativeAttr() -> (
+    value: Self, pullback: (TangentVector) -> TangentVector
+  ) {
+    fatalError()
+  }
+}
+
 class Class: Differentiable {
   // Test `@differentiable` propagation from storage declaration to accessors.
   @differentiable(reverse)

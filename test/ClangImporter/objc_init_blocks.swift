@@ -7,7 +7,7 @@
 // Make sure that the SIL ownership verifier passes.
 // UnsafeUnretainedBlockClass.init()
 // CHECK-LABEL: sil hidden @$s16objc_init_blocks26UnsafeUnretainedBlockClassCACycfc : $@convention(method) (@owned UnsafeUnretainedBlockClass) -> @owned UnsafeUnretainedBlockClass {
-// CHECK: [[ZI:%.*]] = builtin "zeroInitializer"<objc_bool_block>() : $objc_bool_block
+// CHECK: [[ZI:%.*]] = builtin "zeroInitializer"() : $objc_bool_block
 // CHECK:   store [[ZI]] to %{{.*}} : $*objc_bool_block
 // CHECK-LABEL: } // end sil function '$s16objc_init_blocks26UnsafeUnretainedBlockClassCACycfc'
 open class UnsafeUnretainedBlockClass {

@@ -9,9 +9,6 @@
 -ldispatch
 -lBlocksRuntime
 -lpthread
--licui18nswift
--licuucswift
--licudataswift
 -ldl
 -lstdc++
 -lm

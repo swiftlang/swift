@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name optional -I %S/Inputs/custom-modules -emit-silgen -o - %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name optional -I %S/Inputs/custom-modules -Xllvm -sil-print-types -emit-silgen -o - %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

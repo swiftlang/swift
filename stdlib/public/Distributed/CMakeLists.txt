@@ -10,17 +10,22 @@
 #
 #===----------------------------------------------------------------------===#
 
-if(SWIFT_BUILD_SDK_OVERLAY)
-set(swift_distributed_darwin_depencencies Darwin)
-else()
-set(swift_distributed_darwin_depencencies)
+set(swift_distributed_darwin_dependencies)
+
+if((SWIFT_BUILD_CLANG_OVERLAYS
+    OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
+   AND (NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT
+        OR NOT SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT))
+  # This library imports Darwin from the SDK, which re-exports
+  # _Builtin_float which is part of this build.
+  list(APPEND swift_distributed_darwin_dependencies _Builtin_float)
 endif()
 
 set(swift_distributed_link_libraries
   swiftCore)
 
 
-add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IMPORTS_NON_OSSA 
   DistributedActor.cpp
   DistributedActor.swift
   DistributedActorSystem.swift
@@ -30,12 +35,13 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   DistributedMetadata.swift
   LocalTestingDistributedActorSystem.swift
 
-  SWIFT_MODULE_DEPENDS_IOS ${swift_distributed_darwin_depencencies}
-  SWIFT_MODULE_DEPENDS_OSX ${swift_distributed_darwin_depencencies}
-  SWIFT_MODULE_DEPENDS_TVOS ${swift_distributed_darwin_depencencies}
-  SWIFT_MODULE_DEPENDS_WATCHOS ${swift_distributed_darwin_depencencies}
+  SWIFT_MODULE_DEPENDS_IOS ${swift_distributed_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_OSX ${swift_distributed_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_TVOS ${swift_distributed_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_WATCHOS ${swift_distributed_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc
+  SWIFT_MODULE_DEPENDS_LINUX_STATIC Musl
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
   SWIFT_MODULE_DEPENDS_OPENBSD Glibc
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
@@ -51,6 +57,8 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
+    -enable-experimental-feature AllowUnsafeAttribute
+    -strict-memory-safety
 
   LINK_FLAGS
     "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"

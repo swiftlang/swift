@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/resilient-enum-in-cxx.swift -enable-library-evolution -typecheck -module-name Enums -clang-header-expose-decls=all-public -emit-clang-header-path %t/enums.h
+// RUN: %target-swift-frontend %S/resilient-enum-in-cxx.swift -enable-library-evolution -module-name Enums -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/enums.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-enums-execution.o
 

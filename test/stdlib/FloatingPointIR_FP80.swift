@@ -3,7 +3,9 @@
 // RUN: %target-build-swift -Ounchecked -emit-ir %s | %FileCheck -check-prefix=%target-cpu %s
 
 // REQUIRES: CPU=i386 || CPU=x86_64
-// UNSUPPORTED: OS=windows-msvc
+//
+// Windows and Android do not expose Float80.
+// UNSUPPORTED: OS=windows-msvc, OS=linux-android
 
 var globalFloat80 : Float80 = 0.0
 

@@ -3,7 +3,7 @@
 // REQUIRES: objc_interop
 // FIXME: this is failing on simulators
 // REQUIRES: OS=macosx
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SendableCompletionHandlers
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module -enable-experimental-feature SendableCompletionHandlers
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift -enable-experimental-feature SendableCompletionHandlers
@@ -314,7 +314,7 @@
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: @available(swift, obsoleted: 3, renamed: "veryCarefullyBurn()")
 // CHECK-OMIT-NEEDLESS-WORDS-NEXT: func veryCarefullyBurnGarbage4DTypeRefMask_t()
 
-// CHECK-OMIT-NEEDLESS-WORDS-DIAGS: inconsistent Swift name for Objective-C property 'conflictingProp1' in 'OMWSub' ('waggleProp1' in 'OMWWaggle' vs. 'wiggleProp1' in 'OMWSuper')
+// CHECK-OMIT-NEEDLESS-WORDS-DIAGS: inconsistent Swift name for Objective-C property 'conflictingProp1' in 'OMWSub' ('waggleProp1' in 'OMWWaggle' vs. 'wiggleProp1' in 'OMWSuper') [#ClangDeclarationImport]
 
 // Don't drop the 'error'.
 // CHECK-ERRORS: func tryAndReturnError(_: ()) throws

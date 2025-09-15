@@ -64,7 +64,7 @@ internal func _dictionaryDownCastIndirect<SourceKey, SourceValue,
                                           TargetKey, TargetValue>(
   _ source: UnsafePointer<Dictionary<SourceKey, SourceValue>>,
   _ target: UnsafeMutablePointer<Dictionary<TargetKey, TargetValue>>) {
-  target.initialize(to: _dictionaryDownCast(source.pointee))
+  unsafe target.initialize(to: _dictionaryDownCast(source.pointee))
 }
 
 /// Implements a forced downcast.  This operation should have O(1) complexity.
@@ -121,8 +121,8 @@ internal func _dictionaryDownCastConditionalIndirect<SourceKey, SourceValue,
   _ target: UnsafeMutablePointer<Dictionary<TargetKey, TargetValue>>
 ) -> Bool {
   if let result: Dictionary<TargetKey, TargetValue>
-       = _dictionaryDownCastConditional(source.pointee) {
-    target.initialize(to: result)
+       = unsafe _dictionaryDownCastConditional(source.pointee) {
+    unsafe target.initialize(to: result)
     return true
   }
   return false

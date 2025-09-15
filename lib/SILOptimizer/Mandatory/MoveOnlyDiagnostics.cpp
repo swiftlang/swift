@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
@@ -827,10 +828,6 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
     return;
   }
   case PartialMutationError::Kind::HasDeinit: {
-    assert(
-        astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption) ||
-        astContext.LangOpts.hasFeature(
-            Feature::MoveOnlyPartialReinitialization));
     auto diagnostic = [&]() {
       switch (kind) {
       case PartialMutation::Kind::Consume:
@@ -850,10 +847,6 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
     return;
   }
   case PartialMutationError::Kind::NonfrozenImportedType: {
-    assert(
-        astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption) ||
-        astContext.LangOpts.hasFeature(
-            Feature::MoveOnlyPartialReinitialization));
     auto &nominal = error.getNonfrozenImportedNominal();
     auto diagnostic = [&]() {
       switch (kind) {
@@ -869,10 +862,6 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
     return;
   }
   case PartialMutationError::Kind::NonfrozenUsableFromInlineType: {
-    assert(
-        astContext.LangOpts.hasFeature(Feature::MoveOnlyPartialConsumption) ||
-        astContext.LangOpts.hasFeature(
-            Feature::MoveOnlyPartialReinitialization));
     auto &nominal = error.getNonfrozenUsableFromInlineNominal();
     auto diagnostic = [&]() {
       switch (kind) {
@@ -889,5 +878,11 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
     registerDiagnosticEmitted(address);
     return;
   }
+  case PartialMutationError::Kind::ConsumeDuringDeinit: {
+    astContext.Diags.diagnose(user->getLoc().getSourceLoc(),
+                              diag::sil_movechecking_consume_during_deinit);
+    return;
   }
+  }
+  llvm_unreachable("unhandled case");
 }

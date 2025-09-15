@@ -1,5 +1,5 @@
 // REQUIRES: objc_interop
-// RUN: %target-swift-frontend -emit-sil -Xllvm -sil-print-debuginfo %s \
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -Xllvm -sil-print-debuginfo %s \
 // RUN:  -parse-as-library | %FileCheck %s
 import Foundation
 

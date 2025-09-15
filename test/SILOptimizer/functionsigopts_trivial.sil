@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -parse-serialized-sil -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -parse-serialized-sil -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck %s
 
 import Builtin
 import Swift

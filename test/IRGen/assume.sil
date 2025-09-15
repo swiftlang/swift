@@ -4,7 +4,7 @@ sil_stage canonical
 import Swift
 import Builtin
 
-// CHECK-LABEL: define{{.*}} swiftcc i64 @test_assume(i64 %0)
+// CHECK-LABEL: define{{.*}} swiftcc{{.*}} i64 @test_assume(i64 %0)
 // CHECK:   [[COND:%.*]] = icmp sgt i64 %0, -1
 // CHECK:   tail call void @llvm.assume(i1 [[COND]])
 // CHECK:   [[RES:%.*]] = lshr i64 %0, 6

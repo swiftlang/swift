@@ -37,7 +37,7 @@ class CC<T : QQ> : PP {}
 // CHECK: return
 
 // CHECK-LABEL: sil_witness_table hidden <T where T : Q> C<T>: P module class_conforms_with_default_implementation {
-// CHECK-NEXT: associated_type_protocol (T: Q): dependent
+// CHECK-NEXT: associated_conformance (T: Q): dependent
 // CHECK-NEXT: associated_type T: T
 // CHECK-NEXT: method #P.foo: <Self where Self : P> (Self) -> () -> () : @$s42class_conforms_with_default_implementation1CCyqd__GAA1PA2aEP3fooyyFTW
 // CHECK-NEXT: }

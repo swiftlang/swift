@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -emit-silgen %s | %target-sil-opt | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %target-sil-opt -sil-print-types | %FileCheck %s
 
 protocol P {}
 

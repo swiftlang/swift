@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature ThenStatements -enable-experimental-feature DoExpressions
 
-// Required for experimental features
-// REQUIRES: asserts
+// REQUIRES: swift_feature_DoExpressions
+// REQUIRES: swift_feature_ThenStatements
 
 @discardableResult
 func throwsError() throws -> Int { 0 }
@@ -147,7 +147,7 @@ func testReturn1() -> Int {
     try throwsError()
   } catch {
     if .random() {
-      return 0 // expected-error {{cannot 'return' in 'do-catch' when used as expression}}
+      return 0 // expected-error {{cannot use 'return' to transfer control out of 'do-catch' expression}}
     }
     then 0
   }

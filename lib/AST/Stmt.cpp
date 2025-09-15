@@ -17,10 +17,12 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/PointerUnion.h"
 
@@ -300,25 +302,13 @@ ASTNode BraceStmt::findAsyncNode() {
   return asyncFinder.getAsyncNode();
 }
 
-static bool hasSingleActiveElement(ArrayRef<ASTNode> elts) {
-  while (true) {
-    // Single element brace.
-    if (elts.size() == 1)
-      return true;
+bool BraceStmt::hasExplicitReturnStmt(ASTContext &ctx) const {
+  return evaluateOrDefault(ctx.evaluator,
+                           BraceHasExplicitReturnStmtRequest{this}, false);
+}
 
-    // See if we have a #if as the first element of a 2 element brace, if so we
-    // can recuse into its active clause. If so, the second element will be the
-    // active element.
-    if (elts.size() == 2) {
-      if (auto *D = elts.front().dyn_cast<Decl *>()) {
-        if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-          elts = ICD->getActiveClauseElements();
-          continue;
-        }
-      }
-    }
-    return false;
-  }
+static bool hasSingleActiveElement(ArrayRef<ASTNode> elts) {
+  return elts.size() == 1;
 }
 
 ASTNode BraceStmt::getSingleActiveElement() const {
@@ -508,7 +498,7 @@ Type DoCatchStmt::getCaughtErrorType() const {
     ->getCaseLabelItems()
     .front()
     .getPattern();
-  if (firstPattern->hasType())
+  if (firstPattern->hasType() && !firstPattern->getType()->hasError())
     return firstPattern->getType();
 
   return Type();
@@ -529,8 +519,6 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
 /// or `let self = self` condition.
 ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
 ///    RHS of the self condition references a var defined in a capture list.
-///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
-///    the self condition is a `LoadExpr`.
 bool LabeledConditionalStmt::rebindsSelf(ASTContext &Ctx,
                                          bool requiresCaptureListRef,
                                          bool requireLoadExpr) const {
@@ -544,8 +532,6 @@ bool LabeledConditionalStmt::rebindsSelf(ASTContext &Ctx,
 /// or `let self = self` condition.
 ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
 ///    RHS of the self condition references a var defined in a capture list.
-///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
-///    the self condition is a `LoadExpr`.
 bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
                                        bool requiresCaptureListRef,
                                        bool requireLoadExpr) const {
@@ -632,6 +618,11 @@ PoundAvailableInfo::create(ASTContext &ctx, SourceLoc PoundLoc,
   void *Buffer = ctx.Allocate(size, alignof(PoundAvailableInfo));
   return ::new (Buffer) PoundAvailableInfo(PoundLoc, LParenLoc, queries,
                                            RParenLoc, isUnavailability);
+}
+
+SemanticAvailabilitySpecs PoundAvailableInfo::getSemanticAvailabilitySpecs(
+    const DeclContext *declContext) const {
+  return SemanticAvailabilitySpecs(getQueries(), declContext);
 }
 
 SourceLoc PoundAvailableInfo::getEndLoc() const {
@@ -766,16 +757,17 @@ SourceLoc CaseLabelItem::getEndLoc() const {
 CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
                    ArrayRef<CaseLabelItem> caseLabelItems,
                    SourceLoc unknownAttrLoc, SourceLoc itemTerminatorLoc,
-                   BraceStmt *body,
-                   std::optional<MutableArrayRef<VarDecl *>> caseBodyVariables,
+                   BraceStmt *body, ArrayRef<VarDecl *> caseBodyVariables,
                    std::optional<bool> implicit,
                    NullablePtr<FallthroughStmt> fallthroughStmt)
     : Stmt(StmtKind::Case, getDefaultImplicitFlag(implicit, itemIntroducerLoc)),
       UnknownAttrLoc(unknownAttrLoc), ItemIntroducerLoc(itemIntroducerLoc),
       ItemTerminatorLoc(itemTerminatorLoc), ParentKind(parentKind),
-      BodyAndHasFallthrough(body, fallthroughStmt.isNonNull()),
-      CaseBodyVariables(caseBodyVariables) {
+      BodyAndHasFallthrough(body, fallthroughStmt.isNonNull()) {
   Bits.CaseStmt.NumPatterns = caseLabelItems.size();
+  Bits.CaseStmt.NumCaseBodyVars = caseBodyVariables.size();
+  ASSERT(Bits.CaseStmt.NumCaseBodyVars == caseBodyVariables.size() &&
+         "too many case body vars");
   assert(Bits.CaseStmt.NumPatterns > 0 &&
          "case block must have at least one pattern");
   assert(
@@ -785,36 +777,66 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
     *getTrailingObjects<FallthroughStmt *>() = fallthroughStmt.get();
   }
 
-  MutableArrayRef<CaseLabelItem> items{getTrailingObjects<CaseLabelItem>(),
-                                       Bits.CaseStmt.NumPatterns};
+  std::uninitialized_copy(caseBodyVariables.begin(), caseBodyVariables.end(),
+                          getCaseBodyVariablesBuffer().begin());
 
-  // At the beginning mark all of our var decls as being owned by this
-  // statement. In the typechecker we wireup the case stmt var decl list since
-  // we know everything is lined up/typechecked then.
+  MutableArrayRef<CaseLabelItem> items{getTrailingObjects<CaseLabelItem>(),
+                                       static_cast<size_t>(Bits.CaseStmt.NumPatterns)};
+
   for (unsigned i : range(Bits.CaseStmt.NumPatterns)) {
     new (&items[i]) CaseLabelItem(caseLabelItems[i]);
-    items[i].getPattern()->markOwnedByStatement(this);
-  }
-  for (auto *vd : caseBodyVariables.value_or(MutableArrayRef<VarDecl *>())) {
-    vd->setParentPatternStmt(this);
+    // Mark the CaseStmt as the parent for any canonical VarDecls in the
+    // pattern.
+    items[i].getPattern()->forEachVariable([&](VarDecl *VD) {
+      if (!VD->getParentVarDecl())
+        VD->setParentPatternStmt(this);
+    });
   }
 }
 
 namespace {
-static MutableArrayRef<VarDecl *>
-getCaseVarDecls(ASTContext &ctx, ArrayRef<CaseLabelItem> labelItems) {
-  // Grab the first case label item pattern and use it to initialize the case
-  // body var decls.
-  SmallVector<VarDecl *, 4> tmp;
-  labelItems.front().getPattern()->collectVariables(tmp);
-  return ctx.AllocateTransform<VarDecl *>(
-      llvm::ArrayRef(tmp), [&](VarDecl *vOld) -> VarDecl * {
-        auto *vNew = new (ctx) VarDecl(
-            /*IsStatic*/ false, vOld->getIntroducer(), vOld->getNameLoc(),
-            vOld->getName(), vOld->getDeclContext());
-        vNew->setImplicit();
-        return vNew;
-      });
+/// Produces an array of internal case body variables, and binds all of the
+/// pattern variables that occur within the case to their "parent" pattern
+/// variables, forming chains of variables with the same name.
+///
+/// Given a case such as:
+/// \code
+/// case .a(let x), .b(let x), .c(let x):
+/// \endcode
+///
+/// Each case item contains a (different) pattern variable named `x`. This
+/// function will set the "parent" variable of the second and third `x`
+/// variables to the `x` variable immediately to its left. A fourth `x` will be
+/// the body case variable, whose parent will be set to the `x` within the final
+/// case item.
+static void getCaseVarDecls(ASTContext &ctx, ArrayRef<CaseLabelItem> labelItems,
+                            SmallVectorImpl<VarDecl *> &caseVars) {
+  llvm::SmallDenseMap<Identifier, VarDecl *, 4> allVars;
+
+  auto foundVar = [&](VarDecl *VD) {
+    if (!VD->hasName())
+      return;
+
+    auto &entry = allVars[VD->getName()];
+    if (entry) {
+      VD->setParentVarDecl(entry);
+    } else {
+      auto *caseVar = new (ctx) VarDecl(
+          /*IsStatic*/ false, VD->getIntroducer(), VD->getNameLoc(),
+          VD->getName(), VD->getDeclContext());
+      caseVar->setImplicit();
+      caseVars.push_back(caseVar);
+    }
+    entry = VD;
+  };
+
+  for (auto &caseItem : labelItems)
+    caseItem.getPattern()->forEachVariable(foundVar);
+
+  // Now that we've collected the case variables, ensure they're parented to
+  // the last pattern variables we saw.
+  for (auto caseVar : caseVars)
+    foundVar(caseVar);
 }
 
 struct FallthroughFinder : ASTWalker {
@@ -865,7 +887,8 @@ CaseStmt::createParsedSwitchCase(ASTContext &ctx, SourceLoc introducerLoc,
                                  ArrayRef<CaseLabelItem> caseLabelItems,
                                  SourceLoc unknownAttrLoc, SourceLoc colonLoc,
                                  BraceStmt *body) {
-  auto caseVarDecls = getCaseVarDecls(ctx, caseLabelItems);
+  SmallVector<VarDecl *, 4> caseVarDecls;
+  getCaseVarDecls(ctx, caseLabelItems, caseVarDecls);
   auto fallthroughStmt = FallthroughFinder().findFallthrough(body);
   return create(ctx, CaseParentKind::Switch, introducerLoc, caseLabelItems,
                 unknownAttrLoc, colonLoc, body, caseVarDecls,
@@ -875,23 +898,37 @@ CaseStmt::createParsedSwitchCase(ASTContext &ctx, SourceLoc introducerLoc,
 CaseStmt *CaseStmt::createParsedDoCatch(ASTContext &ctx, SourceLoc catchLoc,
                                         ArrayRef<CaseLabelItem> caseLabelItems,
                                         BraceStmt *body) {
-  auto caseVarDecls = getCaseVarDecls(ctx, caseLabelItems);
+  SmallVector<VarDecl *, 4> caseVarDecls;
+  getCaseVarDecls(ctx, caseLabelItems, caseVarDecls);
   return create(ctx, CaseParentKind::DoCatch, catchLoc, caseLabelItems,
                 /*unknownAttrLoc=*/SourceLoc(), body->getStartLoc(), body,
                 caseVarDecls, /*implicit=*/false, /*fallthroughStmt=*/nullptr);
 }
 
 CaseStmt *
-CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind, SourceLoc caseLoc,
-                 ArrayRef<CaseLabelItem> caseLabelItems,
-                 SourceLoc unknownAttrLoc, SourceLoc colonLoc, BraceStmt *body,
-                 std::optional<MutableArrayRef<VarDecl *>> caseVarDecls,
-                 std::optional<bool> implicit,
-                 NullablePtr<FallthroughStmt> fallthroughStmt) {
-  void *mem =
-      ctx.Allocate(totalSizeToAlloc<FallthroughStmt *, CaseLabelItem>(
-                       fallthroughStmt.isNonNull(), caseLabelItems.size()),
-                   alignof(CaseStmt));
+CaseStmt::createImplicit(ASTContext &ctx, CaseParentKind parentKind,
+                         ArrayRef<CaseLabelItem> caseLabelItems,
+                         BraceStmt *body,
+                         NullablePtr<FallthroughStmt> fallthroughStmt) {
+  SmallVector<VarDecl *, 4> caseVarDecls;
+  getCaseVarDecls(ctx, caseLabelItems, caseVarDecls);
+  return create(ctx, parentKind, /*catchLoc*/ SourceLoc(), caseLabelItems,
+                /*unknownAttrLoc*/ SourceLoc(), /*colonLoc*/ SourceLoc(), body,
+                caseVarDecls, /*implicit*/ true, fallthroughStmt);
+}
+
+CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
+                           SourceLoc caseLoc,
+                           ArrayRef<CaseLabelItem> caseLabelItems,
+                           SourceLoc unknownAttrLoc, SourceLoc colonLoc,
+                           BraceStmt *body, ArrayRef<VarDecl *> caseVarDecls,
+                           std::optional<bool> implicit,
+                           NullablePtr<FallthroughStmt> fallthroughStmt) {
+  void *mem = ctx.Allocate(
+      totalSizeToAlloc<FallthroughStmt *, CaseLabelItem, VarDecl *>(
+          fallthroughStmt.isNonNull(), caseLabelItems.size(),
+          caseVarDecls.size()),
+      alignof(CaseStmt));
   return ::new (mem)
       CaseStmt(ParentKind, caseLoc, caseLabelItems, unknownAttrLoc, colonLoc,
                body, caseVarDecls, implicit, fallthroughStmt);
@@ -950,20 +987,10 @@ CaseStmt *CaseStmt::findNextCaseStmt() const {
 }
 
 SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
-                               Expr *SubjectExpr,
-                               SourceLoc LBraceLoc,
-                               ArrayRef<ASTNode> Cases,
-                               SourceLoc RBraceLoc,
-                               SourceLoc EndLoc,
-                               ASTContext &C) {
-#ifndef NDEBUG
-  for (auto N : Cases)
-    assert((N.is<Stmt*>() && isa<CaseStmt>(N.get<Stmt*>())) ||
-           (N.is<Decl*>() && (isa<IfConfigDecl>(N.get<Decl*>()) ||
-                              isa<PoundDiagnosticDecl>(N.get<Decl*>()))));
-#endif
-
-  void *p = C.Allocate(totalSizeToAlloc<ASTNode>(Cases.size()),
+                               Expr *SubjectExpr, SourceLoc LBraceLoc,
+                               ArrayRef<CaseStmt *> Cases, SourceLoc RBraceLoc,
+                               SourceLoc EndLoc, ASTContext &C) {
+  void *p = C.Allocate(totalSizeToAlloc<CaseStmt *>(Cases.size()),
                        alignof(SwitchStmt));
   SwitchStmt *theSwitch = ::new (p) SwitchStmt(LabelInfo, SwitchLoc,
                                                SubjectExpr, LBraceLoc,
@@ -971,7 +998,7 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                                                EndLoc);
 
   std::uninitialized_copy(Cases.begin(), Cases.end(),
-                          theSwitch->getTrailingObjects<ASTNode>());
+                          theSwitch->getTrailingObjects<CaseStmt *>());
   for (auto *caseStmt : theSwitch->getCases())
     caseStmt->setParentStmt(theSwitch);
 
@@ -986,6 +1013,23 @@ LabeledStmt *BreakStmt::getTarget() const {
 LabeledStmt *ContinueStmt::getTarget() const {
   auto &eval = getDeclContext()->getASTContext().evaluator;
   return evaluateOrDefault(eval, ContinueTargetRequest{this}, nullptr);
+}
+
+FallthroughStmt *FallthroughStmt::createParsed(SourceLoc Loc, DeclContext *DC) {
+  auto &ctx = DC->getASTContext();
+  return new (ctx) FallthroughStmt(Loc, DC);
+}
+
+CaseStmt *FallthroughStmt::getFallthroughSource() const {
+  auto &eval = getDeclContext()->getASTContext().evaluator;
+  return evaluateOrDefault(eval, FallthroughSourceAndDestRequest{this}, {})
+      .Source;
+}
+
+CaseStmt *FallthroughStmt::getFallthroughDest() const {
+  auto &eval = getDeclContext()->getASTContext().evaluator;
+  return evaluateOrDefault(eval, FallthroughSourceAndDestRequest{this}, {})
+      .Dest;
 }
 
 SourceLoc swift::extractNearestSourceLoc(const Stmt *S) {

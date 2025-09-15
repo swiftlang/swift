@@ -5,6 +5,8 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_BuiltinModule
+// REQUIRES: swift_feature_RawLayout
 
 import Builtin
 import Darwin

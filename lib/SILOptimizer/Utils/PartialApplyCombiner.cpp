@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -181,7 +182,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
       arg = argToTmpCopy.lookup(arg);
 
     if (paramInfo[paramInfo.size() - partialApplyArgs.size() + i]
-            .isConsumed()) {
+            .isConsumedInCaller()) {
       // Copy the argument as the callee may consume it.
       if (arg->getType().isAddress()) {
         auto *ASI = builder.createAllocStack(pai->getLoc(), arg->getType());
@@ -206,6 +207,10 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
     builder.createTryApply(paiAI.getLoc(), callee, subs, argList,
                            tai->getNormalBB(), tai->getErrorBB(),
                            tai->getApplyOptions());
+  } else if (auto *bai = dyn_cast<BeginApplyInst>(paiAI)) {
+    auto *newBAI = builder.createBeginApply(paiAI.getLoc(), callee, subs,
+                                            argList, bai->getApplyOptions());
+    callbacks.replaceAllInstUsesPairwiseWith(bai, newBAI);
   } else {
     auto *apply = cast<ApplyInst>(paiAI);
     auto *newAI = builder.createApply(paiAI.getLoc(), callee, subs, argList,

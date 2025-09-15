@@ -16,6 +16,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Sema/Concurrency.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BitDataflow.h"
@@ -483,9 +484,9 @@ void Info::diagnoseAll(AnalysisInfo &info, bool forDeinit,
     VarDecl *var = cast<RefElementAddrInst>(use)->getField();
 
     diag.diagnose(illegalLoc.getSourceLoc(), diag::isolated_after_nonisolated,
-                  forDeinit, var->getDescriptiveKind(), var->getName())
-      .highlight(illegalLoc.getSourceRange())
-      .warnUntilSwiftVersion(6);
+                  forDeinit, var)
+        .highlight(illegalLoc.getSourceRange())
+        .warnUntilSwiftVersion(6);
 
     // after <verb><adjective> <subject>, ... can't use self anymore, etc ...
     //   example:
@@ -582,6 +583,12 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
   worklist.pushUsesOfValueIfNotVisited(selfParam);
 
   while (Operand *operand = worklist.pop()) {
+    // A type-dependent use of `self` is an instruction that contains the
+    // DynamicSelfType. These instructions do not access any protected
+    // state.
+    if (operand->isTypeDependent())
+      continue;
+
     SILInstruction *user = operand->getUser();
 
     // First, check if this is an apply that involves `self`

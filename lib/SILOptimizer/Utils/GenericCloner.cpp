@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
 
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -50,6 +51,7 @@ SILFunction *GenericCloner::createDeclaration(
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     NewF->addSemanticsAttr(Attr);
   }
+  NewF->setOptimizationMode(Orig->getOptimizationMode());
   if (!Orig->hasOwnership()) {
     NewF->setOwnershipEliminated();
   }
@@ -124,11 +126,19 @@ void GenericCloner::populateCloned() {
             return true;
           }
         }
-      } else if (ReInfo.isDroppedMetatypeArg(ArgIdx)) {
-        // Replace the metatype argument with an `metatype` instruction in the
-        // entry block.
-        auto *mtInst = getBuilder().createMetatype(Loc, mappedType);
-        entryArgs.push_back(mtInst);
+      } else if (ReInfo.isDroppedArgument(ArgIdx)) {
+        if (OrigArg->getType().isAddress()) {
+          // Create an uninitialized alloc_stack for unused indirect arguments.
+          // This will be removed by other optimizations.
+          createAllocStack();
+          entryArgs.push_back(ASI);
+        } else {
+          // Dropped direct (= non-address) arguments are metatype arguments.
+          // Replace the metatype argument with an `metatype` instruction in the
+          // entry block.
+          auto *mtInst = getBuilder().createMetatype(Loc, mappedType);
+          entryArgs.push_back(mtInst);
+        }
         return true;
       } else {
         // Handle arguments for formal parameters.
@@ -143,7 +153,8 @@ void GenericCloner::populateCloned() {
           // Store the new direct parameter to an alloc_stack.
           createAllocStack();
           SILValue addr;
-          if (NewArg->getArgumentConvention().isGuaranteedConvention() &&
+          if (NewArg->getArgumentConvention()
+                  .isGuaranteedConventionInCallee() &&
               NewArg->getFunction()->hasOwnership()) {
             auto *sbi = getBuilder().createStoreBorrow(Loc, NewArg, ASI);
             StoreBorrowsToCleanup.push_back(sbi);

@@ -60,7 +60,7 @@
     {
       key.kind: source.lang.swift.decl.class,
       key.accessibility: source.lang.swift.accessibility.internal,
-      key.name: "3",
+      key.name: "`3`",
       key.offset: 84,
       key.length: 10,
       key.nameoffset: 90,

@@ -12,14 +12,17 @@
 
 #include "swift/IDE/ConformingMethodList.h"
 #include "ExprContextAnalysis.h"
+#include "ReadyForTypeCheckingCallback.h"
 #include "swift/AST/ASTDemangler.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
-#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 
@@ -28,7 +31,7 @@ using namespace ide;
 
 namespace {
 class ConformingMethodListCallbacks : public CodeCompletionCallbacks,
-                                      public DoneParsingCallback {
+                                      public ReadyForTypeCheckingCallback {
   ArrayRef<const char *> ExpectedTypeNames;
   ConformingMethodListConsumer &Consumer;
   SourceLoc Loc;
@@ -43,8 +46,8 @@ public:
   ConformingMethodListCallbacks(Parser &P,
                                 ArrayRef<const char *> ExpectedTypeNames,
                                 ConformingMethodListConsumer &Consumer)
-      : CodeCompletionCallbacks(P), DoneParsingCallback(),
-        ExpectedTypeNames(ExpectedTypeNames), Consumer(Consumer) {}
+      : CodeCompletionCallbacks(P), ExpectedTypeNames(ExpectedTypeNames),
+        Consumer(Consumer) {}
 
   // Only handle callbacks for suffix completions.
   // {
@@ -52,7 +55,7 @@ public:
   void completePostfixExpr(CodeCompletionExpr *E, bool hasSpace) override;
   // }
 
-  void doneParsing(SourceFile *SrcFile) override;
+  void readyForTypeChecking(SourceFile *SrcFile) override;
 };
 
 void ConformingMethodListCallbacks::completeDotExpr(CodeCompletionExpr *E,
@@ -99,7 +102,7 @@ public:
   ArrayRef<Result> getResults() const { return Results; }
 };
 
-void ConformingMethodListCallbacks::doneParsing(SourceFile *SrcFile) {
+void ConformingMethodListCallbacks::readyForTypeChecking(SourceFile *SrcFile) {
   if (!CCExpr || !CCExpr->getBase())
     return;
 
@@ -107,7 +110,7 @@ void ConformingMethodListCallbacks::doneParsing(SourceFile *SrcFile) {
   {
     llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
         Context.CompletionCallback, &TypeCheckCallback);
-    typeCheckContextAt(
+    swift::typeCheckASTNodeAtLoc(
         TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
         CCExpr->getLoc());
   }
@@ -154,8 +157,6 @@ void ConformingMethodListCallbacks::getMatchingMethods(
   assert(T->mayHaveMembers() && !T->is<ModuleType>());
 
   class LocalConsumer : public VisibleDeclConsumer {
-    ModuleDecl *CurModule;
-
     /// The type of the parsed expression.
     Type T;
 
@@ -185,14 +186,14 @@ void ConformingMethodListCallbacks::getMatchingMethods(
       // we might run into trouble with really complicated cases but the fake
       // archetype setup will mostly work.
       auto substitutions = T->getMemberSubstitutionMap(
-          CurModule, FD, FD->getGenericEnvironment());
+          FD, FD->getGenericEnvironment());
       auto resultTy =  FD->getResultInterfaceType().subst(substitutions);
       if (resultTy->is<ErrorType>())
         return false;
 
       // The return type conforms to any of the requested protocols.
       for (auto Proto : ExpectedTypes) {
-        if (CurModule->checkConformance(resultTy, Proto))
+        if (checkConformance(resultTy, Proto))
           return true;
       }
 
@@ -203,8 +204,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
     LocalConsumer(DeclContext *DC, Type T,
                   llvm::SmallPtrSetImpl<ProtocolDecl*> &expectedTypes,
                   SmallVectorImpl<ValueDecl *> &result)
-        : CurModule(DC->getParentModule()), T(T), ExpectedTypes(expectedTypes),
-          Result(result) {}
+        : T(T), ExpectedTypes(expectedTypes), Result(result) {}
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind reason,
                    DynamicLookupInfo) override {

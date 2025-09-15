@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockBits.h"
@@ -40,8 +41,8 @@
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -101,7 +102,7 @@ void OSSACanonicalizer::computeBoundaryData(SILValue value) {
   // Then use that information to stash for our diagnostics the boundary
   // consuming/non-consuming users as well as enter the boundary consuming users
   // into the boundaryConsumignUserSet for quick set testing later.
-  using IsInterestingUser = CanonicalizeOSSALifetime::IsInterestingUser;
+  using IsInterestingUser = OSSACanonicalizeOwned::IsInterestingUser;
   InstructionSet boundaryConsumingUserSet(value->getFunction());
   for (auto *lastUser : originalBoundary.lastUsers) {
     LLVM_DEBUG(llvm::dbgs() << "Looking at boundary use: " << *lastUser);
@@ -174,7 +175,9 @@ struct MoveOnlyObjectCheckerPImpl {
       : fn(fn), allocator(allocator), diagnosticEmitter(diagnosticEmitter),
         moveIntroducersToProcess(moveIntroducersToProcess) {}
 
-  void check(DominanceInfo *domTree, PostOrderAnalysis *poa);
+  void check(DominanceInfo *domTree,
+             DeadEndBlocksAnalysis *deadEndBlocksAnalysis,
+             PostOrderAnalysis *poa);
 
   bool convertBorrowExtractsToOwnedDestructures(
       MarkUnresolvedNonCopyableValueInst *mmci, DominanceInfo *domTree,
@@ -182,6 +185,9 @@ struct MoveOnlyObjectCheckerPImpl {
 
   bool
   checkForSameInstMultipleUseErrors(MarkUnresolvedNonCopyableValueInst *base);
+
+  bool eraseMarkWithCopiedOperand(
+    MarkUnresolvedNonCopyableValueInst *markedInst);
 };
 
 } // namespace
@@ -216,15 +222,12 @@ bool MoveOnlyObjectCheckerPImpl::checkForSameInstMultipleUseErrors(
     case OperandOwnership::NonUse:
       continue;
 
-    // Conservatively treat a conversion to an unowned value as a pointer
-    // escape. If we see this in the SIL, fail and return false so we emit a
-    // "compiler doesn't understand error".
     case OperandOwnership::ForwardingUnowned:
     case OperandOwnership::PointerEscape:
     case OperandOwnership::BitwiseEscape:
-      LLVM_DEBUG(llvm::dbgs()
-                 << "        Found forwarding unowned or escape!\n");
-      return false;
+      // None of the "unowned" uses can consume the original value. Simply
+      // ignore them.
+      continue;
 
     case OperandOwnership::TrivialUse:
     case OperandOwnership::InstantaneousUse:
@@ -243,6 +246,7 @@ bool MoveOnlyObjectCheckerPImpl::checkForSameInstMultipleUseErrors(
       instToOperandsMap.insert(nextUse->getUser(), nextUse);
       continue;
     case OperandOwnership::InteriorPointer:
+    case OperandOwnership::AnyInteriorPointer:
       // We do not care about interior pointer uses since there aren't any
       // interior pointer using instructions that are also consuming uses.
       continue;
@@ -330,8 +334,9 @@ bool MoveOnlyObjectCheckerPImpl::checkForSameInstMultipleUseErrors(
 //                          MARK: Main PImpl Routine
 //===----------------------------------------------------------------------===//
 
-void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
-                                       PostOrderAnalysis *poa) {
+void MoveOnlyObjectCheckerPImpl::check(
+    DominanceInfo *domTree, DeadEndBlocksAnalysis *deadEndBlocksAnalysis,
+    PostOrderAnalysis *poa) {
   auto callbacks =
       InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
         if (auto *mvi =
@@ -340,7 +345,7 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
         instToDelete->eraseFromParent();
       });
   InstructionDeleter deleter(std::move(callbacks));
-  OSSACanonicalizer canonicalizer(fn, domTree, deleter);
+  OSSACanonicalizer canonicalizer(fn, domTree, deadEndBlocksAnalysis, deleter);
   diagnosticEmitter.initCanonicalizer(&canonicalizer);
 
   unsigned initialDiagCount = diagnosticEmitter.getDiagnosticCount();
@@ -412,7 +417,7 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
     }
 
     // NOTE: In the following we only rewrite lifetimes once we have emitted
-    // diagnostics. This ensures that we can emit diagnostics using the the
+    // diagnostics. This ensures that we can emit diagnostics using the
     // liveness information before rewrite lifetimes has enriched the liveness
     // info with maximized liveness information.
 
@@ -461,9 +466,6 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
   // MarkUnresolvedNonCopyableValueInst in Raw SIL. This ensures we do not
   // miss any.
   //
-  // NOTE: destroys is a separate array that we use to avoid iterator
-  // invalidation when cleaning up destroy_value of guaranteed checked values.
-  SmallVector<DestroyValueInst *, 8> destroys;
   while (!moveIntroducersToProcess.empty()) {
     auto *markedInst = moveIntroducersToProcess.pop_back_val();
 
@@ -473,80 +475,106 @@ void MoveOnlyObjectCheckerPImpl::check(DominanceInfo *domTree,
     if (!diagnosticEmitter.emittedDiagnosticForValue(markedInst)) {
       if (markedInst->getCheckKind() ==
           MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign) {
-        if (auto *cvi = dyn_cast<CopyValueInst>(markedInst->getOperand())) {
-          SingleValueInstruction *i = cvi;
-          if (auto *copyToMoveOnly =
-                  dyn_cast<CopyableToMoveOnlyWrapperValueInst>(
-                      cvi->getOperand())) {
-            i = copyToMoveOnly;
-          }
-
-          // TODO: Instead of pattern matching specific code generation patterns,
-          // we should be able to eliminate any `copy_value` whose canonical
-          // lifetime fits within the borrow scope of the borrowed value being
-          // copied from.
-
-          // Handle:
-          //
-          // bb(%arg : @guaranteed $Type):
-          //   %copy = copy_value %arg
-          //   %mark = mark_unresolved_non_copyable_value [no_consume_or_assign] %copy
-          if (auto *arg = dyn_cast<SILArgument>(i->getOperand(0))) {
-            if (arg->getOwnershipKind() == OwnershipKind::Guaranteed) {
-              for (auto *use : markedInst->getConsumingUses()) {
-                destroys.push_back(cast<DestroyValueInst>(use->getUser()));
-              }
-              while (!destroys.empty())
-                destroys.pop_back_val()->eraseFromParent();
-              markedInst->replaceAllUsesWith(arg);
-              markedInst->eraseFromParent();
-              cvi->eraseFromParent();
-              continue;
-            }
-          }
-
-          // Handle:
-          //
-          //   %1 = load_borrow %0
-          //   %2 = copy_value %1
-          //   %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
-          if (auto *lbi = dyn_cast<LoadBorrowInst>(i->getOperand(0))) {
-            for (auto *use : markedInst->getConsumingUses()) {
-              destroys.push_back(cast<DestroyValueInst>(use->getUser()));
-            }
-            while (!destroys.empty())
-              destroys.pop_back_val()->eraseFromParent();
-            markedInst->replaceAllUsesWith(lbi);
-            markedInst->eraseFromParent();
-            cvi->eraseFromParent();
-            continue;
-          }
-          
-          // Handle:
-          //   (%yield, ..., %handle) = begin_apply
-          //   %copy = copy_value %yield
-          //   %mark = mark_unresolved_noncopyable_value [no_consume_or_assign] %copy
-          if (auto bai = dyn_cast_or_null<BeginApplyInst>(i->getOperand(0)->getDefiningInstruction())) {
-            if (i->getOperand(0)->getOwnershipKind() == OwnershipKind::Guaranteed) {
-              for (auto *use : markedInst->getConsumingUses()) {
-                destroys.push_back(cast<DestroyValueInst>(use->getUser()));
-              }
-              while (!destroys.empty())
-                destroys.pop_back_val()->eraseFromParent();
-              markedInst->replaceAllUsesWith(i->getOperand(0));
-              markedInst->eraseFromParent();
-              cvi->eraseFromParent();
-              continue;
-            }
-          }
+        if (eraseMarkWithCopiedOperand(markedInst)) {
+          changed = true;
+          continue;
         }
       }
+      markedInst->replaceAllUsesWith(markedInst->getOperand());
+      markedInst->eraseFromParent();
+      changed = true;
     }
-
-    markedInst->replaceAllUsesWith(markedInst->getOperand());
-    markedInst->eraseFromParent();
-    changed = true;
   }
+}
+
+/// Erase a copy_value operand of MarkUnresolvedNonCopyableValueInst.
+bool MoveOnlyObjectCheckerPImpl::eraseMarkWithCopiedOperand(
+  MarkUnresolvedNonCopyableValueInst *markedInst)
+{
+  auto *cvi = dyn_cast<CopyValueInst>(markedInst->getOperand());
+  if (!cvi)
+    return false;
+
+  auto replacement = cvi->getOperand();
+  auto orig = replacement;
+  while (true) {
+    if (auto *copyToMoveOnly =
+        dyn_cast<CopyableToMoveOnlyWrapperValueInst>(orig)) {
+      orig = copyToMoveOnly->getOperand();
+      continue;
+    }
+    if (auto *markDep = dyn_cast<MarkDependenceInst>(orig)) {
+      orig = markDep->getValue();
+      continue;
+    }
+    break;
+  }
+
+  // TODO: Instead of pattern matching specific code generation patterns,
+  // we should be able to eliminate any `copy_value` whose canonical
+  // lifetime fits within the borrow scope of the borrowed value being
+  // copied from.
+
+  // NOTE: destroys is a separate array that we use to avoid iterator
+  // invalidation when cleaning up destroy_value of guaranteed checked values.
+  SmallVector<DestroyValueInst *, 8> destroys;
+
+  // Handle:
+  //
+  // bb(%arg : @guaranteed $Type):
+  //   %copy = copy_value %arg
+  //   %mark = mark_unresolved_non_copyable_value [no_consume_or_assign]
+  //   %copy
+  if (auto *arg = dyn_cast<SILArgument>(orig)) {
+    if (arg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      for (auto *use : markedInst->getConsumingUses()) {
+        destroys.push_back(cast<DestroyValueInst>(use->getUser()));
+      }
+      while (!destroys.empty())
+        destroys.pop_back_val()->eraseFromParent();
+      markedInst->replaceAllUsesWith(replacement);
+      markedInst->eraseFromParent();
+      cvi->eraseFromParent();
+      return true;
+    }
+  }
+
+  // Handle:
+  //
+  //   %1 = load_borrow %0
+  //   %2 = copy_value %1
+  //   %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
+  if (isa<LoadBorrowInst>(orig)) {
+    for (auto *use : markedInst->getConsumingUses()) {
+      destroys.push_back(cast<DestroyValueInst>(use->getUser()));
+    }
+    while (!destroys.empty())
+      destroys.pop_back_val()->eraseFromParent();
+    markedInst->replaceAllUsesWith(replacement);
+    markedInst->eraseFromParent();
+    cvi->eraseFromParent();
+    return true;
+  }
+
+  // Handle:
+  //   (%yield, ..., %handle) = begin_apply
+  //   %copy = copy_value %yield
+  //   %mark = mark_unresolved_noncopyable_value [no_consume_or_assign]
+  //   %copy
+  if (isa_and_nonnull<BeginApplyInst>(orig->getDefiningInstruction())) {
+    if (orig->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      for (auto *use : markedInst->getConsumingUses()) {
+        destroys.push_back(cast<DestroyValueInst>(use->getUser()));
+      }
+      while (!destroys.empty())
+        destroys.pop_back_val()->eraseFromParent();
+      markedInst->replaceAllUsesWith(replacement);
+      markedInst->eraseFromParent();
+      cvi->eraseFromParent();
+      return true;
+    }
+  }
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -560,6 +588,6 @@ bool MoveOnlyObjectChecker::check(
          "Should only call this with actual insts to check?!");
   MoveOnlyObjectCheckerPImpl checker(instsToCheck[0]->getFunction(), allocator,
                                      diagnosticEmitter, instsToCheck);
-  checker.check(domTree, poa);
+  checker.check(domTree, deadEndBlocksAnalysis, poa);
   return checker.changed;
 }

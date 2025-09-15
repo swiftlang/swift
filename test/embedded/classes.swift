@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -parse-as-library -enable-experimental-feature Embedded -c -o %t/main.o
-// RUN: %target-clang %t/main.o -o %t/a.out -dead_strip
+// RUN: %target-clang %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 class MyClass {
   init() { print("MyClass.init") }
@@ -15,15 +15,42 @@ class MyClass {
 }
 
 class MySubClass: MyClass {
+  var x = 27
+
   override init() { print("MySubClass.init") }
   deinit { print("MySubClass.deinit") }
   override func foo() { print("MySubClass.foo") }
+
+  func printX() {
+    print(x)
+  }
 }
 
 class MySubSubClass: MySubClass {
   override init() { print("MySubSubClass.init") }
   deinit { print("MySubSubClass.deinit") }
   override func foo() { print("MySubSubClass.foo") }
+}
+
+class OtherSubClass: MyClass {}
+
+func testCasting(_ title: StaticString, _ c: MyClass) {
+  print(title, terminator: "")
+  if let s = c as? MySubClass {
+    s.printX()
+  } else {
+    print("-")
+  }
+}
+
+public class DynamicSelfClass {
+  public static let ds = DynamicSelfClass()
+  public static let i: Int = 42
+  var x: Int
+
+  public init() {
+    self.x = Self.i
+  }
 }
 
 @main
@@ -57,7 +84,7 @@ struct Main {
     // CHECK: MySubClass.foo
     // CHECK: MySubSubClass.foo
     print("")
-    
+
     print("5") // CHECK: 5
     o.0 = nil
     // CHECK: MyClass.deinit
@@ -69,5 +96,17 @@ struct Main {
     // CHECK: MySubClass.deinit
     // CHECK: MyClass.deinit
     print("")
+
+    // CHECK: base: -
+    testCasting("base: ", MyClass())
+    // CHECK: sub: 27
+    testCasting("sub: ", MySubClass())
+    // CHECK: subsub: 27
+    testCasting("subsub: ", MySubSubClass())
+    // CHECK: other: -
+    testCasting("other: ", OtherSubClass())
+
+    // CHECK: 42
+    print(DynamicSelfClass.ds.x)
   }
 }

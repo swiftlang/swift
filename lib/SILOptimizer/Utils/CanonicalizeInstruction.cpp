@@ -18,6 +18,7 @@
 
 // CanonicalizeInstruction defines a default DEBUG_TYPE: "sil-canonicalize"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -547,6 +548,10 @@ static SILBasicBlock::iterator
 eliminateUnneededForwardingUnarySingleValueInst(SingleValueInstruction *inst,
                                                 CanonicalizeInstruction &pass) {
   auto next = std::next(inst->getIterator());
+  if (inst->getType().isValueTypeWithDeinit()) {
+    // Avoid bypassing non-Copyable struct/enum deinitializers.
+    return next;
+  }
   if (isa<DropDeinitInst>(inst))
     return next;
   if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(inst)) {

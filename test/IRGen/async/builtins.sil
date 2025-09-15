@@ -8,6 +8,11 @@ sil_stage canonical
 
 import Builtin
 import Swift
+import _Concurrency
+
+struct Pair<T> {
+  var value: (T, T)
+}
 
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @get_task(ptr swiftasync %0)
 sil hidden [ossa] @get_task : $@async @convention(thin) () -> @owned Builtin.NativeObject {
@@ -30,39 +35,43 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_future
-sil hidden [ossa] @launch_future : $@convention(method) <T> (Int, @owned @Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) -> () {
-bb0(%flags : $Int, %taskFunction: @owned $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>):
+sil hidden [ossa] @launch_future : $@convention(method) <T> (Int, @owned @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) -> () {
+bb0(%flags : $Int, %taskFunction: @owned $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>):
   // CHECK-NOT: br i1
   // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create([[INT]] %0, ptr null, ptr %T, ptr %1, ptr %2)
   %optSerialExecutor = enum $Optional<Builtin.Executor>, #Optional.none
   %optTaskGroup = enum $Optional<Builtin.RawPointer>, #Optional.none
   %optTaskExecutor = enum $Optional<Builtin.Executor>, #Optional.none
-  %20 = builtin "createAsyncTask"<T>(%flags : $Int, %optSerialExecutor : $Optional<Builtin.Executor>, %optTaskGroup : $Optional<Builtin.RawPointer>, %optTaskExecutor : $Optional<Builtin.Executor>, %taskFunction : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %optTaskExecutorOwned = enum $Optional<any TaskExecutor>, #Optional.none
+  %taskName = enum $Optional<Builtin.RawPointer>, #Optional.none
+  %20 = builtin "createAsyncTask"<T>(%flags : $Int, %optSerialExecutor : $Optional<Builtin.Executor>, %optTaskGroup : $Optional<Builtin.RawPointer>, %optTaskExecutor : $Optional<Builtin.Executor>, %optTaskExecutorOwned : $Optional<any TaskExecutor>, %taskName : $Optional<Builtin.RawPointer>, %taskFunction : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
   destroy_value %20 : $(Builtin.NativeObject, Builtin.RawPointer)
   %21 = tuple ()
   return %21 : $()
 }
 
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_future_on(
-sil hidden [ossa] @launch_future_on : $@convention(method) <T> (Int, Builtin.Executor, @owned @Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) -> () {
-bb0(%flags : $Int, %serialExecutor : $Builtin.Executor, %taskFunction: @owned $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>):
+sil hidden [ossa] @launch_future_on : $@convention(method) <T> (Int, Builtin.Executor, @owned @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) -> () {
+bb0(%flags : $Int, %serialExecutor : $Builtin.Executor, %taskFunction: @owned $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>):
   // CHECK: [[EXECUTOR_RECORD:%.*]] = alloca %swift.serial_executor_task_option
   // CHECK-NOT: br i1
-  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds %swift.serial_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 0
-  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
+  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.serial_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 0
+  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
   // CHECK: store [[INT]] 0, ptr [[FLAGS_GEP]], align
-  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
+  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
   // CHECK: store ptr null, ptr [[PARENT_GEP]], align
-  // CHECK: [[EXECUTOR_GEP:%.*]] = getelementptr inbounds %swift.serial_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 1
-  // CHECK: [[EXECUTOR_IDENT_GEP:%.*]] = getelementptr inbounds %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 0
+  // CHECK: [[EXECUTOR_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.serial_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 1
+  // CHECK: [[EXECUTOR_IDENT_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 0
   // CHECK: store [[INT]] %1, ptr [[EXECUTOR_IDENT_GEP]], align
-  // CHECK: [[EXECUTOR_IMPL_GEP:%.*]] = getelementptr inbounds %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 1
+  // CHECK: [[EXECUTOR_IMPL_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 1
   // CHECK: store [[INT]] %2, ptr [[EXECUTOR_IMPL_GEP]], align
   // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create([[INT]] %0, ptr [[EXECUTOR_RECORD]], ptr %T, ptr %3, ptr %4)
   %optSerialExecutor = enum $Optional<Builtin.Executor>, #Optional.some, %serialExecutor : $Builtin.Executor
   %optTaskGroup = enum $Optional<Builtin.RawPointer>, #Optional.none
   %optTaskExecutor = enum $Optional<Builtin.Executor>, #Optional.none
-  %20 = builtin "createAsyncTask"<T>(%flags : $Int, %optSerialExecutor : $Optional<Builtin.Executor>, %optTaskGroup : $Optional<Builtin.RawPointer>, %optTaskExecutor : $Optional<Builtin.Executor>, %taskFunction : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %optTaskExecutorOwned = enum $Optional<any TaskExecutor>, #Optional.none
+  %taskName = enum $Optional<Builtin.RawPointer>, #Optional.none
+  %20 = builtin "createAsyncTask"<T>(%flags : $Int, %optSerialExecutor : $Optional<Builtin.Executor>, %optTaskGroup : $Optional<Builtin.RawPointer>, %optTaskExecutor : $Optional<Builtin.Executor>, %optTaskExecutorOwned : $Optional<any TaskExecutor>, %taskName : $Optional<Builtin.RawPointer>, %taskFunction : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
   destroy_value %20 : $(Builtin.NativeObject, Builtin.RawPointer)
   %21 = tuple ()
   return %21 : $()
@@ -71,20 +80,22 @@ bb0(%flags : $Int, %serialExecutor : $Builtin.Executor, %taskFunction: @owned $@
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_future_in_group
 // CHECK: [[OPTIONS:%.*]] = alloca %swift.task_group_task_option
 // CHECK-NOT: br i1
-// CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 0
-// CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
+// CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 0
+// CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
 // CHECK: store [[INT]] 1, ptr [[FLAGS_GEP]], align
-// CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
+// CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
 // CHECK: store ptr null, ptr [[PARENT_GEP]], align
-// CHECK: [[GROUP_GEP:%.*]] = getelementptr inbounds %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 1
+// CHECK: [[GROUP_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 1
 // CHECK: store ptr %0, ptr [[GROUP_GEP]], align
 // CHECK: call swiftcc %swift.async_task_and_context @swift_task_create([[INT]] %3, ptr [[OPTIONS]],
-sil hidden @launch_future_in_group : $@convention(thin) (Builtin.RawPointer, @owned @Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>, Int) -> () {
-bb0(%taskGroup : $Builtin.RawPointer, %taskFunction : $@Sendable @async @callee_guaranteed  @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>, %flags: $Int):
+sil hidden @launch_future_in_group : $@convention(thin) (Builtin.RawPointer, @owned @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>, Int) -> () {
+bb0(%taskGroup : $Builtin.RawPointer, %taskFunction : $@async @callee_guaranteed  @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>, %flags: $Int):
   %optSerialExecutor = enum $Optional<Builtin.Executor>, #Optional.none
   %optTaskGroup = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt, %taskGroup : $Builtin.RawPointer
   %optTaskExecutor = enum $Optional<Builtin.Executor>, #Optional.none
-  %9 = builtin "createAsyncTask"<Int>(%flags : $Int, %optSerialExecutor : $Optional<Builtin.Executor>, %optTaskGroup : $Optional<Builtin.RawPointer>, %optTaskExecutor : $Optional<Builtin.Executor>, %taskFunction : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %optTaskExecutorOwned = enum $Optional<any TaskExecutor>, #Optional.none
+  %taskName = enum $Optional<Builtin.RawPointer>, #Optional.none
+  %9 = builtin "createAsyncTask"<Int>(%flags : $Int, %optSerialExecutor : $Optional<Builtin.Executor>, %optTaskGroup : $Optional<Builtin.RawPointer>, %optTaskExecutor : $Optional<Builtin.Executor>, %optTaskExecutorOwned : $Optional<any TaskExecutor>, %taskName : $Optional<Builtin.RawPointer>, %taskFunction : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>) : $(Builtin.NativeObject, Builtin.RawPointer)
   %10 = tuple_extract %9 : $(Builtin.NativeObject, Builtin.RawPointer), 0
   strong_release %10 : $Builtin.NativeObject
   %12 = tuple ()
@@ -92,19 +103,19 @@ bb0(%taskGroup : $Builtin.RawPointer, %taskFunction : $@Sendable @async @callee_
 }
 
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_future_opt_task_group
-sil hidden [ossa] @launch_future_opt_task_group : $@convention(method) <T> (Int, Optional<Builtin.RawPointer>, @owned @Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) -> () {
-bb0(%flags : $Int, %optTaskGroup : $Optional<Builtin.RawPointer>, %taskFunction: @owned $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>):
+sil hidden [ossa] @launch_future_opt_task_group : $@convention(method) <T> (Int, Optional<Builtin.RawPointer>, @owned @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) -> () {
+bb0(%flags : $Int, %optTaskGroup : $Optional<Builtin.RawPointer>, %taskFunction: @owned $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>):
   // CHECK: [[OPTIONS:%.*]] = alloca %swift.task_group_task_option
   // CHECK: [[GROUP_IS_NULL:%.*]] = icmp eq [[INT]] %1, 0
   // CHECK: br i1 [[GROUP_IS_NULL]], label %task_group.cont, label %task_group.some
   // CHECK: task_group.some:
   // CHECK: [[GROUP:%.*]] = inttoptr [[INT]] %1 to ptr
-  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 0
-  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
+  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 0
+  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
   // CHECK: store [[INT]] 1, ptr [[FLAGS_GEP]], align
-  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
+  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
   // CHECK: store ptr null, ptr [[PARENT_GEP]], align
-  // CHECK: [[GROUP_GEP:%.*]] = getelementptr inbounds %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 1
+  // CHECK: [[GROUP_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_group_task_option, ptr [[OPTIONS]], i32 0, i32 1
   // CHECK: store ptr [[GROUP]], ptr [[GROUP_GEP]], align
   // CHECK: br label %task_group.cont
   // CHECK: task_group.cont:
@@ -113,21 +124,25 @@ bb0(%flags : $Int, %optTaskGroup : $Optional<Builtin.RawPointer>, %taskFunction:
   
   %optSerialExecutor = enum $Optional<Builtin.Executor>, #Optional.none
   %optTaskExecutor = enum $Optional<Builtin.Executor>, #Optional.none
-  %20 = builtin "createAsyncTask"<T>(%flags : $Int, %optSerialExecutor : $Optional<Builtin.Executor>, %optTaskGroup : $Optional<Builtin.RawPointer>, %optTaskExecutor : $Optional<Builtin.Executor>, %taskFunction : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %optTaskExecutorOwned = enum $Optional<any TaskExecutor>, #Optional.none
+  %taskName = enum $Optional<Builtin.RawPointer>, #Optional.none
+  %20 = builtin "createAsyncTask"<T>(%flags : $Int, %optSerialExecutor : $Optional<Builtin.Executor>, %optTaskGroup : $Optional<Builtin.RawPointer>, %optTaskExecutor : $Optional<Builtin.Executor>, %optTaskExecutorOwned : $Optional<any TaskExecutor>, %taskName : $Optional<Builtin.RawPointer>, %taskFunction : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
   destroy_value %20 : $(Builtin.NativeObject, Builtin.RawPointer)
   %result = tuple ()
   return %result : $()
 }
 
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_discarding_future_in_group
-sil hidden @launch_discarding_future_in_group : $@convention(thin) (Builtin.RawPointer, @owned @Sendable @async @callee_guaranteed () -> @error Error, Int) -> () {
-bb0(%taskGroup : $Builtin.RawPointer, %taskFunction : $@Sendable @async @callee_guaranteed () -> @error Error, %flags: $Int):
+sil hidden @launch_discarding_future_in_group : $@convention(thin) (Builtin.RawPointer, @owned @async @callee_guaranteed () -> @error Error, Int) -> () {
+bb0(%taskGroup : $Builtin.RawPointer, %taskFunction : $@async @callee_guaranteed () -> @error Error, %flags: $Int):
   %optSerialExecutor = enum $Optional<Builtin.Executor>, #Optional.none
   %optTaskGroup = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt, %taskGroup : $Builtin.RawPointer
   %optTaskExecutor = enum $Optional<Builtin.Executor>, #Optional.none
+  %optTaskExecutorOwned = enum $Optional<any TaskExecutor>, #Optional.none
+  %taskName = enum $Optional<Builtin.RawPointer>, #Optional.none
   // CHECK-NOT: br i1
   // CHECK: call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create(
-  %9 = builtin "createAsyncTask"(%flags : $Int, %optSerialExecutor : $Optional<Builtin.Executor>, %optTaskGroup : $Optional<Builtin.RawPointer>, %optTaskExecutor : $Optional<Builtin.Executor>, %taskFunction : $@Sendable @async @callee_guaranteed () -> @error Error) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %9 = builtin "createAsyncTask"(%flags : $Int, %optSerialExecutor : $Optional<Builtin.Executor>, %optTaskGroup : $Optional<Builtin.RawPointer>, %optTaskExecutor : $Optional<Builtin.Executor>, %optTaskExecutorOwned : $Optional<any TaskExecutor>, %taskName : $Optional<Builtin.RawPointer>, %taskFunction : $@async @callee_guaranteed () -> @error Error) : $(Builtin.NativeObject, Builtin.RawPointer)
   %10 = tuple_extract %9 : $(Builtin.NativeObject, Builtin.RawPointer), 0
   strong_release %10 : $Builtin.NativeObject
   %12 = tuple ()
@@ -135,36 +150,38 @@ bb0(%taskGroup : $Builtin.RawPointer, %taskFunction : $@Sendable @async @callee_
 }
 
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_discarding_future_in_group_with_executor
-sil hidden @launch_discarding_future_in_group_with_executor : $@convention(thin) (Builtin.RawPointer, Builtin.Executor, @owned @Sendable @async @callee_guaranteed () -> @error Error, Int) -> () {
-bb0(%taskGroup : $Builtin.RawPointer, %taskExecutor : $Builtin.Executor, %taskFunction : $@Sendable @async @callee_guaranteed () -> @error Error, %flags: $Int):
+sil hidden @launch_discarding_future_in_group_with_executor : $@convention(thin) (Builtin.RawPointer, Builtin.Executor, @owned @async @callee_guaranteed () -> @error Error, Int) -> () {
+bb0(%taskGroup : $Builtin.RawPointer, %taskExecutor : $Builtin.Executor, %taskFunction : $@async @callee_guaranteed () -> @error Error, %flags: $Int):
   %optSerialExecutor = enum $Optional<Builtin.Executor>, #Optional.none
   %optTaskGroup = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt, %taskGroup : $Builtin.RawPointer
   %optTaskExecutor = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, %taskExecutor : $Builtin.Executor
+  %optTaskExecutorOwned = enum $Optional<any TaskExecutor>, #Optional.none
+  %taskName = enum $Optional<Builtin.RawPointer>, #Optional.none
   // CHECK: [[GROUP_RECORD:%.*]] = alloca %swift.task_group_task_option
   // CHECK: [[EXECUTOR_RECORD:%.*]] = alloca %swift.task_executor_task_option
   // CHECK-NOT: br i1
 
-  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds %swift.task_group_task_option, ptr [[GROUP_RECORD]], i32 0, i32 0
-  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
+  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_group_task_option, ptr [[GROUP_RECORD]], i32 0, i32 0
+  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
   // CHECK: store [[INT]] 1, ptr [[FLAGS_GEP]], align
-  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
+  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
   // CHECK: store ptr null, ptr [[PARENT_GEP]], align
-  // CHECK: [[GROUP_GEP:%.*]] = getelementptr inbounds %swift.task_group_task_option, ptr [[GROUP_RECORD]], i32 0, i32 1
+  // CHECK: [[GROUP_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_group_task_option, ptr [[GROUP_RECORD]], i32 0, i32 1
   // CHECK: store ptr %0, ptr [[GROUP_GEP]], align
 
-  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds %swift.task_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 0
-  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
+  // CHECK: [[BASE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 0
+  // CHECK: [[FLAGS_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 0
   // CHECK: store [[INT]] 5, ptr [[FLAGS_GEP]], align
-  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
+  // CHECK: [[PARENT_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_option, ptr [[BASE_GEP]], i32 0, i32 1
   // CHECK: store ptr [[GROUP_RECORD]], ptr [[PARENT_GEP]], align
-  // CHECK: [[EXECUTOR_GEP:%.*]] = getelementptr inbounds %swift.task_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 1
-  // CHECK: [[EXECUTOR_IDENT_GEP:%.*]] = getelementptr inbounds %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 0
+  // CHECK: [[EXECUTOR_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.task_executor_task_option, ptr [[EXECUTOR_RECORD]], i32 0, i32 1
+  // CHECK: [[EXECUTOR_IDENT_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 0
   // CHECK: store [[INT]] %1, ptr [[EXECUTOR_IDENT_GEP]], align
-  // CHECK: [[EXECUTOR_IMPL_GEP:%.*]] = getelementptr inbounds %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 1
+  // CHECK: [[EXECUTOR_IMPL_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.executor, ptr [[EXECUTOR_GEP]], i32 0, i32 1
   // CHECK: store [[INT]] %2, ptr [[EXECUTOR_IMPL_GEP]], align
 
   // CHECK: call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create([[INT]] %5, ptr [[EXECUTOR_RECORD]]
-  %9 = builtin "createAsyncTask"(%flags : $Int, %optSerialExecutor : $Optional<Builtin.Executor>, %optTaskGroup : $Optional<Builtin.RawPointer>, %optTaskExecutor: $Optional<Builtin.Executor>, %taskFunction : $@Sendable @async @callee_guaranteed () -> @error Error) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %9 = builtin "createAsyncTask"(%flags : $Int, %optSerialExecutor : $Optional<Builtin.Executor>, %optTaskGroup : $Optional<Builtin.RawPointer>, %optTaskExecutor: $Optional<Builtin.Executor>, %optTaskExecutorOwned : $Optional<any TaskExecutor>, %taskName : $Optional<Builtin.RawPointer>, %taskFunction : $@async @callee_guaranteed () -> @error Error) : $(Builtin.NativeObject, Builtin.RawPointer)
   %10 = tuple_extract %9 : $(Builtin.NativeObject, Builtin.RawPointer), 0
   strong_release %10 : $Builtin.NativeObject
   %12 = tuple ()
@@ -172,13 +189,15 @@ bb0(%taskGroup : $Builtin.RawPointer, %taskExecutor : $Builtin.Executor, %taskFu
 }
 
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_void_future
-sil hidden [ossa] @launch_void_future : $@convention(method) (Int, Builtin.RawPointer, @owned @Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) -> () {
-bb0(%flags : $Int, %taskGroup : $Builtin.RawPointer, %taskFunction: @owned $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>):
+sil hidden [ossa] @launch_void_future : $@convention(method) (Int, Builtin.RawPointer, @owned @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) -> () {
+bb0(%flags : $Int, %taskGroup : $Builtin.RawPointer, %taskFunction: @owned $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>):
   %optSerialExecutor = enum $Optional<Builtin.Executor>, #Optional.none
   %optTaskGroup = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt, %taskGroup : $Builtin.RawPointer
   %optTaskExecutor = enum $Optional<Builtin.Executor>, #Optional.none
+  %optTaskExecutorOwned = enum $Optional<any TaskExecutor>, #Optional.none
+  %taskName = enum $Optional<Builtin.RawPointer>, #Optional.none
   // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create(
-  %20 = builtin "createAsyncTask"<()>(%flags : $Int, %optSerialExecutor : $Optional<Builtin.Executor>, %optTaskGroup : $Optional<Builtin.RawPointer>, %optTaskExecutor : $Optional<Builtin.Executor>, %taskFunction : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %20 = builtin "createAsyncTask"<()>(%flags : $Int, %optSerialExecutor : $Optional<Builtin.Executor>, %optTaskGroup : $Optional<Builtin.RawPointer>, %optTaskExecutor : $Optional<Builtin.Executor>, %optTaskExecutorOwned : $Optional<any TaskExecutor>, %taskName : $Optional<Builtin.RawPointer>, %taskFunction : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) : $(Builtin.NativeObject, Builtin.RawPointer)
   destroy_value %20 : $(Builtin.NativeObject, Builtin.RawPointer)
   %21 = tuple ()
   return %21 : $()
@@ -187,9 +206,9 @@ bb0(%flags : $Int, %taskGroup : $Builtin.RawPointer, %taskFunction: @owned $@Sen
 // CHECK-LABEL: define hidden swiftcc void @resume_nonthrowing_continuation
 sil hidden [ossa] @resume_nonthrowing_continuation : $(@in Builtin.NativeObject, Builtin.RawUnsafeContinuation) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.RawUnsafeContinuation):
-  // CHECK: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds %swift.task, ptr %1, i32 0, i32 8
+  // CHECK: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds{{.*}} %swift.task, ptr %1, i32 0, i32 8
   // CHECK-NEXT: [[CONTEXT_OPAQUE:%.*]] = load ptr, ptr [[CONTEXT_SLOT]], align
-  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds %swift.continuation_context, ptr [[CONTEXT_OPAQUE]], i32 0, i32 4
+  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds{{.*}} %swift.continuation_context, ptr [[CONTEXT_OPAQUE]], i32 0, i32 4
   // CHECK-NEXT: [[RESULT_ADDR_OPAQUE:%.*]] = load ptr, ptr [[RESULT_ADDR_SLOT]], align
   // CHECK-NEXT: [[VALUE:%.*]] = load ptr, ptr %0, align
   // CHECK-NEXT: store ptr [[VALUE]], ptr [[RESULT_ADDR_OPAQUE]], align
@@ -203,9 +222,9 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.RawUnsafeContinuation):
 // CHECK-LABEL: define hidden swiftcc void @resume_throwing_continuation
 sil hidden [ossa] @resume_throwing_continuation : $(@in Builtin.NativeObject, Builtin.RawUnsafeContinuation) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.RawUnsafeContinuation):
-  // CHECK: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds %swift.task, ptr %1, i32 0, i32 8
+  // CHECK: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds{{.*}} %swift.task, ptr %1, i32 0, i32 8
   // CHECK-NEXT: [[CONTEXT_OPAQUE:%.*]] = load ptr, ptr [[CONTEXT_SLOT]], align
-  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds %swift.continuation_context, ptr [[CONTEXT_OPAQUE]], i32 0, i32 4
+  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds{{.*}} %swift.continuation_context, ptr [[CONTEXT_OPAQUE]], i32 0, i32 4
   // CHECK-NEXT: [[RESULT_ADDR_OPAQUE:%.*]] = load ptr, ptr [[RESULT_ADDR_SLOT]], align
   // CHECK-NEXT: [[VALUE:%.*]] = load ptr, ptr %0, align
   // CHECK-NEXT: store ptr [[VALUE]], ptr [[RESULT_ADDR_OPAQUE]], align
@@ -226,6 +245,33 @@ bb0(%0 : @owned $Error, %1 : $Builtin.RawUnsafeContinuation):
   return %21 : $()
 }
 
+// CHECK-LABEL: define {{.*}} void @async_let_generic(
+sil public @async_let_generic : $@convention(thin) @async <T> () -> @out Pair<T> {
+bb0(%out : $*Pair<T>):
+  %1 = function_ref @async_let_generic_helper : $@convention(thin) @Sendable @async <τ_0_0> () -> (@out Pair<τ_0_0>, @error any Error)
+  %2 = thin_to_thick_function %1 to $@Sendable @async <τ_0_0> () -> (@out Pair<τ_0_0>, @error any Error)
+  %fn = convert_function %2 to $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Pair<T>>
+  %outPtr = address_to_pointer %out to $Builtin.RawPointer
+  %scratch = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
+
+  // We've set up a function that has no reason to request type metadata
+  // for Pair<T> except to pass it to swift_asyncLet_begin. Make sure that we
+  // request complete metadata.
+
+  // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s8builtins4PairVMa"([[INT]] 0, ptr %T)
+  // CHECK-NEXT:    [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+  // CHECK-NEXT:    call swiftcc void @swift_asyncLet_begin({{.*}}, ptr [[METADATA]], {{.*}})
+  %asyncLet = builtin "startAsyncLetWithLocalBuffer"<Pair<T>>(%scratch, %fn, %outPtr) : $Builtin.RawPointer
+  %t1 = builtin "endAsyncLetLifetime"(%asyncLet, %fn) : $()
+  %result = tuple ()
+  return %result
+}
+
+sil private @async_let_generic_helper : $@convention(thin) @Sendable @async <T> () -> (@out Pair<T>, @error any Error) {
+bb0(%out : $*Pair<T>):
+  unreachable
+}
+
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc  void @task_group_create_destroy
 sil hidden [ossa] @task_group_create_destroy : $@async () -> () {
 bb0:
@@ -243,6 +289,31 @@ bb0:
   return %21 : $()
 }
 
+// CHECK-LABEL: define hidden swift{{(tail)?}}cc  void @task_group_create_destroy_generic
+sil hidden [ossa] @task_group_create_destroy_generic : $@async <T> () -> () {
+bb0:
+  // CHECK:      [[TASKGROUP:%.*]] = alloca [32 x ptr], align 16
+  // CHECK: call void @llvm.lifetime.start.p0(i64 -1, ptr [[TASKGROUP]])
+
+  // We've set up a function that has no reason to request type metadata
+  // for Pair<T> except to pass it to swift_taskGroup_initialize. Make sure
+  // that we request complete metadata.
+
+  // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s8builtins4PairVMa"([[INT]] 0, ptr %T)
+  // CHECK-NEXT:    [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+
+  // CHECK-NEXT: call swiftcc void @swift_taskGroup_initialize(ptr [[TASKGROUP]], ptr [[METADATA]])
+
+  %0 = metatype $@thin Pair<T>.Type
+  %1 = builtin "createTaskGroup"<Pair<T>>(%0: $@thin Pair<T>.Type) : $Builtin.RawPointer
+
+  // CHECK-NEXT: call swiftcc void @swift_taskGroup_destroy(ptr [[TASKGROUP]])
+  // CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 -1, ptr [[TASKGROUP]])
+  builtin "destroyTaskGroup"(%1 : $Builtin.RawPointer) : $()
+
+  %21 = tuple ()
+  return %21 : $()
+}
 
 // CHECK-LABEL: define{{.*}} swiftcc void @testRunInline(
 // CHECK-SAME:      ptr noalias sret(%swift.opaque) [[RESULT:%[^,]+]],
@@ -259,5 +330,27 @@ bb0:
 sil hidden @testRunInline : $@convention(thin) <T> (@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) -> @out T {
 entry(%result : $*T, %closure : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>):
   %void = builtin "taskRunInline"<T>(%result : $*T, %closure : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) : $()
+  return %void : $()
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc void @testRunInlineGeneric(
+// CHECK-SAME:      ptr noalias sret(%swift.opaque) [[RESULT:%[^,]+]],
+// CHECK-SAME:      ptr [[CLOSURE:%[^,]+]],
+// CHECK-SAME:      ptr [[CLOSURE_CONTEXT:%[^,]+]],
+// CHECK-SAME:      ptr %T
+// CHECK-SAME:  {
+
+//   Make sure we request complete metadata.
+// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s8builtins4PairVMa"([[INT]] 0, ptr %T)
+// CHECK-NEXT:    [[FUTURE_RESULT_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK:         call swiftcc void @swift_task_run_inline(
+// CHECK-SAME:        ptr [[RESULT]],
+// CHECK-SAME:        ptr [[CLOSURE]],
+// CHECK-SAME:        ptr [[CLOSURE_CONTEXT]],
+// CHECK-SAME:        ptr [[FUTURE_RESULT_TYPE]])
+// CHECK:       }
+sil hidden @testRunInlineGeneric : $@convention(thin) <T> (@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Pair<T>>) -> @out T {
+entry(%result : $*T, %closure : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Pair<T>>):
+  %void = builtin "taskRunInline"<Pair<T>>(%result : $*T, %closure : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Pair<T>>) : $()
   return %void : $()
 }

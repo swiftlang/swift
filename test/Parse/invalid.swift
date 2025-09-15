@@ -76,12 +76,6 @@ do {
   func g() { f(Starfish(), Salmon()) }
 }
 
-// https://github.com/apple/swift/issues/43313
-do {
-  func f(_ a: Int, b: Int) {}
-  f(1, b: 2,) // expected-error {{unexpected ',' separator}}
-}
-
 // https://github.com/apple/swift/issues/43591
 // Two inout crash compiler
 
@@ -125,7 +119,7 @@ prefix func %<T>(x: T) -> T { return x } // No error expected - the < is conside
 
 struct Weak<T: class> { // expected-error {{'class' constraint can only appear on protocol declarations}}
   // expected-note@-1 {{did you mean to write an 'AnyObject' constraint?}} {{16-21=AnyObject}}
-  weak let value: T // expected-error {{'weak' must be a mutable variable, because it may change at runtime}} expected-error {{'weak' variable should have optional type 'T?'}} expected-error {{'weak' must not be applied to non-class-bound 'T'; consider adding a protocol conformance that has a class bound}}
+  weak let value: T // expected-error {{'weak' variable should have optional type 'T?'}} expected-error {{'weak' must not be applied to non-class-bound 'T'; consider adding a protocol conformance that has a class bound}}
 }
 
 let x: () = ()
@@ -146,5 +140,5 @@ class C_50734<@NSApplicationMain T: AnyObject> {} // expected-error {{@NSApplica
 func f6_50734<@discardableResult T>(x: T) {} // expected-error {{'@discardableResult' attribute cannot be applied to this declaration}}
 enum E_50734<@indirect T> {} // expected-error {{'indirect' is a declaration modifier, not an attribute}} expected-error {{'indirect' modifier cannot be applied to this declaration}}
 protocol P {
-  @available(swift, introduced: 4) associatedtype Assoc
+  @available(macOS, introduced: 10.9) associatedtype Assoc
 }

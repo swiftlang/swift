@@ -9,18 +9,18 @@
 
 // STRUCT-LABEL: "precise": "s:12NominalTypes6StructV"
 // STRUCT: subHeading
-// STRUCT-NEXT {
-// STRUCT-NEXT   "kind": "keyword",
-// STRUCT-NEXT   "spelling": "struct"
-// STRUCT-NEXT }
-// STRUCT-NEXT {
-// STRUCT-NEXT   "kind": "text",
-// STRUCT-NEXT   "spelling": " "
-// STRUCT-NEXT }
-// STRUCT-NEXT {
-// STRUCT-NEXT   "kind": "identifier",
-// STRUCT-NEXT   "spelling": "Struct"
-// STRUCT-NEXT }
+// STRUCT-NEXT: {
+// STRUCT-NEXT:   "kind": "keyword",
+// STRUCT-NEXT:   "spelling": "struct"
+// STRUCT-NEXT: }
+// STRUCT-NEXT: {
+// STRUCT-NEXT:   "kind": "text",
+// STRUCT-NEXT:   "spelling": " "
+// STRUCT-NEXT: }
+// STRUCT-NEXT: {
+// STRUCT-NEXT:   "kind": "identifier",
+// STRUCT-NEXT:   "spelling": "Struct"
+// STRUCT-NEXT: }
 public struct Struct<T> where T: Sequence {}
 
 // ENUM-LABEL: "precise": "s:12NominalTypes4EnumO"
@@ -59,18 +59,18 @@ public protocol Protocol where T: Sequence {
 
 // CLASS-LABEL: "precise": "s:12NominalTypes5ClassC"
 // CLASS: subHeading
-// CLASS-NEXT {
-// CLASS-NEXT   "kind": "keyword",
-// CLASS-NEXT   "spelling": "class"
-// CLASS-NEXT },
-// CLASS-NEXT {
-// CLASS-NEXT   "kind": "text",
-// CLASS-NEXT   "spelling": " "
-// CLASS-NEXT },
-// CLASS-NEXT {
-// CLASS-NEXT   "kind": "identifier",
-// CLASS-NEXT   "spelling": "Class"
-// CLASS-NEXT }
+// CLASS-NEXT: {
+// CLASS-NEXT:   "kind": "keyword",
+// CLASS-NEXT:   "spelling": "class"
+// CLASS-NEXT: },
+// CLASS-NEXT: {
+// CLASS-NEXT:   "kind": "text",
+// CLASS-NEXT:   "spelling": " "
+// CLASS-NEXT: },
+// CLASS-NEXT: {
+// CLASS-NEXT:   "kind": "identifier",
+// CLASS-NEXT:   "spelling": "Class"
+// CLASS-NEXT: }
 public class Class<T> where T: Sequence {}
 
 // TYPEALIAS-LABEL: "precise": "s:12NominalTypes9TypeAliasa"

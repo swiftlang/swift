@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -emit-sorted-sil %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -emit-sorted-sil -enable-library-evolution %s | %FileCheck -check-prefix=CHECK-RESILIENT %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -emit-sorted-sil %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -emit-sorted-sil -enable-library-evolution %s | %FileCheck -check-prefix=CHECK-RESILIENT %s
 
 public enum E: Int {
   case a, b, c

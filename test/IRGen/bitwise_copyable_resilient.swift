@@ -9,8 +9,14 @@
 // RUN:     -emit-module-path %t/Library.swiftmodule
 
 // RUN: %target-swift-frontend                           \
-// RUN:     %t/Downstream.swift                          \
+// RUN:     %t/DownstreamDiagnostics.swift               \
 // RUN:     -typecheck -verify                           \
+// RUN:     -debug-diagnostic-names                      \
+// RUN:     -I %t
+
+// RUN: %target-swift-frontend                           \
+// RUN:     %t/Downstream.swift                          \
+// RUN:     -emit-irgen                                  \
 // RUN:     -debug-diagnostic-names                      \
 // RUN:     -I %t
 
@@ -29,7 +35,14 @@ public struct Integer {
   var value: Int
 }
 
-//--- Downstream.swift
+public enum Int2: BitwiseCopyable {
+    case zero
+    case one
+    case two
+    case three
+}
+
+//--- DownstreamDiagnostics.swift
 import Library
 
 func take<T: BitwiseCopyable>(_ t: T) {}
@@ -51,3 +64,13 @@ func passWoopsional<T>(_ t: Woopsional<T>) { take(t) } // expected-error    {{ty
 
 extension Integer : @retroactive BitwiseCopyable {} // expected-error {{bitwise_copyable_outside_module}}
 
+struct S_Explicit_With_Int2 {
+  var i: Int2
+}
+
+//--- Downstream.swift
+import Library
+
+class C_With_Int2 {
+  let i = Int2.one
+}

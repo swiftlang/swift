@@ -16,6 +16,7 @@ let CopyToNativeArrayBufferTests = TestSuite("CopyToNativeArrayBufferTests")
 
 extension Array {
   func _rawIdentifier() -> Int {
+    _blackHole(self)
     return unsafeBitCast(self, to: Int.self)
   }
 }

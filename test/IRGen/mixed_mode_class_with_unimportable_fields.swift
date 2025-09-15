@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t/UsingObjCStuff.swiftmodule -module-name UsingObjCStuff -I %t -I %S/Inputs/mixed_mode -swift-version 5 %S/Inputs/mixed_mode/UsingObjCStuff.swift
-// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 4 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-V4 -DWORD=i%target-ptrsize --check-prefix=CHECK-V4-STABLE-ABI-%target-mandates-stable-abi
-// RUN: %target-swift-frontend -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 5 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-V5 -DWORD=i%target-ptrsize --check-prefix=CHECK-V5-STABLE-ABI-%target-mandates-stable-abi
+// RUN: %target-swift-frontend -target %target-pre-stable-abi-triple -emit-module -o %t/UsingObjCStuff.swiftmodule -module-name UsingObjCStuff -I %t -I %S/Inputs/mixed_mode -swift-version 5 %S/Inputs/mixed_mode/UsingObjCStuff.swift
+// RUN: %target-swift-frontend -target %target-pre-stable-abi-triple -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 4 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-V4 -DWORD=i%target-ptrsize --check-prefix=CHECK-V4-STABLE-ABI-%target-mandates-stable-abi
+// RUN: %target-swift-frontend -target %target-pre-stable-abi-triple -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 5 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-V5 -DWORD=i%target-ptrsize --check-prefix=CHECK-V5-STABLE-ABI-%target-mandates-stable-abi
+// RUN: %target-swift-frontend -target %target-stable-abi-triple -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 4 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-V4 -DWORD=i%target-ptrsize --check-prefix=CHECK-V4-STABLE-ABI-TRUE
+// RUN: %target-swift-frontend -target %target-stable-abi-triple -emit-ir -I %t -I %S/Inputs/mixed_mode -module-name main -swift-version 5 %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-V5 -DWORD=i%target-ptrsize --check-prefix=CHECK-V5-STABLE-ABI-TRUE
 
 // REQUIRES: objc_interop
 
@@ -34,9 +36,9 @@ public func accessFinalFields(of holder: ButtHolder) -> (Any, Any) {
 
   // ButtHolder.y is correctly imported in Swift 5 mode, so we can use fixed offsets.
 
-  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, ptr %2, i32 0, i32 1
+  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds{{.*}} %T14UsingObjCStuff10ButtHolderC, ptr %2, i32 0, i32 1
 
-  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, ptr %2, i32 0, i32 3
+  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds{{.*}} %T14UsingObjCStuff10ButtHolderC, ptr %2, i32 0, i32 3
 
   return (holder.x, holder.z)
 }
@@ -61,11 +63,11 @@ public func accessFinalFields(ofSub holder: SubButtHolder) -> (Any, Any, Any) {
   
   // ButtHolder.y is correctly imported in Swift 5 mode, so we can use fixed offsets.
 
-  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, ptr %3, i32 0, i32 1
+  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds{{.*}} %T14UsingObjCStuff10ButtHolderC, ptr %3, i32 0, i32 1
 
-  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, ptr %3, i32 0, i32 3
+  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds{{.*}} %T14UsingObjCStuff10ButtHolderC, ptr %3, i32 0, i32 3
 
-  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T4main13SubButtHolderC, ptr %3, i32 0, i32 4
+  // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds{{.*}} %T4main13SubButtHolderC, ptr %3, i32 0, i32 4
 
   return (holder.x, holder.z, holder.w)
 }

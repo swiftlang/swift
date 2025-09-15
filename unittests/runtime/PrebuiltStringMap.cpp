@@ -15,7 +15,7 @@
 
 static bool stringIsNull(const char *str) { return str == nullptr; }
 
-TEST(PrebuiltStringMapTest, basic) {
+TEST(PrebuiltStringMapTest, PrebuiltStringMap) {
   auto testOnce = [&](unsigned testEntryCount) {
     std::vector<std::pair<std::string, unsigned>> testVector;
     testVector.reserve(testEntryCount);
@@ -32,6 +32,7 @@ TEST(PrebuiltStringMapTest, basic) {
     void *mapAllocation = calloc(1, Map::byteSize(mapSize));
     Map *map = new (mapAllocation) Map(mapSize);
 
+    // Populate the map.
     for (auto &[key, value] : testVector) {
       const char *keyCStr = key.c_str();
       auto *element = map->insert(keyCStr);
@@ -41,6 +42,7 @@ TEST(PrebuiltStringMapTest, basic) {
       element->value = value;
     }
 
+    // Verify that we can find all the test values.
     for (auto &[key, value] : testVector) {
       const char *keyCStr = key.c_str();
       auto *element = map->find(keyCStr);
@@ -63,7 +65,76 @@ TEST(PrebuiltStringMapTest, basic) {
       EXPECT_EQ(element->value, value);
     }
 
+    // Verify that nonexistent keys are not found.
+    const char *nonexistentKey = "ceci n'est pas une clef";
+    auto *element = map->find(nonexistentKey);
+    EXPECT_EQ(element, nullptr);
+
     free(mapAllocation);
+  };
+
+  testOnce(10);
+  testOnce(100);
+  testOnce(1000);
+}
+
+TEST(PrebuiltStringMapTest, PrebuiltAuxDataImplicitStringMap) {
+  auto testOnce = [&](unsigned testEntryCount) {
+    // Test a map containing positive integers, where the key is a string
+    // derived from the integer. The aux data is the negative of the integer.
+    using Map = swift::PrebuiltAuxDataImplicitStringMap<uint64_t, int32_t>;
+
+    auto getKey = [](unsigned n) {
+      std::string key;
+      for (unsigned i = 0; i < n; i++) {
+        key += 'A' + (i % 26);
+      }
+      return key;
+    };
+
+    unsigned mapSize = testEntryCount * 4 / 3;
+    void *mapAllocation = calloc(1, Map::byteSize(mapSize));
+    Map *map = new (mapAllocation) Map(mapSize);
+
+    // Populate the map.
+    for (unsigned n = 0; n < testEntryCount; n++) {
+      auto key = getKey(n);
+
+      auto isNull = [](auto pointers) { return *pointers.first == 0; };
+      auto pointers = map->insert(key.c_str(), isNull);
+      EXPECT_NE(pointers.first, nullptr);
+      EXPECT_NE(pointers.second, nullptr);
+
+      *pointers.first = n;
+      *pointers.second = -(int64_t)n;
+    }
+
+    // Verify that we can find all the test values.
+    for (unsigned n = 0; n < testEntryCount; n++) {
+      auto key = getKey(n);
+      auto keyLength = key.size();
+
+      // Add some trash to the end to make sure the lookup doesn't look beyond
+      // the specified length.
+      key += "xyz";
+
+      auto isMatch = [n](auto pointers) { return *pointers.first == n; };
+      auto isNull = [](auto pointers) { return *pointers.first == 0; };
+      auto pointers = map->find(key.c_str(), keyLength, isMatch, isNull);
+      EXPECT_NE(pointers.first, nullptr);
+      EXPECT_NE(pointers.second, nullptr);
+      EXPECT_EQ(*pointers.first, n);
+      EXPECT_EQ(*pointers.second, -(int64_t)n);
+    }
+
+    // Verfy a nonexistent value is not found.
+    const char *nonexistentKey = "ceci n'est pas une clef";
+    auto isMatch = [](auto pointers) { return false; };
+    auto isNull = [](auto pointers) { return *pointers.first == 0; };
+    auto pointers =
+        map->find(nonexistentKey, strlen(nonexistentKey), isMatch, isNull);
+    EXPECT_EQ(*pointers.first, 0);
+    EXPECT_EQ(*pointers.second, 0);
   };
 
   testOnce(10);

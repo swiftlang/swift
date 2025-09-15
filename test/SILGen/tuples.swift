@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name tuples %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name tuples %s | %FileCheck %s
 public class C {}
 
 public enum Foo {

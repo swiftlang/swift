@@ -188,17 +188,22 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
   CASOptions CASOpts;
+  SerializationOptions SerializationOpts;
   LangOpts.Target = Invocation.getTargetTriple();
   LangOpts.EnableObjCInterop = Invocation.enableObjCInterop();
   ASTContext &ASTCtx = *ASTContext::get(
       LangOpts, TypeCheckOpts, SILOpts, SearchPathOpts, ClangImporterOpts,
-      SymbolGraphOpts, CASOpts, SrcMgr, Instance.getDiags(),
+      SymbolGraphOpts, CASOpts, SerializationOpts, SrcMgr, Instance.getDiags(),
       llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>());
   registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
-  
-  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ""), true);
-  ModuleDecl *M = ModuleDecl::create(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
+
+  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, "",
+                                               nullptr, nullptr,
+                                               true),
+                         true);
+  ModuleDecl *M =
+      ModuleDecl::createEmpty(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
   std::unique_ptr<Lowering::TypeConverter> TC(
       new Lowering::TypeConverter(*M, ASTCtx.SILOpts.EnableSILOpaqueValues));
   std::unique_ptr<SILModule> SM = SILModule::createEmptyModule(M, *TC, SILOpts);

@@ -94,10 +94,6 @@ public:
     return visitFunction(function, perfConstr, /*parentLoc*/ nullptr);
   }
 
-  bool visitFunctionEmbeddedSwift(SILFunction *function) {
-    return visitFunctionEmbeddedSwift(function, /*parentLoc*/ nullptr);
-  }
-
   /// Check functions _without_ performance annotations.
   ///
   /// This is need to check closure arguments of called performance-annotated
@@ -107,9 +103,6 @@ public:
 private:
   bool visitFunction(SILFunction *function, PerformanceConstraints perfConstr,
                         LocWithParent *parentLoc);
-
-  bool visitFunctionEmbeddedSwift(SILFunction *function,
-                                  LocWithParent *parentLoc);
 
   bool visitInst(SILInstruction *inst, PerformanceConstraints perfConstr,
                     LocWithParent *parentLoc);
@@ -157,75 +150,6 @@ static bool isEffectFreeArraySemanticCall(SILInstruction *inst) {
   }
 }
 
-/// Prints Embedded Swift specific performance diagnostics (no existentials,
-/// no metatypes, optionally no allocations) for \p function.
-bool PerformanceDiagnostics::visitFunctionEmbeddedSwift(
-    SILFunction *function, LocWithParent *parentLoc) {
-  // Don't check generic functions in embedded Swift, they're about to be
-  // removed anyway.
-  if (function->getLoweredFunctionType()->getSubstGenericSignature())
-    return false;
-
-  if (!function->isDefinition())
-    return false;
-
-  if (visitedFuncs.contains(function))
-    return false;
-  visitedFuncs[function] = PerformanceConstraints::None;
-
-  NonErrorHandlingBlocks neBlocks(function);
-
-  for (SILBasicBlock &block : *function) {
-    for (SILInstruction &inst : block) {
-      if (visitInst(&inst, PerformanceConstraints::None, parentLoc)) {
-        if (inst.getLoc().getSourceLoc().isInvalid()) {
-          auto demangledName = Demangle::demangleSymbolAsString(
-              inst.getFunction()->getName(),
-              Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
-          llvm::errs() << "in function " << demangledName << "\n";
-        }
-        LLVM_DEBUG(llvm::dbgs() << inst << *inst.getFunction());
-        return true;
-      }
-
-      if (auto as = FullApplySite::isa(&inst)) {
-        LocWithParent asLoc(inst.getLoc().getSourceLoc(), parentLoc);
-        LocWithParent *loc = &asLoc;
-        if (parentLoc &&
-            asLoc.loc == inst.getFunction()->getLocation().getSourceLoc())
-          loc = parentLoc;
-
-        for (SILFunction *callee : bca->getCalleeList(as)) {
-          if (visitFunctionEmbeddedSwift(callee, loc))
-            return true;
-        }
-      } else if (auto *bi = dyn_cast<BuiltinInst>(&inst)) {
-        PrettyStackTracePerformanceDiagnostics stackTrace(
-            "visitFunction::BuiltinInst (once, once with context)", &inst);
-
-        switch (bi->getBuiltinInfo().ID) {
-        case BuiltinValueKind::Once:
-        case BuiltinValueKind::OnceWithContext:
-          if (auto *fri = dyn_cast<FunctionRefInst>(bi->getArguments()[1])) {
-            LocWithParent asLoc(bi->getLoc().getSourceLoc(), parentLoc);
-            LocWithParent *loc = &asLoc;
-            if (parentLoc &&
-                asLoc.loc == bi->getFunction()->getLocation().getSourceLoc())
-              loc = parentLoc;
-
-            if (visitFunctionEmbeddedSwift(fri->getReferencedFunction(), loc))
-              return true;
-          }
-          break;
-        default:
-          break;
-        }
-      }
-    }
-  }
-  return false;
-}
-
 /// Prints performance diagnostics for \p function.
 bool PerformanceDiagnostics::visitFunction(SILFunction *function,
                                               PerformanceConstraints perfConstr,
@@ -233,26 +157,9 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
   if (!function->isDefinition())
     return false;
 
-  NonErrorHandlingBlocks neBlocks(function);
-
   for (SILBasicBlock &block : *function) {
     // Exclude fatal-error blocks.
     if (isa<UnreachableInst>(block.getTerminator()))
-      continue;
-
-    // TODO: it's not yet clear how to deal with error existentials.
-    // Ignore them for now. If we have typed throws we could ban error existentials
-    // because typed throws would provide and alternative.
-    if (isa<ThrowInst>(block.getTerminator()))
-      continue;
-
-    // If a function has multiple throws, all throw-path branch to the single throw-block.
-    if (SILBasicBlock *succ = block.getSingleSuccessorBlock()) {
-      if (isa<ThrowInst>(succ->getTerminator()))
-        continue;
-    }
-
-    if (!neBlocks.isNonErrorHandling(&block))
       continue;
 
     for (SILInstruction &inst : block) {
@@ -446,33 +353,13 @@ static bool metatypeUsesAreNotRelevant(MetatypeInst *mt) {
       if (auto *callee = apply->getReferencedFunctionOrNull()) {
         // Exclude `Swift._diagnoseUnexpectedEnumCaseValue<A, B>(type: A.Type, rawValue: B) -> Swift.Never`
         // It's a fatal error function, used for imported C enums.
-        if (callee->getName() == "$ss32_diagnoseUnexpectedEnumCaseValue4type03rawE0s5NeverOxm_q_tr0_lF" &&
-            !mt->getModule().getOptions().EmbeddedSwift) {
+        if (callee->getName() == "$ss32_diagnoseUnexpectedEnumCaseValue4type03rawE0s5NeverOxm_q_tr0_lF") {
           continue;
         }
       }
     }
     return false;
   }
-  return true;
-}
-
-static bool allowedMetadataUseInEmbeddedSwift(SILInstruction *inst) {
-  // Only diagnose metatype, value_metatype instructions, ...
-  if ((isa<ValueMetatypeInst>(inst) || isa<MetatypeInst>(inst))) {
-    auto metaTy = cast<SingleValueInstruction>(inst)->getType().castTo<MetatypeType>();
-    if (metaTy->getRepresentation() == MetatypeRepresentation::Thick) {
-      Type instTy = metaTy->getInstanceType();
-      if (auto selfType = instTy->getAs<DynamicSelfType>())
-        instTy = selfType->getSelfType();
-      // Class metadata are supported in embedded Swift
-      return instTy->getClassOrBoundGenericClass() ? true : false;
-    }
-  // ... and alloc_ref_dynamic, for now.
-  } else if (isa<AllocRefDynamicInst>(inst)) {
-    return false;
-  }
-
   return true;
 }
 
@@ -484,7 +371,8 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
 
   if (perfConstr == PerformanceConstraints::NoExistentials &&
-      (impact & RuntimeEffect::Existential)) {
+      ((impact & RuntimeEffect::Existential) ||
+       (impact & RuntimeEffect::ExistentialClassBound))) {
     PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
     if (impactType) {
       diagnose(loc, diag::perf_diag_existential_type, impactType.getASTType());
@@ -503,55 +391,6 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
 
     diagnose(loc, diag::performance_objectivec);
     return true;
-  }
-
-  if (module.getOptions().EmbeddedSwift) {
-    if (impact & RuntimeEffect::Existential) {
-      PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
-      if (impactType) {
-        diagnose(loc, diag::embedded_swift_existential_type, impactType.getASTType());
-      } else {
-        diagnose(loc, diag::embedded_swift_existential);
-      }
-      return true;
-    }
-
-    if (impact & RuntimeEffect::MetaData) {
-      if (isa<ReleaseValueInst>(inst)) {
-        // Move-only value types for which the deinit is not de-virtualized.
-        diagnose(loc, diag::embedded_swift_value_deinit, impactType.getASTType());
-        return true;
-      }
-      if (isa<KeyPathInst>(inst)) {
-        diagnose(loc, diag::embedded_swift_keypath);
-        return true;
-      }
-      if (isa<CheckedCastAddrBranchInst>(inst) || isa<UnconditionalCheckedCastAddrInst>(inst)) {
-        diagnose(loc, diag::embedded_swift_dynamic_cast);
-        return true;
-      }
-      if (!allowedMetadataUseInEmbeddedSwift(inst)) {
-        PrettyStackTracePerformanceDiagnostics stackTrace("metatype", inst);
-        if (impactType) {
-          diagnose(loc, diag::embedded_swift_metatype_type, impactType.getASTType());
-        } else {
-          diagnose(loc, diag::embedded_swift_metatype);
-        }
-        return true;
-      }
-    }
-
-    if (module.getOptions().NoAllocations) {
-      if (impact & RuntimeEffect::Allocating) {
-        PrettyStackTracePerformanceDiagnostics stackTrace("allocation", inst);
-        if (impactType) {
-          diagnose(loc, diag::embedded_swift_allocating_type, impactType.getASTType());
-        } else {
-          diagnose(loc, diag::embedded_swift_allocating);
-        }
-        return true;
-      }
-    }
   }
 
   if (perfConstr == PerformanceConstraints::None ||
@@ -755,6 +594,11 @@ private:
   void run() override {
     SILModule *module = getModule();
 
+    // Skip all performance diagnostics if asked. This is used from
+    // SourceKit to avoid reporting false positives when WMO is turned off for
+    // indexing purposes.
+    if (!module->getOptions().EnableWMORequiredDiagnostics) return;
+
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
 
     // Check that @_section, @_silgen_name is only on constant globals
@@ -794,7 +638,7 @@ private:
       }
     }
 
-    if (!annotatedFunctionsFound && !getModule()->getOptions().EmbeddedSwift)
+    if (!annotatedFunctionsFound)
       return;
 
     for (SILFunction &function : *module) {
@@ -806,57 +650,6 @@ private:
         diagnoser.checkNonAnnotatedFunction(&function);
       }
     }
-
-    if (getModule()->getOptions().EmbeddedSwift) {
-      // Run embedded Swift SIL checks for metatype/existential use, and
-      // allocation use (under -no-allocations mode). Try to start with public
-      // and exported functions to get better call tree information.
-      SmallVector<SILFunction *, 8> externallyVisibleFunctions;
-      SmallVector<SILFunction *, 8> vtableMembers;
-      SmallVector<SILFunction *, 8> others;
-      SmallVector<SILFunction *, 8> constructorsAndDestructors;
-
-      for (SILFunction &function : *module) {
-        // There might be SILFunctions without a location, e.g.
-        // swift_readAtKeyPath generated by SILGen for keypaths. It's okay to
-        // skip the ctor/dtor/method detection logic for those, such functions
-        // still end up in the "others" list and are still visited.
-        if (function.hasLocation()) {
-          auto func =
-              function.getLocation().getAsASTNode<AbstractFunctionDecl>();
-          if (func) {
-            if (isa<DestructorDecl>(func) || isa<ConstructorDecl>(func)) {
-              constructorsAndDestructors.push_back(&function);
-              continue;
-            }
-            if (getMethodDispatch(func) == MethodDispatch::Class) {
-              vtableMembers.push_back(&function);
-              continue;
-            }
-          }
-        }
-
-        if (function.isPossiblyUsedExternally()) {
-          externallyVisibleFunctions.push_back(&function);
-          continue;
-        }
-
-        others.push_back(&function);
-      }
-
-      for (SILFunction *function : externallyVisibleFunctions) {
-        diagnoser.visitFunctionEmbeddedSwift(function);
-      }
-      for (SILFunction *function : vtableMembers) {
-        diagnoser.visitFunctionEmbeddedSwift(function);
-      }
-      for (SILFunction *function : others) {
-        diagnoser.visitFunctionEmbeddedSwift(function);
-      }
-      for (SILFunction *function : constructorsAndDestructors) {
-        diagnoser.visitFunctionEmbeddedSwift(function);
-      }
-    }    
   }
 };
 

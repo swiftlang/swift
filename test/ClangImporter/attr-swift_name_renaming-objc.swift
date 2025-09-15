@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -I %S/Inputs/custom-modules -Xcc -w -typecheck -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -I %/S/Inputs/custom-modules -Xcc -w -typecheck -verify %s -verify-additional-file %/S/Inputs/custom-modules%{fs-sep}SwiftName.h
 
 import SwiftName
 
@@ -22,4 +22,7 @@ func test() {
 
   _ = AnonymousEnumConstantObjC // expected-error {{'AnonymousEnumConstantObjC' has been renamed to 'Foo.anonymousEnumConstant'}}
   _ = Foo.anonymousEnumConstant // okay
+
+  _ = Foo.initWithFoo() // expected-error {{type 'Foo' has no member 'initWithFoo'}}
+  _ = Foo.init(foo: ())
 }

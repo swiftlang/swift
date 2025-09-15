@@ -12,7 +12,6 @@
 import SwiftSyntax
 import SwiftSyntaxMacros
 import SwiftDiagnostics
-import SwiftOperators
 import SwiftSyntaxBuilder
 
 public struct ObservableMacro {
@@ -37,33 +36,68 @@ public struct ObservableMacro {
 
   static let registrarVariableName = "_$observationRegistrar"
   
-  static func registrarVariable(_ observableType: TokenSyntax) -> DeclSyntax {
+  static func registrarVariable(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
     return
       """
       @\(raw: ignoredMacroName) private let \(raw: registrarVariableName) = \(raw: qualifiedRegistrarTypeName)()
       """
   }
   
-  static func accessFunction(_ observableType: TokenSyntax) -> DeclSyntax {
-    return 
+  static func accessFunction(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
+    let memberGeneric = context.makeUniqueName("Member")
+    return
       """
-      internal nonisolated func access<Member>(
-      keyPath: KeyPath<\(observableType), Member>
+      internal nonisolated func access<\(memberGeneric)>(
+        keyPath: KeyPath<\(observableType), \(memberGeneric)>
       ) {
-      \(raw: registrarVariableName).access(self, keyPath: keyPath)
+        \(raw: registrarVariableName).access(self, keyPath: keyPath)
       }
       """
   }
   
-  static func withMutationFunction(_ observableType: TokenSyntax) -> DeclSyntax {
-    return 
+  static func withMutationFunction(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
+    let memberGeneric = context.makeUniqueName("Member")
+    let mutationGeneric = context.makeUniqueName("MutationResult")
+    return
       """
-      internal nonisolated func withMutation<Member, MutationResult>(
-      keyPath: KeyPath<\(observableType), Member>,
-      _ mutation: () throws -> MutationResult
-      ) rethrows -> MutationResult {
-      try \(raw: registrarVariableName).withMutation(of: self, keyPath: keyPath, mutation)
+      internal nonisolated func withMutation<\(memberGeneric), \(mutationGeneric)>(
+        keyPath: KeyPath<\(observableType), \(memberGeneric)>,
+        _ mutation: () throws -> \(mutationGeneric)
+      ) rethrows -> \(mutationGeneric) {
+        try \(raw: registrarVariableName).withMutation(of: self, keyPath: keyPath, mutation)
       }
+      """
+  }
+  
+  static func shouldNotifyObserversNonEquatableFunction(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
+    let memberGeneric = context.makeUniqueName("Member")
+    return
+      """
+       private nonisolated func shouldNotifyObservers<\(memberGeneric)>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { true }
+      """
+  }
+  
+  static func shouldNotifyObserversEquatableFunction(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
+    let memberGeneric = context.makeUniqueName("Member")
+    return
+      """
+      private nonisolated func shouldNotifyObservers<\(memberGeneric): Equatable>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { lhs != rhs }
+      """
+  }
+  
+  static func shouldNotifyObserversNonEquatableObjectFunction(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
+    let memberGeneric = context.makeUniqueName("Member")
+    return
+      """
+       private nonisolated func shouldNotifyObservers<\(memberGeneric): AnyObject>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { lhs !== rhs }
+      """
+  }
+
+  static func shouldNotifyObserversEquatableObjectFunction(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
+    let memberGeneric = context.makeUniqueName("Member")
+    return
+      """
+      private nonisolated func shouldNotifyObservers<\(memberGeneric): Equatable & AnyObject>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { lhs != rhs }
       """
   }
 
@@ -72,6 +106,15 @@ public struct ObservableMacro {
       leadingTrivia: .space,
       atSign: .atSignToken(),
       attributeName: IdentifierTypeSyntax(name: .identifier(ignoredMacroName)),
+      trailingTrivia: .space
+    )
+  }
+
+  static var trackedAttribute: AttributeSyntax {
+    AttributeSyntax(
+      leadingTrivia: .space,
+      atSign: .atSignToken(),
+      attributeName: IdentifierTypeSyntax(name: .identifier(trackedMacroName)),
       trailingTrivia: .space
     )
   }
@@ -108,8 +151,13 @@ extension DiagnosticsError {
   }
 }
 
+
+struct LocalMacroExpansionContext<Context: MacroExpansionContext> {
+  var context: Context
+}
+
 extension DeclModifierListSyntax {
-  func privatePrefixed(_ prefix: String) -> DeclModifierListSyntax {
+  func privatePrefixed(_ prefix: String, in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> DeclModifierListSyntax {
     let modifier: DeclModifierSyntax = DeclModifierSyntax(name: "private", trailingTrivia: .space)
     return [modifier] + filter {
       switch $0.name.tokenKind {
@@ -136,7 +184,7 @@ extension DeclModifierListSyntax {
 }
 
 extension TokenSyntax {
-  func privatePrefixed(_ prefix: String) -> TokenSyntax {
+  func privatePrefixed(_ prefix: String, in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> TokenSyntax {
     switch tokenKind {
     case .identifier(let identifier):
       return TokenSyntax(.identifier(prefix + identifier), leadingTrivia: leadingTrivia, trailingTrivia: trailingTrivia, presence: presence)
@@ -146,8 +194,58 @@ extension TokenSyntax {
   }
 }
 
+extension CodeBlockSyntax {
+  func locationAnnotated(in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> CodeBlockSyntax {
+    guard let firstStatement = statements.first, let loc = context.context.location(of: firstStatement) else {
+      return self
+    }
+    
+    return CodeBlockSyntax(
+      leadingTrivia: leadingTrivia,
+      leftBrace: leftBrace,
+      statements: CodeBlockItemListSyntax {
+        "#sourceLocation(file: \(loc.file), line: \(loc.line))"
+        statements
+        "#sourceLocation()"
+      },
+      rightBrace: rightBrace,
+      trailingTrivia: trailingTrivia
+    )
+  }
+}
+
+
+extension AccessorDeclSyntax {
+  func locationAnnotated(in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> AccessorDeclSyntax {
+    return AccessorDeclSyntax(
+      leadingTrivia: leadingTrivia,
+      attributes: attributes,
+      modifier: modifier,
+      accessorSpecifier: accessorSpecifier,
+      parameters: parameters,
+      effectSpecifiers: effectSpecifiers,
+      body: body?.locationAnnotated(in: context),
+      trailingTrivia: trailingTrivia
+    )
+  }
+}
+
+extension AccessorBlockSyntax {
+  func locationAnnotated(in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> AccessorBlockSyntax {
+    switch accessors {
+    case .accessors(let accessorList):
+      let remapped = AccessorDeclListSyntax {
+        accessorList.map { $0.locationAnnotated(in: context) }
+      }
+      return AccessorBlockSyntax(accessors: .accessors(remapped))
+    case .getter(let codeBlockList):
+      return AccessorBlockSyntax(accessors: .getter(codeBlockList))
+    }
+  }
+}
+
 extension PatternBindingListSyntax {
-  func privatePrefixed(_ prefix: String) -> PatternBindingListSyntax {
+  func privatePrefixed(_ prefix: String, in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> PatternBindingListSyntax {
     var bindings = self.map { $0 }
     for index in 0..<bindings.count {
       let binding = bindings[index]
@@ -156,12 +254,12 @@ extension PatternBindingListSyntax {
           leadingTrivia: binding.leadingTrivia,
           pattern: IdentifierPatternSyntax(
             leadingTrivia: identifier.leadingTrivia,
-            identifier: identifier.identifier.privatePrefixed(prefix),
+            identifier: identifier.identifier.privatePrefixed(prefix, in: context),
             trailingTrivia: identifier.trailingTrivia
           ),
           typeAnnotation: binding.typeAnnotation,
           initializer: binding.initializer,
-          accessorBlock: binding.accessorBlock,
+          accessorBlock: binding.accessorBlock?.locationAnnotated(in: context),
           trailingComma: binding.trailingComma,
           trailingTrivia: binding.trailingTrivia)
         
@@ -173,14 +271,20 @@ extension PatternBindingListSyntax {
 }
 
 extension VariableDeclSyntax {
-  func privatePrefixed(_ prefix: String, addingAttribute attribute: AttributeSyntax) -> VariableDeclSyntax {
-    let newAttributes = attributes + [.attribute(attribute)]
+  func privatePrefixed(_ prefix: String, addingAttribute attribute: AttributeSyntax, removingAttribute toRemove: AttributeSyntax, in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> VariableDeclSyntax {
+    let newAttributes = attributes.filter { attribute in
+      switch attribute {
+      case .attribute(let attr):
+        attr.attributeName.identifier != toRemove.attributeName.identifier
+      default: true
+      }
+    } + [.attribute(attribute)]
     return VariableDeclSyntax(
       leadingTrivia: leadingTrivia,
       attributes: newAttributes,
-      modifiers: modifiers.privatePrefixed(prefix),
+      modifiers: modifiers.privatePrefixed(prefix, in: context),
       bindingSpecifier: TokenSyntax(bindingSpecifier.tokenKind, leadingTrivia: .space, trailingTrivia: .space, presence: .present),
-      bindings: bindings.privatePrefixed(prefix),
+      bindings: bindings.privatePrefixed(prefix, in: context),
       trailingTrivia: trailingTrivia
     )
   }
@@ -197,6 +301,7 @@ extension ObservableMacro: MemberMacro {
   >(
     of node: AttributeSyntax,
     providingMembersOf declaration: Declaration,
+    conformingTo protocols: [TypeSyntax],
     in context: Context
   ) throws -> [DeclSyntax] {
     guard let identified = declaration.asProtocol(NamedDeclSyntax.self) else {
@@ -220,9 +325,13 @@ extension ObservableMacro: MemberMacro {
     
     var declarations = [DeclSyntax]()
 
-    declaration.addIfNeeded(ObservableMacro.registrarVariable(observableType), to: &declarations)
-    declaration.addIfNeeded(ObservableMacro.accessFunction(observableType), to: &declarations)
-    declaration.addIfNeeded(ObservableMacro.withMutationFunction(observableType), to: &declarations)
+    declaration.addIfNeeded(ObservableMacro.registrarVariable(observableType, context: context), to: &declarations)
+    declaration.addIfNeeded(ObservableMacro.accessFunction(observableType, context: context), to: &declarations)
+    declaration.addIfNeeded(ObservableMacro.withMutationFunction(observableType, context: context), to: &declarations)
+    declaration.addIfNeeded(ObservableMacro.shouldNotifyObserversNonEquatableFunction(observableType, context: context), to: &declarations)
+    declaration.addIfNeeded(ObservableMacro.shouldNotifyObserversEquatableFunction(observableType, context: context), to: &declarations)
+    declaration.addIfNeeded(ObservableMacro.shouldNotifyObserversNonEquatableObjectFunction(observableType, context: context), to: &declarations)
+    declaration.addIfNeeded(ObservableMacro.shouldNotifyObserversEquatableObjectFunction(observableType, context: context), to: &declarations)
 
     return declarations
   }
@@ -272,7 +381,7 @@ extension ObservableMacro: ExtensionMacro {
     }
 
     let decl: DeclSyntax = """
-        extension \(raw: type.trimmedDescription): \(raw: qualifiedConformanceName) {}
+        extension \(raw: type.trimmedDescription): nonisolated \(raw: qualifiedConformanceName) {}
         """
     let ext = decl.cast(ExtensionDeclSyntax.self)
 
@@ -298,6 +407,10 @@ public struct ObservationTrackedMacro: AccessorMacro {
           let identifier = property.identifier?.trimmed else {
       return []
     }
+    
+    guard context.lexicalContext[0].as(ClassDeclSyntax.self) != nil else {
+      return []
+    }
 
     if property.hasMacroApplication(ObservableMacro.ignoredMacroName) {
       return []
@@ -307,34 +420,47 @@ public struct ObservationTrackedMacro: AccessorMacro {
       """
       @storageRestrictions(initializes: _\(identifier))
       init(initialValue) {
-      _\(identifier) = initialValue
+        _\(identifier) = initialValue
       }
       """
-
     let getAccessor: AccessorDeclSyntax =
       """
       get {
-      access(keyPath: \\.\(identifier))
-      return _\(identifier)
+        access(keyPath: \\.\(identifier))
+        return _\(identifier)
       }
       """
 
+    // the guard else case must include the assignment else
+    // cases that would notify then drop the side effects of `didSet` etc
     let setAccessor: AccessorDeclSyntax =
       """
       set {
-      withMutation(keyPath: \\.\(identifier)) {
-      _\(identifier) = newValue
-      }
+        guard shouldNotifyObservers(_\(identifier), newValue) else {
+          _\(identifier) = newValue
+          return
+        }
+        withMutation(keyPath: \\.\(identifier)) {
+          _\(identifier) = newValue
+        }
       }
       """
       
+    // Note: this accessor cannot test the equality since it would incur
+    // additional CoW's on structural types. Most mutations in-place do
+    // not leave the value equal so this is "fine"-ish.
+    // Warning to future maintence: adding equality checks here can make
+    // container mutation O(N) instead of O(1).
+    // e.g. observable.array.append(element) should just emit a change
+    // to the new array, and NOT cause a copy of each element of the
+    // array to an entirely new array.
     let modifyAccessor: AccessorDeclSyntax =
       """
       _modify {
-      access(keyPath: \\.\(identifier))
-      \(raw: ObservableMacro.registrarVariableName).willSet(self, keyPath: \\.\(identifier))
-      defer { \(raw: ObservableMacro.registrarVariableName).didSet(self, keyPath: \\.\(identifier)) } 
-      yield &_\(identifier)
+        access(keyPath: \\.\(identifier))
+        \(raw: ObservableMacro.registrarVariableName).willSet(self, keyPath: \\.\(identifier))
+        defer { \(raw: ObservableMacro.registrarVariableName).didSet(self, keyPath: \\.\(identifier)) }
+        yield &_\(identifier)
       }
       """
 
@@ -352,16 +478,21 @@ extension ObservationTrackedMacro: PeerMacro {
     in context: Context
   ) throws -> [DeclSyntax] {
     guard let property = declaration.as(VariableDeclSyntax.self),
-          property.isValidForObservation else {
+          property.isValidForObservation,
+          property.identifier?.trimmed != nil else {
       return []
     }
     
-    if property.hasMacroApplication(ObservableMacro.ignoredMacroName) ||
-       property.hasMacroApplication(ObservableMacro.trackedMacroName) {
+    guard context.lexicalContext[0].as(ClassDeclSyntax.self) != nil else {
       return []
     }
     
-    let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute))
+    if property.hasMacroApplication(ObservableMacro.ignoredMacroName) {
+      return []
+    }
+    
+    let localContext = LocalMacroExpansionContext(context: context)
+    let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute, removingAttribute: ObservableMacro.trackedAttribute, in: localContext))
     return [storage]
   }
 }

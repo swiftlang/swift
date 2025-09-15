@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name test -primary-file %s -import-objc-header %S/Inputs/let_properties_opts.h -O -wmo -emit-sil -target %target-stable-abi-triple | %FileCheck %s
+// RUN: %target-swift-frontend -module-name test -primary-file %s -import-objc-header %S/Inputs/let_properties_opts.h -O -wmo -Xllvm -sil-print-types -emit-sil -target %target-stable-abi-triple | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -18,7 +18,7 @@ public func testObjcInterface(_ x: ObjcInterface) -> Int {
 
 // Test that private @objc constants aren't optimized, but instead continue to pass through ObjC message dispatch.
 @_objcImplementation extension ObjcInterfaceConstInit {
-  private let constant: Int = 0
+  @objc private let constant: Int = 0
 
   // CHECK-LABEL: sil hidden @$sSo22ObjcInterfaceConstInitC4testE0E15PrivateConstantSiyF : $@convention(method) (@guaranteed ObjcInterfaceConstInit) -> Int {
   // CHECK: objc_method %0 : $ObjcInterfaceConstInit, #ObjcInterfaceConstInit.constant!getter.foreign

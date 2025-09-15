@@ -1,0 +1,95 @@
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=load_borrow | %FileCheck %s
+
+import Swift
+import Builtin
+
+class B { }
+
+class E : B {
+  @_hasStorage var i: Int
+}
+
+// CHECK-LABEL: sil [ossa] @load_borrow_and_copy :
+// CHECK:         %1 = load [copy] %0
+// CHECK:         %2 = begin_borrow %1
+// CHECK:         %3 = ref_element_addr %2, #E.i
+// CHECK:         %4 = load [trivial] %3
+// CHECK:         end_borrow %2
+// CHECK:         destroy_value %1 
+// CHECK:         return %4
+// CHECK:       } // end sil function 'load_borrow_and_copy'
+sil [ossa] @load_borrow_and_copy : $@convention(thin) (@inout E) -> Int {
+bb0(%0 : $*E):
+  %1 = load_borrow %0
+  %2 = copy_value %1
+  end_borrow %1
+  %4 = begin_borrow %2
+  %5 = ref_element_addr %4, #E.i
+  %6 = load [trivial] %5
+  end_borrow %4
+  destroy_value %2
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @load_borrow_and_copy_forwarding :
+// CHECK:         %1 = load [copy] %0
+// CHECK:         %2 = unchecked_ref_cast %1 to $E
+// CHECK:         %3 = begin_borrow %2
+// CHECK:         %4 = ref_element_addr %3, #E.i
+// CHECK:         %5 = load [trivial] %4
+// CHECK:         end_borrow %3
+// CHECK:         destroy_value %2 
+// CHECK:         return %5
+// CHECK:       } // end sil function 'load_borrow_and_copy_forwarding'
+sil [ossa] @load_borrow_and_copy_forwarding : $@convention(thin) (@inout B) -> Int {
+bb0(%0 : $*B):
+  %1 = load_borrow %0
+  %2 = unchecked_ref_cast %1 to $E
+  %3 = copy_value %2
+  end_borrow %1
+  %5 = begin_borrow %3
+  %6 = ref_element_addr %5, #E.i
+  %7 = load [trivial] %6
+  end_borrow %5
+  destroy_value %3
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @load_borrow_and_copy_different_block :
+// CHECK:         %1 = load_borrow %0
+// CHECK:         %3 = copy_value %1
+// CHECK:       } // end sil function 'load_borrow_and_copy_different_block'
+sil [ossa] @load_borrow_and_copy_different_block : $@convention(thin) (@inout E) -> () {
+bb0(%0 : $*E):
+  %1 = load_borrow %0
+  cond_br undef, bb1, bb2
+bb1:
+  %3 = copy_value %1
+  %4 = begin_borrow %3
+  %5 = ref_element_addr %4, #E.i
+  %6 = load [trivial] %5
+  fix_lifetime %6
+  end_borrow %4
+  destroy_value %3
+  br bb3
+bb2:
+  br bb3
+bb3:
+  end_borrow %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dead_load_borrow :
+// CHECK-NOT:     load_borrow
+// CHECK:         %1 = tuple ()
+// CHECK:         return %1
+// CHECK:       } // end sil function 'dead_load_borrow'
+sil [ossa] @dead_load_borrow : $@convention(thin) (@inout B) -> () {
+bb0(%0 : $*B):
+  %1 = load_borrow %0
+  debug_value %1, var, name "x"
+  end_borrow %1
+  %4 = tuple ()
+  return %4
+}

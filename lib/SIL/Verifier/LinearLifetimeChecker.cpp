@@ -22,6 +22,7 @@
 
 #define DEBUG_TYPE "sil-linear-lifetime-checker"
 #include "LinearLifetimeCheckerPrivate.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -40,7 +41,7 @@ using namespace swift;
 /// Return true if \p operand can legally be consumed by another operand of the
 /// same instruction (in parallel).
 bool isParallelOperand(Operand *operand) {
-  return isa<MarkDependenceInst>(operand->getUser())
+  return isa<MarkDependenceInst>(operand->getUser()) //!!! why???
     || operand->getOperandOwnership() == OperandOwnership::Reborrow
     || operand->getOperandOwnership() == OperandOwnership::GuaranteedForwarding;
 }

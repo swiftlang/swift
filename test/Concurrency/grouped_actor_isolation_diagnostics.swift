@@ -1,5 +1,6 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature GroupActorErrors  -strict-concurrency=complete
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -enable-experimental-feature GroupActorErrors  -strict-concurrency=complete
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_GroupActorErrors
 
 @MainActor
 protocol P {
@@ -89,17 +90,17 @@ struct HasWrapperOnActor {
   // expected-error@+2{{calls to '@MainActor'-isolated' code in instance method 'testWrapped()'}}
   // expected-note@+1{{add '@MainActor' to make instance method 'testWrapped()' part of global actor 'MainActor'}}
   func testWrapped() {
-    _ = x // expected-note{{main actor-isolated property 'x' can not be referenced from a non-isolated context}}
-    _ = y // expected-note{{main actor-isolated property 'y' can not be referenced from a non-isolated context}}
-    _ = z // expected-note{{main actor-isolated property 'z' can not be referenced from a non-isolated context}}
+    _ = x // expected-note{{main actor-isolated property 'x' can not be referenced from a nonisolated context}}
+    _ = y // expected-note{{main actor-isolated property 'y' can not be referenced from a nonisolated context}}
+    _ = z // expected-note{{main actor-isolated property 'z' can not be referenced from a nonisolated context}}
   }
 
   // expected-error@+2{{calls to '@SomeGlobalActor'-isolated' code in instance method 'testProjected()'}}
   // expected-note@+1{{add '@SomeGlobalActor' to make instance method 'testProjected()' part of global actor 'SomeGlobalActor'}}
   func testProjected(){
-    _ = $x // expected-note{{global actor 'SomeGlobalActor'-isolated property '$x' can not be referenced from a non-isolated context}}
-    _ = $y // expected-note{{global actor 'SomeGlobalActor'-isolated property '$y' can not be referenced from a non-isolated context}}
-    _ = $z // expected-note{{global actor 'SomeGlobalActor'-isolated property '$z' can not be referenced from a non-isolated context}}
+    _ = $x // expected-note{{global actor 'SomeGlobalActor'-isolated property '$x' can not be referenced from a nonisolated context}}
+    _ = $y // expected-note{{global actor 'SomeGlobalActor'-isolated property '$y' can not be referenced from a nonisolated context}}
+    _ = $z // expected-note{{global actor 'SomeGlobalActor'-isolated property '$z' can not be referenced from a nonisolated context}}
   }
 
   @MainActor

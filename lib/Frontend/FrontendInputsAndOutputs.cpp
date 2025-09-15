@@ -13,6 +13,7 @@
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/Range.h"
@@ -379,13 +380,23 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
     }
     return;
   }
-  assert(supplementaryOutputs.size() == 1 &&
-         "WMO only ever produces one set of supplementary outputs");
+
+  assert(supplementaryOutputs.size() == 1 ||
+         supplementaryOutputs.size() == AllInputs.size() &&
+             "WMO produces wrong number of sets of supplementary outputs");
   if (outputFiles.size() == 1) {
-    AllInputs.front().setPrimarySpecificPaths(PrimarySpecificPaths(
-        outputFiles.front(), outputFilesForIndexUnits.front(),
-        firstInputProducingOutput().getFileName(),
-        supplementaryOutputs.front()));
+    for (auto i : indices(AllInputs)) {
+      if (i == 0)
+        AllInputs[i].setPrimarySpecificPaths(PrimarySpecificPaths(
+            outputFiles.front(), outputFilesForIndexUnits.front(),
+            firstInputProducingOutput().getFileName(),
+            supplementaryOutputs.front()));
+      else
+        AllInputs[i].setPrimarySpecificPaths(PrimarySpecificPaths(
+            "", "", "",
+            supplementaryOutputs.size() == 1 ? SupplementaryOutputPaths()
+                                             : supplementaryOutputs[i]));
+    }
     return;
   }
   assert(outputFiles.size() == AllInputs.size() &&
@@ -393,7 +404,8 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
   for (auto i : indices(AllInputs))
     AllInputs[i].setPrimarySpecificPaths(PrimarySpecificPaths(
         outputFiles[i], outputFilesForIndexUnits[i], outputFiles[i],
-        i == 0 ? supplementaryOutputs.front() : SupplementaryOutputPaths()));
+        supplementaryOutputs.size() == 1 && i != 0 ? SupplementaryOutputPaths()
+                                                   : supplementaryOutputs[i]));
 }
 
 std::vector<std::string> FrontendInputsAndOutputs::copyOutputFilenames() const {
@@ -485,6 +497,14 @@ FrontendInputsAndOutputs::getPrimarySpecificPathsForAtMostOnePrimary() const {
   static auto emptyPaths = PrimarySpecificPaths();
   return hasInputs() ? firstInputProducingOutput().getPrimarySpecificPaths()
                      : emptyPaths;
+}
+
+const PrimarySpecificPaths &
+FrontendInputsAndOutputs::getPrimarySpecificPathsForRemaining(unsigned i) const {
+  static auto emptyPaths = PrimarySpecificPaths();
+  unsigned firstProducingIdx = getIndexOfFirstOutputProducingInput();
+  return (hasInputs()  && i > 0) ?
+    AllInputs[firstProducingIdx+i].getPrimarySpecificPaths() : emptyPaths;
 }
 
 const PrimarySpecificPaths &

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -target %target-swift-5.9-abi-triple | %FileCheck %s
 
 // REQUIRES: PTRSIZE=64
 
@@ -31,3 +31,9 @@ blackHole(G<Int, String>.self)
 let g = G<Int, String, Float>()
 blackHole(g.makeTuple1())
 blackHole(g.makeTuple2())
+
+struct VariadicOptionalTuple<each V> {
+    var v: (repeat (each V)?)
+}
+
+func useVOT(_: VariadicOptionalTuple<String>) {}

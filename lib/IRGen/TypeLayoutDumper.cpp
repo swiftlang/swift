@@ -27,6 +27,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 
@@ -66,7 +67,7 @@ public:
 } // end anonymous namespace
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(type->getASTContext());
   return Mangler.mangleTypeAsContextUSR(type);
 }
 

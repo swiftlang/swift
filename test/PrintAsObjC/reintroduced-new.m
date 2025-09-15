@@ -7,11 +7,11 @@
 // FIXME: END -enable-source-import hackaround
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../../test/Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/Inputs/reintroduced-new.swift -swift-version 4 -disable-objc-attr-requires-foundation-module -module-name main
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../../test/Inputs/clang-importer-sdk -I %t) -parse-as-library %t/main.swiftmodule -typecheck -emit-objc-header-path %t/generated.h -disable-objc-attr-requires-foundation-module -swift-version 4
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../../test/Inputs/clang-importer-sdk -I %t) -parse-as-library %t/main.swiftmodule -typecheck -verify -emit-objc-header-path %t/generated.h -disable-objc-attr-requires-foundation-module -swift-version 4
 // RUN: not %clang -fsyntax-only -x objective-c %s -include %t/generated.h -fobjc-arc -fmodules -Werror -F %clang-importer-sdk-path/frameworks -isysroot %S/../../test/Inputs/clang-importer-sdk 2>&1 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-4 %s
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../../test/Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/Inputs/reintroduced-new.swift -disable-objc-attr-requires-foundation-module -module-name main -swift-version 5
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../../test/Inputs/clang-importer-sdk -I %t) -parse-as-library %t/main.swiftmodule -typecheck -emit-objc-header-path %t/generated.h -disable-objc-attr-requires-foundation-module -swift-version 5
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../../test/Inputs/clang-importer-sdk -I %t) -parse-as-library %t/main.swiftmodule -typecheck -verify -emit-objc-header-path %t/generated.h -disable-objc-attr-requires-foundation-module -swift-version 5
 // RUN: not %clang -fsyntax-only -x objective-c %s -include %t/generated.h -fobjc-arc -fmodules -Werror -F %clang-importer-sdk-path/frameworks -isysroot %S/../../test/Inputs/clang-importer-sdk 2>&1 | %FileCheck  -check-prefix=CHECK -check-prefix=CHECK-5 %s
 
 // CHECK-NOT: error:

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -enable-existential-specializer -existential-specializer   | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -enable-existential-specializer -existential-specializer   | %FileCheck %s
 
 // Additional tests for existential_specializer
 
@@ -313,3 +313,29 @@ sil_witness_table hidden Klass4: P module devirtualize_protocol_composition {
   method #P.foo: <Self where Self : P> (Self) -> () -> Int32 : @Klass4foo
 }
 
+// CHECK-LABEL: sil shared [ossa] @$s32testExistentialSpecializeUnownedTf4e_n : 
+// CHECK:  [[VAL0:%.*]] = copy_value %0
+// CHECK:  [[VAL1:%.*]] = init_existential_ref [[VAL0]]
+// CHECK:  destroy_value [[VAL1]]
+// CHECK-LABEL: } // end sil function '$s32testExistentialSpecializeUnownedTf4e_n'
+sil hidden [ossa] @testExistentialSpecializeUnowned : $@convention(thin) (any Klass3 & P) -> Int32 {
+bb0(%0 : @unowned $Klass3 & P):
+  %1 = copy_value %0 : $Klass3 & P 
+  %2 = open_existential_ref %1 : $Klass3 & P to $@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self
+  %3 = alloc_stack $@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self
+  %4 = store_borrow %2 to %3 : $*@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self
+  %5 = witness_method $@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %2 : $@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %6 = apply %5<@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self>(%4) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  end_borrow %4 : $*@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self
+  dealloc_stack %3 : $*@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self
+  destroy_value %2 : $@opened("77949BFA-77BC-11EB-BC0E-F2189810406F", Klass3 & P) Self
+  return %6 : $Int32
+}
+
+sil hidden [ossa] @entrypoint_unowned : $@convention(thin) (@guaranteed Klass4) -> Int32 {
+bb0(%0 : @guaranteed $Klass4):
+  %1 = init_existential_ref %0 : $Klass4 : $Klass4, $any Klass3 & P
+  %func = function_ref @testExistentialSpecializeUnowned : $@convention(thin) (any Klass3 & P) -> Int32
+  %res = apply %func(%1) : $@convention(thin) (any Klass3 & P) -> Int32
+  return %res : $Int32
+}

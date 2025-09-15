@@ -21,6 +21,7 @@
 #include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 
 #define DEBUG_TYPE "AST"
 
@@ -96,7 +97,9 @@ PackConformance *PackConformance::getCanonicalConformance() const {
 /// Project the corresponding associated type from each pack element
 /// of the conforming type, collecting the results into a new pack type
 /// that has the same pack expansion structure as the conforming type.
-PackType *PackConformance::getAssociatedType(Type assocType) const {
+PackType *PackConformance::getTypeWitness(
+    AssociatedTypeDecl *assocType,
+    SubstOptions options) const {
   SmallVector<Type, 4> packElements;
 
   auto conformances = getPatternConformances();
@@ -109,8 +112,7 @@ PackType *PackConformance::getAssociatedType(Type assocType) const {
     // conformance.
     if (auto *packExpansion = packElement->getAs<PackExpansionType>()) {
       auto assocTypePattern =
-        conformances[i].getAssociatedType(packExpansion->getPatternType(),
-                                          assocType);
+        conformances[i].getTypeWitness(assocType, options);
 
       packElements.push_back(PackExpansionType::get(
           assocTypePattern, packExpansion->getCountType()));
@@ -118,8 +120,7 @@ PackType *PackConformance::getAssociatedType(Type assocType) const {
     // If the pack element is a scalar type, replace the scalar type with
     // the associated type witness from the pattern conformance.
     } else {
-      auto assocTypeScalar =
-        conformances[i].getAssociatedType(packElement, assocType);
+      auto assocTypeScalar = conformances[i].getTypeWitness(assocType, options);
       packElements.push_back(assocTypeScalar);
     }
   }
@@ -141,24 +142,20 @@ PackConformance *PackConformance::getAssociatedConformance(
     auto packElement = ConformingType->getElementType(i);
 
     if (auto *packExpansion = packElement->getAs<PackExpansionType>()) {
-      auto assocTypePattern =
-        conformances[i].getAssociatedType(packExpansion->getPatternType(),
-                                          assocType);
+      auto assocConformancePattern =
+        conformances[i].getAssociatedConformance(assocType, protocol);
+      packConformances.push_back(assocConformancePattern);
+
+      auto assocTypePattern = assocConformancePattern.getType();
       packElements.push_back(PackExpansionType::get(
           assocTypePattern, packExpansion->getCountType()));
-
-      auto assocConformancePattern =
-        conformances[i].getAssociatedConformance(packExpansion->getPatternType(),
-                                                 assocType, protocol);
-      packConformances.push_back(assocConformancePattern);
     } else {
-      auto assocTypeScalar =
-        conformances[i].getAssociatedType(packElement, assocType);
-      packElements.push_back(assocTypeScalar);
-
       auto assocConformanceScalar =
-        conformances[i].getAssociatedConformance(packElement, assocType, protocol);
+        conformances[i].getAssociatedConformance(assocType, protocol);
       packConformances.push_back(assocConformanceScalar);
+
+      auto assocTypeScalar = assocConformanceScalar.getType();
+      packElements.push_back(assocTypeScalar);
     }
   }
 
@@ -199,15 +196,12 @@ PackConformance::subst(InFlightSubstitution &IFS) const {
         // Just substitute the conformance.  We don't directly represent
         // pack expansion conformances here; it's sort of implicit in the
         // corresponding pack element type.
-        substConformances.push_back(
-            origConformances[i].subst(origExpansion->getPatternType(), IFS));
+        substConformances.push_back(origConformances[i].subst(IFS));
       });
     } else {
       // Substitute a scalar element of the original pack.
       substElementTypes.push_back(origElementType.subst(IFS));
-
-      substConformances.push_back(
-          origConformances[i].subst(origElementType, IFS));
+      substConformances.push_back(origConformances[i].subst(IFS));
     }
   }
 

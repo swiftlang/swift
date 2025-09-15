@@ -33,6 +33,11 @@ public:
   DeclExportabilityVisitor(){};
 
   bool visit(const Decl *D) {
+    // Declarations nested in fragile functions are exported.
+    if (D->getDeclContext()->getFragileFunctionKind().kind !=
+        FragileFunctionKind::None)
+      return true;
+
     if (auto value = dyn_cast<ValueDecl>(D)) {
       // A decl is exportable if it has a public access level.
       auto accessScope =
@@ -153,6 +158,7 @@ public:
   UNREACHABLE(MissingMember);
   UNREACHABLE(GenericTypeParam);
   UNREACHABLE(Param);
+  UNREACHABLE(Using);
 
 #undef UNREACHABLE
 
@@ -165,9 +171,7 @@ public:
 #define UNINTERESTING(KIND)                                                    \
   bool visit##KIND##Decl(const KIND##Decl *D) { return true; }
   UNINTERESTING(TopLevelCode);
-  UNINTERESTING(IfConfig);
   UNINTERESTING(Import);
-  UNINTERESTING(PoundDiagnostic);
   UNINTERESTING(PrecedenceGroup);
   UNINTERESTING(EnumCase);
   UNINTERESTING(Operator);
@@ -175,6 +179,22 @@ public:
 
 #undef UNINTERESTING
 };
+
+/// Check if a declaration is exported as part of a module's external interface.
+/// This includes public and @usableFromInline decls.
+/// FIXME: This is legacy that should be subsumed by `DeclExportabilityVisitor`
+bool isExported(const Decl *D);
+
+/// A specialization of `isExported` for `ValueDecl`.
+bool isExported(const ValueDecl *VD);
+
+/// A specialization of `isExported` for `ExtensionDecl`.
+bool isExported(const ExtensionDecl *ED);
+
+/// Returns true if the extension declares any protocol conformances that
+/// require the extension to be exported.
+bool hasConformancesToPublicProtocols(const ExtensionDecl *ED);
+
 } // end namespace swift
 
 #endif

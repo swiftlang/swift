@@ -19,11 +19,13 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 
 using namespace swift;
@@ -141,7 +143,7 @@ bool BitwiseCopyableStorageVisitor::visitMemberDecl(ValueDecl *decl, Type ty) {
 }
 
 bool BitwiseCopyableStorageVisitor::visitMemberType(Type ty, SourceLoc loc) {
-  auto conformance = module->checkConformance(ty, protocol);
+  auto conformance = checkConformance(ty, protocol);
   if (conformance.isInvalid() || conformance.hasUnavailableConformance()) {
     return visitNonconformingMemberType(ty, loc);
   }
@@ -375,10 +377,9 @@ NormalProtocolConformance *
 DeriveImplicitBitwiseCopyableConformance::synthesizeConformance(
     DeclContext *dc) {
   auto conformance = context.getNormalConformance(
-      nominal->getDeclaredInterfaceType(), protocol, nominal->getLoc(), dc,
-      ProtocolConformanceState::Complete,
-      /*isUnchecked=*/false,
-      /*isPreconcurrency=*/false);
+      nominal->getDeclaredInterfaceType(), protocol, nominal->getLoc(),
+      /*inheritedTypeRepr=*/nullptr, dc, ProtocolConformanceState::Complete,
+      ProtocolConformanceOptions());
   conformance->setSourceKindAndImplyingConformance(
       ConformanceEntryKind::Synthesized, nullptr);
 
@@ -411,13 +412,14 @@ bool swift::checkBitwiseCopyableConformance(ProtocolConformance *conformance,
 
   // If this is an always-unavailable conformance, there's nothing to check.
   if (auto ext = dyn_cast<ExtensionDecl>(conformanceDC)) {
-    if (AvailableAttr::isUnavailable(ext))
+    if (ext->isUnavailable())
       return false;
   }
 
-  // BitwiseCopyable must be added in the same source file.
+  // BitwiseCopyable must be added in the same module or its overlay.
   auto conformanceDecl = conformanceDC->getAsDecl();
-  if (conformanceDecl->getModuleContext() != nominal->getModuleContext()) {
+  if (!conformanceDecl->getModuleContext()->isSameModuleLookingThroughOverlays(
+          nominal->getModuleContext())) {
     conformanceDecl->diagnose(diag::bitwise_copyable_outside_module, nominal);
     return true;
   }

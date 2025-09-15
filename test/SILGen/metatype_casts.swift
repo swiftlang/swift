@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [ossa] @$s14metatype_casts6t_is_u{{[_0-9a-zA-Z]*}}F
 // CHECK:         checked_cast_br {{.*}} $@thick T.Type to U.Type

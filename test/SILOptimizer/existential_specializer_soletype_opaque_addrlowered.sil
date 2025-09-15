@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt  -wmo -enable-sil-verify-all -emit-sorted-sil %s -enable-existential-specializer -existential-specializer  -type-lowering-force-opaque-value-lowering 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types  -wmo -enable-sil-verify-all -emit-sorted-sil %s -enable-existential-specializer -existential-specializer  -type-lowering-force-opaque-value-lowering 2>&1 | %FileCheck %s
 
 // Test ExistentialSpecializer with OpaqueValueTypeLowerings.
 

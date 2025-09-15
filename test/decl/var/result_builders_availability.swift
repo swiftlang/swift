@@ -68,7 +68,7 @@ enum Option {
 }
 
 @TupleBuilder
-func bestTuple() -> some Any { // expected-note{{add @available attribute to enclosing global function}}
+func bestTuple() -> some Any { // expected-note{{add '@available' attribute to enclosing global function}}
   "Hello"
   Option.best // expected-error{{'best' is only available in macOS 10.15.4 or newer}}
   // expected-note@-1{{add 'if #available' version check}}

@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature ReferenceBindings)
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_ReferenceBindings
 
 import StdlibUnittest
 

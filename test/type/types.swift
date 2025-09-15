@@ -152,9 +152,6 @@ y17 = z17
 let tupleTypeWithNames = (age:Int, count:Int)(4, 5)
 let dictWithTuple = [String: (age:Int, count:Int)]()
 
-// <rdar://problem/21684837> typeexpr not being formed for postfix !
-let bb2 = [Int!](repeating: nil, count: 2) // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{15-16=?}}
-
 // <rdar://problem/21560309> inout allowed on function return type
 func r21560309<U>(_ body: (_: inout Int) -> inout U) {}  // expected-error {{'inout' may only be used on parameters}}
 r21560309 { x in x }
@@ -199,7 +196,7 @@ typealias A = (inout Int ..., Int ... = [42, 12]) -> Void // expected-error {{'i
 
 // rdar://94888357 - failed to produce a diagnostic when type is used incorrectly
 func rdar94888357() {
-  struct S<T> { // expected-note {{generic type 'S' declared here}}
+  struct S<T> { // expected-note {{generic struct 'S' declared here}}
     init(_ str: String) {}
   }
 
@@ -222,3 +219,18 @@ do {
     subscript(_: inout Double...) -> Bool { true } // expected-error {{'inout' may only be used on function or initializer parameters}}
   }
 }
+
+let tupleTypeWithTrailingComma: (
+  bar: String,
+  quux: String,
+)
+
+let _ = (bar: String, quux: String,).self
+
+let closureTypeWithTrailingCommas: (
+  String,
+  String,
+) -> (
+  bar: String,
+  quux: String,
+)

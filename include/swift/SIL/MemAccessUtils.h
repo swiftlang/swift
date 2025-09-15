@@ -164,6 +164,14 @@ inline SILValue stripAccessMarkers(SILValue v) {
   return v;
 }
 
+inline bool isGuaranteedAddressReturn(SILValue value) {
+  auto *defInst = dyn_cast_or_null<ApplyInst>(value->getDefiningInstruction());
+  if (!defInst) {
+    return false;
+  }
+  return defInst->hasGuaranteedAddressResult();
+}
+
 /// Return the source address after stripping as many access projections as
 /// possible without losing the address type.
 ///
@@ -638,6 +646,13 @@ public:
     return findOwnershipReferenceRoot(getReference());
   }
 
+  /// Return the OSSA root of the reference being accessed
+  /// looking through struct_extract, tuple_extract, etc.
+  /// Precondition: isReference() is true.
+  SILValue getOwnershipReferenceAggregate() const {
+    return findOwnershipReferenceAggregate(getReference());
+  }
+  
   /// Return the storage root of the reference being accessed.
   ///
   /// Precondition: isReference() is true.
@@ -887,10 +902,10 @@ namespace swift {
 /// For convenience, encapsulate and AccessStorage value along with its
 /// accessed base address.
 struct AccessStorageWithBase {
-  /// Identical to AccessStorage::compute but preserves the access base.
+  /// Identical to AccessStorage::computeInScope but walks through begin_access.
   static AccessStorageWithBase compute(SILValue sourceAddress);
 
-  /// Identical to AccessStorage::computeInScope but preserves the base.
+  /// Identical to AccessStorage::compute but stops at begin_access
   static AccessStorageWithBase computeInScope(SILValue sourceAddress);
 
   AccessStorage storage;
@@ -1274,7 +1289,7 @@ struct AccessPathWithBase {
 //
 // Returns false if the access path couldn't be computed.
 bool visitProductLeafAccessPathNodes(
-    SILValue address, TypeExpansionContext tec, SILModule &module,
+    SILValue address, TypeExpansionContext tec, SILFunction &function,
     std::function<void(AccessPath::PathNode, SILType)> visitor);
 
 inline AccessPath AccessPath::compute(SILValue address) {
@@ -1599,6 +1614,7 @@ inline bool isAccessStorageTypeCast(SingleValueInstruction *svi) {
   // Simply pass-thru the incoming address.  But change its type!
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
   // Simply pass-thru the incoming address.  But change its type!
   case SILInstructionKind::UncheckedAddrCastInst:
   // Casting to RawPointer does not affect the AccessPath. When converting
@@ -1645,9 +1661,23 @@ inline bool isAccessStorageIdentityCast(SingleValueInstruction *svi) {
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::BeginBorrowInst:
-  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
     return true;
   }
+}
+
+// Strip access markers and casts that preserve the address type.
+//
+// Consider using RelativeAccessStorageWithBase::compute().
+inline SILValue stripAccessAndIdentityCasts(SILValue v) {
+  if (auto *bai = dyn_cast<BeginAccessInst>(v)) {
+    return stripAccessAndIdentityCasts(bai->getOperand());
+  }
+  if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
+    if (isAccessStorageIdentityCast(svi)) {
+      return stripAccessAndIdentityCasts(svi->getAllOperands()[0].get());
+    }
+  }
+  return v;
 }
 
 /// An address, pointer, or box cast that occurs outside of the formal
@@ -1664,6 +1694,22 @@ inline bool isAccessStorageIdentityCast(SingleValueInstruction *svi) {
 /// which we can't do if those operations are behind access projections.
 inline bool isAccessStorageCast(SingleValueInstruction *svi) {
   return isAccessStorageTypeCast(svi) || isAccessStorageIdentityCast(svi);
+}
+
+// Strip access markers and casts that preserve the access storage.
+//
+// Compare to stripAccessAndIdentityCasts.  This function strips cast that
+// change the type.
+inline SILValue stripAccessAndAccessStorageCasts(SILValue v) {
+  if (auto *bai = dyn_cast<BeginAccessInst>(v)) {
+    return stripAccessAndAccessStorageCasts(bai->getOperand());
+  }
+  if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
+    if (isAccessStorageCast(svi)) {
+      return stripAccessAndAccessStorageCasts(svi->getAllOperands()[0].get());
+    }
+  }
+  return v;
 }
 
 /// Abstract CRTP class for a visiting instructions that are part of the use-def
@@ -1763,6 +1809,12 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
     }
     if (isExternalGlobalAddressor(cast<ApplyInst>(sourceAddr)))
       return asImpl().visitUnidentified(sourceAddr);
+
+    if (isGuaranteedAddressReturn(sourceAddr)) {
+      return asImpl().visitAccessProjection(
+          cast<ApplyInst>(sourceAddr),
+          &cast<ApplyInst>(sourceAddr)->getSelfArgumentOperand());
+    }
 
     // Don't currently allow any other calls to return an accessed address.
     return asImpl().visitNonAccess(sourceAddr);

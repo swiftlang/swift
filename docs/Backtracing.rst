@@ -92,9 +92,17 @@ follows:
 |                 |         | only has effect on platforms that have a symbol  |
 |                 |         | cache that can be controlled by the runtime.     |
 +-----------------+---------+--------------------------------------------------+
+| format          | text    | Set to ``json`` to output JSON crash logs rather |
+|                 |         | than plain text.                                 |
++-----------------+---------+--------------------------------------------------+
 | output-to       | stdout  | Set to ``stderr`` to send the backtrace to the   |
 |                 |         | standard error instead of standard output.  This |
 |                 |         | may be useful in some CI systems.                |
+|                 |         |                                                  |
+|                 |         | You may also specify a path; if this points at a |
+|                 |         | directory, the backtracer will generate unique   |
+|                 |         | filenames within that directory.  Otherwise it   |
+|                 |         | is assumed to be a filename.                     |
 +-----------------+---------+--------------------------------------------------+
 | symbolicate     | full    | Options are ``full``, ``fast``, or ``off``.      |
 |                 |         | Full means to look up source locations and       |
@@ -104,6 +112,10 @@ follows:
 |                 |         | swift-backtrace binary to use for crashes.       |
 |                 |         | Otherwise, Swift will locate the binary relative |
 |                 |         | to the runtime library, or using ``SWIFT_ROOT``. |
++-----------------+---------+--------------------------------------------------+
+| warnings        | enabled | Set to ``suppressed`` to disable warning output  |
+|                 |         | related to the state of the backtracer.  This is |
+|                 |         | sometimes useful for testing.                    |
 +-----------------+---------+--------------------------------------------------+
 
 (*) On macOS, this defaults to ``no`` rather than ``yes``.
@@ -319,3 +331,211 @@ of the backtracer using
 
 If the runtime is unable to locate the backtracer, it will allow your program to
 crash as it would have done anyway.
+
+Backtrace Storage
+-----------------
+
+Backtraces are stored internally in a format called :download:`Compact Backtrace
+Format <CompactBacktraceFormat.md>`.  This provides us with a way to store a
+large number of frames in a much smaller space than would otherwise be possible.
+
+Similarly, where we need to store address to image mappings, we
+use :download:`Compact ImageMap Format <CompactImageMapFormat.md>` to minimise
+storage requirements.
+
+JSON Crash Logs
+---------------
+
+JSON crash logs are a structured crash log format that the backtracer is able
+to output.  Note that addresses are represented in this format as hexadecimal
+strings, rather than as numbers, in order to avoid representational issues.
+Additionally, boolean fields that are ``false``, as well as fields whose
+values are unknown or empty, will normally be completely omitted to save space.
+
+Where hexadecimal *values* are output, they will normally be prefixed with
+a ``0x`` prefix.  Hexadecimal *data*, by contrast, such as captured memory or
+build IDs, will not have a prefix and will be formatted as a string with no
+whitespace.
+
+Note that since JSON does not officially support hexadecimal, hexadecimal
+values will always be output as strings.
+
+JSON crash logs will always contain the following top level fields:
+
++-------------------+--------------------------------------------------------+
+| Field             | Value                                                  |
++===================+========================================================+
+| timestamp         | An ISO-8601 formatted timestamp, as a string.          |
++-------------------+--------------------------------------------------------+
+| kind              | The string ``crashReport``.                            |
++-------------------+--------------------------------------------------------+
+| description       | A textual description of the crash or runtime failure. |
++-------------------+--------------------------------------------------------+
+| faultAddress      | The fault address associated with the crash.           |
++-------------------+--------------------------------------------------------+
+| platform          | A string describing the platform; the first token      |
+|                   | identifies the platform itself and is followed by      |
+|                   | platform specific version information.                 |
+|                   |                                                        |
+|                   | e.g. "macOS 13.0 (22A380)",                            |
+|                   |      "linux (Ubuntu 22.04.5 LTS)"                      |
++-------------------+--------------------------------------------------------+
+| architecture      | The name of the processor architecture for this crash. |
++-------------------+--------------------------------------------------------+
+| threads           | An array of thread records, one for each thread.       |
++-------------------+--------------------------------------------------------+
+
+These will be followed by some or all of the following, according to the
+backtracer settings:
+
++-------------------+--------------------------------------------------------+
+| Field             | Value                                                  |
++===================+========================================================+
+| omittedThreads    | A count of the number of threads that were omitted, if |
+|                   | the backtracer is set to give a backtrace only for the |
+|                   | crashed thread.  Omitted if zero.                      |
++-------------------+--------------------------------------------------------+
+| capturedMemory    | A dictionary containing captured memory contents, if   |
+|                   | any.  This will not be present if the ``sanitize``     |
+|                   | setting is enabled, or if no data was captured.        |
+|                   |                                                        |
+|                   | The dictionary is keyed by hexadecimal addresses, as   |
+|                   | strings (with a ``0x`` prefix); the captured data is   |
+|                   | also given as a hexadecimal string, but with no prefix |
+|                   | and no inter-byte whitespace.                          |
+|                   |                                                        |
+|                   | You should make no assumptions about the number of     |
+|                   | bytes captured at each address; the backtracer will    |
+|                   | currently attempt to grab 16 bytes, but this may       |
+|                   | change if only a shorter range is available or in      |
+|                   | future according to configuration parameters.          |
++-------------------+--------------------------------------------------------+
+| omittedImages     | If ``images`` is set to ``mentioned``, this is an      |
+|                   | integer giving the number of images whose details were |
+|                   | omitted from the crash log.                            |
++-------------------+--------------------------------------------------------+
+| images            | Unless ``images`` is ``none``, an array of records     |
+|                   | describing the loaded images in the crashed process.   |
++-------------------+--------------------------------------------------------+
+| backtraceTime     | The time taken to generate the crash report, in        |
+|                   | seconds.                                               |
++-------------------+--------------------------------------------------------+
+
+Thread Records
+^^^^^^^^^^^^^^
+
+A thread record is a dictionary with the following fields:
+
++-------------------+--------------------------------------------------------+
+| Field             | Value                                                  |
++===================+========================================================+
+| name              | The name of the thread.  Omitted if no name.           |
++-------------------+--------------------------------------------------------+
+| crashed           | ``true`` if the thread is the one that crashed,        |
+|                   | omitted otherwise.                                     |
++-------------------+--------------------------------------------------------+
+| registers         | A dictionary containing the register contents on the   |
+|                   | crashed thread.                                        |
+|                   |                                                        |
+|                   | The dictionary is keyed by architecture specific       |
+|                   | register name; values are given as hexadecimal         |
+|                   | strings (with a ``0x`` prefix).                        |
+|                   |                                                        |
+|                   | This field may be omitted for threads other than the   |
+|                   | crashed thread, if the ``registers`` setting is set    |
+|                   | to ``crashed``.                                        |
++-------------------+--------------------------------------------------------+
+| frames            | An array of frames forming the backtrace for the       |
+|                   | thread.                                                |
++-------------------+--------------------------------------------------------+
+
+Each frame in the backtrace is described by a dictionary containing the
+following fields:
+
++-------------------+--------------------------------------------------------+
+| Field             | Value                                                  |
++===================+========================================================+
+| kind              | ``programCounter`` if the frame address is a directly  |
+|                   | captured program counter/instruction pointer.          |
+|                   |                                                        |
+|                   | ``returnAddress`` if the frame address is a return     |
+|                   | address.                                               |
+|                   |                                                        |
+|                   | ``asyncResumePoint`` if the frame address is a         |
+|                   | resumption point in an ``async`` function.             |
+|                   |                                                        |
+|                   | ``omittedFrames`` if this is a frame omission record.  |
+|                   |                                                        |
+|                   | ``truncated`` to indicate that the backtrace is        |
+|                   | truncated at this point and that more frames were      |
+|                   | available but not captured.                            |
++-------------------+--------------------------------------------------------+
+| address           | The frame address as a string (for records containing  |
+|                   | an address).                                           |
++-------------------+--------------------------------------------------------+
+| count             | The number of frames omitted at this point in the      |
+|                   | backtrace (``omittedFrames`` only).                    |
++-------------------+--------------------------------------------------------+
+
+If the backtrace is symbolicated, the frame record may also contain the
+following additional information:
+
++-------------------+--------------------------------------------------------+
+| Field             | Value                                                  |
++===================+========================================================+
+| inlined           | ``true`` if this frame is inlined, omitted otherwise.  |
++-------------------+--------------------------------------------------------+
+| runtimeFailure    | ``true`` if this frame represents a Swift runtime      |
+|                   | failure, omitted otherwise.                            |
++-------------------+--------------------------------------------------------+
+| thunk             | ``true`` if this frame is a compiler-generated thunk   |
+|                   | function, omitted otherwise.                           |
++-------------------+--------------------------------------------------------+
+| system            | ``true`` if this frame is a system frame, omitted      |
+|                   | otherwise.                                             |
++-------------------+--------------------------------------------------------+
+
+If symbol lookup succeeded for the frame address, the following additional
+fields will be present:
+
++-------------------+--------------------------------------------------------+
+| Field             | Value                                                  |
++===================+========================================================+
+| symbol            | The mangled name of the symbol corresponding to the    |
+|                   | frame address.                                         |
++-------------------+--------------------------------------------------------+
+| offset            | The offset from the symbol to the frame address.       |
++-------------------+--------------------------------------------------------+
+| description       | If demangling is enabled, a human readable description |
+|                   | of the frame address, otherwise omitted.               |
++-------------------+--------------------------------------------------------+
+| image             | The name of the image in which the symbol was found;   |
+|                   | omitted if no corresponding image exists.              |
++-------------------+--------------------------------------------------------+
+| sourceLocation    | If the source location of the symbol is known, a       |
+|                   | dictionary containing ``file``, ``line`` and           |
+|                   | ``column`` keys that identify the location of the      |
+|                   | symbol in the source files.                            |
++-------------------+--------------------------------------------------------+
+
+Image Records
+^^^^^^^^^^^^^
+
+An image record is a dictionary with the following fields:
+
++-------------------+--------------------------------------------------------+
+| Field             | Value                                                  |
++===================+========================================================+
+| name              | The name of the image (omitted if not known).          |
++-------------------+--------------------------------------------------------+
+| buildId           | The build ID (aka unique ID) of the image (omitted if  |
+|                   | not known).  Build IDs are formatted as un-prefixed    |
+|                   | hexadecimal strings, with no inter-byte whitespace.    |
++-------------------+--------------------------------------------------------+
+| path              | The path to the image (omitted if not known).          |
++-------------------+--------------------------------------------------------+
+| baseAddress       | The base address of the image text, as a hexadecimal   |
+|                   | string.                                                |
++-------------------+--------------------------------------------------------+
+| endOfText         | The end of the image text, as a hexadecimal string.    |
++-------------------+--------------------------------------------------------+

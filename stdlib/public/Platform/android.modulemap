@@ -12,7 +12,7 @@
 // The module map for the Android NDK.
 // A portion of the modules in this file are prefixed
 // with an underscore, to discourage users from importing them from
-// Swift directly, as these modules might be overriden by the C++ stdlib.
+// Swift directly, as these modules might be overridden by the C++ stdlib.
 // Instead, users should import 'Android' or another
 // umbrella module that includes these headers.
 
@@ -280,6 +280,10 @@ module posix_filesystem [system] {
   }
   explicit module sys_uio {
     header "sys/uio.h"
+    export *
+  }
+  explicit module sys_xattr {
+    header "sys/xattr.h"
     export *
   }
 }
@@ -552,6 +556,14 @@ module _bits_sa_family_t [system] {
   header "bits/sa_family_t.h"
   export *
 }
+
+module _bits_sockaddr_storage [system] {
+  // Note: this module is not part of 'sys_socket'
+  // to prevent a circular modular dependency
+     header "bits/sockaddr_storage.h"
+     export *
+}
+
 module _bits_stdatomic [system] {
   // Note: this module is not part of 'stdatomic'
   // as it depends on libc++ and forcing it to

@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-sil -sil-verify-all -module-name moveonly_lifetime -o /dev/null -Xllvm -sil-print-canonical-module -Onone -verify -enable-experimental-feature MoveOnlyClasses %s | %FileCheck %s
 
+// REQUIRES: swift_feature_MoveOnlyClasses
+
 struct C : ~Copyable {
     deinit {}
 }

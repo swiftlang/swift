@@ -14,6 +14,7 @@
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/IDEBridging.h"
@@ -220,7 +221,7 @@ private:
   bool finishDependency(bool isClangModule) override { return true; }
 
   Action startSourceEntity(const IndexSymbol &symbol) override {
-    if (symbol.decl != declToRename) {
+    if (symbol.decl != declToRename && symbol.originalDecl != declToRename) {
       return IndexDataConsumer::Continue;
     }
     auto loc = indexSymbolToRenameLoc(symbol);

@@ -4,5 +4,6 @@
 // than once for each supported Apple device.
 
 // REQUIRES: OS=macosx
+// RUN: export SWIFT_BACKTRACE=
 
 // RUN: %{python} %utils/update_checkout/run_tests.py

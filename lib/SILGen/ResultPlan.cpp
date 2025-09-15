@@ -17,7 +17,10 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
 
 using namespace swift;
@@ -78,7 +81,7 @@ public:
     assert(box && "buffer never emitted before activating cleanup?!");
     auto theBox = box;
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      if (auto *bbi = cast<BeginBorrowInst>(theBox)) {
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(theBox)) {
         SGF.B.createEndBorrow(loc, bbi);
         theBox = bbi->getOperand();
       }
@@ -97,53 +100,33 @@ public:
 /// dependent type, and return a substitution map with generic parameters
 /// corresponding to each distinct root opened archetype.
 static std::pair<CanType, SubstitutionMap>
-mapTypeOutOfOpenedExistentialContext(CanType t) {
+mapTypeOutOfOpenedExistentialContext(CanType t, GenericEnvironment *genericEnv) {
   auto &ctx = t->getASTContext();
 
-  SmallVector<OpenedArchetypeType *, 4> openedTypes;
-  t->getRootOpenedExistentials(openedTypes);
+  SmallVector<GenericEnvironment *, 4> capturedEnvs;
+  t.visit([&](CanType t) {
+    if (auto local = dyn_cast<LocalArchetypeType>(t)) {
+      auto *genericEnv = local->getGenericEnvironment();
+      if (std::find(capturedEnvs.begin(), capturedEnvs.end(), genericEnv)
+            == capturedEnvs.end()) {
+        capturedEnvs.push_back(genericEnv);
+      }
+    }
+  });
 
-  SmallVector<GenericTypeParamType *, 2> params;
-  SmallVector<Requirement, 2> requirements;
-  for (const unsigned i : indices(openedTypes)) {
-    auto *param = GenericTypeParamType::get(
-        /*isParameterPack*/ false, /*depth*/ 0, /*index*/ i, ctx);
-    params.push_back(param);
-
-    Type constraintTy = openedTypes[i]->getExistentialType();
-    if (auto existentialTy = constraintTy->getAs<ExistentialType>())
-      constraintTy = existentialTy->getConstraintType();
-
-    requirements.emplace_back(RequirementKind::Conformance, param,
-                              constraintTy);
+  GenericSignature baseGenericSig;
+  SubstitutionMap forwardingSubs;
+  if (genericEnv) {
+    baseGenericSig = genericEnv->getGenericSignature();
+    forwardingSubs = genericEnv->getForwardingSubstitutionMap();
   }
 
-  const auto mappedSubs = SubstitutionMap::get(
-      swift::buildGenericSignature(ctx, nullptr, params, requirements,
-                                   /*allowInverses=*/false),
-      [&](SubstitutableType *t) -> Type {
-        return openedTypes[cast<GenericTypeParamType>(t)->getIndex()];
-      },
-      MakeAbstractConformanceForGenericType());
+  auto mappedTy = mapLocalArchetypesOutOfContext(t, baseGenericSig, capturedEnvs);
 
-  const auto mappedTy = t.subst(
-      [&](SubstitutableType *t) -> Type {
-        auto *archTy = cast<ArchetypeType>(t);
-        const auto index = std::find(openedTypes.begin(), openedTypes.end(),
-                                     archTy->getRoot()) -
-                           openedTypes.begin();
-        assert(index != openedTypes.end() - openedTypes.begin());
-
-        if (auto *dmt =
-                archTy->getInterfaceType()->getAs<DependentMemberType>()) {
-          return dmt->substRootParam(params[index],
-                                     MakeAbstractConformanceForGenericType(),
-                                     std::nullopt);
-        }
-
-        return params[index];
-      },
-      MakeAbstractConformanceForGenericType());
+  auto genericSig = buildGenericSignatureWithCapturedEnvironments(
+      ctx, baseGenericSig, capturedEnvs);
+  auto mappedSubs = buildSubstitutionMapWithCapturedEnvironments(
+      forwardingSubs, genericSig, capturedEnvs);
 
   return std::make_pair(mappedTy->getCanonicalType(), mappedSubs);
 }
@@ -186,7 +169,7 @@ public:
     CanType layoutTy;
     SubstitutionMap layoutSubs;
     std::tie(layoutTy, layoutSubs) =
-        mapTypeOutOfOpenedExistentialContext(resultTy);
+        mapTypeOutOfOpenedExistentialContext(resultTy, SGF.F.getGenericEnvironment());
 
     CanGenericSignature layoutSig =
         layoutSubs.getGenericSignature().getCanonicalSignature();
@@ -242,14 +225,14 @@ public:
 /// reabstracting it.  The value can actually be a tuple if the
 /// abstraction is opaque.
 class ScalarResultPlan final : public ResultPlan {
-  std::unique_ptr<TemporaryInitialization> temporary;
+  TemporaryInitializationPtr temporary;
   AbstractionPattern origType;
   CanType substType;
   Initialization *init;
   SILFunctionTypeRepresentation rep;
 
 public:
-  ScalarResultPlan(std::unique_ptr<TemporaryInitialization> &&temporary,
+  ScalarResultPlan(TemporaryInitializationPtr &&temporary,
                    AbstractionPattern origType, CanType substType,
                    Initialization *init,
                    SILFunctionTypeRepresentation rep)
@@ -356,13 +339,13 @@ class InitValueFromTemporaryResultPlan final : public ResultPlan {
   Initialization *init;
   CanType substType;
   ResultPlanPtr subPlan;
-  std::unique_ptr<TemporaryInitialization> temporary;
+  TemporaryInitializationPtr temporary;
 
 public:
   InitValueFromTemporaryResultPlan(
       Initialization *init, CanType substType,
       ResultPlanPtr &&subPlan,
-      std::unique_ptr<TemporaryInitialization> &&temporary)
+      TemporaryInitializationPtr &&temporary)
       : init(init), substType(substType), subPlan(std::move(subPlan)),
         temporary(std::move(temporary)) {}
 
@@ -558,11 +541,9 @@ public:
           if (!eltTL.isAddressOnly()) {
             auto load = eltTL.emitLoad(SGF.B, loc, eltAddr,
                                        LoadOwnershipQualifier::Take);
-            eltMV = SGF.emitManagedRValueWithCleanup(load, eltTL);
-          } else {
-            eltMV = SGF.emitManagedBufferWithCleanup(eltAddr, eltTL);
+            return SGF.emitManagedRValueWithCleanup(load, eltTL);
           }
-          return eltMV;
+          return SGF.emitManagedBufferWithCleanup(eltAddr, eltTL);
         }();
 
         // Finish in the normal way for scalar results.
@@ -769,34 +750,32 @@ public:
               ->getCanonicalType();
     }
 
-    auto blockStorageTy = SILBlockStorageType::get(
-        checkedBridging ? ctx.TheAnyType : continuationTy);
+    auto blockStorageTy = SILBlockStorageType::get(ctx.TheAnyType);
     auto blockStorage = SGF.emitTemporaryAllocation(
         loc, SILType::getPrimitiveAddressType(blockStorageTy));
 
     auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
 
     // Stash continuation in a buffer for a block object.
+    auto conformances =
+        collectExistentialConformances(continuationTy, ctx.TheAnyType);
+
+    // In this case block storage captures `Any` which would be initialized
+    // with a continuation.
+    auto underlyingContinuationAddr = SGF.B.createInitExistentialAddr(
+        loc, continuationAddr, continuationTy,
+        SGF.getLoweredType(continuationTy), conformances);
 
     if (checkedBridging) {
       auto createIntrinsic =
           throws ? SGF.SGM.getCreateCheckedThrowingContinuation()
                  : SGF.SGM.getCreateCheckedContinuation();
-
-      auto conformances = SGF.SGM.M.getSwiftModule()->collectExistentialConformances(
-          continuationTy, ctx.TheAnyType);
-
-      // In this case block storage captures `Any` which would be initialized
-      // with an checked continuation.
-      auto underlyingContinuationAddr =
-          SGF.B.createInitExistentialAddr(loc, continuationAddr, continuationTy,
-                                          SGF.getLoweredType(continuationTy),
-                                          conformances);
-
-      auto subs = SubstitutionMap::get(createIntrinsic->getGenericSignature(),
-                                       {calleeTypeInfo.substResultType},
-                                       conformances);
-
+    auto conformances =
+        collectExistentialConformances(calleeTypeInfo.substResultType,
+                                       ctx.TheAnyType);
+      auto subs =
+          SubstitutionMap::get(createIntrinsic->getGenericSignature(),
+                               {calleeTypeInfo.substResultType}, conformances);
       InitializationPtr underlyingInit(
           new KnownAddressInitialization(underlyingContinuationAddr));
       auto continuationMV =
@@ -804,18 +783,18 @@ public:
       SGF.emitApplyOfLibraryIntrinsic(loc, createIntrinsic, subs,
                                       {continuationMV}, SGFContext())
           .forwardInto(SGF, loc, underlyingInit.get());
+      SGF.enterDestroyCleanup(underlyingContinuationAddr);
     } else {
-      SGF.B.createStore(loc, wrappedContinuation, continuationAddr,
+      SGF.B.createStore(loc, wrappedContinuation, underlyingContinuationAddr,
                         StoreOwnershipQualifier::Trivial);
     }
 
     return std::make_tuple(blockStorage, blockStorageTy, continuationTy);
   }
 
-  ManagedValue
-  emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
-                                    AbstractionPattern origFormalType,
-                                    SILLocation loc) override {
+  ManagedValue emitForeignAsyncCompletionHandler(
+      SILGenFunction &SGF, AbstractionPattern origFormalType, ManagedValue self,
+      SILLocation loc) override {
     // Get the current continuation for the task.
     bool throws =
         calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex()
@@ -827,6 +806,12 @@ public:
 
     std::tie(blockStorage, blockStorageTy, continuationTy) =
         emitBlockStorage(SGF, loc, throws);
+
+    // Add a merge_isolation_region from the continuation result buffer
+    // (resumeBuf) onto the block storage so it is in the same region as the
+    // block storage despite the intervening Sendable continuation wrapping that
+    // disguises this fact from the region isolation checker.
+    SGF.B.createMergeIsolationRegion(loc, {blockStorage, resumeBuf});
 
     // Get the block invocation function for the given completion block type.
     auto completionHandlerIndex = calleeTypeInfo.foreign.async
@@ -859,7 +844,14 @@ public:
     SILValue block = SGF.B.createInitBlockStorageHeader(loc, blockStorage,
                           impRef, SILType::getPrimitiveObjectType(impFnTy),
                           SGF.getForwardingSubstitutionMap());
-    
+
+    // If our block is Sendable, we have lost the connection in between self and
+    // blockStorage. We need to restore that connection by using a merge
+    // isolation region.
+    if (self && block->getType().isSendable(&SGF.F)) {
+      SGF.B.createMergeIsolationRegion(loc, {self.getValue(), blockStorage});
+    }
+
     // Wrap it in optional if the callee expects it.
     if (handlerIsOptional) {
       block = SGF.B.createOptionalSome(loc, block, impTy);
@@ -927,10 +919,6 @@ public:
 
         bool checkedBridging = ctx.LangOpts.UseCheckedAsyncObjCBridging;
 
-        auto env = SGF.F.getGenericEnvironment();
-        auto sig = env ? env->getGenericSignature().getCanonicalSignature()
-                       : CanGenericSignature();
-
         // Load unsafe or checked continuation from the block storage
         // and call _resume{Unsafe, Checked}ThrowingContinuationWithError.
 
@@ -938,11 +926,11 @@ public:
             SGF.B.createProjectBlockStorage(loc, blockStorage);
 
         ManagedValue continuation;
-        if (checkedBridging) {
+        {
           FormalEvaluationScope scope(SGF);
 
           auto underlyingValueTy =
-              OpenedArchetypeType::get(ctx.TheAnyType, sig);
+              ExistentialArchetypeType::get(ctx.TheAnyType);
 
           auto underlyingValueAddr = SGF.emitOpenExistential(
               loc, ManagedValue::forTrivialAddressRValue(continuationAddr),
@@ -951,15 +939,15 @@ public:
           continuation = SGF.B.createUncheckedAddrCast(
               loc, underlyingValueAddr,
               SILType::getPrimitiveAddressType(continuationTy));
-        } else {
-          auto continuationVal = SGF.B.createLoad(
-              loc, continuationAddr, LoadOwnershipQualifier::Trivial);
-          continuation =
-              ManagedValue::forObjectRValueWithoutOwnership(continuationVal);
+
+          // If we are calling the unsafe variant, we always pass the value in
+          // registers.
+          if (!checkedBridging)
+            continuation = SGF.B.createLoadTrivial(loc, continuation);
         }
 
         auto mappedOutContinuationTy =
-            continuationTy->mapTypeOutOfContext()->getReducedType(sig);
+            continuationTy->mapTypeOutOfContext()->getCanonicalType();
         auto resumeType =
             cast<BoundGenericType>(mappedOutContinuationTy).getGenericArgs()[0];
 
@@ -972,7 +960,7 @@ public:
             SGF.F.mapTypeIntoContext(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
-                         LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+                                         LookUpConformanceInModule());
 
         SGF.emitApplyOfLibraryIntrinsic(
             loc, errorIntrinsic, subs,
@@ -1109,11 +1097,11 @@ public:
     subPlan->gatherIndirectResultAddrs(SGF, loc, outList);
   }
 
-  ManagedValue
-  emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
-                                    AbstractionPattern origFormalType,
-                                    SILLocation loc) override {
-    return subPlan->emitForeignAsyncCompletionHandler(SGF, origFormalType, loc);
+  ManagedValue emitForeignAsyncCompletionHandler(
+      SILGenFunction &SGF, AbstractionPattern origFormalType, ManagedValue self,
+      SILLocation loc) override {
+    return subPlan->emitForeignAsyncCompletionHandler(SGF, origFormalType, self,
+                                                      loc);
   }
 
   std::optional<std::pair<ManagedValue, ManagedValue>>
@@ -1261,7 +1249,7 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
   }
 
   // Create a temporary if the result is indirect.
-  std::unique_ptr<TemporaryInitialization> temporary;
+  TemporaryInitializationPtr temporary;
   if (SGF.silConv.isSILIndirect(result)) {
     auto &resultTL = SGF.getTypeLowering(result.getReturnValueType(
         SGF.SGM.M, calleeTy, SGF.getTypeExpansionContext()));

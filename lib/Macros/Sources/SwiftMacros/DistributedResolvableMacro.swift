@@ -9,10 +9,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+@_spi(ExperimentalLanguageFeatures)
 import SwiftSyntax
 import SwiftSyntaxMacros
 import SwiftDiagnostics
-import SwiftOperators
 import SwiftSyntaxBuilder
 
 /// Introduces:
@@ -45,6 +45,9 @@ extension DistributedResolvableMacro {
       return []
     }
 
+    let attributes = proto.attributes.filter { attr in
+      attr.as(AttributeSyntax.self)?.attributeName.trimmed.description == "_spi"
+    }
     let accessModifiers = proto.accessControlModifiers
 
     let requirementStubs =
@@ -64,6 +67,7 @@ extension DistributedResolvableMacro {
 
     let extensionDecl: DeclSyntax =
       """
+      \(raw: attributes.map({$0.description}).joined(separator: "\n"))
       extension \(proto.name.trimmed) where Self: Distributed._DistributedActorStub {
         \(raw: requirementStubs)
       }
@@ -73,9 +77,13 @@ extension DistributedResolvableMacro {
 
   static func stubMethodDecl(access: DeclModifierListSyntax, _ requirement: MemberBlockItemListSyntax.Element) -> String {
     // do we need to stub a computed variable?
-    if let variable = requirement.decl.as(VariableDeclSyntax.self) {
-      var accessorStubs: [String] = []
+    if var variable = requirement.decl.as(VariableDeclSyntax.self) {
+      variable.modifiers = variable.modifiers.filter { !$0.isAccessControl }
+      access.reversed().forEach { modifier in
+        variable.modifiers = [modifier] + variable.modifiers
+      }
 
+      var accessorStubs: [String] = []
       for binding in variable.bindings {
         if let accessorBlock = binding.accessorBlock {
           for accessor in accessorBlock.accessors.children(viewMode: .all) {
@@ -87,24 +95,36 @@ extension DistributedResolvableMacro {
 
       let name = variable.bindings.first!.pattern.trimmed
       let typeAnnotation = variable.bindings.first?.typeAnnotation.map { "\($0.trimmed)" } ?? "Any"
+
+      // computed property stub
       return """
-             \(access)\(variable.modifiers)\(variable.bindingSpecifier) \(name) \(typeAnnotation) {
+             \(variable.attributes)
+             \(variable.modifiers)\(variable.bindingSpecifier) \(name) \(typeAnnotation) {
                \(accessorStubs.joined(separator: "\n  "))
              }
              """
-    }
+    } else if var fun = requirement.decl.as(FunctionDeclSyntax.self) {
+      fun.modifiers = fun.modifiers.filter { !$0.isAccessControl }
+      access.reversed().forEach { modifier in
+        fun.modifiers = [modifier] + fun.modifiers
+      }
 
-    // normal function stub
-    return """
-           \(access)\(requirement) {
-             \(stubFunctionBody())
-           }
-           """
+      // normal function stub
+      return """
+             \(fun) {
+               \(stubFunctionBody())
+             }
+             """
+    } else {
+      // some declaration type we could not handle, let's silently ignore; we should not really need to emit
+      // anything others than var and func here, and it's cleaner to just ignore rather than crash here.
+      return ""
+    }
   }
 
   static func stubFunctionBody() -> DeclSyntax {
     """
-    if #available(SwiftStdlib 6.0, *) {
+    if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
       Distributed._distributedStubFatalError()
     } else {
       fatalError()
@@ -130,9 +150,18 @@ extension DistributedResolvableMacro {
       return []
     }
 
-    var isGenericStub = false
+    var isGenericOverActorSystem = false
     var specificActorSystemRequirement: TypeSyntax?
 
+    let attributes = proto.attributes.filter {
+      guard let attr = $0.as(AttributeSyntax.self) else {
+        return false
+      }
+      guard let ident = attr.attributeName.as(IdentifierTypeSyntax.self) else {
+        return false
+      }
+      return ident.name.text == "_spi"
+    }
     let accessModifiers = proto.accessControlModifiers
 
     for req in proto.genericWhereClause?.requirements ?? [] {
@@ -140,53 +169,106 @@ extension DistributedResolvableMacro {
       case .conformanceRequirement(let conformanceReq)
            where conformanceReq.leftType.isActorSystem:
         specificActorSystemRequirement = conformanceReq.rightType.trimmed
-        isGenericStub = true
+        isGenericOverActorSystem = true
 
-      case .sameTypeRequirement(let sameTypeReq)
-           where sameTypeReq.leftType.isActorSystem:
-        specificActorSystemRequirement = sameTypeReq.rightType.trimmed
-        isGenericStub = false
+      case .sameTypeRequirement(let sameTypeReq):
+        switch sameTypeReq.leftType {
+        case .type(let type) where type.isActorSystem:
+          switch sameTypeReq.rightType.trimmed {
+          case .type(let rightType):
+            specificActorSystemRequirement = rightType
+            isGenericOverActorSystem = false
+
+          case .expr:
+            throw DiagnosticsError(
+              syntax: sameTypeReq.rightType,
+              message: "Expression type not supported for distributed actor",
+              id: .invalidGenericArgument
+            )
+          }
+
+        default:
+          continue
+        }
 
       default:
         continue
       }
     }
 
-    if isGenericStub, let specificActorSystemRequirement {
-      return [
-        """
-        \(proto.modifiers) distributed actor $\(proto.name.trimmed)<ActorSystem>: \(proto.name.trimmed), 
-          Distributed._DistributedActorStub
-          where ActorSystem: \(specificActorSystemRequirement) 
-        { }
-        """
-      ]
-    } else if let specificActorSystemRequirement {
-      return [
-        """
-        \(proto.modifiers) distributed actor $\(proto.name.trimmed): \(proto.name.trimmed), 
-          Distributed._DistributedActorStub
-        { 
-          \(typealiasActorSystem(access: accessModifiers, proto, specificActorSystemRequirement)) 
-        }
-        """
-      ]
+    var primaryAssociatedTypes: [PrimaryAssociatedTypeSyntax] = []
+    if let primaryTypes = proto.primaryAssociatedTypeClause?.primaryAssociatedTypes {
+      primaryAssociatedTypes.append(contentsOf: primaryTypes)
+    }
+
+    // The $Stub is always generic over the actor system: $Stub<ActorSystem>
+    var primaryTypeParams: [String] = primaryAssociatedTypes.map {
+      $0.name.trimmed.text
+    }
+
+    // Don't duplicate the ActorSystem type parameter if it already was declared
+    // on the protocol as a primary associated type;
+    // otherwise, add it as first primary associated type.
+    let actorSystemTypeParam: [String]
+    if primaryTypeParams.contains("ActorSystem") {
+      actorSystemTypeParam = []
+    } else if isGenericOverActorSystem {
+      actorSystemTypeParam = ["ActorSystem"]
     } else {
+      actorSystemTypeParam = []
+    }
+
+    // Prepend the actor system type parameter, as we want it to be the first one
+    primaryTypeParams = actorSystemTypeParam + primaryTypeParams
+    let typeParamsClause =
+      primaryTypeParams.isEmpty ? "" : "<" + primaryTypeParams.joined(separator: ", ") + ">"
+
+    var whereClause: String = ""
+    do {
+      let associatedTypeDecls = proto.associatedTypeDecls
+      var typeParamConstraints: [String] = []
+      for typeParamName in primaryTypeParams {
+        if let decl = associatedTypeDecls[typeParamName] {
+          if let inheritanceClause = decl.inheritanceClause {
+            typeParamConstraints.append("\(typeParamName)\(inheritanceClause)")
+          }
+        }
+      }
+
+      if isGenericOverActorSystem, let specificActorSystemRequirement {
+        typeParamConstraints = ["ActorSystem: \(specificActorSystemRequirement)"] + typeParamConstraints
+      }
+      
+      if !typeParamConstraints.isEmpty {
+        whereClause += "\n  where " + typeParamConstraints.joined(separator: ",\n  ")
+      }
+    }
+
+    let stubActorBody: String
+    if isGenericOverActorSystem {
       // there may be no `where` clause specifying an actor system,
       // but perhaps there is a typealias (or extension with a typealias),
       // specifying a concrete actor system so we let this synthesize
       // an empty `$Greeter` -- this may fail, or succeed depending on
       // surrounding code using a default distributed actor system,
       // or extensions providing it.
-      return [
-        """
-        \(proto.modifiers) distributed actor $\(proto.name.trimmed): \(proto.name.trimmed), 
-          Distributed._DistributedActorStub
-        {
-        }
-        """
-      ]
+      stubActorBody = ""
+    } else if let specificActorSystemRequirement {
+      stubActorBody = "\(typealiasActorSystem(access: accessModifiers, proto, specificActorSystemRequirement))"
+    } else {
+      stubActorBody = ""
     }
+
+    return [
+      """
+      \(attributes)
+      \(proto.modifiers) distributed actor $\(proto.name.trimmed)\(raw: typeParamsClause): \(proto.name.trimmed), 
+        Distributed._DistributedActorStub \(raw: whereClause)
+      {
+        \(raw: stubActorBody)
+      }
+      """
+    ]
   }
 
   private static func typealiasActorSystem(access: DeclModifierListSyntax,
@@ -238,6 +320,23 @@ extension DeclModifierSyntax {
   }
 }
 
+extension ProtocolDeclSyntax {
+  var associatedTypeDecls: [String: AssociatedTypeDeclSyntax] {
+    let visitor = AssociatedTypeDeclVisitor(viewMode: .all)
+    visitor.walk(self)
+    return visitor.associatedTypeDecls
+  }
+
+  final class AssociatedTypeDeclVisitor: SyntaxVisitor {
+    var associatedTypeDecls: [String: AssociatedTypeDeclSyntax] = [:]
+
+    override func visit(_ node: AssociatedTypeDeclSyntax) -> SyntaxVisitorContinueKind {
+      associatedTypeDecls[node.name.text] = node
+      return .skipChildren
+    }
+  }
+}
+
 // ===== -----------------------------------------------------------------------
 // MARK: @Distributed.Resolvable macro errors
 
@@ -266,6 +365,7 @@ struct DistributedResolvableMacroDiagnostic: DiagnosticMessage {
   enum ID: String {
     case invalidApplication = "invalid type"
     case missingInitializer = "missing initializer"
+    case invalidGenericArgument = "invalid generic argument"
   }
 
   var message: String

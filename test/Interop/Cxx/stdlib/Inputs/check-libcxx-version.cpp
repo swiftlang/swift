@@ -6,7 +6,7 @@ int main() {
   return 1;
 #endif
 
-#if _LIBCPP_VERSION >= 170006
+#if _LIBCPP_VERSION >= 170004
   return 0;
 #else
   return 1;

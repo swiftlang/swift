@@ -168,11 +168,11 @@ enum Tree : Differentiable & AdditiveArithmetic {
 // (`Collection.makeIterator` and `IteratorProtocol.next`).
 // expected-error @+1 {{function is not differentiable}}
 @differentiable(reverse)
-// expected-note @+2 {{when differentiating this function definition}}
-// expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'?}} {{+2:12-12=withoutDerivative(at: }} {{+2:17-17=)}}
 func loop_array(_ array: [Float]) -> Float {
+  // expected-note@-1 {{when differentiating this function definition}}
   var result: Float = 1
   for x in array {
+    // expected-note@-1 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'}}
     result = result * x
   }
   return result

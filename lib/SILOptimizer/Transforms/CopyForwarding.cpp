@@ -58,6 +58,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "copy-forwarding"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -340,6 +341,7 @@ public:
     case SILArgumentConvention::Indirect_In:
       return true;
     case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
       return false;
@@ -444,6 +446,7 @@ public:
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Indirect_In_Guaranteed:
       return false;
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_In:
       llvm_unreachable("copy_addr src destroyed without reinitialization");
     default:

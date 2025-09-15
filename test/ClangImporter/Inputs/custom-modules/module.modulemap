@@ -113,8 +113,8 @@ module ImportAsMember {
   }
 }
 
-// FIXME: This probably ought to be in a module_private.map, but that causes
-// hundreds of clang warnings.
+// FIXME: This probably ought to be in a module.private.modulemap, but that
+// causes hundreds of clang warnings.
 module ImportAsMember_Private {
   export *
 
@@ -269,5 +269,22 @@ module LocalVsFileScope {
 
 module CommonName {
   header "CommonName.h"
+  export *
+}
+
+module "Weird C Module" {
+  header "WeirdCModule.h"
+}
+
+module Aliases {
+  header "Aliases.h"
+}
+
+module RetroactiveVersioning {
+  header "versioning.h"
+}
+
+module CVarArgs {
+  header "CVarArgs.h"
   export *
 }

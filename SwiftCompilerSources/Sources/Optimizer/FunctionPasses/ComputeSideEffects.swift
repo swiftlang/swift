@@ -27,7 +27,7 @@ import SIL
 let computeSideEffects = FunctionPass(name: "compute-side-effects") {
   (function: Function, context: FunctionPassContext) in
 
-  if function.isAvailableExternally {
+  if function.isDefinedExternally {
     // We cannot assume anything about function, which are defined in another module,
     // even if the serialized SIL of its body is available in the current module.
     // If the other module was compiled with library evolution, the implementation
@@ -37,39 +37,109 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects") {
     return
   }
 
-  if function.effectAttribute != .none {
-    // Don't try to infer side effects if there are defined effect attributes.
-    return
-  }
-
   var collectedEffects = CollectedEffects(function: function, context)
 
-  // First step: collect effects from all instructions.
-  //
+  // Collect effects from all instructions.
   for block in function.blocks {
     for inst in block.instructions {
       collectedEffects.addInstructionEffects(inst)
     }
   }
-
-  // Second step: If an argument has unknown uses, we must add all previously collected
-  // global effects to the argument, because we don't know to which "global" side-effect
-  // instruction the argument might have escaped.
+  // If an argument has unknown uses, we must add all previously collected
+  // global effects to the argument, because we don't know to which "global"
+  // side-effect instruction the argument might have escaped.
   for argument in function.arguments {
     collectedEffects.addEffectsForEscapingArgument(argument: argument)
+    collectedEffects.addEffectsForConsumingArgument(argument: argument)
   }
+
+  let globalEffects: SideEffects.GlobalEffects
+  do {
+    let computed = collectedEffects.globalEffects
+
+    // Combine computed global effects with effects defined by the function's effect attribute, if it has one.
+
+    // The defined and computed global effects of a function with an effect attribute should be treated as
+    // worst case global effects of the function.
+    // This means a global effect should only occur iff it is computed AND defined to occur.
+
+    let defined = function.definedGlobalEffects
+
+    globalEffects = SideEffects.GlobalEffects(
+      memory: SideEffects.Memory(read: defined.memory.read && computed.memory.read,
+                                 write: defined.memory.write && computed.memory.write),
+      ownership: SideEffects.Ownership(copy: defined.ownership.copy && computed.ownership.copy,
+                                       destroy: defined.ownership.destroy && computed.ownership.destroy),
+      allocates: defined.allocates && computed.allocates,
+      isDeinitBarrier: defined.isDeinitBarrier && computed.isDeinitBarrier
+    )
+  }
+
+  // Obtain the argument effects of the function.
+  var argumentEffects = collectedEffects.argumentEffects
+
+  // `[readnone]` and `[readonly]` functions can still access the value fields
+  // of their indirect arguments, permitting v** read and write effects. If
+  // additional read or write effects are computed, we can replace.
+  switch function.effectAttribute {
+  case .readNone:
+    for i in (0..<argumentEffects.count) {
+      // Even a `[readnone]` function can read from indirect arguments.
+      if !function.argumentConventions[i].isIndirectIn {
+        argumentEffects[i].read = nil
+      } else if argumentEffects[i].read?.mayHaveClassProjection ?? false {
+        argumentEffects[i].read = SmallProjectionPath(.anyValueFields)
+      }
+
+      // Even a `[readnone]` function can write to indirect results.
+      if !function.argument(at: i).isIndirectResult {
+        argumentEffects[i].write = nil
+      } else if argumentEffects[i].write?.mayHaveClassProjection ?? false {
+        argumentEffects[i].write = SmallProjectionPath(.anyValueFields)
+      }
+
+      argumentEffects[i].copy = nil
+      argumentEffects[i].destroy = nil
+    }
+
+  case .readOnly:
+    for i in (0..<argumentEffects.count) {
+      // Even a `[readonly]` function can write to indirect results.
+      if !function.argument(at: i).isIndirectResult {
+        argumentEffects[i].write = nil
+      } else if argumentEffects[i].write?.mayHaveClassProjection ?? false {
+        argumentEffects[i].write = SmallProjectionPath(.anyValueFields)
+      }
+
+      argumentEffects[i].destroy = nil
+    }
+
+  case .releaseNone:
+    for i in (0..<argumentEffects.count) {
+      // A `[releasenone]` function can do anything except destroy an argument.
+      argumentEffects[i].destroy = nil
+    }
+
+  case .none:
+    // The user makes no additional guarantees about the effects of the function.
+    break
+  }
+
 
   // Don't modify the effects if they didn't change. This avoids sending a change notification
   // which can trigger unnecessary other invalidations.
   if let existingEffects = function.effects.sideEffects,
-     existingEffects.arguments == collectedEffects.argumentEffects,
-     existingEffects.global == collectedEffects.globalEffects {
+     existingEffects.arguments == argumentEffects,
+     existingEffects.global == globalEffects {
     return
   }
 
   // Finally replace the function's side effects.
-  context.modifyEffects(in: function) { (effects: inout FunctionEffects) in
-    effects.sideEffects = SideEffects(arguments: collectedEffects.argumentEffects, global: collectedEffects.globalEffects)
+  function.modifyEffects(context) { (effects: inout FunctionEffects) in
+    let globalEffects = function.isProgramTerminationPoint ?
+      globalEffects.forProgramTerminationPoints
+      : globalEffects
+    effects.sideEffects = SideEffects(arguments: argumentEffects, global: globalEffects)
   }
 }
 
@@ -94,7 +164,7 @@ private struct CollectedEffects {
     case is CopyValueInst, is RetainValueInst, is StrongRetainInst:
       addEffects(.copy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
 
-    case is DestroyValueInst, is ReleaseValueInst, is StrongReleaseInst:
+    case is DestroyValueInst, is DestroyNotEscapedClosureInst, is ReleaseValueInst, is StrongReleaseInst:
       addDestroyEffects(ofValue: inst.operands[0].value)
 
     case let da as DestroyAddrInst:
@@ -104,10 +174,10 @@ private struct CollectedEffects {
       addEffects(.read, to: copy.source)
       addEffects(.write, to: copy.destination)
 
-      if !copy.isTakeOfSrc {
+      if !copy.isTakeOfSource {
         addEffects(.copy, to: copy.source)
       }
-      if !copy.isInitializationOfDest {
+      if !copy.isInitializationOfDestination {
         addDestroyEffects(ofAddress: copy.destination)
       }
 
@@ -145,7 +215,7 @@ private struct CollectedEffects {
       // In addition to the effects of the apply, also consider the
       // effects of the capture, which reads the captured value in
       // order to move it into the context. This only applies to
-      // addressible values, because capturing does not dereference
+      // addressable values, because capturing does not dereference
       // any class objects.
       //
       // Ignore captures for on-stack partial applies. They only
@@ -179,10 +249,15 @@ private struct CollectedEffects {
       is CondFailInst:
       break
 
-    case is BeginCOWMutationInst, is IsUniqueInst, is IsEscapingClosureInst:
-      // Model reference count reading as "destroy" for now. Although we could intoduce a "read-refcount"
+    case is BeginCOWMutationInst, is IsUniqueInst:
+      // Model reference count reading as "destroy" for now. Although we could introduce a "read-refcount"
       // effect, it would not give any significant benefit in any of our current optimizations.
       addEffects(.destroy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
+
+    case is ReturnInst:
+      if inst.parentFunction.convention.hasGuaranteedAddressResult {
+        addEffects(.read, to: inst.operands[0].value)
+      }
 
     default:
       if inst.mayRelease {
@@ -236,7 +311,17 @@ private struct CollectedEffects {
       addEffects(.destroy, to: argument)
     }
   }
-  
+
+  mutating func addEffectsForConsumingArgument(argument: FunctionArgument) {
+    if argument.convention == .indirectIn {
+      // Usually there _must_ be a read from a consuming in-argument, because the function has to consume the argument.
+      // But in the special case if all control paths end up in an `unreachable`, the consuming read might have been
+      // dead-code eliminated. Therefore make sure to add the read-effect in any case. Otherwise it can result
+      // in memory lifetime failures at a call site.
+      addEffects(.read, to: argument)
+    }
+  }
+
   private mutating func handleApply(_ apply: ApplySite) {
     let callees = calleeAnalysis.getCallees(callee: apply.callee)
     let args = apply.argumentOperands.lazy.map {
@@ -287,6 +372,8 @@ private struct CollectedEffects {
   private mutating func addEffects<Arguments: Sequence>(ofFunctions callees: FunctionArray?,
                                                         withArguments arguments: Arguments)
                                    where Arguments.Element == (calleeArgumentIndex: Int, callerArgument: Value) {
+    // The argument summary for @in_cxx is insufficient in OSSA because the function body does not contain the
+    // destroy. But the call is still effectively a release from the caller's perspective.
     guard let callees = callees else {
       // We don't know which function(s) are called.
       globalEffects = .worstEffects
@@ -330,7 +417,7 @@ private struct CollectedEffects {
   /// Adds effects to a specific value.
   ///
   /// If the value comes from an argument (or multiple arguments), then the effects are added
-  /// to the corrseponding `argumentEffects`. Otherwise they are added to the `global` effects.
+  /// to the corresponding `argumentEffects`. Otherwise they are added to the `global` effects.
   private mutating func addEffects(_ effects: SideEffects.GlobalEffects, to value: Value) {
     addEffects(effects, to: value, fromInitialPath: defaultPath(for: value))
   }
@@ -478,7 +565,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
     case let copy as CopyAddrInst:
       if address == copy.sourceOperand &&
           !address.value.hasTrivialType &&
-          (!function.hasOwnership || copy.isTakeOfSrc) {
+          (!function.hasOwnership || copy.isTakeOfSource) {
         foundTakingLoad = true
       }
       return .continueWalk
@@ -542,6 +629,6 @@ private extension PartialApplyInst {
       var followTrivialTypes: Bool { true }
     }
 
-    return self.isEscapingWhenWalkingDown(using: EscapesToApply(), context)
+    return self.isEscaping(using: EscapesToApply(), initialWalkingDirection: .down, context)
   }
 }

@@ -12,17 +12,16 @@ struct Maker {} // expected-error {{result builder must provide at least one sta
 @resultBuilder
 class Inventor {} // expected-error {{result builder must provide at least one static 'buildBlock' method}}
 
-@Maker // expected-error {{result builder attribute 'Maker' can only be applied to a parameter, function, or computed property}}
+@Maker // expected-error {{result builder attribute 'Maker' can only be applied to a parameter, function, subscript, or computed property}}
 typealias typename = Inventor
 
 @Maker // expected-error {{result builder attribute 'Maker' can only be applied to a variable if it defines a getter}}
 var global: Int
 
-// FIXME: should this be allowed?
 @Maker
 var globalWithEmptyImplicitGetter: Int {}
-// expected-error@-1 {{missing return in accessor expected to return 'Int'}}
-// expected-error@-3 {{result builder attribute 'Maker' can only be applied to a variable if it defines a getter}}
+// expected-error@-1{{result builder 'Maker' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
+// Note: no missing return error is expected in this case. Similar test added to `SILOptimizer/missing_returns` to verify SIL diagnostic behavior.
 
 @Maker
 var globalWithEmptyExplicitGetter: Int { get {} }  // expected-error{{result builder 'Maker' does not implement any 'buildBlock' or a combination of 'buildPartialBlock(first:)' and 'buildPartialBlock(accumulated:next:)' with sufficient availability for this call site}}
@@ -66,9 +65,9 @@ func makerParamAutoclosure(@Maker // expected-error {{result builder attribute '
                            fn: @autoclosure () -> ()) {}
 
 @resultBuilder
-struct GenericMaker<T> {} // expected-note {{generic type 'GenericMaker' declared here}} expected-error {{result builder must provide at least one static 'buildBlock' method}}
+struct GenericMaker<T> {} // expected-note {{generic struct 'GenericMaker' declared here}} expected-error {{result builder must provide at least one static 'buildBlock' method}}
 
-struct GenericContainer<T> {  // expected-note {{generic type 'GenericContainer' declared here}}
+struct GenericContainer<T> {  // expected-note {{generic struct 'GenericContainer' declared here}}
   @resultBuilder
   struct Maker {} // expected-error {{result builder must provide at least one static 'buildBlock' method}}
 }

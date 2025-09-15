@@ -27,6 +27,7 @@
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 
 print("Hello Embedded Swift!") // CHECK: Hello Embedded Swift!

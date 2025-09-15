@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-print-debuginfo | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -inline -sil-print-debuginfo | %FileCheck %s
 
 // Generated from:
 // func g(_ x: Int64) -> Int64 {

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all -enable-expand-all -inline -function-signature-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all -enable-expand-all -inline -function-signature-opts %s | %FileCheck %s
 
 import Builtin
 

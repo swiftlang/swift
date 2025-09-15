@@ -123,3 +123,20 @@ extension Carrot {
     let _: any Veggie & ~Copyable = self
   }
 }
+
+// rdar://131546153 (implicit consuming conversion error triggers incorrectly for implicit initializers)
+struct ImplicitInit: ~Copyable {
+  let x: NC?
+}
+func test(_ nc: consuming NC) -> ImplicitInit {
+  return .init(x: nc)
+}
+
+
+// rdar://134371893 (optional chaining on ~Copyable type)
+struct NonCopyable: ~Copyable {
+    var shared: Self { .init() }
+}
+func f() {
+    _ = (Optional<NonCopyable>.none)?.shared
+}

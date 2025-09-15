@@ -122,6 +122,42 @@ struct OverlapsTest {
   }
 }
 
+typealias ContainsRangeTest = OverlapsTest
+
+let containsRangeTests: [ContainsRangeTest] = [
+  // Same bounds
+  ContainsRangeTest(expected: true,  lhs: 0..<*10, rhs: 0..<*10),
+  ContainsRangeTest(expected: false, lhs: 0..<*10, rhs: 0...*10),
+  ContainsRangeTest(expected: true,  lhs: 0..<*10, rhs: 0...*9),
+  ContainsRangeTest(expected: true,  lhs: 0...*10, rhs: 0...*10),
+  ContainsRangeTest(expected: true,  lhs: 0...*10, rhs: 0..<*10),
+  ContainsRangeTest(expected: true,  lhs: 0...*10, rhs: 0..<*11),
+
+  // Interior
+  ContainsRangeTest(expected: true,  lhs: 0..<*10, rhs: 1..<*9),
+  ContainsRangeTest(expected: true,  lhs: 0..<*10, rhs: 1...*9),
+  ContainsRangeTest(expected: true,  lhs: 0...*10, rhs: 1...*9),
+  ContainsRangeTest(expected: true,  lhs: 0...*10, rhs: 1..<*9),
+
+  // Failures
+  ContainsRangeTest(expected: false, lhs: 0..<*10, rhs: -10..<*5),
+  ContainsRangeTest(expected: false, lhs: 0..<*10, rhs: -10...*5),
+  ContainsRangeTest(expected: false, lhs: 0...*10, rhs: -10...*5),
+  ContainsRangeTest(expected: false, lhs: 0...*10, rhs: -10..<*5),
+  ContainsRangeTest(expected: false, lhs: 0..<*10, rhs: 5..<*15),
+  ContainsRangeTest(expected: false, lhs: 0..<*10, rhs: 5...*15),
+  ContainsRangeTest(expected: false, lhs: 0...*10, rhs: 5...*15),
+  ContainsRangeTest(expected: false, lhs: 0...*10, rhs: 5..<*15),
+
+  // "Empty" ranges
+  ContainsRangeTest(expected: true,  lhs: 0..<*0, rhs: 0..<*0),
+  ContainsRangeTest(expected: true,  lhs: 0..<*0, rhs: 1..<*1),
+  ContainsRangeTest(expected: false, lhs: 0..<*0, rhs: 0...*0),
+  ContainsRangeTest(expected: true,  lhs: 0...*0, rhs: 0...*0),
+  ContainsRangeTest(expected: true,  lhs: 0...*0, rhs: 0..<*0),
+  ContainsRangeTest(expected: true,  lhs: 0...*0, rhs: 1..<*1),
+]
+
 let overlapsTests: [OverlapsTest] = [
   // 0-4, 5-10
   OverlapsTest(expected: false, lhs: 0..<*4, rhs: 5..<*10),
@@ -507,20 +543,20 @@ ${TestSuite}.test("contains(_:)/semantics, ~=/semantics")
   expectEqual(expected, range ~= value)
 }
 
-%   for (OtherSelf, other_op, OtherBound, __elementIsTestProtocol1) in all_range_types:
+%   for (OtherSelf, other_op, _, _) in all_range_types:
 ${TestSuite}.test("overlaps(${OtherSelf})/semantics")
   .forEach(in: overlapsTests) {
   (test) in
 
   if test.lhs.isHalfOpen != ${Self}<${Bound}>._isHalfOpen ||
-     test.rhs.isHalfOpen != ${OtherSelf}<${OtherBound}>._isHalfOpen {
+     test.rhs.isHalfOpen != ${OtherSelf}<${Bound}>._isHalfOpen {
     return
   }
 
   let lhs: ${Self}<${Bound}>
     = ${Bound}(test.lhs.lowerBound)${op}${Bound}(test.lhs.upperBound)
-  let rhs: ${Self}<${Bound}>
-    = ${Bound}(test.rhs.lowerBound)${op}${Bound}(test.rhs.upperBound)
+  let rhs: ${OtherSelf}<${Bound}>
+    = ${Bound}(test.rhs.lowerBound)${other_op}${Bound}(test.rhs.upperBound)
 
   expectEqual(test.expected, lhs.overlaps(rhs))
   expectEqual(test.expected, rhs.overlaps(lhs))
@@ -528,6 +564,26 @@ ${TestSuite}.test("overlaps(${OtherSelf})/semantics")
   expectEqual(!lhs.isEmpty, lhs.overlaps(lhs))
   expectEqual(!rhs.isEmpty, rhs.overlaps(rhs))
 }
+
+// ClosedRange.contains(_: Range) is only available for stridable bounds
+%      if Self == 'Range' or (Self == 'ClosedRange' and OtherSelf == 'ClosedRange') or 'Stridable' in Bound:
+${TestSuite}.test("contains(${OtherSelf})/semantics")
+  .forEach(in: containsRangeTests) {
+  (test) in
+
+  if test.lhs.isHalfOpen != ${Self}<${Bound}>._isHalfOpen ||
+     test.rhs.isHalfOpen != ${OtherSelf}<${Bound}>._isHalfOpen {
+    return
+  }
+
+  let lhs: ${Self}<${Bound}>
+    = ${Bound}(test.lhs.lowerBound)${op}${Bound}(test.lhs.upperBound)
+  let rhs: ${OtherSelf}<${Bound}>
+    = ${Bound}(test.rhs.lowerBound)${other_op}${Bound}(test.rhs.upperBound)
+
+  expectEqual(test.expected, lhs.contains(rhs))
+}
+%      end
 %   end
 
 ${TestSuite}.test("clamped(to:)/semantics")

@@ -5,8 +5,8 @@
 
 // REQUIRES: OS=macosx
 
-@available(macOS, obsoleted: 10.999)
-@available(macOS, obsoleted: 10.888)
+@available(macOS, obsoleted: 999.0)
+@available(macOS, obsoleted: 888.0)
 public func foo() {}
 
 // CHECK: "precise": "s:15ObsoletedFilled3fooyyF"
@@ -14,8 +14,8 @@ public func foo() {}
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "domain": "macOS",
 // CHECK-NEXT:     "obsoleted": {
-// CHECK-NEXT:       "major": 10,
-// CHECK-NEXT:       "minor": 888
+// CHECK-NEXT:       "major": 888,
+// CHECK-NEXT:       "minor": 0
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]

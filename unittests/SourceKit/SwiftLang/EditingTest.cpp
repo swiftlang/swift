@@ -69,6 +69,9 @@ private:
     Annotations.push_back({Offset, Length, Kind, isSystem});
   }
 
+  void handleDeclaration(unsigned Offset, unsigned Length, UIdent Kind,
+                         StringRef USR) override {}
+
   bool documentStructureEnabled() override { return false; }
 
   void beginDocumentSubStructure(unsigned Offset, unsigned Length,
@@ -126,11 +129,11 @@ public:
     // This is avoiding destroying \p SourceKit::Context because another
     // thread may be active trying to use it to post notifications.
     // FIXME: Use shared_ptr ownership to avoid such issues.
-    Ctx = new SourceKit::Context(getSwiftExecutablePath(),
-                                 getRuntimeLibPath(),
-                                 /*diagnosticDocumentationPath*/ "",
-                                 SourceKit::createSwiftLangSupport,
-                                 /*dispatchOnMain=*/false);
+    Ctx = new SourceKit::Context(
+        getSwiftExecutablePath(), getRuntimeLibPath(),
+        SourceKit::createSwiftLangSupport,
+        [](SourceKit::Context &Ctx) { return nullptr; },
+        /*dispatchOnMain=*/false);
     auto localDocUpdState = std::make_shared<DocUpdateMutexState>();
     Ctx->getNotificationCenter()->addDocumentUpdateNotificationReceiver(
         [localDocUpdState](StringRef docName) {

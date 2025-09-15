@@ -42,7 +42,7 @@ struct SILPassPipeline final {
 
   friend bool operator==(const SILPassPipeline &lhs,
                          const SILPassPipeline &rhs) {
-    return lhs.ID == rhs.ID && lhs.Name.equals(rhs.Name) &&
+    return lhs.ID == rhs.ID && lhs.Name == rhs.Name &&
            lhs.KindOffset == rhs.KindOffset;
   }
 

@@ -24,14 +24,18 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
@@ -178,6 +182,7 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::Allocator:
     return getMagicFunctionName(cast<ConstructorDecl>(ref.getDecl()));
   case SILDeclRef::Kind::Deallocator:
+  case SILDeclRef::Kind::IsolatedDeallocator:
   case SILDeclRef::Kind::Destroyer:
     return getMagicFunctionName(cast<DestructorDecl>(ref.getDecl()));
   case SILDeclRef::Kind::GlobalAccessor:
@@ -186,6 +191,8 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
     return getMagicFunctionName(cast<DeclContext>(ref.getDecl()));
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
@@ -204,6 +211,35 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
+}
+
+bool SILGenFunction::referenceAllowed(ValueDecl *decl) {
+  // Use in any non-fragile functions.
+  if (FunctionDC->getResilienceExpansion() == ResilienceExpansion::Maximal)
+    return true;
+
+  // Allow same-module references.
+  auto *targetMod = decl->getDeclContext()->getParentModule();
+  auto *thisMod = FunctionDC->getParentModule();
+  if (thisMod == targetMod)
+    return true;
+
+  ModuleDecl::ImportFilter filter = {
+    ModuleDecl::ImportFilterKind::Exported,
+    ModuleDecl::ImportFilterKind::Default,
+    ModuleDecl::ImportFilterKind::SPIOnly};
+  if (thisMod->getResilienceStrategy() != ResilienceStrategy::Resilient)
+    filter |= ModuleDecl::ImportFilterKind::InternalOrBelow;
+
+  // Look through public module local imports and their reexports.
+  llvm::SmallVector<ImportedModule, 8> imports;
+  thisMod->getImportedModules(imports, filter);
+  auto &importCache = getASTContext().getImportCache();
+  for (auto &import : imports) {
+    if (importCache.isImportedBy(targetMod, import.importedModule))
+      return true;
+  }
+  return false;
 }
 
 SILDebugLocation SILGenFunction::getSILDebugLocation(
@@ -284,14 +320,14 @@ static DeclContext *getInnermostFunctionContext(DeclContext *DC) {
 }
 
 /// Return location of the macro expansion and the macro name.
-static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
+static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
                               DeclContext *FunctionDC) {
   MacroInfo Result(Info.generatedSourceRange.getStart(),
                    Info.originalSourceRange.getStart());
   if (!Info.astNode)
     return Result;
   // Keep this in sync with ASTMangler::appendMacroExpansionContext().
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(FunctionDC->getASTContext());
   switch (Info.kind) {
   case GeneratedSourceInfo::ExpressionMacroExpansion: {
     auto parent = ASTNode::getFromOpaqueValue(Info.astNode);
@@ -300,7 +336,7 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
       Result.ExpansionLoc = RegularLocation(expr);
       Result.Name = mangler.mangleMacroExpansion(expr);
     } else {
-      auto decl = cast<MacroExpansionDecl>(parent.get<Decl *>());
+      auto decl = cast<MacroExpansionDecl>(cast<Decl *>(parent));
       Result.ExpansionLoc = RegularLocation(decl);
       Result.Name = mangler.mangleMacroExpansion(decl);
     }
@@ -316,7 +352,7 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::DeclarationMacroExpansion: 
   case GeneratedSourceInfo::CodeItemMacroExpansion: {
     auto expansion = cast<MacroExpansionDecl>(
-        ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>());
+        cast<Decl *>(ASTNode::getFromOpaqueValue(Info.astNode)));
     Result.ExpansionLoc = RegularLocation(expansion);
     Result.Name = mangler.mangleMacroExpansion(expansion);
     Result.Freestanding = true;
@@ -333,7 +369,7 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::ExtensionMacroExpansion:
   case GeneratedSourceInfo::PreambleMacroExpansion:
   case GeneratedSourceInfo::BodyMacroExpansion: {
-    auto decl = ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>();
+    auto decl = cast<Decl *>(ASTNode::getFromOpaqueValue(Info.astNode));
     auto attr = Info.attachedMacroCustomAttr;
     if (auto *macroDecl = decl->getResolvedMacro(attr)) {
       Result.ExpansionLoc = RegularLocation(macroDecl);
@@ -345,6 +381,7 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
+  case GeneratedSourceInfo::AttributeFromClang:
     break;
   }
   return Result;
@@ -372,7 +409,7 @@ const SILDebugScope *SILGenFunction::getMacroScope(SourceLoc SLoc) {
     TopLevelScope = It->second;
   else {
     // Recursively create one inlined function + scope per layer of generated
-    // sources.  Chains of Macro expansions are representad as flat
+    // sources.  Chains of Macro expansions are represented as flat
     // function-level scopes.
     SILGenFunctionBuilder B(SGM);
     auto &ASTContext = SGM.M.getASTContext();
@@ -451,7 +488,7 @@ SILGenFunction::getOrCreateScope(const ast_scope::ASTScopeImpl *ASTScope,
   // Collapse BraceStmtScopes whose parent is a .*BodyScope.
   if (auto Parent = ASTScope->getParent().getPtrOrNull())
     if (Parent->getSourceRangeOfThisASTNode() ==
-        ASTScope->getSourceRangeOfThisASTNode())
+       ASTScope->getSourceRangeOfThisASTNode())
       return cache(getOrCreateScope(Parent, FnScope, InlinedAt));
 
   // The calls to defer closures have cleanup source locations pointing to the
@@ -735,7 +772,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       }
     };
 
-    auto Entry = found->second;
+    auto &Entry = found->second;
     auto val = Entry.value;
 
     switch (SGM.Types.getDeclCaptureKind(capture, expansion)) {
@@ -987,7 +1024,13 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
         constant, loweredCaptureInfo, subs);
   }
 
-  if (subs) {
+  // We completely drop the generic signature if all generic parameters were
+  // concrete.
+  if (!pft->isPolymorphic()) {
+    subs = SubstitutionMap();
+  } else {
+    assert(!subs.getGenericSignature()->areAllParamsConcrete());
+
     auto specialized =
         pft->substGenericArgs(F.getModule(), subs, getTypeExpansionContext());
     functionTy = SILType::getPrimitiveObjectType(specialized);
@@ -1031,10 +1074,9 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
     auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
-    auto resultIsolation = (hasErasedIsolation
-                              ? SILFunctionTypeIsolation::Erased
-                              : SILFunctionTypeIsolation::Unknown);
-
+    auto resultIsolation =
+        (hasErasedIsolation ? SILFunctionTypeIsolation::forErased()
+                            : SILFunctionTypeIsolation::forUnknown());
     auto toClosure =
       B.createPartialApply(loc, functionRef, subs, forwardedArgs,
                            calleeConvention, resultIsolation);
@@ -1049,6 +1091,26 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                   typeContext.OrigType,
                                   typeContext.FormalType,
               SILType::getPrimitiveObjectType(typeContext.ExpectedLoweredType));
+
+    auto resultType = cast<SILFunctionType>(result.getType().getASTType());
+
+    // Check if we performed Sendable/sending type compensation in
+    // emitTransformedValue for a closure. If we did, insert some fixup code to
+    // convert from an @Sendable to a not-@Sendable value.
+    //
+    // DISCUSSION: We cannot do this internally to emitTransformedValue since it
+    // does not have access to our SILDeclRef.
+    if (auto *e = constant.getClosureExpr()) {
+      auto actualType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
+      if (e->inheritsActorContext() &&
+          e->getActorIsolation().isActorIsolated() && actualType->isAsync() &&
+          !actualType->isSendable() && resultType->isSendable()) {
+        auto extInfo = resultType->getExtInfo().withSendable(false);
+        resultType = resultType->getWithExtInfo(extInfo);
+        result = B.createConvertFunction(
+            loc, result, SILType::getPrimitiveObjectType(resultType));
+      }
+    }
   }
 
   return result;
@@ -1190,9 +1252,8 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
                                                   MetatypeRepresentation::ObjC);
 
-    auto conformances =
-        SGM.SwiftModule->collectExistentialConformances(mainClassMetaty,
-                                                        anyObjectMetaTy);
+    auto conformances = collectExistentialConformances(mainClassMetaty,
+                                                       anyObjectMetaTy);
 
     auto paramConvention = ParameterConvention::Direct_Unowned;
     auto params = {SILParameterInfo(anyObjectMetaTy, paramConvention)};
@@ -1328,6 +1389,28 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
   }
 }
 
+static bool isCreateExecutorsFunctionAvailable(SILGenModule &SGM) {
+  FuncDecl *createExecutorsFuncDecl = SGM.getCreateExecutors();
+  if (!createExecutorsFuncDecl)
+    return false;
+
+  auto &ctx = createExecutorsFuncDecl->getASTContext();
+
+  if (ctx.LangOpts.hasFeature(Feature::Embedded))
+    return true;
+
+  if (!ctx.LangOpts.DisableAvailabilityChecking) {
+    auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
+    auto runtimeAvailability = AvailabilityRange::forRuntimeTarget(ctx);
+    auto declAvailability = ctx.getCustomGlobalExecutorsAvailability();
+    auto declRtAvailability = ctx.getCustomGlobalExecutorsRuntimeAvailability();
+    return deploymentAvailability.isContainedIn(declAvailability)
+      && runtimeAvailability.isContainedIn(declRtAvailability);
+  }
+
+  return true;
+}
+
 void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
   auto moduleLoc = entryPoint.getAsRegularLocation();
   auto *entryBlock = B.getInsertionBB();
@@ -1342,6 +1425,46 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
   swift::ASTContext &ctx = entryPoint.getASTContext();
 
   B.setInsertionPoint(entryBlock);
+
+  // If we're using a new enough deployment target, and we can find a
+  // DefaultExecutorFactory type, call swift_createExecutors()
+  Type factoryNonCanTy = SGM.getConfiguredExecutorFactory();
+
+  if (isCreateExecutorsFunctionAvailable(SGM) && factoryNonCanTy) {
+    CanType factoryTy = factoryNonCanTy->getCanonicalType();
+
+    ProtocolDecl *executorFactoryProtocol
+      = ctx.getProtocol(KnownProtocolKind::ExecutorFactory);
+    auto conformance = lookupConformance(factoryTy, executorFactoryProtocol);
+
+    if (conformance.isInvalid()) {
+      // If this type doesn't conform, ignore it and use the default factory
+      SourceLoc loc = extractNearestSourceLoc(factoryTy);
+
+      ctx.Diags.diagnose(loc, diag::executor_factory_must_conform);
+
+      factoryTy = SGM.getDefaultExecutorFactory()->getCanonicalType();
+      conformance = lookupConformance(factoryTy, executorFactoryProtocol);
+
+      assert(!conformance.isInvalid());
+    }
+
+    FuncDecl *createExecutorsFuncDecl = SGM.getCreateExecutors();
+    assert(createExecutorsFuncDecl
+           && "Failed to find swift_createExecutors function decl");
+    SILFunction *createExecutorsSILFunc =
+      SGM.getFunction(SILDeclRef(createExecutorsFuncDecl, SILDeclRef::Kind::Func),
+                        NotForDefinition);
+    SILValue createExecutorsFunc =
+      B.createFunctionRefFor(moduleLoc, createExecutorsSILFunc);
+    MetatypeType *factoryThickMetaTy
+      = MetatypeType::get(factoryTy, MetatypeRepresentation::Thick);
+    SILValue factorySILMetaTy
+      = B.createMetatype(moduleLoc, getLoweredType(factoryThickMetaTy));
+    auto ceSubs = SubstitutionMap::getProtocolSubstitutions(
+      conformance.getProtocol(), factoryTy, conformance);
+    B.createApply(moduleLoc, createExecutorsFunc, ceSubs, { factorySILMetaTy });
+  }
 
   auto wrapCallArgs = [this, &moduleLoc](SILValue originalValue, FuncDecl *fd,
                             uint32_t paramIndex) -> SILValue {
@@ -1625,7 +1748,7 @@ void SILGenFunction::emitGeneratorFunction(
   mergeCleanupBlocks();
 }
 
-std::unique_ptr<Initialization> SILGenFunction::getSingleValueStmtInit(Expr *E) {
+InitializationPtr SILGenFunction::getSingleValueStmtInit(Expr *E) {
   if (SingleValueStmtInitStack.empty())
     return nullptr;
 
@@ -1635,7 +1758,7 @@ std::unique_ptr<Initialization> SILGenFunction::getSingleValueStmtInit(Expr *E) 
     return nullptr;
   
   auto resultAddr = SingleValueStmtInitStack.back().InitializationBuffer;
-  return std::make_unique<KnownAddressInitialization>(resultAddr);
+  return make_possibly_unique<KnownAddressInitialization>(resultAddr);
 }
 
 void SILGenFunction::emitProfilerIncrement(ASTNode Node) {
@@ -1788,7 +1911,7 @@ SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
   PartialApplyInst *setterPAI =
       B.createPartialApply(loc, setterFRef, substitutions, capturedArgs,
                            ParameterConvention::Direct_Guaranteed,
-                           SILFunctionTypeIsolation::Unknown,
+                           SILFunctionTypeIsolation::forUnknown(),
                            PartialApplyInst::OnStackKind::OnStack);
   return emitManagedRValueWithCleanup(setterPAI).getValue();
 }
@@ -1840,7 +1963,7 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   PartialApplyInst *initPAI =
       B.createPartialApply(loc, initFRef, substitutions, selfMetatype,
                            ParameterConvention::Direct_Guaranteed,
-                           SILFunctionTypeIsolation::Unknown,
+                           SILFunctionTypeIsolation::forUnknown(),
                            PartialApplyInst::OnStackKind::OnStack);
   initFRef = emitManagedRValueWithCleanup(initPAI).getValue();
 
@@ -1882,4 +2005,18 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   B.createAssignOrInit(loc, field, selfRef.getValue(),
                        newValue.forward(*this), initFRef, setterFRef,
                        AssignOrInitInst::Unknown);
+}
+
+SILGenFunction::AddressableBuffer *
+SILGenFunction::getAddressableBufferInfo(ValueDecl *vd) {
+  do {
+    auto &found = AddressableBuffers[vd];
+
+    if (auto orig = found.stateOrAlias
+                      .dyn_cast<VarDecl*>()) {
+      vd = orig;
+      continue;
+    }
+    return &found;
+  } while (true);
 }

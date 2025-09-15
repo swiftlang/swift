@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift( -Xfrontend -sil-verify-all -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library)
+// RUN: %target-run-simple-swift( -Xfrontend -sil-verify-all -target %target-swift-5.1-abi-triple %import-libdispatch -parse-as-library)
+// RUN: %target-run-simple-swift( -Xfrontend -sil-verify-all -target %target-swift-5.1-abi-triple %import-libdispatch -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -44,7 +46,7 @@ nonisolated var randomPriority: TaskPriority? {
 
 @available(SwiftStdlib 5.1, *)
 func worker(identity: Int, counters: [Counter], numIterations: Int) async {
-  for i in 0..<numIterations {
+  for _ in 0..<numIterations {
     let counterIndex = Int.random(in: 0 ..< counters.count)
     let counter = counters[counterIndex]
     let nextValue = await counter.next()
@@ -56,12 +58,12 @@ func worker(identity: Int, counters: [Counter], numIterations: Int) async {
 func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   // Create counter actors.
   var counters: [Counter] = []
-  for i in 0..<numCounters {
+  for _ in 0..<numCounters {
     counters.append(Counter(maxCount: numWorkers * numIterations))
   }
 
   // Create a bunch of worker threads.
-  var workers: [Task.Handle<Void, Error>] = []
+  var workers: [Task<Void, Error>] = []
   for i in 0..<numWorkers {
     workers.append(
       Task.detached(priority: randomPriority) { [counters] in
@@ -73,7 +75,7 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
 
   // Wait until all of the workers have finished.
   for worker in workers {
-    try! await worker.get()
+    try! await worker.value
   }
 
   print("DONE!")

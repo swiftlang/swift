@@ -2,7 +2,7 @@
 
 func markUsed<T>(_ t: T) {}
 
-// CHECK-DAG: ![[INTTYPE:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int", {{.*}})
+// CHECK-DAG: ![[INTTYPE:.*]] = !DICompositeType(tag: DW_TAG_structure_type, {{.*}}"$sSiD"
 
 public class DWARF {
 // CHECK-DAG: ![[BASE:.*]] = !DICompositeType({{.*}}identifier: "$ss6UInt32VD"
@@ -126,4 +126,16 @@ extension Up where A.A == Int {
     // CHECK-DAG: !DILocalVariable(name: "gg",{{.*}} type: ![[INTTYPE]]
     var gg: DependentAlias<Self> = 123
   }
+}
+
+typealias UsedAsGenericParameter = Float
+struct S<T> {}
+public func bar() {
+  let s = S<UsedAsGenericParameter>()
+  // CHECK-DAG: !DILocalVariable(name: "s",{{.*}} type: ![[LET_S_WITH_ALIAS:[0-9]+]]
+  // CHECK-DAG: ![[LET_S_WITH_ALIAS]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[S_WITH_ALIAS:[0-9]+]]
+  // CHECK-DAG: ![[S_WITH_ALIAS]] = !DICompositeType(tag: DW_TAG_structure_type, {{.*}}elements: ![[ELTS:[0-9]+]]
+  // CHECK-DAG: ![[ELTS]] = !{![[MEMBER:[0-9]+]]}
+  // CHECK-DAG: ![[MEMBER]] = !DIDerivedType(tag: DW_TAG_member, {{.*}}baseType: ![[USED_AS_GENERIC:[0-9]+]])
+  // CHECK-DAG: ![[USED_AS_GENERIC]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$s9typealias1SVyAA22UsedAsGenericParameteraGD"
 }

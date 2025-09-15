@@ -56,6 +56,55 @@ StringBridgeTests.test("Tagged NSString") {
 #endif // not 32bit
 }
 
+StringBridgeTests.test("Constant NSString New SPI") {
+  if #available(SwiftStdlib 6.1, *) {
+    //21 characters long so avoids _SmallString
+    let constantString:NSString = CFRunLoopMode.commonModes.rawValue as NSString
+    let regularBridged = constantString as String
+    let count = regularBridged.count
+    let bridged = String(
+      _immortalCocoaString: constantString,
+      count: count,
+      encoding: Unicode.ASCII.self
+    )
+    let reverseBridged = bridged as NSString
+    expectEqual(constantString, reverseBridged)
+    expectEqual(
+      ObjectIdentifier(constantString),
+      ObjectIdentifier(reverseBridged)
+    )
+    expectEqual(bridged, regularBridged)
+  }
+}
+
+StringBridgeTests.test("Shared String SPI")
+  .require(.stdlib_6_2)
+  .code {
+    guard #available(SwiftStdlib 6.2, *) else { return }
+    func test(literal: String, isASCII: Bool) {
+      let baseCount = literal.utf8.count
+      literal.withCString { intptr in
+        intptr.withMemoryRebound(to: UInt8.self, capacity: baseCount) { ptr in
+          let fullBuffer = UnsafeBufferPointer(start: ptr, count: baseCount)
+          let fullString = _SwiftCreateImmortalString_ForFoundation(
+            buffer: fullBuffer,
+            isASCII: isASCII
+          )
+          expectNotNil(fullString)
+          let bridgedFullString = (fullString! as NSString)
+          let fullCString = bridgedFullString.utf8String!
+          expectEqual(baseCount, strlen(fullCString))
+          expectEqual(strcmp(ptr, fullCString), 0)
+          let fullCString2 = bridgedFullString.utf8String!
+          expectEqual(fullCString, fullCString2) //if we're already terminated, we can return the contents pointer as-is
+          withExtendedLifetime(fullString) {}
+        }
+      }
+    }
+    test(literal: "abcdefghijklmnopqrstuvwxyz", isASCII: true)
+    test(literal: "abcdëfghijklmnopqrstuvwxyz", isASCII: false)
+}
+
 StringBridgeTests.test("Bridging") {
   // Test bridging retains small string form
   func bridge(_ small: _SmallString) -> String {
@@ -125,5 +174,25 @@ StringBridgeTests.test("Character from NSString") {
   expectNil((ns3 as String).utf8.withContiguousStorageIfAvailable(returnOne))
 }
 
+StringBridgeTests.test("lengthOfBytes(using:)") {
+  let ascii = "The quick brown fox jumps over the lazy dog"
+  let utf8 = "The quick brown fox jümps over the lazy dog"
+  let asciiAsASCIILen = ascii.lengthOfBytes(using: .ascii)
+  let asciiAsUTF8Len = ascii.lengthOfBytes(using: .utf8)
+  let asciiAsUTF16Len = ascii.lengthOfBytes(using: .utf16)
+  let asciiAsMacRomanLen = ascii.lengthOfBytes(using: .macOSRoman)
+  let utf8AsASCIILen = utf8.lengthOfBytes(using: .ascii)
+  let utf8AsUTF8Len = utf8.lengthOfBytes(using: .utf8)
+  let utf8AsUTF16Len = utf8.lengthOfBytes(using: .utf16)
+  let utf8AsMacRomanLen = utf8.lengthOfBytes(using: .macOSRoman)
+  expectEqual(asciiAsASCIILen, 43)
+  expectEqual(asciiAsUTF8Len, 43)
+  expectEqual(asciiAsUTF16Len, 86)
+  expectEqual(asciiAsMacRomanLen, 43)
+  expectEqual(utf8AsASCIILen, 0)
+  expectEqual(utf8AsUTF8Len, 44)
+  expectEqual(utf8AsUTF16Len, 86)
+  expectEqual(utf8AsMacRomanLen, 43)
+}
 
 runAllTests()

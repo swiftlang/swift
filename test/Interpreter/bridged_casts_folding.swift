@@ -58,7 +58,7 @@ Tests.test("NSString => Array<Int>. Crashing test case") {
   // CHECK: [       OK ] BridgedCastFolding.NSString => Array<Int>. Crashing test case
 
   // CHECK-OPT-LABEL: [ RUN      ] BridgedCastFolding.NSString => Array<Int>. Crashing test case
-  // CHECK-OPT: stderr>>> OK: saw expected "crashed: sig{{ill|trap}}"
+  // CHECK-OPT: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK-OPT: [       OK ] BridgedCastFolding.NSString => Array<Int>. Crashing test case
   expectCrashLater()
   do {
@@ -130,7 +130,7 @@ Tests.test("NSNumber (Int) -> String. Crashing test.") {
   // CHECK: [       OK ] BridgedCastFolding.NSNumber (Int) -> String. Crashing test.
 
   // CHECK-OPT-LABEL: [ RUN      ] BridgedCastFolding.NSNumber (Int) -> String. Crashing test.
-  // CHECK-OPT: stderr>>> OK: saw expected "crashed: sig{{ill|trap}}"
+  // CHECK-OPT: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK-OPT: [       OK ] BridgedCastFolding.NSNumber (Int) -> String. Crashing test.
   expectCrashLater()
   do {
@@ -393,7 +393,7 @@ Tests.test("String -> NSNumber. Crashing Test Case") {
   // CHECK: [       OK ] BridgedCastFolding.String -> NSNumber. Crashing Test Case
 
   // CHECK-OPT-LABEL: [ RUN      ] BridgedCastFolding.String -> NSNumber. Crashing Test Case
-  // CHECK-OPT: stderr>>> OK: saw expected "crashed: sig{{ill|trap}}"
+  // CHECK-OPT: stderr>>> OK: saw expected "crashed: sigabrt"
   // CHECK-OPT: [       OK ] BridgedCastFolding.String -> NSNumber. Crashing Test Case
   expectCrashLater()
   do {

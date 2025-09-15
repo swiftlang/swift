@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend %s -emit-silgen -swift-version 6 | swift-demangle | %FileCheck -check-prefix=CHECK %s
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend %s -emit-silgen -swift-version 6 | swift-demangle | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen -swift-version 6 | %FileCheck -check-prefix=SIL %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -32,8 +34,8 @@ func testNoRemoveFunctionResultSubTypeResult() -> sending S<() -> sending NonSen
 // CHECK: sil hidden [ossa] @sending_mangling.testNoRemoveFunctionResultImmediateTypedFunctionWithArg() -> (sending __owned sending_mangling.NonSendableKlass) -> () : $@convention(thin) () -> @owned @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> () {
 func testNoRemoveFunctionResultImmediateTypedFunctionWithArg() -> ((sending NonSendableKlass) -> ()) { fatalError() }
 
-// CHECK: sil hidden [ossa] @sending_mangling.testNoRemoveFunctionResultImmedateTypedFunctionWithResult() -> () -> sending sending_mangling.NonSendableKlass : $@convention(thin) () -> @owned @callee_guaranteed () -> @sil_sending @owned NonSendableKlass {
-func testNoRemoveFunctionResultImmedateTypedFunctionWithResult() -> (() -> sending NonSendableKlass) { fatalError() }
+// CHECK: sil hidden [ossa] @sending_mangling.testNoRemoveFunctionResultImmediateTypedFunctionWithResult() -> () -> sending sending_mangling.NonSendableKlass : $@convention(thin) () -> @owned @callee_guaranteed () -> @sil_sending @owned NonSendableKlass {
+func testNoRemoveFunctionResultImmediateTypedFunctionWithResult() -> (() -> sending NonSendableKlass) { fatalError() }
 
 struct MethodTest {
   // CHECK: sil hidden [ossa] @sending_mangling.MethodTest.init(__owned sending_mangling.NonSendableKlass) -> sending_mangling.MethodTest : $@convention(method) (@sil_sending @owned NonSendableKlass, @thin MethodTest.Type) -> MethodTest {
@@ -61,8 +63,8 @@ struct MethodTest {
   // CHECK: sil hidden [ossa] @sending_mangling.MethodTest.testNoRemoveFunctionResultImmediateTypedFunctionWithArg() -> (sending __owned sending_mangling.NonSendableKlass) -> () : $@convention(method) (MethodTest) -> @owned @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> () {
   func testNoRemoveFunctionResultImmediateTypedFunctionWithArg() -> ((sending NonSendableKlass) -> ()) { fatalError() }
 
-  // CHECK: sil hidden [ossa] @sending_mangling.MethodTest.testNoRemoveFunctionResultImmedateTypedFunctionWithResult() -> () -> sending sending_mangling.NonSendableKlass : $@convention(method) (MethodTest) -> @owned @callee_guaranteed () -> @sil_sending @owned NonSendableKlass {
-  func testNoRemoveFunctionResultImmedateTypedFunctionWithResult() -> (() -> sending NonSendableKlass) { fatalError() }
+  // CHECK: sil hidden [ossa] @sending_mangling.MethodTest.testNoRemoveFunctionResultImmediateTypedFunctionWithResult() -> () -> sending sending_mangling.NonSendableKlass : $@convention(method) (MethodTest) -> @owned @callee_guaranteed () -> @sil_sending @owned NonSendableKlass {
+  func testNoRemoveFunctionResultImmediateTypedFunctionWithResult() -> (() -> sending NonSendableKlass) { fatalError() }
 }
 
 protocol SendingProtocol {
@@ -79,11 +81,14 @@ extension SendingProtocol {
   // CHECK: sil hidden [ossa] @(extension in sending_mangling):sending_mangling.SendingProtocol.sendingResult() -> sending_mangling.NonSendableKlass : $@convention(method) <Self where Self : SendingProtocol> (@in_guaranteed Self) -> @sil_sending @owned NonSendableKlass {
   func sendingResult() -> sending NonSendableKlass { fatalError() }
 
-  // CHECK: sil hidden [ossa] @(extension in sending_mangling):sending_mangling.SendingProtocol.sendingArgWithFunctionSendingArg(__owned (sending __owned sending_mangling.NonSendableKlass) -> ()) -> () : $@convention(method) <Self where Self : SendingProtocol> (@sil_sending @owned @noescape @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> (), @in_guaranteed Self) -> () {
+  // CHECK: sil hidden [ossa] @(extension in sending_mangling):sending_mangling.SendingProtocol.sendingArgWithFunctionSendingArg((sending __owned sending_mangling.NonSendableKlass) -> ()) -> () : $@convention(method) <Self where Self : SendingProtocol> (@sil_sending @guaranteed @noescape @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> (), @in_guaranteed Self) -> () {
   func sendingArgWithFunctionSendingArg(_ x: sending (sending NonSendableKlass) -> ()) {}
 
   // CHECK: sil hidden [ossa] @(extension in sending_mangling):sending_mangling.SendingProtocol.sendingArgWithFunctionSendingResult() -> (sending __owned sending_mangling.NonSendableKlass) -> () : $@convention(method) <Self where Self : SendingProtocol> (@in_guaranteed Self) -> @sil_sending @owned @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> () {
   func sendingArgWithFunctionSendingResult() -> sending (sending NonSendableKlass) -> () { fatalError() }
+
+  // CHECK: sil hidden [ossa] @(extension in sending_mangling):sending_mangling.SendingProtocol.sendingArgWithEscapingFunctionSendingArg(__owned (sending __owned sending_mangling.NonSendableKlass) -> ()) -> () : $@convention(method) <Self where Self : SendingProtocol> (@sil_sending @owned @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> (), @in_guaranteed Self) -> () {
+  func sendingArgWithEscapingFunctionSendingArg(_ x: sending @escaping (sending NonSendableKlass) -> ()) {}
 }
 
 // Make sure we only do not mangle in __shared if we are borrowed by default and
@@ -104,6 +109,24 @@ struct ConstructorSharedTest {
 
   // This is a func which takes its parameter at +0 so we should suppress both.
   //
-  // CHECK: sil hidden [ossa] @sending_mangling.ConstructorSharedTest.functionSupressed(sending_mangling.NonSendableKlass) -> () : $@convention(method) (@sil_sending @guaranteed NonSendableKlass, ConstructorSharedTest) -> () {
-  func functionSupressed(_ x: __shared sending NonSendableKlass) {}
+  // CHECK: sil hidden [ossa] @sending_mangling.ConstructorSharedTest.functionSuppressed(sending_mangling.NonSendableKlass) -> () : $@convention(method) (@sil_sending @guaranteed NonSendableKlass, ConstructorSharedTest) -> () {
+  func functionSuppressed(_ x: __shared sending NonSendableKlass) {}
+}
+
+// Make sure that we produce the appropriate reabstraction thunk.
+func reabstractionThunkTest_takeSendingReturnSending<T>(
+  _ x: sending T) -> sending T { fatalError() }
+func reabstractionThunkTest_reabstractionThunkGenerator<T>(
+  _ x: sending T,
+  _ f: (sending T) -> T) {}
+
+// CHECK: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @reabstraction thunk helper from @escaping @callee_guaranteed (@in sending sending_mangling.NonSendableKlass) -> sending (@out sending_mangling.NonSendableKlass) to @escaping @callee_guaranteed (@owned sending sending_mangling.NonSendableKlass) -> sending (@owned sending_mangling.NonSendableKlass) : $@convention(thin) (@sil_sending @owned NonSendableKlass, @guaranteed @callee_guaranteed (@sil_sending @in NonSendableKlass) -> @sil_sending @out NonSendableKlass) -> @sil_sending @owned NonSendableKlass {
+// SIL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s16sending_mangling16NonSendableKlassCACIegTiTr_A2CIegTxTo_TR : $@convention(thin) (@sil_sending @owned NonSendableKlass, @guaranteed @callee_guaranteed (@sil_sending @in NonSendableKlass) -> @sil_sending @out NonSendableKlass) -> @sil_sending @owned NonSendableKlass {
+
+// CHECK: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @reabstraction thunk helper from @callee_guaranteed (@owned sending sending_mangling.NonSendableKlass) -> (@owned sending_mangling.NonSendableKlass) to @escaping @callee_guaranteed (@in sending sending_mangling.NonSendableKlass) -> (@out sending_mangling.NonSendableKlass) : $@convention(thin) (@sil_sending @in NonSendableKlass, @guaranteed @noescape @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> @owned NonSendableKlass) -> @out NonSendableKlass {
+// SIL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s16sending_mangling16NonSendableKlassCACIgxTo_A2CIegiTr_TR : $@convention(thin) (@sil_sending @in NonSendableKlass, @guaranteed @noescape @callee_guaranteed (@sil_sending @owned NonSendableKlass) -> @owned NonSendableKlass) -> @out NonSendableKlass {
+func reabstractionThunkTest() {
+  reabstractionThunkTest_reabstractionThunkGenerator(
+    NonSendableKlass(),
+    reabstractionThunkTest_takeSendingReturnSending)
 }

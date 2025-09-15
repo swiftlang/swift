@@ -1,10 +1,9 @@
-// RUN: %target-swift-frontend -disable-availability-checking -enable-experimental-feature StrictConcurrency -emit-sil -o /dev/null -verify %s -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend -disable-availability-checking -enable-experimental-feature StrictConcurrency=complete -emit-sil -o /dev/null -verify %s -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend -disable-availability-checking -enable-upcoming-feature StrictConcurrency -emit-sil -o /dev/null -verify %s -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend -disable-availability-checking -enable-upcoming-feature StrictConcurrency -emit-sil -o /dev/null -verify -verify-additional-prefix region-isolation- %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-experimental-feature StrictConcurrency -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-experimental-feature StrictConcurrency=complete -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-upcoming-feature StrictConcurrency -emit-sil -o /dev/null -verify %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_StrictConcurrency
 
 class C1 { } // expected-note{{class 'C1' does not conform to the 'Sendable' protocol}}
 class C2 { }

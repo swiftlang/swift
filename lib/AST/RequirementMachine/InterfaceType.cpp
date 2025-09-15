@@ -99,17 +99,13 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "PropertyMap.h"
 #include "RewriteSystem.h"
 #include "RewriteContext.h"
 
 using namespace swift;
 using namespace rewriting;
-
-Term RewriteContext::getTermForType(CanType paramType,
-                                    const ProtocolDecl *proto) {
-  return Term::get(getMutableTermForType(paramType, proto), *this);
-}
 
 /// Map an interface type to a term.
 ///
@@ -160,7 +156,7 @@ Term RewriteContext::getTermForType(CanType paramType,
 ///
 MutableTerm RewriteContext::getMutableTermForType(CanType paramType,
                                                   const ProtocolDecl *proto) {
-  assert(paramType->isTypeParameter());
+  ASSERT(paramType->isTypeParameter());
 
   // Collect zero or more nested type names in reverse order.
   bool innermostAssocTypeWasResolved = false;
@@ -186,7 +182,7 @@ MutableTerm RewriteContext::getMutableTermForType(CanType paramType,
 
   // Add the root symbol at the end.
   if (proto) {
-    assert(proto->getSelfInterfaceType()->isEqual(paramType));
+    ASSERT(proto->getSelfInterfaceType()->isEqual(paramType));
 
     // Self.Foo becomes [P].Foo
     // Self.Q::Foo becomes [P:Foo] (not [Q:Foo] or [P].[Q:Foo])
@@ -229,11 +225,10 @@ AssociatedTypeDecl *PropertyBag::getAssociatedType(Identifier name) {
     }
   }
 
-  assert(assocType != nullptr && "Need to look harder");
+  ASSERT(assocType != nullptr && "Need to look harder");
 
   auto inserted = AssocTypes.insert(std::make_pair(name, assocType)).second;
-  assert(inserted);
-  (void) inserted;
+  ASSERT(inserted);
 
   return assocType;
 }
@@ -247,7 +242,7 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
   Type result;
 
   auto handleRoot = [&](GenericTypeParamType *genericParam) {
-    assert(genericParam->isCanonical());
+    ASSERT(genericParam->isCanonical());
 
     if (!genericParams.empty()) {
       // Return a sugared GenericTypeParamType if we're given an array of
@@ -255,15 +250,14 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
       unsigned index = GenericParamKey(genericParam).findIndexIn(genericParams);
 
       if (index == genericParams.size()) {
-        llvm::errs() << "Cannot build interface type for term "
-                     << MutableTerm(begin, end) << "\n";
-        llvm::errs() << "Invalid generic parameter: "
-                     << Type(genericParam) << "\n";
-        llvm::errs() << "Valid generic parameters: ";
-        for (auto *otherParam : genericParams)
-          llvm::errs() << " " << otherParam->getCanonicalType();
-        llvm::errs() << "\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Cannot build interface type for term "
+              << MutableTerm(begin, end) << "\n";
+          out << "Invalid generic parameter: " << Type(genericParam) << "\n";
+          out << "Valid generic parameters: ";
+          for (auto *otherParam : genericParams)
+            out << " " << otherParam->getCanonicalType();
+        });
       }
 
       result = genericParams[index];
@@ -286,17 +280,18 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
         continue;
 
       case Symbol::Kind::Protocol:
-        handleRoot(GenericTypeParamType::get(/*isParameterPack*/ false, 0, 0,
-                                             ctx.getASTContext()));
+        handleRoot(ctx.getASTContext().TheSelfType);
         continue;
 
       case Symbol::Kind::AssociatedType:
-        handleRoot(GenericTypeParamType::get(/*isParameterPack*/ false, 0, 0,
-                                             ctx.getASTContext()));
+        handleRoot(ctx.getASTContext().TheSelfType);
 
         // An associated type symbol at the root means we have a dependent
         // member type rooted at Self; handle the associated type below.
         break;
+
+      case Symbol::Kind::PackElement:
+        continue;
 
       case Symbol::Kind::Name:
       case Symbol::Kind::Layout:
@@ -304,8 +299,9 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
       case Symbol::Kind::ConcreteType:
       case Symbol::Kind::ConcreteConformance:
       case Symbol::Kind::Shape:
-        llvm::errs() << "Invalid root symbol: " << MutableTerm(begin, end) << "\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Invalid root symbol: " << MutableTerm(begin, end);
+        });
       }
     }
 
@@ -322,17 +318,16 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
     // Simplification will rewrite X.[P] to X, so just ignore a protocol symbol
     // in the middle of a term.
     if (symbol.getKind() == Symbol::Kind::Protocol) {
-#ifndef NDEBUG
       // Ensure that the domain of the suffix contains P.
       if (iter + 1 < end) {
         auto proto = (iter + 1)->getProtocol();
-        assert(proto == symbol.getProtocol());
+        ASSERT(proto == symbol.getProtocol());
       }
-#endif
+
       continue;
     }
 
-    assert(symbol.getKind() == Symbol::Kind::AssociatedType);
+    ASSERT(symbol.getKind() == Symbol::Kind::AssociatedType);
 
     MutableTerm prefix;
     if (begin == iter) {
@@ -353,35 +348,35 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
 
     auto *props = map.lookUpProperties(prefix.rbegin(), prefix.rend());
     if (props == nullptr) {
-      llvm::errs() << "Cannot build interface type for term "
-                   << MutableTerm(begin, end) << "\n";
-      llvm::errs() << "Prefix does not conform to any protocols: "
-                   << prefix << "\n\n";
-      map.dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Cannot build interface type for term "
+            << MutableTerm(begin, end) << "\n";
+        out << "Prefix does not conform to any protocols: " << prefix << "\n\n";
+        map.dump(out);
+      });
     }
 
     // Assert that the associated type's protocol appears among the set
     // of protocols that the prefix conforms to.
-#ifndef NDEBUG
-    auto conformsTo = props->getConformsTo();
-    assert(std::find(conformsTo.begin(), conformsTo.end(),
-                     symbol.getProtocol())
-           != conformsTo.end());
-#endif
+    if (CONDITIONAL_ASSERT_enabled()) {
+      auto conformsTo = props->getConformsTo();
+      ASSERT(std::find(conformsTo.begin(), conformsTo.end(),
+                       symbol.getProtocol())
+             != conformsTo.end());
+    }
 
     auto *assocType = props->getAssociatedType(symbol.getName());
     if (assocType == nullptr) {
-      llvm::errs() << "Cannot build interface type for term "
-                   << MutableTerm(begin, end) << "\n";
-      llvm::errs() << "Prefix term does not have a nested type named "
-                   << symbol.getName() << ": "
-                   << prefix << "\n";
-      llvm::errs() << "Property map entry: ";
-      props->dump(llvm::errs());
-      llvm::errs() << "\n\n";
-      map.dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Cannot build interface type for term "
+            << MutableTerm(begin, end) << "\n";
+        out << "Prefix term does not have a nested type named "
+            << symbol.getName() << ": " << prefix << "\n";
+        out << "Property map entry: ";
+        props->dump(out);
+        out << "\n\n";
+        map.dump(out);
+      });
     }
 
     result = DependentMemberType::get(result, assocType);
@@ -406,7 +401,7 @@ Type PropertyMap::getTypeForTerm(const MutableTerm &term,
 /// See RewriteSystemBuilder::getSubstitutionSchemaFromType().
 unsigned RewriteContext::getGenericParamIndex(Type type) {
   auto *paramTy = type->castTo<GenericTypeParamType>();
-  assert(paramTy->getDepth() == 0);
+  ASSERT(paramTy->getDepth() == 0);
   return paramTy->getIndex();
 }
 
@@ -429,7 +424,7 @@ RewriteContext::getRelativeTermForType(CanType typeWitness,
   // Get the substitution S corresponding to τ_0_n.
   unsigned index = getGenericParamIndex(typeWitness->getRootGenericParam());
   result = MutableTerm(substitutions[index]);
-  assert(result.back().getKind() != Symbol::Kind::Shape);
+  ASSERT(result.back().getKind() != Symbol::Kind::Shape);
 
   // If the substitution is a term consisting of a single protocol symbol
   // [P], save P for later.
@@ -445,7 +440,7 @@ RewriteContext::getRelativeTermForType(CanType typeWitness,
     typeWitness = memberType.getBase();
 
     auto *assocType = memberType->getAssocType();
-    assert(assocType != nullptr &&
+    ASSERT(assocType != nullptr &&
            "Conformance checking should not produce unresolved member types");
 
     // If the substitution is a term consisting of a single protocol symbol [P],
@@ -454,9 +449,9 @@ RewriteContext::getRelativeTermForType(CanType typeWitness,
     if (proto && isa<GenericTypeParamType>(typeWitness)) {
       thisProto = proto;
 
-      assert(result.size() == 1);
-      assert(result[0].getKind() == Symbol::Kind::Protocol);
-      assert(result[0].getProtocol() == proto);
+      ASSERT(result.size() == 1);
+      ASSERT(result[0].getKind() == Symbol::Kind::Protocol);
+      ASSERT(result[0].getProtocol() == proto);
       result = MutableTerm();
     }
 
@@ -477,7 +472,7 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
     Type schema, ArrayRef<Term> substitutions,
     ArrayRef<GenericTypeParamType *> genericParams,
     const MutableTerm &prefix) const {
-  assert(!schema->isTypeParameter() && "Must have a concrete type here");
+  ASSERT(!schema->isTypeParameter() && "Must have a concrete type here");
 
   if (!schema->hasTypeParameter())
     return schema;
@@ -492,18 +487,18 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
           bool isShapePosition = (pos == TypePosition::Shape);
           bool isShapeTerm = (substitution.back() == Symbol::forShape(Context));
           if (isShapePosition != isShapeTerm) {
-            llvm::errs() << "Shape vs. type mixup\n\n";
-            schema.dump(llvm::errs());
-            llvm::errs() << "Substitutions:\n";
-            for (auto otherSubst : substitutions) {
-              llvm::errs() << "- ";
-              otherSubst.dump(llvm::errs());
-              llvm::errs() << "\n";
-            }
-            llvm::errs() << "\n";
-            dump(llvm::errs());
-
-            abort();
+            ABORT([&](auto &out) {
+              out << "Shape vs. type mixup\n\n";
+              schema.dump(out);
+              out << "Substitutions:\n";
+              for (auto otherSubst : substitutions) {
+                out << "- ";
+                otherSubst.dump(out);
+                out << "\n";
+              }
+              out << "\n";
+              dump(out);
+            });
           }
 
           // Undo the thing where the count type of a PackExpansionType
@@ -527,7 +522,7 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
           }
         }
 
-        assert(!t->isTypeParameter());
+        ASSERT(!t->isTypeParameter());
         return std::nullopt;
       });
 }
@@ -557,8 +552,8 @@ RewriteContext::getRelativeSubstitutionSchemaFromType(
     CanType concreteType,
     ArrayRef<Term> substitutions,
     SmallVectorImpl<Term> &result) {
-  assert(!concreteType->isTypeParameter() && "Must have a concrete type here");
-  assert(!concreteType->is<PackExpansionType>());
+  ASSERT(!concreteType->isTypeParameter() && "Must have a concrete type here");
+  ASSERT(!concreteType->is<PackExpansionType>());
 
   if (!concreteType->hasTypeParameter())
     return concreteType;
@@ -576,17 +571,13 @@ RewriteContext::getRelativeSubstitutionSchemaFromType(
         //
         // τ_0_0 := T
         // τ_0_1 := U.[shape]
-        if (pos == TypePosition::Shape) {
-          assert(false);
-          term.add(Symbol::forShape(*this));
-        }
+        ASSERT(pos != TypePosition::Shape && "Not implemented");
 
         unsigned index = result.size();
 
         result.push_back(Term::get(term, *this));
 
-        return CanGenericTypeParamType::get(/*isParameterPack=*/false,
-                                            /*depth=*/0, index, Context);
+        return CanGenericTypeParamType::getType(/*depth=*/0, index, Context);
       }));
 }
 
@@ -601,8 +592,8 @@ CanType
 RewriteContext::getSubstitutionSchemaFromType(CanType concreteType,
                                               const ProtocolDecl *proto,
                                               SmallVectorImpl<Term> &result) {
-  assert(!concreteType->isTypeParameter() && "Must have a concrete type here");
-  assert(!concreteType->is<PackExpansionType>());
+  ASSERT(!concreteType->isTypeParameter() && "Must have a concrete type here");
+  ASSERT(!concreteType->is<PackExpansionType>());
 
   if (!concreteType->hasTypeParameter())
     return concreteType;
@@ -626,7 +617,6 @@ RewriteContext::getSubstitutionSchemaFromType(CanType concreteType,
 
         result.push_back(Term::get(term, *this));
 
-        return CanGenericTypeParamType::get(/*isParameterPack=*/false,
-                                            /*depth=*/0, index, Context);
+        return CanGenericTypeParamType::getType(/*depth=*/0, index, Context);
       }));
 }

@@ -168,6 +168,11 @@ func main() {
   takesCircle(.init()) // Ok
   takesRectangle(.init())
   // expected-error@-1 {{cannot convert default value of type 'Rectangle' to expected argument type 'Circle' for parameter #0}}
+  
+  testS72199_2(x: 0)
+  testS72199_3(xs: 0, 0)
+  testS72199_4(x: 0)
+  testS72199_5(x: 0)
 }
 
 func test_magic_defaults() {
@@ -269,3 +274,19 @@ do {
 
 func testInferenceFromClosureVarInvalid<T>(x: T = { let x = "" as Int; return x }()) {}
 // expected-error@-1 {{cannot convert value of type 'String' to type 'Int' in coercion}}
+
+// https://github.com/swiftlang/swift/issues/72199
+enum S72199_1 {
+  func testS72199_1<T>(_: T = 42, _: [T]) {}
+  // expected-warning@-1 {{cannot use default expression for inference of 'T' because it is inferrable from parameters #0, #1; this will be an error in a future Swift language mode}}
+}
+
+func testS72199_2<T: P>(x: T.X, y: T = S()) { } // Ok
+func testS72199_3<each T: P>(xs: repeat (each T).X, ys: (repeat each T) = (S(), S())) {} // Ok
+
+typealias S72199_4<T> = Int
+func testS72199_4<T>(x: S72199_4<T>, y: T = "") {} // Ok
+
+func testS72199_5<T: P>(x: T.X, y: (T, T.X) = (S(), 0)) {} // Ok
+func testS72199_6<T: P>(x: T, y: (T, T.X) = (S(), 0)) {}
+// expected-error@-1 {{cannot use default expression for inference of '(T, T.X)' because it is inferrable from parameters #0, #1}}

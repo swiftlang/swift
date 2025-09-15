@@ -1211,7 +1211,7 @@ fileprivate struct EquatablishOuterPkg2 {
 }
 
 fileprivate struct EquatablishOuterProblem {
-  internal struct Inner : Equatablish { // expected-error {{type 'EquatablishOuterProblem.Inner' does not conform to protocol 'Equatablish'}}
+  internal struct Inner : Equatablish { // expected-error {{type 'EquatablishOuterProblem.Inner' does not conform to protocol 'Equatablish'}} expected-note {{add stubs for conformance}}
     private static func ==(lhs: Inner, rhs: Inner) {}
   }
 }
@@ -1324,7 +1324,7 @@ fileprivate struct EquatablishPackageOuter2 {
 }
 
 fileprivate struct EquatablishPackageOuterProblem {
-  internal struct Inner : EquatablishPackage { // expected-error {{type 'EquatablishPackageOuterProblem.Inner' does not conform to protocol 'EquatablishPackage'}}
+  internal struct Inner : EquatablishPackage { // expected-error {{type 'EquatablishPackageOuterProblem.Inner' does not conform to protocol 'EquatablishPackage'}} expected-note {{add stubs for conformance}}
     private static func ==(lhs: Inner, rhs: Inner) {}
   }
 }

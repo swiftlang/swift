@@ -1,0 +1,31 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend %s -module-name=NonLE -emit-module -o %t/NonLE.swiftmodule
+// RUN: %target-swift-frontend %s -module-name=LE -enable-library-evolution -emit-module -o %t/LE.swiftmodule
+// RUN: %target-sil-opt %t/NonLE.swiftmodule | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NONLE
+// RUN: %target-sil-opt %t/LE.swiftmodule | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-LE
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+// CHECK-LABEL:      sil [serialized] [canonical] [ossa] @public_func :
+// CHECK-NONLE-NEXT: [global: ]
+// CHECK-NEXT:       bb0:
+sil [serialized] [ossa] @public_func : $@convention(thin) () -> () {
+[global: ]
+bb0:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL:      sil non_abi [serialized] [canonical] [ossa] @public_non_abi_func :
+// CHECK-NEXT:       [global: ]
+// CHECK-NEXT:       bb0:
+sil non_abi [serialized] [ossa] @public_non_abi_func : $@convention(thin) () -> () {
+[global: ]
+bb0:
+  %r = tuple ()
+  return %r
+}
+

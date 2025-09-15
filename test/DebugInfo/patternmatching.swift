@@ -49,43 +49,43 @@ func classifyPoint2(_ p: (Double, Double)) {
 
 // Test the scopes for the switch at line 20.
 
-// CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[P:[0-9]+]],
+// CHECK-SCOPES: #dbg_{{.*}}![[P:[0-9]+]],
 
-// CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[X1:[0-9]+]],
-// CHECK-SCOPES-SAME:                         !dbg ![[X1LOC:[0-9]+]]
+// CHECK-SCOPES: #dbg_{{.*}}![[X1:[0-9]+]], !DIExpression
+// CHECK-SCOPES-SAME:                         , ![[X1LOC:[0-9]+]]
 
-// CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[Y1:[0-9]+]],
-// CHECK-SCOPES-SAME:                         !dbg ![[Y1LOC:[0-9]+]]
+// CHECK-SCOPES: #dbg_{{.*}}![[Y1:[0-9]+]], !DIExpression
+// CHECK-SCOPES-SAME:                         , ![[Y1LOC:[0-9]+]]
 
-// CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[X2:[0-9]+]],
-// CHECK-SCOPES-SAME:                         !dbg ![[X2LOC:[0-9]+]]
+// CHECK-SCOPES: #dbg_{{.*}}![[X2:[0-9]+]], !DIExpression
+// CHECK-SCOPES-SAME:                         , ![[X2LOC:[0-9]+]]
 
-// CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[Y2:[0-9]+]],
-// CHECK-SCOPES-SAME:                         !dbg ![[Y2LOC:[0-9]+]]
+// CHECK-SCOPES: #dbg_{{.*}}![[Y2:[0-9]+]], !DIExpression
+// CHECK-SCOPES-SAME:                         , ![[Y2LOC:[0-9]+]]
 
-// CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[X3:[0-9]+]],
-// CHECK-SCOPES-SAME:                         !dbg ![[X3LOC:[0-9]+]]
+// CHECK-SCOPES: #dbg_{{.*}}![[X3:[0-9]+]], !DIExpression
+// CHECK-SCOPES-SAME:                         , ![[X3LOC:[0-9]+]]
 
-// CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[Y3:[0-9]+]],
-// CHECK-SCOPES-SAME:                         !dbg ![[Y3LOC:[0-9]+]]
+// CHECK-SCOPES: #dbg_{{.*}}![[Y3:[0-9]+]], !DIExpression
+// CHECK-SCOPES-SAME:                         , ![[Y3LOC:[0-9]+]]
 
-// CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[X4:[0-9]+]],
-// CHECK-SCOPES-SAME:                         !dbg ![[X4LOC:[0-9]+]]
+// CHECK-SCOPES: #dbg_{{.*}}![[X4:[0-9]+]], !DIExpression
+// CHECK-SCOPES-SAME:                         , ![[X4LOC:[0-9]+]]
 
-// CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[Y4:[0-9]+]],
-// CHECK-SCOPES-SAME:                         !dbg ![[Y4LOC:[0-9]+]]
+// CHECK-SCOPES: #dbg_{{.*}}![[Y4:[0-9]+]], !DIExpression
+// CHECK-SCOPES-SAME:                         , ![[Y4LOC:[0-9]+]]
 
-// CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[X5:[0-9]+]],
-// CHECK-SCOPES-SAME:                         !dbg ![[X5LOC:[0-9]+]]
+// CHECK-SCOPES: #dbg_{{.*}}![[X5:[0-9]+]], !DIExpression
+// CHECK-SCOPES-SAME:                         , ![[X5LOC:[0-9]+]]
 
-// CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[Y5:[0-9]+]],
-// CHECK-SCOPES-SAME:                         !dbg ![[Y5LOC:[0-9]+]]
+// CHECK-SCOPES: #dbg_{{.*}}![[Y5:[0-9]+]], !DIExpression
+// CHECK-SCOPES-SAME:                         , ![[Y5LOC:[0-9]+]]
 
-// CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[X6:[0-9]+]],
-// CHECK-SCOPES-SAME:                         !dbg ![[X6LOC:[0-9]+]]
+// CHECK-SCOPES: #dbg_{{.*}}![[X6:[0-9]+]], !DIExpression
+// CHECK-SCOPES-SAME:                         , ![[X6LOC:[0-9]+]]
 
-// CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[Y6:[0-9]+]],
-// CHECK-SCOPES-SAME:                         !dbg ![[Y6LOC:[0-9]+]]
+// CHECK-SCOPES: #dbg_{{.*}}![[Y6:[0-9]+]], !DIExpression
+// CHECK-SCOPES-SAME:                         , ![[Y6LOC:[0-9]+]]
 
 // Verify that variables end up in separate appropriate scopes.
 

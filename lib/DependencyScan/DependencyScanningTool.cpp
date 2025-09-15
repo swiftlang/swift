@@ -15,6 +15,7 @@
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/TargetInfo.h"
 #include "swift/Basic/ColorUtils.h"
+#include "swift/Basic/Defer.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
@@ -35,11 +36,6 @@ llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Comma
                                                     const char *main_executable_path) {
   llvm::sys::SmartScopedLock<true> Lock(TargetInfoMutex);
 
-  // We must reset option occurrences because we are handling an unrelated
-  // command-line to those possibly parsed before using the same tool.
-  // We must do so because LLVM options parsing is done using a managed
-  // static `GlobalParser`.
-  llvm::cl::ResetAllOptionOccurrences();
   // Parse arguments.
   std::string CommandString;
   for (const auto *c : Command) {
@@ -69,15 +65,16 @@ llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Comma
   return c_string_utils::create_clone(ResultStr.c_str());
 }
 
-void DependencyScanDiagnosticCollector::handleDiagnostic(SourceManager &SM,
+void ThreadSafeDiagnosticCollector::handleDiagnostic(SourceManager &SM,
                       const DiagnosticInfo &Info) {
+  llvm::sys::SmartScopedLock<true> Lock(DiagnosticConsumerStateLock);
   addDiagnostic(SM, Info);
   for (auto ChildInfo : Info.ChildDiagnosticInfo) {
     addDiagnostic(SM, *ChildInfo);
   }
 }
 
-void DependencyScanDiagnosticCollector::addDiagnostic(
+void DepScanInMemoryDiagnosticCollector::addDiagnostic(
     SourceManager &SM, const DiagnosticInfo &Info) {
   // Determine what kind of diagnostic we're emitting.
   llvm::SourceMgr::DiagKind SMKind;
@@ -134,208 +131,293 @@ void DependencyScanDiagnosticCollector::addDiagnostic(
   }
 }
 
-void LockingDependencyScanDiagnosticCollector::addDiagnostic(
-    SourceManager &SM, const DiagnosticInfo &Info) {
-  llvm::sys::SmartScopedLock<true> Lock(ScanningDiagnosticConsumerStateLock);
-  DependencyScanDiagnosticCollector::addDiagnostic(SM, Info);
+swiftscan_diagnostic_set_t *mapCollectedDiagnosticsForOutput(
+    ArrayRef<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+        diagnostics) {
+  auto numDiagnostics = diagnostics.size();
+  swiftscan_diagnostic_set_t *diagnosticOutput = new swiftscan_diagnostic_set_t;
+  diagnosticOutput->count = numDiagnostics;
+  diagnosticOutput->diagnostics =
+      new swiftscan_diagnostic_info_t[numDiagnostics];
+  for (size_t i = 0; i < numDiagnostics; ++i) {
+    const auto &Diagnostic = diagnostics[i];
+    swiftscan_diagnostic_info_s *diagnosticInfo =
+        new swiftscan_diagnostic_info_s;
+    diagnosticInfo->message =
+        swift::c_string_utils::create_clone(Diagnostic.Message.c_str());
+    switch (Diagnostic.Severity) {
+    case llvm::SourceMgr::DK_Error:
+      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_ERROR;
+      break;
+    case llvm::SourceMgr::DK_Warning:
+      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_WARNING;
+      break;
+    case llvm::SourceMgr::DK_Note:
+      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_NOTE;
+      break;
+    case llvm::SourceMgr::DK_Remark:
+      diagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_REMARK;
+      break;
+    }
+
+    if (Diagnostic.ImportLocation.has_value()) {
+      auto importLocation = Diagnostic.ImportLocation.value();
+      swiftscan_source_location_s *sourceLoc = new swiftscan_source_location_s;
+      if (importLocation.bufferIdentifier.empty())
+        sourceLoc->buffer_identifier = swift::c_string_utils::create_null();
+      else
+        sourceLoc->buffer_identifier = swift::c_string_utils::create_clone(
+            importLocation.bufferIdentifier.c_str());
+      sourceLoc->line_number = importLocation.lineNumber;
+      sourceLoc->column_number = importLocation.columnNumber;
+      diagnosticInfo->source_location = sourceLoc;
+    } else {
+      diagnosticInfo->source_location = nullptr;
+    }
+
+    diagnosticOutput->diagnostics[i] = diagnosticInfo;
+  }
+  return diagnosticOutput;
+}
+
+// Generate an instance of the `swiftscan_dependency_graph_s` which contains no
+// module dependnecies but captures the diagnostics emitted during the attempted
+// scan query.
+static swiftscan_dependency_graph_t generateHollowDiagnosticOutput(
+    ArrayRef<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+        diagnostics) {
+  // Create a dependency graph instance
+  swiftscan_dependency_graph_t hollowResult = new swiftscan_dependency_graph_s;
+
+  // Populate the `modules` with a single info for the main module
+  // containing no dependencies
+  swiftscan_dependency_set_t *dependencySet = new swiftscan_dependency_set_t;
+  dependencySet->count = 1;
+  dependencySet->modules = new swiftscan_dependency_info_t[1];
+  swiftscan_dependency_info_s *hollowMainModuleInfo =
+      new swiftscan_dependency_info_s;
+  dependencySet->modules[0] = hollowMainModuleInfo;
+  hollowResult->dependencies = dependencySet;
+
+  // Other main module details empty
+  hollowMainModuleInfo->direct_dependencies =
+      c_string_utils::create_empty_set();
+  hollowMainModuleInfo->source_files = c_string_utils::create_empty_set();
+  hollowMainModuleInfo->module_path = c_string_utils::create_null();
+  hollowResult->main_module_name = c_string_utils::create_clone("unknown");
+  hollowMainModuleInfo->module_name =
+      c_string_utils::create_clone("swiftTextual:unknown");
+
+  // Hollow info details
+  swiftscan_module_details_s *hollowDetails = new swiftscan_module_details_s;
+  hollowDetails->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL;
+  hollowDetails->swift_textual_details = {c_string_utils::create_null(),
+                                          c_string_utils::create_empty_set(),
+                                          c_string_utils::create_null(),
+                                          c_string_utils::create_empty_set(),
+                                          c_string_utils::create_empty_set(),
+                                          c_string_utils::create_empty_set(),
+                                          c_string_utils::create_empty_set(),
+                                          c_string_utils::create_empty_set(),
+                                          c_string_utils::create_empty_set(),
+                                          c_string_utils::create_null(),
+                                          false,
+                                          false,
+                                          c_string_utils::create_null(),
+                                          c_string_utils::create_null(),
+                                          c_string_utils::create_null(),
+                                          nullptr,
+                                          c_string_utils::create_null(),
+                                          c_string_utils::create_null(),
+                                          c_string_utils::create_null()};
+  hollowMainModuleInfo->details = hollowDetails;
+
+  // Empty Link Library set
+  swiftscan_link_library_set_t *hollowLinkLibrarySet =
+      new swiftscan_link_library_set_t;
+  hollowLinkLibrarySet->count = 0;
+  hollowLinkLibrarySet->link_libraries = nullptr;
+  hollowMainModuleInfo->link_libraries = hollowLinkLibrarySet;
+
+  // Empty Import set
+  swiftscan_import_info_set_t *hollowImportInfoSet =
+      new swiftscan_import_info_set_t;
+  hollowImportInfoSet->count = 0;
+  hollowImportInfoSet->imports = nullptr;
+  hollowMainModuleInfo->imports = hollowImportInfoSet;
+
+  // Populate the diagnostic info
+  hollowResult->diagnostics =
+      mapCollectedDiagnosticsForOutput(diagnostics);
+  return hollowResult;
+}
+
+// Generate an instance of the `swiftscan_import_set_t` which contains no
+// imports but captures the diagnostics emitted during the attempted
+// scan query.
+static swiftscan_import_set_t generateHollowDiagnosticOutputImportSet(
+    ArrayRef<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+        diagnostics) {
+  // Create an dependency graph instance
+  swiftscan_import_set_t hollowResult = new swiftscan_import_set_s;
+  hollowResult->imports = c_string_utils::create_empty_set();
+  hollowResult->diagnostics =
+    mapCollectedDiagnosticsForOutput(diagnostics);
+  return hollowResult;
 }
 
 DependencyScanningTool::DependencyScanningTool()
     : ScanningService(std::make_unique<SwiftDependencyScanningService>()),
-      VersionedPCMInstanceCacheCache(
-          std::make_unique<CompilerArgInstanceCacheMap>()),
-      CDC(), Alloc(), Saver(Alloc) {}
+      Alloc(), Saver(Alloc) {}
 
 llvm::ErrorOr<swiftscan_dependency_graph_t>
-DependencyScanningTool::getDependencies(
-    ArrayRef<const char *> Command, const llvm::StringSet<> &PlaceholderModules,
-    StringRef WorkingDirectory) {
+DependencyScanningTool::getDependencies(ArrayRef<const char *> Command,
+                                        StringRef WorkingDirectory) {
+  // Diagnostics which may get collected during scanning instance
+  // initialization
+  std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+      InitializationDiagnostics;
+
   // The primary instance used to scan the query Swift source-code
-  auto QueryContextOrErr = initScannerForAction(Command, WorkingDirectory);
-  if (std::error_code EC = QueryContextOrErr.getError())
-    return EC;
-  auto QueryContext = std::move(*QueryContextOrErr);
+  auto QueryContext = createScanQueryContext(Command, WorkingDirectory,
+                                             InitializationDiagnostics);
+  if (QueryContext.getError())
+    return generateHollowDiagnosticOutput(InitializationDiagnostics);
+  auto ScanInstance = QueryContext->ScanInstance.get();
 
   // Local scan cache instance, wrapping the shared global cache.
   ModuleDependenciesCache cache(
-      *ScanningService, QueryContext.ScanInstance->getMainModule()->getNameStr().str(),
-      QueryContext.ScanInstance->getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
-      QueryContext.ScanInstance->getInvocation().getModuleScanningHash());
+      ScanInstance->getMainModule()->getNameStr().str(),
+      ScanInstance->getInvocation().getModuleScanningHash());
   // Execute the scanning action, retrieving the in-memory result
-  auto DependenciesOrErr = performModuleScan(*QueryContext.ScanInstance.get(), 
-                                             QueryContext.ScanDiagnostics.get(),
-                                             cache);
-  if (DependenciesOrErr.getError())
-    return std::make_error_code(std::errc::not_supported);
-  auto Dependencies = std::move(*DependenciesOrErr);
+  auto DependenciesOrErr =
+      performModuleScan(*ScanningService, cache, *QueryContext);
 
-  return Dependencies;
+  if (DependenciesOrErr.getError())
+    return generateHollowDiagnosticOutput(
+        QueryContext->InMemoryDiagnosticCollector->getDiagnosticsRef());
+
+  return std::move(*DependenciesOrErr);
 }
 
 llvm::ErrorOr<swiftscan_import_set_t>
 DependencyScanningTool::getImports(ArrayRef<const char *> Command,
                                    StringRef WorkingDirectory) {
+  // Diagnostics which may get collected during scanning instance
+  // initialization
+  std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+      InitializationDiagnostics;
+
   // The primary instance used to scan the query Swift source-code
-  auto QueryContextOrErr = initScannerForAction(Command, WorkingDirectory);
-  if (std::error_code EC = QueryContextOrErr.getError())
-    return EC;
-  auto QueryContext = std::move(*QueryContextOrErr);
+  auto QueryContext = createScanQueryContext(Command, WorkingDirectory,
+                                             InitializationDiagnostics);
+  if (QueryContext.getError())
+    return generateHollowDiagnosticOutputImportSet(InitializationDiagnostics);
+  auto ScanInstance = QueryContext->ScanInstance.get();
 
   // Local scan cache instance, wrapping the shared global cache.
   ModuleDependenciesCache cache(
-      *ScanningService, QueryContext.ScanInstance->getMainModule()->getNameStr().str(),
-      QueryContext.ScanInstance->getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
-      QueryContext.ScanInstance->getInvocation().getModuleScanningHash());
-  auto DependenciesOrErr = performModulePrescan(*QueryContext.ScanInstance.get(), 
-                                                QueryContext.ScanDiagnostics.get(),
-                                                cache);
+      ScanInstance->getMainModule()->getNameStr().str(),
+      ScanInstance->getInvocation().getModuleScanningHash());
+  // Execute the pre-scanning action, retrieving the in-memory result
+  auto DependenciesOrErr =
+      performModulePrescan(*ScanningService, cache, *QueryContext);
+
   if (DependenciesOrErr.getError())
-    return std::make_error_code(std::errc::not_supported);
-  auto Dependencies = std::move(*DependenciesOrErr);
+    return generateHollowDiagnosticOutputImportSet(
+        QueryContext->InMemoryDiagnosticCollector->getDiagnosticsRef());
 
-  return Dependencies;
+  return std::move(*DependenciesOrErr);
 }
 
-std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
-DependencyScanningTool::getDependencies(
-    ArrayRef<const char *> Command,
-    const std::vector<BatchScanInput> &BatchInput,
-    const llvm::StringSet<> &PlaceholderModules, StringRef WorkingDirectory) {
-  // The primary instance used to scan Swift modules
-  auto QueryContextOrErr = initScannerForAction(Command, WorkingDirectory);
-  if (std::error_code EC = QueryContextOrErr.getError())
-    return std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>(
-        BatchInput.size(), std::make_error_code(std::errc::invalid_argument));
-  auto QueryContext = std::move(*QueryContextOrErr);
-
-  // Local scan cache instance, wrapping the shared global cache.
-  ModuleDependenciesCache cache(
-      *ScanningService, QueryContext.ScanInstance->getMainModule()->getNameStr().str(),
-      QueryContext.ScanInstance->getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
-      QueryContext.ScanInstance->getInvocation().getModuleScanningHash());
-  auto BatchScanResults = performBatchModuleScan(
-      *QueryContext.ScanInstance.get(), QueryContext.ScanDiagnostics.get(),
-      cache, VersionedPCMInstanceCacheCache.get(),
-      Saver, BatchInput);
-
-  return BatchScanResults;
-}
-
-void DependencyScanningTool::serializeCache(llvm::StringRef path) {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  SourceManager SM;
-  DiagnosticEngine Diags(SM);
-  Diags.addConsumer(CDC);
-  llvm::vfs::OnDiskOutputBackend Backend;
-  module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-      Diags, Backend, path, *ScanningService);
-}
-
-bool DependencyScanningTool::loadCache(llvm::StringRef path) {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  SourceManager SM;
-  DiagnosticEngine Diags(SM);
-  Diags.addConsumer(CDC);
-  ScanningService = std::make_unique<SwiftDependencyScanningService>();
-  bool readFailed =
-      module_dependency_cache_serialization::readInterModuleDependenciesCache(
-          path, *ScanningService);
-  if (readFailed) {
-    Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed, path);
-  }
-  return readFailed;
-}
-
-void DependencyScanningTool::resetCache() {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  ScanningService.reset(new SwiftDependencyScanningService());
-}
-
-std::vector<
-    DependencyScanDiagnosticCollector::ScannerDiagnosticInfo>
-DependencyScanningTool::getDiagnostics() {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  return CDC.Diagnostics;
-}
-
-void DependencyScanningTool::resetDiagnostics() {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  CDC.reset();
-}
-
-llvm::ErrorOr<ScanQueryInstance>
-DependencyScanningTool::initScannerForAction(
-    ArrayRef<const char *> Command, StringRef WorkingDirectory) {
+llvm::ErrorOr<ScanQueryContext> DependencyScanningTool::createScanQueryContext(
+    ArrayRef<const char *> CommandArgs, StringRef WorkingDir,
+    std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+        &InitializationDiagnostics) {
   // The remainder of this method operates on shared state in the
-  // scanning service and global LLVM state with:
-  // llvm::cl::ResetAllOptionOccurrences
+  // scanning service
   llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  return initCompilerInstanceForScan(Command, WorkingDirectory);
-}
+  // FIXME: Instead, target-info and supported-features queries must use
+  // `DependencyScanningToolStateLock`, but this currently requires further
+  // client-side API plumbing.
+  llvm::sys::SmartScopedLock<true> TargetInfoLock(TargetInfoMutex);
 
-llvm::ErrorOr<ScanQueryInstance>
-DependencyScanningTool::initCompilerInstanceForScan(
-    ArrayRef<const char *> CommandArgs, StringRef WorkingDir) {
+  // There may be errors as early as in instance initialization, so we must
+  // ensure we can catch those
+  auto ScannerDiagnosticsCollector =
+      std::make_unique<DepScanInMemoryDiagnosticCollector>();
+
   // State unique to an individual scan
   auto Instance = std::make_unique<CompilerInstance>();
-  auto ScanDiagnosticConsumer = std::make_unique<DependencyScanDiagnosticCollector>();
+  Instance->addDiagnosticConsumer(ScannerDiagnosticsCollector.get());
 
-  // FIXME: The shared CDC must be deprecated once all clients have switched
-  // to using per-scan diagnostic output embedded in the `swiftscan_dependency_graph_s`
-  Instance->addDiagnosticConsumer(&CDC);
-  Instance->addDiagnosticConsumer(ScanDiagnosticConsumer.get());
+  {
+    // In case we exit with an error, ensure the client gets the
+    // diagnostics collected so-far.
+    SWIFT_DEFER {
+      InitializationDiagnostics = ScannerDiagnosticsCollector->getDiagnostics();
+    };
 
-  // Basic error checking on the arguments
-  if (CommandArgs.empty()) {
-    Instance->getDiags().diagnose(SourceLoc(), diag::error_no_frontend_args);
-    return std::make_error_code(std::errc::invalid_argument);
+    // Basic error checking on the arguments
+    if (CommandArgs.empty()) {
+      Instance->getDiags().diagnose(SourceLoc(), diag::error_no_frontend_args);
+      return std::make_error_code(std::errc::invalid_argument);
+    }
+
+    CompilerInvocation Invocation;
+    SmallString<128> WorkingDirectory(WorkingDir);
+    if (WorkingDirectory.empty())
+      llvm::sys::fs::current_path(WorkingDirectory);
+
+    // Parse/tokenize arguments.
+    std::string CommandString;
+    for (const auto *c : CommandArgs) {
+      CommandString.append(c);
+      CommandString.append(" ");
+    }
+    SmallVector<const char *, 4> Args;
+    llvm::BumpPtrAllocator Alloc;
+    llvm::StringSaver Saver(Alloc);
+    // Ensure that we use the Windows command line parsing on Windows as we need
+    // to ensure that we properly handle paths.
+    if (llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows())
+      llvm::cl::TokenizeWindowsCommandLine(CommandString, Saver, Args);
+    else
+      llvm::cl::TokenizeGNUCommandLine(CommandString, Saver, Args);
+
+    if (Invocation.parseArgs(Args, Instance->getDiags(),
+                             nullptr, WorkingDirectory, "/tmp/foo")) {
+      return std::make_error_code(std::errc::invalid_argument);
+    }
+
+    // Setup the instance
+    std::string InstanceSetupError;
+    if (Instance->setup(Invocation, InstanceSetupError))
+      return std::make_error_code(std::errc::not_supported);
+
+    Invocation.getFrontendOptions().LLVMArgs.clear();
+
+    // Setup the caching service after the instance finishes setup.
+    if (ScanningService->setupCachingDependencyScanningService(*Instance))
+      return std::make_error_code(std::errc::invalid_argument);
+
+    (void)Instance->getMainModule();
   }
 
-  CompilerInvocation Invocation;
-  SmallString<128> WorkingDirectory(WorkingDir);
-  if (WorkingDirectory.empty())
-    llvm::sys::fs::current_path(WorkingDirectory);
-
-  // We must reset option occurrences because we are handling an unrelated
-  // command-line to those possibly parsed before using the same tool.
-  // We must do so because LLVM options parsing is done using a managed
-  // static `GlobalParser`.
-  llvm::cl::ResetAllOptionOccurrences();
-  // Parse/tokenize arguments.
-  std::string CommandString;
-  for (const auto *c : CommandArgs) {
-    CommandString.append(c);
-    CommandString.append(" ");
-  }
-  SmallVector<const char *, 4> Args;
-  llvm::BumpPtrAllocator Alloc;
-  llvm::StringSaver Saver(Alloc);
-  // Ensure that we use the Windows command line parsing on Windows as we need
-  // to ensure that we properly handle paths.
-  if (llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows())
-    llvm::cl::TokenizeWindowsCommandLine(CommandString, Saver, Args);
-  else
-    llvm::cl::TokenizeGNUCommandLine(CommandString, Saver, Args);
-
-  if (Invocation.parseArgs(Args, Instance->getDiags(),
-                           nullptr, WorkingDirectory, "/tmp/foo")) {
-    return std::make_error_code(std::errc::invalid_argument);
+  auto SerializedDiagnosticsOutputPath =
+      Instance->getInvocation()
+          .getSerializedDiagnosticsPathForAtMostOnePrimary();
+  std::unique_ptr<DiagnosticConsumer> SerailizedDiagnosticsConsumer;
+  if (!SerializedDiagnosticsOutputPath.empty()) {
+    SerailizedDiagnosticsConsumer =
+        swift::serialized_diagnostics::createThreadSafeConsumer(
+            SerializedDiagnosticsOutputPath, false);
+    Instance->addDiagnosticConsumer(SerailizedDiagnosticsConsumer.get());
   }
 
-  // Setup the instance
-  std::string InstanceSetupError;
-  if (Instance->setup(Invocation, InstanceSetupError)) {
-    return std::make_error_code(std::errc::not_supported);
-  }
-
-  // Setup the caching service after the instance finishes setup.
-  if (ScanningService->setupCachingDependencyScanningService(*Instance))
-    return std::make_error_code(std::errc::invalid_argument);
-
-  (void)Instance->getMainModule();
-
-  return ScanQueryInstance{std::move(Instance), 
-                           std::move(ScanDiagnosticConsumer)};
+  return ScanQueryContext{std::move(Instance),
+                          std::move(ScannerDiagnosticsCollector),
+                          std::move(SerailizedDiagnosticsConsumer)};
 }
 
 } // namespace dependencies

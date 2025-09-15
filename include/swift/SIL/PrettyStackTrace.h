@@ -20,6 +20,7 @@
 
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILNode.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -80,6 +81,18 @@ public:
     : Node(node), Action(action) {}
 
   virtual void print(llvm::raw_ostream &OS) const override;
+};
+
+/// Observe that we are processing a reference to a SIL decl.
+class PrettyStackTraceSILDeclRef : public llvm::PrettyStackTraceEntry {
+  SILDeclRef declRef;
+  StringRef action;
+
+public:
+  PrettyStackTraceSILDeclRef(const char *action, SILDeclRef declRef)
+      : declRef(declRef), action(action) {}
+
+  virtual void print(llvm::raw_ostream &os) const override;
 };
 
 } // end namespace swift

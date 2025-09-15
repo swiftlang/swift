@@ -62,7 +62,7 @@ public func testInlinable() -> Int {
 // CHECK-macosx10_14:  apply [[F]]
 // CHECK-macosx10_14: } // end sil function '$s33constant_propagation_availability27testAvailabilityPropagationSiyF'
 
-// CHECK-macosx10_14: sil [readnone] [_semantics "availability.osversion"] @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF
+// CHECK-macosx10_14: sil [no_locks] [readnone] [_semantics "availability.osversion"] @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF
 
 // CHECK-inlinable-LABEL: sil {{.*}} @$s4Test13testInlinableSiyF  : $@convention(thin) () -> Int {
 // CHECK-inlinable:  [[F:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF

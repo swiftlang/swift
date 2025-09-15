@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_WRAPPERTYPES_H
 #define SWIFT_SIL_WRAPPERTYPES_H
 
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
@@ -37,9 +38,9 @@ struct LoadOperation {
   explicit operator bool() const { return !value.isNull(); }
 
   SingleValueInstruction *getLoadInst() const {
-    if (value.is<LoadInst *>())
-      return value.get<LoadInst *>();
-    return value.get<LoadBorrowInst *>();
+    if (isa<LoadInst *>(value))
+      return cast<LoadInst *>(value);
+    return cast<LoadBorrowInst *>(value);
   }
 
   SingleValueInstruction *operator*() const { return getLoadInst(); }
@@ -49,9 +50,9 @@ struct LoadOperation {
   SingleValueInstruction *operator->() { return getLoadInst(); }
 
   SILValue getOperand() const {
-    if (value.is<LoadInst *>())
-      return value.get<LoadInst *>()->getOperand();
-    return value.get<LoadBorrowInst *>()->getOperand();
+    if (isa<LoadInst *>(value))
+      return cast<LoadInst *>(value)->getOperand();
+    return cast<LoadBorrowInst *>(value)->getOperand();
   }
 
   /// Return the ownership qualifier of the underlying load if we have a load or
@@ -60,11 +61,11 @@ struct LoadOperation {
   /// TODO: Rather than use an optional here, we should include an invalid
   /// representation in LoadOwnershipQualifier.
   std::optional<LoadOwnershipQualifier> getOwnershipQualifier() const {
-    if (auto *lbi = value.dyn_cast<LoadBorrowInst *>()) {
+    if (value.dyn_cast<LoadBorrowInst *>()) {
       return std::nullopt;
     }
 
-    return value.get<LoadInst *>()->getOwnershipQualifier();
+    return cast<LoadInst *>(value)->getOwnershipQualifier();
   }
 };
 
@@ -179,19 +180,19 @@ public:
   operator SingleValueInstruction *() const {
     if (auto *seai = value.dyn_cast<SelectEnumAddrInst *>())
       return seai;
-    return value.get<SelectEnumInst *>();
+    return cast<SelectEnumInst *>(value);
   }
 
   SingleValueInstruction *operator*() const {
     if (auto *seai = value.dyn_cast<SelectEnumAddrInst *>())
       return seai;
-    return value.get<SelectEnumInst *>();
+    return cast<SelectEnumInst *>(value);
   }
 
   SingleValueInstruction *operator->() const {
     if (auto *seai = value.dyn_cast<SelectEnumAddrInst *>())
       return seai;
-    return value.get<SelectEnumInst *>();
+    return cast<SelectEnumInst *>(value);
   }
 
   operator bool() const { return bool(value); }
@@ -199,7 +200,7 @@ public:
   SILValue getOperand() {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getOperand();
-    return value.get<SelectEnumAddrInst *>()->getOperand();
+    return cast<SelectEnumAddrInst *>(value)->getOperand();
   }
 
   SILValue getEnumOperand() { return getOperand(); }
@@ -207,26 +208,39 @@ public:
   const Operand &getEnumOperandRef() {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getEnumOperandRef();
-    return value.get<SelectEnumAddrInst *>()->getEnumOperandRef();
+    return cast<SelectEnumAddrInst *>(value)->getEnumOperandRef();
   }
 
   unsigned getNumCases() const {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getNumCases();
-    return value.get<SelectEnumAddrInst *>()->getNumCases();
+    return cast<SelectEnumAddrInst *>(value)->getNumCases();
   }
 
   std::pair<EnumElementDecl *, SILValue> getCase(unsigned i) const {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getCase(i);
-    return value.get<SelectEnumAddrInst *>()->getCase(i);
+    return cast<SelectEnumAddrInst *>(value)->getCase(i);
   }
+
+  std::pair<EnumElementDecl *, Operand *> getCaseOperand(unsigned i) const {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->getCaseOperand(i);
+    return cast<SelectEnumAddrInst *>(value)->getCaseOperand(i);
+  }
+
   /// Return the value that will be used as the result for the specified enum
   /// case.
   SILValue getCaseResult(EnumElementDecl *D) {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getCaseResult(D);
-    return value.get<SelectEnumAddrInst *>()->getCaseResult(D);
+    return cast<SelectEnumAddrInst *>(value)->getCaseResult(D);
+  }
+
+  Operand *getCaseResultOperand(EnumElementDecl *D) {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->getCaseResultOperand(D);
+    return cast<SelectEnumAddrInst *>(value)->getCaseResultOperand(D);
   }
 
   /// If the default refers to exactly one case decl, return it.
@@ -235,13 +249,19 @@ public:
   bool hasDefault() const {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->hasDefault();
-    return value.get<SelectEnumAddrInst *>()->hasDefault();
+    return cast<SelectEnumAddrInst *>(value)->hasDefault();
   }
 
   SILValue getDefaultResult() const {
     if (auto *sei = value.dyn_cast<SelectEnumInst *>())
       return sei->getDefaultResult();
-    return value.get<SelectEnumAddrInst *>()->getDefaultResult();
+    return cast<SelectEnumAddrInst *>(value)->getDefaultResult();
+  }
+
+  Operand *getDefaultResultOperand() const {
+    if (auto *sei = value.dyn_cast<SelectEnumInst *>())
+      return sei->getDefaultResultOperand();
+    return cast<SelectEnumAddrInst *>(value)->getDefaultResultOperand();
   }
 };
 
@@ -273,7 +293,7 @@ public:
     case SILInstructionKind::DifferentiableFunctionInst:
       return nullptr;
     case SILInstructionKind::MarkDependenceInst:
-      return &forwardingInst->getOperandRef(MarkDependenceInst::Value);
+      return &forwardingInst->getOperandRef(MarkDependenceInst::Dependent);
     case SILInstructionKind::RefToBridgeObjectInst:
       return
         &forwardingInst->getOperandRef(RefToBridgeObjectInst::ConvertedOperand);
@@ -342,6 +362,43 @@ public:
   // operation.
   bool visitForwardedValues(function_ref<bool(SILValue)> visitor);
 };
+
+enum class FixedStorageSemanticsCallKind { None, CheckIndex, GetCount };
+
+struct FixedStorageSemanticsCall {
+  ApplyInst *apply = nullptr;
+  FixedStorageSemanticsCallKind kind = FixedStorageSemanticsCallKind::None;
+
+  FixedStorageSemanticsCall(SILInstruction *input) {
+    auto *applyInst = dyn_cast<ApplyInst>(input);
+    if (!applyInst) {
+      return;
+    }
+    auto *callee = applyInst->getReferencedFunctionOrNull();
+    if (!callee) {
+      return;
+    }
+    for (auto &attr : callee->getSemanticsAttrs()) {
+      if (attr == "fixed_storage.check_index") {
+        apply = applyInst;
+        kind = FixedStorageSemanticsCallKind::CheckIndex;
+        break;
+      } else if (attr == "fixed_storage.get_count") {
+        apply = applyInst;
+        kind = FixedStorageSemanticsCallKind::GetCount;
+        break;
+      }
+    }
+  }
+
+  FixedStorageSemanticsCallKind getKind() const { return kind; }
+  explicit operator bool() const { return apply != nullptr; }
+  const ApplyInst *operator->() const { return apply; }
+  ApplyInst *operator->() { return apply; }
+};
+
+bool isFixedStorageSemanticsCallKind(SILFunction *function);
+
 } // end namespace swift
 
 #endif

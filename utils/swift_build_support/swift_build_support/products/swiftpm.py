@@ -16,11 +16,11 @@ from . import cmark
 from . import foundation
 from . import libcxx
 from . import libdispatch
-from . import libicu
 from . import llbuild
 from . import llvm
 from . import product
 from . import swift
+from . import swift_testing
 from . import xctest
 from .. import shell
 from ..targets import StdlibDeploymentTarget
@@ -42,13 +42,21 @@ class SwiftPM(product.Product):
     def should_build(self, host_target):
         return True
 
-    def run_bootstrap_script(self, action, host_target, additional_params=[]):
+    def run_bootstrap_script(
+            self,
+            action,
+            host_target,
+            additional_params=[],
+            *,
+            compile_only_for_running_host_architecture=False,
+    ):
         script_path = os.path.join(
             self.source_dir, 'Utilities', 'bootstrap')
 
         toolchain_path = self.native_toolchain_path(host_target)
+        clang_tools_path = self.native_clang_tools_path(host_target)
         swiftc = os.path.join(toolchain_path, "bin", "swiftc")
-        clang = os.path.join(toolchain_path, "bin", "clang")
+        clang = os.path.join(clang_tools_path, "bin", "clang")
 
         # FIXME: We require llbuild build directory in order to build. Is
         # there a better way to get this?
@@ -84,17 +92,11 @@ class SwiftPM(product.Product):
                 "--dispatch-build-dir", dispatch_build_dir
             ]
 
-        # Pass Foundation directory down if we built it
-        foundation_build_dir = os.path.join(
-            build_root, '%s-%s' % ("foundation", host_target))
-
-        if os.path.exists(foundation_build_dir):
-            helper_cmd += [
-                "--foundation-build-dir", foundation_build_dir
-            ]
-
         # Pass Cross compile host info
-        if self.has_cross_compile_hosts():
+        if (
+            not compile_only_for_running_host_architecture
+            and self.has_cross_compile_hosts()
+        ):
             if self.is_darwin_host(host_target):
                 helper_cmd += ['--cross-compile-hosts']
                 for cross_compile_host in self.args.cross_compile_hosts:
@@ -117,13 +119,27 @@ class SwiftPM(product.Product):
         shell.call(helper_cmd)
 
     def build(self, host_target):
-        self.run_bootstrap_script('build', host_target, ["--reconfigure"])
+        self.run_bootstrap_script(
+            'build',
+            host_target,
+            additional_params=[
+                "--reconfigure",
+                "--verbose",
+            ],
+        )
 
     def should_test(self, host_target):
         return self.args.test_swiftpm
 
     def test(self, host_target):
-        self.run_bootstrap_script('test', host_target)
+        self.run_bootstrap_script(
+            'test',
+            host_target,
+            compile_only_for_running_host_architecture=True,
+            additional_params=[
+                '--verbose'
+            ]
+        )
 
     def should_clean(self, host_target):
         return self.args.clean_swiftpm
@@ -139,6 +155,7 @@ class SwiftPM(product.Product):
         install_prefix = install_destdir + self.args.install_prefix
 
         self.run_bootstrap_script('install', host_target, [
+            '--verbose',
             '--prefix', install_prefix
         ])
 
@@ -147,9 +164,9 @@ class SwiftPM(product.Product):
         return [cmark.CMark,
                 llvm.LLVM,
                 libcxx.LibCXX,
-                libicu.LibICU,
                 swift.Swift,
                 libdispatch.LibDispatch,
                 foundation.Foundation,
                 xctest.XCTest,
-                llbuild.LLBuild]
+                llbuild.LLBuild,
+                swift_testing.SwiftTesting]

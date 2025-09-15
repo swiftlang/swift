@@ -10,20 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/IDE/IDERequests.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ASTDemangler.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Utils.h"
-#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Markup/XMLUtils.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
-#include "swift/IDE/IDERequests.h"
 
 using namespace swift;
 using namespace swift::ide;
@@ -87,8 +89,8 @@ private:
   bool walkToDeclPost(Decl *D) override;
   bool walkToStmtPre(Stmt *S) override;
   bool walkToStmtPost(Stmt *S) override;
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override;
   bool visitCallArgName(Identifier Name, CharSourceRange Range,
                         ValueDecl *D) override;
@@ -103,7 +105,7 @@ private:
                   std::optional<ReferenceMetaData> Data = std::nullopt);
   bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
   bool tryResolve(Stmt *St);
-  bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+  bool visitSubscriptReference(ValueDecl *D, SourceRange Range,
                                ReferenceMetaData Data,
                                bool IsOpenBracket) override;
 };
@@ -208,7 +210,7 @@ bool CursorInfoResolver::tryResolve(Stmt *St) {
 }
 
 bool CursorInfoResolver::visitSubscriptReference(ValueDecl *D,
-                                                 CharSourceRange Range,
+                                                 SourceRange Range,
                                                  ReferenceMetaData Data,
                                                  bool IsOpenBracket) {
   // We should treat both open and close brackets equally
@@ -299,8 +301,7 @@ bool CursorInfoResolver::walkToStmtPost(Stmt *S) {
   return true;
 }
 
-bool CursorInfoResolver::visitDeclReference(ValueDecl *D,
-                                            CharSourceRange Range,
+bool CursorInfoResolver::visitDeclReference(ValueDecl *D, SourceRange Range,
                                             TypeDecl *CtorTyRef,
                                             ExtensionDecl *ExtTyRef, Type T,
                                             ReferenceMetaData Data) {
@@ -308,7 +309,8 @@ bool CursorInfoResolver::visitDeclReference(ValueDecl *D,
     return false;
   if (Data.isImplicit || !Range.isValid())
     return true;
-  return !tryResolve(D, CtorTyRef, ExtTyRef, Range.getStart(), /*IsRef=*/true, T, Data);
+  return !tryResolve(D, CtorTyRef, ExtTyRef, Range.Start, /*IsRef=*/true, T,
+                     Data);
 }
 
 static bool isCursorOn(Expr *E, SourceLoc Loc) {
@@ -339,12 +341,13 @@ bool CursorInfoResolver::walkToExprPre(Expr *E) {
   }
 
   if (auto SAE = dyn_cast<SelfApplyExpr>(E)) {
-    if (SAE->getFn()->getStartLoc() == LocToResolve) {
+    auto *fn = SAE->getFn();
+    if (!fn->isImplicit() && fn->getStartLoc() == LocToResolve) {
       ContainerType = SAE->getBase()->getType();
     }
   } else if (auto ME = dyn_cast<MemberRefExpr>(E)) {
     SourceLoc MemberLoc = ME->getNameLoc().getBaseNameLoc();
-    if (MemberLoc.isValid() && MemberLoc == LocToResolve) {
+    if (!ME->isImplicit() && MemberLoc.isValid() && MemberLoc == LocToResolve) {
       ContainerType = ME->getBase()->getType();
     }
   }
@@ -430,7 +433,7 @@ void swift::simple_display(llvm::raw_ostream &out, const CursorInfoOwner &owner)
   if (!owner.isValid())
     return;
   auto &SM = owner.File->getASTContext().SourceMgr;
-  out << SM.getIdentifierForBuffer(*owner.File->getBufferID());
+  out << SM.getIdentifierForBuffer(owner.File->getBufferID());
   auto LC = SM.getLineAndColumnInBuffer(owner.Loc);
   out << ":" << LC.first << ":" << LC.second;
 }
@@ -441,7 +444,7 @@ void swift::ide::simple_display(llvm::raw_ostream &out,
     return;
   out << "Resolved cursor info at ";
   auto &SM = info->getSourceFile()->getASTContext().SourceMgr;
-  out << SM.getIdentifierForBuffer(*info->getSourceFile()->getBufferID());
+  out << SM.getIdentifierForBuffer(info->getSourceFile()->getBufferID());
   auto LC = SM.getLineAndColumnInBuffer(info->getLoc());
   out << ":" << LC.first << ":" << LC.second;
 }
@@ -458,8 +461,8 @@ class RangeResolver : public SourceEntityWalker {
   bool walkToStmtPost(Stmt *S) override;
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
   bool walkToDeclPost(Decl *D) override;
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override;
   ResolvedRangeInfo moveArrayToASTContext(ResolvedRangeInfo Info);
 public:
@@ -491,6 +494,8 @@ static PossibleEffects getUnhandledEffects(ArrayRef<ASTNode> Nodes) {
         Effects |= EffectKind::Throws;
       if (isa<AwaitExpr>(E))
         Effects |= EffectKind::Async;
+      if (isa<UnsafeExpr>(E))
+        Effects |= EffectKind::Unsafe;
 
       return true;
     }
@@ -591,13 +596,13 @@ private:
 
         // For a single expression, its type is apparent.
       case RangeKind::SingleExpression:
-        return {N.get<Expr*>()->getType().getPointer(), ExitState::Negative};
+        return {cast<Expr *>(N)->getType().getPointer(), ExitState::Negative};
 
         // For statements, we either resolve to the returning type or Void.
       case RangeKind::SingleStatement:
       case RangeKind::MultiStatement: {
-        if (N.is<Stmt*>()) {
-          if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
+        if (isa<Stmt *>(N)) {
+          if (auto RS = dyn_cast<ReturnStmt>(cast<Stmt *>(N))) {
             return {
               resolveNodeType(RS->hasResult() ? RS->getResult() : nullptr,
                               RangeKind::SingleExpression).ReturnType,
@@ -605,7 +610,7 @@ private:
           }
 
           // Unbox the brace statement to find its type.
-          if (auto BS = dyn_cast<BraceStmt>(N.get<Stmt*>())) {
+          if (auto BS = dyn_cast<BraceStmt>(cast<Stmt *>(N))) {
             if (!BS->getElements().empty()) {
               return resolveNodeType(BS->getLastElement(),
                                      RangeKind::SingleStatement);
@@ -613,7 +618,7 @@ private:
           }
 
           // Unbox the if statement to find its type.
-          if (auto *IS = dyn_cast<IfStmt>(N.get<Stmt*>())) {
+          if (auto *IS = dyn_cast<IfStmt>(cast<Stmt *>(N))) {
             llvm::SmallVector<ReturnInfo, 2> Branches;
             Branches.push_back(resolveNodeType(IS->getThenStmt(),
                                                RangeKind::SingleStatement));
@@ -623,7 +628,7 @@ private:
           }
 
           // Unbox switch statement to find return information.
-          if (auto *SWS = dyn_cast<SwitchStmt>(N.get<Stmt*>())) {
+          if (auto *SWS = dyn_cast<SwitchStmt>(cast<Stmt *>(N))) {
             llvm::SmallVector<ReturnInfo, 4> Branches;
             for (auto *CS : SWS->getCases()) {
               Branches.push_back(resolveNodeType(CS->getBody(),
@@ -646,7 +651,7 @@ private:
     bool SingleEntry = true;
     auto UnhandledEffects = getUnhandledEffects({Node});
     OrphanKind Kind = getOrphanKind(ContainedASTNodes);
-    if (Node.is<Expr*>())
+    if (isa<Expr *>(Node))
       return ResolvedRangeInfo(
           RangeKind::SingleExpression,
           resolveNodeType(Node, RangeKind::SingleExpression), TokensInRange,
@@ -654,7 +659,7 @@ private:
           /*Common Parent Expr*/ nullptr, SingleEntry, UnhandledEffects, Kind,
           llvm::ArrayRef(ContainedASTNodes), llvm::ArrayRef(DeclaredDecls),
           llvm::ArrayRef(ReferencedDecls));
-    else if (Node.is<Stmt*>())
+    else if (isa<Stmt *>(Node))
       return ResolvedRangeInfo(
           RangeKind::SingleStatement,
           resolveNodeType(Node, RangeKind::SingleStatement), TokensInRange,
@@ -663,7 +668,7 @@ private:
           llvm::ArrayRef(ContainedASTNodes), llvm::ArrayRef(DeclaredDecls),
           llvm::ArrayRef(ReferencedDecls));
     else {
-      assert(Node.is<Decl*>());
+      assert(isa<Decl *>(Node));
       return ResolvedRangeInfo(
           RangeKind::SingleDecl, ReturnInfo(), TokensInRange,
           getImmediateContext(),
@@ -719,7 +724,7 @@ public:
 
   void leave(ASTNode Node) {
     if (!hasResult() && !Node.isImplicit() && nodeContainSelection(Node)) {
-      if (auto Parent = Node.is<Expr*>() ? Node.get<Expr*>() : nullptr) {
+      if (auto Parent = isa<Expr *>(Node) ? cast<Expr *>(Node) : nullptr) {
         Result = {RangeKind::PartOfExpression,
                   ReturnInfo(),
                   TokensInRange,
@@ -794,12 +799,13 @@ public:
       Impl->analyzeDecl(D);
       return true;
     }
-    bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                            TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                            ReferenceMetaData Data) override {
-      Impl->analyzeDeclRef(D, Range.getStart(), T, Data);
+    bool visitDeclReference(ValueDecl *D, SourceRange Range,
+                            TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
+                            Type T, ReferenceMetaData Data) override {
+      Impl->analyzeDeclRef(D, Range.Start, T, Data);
       return true;
     }
+
   public:
     CompleteWalker(Implementation *Impl) : Impl(Impl) {}
   };
@@ -808,11 +814,11 @@ public:
   /// decls in the range is referenced after it.
   class FurtherReferenceWalker : public SourceEntityWalker {
     Implementation *Impl;
-    bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                            TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                            ReferenceMetaData Data) override {
+    bool visitDeclReference(ValueDecl *D, SourceRange Range,
+                            TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
+                            Type T, ReferenceMetaData Data) override {
       // If the reference is after the given range, continue logic.
-      if (!Impl->SM.isBeforeInBuffer(Impl->End, Range.getStart()))
+      if (!Impl->SM.isBeforeInBuffer(Impl->End, Range.Start))
         return true;
 
       // If the referenced decl is declared in the range, than the declared decl
@@ -824,6 +830,7 @@ public:
       }
       return true;
     }
+
   public:
     FurtherReferenceWalker(Implementation *Impl) : Impl(Impl) {}
   };
@@ -841,7 +848,7 @@ public:
     unsigned CaseCount = 0;
     // Count the number of case/default statements.
     for (auto N : Nodes) {
-      if (Stmt *S = N.is<Stmt*>() ? N.get<Stmt*>() : nullptr) {
+      if (Stmt *S = isa<Stmt *>(N) ? cast<Stmt *>(N) : nullptr) {
         if (S->getKind() == StmtKind::Case)
           ++CaseCount;
       }
@@ -894,7 +901,7 @@ public:
   void analyze(ASTNode Node) {
     if (!shouldAnalyze(Node))
       return;
-    Decl *D = Node.is<Decl*>() ? Node.get<Decl*>() : nullptr;
+    Decl *D = isa<Decl *>(Node) ? cast<Decl *>(Node) : nullptr;
     analyzeDecl(D);
     auto &DCInfo = getCurrentDC();
 
@@ -1135,11 +1142,11 @@ bool RangeResolver::walkToDeclPost(Decl *D) {
   return !Impl->hasResult();
 }
 
-
-bool RangeResolver::
-visitDeclReference(ValueDecl *D, CharSourceRange Range, TypeDecl *CtorTyRef,
-                   ExtensionDecl *ExtTyRef, Type T, ReferenceMetaData Data) {
-  Impl->analyzeDeclRef(D, Range.getStart(), T, Data);
+bool RangeResolver::visitDeclReference(ValueDecl *D, SourceRange Range,
+                                       TypeDecl *CtorTyRef,
+                                       ExtensionDecl *ExtTyRef, Type T,
+                                       ReferenceMetaData Data) {
+  Impl->analyzeDeclRef(D, Range.Start, T, Data);
   return true;
 }
 
@@ -1177,7 +1184,7 @@ void swift::simple_display(llvm::raw_ostream &out,
   if (!owner.isValid())
     return;
   auto &SM = owner.File->getASTContext().SourceMgr;
-  out << SM.getIdentifierForBuffer(*owner.File->getBufferID());
+  out << SM.getIdentifierForBuffer(owner.File->getBufferID());
   auto SLC = SM.getLineAndColumnInBuffer(owner.StartLoc);
   auto ELC = SM.getLineAndColumnInBuffer(owner.EndLoc);
   out << ": (" << SLC.first << ":" << SLC.second << ", "
@@ -1187,7 +1194,7 @@ void swift::simple_display(llvm::raw_ostream &out,
 RangeInfoOwner::RangeInfoOwner(SourceFile *File, unsigned Offset,
                                unsigned Length): File(File) {
   SourceManager &SM = File->getASTContext().SourceMgr;
-  unsigned BufferId = File->getBufferID().value();
+  unsigned BufferId = File->getBufferID();
   StartLoc = SM.getLocForOffset(BufferId, Offset);
   EndLoc = SM.getLocForOffset(BufferId, Offset + Length);
 }

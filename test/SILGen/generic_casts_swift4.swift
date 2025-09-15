@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -swift-version 4 -module-name generic_casts -Xllvm -sil-full-demangle %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 4 -module-name generic_casts -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 // The below tests are to ensure we maintain compatibility with Swift 4.1's
 // behaviour when casting to an archetype – the compiler assumes a non-optional

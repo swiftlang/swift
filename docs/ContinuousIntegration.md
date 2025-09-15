@@ -33,7 +33,7 @@ In order for the Swift project to be able to advance quickly, it is important th
 
 ### @swift-ci
 
-Users with [commit access](https://swift.org/contributing/#commit-access) can trigger pull request testing by writing a comment on a PR addressed to the GitHub user @swift-ci. Different tests will run depending on the specific comment used. The current test types are:
+Users with [commit access](/CONTRIBUTING.md#commit-access) can trigger pull request testing by writing a comment on a PR addressed to the GitHub user @swift-ci. Different tests will run depending on the specific comment used. The current test types are:
 
 1. Smoke Testing
 2. Validation Testing
@@ -126,6 +126,7 @@ A validation test on Linux does the following:
 Platform        | Comment | Check Status
 ------------    | ------- | ------------
 macOS platform  | @swift-ci Please benchmark       | Swift Benchmark on macOS Platform (many runs - rigorous)
+macOS platform (Apple Silicon) | @swift-ci Apple Silicon benchmark | Swift Benchmark on macOS Platform using Apple Silicon (many runs - rigorous)
 macOS platform  | @swift-ci Please smoke benchmark | Swift Benchmark on macOS Platform (few runs - soundness)
 
 ### Linting
@@ -244,7 +245,7 @@ These commands will:
 3. Compare the obtained data to the baseline (stored in git) and HEAD (version of a compiler built without the PR changes)
 4. Report the results in a pull request comment
 
-For the detailed explanation of how compiler performance is measured, please refer to [this document](https://github.com/apple/swift/blob/main/docs/CompilerPerformance.md).
+For the detailed explanation of how compiler performance is measured, please refer to [this document](https://github.com/swiftlang/swift/blob/main/docs/CompilerPerformance.md).
 
 ## Cross Repository Testing
 
@@ -254,7 +255,7 @@ For example:
 
 ```
 Please test with following pull request:
-https://github.com/apple/swift/pull/4574
+https://github.com/swiftlang/swift/pull/4574
 
 @swift-ci Please test Linux platform
 ```
@@ -262,7 +263,7 @@ https://github.com/apple/swift/pull/4574
 ```
 Please test with following PR:
 https://github.com/apple/swift-lldb/pull/48
-https://github.com/apple/swift-package-manager/pull/632
+https://github.com/swiftlang/swift-package-manager/pull/632
 
 @swift-ci Please test macOS platform
 ```

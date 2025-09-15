@@ -23,7 +23,7 @@
 #include <unistd.h>
 
 static inline __swift_uint32_t _swift_stdlib_gettid() {
-  static __thread tid = 0;
+  static __thread __swift_uint32_t tid = 0;
 
   if (tid == 0) {
     tid = syscall(SYS_gettid);
@@ -65,5 +65,10 @@ static inline __swift_uint32_t _swift_stdlib_futex_unlock(__swift_uint32_t *lock
 }
 
 #endif // defined(__linux__)
+
+#if defined(__FreeBSD__)
+#include <sys/types.h>
+#include <sys/umtx.h>
+#endif
 
 #endif // SWIFT_STDLIB_SYNCHRONIZATION_SHIMS_H

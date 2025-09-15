@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 /// Outlines class objects from functions into statically initialized global variables.
@@ -105,7 +106,11 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
 
   let outlinedGlobal = context.createGlobalVariable(
         name: context.mangleOutlinedVariable(from: allocRef.parentFunction),
-        type: allocRef.type, isPrivate: true)
+        type: allocRef.type, linkage: .private,
+        // Only if it's a COW object we can be sure that the object allocated in the global is not mutated.
+        // If someone wants to mutate it, it has to be copied first.
+        isLet: endOfInitInst is EndCOWMutationInst,
+        markedAsUsed: false)
 
   constructObject(of: allocRef, inInitializerOf: outlinedGlobal, storesToClassFields, storesToTailElements, context)
   context.erase(instructions: storesToClassFields)
@@ -301,7 +306,8 @@ private func isValidUseOfObject(_ use: Operand) -> Bool {
        is DeallocStackRefInst,
        is StrongRetainInst,
        is StrongReleaseInst,
-       is FixLifetimeInst:
+       is FixLifetimeInst,
+       is MarkDependenceAddrInst:
     return true
 
   case let mdi as MarkDependenceInst:
@@ -358,13 +364,13 @@ private func constructObject(of allocRef: AllocRefInstBase,
                              inInitializerOf global: GlobalVariable,
                              _ storesToClassFields: [StoreInst], _ storesToTailElements: [StoreInst],
                              _ context: FunctionPassContext) {
-  var cloner = StaticInitCloner(cloneTo: global, context)
+  var cloner = Cloner(cloneToGlobal: global, context)
   defer { cloner.deinitialize() }
 
   // Create the initializers for the fields
   var objectArgs = [Value]()
   for store in storesToClassFields {
-    objectArgs.append(cloner.clone(store.source as! SingleValueInstruction))
+    objectArgs.append(cloner.cloneRecursivelyToGlobal(value: store.source as! SingleValueInstruction))
   }
   let globalBuilder = Builder(staticInitializerOf: global, context)
 
@@ -376,7 +382,7 @@ private func constructObject(of allocRef: AllocRefInstBase,
       for elementIdx in 0..<allocRef.numTailElements! {
         let tupleElems = (0..<numTailTupleElems).map { tupleIdx in
             let store = storesToTailElements[elementIdx * numTailTupleElems + tupleIdx]
-            return cloner.clone(store.source as! SingleValueInstruction)
+            return cloner.cloneRecursivelyToGlobal(value: store.source as! SingleValueInstruction)
         }
         let tuple = globalBuilder.createTuple(type: allocRef.tailAllocatedTypes[0], elements: tupleElems)
         objectArgs.append(tuple)
@@ -384,7 +390,7 @@ private func constructObject(of allocRef: AllocRefInstBase,
     } else {
       // The non-tuple element case.
       for store in storesToTailElements {
-        objectArgs.append(cloner.clone(store.source as! SingleValueInstruction))
+        objectArgs.append(cloner.cloneRecursivelyToGlobal(value: store.source as! SingleValueInstruction))
       }
     }
   }
@@ -409,8 +415,7 @@ private func replace(object allocRef: AllocRefInstBase,
   }
 
   rewriteUses(of: allocRef, context)
-  allocRef.uses.replaceAll(with: globalValue, context)
-  context.erase(instruction: allocRef)
+  allocRef.replace(with: globalValue, context)
   return globalValue
 }
 
@@ -427,13 +432,11 @@ private func rewriteUses(of startValue: Value, _ context: FunctionPassContext) {
       if !beginDealloc.parentFunction.hasOwnership {
         builder.createStrongRelease(operand: beginDealloc.reference)
       }
-      beginDealloc.uses.replaceAll(with: beginDealloc.reference, context)
-      context.erase(instruction: beginDealloc)
+      beginDealloc.replace(with: beginDealloc.reference, context)
     case is EndCOWMutationInst, is EndInitLetRefInst, is MoveValueInst:
       let svi = inst as! SingleValueInstruction
       worklist.pushIfNotVisited(usersOf: svi)
-      svi.uses.replaceAll(with: svi.operands[0].value, context)
-      context.erase(instruction: svi)
+      svi.replace(with: svi.operands[0].value, context)
     case let upCast as UpcastInst:
       worklist.pushIfNotVisited(usersOf: upCast)
     case let refCast as UncheckedRefCastInst:
@@ -450,7 +453,7 @@ private func rewriteUses(of startValue: Value, _ context: FunctionPassContext) {
 
 private extension InstructionWorklist {
   mutating func pushIfNotVisited(usersOf value: Value) {
-    pushIfNotVisited(contentsOf: value.uses.lazy.map { $0.instruction })
+    pushIfNotVisited(contentsOf: value.users)
   }
 }
 
@@ -499,14 +502,6 @@ private extension AllocRefInstBase {
       return tailType.tupleElements.count
     }
     return 1
-  }
-}
-
-private extension FunctionPassContext {
-  func erase(instructions: [Instruction]) {
-    for inst in instructions {
-      erase(instruction: inst)
-    }
   }
 }
 
@@ -561,7 +556,7 @@ private func replace(findStringCall: ApplyInst,
 
   // Create an "opaque" global variable which is passed as inout to
   // _findStringSwitchCaseWithCache and into which the function stores the "cache".
-  let cacheVar = context.createGlobalVariable(name: name, type: cacheType, isPrivate: true)
+  let cacheVar = context.createGlobalVariable(name: name, type: cacheType, linkage: .private, isLet: false, markedAsUsed: false)
 
   let varBuilder = Builder(staticInitializerOf: cacheVar, context)
   let zero = varBuilder.createIntegerLiteral(0, type: wordTy)
@@ -575,8 +570,7 @@ private func replace(findStringCall: ApplyInst,
                                                 findStringCall.arguments[1],
                                                 cacheAddr])
 
-  findStringCall.uses.replaceAll(with: newCall, context)
-  context.erase(instruction: findStringCall)
+  findStringCall.replace(with: newCall, context)
 }
 
 private extension GlobalValueInst {

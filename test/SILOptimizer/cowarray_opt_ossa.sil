@@ -164,6 +164,42 @@ bb2:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @hoist_ignoring_paired_retain_release_and_hoist2_load_borrow :
+// CHECK: bb0([[ARRAY:%[0-9]+]]
+// CHECK:   [[MM:%[0-9]+]] = function_ref @array_make_mutable
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   [[EM:%[0-9]+]] = function_ref @array_end_mutation
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK: bb1:
+// CHECK:   load_borrow
+// CHECK:   end_borrow
+// CHECK:   apply [[MM]]([[ARRAY]]
+// CHECK:   apply [[EM]]([[ARRAY]]
+// CHECK:  cond_br {{.*}}, bb2
+// CHECK: } // end sil function 'hoist_ignoring_paired_retain_release_and_hoist2_load_borrow'
+sil [ossa] @hoist_ignoring_paired_retain_release_and_hoist2_load_borrow : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
+  %2 = load [copy] %0 : $*MyArray<MyStruct>
+  br bb1
+
+bb1:
+  %b = load_borrow %0
+  %3 = load [trivial] %1 : $*Builtin.Int1
+  end_borrow %b
+  %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %7 = function_ref @array_end_mutation : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %8 = apply %7(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  cond_br %3, bb1a, bb2
+
+bb1a:
+  br bb1
+
+bb2:
+  destroy_value %2 : $MyArray<MyStruct>
+  %r = tuple()
+  return %r : $()
+}
 // CHECK-LABEL: sil [ossa] @hoist_blocked_by_unpaired_retain_release_1 :
 // CHECK: bb0(
 // CHECK-NOT: apply

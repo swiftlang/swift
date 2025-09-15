@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -disable-availability-checking
+// RUN: %target-swift-frontend -typecheck %s -target %target-swift-5.9-abi-triple
 
 protocol P<A> {
   associatedtype A

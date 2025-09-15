@@ -63,14 +63,10 @@ public:
   
   /// A witness table entry describing the witness for an associated type's
   /// protocol requirement.
-  struct AssociatedTypeProtocolWitness {
-    /// The associated type required.  A dependent type in the protocol's
-    /// context.
+  struct AssociatedConformanceWitness {
+    /// The subject type of the associated requirement.
     CanType Requirement;
-    /// The protocol requirement on the type.
-    ProtocolDecl *Protocol;
-    /// The ProtocolConformance satisfying the requirement. Null if the
-    /// conformance is dependent.
+    /// The ProtocolConformanceRef satisfying the requirement.
     ProtocolConformanceRef Witness;
   };
   
@@ -88,7 +84,7 @@ public:
     Invalid,
     Method,
     AssociatedType,
-    AssociatedTypeProtocol,
+    AssociatedConformance,
     BaseProtocol
   } ENUM_EXTENSIBILITY_ATTR(open);
   
@@ -98,7 +94,7 @@ public:
     union {
       MethodWitness Method;
       AssociatedTypeWitness AssociatedType;
-      AssociatedTypeProtocolWitness AssociatedTypeProtocol;
+      AssociatedConformanceWitness AssociatedConformance;
       BaseProtocolWitness BaseProtocol;
     };
     
@@ -113,9 +109,9 @@ public:
       : Kind(WitnessKind::AssociatedType), AssociatedType(AssociatedType)
     {}
     
-    Entry(const AssociatedTypeProtocolWitness &AssociatedTypeProtocol)
-      : Kind(WitnessKind::AssociatedTypeProtocol),
-        AssociatedTypeProtocol(AssociatedTypeProtocol)
+    Entry(const AssociatedConformanceWitness &AssociatedConformance)
+      : Kind(WitnessKind::AssociatedConformance),
+        AssociatedConformance(AssociatedConformance)
     {}
     
     Entry(const BaseProtocolWitness &BaseProtocol)
@@ -135,10 +131,9 @@ public:
       assert(Kind == WitnessKind::AssociatedType);
       return AssociatedType;
     }
-    const AssociatedTypeProtocolWitness &
-    getAssociatedTypeProtocolWitness() const {
-      assert(Kind == WitnessKind::AssociatedTypeProtocol);
-      return AssociatedTypeProtocol;
+    const AssociatedConformanceWitness &getAssociatedConformanceWitness() const {
+      assert(Kind == WitnessKind::AssociatedConformance);
+      return AssociatedConformance;
     }
     const BaseProtocolWitness &getBaseProtocolWitness() const {
       assert(Kind == WitnessKind::BaseProtocol);
@@ -157,14 +152,6 @@ public:
                const PrintOptions &options) const;
   };
 
-  /// An entry for a conformance requirement that makes the requirement
-  /// conditional. These aren't public, but any witness thunks need to feed them
-  /// into the true witness functions.
-  struct ConditionalConformance {
-    CanType Requirement;
-    ProtocolConformanceRef Conformance;
-  };
-
 private:
   /// The module which contains the SILWitnessTable.
   SILModule &Mod;
@@ -177,7 +164,7 @@ private:
   SILLinkage Linkage;
 
   /// The conformance mapped to this witness table.
-  RootProtocolConformance *Conformance;
+  ProtocolConformance *Conformance;
 
   /// The various witnesses containing in this witness table. Is empty if the
   /// table has no witness entries or if it is a declaration.
@@ -188,26 +175,29 @@ private:
   ///
   /// (If other private entities are introduced this could/should be switched
   /// into a private version of Entries.)
-  MutableArrayRef<ConditionalConformance> ConditionalConformances;
+  MutableArrayRef<ProtocolConformanceRef> ConditionalConformances;
 
   /// Whether or not this witness table is a declaration. This is separate from
   /// whether or not entries is empty since you can have an empty witness table
   /// that is not a declaration.
   bool IsDeclaration;
- 
+
+  bool specialized;
+
   /// Whether or not this witness table is serialized, which allows
   /// devirtualization from another module.
   unsigned SerializedKind : 2;
 
   /// Private constructor for making SILWitnessTable definitions.
   SILWitnessTable(SILModule &M, SILLinkage Linkage, SerializedKind_t Serialized,
-                  StringRef name, RootProtocolConformance *conformance,
+                  StringRef name, ProtocolConformance *conformance,
                   ArrayRef<Entry> entries,
-                  ArrayRef<ConditionalConformance> conditionalConformances);
+                  ArrayRef<ProtocolConformanceRef> conditionalConformances,
+                  bool specialized);
 
   /// Private constructor for making SILWitnessTable declarations.
   SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef Name,
-                  RootProtocolConformance *conformance);
+                  ProtocolConformance *conformance, bool specialized);
 
   void addWitnessTable();
 
@@ -215,19 +205,21 @@ public:
   /// Create a new SILWitnessTable definition with the given entries.
   static SILWitnessTable *
   create(SILModule &M, SILLinkage Linkage, SerializedKind_t SerializedKind,
-         RootProtocolConformance *conformance, ArrayRef<Entry> entries,
-         ArrayRef<ConditionalConformance> conditionalConformances);
+         ProtocolConformance *conformance, ArrayRef<Entry> entries,
+         ArrayRef<ProtocolConformanceRef> conditionalConformances,
+         bool specialized);
 
   /// Create a new SILWitnessTable declaration.
   static SILWitnessTable *create(SILModule &M, SILLinkage Linkage,
-                                 RootProtocolConformance *conformance);
+                                 ProtocolConformance *conformance,
+                                 bool specialized);
 
   ~SILWitnessTable();
   
   SILModule &getModule() const { return Mod; }
 
   /// Return the AST ProtocolConformance this witness table represents.
-  RootProtocolConformance *getConformance() const {
+  ProtocolConformance *getConformance() const {
     return Conformance;
   }
 
@@ -251,6 +243,9 @@ public:
   /// Returns true if this witness table is a definition.
   bool isDefinition() const { return !isDeclaration(); }
 
+  // Returns true, if this is a specialized witness table (currently only used in embedded mode).
+  bool isSpecialized() const { return specialized; }
+
   /// Returns true if this witness table is going to be (or was) serialized.
   bool isSerialized() const {
     return SerializedKind_t(SerializedKind) == IsSerialized;
@@ -273,7 +268,7 @@ public:
   ArrayRef<Entry> getEntries() const { return Entries; }
 
   /// Return all of the conditional conformances.
-  ArrayRef<ConditionalConformance> getConditionalConformances() const {
+  ArrayRef<ProtocolConformanceRef> getConditionalConformances() const {
     return ConditionalConformances;
   }
 
@@ -302,7 +297,7 @@ public:
   /// Change a SILWitnessTable declaration into a SILWitnessTable definition.
   void
   convertToDefinition(ArrayRef<Entry> newEntries,
-                      ArrayRef<ConditionalConformance> conditionalConformances,
+                      ArrayRef<ProtocolConformanceRef> conditionalConformances,
                       SerializedKind_t serializedKind);
 
   // Gets conformance serialized kind.

@@ -3,6 +3,11 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --color
 
+// Run again with library evolution:
+// RUN: %target-build-swift -module-name main -j2 -parse-as-library -enable-library-evolution -I %t %s -plugin-path %swift-plugin-dir -o %t/evo.out
+// RUN: %target-codesign %t/evo.out
+// RUN: %target-run %t/evo.out | %FileCheck %s --color
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed
@@ -14,9 +19,6 @@
 // rdar://90373022
 // UNSUPPORTED: OS=watchos
 
-// rdar://125628060
-// UNSUPPORTED: CPU=arm64e
- 
 import Distributed
 
 @Resolvable
@@ -64,7 +66,7 @@ func test_distributedVariable<DA: WorkerProtocol>(actor: DA) async throws -> Str
     let v1 = try await test_distributedVariable(actor: actor)
     print("v1 = \(v1)") // CHECK: v1 = implemented variable
 
-    let v = try await actor.distributedVariable
-    print("v = \(v)") // CHECK: v = implemented variable
+    let v2 = try await actor.distributedVariable
+    print("v2 = \(v2)") // CHECK: v2 = implemented variable
   }
 }

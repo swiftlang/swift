@@ -64,10 +64,14 @@ atBest(DynamicCastFeasibility feasibility, DynamicCastFeasibility bestCase) {
 /// Classify the feasibility of a dynamic cast.  The source and target
 /// types should be unlowered formal types.
 DynamicCastFeasibility classifyDynamicCast(
-    ModuleDecl *context,
+    SILFunction *function,
     CanType sourceType, CanType targetType,
     bool isSourceTypeExact = false,
     bool isWholeModuleOpts = false);
+
+/// Returns true if the conformance is not isolated or if its isolation matches
+/// the isolation `inFunction`.
+bool matchesActorIsolation(ProtocolConformanceRef conformance, SILFunction *inFunction);
 
 SILValue emitSuccessfulScalarUnconditionalCast(SILBuilder &B, SILLocation loc,
                                                SILDynamicCastInst inst);
@@ -93,6 +97,12 @@ bool canSILUseScalarCheckedCastInstructions(SILModule &M,
                                             CanType sourceType,
                                             CanType targetType);
 
+/// Can the given cast be performed by the scalar checked-cast instructions in
+/// the current SIL stage, or do we need to use the indirect instructions?
+bool canOptimizeToScalarCheckedCastInstructions(
+    SILFunction *func, CanType sourceType, CanType targetType,
+    CastConsumptionKind consumption);
+
 /// Can the given cast be performed by the scalar checked-cast
 /// instructions at IRGen, or do we need to use the indirect instructions?
 bool canIRGenUseScalarCheckedCastInstructions(SILModule &M,
@@ -103,20 +113,21 @@ bool canIRGenUseScalarCheckedCastInstructions(SILModule &M,
 /// using a scalar cast operation.
 void emitIndirectConditionalCastWithScalar(
     SILBuilder &B, ModuleDecl *M, SILLocation loc,
+    CheckedCastInstOptions options,
     CastConsumptionKind consumption, SILValue src, CanType sourceType,
     SILValue dest, CanType targetType, SILBasicBlock *trueBB,
     SILBasicBlock *falseBB, ProfileCounter TrueCount = ProfileCounter(),
     ProfileCounter FalseCount = ProfileCounter());
 
 /// Does the type conform to the _ObjectiveCBridgeable protocol.
-bool isObjectiveCBridgeable(ModuleDecl *M, CanType Ty);
+bool isObjectiveCBridgeable(CanType Ty);
 
 /// Get the bridged NS class of a CF class if it exists. Returns
 /// an empty CanType if such class does not exist.
-CanType getNSBridgedClassOfCFClass(ModuleDecl *M, CanType type);
+CanType getNSBridgedClassOfCFClass(CanType type);
 
 /// Does the type conform to Error.
-bool isError(ModuleDecl *M, CanType Ty);
+bool isError(CanType Ty);
 
 struct SILDynamicCastKind {
   enum innerty : std::underlying_type<SILInstructionKind>::type {
@@ -385,7 +396,7 @@ public:
 
   DynamicCastFeasibility classifyFeasibility(bool allowWholeModule) const {
     return swift::classifyDynamicCast(
-        getModule().getSwiftModule(),
+        getFunction(),
         getSourceFormalType(), getTargetFormalType(),
         isSourceTypeExact(), allowWholeModule && getModule().isWholeModule());
   }
@@ -451,6 +462,21 @@ public:
   bool canSILUseScalarCheckedCastInstructions() const {
     return swift::canSILUseScalarCheckedCastInstructions(
         getModule(), getSourceFormalType(), getTargetFormalType());
+  }
+
+  CheckedCastInstOptions getCheckedCastOptions() const {
+    switch (getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getCheckedCastOptions();
+    case SILDynamicCastKind::CheckedCastBranchInst:
+      return cast<CheckedCastBranchInst>(inst)->getCheckedCastOptions();
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+      return cast<UnconditionalCheckedCastAddrInst>(inst)
+          ->getCheckedCastOptions();
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      return cast<UnconditionalCheckedCastInst>(inst)
+          ->getCheckedCastOptions();
+    }
   }
 };
 

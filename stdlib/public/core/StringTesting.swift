@@ -72,7 +72,7 @@ extension String {
     usesScratch: Bool,
     allocatedMemory: Bool
   ) {
-    _guts._deconstructUTF8(scratch: scratch)
+    unsafe _guts._deconstructUTF8(scratch: scratch)
   }
 #endif
 }
@@ -99,7 +99,7 @@ extension _StringGuts {
     // TODO: shared native
     _internalInvariant(_object.providesFastUTF8)
     if _object.isImmortal {
-      result._form = ._immortal(
+      result._form = unsafe ._immortal(
         address: UInt(bitPattern: _object.nativeUTF8Start))
       return result
     }
@@ -155,15 +155,14 @@ extension _StringGuts {
     // If we're small, try to copy into the scratch space provided
     if self.isSmall {
       let smol = self.asSmall
-      if let scratch = scratch, scratch.count > smol.count {
-        let scratchStart =
-          scratch.baseAddress!
+      if let scratch = unsafe scratch, scratch.count > smol.count {
+        let scratchStart = scratch.baseAddress!
         smol.withUTF8 { smolUTF8 -> () in
-          scratchStart.initializeMemory(
+          unsafe scratchStart.initializeMemory(
             as: UInt8.self, from: smolUTF8.baseAddress!, count: smolUTF8.count)
         }
-        scratch[smol.count] = 0
-        return (
+        unsafe scratch[smol.count] = 0
+        return unsafe (
           owner: nil,
           _convertPointerToPointerArgument(scratchStart),
           length: smol.count,
@@ -171,7 +170,7 @@ extension _StringGuts {
       }
     } else if _fastPath(self.isFastUTF8) {
       let ptr: ToPointer =
-        _convertPointerToPointerArgument(self._object.fastUTF8.baseAddress!)
+        unsafe _convertPointerToPointerArgument(self._object.fastUTF8.baseAddress!)
       return (
         owner: self._object.owner,
         ptr,
@@ -179,8 +178,8 @@ extension _StringGuts {
         usesScratch: false, allocatedMemory: false)
     }
 
-    let (object, ptr, len) = self._allocateForDeconstruct()
-    return (
+    let (object, ptr, len) = unsafe self._allocateForDeconstruct()
+    return unsafe (
       owner: object,
       _convertPointerToPointerArgument(ptr),
       length: len,
@@ -198,10 +197,10 @@ extension _StringGuts {
   ) {
     let utf8 = Array(String(self).utf8) + [0]
     let (owner, ptr): (AnyObject?, UnsafeRawPointer) =
-      _convertConstArrayToPointerArgument(utf8)
+      unsafe _convertConstArrayToPointerArgument(utf8)
 
     // Array's owner cannot be nil, even though it is declared optional...
-    return (owner: owner!, ptr, length: utf8.count - 1)
+    return unsafe (owner: owner!, ptr, length: utf8.count - 1)
   }
 
 #endif

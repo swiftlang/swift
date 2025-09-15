@@ -24,6 +24,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "dead-object-elim"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/IndexTrie.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -203,6 +204,10 @@ static DestructorEffects doesDestructorHaveSideEffects(AllocRefInstBase *ARI) {
         continue;
       }
 
+      if (isa<BeginBorrowInst>(I) || isa<EndBorrowInst>(I) || isa<EndLifetimeInst>(I)) {
+        continue;
+      }
+
       // dealloc_ref on self can be ignored, but dealloc_ref on anything else
       // cannot be eliminated.
       if (auto *DeallocRef = dyn_cast<DeallocRefInst>(&I)) {
@@ -313,7 +318,8 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
   // The value form of zero init is not a user of any operand. The address
   // form however is easily zappable because it's always a trivial store.
   if (auto bi = dyn_cast<BuiltinInst>(Inst)) {
-    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer) {
+    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer ||
+        bi->getBuiltinKind() == BuiltinValueKind::PrepareInitialization) {
       return true;
     }
   }
@@ -603,7 +609,8 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
 
     // Lifetime endpoints that don't allow the address to escape.
     if (isa<RefCountingInst>(User) || isa<DebugValueInst>(User) ||
-        isa<FixLifetimeInst>(User) || isa<DestroyValueInst>(User)) {
+        isa<FixLifetimeInst>(User) || isa<DestroyValueInst>(User) ||
+        isa<EndBorrowInst>(User)) {
       AllUsers.insert(User);
       continue;
     }
@@ -626,6 +633,13 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     }
     if (auto *MDI = dyn_cast<MarkDependenceInst>(User)) {
       if (!recursivelyCollectInteriorUses(MDI, AddressNode,
+                                          IsInteriorAddress)) {
+        return false;
+      }
+      continue;
+    }
+    if (auto *bb = dyn_cast<BeginBorrowInst>(User)) {
+      if (!recursivelyCollectInteriorUses(bb, AddressNode,
                                           IsInteriorAddress)) {
         return false;
       }
@@ -672,7 +686,7 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
         continue;
       }
       ArraySemanticsCall AS(svi);
-      if (AS.getKind() == swift::ArrayCallKind::kArrayFinalizeIntrinsic) {
+      if (AS.getKind() == ArrayCallKind::kArrayFinalizeIntrinsic) {
         if (!recursivelyCollectInteriorUses(svi, AddressNode, IsInteriorAddress))
           return false;
         continue;
@@ -994,6 +1008,9 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
     return false;
   }
 
+  for (auto *I : UsersToRemove)
+    salvageDebugInfo(I);
+
   if (ASI->getFunction()->hasOwnership()) {
     for (auto *user : UsersToRemove) {
       auto *store = dyn_cast<StoreInst>(user);
@@ -1018,8 +1035,6 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
     }
   }
 
-  for (auto *I : UsersToRemove)
-    salvageDebugInfo(I);
   // Remove the AllocRef and all of its users.
   removeInstructions(
     ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));

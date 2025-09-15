@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SILBridging
 
 /// Argument conventions indexed on an apply's operand.
@@ -68,6 +69,13 @@ public struct ApplyOperandConventions : Collection {
   public subscript(resultDependsOn operandIndex: Int)
     -> LifetimeDependenceConvention? {
     return calleeArgumentConventions[resultDependsOn:
+      calleeArgumentIndex(ofOperandIndex: operandIndex)!]
+  }
+
+  // If the specified parameter is a dependency target, return its dependency sources.
+  public subscript(parameterDependencies operandIndex: Int)
+    -> FunctionConvention.LifetimeDependencies? {
+    return calleeArgumentConventions[parameterDependencies:
       calleeArgumentIndex(ofOperandIndex: operandIndex)!]
   }
 
@@ -176,7 +184,7 @@ extension ApplySite {
   }
 
   public var substitutionMap: SubstitutionMap {
-    SubstitutionMap(bridged.ApplySite_getSubstitutionMap())
+    SubstitutionMap(bridged: bridged.ApplySite_getSubstitutionMap())
   }
 
   public var calleeArgumentConventions: ArgumentConventions {
@@ -222,6 +230,23 @@ extension ApplySite {
     functionConvention.resultDependencies != nil
   }
 
+  public func isAddressable(operand: Operand) -> Bool {
+    if let dep = resultDependence(on: operand) {
+      return dep.isAddressable(for: operand.value)
+    }
+    return false
+  }
+
+  public var hasLifetimeDependence: Bool {
+    functionConvention.hasLifetimeDependencies()
+  }
+
+  public func parameterDependencies(target operand: Operand) -> FunctionConvention.LifetimeDependencies? {
+    let idx = operand.index
+    return idx < operandConventions.startIndex ? nil
+      : operandConventions[parameterDependencies: idx]
+  }
+
   public var yieldConventions: YieldConventions {
     YieldConventions(convention: functionConvention)
   }
@@ -253,29 +278,50 @@ extension ApplySite {
     return argumentOperands[callerArgIdx]
   }
 
+  /// Returns the argument of `operand` in a callee function.
+  ///
+  /// Returns nil if `operand` is not an argument operand. This is the case if
+  /// it's the callee function operand.
+  public func calleeArgument(of operand: Operand, in callee: Function) -> FunctionArgument? {
+    if let argIdx = calleeArgumentIndex(of: operand) {
+      return callee.arguments[argIdx]
+    }
+    return nil
+  }
+
   /// Returns the argument index of an operand.
   ///
-  /// Returns nil if 'operand' is not an argument operand. This is the case if
+  /// Returns nil if `operand` is not an argument operand. This is the case if
   /// it's the callee function operand.
   ///
-  /// Warning: the returned integer can be misused as an index into
-  /// the wrong collection. Replace uses of this API with safer APIs.
-  ///
-  /// TODO: delete this API and rewrite the users. 
+  /// Warning: the returned integer can be misused as an index into the wrong collection.
+  /// Use `calleeArgument(of:,in:)` if possible.
   public func calleeArgumentIndex(of operand: Operand) -> Int? {
     operandConventions.calleeArgumentIndex(of: operand)
+  }
+
+  public var hasGuaranteedResult: Bool {
+    functionConvention.hasGuaranteedResult
+  }
+
+  public var hasGuaranteedAddressResult: Bool {
+    functionConvention.hasGuaranteedAddressResult
   }
 }
 
 extension ApplySite {
-  private var functionConvention: FunctionConvention {
-    FunctionConvention(for: bridged.ApplySite_getSubstitutedCalleeType(),
-                       in: parentFunction)
+  public var functionConvention: FunctionConvention {
+    FunctionConvention(for: substitutedCalleeType, in: parentFunction)
+  }
+
+  public var substitutedCalleeType: CanonicalType {
+    CanonicalType(bridged: bridged.ApplySite_getSubstitutedCalleeType())
   }
 }
 
 public protocol FullApplySite : ApplySite {
   var singleDirectResult: Value? { get }
+  var singleDirectErrorResult: Value? { get }
 }
 
 extension FullApplySite {
@@ -301,7 +347,7 @@ extension FullApplySite {
       beginApply.yieldedValues.forEach { values.push($0) }
     } else {
       let result = singleDirectResult!
-      if !result.type.isEmpty(in: parentFunction) {
+      if !result.type.isVoid {
         values.push(result)
       }
     }

@@ -16,6 +16,13 @@ import Foundation
 
 // We should never see @_objcImplementation in the header
 // NEGATIVE-NOT: @_objcImplementation
+// NEGATIVE-NOT: @implementation
+
+// @objc should be omitted on extensions
+// NEGATIVE-NOT: @objc{{.*}} extension
+
+// Stored properties in objcImpl extensions shouldn't have @_hasStorage
+// NEGATIVE-NOT: @_hasStorage
 
 //
 // @_objcImplementation class
@@ -35,8 +42,19 @@ import Foundation
     didSet { print(implProperty) }
   }
 
+  // CHECK-NOT: var letProperty1:
+  @objc public let letProperty1: Int32
+
+  // CHECK-DAG: @nonobjc public var letProperty2: Swift.Int32 { get }
+  @nonobjc public let letProperty2: Int32
+
   // CHECK-DAG: final public var implProperty2: ObjectiveC.NSObject? { get set }
   public final var implProperty2: NSObject?
+
+  // CHECK-DAG: final public var implProperty3: ObjectiveC.NSObject? {
+  public final var implProperty3: NSObject? {
+    didSet { }
+  }
 
   // CHECK-NOT: func mainMethod
   @objc public func mainMethod(_: Int32) { print(implProperty) }

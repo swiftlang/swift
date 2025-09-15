@@ -19,8 +19,10 @@
 
 // REQUIRES: rdar94452524
 
-#if canImport(Darwin)
-  import Darwin.C.tgmath
+#if canImport(tgmath_h)
+  import tgmath_h
+#elseif canImport(Darwin)
+  import tgmath_h
 #elseif canImport(Glibc)
   import Glibc
 #elseif os(WASI)

@@ -1,7 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature TupleConformances
 
-// Because of -enable-experimental-feature TupleConformances
-// REQUIRES: asserts
+// REQUIRES: swift_feature_TupleConformances
 
 extension () {
   // expected-error@-1 {{tuple extension must be written as extension of '(repeat each Element)'}}
@@ -34,8 +33,10 @@ protocol Derived1: Base1 {}
 
 extension Tuple: Derived1 where repeat each Element: Derived1 {}
 // expected-error@-1 {{conditional conformance of type '(repeat each Element)' to protocol 'Derived1' does not imply conformance to inherited protocol 'Base1'}}
-// expected-note@-2 {{did you mean to explicitly state the conformance like 'extension Tuple: Base1 where ...'?}}
-// expected-error@-3 {{tuple extension must declare conformance to exactly one protocol}}
+// expected-note@-2 {{did you mean to explicitly state the conformance with relaxed bounds using 'where each Element: Base1'?}}
+// expected-note@-3 {{did you mean to explicitly state the conformance with the same bounds using 'where repeat each Element: Derived1'?}}
+// expected-note@-4 {{did you mean to explicitly state the conformance with different bounds?}}
+// expected-error@-5 {{tuple extension must declare conformance to exactly one protocol}}
 
 protocol Base2 {}
 protocol Derived2: Base2 {}

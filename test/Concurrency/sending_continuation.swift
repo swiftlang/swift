@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -disable-availability-checking -enable-experimental-feature TransferringArgsAndResults -verify %s -o /dev/null -parse-as-library
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -parse-as-library
 
-// REQUIRES: asserts
 // REQUIRES: concurrency
 
 ////////////////////////
@@ -52,7 +51,7 @@ func withCheckedContinuation_2a() async -> NonSendableKlass {
 
 @MainActor
 func withCheckedContinuation_3() async {
-  // x is main actor isolated since withCheckedContinuation is #isolated.
+  // x is MainActor isolated since withCheckedContinuation is #isolated.
   let x = await withCheckedContinuation { continuation in
     let x = NonSendableKlass()
     continuation.resume(returning: x)
@@ -60,9 +59,10 @@ func withCheckedContinuation_3() async {
     // expected-note @-2 {{'x' used after being passed as a 'sending' parameter}}
     useValue(x) // expected-note {{access can happen concurrently}}
   }
+
+  // Since x is returned as sending from withCheckedContinuation, we can send it
+  // further.
   await useValueAsync(x)
-  // expected-error @-1 {{sending 'x' risks causing data races}}
-  // expected-note @-2 {{sending main actor-isolated 'x' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
 }
 
 func withCheckedContinuation_3a() async {
@@ -80,7 +80,7 @@ func withCheckedContinuation_3a() async {
 
 @MainActor
 func withCheckedContinuation_4() async {
-  // x is main actor isolated since withCheckedContinuation is #isolated.
+  // x is MainActor isolated since withCheckedContinuation is #isolated.
   let y = NonSendableKlass()
   let x = await withCheckedContinuation { continuation in
     continuation.resume(returning: y)
@@ -88,13 +88,14 @@ func withCheckedContinuation_4() async {
     // expected-note @-2 {{main actor-isolated 'y' is passed as a 'sending' parameter}}
     useValue(y)
   }
+
+  // Since withCheckedContinuation returns value as sending, we can call
+  // useValueAsync since it is disconnected.
   await useValueAsync(x)
-  // expected-error @-1 {{sending 'x' risks causing data races}}
-  // expected-note @-2 {{sending main actor-isolated 'x' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
 }
 
 func withCheckedContinuation_4a() async {
-  // x is main actor isolated since withCheckedContinuation is #isolated.
+  // x is MainActor isolated since withCheckedContinuation is #isolated.
   let y = NonSendableKlass()
   let x = await withCheckedContinuation { continuation in
     continuation.resume(returning: y)
@@ -181,7 +182,7 @@ func withUnsafeContinuation_2a() async -> NonSendableKlass {
 
 @MainActor
 func withUnsafeContinuation_3() async {
-  // x is main actor isolated since withUnsafeContinuation is #isolated.
+  // x is MainActor isolated since withUnsafeContinuation is #isolated.
   let x = await withUnsafeContinuation { continuation in
     let x = NonSendableKlass()
     continuation.resume(returning: x)
@@ -189,9 +190,10 @@ func withUnsafeContinuation_3() async {
     // expected-note @-2 {{'x' used after being passed as a 'sending' parameter}}
     useValue(x) // expected-note {{access can happen concurrently}}
   }
+
+  // withUnsafeContinuation returns x as sending, so we can pass it to a
+  // nonisolated function.
   await useValueAsync(x)
-  // expected-error @-1 {{sending 'x' risks causing data races}}
-  // expected-note @-2 {{sending main actor-isolated 'x' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
 }
 
 func withUnsafeContinuation_3a() async {
@@ -207,7 +209,7 @@ func withUnsafeContinuation_3a() async {
 
 @MainActor
 func withUnsafeContinuation_4() async {
-  // x is main actor isolated since withUnsafeContinuation is #isolated.
+  // x is MainActor isolated since withUnsafeContinuation is #isolated.
   let y = NonSendableKlass()
   let x = await withUnsafeContinuation { continuation in
     continuation.resume(returning: y)
@@ -215,13 +217,14 @@ func withUnsafeContinuation_4() async {
     // expected-note @-2 {{main actor-isolated 'y' is passed as a 'sending' parameter}}
     useValue(y)
   }
+
+  // Since withUnsafeContinuation returns x as sending, we can use it in a
+  // nonisolated function.
   await useValueAsync(x)
-  // expected-error @-1 {{sending 'x' risks causing data races}}
-  // expected-note @-2 {{sending main actor-isolated 'x' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
 }
 
 func withUnsafeContinuation_4a() async {
-  // x is main actor isolated since withUnsafeContinuation is #isolated.
+  // x is MainActor isolated since withUnsafeContinuation is #isolated.
   let y = NonSendableKlass()
   let x = await withUnsafeContinuation { continuation in
     continuation.resume(returning: y)
@@ -230,4 +233,17 @@ func withUnsafeContinuation_4a() async {
     useValue(y)
   }
   await useValueAsync(x)
+}
+
+public actor WithCheckedThrowingContinuationErrorAvoidance {
+  nonisolated func handle(reply: (Int) -> Void) {}
+
+  // make sure that we do not emit any errors on the following code.
+  func noError() async throws -> Int {
+    return try await withCheckedThrowingContinuation { continuation in 
+      handle { result in
+        continuation.resume(returning: result)
+      }
+    }
+  }
 }

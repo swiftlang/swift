@@ -68,6 +68,8 @@ class RequirementMachine final {
   unsigned MaxRuleCount;
   unsigned MaxRuleLength;
   unsigned MaxConcreteNesting;
+  unsigned MaxConcreteSize;
+  unsigned MaxTypeDifferences;
 
   UnifiedStatsReporter *Stats;
 
@@ -140,8 +142,7 @@ public:
   // Generic signature queries. Generally you shouldn't have to construct a
   // RequirementMachine instance; instead, call the corresponding methods on
   // GenericSignature, which lazily create a RequirementMachine for you.
-  GenericSignature::LocalRequirements getLocalRequirements(Type depType,
-                      ArrayRef<GenericTypeParamType *> genericParams) const;
+  GenericSignature::LocalRequirements getLocalRequirements(Type depType) const;
   bool requiresClass(Type depType) const;
   LayoutConstraint getLayoutConstraint(Type depType) const;
   bool requiresProtocol(Type depType, const ProtocolDecl *proto) const;
@@ -155,6 +156,8 @@ public:
                        const ProtocolDecl *proto=nullptr) const;
   bool areReducedTypeParametersEqual(Type depType1, Type depType2) const;
   bool isReducedType(Type type) const;
+  Type getReducedTypeParameter(CanType type,
+                      ArrayRef<GenericTypeParamType *> genericParams) const;
   Type getReducedType(Type type,
                       ArrayRef<GenericTypeParamType *> genericParams) const;
   bool isValidTypeParameter(Type type) const;

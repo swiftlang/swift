@@ -12,9 +12,9 @@
 
 #define DEBUG_TYPE "alloc-stack-hoisting"
 
-#include "swift/AST/Availability.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
@@ -441,7 +441,9 @@ bool inhibitsAllocStackHoisting(SILInstruction *I) {
     return Apply->hasSemantics(semantics::AVAILABILITY_OSVERSION);
   }
   if (auto *bi = dyn_cast<BuiltinInst>(I)) {
-    return bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionAtLeast;
+    return bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionAtLeast
+        || bi->getBuiltinInfo().ID == BuiltinValueKind::TargetVariantOSVersionAtLeast
+        || bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionOrVariantOSVersionAtLeast;
   }
   if (isa<HasSymbolInst>(I)) {
     return true;

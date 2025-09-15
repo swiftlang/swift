@@ -21,6 +21,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -93,15 +94,15 @@ printTypeInterface(ModuleDecl *M, StringRef TypeUSR, ASTPrinter &Printer,
                             Printer, TypeName, Error);
 }
 
-static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
+static void adjustPrintOptions(PrintOptions::OverrideScope &Options) {
   // Don't print empty curly braces while printing the module interface.
-  AdjustedOptions.FunctionDefinitions = false;
+  OVERRIDE_PRINT_OPTION(Options, FunctionDefinitions, false);
 
-  AdjustedOptions.PrintGetSetOnRWProperties = false;
+  OVERRIDE_PRINT_OPTION(Options, PrintGetSetOnRWProperties, false);
 
   // Print var declarations separately, one variable per decl.
-  AdjustedOptions.ExplodePatternBindingDecls = true;
-  AdjustedOptions.VarInitializers = false;
+  OVERRIDE_PRINT_OPTION(Options, ExplodePatternBindingDecls, true);
+  OVERRIDE_PRINT_OPTION(Options, VarInitializers, false);
 }
 
 void swift::ide::collectModuleGroups(ModuleDecl *M,
@@ -137,7 +138,7 @@ std::optional<StringRef> swift::ide::findGroupNameForUSR(ModuleDecl *M,
 /// \returns Whether the given decl was printed.
 static bool printModuleInterfaceDecl(Decl *D,
                                      ASTPrinter &Printer,
-                                     PrintOptions &Options,
+                                     const PrintOptions &Options,
                                      bool PrintSynthesizedExtensions,
                                      StringRef LeadingComment = StringRef()) {
   if (!Options.shouldPrint(D)) {
@@ -155,16 +156,27 @@ static bool printModuleInterfaceDecl(Decl *D,
         return false;
     }
   }
+
+  // It'd be nice to avoid cloning the options here, but that would require
+  // SynthesizedExtensionAnalyzer to promise to stay within the lifetime of
+  // the options it was constructed with, and besides, it isn't easy to see
+  // whether the mutations we make to Options here are meant to be independent
+  // of what might be done with the analyzer.
+  PrintOptions::OverrideScope OptionAdjustment(Options);
+
   std::unique_ptr<SynthesizedExtensionAnalyzer> pAnalyzer;
   if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
     if (PrintSynthesizedExtensions) {
-      pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, Options));
-      Options.BracketOptions = {
+      pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, Options.clone()));
+
+      BracketOptions NewBracketOptions = {
         NTD, true, true,
         !pAnalyzer->hasMergeGroup(
           SynthesizedExtensionAnalyzer::MergeGroupKind::MergeableWithTypeDef
         )
       };
+      OVERRIDE_PRINT_OPTION_UNCONDITIONAL(OptionAdjustment, BracketOptions,
+                                          NewBracketOptions);
     }
   }
   if (!LeadingComment.empty() && Options.shouldPrint(D)) {
@@ -174,7 +186,8 @@ static bool printModuleInterfaceDecl(Decl *D,
   if (D->print(Printer, Options)) {
     if (Options.BracketOptions.shouldCloseNominal(D))
       Printer.printNewline();
-    Options.BracketOptions = BracketOptions();
+    OVERRIDE_PRINT_OPTION_UNCONDITIONAL(OptionAdjustment, BracketOptions,
+                                        BracketOptions());
     if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
       std::queue<NominalTypeDecl *> SubDecls{{NTD}};
 
@@ -221,15 +234,18 @@ static bool printModuleInterfaceDecl(Decl *D,
             SynthesizedExtensionAnalyzer::MergeGroupKind::MergeableWithTypeDef,
             [&](ArrayRef<ExtensionInfo> Decls) {
               for (auto ET : Decls) {
-                Options.BracketOptions = {
+                PrintOptions::OverrideScope ETOptionsScope(Options);
+
+                BracketOptions NewBracketOptions = {
                   ET.Ext, false, Decls.back().Ext == ET.Ext, true
                 };
+                OVERRIDE_PRINT_OPTION_UNCONDITIONAL(ETOptionsScope, BracketOptions,
+                                                    NewBracketOptions);
+
                 if (ET.IsSynthesized)
-                  Options.initForSynthesizedExtension(NTD);
+                  Options.initForSynthesizedExtensionInScope(NTD, ETOptionsScope);
                 ET.Ext->print(Printer, Options);
-                if (ET.IsSynthesized)
-                  Options.clearSynthesizedExtension();
-                if (Options.BracketOptions.shouldCloseExtension(ET.Ext))
+                if (NewBracketOptions.shouldCloseExtension(ET.Ext))
                   Printer.printNewline();
               }
             });
@@ -237,7 +253,7 @@ static bool printModuleInterfaceDecl(Decl *D,
 
         // If the printed Decl is not the top-level one, reset analyzer.
         if (!IsTopLevelDecl)
-          pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, Options));
+          pAnalyzer.reset(new SynthesizedExtensionAnalyzer(NTD, Options.clone()));
 
         // Print the rest as synthesized extensions.
         pAnalyzer->forEachExtensionMergeGroup(
@@ -250,10 +266,15 @@ static bool printModuleInterfaceDecl(Decl *D,
             // Whether we've started the extension merge group in printing.
             bool Opened = false;
             for (auto ET : Decls) {
-              Options.BracketOptions = {
+              PrintOptions::OverrideScope ETOptionsScope(Options);
+
+              BracketOptions NewBracketOptions = {
                 ET.Ext, !Opened, Decls.back().Ext == ET.Ext, true
               };
-              if (Options.BracketOptions.shouldOpenExtension(ET.Ext)) {
+              OVERRIDE_PRINT_OPTION_UNCONDITIONAL(ETOptionsScope, BracketOptions,
+                                                  NewBracketOptions);
+
+              if (NewBracketOptions.shouldOpenExtension(ET.Ext)) {
                 Printer.printNewline();
                 if (Options.shouldPrint(ET.Ext) && !LeadingComment.empty()) {
                   Printer << LeadingComment;
@@ -262,20 +283,19 @@ static bool printModuleInterfaceDecl(Decl *D,
               }
               if (ET.IsSynthesized) {
                 if (ET.EnablingExt)
-                  Options.initForSynthesizedExtension(ET.EnablingExt);
+                  Options.initForSynthesizedExtensionInScope(ET.EnablingExt,
+                                                             ETOptionsScope);
                 else
-                  Options.initForSynthesizedExtension(NTD);
+                  Options.initForSynthesizedExtensionInScope(NTD, ETOptionsScope);
               }
               // Set opened if we actually printed this extension.
               Opened |= ET.Ext->print(Printer, Options);
-              if (ET.IsSynthesized)
-                Options.clearSynthesizedExtension();
-              if (Options.BracketOptions.shouldCloseExtension(ET.Ext)) {
+
+              if (NewBracketOptions.shouldCloseExtension(ET.Ext)) {
                 Printer.printNewline();
               }
             }
           });
-        Options.BracketOptions = BracketOptions();
       }
     }
     return true;
@@ -303,6 +323,34 @@ static bool compareSwiftDecls(Decl *LHS, Decl *RHS) {
   return LHS->getKind() < RHS->getKind();
 }
 
+static bool shouldPrintImport(ImportDecl *ImportD, ModuleDecl *OrigMod,
+                              const clang::Module *OrigClangMod) {
+  if (ImportD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+    return false;
+
+  auto *ImportedMod = ImportD->getModule();
+  if (ImportedMod) {
+    if (ImportedMod == OrigMod)
+      return false;
+    if (ImportedMod->isOnoneSupportModule())
+      return false;
+    if (ImportedMod->getName().hasUnderscoredNaming())
+      return false;
+  }
+
+  if (!OrigClangMod)
+    return true;
+
+  auto ImportedClangMod = ImportD->getClangModule();
+  if (!ImportedClangMod)
+    return true;
+  if (!ImportedClangMod->isSubModule())
+    return true;
+  if (ImportedClangMod == OrigClangMod)
+    return false;
+  return ImportedClangMod->isSubModuleOf(OrigClangMod);
+}
+
 static std::pair<ArrayRef<Decl*>, ArrayRef<Decl*>>
 getDeclsFromCrossImportOverlay(ModuleDecl *Overlay, ModuleDecl *Declaring,
                                SmallVectorImpl<Decl *> &Decls,
@@ -328,7 +376,8 @@ getDeclsFromCrossImportOverlay(ModuleDecl *Overlay, ModuleDecl *Declaring,
 
       // Ignore imports of the underlying module, or any cross-import
       // that would map back to it.
-      if (Imported == Declaring || Imported->isCrossImportOverlayOf(Declaring))
+      if (!shouldPrintImport(ID, Declaring, nullptr) ||
+          Imported->isCrossImportOverlayOf(Declaring))
         return false;
 
       // Ignore an imports of modules also imported by the underlying module.
@@ -365,7 +414,7 @@ getDeclsFromCrossImportOverlay(ModuleDecl *Overlay, ModuleDecl *Declaring,
 
 static void printCrossImportOverlays(ModuleDecl *Declaring, ASTContext &Ctx,
                                      ASTPrinter &Printer,
-                                     PrintOptions Options,
+                                     const PrintOptions &Options,
                                      bool PrintSynthesizedExtensions) {
   SmallVector<Decl *, 1> OverlayDecls;
   SmallVector<Identifier, 1> Bystanders;
@@ -445,9 +494,6 @@ void swift::ide::printModuleInterface(
        const PrintOptions &Options,
        const bool PrintSynthesizedExtensions) {
 
-  // Clang submodules aren't handled well by `getDisplayDecls()` (no decls are
-  // returned), so map them to their top-level module and filter out the extra
-  // results below.
   const clang::Module *TargetClangMod = TargetMod->findUnderlyingClangModule();
   ModuleDecl *TopLevelMod = TargetMod->getTopLevelModule();
   bool IsSubmodule = TargetMod != TopLevelMod;
@@ -456,22 +502,43 @@ void swift::ide::printModuleInterface(
   auto &Importer =
       static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
 
-  auto AdjustedOptions = Options;
-  adjustPrintOptions(AdjustedOptions);
+  PrintOptions::OverrideScope OptionAdjustment(Options);
+  adjustPrintOptions(OptionAdjustment);
 
-  SmallVector<Decl *, 1> Decls;
-  swift::getTopLevelDeclsForDisplay(TopLevelMod, Decls);
+  llvm::DenseSet<const void *> SeenImportedDecls;
+  SmallVector<ModuleDecl *, 1> ModuleList;
+  ModuleList.push_back(TargetMod);
+  SeenImportedDecls.insert(TargetMod);
 
-  SmallVector<ImportDecl *, 1> ImportDecls;
-  llvm::DenseSet<const clang::Module *> ClangModulesForImports;
-  SmallVector<Decl *, 1> SwiftDecls;
+  SmallVector<ImportDecl *, 0> ImportDecls;
+  SmallVector<Decl *, 0> SwiftDecls;
   llvm::DenseMap<const clang::Module *,
-                 SmallVector<std::pair<Decl *, clang::SourceLocation>, 1>>
-    ClangDecls;
+                 SmallVector<std::pair<Decl *, clang::SourceLocation>, 0>>
+      ClangDecls;
 
-  // If we're printing recursively, find all of the submodules to print.
+  // Add exported modules that have the same public module name as this module
+  // (excluding the underlying clang module if there is one).
+  if (TraversalOptions & ModuleTraversal::VisitMatchingExported) {
+    SmallVector<ImportedModule> Imports;
+    TargetMod->getImportedModules(Imports,
+                                  ModuleDecl::ImportFilterKind::Exported);
+    for (ImportedModule Import : Imports) {
+      if (Import.importedModule->getPublicModuleName(
+              /*onlyIfImported=*/false) != TargetMod->getName())
+        continue;
+
+      if (TargetClangMod != nullptr &&
+          Import.importedModule->findUnderlyingClangModule() == TargetClangMod)
+        continue;
+
+      ModuleList.push_back(Import.importedModule);
+      SeenImportedDecls.insert(Import.importedModule);
+    }
+  }
+
   if (TargetClangMod) {
-    if (TraversalOptions) {
+    // Add clang submodules if they're being visited
+    if (TraversalOptions & ModuleTraversal::VisitSubmodules) {
       SmallVector<const clang::Module *, 8> Worklist;
       SmallPtrSet<const clang::Module *, 8> Visited;
       Worklist.push_back(TargetClangMod);
@@ -484,18 +551,26 @@ void swift::ide::printModuleInterface(
 
         ClangDecls.insert({ CM, {} });
 
-        // If we're supposed to visit submodules, add them now.
-        if (TraversalOptions & ModuleTraversal::VisitSubmodules) {
-          for (clang::Module * submodule: CM->submodules()) {
-            if (Visited.insert(submodule).second) {
-                Worklist.push_back(submodule);
-            }
+        if (CM != TargetClangMod) {
+          if (auto *OwningModule = Importer.getWrapperForModule(CM)) {
+            ModuleList.push_back(OwningModule);
+          }
+        }
+
+        for (clang::Module *submodule : CM->submodules()) {
+          if (Visited.insert(submodule).second) {
+            Worklist.push_back(submodule);
           }
         }
       }
     } else {
       ClangDecls.insert({ TargetClangMod, {} });
     }
+  }
+
+  SmallVector<Decl *, 0> Decls;
+  for (ModuleDecl *M : ModuleList) {
+    swift::getTopLevelDeclsForDisplay(M, Decls);
   }
 
   // Collect those submodules that are actually imported but have no import
@@ -519,42 +594,38 @@ void swift::ide::printModuleInterface(
         continue;
     }
 
-    auto ShouldPrintImport = [&](ImportDecl *ImportD) -> bool {
-      if (ImportD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
-        return false;
-
-      if (!TargetClangMod)
-        return true;
-      if (ImportD->getModule() == TargetMod)
-        return false;
-
-      auto ImportedMod = ImportD->getClangModule();
-      if (!ImportedMod)
-        return true;
-      if (!ImportedMod->isSubModule())
-        return true;
-      if (ImportedMod == TargetClangMod)
-        return false;
-      return ImportedMod->isSubModuleOf(TargetClangMod);
-    };
-
     if (auto ID = dyn_cast<ImportDecl>(D)) {
-      if (ShouldPrintImport(ID)) {
-        if (ID->getClangModule())
-          // Erase those submodules that are not missing.
-          NoImportSubModules.erase(ID->getClangModule());
-        if (ID->getImportKind() == ImportKind::Module) {
-          // Make sure we don't print duplicate imports, due to getting imports
-          // for both a clang module and its overlay.
-          if (auto *ClangMod = getUnderlyingClangModuleForImport(ID)) {
-            auto P = ClangModulesForImports.insert(ClangMod);
-            bool IsNew = P.second;
-            if (!IsNew)
-              continue;
-          }
+      if (!shouldPrintImport(ID, TargetMod, TargetClangMod))
+        continue;
+
+      // Erase submodules that are not missing
+      if (ID->getClangModule())
+        NoImportSubModules.erase(ID->getClangModule());
+
+      if (ID->getImportKind() == ImportKind::Module) {
+        // Could have a duplicate import from a clang module's overlay or
+        // because we're merging modules. Skip them.
+
+        if (auto *ClangMod = getUnderlyingClangModuleForImport(ID)) {
+          if (!SeenImportedDecls.insert(ClangMod).second)
+            continue;
         }
-        ImportDecls.push_back(ID);
+
+        if (auto *ImportedMod = ID->getModule()) {
+          if (!SeenImportedDecls.insert(ImportedMod).second)
+            continue;
+        }
+      } else {
+        bool AnyNewDecls = false;
+        for (auto *ImportedDecl : ID->getDecls()) {
+          AnyNewDecls |= SeenImportedDecls.insert(ImportedDecl).second;
+        }
+        if (!AnyNewDecls)
+          continue;
       }
+
+      ImportDecls.push_back(ID);
+
       continue;
     }
 
@@ -670,15 +741,18 @@ void swift::ide::printModuleInterface(
     std::stable_sort(SwiftDecls.begin(), SwiftDecls.end(), compareSwiftDecls);
 
   auto PrintDecl = [&](Decl *D) {
-    return printModuleInterfaceDecl(D, Printer, AdjustedOptions,
+    return printModuleInterfaceDecl(D, Printer, Options,
                                     PrintSynthesizedExtensions);
   };
 
   // Imports from the stdlib are internal details that don't need to be exposed.
   if (!TargetMod->isStdlibModule()) {
-    for (auto *D : ImportDecls)
+    for (auto *D : ImportDecls) {
       PrintDecl(D);
-    Printer.printNewline();
+    }
+    if (!ImportDecls.empty()) {
+      Printer.printNewline();
+    }
   }
 
   {
@@ -712,7 +786,7 @@ void swift::ide::printModuleInterface(
     // is the underlying module of, transitively.
     if (GroupNames.empty()) {
       printCrossImportOverlays(TargetMod, SwiftContext, Printer,
-                               AdjustedOptions, PrintSynthesizedExtensions);
+                               Options, PrintSynthesizedExtensions);
     }
   }
   // Flush pending newlines.
@@ -750,9 +824,7 @@ static SourceLoc getDeclStartPosition(SourceFile &File) {
 }
 
 static void printUntilFirstDeclStarts(SourceFile &File, ASTPrinter &Printer) {
-  if (!File.getBufferID().has_value())
-    return;
-  auto BufferID = *File.getBufferID();
+  auto BufferID = File.getBufferID();
 
   auto &SM = File.getASTContext().SourceMgr;
   CharSourceRange TextRange = SM.getRangeForBuffer(BufferID);
@@ -789,8 +861,8 @@ void swift::ide::printHeaderInterface(
        ASTContext &Ctx,
        ASTPrinter &Printer,
        const PrintOptions &Options) {
-  auto AdjustedOptions = Options;
-  adjustPrintOptions(AdjustedOptions);
+  PrintOptions::OverrideScope OptionAdjustment(Options);
+  adjustPrintOptions(OptionAdjustment);
 
   auto &Importer = static_cast<ClangImporter &>(*Ctx.getClangModuleLoader());
   auto &ClangSM = Importer.getClangASTContext().getSourceManager();
@@ -821,36 +893,12 @@ void swift::ide::printHeaderInterface(
     // equivalent Swift decl may not be. E.g. a top-level function may be mapped
     // to a property accessor in Swift.
     D = getTopLevelDecl(D);
-    if (!AdjustedOptions.shouldPrint(D)) {
+    if (!Options.shouldPrint(D)) {
       Printer.callAvoidPrintDeclPost(D);
       continue;
     }
-    if (D->print(Printer, AdjustedOptions))
+    if (D->print(Printer, Options))
       Printer.printNewline();
   }
   Printer.forceNewlines();
-}
-
-void swift::ide::printSymbolicSwiftClangModuleInterface(
-    ModuleDecl *M, ASTPrinter &Printer, const clang::Module *clangModule) {
-  std::string headerComment;
-  llvm::raw_string_ostream(headerComment)
-      << "// Swift interface for " << (clangModule->IsSystem ? "system " : "")
-      << "module '" << clangModule->Name << "'\n";
-  Printer.printText(headerComment);
-
-  ModuleTraversalOptions opts;
-  opts |= ModuleTraversal::VisitSubmodules;
-  auto popts =
-      PrintOptions::printModuleInterface(/*printFullConvention=*/false);
-  popts.PrintDocumentationComments = false;
-  popts.SkipInlineCXXNamespace = true;
-
-  auto &SwiftContext = M->getTopLevelModule()->getASTContext();
-  auto &Importer =
-      static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
-  Importer.withSymbolicFeatureEnabled([&]() {
-    printModuleInterface(M, {}, opts, Printer, popts,
-                         /*SynthesizeExtensions=*/false);
-  });
 }

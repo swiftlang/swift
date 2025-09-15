@@ -2,8 +2,8 @@
 // CHECK-macho: "swift-frontend", inputs: ["{{.*}}embed-bitcode.swift"], output: {llvm-bc: "[[BC:.*\.bc]]"}
 // CHECK-macho: "swift-frontend", inputs: ["[[BC]]"], output: {object: "[[OBJECT:.*\.o]]"}
 // CHECK-macho: "ld", inputs: ["[[OBJECT]]"], output: {image: "embed-bitcode"}
-// CHECK-coff: "swiftc.{{exe}}", inputs: ["{{.*}}embed-bitcode.swift"], output: {llvm-bc: "[[BC:.*\.bc]]"}
-// CHECK-coff: "swiftc.{{exe}}", inputs: ["[[BC]]"], output: {object: "[[OBJECT:.*\.o]]"}
+// CHECK-coff: "swift{{(c|c-legacy-driver)}}.{{exe}}", inputs: ["{{.*}}embed-bitcode.swift"], output: {llvm-bc: "[[BC:.*\.bc]]"}
+// CHECK-coff: "swift{{(c|c-legacy-driver)}}.{{exe}}", inputs: ["[[BC]]"], output: {object: "[[OBJECT:.*\.o]]"}
 // CHECK-coff: "clang.exe", inputs: ["[[OBJECT]]"], output: {image: "embed-bitcode"}
 
 // CHECK-elf: "swift-frontend", inputs: ["{{.*}}embed-bitcode.swift"], output: {llvm-bc: "[[BC:.*\.bc]]"}
@@ -93,23 +93,23 @@
 // CHECK-LIB-WMO: -parse-stdlib
 
 // RUN: %target-swiftc_driver -embed-bitcode -c -parse-as-library -emit-module %s %S/../Inputs/empty.swift -module-name ABC 2>&1 -### | %FileCheck %s -check-prefix=CHECK-LIB
-// CHECK-LIB: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
+// CHECK-LIB: swift{{(c|c-legacy-driver|-frontend)?(\.exe)?"?}} -frontend
 // CHECK-LIB: -emit-bc
 // CHECK-LIB: -primary-file
-// CHECK-LIB: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
+// CHECK-LIB: swift{{(c|c-legacy-driver|-frontend)?(\.exe)?"?}} -frontend
 // CHECK-LIB: -emit-bc
 // CHECK-LIB: -primary-file
-// CHECK-LIB: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
+// CHECK-LIB: swift{{(c|c-legacy-driver|-frontend)?(\.exe)?"?}} -frontend
 // CHECK-LIB: -c
 // CHECK-LIB: -embed-bitcode
 // CHECK-LIB: -disable-llvm-optzns
-// CHECK-LIB: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
+// CHECK-LIB: swift{{(c|c-legacy-driver|-frontend)?(\.exe)?"?}} -frontend
 // CHECK-LIB: -c
 // CHECK-LIB: -embed-bitcode
 // CHECK-LIB: -disable-llvm-optzns
-// CHECK-LIB: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
+// CHECK-LIB: swift{{(c|c-legacy-driver|-frontend)?(\.exe)?"?}} -frontend
 // CHECK-LIB: -emit-module
-// CHECK-LIB-NOT: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
+// CHECK-LIB-NOT: swift{{(c|c-legacy-driver|-frontend)?(\.exe)?"?}} -frontend
 
 // RUN: %target-swiftc_driver -embed-bitcode -emit-module %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE
 // RUN: %target-swiftc_driver -embed-bitcode -emit-module-path a.swiftmodule %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE

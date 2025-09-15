@@ -20,6 +20,7 @@
 #include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Differentiation/Common.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 
 namespace swift {
@@ -60,10 +61,10 @@ bool isSemanticMemberAccessor(SILFunction *original) {
   auto *accessor = dyn_cast<AccessorDecl>(decl);
   if (!accessor)
     return false;
-  // Currently, only getters and setters are supported.
-  // TODO(https://github.com/apple/swift/issues/55084): Support `modify` accessors.
+  // Currently, only getters, setters and _modify accessors are supported.
   if (accessor->getAccessorKind() != AccessorKind::Get &&
-      accessor->getAccessorKind() != AccessorKind::Set)
+      accessor->getAccessorKind() != AccessorKind::Set &&
+      accessor->getAccessorKind() != AccessorKind::Modify)
     return false;
   // Accessor must come from a `var` declaration.
   auto *varDecl = dyn_cast<VarDecl>(accessor->getStorage());
@@ -416,7 +417,7 @@ SILValue emitMemoryLayoutSize(
       loc, id, SILType::getBuiltinWordType(ctx),
       SubstitutionMap::get(
           builtin->getGenericSignature(), ArrayRef<Type>{type},
-          LookUpConformanceInSignature(builtin->getGenericSignature().getPointer())),
+          LookUpConformanceInModule()),
       {metatypeVal});
 }
 
@@ -537,9 +538,14 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
          "definitions with explicit differentiable attributes");
 
   return SILDifferentiabilityWitness::createDeclaration(
-      module, SILLinkage::PublicExternal, original, kind,
-      minimalConfig->parameterIndices, minimalConfig->resultIndices,
-      minimalConfig->derivativeGenericSignature);
+      module,
+      // Witness for @_alwaysEmitIntoClient original function must be emitted,
+      // otherwise a linker error would occur due to undefined reference to the
+      // witness symbol.
+      original->markedAsAlwaysEmitIntoClient() ? SILLinkage::PublicNonABI
+                                               : SILLinkage::PublicExternal,
+      original, kind, minimalConfig->parameterIndices,
+      minimalConfig->resultIndices, minimalConfig->derivativeGenericSignature);
 }
 
 } // end namespace autodiff

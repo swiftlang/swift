@@ -10,7 +10,7 @@ module Test {
 
 //--- Inputs/test.h
 struct Ptr { int *p; };
-struct __attribute__((swift_attr("import_owned"))) StirngLiteral { const char *name; };
+struct __attribute__((swift_attr("import_owned"))) StringLiteral { const char *name; };
 
 struct M {
   M(const M&);
@@ -20,7 +20,12 @@ struct M {
 
   int *begin() const;
 
-  StirngLiteral stringLiteral() const { return StirngLiteral{"M"}; }
+  StringLiteral stringLiteral() const { return StringLiteral{"M"}; }
+};
+
+struct HasNonIteratorBeginMethod {
+  void begin() const;
+  void end() const;
 };
 
 //--- test.swift
@@ -47,4 +52,9 @@ public func test(x: M) {
 
   // CHECK-NOT: error: value of type 'M' has no member 'stringLiteral'
   x.stringLiteral()
+}
+
+public func test(_ x: HasNonIteratorBeginMethod) {
+  x.begin()
+  x.end()
 }

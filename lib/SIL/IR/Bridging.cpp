@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -239,7 +240,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
     assert(conformance && "Missing conformance?");
     Type bridgedTy =
       ProtocolConformanceRef(conformance).getTypeWitnessByName(
-        t, M.getASTContext().Id_ObjectiveCType);
+        M.getASTContext().Id_ObjectiveCType);
     if (purpose == BridgedTypePurpose::ForResult && clangTy)
       bridgedTy = OptionalType::get(bridgedTy);
     return bridgedTy;

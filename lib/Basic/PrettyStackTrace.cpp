@@ -18,6 +18,7 @@
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/Version.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 

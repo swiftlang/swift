@@ -42,6 +42,7 @@ extension ${Self}: Differentiable {
   public typealias TangentVector = ${Self}
 
   ${Availability(bits)}
+  @inlinable
   public mutating func move(by offset: TangentVector) {
     self += offset
   }
@@ -95,7 +96,7 @@ extension ${Self} {
 /// Derivatives of standard unary operators.
 ${Availability(bits)}
 extension ${Self} {
-  @usableFromInline
+  @inlinable
   @_transparent
   @derivative(of: -)
   static func _vjpNegate(x: ${Self})
@@ -103,7 +104,7 @@ extension ${Self} {
     return (-x, { v in -v })
   }
 
-  @usableFromInline
+  @inlinable
   @_transparent
   @derivative(of: -)
   static func _jvpNegate(x: ${Self})

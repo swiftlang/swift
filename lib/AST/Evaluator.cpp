@@ -18,6 +18,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/TypeCheckRequests.h" // for ResolveMacroRequest
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceManager.h"
@@ -125,6 +126,12 @@ void Evaluator::diagnoseCycle(const ActiveRequest &request) {
   request.diagnoseCycle(diags);
   for (const auto &step : llvm::reverse(activeRequests)) {
     if (step == request) return;
+
+    // Reporting the lifetime dependence location generates a redundant
+    // diagnostic.
+    if (step.getAs<LifetimeDependenceInfoRequest>()) {
+      continue;
+    }
 
     step.noteCycleStep(diags);
   }

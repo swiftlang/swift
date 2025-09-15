@@ -13,7 +13,7 @@ bb0(%arg : $Int):
   return %res : $Int
 }
 
-// CHECK: define{{.*}} swiftcc [[T:i[0-9]+]] @rec([[T]] %0) #0 {
+// CHECK: define{{.*}} swiftcc{{( noundef)?}} [[T:i[0-9]+]] @rec([[T]] %0) #0 {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: br label %tailrecurse
 // CHECK-EMPTY:

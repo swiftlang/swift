@@ -33,6 +33,7 @@
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/Statistic.h"
@@ -162,7 +163,8 @@ static FullApplySite speculateMonomorphicTarget(SILPassManager *pm, FullApplySit
   // class instance is identical to the SILType.
 
   CCBI = Builder.createCheckedCastBranch(AI.getLoc(), /*exact*/ true,
-                                      CMI->getOperand(), 
+                                      CheckedCastInstOptions(),
+                                      CMI->getOperand(),
                                       CMI->getOperand()->getType().getASTType(),
                                       SILType::getPrimitiveObjectType(SubType),
                                       SubType, Iden, Virt);
@@ -444,7 +446,7 @@ static bool tryToSpeculateTarget(SILPassManager *pm, FullApplySite AI, ClassHier
 
   // Try to devirtualize the static class of instance
   // if it is possible.
-  if (auto F = getTargetClassMethod(M, CD, ClassType, CMI)) {
+  if (auto F = getTargetClassMethod(M, AI, CD, ClassType, CMI)) {
     // Do not devirtualize if a method in the base class is marked
     // as non-optimizable. This way it is easy to disable the
     // devirtualization of this method in the base class and

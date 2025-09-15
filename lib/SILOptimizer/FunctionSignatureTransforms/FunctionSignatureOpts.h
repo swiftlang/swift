@@ -46,7 +46,7 @@ struct ArgumentDescriptor {
   unsigned Index;
 
   /// The original decl of this Argument.
-  const ValueDecl *Decl;
+  ValueDecl *Decl;
 
   /// Was this parameter originally dead?
   bool IsEntirelyDead;

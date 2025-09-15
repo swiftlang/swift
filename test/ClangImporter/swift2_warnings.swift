@@ -101,6 +101,7 @@ func useLowercasedEnumCase(x: NSRuncingMode) {
   switch x { // expected-error {{switch must be exhaustive}}
     // expected-note@-1 {{add missing case: '.mince'}}
     // expected-note@-2 {{add missing case: '.quince'}}
+    // expected-note@-3 {{add missing cases}}
     case .Mince: return // expected-error {{'Mince' has been renamed to 'mince'}} {{11-16=mince}}
     case .Quince: return // expected-error {{'Quince' has been renamed to 'quince'}} {{11-17=quince}}
   }

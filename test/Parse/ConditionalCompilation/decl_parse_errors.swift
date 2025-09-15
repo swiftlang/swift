@@ -25,7 +25,7 @@ var val2: Int = 0
 lazy
 #line 12 "test.swift"
 var val3: Int = 0;
-#line
+#line // expected-error {{#line directive was renamed to #sourceLocation}}
 
 class C { // expected-note {{to match this opening '{'}}
 

@@ -1,9 +1,4 @@
-$ld$install_name$os10.10$@rpath/libswiftCore.dylib
-$ld$install_name$os10.11$@rpath/libswiftCore.dylib
-$ld$install_name$os10.12$@rpath/libswiftCore.dylib
-$ld$install_name$os10.13$@rpath/libswiftCore.dylib
-$ld$install_name$os10.14$@rpath/libswiftCore.dylib
-$ld$install_name$os10.9$@rpath/libswiftCore.dylib
+$ld$previous$@rpath/libswiftCore.dylib$$1$10.9$10.14.4$$
 _$s11MaskStorages4SIMDPTl
 _$s11RawExponentSBTl
 _$s11SubSequenceSlTl
@@ -13378,7 +13373,7 @@ __swift_makeAnyHashableUpcastingToHashableBaseType
 __swift_modifyAtReferenceWritableKeyPath_impl
 __swift_modifyAtWritableKeyPath_impl
 __swift_objcClassUsesNativeSwiftReferenceCounting
-__swift_registerConcurrencyStandardTypeDescriptors
+__swift_registerConcurrencyRuntime
 __swift_release
 __swift_release_n
 __swift_reportFatalErrorsToDebugger
@@ -13466,6 +13461,7 @@ _swift_conformsToProtocolCommon
 _swift_copyAuxiliaryExecutablePath
 _swift_copyKeyPathTrivialIndices
 _swift_copyPOD
+_swift_coroFrameAlloc
 _swift_deallocBox
 _swift_deallocClassInstance
 _swift_deallocError

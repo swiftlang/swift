@@ -17,6 +17,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -129,6 +130,18 @@ public:
   unsigned getFlags() const { return Value.getInt(); }
 };
 
+/// Describes a type that has been captured by a closure or local function.
+class CapturedType {
+  Type type;
+  SourceLoc loc;
+
+public:
+  CapturedType(Type type, SourceLoc loc) : type(type), loc(loc) { }
+  
+  Type getType() const { return type; }
+  SourceLoc getLoc() const { return loc; }
+};
+
 } // end swift namespace
 
 namespace swift {
@@ -140,25 +153,31 @@ class CaptureInfo {
   class CaptureInfoStorage final
       : public llvm::TrailingObjects<CaptureInfoStorage,
                                      CapturedValue,
-                                     GenericEnvironment *> {
+                                     GenericEnvironment *,
+                                     CapturedType> {
 
     DynamicSelfType *DynamicSelf;
     OpaqueValueExpr *OpaqueValue;
     unsigned NumCapturedValues;
     unsigned NumGenericEnvironments;
+    unsigned NumCapturedTypes;
 
   public:
     explicit CaptureInfoStorage(DynamicSelfType *dynamicSelf,
                                 OpaqueValueExpr *opaqueValue,
                                 unsigned numCapturedValues,
-                                unsigned numGenericEnvironments)
+                                unsigned numGenericEnvironments,
+                                unsigned numCapturedTypes)
       : DynamicSelf(dynamicSelf), OpaqueValue(opaqueValue),
         NumCapturedValues(numCapturedValues),
-        NumGenericEnvironments(numGenericEnvironments) { }
+        NumGenericEnvironments(numGenericEnvironments),
+        NumCapturedTypes(numCapturedTypes) { }
 
     ArrayRef<CapturedValue> getCaptures() const;
 
     ArrayRef<GenericEnvironment *> getGenericEnvironments() const;
+
+    ArrayRef<CapturedType> getCapturedTypes() const;
 
     DynamicSelfType *getDynamicSelfType() const {
       return DynamicSelf;
@@ -170,6 +189,14 @@ class CaptureInfo {
 
     unsigned numTrailingObjects(OverloadToken<CapturedValue>) const {
       return NumCapturedValues;
+    }
+
+    unsigned numTrailingObjects(OverloadToken<GenericEnvironment *>) const {
+      return NumGenericEnvironments;
+    }
+
+    unsigned numTrailingObjects(OverloadToken<CapturedType>) const {
+      return NumCapturedTypes;
     }
   };
 
@@ -187,7 +214,8 @@ public:
               ArrayRef<CapturedValue> captures,
               DynamicSelfType *dynamicSelf, OpaqueValueExpr *opaqueValue,
               bool genericParamCaptures,
-              ArrayRef<GenericEnvironment *> genericEnv=ArrayRef<GenericEnvironment*>());
+              ArrayRef<GenericEnvironment *> genericEnv=ArrayRef<GenericEnvironment*>(),
+              ArrayRef<CapturedType> capturedTypes = ArrayRef<CapturedType>());
 
   /// A CaptureInfo representing no captures at all.
   static CaptureInfo empty();
@@ -196,11 +224,7 @@ public:
     return StorageAndFlags.getPointer();
   }
 
-  bool isTrivial() const {
-    assert(hasBeenComputed());
-    return getCaptures().empty() && !hasGenericParamCaptures() &&
-           !hasDynamicSelfCapture() && !hasOpaqueValueCapture();
-  }
+  bool isTrivial() const;
 
   /// Returns all captured values and opaque expressions.
   ArrayRef<CapturedValue> getCaptures() const {
@@ -212,6 +236,12 @@ public:
   ArrayRef<GenericEnvironment *> getGenericEnvironments() const {
     assert(hasBeenComputed());
     return StorageAndFlags.getPointer()->getGenericEnvironments();
+  }
+
+  /// Returns all captured values and opaque expressions.
+  ArrayRef<CapturedType> getCapturedTypes() const {
+    assert(hasBeenComputed());
+    return StorageAndFlags.getPointer()->getCapturedTypes();
   }
 
   /// \returns true if the function captures the primary generic environment

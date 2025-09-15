@@ -1,17 +1,14 @@
 // Typecheck.
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking -verify-additional-prefix without-transferring-
+// RUN: %target-typecheck-verify-swift  -target %target-swift-5.1-abi-triple -verify-additional-prefix without-transferring-
 
 // Emit SIL with minimal strict concurrency.
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix without-transferring-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -verify-additional-prefix without-transferring-
 
 // Emit SIL with targeted concurrency.
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix without-transferring-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix without-transferring-
 
-// Emit SIL with strict concurrency but without region based isolation
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns- -verify-additional-prefix without-transferring- -disable-region-based-isolation-with-strict-concurrency
-
-// Emit SIL with strict concurrency + region based isolation + transferring
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete  -verify-additional-prefix complete-tns-
+// Emit SIL with strict concurrency + region-based isolation + transferring
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete  -verify-additional-prefix complete-
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -41,7 +38,7 @@ func testConversions(f: @escaping @SomeGlobalActor (Int) -> Void, g: @escaping (
 
 @OtherGlobalActor func onOtherGlobalActor() -> Int { 5 } // expected-note{{calls to global function 'onOtherGlobalActor()' from outside of its actor context are implicitly asynchronous}}
 @preconcurrency @OtherGlobalActor func onOtherGlobalActorUnsafe() -> Int { 5 }  // expected-note 2{{calls to global function 'onOtherGlobalActorUnsafe()' from outside of its actor context are implicitly asynchronous}}
-// expected-complete-tns-note @-1 {{calls to global function 'onOtherGlobalActorUnsafe()' from outside of its actor context are implicitly asynchronous}}
+// expected-complete-note @-1 {{calls to global function 'onOtherGlobalActorUnsafe()' from outside of its actor context are implicitly asynchronous}}
 
 func someSlowOperation() async -> Int { 5 }
 
@@ -102,7 +99,7 @@ func testClosuresOld() {
   }
 
   acceptOnSomeGlobalActor { () -> Int in
-    let i = onOtherGlobalActorUnsafe() // expected-complete-tns-warning {{call to global actor 'OtherGlobalActor'-isolated global function 'onOtherGlobalActorUnsafe()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
+    let i = onOtherGlobalActorUnsafe() // expected-complete-warning {{call to global actor 'OtherGlobalActor'-isolated global function 'onOtherGlobalActorUnsafe()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
     return i
   }
 
@@ -132,16 +129,16 @@ func g2(_ x: X<() -> Void>) {
 
 
 func testTypesNonConcurrencyContext() { // expected-note{{add '@SomeGlobalActor' to make global function 'testTypesNonConcurrencyContext()' part of global actor 'SomeGlobalActor'}}
-  // expected-complete-tns-note @-1 {{add '@SomeGlobalActor' to make global function 'testTypesNonConcurrencyContext()' part of global actor 'SomeGlobalActor'}}
+  // expected-complete-note @-1 {{add '@SomeGlobalActor' to make global function 'testTypesNonConcurrencyContext()' part of global actor 'SomeGlobalActor'}}
   let f1 = onSomeGlobalActor // expected-note{{calls to let 'f1' from outside of its actor context are implicitly asynchronous}}
-  let f2 = onSomeGlobalActorUnsafe // expected-complete-tns-note {{calls to let 'f2' from outside of its actor context are implicitly asynchronous}}
+  let f2 = onSomeGlobalActorUnsafe // expected-complete-note {{calls to let 'f2' from outside of its actor context are implicitly asynchronous}}
 
   let _: () -> Int = f1 // expected-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
-  let _: () -> Int = f2 // expected-complete-tns-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+  let _: () -> Int = f2 // expected-complete-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
 
   _ = {
     let _: () -> Int = f1 // expected-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
-    let _: () -> Int = f2 // expected-complete-tns-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+    let _: () -> Int = f2 // expected-complete-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
   }
 
   @SomeGlobalActor func isolated() {
@@ -150,7 +147,7 @@ func testTypesNonConcurrencyContext() { // expected-note{{add '@SomeGlobalActor'
   }
 
   _ = f1() // expected-error{{call to global actor 'SomeGlobalActor'-isolated let 'f1' in a synchronous nonisolated context}}
-  _ = f2() // expected-complete-tns-error {{call to global actor 'SomeGlobalActor'-isolated let 'f2' in a synchronous nonisolated context}}
+  _ = f2() // expected-complete-error {{call to global actor 'SomeGlobalActor'-isolated let 'f2' in a synchronous nonisolated context}}
 }
 
 func testTypesConcurrencyContext() async {
@@ -330,9 +327,12 @@ func stripActor(_ expr: @Sendable @autoclosure () -> (() -> ())) async {
   return await stripActor(mainActorFn) // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
 }
 
-// NOTE: this warning is correct, but is only being caught by TypeCheckConcurrency's extra check.
+// We used to not emit an error here with strict-concurrency enabled since we
+// were inferring the async let to MainActor isolated (which was incorrect). We
+// now always treat async let as non-isolated, so we get the same error in all
+// contexts.
 @MainActor func exampleWhereConstraintSolverHasWrongDeclContext_v2() async -> Int {
-  async let a: () = noActor(mainActorFn) // expected-without-transferring-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
+  async let a: () = noActor(mainActorFn) // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
   await a
 }
 
@@ -412,4 +412,29 @@ extension GlobalType {
     lhs: GlobalType,
     rhs: GlobalType
   ) -> Bool { true }
+}
+
+func takesMainActorFn(_ x: @MainActor () -> Int) {}
+func takesMainActorAutoclosure(_ x: @autoclosure @MainActor () -> Int) {}
+
+func nonisolatedIntFn() -> Int { 0 }
+@MainActor func mainActorIntFn() -> Int { 0 }
+
+struct HasMainActorFns {
+  @MainActor static func staticFn() -> Int { 0 }
+  @MainActor func instanceFn() -> Int { 0 }
+}
+
+func testGlobalActorAutoclosure(_ x: HasMainActorFns) {
+  takesMainActorFn(nonisolatedIntFn)
+  takesMainActorFn(mainActorIntFn)
+
+  // Make sure we respect global actors on autoclosures.
+  takesMainActorAutoclosure(nonisolatedIntFn())
+  takesMainActorAutoclosure(mainActorIntFn())
+
+  // Including autoclosure thunks.
+  takesMainActorFn(HasMainActorFns.staticFn)
+  takesMainActorFn(HasMainActorFns.instanceFn(x))
+  takesMainActorFn(x.instanceFn)
 }

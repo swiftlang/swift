@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -45,6 +45,7 @@ actor A2: DistributedActor {
 // FIXME(distributed): error reporting is a bit whacky here; needs cleanup
 // expected-error@-2{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
 // expected-error@-3{{actor type 'A2' cannot conform to the 'DistributedActor' protocol. Isolation rules of these actor types are not interchangeable.}}
+// expected-note@-4 {{add stubs for conformance}}
   nonisolated var id: ID {
     fatalError()
   }
@@ -63,6 +64,7 @@ actor A2: DistributedActor {
 
 final class DA2: DistributedActor {
 // expected-error@-1{{non-distributed actor type 'DA2' cannot conform to the 'DistributedActor' protocol}}
+// expected-note@-2 {{add stubs for conformance}}
   nonisolated var id: ID {
     fatalError()
   }
@@ -84,6 +86,7 @@ final class DA2: DistributedActor {
 struct S2: DistributedActor {
   // expected-error@-1{{non-class type 'S2' cannot conform to class protocol 'DistributedActor'}}
   // expected-error@-2{{type 'S2' does not conform to protocol 'Identifiable'}}
+  // expected-note@-3 {{add stubs for conformance}}
 }
 
 // ==== -----------------------------------------------------------------------
@@ -92,7 +95,7 @@ actor A3: AnyActor {} // expected-warning {{'AnyActor' is deprecated: Use 'any A
 distributed actor DA3: AnyActor {} // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
 
 class C3: AnyActor { // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
-  // expected-warning@-1 {{non-final class 'C3' cannot conform to 'Sendable'; use '@unchecked Sendable'}}
+  // expected-warning@-1 {{non-final class 'C3' cannot conform to the 'Sendable' protocol}}
 }
 
 struct S3: AnyActor { // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}

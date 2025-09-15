@@ -18,6 +18,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILLinkage.h"
@@ -123,11 +124,11 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
 }
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
-                       bool isDistributed, bool isKnownToBeLocal,
+                       bool isDistributedThunk, bool isKnownToBeLocal,
                        bool isRuntimeAccessible,
                        SILDeclRef::BackDeploymentKind backDeploymentKind,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
-    : loc(vd), kind(kind), isForeign(isForeign), isDistributed(isDistributed),
+    : loc(vd), kind(kind), isForeign(isForeign), distributedThunk(isDistributedThunk),
       isKnownToBeLocal(isKnownToBeLocal),
       isRuntimeAccessible(isRuntimeAccessible),
       backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
@@ -185,7 +186,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
   }
 
   isForeign = asForeign;
-  isDistributed = asDistributed;
+  distributedThunk = asDistributed;
   isKnownToBeLocal = asDistributedKnownToBeLocal;
 }
 
@@ -229,8 +230,7 @@ ASTContext &SILDeclRef::getASTContext() const {
   return DC->getASTContext();
 }
 
-std::optional<AvailabilityContext>
-SILDeclRef::getAvailabilityForLinkage() const {
+std::optional<AvailabilityRange> SILDeclRef::getAvailabilityForLinkage() const {
   // Back deployment thunks and fallbacks don't have availability since they
   // are non-ABI.
   // FIXME: Generalize this check to all kinds of non-ABI functions.
@@ -303,6 +303,7 @@ bool SILDeclRef::hasUserWrittenCode() const {
   // Non-implicit decls generally have user-written code.
   if (!isImplicit()) {
     switch (kind) {
+    case Kind::PropertyWrappedFieldInitAccessor:
     case Kind::PropertyWrapperBackingInitializer: {
       // Only has user-written code if any of the property wrappers have
       // arguments to apply. Otherwise, it's just a forwarding initializer for
@@ -316,6 +317,14 @@ bool SILDeclRef::hasUserWrittenCode() const {
       // Never has user-written code, is just a forwarding initializer.
       return false;
     default:
+      if (auto decl = getDecl()) {
+        // Declarations synthesized by ClangImporter by definition don't have
+        // user written code, but despite that they aren't always marked
+        // implicit.
+        auto moduleContext = decl->getDeclContext()->getModuleScopeContext();
+        if (isa<ClangModuleUnit>(moduleContext))
+          return false;
+      }
       // TODO: This checking is currently conservative, we ought to
       // exhaustively handle all the cases here, and use emitOrDelayFunction
       // in more cases to take advantage of it.
@@ -372,11 +381,13 @@ bool SILDeclRef::hasUserWrittenCode() const {
   case Kind::EnumElement:
   case Kind::Destroyer:
   case Kind::Deallocator:
+  case Kind::IsolatedDeallocator:
   case Kind::GlobalAccessor:
   case Kind::DefaultArgGenerator:
   case Kind::IVarInitializer:
   case Kind::IVarDestroyer:
   case Kind::PropertyWrapperBackingInitializer:
+  case Kind::PropertyWrappedFieldInitAccessor:
   case Kind::PropertyWrapperInitFromProjectedValue:
   case Kind::EntryPoint:
   case Kind::AsyncEntryPoint:
@@ -384,6 +395,39 @@ bool SILDeclRef::hasUserWrittenCode() const {
     return false;
   }
   llvm_unreachable("Unhandled case in switch!");
+}
+
+bool SILDeclRef::shouldBeEmittedForDebugger() const {
+  if (!isFunc())
+    return false;
+
+  if (getASTContext().SILOpts.OptMode != OptimizationMode::NoOptimization)
+    return false;;
+
+  if (!getASTContext().SILOpts.ShouldFunctionsBePreservedToDebugger)
+    return false;
+
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  ValueDecl *decl = getDecl();
+  DeclAttributes &attrs = decl->getAttrs();
+  if (attrs.hasSemanticsAttr("no.preserve.debugger"))
+    return false;
+
+  if (getLinkage(ForDefinition) == SILLinkage::Shared)
+    return false;
+  
+  if (auto decl = getDecl()) 
+    if (!decl->isImplicit())
+      return true;
+
+  // Synthesized getters are still callable in the debugger.
+  if (auto *accessor = dyn_cast_or_null<AccessorDecl>(getFuncDecl())) {
+    return accessor->isSynthesized() && accessor->isGetterOrSetter();
+  };
+
+  return false;
 }
 
 namespace {
@@ -409,6 +453,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   using Kind = SILDeclRef::Kind;
 
   auto *d = constant.getDecl();
+  ASSERT(ABIRoleInfo(d).providesAPI() && "getLinkageLimit() for ABI decl?");
 
   // Back deployment thunks and fallbacks are emitted into the client.
   if (constant.backDeploymentKind != SILDeclRef::BackDeploymentKind::None)
@@ -435,7 +480,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
       return Limit::OnDemand;
   }
   
-  if (auto dd = dyn_cast<DestructorDecl>(d)) {
+  if (isa<DestructorDecl>(d)) {
     // The destructor of a class implemented with @_objcImplementation is only
     // ever called by its ObjC thunk, so it should not be public.
     if (d->getDeclContext()->getSelfNominalTypeDecl()->hasClangNode())
@@ -447,6 +492,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::Allocator:
   case Kind::Initializer:
   case Kind::Deallocator:
+  case Kind::IsolatedDeallocator:
   case Kind::Destroyer: {
     // @_alwaysEmitIntoClient declarations are like the default arguments of
     // public functions; they are roots for dead code elimination and have
@@ -464,7 +510,9 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     return Limit::OnDemand;
 
   case Kind::GlobalAccessor:
-    return cast<VarDecl>(d)->isStrictlyResilient() ? Limit::NeverPublic : Limit::None;
+    // global unsafeMutableAddressor should be kept hidden if its decl
+    // is resilient.
+    return cast<VarDecl>(d)->isResilient() ? Limit::NeverPublic : Limit::None;
 
   case Kind::DefaultArgGenerator:
     // If the default argument is to be serialized, only use non-ABI public
@@ -475,6 +523,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     return constant.isSerialized() ? Limit::AlwaysEmitIntoClient : Limit::None;
 
   case Kind::PropertyWrapperBackingInitializer:
+  case Kind::PropertyWrappedFieldInitAccessor:
   case Kind::PropertyWrapperInitFromProjectedValue: {
     if (!d->getDeclContext()->isTypeContext()) {
       // If the backing initializer is to be serialized, only use non-ABI public
@@ -525,6 +574,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::AsyncEntryPoint:
     llvm_unreachable("Already handled");
   }
+
   return Limit::None;
 }
 
@@ -705,28 +755,28 @@ SILDeclRef SILDeclRef::getMainFileEntryPoint(FileUnit *file) {
 }
 
 bool SILDeclRef::hasClosureExpr() const {
-  return loc.is<AbstractClosureExpr *>()
-    && isa<ClosureExpr>(getAbstractClosureExpr());
+  return isa<AbstractClosureExpr *>(loc) &&
+         isa<ClosureExpr>(getAbstractClosureExpr());
 }
 
 bool SILDeclRef::hasAutoClosureExpr() const {
-  return loc.is<AbstractClosureExpr *>()
-    && isa<AutoClosureExpr>(getAbstractClosureExpr());
+  return isa<AbstractClosureExpr *>(loc) &&
+         isa<AutoClosureExpr>(getAbstractClosureExpr());
 }
 
 bool SILDeclRef::hasFuncDecl() const {
-  return loc.is<ValueDecl *>() && isa<FuncDecl>(getDecl());
+  return isa<ValueDecl *>(loc) && isa<FuncDecl>(getDecl());
 }
 
 ClosureExpr *SILDeclRef::getClosureExpr() const {
-  return dyn_cast<ClosureExpr>(getAbstractClosureExpr());
+  return dyn_cast_or_null<ClosureExpr>(getAbstractClosureExpr());
 }
 AutoClosureExpr *SILDeclRef::getAutoClosureExpr() const {
-  return dyn_cast<AutoClosureExpr>(getAbstractClosureExpr());
+  return dyn_cast_or_null<AutoClosureExpr>(getAbstractClosureExpr());
 }
 
 FuncDecl *SILDeclRef::getFuncDecl() const {
-  return dyn_cast<FuncDecl>(getDecl());
+  return dyn_cast_or_null<FuncDecl>(getDecl());
 }
 
 ModuleDecl *SILDeclRef::getModuleContext() const {
@@ -754,13 +804,28 @@ AbstractFunctionDecl *SILDeclRef::getAbstractFunctionDecl() const {
   return dyn_cast_or_null<AbstractFunctionDecl>(getDecl());
 }
 
-bool SILDeclRef::isInitAccessor() const {
+AccessorDecl *SILDeclRef::getAccessorDecl() const {
   if (kind != Kind::Func || !hasDecl())
-    return false;
+    return nullptr;
+  return dyn_cast_or_null<AccessorDecl>(getDecl());
+}
 
-  if (auto accessor = dyn_cast<AccessorDecl>(getDecl()))
+bool SILDeclRef::isInitAccessor() const {
+  if (auto *accessor = getAccessorDecl())
     return accessor->getAccessorKind() == AccessorKind::Init;
 
+  return false;
+}
+
+bool SILDeclRef::isMutateAccessor() const {
+  if (auto *accessor = getAccessorDecl())
+    return accessor->getAccessorKind() == AccessorKind::Mutate;
+  return false;
+}
+
+bool SILDeclRef::isBorrowAccessor() const {
+  if (auto *accessor = getAccessorDecl())
+    return accessor->getAccessorKind() == AccessorKind::Borrow;
   return false;
 }
 
@@ -782,6 +847,20 @@ bool SILDeclRef::isTransparent() const {
     case AutoClosureExpr::Kind::DoubleCurryThunk:
     case AutoClosureExpr::Kind::SingleCurryThunk:
       break;
+    }
+  }
+
+  // To support using metatypes as type hints in Embedded Swift. A default
+  // argument generator might be returning a metatype, which we normally don't
+  // support in Embedded Swift, but to still allow metatypes as type hints, we
+  // make the generator always inline to the callee by marking it transparent.
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    if (isDefaultArgGenerator() && hasDecl()) {
+      auto *decl = getDecl();
+      auto *param = getParameterAt(decl, defaultArgIndex);
+      Type paramType = param->getTypeOfDefaultExpr();
+      if (paramType && paramType->is<MetatypeType>())
+        return true;
     }
   }
 
@@ -823,6 +902,14 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
 
   auto *d = getDecl();
 
+  ASSERT(ABIRoleInfo(d).providesAPI()
+            && "should not get serialization info from ABI-only decl");
+
+  // A declaration marked as "never emitted into client" will not have its SIL
+  // serialized, ever.
+  if (d->isNeverEmittedIntoClient())
+    return IsNotSerialized;
+
   // Default and property wrapper argument generators are serialized if the
   // containing declaration is public.
   if (isDefaultArgGenerator() || (isPropertyWrapperBackingInitializer() &&
@@ -853,7 +940,17 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
   // marked as @frozen.
   if (isStoredPropertyInitializer() || (isPropertyWrapperBackingInitializer() &&
                                         d->getDeclContext()->isTypeContext())) {
-    auto *nominal = cast<NominalTypeDecl>(d->getDeclContext()->getImplementedObjCContext());
+    auto *nominal = dyn_cast<NominalTypeDecl>(d->getDeclContext());
+
+    // If this isn't in a nominal, it must be in an @objc @implementation
+    // extension. We don't serialize those since clients outside the module
+    // don't think of these as Swift classes.
+    if (!nominal) {
+      ASSERT(isa<ExtensionDecl>(d->getDeclContext()) &&
+             cast<ExtensionDecl>(d->getDeclContext())->isObjCImplementation());
+      return IsNotSerialized;
+    }
+
     auto scope =
       nominal->getFormalAccessScope(/*useDC=*/nullptr,
                                     /*treatUsableFromInlineAsPublic=*/true);
@@ -951,6 +1048,9 @@ bool SILDeclRef::isNoinline() const {
     return false;
 
   auto *decl = getDecl();
+  ASSERT(ABIRoleInfo(decl).providesAPI()
+            && "should not get inline attr from ABI-only decl");
+
   if (auto *attr = decl->getAttrs().getAttribute<InlineAttr>())
     if (attr->getKind() == InlineKind::Never)
       return true;
@@ -981,6 +1081,9 @@ bool SILDeclRef::isAlwaysInline() const {
     return false;
   }
 
+  ASSERT(ABIRoleInfo(decl).providesAPI()
+            && "should not get inline attr from ABI-only decl");
+
   if (auto attr = decl->getAttrs().getAttribute<InlineAttr>())
     if (attr->getKind() == InlineKind::Always)
       return true;
@@ -1000,10 +1103,48 @@ bool SILDeclRef::isBackDeployed() const {
     return false;
 
   auto *decl = getDecl();
+
+  ASSERT(ABIRoleInfo(decl).providesAPI()
+            && "should not get backDeployed from ABI-only decl");
+
   if (auto afd = dyn_cast<AbstractFunctionDecl>(decl))
-    return afd->isBackDeployed(getASTContext());
+    return afd->isBackDeployed();
 
   return false;
+}
+
+bool SILDeclRef::hasNonUniqueDefinition() const {
+  if (auto decl = getDecl())
+    return declHasNonUniqueDefinition(decl);
+
+  return false;
+}
+
+bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
+  // This function only forces the issue in embedded.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  // If the declaration is marked as @_neverEmitIntoClient, it has a unique
+  // definition.
+  if (decl->isNeverEmittedIntoClient())
+    return false;
+
+  /// @_alwaysEmitIntoClient means that we have a non-unique definition.
+  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    return true;
+
+  auto module = decl->getModuleContext();
+  auto &ctx = module->getASTContext();
+
+  /// With deferred code generation, declarations are emitted as late as
+  /// possible, so they must have non-unique definitions.
+  if (module->deferredCodeGen())
+    return true;
+
+  // If the declaration is not from the main module, treat its definition as
+  // non-unique.
+  return module != ctx.MainModule && ctx.MainModule;
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {
@@ -1059,9 +1200,19 @@ bool SILDeclRef::isNativeToForeignThunk() const {
 }
 
 bool SILDeclRef::isDistributedThunk() const {
-  if (!isDistributed)
+  if (!distributedThunk)
     return false;
   return kind == Kind::Func;
+}
+bool SILDeclRef::isDistributed() const {
+  if (!hasFuncDecl())
+    return false;
+
+  if (auto decl = getFuncDecl()) {
+    return decl->isDistributed();
+  }
+
+  return false;
 }
 
 bool SILDeclRef::isBackDeploymentFallback() const {
@@ -1118,8 +1269,11 @@ static std::string mangleClangDecl(Decl *decl, bool isForeign) {
 }
 
 std::string SILDeclRef::mangle(ManglingKind MKind) const {
+  ASSERT(!hasDecl() || ABIRoleInfo(getDecl()).providesAPI()
+            && "SILDeclRef mangling ABI decl directly?");
+
   using namespace Mangle;
-  ASTMangler mangler;
+  ASTMangler mangler(getASTContext());
 
   if (auto *derivativeFunctionIdentifier = getDerivativeFunctionIdentifier()) {
     std::string originalMangled = asAutoDiffOriginalFunction().mangle(MKind);
@@ -1160,7 +1314,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     auto *funcDecl = cast<AbstractFunctionDecl>(getDecl());
     auto genericSig = funcDecl->getGenericSignature();
     return GenericSpecializationMangler::manglePrespecialization(
-        mangledNonSpecializedString, genericSig, getSpecializedSignature());
+        getASTContext(), mangledNonSpecializedString, genericSig, getSpecializedSignature());
   }
 
   ASTMangler::SymbolKind SKind = ASTMangler::SymbolKind::Default;
@@ -1202,7 +1356,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     }
 
     // Use a given cdecl name for native-to-foreign thunks.
-    if (auto CDeclA = getDecl()->getAttrs().getAttribute<CDeclAttr>())
+    if (getDecl()->getAttrs().hasAttribute<CDeclAttr>())
       if (isNativeToForeignThunk()) {
         // If this is an @implementation @_cdecl, mangle it like the clang
         // function it implements.
@@ -1211,7 +1365,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
           if (!clangMangling.empty())
             return clangMangling;
         }
-        return CDeclA->Name.str();
+        return getDecl()->getCDeclName().str();
       }
 
     if (SKind == ASTMangler::SymbolKind::DistributedThunk) {
@@ -1226,12 +1380,16 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
   case SILDeclRef::Kind::Deallocator:
     return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
-                                          /*isDeallocating*/ true,
-                                          SKind);
+                                          DestructorKind::Deallocating, SKind);
 
   case SILDeclRef::Kind::Destroyer:
     return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
-                                          /*isDeallocating*/ false,
+                                          DestructorKind::NonDeallocating,
+                                          SKind);
+
+  case SILDeclRef::Kind::IsolatedDeallocator:
+    return mangler.mangleDestructorEntity(cast<DestructorDecl>(getDecl()),
+                                          DestructorKind::IsolatedDeallocating,
                                           SKind);
 
   case SILDeclRef::Kind::Allocator:
@@ -1277,6 +1435,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return mangler.mangleBackingInitializerEntity(cast<VarDecl>(getDecl()),
                                                   SKind);
+
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
+    return mangler.manglePropertyWrappedFieldInitAccessorEntity(
+        cast<VarDecl>(getDecl()), SKind);
 
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return mangler.mangleInitFromProjectedValueEntity(cast<VarDecl>(getDecl()),
@@ -1633,6 +1795,7 @@ Expr *SILDeclRef::getInitializationExpr() const {
     }
     return init;
   }
+  case Kind::PropertyWrappedFieldInitAccessor:
   case Kind::PropertyWrapperBackingInitializer: {
     auto *var = cast<VarDecl>(getDecl());
     auto wrapperInfo = var->getPropertyWrapperInitializerInfo();
@@ -1758,4 +1921,36 @@ bool SILDeclRef::hasAsync() const {
     return false;
   }
   return getAbstractClosureExpr()->isBodyAsync();
+}
+
+bool SILDeclRef::isCalleeAllocatedCoroutine() const {
+  if (!hasDecl())
+    return false;
+
+  auto *accessor = dyn_cast<AccessorDecl>(getDecl());
+  if (!accessor)
+    return false;
+
+  if (!requiresFeatureCoroutineAccessors(accessor->getAccessorKind()))
+    return false;
+
+  return getASTContext().SILOpts.CoroutineAccessorsUseYieldOnce2;
+}
+
+ActorIsolation SILDeclRef::getActorIsolation() const {
+  // Deallocating destructor is always nonisolated. Isolation of the deinit
+  // applies only to isolated deallocator and destroyer.
+  if (kind == SILDeclRef::Kind::Deallocator) {
+    return ActorIsolation::forNonisolated(false);
+  }
+
+  // Default argument generators use the isolation of the initializer,
+  // not the general isolation of the function.
+  if (isDefaultArgGenerator()) {
+    auto param = getParameterAt(getDecl(), defaultArgIndex);
+    assert(param);
+    return param->getInitializerIsolation();
+  }
+
+  return getActorIsolationOfContext(getInnermostDeclContext());
 }

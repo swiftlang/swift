@@ -16,10 +16,12 @@
 #include "SemanticARCOptVisitor.h"
 #include "Transforms.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -75,7 +77,6 @@ struct SemanticARCOpts : SILFunctionTransform {
   SemanticARCOpts(bool mandatoryOptsOnly)
       : mandatoryOptsOnly(mandatoryOptsOnly) {}
 
-#ifndef NDEBUG
   void performCommandlineSpecifiedTransforms(SemanticARCOptVisitor &visitor) {
     for (auto transform : TransformsToPerform) {
       visitor.ctx.transformKind = transform;
@@ -108,7 +109,6 @@ struct SemanticARCOpts : SILFunctionTransform {
       }
     }
   }
-#endif
 
   bool performPeepholesWithoutFixedPoint(SemanticARCOptVisitor &visitor) {
     // Add all the results of all instructions that we want to visit to the
@@ -160,13 +160,11 @@ struct SemanticARCOpts : SILFunctionTransform {
     SemanticARCOptVisitor visitor(f, getPassManager(), *deBlocksAnalysis->get(&f),
                                   mandatoryOptsOnly);
 
-#ifndef NDEBUG
     // If we are being asked for testing purposes to run a series of transforms
     // expressed on the command line, run that and return.
     if (!TransformsToPerform.empty()) {
       return performCommandlineSpecifiedTransforms(visitor);
     }
-#endif
 
     // Otherwise, perform our standard optimizations.
     bool didEliminateARCInsts = performPeepholes(visitor);
@@ -175,6 +173,8 @@ struct SemanticARCOpts : SILFunctionTransform {
     // converted to guaranteed, ignoring the phi, try convert those phis to be
     // guaranteed.
     if (tryConvertOwnedPhisToGuaranteedPhis(visitor.ctx)) {
+      updateAllGuaranteedPhis(getPassManager(), &f);
+
       // We return here early to save a little compile time so we do not
       // invalidate analyses redundantly.
       return invalidateAnalysis(
@@ -182,8 +182,10 @@ struct SemanticARCOpts : SILFunctionTransform {
     }
 
     // Otherwise, we only deleted instructions and did not touch phis.
-    if (didEliminateARCInsts)
+    if (didEliminateARCInsts) {
+      updateAllGuaranteedPhis(getPassManager(), &f);
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    }
   }
 };
 

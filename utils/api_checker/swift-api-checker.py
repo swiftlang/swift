@@ -146,7 +146,7 @@ class DumpConfig:
                '/tmp/ModuleCache', '-swift-version',
                swift_ver, '-abort-on-module-fail']
         for path in self.frameworks:
-            cmd.extend(['-iframework', path])
+            cmd.extend(['-Fsystem', path])
         for path in self.inputs:
             cmd.extend(['-I', path])
         if self.abi:

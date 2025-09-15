@@ -84,7 +84,11 @@ private:
   static char *getCString(char *str) { return str; }
 
   static char *getCString(const std::string &str) {
+#if defined(_WIN32)
+    return _strdup(str.c_str());
+#else
     return strdup(str.c_str());
+#endif
   }
 
 public:
@@ -172,8 +176,8 @@ template <typename T> class TypeLookupErrorOr {
 public:
   TypeLookupErrorOr() : Value(TypeLookupError("freshly constructed error")) {}
 
-  TypeLookupErrorOr(const T &t) : Value(t) {
-    if (!t)
+  TypeLookupErrorOr(const T &t, bool ignoreValueCheck = false) : Value(t) {
+    if (!t && !ignoreValueCheck)
       Value = TypeLookupError("unknown error");
   }
 

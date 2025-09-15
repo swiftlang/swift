@@ -46,12 +46,6 @@ internal protocol RemoteProcess: AnyObject {
 }
 
 extension RemoteProcess {
-  static var Free: FreeFunction? {
-    return nil
-  }
-}
-
-extension RemoteProcess {
   internal func toOpaqueRef() -> UnsafeMutableRawPointer {
     return Unmanaged.passRetained(self).toOpaque()
   }

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
@@ -368,6 +369,11 @@ void swift::mergeBasicBlockWithSingleSuccessor(SILBasicBlock *BB,
 //                              DeadEndBlocks
 //===----------------------------------------------------------------------===//
 
+// Force the compiler to generate the destructor in this C++ file.
+// Otherwise it can happen that it is generated in a SwiftCompilerSources module
+// and that results in unresolved-symbols linker errors.
+DeadEndBlocks::~DeadEndBlocks() {}
+
 // Propagate the reachability up the control flow graph.
 void DeadEndBlocks::propagateNewlyReachableBlocks(unsigned startIdx) {
   for (unsigned idx = startIdx; idx < reachableBlocks.size(); ++idx) {
@@ -440,6 +446,16 @@ static FunctionTest DeadEndBlocksTest("dead_end_blocks", [](auto &function,
   }
 #endif
 });
+
+// Arguments:
+// - none
+// Dumps:
+// - message
+static FunctionTest HasAnyDeadEndBlocksTest(
+    "has_any_dead_ends", [](auto &function, auto &arguments, auto &test) {
+      auto deb = test.getDeadEndBlocks();
+      llvm::outs() << (deb->isEmpty() ? "no dead ends\n" : "has dead ends\n");
+    });
 } // end namespace swift::test
 
 //===----------------------------------------------------------------------===//

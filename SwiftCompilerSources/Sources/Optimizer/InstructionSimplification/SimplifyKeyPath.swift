@@ -12,14 +12,18 @@
 
 import SIL
 
-extension KeyPathInst : OnoneSimplifyable {
+extension KeyPathInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if allUsesRemovable(instruction: self) {
       if parentFunction.hasOwnership {
         let builder = Builder(after: self, context)
         for operand in self.operands {
           if !operand.value.type.isTrivial(in: parentFunction) {
-            builder.createDestroyValue(operand: operand.value)
+            if operand.value.type.isAddress {
+              builder.createDestroyAddr(address: operand.value)
+            } else {
+              builder.createDestroyValue(operand: operand.value)
+            }
           }
         }
       }

@@ -21,6 +21,7 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
@@ -104,6 +105,9 @@ static bool validateModule(
         break;
       case swift::PluginSearchOption::Kind::LoadPluginExecutable:
         optStr = "-load-plugin-executable";
+        break;
+      case swift::PluginSearchOption::Kind::ResolvedPluginConfig:
+        optStr = "-load-resolved-plugin";
         break;
       }
       llvm::outs() << "    " << optStr << " " << opt.second << "\n";
@@ -236,6 +240,7 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
 int main(int argc, char **argv) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
+  initializeSwiftModules();
 
   // Command line handling.
   using namespace llvm::cl;
@@ -250,7 +255,7 @@ int main(int argc, char **argv) {
       desc("Dump the imported module after checking it imports just fine"),
       cat(Visible));
 
-  opt<bool> Verbose("verbose", desc("Dump informations on the loaded module"),
+  opt<bool> Verbose("verbose", desc("Dump information on the loaded module"),
                     cat(Visible));
 
   opt<std::string> Filter("filter", desc("triple for filtering modules"),

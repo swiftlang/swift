@@ -10,22 +10,16 @@ public let s = S<Int>(t: 0)
 // CHECK-SAME:             templateParams: ![[PARAMS:[0-9]+]]
 // CHECK: ![[PARAMS]] = !{![[INTPARAM:[0-9]+]]}
 // CHECK: ![[INTPARAM]] = !DITemplateTypeParameter(type: ![[INT:[0-9]+]])
-// CHECK: ![[INT]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$sSiD",
+// CHECK: ![[INT]] = !DICompositeType(tag: DW_TAG_structure_type, {{.*}}"$sSiD"
 
+// DWARF-DAG: !DICompositeType(tag: DW_TAG_structure_type, {{.*}}name: "$s18BoundGenericStruct1SVySiGD"{{.*}}templateParams: ![[PARAMS:[0-9]+]]
 
-// DWARF: !DICompositeType(tag: DW_TAG_structure_type,
-// DWARF-SAME:             templateParams: ![[PARAMS:[0-9]+]]
-// DWARF-SAME:             identifier: "$s18BoundGenericStruct1SVySiGD"
-// DWARF-SAME:             specification_of:
+// DWARF-DAG: ![[PARAMS]] = !{![[INTPARAM:[0-9]+]]}
+// DWARF-DAG: ![[INTPARAM]] = !DITemplateTypeParameter(type: ![[INT:[0-9]+]])
+// DWARF-DAG: ![[INT]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int", {{.*}}"$sSiD"
 
-// DWARF: ![[PARAMS]] = !{![[INTPARAM:[0-9]+]]}
-// DWARF: ![[INTPARAM]] = !DITemplateTypeParameter(type: ![[INT:[0-9]+]])
-// DWARF: ![[INT]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int", {{.*}}identifier: "$sSiD"
-
-// DWARF: !DICompositeType(tag: DW_TAG_structure_type, name: "S", 
-// DWARF-SAME:             identifier: "$s18BoundGenericStruct1SVyxGD")
-// DWARF: !DIDerivedType(tag: DW_TAG_member, name: "t"
-// DWARF: ![[GENERIC_PARAM_TYPE:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$sxD"
+// DWARF-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "S", {{.*}}identifier: "$s18BoundGenericStruct1SVyxGD")
+// DWARF-DAG: !DIDerivedType(tag: DW_TAG_member, name: "t"
 
 
 public struct S2<T> {
@@ -40,20 +34,17 @@ public let inner = S2<Double>.Inner(t:4.2)
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "$s18BoundGenericStruct2S2VyxGD", 
 // CHECK-SAME: flags: DIFlagFwdDecl, runtimeLang: DW_LANG_Swift)
 
-// DWARF: !DICompositeType(tag: DW_TAG_structure_type, scope: ![[SCOPE1:[0-9]+]],
-// DWARF-SAME: size: 64, {{.*}}, templateParams: ![[PARAMS2:[0-9]+]], identifier: "$s18BoundGenericStruct2S2V5InnerVySd_GD"
-// DWARF-SAME: specification_of: ![[SPECIFICATION:[0-9]+]]
+// DWARF-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "$s18BoundGenericStruct2S2V5InnerVySd_GD", scope: ![[SCOPE1:[0-9]+]], {{.*}}flags: DIFlagFwdDecl, runtimeLang: DW_LANG_Swift, templateParams: ![[PARAMS2:[0-9]+]])
 
-// DWARF: ![[SCOPE1]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$s18BoundGenericStruct2S2VyxGD", 
+// DWARF-DAG: ![[SCOPE1]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$s18BoundGenericStruct2S2VyxGD", 
 
-// DWARF: ![[PARAMS2]] = !{![[PARAMS3:[0-9]+]]}
-// DWARF: ![[PARAMS3]] = !DITemplateTypeParameter(type: ![[PARAMS4:[0-9]+]])
-// DWARF: ![[PARAMS4]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Double",
-// DWARF-SAME: size: 64, {{.*}}runtimeLang: DW_LANG_Swift, identifier: "$sSdD")
+// DWARF-DAG: ![[PARAMS2]] = !{![[PARAMS3:[0-9]+]]}
+// DWARF-DAG: ![[PARAMS3]] = !DITemplateTypeParameter(type: ![[PARAMS4:[0-9]+]])
+// DWARF-DAG: ![[PARAMS4]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Double"{{.*}} size: 64, {{.*}}runtimeLang: DW_LANG_Swift,{{.*}} identifier: "$sSdD")
 
-// DWARF: [[SPECIFICATION]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Inner", 
-// DWARF-SAME: elements: ![[ELEMENTS1:[0-9]+]], runtimeLang: DW_LANG_Swift, identifier: "$s18BoundGenericStruct2S2V5InnerVyx_GD")
+// DWARF-DAG: ![[SPECIFICATION:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Inner", {{.*}}elements: ![[ELEMENTS1:[0-9]+]], runtimeLang: DW_LANG_Swift, identifier: "$s18BoundGenericStruct2S2V5InnerVyx_GD")
+// DWARF-DAG: !DICompositeType(tag: DW_TAG_structure_type, {{.*}}line: 26, size: 64, {{.*}}specification: ![[SPECIFICATION]]
 
-// DWARF: ![[ELEMENTS1]] = !{![[ELEMENTS2:[0-9]+]]}
+// DWARF-DAG: ![[ELEMENTS1]] = !{![[ELEMENTS2:[0-9]+]]}
 
-// DWARF: ![[ELEMENTS2]] = !DIDerivedType(tag: DW_TAG_member, name: "t", scope: !27, file: !3, baseType: ![[GENERIC_PARAM_TYPE]])
+// DWARF-DAG: ![[ELEMENTS2]] = !DIDerivedType(tag: DW_TAG_member, name: "t"

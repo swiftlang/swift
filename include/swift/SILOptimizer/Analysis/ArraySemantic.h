@@ -14,40 +14,11 @@
 #define SWIFT_SILOPTIMIZER_ANALYSIS_ARRAYSEMANTIC_H
 
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/ArrayCallKind.h"
 
 namespace swift {
 
 class DominanceInfo;
-
-/// The kind of array operation identified by looking at the semantics attribute
-/// of the called function.
-enum class ArrayCallKind {
-  kNone = 0,
-  kArrayPropsIsNativeTypeChecked,
-  kCheckSubscript,
-  kCheckIndex,
-  kGetCount,
-  kGetCapacity,
-  kGetElement,
-  kGetElementAddress,
-  kMakeMutable,
-  kEndMutation,
-  kMutateUnknown,
-  kReserveCapacityForAppend,
-  kWithUnsafeMutableBufferPointer,
-  kAppendContentsOf,
-  kAppendElement,
-  kCopyIntoVector,
-  // The following two semantic function kinds return the result @owned
-  // instead of operating on self passed as parameter. If you are adding
-  // a function, and it has a self parameter, make sure that it is defined
-  // before this comment.
-  kArrayInit,
-  kArrayInitEmpty,
-  kArrayUninitialized,
-  kArrayUninitializedIntrinsic,
-  kArrayFinalizeIntrinsic,
-};
 
 /// Return true is the given function is an array semantics call.
 ArrayCallKind getArraySemanticsKind(SILFunction *f);
@@ -152,22 +123,6 @@ public:
   /// Remove the semantics call replacing it by a release of any @owned
   /// parameter.
   void removeCall();
-
-  /// Replace a call to get_element by a value.
-  ///
-  /// Preconditions:
-  /// The value \p V must dominate this get_element call.
-  /// This must be a get_element call.
-  ///
-  /// Returns true on success, false otherwise.
-  bool replaceByValue(SILValue V);
-
-  /// Replace a call to append(contentsOf: ) with a series of
-  /// append(element: ) calls.
-  bool replaceByAppendingValues(SILFunction *AppendFn,
-                                SILFunction *ReserveFn,
-                                const llvm::SmallVectorImpl<SILValue> &Vals,
-                                SubstitutionMap Subs);
 
   /// Hoist the call to the insert point.
   void hoist(SILInstruction *InsertBefore, DominanceInfo *DT) {

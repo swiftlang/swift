@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/convenience_init_peer_delegation_import.h %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/convenience_init_peer_delegation_import.h %s | %FileCheck %s
 
 extension ImportedClass {
   // CHECK-LABEL: sil hidden [ossa] @$sSo13ImportedClassC39convenience_init_peer_delegation_importE17swiftToDesignatedAByt_tcfC

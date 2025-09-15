@@ -266,6 +266,20 @@ _buildDemanglingForMetadataPack(MetadataPackPointer pack, size_t count,
   return node;
 }
 
+static Demangle::NodePointer
+_buildDemanglingForValue(intptr_t value, GenericValueDescriptor valueDescriptor,
+                         Demangle::Demangler &Dem) {
+  switch (valueDescriptor.Type) {
+  case GenericValueType::Int: {
+    if (value < 0) {
+      return Dem.createNode(Node::Kind::NegativeInteger, value);
+    }
+
+    return Dem.createNode(Node::Kind::Integer, value);
+  }
+  }
+}
+
 /// Build an array of demangling trees for each generic argument to the given
 /// generic type context descriptor.
 ///
@@ -297,7 +311,7 @@ static bool _buildDemanglingForGenericArgs(
   auto packHeader = generics->getGenericPackShapeHeader();
   auto packDescriptors = generics->getGenericPackShapeDescriptors();
 
-  llvm::SmallVector<MetadataOrPack> allGenericArgs;
+  llvm::SmallVector<MetadataPackOrValue> allGenericArgs;
 
   auto numKeyArgs = 0;
   for (auto param : generics->getGenericParams()) {
@@ -356,6 +370,25 @@ static bool _buildDemanglingForGenericArgs(
 
       demangledGenerics.push_back(genericArgDemangling);
       packIndex += 1;
+      break;
+    }
+
+    case GenericParamKind::Value: {
+      // FIXME: We really want to get the specific value descriptor when
+      // building a demangling, but when all value parameters become non-key
+      // we lose the value header. May need to do extra work to walk up parents
+      // and find this parameter's specific value descriptor.
+
+      auto valueDescriptor = GenericValueDescriptor{GenericValueType::Int};
+      auto value = genericArg.getValue();
+      auto genericArgDemangling = _buildDemanglingForValue(value,
+                                                           valueDescriptor,
+                                                           Dem);
+
+      if (!genericArgDemangling)
+        return false;
+
+      demangledGenerics.push_back(genericArgDemangling);
       break;
     }
 
@@ -430,6 +463,69 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   }
 
   return _buildDemanglingForContext(description, demangledGenerics, Dem);
+}
+
+static Demangle::NodePointer
+_replaceGeneralizationArg(Demangle::NodePointer type,
+                          SubstGenericParametersFromMetadata substitutions,
+                          Demangle::Demangler &Dem) {
+  assert(type->getKind() == Node::Kind::Type);
+  auto genericParam = type->getChild(0);
+
+  if (genericParam->getKind() != Node::Kind::DependentGenericParamType)
+    return type;
+
+  auto depth = genericParam->getChild(0)->getIndex();
+  auto index = genericParam->getChild(1)->getIndex();
+
+  auto arg = substitutions.getMetadata(depth, index);
+  assert(arg.isMetadata());
+  return _swift_buildDemanglingForMetadata(arg.getMetadata(), Dem);
+}
+
+static Demangle::NodePointer
+_buildDemanglingForExtendedExistential(const Metadata *type,
+                                       Demangle::Demangler &Dem) {
+  auto ee = cast<ExtendedExistentialTypeMetadata>(type);
+
+  auto demangledExistential = Dem.demangleType(ee->Shape->ExistentialType.get(),
+                                               ResolveToDemanglingForContext(Dem));
+
+  if (!ee->Shape->hasGeneralizationSignature())
+    return demangledExistential;
+
+  SubstGenericParametersFromMetadata substitutions(ee->Shape,
+                                              ee->getGeneralizationArguments());
+
+  // Dig out the requirement list.
+  auto constrainedExistential = demangledExistential->getChild(0);
+  assert(constrainedExistential->getKind() == Node::Kind::ConstrainedExistential);
+  auto reqList = constrainedExistential->getChild(1);
+  assert(reqList->getKind() == Node::Kind::ConstrainedExistentialRequirementList);
+
+  auto newReqList = Dem.createNode(Node::Kind::ConstrainedExistentialRequirementList);
+
+  for (auto req : *reqList) {
+    // Currently, the only requirements that can create generalization arguments
+    // are same types.
+    if (req->getKind() != Node::Kind::DependentGenericSameTypeRequirement) {
+      newReqList->addChild(req, Dem);
+      continue;
+    }
+
+    auto lhs = _replaceGeneralizationArg(req->getChild(0), substitutions, Dem);
+    auto rhs = _replaceGeneralizationArg(req->getChild(1), substitutions, Dem);
+
+    auto newReq = Dem.createNode(Node::Kind::DependentGenericSameTypeRequirement);
+    newReq->addChild(lhs, Dem);
+    newReq->addChild(rhs, Dem);
+
+    newReqList->addChild(newReq, Dem);
+  }
+
+  constrainedExistential->replaceChild(1, newReqList);
+
+  return demangledExistential;
 }
 
 // Build a demangled type tree for a type.
@@ -563,13 +659,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     return proto_list;
   }
   case MetadataKind::ExtendedExistential: {
-    // FIXME: Implement this by demangling the extended existential and
-    // substituting the generalization arguments into the demangle tree.
-    // For now, unconditional casts will report '<<< invalid type >>>' when
-    // they fail.
-    // TODO: for clients that need to guarantee round-tripping, demangle
-    // to a SymbolicExtendedExistentialType.
-    return nullptr;
+    return _buildDemanglingForExtendedExistential(type, Dem);
   }
   case MetadataKind::ExistentialMetatype: {
     auto metatype = static_cast<const ExistentialMetatypeMetadata *>(type);
@@ -708,8 +798,14 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
 
     NodePointer result = Dem.createNode(Node::Kind::ReturnType);
     result->addChild(resultTy, Dem);
-    
+
     auto funcNode = Dem.createNode(kind);
+    // Add the components of the function-signature production in the same
+    // order that the demangler would.
+    // TODO: C function type would go here
+    if (func->getExtendedFlags().hasSendingResult())
+      funcNode->addChild(Dem.createNode(Node::Kind::SendingResultFunctionType),
+                         Dem);
     if (func->hasGlobalActor()) {
       auto globalActorTypeNode =
           _swift_buildDemanglingForMetadata(func->getGlobalActor(), Dem);
@@ -719,6 +815,12 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
           Dem.createNode(Node::Kind::GlobalActorFunctionType);
       globalActorNode->addChild(globalActorTypeNode, Dem);
       funcNode->addChild(globalActorNode, Dem);
+    } else if (func->getExtendedFlags().isIsolatedAny()) {
+      funcNode->addChild(Dem.createNode(
+          Node::Kind::IsolatedAnyFunctionType), Dem);
+    } else if (func->getExtendedFlags().isNonIsolatedCaller()) {
+      funcNode->addChild(Dem.createNode(
+        Node::Kind::NonIsolatedCallerFunctionType), Dem);
     }
     switch (func->getDifferentiabilityKind().Value) {
     case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
@@ -764,10 +866,6 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     }
     if (func->isAsync())
       funcNode->addChild(Dem.createNode(Node::Kind::AsyncAnnotation), Dem);
-
-    if (func->getExtendedFlags().hasSendingResult())
-      funcNode->addChild(Dem.createNode(Node::Kind::SendingResultFunctionType),
-                         Dem);
 
     funcNode->addChild(parameters, Dem);
     funcNode->addChild(result, Dem);
@@ -916,7 +1014,11 @@ char *swift_demangle(const char *mangledName,
 
   // If the output buffer is not provided, malloc memory ourselves.
   if (outputBuffer == nullptr || *outputBufferSize == 0) {
+#if defined(_WIN32)
+    return _strdup(result.c_str());
+#else
     return strdup(result.c_str());
+#endif
   }
 
   // Copy into the provided buffer.

@@ -59,6 +59,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
@@ -170,7 +171,7 @@ public:
 void
 RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
     MutableTerm term, SmallVectorImpl<unsigned> &result) const {
-  assert(term.back().getKind() == Symbol::Kind::Protocol);
+  ASSERT(term.back().getKind() == Symbol::Kind::Protocol);
 
   // If T is canonical and T.[P] => T, then by confluence, T.[P]
   // reduces to T in a single step, via a rule V.[P] => V, where
@@ -178,27 +179,28 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
   RewritePath steps;
   bool simplified = simplify(term, &steps);
   if (!simplified) {
-    llvm::errs() << "Term does not conform to protocol: " << term << "\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Term does not conform to protocol: " << term << "\n";
+      dump(out);
+    });
   }
 
-  assert(steps.size() == 1 &&
+  ASSERT(steps.size() == 1 &&
          "Canonical conformance term should simplify in one step");
 
   const auto &step = *steps.begin();
 
   const auto &rule = getRule(step.getRuleID());
-  assert(rule.isAnyConformanceRule());
+  CONDITIONAL_ASSERT(rule.isAnyConformanceRule());
 
   // The identity conformance ([P].[P] => [P]) decomposes to an empty
   // conformance path.
   if (rule.isIdentityConformanceRule())
     return;
 
-  assert(step.Kind == RewriteStep::Rule);
-  assert(step.EndOffset == 0);
-  assert(!step.Inverse);
+  ASSERT(step.Kind == RewriteStep::Rule);
+  ASSERT(step.EndOffset == 0);
+  ASSERT(!step.Inverse);
 
   // If |U| > 0, recurse with the term U.[domain(V)]. Since T is
   // canonical, we know that U is canonical as well.
@@ -221,8 +223,8 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
     MutableTerm term, unsigned ruleID,
     SmallVectorImpl<unsigned> &result) const {
   const auto &rule = getRule(ruleID);
-  assert(rule.isAnyConformanceRule());
-  assert(!rule.isIdentityConformanceRule());
+  CONDITIONAL_ASSERT(rule.isAnyConformanceRule());
+  CONDITIONAL_ASSERT(!rule.isIdentityConformanceRule());
 
   // Compute domain(V).
   const auto &lhs = rule.getLHS();
@@ -253,12 +255,12 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
 static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
   // The last element is a protocol symbol, because this is the left hand side
   // of a conformance rule.
-  assert(lhs.back().getKind() == Symbol::Kind::Protocol ||
+  ASSERT(lhs.back().getKind() == Symbol::Kind::Protocol ||
          lhs.back().getKind() == Symbol::Kind::ConcreteConformance);
 
   // The second to last symbol is either an associated type, protocol or generic
   // parameter symbol.
-  assert(lhs.size() >= 2);
+  ASSERT(lhs.size() >= 2);
 
   auto parentSymbol = lhs[lhs.size() - 2];
 
@@ -286,11 +288,13 @@ static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
   case Symbol::Kind::ConcreteType:
   case Symbol::Kind::ConcreteConformance:
   case Symbol::Kind::Shape:
+  case Symbol::Kind::PackElement:
     break;
   }
 
-  llvm::errs() << "Bad symbol in " << lhs << "\n";
-  abort();
+  ABORT([&](auto &out) {
+    out << "Bad symbol in " << lhs;
+  });
 }
 
 /// Collect conformance rules and parent paths, and record an initial
@@ -309,7 +313,7 @@ void MinimalConformances::collectConformanceRules() {
         rule.isSubstitutionSimplified())
       continue;
 
-    if (rule.containsUnresolvedSymbols())
+    if (rule.containsNameSymbols())
       continue;
 
     if (!rule.isAnyConformanceRule())
@@ -330,7 +334,7 @@ void MinimalConformances::collectConformanceRules() {
     // conformance path to derive.
     if (auto *parentProto = getParentConformanceForTerm(lhs)) {
       MutableTerm mutTerm(lhs.begin(), lhs.end() - 2);
-      assert(!mutTerm.empty());
+      ASSERT(!mutTerm.empty());
 
       mutTerm.add(Symbol::forProtocol(parentProto, Context));
 
@@ -424,7 +428,7 @@ void RewriteSystem::computeCandidateConformancePaths(
     if (lhs.isRHSSimplified() ||
         lhs.isSubstitutionSimplified() ||
         lhs.isIdentityConformanceRule() ||
-        lhs.containsUnresolvedSymbols())
+        lhs.containsNameSymbols())
       continue;
 
     if (!lhs.isAnyConformanceRule() &&
@@ -503,7 +507,7 @@ void RewriteSystem::computeCandidateConformancePaths(
         if (rhs.isRHSSimplified() ||
             rhs.isSubstitutionSimplified() ||
             rhs.isIdentityConformanceRule() ||
-            rhs.containsUnresolvedSymbols())
+            rhs.containsNameSymbols())
           return;
 
         if (!rhs.isAnyConformanceRule() &&
@@ -528,7 +532,7 @@ void RewriteSystem::computeCandidateConformancePaths(
           // If the LHS rule is a conformance rule and the RHS rule is
           // a suffix of the LHS rule, the RHS rule must also be a
           // conformance rule.
-          assert(rhs.isAnyConformanceRule());
+          CONDITIONAL_ASSERT(rhs.isAnyConformanceRule());
 
           // Build the term U.
           MutableTerm u(lhs.getLHS().begin(), from);
@@ -552,6 +556,7 @@ void RewriteSystem::computeCandidateConformancePaths(
         //
         // where Y is the simplified form of X.W.
         } else if (rhs.isAnyConformanceRule() &&
+                   !lhs.isSameElementRule() &&
                    (unsigned)(lhs.getLHS().end() - from) < rhs.getLHS().size()) {
           if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
             llvm::dbgs() << "Case 2: same-type suffix\n";
@@ -612,19 +617,20 @@ void RewriteSystem::computeCandidateConformancePaths(
           RewritePath rewritePath;
           bool result = simplify(yp, &rewritePath);
           if (!result) {
-            llvm::errs() << "Does not conform to protocol: " << yp << "\n";
-            dump(llvm::errs());
-            abort();
+            ABORT([&](auto &out) {
+              out << "Does not conform to protocol: " << yp << "\n";
+              dump(out);
+            });
           }
 
           if (rewritePath.size() != 1) {
-            llvm::errs() << "Funny rewrite path: ";
+            ABORT([&](auto &out) {
+              out << "Funny rewrite path: ";
 
-            yp = y;
-            yp.add(rhs.getLHS().back());
-            rewritePath.dump(llvm::errs(), yp, *this);
-            llvm::errs() << "\n";
-            abort();
+              yp = y;
+              yp.add(rhs.getLHS().back());
+              rewritePath.dump(out, yp, *this);
+            });
           }
 
           if (rewritePath.begin()->StartOffset == 0) {
@@ -797,15 +803,15 @@ void MinimalConformances::verifyMinimalConformanceEquations() const {
       auto *otherProto = otherRule.getLHS().back().getProtocol();
 
       if (proto != otherProto) {
-        llvm::errs() << "Invalid equation: ";
-        dumpMinimalConformanceEquation(llvm::errs(),
-                                       pair.first, pair.second);
-        llvm::errs() << "\n";
-        llvm::errs() << "Mismatched conformance:\n";
-        llvm::errs() << "Base rule: " << rule << "\n";
-        llvm::errs() << "Final rule: " << otherRule << "\n\n";
-        dumpMinimalConformanceEquations(llvm::errs());
-        abort();
+        ABORT([&](auto &out) {
+          out << "Invalid equation: ";
+          dumpMinimalConformanceEquation(out, pair.first, pair.second);
+          out << "\n";
+          out << "Mismatched conformance:\n";
+          out << "Base rule: " << rule << "\n";
+          out << "Final rule: " << otherRule << "\n\n";
+          dumpMinimalConformanceEquations(out);
+        });
       }
 
       MutableTerm otherTerm;
@@ -816,13 +822,13 @@ void MinimalConformances::verifyMinimalConformanceEquations() const {
         bool isLastElement = (i == path.size() - 1);
         if ((isLastElement && !rule.isAnyConformanceRule()) ||
             (!isLastElement && !rule.isProtocolConformanceRule())) {
-          llvm::errs() << "Equation term is not a conformance rule: ";
-          dumpMinimalConformanceEquation(llvm::errs(),
-                                         pair.first, pair.second);
-          llvm::errs() << "\n";
-          llvm::errs() << "Term: " << rule << "\n";
-          dumpMinimalConformanceEquations(llvm::errs());
-          abort();
+          ABORT([&](auto &out) {
+            out << "Equation term is not a conformance rule: ";
+            dumpMinimalConformanceEquation(out, pair.first, pair.second);
+            out << "\n";
+            out << "Term: " << rule << "\n";
+            dumpMinimalConformanceEquations(out);
+          });
         }
 
         otherTerm.append(rule.getRHS());
@@ -831,15 +837,15 @@ void MinimalConformances::verifyMinimalConformanceEquations() const {
       (void) System.simplify(otherTerm);
 
       if (baseTerm != otherTerm) {
-        llvm::errs() << "Invalid equation: ";
-        dumpMinimalConformanceEquation(llvm::errs(),
-                                       pair.first, pair.second);
-        llvm::errs() << "\n";
-        llvm::errs() << "Invalid conformance path:\n";
-        llvm::errs() << "Expected: " << baseTerm << "\n";
-        llvm::errs() << "Got: " << otherTerm << "\n\n";
-        dumpMinimalConformanceEquations(llvm::errs());
-        abort();
+        ABORT([&](auto &out) {
+          out << "Invalid equation: ";
+          dumpMinimalConformanceEquation(out, pair.first, pair.second);
+          out << "\n";
+          out << "Invalid conformance path:\n";
+          out << "Expected: " << baseTerm << "\n";
+          out << "Got: " << otherTerm << "\n\n";
+          dumpMinimalConformanceEquations(out);
+        });
       }
     }
   }
@@ -938,22 +944,24 @@ void MinimalConformances::verifyMinimalConformances() const {
       llvm::SmallDenseSet<unsigned, 4> visited;
 
       if (!isConformanceRuleRecoverable(visited, ruleID)) {
-        llvm::errs() << "Redundant conformance is not recoverable:\n";
-        llvm::errs() << rule << "\n\n";
-        dumpMinimalConformanceEquations(llvm::errs());
-        dumpMinimalConformances(llvm::errs());
-        abort();
+        ABORT([&](auto &out) {
+          out << "Redundant conformance is not recoverable:\n";
+          out << rule << "\n\n";
+          dumpMinimalConformanceEquations(out);
+          dumpMinimalConformances(out);
+        });
       }
 
       continue;
     }
 
-    if (rule.containsUnresolvedSymbols()) {
-      llvm::errs() << "Minimal conformance contains unresolved symbols: ";
-      llvm::errs() << rule << "\n\n";
-      dumpMinimalConformanceEquations(llvm::errs());
-      dumpMinimalConformances(llvm::errs());
-      abort();
+    if (rule.containsNameSymbols()) {
+      ABORT([&](auto &out) {
+        out << "Minimal conformance contains unresolved symbols: ";
+        out << rule << "\n\n";
+        dumpMinimalConformanceEquations(out);
+        dumpMinimalConformances(out);
+      });
     }
   }
 }

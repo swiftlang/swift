@@ -13,7 +13,7 @@
 import SwiftShims
 
 // Macros are disabled when Swift is built without swift-syntax.
-#if $Macros && $DebugDescriptionMacro && hasAttribute(attached)
+#if $Macros && hasAttribute(attached)
 
 /// Converts description definitions to a debugger Type Summary.
 ///
@@ -44,12 +44,12 @@ import SwiftShims
 ///     }
 ///
 /// The `DebugDescription` macro supports both `debugDescription`, `description`,
-/// as well as a third option: a property named `_debugDescription`. The first
+/// as well as a third option: a property named `lldbDescription`. The first
 /// two are implemented when conforming to the `CustomDebugStringConvertible`
-/// and `CustomStringConvertible` protocols. The additional `_debugDescription`
+/// and `CustomStringConvertible` protocols. The additional `lldbDescription`
 /// property is useful when both `debugDescription` and `description` are
 /// implemented, but don't meet the requirements of the `DebugDescription`
-/// macro. If `_debugDescription` is implemented, `DebugDescription` choose it
+/// macro. If `lldbDescription` is implemented, `DebugDescription` choose it
 /// over `debugDescription` and `description`. Likewise, `debugDescription` is
 /// preferred over `description`.
 ///
@@ -64,6 +64,7 @@ import SwiftShims
 ///   and other arbitrary computation are not supported. Of note, conditional
 ///   logic and computed properties are not supported.
 /// * Overloaded string interpolation cannot be used.
+@attached(member)
 @attached(memberAttribute)
 public macro DebugDescription() =
   #externalMacro(module: "SwiftMacros", type: "DebugDescriptionMacro")
@@ -129,7 +130,7 @@ public enum _DebuggerSupport {
 
   private static func asObjectAddress(_ value: Any) -> String {
     let address = checkValue(value,
-      ifClass: { return unsafeBitCast($0, to: Int.self) },
+      ifClass: { return unsafe unsafeBitCast($0, to: Int.self) },
       otherwise: { return 0 })
     return String(address, radix: 16, uppercase: false)
   }
@@ -157,7 +158,7 @@ public enum _DebuggerSupport {
       default:
         return value.map(String.init(reflecting:))
       }
-    case .`class`?:
+    case .`class`?, .foreignReference?:
       switch value {
       case let x as CustomDebugStringConvertible:
         return x.debugDescription
@@ -343,8 +344,8 @@ internal func _withHeapObject<R>(
   _ body: (UnsafeMutableRawPointer) -> R
 ) -> R {
   defer { _fixLifetime(object) }
-  let unmanaged = Unmanaged.passUnretained(object)
-  return body(unmanaged.toOpaque())
+  let unmanaged = unsafe Unmanaged.passUnretained(object)
+  return unsafe body(unmanaged.toOpaque())
 }
 
 @_extern(c, "swift_retainCount") @usableFromInline
@@ -357,18 +358,18 @@ internal func _swift_weakRetainCount(_: UnsafeMutableRawPointer) -> Int
 // Utilities to get refcount(s) of class objects.
 @_alwaysEmitIntoClient
 public func _getRetainCount(_ object: AnyObject) -> UInt {
-  let count = _withHeapObject(of: object) { _swift_retainCount($0) }
+  let count = unsafe _withHeapObject(of: object) { unsafe _swift_retainCount($0) }
   return UInt(bitPattern: count)
 }
 
 @_alwaysEmitIntoClient
 public func _getUnownedRetainCount(_ object: AnyObject) -> UInt {
-  let count = _withHeapObject(of: object) { _swift_unownedRetainCount($0) }
+  let count = unsafe _withHeapObject(of: object) { unsafe _swift_unownedRetainCount($0) }
   return UInt(bitPattern: count)
 }
 
 @_alwaysEmitIntoClient
 public func _getWeakRetainCount(_ object: AnyObject) -> UInt {
-  let count = _withHeapObject(of: object) { _swift_weakRetainCount($0) }
+  let count = unsafe _withHeapObject(of: object) { unsafe _swift_weakRetainCount($0) }
   return UInt(bitPattern: count)
 }

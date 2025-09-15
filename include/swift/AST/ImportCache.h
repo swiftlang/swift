@@ -127,12 +127,17 @@ class alignas(ImportedModule) ImportCache {
   llvm::DenseMap<std::tuple<const ModuleDecl *,
                             const DeclContext *>,
                  bool> SwiftOnlyCache;
+  llvm::DenseMap<const ModuleDecl *, ArrayRef<ModuleDecl *>> WeakCache;
 
   ImportPath::Access EmptyAccessPath;
 
   ArrayRef<ImportPath::Access> allocateArray(
       ASTContext &ctx,
       SmallVectorImpl<ImportPath::Access> &results);
+
+  ArrayRef<ModuleDecl *> allocateArray(
+      ASTContext &ctx,
+      llvm::SetVector<ModuleDecl *> &results);
 
   ImportSet &getImportSet(ASTContext &ctx,
                           ArrayRef<ImportedModule> topLevelImports);
@@ -166,6 +171,13 @@ public:
   getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
                                  const ModuleDecl *other,
                                  const DeclContext *dc);
+
+  /// Returns all weak-linked imported modules.
+  ArrayRef<ModuleDecl *>
+  getWeakImports(const ModuleDecl *mod);
+
+  bool isWeakImportedBy(const ModuleDecl *mod,
+                        const ModuleDecl *from);
 
   /// This is a hack to cope with main file parsing and REPL parsing, where
   /// we can add ImportDecls after import resolution.

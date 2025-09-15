@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all=true %s | %target-sil-opt -enable-objc-interop -enable-sil-verify-all=true | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all=true %s | %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all=true | %FileCheck %s
 
 sil_stage raw // CHECK: sil_stage raw
 
@@ -47,14 +47,6 @@ sil_global @static_global_vector : $Int32 = {
   %initval = vector (%1 : $Int32, %3 : $Int32)
 }
 
-// CHECK-LABEL: sil_global @static_global_uninitialized_vector : $Int = {
-// CHECK:         %initval = alloc_vector $Int, %0 : $Builtin.Word
-// CHECK-NEXT:  }       
-sil_global @static_global_uninitialized_vector : $Int = {
-  %0 = integer_literal $Builtin.Word, 10
-  %initval = alloc_vector $Int, %0 : $Builtin.Word
-}
-
 // Type references
 
 // Some cyclic type references between SIL function bodies.
@@ -67,7 +59,7 @@ class Class2 {
   init()
 }
 
-@_moveOnly struct MoveOnlyStruct {
+struct MoveOnlyStruct: ~Copyable {
   @_hasStorage var i: Int
   deinit
 }
@@ -579,17 +571,6 @@ bb0:
   %0 = global_value @static_array : $TestArrayStorage
   %1 = struct $TestArray (%0 : $TestArrayStorage)
   return %1 : $TestArray
-}
-
-// CHECK-LABEL: sil @alloc_vector :
-sil @alloc_vector : $@convention(thin) () -> () {
-bb0:
-  %0 = integer_literal $Builtin.Word, 42
-  // CHECK: %1 = alloc_vector $Int, %0 : $Builtin.Word
-  %1 = alloc_vector $Int, %0 : $Builtin.Word
-  dealloc_stack %1 : $*Int
-  %3 = tuple ()
-  return %3 : $()
 }
 
 // CHECK-LABEL: @global_code : $@convention(thin) () -> ()
@@ -1239,6 +1220,16 @@ sil @alloc_stack_test : $() -> () {
 // CHECK: } // end sil function 'alloc_stack_test'
 }
 
+// CHECK-LABEL: sil @vector_base_addr :
+// CHECK:         %1 = vector_base_addr %0 : $*Builtin.FixedArray<10, Int>
+// CHECK-LABEL: } // end sil function 'vector_base_addr'
+sil @vector_base_addr : $@convention(thin) (@inout Builtin.FixedArray<10, Int>) -> Int {
+bb0(%0 : $*Builtin.FixedArray<10, Int>):
+  %1 = vector_base_addr %0
+  %2 = load %1
+  return %2
+}
+
 sil_global @staticProp: $Int
 
 // CHECK-LABEL: sil private @globalinit_func0 : $@convention(thin) () -> () {
@@ -1524,13 +1515,13 @@ bb0(%0 : $*Builtin.NativeObject):
   return %1 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil @is_escaping_closure
-sil @is_escaping_closure : $@convention(thin)(@guaranteed @callee_guaranteed () -> ()) -> Builtin.Int1 {
+// CHECK-LABEL: sil @destroy_not_escaped_closure
+sil @destroy_not_escaped_closure : $@convention(thin)(@guaranteed @callee_guaranteed () -> ()) -> Builtin.Int1 {
 bb0(%0 : $@callee_guaranteed () -> ()):
-  // CHECK: %1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
-  // CHECK: %2 = is_escaping_closure [objc] %0 : $@callee_guaranteed () -> ()
-  %1 = is_escaping_closure %0: $@callee_guaranteed () -> ()
-  %2 = is_escaping_closure [objc] %0: $@callee_guaranteed () -> ()
+  // CHECK: %1 = destroy_not_escaped_closure %0 : $@callee_guaranteed () -> ()
+  // CHECK: %2 = destroy_not_escaped_closure [objc] %0 : $@callee_guaranteed () -> ()
+  %1 = destroy_not_escaped_closure %0: $@callee_guaranteed () -> ()
+  %2 = destroy_not_escaped_closure [objc] %0: $@callee_guaranteed () -> ()
   return %1 : $Builtin.Int1
 }
 
@@ -1751,6 +1742,22 @@ bb0:
   %1 = tuple()
   () = destructure_tuple %1 : $()
   return %1 : $()
+}
+
+protocol P2 {
+  associatedtype A
+}
+
+// CHECK-LABEL: sil [ossa] @test_dependent_existential_archetype :
+// CHECK:         %2 = alloc_stack $(@opened("0B7C132E-8010-11F0-8526-0EA13E3AABB4", any P2) Self).A
+// CHECK-LABEL: } // end sil function 'test_dependent_existential_archetype'
+sil [ossa] @test_dependent_existential_archetype : $@convention(thin) (@thick any P2.Type) -> () {
+bb0(%0 : $@thick any P2.Type):
+  %1 = open_existential_metatype %0 to $@thick (@opened("0B7C132E-8010-11F0-8526-0EA13E3AABB4", any P2) Self).Type
+  %2 = alloc_stack $(@opened("0B7C132E-8010-11F0-8526-0EA13E3AABB4", any P2) Self).A
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
 }
 
 class Foo2: Foo {}

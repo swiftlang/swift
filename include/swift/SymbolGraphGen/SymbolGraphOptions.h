@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/TargetParser/Triple.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/TargetParser/Triple.h"
 
 #include "swift/AST/AttrKind.h"
 
@@ -60,15 +61,22 @@ struct SymbolGraphOptions {
   /// members and conformances with the extended nominal.
   bool EmitExtensionBlockSymbols = false;
 
-  /// Whether to print information for private symbols in the standard library.
+  /// Whether to print information for private symbols in system modules.
   /// This should be left as `false` when printing a full-module symbol graph,
   /// but SourceKit should be able to load the information when pulling symbol
   /// information for individual queries.
-  bool PrintPrivateStdlibSymbols = false;
+  bool PrintPrivateSystemSymbols = false;
 
   /// If this has a value specifies an explicit allow list of reexported module
   /// names that should be included symbol graph.
   std::optional<llvm::ArrayRef<StringRef>> AllowedReexportedModules = {};
+
+  /// If set, a list of availability platforms to restrict (or block) when
+  /// rendering symbol graphs.
+  std::optional<llvm::DenseSet<StringRef>> AvailabilityPlatforms = {};
+
+  /// Whether `AvailabilityPlatforms` is an allow list or a block list.
+  bool AvailabilityIsBlockList = false;
 };
 
 } // end namespace symbolgraphgen

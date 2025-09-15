@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -module-name=test -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -module-name=test -Xllvm -sil-print-types -emit-sil -primary-file %s | %FileCheck %s
 
 protocol P { associatedtype A = Int }
 protocol Q : P {}

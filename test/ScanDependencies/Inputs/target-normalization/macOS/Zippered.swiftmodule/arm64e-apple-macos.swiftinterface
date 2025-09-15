@@ -1,0 +1,4 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name Zippered -target arm64e-apple-macosx12.0 -target-variant arm64e-apple-ios15.0-macabi
+import Swift
+public func zipperedFunc() { }

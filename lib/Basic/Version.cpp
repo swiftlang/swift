@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/LLVM.h"
 #include "clang/Basic/CharInfo.h"
@@ -180,6 +181,20 @@ std::optional<Version> Version::getEffectiveLanguageVersion() const {
     static_assert(SWIFT_VERSION_MAJOR == 6,
                   "getCurrentLanguageVersion is no longer correct here");
     return Version::getCurrentLanguageVersion();
+
+  // FIXME: When Swift 7 becomes real, remove 'REQUIRES: swift7' from tests
+  //        using '-swift-version 7'.
+
+  case Version::getFutureMajorLanguageVersion():
+    // Allow the future language mode version in asserts compilers *only* so
+    // that we can start testing changes planned for after the current latest
+    // language mode. Note that it'll not be listed in
+    // `Version::getValidEffectiveVersions()`.
+#ifdef NDEBUG
+    LLVM_FALLTHROUGH;
+#else
+    return Version{Version::getFutureMajorLanguageVersion()};
+#endif
   default:
     return std::nullopt;
   }
@@ -289,17 +304,9 @@ StringRef getSwiftRevision() {
 #endif
 }
 
-bool isCurrentCompilerTagged() {
-#ifdef SWIFT_COMPILER_VERSION
-  return true;
-#else
-  return false;
-#endif
-}
-
 StringRef getCurrentCompilerTag() {
-#ifdef SWIFT_COMPILER_VERSION
-  return SWIFT_COMPILER_VERSION;
+#ifdef SWIFT_TOOLCHAIN_VERSION
+  return SWIFT_TOOLCHAIN_VERSION;
 #else
   return StringRef();
 #endif
@@ -325,6 +332,18 @@ StringRef getCurrentCompilerChannel() {
 
 unsigned getUpcomingCxxInteropCompatVersion() {
   return SWIFT_VERSION_MAJOR + 1;
+}
+
+std::string getCompilerVersion() {
+  std::string buf;
+  llvm::raw_string_ostream OS(buf);
+
+ // TODO: This should print SWIFT_COMPILER_VERSION when
+ // available, but to do that we need to switch from
+ // llvm::VersionTuple to swift::Version.
+ OS << SWIFT_VERSION_STRING;
+
+  return OS.str();
 }
 
 } // end namespace version

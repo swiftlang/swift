@@ -19,11 +19,11 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/LangOptions.h"
 
 namespace swift {
 
 class ASTContext;
+class AvailabilityContext;
 class QualifiedIdentTypeRepr;
 class TypeRepr;
 class PackElementTypeRepr;
@@ -106,6 +106,11 @@ enum class TypeResolverContext : uint8_t {
   /// arguments.
   VariadicGenericArgument,
 
+  /// Whether we are checking generic arguments of a bound generic type with
+  /// value parameters. We use the ValueMatchVisitor to ensure that all value
+  /// parameters line up with integer types or other value parameters.
+  ValueGenericArgument,
+
   /// Whether we are checking a tuple element type.
   TupleElement,
 
@@ -118,7 +123,7 @@ enum class TypeResolverContext : uint8_t {
   /// Whether we are checking the parameter list of a subscript.
   SubscriptDecl,
 
-  /// Whether we are checking the parameter list of a closure.
+  /// Whether we are checking the parameter list or result of a closure.
   ClosureExpr,
 
   /// Whether we are in the input type of a function, or under one level of
@@ -205,6 +210,9 @@ enum class TypeResolverContext : uint8_t {
 
   /// Whether this is the argument of an inverted constraint (~).
   Inverted,
+
+  /// Whether this is inside a @_rawLayout attribute.
+  RawLayoutAttr,
 };
 
 /// Options that determine how type resolution should work.
@@ -270,7 +278,6 @@ public:
     case Context::InExpression:
     case Context::ExplicitCastExpr:
     case Context::ForEachStmt:
-    case Context::PatternBindingDecl:
     case Context::EditorPlaceholderExpr:
     case Context::ClosureExpr:
       return true;
@@ -302,6 +309,9 @@ public:
     case Context::AssociatedTypeInherited:
     case Context::CustomAttr:
     case Context::Inverted:
+    case Context::ValueGenericArgument:
+    case Context::PatternBindingDecl:
+    case Context::RawLayoutAttr:
       return false;
     }
     llvm_unreachable("unhandled kind");
@@ -346,6 +356,8 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
+    case Context::ValueGenericArgument:
+    case Context::RawLayoutAttr:
       return true;
     }
   }
@@ -388,6 +400,53 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
+    case Context::ValueGenericArgument:
+    case Context::RawLayoutAttr:
+      return false;
+    }
+  }
+
+  /// Whether we are resolving a type in a generic argument list.
+  bool isGenericArgument() const {
+    switch (context) {
+    case Context::ScalarGenericArgument:
+    case Context::VariadicGenericArgument:
+    case Context::ValueGenericArgument:
+      return true;
+
+    case Context::None:
+    case Context::Inherited:
+    case Context::FunctionInput:
+    case Context::PackElement:
+    case Context::TupleElement:
+    case Context::GenericRequirement:
+    case Context::SameTypeRequirement:
+    case Context::ExtensionBinding:
+    case Context::TypeAliasDecl:
+    case Context::GenericTypeAliasDecl:
+    case Context::ExistentialConstraint:
+    case Context::MetatypeBase:
+    case Context::InExpression:
+    case Context::ExplicitCastExpr:
+    case Context::ForEachStmt:
+    case Context::PatternBindingDecl:
+    case Context::EditorPlaceholderExpr:
+    case Context::ClosureExpr:
+    case Context::VariadicFunctionInput:
+    case Context::InoutFunctionInput:
+    case Context::FunctionResult:
+    case Context::SubscriptDecl:
+    case Context::EnumElementDecl:
+    case Context::MacroDecl:
+    case Context::EnumPatternPayload:
+    case Context::ProtocolMetatypeBase:
+    case Context::ImmediateOptionalTypeArgument:
+    case Context::AbstractFunctionDecl:
+    case Context::CustomAttr:
+    case Context::Inverted:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
+    case Context::RawLayoutAttr:
       return false;
     }
   }
@@ -432,6 +491,8 @@ public:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
     case Context::Inverted:
+    case Context::ValueGenericArgument:
+    case Context::RawLayoutAttr:
       return false;
     }
   }
@@ -513,6 +574,9 @@ using HandlePlaceholderTypeReprFn =
 using OpenPackElementFn =
     llvm::function_ref<Type(Type, PackElementTypeRepr *)>;
 
+using OpenRequirementFn =
+    llvm::function_ref<void(GenericTypeDecl *, TypeSubstitutionFn)>;
+
 /// Handles the resolution of types within a given declaration context,
 /// which might involve resolving generic parameters to a particular
 /// stage.
@@ -523,6 +587,7 @@ class TypeResolution {
   OpenUnboundGenericTypeFn unboundTyOpener;
   HandlePlaceholderTypeReprFn placeholderHandler;
   OpenPackElementFn packElementOpener;
+  OpenRequirementFn requirementOpener;
   GenericSignature genericSig;
 
 private:
@@ -530,11 +595,13 @@ private:
                  TypeResolutionStage stage, TypeResolutionOptions options,
                  OpenUnboundGenericTypeFn unboundTyOpener,
                  HandlePlaceholderTypeReprFn placeholderHandler,
-                 OpenPackElementFn packElementOpener)
+                 OpenPackElementFn packElementOpener,
+                 OpenRequirementFn requirementOpener)
       : dc(dc), stage(stage), options(options),
         unboundTyOpener(unboundTyOpener),
         placeholderHandler(placeholderHandler),
-        packElementOpener(packElementOpener), genericSig(genericSig) {}
+        packElementOpener(packElementOpener),
+        requirementOpener(requirementOpener), genericSig(genericSig) {}
 
 public:
   /// Form a type resolution for the structure of a type, which does not
@@ -552,7 +619,8 @@ public:
   forInterface(DeclContext *dc, TypeResolutionOptions opts,
                OpenUnboundGenericTypeFn unboundTyOpener,
                HandlePlaceholderTypeReprFn placeholderHandler,
-               OpenPackElementFn packElementOpener);
+               OpenPackElementFn packElementOpener,
+               OpenRequirementFn requirementOpener = nullptr);
 
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
@@ -561,7 +629,8 @@ public:
                TypeResolutionOptions opts,
                OpenUnboundGenericTypeFn unboundTyOpener,
                HandlePlaceholderTypeReprFn placeholderHandler,
-               OpenPackElementFn packElementOpener);
+               OpenPackElementFn packElementOpener,
+               OpenRequirementFn requirementOpener = nullptr);
 
   /// Form a type resolution for a contextual type, which is a complete
   /// description of the type using the archetypes of the given generic
@@ -572,14 +641,17 @@ public:
                         OpenUnboundGenericTypeFn unboundTyOpener,
                         HandlePlaceholderTypeReprFn placeholderHandler,
                         OpenPackElementFn packElementOpener,
+                        OpenRequirementFn requirementOpener = nullptr,
                         SILTypeResolutionContext *silContext = nullptr);
 
-  static Type resolveContextualType(
-      TypeRepr *TyR, DeclContext *dc, GenericSignature genericSig,
-      TypeResolutionOptions opts, OpenUnboundGenericTypeFn unboundTyOpener,
-      HandlePlaceholderTypeReprFn placeholderHandler,
-      OpenPackElementFn packElementOpener,
-      SILTypeResolutionContext *silContext = nullptr);
+  static Type
+  resolveContextualType(TypeRepr *TyR, DeclContext *dc,
+                        GenericSignature genericSig, TypeResolutionOptions opts,
+                        OpenUnboundGenericTypeFn unboundTyOpener,
+                        HandlePlaceholderTypeReprFn placeholderHandler,
+                        OpenPackElementFn packElementOpener,
+                        OpenRequirementFn requirementOpener = nullptr,
+                        SILTypeResolutionContext *silContext = nullptr);
 
 public:
   TypeResolution withOptions(TypeResolutionOptions opts) const;
@@ -609,6 +681,10 @@ public:
 
   OpenPackElementFn getPackElementOpener() const {
     return packElementOpener;
+  }
+
+  OpenRequirementFn getRequirementOpener() const {
+    return requirementOpener;
   }
 
   /// Retrieves the generic signature for the context, or NULL if there is

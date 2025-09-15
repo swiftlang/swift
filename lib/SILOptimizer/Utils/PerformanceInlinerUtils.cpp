@@ -12,8 +12,10 @@
 
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/IsSelfRecursiveAnalysis.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -133,6 +135,9 @@ SILValue swift::stripFunctionConversions(SILValue val) {
       val = cvt->getOperand();
       result = val;
       continue;
+    } else if (auto md = dyn_cast<MarkDependenceInst>(val)) {
+      val = md->getValue();
+      result = val;
     } else {
       break;
     }
@@ -576,16 +581,6 @@ void ShortestPathAnalysis::Weight::updateBenefit(int &Benefit,
     Benefit = newBenefit;
 }
 
-// Return true if the callee has self-recursive calls.
-static bool calleeIsSelfRecursive(SILFunction *Callee) {
-  for (auto &BB : *Callee)
-    for (auto &I : BB)
-      if (auto Apply = FullApplySite::isa(&I))
-        if (Apply.getReferencedFunctionOrNull() == Callee)
-          return true;
-  return false;
-}
-
 SemanticFunctionLevel swift::getSemanticFunctionLevel(SILFunction *function) {
   // Currently, we only consider "array" semantic calls to be "optimizable
   // semantic functions" (non-transient) because we only have semantic passes
@@ -593,6 +588,11 @@ SemanticFunctionLevel swift::getSemanticFunctionLevel(SILFunction *function) {
   //
   // Compiler "hints" and informational annotations (like remarks) should
   // ideally use a separate annotation rather than @_semantics.
+
+  if (isFixedStorageSemanticsCallKind(function)) {
+    return SemanticFunctionLevel::Fundamental;
+  }
+
   switch (getArraySemanticsKind(function)) {
   case ArrayCallKind::kNone:
     return SemanticFunctionLevel::Transient;
@@ -631,7 +631,6 @@ SemanticFunctionLevel swift::getSemanticFunctionLevel(SILFunction *function) {
   // transient and should be inlined away immediately.
   case ArrayCallKind::kArrayUninitializedIntrinsic:
   case ArrayCallKind::kArrayFinalizeIntrinsic:
-  case ArrayCallKind::kCopyIntoVector:
     return SemanticFunctionLevel::Transient;
 
   } // end switch
@@ -747,7 +746,8 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
 
 // Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *swift::getEligibleFunction(FullApplySite AI,
-                                        InlineSelection WhatToInline) {
+                                        InlineSelection WhatToInline,
+                                        IsSelfRecursiveAnalysis *SRA) {
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
 
   if (!Callee) {
@@ -851,18 +851,16 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
         !Callee->hasValidLinkageForFragileRef(Caller->getSerializedKind())) {
       llvm::errs() << "caller: " << Caller->getName() << "\n";
       llvm::errs() << "callee: " << Callee->getName() << "\n";
-      llvm_unreachable("Should never be inlining a resilient function into "
-                       "a fragile function");
+      ASSERT(false && "Should never be inlining a resilient function into "
+                      "a fragile function");
     }
     return nullptr;
   }
 
   // Inlining self-recursive functions into other functions can result
   // in excessive code duplication since we run the inliner multiple
-  // times in our pipeline
-  //
-  // FIXME: This should be cached!
-  if (calleeIsSelfRecursive(Callee)) {
+  // times in our pipeline.
+  if (SRA->get(Callee)->get()) {
     return nullptr;
   }
 

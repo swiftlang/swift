@@ -57,7 +57,7 @@ public struct EV : V {
 @available(SwiftStdlib 5.1, *)
 public extension V {
 // CHECK: Loading underlying information for opaque type of 'backdeployedOpaqueFunc()'
-  @backDeployed(before: SwiftStdlib 5.1) // expected-warning 4 {{'@backDeployed' is unsupported on a instance method with a 'some' return type}}
+  @backDeployed(before: SwiftStdlib 5.1) // expected-warning 4 {{'@backDeployed' cannot be applied to instance method 'backdeployedOpaqueFunc()' because it has a 'some' return type}}
   func backdeployedOpaqueFunc() -> some V { EV() }
 }
 

@@ -10,7 +10,7 @@ struct FakeInt {
   var i: Builtin.Int32
 }
 
-@_moveOnly struct MO_DEINIT {
+struct MO_DEINIT: ~Copyable {
   @_hasStorage var value: FakeInt { get set }
   deinit
   init(value: FakeInt)
@@ -22,7 +22,7 @@ struct NC_DEINIT : ~Copyable {
   init(value: FakeInt)
 }
 
-@_moveOnly struct MO {
+struct MO: ~Copyable {
   @_hasStorage var value: FakeInt { get set }
 }
 
@@ -30,29 +30,29 @@ struct NC : ~Copyable {
   @_hasStorage var value: FakeInt { get set }
 }
 
-// CHECK: begin running test 1 of 4 on motest1: is-sil-trivial with: @instruction[2]
+// CHECK: begin running test 1 of 4 on motest1: is_sil_trivial with: @instruction[2]
 // CHECK:   %2 = struct $MO_DEINIT (%1 : $FakeInt)
 // CHECK:  is not trivial
-// CHECK: end running test 1 of 4 on motest1: is-sil-trivial with: @instruction[2]
-// CHECK: begin running test 2 of 4 on motest1: get-ownership-kind with: @instruction[2]
+// CHECK: end running test 1 of 4 on motest1: is_sil_trivial with: @instruction[2]
+// CHECK: begin running test 2 of 4 on motest1: get_ownership_kind with: @instruction[2]
 // CHECK:   %2 = struct $MO_DEINIT (%1 : $FakeInt)
 // CHECK: OwnershipKind: owned
-// CHECK: end running test 2 of 4 on motest1: get-ownership-kind with: @instruction[2]
-// CHECK: begin running test 3 of 4 on motest1: is-sil-trivial with: @instruction[4]
+// CHECK: end running test 2 of 4 on motest1: get_ownership_kind with: @instruction[2]
+// CHECK: begin running test 3 of 4 on motest1: is_sil_trivial with: @instruction[4]
 // CHECK:   %4 = move_value [lexical] %2 : $MO_DEINIT
 // CHECK:  is not trivial
-// CHECK: end running test 3 of 4 on motest1: is-sil-trivial with: @instruction[4]
-// CHECK: begin running test 4 of 4 on motest1: get-ownership-kind with: @instruction[4]
+// CHECK: end running test 3 of 4 on motest1: is_sil_trivial with: @instruction[4]
+// CHECK: begin running test 4 of 4 on motest1: get_ownership_kind with: @instruction[4]
 // CHECK:   %4 = move_value [lexical] %2 : $MO_DEINIT
 // CHECK: OwnershipKind: owned
-// CHECK: end running test 4 of 4 on motest1: get-ownership-kind with: @instruction[4]
+// CHECK: end running test 4 of 4 on motest1: get_ownership_kind with: @instruction[4]
 sil hidden [ossa] @motest1 : $@convention(thin) () -> () {
 [global: read,write,copy,destroy,allocate,deinit_barrier]
 bb0:
-  specify_test "is-sil-trivial @instruction[2]"
-  specify_test "get-ownership-kind @instruction[2]"
-  specify_test "is-sil-trivial @instruction[4]"
-  specify_test "get-ownership-kind @instruction[4]"
+  specify_test "is_sil_trivial @instruction[2]"
+  specify_test "get_ownership_kind @instruction[2]"
+  specify_test "is_sil_trivial @instruction[4]"
+  specify_test "get_ownership_kind @instruction[4]"
   %0 = integer_literal $Builtin.Int32, 38
   %1 = struct $FakeInt (%0 : $Builtin.Int32)
   %2 = struct $MO_DEINIT (%1 : $FakeInt)
@@ -63,29 +63,29 @@ bb0:
   return %6 : $()
 }
 
-// CHECK: begin running test 1 of 4 on motest2: is-sil-trivial with: @instruction[2]
+// CHECK: begin running test 1 of 4 on motest2: is_sil_trivial with: @instruction[2]
 // CHECK:   %2 = struct $MO (%1 : $FakeInt)
 // CHECK:  is not trivial
-// CHECK: end running test 1 of 4 on motest2: is-sil-trivial with: @instruction[2]
-// CHECK: begin running test 2 of 4 on motest2: get-ownership-kind with: @instruction[2]
+// CHECK: end running test 1 of 4 on motest2: is_sil_trivial with: @instruction[2]
+// CHECK: begin running test 2 of 4 on motest2: get_ownership_kind with: @instruction[2]
 // CHECK:   %2 = struct $MO (%1 : $FakeInt)
 // CHECK: OwnershipKind: owned
-// CHECK: end running test 2 of 4 on motest2: get-ownership-kind with: @instruction[2]
-// CHECK: begin running test 3 of 4 on motest2: is-sil-trivial with: @instruction[4]
+// CHECK: end running test 2 of 4 on motest2: get_ownership_kind with: @instruction[2]
+// CHECK: begin running test 3 of 4 on motest2: is_sil_trivial with: @instruction[4]
 // CHECK:   %4 = move_value [lexical] %2 : $MO
 // CHECK:  is not trivial
-// CHECK: end running test 3 of 4 on motest2: is-sil-trivial with: @instruction[4]
-// CHECK: begin running test 4 of 4 on motest2: get-ownership-kind with: @instruction[4]
+// CHECK: end running test 3 of 4 on motest2: is_sil_trivial with: @instruction[4]
+// CHECK: begin running test 4 of 4 on motest2: get_ownership_kind with: @instruction[4]
 // CHECK:   %4 = move_value [lexical] %2 : $MO
 // CHECK: OwnershipKind: owned
-// CHECK: end running test 4 of 4 on motest2: get-ownership-kind with: @instruction[4]
+// CHECK: end running test 4 of 4 on motest2: get_ownership_kind with: @instruction[4]
 sil hidden [ossa] @motest2 : $@convention(thin) () -> () {
 [global: read,write,copy,destroy,allocate,deinit_barrier]
 bb0:
-  specify_test "is-sil-trivial @instruction[2]"
-  specify_test "get-ownership-kind @instruction[2]"
-  specify_test "is-sil-trivial @instruction[4]"
-  specify_test "get-ownership-kind @instruction[4]"
+  specify_test "is_sil_trivial @instruction[2]"
+  specify_test "get_ownership_kind @instruction[2]"
+  specify_test "is_sil_trivial @instruction[4]"
+  specify_test "get_ownership_kind @instruction[4]"
   %0 = integer_literal $Builtin.Int32, 38
   %1 = struct $FakeInt (%0 : $Builtin.Int32)
   %2 = struct $MO (%1 : $FakeInt)
@@ -96,30 +96,30 @@ bb0:
   return %6 : $()
 }
 
-// CHECK: begin running test 1 of 4 on nctest1: is-sil-trivial with: @instruction[2]
+// CHECK: begin running test 1 of 4 on nctest1: is_sil_trivial with: @instruction[2]
 // CHECK:   %2 = struct $NC_DEINIT (%1 : $FakeInt)
 // CHECK:  is not trivial
-// CHECK: end running test 1 of 4 on nctest1: is-sil-trivial with: @instruction[2]
-// CHECK: begin running test 2 of 4 on nctest1: get-ownership-kind with: @instruction[2]
+// CHECK: end running test 1 of 4 on nctest1: is_sil_trivial with: @instruction[2]
+// CHECK: begin running test 2 of 4 on nctest1: get_ownership_kind with: @instruction[2]
 // CHECK:   %2 = struct $NC_DEINIT (%1 : $FakeInt)
 // CHECK: OwnershipKind: owned
-// CHECK: end running test 2 of 4 on nctest1: get-ownership-kind with: @instruction[2]
-// CHECK: begin running test 3 of 4 on nctest1: is-sil-trivial with: @instruction[4]
+// CHECK: end running test 2 of 4 on nctest1: get_ownership_kind with: @instruction[2]
+// CHECK: begin running test 3 of 4 on nctest1: is_sil_trivial with: @instruction[4]
 // CHECK:   %4 = move_value [lexical] %2 : $NC_DEINIT
 // CHECK:  is not trivial
-// CHECK: end running test 3 of 4 on nctest1: is-sil-trivial with: @instruction[4]
-// CHECK: begin running test 4 of 4 on nctest1: get-ownership-kind with: @instruction[4]
+// CHECK: end running test 3 of 4 on nctest1: is_sil_trivial with: @instruction[4]
+// CHECK: begin running test 4 of 4 on nctest1: get_ownership_kind with: @instruction[4]
 // CHECK:   %4 = move_value [lexical] %2 : $NC_DEINIT
 // CHECK: OwnershipKind: owned
-// CHECK: end running test 4 of 4 on nctest1: get-ownership-kind with: @instruction[4]
+// CHECK: end running test 4 of 4 on nctest1: get_ownership_kind with: @instruction[4]
 
 sil hidden [ossa] @nctest1 : $@convention(thin) () -> () {
 [global: read,write,copy,destroy,allocate,deinit_barrier]
 bb0:
-  specify_test "is-sil-trivial @instruction[2]"
-  specify_test "get-ownership-kind @instruction[2]"
-  specify_test "is-sil-trivial @instruction[4]"
-  specify_test "get-ownership-kind @instruction[4]"
+  specify_test "is_sil_trivial @instruction[2]"
+  specify_test "get_ownership_kind @instruction[2]"
+  specify_test "is_sil_trivial @instruction[4]"
+  specify_test "get_ownership_kind @instruction[4]"
   %0 = integer_literal $Builtin.Int32, 38
   %1 = struct $FakeInt (%0 : $Builtin.Int32)
   %2 = struct $NC_DEINIT (%1 : $FakeInt)
@@ -130,29 +130,29 @@ bb0:
   return %6 : $()
 }
 
-// CHECK: begin running test 1 of 4 on nctest2: is-sil-trivial with: @instruction[2]
+// CHECK: begin running test 1 of 4 on nctest2: is_sil_trivial with: @instruction[2]
 // CHECK:   %2 = struct $NC (%1 : $FakeInt)
 // CHECK:  is not trivial
-// CHECK: end running test 1 of 4 on nctest2: is-sil-trivial with: @instruction[2]
-// CHECK: begin running test 2 of 4 on nctest2: get-ownership-kind with: @instruction[2]
+// CHECK: end running test 1 of 4 on nctest2: is_sil_trivial with: @instruction[2]
+// CHECK: begin running test 2 of 4 on nctest2: get_ownership_kind with: @instruction[2]
 // CHECK:   %2 = struct $NC (%1 : $FakeInt)
 // CHECK: OwnershipKind: owned
-// CHECK: end running test 2 of 4 on nctest2: get-ownership-kind with: @instruction[2]
-// CHECK: begin running test 3 of 4 on nctest2: is-sil-trivial with: @instruction[4]
+// CHECK: end running test 2 of 4 on nctest2: get_ownership_kind with: @instruction[2]
+// CHECK: begin running test 3 of 4 on nctest2: is_sil_trivial with: @instruction[4]
 // CHECK:   %4 = move_value [lexical] %2 : $NC
 // CHECK:  is not trivial
-// CHECK: end running test 3 of 4 on nctest2: is-sil-trivial with: @instruction[4]
-// CHECK: begin running test 4 of 4 on nctest2: get-ownership-kind with: @instruction[4]
+// CHECK: end running test 3 of 4 on nctest2: is_sil_trivial with: @instruction[4]
+// CHECK: begin running test 4 of 4 on nctest2: get_ownership_kind with: @instruction[4]
 // CHECK:   %4 = move_value [lexical] %2 : $NC
 // CHECK: OwnershipKind: owned
-// CHECK: end running test 4 of 4 on nctest2: get-ownership-kind with: @instruction[4]
+// CHECK: end running test 4 of 4 on nctest2: get_ownership_kind with: @instruction[4]
 sil hidden [ossa] @nctest2 : $@convention(thin) () -> () {
 [global: read,write,copy,destroy,allocate,deinit_barrier]
 bb0:
-  specify_test "is-sil-trivial @instruction[2]"
-  specify_test "get-ownership-kind @instruction[2]"
-  specify_test "is-sil-trivial @instruction[4]"
-  specify_test "get-ownership-kind @instruction[4]"
+  specify_test "is_sil_trivial @instruction[2]"
+  specify_test "get_ownership_kind @instruction[2]"
+  specify_test "is_sil_trivial @instruction[4]"
+  specify_test "get_ownership_kind @instruction[4]"
   %0 = integer_literal $Builtin.Int32, 38
   %1 = struct $FakeInt (%0 : $Builtin.Int32)
   %2 = struct $NC (%1 : $FakeInt)

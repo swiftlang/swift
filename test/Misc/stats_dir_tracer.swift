@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swiftc_driver -o %t/main -module-name main -stats-output-dir %t %s -trace-stats-events
+// RUN: %target-swiftc_driver -o %t/main -module-name main -stats-output-dir %t %s -trace-stats-events -Xfrontend -fine-grained-timers
 // RUN: %FileCheck -input-file %t/*.csv %s
 
 // CHECK-DAG: {{[0-9]+,[0-9]+,"exit","SelfBoundsFromWhereClauseRequest","Sema.SelfBoundsFromWhereClauseRequest",[0-9]+,[0-9]+,"Proto",".*stats_dir_tracer.swift.*"}}

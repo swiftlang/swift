@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/STLExtras.h"
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
@@ -27,9 +26,12 @@
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 #include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
@@ -130,6 +132,10 @@ private:
   /// Stack buffers allocated for storing local adjoint values.
   SmallVector<AllocStackInst *, 64> functionLocalAllocations;
 
+  /// Copies created to deal with destructive enum operations
+  /// (unchecked_take_enum_addr)
+  llvm::SmallDenseMap<InitEnumDataAddrInst*, SILValue> enumDataAdjCopies;
+
   /// A set used to remember local allocations that were destroyed.
   llvm::SmallDenseSet<SILValue> destroyedLocalAllocations;
 
@@ -209,12 +215,17 @@ private:
   //--------------------------------------------------------------------------//
 
   /// Get the type lowering for the given AST type.
+  ///
+  /// Explicitly use minimal type expansion context: in general, differentiation
+  /// happens on function types, so it cannot know if the original function is
+  /// resilient or not.
   const Lowering::TypeLowering &getTypeLowering(Type type) {
     auto pbGenSig =
         getPullback().getLoweredFunctionType()->getSubstGenericSignature();
     Lowering::AbstractionPattern pattern(pbGenSig,
                                          type->getReducedType(pbGenSig));
-    return getPullback().getTypeLowering(pattern, type);
+    return getContext().getTypeConverter().getTypeLowering(
+      pattern, type, TypeExpansionContext::minimal());
   }
 
   /// Remap any archetypes into the current function's context.
@@ -238,7 +249,7 @@ private:
         getWitness()->getDerivativeGenericSignature().getReducedType(
             type);
     return type->getAutoDiffTangentSpace(
-        LookUpConformanceInModule(getModule().getSwiftModule()));
+        LookUpConformanceInModule());
   }
 
   /// Returns the tangent value category of the given value.
@@ -764,14 +775,15 @@ private:
                                         SILValue wrappedAdjoint,
                                         SILType optionalTy);
 
-  /// Accumulate optional buffer from `wrappedAdjoint`.
+  /// Accumulate adjoint of `wrappedAdjoint` into optionalBuffer.
   void accumulateAdjointForOptionalBuffer(SILBasicBlock *bb,
                                           SILValue optionalBuffer,
                                           SILValue wrappedAdjoint);
 
-  /// Set optional value from `wrappedAdjoint`.
-  void setAdjointValueForOptional(SILBasicBlock *bb, SILValue optionalValue,
-                                  SILValue wrappedAdjoint);
+  /// Accumulate adjoint of `wrappedAdjoint` into optionalValue.
+  void accumulateAdjointValueForOptional(SILBasicBlock *bb,
+                                         SILValue optionalValue,
+                                         SILValue wrappedAdjoint);
 
   //--------------------------------------------------------------------------//
   // Array literal initialization differentiation
@@ -893,6 +905,7 @@ public:
   bool runForSemanticMemberAccessor();
   bool runForSemanticMemberGetter();
   bool runForSemanticMemberSetter();
+  bool runForSemanticMemberModify();
 
   /// If original result is non-varied, it will always have a zero derivative.
   /// Skip full pullback generation and simply emit zero derivatives for wrt
@@ -1427,7 +1440,7 @@ public:
           recordTemporary(adjElt);
         } else {
           auto substMap = tangentVectorTy->getMemberSubstitutionMap(
-              field->getModuleContext(), field);
+              field);
           auto fieldTy = field->getInterfaceType().subst(substMap);
           auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
           assert(fieldSILTy.isObject());
@@ -1724,13 +1737,21 @@ public:
   /// move_value, begin_borrow.
   ///   Original: y = copy_value x
   ///    Adjoint: adj[x] += adj[y]
-  void visitValueOwnershipInst(SingleValueInstruction *svi) {
+  void visitValueOwnershipInst(SingleValueInstruction *svi,
+                               bool needZeroResAdj = false) {
     assert(svi->getNumOperands() == 1);
     auto *bb = svi->getParent();
     switch (getTangentValueCategory(svi)) {
     case SILValueCategory::Object: {
       auto adj = getAdjointValue(bb, svi);
       addAdjointValue(bb, svi->getOperand(0), adj, svi->getLoc());
+      if (needZeroResAdj) {
+        assert(svi->getNumResults() == 1);
+        SILValue val = svi->getResult(0);
+        setAdjointValue(
+            bb, val,
+            makeZeroAdjointValue(getRemappedTangentType(val->getType())));
+      }
       break;
     }
     case SILValueCategory::Address: {
@@ -1756,8 +1777,20 @@ public:
 
   /// Handle `move_value` instruction.
   ///   Original: y = move_value x
-  ///    Adjoint: adj[x] += adj[y]
-  void visitMoveValueInst(MoveValueInst *mvi) { visitValueOwnershipInst(mvi); }
+  ///    Adjoint: adj[x] += adj[y]; adj[y] = 0
+  void visitMoveValueInst(MoveValueInst *mvi) {
+    switch (getTangentValueCategory(mvi)) {
+    case SILValueCategory::Address:
+      LLVM_DEBUG(getADDebugStream() << "AutoDiff does not support move_value with "
+                 "SILValueCategory::Address");
+      getContext().emitNondifferentiabilityError(
+        mvi, getInvoker(), diag::autodiff_expression_not_differentiable_note);
+      errorOccurred = true;
+      return;
+    case SILValueCategory::Object:
+      visitValueOwnershipInst(mvi, /*needZeroResAdj=*/true);
+    }
+  }
 
   void visitEndInitLetRefInst(EndInitLetRefInst *eir) { visitValueOwnershipInst(eir); }
 
@@ -1794,7 +1827,8 @@ public:
     auto adjSrc = getAdjointBuffer(bb, uccai->getSrc());
     auto castBuf = builder.createAllocStack(uccai->getLoc(), adjSrc->getType());
     builder.createUnconditionalCheckedCastAddr(
-        uccai->getLoc(), adjDest, adjDest->getType().getASTType(), castBuf,
+        uccai->getLoc(), uccai->getCheckedCastOptions(),
+        adjDest, adjDest->getType().getASTType(), castBuf,
         adjSrc->getType().getASTType());
     addToAdjointBuffer(bb, uccai->getSrc(), castBuf, uccai->getLoc());
     builder.emitDestroyAddrAndFold(uccai->getLoc(), castBuf);
@@ -1802,10 +1836,43 @@ public:
     builder.emitZeroIntoBuffer(uccai->getLoc(), adjDest, IsInitialization);
   }
 
+  /// Handle `enum` instruction.
+  ///   Original: y = enum $Enum, #Enum.some!enumelt, x
+  ///    Adjoint: adj[x] += adj[y]
+  void visitEnumInst(EnumInst *ei) {
+    SILBasicBlock *bb = ei->getParent();
+    SILLocation loc = ei->getLoc();
+    auto *optionalEnumDecl = getASTContext().getOptionalDecl();
+
+    // Only `Optional`-typed operands are supported for now. Diagnose all other
+    // enum operand types.
+    if (ei->getType().getEnumOrBoundGenericEnum() != optionalEnumDecl) {
+      LLVM_DEBUG(getADDebugStream()
+                 << "Unsupported enum type in PullbackCloner: " << *ei);
+      getContext().emitNondifferentiabilityError(
+          ei, getInvoker(),
+          diag::autodiff_expression_not_differentiable_note);
+      errorOccurred = true;
+      return;
+    }
+
+    auto adjOpt = getAdjointValue(bb, ei);
+    auto adjStruct = materializeAdjointDirect(adjOpt, loc);
+
+    VarDecl *adjOptVar =
+      getASTContext().getOptionalTanValueDecl(adjStruct->getType().getASTType());
+    auto *adjVal = builder.createStructExtract(loc, adjStruct, adjOptVar);
+
+    EnumElementDecl *someElemDecl = getASTContext().getOptionalSomeDecl();
+    auto *adjData = builder.createUncheckedEnumData(loc, adjVal, someElemDecl);
+
+    addAdjointValue(bb, ei->getOperand(), makeConcreteAdjointValue(adjData), loc);
+  }
+
   /// Handle a sequence of `init_enum_data_addr` and `inject_enum_addr`
   /// instructions.
   ///
-  /// Original: y = init_enum_data_addr x
+  /// Original: x = init_enum_data_addr y : $*Enum, #Enum.Case
   ///           inject_enum_addr y
   ///
   ///  Adjoint: adj[x] += unchecked_take_enum_data_addr adj[y]
@@ -1825,6 +1892,10 @@ public:
       errorOccurred = true;
       return;
     }
+
+    // No associated value => no adjoint to propagate
+    if (!inject->getElement()->hasAssociatedValues())
+      return;
 
     InitEnumDataAddrInst *origData = nullptr;
     for (auto use : origEnum->getUses()) {
@@ -1847,29 +1918,13 @@ public:
       }
     }
 
-    SILValue adjStruct = getAdjointBuffer(bb, origEnum);
-    StructDecl *adjStructDecl =
-        adjStruct->getType().getStructOrBoundGenericStruct();
-
-    VarDecl *adjOptVar = nullptr;
-    if (adjStructDecl) {
-      ArrayRef<VarDecl *> properties = adjStructDecl->getStoredProperties();
-      adjOptVar = properties.size() == 1 ? properties[0] : nullptr;
-    }
-
-    EnumDecl *adjOptDecl =
-        adjOptVar ? adjOptVar->getTypeInContext()->getEnumOrBoundGenericEnum()
-                  : nullptr;
-
-    // Optional<T>.TangentVector should be a struct with a single
-    // Optional<T.TangentVector> property. This is an implementation detail of
-    // OptionalDifferentiation.swift
-    if (!adjOptDecl || adjOptDecl != optionalEnumDecl)
-      llvm_unreachable("Unexpected type of Optional.TangentVector");
+    SILValue adjDest = getAdjointBuffer(bb, origEnum);
+    VarDecl *adjOptVar =
+      getASTContext().getOptionalTanValueDecl(adjDest->getType().getASTType());
 
     SILLocation loc = origData->getLoc();
     StructElementAddrInst *adjOpt =
-        builder.createStructElementAddr(loc, adjStruct, adjOptVar);
+        builder.createStructElementAddr(loc, adjDest, adjOptVar);
 
     // unchecked_take_enum_data_addr is destructive, so copy
     // Optional<T.TangentVector> to a new alloca.
@@ -1877,27 +1932,27 @@ public:
         createFunctionLocalAllocation(adjOpt->getType(), loc);
     builder.createCopyAddr(loc, adjOpt, adjOptCopy, IsNotTake,
                            IsInitialization);
+    // The Optional copy is invalidated, do not attempt to destroy it at the end
+    // of the pullback. The value returned from unchecked_take_enum_data_addr is
+    // destroyed in visitInitEnumDataAddrInst.
+    auto [_, inserted] = enumDataAdjCopies.try_emplace(origData, adjOptCopy);
+    assert(inserted && "expected single buffer");
 
     EnumElementDecl *someElemDecl = getASTContext().getOptionalSomeDecl();
     UncheckedTakeEnumDataAddrInst *adjData =
         builder.createUncheckedTakeEnumDataAddr(loc, adjOptCopy, someElemDecl);
 
-    setAdjointBuffer(bb, origData, adjData);
-
-    // The Optional copy is invalidated, do not attempt to destroy it at the end
-    // of the pullback. The value returned from unchecked_take_enum_data_addr is
-    // destroyed in visitInitEnumDataAddrInst.
-    destroyedLocalAllocations.insert(adjOptCopy);
+    addToAdjointBuffer(bb, origData, adjData, loc);
   }
 
   /// Handle `init_enum_data_addr` instruction.
   /// Destroy the value returned from `unchecked_take_enum_data_addr`.
   void visitInitEnumDataAddrInst(InitEnumDataAddrInst *init) {
-    auto bufIt = bufferMap.find({init->getParent(), SILValue(init)});
-    if (bufIt == bufferMap.end())
-      return;
-    SILValue adjData = bufIt->second;
-    builder.emitDestroyAddr(init->getLoc(), adjData);
+    SILValue adjOptCopy = enumDataAdjCopies.at(init);
+
+    builder.emitDestroyAddr(init->getLoc(), adjOptCopy);
+    destroyedLocalAllocations.insert(adjOptCopy);
+    enumDataAdjCopies.erase(init);
   }
 
   /// Handle `unchecked_ref_cast` instruction.
@@ -2045,6 +2100,23 @@ PullbackCloner::PullbackCloner(VJPCloner &vjpCloner)
 
 PullbackCloner::~PullbackCloner() { delete &impl; }
 
+static SILValue getArrayValue(ApplyInst *ai) {
+  SILValue arrayValue;
+  for (auto use : ai->getUses()) {
+    auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
+    if (!dti)
+      continue;
+    DEBUG_ASSERT(!arrayValue && "Array value already found");
+    // The first `destructure_tuple` result is the `Array` value.
+    arrayValue = dti->getResult(0);
+#ifndef DEBUG_ASSERT_enabled
+    break;
+#endif
+  }
+  ASSERT(arrayValue);
+  return arrayValue;
+}
+
 //--------------------------------------------------------------------------//
 // Entry point
 //--------------------------------------------------------------------------//
@@ -2124,7 +2196,7 @@ bool PullbackCloner::Implementation::run() {
       //
       // Do not diagnose `Optional`-typed values, which will have special-case
       // differentiation support.
-      if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
+      if (type.getEnumOrBoundGenericEnum()) {
         if (!type.getASTType()->isOptional()) {
           getContext().emitNondifferentiabilityError(
               v, getInvoker(), diag::autodiff_enums_unsupported);
@@ -2381,7 +2453,8 @@ bool PullbackCloner::Implementation::run() {
 
   // If the original function is an accessor with special-case pullback
   // generation logic, do special-case generation.
-  if (isSemanticMemberAccessor(&original)) {
+  bool isSemanticMemberAcc = isSemanticMemberAccessor(&original);
+  if (isSemanticMemberAcc) {
     if (runForSemanticMemberAccessor())
       return true;
   }
@@ -2389,6 +2462,134 @@ bool PullbackCloner::Implementation::run() {
   // Visit original blocks in post-order and perform differentiation
   // in corresponding pullback blocks. If errors occurred, back out.
   else {
+    LLVM_DEBUG(getADDebugStream()
+               << "Begin search for adjoints of loop-local active values\n");
+    llvm::DenseMap<const SILLoop *, llvm::DenseSet<SILValue>>
+        loopLocalActiveValues;
+    for (auto *bb : originalBlocks) {
+      const SILLoop *loop = vjpCloner.getLoopInfo()->getLoopFor(bb);
+      if (loop == nullptr)
+        continue;
+      SILBasicBlock *loopHeader = loop->getHeader();
+      SILBasicBlock *pbLoopHeader = getPullbackBlock(loopHeader);
+      LLVM_DEBUG(getADDebugStream()
+                 << "Original bb" << bb->getDebugID()
+                 << " belongs to a loop, original header bb"
+                 << loopHeader->getDebugID() << ", pullback header bb"
+                 << pbLoopHeader->getDebugID() << '\n');
+      builder.setInsertionPoint(pbLoopHeader);
+      auto bbActiveValuesIt = activeValues.find(bb);
+      if (bbActiveValuesIt == activeValues.end())
+        continue;
+      const auto &bbActiveValues = bbActiveValuesIt->second;
+      for (SILValue bbActiveValue : bbActiveValues) {
+        if (vjpCloner.getLoopInfo()->getLoopFor(
+                bbActiveValue->getParentBlock()) != loop) {
+          LLVM_DEBUG(
+              getADDebugStream()
+              << "The following active value is NOT loop-local, skipping: "
+              << bbActiveValue);
+          continue;
+        }
+
+        auto [_, wasInserted] =
+            loopLocalActiveValues[loop].insert(bbActiveValue);
+        LLVM_DEBUG(getADDebugStream()
+                   << "The following active value is loop-local, ");
+        if (!wasInserted) {
+          LLVM_DEBUG(llvm::dbgs() << "but it was already processed, skipping: "
+                                  << bbActiveValue);
+          continue;
+        }
+
+        if (getTangentValueCategory(bbActiveValue) ==
+            SILValueCategory::Object) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "zeroing its adjoint value in loop header: "
+                     << bbActiveValue);
+          setAdjointValue(bb, bbActiveValue,
+                          makeZeroAdjointValue(getRemappedTangentType(
+                              bbActiveValue->getType())));
+          continue;
+        }
+
+        ASSERT(getTangentValueCategory(bbActiveValue) ==
+               SILValueCategory::Address);
+
+        // getAdjointProjection might call materializeAdjointDirect which
+        // writes to debug output, emit \n.
+        LLVM_DEBUG(llvm::dbgs()
+                   << "checking if it's adjoint is a projection\n");
+
+        if (!getAdjointProjection(bb, bbActiveValue)) {
+          LLVM_DEBUG(getADDebugStream()
+                     << "Adjoint for the following value is NOT a projection, "
+                        "zeroing its adjoint buffer in loop header: "
+                     << bbActiveValue);
+
+          // All adjoint buffers are allocated in the pullback entry and
+          // deallocated in the pullback exit. So, use IsNotInitialization to
+          // emit destroy_addr before zeroing the buffer.
+          ASSERT(bufferMap.contains({bb, bbActiveValue}));
+          builder.emitZeroIntoBuffer(pbLoc, getAdjointBuffer(bb, bbActiveValue),
+                                     IsNotInitialization);
+
+          continue;
+        }
+
+        LLVM_DEBUG(getADDebugStream()
+                   << "Adjoint for the following value is a projection, ");
+
+        // If Projection::isAddressProjection(v) is true for a value v, it
+        // is not added to active values list (see recordValueIfActive).
+        //
+        // Ensure that only the following value types conforming to
+        // getAdjointProjection but not conforming to
+        // Projection::isAddressProjection can go here.
+        //
+        // Instructions conforming to Projection::isAddressProjection and
+        // thus never corresponding to an active value do not need any
+        // handling, because only active values can have adjoints from
+        // previous iterations propagated via BB arguments.
+        do {
+          // Consider '%X = begin_access [modify] [static] %Y'.
+          // 1. If %Y is loop-local, it's adjoint buffer will
+          //    be zeroed, and we'll have zero adjoint projection to it.
+          // 2. Otherwise, we do not need to zero the projection buffer.
+          // Thus, we can just skip.
+          if (dyn_cast<BeginAccessInst>(bbActiveValue)) {
+            LLVM_DEBUG(llvm::dbgs() << "skipping: " << bbActiveValue);
+            break;
+          }
+
+          // Consider the following sequence:
+          //   %1 = function_ref @allocUninitArray
+          //   %2 = apply %1<Float>(%0)
+          //   (%3, %4) = destructure_tuple %2
+          //   %5 = mark_dependence %4 on %3
+          //   %6 = pointer_to_address %6 to [strict] $*Float
+          // Since %6 is active, %3 (which is an array) must also be active.
+          // Thus, adjoint for %3 will be zeroed if needed. Ensure that expected
+          // invariants hold and then skip.
+          if (auto *ai = getAllocateUninitializedArrayIntrinsicElementAddress(
+                  bbActiveValue)) {
+            ASSERT(isa<PointerToAddressInst>(bbActiveValue));
+            SILValue arrayValue = getArrayValue(ai);
+            ASSERT(llvm::find(bbActiveValues, arrayValue) !=
+                   bbActiveValues.end());
+            ASSERT(vjpCloner.getLoopInfo()->getLoopFor(
+                       arrayValue->getParentBlock()) == loop);
+            LLVM_DEBUG(llvm::dbgs() << "skipping: " << bbActiveValue);
+            break;
+          }
+
+          ASSERT(false);
+        } while (false);
+      }
+    }
+    LLVM_DEBUG(getADDebugStream()
+               << "End search for adjoints of loop-local active values\n");
+
     for (auto *bb : originalBlocks) {
       visitSILBasicBlock(bb);
       if (errorOccurred)
@@ -2514,6 +2715,12 @@ bool PullbackCloner::Implementation::run() {
       }
     }
   }
+  // Ensure all enum adjoint copeis have been cleaned up
+  for (const auto &enumData : enumDataAdjCopies) {
+    leakFound = true;
+    getADDebugStream() << "Found leaked temporary:\n" << enumData.second;
+  }
+
   // Ensure all local allocations have been cleaned up.
   for (auto localAlloc : functionLocalAllocations) {
     if (!destroyedLocalAllocations.count(localAlloc)) {
@@ -2525,7 +2732,8 @@ bool PullbackCloner::Implementation::run() {
 #endif
 
   LLVM_DEBUG(getADDebugStream()
-             << "Generated pullback for " << original.getName() << ":\n"
+             << "Generated " << (isSemanticMemberAcc ? "semantic member accessor" : "normal")
+             << " pullback for " << original.getName() << ":\n"
              << pullback);
   return errorOccurred;
 }
@@ -2589,24 +2797,9 @@ AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
   auto optionalOfWrappedTanType = SILType::getOptionalType(wrappedTanType);
   // `Optional<T>.TangentVector`
   auto optionalTanTy = getRemappedTangentType(optionalTy);
-  auto *optionalTanDecl = optionalTanTy.getNominalOrBoundGenericNominal();
   // Look up the `Optional<T>.TangentVector.init` declaration.
-  auto initLookup =
-      optionalTanDecl->lookupDirect(DeclBaseName::createConstructor());
-  ConstructorDecl *constructorDecl = nullptr;
-  for (auto *candidate : initLookup) {
-    auto candidateModule = candidate->getModuleContext();
-    if (candidateModule->getName() ==
-            builder.getASTContext().Id_Differentiation ||
-        candidateModule->isStdlibModule()) {
-      assert(!constructorDecl && "Multiple `Optional.TangentVector.init`s");
-      constructorDecl = cast<ConstructorDecl>(candidate);
-#ifdef NDEBUG
-      break;
-#endif
-    }
-  }
-  assert(constructorDecl && "No `Optional.TangentVector.init`");
+  ConstructorDecl *constructorDecl =
+    getASTContext().getOptionalTanInitDecl(optionalTanTy.getASTType());
 
   // Allocate a local buffer for the `Optional` adjoint value.
   auto *optTanAdjBuf = builder.createAllocStack(pbLoc, optionalTanTy);
@@ -2616,7 +2809,7 @@ AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
   // Initialize an `Optional<T.TangentVector>` buffer from `wrappedAdjoint` as
   // the input for `Optional<T>.TangentVector.init`.
   auto *optArgBuf = builder.createAllocStack(pbLoc, optionalOfWrappedTanType);
-  if (optionalOfWrappedTanType.isLoadableOrOpaque(builder.getFunction())) {
+  if (optionalOfWrappedTanType.isObject()) {
     // %enum = enum $Optional<T.TangentVector>, #Optional.some!enumelt,
     //         %wrappedAdjoint : $T
     auto *enumInst = builder.createEnum(pbLoc, wrappedAdjoint, someEltDecl,
@@ -2645,9 +2838,8 @@ AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
   auto *initFnRef = builder.createFunctionRef(pbLoc, initFn);
   auto *diffProto =
       builder.getASTContext().getProtocol(KnownProtocolKind::Differentiable);
-  auto *swiftModule = getModule().getSwiftModule();
   auto diffConf =
-      swiftModule->lookupConformance(wrappedType.getASTType(), diffProto);
+      lookupConformance(wrappedType.getASTType(), diffProto);
   assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
   auto subMap = SubstitutionMap::get(
       initFn->getLoweredFunctionType()->getSubstGenericSignature(),
@@ -2681,8 +2873,8 @@ void PullbackCloner::Implementation::accumulateAdjointForOptionalBuffer(
   builder.createDeallocStack(pbLoc, optTanAdjBuf);
 }
 
-// Set the adjoint value for the incoming `Optional` value.
-void PullbackCloner::Implementation::setAdjointValueForOptional(
+// Accumulate adjoint for the incoming `Optional` value.
+void PullbackCloner::Implementation::accumulateAdjointValueForOptional(
     SILBasicBlock *bb, SILValue optionalValue, SILValue wrappedAdjoint) {
   assert(getTangentValueCategory(optionalValue) == SILValueCategory::Object);
   auto pbLoc = getPullback().getLocation();
@@ -2694,10 +2886,11 @@ void PullbackCloner::Implementation::setAdjointValueForOptional(
 
   auto optTanAdjVal = builder.emitLoadValueOperation(
       pbLoc, optTanAdjBuf, LoadOwnershipQualifier::Take);
+
   recordTemporary(optTanAdjVal);
   builder.createDeallocStack(pbLoc, optTanAdjBuf);
 
-  setAdjointValue(bb, optionalValue, makeConcreteAdjointValue(optTanAdjVal));
+  addAdjointValue(bb, optionalValue, makeConcreteAdjointValue(optTanAdjVal), pbLoc);
 }
 
 SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
@@ -2908,12 +3101,12 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
           // Handle `switch_enum` on `Optional`.
           auto termInst = bbArg->getSingleTerminator();
           if (isSwitchEnumInstOnOptional(termInst)) {
-            setAdjointValueForOptional(bb, incomingValue, concreteBBArgAdjCopy);
+            accumulateAdjointValueForOptional(bb, incomingValue, concreteBBArgAdjCopy);
           } else {
             blockTemporaries[getPullbackBlock(predBB)].insert(
               concreteBBArgAdjCopy);
-            setAdjointValue(predBB, incomingValue,
-                            makeConcreteAdjointValue(concreteBBArgAdjCopy));
+            addAdjointValue(predBB, incomingValue,
+                            makeConcreteAdjointValue(concreteBBArgAdjCopy), pbLoc);
           }
         }
         break;
@@ -2935,8 +3128,21 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
         break;
       }
       }
-    } else
-      llvm::report_fatal_error("do not know how to handle this incoming bb argument");
+    } else {
+      LLVM_DEBUG(getADDebugStream() <<
+                 "do not know how to handle this incoming bb argument");
+      if (auto term = bbArg->getSingleTerminator()) {
+        getContext().emitNondifferentiabilityError(term, getInvoker(),
+          diag::autodiff_expression_not_differentiable_note);
+      } else {
+        // This will be a bit confusing, but still better than nothing.
+        getContext().emitNondifferentiabilityError(bbArg, getInvoker(),
+          diag::autodiff_expression_not_differentiable_note);
+      }
+
+      errorOccurred = true;
+      return;
+    }
   }
 
   // 3. Build the pullback successor cases for the `switch_enum`
@@ -3002,7 +3208,8 @@ bool PullbackCloner::Implementation::runForSemanticMemberAccessor() {
     return runForSemanticMemberGetter();
   case AccessorKind::Set:
     return runForSemanticMemberSetter();
-  // TODO(https://github.com/apple/swift/issues/55084): Support `modify` accessors.
+  case AccessorKind::Modify:
+    return runForSemanticMemberModify();
   default:
     llvm_unreachable("Unsupported accessor kind; inconsistent with "
                      "`isSemanticMemberAccessor`?");
@@ -3070,8 +3277,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
         if (field == tanField) {
           eltVals.push_back(adjResult);
         } else {
-          auto substMap = tangentVectorTy->getMemberSubstitutionMap(
-              field->getModuleContext(), field);
+          auto substMap = tangentVectorTy->getMemberSubstitutionMap(field);
           auto fieldTy = field->getInterfaceType().subst(substMap);
           auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
           assert(fieldSILTy.isObject());
@@ -3187,6 +3393,83 @@ bool PullbackCloner::Implementation::runForSemanticMemberSetter() {
   return false;
 }
 
+bool PullbackCloner::Implementation::runForSemanticMemberModify() {
+  auto &original = getOriginal();
+  auto &pullback = getPullback();
+  auto pbLoc = getPullback().getLocation();
+
+  auto *accessor = cast<AccessorDecl>(original.getDeclContext()->getAsDecl());
+  assert(accessor->getAccessorKind() == AccessorKind::Modify);
+
+  auto *origEntry = original.getEntryBlock();
+  // We assume that the accessor has a simple 3-BB structure with yield in the entry BB
+  // plus resume and unwind BBs
+  auto *yi = cast<YieldInst>(origEntry->getTerminator());
+  auto *origResumeBB = yi->getResumeBB();
+
+  auto *pbEntry = pullback.getEntryBlock();
+  builder.setCurrentDebugScope(
+      remapScope(origEntry->getScopeOfFirstNonMetaInstruction()));
+  builder.setInsertionPoint(pbEntry);
+
+  // Get _modify accessor argument values.
+  // Accessor type : $(inout Self) -> @yields @inout Argument
+  // Pullback type : $(inout Self', linear map tuple) -> @yields @inout Argument'
+  // Normally pullbacks for semantic member accessors are single BB and
+  // therefore have empty linear map tuple, however, coroutines have a branching
+  // control flow due to possible coroutine abort, so we need to accommodate for
+  // this. We keep branch tracing enums in order not to special case in many
+  // other places. As there is no way to return to coroutine via abort exit, we
+  // essentially "linearize" a coroutine.
+  auto loweredFnTy = original.getLoweredFunctionType();
+  auto pullbackLoweredFnTy = pullback.getLoweredFunctionType();
+
+  assert(loweredFnTy->getNumParameters() == 1 &&
+         loweredFnTy->getNumYields() == 1);
+  assert(pullbackLoweredFnTy->getNumParameters() == 2);
+  assert(pullbackLoweredFnTy->getNumYields() == 1);
+
+  SILValue origSelf = original.getArgumentsWithoutIndirectResults().front();
+
+  SmallVector<SILValue, 8> origFormalResults;
+  collectAllFormalResultsInTypeOrder(original, origFormalResults);
+
+  assert(getConfig().resultIndices->getNumIndices() == 2 &&
+         "Modify accessor should have two semantic results");
+
+  auto origYield = origFormalResults[*std::next(getConfig().resultIndices->begin())];
+
+  // Look up the corresponding field in the tangent space.
+  auto *origField = cast<VarDecl>(accessor->getStorage());
+  auto baseType = remapType(origSelf->getType()).getASTType();
+  auto *tanField = getTangentStoredProperty(getContext(), origField, baseType,
+                                            pbLoc, getInvoker());
+  if (!tanField) {
+    errorOccurred = true;
+    return true;
+  }
+
+  auto adjSelf = getAdjointBuffer(origResumeBB, origSelf);
+  auto *adjSelfElt = builder.createStructElementAddr(pbLoc, adjSelf, tanField);
+  // Modify accessors have inout yields and therefore should yield addresses.
+  assert(getTangentValueCategory(origYield) == SILValueCategory::Address &&
+         "Modify accessors should yield indirect");
+
+  // Yield the adjoint buffer and do everything else in the resume
+  // destination. Unwind destination is unreachable as the coroutine can never
+  // be aborted.
+  auto *unwindBB = getPullback().createBasicBlock();
+  auto *resumeBB = getPullbackBlock(origEntry);
+  builder.createYield(yi->getLoc(), {adjSelfElt}, resumeBB, unwindBB);
+  builder.setInsertionPoint(unwindBB);
+  builder.createUnreachable(SILLocation::invalid());
+
+  builder.setInsertionPoint(resumeBB);
+  addToAdjointBuffer(origEntry, origSelf, adjSelf, pbLoc);
+
+  return false;
+}
+
 //--------------------------------------------------------------------------//
 // Adjoint buffer mapping
 //--------------------------------------------------------------------------//
@@ -3212,7 +3495,7 @@ SILValue PullbackCloner::Implementation::getAdjointProjection(
     auto adjSource = getAdjointBuffer(origBB, source);
     if (!adjSource->getType().is<TupleType>())
       return adjSource;
-    auto origTupleTy = source->getType().castTo<TupleType>();
+    auto origTupleTy = remapType(source->getType()).castTo<TupleType>();
     unsigned adjIndex = 0;
     for (unsigned i : range(teai->getFieldIndex())) {
       if (getTangentSpace(
@@ -3299,19 +3582,9 @@ SILValue PullbackCloner::Implementation::getAdjointProjection(
       eltIndex = ili->getValue().getLimitedValue();
     }
     // Get the array adjoint value.
-    SILValue arrayAdjoint;
-    assert(ai && "Expected `array.uninitialized_intrinsic` application");
-    for (auto use : ai->getUses()) {
-      auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
-      if (!dti)
-        continue;
-      assert(!arrayAdjoint && "Array adjoint already found");
-      // The first `destructure_tuple` result is the `Array` value.
-      auto arrayValue = dti->getResult(0);
-      arrayAdjoint = materializeAdjointDirect(
-          getAdjointValue(origBB, arrayValue), definingInst->getLoc());
-    }
-    assert(arrayAdjoint && "Array does not have adjoint value");
+    SILValue arrayValue = getArrayValue(ai);
+    SILValue arrayAdjoint = materializeAdjointDirect(
+        getAdjointValue(origBB, arrayValue), definingInst->getLoc());
     // Apply `Array.TangentVector.subscript` to get array element adjoint value.
     auto *eltAdjBuffer =
         getArrayAdjointElementBuffer(arrayAdjoint, eltIndex, ai->getLoc());
@@ -3474,14 +3747,31 @@ void PullbackCloner::Implementation::
   if (originalValue != dti->getResult(0))
     return;
   // Accumulate the array's adjoint value into the adjoint buffers of its
-  // element addresses: `pointer_to_address` and `index_addr` instructions.
+  // element addresses: `pointer_to_address` and (optionally) `index_addr`
+  // instructions.
+  // The input code looks like as follows:
+  //  %17 = integer_literal $Builtin.Word, 1
+  //  function_ref _allocateUninitializedArray<A>(_:)
+  //  %18 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  //  %19 = apply %18<Float>(%17) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  //  (%20, %21) = destructure_tuple %19
+  //  %22 = mark_dependence %21 on %20
+  //  %23 = pointer_to_address %22 to [strict] $*Float
+  //  store %0 to [trivial] %23
+  //  function_ref _finalizeUninitializedArray<A>(_:)
+  //  %25 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+  //  %26 = apply %25<Float>(%20) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %27
+  // Note that %20 and %21 are in some sense "aliases" for each other. Here our `originalValue` is %20 in the code above.
+  // We need to trace from %21 down to %23 and propagate (decomposed) adjoint of originalValue to adjoint of %23.
+  // Then the generic adjoint propagation code would do its job to propagate %23' to %0'.
+  // If we're initializing multiple values we're having additional `index_addr` instructions, but
+  // the handling is similar.
   LLVM_DEBUG(getADDebugStream()
              << "Accumulating adjoint value for array literal into element "
                 "address adjoint buffers"
              << originalValue);
   auto arrayAdjoint = materializeAdjointDirect(arrayAdjointValue, loc);
   builder.setCurrentDebugScope(remapScope(dti->getDebugScope()));
-  builder.setInsertionPoint(arrayAdjoint->getParentBlock());
   for (auto use : dti->getResult(1)->getUses()) {
     auto *mdi = dyn_cast<MarkDependenceInst>(use->getUser());
     assert(mdi && "Expected mark_dependence user");
@@ -3554,12 +3844,11 @@ AllocStackInst *PullbackCloner::Implementation::getArrayAdjointElementBuffer(
       ctx.getIntType()->getCanonicalType());
   // %index_int = struct $Int (%index_literal)
   auto *eltIndexInt = builder.createStruct(loc, intType, {eltIndexLiteral});
-  auto *swiftModule = getModule().getSwiftModule();
   auto *diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto diffConf = swiftModule->lookupConformance(eltTanType, diffProto);
+  auto diffConf = lookupConformance(eltTanType, diffProto);
   assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
   auto *addArithProto = ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  auto addArithConf = swiftModule->lookupConformance(eltTanType, addArithProto);
+  auto addArithConf = lookupConformance(eltTanType, addArithProto);
   assert(!addArithConf.isInvalid() &&
          "Missing conformance to `AdditiveArithmetic`");
   auto subMap = SubstitutionMap::get(subscriptFnGenSig, {eltTanType},

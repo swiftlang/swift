@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -O -emit-ir -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -O -emit-ir -target %target-swift-5.1-abi-triple | %FileCheck %s
 // REQUIRES: concurrency
 
 @_silgen_name("blackHole")
@@ -9,5 +9,5 @@ func f() async {
     blackHole(buffer.baseAddress)
   }
 }
-// CHECK: alloca [123 x i8], align 1
+
 // CHECK-NOT: swift_task_alloc

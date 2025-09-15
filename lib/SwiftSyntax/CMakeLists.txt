@@ -7,6 +7,10 @@ if(NOT EXISTS "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}")
 endif()
 
 # Build swift-syntax libraries with FetchContent.
+set(CMAKE_SYSTEM_PROCESSOR ${SWIFT_HOST_VARIANT_ARCH})
+set(CMAKE_OSX_ARCHITECTURES ${SWIFT_HOST_VARIANT_ARCH})
+set(CMAKE_C_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
+set(CMAKE_CXX_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
 set(CMAKE_Swift_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
 set(BUILD_SHARED_LIBS ON)
 # All libraries in 'swift-syntax' goes to 'lib/swift/host'.
@@ -18,14 +22,21 @@ endif()
 # Add unique ABI prefix to swift-syntax libraries so that compiler libraries (e.g. sourcekitdInProc)
 # can be used from tools that has its own swift-syntax libraries as SwiftPM dependencies.
 set(SWIFT_MODULE_ABI_NAME_PREFIX "Compiler")
+set(SWIFTSYNTAX_PACKAGE_NAME "Toolchain")
+set(SWIFTSYNTAX_EMIT_MODULE ON)
 
 file(TO_CMAKE_PATH "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}" swift_syntax_path)
 FetchContent_Declare(SwiftSyntax SOURCE_DIR "${swift_syntax_path}")
 FetchContent_MakeAvailable(SwiftSyntax)
 
+# FIXME: Use FetchContent_Declare's EXCLUDE_FROM_ALL after CMake 3.28
+FetchContent_GetProperties(SwiftSyntax BINARY_DIR binary_dir)
+set_property(DIRECTORY "${binary_dir}" PROPERTY EXCLUDE_FROM_ALL TRUE)
+
 # Install swift-syntax libraries.
 set(SWIFT_SYNTAX_MODULES
   SwiftBasicFormat
+  SwiftIfConfig
   SwiftParser
   SwiftParserDiagnostics
   SwiftDiagnostics

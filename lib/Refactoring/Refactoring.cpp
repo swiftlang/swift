@@ -14,6 +14,7 @@
 #include "RefactoringActions.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/IDE/IDERequests.h"
 #include "swift/Parse/Lexer.h"
@@ -48,7 +49,7 @@ collectRefactoringsAtCursor(SourceFile *SF, unsigned Line, unsigned Column,
   DiagnosticEngine DiagEngine(SM);
   std::for_each(DiagConsumers.begin(), DiagConsumers.end(),
                 [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
-  SourceLoc Loc = SM.getLocForLineCol(SF->getBufferID().value(), Line, Column);
+  SourceLoc Loc = SM.getLocForLineCol(SF->getBufferID(), Line, Column);
   if (Loc.isInvalid())
     return {};
 

@@ -3,7 +3,6 @@ add_swift_host_library(swiftFrontendTool STATIC
   FrontendTool.cpp
   ImportedModules.cpp
   LoadedModuleTrace.cpp
-  MakeStyleDependencies.cpp
   TBD.cpp)
 add_dependencies(swiftFrontendTool
   SwiftOptions)

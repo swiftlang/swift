@@ -26,7 +26,7 @@ func bad_containers_3(bc: BadContainer3) {
 
 struct BadIterator1 {}
 
-struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}}
+struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}} expected-note {{add stubs for conformance}}
   typealias Iterator = BadIterator1 // expected-note{{possibly intended match 'BadContainer4.Iterator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
   func makeIterator() -> BadIterator1 { }
 }
@@ -349,5 +349,18 @@ do {
       _ = i
       _ = leaves
     }
+  }
+}
+
+// Make sure the bodies still type-check okay if the preamble is invalid.
+func testInvalidPreamble() {
+  func takesAutoclosure(_ x: @autoclosure () -> Int) -> Int { 0 }
+
+  for _ in undefined { // expected-error {{cannot find 'undefined' in scope}}
+    let a = takesAutoclosure(0) // Fine
+  }
+  for x in undefined { // expected-error {{cannot find 'undefined' in scope}}
+    let b: Int = x  // No type error, `x` is invalid.
+    _ = "" as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
   }
 }

@@ -41,9 +41,9 @@ Download the sources with the [Getting Started](/docs/HowToGuides/GettingStarted
   "https-clone-pattern": "https://github.com/%s.git",
   "default-branch-scheme": "main",
   "repos": {
-    "cmark": { "remote": { "id": "apple/swift-cmark" } },
-    "llvm-project": { "remote": { "id": "apple/llvm-project" } },
-    "swift": { "remote": { "id": "apple/swift" } }
+    "cmark": { "remote": { "id": "swiftlang/swift-cmark" } },
+    "llvm-project": { "remote": { "id": "swiftlang/llvm-project" } },
+    "swift": { "remote": { "id": "swiftlang/swift" } }
   },
   "branch-schemes": {
     "main": {

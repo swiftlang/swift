@@ -1,0 +1,54 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %target-sil-opt -I %t %t/test.sil -sil-combine | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+//--- module.modulemap
+
+module CModule {
+  header "c-header.h"
+  export *
+}
+
+
+//--- c-header.h
+
+@import Foundation;
+
+@interface ObjClass : NSObject
+@property (nonatomic, strong, readwrite, nonnull) NSObject *o;
+@end
+
+
+//--- test.sil
+
+sil_stage canonical
+
+import Swift
+import SwiftShims
+import Builtin
+import CModule
+
+@objc @implementation extension ObjClass {
+  @objc @_hasStorage dynamic var o: NSObject { get set }
+}
+
+sil @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+
+// Check that we don't crash
+
+// CHECK-LABEL: sil @testObjcKeypath :
+// CHECK:         keypath
+// CHECK:         apply
+// CHECK:       } // end sil function 'testObjcKeypath'
+sil @testObjcKeypath : $@convention(thin) (@in_guaranteed ObjClass) -> @out NSObject {
+bb0(%0 : $*NSObject, %1 : $*ObjClass):
+  %2 = keypath $KeyPath<ObjClass, NSObject>, (root $ObjClass; stored_property #ObjClass.o : $NSObject)
+  %3 = function_ref @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  %4 = apply %3<ObjClass, NSObject>(%0, %1, %2) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  strong_release %2 : $KeyPath<ObjClass, NSObject>
+  %6 = tuple ()
+  return %6 : $()
+}
+

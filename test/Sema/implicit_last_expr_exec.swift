@@ -4,9 +4,7 @@
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
-
-// Required for experimental features
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ImplicitLastExprResults
 
 func testBinding(_ cond: Bool) -> Int {
   let x = if cond {

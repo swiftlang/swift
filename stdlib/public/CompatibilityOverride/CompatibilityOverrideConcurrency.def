@@ -136,11 +136,21 @@ OVERRIDE_ACTOR(task_isCurrentExecutor, bool,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                swift::, (SerialExecutorRef executor), (executor))
 
+OVERRIDE_ACTOR(task_isCurrentExecutorWithFlags, bool,
+               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+               (SerialExecutorRef executor, swift_task_is_current_executor_flag flags),
+               (executor, flags))
+
 OVERRIDE_ACTOR(task_switch, void,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
                swift::, (SWIFT_ASYNC_CONTEXT AsyncContext *resumeToContext,
                TaskContinuationFunction *resumeFunction, SerialExecutorRef newExecutor),
                (resumeToContext, resumeFunction, newExecutor))
+
+OVERRIDE_ACTOR(task_deinitOnExecutor, void,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+              (void *object, DeinitWorkFunction *work, SerialExecutorRef newExecutor, size_t flags),
+              (object, work, newExecutor, flags))
 
 OVERRIDE_TASK(task_create_common, AsyncTaskAndContext,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
@@ -195,6 +205,17 @@ OVERRIDE_TASK(task_addCancellationHandler,
 OVERRIDE_TASK(task_removeCancellationHandler, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               (CancellationNotificationStatusRecord *record), (record))
+
+OVERRIDE_TASK(task_addPriorityEscalationHandler,
+              EscalationNotificationStatusRecord *,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+              (EscalationNotificationStatusRecord::FunctionType handler,
+               void *context),
+              (handler, context))
+
+OVERRIDE_TASK(task_removePriorityEscalationHandler, void,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+              (EscalationNotificationStatusRecord *record), (record))
 
 OVERRIDE_TASK(task_createNullaryContinuationJob, NullaryContinuationJob *,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
@@ -299,6 +320,10 @@ OVERRIDE_TASK_GROUP(taskGroup_initialize, void,
 OVERRIDE_TASK_GROUP(taskGroup_initializeWithFlags, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (size_t flags, TaskGroup *group, const Metadata *T), (flags, group, T))
+
+OVERRIDE_TASK_GROUP(taskGroup_initializeWithOptions, void,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::, (size_t flags, TaskGroup *group, const Metadata *T, TaskOptionRecord *options), (flags, group, T, options))
 
 OVERRIDE_TASK_STATUS(taskGroup_attachChild, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -412,6 +437,12 @@ OVERRIDE_TASK_STATUS(task_popTaskExecutorPreference, void,
 OVERRIDE_TASK(task_startOnMainActor, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
               swift::, (AsyncTask *task), (task))
+
+// In ACTOR since we need ExecutorTracking info
+OVERRIDE_ACTOR(task_immediate, void,
+               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+               swift::, (AsyncTask *task, SerialExecutorRef targetExecutor),
+               (task, targetExecutor))
 
 #undef OVERRIDE
 #undef OVERRIDE_ACTOR

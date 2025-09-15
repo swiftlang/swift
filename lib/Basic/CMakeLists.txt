@@ -52,12 +52,14 @@ add_swift_host_library(swiftBasic STATIC
   Edit.cpp
   EditorPlaceholder.cpp
   ExponentialGrowthAppendingBinaryByteStream.cpp
+  Feature.cpp
   FileSystem.cpp
   FileTypes.cpp
   Fingerprint.cpp
   ParseableOutput.cpp
   JSONSerialization.cpp
   LangOptions.cpp
+  LoadDynamicLibrary.cpp
   Located.cpp
   Mangler.cpp
   OutputFileMap.cpp
@@ -73,6 +75,7 @@ add_swift_host_library(swiftBasic STATIC
   StableHasher.cpp
   Statistic.cpp
   StringExtras.cpp
+  SupportedFeatures.cpp
   TargetInfo.cpp
   TaskQueue.cpp
   ThreadSafeRefCounted.cpp
@@ -96,6 +99,7 @@ _swift_gyb_target_sources(swiftBasic PRIVATE
     UnicodeExtendedGraphemeClusters.cpp.gyb)
 
 target_include_directories(swiftBasic PRIVATE
+  clangBasic
   ${UUID_INCLUDE})
 
 target_link_libraries(swiftBasic PUBLIC
@@ -130,10 +134,8 @@ if(NOT "${SWIFT_VENDOR}" STREQUAL "")
       " -DSWIFT_VENDOR=\"\\\"${SWIFT_VENDOR}\\\"\"")
 endif()
 
-set(SWIFT_COMPILER_VERSION "" CACHE STRING
-    "The string that identifies the SCM commit(s) for this build")
-
 message(STATUS "Swift compiler version: ${SWIFT_COMPILER_VERSION}")
+message(STATUS "Swift toolchain version: ${SWIFT_TOOLCHAIN_VERSION}")
 message(STATUS "Embedded clang compiler version: ${CLANG_COMPILER_VERSION}")
 
 if(SWIFT_COMPILER_VERSION)
@@ -146,3 +148,7 @@ if(CLANG_COMPILER_VERSION)
     " -DCLANG_COMPILER_VERSION=\"\\\"${CLANG_COMPILER_VERSION}\\\"\"")
 endif()
 
+if(SWIFT_TOOLCHAIN_VERSION)
+  set_property(SOURCE Version.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
+    " -DSWIFT_TOOLCHAIN_VERSION=\"\\\"${SWIFT_TOOLCHAIN_VERSION}\\\"\"")
+endif()

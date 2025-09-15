@@ -388,7 +388,7 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
 
     // Equality comparisons b/w infinity and non-infinity are not constant folded.
     // In such comparisons, special floating point types - Float80 and Float16, may 
-    // come into play and pattern matching againt them complicates the constant folding
+    // come into play and pattern matching against them complicates the constant folding
     // logic more than we'd like.
     private func checkIfEqCmpBetweenInfAndNonInf(op: FPOperation, op1: FPOperand, op2: FPOperand) -> Bool {
         if op == .Equal || op == .NotEqual {

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking | %FileCheck --implicit-check-not hop_to_executor %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test -swift-version 5  -target %target-swift-5.1-abi-triple | %FileCheck --implicit-check-not hop_to_executor %s
 // REQUIRES: concurrency
 
 func f(_: Int, _: String) -> String? { nil }
@@ -47,7 +47,7 @@ actor A: P2 {
   // CHECK: hop_to_executor {{.*}} : $MainActor
   // CHECK: [[F:%.*]] = function_ref @$s4test11mainActorFnyyF : $@convention(thin) () -> ()
   // CHECK: [[THICK_F:%.*]] = thin_to_thick_function [[F]] : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
-  // CHECK: [[THICK_F_VAR:%.*]] = move_value [var_decl] [[THICK_F]]
+  // CHECK: [[THICK_F_VAR:%.*]] = move_value [lexical] [var_decl] [[THICK_F]]
   // CHECK: [[THICK_F_BORROW:%.*]] = begin_borrow [[THICK_F_VAR]]
   // CHECK: [[THICK_F_COPY:%.*]] = copy_value [[THICK_F_BORROW]]
   // CHECK: [[THUNK:%.*]] = function_ref @$sIeg_IegH_TR : $@convention(thin) @async (@guaranteed @callee_guaranteed () -> ()) -> ()

@@ -29,11 +29,11 @@ class B : A {
     get { return self }  // expected-error{{subscript getter with Objective-C selector 'objectForKeyedSubscript:' conflicts with subscript getter from superclass 'A'}}
   }
 
-  override func foo() { } // expected-error{{non-@objc instance method 'foo()' is declared in extension of 'A' and cannot be overridden}}
+  override func foo() { } // expected-error{{non-'@objc' instance method 'foo()' is declared in extension of 'A' and cannot be overridden}}
 
   override func wibble(_: SwiftStruct) { } // expected-error{{instance method 'wibble' is declared in extension of 'A' and cannot be overridden}}
 }
 
 extension B {
-  override func bar() { } // expected-error{{non-@objc instance method 'bar()' declared in 'A' cannot be overridden from extension}}
+  override func bar() { } // expected-error{{non-'@objc' instance method 'bar()' declared in 'A' cannot be overridden from extension}}
 }

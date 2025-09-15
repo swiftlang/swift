@@ -13,3 +13,7 @@ Namespaces:
     SwiftImportAs: owned
   - Name: vector
     SwiftImportAs: owned
+  - Name: span
+    Methods:
+    - Name: data
+      SwiftName: __dataUnsafe()

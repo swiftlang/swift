@@ -1,5 +1,3 @@
-import SwiftOnoneSupport
-
 public func fromOther()
 
 
@@ -7,7 +5,6 @@ public func fromOther()
 
 import B
 import C
-import A
 
 // Available when C is imported with Other
 /// This has some interesting documentation that shouldn't be separated from
@@ -18,126 +15,95 @@ public func from_OtherCAdditions()
 
 [
   {
-    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
     key.offset: 0,
     key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 26,
-    key.length: 6
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 33,
+    key.offset: 7,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 38,
+    key.offset: 12,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 52,
+    key.offset: 26,
     key.length: 23
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment.mark,
-    key.offset: 55,
+    key.offset: 29,
     key.length: 19
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 76,
+    key.offset: 50,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 83,
+    key.offset: 57,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 85,
+    key.offset: 59,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 92,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 94,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 101,
+    key.offset: 66,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 104,
+    key.offset: 69,
     key.length: 43
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 147,
+    key.offset: 112,
     key.length: 77
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 224,
+    key.offset: 189,
     key.length: 80
   },
   {
     key.kind: source.lang.swift.syntaxtype.doccomment,
-    key.offset: 304,
+    key.offset: 269,
     key.length: 36
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 340,
+    key.offset: 305,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 347,
+    key.offset: 312,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 352,
+    key.offset: 317,
     key.length: 20
   }
 ]
 [
   {
     key.kind: source.lang.swift.ref.module,
-    key.offset: 7,
-    key.length: 17,
-    key.is_system: 1
-  },
-  {
-    key.kind: source.lang.swift.ref.module,
-    key.offset: 83,
+    key.offset: 57,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.module,
-    key.offset: 92,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.ref.module,
-    key.offset: 101,
+    key.offset: 66,
     key.length: 1
   }
 ]
@@ -146,13 +112,13 @@ public func from_OtherCAdditions()
     key.kind: source.lang.swift.decl.function.free,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "fromOther()",
-    key.offset: 33,
+    key.offset: 7,
     key.length: 16,
-    key.nameoffset: 38,
+    key.nameoffset: 12,
     key.namelength: 11,
     key.attributes: [
       {
-        key.offset: 26,
+        key.offset: 0,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
@@ -162,15 +128,15 @@ public func from_OtherCAdditions()
     key.kind: source.lang.swift.decl.function.free,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "from_OtherCAdditions()",
-    key.offset: 347,
+    key.offset: 312,
     key.length: 27,
-    key.nameoffset: 352,
+    key.nameoffset: 317,
     key.namelength: 22,
-    key.docoffset: 147,
+    key.docoffset: 112,
     key.doclength: 193,
     key.attributes: [
       {
-        key.offset: 340,
+        key.offset: 305,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }

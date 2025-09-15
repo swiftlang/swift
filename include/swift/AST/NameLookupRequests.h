@@ -25,6 +25,7 @@
 #include "swift/AST/TypeOrExtensionDecl.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -202,7 +203,7 @@ public:
 class AllInheritedProtocolsRequest
     : public SimpleRequest<
           AllInheritedProtocolsRequest, ArrayRef<ProtocolDecl *>(ProtocolDecl *),
-          RequestFlags::Cached> {
+          RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -216,6 +217,8 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
+  std::optional<ArrayRef<ProtocolDecl *>> getCachedResult() const;
+  void cacheResult(ArrayRef<ProtocolDecl *> value) const;
 };
 
 class ProtocolRequirementsRequest
@@ -264,7 +267,7 @@ public:
 /// Request the nominal declaration extended by a given extension declaration.
 class ExtendedNominalRequest
     : public SimpleRequest<
-          ExtendedNominalRequest, NominalTypeDecl *(ExtensionDecl *),
+          ExtendedNominalRequest, NominalTypeDecl *(const ExtensionDecl *),
           RequestFlags::SeparatelyCached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -273,8 +276,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  NominalTypeDecl *
-  evaluate(Evaluator &evaluator, ExtensionDecl *ext) const;
+  NominalTypeDecl * evaluate(Evaluator &evaluator, const ExtensionDecl *ext) const;
 
 public:
   // Separate caching.
@@ -648,7 +650,7 @@ public:
   DeclContext *getDC() const {
     if (auto *module = getModule())
       return module;
-    return fileOrModule.get<FileUnit *>();
+    return cast<FileUnit *>(fileOrModule);
   }
 
   friend llvm::hash_code hash_value(const OperatorLookupDescriptor &desc) {
@@ -730,21 +732,18 @@ public:
 
 class LookupConformanceDescriptor final {
 public:
-  ModuleDecl *Mod;
   Type Ty;
   ProtocolDecl *PD;
 
-  LookupConformanceDescriptor(ModuleDecl *Mod, Type Ty, ProtocolDecl *PD)
-      : Mod(Mod), Ty(Ty), PD(PD) {}
+  LookupConformanceDescriptor(Type Ty, ProtocolDecl *PD) : Ty(Ty), PD(PD) {}
 
   friend llvm::hash_code hash_value(const LookupConformanceDescriptor &desc) {
-    return llvm::hash_combine(desc.Mod, desc.Ty.getPointer(), desc.PD);
+    return llvm::hash_combine(desc.Ty.getPointer(), desc.PD);
   }
 
   friend bool operator==(const LookupConformanceDescriptor &lhs,
                          const LookupConformanceDescriptor &rhs) {
-    return lhs.Mod == rhs.Mod && lhs.Ty.getPointer() == rhs.Ty.getPointer() &&
-           lhs.PD == rhs.PD;
+    return lhs.Ty.getPointer() == rhs.Ty.getPointer() && lhs.PD == rhs.PD;
   }
 
   friend bool operator!=(const LookupConformanceDescriptor &lhs,
@@ -998,6 +997,32 @@ private:
   ObjCCategoryNameMap evaluate(Evaluator &evaluator,
                                ClassDecl *classDecl,
                                ExtensionDecl *lastExtension) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+struct DeclABIRoleInfoResult {
+  llvm::PointerIntPair<Decl *, 2, uint8_t> storage;
+  DeclABIRoleInfoResult(Decl *counterpart, uint8_t roleValue)
+    : storage(counterpart, roleValue) {}
+};
+
+/// Return the ABI role info (role and counterpart) of a given declaration.
+class DeclABIRoleInfoRequest
+    : public SimpleRequest<DeclABIRoleInfoRequest,
+                           DeclABIRoleInfoResult(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  void recordABIOnly(Evaluator &evaluator, Decl *counterpart);
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  DeclABIRoleInfoResult evaluate(Evaluator &evaluator, Decl *decl) const;
 
 public:
   bool isCached() const { return true; }

@@ -43,6 +43,7 @@ public:
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
   CASOptions CASOpts;
+  SerializationOptions SerializationOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags;
 

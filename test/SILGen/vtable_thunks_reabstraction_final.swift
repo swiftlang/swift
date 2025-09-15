@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name vtable_thunks_reabstraction_final %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name vtable_thunks_reabstraction_final %s | %FileCheck %s
 
 protocol Fooable {
   func foo(_ x: Int) -> Int?

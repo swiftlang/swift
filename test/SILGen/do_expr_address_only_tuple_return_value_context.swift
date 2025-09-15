@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-silgen -verify -enable-experimental-feature DoExpressions %s
 
-// Required for experimental features
-// REQUIRES: asserts
+// REQUIRES: swift_feature_DoExpressions
 
 struct BigNontrivialThing {
   var x: Any

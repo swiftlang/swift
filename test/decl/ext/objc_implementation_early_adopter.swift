@@ -1,18 +1,23 @@
 // RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/objc_implementation.h -enable-experimental-feature ObjCImplementation -enable-experimental-feature CImplementation -target %target-stable-abi-triple
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_CImplementation
+// REQUIRES: swift_feature_ObjCImplementation
 
 protocol EmptySwiftProto {}
 
+// expected-note@+1 {{previously implemented here}}
 @_objcImplementation extension ObjCClass: EmptySwiftProto, EmptyObjCProto {
-  // expected-note@-1 {{previously implemented here}}
-  // expected-warning@-2 {{extension for main class interface should provide implementation for instance method 'method(fromHeader4:)'}}
-  // expected-warning@-3 {{extension for main class interface should provide implementation for property 'propertyFromHeader9'}}
-  // FIXME: give better diagnostic expected-warning@-4 {{extension for main class interface should provide implementation for property 'propertyFromHeader8'}}
-  // FIXME: give better diagnostic expected-warning@-5 {{extension for main class interface should provide implementation for property 'propertyFromHeader7'}}
-  // FIXME: give better diagnostic expected-warning@-6 {{extension for main class interface should provide implementation for instance method 'method(fromHeader3:)'}}
-  // expected-warning@-7 {{'@_objcImplementation' extension cannot add conformance to 'EmptySwiftProto'; add this conformance with an ordinary extension}}
-  // expected-warning@-8 {{'@_objcImplementation' extension cannot add conformance to 'EmptyObjCProto'; add this conformance in the Objective-C header}}
-  // expected-warning@-9 {{extension for main class interface should provide implementation for instance method 'extensionMethod(fromHeader2:)'}}
+  // expected-warning@-1 {{'@objc @implementation' extension cannot add conformance to 'EmptySwiftProto'; add this conformance with an ordinary extension}}
+  // expected-warning@-2 {{'@objc @implementation' extension cannot add conformance to 'EmptyObjCProto'; add this conformance in the Objective-C header}}
+  // expected-warning@-3 {{extension for main class interface does not provide all required implementations; this will become an error after adopting '@implementation'}}
+  // expected-note@-4 {{missing instance method 'method(fromHeader4:)'}} {{none}}
+  // expected-note@-5 {{missing property 'propertyFromHeader9'}} {{none}}
+  // FIXME: give better diagnostic expected-note@-6 {{missing property 'propertyFromHeader8'}} {{none}}
+  // FIXME: give better diagnostic expected-note@-7 {{missing property 'propertyFromHeader7'}} {{none}}
+  // FIXME: give better diagnostic expected-note@-8 {{missing instance method 'method(fromHeader3:)'}} {{none}}
+  // expected-note@-9 {{missing instance method 'extensionMethod(fromHeader2:)'}} {{none}}
+  // expected-note@-10 {{missing property 'readonlyPropertyFromHeader7'}}
+  // expected-note@-11 {{add stubs for missing '@implementation' requirements}} {{76-76=\n    @objc(methodFromHeader3:)\n    open func method(fromHeader3 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(methodFromHeader4:)\n    open func method(fromHeader4 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(propertyFromHeader7)\n    open var propertyFromHeader7: Int32\n\n    @objc(propertyFromHeader8)\n    open var propertyFromHeader8: Int32\n\n    @objc(propertyFromHeader9)\n    open var propertyFromHeader9: Int32\n\n    @objc(readonlyPropertyFromHeader7)\n    open let readonlyPropertyFromHeader7: Int32\n\n    @objc(extensionMethodFromHeader2:)\n    open func extensionMethod(fromHeader2 param: Int32) {\n        <#code#>\n    \}\n}}
 
   func method(fromHeader1: CInt) {
     // OK, provides an implementation for the header's method.
@@ -26,7 +31,7 @@ protocol EmptySwiftProto {}
     // FIXME: should emit expected-DISABLED-error@-1 {{instance method 'categoryMethod(fromHeader3:)' should be implemented in extension for category 'PresentAdditions', not main class interface}}
     // FIXME: expected-warning@-2 {{instance method 'categoryMethod(fromHeader3:)' does not match any instance method declared in the headers for 'ObjCClass'; did you use the instance method's Swift name?; this will become an error after adopting '@implementation'}}
     // FIXME: expected-note@-3 {{add 'private' or 'fileprivate' to define an Objective-C-compatible instance method not declared in the header}} {{3-3=private }}
-    // FIXME: expected-note@-4 {{add 'final' to define a Swift instance method that cannot be overridden}} {{3-3=final }}
+    // FIXME: expected-note@-4 {{add 'final' to define a Swift-only instance method that cannot be overridden}} {{3-3=final }}
   }
 
   @objc fileprivate func methodNot(fromHeader1: CInt) {
@@ -40,7 +45,7 @@ protocol EmptySwiftProto {}
   func methodNot(fromHeader3: CInt) {
     // expected-warning@-1 {{instance method 'methodNot(fromHeader3:)' does not match any instance method declared in the headers for 'ObjCClass'; did you use the instance method's Swift name?; this will become an error after adopting '@implementation'}}
     // expected-note@-2 {{add 'private' or 'fileprivate' to define an Objective-C-compatible instance method not declared in the header}} {{3-3=private }}
-    // expected-note@-3 {{add 'final' to define a Swift instance method that cannot be overridden}} {{3-3=final }}
+    // expected-note@-3 {{add 'final' to define a Swift-only instance method that cannot be overridden}} {{3-3=final }}
   }
 
   var methodFromHeader5: CInt
@@ -116,7 +121,7 @@ protocol EmptySwiftProto {}
   internal var propertyNotFromHeader1: CInt
   // expected-warning@-1 {{property 'propertyNotFromHeader1' does not match any property declared in the headers for 'ObjCClass'; did you use the property's Swift name?; this will become an error after adopting '@implementation'}}
   // expected-note@-2 {{add 'private' or 'fileprivate' to define an Objective-C-compatible property not declared in the header}} {{3-11=private}}
-  // expected-note@-3 {{add 'final' to define a Swift property that cannot be overridden}} {{3-3=final }}
+  // expected-note@-3 {{add 'final' to define a Swift-only property that cannot be overridden}} {{3-3=final }}
 
   @objc private var propertyNotFromHeader2: CInt
   // OK, provides a nonpublic but ObjC-compatible stored property
@@ -204,12 +209,12 @@ protocol EmptySwiftProto {}
   }
 
   @nonobjc public init(notFromHeader4: CInt) {
-    // expected-warning@-1 {{initializer 'init(notFromHeader4:)' is not valid in an '@_objcImplementation' extension because Objective-C subclasses must be able to override designated initializers}}
+    // expected-warning@-1 {{initializer 'init(notFromHeader4:)' is not valid in an '@objc @implementation' extension because Objective-C subclasses must be able to override designated initializers}}
     // expected-note@-2 {{add 'convenience' keyword to make this a convenience initializer}} {{12-12=convenience }}
   }
 
   @nonobjc public required init(notFromHeader5: CInt) {
-    // expected-warning@-1 {{initializer 'init(notFromHeader5:)' is not valid in an '@_objcImplementation' extension because Objective-C subclasses must be able to override required initializers}}
+    // expected-warning@-1 {{initializer 'init(notFromHeader5:)' is not valid in an '@objc @implementation' extension because Objective-C subclasses must be able to override required initializers}}
     // expected-note@-2 {{replace 'required' keyword with 'convenience' to make this a convenience initializer}} {{19-27=convenience}}
   }
 
@@ -231,23 +236,27 @@ protocol EmptySwiftProto {}
   // expected-warning@-1 {{property 'rdar122280735' of type '(() -> ()) -> Void' does not match type '(@escaping () -> Void) -> Void' declared by the header}}
 }
 
+// expected-note@+1 {{'PresentAdditions' previously declared here}}
 @_objcImplementation(PresentAdditions) extension ObjCClass {
-  // expected-note@-1 {{'PresentAdditions' previously declared here}}
-  // expected-warning@-2 {{extension for category 'PresentAdditions' should provide implementation for instance method 'categoryMethod(fromHeader4:)'; this will become an error after adopting '@implementation'}}
-  // FIXME: give better diagnostic expected-warning@-3 {{extension for category 'PresentAdditions' should provide implementation for instance method 'categoryMethod(fromHeader3:)'; this will become an error after adopting '@implementation'}}
+  // expected-warning@-1 {{extension for category 'PresentAdditions' does not provide all required implementations; this will become an error after adopting '@implementation'}}
+  // expected-note@-2 {{missing instance method 'categoryMethod(fromHeader4:)'}} {{none}}
+  // FIXME: give better diagnostic expected-note@-3 {{missing instance method 'categoryMethod(fromHeader3:)'}} {{none}}
+  // expected-note@-4 {{missing property 'categoryPropertyFromHeader5'}} {{none}}
+  // expected-note@-5 {{missing property 'categoryReadonlyPropertyFromHeader1'}} {{none}}
+  // expected-note@-6 {{add stubs for missing '@implementation' requirements}} {{61-61=\n    @objc(categoryMethodFromHeader3:)\n    open func categoryMethod(fromHeader3 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(categoryMethodFromHeader4:)\n    open func categoryMethod(fromHeader4 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(categoryPropertyFromHeader5)\n    open var categoryPropertyFromHeader5: Int32 {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n\n    @objc(categoryReadonlyPropertyFromHeader1)\n    open var categoryReadonlyPropertyFromHeader1: Int32 {\n        <#code#>\n    \}\n}}
 
   func method(fromHeader3: CInt) {
     // FIXME: should emit expected-DISABLED-error@-1 {{instance method 'method(fromHeader3:)' should be implemented in extension for main class interface, not category 'PresentAdditions'}}
     // FIXME: expected-warning@-2 {{instance method 'method(fromHeader3:)' does not match any instance method declared in the headers for 'ObjCClass'; did you use the instance method's Swift name?; this will become an error after adopting '@implementation'}}
     // FIXME: expected-note@-3 {{add 'private' or 'fileprivate' to define an Objective-C-compatible instance method not declared in the header}} {{3-3=private }}
-    // FIXME: expected-note@-4 {{add 'final' to define a Swift instance method that cannot be overridden}} {{3-3=final }}
+    // FIXME: expected-note@-4 {{add 'final' to define a Swift-only instance method that cannot be overridden}} {{3-3=final }}
   }
 
   var propertyFromHeader7: CInt {
     // FIXME: should emit expected-DISABLED-error@-1 {{property 'propertyFromHeader7' should be implemented in extension for main class interface, not category 'PresentAdditions'}}
     // FIXME: expected-warning@-2 {{property 'propertyFromHeader7' does not match any property declared in the headers for 'ObjCClass'; did you use the property's Swift name?; this will become an error after adopting '@implementation'}}
     // FIXME: expected-note@-3 {{add 'private' or 'fileprivate' to define an Objective-C-compatible property not declared in the header}} {{3-3=private }}
-    // FIXME: expected-note@-4 {{add 'final' to define a Swift property that cannot be overridden}} {{3-3=final }}
+    // FIXME: expected-note@-4 {{add 'final' to define a Swift-only property that cannot be overridden}} {{3-3=final }}
     get { return 1 }
   }
 
@@ -270,7 +279,7 @@ protocol EmptySwiftProto {}
   func categoryMethodNot(fromHeader3: CInt) {
     // expected-warning@-1 {{instance method 'categoryMethodNot(fromHeader3:)' does not match any instance method declared in the headers for 'ObjCClass'; did you use the instance method's Swift name?; this will become an error after adopting '@implementation'}}
     // expected-note@-2 {{add 'private' or 'fileprivate' to define an Objective-C-compatible instance method not declared in the header}} {{3-3=private }}
-    // expected-note@-3 {{add 'final' to define a Swift instance method that cannot be overridden}} {{3-3=final }}
+    // expected-note@-3 {{add 'final' to define a Swift-only instance method that cannot be overridden}} {{3-3=final }}
   }
 
   var categoryPropertyFromHeader1: CInt
@@ -293,7 +302,9 @@ protocol EmptySwiftProto {}
 }
 
 @_objcImplementation(SwiftNameTests) extension ObjCClass {
-  // expected-warning@-1 {{extension for category 'SwiftNameTests' should provide implementation for instance method 'methodSwiftName6B()'; this will become an error after adopting '@implementation'}}
+  // expected-warning@-1 {{extension for category 'SwiftNameTests' does not provide all required implementations; this will become an error after adopting '@implementation'}}
+  // expected-note@-2 {{missing instance method 'methodSwiftName6B()'}} {{none}}
+  // expected-note@-3 {{add stub for missing '@implementation' requirement}} {{59-59=\n    @objc(methodObjCName6B)\n    open func methodSwiftName6B() {\n        <#code#>\n    \}\n}}
 
   func methodSwiftName1() {
     // expected-warning@-1 {{selector 'methodSwiftName1' for instance method 'methodSwiftName1()' not found in header; did you mean 'methodObjCName1'?; this will become an error after adopting '@implementation'}} {{3-3=@objc(methodObjCName1) }}
@@ -361,6 +372,10 @@ protocol EmptySwiftProto {}
 }
 
 @_objcImplementation(Effects) extension ObjCClass {
+  // expected-warning@-1 {{extension for category 'Effects' does not provide all required implementations; this will become an error after adopting '@implementation'}}
+  // expected-note@-2 {{missing instance method 'doSomethingMissingAndAsynchronous()' or 'doSomethingMissingAndAsynchronous(completionHandler:)'}}
+  // expected-note@-3 {{add stub for missing '@implementation' requirement}} {{52-52=\n    @objc(doSomethingMissingAndAsynchronousWithCompletionHandler:)\n    open func doSomethingMissingAndAsynchronous() async throws -> Any {\n        <#code#>\n    \}\n}}
+
   @available(SwiftStdlib 5.1, *)
   public func doSomethingAsynchronous() async throws -> Any {
     return self
@@ -404,7 +419,9 @@ protocol EmptySwiftProto {}
 }
 
 @_objcImplementation(Conformance) extension ObjCClass {
-  // expected-warning@-1 {{extension for category 'Conformance' should provide implementation for instance method 'requiredMethod2()'; this will become an error after adopting '@implementation'}}
+  // expected-warning@-1 {{extension for category 'Conformance' does not provide all required implementations; this will become an error after adopting '@implementation'}}
+  // expected-note@-2 {{missing instance method 'requiredMethod2()'}} {{none}}
+  // expected-note@-3 {{add stub for missing '@implementation' requirement}} {{56-56=\n    @objc(requiredMethod2)\n    open func requiredMethod2() {\n        <#code#>\n    \}\n}}
   // no-error concerning 'optionalMethod2()'
 
   func requiredMethod1() {}
@@ -427,9 +444,40 @@ protocol EmptySwiftProto {}
 
   func nullableResult() -> Any { fatalError() } // expected-warning {{instance method 'nullableResult()' of type '() -> Any' does not match type '() -> Any?' declared by the header}}
   func nullableArgument(_: Any) {} // expected-warning {{instance method 'nullableArgument' of type '(Any) -> ()' does not match type '(Any?) -> Void' declared by the header}}
+}
 
-  func nonPointerResult() -> CInt! { fatalError() } // expected-error{{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because its result type cannot be represented in Objective-C}}
-  func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
+@_objcImplementation(TypeMatchOptionalityInvalid) extension ObjCClass {
+  func nonPointerResult() -> CInt! { fatalError() } // expected-warning{{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because its result type cannot be represented in Objective-C}}
+  func nonPointerArgument(_: CInt!) {} // expected-warning {{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because the type of the parameter cannot be represented in Objective-C}}
+}
+
+@_objcImplementation(InvalidMembers) extension ObjCClass {
+  // expected-warning@-1 {{extension for category 'InvalidMembers' does not provide all required implementations}}
+  // expected-note@-2 {{missing instance method 'unimplementedMember()'}} {{none}}
+  // expected-note@-3 {{add stub for missing '@implementation' requirement}} {{59-59=\n    @objc(unimplementedMember)\n    open func unimplementedMember() {\n        <#code#>\n    \}\n}}
+
+  func nonObjCMethod(_: EmptySwiftProto) {
+    // expected-warning@-1 {{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because the type of the parameter cannot be represented in Objective-C}}
+    // expected-note@-2 {{protocol-constrained type containing protocol 'EmptySwiftProto' cannot be represented in Objective-C}}
+  }
+
+  private func privateNonObjCMethod(_: EmptySwiftProto) {
+    // expected-warning@-1 {{instance method 'privateNonObjCMethod' will become implicitly '@objc' after adopting '@objc @implementation'; add 'final' to keep the current behavior}} {{3-3=final }}
+    // expected-note@-2 {{add '@objc' to expose this instance method to Objective-C}} {{3-3=@objc }}
+  }
+
+  override public static func superclassClassMethod() {
+    // rdar://136113393: `static override` could make a non-`@objc` override
+    // of an `@objc` member when using new syntax. (We would get a warning here
+    // if that bug were still in place.)
+  }
+}
+
+@objc @_objcImplementation extension ObjCClassWithWeirdSwiftAttributeCombo {
+  static func staticFnPreviouslyTreatedAsAtObjcExtensionMember() {
+    // expected-warning@-1 {{static method 'staticFnPreviouslyTreatedAsAtObjcExtensionMember()' will no longer be implicitly '@objc' after adopting '@objc @implementation'; add '@objc' to keep the current behavior}} {{3-3=@objc }}
+    // expected-note@-2 {{add 'final' to define a Swift-only static method that cannot be overridden}} {{3-3=final }}
+  }
 }
 
 // Intentionally using `@_objcImplementation` for this test; do not upgrade!
@@ -472,17 +520,17 @@ protocol EmptySwiftProto {}
 // expected-note@-1 2 {{'SwiftClass' declared here}}
 
 @_objcImplementation extension SwiftClass {}
-// expected-error@-1 {{'@_objcImplementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{1-22=}}
+// expected-error@-1 {{'@objc @implementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{1-22=}}
 
 @_objcImplementation(WTF) extension SwiftClass {} // expected
-// expected-error@-1 {{'@_objcImplementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{1-27=}}
+// expected-error@-1 {{'@objc @implementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{1-27=}}
 
 @_objcImplementation extension ObjCImplRootClass {
-  // expected-error@-1 {{'@_objcImplementation' cannot be used to implement root class 'ObjCImplRootClass'; declare its superclass in the header}}
+  // expected-error@-1 {{'@objc @implementation' cannot be used to implement root class 'ObjCImplRootClass'; declare its superclass in the header}}
 }
 
 @_objcImplementation extension ObjCImplGenericClass {
-  // expected-error@-1 {{'@_objcImplementation' cannot be used to implement generic class 'ObjCImplGenericClass'}}
+  // expected-error@-1 {{'@objc @implementation' cannot be used to implement generic class 'ObjCImplGenericClass'}}
 }
 
 //

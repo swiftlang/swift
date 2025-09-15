@@ -1,5 +1,7 @@
 framework module sourcekitdInProc {
   umbrella header "sourcekitd.h"
+  header "plugin.h"
+  header "CodeCompletionSwiftInterop.h"
   export *
   module * { export * }
 }

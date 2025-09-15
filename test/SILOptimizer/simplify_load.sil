@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=load | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
-// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=load | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-O
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=load | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -simplification -simplify-instruction=load | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-O
 
 // REQUIRES: swift_in_compiler
 
@@ -23,11 +23,35 @@ sil_global [let] @gstr : $Str = {
 class B { }
 class E : B { }
 
+class C {
+  @_hasStorage var c: Builtin.Int64
+}
+
+class D : C {
+  @_hasStorage var d: Builtin.Int64
+}
+
 sil_global hidden [let] @gb : $B
 sil_global hidden [let] @gb2 : $(B, Int64)
 
 sil_global private @gb_obj : $B = {
   %initval = object $B ()
+}
+
+sil_global [let] @gc : $D = {
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = integer_literal $Builtin.Int64, 3
+  %initval = object $D (%0, %1, [tail_elems] %2, %3)
+}
+
+sil_global @gc_var : $D = {
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = integer_literal $Builtin.Int64, 3
+  %initval = object $D (%0, %1, [tail_elems] %2, %3)
 }
 
 sil [global_init_once_fn] @init_gb : $@convention(c) () -> () {
@@ -59,6 +83,9 @@ bb0:
   %1 = address_to_pointer %0 : $*Str to $Builtin.RawPointer
   return %1 : $Builtin.RawPointer
 }
+
+sil_global private @global_char : $Int8
+sil_global private [let] @global_pointer : $UnsafeRawPointer
 
 // CHECK-LABEL: sil @load_global_simple
 // CHECK-DAG:     [[L27:%.*]] = integer_literal $Builtin.Int64, 27
@@ -182,6 +209,35 @@ bb0(%0 : $Builtin.RawPointer):
   %3 = global_addr @gb2 : $*(B, Int64) depends_on %2
   %4 = load %3 : $*(B, Int64)
   return %4 : $(B, Int64)
+}
+
+sil private [global_init_once_fn] @init_global_pointer : $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @global_pointer
+  %2 = global_addr @global_pointer : $*UnsafeRawPointer
+  %3 = global_addr @global_char : $*Int8
+  %4 = begin_access [modify] [dynamic] %3 : $*Int8
+  %5 = address_to_pointer %4 : $*Int8 to $Builtin.RawPointer
+  %6 = struct $UnsafeRawPointer (%5 : $Builtin.RawPointer)
+  end_access %4 : $*Int8
+  store %6 to %2 : $*UnsafeRawPointer
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil @load_global_pointer :
+// CHECK:         %1 = global_addr @global_char
+// CHECK-NEXT:    %2 = address_to_pointer %1 : $*Int8 to $Builtin.RawPointer
+// CHECK-NEXT:    %3 = struct $UnsafeRawPointer (%2 : $Builtin.RawPointer)
+// CHECK-NEXT:    return %3
+// CHECK:       } // end sil function 'load_global_pointer'
+sil @load_global_pointer : $@convention(thin) (Builtin.RawPointer) -> UnsafeRawPointer {
+bb0(%0 : $Builtin.RawPointer):
+  %2 = function_ref @init_global_pointer : $@convention(c) (Builtin.RawPointer) -> ()
+  %3 = builtin "once"(%0 : $Builtin.RawPointer, %2 : $@convention(c) (Builtin.RawPointer) -> ()) : $Builtin.SILToken
+  %4 = global_addr @global_pointer : $*UnsafeRawPointer depends_on %3
+  %5 = load %4 : $*UnsafeRawPointer
+  return %5 : $UnsafeRawPointer
 }
 
 // CHECK-LABEL: sil @load_first_char_from_string_literal
@@ -435,5 +491,55 @@ bb0(%0 : $*B):
   destroy_value %1 : $B
   %3 = tuple ()
   return %3 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_from_global_object :
+// CHECK-DAG:     [[I0:%.*]] = integer_literal $Builtin.Int64, 0
+// CHECK-DAG:     [[I1:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK-DAG:     [[I2:%.*]] = integer_literal $Builtin.Int64, 2
+// CHECK-DAG:     [[I3:%.*]] = integer_literal $Builtin.Int64, 3
+// CHECK:         [[T:%.*]] = tuple ([[I0]] : $Builtin.Int64, [[I1]] : $Builtin.Int64, [[I2]] : $Builtin.Int64, [[I3]] : $Builtin.Int64)
+// CHECK:         return [[T]]
+// CHECK:       } // end sil function 'load_from_global_object'
+sil [ossa] @load_from_global_object : $@convention(thin) () -> (Builtin.Int64, Builtin.Int64, Builtin.Int64, Builtin.Int64) {
+bb0:
+  %0 = global_value @gc : $D
+  %1 = upcast %0 to $C
+  %2 = ref_element_addr %1, #C.c
+  %3 = ref_element_addr %0, #D.d
+  %4 = ref_tail_addr %1, $Builtin.Int64
+  %5 = integer_literal $Builtin.Word, 1
+  %6 = index_addr %4, %5
+  %7 = load [trivial] %2
+  %8 = load [trivial] %3
+  %9 = load [trivial] %4
+  %10 = load [trivial] %6
+  %11 = tuple (%7, %8, %9, %10)
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @dont_load_from_global_var_object :
+// CHECK:         [[L:%.*]] = load
+// CHECK:         return [[L]]
+// CHECK:       } // end sil function 'dont_load_from_global_var_object'
+sil [ossa] @dont_load_from_global_var_object : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = global_value @gc_var : $D
+  %1 = ref_element_addr %0, #D.d
+  %2 = load [trivial] %1
+  return %2
+}
+
+// CHECK-LABEL: sil @load_from_begin_cow_mutation :
+// CHECK:         [[I:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK:         return [[I]]
+// CHECK:       } // end sil function 'load_from_begin_cow_mutation'
+sil @load_from_begin_cow_mutation : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = global_value @gc : $D
+  (%1, %2) = begin_cow_mutation %0
+  %3 = ref_element_addr %2, #D.d
+  %4 = load %3
+  return %4
 }
 

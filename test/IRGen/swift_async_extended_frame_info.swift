@@ -1,13 +1,13 @@
-// RUN: %target-swift-frontend -disable-availability-checking -target x86_64-apple-macosx11 %s -S | %FileCheck  -check-prefix=AUTO %s
-// RUN: %target-swift-frontend -disable-availability-checking -target x86_64-apple-macosx12 %s -S | %FileCheck  -check-prefix=ALWAYS %s
-// RUN: %target-swift-frontend -disable-availability-checking -swift-async-frame-pointer=auto -target x86_64-apple-macosx11 %s -S | %FileCheck  -check-prefix=AUTO %s
-// RUN: %target-swift-frontend -disable-availability-checking -swift-async-frame-pointer=auto -target x86_64-apple-macosx12 %s -S | %FileCheck  -check-prefix=ALWAYS %s
-// RUN: %target-swift-frontend -disable-availability-checking -swift-async-frame-pointer=never -target x86_64-apple-macosx11 %s -S | %FileCheck  -check-prefix=NEVER %s
-// RUN: %target-swift-frontend -disable-availability-checking -swift-async-frame-pointer=never -target x86_64-apple-macosx12 %s -S | %FileCheck  -check-prefix=NEVER %s
-// RUN: %target-swift-frontend -disable-availability-checking -swift-async-frame-pointer=always -target x86_64-apple-macosx11 %s -S | %FileCheck  -check-prefix=ALWAYS %s
-// RUN: %target-swift-frontend -disable-availability-checking -swift-async-frame-pointer=always -target x86_64-apple-macosx12 %s -S | %FileCheck  -check-prefix=ALWAYS %s
-// RUN: %target-swift-frontend -disable-availability-checking -swift-async-frame-pointer=never -target arm64-apple-macos12 %s -S | %FileCheck -check-prefix=NEVER-ARM64 %s
-// RUN: %target-swift-frontend -disable-availability-checking -swift-async-frame-pointer=always -target arm64-apple-macos12 %s -S | %FileCheck -check-prefix=ALWAYS-ARM64 %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -target x86_64-apple-macosx11 %s -S | %FileCheck  -check-prefix=AUTO %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -target x86_64-apple-macosx12 %s -S | %FileCheck  -check-prefix=ALWAYS %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-async-frame-pointer=auto -target x86_64-apple-macosx11 %s -S | %FileCheck  -check-prefix=AUTO %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-async-frame-pointer=auto -target x86_64-apple-macosx12 %s -S | %FileCheck  -check-prefix=ALWAYS %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-async-frame-pointer=never -target x86_64-apple-macosx11 %s -S | %FileCheck  -check-prefix=NEVER %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-async-frame-pointer=never -target x86_64-apple-macosx12 %s -S | %FileCheck  -check-prefix=NEVER %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-async-frame-pointer=always -target x86_64-apple-macosx11 %s -S | %FileCheck  -check-prefix=ALWAYS %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-async-frame-pointer=always -target x86_64-apple-macosx12 %s -S | %FileCheck  -check-prefix=ALWAYS %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-async-frame-pointer=never -target arm64-apple-macos12 %s -S | %FileCheck -check-prefix=NEVER-ARM64 %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-async-frame-pointer=always -target arm64-apple-macos12 %s -S | %FileCheck -check-prefix=ALWAYS-ARM64 %s
 
 // REQUIRES: OS=macosx
 // REQUIRES: CODEGENERATOR=X86 && CODEGENERATOR=AArch64

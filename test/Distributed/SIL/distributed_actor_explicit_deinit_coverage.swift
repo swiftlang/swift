@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
 
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_dist -disable-availability-checking -I %t %s | %FileCheck %s
-// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir -disable-availability-checking -I %t %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_dist -target %target-swift-5.7-abi-triple -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -profile-generate -profile-coverage-mapping -emit-ir -target %target-swift-5.7-abi-triple -I %t %s
 
 // REQUIRES: concurrency
 // REQUIRES: distributed
@@ -17,10 +17,9 @@ distributed actor MyDistActor {
     self.actorSystem = system
   }
 
-  // CHECK-LABEL: sil hidden @$s13coverage_dist11MyDistActorCfd : $@convention(method) (@guaranteed MyDistActor) -> @owned Builtin.NativeObject
-  // CHECK:       cond_br {{%[0-9]+}}, {{bb[0-9]+}}, [[DEINITBODYBB:bb[0-9]+]]
-
-  // CHECK:       [[DEINITBODYBB]]:
+  // CHECK-LABEL: sil hidden @$s13coverage_dist11MyDistActorCfd : $@convention(method) (@guaranteed MyDistActor) -> @owned Builtin.Nativ
+  // CHECK:  bb0(%0 : $MyDistActor):
+  // CHECK-NEXT:  debug_value
   // CHECK-NEXT:  increment_profiler_counter 0
   // CHECK:       function_ref @$sSb6randomSbyFZ
   // CHECK:       cond_br {{%[0-9]+}}, [[TRUEBB:bb[0-9]+]], {{bb[0-9]+}}

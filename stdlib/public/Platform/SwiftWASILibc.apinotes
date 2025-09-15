@@ -1,0 +1,5 @@
+Name: SwiftWASILibc
+Globals:
+  # errno macro is importable but we provide explicit Swift wrapper
+  - Name: errno
+    SwiftPrivate: true

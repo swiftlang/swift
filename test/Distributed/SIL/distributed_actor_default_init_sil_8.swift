@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -verify -disable-availability-checking -I %t | %FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -Xllvm -sil-print-types -emit-sil -verify -target %target-swift-5.7-abi-triple -I %t | %FileCheck %s --enable-var-scope --dump-input=fail
 // REQUIRES: concurrency
 // REQUIRES: distributed
 // REQUIRES: swift_in_compiler
@@ -51,11 +51,11 @@ distributed actor MyDistActor {
 // CHECK:    [[SELF_METATYPE:%[0-9]+]] = metatype $@thick MyDistActor.Type
 // CHECK:    strong_retain [[RELOADED_SYS1]] : $FakeRoundtripActorSystem
 // CHECK:    [[ASSIGN_ID_FN:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0a9RoundtripC6SystemC8assignIDyAA0C7AddressVxm0B00bC0RzlF
-// CHECK:    [[ID:%[0-9]+]] = apply [[ASSIGN_ID_FN]]<MyDistActor>([[SELF_METATYPE]], [[RELOADED_SYS1]])
-// CHECK:    strong_release [[RELOADED_SYS1]] : $FakeRoundtripActorSystem
+// CHECK:    [[ID:%[0-9]+]] = apply [[ASSIGN_ID_FN]]<MyDistActor>([[SELF_METATYPE]], {{.*}})
+// CHECK:    strong_release {{.*}} : $FakeRoundtripActorSystem
                 // *** save identity ***
 // CHECK:    [[ID_FIELD:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
-// CHECK:    store [[ID]] to [[ID_FIELD]] : $*ActorAddress
+// CHECK:    copy_addr {{.*}} to [init] [[ID_FIELD]] : $*ActorAddress
 // CHECK-NOT: apply
 // CHECK:    br [[JOIN_PT:bb[0-9]+]]
 
@@ -68,7 +68,7 @@ distributed actor MyDistActor {
 // CHECK:    [[TP_FIELD3:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
 // CHECK:    [[RELOADED_SYS2:%[0-9]+]] = load [[TP_FIELD3]] : $*FakeRoundtripActorSystem
 // CHECK:    [[READY_FN:%[0-9]+]] = function_ref @$s27FakeDistributedActorSystems0a9RoundtripC6SystemC10actorReadyyyx0B00bC0RzAA0C7AddressV2IDRtzlF
-// CHECK:    = apply [[READY_FN]]<MyDistActor>([[SELF]], [[RELOADED_SYS2]])
+// CHECK:    = apply [[READY_FN]]<MyDistActor>([[SELF]], {{.*}})
 // CHECK:    return [[SELF]] : $MyDistActor
 
 // CHECK:  [[SYSTEM_ERROR_BB]]([[ERROR_ARG:%[0-9]+]] : $any Error):

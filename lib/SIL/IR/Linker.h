@@ -91,6 +91,8 @@ class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, void> {
   /// Whether any functions were deserialized.
   bool Changed;
 
+  bool hasError = false;
+
 public:
   SILLinkerVisitor(SILModule &M, SILModule::LinkingMode LinkingMode)
       : Mod(M), Worklist(), Mode(LinkingMode), Changed(false) {}
@@ -119,13 +121,15 @@ public:
   void visitFunctionRefInst(FunctionRefInst *FRI);
   void visitDynamicFunctionRefInst(DynamicFunctionRefInst *FRI);
   void visitPreviousDynamicFunctionRefInst(PreviousDynamicFunctionRefInst *FRI);
-  void visitProtocolConformance(ProtocolConformanceRef C);
+  void visitProtocolConformance(ProtocolConformanceRef C,
+                                bool referencedFromInitExistential);
   void visitApplySubstitutions(SubstitutionMap subs);
   void visitWitnessMethodInst(WitnessMethodInst *WMI) {
-    visitProtocolConformance(WMI->getConformance());
+    visitProtocolConformance(WMI->getConformance(), false);
   }
   void visitInitExistentialAddrInst(InitExistentialAddrInst *IEI);
   void visitInitExistentialRefInst(InitExistentialRefInst *IERI);
+  void visitBuiltinInst(BuiltinInst *bi);
   void visitAllocRefInst(AllocRefInst *ARI);
   void visitAllocRefDynamicInst(AllocRefDynamicInst *ARI);
   void visitMetatypeInst(MetatypeInst *MI);
@@ -142,7 +146,8 @@ private:
   /// If `callerSerializedKind` is IsSerialized, then all shared
   /// functions which are referenced from `F` are set to be serialized.
   void maybeAddFunctionToWorklist(SILFunction *F,
-                                  SerializedKind_t callerSerializedKind);
+                                  SerializedKind_t callerSerializedKind,
+                                  SILFunction *caller = nullptr);
 
   /// Is the current mode link all? Link all implies we should try and link
   /// everything, not just transparent/shared functions.

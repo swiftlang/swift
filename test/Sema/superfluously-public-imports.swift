@@ -32,8 +32,13 @@
 // RUN: %target-swift-frontend -typecheck %t/ClientOfClangModules.swift -I %t \
 // RUN:   -package-name pkg -Rmodule-api-import \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault -verify
+// RUN: %target-swift-frontend -typecheck %t/ClientOfClangReexportedSubmodules.swift -I %t \
+// RUN:   -package-name pkg -Rmodule-api-import \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault -verify
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
 // RUN:   -swift-version 5 -verify
+
+// REQUIRES: swift_feature_InternalImportsByDefault
 
 //--- DepUsedFromInlinableCode.swift
 public struct TypeUsedFromInlinableCode {}
@@ -235,9 +240,7 @@ internal func internalFunc(a: NotAnAPIType = notAnAPIFunc()) {}
 func implicitlyInternalFunc(a: NotAnAPIType = notAnAPIFunc()) {}
 
 // For package decls we only remark on types used in signatures, not for inlinable code.
-package func packageFunc(a: PackageType = packageFunc()) {} 
-// expected-remark@-1 {{struct 'PackageType' is imported via 'ImportUsedInPackage'}}
-// expected-remark@-2 {{global function 'packageFunc()' is imported via 'ImportUsedInPackage'}}
+package func packageFunc(a: PackageType = packageFunc()) {} // expected-remark {{struct 'PackageType' is imported via 'ImportUsedInPackage'}}
 
 @_spi(X)
 public func spiFunc(a: ToUseFromSPI) {} // expected-remark {{struct 'ToUseFromSPI' is imported via 'SPIOnlyUsedInSPI'}}
@@ -249,7 +252,7 @@ public protocol Countable {
 extension Extended: Countable { // expected-remark {{struct 'Extended' is imported via 'RetroactiveConformance'}}
 }
 
-extension ExtendedPackageType { // expected-remark 2 {{struct 'ExtendedPackageType' is imported via 'ExtendedPackageTypeImport'}}
+extension ExtendedPackageType { // expected-remark {{struct 'ExtendedPackageType' is imported via 'ExtendedPackageTypeImport'}}
   package func useExtendedPackageType() { }
 }
 
@@ -285,6 +288,21 @@ module ClangTopModule {
   }
 }
 
+module ClangReexportedSubmodulePublic {
+  header "ClangReexportedSubmodulePublic.h"
+  module ClangReexportedSubmodulePublicSub {
+    header "ClangReexportedSubmodulePublicSub.h"
+    export *
+  }
+}
+
+module ClangReexportedSubmoduleTop {
+  header "ClangReexportedSubmoduleTop.h"
+  module ClangReexportedSubmoduleSub {
+    header "ClangReexportedSubmoduleSub.h"
+  }
+}
+
 //--- ClangSimpleUnused.h
 //--- ClangSimple.h
 struct ClangSimpleType {};
@@ -300,6 +318,15 @@ struct ClangSubmoduleSubmoduleType {};
 struct ClangTopModuleType {};
 //--- ClangTopModuleSubmodule.h
 
+//--- ClangReexportedSubmodulePublic.h
+//--- ClangReexportedSubmodulePublicSub.h
+#include <ClangReexportedSubmoduleSub.h>
+
+//--- ClangReexportedSubmoduleTop.h
+//--- ClangReexportedSubmoduleSub.h
+typedef struct _TypedefTypeUnderlying {
+} TypedefType;
+
 //--- ClientOfClangModules.swift
 public import ClangSimple
 public import ClangSimpleUnused // expected-warning {{public import of 'ClangSimpleUnused' was not used in public declarations or inlinable code}}
@@ -312,3 +339,9 @@ public import ClangTopModule.ClangTopModuleSubmodule
 public func clangUser(a: ClangSimpleType) {} // expected-remark {{struct 'ClangSimpleType' is imported via 'ClangSimple'}}
 public func clangUser(a: ClangSubmoduleSubmoduleType) {} // expected-remark {{struct 'ClangSubmoduleSubmoduleType' is imported via 'ClangSubmodule'}}
 public func clangUser(a: ClangTopModuleType) {} // expected-remark {{struct 'ClangTopModuleType' is imported via 'ClangTopModule'}}
+
+//--- ClientOfClangReexportedSubmodules.swift
+public import ClangReexportedSubmodulePublic.ClangReexportedSubmodulePublicSub
+
+public func useTypedefed(a: TypedefType) {} // expected-remark 2 {{typealias underlying type struct '_TypedefTypeUnderlying' is imported via 'ClangReexportedSubmodulePublicSub', which reexports definition from 'ClangReexportedSubmoduleTop'}}
+// expected-remark @-1 {{type alias 'TypedefType' is imported via 'ClangReexportedSubmodulePublicSub', which reexports definition from 'ClangReexportedSubmoduleTop'}}

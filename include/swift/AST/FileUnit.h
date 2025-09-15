@@ -39,7 +39,8 @@ class FileUnit : public DeclContext, public ASTAllocated<FileUnit> {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
 
-  // The pointer is FileUnit insted of SynthesizedFileUnit to break circularity.
+  /// The pointer is FileUnit insted of SynthesizedFileUnit to break
+  /// circularity.
   llvm::PointerIntPair<FileUnit *, 3, FileUnitKind> SynthesizedFileAndKind;
 
 protected:
@@ -125,16 +126,13 @@ public:
                             const ModuleDecl *importedModule,
                             llvm::SmallSetVector<Identifier, 4> &spiGroups) const {};
 
-  /// Checks whether this file imports \c module as \c @_weakLinked.
-  virtual bool importsModuleAsWeakLinked(const ModuleDecl *module) const {
-    // For source files, this should be overridden to inspect the import
-    // declarations in the file. Other kinds of file units, like serialized
-    // modules, can just use this default implementation since the @_weakLinked
-    // attribute is not transitive. If module C is imported @_weakLinked by
-    // module B, that does not imply that module A imports module C @_weakLinked
-    // if it imports module B.
-    return false;
-  }
+  /// Find all availability domains defined in this module with the given
+  /// identifier.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  virtual void lookupAvailabilityDomains(
+      Identifier identifier,
+      SmallVectorImpl<AvailabilityDomain> &results) const {};
 
   virtual std::optional<Fingerprint>
   loadFingerprint(const IterableDeclContext *IDC) const {
@@ -205,8 +203,6 @@ public:
   /// identifier.
   virtual Identifier
   getDiscriminatorForPrivateDecl(const Decl *D) const = 0;
-
-  virtual bool shouldCollectDisplayDecls() const { return true; }
 
   /// Finds all top-level decls in this file.
   ///
@@ -283,9 +279,13 @@ public:
   getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const {}
 
-  /// Lists modules that are not imported from this file and used in API.
+  /// Looks up which external macros are defined by this file.
   virtual void
-  getMissingImportedModules(SmallVectorImpl<ImportedModule> &imports) const {}
+  getExternalMacros(SmallVectorImpl<ExternalMacroPlugin> &macros) const {}
+
+  /// Lists modules that are not imported from this file and used in API.
+  virtual void getImplicitImportsForModuleInterface(
+      SmallVectorImpl<ImportedModule> &imports) const {}
 
   /// \see ModuleDecl::getImportedModulesForLookup
   virtual void getImportedModulesForLookup(
@@ -344,6 +344,18 @@ public:
   /// verified.
   virtual StringRef getExportedModuleName() const {
     return getParentModule()->getRealName().str();
+  }
+
+  /// Returns the public facing name of this module, only if it is set
+  /// explicitly.
+  virtual StringRef getPublicModuleName() const {
+    return {};
+  }
+
+  /// Returns the version of the Swift compiler used to create generate
+  /// .swiftinterface file if this file is produced from one.
+  virtual version::Version getSwiftInterfaceCompilerVersion() const {
+    return {};
   }
 
   SWIFT_DEBUG_DUMPER(dumpDisplayDecls());
@@ -481,9 +493,11 @@ void simple_display(llvm::raw_ostream &out, const FileUnit *file);
 inline FileUnit &ModuleDecl::getMainFile(FileUnitKind expectedKind) const {
   assert(expectedKind != FileUnitKind::Source &&
          "must use specific source kind; see getMainSourceFile");
-  assert(!Files.empty() && "No files added yet");
-  assert(Files.front()->getKind() == expectedKind);
-  return *Files.front();
+
+  auto files = getFiles();
+  assert(!files.empty() && "No files in module");
+  assert(files.front()->getKind() == expectedKind);
+  return *files.front();
 }
 
 } // end namespace swift

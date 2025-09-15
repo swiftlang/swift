@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -enable-upcoming-feature ImplicitOpenExistentials
 // RUN: %target-typecheck-verify-swift -swift-version 6
 
+// REQUIRES: swift_feature_ImplicitOpenExistentials
+
 #if _runtime(_ObjC)
 @objc
 protocol X {}

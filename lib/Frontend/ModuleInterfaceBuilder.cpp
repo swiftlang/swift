@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
@@ -104,6 +105,12 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
   path::native(SDKPath);
   SmallString<128> ResourcePath(Opts.RuntimeResourcePath);
   path::native(ResourcePath);
+  // When compiling with a relative resource dir, the clang
+  // importer will track inputs with absolute paths. To avoid
+  // serializing resource dir inputs we need to check for
+  // relative _and_ absolute prefixes.
+  SmallString<128> AbsResourcePath(ResourcePath);
+  llvm::sys::fs::make_absolute(AbsResourcePath);
 
   auto DTDeps = Instance.getDependencyTracker()->getDependencies();
   SmallVector<std::string, 16> InitialDepNames(DTDeps.begin(), DTDeps.end());
@@ -145,7 +152,7 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
     }
 
     // Don't serialize compiler-relative deps so the cache is relocatable.
-    if (DepName.starts_with(ResourcePath))
+    if (DepName.starts_with(ResourcePath) || DepName.starts_with(AbsResourcePath))
       continue;
 
     auto Status = fs.status(DepName);
@@ -196,6 +203,7 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
     ArrayRef<std::string> CompiledCandidates,
     StringRef CompilerVersion) {
   auto Invocation = Instance.getInvocation();
+
   // Try building forwarding module first. If succeed, return.
   if (Instance.getASTContext()
           .getModuleInterfaceChecker()
@@ -247,6 +255,9 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
                  builtByCompiler);
       }
     }
+
+    // If requested, dump debugging output before exiting.
+    Instance.emitEndOfPipelineDebuggingOutput();
   };
 
   Instance.performSema();
@@ -272,18 +283,22 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
   // optimization pipeline.
   SerializationOptions SerializationOpts;
   std::string OutPathStr = OutputPath.str();
+  SerializationOpts.StaticLibrary = FEOpts.Static;
   SerializationOpts.OutputPath = OutPathStr.c_str();
   SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
   SerializationOpts.AutolinkForceLoad =
       !Invocation.getIRGenOptions().ForceLoadSymbolName.empty();
+  SerializationOpts.PublicDependentLibraries =
+      Invocation.getIRGenOptions().PublicLinkLibraries;
   SerializationOpts.UserModuleVersion = FEOpts.UserModuleVersion;
   SerializationOpts.AllowableClients = FEOpts.AllowableClients;
   StringRef SDKPath = Instance.getASTContext().SearchPathOpts.getSDKPath();
 
   auto SDKRelativePath = getRelativeDepPath(InPath, SDKPath);
-  if (SDKRelativePath.has_value())
+  if (SDKRelativePath.has_value()) {
     SerializationOpts.ModuleInterface = SDKRelativePath.value();
-  else
+    SerializationOpts.IsInterfaceSDKRelative = true;
+  } else
     SerializationOpts.ModuleInterface = InPath;
 
   SerializationOpts.SDKName = Instance.getASTContext().LangOpts.SDKName;
@@ -345,7 +360,7 @@ bool ImplicitModuleInterfaceBuilder::buildSwiftModuleInternal(
     }
 
     SubError = (bool)subASTDelegate.runInSubCompilerInstance(
-        moduleName, interfacePath, sdkPath, OutPath, diagnosticLoc,
+        moduleName, interfacePath, sdkPath, sysroot, OutPath, diagnosticLoc,
         silenceInterfaceDiagnostics,
         [&](SubCompilerInstanceInfo &info) {
           auto EBuilder = ExplicitModuleInterfaceBuilder(
@@ -381,53 +396,48 @@ bool ImplicitModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
   // processes are doing the same.
   // FIXME: We should surface the module building step to the build system so
   // we don't need to synchronize here.
-  llvm::LockFileManager Locked(OutPath);
-  switch (Locked) {
-  case llvm::LockFileManager::LFS_Error:{
+  llvm::LockFileManager Lock(OutPath);
+  bool Owned;
+  if (llvm::Error Err = Lock.tryLock().moveInto(Owned)) {
+    llvm::consumeError(std::move(Err));
     // ModuleInterfaceBuilder takes care of correctness and locks are only
     // necessary for performance. Fallback to building the module in case of any lock
     // related errors.
     if (RemarkRebuild) {
       diagnose(diag::interface_file_lock_failure);
     }
-    // Clear out any potential leftover.
-    Locked.unsafeRemoveLockFile();
-    LLVM_FALLTHROUGH;
-  }
-  case llvm::LockFileManager::LFS_Owned: {
     return build();
   }
-  case llvm::LockFileManager::LFS_Shared: {
-    // Someone else is responsible for building the module. Wait for them to
-    // finish.
-    switch (Locked.waitForUnlock(256)) {
-    case llvm::LockFileManager::Res_Success: {
-      // This process may have a different module output path. If the other
-      // process doesn't build the interface to this output path, we should try
-      // building ourselves.
-      auto bufferOrError = llvm::MemoryBuffer::getFile(OutPath);
-      if (!bufferOrError)
-        continue;
-      if (ModuleBuffer)
-        *ModuleBuffer = std::move(bufferOrError.get());
-      return false;
-    }
-    case llvm::LockFileManager::Res_OwnerDied: {
-      continue; // try again to get the lock.
-    }
-    case llvm::LockFileManager::Res_Timeout: {
-      // Since ModuleInterfaceBuilder takes care of correctness, we try waiting for
-      // another process to complete the build so swift does not do it done
-      // twice. If case of timeout, build it ourselves.
-      if (RemarkRebuild) {
-        diagnose(diag::interface_file_lock_timed_out, interfacePath);
-      }
-      // Clear the lock file so that future invocations can make progress.
-      Locked.unsafeRemoveLockFile();
+  if (Owned) {
+    return build();
+  }
+  // Someone else is responsible for building the module. Wait for them to
+  // finish.
+  switch (Lock.waitForUnlockFor(std::chrono::seconds(256))) {
+  case llvm::WaitForUnlockResult::Success: {
+    // This process may have a different module output path. If the other
+    // process doesn't build the interface to this output path, we should try
+    // building ourselves.
+    auto bufferOrError = llvm::MemoryBuffer::getFile(OutPath);
+    if (!bufferOrError)
       continue;
+    if (ModuleBuffer)
+      *ModuleBuffer = std::move(bufferOrError.get());
+    return false;
+  }
+  case llvm::WaitForUnlockResult::OwnerDied: {
+    continue; // try again to get the lock.
+  }
+  case llvm::WaitForUnlockResult::Timeout: {
+    // Since ModuleInterfaceBuilder takes care of correctness, we try waiting for
+    // another process to complete the build so swift does not do it done
+    // twice. If case of timeout, build it ourselves.
+    if (RemarkRebuild) {
+      diagnose(diag::interface_file_lock_timed_out, interfacePath);
     }
-    }
-    break;
+    // Clear the lock file so that future invocations can make progress.
+    Lock.unsafeMaybeUnlock();
+    continue;
   }
   }
   }

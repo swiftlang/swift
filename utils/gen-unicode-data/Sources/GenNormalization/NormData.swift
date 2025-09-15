@@ -149,6 +149,7 @@ func emitNormData(
     type: "__swift_uint64_t",
     into: &result
   ) {
-    "0x\(String($0.words[0], radix: 16, uppercase: true))"
+    assert($0.words.count == 1)
+    return "0x\(String($0.words[0], radix: 16, uppercase: true))"
   }
 }

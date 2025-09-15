@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
@@ -59,6 +60,12 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
   // If the instruction has any use other than end of scope use or destroy_value
   // use, bail out.
   if (!hasOnlyEndOfScopeOrEndOfLifetimeUses(inst)) {
+    return false;
+  }
+
+  // Don't delete dead drop_deinit instruction. They are a marker to eliminate
+  // user-defined deinit and we do not want to lose it.
+  if (isa<DropDeinitInst>(inst)) {
     return false;
   }
 
@@ -180,9 +187,8 @@ bool InstructionDeleter::trackIfDead(SILInstruction *inst) {
   bool fixLifetime = inst->getFunction()->hasOwnership();
   if (isInstructionTriviallyDead(inst)
       || isScopeAffectingInstructionDead(inst, fixLifetime)) {
-    assert(!isIncidentalUse(inst) &&
-           (!isa<DestroyValueInst>(inst) ||
-            canTriviallyDeleteOSSAEndScopeInst(inst)) &&
+    assert(!isIncidentalUse(inst)
+           || canTriviallyDeleteOSSAEndScopeInst(inst) &&
            "Incidental uses cannot be removed in isolation. "
            "They would be removed iff the operand is dead");
     getCallbacks().notifyWillBeDeleted(inst);
@@ -267,9 +273,16 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
       if (fixLifetimes) {
         LoadInst *li = nullptr;
         if (operand.isConsuming()) {
-          SILBuilderWithScope builder(inst);
-          auto *dvi = builder.createDestroyValue(inst->getLoc(), operandValue);
-          getCallbacks().createdNewInst(dvi);
+          if (isa<DropDeinitInst>(operandValue)) {
+            SILBuilderWithScope builder(inst);
+            auto *eli = builder.createEndLifetime(inst->getLoc(), operandValue);
+            getCallbacks().createdNewInst(eli);
+          } else {
+            SILBuilderWithScope builder(inst);
+            auto *dvi =
+                builder.createDestroyValue(inst->getLoc(), operandValue);
+            getCallbacks().createdNewInst(dvi);
+          }
         } else if ((li = dyn_cast<LoadInst>(inst)) &&
                    li->getOwnershipQualifier() ==
                        LoadOwnershipQualifier::Take) {
@@ -334,12 +347,26 @@ namespace swift::test {
 // Dumps:
 // - the function
 static FunctionTest DeleterDeleteIfDeadTest(
-    "deleter-delete-if-dead", [](auto &function, auto &arguments, auto &test) {
+    "deleter_delete_if_dead", [](auto &function, auto &arguments, auto &test) {
       auto *inst = arguments.takeInstruction();
       InstructionDeleter deleter;
       llvm::outs() << "Deleting-if-dead " << *inst;
       auto deleted = deleter.deleteIfDead(inst);
       llvm::outs() << "deleteIfDead returned " << deleted << "\n";
+      function.print(llvm::outs());
+    });
+
+// Arguments:
+// - instruction: the instruction to delete
+// Dumps:
+// - the function
+static FunctionTest DeleterTrackIfDeadTest(
+    "deleter_track_if_dead", [](auto &function, auto &arguments, auto &test) {
+      auto *inst = arguments.takeInstruction();
+      InstructionDeleter deleter;
+      llvm::outs() << "Tracking " << *inst;
+      deleter.trackIfDead(inst);
+      deleter.cleanupDeadInstructions();
       function.print(llvm::outs());
     });
 } // namespace swift::test

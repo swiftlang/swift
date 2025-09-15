@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Extern %s | %FileCheck %s
 
+// REQUIRES: swift_feature_Extern
+
 func test() {
   // CHECK: call void @explicit_extern_c()
   explicit_extern_c()

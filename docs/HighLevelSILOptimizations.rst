@@ -392,16 +392,30 @@ Optimize semantics attribute
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The optimize attribute adds function-specific directives to the optimizer.
-
 The optimize attribute supports the following tags:
 
-sil.specialize.generic.never
+optimize.sil.specialize.generic.never
 
-   The sil optimizer should never create generic specializations of this function. 
+  Disable generic specializations of this function.
 
 optimize.sil.specialize.generic.partial.never
 
-   The sil optimizer should never create generic partial specializations of this function. 
+  Disable create generic partial specializations of this function.
+
+optimize.sil.specialize.generic.size.never
+
+  Disable generic specializations of this function when optimizing for code
+  size (-Osize).
+
+optimize.sil.specialize.owned2guarantee.never
+
+  Disable function signature optimization which converts an "owned" to a
+  "guaranteed" function parameter.
+
+optimize.sil.inline.aggressive
+
+  Inlines into this function more aggressively than it would be done without
+  this attribute.
 
 Availability checks
 ~~~~~~~~~~~~~~~~~~~

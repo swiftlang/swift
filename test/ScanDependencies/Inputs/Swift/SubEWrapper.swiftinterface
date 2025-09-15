@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
 // swift-module-flags: -module-name SubEWrapper
 import Swift
-import SubE
+@_exported import SubE
 public func funcSubEWrapper() { }

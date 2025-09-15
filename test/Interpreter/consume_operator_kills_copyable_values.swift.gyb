@@ -176,6 +176,20 @@ func testNested2_${introducer}(_ c1: Bool, _ c2: Bool) {
   end([c1, c2])
 }
 
+// CHECK-LABEL: begin testDeadEnd_{{let|var}}(_:)(true)
+// CHECK:       hi
+// CHECK:       adios
+// CHECK:       barrier
+// CHECK-LABEL: end testDeadEnd_{{let|var}}(_:)(true)
+func testDeadEnd_${introducer}(_ condition: Bool) {
+  begin([condition])
+  ${introducer} x = X(0)
+  _ = consume x
+  guard condition else { fatalError() }
+  barrier()
+  end([condition])
+}
+
 func main_${introducer}() {
   simple_${introducer}()
   testLeft_${introducer}(true)
@@ -188,6 +202,7 @@ func main_${introducer}() {
   testNested2_${introducer}(false, true)
   testNested2_${introducer}(true, false)
   testNested2_${introducer}(true, true)
+  testDeadEnd_${introducer}(true)
 }
 
 % end

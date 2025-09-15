@@ -16,4 +16,4 @@ BridgingHeader.takeForward(SwiftClass(x: 42))
 BridgingHeader.takeRenamedForward(CustomNameClass())
 
 // Check that we're compiling at all.
-BridgingHeader.takeRenamedForward(SwiftClass(x: 42)) // expected-error {{cannot convert value of type 'SwiftClass' to expected argument type 'CustomNameClass?'}}
+BridgingHeader.takeRenamedForward(SwiftClass(x: 42)) // expected-error {{cannot convert value of type 'SwiftClass' to expected argument type 'CustomNameClass'}}

@@ -18,7 +18,10 @@
 #ifndef SWIFT_AST_MACRO_DEFINITION_H
 #define SWIFT_AST_MACRO_DEFINITION_H
 
+#include "swift/AST/Identifier.h"
 #include "swift/Basic/StringExtras.h"
+
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
@@ -26,24 +29,38 @@ namespace swift {
 class ASTContext;
 
 /// A reference to an external macro definition that is understood by ASTGen.
-struct ExternalMacroDefinition {
-  enum class PluginKind : int8_t {
-    InProcess = 0,
-    Executable = 1,
-    Error = -1,
+class ExternalMacroDefinition {
+  enum class Status : int8_t {
+    Success = 0,
+    Error,
   };
-  PluginKind kind;
+  Status status;
   /// ASTGen's notion of an macro definition, which is opaque to the C++ part
   /// of the compiler. If 'kind' is 'PluginKind::Error', this is a C-string to
   /// the error message
-  const void *opaqueHandle = nullptr;
+  const void *opaqueHandle;
+
+  ExternalMacroDefinition(Status status, const void *opaqueHandle)
+      : status(status), opaqueHandle(opaqueHandle) {}
+
+public:
+  static ExternalMacroDefinition success(const void *opaqueHandle) {
+    return ExternalMacroDefinition{Status::Success, opaqueHandle};
+  }
 
   static ExternalMacroDefinition error(NullTerminatedStringRef message) {
-    return ExternalMacroDefinition{PluginKind::Error,
+    return ExternalMacroDefinition{Status::Error,
                                    static_cast<const void *>(message.data())};
   }
-  bool isError() const { return kind == PluginKind::Error; }
+
+  const void *get() {
+    if (status != Status::Success)
+      return nullptr;
+    return opaqueHandle;
+  }
+  bool isError() const { return status == Status::Error; }
   NullTerminatedStringRef getErrorMessage() const {
+    assert(isError());
     return static_cast<const char *>(opaqueHandle);
   }
 };
@@ -55,7 +72,7 @@ struct ExternalMacroReference {
 };
 
 /// Describes the known kinds of builtin macros.
-enum class BuiltinMacroKind: uint8_t {
+enum class BuiltinMacroKind : uint8_t {
   /// #externalMacro, which references an external macro.
   ExternalMacro,
   /// #isolation, which produces the isolation of the current context

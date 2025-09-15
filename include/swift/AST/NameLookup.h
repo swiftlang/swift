@@ -19,6 +19,7 @@
 
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/CatchNode.h"
+#include "swift/AST/ConformanceAttributes.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
@@ -249,7 +250,15 @@ enum class UnqualifiedLookupFlags {
   ModuleLookup           = 1 << 8,
   /// This lookup should discard 'Self' requirements in protocol extension
   /// 'where' clauses.
-  DisregardSelfBounds    = 1 << 9
+  DisregardSelfBounds    = 1 << 9,
+  /// This lookup should include members that would otherwise be filtered out
+  /// because they come from a module that has not been imported.
+  IgnoreMissingImports = 1 << 10,
+  /// If @abi attributes are present, return the decls representing the ABI,
+  /// not the API.
+  ABIProviding = 1 << 11,
+
+  // Reminder: If you add a flag, make sure you update simple_display() below
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
@@ -525,6 +534,15 @@ void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               bool includeProtocolExtensionMembers,
                               GenericSignature genericSig = GenericSignature());
 
+/// Determine the module-scope context from which lookup should proceed.
+///
+/// In the common case, module-scope context is the source file in which
+/// the declaration context is nested. However, when declaration context is
+/// part of an imported Clang declaration context, it won't be nested within a
+/// source file. Rather, the source file will be on the side, and will be
+/// provided here because it contains information about the available imports.
+DeclContext *getModuleScopeLookupContext(DeclContext *dc);
+
 namespace namelookup {
 
 /// Add semantic members to \p type before attempting a semantic lookup.
@@ -549,6 +567,9 @@ void pruneLookupResultSet(const DeclContext *dc, NLOptions options,
 template <typename Result>
 void filterForDiscriminator(SmallVectorImpl<Result> &results,
                             DebuggerClient *debugClient);
+
+/// \returns Whether the given source location is inside an \@abi attribute.
+bool isInABIAttr(SourceFile *sourceFile, SourceLoc loc);
 
 /// \returns The set of macro declarations with the given name that
 /// fulfill any of the given macro roles.
@@ -583,11 +604,12 @@ void forEachPotentialAttachedMacro(
 
 /// Describes an inherited nominal entry.
 struct InheritedNominalEntry : Located<NominalTypeDecl *> {
-  /// The location of the "unchecked" attribute, if present.
-  SourceLoc uncheckedLoc;
+  /// The `TypeRepr` of the inheritance clause entry from which this nominal was
+  /// sourced, if any. For example, if this is a conformance to `Y` declared as
+  /// `struct S: X, Y & Z {}`, this is the `TypeRepr` for `Y & Z`.
+  TypeRepr *inheritedTypeRepr;
 
-  /// The location of the "preconcurrency" attribute if present.
-  SourceLoc preconcurrencyLoc;
+  ConformanceAttributes attributes;
 
   /// Whether this inherited entry was suppressed via "~".
   bool isSuppressed;
@@ -595,10 +617,10 @@ struct InheritedNominalEntry : Located<NominalTypeDecl *> {
   InheritedNominalEntry() { }
 
   InheritedNominalEntry(NominalTypeDecl *item, SourceLoc loc,
-                        SourceLoc uncheckedLoc, SourceLoc preconcurrencyLoc,
-                        bool isSuppressed)
-      : Located(item, loc), uncheckedLoc(uncheckedLoc),
-        preconcurrencyLoc(preconcurrencyLoc), isSuppressed(isSuppressed) {}
+                        TypeRepr *inheritedTypeRepr,
+                        ConformanceAttributes attributes, bool isSuppressed)
+      : Located(item, loc), inheritedTypeRepr(inheritedTypeRepr),
+        attributes(attributes), isSuppressed(isSuppressed) {}
 };
 
 /// Retrieve the set of nominal type declarations that are directly
@@ -744,7 +766,15 @@ public:
   /// local declarations inside the innermost syntactic scope only.
   static void lookupLocalDecls(SourceFile *, DeclName, SourceLoc,
                                bool stopAfterInnermostBraceStmt,
+                               ABIRole roleFilter,
                                SmallVectorImpl<ValueDecl *> &);
+
+  static void lookupLocalDecls(SourceFile *sf, DeclName name, SourceLoc loc,
+                               bool stopAfterInnermostBraceStmt,
+                               SmallVectorImpl<ValueDecl *> &results) {
+    lookupLocalDecls(sf, name, loc, stopAfterInnermostBraceStmt,
+                     ABIRole::ProvidesAPI, results);
+  }
 
   /// Returns the result if there is exactly one, nullptr otherwise.
   static ValueDecl *lookupSingleLocalDecl(SourceFile *, DeclName, SourceLoc);
@@ -789,6 +819,18 @@ public:
   static void lookupEnclosingMacroScope(
       SourceFile *sourceFile, SourceLoc loc,
       llvm::function_ref<bool(PotentialMacro macro)> consume);
+
+  /// Look up the scope tree for the nearest enclosing ABI attribute at
+  /// the given source location.
+  ///
+  /// \param sourceFile The source file containing the given location.
+  /// \param loc        The source location to start lookup from.
+  /// \param consume    A function that is called when an ABI attribute
+  ///                   scope is found. If \c consume returns \c true, lookup
+  ///                   will stop. If \c consume returns \c false, lookup will
+  ///                   continue up the scope tree.
+  static ABIAttr *lookupEnclosingABIAttributeScope(
+      SourceFile *sourceFile, SourceLoc loc);
 
   /// Look up the scope tree for the nearest point at which an error thrown from
   /// this location can be caught or rethrown.

@@ -26,40 +26,40 @@
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
-      key.name: "intanceReturnMyEnum(:)",
-      key.description: "intanceReturnMyEnum(self: MyEnum)",
+      key.name: "instanceReturnMyEnum(:)",
+      key.description: "instanceReturnMyEnum(self: MyEnum)",
       key.typename: "() -> MyEnum",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unrelated,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:21complete_typerelation6MyEnumO013intanceReturncD0ACyF",
+      key.associated_usrs: "s:21complete_typerelation6MyEnumO014instanceReturncD0ACyF",
       key.modulename: "complete_typerelation",
-      key.sourcetext: "intanceReturnMyEnum(<#T##self: MyEnum##MyEnum#>)"
+      key.sourcetext: "instanceReturnMyEnum(<#T##self: MyEnum##MyEnum#>)"
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
-      key.name: "intanceReturnVoid(:)",
-      key.description: "intanceReturnVoid(self: MyEnum)",
+      key.name: "instanceReturnVoid(:)",
+      key.description: "instanceReturnVoid(self: MyEnum)",
       key.typename: "() -> Void",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.invalid,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:21complete_typerelation6MyEnumO17intanceReturnVoidyyF",
+      key.associated_usrs: "s:21complete_typerelation6MyEnumO18instanceReturnVoidyyF",
       key.modulename: "complete_typerelation",
-      key.sourcetext: "intanceReturnVoid(<#T##self: MyEnum##MyEnum#>)"
+      key.sourcetext: "instanceReturnVoid(<#T##self: MyEnum##MyEnum#>)"
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
-      key.name: "intanceReturnVoidDeprecated(:)",
-      key.description: "intanceReturnVoidDeprecated(self: MyEnum)",
+      key.name: "instanceReturnVoidDeprecated(:)",
+      key.description: "instanceReturnVoidDeprecated(self: MyEnum)",
       key.typename: "() -> Void",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.invalid,
       key.num_bytes_to_erase: 0,
       key.not_recommended: 1,
-      key.associated_usrs: "s:21complete_typerelation6MyEnumO27intanceReturnVoidDeprecatedyyF",
+      key.associated_usrs: "s:21complete_typerelation6MyEnumO28instanceReturnVoidDeprecatedyyF",
       key.modulename: "complete_typerelation",
-      key.sourcetext: "intanceReturnVoidDeprecated(<#T##self: MyEnum##MyEnum#>)"
+      key.sourcetext: "instanceReturnVoidDeprecated(<#T##self: MyEnum##MyEnum#>)"
     },
     {
       key.kind: source.lang.swift.keyword,

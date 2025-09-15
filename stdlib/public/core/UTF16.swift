@@ -161,15 +161,15 @@ extension Unicode.UTF16 {
     count: Int
   ) {
     if MemoryLayout<T>.stride == MemoryLayout<U>.stride {
-      _memcpy(
+      unsafe _memcpy(
         dest: UnsafeMutablePointer(destination),
         src: UnsafeMutablePointer(source),
         size: UInt(count) * UInt(MemoryLayout<U>.stride))
     }
     else {
       for i in 0..<count {
-        let u16 = T._toUTF16CodeUnit((source + i).pointee)
-        (destination + i).pointee = U._fromUTF16CodeUnit(u16)
+        let u16 = unsafe T._toUTF16CodeUnit((source + i).pointee)
+        unsafe (destination + i).pointee = U._fromUTF16CodeUnit(u16)
       }
     }
   }
@@ -256,6 +256,7 @@ extension Unicode.UTF16 {
         return (utf16Count, utf16BitUnion < 0x80)
       }
     }
+    fatalError()
   }
 }
 
@@ -364,7 +365,7 @@ extension Unicode.UTF16: Unicode.Encoding {
       return encode(Unicode.Scalar(_unchecked: r))
     }
     else if _fastPath(FromEncoding.self == UTF16.self) {
-      return unsafeBitCast(content, to: UTF16.EncodedScalar.self)
+      return unsafe unsafeBitCast(content, to: UTF16.EncodedScalar.self)
     }
     return encode(FromEncoding.decode(content))
   }

@@ -5,7 +5,7 @@ import MemberInline
 public func sub(_ lhs: inout LoadableIntWrapper, _ rhs: LoadableIntWrapper) -> LoadableIntWrapper { lhs - rhs }
 
 // CHECK-SYSV: call [[RESA:i32|i64]] [[NAMEA:@_ZN18LoadableIntWrappermiES_]](ptr {{%[0-9]+}}, {{i32|\[1 x i32\]|i64|%struct.LoadableIntWrapper\* byval\(.*\) align 4}} {{%[0-9]+}})
-// CHECK-WIN: call [[RESA:void]] [[NAMEA:@"\?\?GLoadableIntWrapper@@QEAA\?AU0@U0@@Z"]](ptr {{%[0-9]+}}, ptr sret(%struct.LoadableIntWrapper) {{.*}}, i32 {{%[0-9]+}})
+// CHECK-WIN: call [[RESA:void]] [[NAMEA:@"\?\?GLoadableIntWrapper@@QEAA\?AU0@U0@@Z"]](ptr {{%[0-9]+}}, ptr {{.*}} sret(%TSo18LoadableIntWrapperV) {{.*}}, i32 {{%[0-9]+}})
 
 public func call(_ wrapper: inout LoadableIntWrapper, _ arg: Int32) -> Int32 { wrapper(arg) }
 
@@ -24,7 +24,7 @@ public func index(_ arr: inout ReadOnlyIntArray, _ arg: Int32) -> Int32 { arr[ar
 // CHECK: call ptr [[NAME:@(_ZNK16ReadOnlyIntArrayixEi|"\?\?AReadOnlyIntArray@@QEBAAEBHH@Z")]](ptr {{.*}}, {{i32|i64}}{{.*}})
 // CHECK: define {{.*}}ptr [[NAME]](ptr {{.*}}, {{i32|\[1 x i32\]|i64|%struct.ReadOnlyIntArray\* byval\(%struct.ReadOnlyIntArray\)}}{{.*}})
 // CHECK:   [[THIS:%.*]] = load ptr, ptr
-// CHECK:   [[VALUES:%.*]] = getelementptr inbounds %struct.ReadOnlyIntArray, ptr [[THIS]]
+// CHECK:   [[VALUES:%.*]] = getelementptr inbounds{{.*}} %struct.ReadOnlyIntArray, ptr [[THIS]]
 // CHECK:   [[VALUE:%.*]] = getelementptr inbounds [5 x {{i32|i64}}], ptr [[VALUES]]
 // CHECK:   ret ptr [[VALUE]]
 
@@ -33,7 +33,7 @@ public func index(_ arr: inout ReadWriteIntArray, _ arg: Int32, _ val: Int32) { 
 // CHECK: call ptr [[NAME:@(_ZN17ReadWriteIntArrayixEi|"\?\?AReadWriteIntArray@@QEAAAEAHH@Z")]](ptr {{.*}}, {{i32|i64}}{{.*}})
 // CHECK: define {{.*}}ptr [[NAME]](ptr {{.*}}, {{i32|\[1 x i32\]|i64|%struct.ReadWriteIntArray\* byval\(%struct.ReadWriteIntArray\)}}{{.*}})
 // CHECK:   [[THIS:%.*]] = load ptr, ptr
-// CHECK:   [[VALUES:%.*]] = getelementptr inbounds %struct.ReadWriteIntArray, ptr [[THIS]]
+// CHECK:   [[VALUES:%.*]] = getelementptr inbounds{{.*}} %struct.ReadWriteIntArray, ptr [[THIS]]
 // CHECK:   [[VALUE:%.*]] = getelementptr inbounds [5 x {{i32|i64}}], ptr [[VALUES]]
 // CHECK:   ret ptr [[VALUE]]
 
@@ -44,7 +44,7 @@ public func index(_ arr: inout NonTrivialIntArrayByVal, _ arg: Int32) -> Int32 {
 
 // CHECK: define {{.*}}[[RES:i32|i64]] [[NAME]](ptr {{.*}}, {{i32|\[1 x i32\]|i64|%struct.NonTrivialIntArrayByVal\* byval\(%struct.NonTrivialIntArrayByVal\)}}{{.*}})
 // CHECK:   [[THIS:%.*]] = load ptr, ptr
-// CHECK:   [[VALUES:%.*]] = getelementptr inbounds %struct.NonTrivialIntArrayByVal, ptr [[THIS]]
+// CHECK:   [[VALUES:%.*]] = getelementptr inbounds{{.*}} %struct.NonTrivialIntArrayByVal, ptr [[THIS]]
 // CHECK:   [[VALUE:%.*]] = getelementptr inbounds [5 x {{i32|i64}}], ptr [[VALUES]]
 // CHECK:   [[VALUE2:%.*]] = load {{i32|i64}}, ptr [[VALUE]]
 // CHECK:   ret {{i32|i64}} [[VALUE2]]

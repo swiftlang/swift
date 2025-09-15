@@ -24,14 +24,14 @@
 ///     class Manager {
 ///       let cache = Mutex<[Key: Resource]>([:])
 ///
-///       func saveResouce(_ resource: Resouce, as key: Key) {
+///       func saveResource(_ resource: Resource, as key: Key) {
 ///         cache.withLock {
 ///           $0[key] = resource
 ///         }
 ///       }
 ///     }
 ///
-@available(unavailable, *, message: "Mutex is not available on this platform")
+@available(*, unavailable, message: "Mutex is not available on this platform")
 @frozen
 @_staticExclusiveOnly
 public struct Mutex<Value: ~Copyable>: ~Copyable {}

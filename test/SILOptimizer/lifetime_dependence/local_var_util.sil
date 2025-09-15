@@ -1,0 +1,134 @@
+// RUN: %target-sil-opt -test-runner %s \
+// RUN:     -enable-experimental-feature LifetimeDependence \
+// RUN:     -o /dev/null 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct NE: ~Escapable {}
+
+sil @makeDepNE : $@convention(thin) (@inout NE) -> @lifetime(borrow address_for_deps 0) @out NE
+
+// CHECK-LABEL: testNEInitNoEscape: local_variable_reachable_uses with: %1, @instruction
+// CHECK: ### Access map:
+// CHECK-NEXT: Access map for:   %{{.*}} = alloc_box ${ var NE }, var, name "self"
+// CHECK-NEXT: assign: true, store  destroy_value %{{.*}} : ${ var NE }
+// CHECK-NEXT: assign: false, escape  %{{.*}} = address_to_pointer %{{.*}} : $*NE to $Builtin.RawPointer
+// CHECK-NEXT: assign: true, beginAccess  %{{.*}} = begin_access [modify] [unknown] %{{.*}} : $*NE
+// CHECK-NEXT: assign: false, load  %{{.*}} = load [copy] %{{.*}} : $*NE
+// CHECK-NEXT: assign: true, beginAccess  %{{.*}} = begin_access [modify] [unknown] %{{.*}} : $*NE
+// CHECK-NEXT: ### Modify:   %{{.*}} = begin_access [modify] [unknown] %4 : $*NE
+// CHECK-NEXT: ### Reachable access:
+// CHECK-NEXT: load  %{{.*}} = load [copy] %{{.*}} : $*NE
+// CHECK-NEXT: testNEInitNoEscape: local_variable_reachable_uses with: %1, @instruction
+
+// CHECK-LABEL: testNEInitNoEscape: local_variable_reaching_assignments with: %1, @instruction
+// CHECK: ### Instruction:   end_access %{{.*}} : $*NE
+// CHECK-NEXT: ### Reachable assignments:
+// CHECK-NEXT: beginAccess  %21 = begin_access [modify] [unknown] %4 : $*NE
+// CHECK-NEXT: testNEInitNoEscape: local_variable_reaching_assignments with: %1, @instruction
+sil [ossa] @testNEInitNoEscape : $@convention(thin) (@inout NE) -> @lifetime(borrow 0) @owned NE {
+bb0(%0 : $*NE):
+  %1 = alloc_box ${ var NE }, var, name "self"
+  %2 = mark_uninitialized [rootself] %1
+  %3 = begin_borrow [lexical] [var_decl] %2
+  %4 = project_box %3, 0
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %8 = alloc_stack $NE
+
+  %9 = begin_access [modify] [unknown] %0
+
+  %10 = function_ref @makeDepNE : $@convention(thin) (@inout NE) -> @lifetime(borrow address_for_deps 0) @out NE
+  %11 = apply %10(%8, %9) : $@convention(thin) (@inout NE) -> @lifetime(borrow address_for_deps 0) @out NE
+
+  mark_dependence_addr [unresolved] %8 on %9
+  end_access %9
+
+  %14 = load [take] %8
+
+  specify_test "local_variable_reachable_uses %1 @instruction"
+  %15 = begin_access [modify] [unknown] %4
+  assign %14 to %15
+  end_access %15
+  dealloc_stack %8
+  %19 = load [copy] %4
+
+  %21 = load [take] %8
+  %22 = begin_access [modify] [unknown] %4
+  assign %21 to %22
+  specify_test "local_variable_reaching_assignments %1 @instruction"
+  end_access %22
+  %escape = address_to_pointer %4 : $*NE to $Builtin.RawPointer
+  end_borrow %3
+  destroy_value %2
+  return %19
+}
+
+// CHECK-LABEL: testNEInitEscape: local_variable_reaching_assignments with: %1, @instruction
+// CHECK: ### Instruction:   %{{.*}} = load [take] %{{.*}} : $*NE
+// CHECK-NEXT: !!! Reaching escape
+// CHECK-NEXT: testNEInitEscape: local_variable_reaching_assignments with: %1, @instruction
+
+// CHECK-LABEL: testNEInitEscape: local_variable_reachable_uses with: %1, @instruction
+// CHECK: ### Access map:
+// CHECK-NEXT: Access map for:   %{{.*}} = alloc_box ${ var NE }, var, name "self"
+// CHECK-NEXT: assign: true, store  destroy_value %{{.*}} : ${ var NE }
+// CHECK-NEXT: assign: false, load  %{{.*}} = load [copy] %{{.*}} : $*NE
+// CHECK-NEXT: assign: true, beginAccess  %{{.*}} = begin_access [modify] [unknown] %{{.*}} : $*NE
+// CHECK-NEXT: assign: false, escape  %6 = address_to_pointer %4 : $*NE to $Builtin.RawPointer
+// CHECK-NEXT: ### Modify:   %{{.*}} = begin_access [modify] [unknown] %4 : $*NE
+// CHECK-NEXT: !!! Reachable escape
+// CHECK-NEXT: testNEInitEscape: local_variable_reachable_uses with: %1, @instruction
+sil [ossa] @testNEInitEscape : $@convention(thin) (@inout NE) -> @lifetime(borrow 0) @owned NE {
+bb0(%0 : $*NE):
+  %1 = alloc_box ${ var NE }, var, name "self"
+  %2 = mark_uninitialized [rootself] %1
+  %3 = begin_borrow [lexical] [var_decl] %2
+  %4 = project_box %3, 0
+  cond_br undef, bb1, bb2
+
+bb1:
+  %escape = address_to_pointer %4 : $*NE to $Builtin.RawPointer
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %8 = alloc_stack $NE
+
+  %9 = begin_access [modify] [unknown] %0
+
+  %10 = function_ref @makeDepNE : $@convention(thin) (@inout NE) -> @lifetime(borrow address_for_deps 0) @out NE
+  %11 = apply %10(%8, %9) : $@convention(thin) (@inout NE) -> @lifetime(borrow address_for_deps 0) @out NE
+
+  mark_dependence_addr [unresolved] %8 on %9
+  end_access %9
+
+  specify_test "local_variable_reaching_assignments %1 @instruction"
+  %14 = load [take] %8
+
+  specify_test "local_variable_reachable_uses %1 @instruction"
+  %15 = begin_access [modify] [unknown] %4
+  assign %14 to %15
+  end_access %15
+  dealloc_stack %8
+  %19 = load [copy] %4
+  end_borrow %3
+  destroy_value %2
+  return %19
+}

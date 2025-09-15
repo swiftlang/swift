@@ -260,6 +260,9 @@ private:
     /// This value is represented with an inline integer representation.
     RK_IntegerInline,
 
+    /// This value is represented with a bump-pointer allocated APFloat.
+    RK_FloatingPoint,
+
     /// This value is represented with a bump-pointer allocated char array
     /// representing a UTF-8 encoded string.
     RK_String,
@@ -304,6 +307,10 @@ private:
     /// When this SymbolicValue is of "Integer" kind, this pointer stores
     /// the words of the APInt value it holds.
     uint64_t *integer;
+
+    /// When this SymbolicValue is of "FloatingPoint" kind, this
+    /// pointer stoes information about its APFloat value
+    APFloat *floatingPoint;
 
     /// This holds the bits of an integer for an inline representation.
     uint64_t integerInline;
@@ -389,6 +396,9 @@ public:
 
     /// This is an integer constant.
     Integer,
+
+    /// This is a floating point constant.
+    FloatingPoint,
 
     /// String values may have SIL type of Builtin.RawPointer or Builtin.Word
     /// type.
@@ -480,8 +490,12 @@ public:
   static SymbolicValue getInteger(const APInt &value,
                                   SymbolicValueAllocator &allocator);
 
+  static SymbolicValue getFloat(const APFloat &value,
+                                SymbolicValueAllocator &allocator);
+
   APInt getIntegerValue() const;
   unsigned getIntegerValueBitWidth() const;
+  APFloat getFloatValue() const;
 
   /// Returns a SymbolicValue representing a UTF-8 encoded string.
   static SymbolicValue getString(StringRef string,

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name switch_default %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name switch_default %s | %FileCheck %s
 
 class Klass {}
 protocol Protocol {}

@@ -14,13 +14,19 @@
 #include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
 #include "ModuleFileCoreTableInfo.h"
+#include "ModuleFormat.h"
+#include "SerializationFormat.h"
+#include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/PrettyStackTrace.h"
+#include "llvm/TargetParser/Triple.h"
 
 using namespace swift;
 using namespace swift::serialization;
@@ -144,6 +150,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       case PluginSearchOptionKind::LoadPluginExecutable:
         optKind = PluginSearchOption::Kind::LoadPluginExecutable;
         break;
+      case PluginSearchOptionKind::ResolvedPluginConfig:
+        optKind = PluginSearchOption::Kind::ResolvedPluginConfig;
+        break;
       }
       extendedInfo.addPluginSearchOption({optKind, blobData});
       break;
@@ -197,11 +206,28 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::HAS_CXX_INTEROPERABILITY_ENABLED:
       extendedInfo.setHasCxxInteroperability(true);
       break;
+    case options_block::CXX_STDLIB_KIND:
+      unsigned rawKind;
+      options_block::CXXStdlibKindLayout::readRecord(scratch, rawKind);
+      extendedInfo.setCXXStdlibKind(static_cast<CXXStdlibKind>(rawKind));
+      break;
     case options_block::ALLOW_NON_RESILIENT_ACCESS:
       extendedInfo.setAllowNonResilientAccess(true);
       break;
     case options_block::SERIALIZE_PACKAGE_ENABLED:
       extendedInfo.setSerializePackageEnabled(true);
+      break;
+    case options_block::PUBLIC_MODULE_NAME:
+      extendedInfo.setPublicModuleName(blobData);
+      break;
+    case options_block::SWIFT_INTERFACE_COMPILER_VERSION:
+      extendedInfo.setSwiftInterfaceCompilerVersion(blobData);
+      break;
+    case options_block::STRICT_MEMORY_SAFETY:
+      extendedInfo.setStrictMemorySafety(true);
+      break;
+    case options_block::DEFERRED_CODE_GEN:
+      extendedInfo.setDeferredCodeGen(true);
       break;
     default:
       // Unknown options record, possibly for use by a future version of the
@@ -219,6 +245,7 @@ static ValidationInfo validateControlBlock(
     bool requiresOSSAModules,
     bool requiresRevisionMatch,
     StringRef requiredSDK,
+    std::optional<llvm::Triple> target,
     ExtendedValidationInfo *extendedInfo,
     PathObfuscator &pathRecoverer) {
   // The control block is malformed until we've at least read a major version
@@ -354,9 +381,17 @@ static ValidationInfo validateControlBlock(
     case control_block::MODULE_NAME:
       result.name = blobData;
       break;
-    case control_block::TARGET:
+    case control_block::TARGET: {
       result.targetTriple = blobData;
+      if (target &&
+          !areCompatible(*target, llvm::Triple(llvm::Triple::normalize(
+                                      result.targetTriple)))) {
+        result.status = Status::TargetIncompatible;
+        return result;
+      }
+
       break;
+    }
     case control_block::ALLOWABLE_CLIENT_NAME:
       result.allowableClients.push_back(blobData);
       break;
@@ -370,7 +405,7 @@ static ValidationInfo validateControlBlock(
       // env var is set (for testing).
       static const char* forceDebugPreSDKRestriction =
         ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_PER_SDK");
-      if (!version::isCurrentCompilerTagged() &&
+      if (version::getCurrentCompilerSerializationTag().empty() &&
           !forceDebugPreSDKRestriction) {
         break;
       }
@@ -411,10 +446,12 @@ static ValidationInfo validateControlBlock(
         ::getenv("SWIFT_DEBUG_FORCE_SWIFTMODULE_REVISION");
 
       StringRef moduleRevision = blobData;
+      StringRef serializationTag =
+          version::getCurrentCompilerSerializationTag();
       if (forcedDebugRevision ||
-          (requiresRevisionMatch && version::isCurrentCompilerTagged())) {
-        StringRef compilerRevision = forcedDebugRevision ?
-          forcedDebugRevision : version::getCurrentCompilerSerializationTag();
+          (requiresRevisionMatch && !serializationTag.empty())) {
+        StringRef compilerRevision =
+            forcedDebugRevision ? forcedDebugRevision : serializationTag;
         if (moduleRevision != compilerRevision) {
           // The module versions are mismatching, record it and diagnose later.
           result.problematicRevision = moduleRevision;
@@ -582,7 +619,8 @@ ValidationInfo serialization::validateSerializedAST(
     StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
-    SmallVectorImpl<SearchPath> *searchPaths) {
+    SmallVectorImpl<SearchPath> *searchPaths,
+    std::optional<llvm::Triple> target) {
   ValidationInfo result;
 
   // Check 32-bit alignment.
@@ -625,7 +663,7 @@ ValidationInfo serialization::validateSerializedAST(
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
           requiresOSSAModules,
           /*requiresRevisionMatch=*/true,
-          requiredSDK,
+          requiredSDK, target,
           extendedInfo, localObfuscator);
       if (result.status != Status::Valid)
         return result;
@@ -673,23 +711,19 @@ std::string ModuleFileSharedCore::Dependency::getPrettyPrintedPath() const {
 }
 
 void ModuleFileSharedCore::fatal(llvm::Error error) const {
-  llvm::SmallString<0> errorStr;
-  llvm::raw_svector_ostream out(errorStr);
-
-  out << "*** DESERIALIZATION FAILURE ***\n";
-  out << "*** If any module named here was modified in the SDK, please delete the ***\n";
-  out << "*** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***\n";
-  outputDiagnosticInfo(out);
-  out << "\n";
-  if (error) {
-    handleAllErrors(std::move(error), [&](const llvm::ErrorInfoBase &ei) {
-      ei.log(out);
-      out << "\n";
-    });
-  }
-
-  llvm::PrettyStackTraceString trace(errorStr.c_str());
-  abort();
+  ABORT([&](auto &out) {
+    out << "*** DESERIALIZATION FAILURE ***\n";
+    out << "*** If any module named here was modified in the SDK, please delete the ***\n";
+    out << "*** new swiftmodule files from the SDK and keep only swiftinterfaces.   ***\n";
+    outputDiagnosticInfo(out);
+    out << "\n";
+    if (error) {
+      handleAllErrors(std::move(error), [&](const llvm::ErrorInfoBase &ei) {
+        ei.log(out);
+        out << "\n";
+      });
+    }
+  });
 }
 
 void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
@@ -702,7 +736,7 @@ void ModuleFileSharedCore::outputDiagnosticInfo(llvm::raw_ostream &os) const {
      << " against SDK " << SDKVersion
      << ", " << (resilient? "resilient": "non-resilient");
   if (Bits.AllowNonResilientAccess)
-    os << ", built with -experimental-allow-non-resilient-access";
+    os << ", built with -allow-non-resilient-access";
   if (Bits.IsAllowModuleWithCompilerErrorsEnabled)
     os << ", built with -experimental-allow-module-with-compiler-errors";
   if (ModuleInputBuffer)
@@ -976,6 +1010,10 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         allocateBuffer(Conformances, scratch);
         break;
+      case index_block::ABSTRACT_CONFORMANCE_OFFSETS:
+        assert(blobData.empty());
+        allocateBuffer(AbstractConformances, scratch);
+        break;
       case index_block::PACK_CONFORMANCE_OFFSETS:
         assert(blobData.empty());
         allocateBuffer(PackConformances, scratch);
@@ -1014,9 +1052,9 @@ ModuleFileSharedCore::readGroupTable(ArrayRef<uint64_t> Fields,
                                      StringRef BlobData) const {
   auto pMap = std::make_unique<llvm::DenseMap<unsigned, StringRef>>();
   auto Data = reinterpret_cast<const uint8_t *>(BlobData.data());
-  unsigned GroupCount = endian::readNext<uint32_t, little, unaligned>(Data);
+  unsigned GroupCount = readNext<uint32_t>(Data);
   for (unsigned I = 0; I < GroupCount; ++I) {
-    auto RawSize = endian::readNext<uint32_t, little, unaligned>(Data);
+    auto RawSize = readNext<uint32_t>(Data);
     auto RawText = StringRef(reinterpret_cast<const char *>(Data), RawSize);
     Data += RawSize;
     (*pMap)[I] = RawText;
@@ -1121,6 +1159,22 @@ getActualImportControl(unsigned rawValue) {
   }
 }
 
+static std::optional<ExternalMacroPlugin::Access>
+getActualMacroAccess(unsigned rawValue) {
+  // We switch on the raw value rather than the enum in order to handle future
+  // values.
+  switch (rawValue) {
+  case static_cast<unsigned>(serialization::AccessLevel::Public):
+    return ExternalMacroPlugin::Public;
+  case static_cast<unsigned>(serialization::AccessLevel::Package):
+    return ExternalMacroPlugin::Package;
+  case static_cast<unsigned>(serialization::AccessLevel::Internal):
+    return ExternalMacroPlugin::Internal;
+  default:
+    return std::nullopt;
+  }
+}
+
 bool ModuleFileSharedCore::readModuleDocIfPresent(PathObfuscator &pathRecoverer) {
   if (!this->ModuleDocInputBuffer)
     return true;
@@ -1161,7 +1215,8 @@ bool ModuleFileSharedCore::readModuleDocIfPresent(PathObfuscator &pathRecoverer)
           docCursor, scratch, {SWIFTDOC_VERSION_MAJOR, SWIFTDOC_VERSION_MINOR},
           RequiresOSSAModules,
           /*requiresRevisionMatch*/false,
-          /*requiredSDK*/StringRef(), /*extendedInfo*/nullptr, pathRecoverer);
+          /*requiredSDK*/StringRef(), /*target*/std::nullopt,
+          /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
       // Check that the swiftdoc is actually for this module.
@@ -1306,7 +1361,8 @@ bool ModuleFileSharedCore::readModuleSourceInfoIfPresent(PathObfuscator &pathRec
           {SWIFTSOURCEINFO_VERSION_MAJOR, SWIFTSOURCEINFO_VERSION_MINOR},
           RequiresOSSAModules,
           /*requiresRevisionMatch*/false,
-          /*requiredSDK*/StringRef(), /*extendedInfo*/nullptr, pathRecoverer);
+          /*requiredSDK*/StringRef(), /*target*/std::nullopt,
+          /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
       // Check that the swiftsourceinfo is actually for this module.
@@ -1369,11 +1425,13 @@ StringRef ModuleFileSharedCore::getIdentifierText(IdentifierID IID) const {
 
   assert(!IdentifierData.empty() && "no identifier data in module");
 
-  StringRef rawStrPtr = IdentifierData.substr(offset);
-  size_t terminatorOffset = rawStrPtr.find('\0');
-  assert(terminatorOffset != StringRef::npos &&
+  size_t endOffset = ((rawID + 1 < Identifiers.size()) ?
+    Identifiers[rawID + 1] : IdentifierData.size()) - 1;
+
+  ASSERT(IdentifierData[endOffset] == '\0' &&
          "unterminated identifier string data");
-  return rawStrPtr.slice(0, terminatorOffset);
+
+  return IdentifierData.slice(offset, endOffset);
 }
 
 ModuleFileSharedCore::ModuleFileSharedCore(
@@ -1383,6 +1441,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     bool isFramework,
     bool requiresOSSAModules,
     StringRef requiredSDK,
+    std::optional<llvm::Triple> target,
     serialization::ValidationInfo &info, PathObfuscator &pathRecoverer)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
@@ -1435,7 +1494,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
           RequiresOSSAModules,
-          /*requiresRevisionMatch=*/true, requiredSDK,
+          /*requiresRevisionMatch=*/true, requiredSDK, target,
           &extInfo, pathRecoverer);
       if (info.status != Status::Valid) {
         error(info.status);
@@ -1460,13 +1519,19 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           extInfo.isAllowModuleWithCompilerErrorsEnabled();
       Bits.IsConcurrencyChecked = extInfo.isConcurrencyChecked();
       Bits.HasCxxInteroperability = extInfo.hasCxxInteroperability();
+      Bits.CXXStdlibKind = static_cast<uint8_t>(extInfo.getCXXStdlibKind());
       Bits.AllowNonResilientAccess = extInfo.allowNonResilientAccess();
       Bits.SerializePackageEnabled = extInfo.serializePackageEnabled();
+      Bits.StrictMemorySafety = extInfo.strictMemorySafety();
+      Bits.DeferredCodeGen = extInfo.deferredCodeGen();
       MiscVersion = info.miscVersion;
       SDKVersion = info.sdkVersion;
       ModuleABIName = extInfo.getModuleABIName();
       ModulePackageName = extInfo.getModulePackageName();
       ModuleExportAsName = extInfo.getExportAsName();
+      PublicModuleName = extInfo.getPublicModuleName();
+      SwiftInterfaceCompilerVersion =
+          extInfo.getSwiftInterfaceCompilerVersion();
 
       hasValidControlBlock = true;
       break;
@@ -1541,13 +1606,31 @@ ModuleFileSharedCore::ModuleFileSharedCore(
         }
         case input_block::LINK_LIBRARY: {
           uint8_t rawKind;
+          bool isStaticLibrary;
           bool shouldForceLink;
           input_block::LinkLibraryLayout::readRecord(scratch, rawKind,
-                                                     shouldForceLink);
-          if (Bits.IsStaticLibrary)
-            shouldForceLink = false;
+                                                     isStaticLibrary, shouldForceLink);
+
+          // FIXME: the propagation of the static library is a problem as it
+          // causes over-linkage of the dependencies and hinders DCE. This
+          // results in significant code size increase on Windows.
+          //
+          // We propogate it on Darwin as ld64 has special handling for
+          // preserving the Swift conformances. The `_swift_FORCE_LOAD_$_`
+          // symbols will force the static library to be scanned for inclusion.
+          // The other platforms do not have this special handling and so this
+          // will only slow down the linker and not guarantee any conformances
+          // to be preserved. The same behaviour is better achieved with `-(`,
+          // `-)` to preserve the whole archive.
+          //
+          // When using dynamic libraries, the force load symbol will force the
+          // shared library to be loaded and register the conformances.
+          bool EmitForceLinkSymbol = shouldForceLink;
+          if (!llvm::Triple(TargetTriple).isOSDarwin())
+            EmitForceLinkSymbol = !isStaticLibrary && shouldForceLink;
           if (auto libKind = getActualLibraryKind(rawKind))
-            LinkLibraries.push_back({blobData, *libKind, shouldForceLink});
+            LinkLibraries.emplace_back(blobData, *libKind, isStaticLibrary,
+                                       EmitForceLinkSymbol);
           // else ignore the dependency...it'll show up as a linker error.
           break;
         }
@@ -1577,7 +1660,21 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           break;
         }
         case input_block::MODULE_INTERFACE_PATH: {
+          input_block::ModuleInterfaceLayout::readRecord(
+              scratch, IsModuleInterfaceSDKRelative);
           ModuleInterfacePath = blobData;
+          break;
+        }
+        case input_block::EXTERNAL_MACRO: {
+          uint8_t rawKind;
+          input_block::ExternalMacroLayout::readRecord(scratch, rawKind);
+          auto accessKind = getActualMacroAccess(rawKind);
+          if (!accessKind) {
+            info.status = error(Status::Malformed);
+            return;
+          }
+
+          MacroModuleNames.push_back({blobData.str(), *accessKind});
           break;
         }
         default:
@@ -1784,12 +1881,28 @@ bool ModuleFileSharedCore::hasSourceInfo() const {
   return !!DeclUSRsTable;
 }
 
+std::string ModuleFileSharedCore::resolveModuleDefiningFilePath(const StringRef SDKPath) const {
+  if (!ModuleInterfacePath.empty()) {
+    std::string interfacePath = ModuleInterfacePath.str();
+    if (IsModuleInterfaceSDKRelative &&
+        !ModuleInterfacePath.starts_with(SDKPath) &&
+        llvm::sys::path::is_relative(interfacePath)) {
+      SmallString<128> resolvedPath(SDKPath);
+      llvm::sys::path::append(resolvedPath, interfacePath);
+      return resolvedPath.str().str();
+    } else
+      return interfacePath;
+  } else
+    return ModuleInputBuffer->getBufferIdentifier().str();
+}
+
 ModuleLoadingBehavior
 ModuleFileSharedCore::getTransitiveLoadingBehavior(
                                           const Dependency &dependency,
-                                          bool debuggerMode,
+                                          bool importNonPublicDependencies,
                                           bool isPartialModule,
                                           StringRef packageName,
+                                          bool resolveInPackageModuleDependencies,
                                           bool forTestable) const {
   if (isPartialModule) {
     // Keep the merge-module behavior for legacy support. In that case
@@ -1803,7 +1916,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
   if (dependency.isImplementationOnly()) {
     // Implementation-only dependencies are not usually loaded from
     // transitive imports.
-    if (debuggerMode || forTestable) {
+    if (importNonPublicDependencies || forTestable) {
       // In the debugger, try to load the module if possible.
       // Same in the case of a testable import, try to load the dependency
       // but don't fail if it's missing as this could be source breaking.
@@ -1821,7 +1934,7 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
     // on testable imports.
     if (forTestable || !moduleIsResilient) {
       return ModuleLoadingBehavior::Required;
-    } else if (debuggerMode) {
+    } else if (importNonPublicDependencies) {
       return ModuleLoadingBehavior::Optional;
     } else {
       return ModuleLoadingBehavior::Ignored;
@@ -1829,13 +1942,16 @@ ModuleFileSharedCore::getTransitiveLoadingBehavior(
   }
 
   if (dependency.isPackageOnly()) {
+    if (!resolveInPackageModuleDependencies)
+      return ModuleLoadingBehavior::Ignored;
+
     // Package dependencies are usually loaded only for import from the same
     // package.
     if ((!packageName.empty() && packageName == getModulePackageName()) ||
         forTestable ||
         !moduleIsResilient) {
       return ModuleLoadingBehavior::Required;
-    } else if (debuggerMode) {
+    } else if (importNonPublicDependencies) {
       return ModuleLoadingBehavior::Optional;
     } else {
       return ModuleLoadingBehavior::Ignored;

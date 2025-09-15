@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -target %target-swift-5.9-abi-triple %s | %FileCheck %s
 
 func takeAny(_ arg: Any) {}
 
@@ -102,7 +102,7 @@ public struct Container<each T> {
 //   Finally, the actual assignment.
 // CHECK-NEXT:    [[ACCESS:%.*]] = begin_access [modify] [unknown] %1 :
 // CHECK-NEXT:    [[FIELD:%.*]] = struct_element_addr [[ACCESS]] : $*Container<repeat each T>, #Container.storage
-// CHECK-NEXT:    copy_addr [take] [[COPY2]] to [[FIELD]] : $*(repeat Stored<each T>)
+// CHECK-NEXT:    copy_addr [[COPY2]] to [[FIELD]] : $*(repeat Stored<each T>)
 // CHECK-NEXT:    end_access [[ACCESS]]
 //   Clean up.
 // CHECK-NEXT:    dealloc_stack [[COPY2]]
@@ -423,3 +423,13 @@ func testTupleExpansionInEnumConstructor<each T>(
 // CHECK-NEXT:    [[PAYLOAD_ADDR:%.*]] = init_enum_data_addr [[RESULT_TEMP]] : $*Result<(repeat each T), any Error>, #Result.success
 // CHECK-NEXT:    copy_addr [[VAR]] to [init] [[PAYLOAD_ADDR]] : $*(repeat each T)
 // CHECK-NEXT:    inject_enum_addr [[RESULT_TEMP]] : $*Result<(repeat each T), any Error>, #Result.success
+
+// rdar://145478336
+
+func convertVoidPayloads() {
+  convertPayloads(as: Void.self)
+}
+
+func convertPayloads<each Value>(as valueTypes: repeat (each Value).Type) -> (repeat each Value) {
+  fatalError()
+}

@@ -1,6 +1,4 @@
 // RUN: %target-swift-emit-irgen %s -I %S/Inputs -cxx-interoperability-mode=default -Xcc -fignore-exceptions -disable-availability-checking | %FileCheck %s
-// XFAIL: OS=linux-android, OS=linux-androideabi
-// XFAIL: OS=windows-msvc
 
 import ReferenceCounted
 
@@ -14,6 +12,19 @@ public func getLocalCount() -> NS.LocalCount {
 // CHECK-NEXT: entry:
 // CHECK:        %0 = call ptr @{{_ZN2NS10LocalCount6createEv|"\?create\@LocalCount\@NS\@\@SAPEAU12\@XZ"}}()
 // CHECK-NEXT:   call void @{{_Z8LCRetainPN2NS10LocalCountE|"\?LCRetain\@\@YAXPEAULocalCount\@NS\@\@\@Z"}}(ptr %0)
+// CHECK:        ret ptr %0
+// CHECK-NEXT: }
+
+
+public func useRetainReleaseOpsReturningRefCount() -> HasOpsReturningRefCount {
+    let result = HasOpsReturningRefCount.create()
+    return result
+}
+
+// CHECK:      define {{.*}}swiftcc ptr @"$s4main36useRetainReleaseOpsReturningRefCountSo03HasefgH0VyF"()
+// CHECK-NEXT: entry:
+// CHECK:        %0 = call ptr @{{_ZN23HasOpsReturningRefCount6createEv|"\?create\@HasOpsReturningRefCount\@\@SAPEAU1\@XZ"}}()
+// CHECK:        %1 = call i32 @{{_Z8RCRetainP23HasOpsReturningRefCount|"\?RCRetain\@\@YAIPEAUHasOpsReturningRefCount\@\@\@Z"}}(ptr %0)
 // CHECK:        ret ptr %0
 // CHECK-NEXT: }
 

@@ -94,15 +94,15 @@
           key.entities: [
             {
               key.kind: source.lang.swift.decl.function.accessor.getter,
-              key.name: "getter:value",
               key.usr: "s:11test_module16ComputedPropertyC5valueSivg",
-              key.is_dynamic: 1
+              key.is_dynamic: 1,
+              key.is_implicit: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
-              key.name: "setter:value",
               key.usr: "s:11test_module16ComputedPropertyC5valueSivs",
-              key.is_dynamic: 1
+              key.is_dynamic: 1,
+              key.is_implicit: 1
             }
           ],
           key.effective_access: source.decl.effective_access.public

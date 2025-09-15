@@ -1,0 +1,15 @@
+// RUN: %scale-test --begin 1 --end 10 --step 1 --select NumConstraintScopes %s
+// REQUIRES: tools-release,no_asan,asserts
+
+// REQUIRES: rdar135382075
+
+var v: [String] = []
+var vv: [String]? = nil
+
+func f() -> [String] {
+  return (
+%for i in range(0, N):
+    v +
+%end
+    v + (vv ?? []))
+}

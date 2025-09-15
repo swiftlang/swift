@@ -34,18 +34,18 @@ namespace swift {
 namespace unittests {
 
 enum LocalDiagID : uint32_t {
-#define DIAG(KIND, ID, Options, Text, Signature) ID,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) ID,
 #include "swift/AST/DiagnosticsAll.def"
   NumDiags
 };
 
 static constexpr const char *const diagnosticID[] = {
-#define DIAG(KIND, ID, Options, Text, Signature) #ID,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) #ID,
 #include "swift/AST/DiagnosticsAll.def"
 };
 
 static constexpr const char *const diagnosticMessages[] = {
-#define DIAG(KIND, ID, Options, Text, Signature) Text,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) Text,
 #include "swift/AST/DiagnosticsAll.def"
 };
 

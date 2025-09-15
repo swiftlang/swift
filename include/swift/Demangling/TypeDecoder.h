@@ -51,6 +51,7 @@ enum class ImplMetatypeRepresentation {
 enum class ImplCoroutineKind {
   None,
   YieldOnce,
+  YieldOnce2,
   YieldMany,
 };
 
@@ -117,6 +118,8 @@ enum class ImplParameterConvention {
 enum class ImplParameterInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
   Sending = 0x2,
+  Isolated = 0x4,
+  ImplicitLeading = 0x8
 };
 
 using ImplParameterInfoOptions = OptionSet<ImplParameterInfoFlags>;
@@ -187,6 +190,22 @@ public:
     OptionsType result;
 
     result |= ImplParameterInfoFlags::Sending;
+
+    return result;
+  }
+
+  static OptionsType getIsolated() {
+    OptionsType result;
+
+    result |= ImplParameterInfoFlags::Isolated;
+
+    return result;
+  }
+
+  static OptionsType getImplicitLeading() {
+    OptionsType result;
+
+    result |= ImplParameterInfoFlags::ImplicitLeading;
 
     return result;
   }
@@ -454,7 +473,8 @@ void decodeRequirement(
     BuilderType &Builder) {
   for (auto &child : *node) {
     if (child->getKind() == Demangle::Node::Kind::DependentGenericParamCount ||
-        child->getKind() == Demangle::Node::Kind::DependentGenericParamPackMarker)
+        child->getKind() == Demangle::Node::Kind::DependentGenericParamPackMarker ||
+        child->getKind() == Demangle::Node::Kind::DependentGenericParamValueMarker)
       continue;
 
     if (child->getNumChildren() != 2)
@@ -551,6 +571,43 @@ void decodeRequirement(
       break;
     }
   }
+}
+
+/// Extract the protocol and requirement nodes from a shape symbol.
+static inline std::pair<NodePointer, NodePointer>
+decodeShape(NodePointer Node) {
+  if (!Node || Node->getKind() != Node::Kind::Global ||
+      Node->getNumChildren() != 1)
+    return {nullptr, nullptr};
+  Node = Node->getChild(0);
+  if (Node && (Node->getKind() == Node::Kind::Uniquable) &&
+      Node->getNumChildren() == 1)
+    Node = Node->getChild(0);
+  if (!Node || Node->getKind() != Node::Kind::ExtendedExistentialTypeShape ||
+      Node->getNumChildren() != 2)
+    return {nullptr, nullptr};
+  Node = Node->getChild(1);
+  if (!Node || Node->getKind() != Node::Kind::Type ||
+      Node->getNumChildren() != 1)
+    return {nullptr, nullptr};
+  Node = Node->getChild(0);
+  if (!Node || Node->getKind() != Node::Kind::ConstrainedExistential ||
+      Node->getNumChildren() != 2)
+    return {nullptr, nullptr};
+  NodePointer Requirements = Node->getChild(1);
+  if (!Requirements || Requirements->getKind() !=
+                           Node::Kind::ConstrainedExistentialRequirementList)
+    return {nullptr, nullptr};
+
+  Node = Node->getChild(0);
+  if (!Node || Node->getKind() != Node::Kind::Type ||
+      Node->getNumChildren() != 1)
+    return {nullptr, nullptr};
+  NodePointer Protocol = Node;
+  if (!Protocol)
+    return {nullptr, nullptr};
+
+  return {Protocol, Requirements};
 }
 
 #define MAKE_NODE_TYPE_ERROR(Node, Fmt, ...)                                   \
@@ -718,7 +775,7 @@ protected:
       return decodeMangledType(genericArgs->getChild(0), depth + 1);
     }
     case NodeKind::BuiltinTypeName: {
-      auto mangling = Demangle::mangleNode(Node);
+      auto mangling = Demangle::mangleNode(Node, Builder.getManglingFlavor());
       if (!mangling.isSuccess()) {
         return MAKE_NODE_TYPE_ERROR(Node,
                                     "failed to mangle node (%d:%u)",
@@ -877,7 +934,9 @@ protected:
     case NodeKind::DependentGenericParamType: {
       auto depth = Node->getChild(0)->getIndex();
       auto index = Node->getChild(1)->getIndex();
-      return Builder.createGenericTypeParameterType(depth, index);
+      return TypeLookupErrorOr<BuiltType>(
+          Builder.createGenericTypeParameterType(depth, index),
+          /*ignoreValueCheck*/ true);
     }
     case NodeKind::EscapingObjCBlock:
     case NodeKind::ObjCBlock:
@@ -911,6 +970,12 @@ protected:
         ++firstChildIdx;
       }
 
+      if (Node->getChild(firstChildIdx)->getKind() ==
+          NodeKind::SendingResultFunctionType) {
+        extFlags = extFlags.withSendingResult();
+        ++firstChildIdx;
+      }
+
       BuiltType globalActorType = BuiltType();
       if (Node->getChild(firstChildIdx)->getKind() ==
           NodeKind::GlobalActorFunctionType) {
@@ -931,11 +996,9 @@ protected:
                  NodeKind::IsolatedAnyFunctionType) {
         extFlags = extFlags.withIsolatedAny();
         ++firstChildIdx;
-      }
-
-      if (Node->getChild(firstChildIdx)->getKind() ==
-          NodeKind::SendingResultFunctionType) {
-        extFlags = extFlags.withSendingResult();
+      } else if (Node->getChild(firstChildIdx)->getKind() ==
+                 NodeKind::NonIsolatedCallerFunctionType) {
+        extFlags = extFlags.withNonIsolatedCaller();
         ++firstChildIdx;
       }
 
@@ -1089,12 +1152,21 @@ protected:
             flags = flags.withSendable();
           } else if (child->getText() == "@async") {
             flags = flags.withAsync();
+          } else if (child->getText() == "sending-result") {
+            flags = flags.withSendingResult();
           }
+        } else if (child->getKind() == NodeKind::ImplSendingResult) {
+          // NOTE: This flag needs to be set both at the function level and on
+          // each of the parameters. The flag on the function just means that
+          // all parameters are sending (which is always true today).
+          flags = flags.withSendingResult();
         } else if (child->getKind() == NodeKind::ImplCoroutineKind) {
           if (!child->hasText())
             return MAKE_NODE_TYPE_ERROR0(child, "expected text");
           if (child->getText() == "yield_once") {
             coroutineKind = ImplCoroutineKind::YieldOnce;
+          } else if (child->getText() == "yield_once_2") {
+            coroutineKind = ImplCoroutineKind::YieldOnce2;
           } else if (child->getText() == "yield_many") {
             coroutineKind = ImplCoroutineKind::YieldMany;
           } else
@@ -1126,11 +1198,11 @@ protected:
             return MAKE_NODE_TYPE_ERROR0(child,
                                          "failed to decode function yields");
         } else if (child->getKind() == NodeKind::ImplResult) {
-          if (decodeImplFunctionParam(child, depth + 1, results))
+          if (decodeImplFunctionResult(child, depth + 1, results))
             return MAKE_NODE_TYPE_ERROR0(child,
                                          "failed to decode function results");
         } else if (child->getKind() == NodeKind::ImplErrorResult) {
-          if (decodeImplFunctionPart(child, depth + 1, errorResults))
+          if (decodeImplFunctionResult(child, depth + 1, errorResults))
             return MAKE_NODE_TYPE_ERROR0(child,
                                          "failed to decode function part");
         } else {
@@ -1449,6 +1521,22 @@ protected:
 
       return Builder.createArrayType(base.getType());
     }
+    case NodeKind::SugaredInlineArray: {
+      if (Node->getNumChildren() < 2) {
+        return MAKE_NODE_TYPE_ERROR(Node,
+                                    "fewer children (%zu) than required (2)",
+                                    Node->getNumChildren());
+      }
+      auto count = decodeMangledType(Node->getChild(0), depth + 1);
+      if (count.isError())
+        return count;
+
+      auto element = decodeMangledType(Node->getChild(1), depth + 1);
+      if (element.isError())
+        return element;
+
+      return Builder.createInlineArrayType(count.getType(), element.getType());
+    }
     case NodeKind::SugaredDictionary: {
       if (Node->getNumChildren() < 2)
         return MAKE_NODE_TYPE_ERROR(Node,
@@ -1473,7 +1561,9 @@ protected:
       if (base.isError())
         return base;
 
-      return Builder.createParenType(base.getType());
+      // ParenType has been removed, return the base type for backwards
+      // compatibility.
+      return base.getType();
     }
     case NodeKind::OpaqueType: {
       if (Node->getNumChildren() < 3)
@@ -1515,6 +1605,32 @@ protected:
       
       return Builder.resolveOpaqueType(descriptor, genericArgs, ordinal);
     }
+
+    case NodeKind::Integer: {
+      return Builder.createIntegerType((intptr_t)Node->getIndex());
+    }
+
+    case NodeKind::NegativeInteger: {
+      return Builder.createNegativeIntegerType((intptr_t)Node->getIndex());
+    }
+
+    case NodeKind::BuiltinFixedArray: {
+      if (Node->getNumChildren() < 2)
+        return MAKE_NODE_TYPE_ERROR(Node,
+                                    "fewer children (%zu) than required (2)",
+                                    Node->getNumChildren());
+
+      auto size = decodeMangledType(Node->getChild(0), depth + 1);
+      if (size.isError())
+        return size;
+
+      auto element = decodeMangledType(Node->getChild(1), depth + 1);
+      if (element.isError())
+        return element;
+
+      return Builder.createBuiltinFixedArrayType(size.getType(), element.getType());
+    }
+
     // TODO: Handle OpaqueReturnType, when we're in the middle of reconstructing
     // the defining decl
     default:
@@ -1577,40 +1693,14 @@ private:
   }
 
   template <typename T>
-  bool decodeImplFunctionPart(Demangle::NodePointer node, unsigned depth,
-                              llvm::SmallVectorImpl<T> &results) {
-    if (depth > TypeDecoder::MaxDepth)
-      return true;
-
-    if (node->getNumChildren() != 2)
-      return true;
-    
-    if (node->getChild(0)->getKind() != Node::Kind::ImplConvention ||
-        node->getChild(1)->getKind() != Node::Kind::Type)
-      return true;
-
-    StringRef conventionString = node->getChild(0)->getText();
-    std::optional<typename T::ConventionType> convention =
-        T::getConventionFromString(conventionString);
-    if (!convention)
-      return true;
-    auto type = decodeMangledType(node->getChild(1), depth + 1);
-    if (type.isError())
-      return true;
-
-    results.emplace_back(type.getType(), *convention);
-    return false;
-  }
-
-  template <typename T>
   bool decodeImplFunctionParam(Demangle::NodePointer node, unsigned depth,
                                llvm::SmallVectorImpl<T> &results) {
     if (depth > TypeDecoder::MaxDepth)
       return true;
 
-    // Children: `convention, differentiability?, sending?, type`
-    if (node->getNumChildren() != 2 && node->getNumChildren() != 3 &&
-        node->getNumChildren() != 4)
+    // Children: `convention, attrs, type`
+    // attrs: `differentiability?, sending?, isolated?, implicit_leading?`
+    if (node->getNumChildren() < 2)
       return true;
 
     auto *conventionNode = node->getChild(0);
@@ -1628,23 +1718,79 @@ private:
       return true;
 
     typename T::OptionsType options;
-    if (node->getNumChildren() == 3 || node->getNumChildren() == 4) {
-      auto diffKindNode = node->getChild(1);
-      if (diffKindNode->getKind() !=
-          Node::Kind::ImplParameterResultDifferentiability)
+    for (unsigned i = 1; i < node->getNumChildren() - 1; ++i) {
+      auto child = node->getChild(i);
+      switch (child->getKind()) {
+      case Node::Kind::ImplParameterResultDifferentiability: {
+        auto optDiffOptions =
+            T::getDifferentiabilityFromString(child->getText());
+        if (!optDiffOptions)
+          return true;
+        options |= *optDiffOptions;
+        break;
+      }
+      case Node::Kind::ImplParameterSending:
+        options |= T::getSending();
+        break;
+      case Node::Kind::ImplParameterIsolated:
+        options |= T::getIsolated();
+        break;
+      case Node::Kind::ImplParameterImplicitLeading:
+        options |= T::getImplicitLeading();
+        break;
+      default:
         return true;
-      auto optDiffOptions =
-          T::getDifferentiabilityFromString(diffKindNode->getText());
-      if (!optDiffOptions)
-        return true;
-      options |= *optDiffOptions;
+      }
     }
 
-    if (node->getNumChildren() == 4) {
-      auto sendingKindNode = node->getChild(2);
-      if (sendingKindNode->getKind() != Node::Kind::ImplParameterSending)
+    results.emplace_back(result.getType(), *convention, options);
+
+    return false;
+  }
+
+  template <typename T>
+  bool decodeImplFunctionResult(Demangle::NodePointer node, unsigned depth,
+                                llvm::SmallVectorImpl<T> &results) {
+    if (depth > TypeDecoder::MaxDepth)
+      return true;
+
+    // Children: `convention, attrs, type`
+    // attrs: `differentiability?, sending?, isolated?, implicit_leading?`
+    if (node->getNumChildren() < 2)
+      return true;
+
+    auto *conventionNode = node->getChild(0);
+    auto *typeNode = node->getLastChild();
+    if (conventionNode->getKind() != Node::Kind::ImplConvention ||
+        typeNode->getKind() != Node::Kind::Type)
+      return true;
+
+    StringRef conventionString = conventionNode->getText();
+    auto convention = T::getConventionFromString(conventionString);
+    if (!convention)
+      return true;
+    auto result = decodeMangledType(typeNode, depth + 1);
+    if (result.isError())
+      return true;
+
+    typename T::OptionsType options;
+    for (unsigned i = 1; i < node->getNumChildren() - 1; ++i) {
+      auto child = node->getChild(i);
+      switch (child->getKind()) {
+      case Node::Kind::ImplParameterResultDifferentiability: {
+        auto optDiffOptions =
+            T::getDifferentiabilityFromString(child->getText());
+        if (!optDiffOptions)
+          return true;
+        options |= *optDiffOptions;
+        break;
+      }
+      case Node::Kind::ImplParameterSending:
+        options |= T::getSending();
+        break;
+      default:
         return true;
-      options |= T::getSending();
+      }
     }
 
     results.emplace_back(result.getType(), *convention, options);

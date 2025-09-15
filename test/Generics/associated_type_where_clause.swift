@@ -22,7 +22,7 @@ struct ConcreteConforms2: Conforms { typealias T = Int }
 struct ConcreteConformsNonFoo2: Conforms { typealias T = Float }
 
 protocol NestedConforms {
-    associatedtype U where U: Conforms, U.T: Foo2 // expected-note{{protocol requires nested type 'U'; add nested type 'U' for conformance}}
+    associatedtype U where U: Conforms, U.T: Foo2 // expected-note{{protocol requires nested type 'U'}}
 
     func foo(_: U)
 }
@@ -45,6 +45,7 @@ struct BadConcreteNestedConforms: NestedConforms {
 }
 struct BadConcreteNestedConformsInfer: NestedConforms {
     // expected-error@-1 {{type 'BadConcreteNestedConformsInfer' does not conform to protocol 'NestedConforms'}}
+    // expected-note@-2{{add stubs for conformance}}
     func foo(_: ConcreteConformsNonFoo2) {}
 }
 
@@ -62,7 +63,7 @@ func needsNestedConformsDefault<X: NestedConformsDefault>(_: X.Type) {
 }
 
 protocol NestedSameType {
-    associatedtype U: Conforms where U.T == Int // expected-note{{protocol requires nested type 'U'; add nested type 'U' for conformance}}
+    associatedtype U: Conforms where U.T == Int // expected-note{{protocol requires nested type 'U'}}
 
     func foo(_: U)
 }
@@ -80,6 +81,7 @@ struct BadConcreteNestedSameType: NestedSameType {
 }
 struct BadConcreteNestedSameTypeInfer: NestedSameType {
     // expected-error@-1 {{type 'BadConcreteNestedSameTypeInfer' does not conform to protocol 'NestedSameType'}}
+    // expected-note@-2{{add stubs for conformance}}
     func foo(_: ConcreteConformsNonFoo2) {}
 }
 

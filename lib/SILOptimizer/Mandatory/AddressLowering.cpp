@@ -136,6 +136,7 @@
 
 #include "PhiStorageOptimizer.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -363,7 +364,7 @@ static bool isStoreCopy(SILValue value) {
     if (summary.innerBorrowKind != InnerBorrowKind::Contained) {
       return true;
     }
-    if (!liveness.isWithinBoundary(storeInst)) {
+    if (!liveness.isWithinBoundary(storeInst, /*deadEndBlocks=*/nullptr)) {
       return true;
     }
     return false;
@@ -650,7 +651,7 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
       if (addrType.isTrivial(*pass.function)) {
         load = argBuilder.createLoad(loc, undefAddress,
                                      LoadOwnershipQualifier::Trivial);
-      } else if (param.isConsumed()) {
+      } else if (param.isConsumedInCallee()) {
         load = argBuilder.createLoad(loc, undefAddress,
                                      LoadOwnershipQualifier::Take);
       } else {
@@ -2269,7 +2270,7 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
   // Allocate temporary storage for a loadable operand.
   AllocStackInst *allocInst =
       argBuilder.createAllocStack(callLoc, argValue->getType());
-  if (apply.getCaptureConvention(*operand).isOwnedConvention()) {
+  if (apply.getCaptureConvention(*operand).isOwnedConventionInCaller()) {
     argBuilder.createTrivialStoreOr(apply.getLoc(), argValue, allocInst,
                                     StoreOwnershipQualifier::Init);
     apply.insertAfterApplication([&](SILBuilder &callBuilder) {
@@ -2648,7 +2649,7 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
     if (oldResult.getType().isAddressOnly(*pass.function)) {
       auto info = newCall->getSubstCalleeConv().getYieldInfoForOperandIndex(i);
       assert(info.isFormalIndirect());
-      if (info.isConsumed()) {
+      if (info.isConsumedInCaller()) {
         // Because it is legal to have uses of an owned value produced by a
         // begin_apply after a coroutine's range, AddressLowering must move the
         // value into local storage so that such out-of-coroutine-range uses can
@@ -2660,9 +2661,9 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
         auto destAddr = addrMat.materializeAddress(&oldResult);
         storage.storageAddress = destAddr;
         storage.markRewritten();
-        resultBuilder.createCopyAddr(callLoc, &newResult, destAddr,
-                                     info.isConsumed() ? IsTake : IsNotTake,
-                                     IsInitialization);
+        resultBuilder.createCopyAddr(
+            callLoc, &newResult, destAddr,
+            info.isConsumedInCaller() ? IsTake : IsNotTake, IsInitialization);
       } else {
         // [in_guaranteed_begin_apply_results] Because OSSA ensures that all
         // uses of a guaranteed value produced by a begin_apply are used within
@@ -2681,8 +2682,8 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
       SILValue load =
           resultBuilder.emitLoadBorrowOperation(callLoc, &newResult);
       oldResult.replaceAllUsesWith(load);
-      for (auto *user : origCall->getTokenResult()->getUsers()) {
-        pass.getBuilder(user->getIterator())
+      for (auto *use : origCall->getEndApplyUses()) {
+        pass.getBuilder(use->getUser()->getIterator())
             .createEndBorrow(pass.genLoc(), load);
       }
     } else {
@@ -2923,7 +2924,8 @@ public:
     }
 
     termBuilder.createCheckedCastAddrBranch(
-        castLoc, CastConsumptionKind::TakeOnSuccess, srcAddr,
+        castLoc, ccb->getCheckedCastOptions(),
+        CastConsumptionKind::TakeOnSuccess, srcAddr,
         ccb->getSourceFormalType(), destAddr, ccb->getTargetFormalType(),
         successBB, failureBB, ccb->getTrueBBCount(), ccb->getFalseBBCount());
 
@@ -3019,7 +3021,8 @@ static UnconditionalCheckedCastAddrInst *rewriteUnconditionalCheckedCastInst(
   }
   assert(destAddr);
   auto *uccai = builder.createUnconditionalCheckedCastAddr(
-      uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
+      uncondCheckedCast->getLoc(), uncondCheckedCast->getCheckedCastOptions(),
+      srcAddr, srcAddr->getType().getASTType(),
       destAddr, destAddr->getType().getASTType());
   auto afterBuilder =
       pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator());
@@ -3227,6 +3230,7 @@ void YieldRewriter::rewriteOperand(YieldInst *yieldInst, unsigned index) {
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     return;
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In:
     ownership = OwnershipKind::Owned;
     break;

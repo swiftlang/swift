@@ -15,12 +15,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -80,7 +82,9 @@ ProtocolDecl *Requirement::getProtocolDecl() const {
 
 CheckRequirementResult Requirement::checkRequirement(
     SmallVectorImpl<Requirement> &subReqs,
-    bool allowMissing) const {
+    bool allowMissing,
+    SmallVectorImpl<ProtocolConformanceRef> *isolatedConformances
+) const {
   if (hasError())
     return CheckRequirementResult::SubstitutionFailure;
 
@@ -111,11 +115,23 @@ CheckRequirementResult Requirement::checkRequirement(
     }
 
     auto *proto = getProtocolDecl();
-    auto *module = proto->getParentModule();
-    auto conformance = module->lookupConformance(
+
+    if (firstType->isTypeParameter())
+      return CheckRequirementResult::RequirementFailure;
+
+    auto conformance = lookupConformance(
         firstType, proto, allowMissing);
     if (!conformance)
       return CheckRequirementResult::RequirementFailure;
+
+    // Collect isolated conformances.
+    if (isolatedConformances) {
+      conformance.forEachIsolatedConformance(
+          [&](ProtocolConformanceRef isolatedConformance) {
+            isolatedConformances->push_back(isolatedConformance);
+            return false;
+          });
+    }
 
     auto condReqs = conformance.getConditionalRequirements();
     if (condReqs.empty())
@@ -205,6 +221,12 @@ bool Requirement::canBeSatisfied() const {
   llvm_unreachable("Bad requirement kind");
 }
 
+bool Requirement::isInvertibleProtocolRequirement() const {
+  return getKind() == RequirementKind::Conformance
+      && getFirstType()->is<GenericTypeParamType>()
+      && getProtocolDecl()->getInvertibleProtocolKind();
+}
+
 /// Determine the canonical ordering of requirements.
 static unsigned getRequirementKindOrder(RequirementKind kind) {
   switch (kind) {
@@ -233,10 +255,11 @@ int Requirement::compare(const Requirement &other) const {
 
   // We should only have multiple conformance requirements.
   if (getKind() != RequirementKind::Conformance) {
-    llvm::errs() << "Unordered generic requirements\n";
-    llvm::errs() << "LHS: "; dump(llvm::errs()); llvm::errs() << "\n";
-    llvm::errs() << "RHS: "; other.dump(llvm::errs()); llvm::errs() << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "Unordered generic requirements\n";
+      out << "LHS: "; dump(out); out << "\n";
+      out << "RHS: "; other.dump(out);
+    });
   }
 
   int compareProtos =
@@ -256,28 +279,24 @@ checkRequirementsImpl(ArrayRef<Requirement> requirements,
   while (!worklist.empty()) {
     auto req = worklist.pop_back_val();
 
-  // Check preconditions.
-#ifndef NDEBUG
-  {
+    // Check preconditions.
     auto firstType = req.getFirstType();
-    assert((allowTypeParameters || !firstType->hasTypeParameter())
+    ASSERT((allowTypeParameters || !firstType->hasTypeParameter())
            && "must take a contextual type. if you really are ok with an "
             "indefinite answer (and usually YOU ARE NOT), then consider whether "
             "you really, definitely are ok with an indefinite answer, and "
             "use `checkRequirementsWithoutContext` instead");
-    assert(!firstType->hasTypeVariable());
+    ASSERT(!firstType->hasTypeVariable());
 
     if (req.getKind() != RequirementKind::Layout) {
       auto secondType = req.getSecondType();
-      assert((allowTypeParameters || !secondType->hasTypeParameter())
+      ASSERT((allowTypeParameters || !secondType->hasTypeParameter())
              && "must take a contextual type. if you really are ok with an "
               "indefinite answer (and usually YOU ARE NOT), then consider whether "
               "you really, definitely are ok with an indefinite answer, and "
               "use `checkRequirementsWithoutContext` instead");
-      assert(!secondType->hasTypeVariable());
+      ASSERT(!secondType->hasTypeVariable());
     }
-  }
-#endif
 
     switch (req.checkRequirement(worklist, /*allowMissing=*/true)) {
     case CheckRequirementResult::Success:
@@ -320,12 +339,12 @@ swift::checkRequirementsWithoutContext(ArrayRef<Requirement> requirements) {
 }
 
 CheckRequirementsResult swift::checkRequirements(
-    ModuleDecl *module, ArrayRef<Requirement> requirements,
+    ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions, SubstOptions options) {
   SmallVector<Requirement, 4> substReqs;
   for (auto req : requirements) {
     substReqs.push_back(req.subst(substitutions,
-                              LookUpConformanceInModule(module), options));
+                                  LookUpConformanceInModule(), options));
   }
 
   return checkRequirements(substReqs);
@@ -350,6 +369,13 @@ void InverseRequirement::expandDefaults(
     ArrayRef<Type> gps,
     SmallVectorImpl<StructuralRequirement> &result) {
   for (auto gp : gps) {
+    // Value generics never have inverses (or the positive thereof).
+    if (auto gpTy = gp->getAs<GenericTypeParamType>()) {
+      if (gpTy->isValue()) {
+        continue;
+      }
+    }
+
     for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
       result.push_back({{RequirementKind::Conformance, gp,

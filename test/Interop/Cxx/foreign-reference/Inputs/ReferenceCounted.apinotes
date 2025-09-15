@@ -1,0 +1,8 @@
+---
+Name: ReferenceCounted
+Tags:
+- Name: OpaqueRefImpl
+  SwiftImportAs: reference
+  SwiftRetainOp: OPRetain
+  SwiftReleaseOp: OPRelease
+

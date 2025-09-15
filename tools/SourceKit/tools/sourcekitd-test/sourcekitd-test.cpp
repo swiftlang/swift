@@ -734,6 +734,9 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
     // Default to sort by name.
     Opts.RequestOptions.insert(Opts.RequestOptions.begin(), "sort.byname=1");
+    // Default to verifying USR to Decl conversion to cover many use cases
+    Opts.RequestOptions.insert(Opts.RequestOptions.begin(),
+                               "verifyusrtodecl=1");
     addRequestOptions(Req, Opts, KeyCodeCompleteOptions, "key.codecomplete.");
     break;
 
@@ -815,6 +818,12 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                           RequestConformingMethodList);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     addRequestOptionsDirect(Req, Opts);
+    break;
+
+  case SourceKitRequest::SignatureHelp:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestSignatureHelp);
+    sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
     break;
 
   case SourceKitRequest::CursorInfo:
@@ -1069,6 +1078,9 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                                Opts.InterestedUSR.c_str());
     if (!Opts.USR.empty())
       sourcekitd_request_dictionary_set_string(Req, KeyUSR, Opts.USR.c_str());
+
+    // add possible EnableDeclarations in particular
+    addRequestOptionsDirect(Req, Opts);
     break;
 
   case SourceKitRequest::FindInterfaceDoc:
@@ -1218,20 +1230,6 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                           "-Xfrontend");
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
           "-disable-implicit-string-processing-module-import");
-    }
-    if (Opts.EnableImplicitBacktracingModuleImport &&
-        !compilerArgsAreClang) {
-      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
-                                          "-Xfrontend");
-      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
-          "-enable-implicit-backtracing-module-import");
-    }
-    if (Opts.DisableImplicitBacktracingModuleImport &&
-        !compilerArgsAreClang) {
-      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
-                                          "-Xfrontend");
-      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
-          "-disable-implicit-backtracing-module-import");
     }
 
     for (auto Arg : Opts.CompilerArgs)
@@ -1427,6 +1425,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::CodeCompleteSetPopularAPI:
     case SourceKitRequest::TypeContextInfo:
     case SourceKitRequest::ConformingMethodList:
+    case SourceKitRequest::SignatureHelp:
     case SourceKitRequest::DependencyUpdated:
     case SourceKitRequest::Diagnostics:
     case SourceKitRequest::SemanticTokens:
@@ -2453,6 +2452,12 @@ static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII) {
   sourcekitd_variant_t structure =
       sourcekitd_variant_dictionary_get_value(Info, KeySubStructure);
   printRawVariant(structure);
+  sourcekitd_variant_t declarations =
+      sourcekitd_variant_dictionary_get_value(Info, KeyDeclarations);
+  // only output declarations if there are any (because this might have been
+  // disabled in the request itself)
+  if (sourcekitd_variant_get_type(declarations) != SOURCEKITD_VARIANT_TYPE_NULL)
+    printRawVariant(declarations);
 }
 
 static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,

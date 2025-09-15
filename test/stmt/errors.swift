@@ -156,7 +156,7 @@ func twelve() {
   twelve_helper { (a, b) in // expected-error {{invalid conversion from throwing function of type '(Int, Int) throws -> ()' to non-throwing function type '(Int, Int) -> ()'}}
     do {
       try thrower()
-    } catch Twelve.Payload(a...b) {
+    } catch Twelve.Payload(a...b) { // expected-error {{pattern of type 'Twelve' does not conform to expected match type 'Error'}}
     }
   }
 }
@@ -255,4 +255,18 @@ func takesClosure(_: (() -> ())) throws -> Int {}
 
 func passesClosure() {
     _ = try takesClosure { } // expected-error {{errors thrown from here are not handled}}
+}
+
+// Parameter packs checking
+struct S {
+  static func packTest<each T>(_ values: repeat (each T).Type, shouldThrow: Bool) throws -> Bool {
+    if (shouldThrow) {
+      throw MSV.Foo
+    }
+    return true
+  }
+
+  static func test() -> Bool {
+    return try packTest(String.self, String.self, shouldThrow: true) // expected-error{{errors thrown from here are not handled}}
+  }
 }

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/consuming-parameter-in-cxx.swift -typecheck -module-name Init -clang-header-expose-decls=all-public -emit-clang-header-path %t/consuming.h
+// RUN: %target-swift-frontend %S/consuming-parameter-in-cxx.swift -module-name Init -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/consuming.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-consume-execution.o
 // RUN: %target-interop-build-swift %S/consuming-parameter-in-cxx.swift -o %t/swift-consume-execution -Xlinker %t/swift-consume-execution.o -module-name Init -Xfrontend -entry-point-function-name -Xfrontend swiftMain

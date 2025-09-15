@@ -13,9 +13,12 @@
 #ifndef SWIFT_NAME_TRANSLATION_H
 #define SWIFT_NAME_TRANSLATION_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Identifier.h"
+#include <optional>
 
 namespace swift {
 
@@ -67,7 +70,7 @@ StringRef
 getNameForCxx(const ValueDecl *VD,
               CustomNamesOnly_t customNamesOnly = objc_translation::Normal);
 
-enum RepresentationKind { Representable, Unsupported };
+enum RepresentationKind { Representable, ObjCxxOnly, Unsupported };
 
 enum RepresentationError {
   UnrepresentableObjC,
@@ -82,8 +85,8 @@ enum RepresentationError {
   UnrepresentableEnumCaseTuple,
   UnrepresentableProtocol,
   UnrepresentableMoveOnly,
-  UnrepresentableNested,
   UnrepresentableMacro,
+  UnrepresentableZeroSizedValueType,
 };
 
 /// Constructs a diagnostic that describes the given C++ representation error.
@@ -99,12 +102,19 @@ struct DeclRepresentation {
 };
 
 /// Returns the C++ representation info for the given declaration.
-DeclRepresentation getDeclRepresentation(const ValueDecl *VD);
+DeclRepresentation getDeclRepresentation(
+    const ValueDecl *VD,
+    std::optional<std::function<bool(const NominalTypeDecl *)>> isZeroSized);
 
 /// Returns true if the given value decl is exposable to C++.
-inline bool isExposableToCxx(const ValueDecl *VD) {
-  return !getDeclRepresentation(VD).isUnsupported();
+inline bool isExposableToCxx(
+    const ValueDecl *VD,
+    std::optional<std::function<bool(const NominalTypeDecl *)>> isZeroSized) {
+  return !getDeclRepresentation(VD, isZeroSized).isUnsupported();
 }
+
+bool isObjCxxOnly(const ValueDecl *VD);
+bool isObjCxxOnly(const clang::Decl *D, const ASTContext &ctx);
 
 /// Returns true if the given value decl D is visible to C++ of its
 /// own accord (i.e. without considering its context)

@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend -swift-version 6 -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -strict-concurrency=complete %S/Inputs/other_global_actor_inference.swift
 
-// RUN: %target-swift-frontend -swift-version 6 -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -swift-version 6 -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify
 
 // REQUIRES: concurrency
 
@@ -73,7 +73,7 @@ public struct WrapperOnMainActor<Wrapped> {
   public var accessCount: Int
 
   nonisolated public init(wrappedValue: Wrapped) {
-    // expected-error@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a non-isolated context}}
+    // expected-error@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a nonisolated context}}
     self.wrappedValue = wrappedValue
   }
 }
@@ -86,8 +86,8 @@ struct HasMainActorWrappedProp {
   var computedProp: Int { 0 }
 
   nonisolated func testErrors() {
-    _ = thing // expected-error {{main actor-isolated property 'thing' can not be referenced from a non-isolated context}}
-    _ = _thing.wrappedValue // expected-error {{main actor-isolated property 'wrappedValue' can not be referenced from a non-isolated context}}
+    _ = thing // expected-error {{main actor-isolated property 'thing' can not be referenced from a nonisolated context}}
+    _ = _thing.wrappedValue // expected-error {{main actor-isolated property 'wrappedValue' can not be referenced from a nonisolated context}}
 
     _ = _thing
     _ = _thing.accessCount
@@ -104,10 +104,10 @@ struct HasWrapperOnActor {
 
   // expected-note@+1 3{{to make instance method 'testErrors()'}}
   func testErrors() {
-    _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
-    _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
+    _ = synced // expected-error{{main actor-isolated property 'synced' can not be referenced from a nonisolated context}}
+    _ = $synced // expected-error{{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a nonisolated context}}
     _ = _synced
-    _ = _synced.wrappedValue // expected-error{{main actor-isolated property 'wrappedValue' can not be referenced from a non-isolated context}}
+    _ = _synced.wrappedValue // expected-error{{main actor-isolated property 'wrappedValue' can not be referenced from a nonisolated context}}
   }
 
   @MainActor mutating func testOnMain() {
@@ -128,7 +128,7 @@ struct Carbon {
   @IntWrapper var atomicWeight: Int // expected-note {{property declared here}}
 
   nonisolated func getWeight() -> Int {
-    return atomicWeight // expected-error {{main actor-isolated property 'atomicWeight' can not be referenced from a non-isolated context}}
+    return atomicWeight // expected-error {{main actor-isolated property 'atomicWeight' can not be referenced from a nonisolated context}}
   }
 }
 
@@ -155,7 +155,7 @@ struct S: InferMainActor {
 }
 
 protocol InferMainActorInherited: InferMainActor {
-  func f() // expected-note{{mark the protocol requirement 'f()' 'async' to allow actor-isolated conformances}}
+  func f()
   func g()
 }
 
@@ -169,13 +169,60 @@ struct S2: InferMainActorInherited {
   @MainActor func g() { } // okay for the same reasons, but more explicitly
 }
 
+// expected-error@+2{{conformance of 'S3' to protocol 'InferMainActorInherited' involves isolation mismatches and can cause data races}}
 @SomeGlobalActor
 struct S3: InferenceConflict {
+  // expected-note@-1{{mark all declarations used in the conformance 'nonisolated'}}
+  // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}
   nonisolated func g() { }
 }
 
 extension S3 {
+
   func f() { }
-  // expected-error@-1{{global actor 'SomeGlobalActor'-isolated instance method 'f()' cannot be used to satisfy main actor-isolated protocol requirement}}
-  //expected-note@-2{{add 'nonisolated' to 'f()' to make this instance method not isolated to the actor}}
+  // expected-note@-1{{global actor 'SomeGlobalActor'-isolated instance method 'f()' cannot satisfy main actor-isolated requirement}}
+}
+
+@MainActor
+func onMain() {}
+
+@MainActor
+class MainActorSuperclass {}
+
+protocol InferMainFromSuperclass: MainActorSuperclass {
+  func f()
+}
+
+class C1: MainActorSuperclass, InferMainFromSuperclass {
+  func f() {
+    onMain() // okay
+  }
+}
+
+protocol InferenceConflictWithSuperclass: MainActorSuperclass, InferSomeGlobalActor {
+  func g()
+}
+
+// expected-error@+1{{conformance of 'C2' to protocol 'InferenceConflictWithSuperclass' crosses into main actor-isolated code and can cause data races}}
+class C2: MainActorSuperclass, InferenceConflictWithSuperclass {
+  //expected-note@-1 {{turn data races into runtime errors with '@preconcurrency'}}
+  // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
+  // expected-note@-3{{isolate this conformance to the main actor with '@MainActor'}}
+
+  func f() {}
+
+  func g() {}
+  // expected-note@-1 {{main actor-isolated instance method 'g()' cannot satisfy nonisolated requirement}}
+}
+
+
+class ConformInExtension {}
+extension ConformInExtension: InferMainActor {}
+
+class InheritConformance: ConformInExtension {
+  func f() {}
+}
+
+func testInheritedMainActorConformance() {
+  InheritConformance().f() // okay; this is not MainActor isolated
 }

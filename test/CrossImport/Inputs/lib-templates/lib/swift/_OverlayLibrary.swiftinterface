@@ -11,3 +11,11 @@ public struct OverlayLibraryTy {
 }
 
 public struct ShadowTy {}
+
+extension DeclaringLibrary.DeclaringLibraryTy {
+  public func overlayMember()
+}
+
+extension BystandingLibrary.BystandingLibraryTy {
+  public func overlayMember()
+}

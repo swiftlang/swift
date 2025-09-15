@@ -24,6 +24,7 @@ class ModuleDecl;
 class SourceLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
+  std::vector<ModuleDecl *> ModulesToBindExtensions;
   bool EnableLibraryEvolution;
 
   explicit SourceLoader(ASTContext &ctx,
@@ -59,9 +60,10 @@ public:
   ///
   /// If a non-null \p versionInfo is provided, the module version will be
   /// parsed and populated.
-  virtual bool canImportModule(ImportPath::Module named,
-                               ModuleVersionInfo *versionInfo,
-                               bool isTestableDependencyLookup = false) override;
+  virtual bool
+  canImportModule(ImportPath::Module named, SourceLoc loc,
+                  ModuleVersionInfo *versionInfo,
+                  bool isTestableDependencyLookup = false) override;
 
   /// Import a module with the given module path.
   ///
@@ -96,15 +98,6 @@ public:
   {
     // Parsing populates the Objective-C method tables.
   }
-
-  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath,
-                        llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
-                        const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                        clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-                        InterfaceSubContextDelegate &delegate,
-                        llvm::TreePathPrefixMapper *mapper,
-                        bool isTestableImport) override;
 };
 }
 

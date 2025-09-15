@@ -1,8 +1,7 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature ThenStatements %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature ThenStatements %s | %FileCheck %s
 // RUN: %target-swift-emit-ir -enable-experimental-feature ThenStatements %s
 
-// Needed for experimental features
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ThenStatements
 
 func foo() -> Int {
   if .random() { 1 } else { 2 }
@@ -658,4 +657,52 @@ struct LazyProp {
   } else {
     0
   }
+}
+
+// https://github.com/swiftlang/swift/issues/75294
+func testAsyncLet(_ x: Int?) async {
+  async let _ = if let i = x { i } else { 0 }
+  // CHECK-LABEL: sil private [ossa] @$s7if_expr12testAsyncLetyySiSgYaFSiyYaYbcfu_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (Optional<Int>) -> (@out τ_0_0, @error any Error) for <Int>
+
+  async let _ = if let i = x {
+    // CHECK-LABEL: sil private [ossa] @$s7if_expr12testAsyncLetyySiSgYaFSiyYaYbcfu0_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (Optional<Int>) -> (@out τ_0_0, @error any Error) for <Int>
+    lazy var y = i
+    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s7if_expr12testAsyncLetyySiSgYaFSiyYaYbcfu0_1yL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Int) -> Int
+    then y
+  } else {
+    0
+  }
+}
+
+func testNestedFallthrough1() throws -> Int {
+  let x = if .random() {
+    switch Bool.random() {
+    case true:
+      fallthrough
+    case false:
+      break
+    }
+    throw Err()
+  } else {
+    0
+  }
+  return x
+}
+
+func testNestedFallthrough2() throws -> Int {
+  let x = if .random() {
+    switch Bool.random() {
+    case true:
+      if .random() {
+        fallthrough
+      }
+      break
+    case false:
+      break
+    }
+    throw Err()
+  } else {
+    0
+  }
+  return x
 }

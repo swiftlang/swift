@@ -2,16 +2,13 @@
 //
 // LC_DYLD_CHAINED_FIXUPS decode not currently supported (default on visionOS)
 // UNSUPPORTED: OS=xros
-//
-// Temporarily disable on AArch64 Linux (rdar://88451721)
-// UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 
 // rdar://100558042
 // UNSUPPORTED: CPU=arm64e
 
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift %S/Inputs/Conformances.swift -parse-as-library -emit-module -emit-library -module-name ConformanceCheck -o %t/Conformances
+// RUN: %target-build-swift -target %target-swift-5.2-abi-triple %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift %S/Inputs/Conformances.swift -parse-as-library -emit-module -emit-library %no-fixup-chains -module-name ConformanceCheck -o %t/Conformances
 // RUN: %target-swift-reflection-dump %t/Conformances %platform-module-dir/%target-library-name(swiftCore) | %FileCheck %s
 
 // CHECK: CONFORMANCES:

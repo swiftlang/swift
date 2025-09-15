@@ -22,6 +22,7 @@
 
 #include "Cleanup.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILValue.h"
 
@@ -33,6 +34,7 @@ namespace Lowering {
 
 class Initialization;
 class SILGenFunction;
+enum class SGFAccessKind : uint8_t;
 
 /// ManagedValue - represents a singular SIL value and an optional cleanup.
 /// Ownership of the ManagedValue can be "forwarded" to disable its cleanup when
@@ -187,11 +189,6 @@ public:
     assert(value->getType().isAddress() && "Expected value to be an address");
     // We check for value->getFunction() here since we /could/ be passed
     // SILUndef here.
-    if (auto *f = value->getFunction()) {
-      if (value->getType().isTrivial(f)) {
-        return forTrivialAddressRValue(value);
-      }
-    }
     assert(value->getOwnershipKind() == OwnershipKind::None &&
            "Addresses always have trivial ownership");
     return ManagedValue(value, false, CleanupHandle::invalid());
@@ -251,6 +248,13 @@ public:
   static ManagedValue forInContext() {
     return ManagedValue(SILValue(), true, CleanupHandle::invalid());
   }
+  
+  /// Creates a managed value for an address that is undergoing a formal
+  /// access. This will be `forLValue` if the `accessKind` is a mutating
+  /// (exclusive) access or `forBorrowedAddressRValue` if the
+  /// `accessKind` is borrowing (shared).
+  static ManagedValue forFormalAccessedAddress(SILValue address,
+                                               SGFAccessKind accessKind);
 
   bool isValid() const {
     return valueAndFlag.getInt() || valueAndFlag.getPointer();
@@ -323,6 +327,9 @@ public:
     assert(!hasCleanup());
     return getValue();
   }
+  /// Treat getValue() as used so that we can access the value directly when
+  /// debugging without needing to interpret the flag field.
+  LLVM_ATTRIBUTE_USED
   SILValue getValue() const { return valueAndFlag.getPointer(); }
   
   SILType getType() const { return getValue()->getType(); }

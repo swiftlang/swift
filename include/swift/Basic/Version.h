@@ -131,6 +131,13 @@ public:
   /// SWIFT_VERSION_MINOR.
   static Version getCurrentLanguageVersion();
 
+  /// Returns a major version to represent the next future language mode. This
+  /// exists to make it easier to find and update clients when a new language
+  /// mode is added.
+  static constexpr unsigned getFutureMajorLanguageVersion() {
+    return 7;
+  }
+
   // List of backward-compatibility versions that we permit passing as
   // -swift-version <vers>
   static std::array<StringRef, 4> getValidEffectiveVersions() {
@@ -164,11 +171,6 @@ std::string getSwiftFullVersion(Version effectiveLanguageVersion =
 /// this Swift was built.
 StringRef getSwiftRevision();
 
-/// Is the running compiler built with a version tag for distribution?
-/// When true, \c version::getCurrentCompilerVersion returns a valid version
-/// and \c getCurrentCompilerTag returns the version tuple in string format.
-bool isCurrentCompilerTagged();
-
 /// Retrieves the distribution tag of the running compiler, if any.
 StringRef getCurrentCompilerTag();
 
@@ -186,6 +188,10 @@ StringRef getCurrentCompilerChannel();
 /// version that's going to be presented as some new concrete version to the
 /// users.
 unsigned getUpcomingCxxInteropCompatVersion();
+
+/// Retrieves the version of the running compiler. It could be a tag or
+/// a "development" version that only has major/minor.
+std::string getCompilerVersion();
 
 } // end namespace version
 } // end namespace swift

@@ -1,4 +1,4 @@
-//===--- DeclSynthesizer.h - Synthesize helper Swift decls ------*- C++ -*-===//
+//===--- SwiftDeclSynthesizer.h - Synthesize helper Swift decls -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -84,10 +84,11 @@ public:
   /// \param value The value of the named constant.
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
+  /// \param access What access level should be given to the constant.
   ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
                             const clang::APValue &value,
                             ConstantConvertKind convertKind, bool isStatic,
-                            ClangNode ClangN);
+                            ClangNode ClangN, AccessLevel access);
 
   /// Create a new named constant with the given value.
   ///
@@ -97,9 +98,11 @@ public:
   /// \param value The value of the named constant.
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
+  /// \param access What access level should be given to the constant.
   ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
                             StringRef value, ConstantConvertKind convertKind,
-                            bool isStatic, ClangNode ClangN);
+                            bool isStatic, ClangNode ClangN,
+                            AccessLevel access);
 
   /// Create a new named constant using the given expression.
   ///
@@ -109,9 +112,11 @@ public:
   /// \param valueExpr An expression to use as the value of the constant.
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
+  /// \param access What access level should be given to the constant.
   ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
                             Expr *valueExpr, ConstantConvertKind convertKind,
-                            bool isStatic, ClangNode ClangN);
+                            bool isStatic, ClangNode ClangN,
+                            AccessLevel access);
 
   /// Create a default constructor that initializes a struct to zero.
   ConstructorDecl *createDefaultConstructor(NominalTypeDecl *structDecl);
@@ -317,7 +322,11 @@ public:
 
   /// Given an overload of a C++ virtual method on a reference type, create a
   /// method that dispatches the call dynamically.
-  FuncDecl *makeVirtualMethod(const clang::CXXMethodDecl *clangMethodDecl);
+  FuncDecl *makeVirtualMethod(const clang::CXXMethodDecl *clangMethodDecl,
+                              StringRef swiftName);
+
+  FuncDecl *makeInstanceToStaticOperatorCallMethod(
+      const clang::CXXMethodDecl *clangMethodDecl);
 
   VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                               FuncDecl *setter);
@@ -326,8 +335,35 @@ public:
                                 const swift::Type &swiftParamTy,
                                 SourceLoc paramLoc);
 
+  /// Synthesize a static factory method for a C++ foreign reference type,
+  /// returning a `CXXMethodDecl*` or `nullptr` if the required constructor or
+  /// allocation function is not found.
+  llvm::SmallVector<clang::CXXMethodDecl *, 4>
+  synthesizeStaticFactoryForCXXForeignRef(
+      const clang::CXXRecordDecl *cxxRecordDecl);
+
+  /// Look for an explicitly-provided "destroy" operation. If one exists
+  /// and the type has been imported as noncopyable, add an explicit `deinit`
+  /// that calls that destroy operation.
+  void addExplicitDeinitIfRequired(
+      NominalTypeDecl *nominal, const clang::RecordDecl *clangType);
+
+  /// Synthesize a Swift function that calls the Clang runtime predicate
+  /// function for the availability domain represented by `var`.
+  FuncDecl *makeAvailabilityDomainPredicate(const clang::VarDecl *var);
+
+  bool isCGFloat(Type type);
+
+  bool isObjCBool(Type type);
+
 private:
   Type getConstantLiteralType(Type type, ConstantConvertKind convertKind);
+
+  /// Find an explicitly-provided "destroy" operation specified for the
+  /// given Clang type and return it.
+  FuncDecl *findExplicitDestroy(
+      NominalTypeDecl *nominal, const clang::RecordDecl *clangType);
+
 };
 
 } // namespace swift

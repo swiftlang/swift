@@ -32,3 +32,7 @@ public var varWithImplicitInvalidType = (1 as InvalidType)
 // expected-serialization-remark@-3 {{serialization skipped for invalid type}}
 
 public var _: InvalidType
+
+extension InvalidType {
+  public func method() {}
+}

@@ -27,8 +27,8 @@ private:
   uint64_t count;
 
 public:
-  explicit ProfileCounter() : count(UINT64_MAX) {}
-  ProfileCounter(uint64_t Count) : count(Count) {
+  explicit constexpr ProfileCounter() : count(UINT64_MAX) {}
+  constexpr ProfileCounter(uint64_t Count) : count(Count) {
     if (Count == UINT64_MAX) {
       count = UINT64_MAX - 1;
     }
@@ -40,6 +40,22 @@ public:
     return count;
   }
   explicit operator bool() const { return hasValue(); }
+
+  /// Saturating addition of another counter to this one, meaning that overflow
+  /// is avoided. If overflow would have happened, this function returns true
+  /// and the maximum representable value will be set in this counter.
+  bool add_saturating(ProfileCounter other) {
+    assert(hasValue() && other.hasValue());
+
+    // Will we go over the max representable value by adding other?
+    if (count > ((UINT64_MAX-1) - other.count)) {
+      count = UINT64_MAX - 1;
+      return true;
+    }
+
+    count += other.count;
+    return false;
+  }
 };
 } // end namespace swift
 

@@ -198,6 +198,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Requirement.h"
+#include "swift/Basic/Assertions.h"
 #include "RequirementLowering.h"
 #include "RuleBuilder.h"
 
@@ -211,6 +212,8 @@ RequirementMachine::RequirementMachine(RewriteContext &ctx)
   MaxRuleCount = langOpts.RequirementMachineMaxRuleCount;
   MaxRuleLength = langOpts.RequirementMachineMaxRuleLength;
   MaxConcreteNesting = langOpts.RequirementMachineMaxConcreteNesting;
+  MaxConcreteSize = langOpts.RequirementMachineMaxConcreteSize;
+  MaxTypeDifferences = langOpts.RequirementMachineMaxTypeDifferences;
   Stats = ctx.getASTContext().Stats;
 
   if (Stats)
@@ -230,19 +233,34 @@ void RequirementMachine::checkCompletionResult(CompletionResult result) const {
     break;
 
   case CompletionResult::MaxRuleCount:
-    llvm::errs() << "Rewrite system exceeded maximum rule count\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded maximum rule count\n";
+      dump(out);
+    });
 
   case CompletionResult::MaxRuleLength:
-    llvm::errs() << "Rewrite system exceeded rule length limit\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded rule length limit\n";
+      dump(out);
+    });
 
   case CompletionResult::MaxConcreteNesting:
-    llvm::errs() << "Rewrite system exceeded concrete type nesting depth limit\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded concrete type nesting depth limit\n";
+      dump(out);
+    });
+
+  case CompletionResult::MaxConcreteSize:
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded concrete type size limit\n";
+      dump(out);
+    });
+
+  case CompletionResult::MaxTypeDifferences:
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded concrete type difference limit\n";
+      dump(out);
+    });
   }
 }
 
@@ -492,14 +510,24 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
           return std::make_pair(CompletionResult::MaxRuleLength,
                                 ruleCount + i);
         }
-        if (newRule.getNesting() > MaxConcreteNesting + System.getDeepestInitialRule()) {
+        auto nestingAndSize = newRule.getNestingAndSize();
+        if (nestingAndSize.first > MaxConcreteNesting + System.getMaxNestingOfInitialRule()) {
           return std::make_pair(CompletionResult::MaxConcreteNesting,
+                                ruleCount + i);
+        }
+        if (nestingAndSize.second > MaxConcreteSize + System.getMaxSizeOfInitialRule()) {
+          return std::make_pair(CompletionResult::MaxConcreteSize,
                                 ruleCount + i);
         }
       }
 
       if (System.getLocalRules().size() > MaxRuleCount) {
         return std::make_pair(CompletionResult::MaxRuleCount,
+                              System.getRules().size() - 1);
+      }
+
+      if (System.getTypeDifferenceCount() > MaxTypeDifferences) {
+        return std::make_pair(CompletionResult::MaxTypeDifferences,
                               System.getRules().size() - 1);
       }
     }
@@ -509,7 +537,7 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
     dump(llvm::dbgs());
   }
 
-  assert(!Complete);
+  ASSERT(!Complete);
   Complete = true;
 
   return std::make_pair(CompletionResult::Success, 0);
@@ -550,7 +578,7 @@ void RequirementMachine::dump(llvm::raw_ostream &out) const {
     for (auto paramTy : Params) {
       out << " " << Type(paramTy);
       if (paramTy->isParameterPack())
-        out << "…";
+        out << " " << paramTy;
     }
     out << " >";
   }

@@ -22,6 +22,7 @@
 #include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/RequestCache.h"
 #include "swift/Basic/AnyValue.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Statistic.h"
@@ -29,8 +30,6 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/PrettyStackTrace.h"
-#include <string>
-#include <tuple>
 #include <type_traits>
 #include <vector>
 
@@ -210,6 +209,7 @@ public:
   void enumerateReferencesInFile(
       const SourceFile *SF,
       evaluator::DependencyRecorder::ReferenceEnumerator f) const {
+    ASSERT(recorder.isRecordingEnabled() && "Dep recording should be enabled");
     return recorder.enumerateReferencesInFile(SF, f);
   }
 
@@ -271,6 +271,29 @@ public:
     recorder.clearRequest<Request>(request);
   }
 
+  /// Store a value in the request evaluator's cache for a split-cached request.
+  /// The request chooses to do this itself for storing some suitable definition of
+  /// "non-empty" value.
+  template<typename Request,
+           typename std::enable_if<Request::hasSplitCache>::type* = nullptr>
+  void cacheNonEmptyOutput(const Request &request,
+                           typename Request::OutputType &&output) {
+    (void)cache.insert<Request>(request, std::move(output));
+  }
+
+  /// Consults the request evaluator's cache for a split-cached request.
+  /// The request should perform this check after consulting it's own optimized
+  /// representation for storing an empty value.
+  template<typename Request,
+           typename std::enable_if<Request::hasSplitCache>::type* = nullptr>
+  std::optional<typename Request::OutputType>
+  getCachedNonEmptyOutput(const Request &request) {
+    auto found = cache.find_as(request);
+    if (found == cache.end<Request>())
+      return std::nullopt;
+    return found->second;
+  }
+
   /// Clear the cache stored within this evaluator.
   ///
   /// Note that this does not clear the caches of requests that use external
@@ -282,6 +305,8 @@ public:
   bool hasActiveRequest(const Request &request) const {
     return activeRequests.count(ActiveRequest(request));
   }
+
+  void dump(llvm::raw_ostream &out) { cache.dump(out); }
 
 private:
   /// Diagnose a cycle detected in the evaluation of the given
@@ -391,6 +416,8 @@ private:
             typename std::enable_if<Request::isDependencySink>::type * = nullptr>
   void handleDependencySinkRequest(const Request &r,
                                    const typename Request::OutputType &o) {
+    if (!recorder.isRecordingEnabled())
+      return;
     evaluator::DependencyCollector collector(recorder);
     r.writeDependencySink(collector, o);
   }
@@ -402,6 +429,8 @@ private:
   template <typename Request,
             typename std::enable_if<Request::isDependencySource>::type * = nullptr>
   void handleDependencySourceRequest(const Request &r) {
+    if (!recorder.isRecordingEnabled())
+      return;
     auto source = r.readDependencySource(recorder);
     if (!source.isNull() && source.get()->isPrimary()) {
       recorder.handleDependencySourceRequest(r, source.get());
@@ -425,6 +454,6 @@ evaluateOrFatal(Evaluator &eval, Request req) {
   });
 }
 
-} // end namespace evaluator
+} // end namespace swift
 
 #endif // SWIFT_AST_EVALUATOR_H

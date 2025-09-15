@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -module-name test %s | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -module-name test %s | %FileCheck %s --enable-var-scope
 
 struct MoveWithDeinit: ~Copyable {
   deinit { }

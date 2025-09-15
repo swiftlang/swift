@@ -85,6 +85,7 @@ extension FlattenSequence.Iterator: IteratorProtocol {
       _inner = s!.makeIterator()
     }
     while true
+    fatalError()
   }
 }
 

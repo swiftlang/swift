@@ -592,16 +592,16 @@ func f60503() {
 }
 
 // rdar://105089074
-enum EWithIdent<Id> where Id: P { // expected-note 2 {{where 'Id' = 'Int'}}
+enum EWithIdent<Id> where Id: P {
 case test(Id)
 }
 
-extension [EWithIdent<Int>] {
+extension [EWithIdent<Int>] { // expected-error {{type 'Int' does not conform to protocol 'P'}}
   func test() {
     sorted { lhs, rhs in
       switch (rhs, rhs) {
       case let (.test(x), .test(y)): break
-        // expected-error@-1 2 {{generic enum 'EWithIdent' requires that 'Int' conform to 'P'}}
+        // expected-error@-1 2 {{type 'Element' has no member 'test'}}
       case (_, _): break
       }
     }
@@ -789,5 +789,55 @@ do {
     case .test(a: 42, b: "", c: 0.0): break
       // expected-error@-1 {{tuple pattern has the wrong length for tuple type '(Int, String)'}}
     }
+  }
+}
+
+func testMatchingNonErrorConformingTypeInClosure(_ x: any Error) {
+  enum E {
+    case e
+  }
+  _ = {
+    switch x {
+    case E.e: // expected-error {{pattern of type 'E' does not conform to expected match type 'Error'}}
+      break
+    default:
+      break
+    }
+  }
+}
+
+// rdar://131819800 - crash in `transformWithPosition` while trying to emit diagnostics for `AllowFunctionTypeMismatch` fix
+do {
+  enum E {
+  case test(kind: Int, defaultsToEmpty: Bool = false)
+  }
+
+  func test(e: E) {
+    if case .test(kind: _, // expected-error {{tuple pattern has the wrong length for tuple type '(Int, Bool)'}}
+                  name: let name?,
+                  defaultsToEmpty: _,
+                  deprecateName: let deprecatedName?) = e {
+    }
+  }
+}
+
+// Make sure we diagnose 'Undefined' here.
+func testUndefinedTypeInPattern(_ x: Int) {
+  switch x {
+  case Optional<Undefined>.alsoUndefined: // expected-error {{cannot find type 'Undefined' in scope}}
+    break
+  }
+  _ = {
+    switch x {
+    case Optional<Undefined>.alsoUndefined: // expected-error {{cannot find type 'Undefined' in scope}}
+      break
+    }
+  }
+}
+
+func testUndefinedInClosureVar() {
+  // Make sure we don't produce "unable to infer closure type without a type annotation"
+  _ = {
+    var x: Undefined // expected-error {{cannot find type 'Undefined' in scope}}
   }
 }

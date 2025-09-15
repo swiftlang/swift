@@ -1,10 +1,8 @@
-// RUN: %target-swift-frontend -emit-sil %s  -disable-availability-checking | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil %s  -disable-availability-checking -strict-concurrency=targeted | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil %s  -disable-availability-checking -strict-concurrency=complete | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil %s  -disable-availability-checking -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s  -target %target-swift-5.1-abi-triple | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s  -target %target-swift-5.1-abi-triple -strict-concurrency=targeted | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s  -target %target-swift-5.1-abi-triple -strict-concurrency=complete | %FileCheck %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
 
 actor A {

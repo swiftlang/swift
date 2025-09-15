@@ -35,6 +35,18 @@ public struct TopLevelStruct {
   }
 
   @backDeployed(before: macOS 12.0)
+  public private(set) var readWritePropertyPrivateSet: Int {
+    get { 42 }
+    set(newValue) {}
+  }
+
+  @backDeployed(before: macOS 12.0)
+  public internal(set) var readWritePropertyInternalSet: Int {
+    get { 42 }
+    set(newValue) {}
+  }
+
+  @backDeployed(before: macOS 12.0)
   public subscript(at index: Int) -> Int {
     get { 42 }
     set(newValue) {}
@@ -205,6 +217,19 @@ extension TopLevelProtocol {
   public func backDeployedExtensionMethod() {}
 }
 
+@backDeployed(before: macOS 16.0, iOS 19.0, tvOS 19.0, watchOS 12.0, visionOS 3.0)
+public func backDeployedBeforeVersionsMappingTo26() -> Int { 26 }
+
+@backDeployed(before: macOS 17.0, iOS 20.0, tvOS 20.0, watchOS 13.0, visionOS 4.0)
+// expected-warning@-1 {{'17.0' is not a valid version number for macOS}}
+// expected-warning@-2 {{'20.0' is not a valid version number for iOS}}
+// expected-warning@-3 {{'20.0' is not a valid version number for tvOS}}
+// expected-warning@-4 {{'13.0' is not a valid version number for watchOS}}
+// expected-warning@-5 {{'4.0' is not a valid version number for visionOS}}
+public func backDeployedBeforeVersionsMappingTo27() -> Int { 27 }
+
+@backDeployed(before: macOS 26.0, iOS 26.0, tvOS 26.0, watchOS 26.0, visionOS 26.0)
+public func backDeployedBefore26() -> Int { 26 }
 
 // MARK: - Unsupported declaration kinds
 
@@ -221,7 +246,6 @@ public final class CannotBackDeployClassDeinit {
   deinit {}
 }
 
-// Ok, final decls in a non-final, derived class
 public class CannotBackDeployOverride: TopLevelClass {
   @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' cannot be combined with 'override'}}
   final public override func hook() {}
@@ -251,6 +275,9 @@ public enum CannotBackDeployEnum {
 @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' must not be used on stored properties}}
 public var cannotBackDeployTopLevelVar = 79
 
+@backDeployed(before: iOS 15.0) // OK, this can only be diagnosed when compiling for iOS
+public var cannotBackDeployTopLevelVarOniOS = 79
+
 @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' attribute cannot be applied to this declaration}}
 extension TopLevelStruct {}
 
@@ -266,15 +293,49 @@ public struct ConformsToTopLevelProtocol: TopLevelProtocol {
 }
 
 @available(SwiftStdlib 5.1, *)
-@backDeployed(before: macOS 12.0) // expected-warning {{'@backDeployed' is unsupported on a var with a 'some' return type}}
+@backDeployed(before: macOS 12.0) // expected-warning {{'@backDeployed' cannot be applied to var 'cannotBackDeployVarWithOpaqueResultType' because it has a 'some' return type}}
 public var cannotBackDeployVarWithOpaqueResultType: some TopLevelProtocol {
   return ConformsToTopLevelProtocol()
 }
 
 @available(SwiftStdlib 5.1, *)
-@backDeployed(before: macOS 12.0) // expected-warning {{'@backDeployed' is unsupported on a global function with a 'some' return type}}
+@backDeployed(before: macOS 12.0) // expected-warning {{'@backDeployed' cannot be applied to global function 'cannotBackDeployFuncWithOpaqueResultType()' because it has a 'some' return type}}
 public func cannotBackDeployFuncWithOpaqueResultType() -> some TopLevelProtocol {
   return ConformsToTopLevelProtocol()
+}
+
+public struct CannotBackDeployNonPublicAccessors {
+  private var privateVar: Int {
+    @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' may not be used on private declarations}}
+    get { 0 }
+
+    @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' may not be used on private declarations}}
+    set { }
+  }
+
+  internal var internalVar: Int {
+    @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' may not be used on internal declarations}}
+    get { 0 }
+
+    @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' may not be used on internal declarations}}
+    set { }
+  }
+
+  public private(set) var publicVarPrivateSet: Int {
+    @backDeployed(before: macOS 12.0)
+    get { 0 }
+
+    @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' may not be used on private declarations}}
+    set { }
+  }
+
+  public internal(set) var publicVarInternalSet: Int {
+    @backDeployed(before: macOS 12.0)
+    get { 0 }
+
+    @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' may not be used on internal declarations}}
+    set { }
+  }
 }
 
 // MARK: - Function body diagnostics
@@ -367,7 +428,11 @@ public func incorrectPlatformCaseFunc() {}
 public func incorrectPlatformSimilarFunc() {}
 
 @backDeployed(before: macOS 12.0, unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for attribute '@backDeployed'}}
-public func unknownOSFunc() {}
+public func unknownOSFunc1() {}
+
+@backDeployed(before: macOS 12.0)
+@backDeployed(before: unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for attribute '@backDeployed'}}
+public func unknownOSFunc2() {}
 
 @backDeployed(before: @) // expected-error {{expected platform in '@backDeployed' attribute}}
 public func badPlatformFunc1() {}
@@ -414,7 +479,6 @@ public func missingMacroVersion() {}
 public func unknownMacroMissingVersion() {}
 
 @backDeployed(before: _unknownMacro 1.0) // expected-warning {{unknown platform '_unknownMacro' for attribute '@backDeployed'}}
-// expected-error@-1 {{expected at least one platform version in '@backDeployed' attribute}}
 public func unknownMacroVersioned() {}
 
 @backDeployed(before: _unknownMacro 1.0, _myProject 2.0) // expected-warning {{unknown platform '_unknownMacro' for attribute '@backDeployed'}}

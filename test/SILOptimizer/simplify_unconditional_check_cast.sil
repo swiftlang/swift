@@ -1,0 +1,70 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=unconditional_checked_cast | %FileCheck %s
+
+// REQUIRES: concurrency
+
+import Swift
+import Builtin
+import _Concurrency
+
+protocol P {}
+protocol PC: AnyObject {}
+
+struct S : P {}
+
+struct T {}
+
+class C {}
+
+struct X : @MainActor P {}
+
+// CHECK-LABEL: sil [ossa] @test_conforming_struct :
+// CHECK:         %1 = init_existential_metatype %0, $@thick any P.Type
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'test_conforming_struct'
+sil [ossa] @test_conforming_struct : $@convention(thin) (@thick S.Type) -> @thick any P.Type {
+bb0(%0 : $@thick S.Type):
+  %1 = unconditional_checked_cast %0 to any P.Type
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @test_non_conforming_struct :
+// CHECK:         %1 = unconditional_checked_cast %0
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'test_non_conforming_struct'
+sil [ossa] @test_non_conforming_struct : $@convention(thin) (@thick T.Type) -> @thick any P.Type {
+bb0(%0 : $@thick T.Type):
+  %1 = unconditional_checked_cast %0 to any P.Type
+  return %1
+}
+
+
+// CHECK-LABEL: sil [ossa] @test_non_metatype :
+// CHECK:         %1 = unconditional_checked_cast %0
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'test_non_metatype'
+sil [ossa] @test_non_metatype : $@convention(thin) (@guaranteed C) -> any PC {
+bb0(%0 : @guaranteed $C):
+  %1 = unconditional_checked_cast %0 to any PC
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @test_non_existential_target :
+// CHECK:         %1 = unconditional_checked_cast %0
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'test_non_existential_target'
+sil [ossa] @test_non_existential_target : $@convention(thin) (@thick S.Type) -> @thick Int.Type {
+bb0(%0 : $@thick S.Type):
+  %1 = unconditional_checked_cast %0 to Int.Type
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @test_isolated_conformance :
+// CHECK:         %1 = unconditional_checked_cast %0
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'test_isolated_conformance'
+sil [ossa] @test_isolated_conformance : $@convention(thin) (@thick X.Type) -> @thick any P.Type {
+bb0(%0 : $@thick X.Type):
+  %1 = unconditional_checked_cast %0 to any P.Type
+  return %1
+}
+

@@ -49,7 +49,7 @@ namespace swift {
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
 /// \returns The found opened archetype or empty type otherwise.
-CanOpenedArchetypeType getOpenedArchetypeOf(CanType Ty);
+CanExistentialArchetypeType getOpenedArchetypeOf(CanType Ty);
 CanLocalArchetypeType getLocalArchetypeOf(CanType Ty);
 
 /// How an existential type container is represented.
@@ -243,19 +243,16 @@ public:
 
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
-  SWIFT_IMPORT_UNSAFE
   ClassDecl *getClassOrBoundGenericClass() const {
     return getASTType().getClassOrBoundGenericClass();
   }
   /// Retrieve the StructDecl for a type that maps to a Swift struct or
   /// bound generic struct type.
-  SWIFT_IMPORT_UNSAFE
   StructDecl *getStructOrBoundGenericStruct() const {
     return getASTType().getStructOrBoundGenericStruct();
   }
   /// Retrieve the EnumDecl for a type that maps to a Swift enum or
   /// bound generic enum type.
-  SWIFT_IMPORT_UNSAFE
   EnumDecl *getEnumOrBoundGenericEnum() const {
     return getASTType().getEnumOrBoundGenericEnum();
   }
@@ -267,26 +264,8 @@ public:
     });
   }
 
-  bool isBuiltinInteger() const {
-    return is<BuiltinIntegerType>();
-  }
-
-  bool isBuiltinFixedWidthInteger(unsigned width) const {
-    BuiltinIntegerType *bi = getAs<BuiltinIntegerType>();
-    return bi && bi->isFixedWidth(width);
-  }
-
-  bool isBuiltinFloat() const {
-    return is<BuiltinFloatType>();
-  }
-
-  bool isBuiltinVector() const {
-    return is<BuiltinVectorType>();
-  }
-
   bool isBuiltinBridgeObject() const { return is<BuiltinBridgeObjectType>(); }
 
-  SWIFT_IMPORT_UNSAFE
   SILType getBuiltinVectorElementType() const {
     auto vector = castTo<BuiltinVectorType>();
     return getPrimitiveObjectType(vector.getElementType());
@@ -294,7 +273,6 @@ public:
 
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
-  SWIFT_IMPORT_UNSAFE
   NominalTypeDecl *getNominalOrBoundGenericNominal() const {
     return getASTType().getNominalOrBoundGenericNominal();
   }
@@ -365,6 +343,9 @@ public:
   /// True if the type, or the referenced type of an address type, is
   /// address-only. This is the opposite of isLoadable.
   bool isAddressOnly(const SILFunction &F) const;
+
+  /// For details see the comment of `IsFixedABI_t`.
+  bool isFixedABI(const SILFunction &F) const;
 
   /// True if the underlying AST type is trivial, meaning it is loadable and can
   /// be trivially copied, moved or destroyed. Returns false for address types
@@ -438,6 +419,9 @@ public:
   
   /// Returns true if the referenced type is guaranteed to have a
   /// single-retainable-pointer representation.
+  /// This does not include C++ imported `SWIFT_SHARED_REFERENCE` classes.
+  /// They act as Swift classes but are not compatible with Swift's
+  /// retain/release runtime functions.
   bool hasRetainablePointerRepresentation() const {
     return getASTType()->hasRetainablePointerRepresentation();
   }
@@ -452,12 +436,6 @@ public:
   /// Returns true if the referenced type is a class existential type.
   bool isClassExistentialType() const {
     return getASTType()->isClassExistentialType();
-  }
-
-  /// Returns true if the referenced type is an opened existential type
-  /// (which is actually a kind of archetype).
-  bool isOpenedExistential() const {
-    return getASTType()->isOpenedExistential();
   }
 
   /// Returns true if the referenced type is expressed in terms of one
@@ -779,13 +757,16 @@ public:
   SILType subst(SILModule &M, SubstitutionMap subs,
                 TypeExpansionContext context) const;
 
+  /// Strip concurrency annotations from the representation type.
+  SILType stripConcurrency(bool recursive, bool dropGlobalActor) {
+    auto strippedASTTy = getASTType()->stripConcurrency(recursive, dropGlobalActor);
+    return SILType::getPrimitiveType(strippedASTTy->getCanonicalType(),
+                                     getCategory());
+  }
+
   /// Return true if this type references a "ref" type that has a single pointer
   /// representation. Class existentials do not always qualify.
   bool isHeapObjectReferenceType() const;
-
-  /// Returns true if this SILType is an aggregate that contains \p Ty
-  bool aggregateContainsRecord(SILType Ty, SILModule &SILMod,
-                               TypeExpansionContext context) const;
 
   /// Returns true if this SILType is an aggregate with unreferenceable storage,
   /// meaning it cannot be fully destructured in SIL.
@@ -868,7 +849,15 @@ public:
   ///
   /// DISCUSSION: This is separate from removingMoveOnlyWrapper since this API
   /// requires a SILFunction * and is specialized.
-  SILType removingMoveOnlyWrapperToBoxedType(const SILFunction *fn);
+  SILType removingMoveOnlyWrapperFromBoxedType(const SILFunction *fn);
+
+  /// Whether there's a direct wrapper or a wrapper inside a box.
+  bool hasAnyMoveOnlyWrapping(const SILFunction *fn) {
+    return isMoveOnlyWrapped() || isBoxedMoveOnlyWrappedType(fn);
+  }
+
+  /// Removes a direct wrapper from a type or a wrapper from a type in a box.
+  SILType removingAnyMoveOnlyWrapping(const SILFunction *fn);
 
   /// Returns a SILType with any archetypes mapped out of context.
   SILType mapTypeOutOfContext() const;
@@ -902,6 +891,12 @@ public:
     return sd->getAttrs().getAttribute<RawLayoutAttr>();
   }
 
+  /// If this is a raw layout type, returns the substituted like type.
+  Type getRawLayoutSubstitutedLikeType() const;
+
+  /// If this is a raw layout type, returns the substituted count type.
+  Type getRawLayoutSubstitutedCountType() const;
+
   /// If this is a SILBoxType, return getSILBoxFieldType(). Otherwise, return
   /// SILType().
   ///
@@ -933,18 +928,27 @@ public:
     return getSILBoxFieldType(fn).isMoveOnlyWrapped();
   }
 
-  SILType getInstanceTypeOfMetatype(SILFunction *function) const;
-
-  MetatypeRepresentation getRepresentationOfMetatype(SILFunction *function) const;
-
-  bool isOrContainsObjectiveCClass() const;
+  SILType getLoweredInstanceTypeOfMetatype(SILFunction *function) const;
 
   bool isCalleeConsumedFunction() const {
     auto funcTy = castTo<SILFunctionType>();
     return funcTy->isCalleeConsumed() && !funcTy->isNoEscape();
   }
 
+  bool isNonIsolatedCallerFunction() const {
+    auto funcTy = getAs<SILFunctionType>();
+    if (!funcTy)
+      return false;
+    auto isolatedParam = funcTy->maybeGetIsolatedParameter();
+    return isolatedParam &&
+           isolatedParam->hasOption(SILParameterInfo::ImplicitLeading);
+  }
+
   bool isMarkedAsImmortal() const;
+
+  /// True if a value of this type can have its address taken by a
+  /// lifetime-dependent value.
+  bool isAddressableForDeps(const SILFunction &function) const;
 
   /// Returns true if this type is an actor type. Returns false if this is any
   /// other type. This includes distributed actors. To check for distributed
@@ -957,6 +961,11 @@ public:
   bool isAnyActor() const { return getASTType()->isAnyActorType(); }
 
   /// Returns true if this function conforms to the Sendable protocol.
+  ///
+  /// NOTE: For diagnostics this is not always the correct thing to check since
+  /// non-Sendable types afflicted with preconcurrency can have different
+  /// semantic requirements around diagnostics. \see
+  /// getConcurrencyDiagnosticBehavior.
   bool isSendable(SILFunction *fn) const;
 
   /// False if SILValues of this type cannot be used outside the scope of their
@@ -970,6 +979,16 @@ public:
   bool mayEscape(const SILFunction &function) const {
     return !isNoEscapeFunction() && isEscapable(function);
   }
+
+  /// Return the expected concurrency diagnostic behavior for this SILType.
+  ///
+  /// This allows one to know if the type is marked with preconcurrency and thus
+  /// should have diagnostics ignored or converted to warnings instead of
+  /// errors.
+  ///
+  /// \returns nil if we were unable to find such information for this type.
+  std::optional<DiagnosticBehavior>
+  getConcurrencyDiagnosticBehavior(SILFunction *fn) const;
 
   //
   // Accessors for types used in SIL instructions:

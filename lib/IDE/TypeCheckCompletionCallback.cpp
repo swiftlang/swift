@@ -11,37 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/TypeCheckCompletionCallback.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/CompletionLookup.h"
-#include "swift/Sema/CompletionContextFinder.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 
 using namespace swift;
 using namespace swift::ide;
 using namespace swift::constraints;
-
-void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
-  assert(!GotCallback);
-
-  CompletionContextFinder finder(DC);
-  if (!finder.hasCompletionExpr())
-    return;
-
-  auto fallback = finder.getFallbackCompletionExpr();
-  if (!fallback || isa<AbstractClosureExpr>(fallback->DC)) {
-    // If the expression is embedded in a closure, the constraint system tries
-    // to retrieve that closure's type, which will fail since we won't have
-    // generated any type variables for it. Thus, fallback type checking isn't
-    // available in this case.
-    return;
-  }
-
-  SyntacticElementTarget completionTarget(fallback->E, fallback->DC, CTP_Unused,
-                                          Type(),
-                                          /*isDiscared=*/true);
-  typeCheckForCodeCompletion(completionTarget, /*needsPrecheck=*/true,
-                             [&](const Solution &S) { sawSolution(S); });
-}
 
 // MARK: - Utility functions for subclasses of TypeCheckCompletionCallback
 
@@ -50,12 +27,14 @@ Type swift::ide::getTypeForCompletion(const constraints::Solution &S,
   // Use the contextual type, unless it is still unresolved, in which case fall
   // back to getting the type from the expression.
   if (auto ContextualType = S.getContextualType(Node)) {
-    if (!ContextualType->hasUnresolvedType())
+    if (!ContextualType->hasUnresolvedType() &&
+        !ContextualType->hasUnboundGenericType()) {
       return ContextualType;
+    }
   }
 
   if (!S.hasType(Node)) {
-    assert(false && "Expression wasn't type checked?");
+    CONDITIONAL_ASSERT(false && "Expression wasn't type checked?");
     return nullptr;
   }
 
@@ -133,10 +112,10 @@ Type swift::ide::getPatternMatchType(const constraints::Solution &S, Expr *E) {
   // not part of the solution.
   // TODO: This can be removed once ExprPattern type-checking is fully part
   // of the constraint system.
-  if (auto T = S.getConstraintSystem().getVarType(MatchVar))
-    return T;
-
-  return getTypeForCompletion(S, MatchVar);
+  auto Ty = MatchVar->getTypeInContext();
+  if (Ty->hasError())
+    return Type();
+  return Ty;
 }
 
 void swift::ide::getSolutionSpecificVarTypes(

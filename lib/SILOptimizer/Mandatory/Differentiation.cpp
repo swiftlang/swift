@@ -21,6 +21,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
@@ -30,6 +31,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILBuilder.h"
@@ -45,6 +47,7 @@
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/CommandLine.h"
@@ -82,6 +85,9 @@ private:
   /// Context necessary for performing the transformations.
   ADContext context;
 
+  /// Cache used in getUnwrappedCurryThunkFunction.
+  llvm::DenseMap<AbstractFunctionDecl *, SILFunction *> afdToSILFn;
+
   /// Promotes the given `differentiable_function` instruction to a valid
   /// `@differentiable` function-typed value.
   SILValue promoteToDifferentiableFunction(DifferentiableFunctionInst *inst,
@@ -93,6 +99,25 @@ private:
   SILValue promoteToLinearFunction(LinearFunctionInst *inst,
                                    SILBuilder &builder, SILLocation loc,
                                    DifferentiationInvoker invoker);
+
+  /// Emits a reference to a derivative function of `original`, differentiated
+  /// with respect to a superset of `desiredIndices`. Returns the `SILValue` for
+  /// the derivative function and the actual indices that the derivative
+  /// function is with respect to.
+  ///
+  /// Returns `None` on failure, signifying that a diagnostic has been emitted
+  /// using `invoker`.
+  std::optional<std::pair<SILValue, AutoDiffConfig>>
+  emitDerivativeFunctionReference(
+      SILBuilder &builder, const AutoDiffConfig &desiredConfig,
+      AutoDiffDerivativeFunctionKind kind, SILValue original,
+      DifferentiationInvoker invoker,
+      SmallVectorImpl<AllocStackInst *> &newBuffersToDealloc);
+
+  /// If the given function corresponds to AutoClosureExpr with either
+  /// SingleCurryThunk or DoubleCurryThunk kind, get the SILFunction
+  /// corresponding to the function being wrapped in the thunk.
+  SILFunction *getUnwrappedCurryThunkFunction(SILFunction *originalFn);
 
 public:
   /// Construct an `DifferentiationTransformer` for the given module.
@@ -203,7 +228,6 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
   if (requirements.empty())
     return false;
   // Iterate through all requirements and check whether they are satisfied.
-  auto *swiftModule = context.getModule().getSwiftModule();
   SmallVector<Requirement, 2> unsatisfiedRequirements;
   for (auto req : requirements) {
     auto firstType = req.getFirstType();
@@ -212,14 +236,14 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
     // looking up conformances in the current module, if possible.
     if (auto substFirstType =
             firstType.subst(QuerySubstitutionMap{substMap},
-                            LookUpConformanceInModule(swiftModule))) {
+                            LookUpConformanceInModule())) {
       firstType = substFirstType;
     }
     if (req.getKind() != RequirementKind::Layout) {
       secondType = req.getSecondType();
       if (auto substSecondType =
               secondType.subst(QuerySubstitutionMap{substMap},
-                               LookUpConformanceInModule(swiftModule))) {
+                               LookUpConformanceInModule())) {
         secondType = substSecondType;
       }
     }
@@ -266,7 +290,7 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
       assert(protocol && "Expected protocol in generic signature requirement");
       // If the first type does not conform to the second type in the current
       // module, then record the unsatisfied requirement.
-      if (!swiftModule->lookupConformance(firstType, protocol))
+      if (!lookupConformance(firstType, protocol))
         unsatisfiedRequirements.push_back(req);
       continue;
     }
@@ -312,7 +336,7 @@ static void copyParameterArgumentsForApply(
     auto argConv = applySite.getArgumentConvention(argOperand);
     auto collectNewArg = [&](SILValue newArg) {
       copiedArgs.push_back(newArg);
-      if (argConv.isGuaranteedConvention() &&
+      if (argConv.isGuaranteedConventionInCaller() &&
           argConv != SILArgumentConvention::Indirect_InoutAliasable)
         newArgsToDestroy.push_back(newArg);
     };
@@ -443,7 +467,7 @@ static SILValue reapplyFunctionConversion(
       } else {
         substMap = SubstitutionMap::get(
             newFuncGenSig, QuerySubstitutionMap{pai->getSubstitutionMap()},
-            LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+            LookUpConformanceInModule());
       }
     }
     return builder.createPartialApply(loc, innerNewFunc, substMap, newArgs,
@@ -452,21 +476,63 @@ static SILValue reapplyFunctionConversion(
   llvm_unreachable("Unhandled function conversion instruction");
 }
 
-/// Emits a reference to a derivative function of `original`, differentiated
-/// with respect to a superset of `desiredIndices`. Returns the `SILValue` for
-/// the derivative function and the actual indices that the derivative function
-/// is with respect to.
-///
-/// Returns `None` on failure, signifying that a diagnostic has been emitted
-/// using `invoker`.
-static std::optional<std::pair<SILValue, AutoDiffConfig>>
-emitDerivativeFunctionReference(
-    DifferentiationTransformer &transformer, SILBuilder &builder,
-    const AutoDiffConfig &desiredConfig, AutoDiffDerivativeFunctionKind kind,
-    SILValue original, DifferentiationInvoker invoker,
-    SmallVectorImpl<AllocStackInst *> &newBuffersToDealloc) {
-  ADContext &context = transformer.getContext();
+SILFunction *DifferentiationTransformer::getUnwrappedCurryThunkFunction(
+    SILFunction *originalFn) {
+  auto *autoCE = dyn_cast_or_null<AutoClosureExpr>(
+      originalFn->getDeclRef().getAbstractClosureExpr());
+  if (autoCE == nullptr)
+    return nullptr;
 
+  auto *ae = dyn_cast_or_null<ApplyExpr>(autoCE->getUnwrappedCurryThunkExpr());
+  if (ae == nullptr)
+    return nullptr;
+
+  AbstractFunctionDecl *afd = cast<AbstractFunctionDecl>(ae->getCalledValue(
+      /*skipFunctionConversions=*/true));
+  auto silFnIt = afdToSILFn.find(afd);
+  if (silFnIt == afdToSILFn.end()) {
+    assert(afdToSILFn.empty() && "Expect all 'afdToSILFn' cache entries to be "
+                                 "filled at once on the first access attempt");
+
+    SILModule *module = getTransform().getModule();
+    for (SILFunction &currentFunc : module->getFunctions()) {
+      if (auto *currentAFD =
+              currentFunc.getDeclRef().getAbstractFunctionDecl()) {
+        // Update cache only with AFDs which might be potentially wrapped by a
+        // curry thunk. This includes member function references and references
+        // to functions having external property wrapper parameters (see
+        // ExprRewriter::buildDeclRef). If new use cases of curry thunks appear
+        // in future, the assertion after the loop will be a trigger for such
+        // cases being unhandled here.
+        //
+        // FIXME: References to functions having external property wrapper
+        // parameters are not handled since we can't now construct a test case
+        // for that due to the crash
+        // https://github.com/swiftlang/swift/issues/77613
+        if (currentAFD->hasCurriedSelf()) {
+          auto [_, wasEmplace] =
+              afdToSILFn.try_emplace(currentAFD, &currentFunc);
+          assert(wasEmplace && "Expect all 'afdToSILFn' cache entries to be "
+                               "filled at once on the first access attempt");
+        }
+      }
+    }
+
+    silFnIt = afdToSILFn.find(afd);
+    assert(silFnIt != afdToSILFn.end() &&
+           "Expect present curry thunk to SIL function mapping after "
+           "'afdToSILFn' cache fill");
+  }
+
+  return silFnIt->second;
+}
+
+std::optional<std::pair<SILValue, AutoDiffConfig>>
+DifferentiationTransformer::emitDerivativeFunctionReference(
+    SILBuilder &builder, const AutoDiffConfig &desiredConfig,
+    AutoDiffDerivativeFunctionKind kind, SILValue original,
+    DifferentiationInvoker invoker,
+    SmallVectorImpl<AllocStackInst *> &newBuffersToDealloc) {
   // If `original` is itself an `DifferentiableFunctionExtractInst` whose kind
   // matches the given kind and desired differentiation parameter indices,
   // simply extract the derivative function of its function operand, retain the
@@ -603,32 +669,55 @@ emitDerivativeFunctionReference(
               originalFn->getLoweredFunctionType(),
               desiredParameterIndices, desiredResultIndices,
               contextualDerivativeGenSig,
-              LookUpConformanceInModule(context.getModule().getSwiftModule()));
+              LookUpConformanceInModule());
       minimalWitness = SILDifferentiabilityWitness::createDefinition(
           context.getModule(), SILLinkage::Private, originalFn,
           DifferentiabilityKind::Reverse, desiredParameterIndices,
           desiredResultIndices, derivativeConstrainedGenSig, /*jvp*/ nullptr,
           /*vjp*/ nullptr, /*isSerialized*/ false);
-      if (transformer.canonicalizeDifferentiabilityWitness(
-              minimalWitness, invoker, IsNotSerialized))
+      if (canonicalizeDifferentiabilityWitness(minimalWitness, invoker,
+                                               IsNotSerialized))
         return std::nullopt;
     }
     assert(minimalWitness);
-    if (original->getFunction()->isSerialized() &&
-        !hasPublicVisibility(minimalWitness->getLinkage())) {
-      enum { Inlinable = 0, DefaultArgument = 1 };
-      unsigned fragileKind = Inlinable;
-      // FIXME: This is not a very robust way of determining if the function is
-      // a default argument. Also, we have not exhaustively listed all the kinds
-      // of fragility.
-      if (original->getFunction()->getLinkage() == SILLinkage::PublicNonABI)
-        fragileKind = DefaultArgument;
-      context.emitNondifferentiabilityError(
-          original, invoker, diag::autodiff_private_derivative_from_fragile,
-          fragileKind,
-          isa_and_nonnull<AbstractClosureExpr>(
-              originalFRI->getLoc().getAsASTNode<Expr>()));
-      return std::nullopt;
+    if (original->getFunction()->isSerialized()) {
+      bool isWitnessPublic;
+      if (SILFunction *unwrappedFn =
+              getUnwrappedCurryThunkFunction(originalFn)) {
+        // When dealing with curry thunk, look at the function being wrapped
+        // inside implicit closure. If it has public visibility, the
+        // corresponding differentiability witness also has public visibility.
+        // It should be OK for implicit wrapper closure and its witness to have
+        // private linkage.
+        isWitnessPublic = hasPublicVisibility(unwrappedFn->getLinkage());
+      } else if (originalFn->getDeclRef().getAbstractClosureExpr() &&
+                 originalFRI->getFunction()
+                     ->getDeclRef()
+                     .isDefaultArgGenerator()) {
+        // If we reference a closure from inside default argument generator,
+        // check against generator's visibility. If the function having this
+        // default argument has public visibility, it's OK to have a closure
+        // (which always has private visibility) as its default value.
+        isWitnessPublic =
+            hasPublicVisibility(originalFRI->getFunction()->getLinkage());
+      } else {
+        isWitnessPublic = hasPublicVisibility(minimalWitness->getLinkage());
+      }
+      if (!isWitnessPublic) {
+        enum { Inlinable = 0, DefaultArgument = 1 };
+        unsigned fragileKind = Inlinable;
+        // FIXME: This is not a very robust way of determining if the function
+        // is a default argument. Also, we have not exhaustively listed all the
+        // kinds of fragility.
+        if (original->getFunction()->getLinkage() == SILLinkage::PublicNonABI)
+          fragileKind = DefaultArgument;
+        context.emitNondifferentiabilityError(
+            original, invoker, diag::autodiff_private_derivative_from_fragile,
+            fragileKind,
+            isa_and_nonnull<AbstractClosureExpr>(
+                originalFRI->getLoc().getAsASTNode<Expr>()));
+        return std::nullopt;
+      }
     }
     // TODO(TF-482): Move generic requirement checking logic to
     // `getExactDifferentiabilityWitness` and
@@ -702,7 +791,7 @@ emitDerivativeFunctionReference(
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
         minimalConfig->parameterIndices, minimalConfig->resultIndices, kind,
         context.getTypeConverter(),
-        LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+        LookUpConformanceInModule());
     auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
         kind, minimalASTParamIndices, minimalConfig->derivativeGenericSignature,
         context.getASTContext());
@@ -747,7 +836,7 @@ emitDerivativeFunctionReference(
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
         minimalConfig->parameterIndices, minimalConfig->resultIndices, kind,
         context.getTypeConverter(),
-        LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+        LookUpConformanceInModule());
     auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
         kind, minimalASTParamIndices, minimalConfig->derivativeGenericSignature,
         context.getASTContext());
@@ -787,7 +876,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
   auto originalTy = original->getLoweredFunctionType();
 
   // === Create an empty VJP. ===
-  Mangle::DifferentiationMangler mangler;
+  Mangle::DifferentiationMangler mangler(context.getASTContext());
   auto vjpName = mangler.mangleDerivativeFunction(
       original->getName(), AutoDiffDerivativeFunctionKind::VJP, config);
   auto vjpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
@@ -797,7 +886,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
   auto vjpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,
       AutoDiffDerivativeFunctionKind::VJP,
-      module.Types, LookUpConformanceInModule(module.getSwiftModule()),
+      module.Types, LookUpConformanceInModule(),
       vjpCanGenSig,
       /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk);
 
@@ -831,7 +920,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
   auto &module = context.getModule();
   auto originalTy = original->getLoweredFunctionType();
 
-  Mangle::DifferentiationMangler mangler;
+  Mangle::DifferentiationMangler mangler(context.getASTContext());
   auto jvpName = mangler.mangleDerivativeFunction(
       original->getName(), AutoDiffDerivativeFunctionKind::JVP, config);
   auto jvpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
@@ -841,7 +930,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
   auto jvpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,
       AutoDiffDerivativeFunctionKind::JVP,
-      module.Types, LookUpConformanceInModule(module.getSwiftModule()),
+      module.Types, LookUpConformanceInModule(),
       jvpCanGenSig,
       /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk);
 
@@ -910,10 +999,14 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
 
   // We can generate empty JVP / VJP for functions available externally. These
   // functions have the same linkage as the original ones sans `external`
-  // flag. Important exception here hidden_external functions as they are
-  // serializable but corresponding hidden ones would be not and the SIL
-  // verifier will fail. Patch `serializeFunctions` for this case.
-  if (orig->getLinkage() == SILLinkage::HiddenExternal)
+  // flag. Important exception here hidden_external non-@_alwaysEmitIntoClient
+  // functions as they are serializable but corresponding hidden ones would be
+  // not and the SIL verifier will fail. Patch `serializeFunctions` for this
+  // case. For @_alwaysEmitIntoClient original functions (which might be
+  // HiddenExternal if we only have declaration without definition), we want
+  // derivatives to be serialized and do not patch `serializeFunctions`.
+  if (orig->getLinkage() == SILLinkage::HiddenExternal &&
+      !orig->markedAsAlwaysEmitIntoClient())
     serializeFunctions = IsNotSerialized;
 
   // If the JVP doesn't exist, need to synthesize it.
@@ -1120,8 +1213,8 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
   for (auto derivativeFnKind : {AutoDiffDerivativeFunctionKind::JVP,
                                 AutoDiffDerivativeFunctionKind::VJP}) {
     auto derivativeFnAndIndices = emitDerivativeFunctionReference(
-        *this, builder, desiredConfig, derivativeFnKind, origFnOperand,
-        invoker, newBuffersToDealloc);
+        builder, desiredConfig, derivativeFnKind, origFnOperand, invoker,
+        newBuffersToDealloc);
     // Show an error at the operator, highlight the argument, and show a note
     // at the definition site of the argument.
     if (!derivativeFnAndIndices)
@@ -1191,7 +1284,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
     auto expectedDerivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
         parameterIndices, resultIndices, derivativeFnKind,
         context.getTypeConverter(),
-        LookUpConformanceInModule(context.getModule().getSwiftModule()));
+        LookUpConformanceInModule());
     // If `derivativeFn` is `@convention(thin)` but is expected to be
     // `@convention(thick)`, emit a `thin_to_thick` instruction.
     if (expectedDerivativeFnTy->getRepresentation() ==
@@ -1250,7 +1343,7 @@ SILValue DifferentiationTransformer::promoteToLinearFunction(
   auto originalType = origFnOperand->getType().castTo<SILFunctionType>();
   auto transposeFnType = originalType->getAutoDiffTransposeFunctionType(
       parameterIndices, context.getTypeConverter(),
-      LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+      LookUpConformanceInModule());
   auto transposeType = SILType::getPrimitiveObjectType(transposeFnType);
   auto transposeFn = SILUndef::get(builder.getFunction(), transposeType);
   auto *newLinearFn = context.createLinearFunction(

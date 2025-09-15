@@ -1,7 +1,0 @@
-// Make sure that we can deserialize darwin.
-// RUN: %target-sil-opt %platform-sdk-overlay-dir/Darwin.swiftmodule/%target-swiftmodule-name -module-name Darwin > /dev/null
-// RUN: llvm-bcanalyzer %platform-sdk-overlay-dir/Darwin.swiftmodule/%target-swiftmodule-name | %FileCheck %s
-
-// REQUIRES: objc_interop
-
-// CHECK-NOT: Unknown

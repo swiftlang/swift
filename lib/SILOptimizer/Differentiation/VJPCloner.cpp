@@ -18,6 +18,7 @@
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 
 #include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
@@ -40,7 +41,7 @@ namespace swift {
 namespace autodiff {
 
 class VJPCloner::Implementation final
-    : public TypeSubstCloner<VJPCloner::Implementation, SILOptFunctionBuilder> {
+    : public TypeSubstCloner<VJPCloner::Implementation> {
   friend class VJPCloner;
   friend class PullbackCloner;
 
@@ -423,7 +424,8 @@ public:
     auto *pbTupleVal = buildPullbackValueTupleValue(ccbi);
     // Create a new `checked_cast_branch` instruction.
     getBuilder().createCheckedCastBranch(
-        ccbi->getLoc(), ccbi->isExact(), getOpValue(ccbi->getOperand()),
+        ccbi->getLoc(), ccbi->isExact(), ccbi->getCheckedCastOptions(),
+        getOpValue(ccbi->getOperand()),
         getOpASTType(ccbi->getSourceFormalType()),
         getOpType(ccbi->getTargetLoweredType()),
         getOpASTType(ccbi->getTargetFormalType()),
@@ -438,7 +440,9 @@ public:
     auto *pbTupleVal = buildPullbackValueTupleValue(ccabi);
     // Create a new `checked_cast_addr_branch` instruction.
     getBuilder().createCheckedCastAddrBranch(
-        ccabi->getLoc(), ccabi->getConsumptionKind(),
+        ccabi->getLoc(),
+        ccabi->getCheckedCastOptions(),
+        ccabi->getConsumptionKind(),
         getOpValue(ccabi->getSrc()), getOpASTType(ccabi->getSourceFormalType()),
         getOpValue(ccabi->getDest()),
         getOpASTType(ccabi->getTargetFormalType()),
@@ -453,6 +457,16 @@ public:
     // If callee should not be differentiated, do standard cloning.
     if (!pullbackInfo.shouldDifferentiateApplySite(bai)) {
       LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *bai << '\n');
+      TypeSubstCloner::visitEndApplyInst(eai);
+      return;
+    }
+    // If the original function is a semantic member accessor, do standard
+    // cloning. Semantic member accessors have special pullback generation
+    // logic, so all `end_apply` instructions can be directly cloned to the VJP.
+    if (isSemanticMemberAccessor(original)) {
+      LLVM_DEBUG(getADDebugStream()
+                 << "Cloning `end_apply` in semantic member accessor:\n"
+                 << *eai << '\n');
       TypeSubstCloner::visitEndApplyInst(eai);
       return;
     }
@@ -600,6 +614,16 @@ public:
     // If callee should not be differentiated, do standard cloning.
     if (!pullbackInfo.shouldDifferentiateApplySite(bai)) {
       LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *bai << '\n');
+      TypeSubstCloner::visitBeginApplyInst(bai);
+      return;
+    }
+    // If the original function is a semantic member accessor, do standard
+    // cloning. Semantic member accessors have special pullback generation
+    // logic, so all `begin_apply` instructions can be directly cloned to the VJP.
+    if (isSemanticMemberAccessor(original)) {
+      LLVM_DEBUG(getADDebugStream()
+                 << "Cloning `begin_apply` in semantic member accessor:\n"
+                 << *bai << '\n');
       TypeSubstCloner::visitBeginApplyInst(bai);
       return;
     }
@@ -1094,7 +1118,6 @@ const DifferentiableActivityInfo &VJPCloner::getActivityInfo() const {
 }
 
 SILFunction *VJPCloner::Implementation::createEmptyPullback() {
-  auto &module = context.getModule();
   auto origTy = original->getLoweredFunctionType();
   // Get witness generic signature for remapping types.
   // Witness generic signature may have more requirements than VJP generic
@@ -1102,7 +1125,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   // binding all generic parameters to concrete types, VJP function type uses
   // all the concrete types and VJP generic signature is null.
   auto witnessCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
-  auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
+  auto lookupConformance = LookUpConformanceInModule();
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult =
@@ -1130,6 +1153,9 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
     case ResultConvention::Pack:
       conv = ParameterConvention::Pack_Guaranteed;
       break;
+    case ResultConvention::GuaranteedAddress:
+    case ResultConvention::Guaranteed:
+      llvm_unreachable("borrow accessor is not yet implemented");
     }
     return {tanType, conv};
   };
@@ -1157,6 +1183,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Indirect_In_CXX:
       conv = ResultConvention::Indirect;
       break;
     case ParameterConvention::Pack_Guaranteed:
@@ -1282,7 +1309,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
         origParam.getConvention()));
   }
 
-  Mangle::DifferentiationMangler mangler;
+  Mangle::DifferentiationMangler mangler(getASTContext());
   auto pbName = mangler.mangleLinearMap(
       original->getName(), AutoDiffLinearMapKind::Pullback, config);
   // Set pullback generic signature equal to VJP generic signature.
@@ -1304,6 +1331,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
       IsNotTransparent, vjp->getSerializedKind(),
       original->isDynamicallyReplaceable(), original->isDistributed(),
       original->isRuntimeAccessible());
+  auto &module = context.getModule();
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
 

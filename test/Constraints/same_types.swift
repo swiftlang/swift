@@ -2,7 +2,7 @@
 // RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol Fooable {
-  associatedtype Foo // expected-note{{protocol requires nested type 'Foo'; add nested type 'Foo' for conformance}}
+  associatedtype Foo // expected-note{{protocol requires nested type 'Foo'}}
 
   var foo: Foo { get }
 }
@@ -169,7 +169,7 @@ rdar19137463(1)
 
 struct Brunch<U : Fooable> where U.Foo == X {}
 
-struct BadFooable : Fooable { // expected-error{{type 'BadFooable' does not conform to protocol 'Fooable'}}
+struct BadFooable : Fooable { // expected-error{{type 'BadFooable' does not conform to protocol 'Fooable'}} expected-note {{add stubs for conformance}}
   typealias Foo = DoesNotExist // expected-error{{cannot find type 'DoesNotExist' in scope}}
   var foo: Foo { while true {} }
 }
@@ -284,7 +284,7 @@ protocol P2 {
 // CHECK-LABEL: same_types.(file).structuralSameTypeRecursive1@
 // CHECK-NEXT: Generic signature: <T, U>
 
-// expected-error@+2 {{cannot build rewrite system for generic signature; concrete nesting limit exceeded}}
+// expected-error@+2 {{cannot build rewrite system for generic signature; concrete type nesting limit exceeded}}
 // expected-note@+1 {{τ_0_0.[P2:Assoc1].[concrete: ((((((((((((((((((((((((((((((((τ_0_0.[P2:Assoc1], τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1)] => τ_0_0.[P2:Assoc1]}}
 func structuralSameTypeRecursive1<T: P2, U>(_: T, _: U)
   where T.Assoc1 == Tuple2<T.Assoc1, U>

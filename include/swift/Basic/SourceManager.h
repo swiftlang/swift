@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,20 +13,41 @@
 #ifndef SWIFT_BASIC_SOURCEMANAGER_H
 #define SWIFT_BASIC_SOURCEMANAGER_H
 
+#include "swift/AST/ClangNode.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/SourceLoc.h"
 #include "clang/Basic/FileManager.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/SourceMgr.h"
 #include <map>
 #include <optional>
+#include <utility>
 #include <vector>
+
+namespace swift {
+  class SourceFile;
+}
+
+namespace llvm {
+  template <> struct PointerLikeTypeTraits<swift::SourceFile *> {
+  public:
+    static inline swift::SourceFile *getFromVoidPointer(void *P) {
+      return (swift::SourceFile *)P;
+    }
+    static inline void *getAsVoidPointer(swift::SourceFile *S) {
+      return (void *)S;
+    }
+    enum { NumLowBitsAvailable = /*swift::DeclContextAlignInBits=*/ 3 };
+  };
+}
 
 namespace swift {
 
 class CustomAttr;
 class DeclContext;
+class SourceFile;
 
 /// Augments a buffer that was created specifically to hold generated source
 /// code with the reasons for it being generated.
@@ -36,6 +57,7 @@ public:
   enum Kind {
 #define MACRO_ROLE(Name, Description) Name##MacroExpansion,
 #include "swift/Basic/MacroRoles.def"
+#undef MACRO_ROLE
 
     /// A new function body that is replacing an existing function body.
     ReplacedFunctionBody,
@@ -45,7 +67,29 @@ public:
 
     /// The expansion of default argument at caller side
     DefaultArgument,
+
+    /// A Swift attribute expressed in C headers.
+    AttributeFromClang,
   } kind;
+
+  static StringRef kindToString(GeneratedSourceInfo::Kind kind) {
+    switch (kind) {
+#define MACRO_ROLE(Name, Description)                                          \
+  case Name##MacroExpansion:                                                   \
+    return #Name "MacroExpansion";
+#include "swift/Basic/MacroRoles.def"
+#undef MACRO_ROLE
+    case ReplacedFunctionBody:
+      return "ReplacedFunctionBody";
+    case PrettyPrinted:
+      return "PrettyPrinted";
+    case DefaultArgument:
+      return "DefaultArgument";
+    case AttributeFromClang:
+      return "AttributeFromClang";
+    }
+    llvm_unreachable("Invalid kind");
+  }
 
   /// The source range in the enclosing buffer where this source was generated.
   ///
@@ -69,13 +113,21 @@ public:
   /// The custom attribute for an attached macro.
   CustomAttr *attachedMacroCustomAttr = nullptr;
 
+  /// MacroDecl name if the generated source is coming from macro expansion,
+  /// otherwise empty string.
+  std::string macroName = "";
+
   /// The name of the source file on disk that was created to hold the
   /// contents of this file for external clients.
-  StringRef onDiskBufferCopyFileName = StringRef();
+  mutable StringRef onDiskBufferCopyFileName = StringRef();
 
   /// Contains the ancestors of this source buffer, starting with the root source
   /// buffer and ending at this source buffer.
   mutable llvm::ArrayRef<unsigned> ancestors = llvm::ArrayRef<unsigned>();
+
+  /// Clang node where this buffer comes from. This should be set when this is
+  /// an 'AttributeFromClang'.
+  ClangNode clangNode = ClangNode();
 };
 
 /// This class manages and owns source buffers.
@@ -94,6 +146,7 @@ public:
 private:
   llvm::SourceMgr LLVMSourceMgr;
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
+  bool OpenSourcesAsVolatile = false;
   unsigned IDEInspectionTargetBufferID = 0U;
   unsigned IDEInspectionTargetOffset;
 
@@ -117,6 +170,13 @@ private:
   /// The starting source locations of regex literals written in source. This
   /// is an unfortunate hack needed to allow for correct re-lexing.
   llvm::DenseSet<SourceLoc> RegexLiteralStartLocs;
+
+  /// Mapping from each buffer ID to the source files that describe it
+  /// semantically.
+  llvm::DenseMap<
+    unsigned,
+    llvm::TinyPtrVector<SourceFile *>
+  > bufferIDToSourceFiles;
 
   std::map<const char *, VirtualFile> VirtualFiles;
   mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
@@ -166,6 +226,12 @@ public:
     return FileSystem;
   }
 
+  // Setting this prevents SourceManager from memory mapping sources (via opening files
+  // with isVolatile=true);
+  void setOpenSourcesAsVolatile() {
+    OpenSourcesAsVolatile = true;
+  }
+
   void setIDEInspectionTarget(unsigned BufferID, unsigned Offset) {
     assert(BufferID != 0U && "Buffer should be valid");
 
@@ -209,8 +275,7 @@ public:
   bool hasGeneratedSourceInfo(unsigned bufferID);
 
   /// Retrieve the generated source information for the given buffer.
-  std::optional<GeneratedSourceInfo>
-  getGeneratedSourceInfo(unsigned bufferID) const;
+  const GeneratedSourceInfo *getGeneratedSourceInfo(unsigned bufferID) const;
 
   /// Retrieve the list of ancestors of the given source buffer, starting with
   /// the root buffer and proceding to the given buffer ID at the end.
@@ -246,7 +311,7 @@ public:
 
   /// Returns true if \c LHS is before \c RHS in the same source buffer.
   bool isBeforeInBuffer(SourceLoc LHS, SourceLoc RHS) const {
-    return LHS.Value.getPointer() < RHS.Value.getPointer();
+    return LHS.getPointer() < RHS.getPointer();
   }
 
   /// Returns true if \c range contains the location \c loc.  The location
@@ -312,6 +377,13 @@ public:
 
   /// Adds a memory buffer to the SourceManager, taking ownership of it.
   unsigned addNewSourceBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer);
+
+  /// Record the source file as having the given buffer ID.
+  void recordSourceFile(unsigned bufferID, SourceFile *sourceFile);
+
+  /// Retrieve the source files for the given buffer ID.
+  llvm::TinyPtrVector<SourceFile *>
+  getSourceFilesForBufferID(unsigned bufferID) const;
 
   /// Add a \c #sourceLocation-defined virtual file region of \p Length.
   void createVirtualFile(SourceLoc Loc, StringRef Name, int LineOffset,
@@ -413,7 +485,7 @@ public:
     assert(Loc.isValid());
     int LineOffset = getLineOffset(Loc);
     int l, c;
-    std::tie(l, c) = LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
+    std::tie(l, c) = LLVMSourceMgr.getLineAndColumn(Loc, BufferID);
     assert(LineOffset+l > 0 && "bogus line offset");
     return { LineOffset + l, c };
   }
@@ -426,7 +498,7 @@ public:
   std::pair<unsigned, unsigned>
   getLineAndColumnInBuffer(SourceLoc Loc, unsigned BufferID = 0) const {
     assert(Loc.isValid());
-    return LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
+    return LLVMSourceMgr.getLineAndColumn(Loc, BufferID);
   }
 
   /// Returns the column for the given source location in the given buffer.
@@ -483,6 +555,10 @@ public:
   /// owned by \p otherManager. Returns an invalid SourceLoc if it cannot be
   /// translated.
   SourceLoc getLocForForeignLoc(SourceLoc otherLoc, SourceManager &otherMgr);
+
+  /// Returns true when the location is in a buffer generated by the
+  /// \p _SwiftifyImport macro.
+  bool isImportMacroGeneratedLoc(SourceLoc loc);
 
 private:
   int getLineOffset(SourceLoc Loc) const {

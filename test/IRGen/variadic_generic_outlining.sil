@@ -45,3 +45,31 @@ bb3:
   %ret = tuple ()
   return %ret : $()
 }
+
+sil hidden @test_outlining_retain_release_addr : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat Wrapper<each T>}) -> @pack_out Pack{repeat Wrapper<each T>} {
+bb0(%0 : $*Pack{repeat Wrapper<each T>}, %1 : $*Pack{repeat Wrapper<each T>}):
+  %zero = integer_literal $Builtin.Word, 0
+  %one = integer_literal $Builtin.Word, 1
+  %len = pack_length $Pack{repeat each T}
+  br bb1(%zero : $Builtin.Word)
+
+bb1(%idx : $Builtin.Word):
+  %done = builtin "cmp_eq_Word"(%idx : $Builtin.Word, %len : $Builtin.Word) : $Builtin.Int1 // user: %10
+  cond_br %done, bb3, bb2
+
+bb2:
+  %pi = dynamic_pack_index %idx of $Pack{repeat Wrapper<each T>}
+  %opening = open_pack_element %pi of <each T> at <Pack{repeat each T}>, shape $T, uuid "31FF306C-BF88-11ED-A03F-ACDE48001123"
+  %in = pack_element_get %pi of %0 : $*Pack{repeat Wrapper<each T>} as $*Wrapper<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001123") T>
+  %out = pack_element_get %pi of %1 : $*Pack{repeat Wrapper<each T>} as $*Wrapper<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001123") T>
+  // Make sure that these don't crash.
+  retain_value_addr %in : $*Wrapper<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001123") T>
+  release_value_addr %in : $*Wrapper<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001123") T>
+  copy_addr %in to [init] %out : $*Wrapper<@pack_element("31FF306C-BF88-11ED-A03F-ACDE48001123") T>
+  %next = builtin "add_Word"(%idx : $Builtin.Word, %one : $Builtin.Word) : $Builtin.Word
+  br bb1(%next : $Builtin.Word)
+
+bb3:
+  %ret = tuple ()
+  return %ret : $()
+}

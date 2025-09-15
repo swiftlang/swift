@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -Onone -emit-sil \
-// RUN:   -Xllvm -sil-print-after=raw-sil-inst-lowering \
+// RUN: %target-swift-frontend -primary-file %s -Onone -Xllvm -sil-print-types -emit-sil \
+// RUN:   -Xllvm -sil-print-types -Xllvm -sil-print-after=raw-sil-inst-lowering \
 // RUN:   -o /dev/null -module-name init_accessors 2>&1 | %FileCheck %s
 
 class NSObject {}
@@ -10,7 +10,7 @@ struct TestInit {
   var full: (Int, Int)
 
   var point: (Int, Int) {
-    // CHECK-LABEL: sil private [ossa] @$s14init_accessors8TestInitV5pointSi_Sitvi : $@convention(thin) (Int, Int, @inout Int, @thin TestInit.Type) -> (@out Int, @out (Int, Int))
+    // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors8TestInitV5pointSi_Sitvi : $@convention(thin) (Int, Int, @inout Int, @thin TestInit.Type) -> (@out Int, @out (Int, Int))
     // CHECK: bb0([[Y_REF:%.*]] : $*Int, [[FULL_REF:%.*]] : $*(Int, Int), [[X_VAL:%.*]] : $Int, [[Y_VAL:%.*]] : $Int, [[X_REF:%.*]] : $*Int, [[METATYPE:%.*]] : $@thin TestInit.Type):
     //
     // CHECK: [[INITIAL_VALUE:%.*]] = tuple ([[X_VAL]] : $Int, [[Y_VAL]] : $Int)
@@ -41,10 +41,11 @@ struct TestInit {
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors8TestInitV1x1yACSi_SitcfC : $@convention(method) (Int, Int, @thin TestInit.Type) -> TestInit
+  // CHECK: end_access
+  // CHECK: [[SELF_VALUE:%.*]] = begin_access [modify] [static] {{.*}} : $*TestInit
   // CHECK: // function_ref TestInit.point.init
   // CHECK-NEXT: [[INIT_ACCESSOR_FN:%.*]] = function_ref @$s14init_accessors8TestInitV5pointSi_Sitvi : $@convention(thin) (Int, Int, @inout Int, @thin TestInit.Type) -> (@out Int, @out (Int, Int))
   // CHECK-NEXT: [[INIT_ACCESSOR:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[INIT_ACCESSOR_FN]](%2) : $@convention(thin) (Int, Int, @inout Int, @thin TestInit.Type) -> (@out Int, @out (Int, Int))
-  // CHECK: [[SELF_VALUE:%.*]] = begin_access [modify] [dynamic] {{.*}} : $*TestInit
   // CHECK: [[Y_REF:%.*]] = struct_element_addr [[SELF_VALUE]] : $*TestInit, #TestInit.y
   // CHECK-NEXT: [[FULL_REF:%.*]] = struct_element_addr [[SELF_VALUE]] : $*TestInit, #TestInit.full
   // CHECK-NEXT: ([[X_VAL:%.*]], [[Y_VAL:%.*]]) = destructure_tuple {{.*}} : $(Int, Int)
@@ -71,10 +72,13 @@ struct TestSetter {
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors10TestSetterV1x1yACSi_SitcfC : $@convention(method) (Int, Int, @thin TestSetter.Type) -> TestSetter
+  // CHECK: [[AS:%.*]] = alloc_stack
+  // CHECK: end_access
+  // CHECK: end_access
+  // CHECK: [[SELF:%.*]] = begin_access [modify] [static] [[AS]] : $*TestSetter
   // CHECK: [[INIT_ACCESSOR_FN:%.*]] = function_ref @$s14init_accessors10TestSetterV5pointSi_Sitvi : $@convention(thin) (Int, Int, @inout Int, @inout Int, @thin TestSetter.Type) -> ()
   // CHECK: [[INIT_ACCESSOR:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[INIT_ACCESSOR_FN]](%2) : $@convention(thin) (Int, Int, @inout Int, @inout Int, @thin TestSetter.Type) -> ()
-  // CHECK: [[SELF:%.*]] = begin_access [modify] [dynamic] %14 : $*TestSetter
-  // CHECK-NEXT: ([[X:%.*]], [[Y:%.*]]) = destructure_tuple {{.*}} : $(Int, Int)
+  // CHECK:      ([[X:%.*]], [[Y:%.*]]) = destructure_tuple {{.*}} : $(Int, Int)
   // CHECK-NEXT: [[X_REF:%.*]] = struct_element_addr [[SELF]] : $*TestSetter, #TestSetter.x
   // CHECK-NEXT: [[Y_REF:%.*]] = struct_element_addr [[SELF]] : $*TestSetter, #TestSetter.y
   // CHECK-NEXT: {{.*}} = apply [[INIT_ACCESSOR]]([[X]], [[Y]], [[X_REF]], [[Y_REF]]) : $@noescape @callee_guaranteed (Int, Int, @inout Int, @inout Int) -> ()
@@ -185,7 +189,7 @@ struct TestNoInitAndInit {
 
   var pointX: Int {
     @storageRestrictions(accesses: x)
-    init(initalValue) {
+    init(initialValue) {
     }
 
     get { x }
@@ -204,17 +208,18 @@ struct TestNoInitAndInit {
 
   // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors013TestNoInitAndE0V1x1yACSi_SitcfC : $@convention(method) (Int, Int, @thin TestNoInitAndInit.Type) -> TestNoInitAndInit
   //
+  // CHECK: end_access
+  // CHECK: [[SELF_REF:%.*]] = begin_access [modify] [static] {{.*}} : $*TestNoInitAndInit
   // CHECK: [[INIT_REF_FN:%.*]] = function_ref @$s14init_accessors013TestNoInitAndE0V6pointXSivi : $@convention(thin) (Int, @inout Int, @thin TestNoInitAndInit.Type) -> ()
   // CHECK: [[INIT_REF:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[INIT_REF_FN]](%2) : $@convention(thin) (Int, @inout Int, @thin TestNoInitAndInit.Type) -> ()
-  // CHECK: [[SELF_REF:%.*]] = begin_access [modify] [dynamic] {{.*}} : $*TestNoInitAndInit
-  // CHECK-NEXT: [[X_REF:%.*]] = struct_element_addr [[SELF_REF]] : $*TestNoInitAndInit, #TestNoInitAndInit.x
+  // CHECK:      [[X_REF:%.*]] = struct_element_addr [[SELF_REF]] : $*TestNoInitAndInit, #TestNoInitAndInit.x
   // CHECK-NEXT: {{.*}} = apply [[INIT_REF]](%0, [[X_REF]]) : $@noescape @callee_guaranteed (Int, @inout Int) -> ()
   // CHECK-NEXT: end_access [[SELF_REF]] : $*TestNoInitAndInit
   //
+  // CHECK: [[SELF_REF:%.*]] = begin_access [modify] [static] {{.*}} : $*TestNoInitAndInit
   // CHECK: [[INIT_REF_FN:%.*]] = function_ref @$s14init_accessors013TestNoInitAndE0V6pointYSivi : $@convention(thin) (Int, @thin TestNoInitAndInit.Type) -> @out Int
   // CHECK: [[INIT_REF:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[INIT_REF_FN]](%2) : $@convention(thin) (Int, @thin TestNoInitAndInit.Type) -> @out Int
-  // CHECK: [[SELF_REF:%.*]] = begin_access [modify] [dynamic] {{.*}} : $*TestNoInitAndInit
-  // CHECK-NEXT: [[Y_REF:%.*]] = struct_element_addr [[SELF_REF]] : $*TestNoInitAndInit, #TestNoInitAndInit.y
+  // CHECK:      [[Y_REF:%.*]] = struct_element_addr [[SELF_REF]] : $*TestNoInitAndInit, #TestNoInitAndInit.y
   // CHECK-NEXT: {{.*}} = apply [[INIT_REF]]([[Y_REF]], %1) : $@noescape @callee_guaranteed (Int) -> @out Int
   // CHECK-NEXT: end_access [[SELF_REF]] : $*TestNoInitAndInit
   init(x: Int, y: Int) {
@@ -230,7 +235,7 @@ class TestClass {
   var y: (Int, [String])
 
   var data: (Int, (Int, [String])) {
-    // CHECK-LABEL: sil private [ossa] @$s14init_accessors9TestClassC4dataSi_Si_SaySSGttvi : $@convention(thin) (Int, Int, @owned Array<String>, @thick TestClass.Type) -> (@out Int, @out (Int, Array<String>))
+    // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors9TestClassC4dataSi_Si_SaySSGttvi : $@convention(thin) (Int, Int, @owned Array<String>, @thick TestClass.Type) -> (@out Int, @out (Int, Array<String>))
     // CHECK: bb0([[X_REF:%.*]] : $*Int, [[Y_REF:%.*]] : $*(Int, Array<String>), [[X_VAL:%.*]] : $Int, [[Y_VAL_0:%.*]] : $Int, [[Y_VAL_1:%.*]] : @owned $Array<String>, [[METATYPE:%.*]] : $@thick TestClass.Type):
     //
     // CHECK: ([[X_VAL:%.*]], [[Y_VAL:%.*]]) = destructure_tuple {{.*}} : $(Int, (Int, Array<String>))
@@ -277,7 +282,7 @@ struct TestGeneric<T, U> {
   var b: T
   var c: U
 
-  // CHECK-LABEL: sil private [ossa] @$s14init_accessors11TestGenericV4datax_xtvi : $@convention(thin) <T, U> (@in T, @in T, @inout U, @thin TestGeneric<T, U>.Type) -> (@out T, @out T)
+  // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors11TestGenericV4datax_xtvi : $@convention(thin) <T, U> (@in T, @in T, @inout U, @thin TestGeneric<T, U>.Type) -> (@out T, @out T)
   //
   // CHECK: bb0([[A_REF:%.*]] : $*T, [[B_REF:%.*]] : $*T, [[A_VALUE:%.*]] : $*T, [[B_VALUE:%.*]] : $*T, [[C_REF:%.*]] : $*U, [[METATYPE:%.*]] : $@thin TestGeneric<T, U>.Type):
   //
@@ -326,7 +331,7 @@ struct TestGenericTuple<T, U> {
   var a: T
   var b: (T, U)
 
-  // CHECK-LABEL: sil private [ossa] @$s14init_accessors16TestGenericTupleV4datax_x_q_ttvi : $@convention(thin) <T, U> (@in T, @in T, @in U, @thin TestGenericTuple<T, U>.Type) -> (@out T, @out (T, U)) {
+  // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors16TestGenericTupleV4datax_x_q_ttvi : $@convention(thin) <T, U> (@in T, @in T, @in U, @thin TestGenericTuple<T, U>.Type) -> (@out T, @out (T, U)) {
   //
   // CHECK: bb0([[A_REF:%.*]] : $*T, [[B_REF:%.*]] : $*(T, U), [[A_VALUE:%.*]] : $*T, [[B_VALUE:%.*]] : $*T, [[C_VALUE:%.*]] : $*U, [[METATYPE:%.*]] : $@thin TestGenericTuple<T, U>.Type):
   //

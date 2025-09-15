@@ -40,9 +40,10 @@
 ///             byteCount: count * MemoryLayout<Point>.stride,
 ///             alignment: MemoryLayout<Point>.alignment)
 @frozen // namespace
-public enum MemoryLayout<T: ~Copyable>: ~BitwiseCopyable, Copyable {}
+public enum MemoryLayout<T: ~Copyable & ~Escapable>
+: ~BitwiseCopyable, Copyable, Escapable {}
 
-extension MemoryLayout where T: ~Copyable {
+extension MemoryLayout where T: ~Copyable & ~Escapable {
   /// The contiguous memory footprint of `T`, in bytes.
   ///
   /// A type's size does not include any dynamically allocated or out of line
@@ -81,7 +82,7 @@ extension MemoryLayout where T: ~Copyable {
   }
 }
 
-extension MemoryLayout where T: ~Copyable {
+extension MemoryLayout where T: ~Copyable & ~Escapable {
   /// Returns the contiguous memory footprint of the given instance.
   ///
   /// The result does not include any dynamically allocated or out of line
@@ -258,20 +259,20 @@ extension MemoryLayout where T: ~Copyable {
   }
 
   internal static func _roundingUpToAlignment(_ value: UnsafeRawPointer) -> UnsafeRawPointer {
-    return UnsafeRawPointer(bitPattern:
+    return unsafe UnsafeRawPointer(bitPattern:
      _roundingUpToAlignment(UInt(bitPattern: value))).unsafelyUnwrapped
   }
   internal static func _roundingDownToAlignment(_ value: UnsafeRawPointer) -> UnsafeRawPointer {
-    return UnsafeRawPointer(bitPattern:
+    return unsafe UnsafeRawPointer(bitPattern:
      _roundingDownToAlignment(UInt(bitPattern: value))).unsafelyUnwrapped
   }
 
   internal static func _roundingUpToAlignment(_ value: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer {
-    return UnsafeMutableRawPointer(bitPattern:
+    return unsafe UnsafeMutableRawPointer(bitPattern:
      _roundingUpToAlignment(UInt(bitPattern: value))).unsafelyUnwrapped
   }
   internal static func _roundingDownToAlignment(_ value: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer {
-    return UnsafeMutableRawPointer(bitPattern:
+    return unsafe UnsafeMutableRawPointer(bitPattern:
      _roundingDownToAlignment(UInt(bitPattern: value))).unsafelyUnwrapped
   }
 
@@ -280,11 +281,11 @@ extension MemoryLayout where T: ~Copyable {
     var misalignment = baseAddressBits & _alignmentMask
     if misalignment != 0 {
       misalignment = _alignmentMask & -misalignment
-      return UnsafeRawBufferPointer(
+      return unsafe UnsafeRawBufferPointer(
         start: UnsafeRawPointer(bitPattern: baseAddressBits + misalignment),
         count: value.count - misalignment)
     }
-    return value
+    return unsafe value
   }
 
   internal static func _roundingUpBaseToAlignment(_ value: UnsafeMutableRawBufferPointer) -> UnsafeMutableRawBufferPointer {
@@ -292,10 +293,10 @@ extension MemoryLayout where T: ~Copyable {
     var misalignment = baseAddressBits & _alignmentMask
     if misalignment != 0 {
       misalignment = _alignmentMask & -misalignment
-      return UnsafeMutableRawBufferPointer(
+      return unsafe UnsafeMutableRawBufferPointer(
         start: UnsafeMutableRawPointer(bitPattern: baseAddressBits + misalignment),
         count: value.count - misalignment)
     }
-    return value
+    return unsafe value
   }
 }

@@ -238,7 +238,7 @@ dest(%u2 : $(Builtin.Int64, Builtin.Int64)):
   return %x : $()
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @singleton_switch_indirect(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @singleton_switch_indirect(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK: entry:
 // CHECK:   br label %[[DEST:[0-9]+]]
 // CHECK: [[DEST]]:
@@ -274,11 +274,11 @@ entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
   return %u : $Singleton
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @singleton_inject_indirect(i64 %0, i64 %1, ptr nocapture dereferenceable({{.*}}) %2) {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @singleton_inject_indirect(i64 %0, i64 %1, ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %2) {{.*}} {
 // CHECK: entry:
-// CHECK:   [[DATA_0_ADDR:%.*]] = getelementptr inbounds <{ i64, i64 }>, ptr %2, i32 0, i32 0
+// CHECK:   [[DATA_0_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ i64, i64 }>, ptr %2, i32 0, i32 0
 // CHECK:   store i64 %0, ptr [[DATA_0_ADDR]]
-// CHECK:   [[DATA_1_ADDR:%.*]] = getelementptr inbounds <{ i64, i64 }>, ptr %2, i32 0, i32 1
+// CHECK:   [[DATA_1_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ i64, i64 }>, ptr %2, i32 0, i32 1
 // CHECK:   store i64 %1, ptr [[DATA_1_ADDR]]
 // CHECK:   ret void
 // CHECK: }
@@ -349,10 +349,10 @@ end:
   return %x : $()
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @no_payload_switch_indirect(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @no_payload_switch_indirect(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 sil @no_payload_switch_indirect : $@convention(thin) (@inout NoPayloads) -> () {
 entry(%u : $*NoPayloads):
-// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %T4enum10NoPayloadsO, ptr %0, i32 0, i32 0
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds{{.*}} %T4enum10NoPayloadsO, ptr %0, i32 0, i32 0
 // CHECK:   [[TAG:%.*]] = load i8, ptr [[TAG_ADDR]]
 // CHECK:   switch i8 [[TAG]]
   switch_enum_addr %u : $*NoPayloads, case #NoPayloads.x!enumelt: x_dest, case #NoPayloads.y!enumelt: y_dest, case #NoPayloads.z!enumelt: z_dest
@@ -398,9 +398,9 @@ entry:
   return %u : $NoPayloads
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @no_payload_inject_z_indirect(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @no_payload_inject_z_indirect(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK: entry:
-// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %T4enum10NoPayloadsO, ptr %0, i32 0, i32 0
+// CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds{{.*}} %T4enum10NoPayloadsO, ptr %0, i32 0, i32 0
 // CHECK:   store i8 2, ptr [[TAG_ADDR]]
 // CHECK:   ret void
 // CHECK: }
@@ -470,10 +470,10 @@ enum SinglePayloadNoXI2 {
 // CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @select_enum([[WORD:i32]] %0, i8 %1)
 // CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @select_enum([[WORD:i64]] %0, i8 %1)
 // CHECK: entry:
-// CHECK:   [[TAG:%.*]] = trunc i8 %1 to i1
 // CHECK:   [[PAYLOAD:%.*]] = icmp eq [[WORD]] %0, 1
-// CHECK:   [[MATCHES:%.*]] = and i1 [[TAG]], [[PAYLOAD]]
-// CHECK:   [[RES:%.*]] = select i1 [[MATCHES]], i1 false, i1 true
+// CHECK:   [[TAG:%.*]] = icmp eq i8 %1, 1
+// CHECK:   [[COMBINED:%.*]] = and i1 [[TAG]], [[PAYLOAD]]
+// CHECK:   [[RES:%.*]] = select i1 [[COMBINED]], i1 false, i1 true
 // CHECK:   ret i1 [[RES]]
 // CHECK: }
 
@@ -490,7 +490,7 @@ bb0(%0 : $SinglePayloadNoXI2):
 sil @single_payload_no_xi_switch : $@convention(thin) (SinglePayloadNoXI2) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadNoXI2):
-// CHECK:   %2 = trunc i8
+// CHECK:   %2 = icmp eq i8 %1, 1
 // CHECK:   br i1 %2, label %[[TAGS:[0-9]+]], label %[[X_DEST:[0-9]+]]
 // CHECK: [[TAGS]]:
 // CHECK:   switch [[WORD]] %0, label %[[DFLT:[0-9]+]] [
@@ -564,7 +564,7 @@ end:
 sil @single_payload_no_xi_switch_arg : $@convention(thin) (SinglePayloadNoXI2) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadNoXI2):
-// CHECK:  %2 = trunc i8
+// CHECK:   %2 = icmp eq i8 %1, 1
 // CHECK:   br i1 %2, label %[[TAGS:[0-9]+]], label %[[X_PREDEST:[0-9]+]]
 // CHECK: [[TAGS]]:
 // CHECK:   switch [[WORD]] %0, label %[[DFLT:[0-9]+]] [
@@ -629,11 +629,11 @@ entry(%0 : $Builtin.Word):
   return %u : $SinglePayloadNoXI2
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_no_xi_inject_x_indirect([[WORD]] %0, ptr nocapture dereferenceable({{.*}}) %1) {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_no_xi_inject_x_indirect([[WORD]] %0, ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1) {{.*}} {
 // CHECK: entry:
 // CHECK:   store [[WORD]] %0, ptr %1
-// CHECK:   [[T0:%.*]] = getelementptr inbounds %T4enum18SinglePayloadNoXI2O, ptr %1, i32 0, i32 1
-// CHECK:   store i1 false, ptr [[T0]]
+// CHECK:   [[T0:%.*]] = getelementptr inbounds{{.*}} %T4enum18SinglePayloadNoXI2O, ptr %1, i32 0, i32 1
+// CHECK:   store i8 0, ptr [[T0]]
 // CHECK:   ret void
 // CHECK: }
 sil @single_payload_no_xi_inject_x_indirect : $(Builtin.Word, @inout SinglePayloadNoXI2) -> () {
@@ -655,11 +655,11 @@ entry:
   return %u : $SinglePayloadNoXI2
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_no_xi_inject_y_indirect(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_no_xi_inject_y_indirect(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK: entry:
 // CHECK:   store [[WORD]] 0, ptr %0
-// CHECK:   [[T0:%.*]] = getelementptr inbounds %T4enum18SinglePayloadNoXI2O, ptr %0, i32 0, i32 1
-// CHECK:   store i1 true, ptr [[T0]]
+// CHECK:   [[T0:%.*]] = getelementptr inbounds{{.*}} %T4enum18SinglePayloadNoXI2O, ptr %0, i32 0, i32 1
+// CHECK:   store i8 1, ptr [[T0]]
 // CHECK:   ret void
 // CHECK: }
 sil @single_payload_no_xi_inject_y_indirect : $(@inout SinglePayloadNoXI2) -> () {
@@ -992,7 +992,7 @@ entry(%0 : $Builtin.Int63):
   return %u : $SinglePayloadSpareBit
 }
 
-// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_spare_bit_inject_x_indirect(i64 %0, ptr nocapture dereferenceable({{.*}}) %1) {{.*}} {
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_spare_bit_inject_x_indirect(i64 %0, ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   [[T:%.*]] = trunc i64 %0 to i63
 // CHECK-64:   [[BYTE:%.*]] = zext i63 [[T]] to i64
@@ -1019,7 +1019,7 @@ entry:
   return %u : $SinglePayloadSpareBit
 }
 
-// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_spare_bit_inject_y_indirect(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_spare_bit_inject_y_indirect(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-64: entry:
 // --                0x8000_0000_0000_0000
 // CHECK-64:   store i64 -9223372036854775808, ptr %0
@@ -1304,7 +1304,7 @@ end(%z : $()):
   return %z : $()
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @dynamic_single_payload_empty_payload_load(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @dynamic_single_payload_empty_payload_load(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK: entry:
 // CHECK:   %1 = load i8, ptr %0
 // CHECK:   ret i8 %1
@@ -1315,7 +1315,7 @@ entry(%p : $*DynamicSinglePayload<()>):
   return %x : $DynamicSinglePayload<()>
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_single_payload_empty_payload_store(ptr nocapture dereferenceable({{.*}}) %0, i8 %1) {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_single_payload_empty_payload_store(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0, i8 %1) {{.*}} {
 // CHECK: entry:
 // CHECK:   store i8 %1, ptr %0
 // CHECK:   ret void
@@ -1440,11 +1440,11 @@ end:
   return %v : $()
 }
 
-// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_no_spare_bits_switch_indirect(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_no_spare_bits_switch_indirect(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 sil @multi_payload_no_spare_bits_switch_indirect : $(@inout MultiPayloadNoSpareBits) -> () {
 entry(%u : $*MultiPayloadNoSpareBits):
 // CHECK-64:   [[PAYLOAD:%.*]] = load i64, ptr %0
-// CHECK-64:   [[T0:%.*]] = getelementptr inbounds %T4enum23MultiPayloadNoSpareBitsO, ptr %0, i32 0, i32 1
+// CHECK-64:   [[T0:%.*]] = getelementptr inbounds{{.*}} %T4enum23MultiPayloadNoSpareBitsO, ptr %0, i32 0, i32 1
 // CHECK-64:   [[TAG:%.*]] = load i8, ptr [[T0]]
 // CHECK-64:   switch i8 [[TAG]]
 // CHECK-64:   switch i64 [[PAYLOAD]]
@@ -1494,10 +1494,10 @@ entry(%0 : $Builtin.Int64):
   return %u : $MultiPayloadNoSpareBits
 }
 
-// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_no_spare_bit_inject_x_indirect(i64 %0, ptr nocapture dereferenceable({{.*}}) %1) {{.*}} {
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_no_spare_bit_inject_x_indirect(i64 %0, ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   store i64 %0, ptr %1
-// CHECK-64:   [[T0:%.*]] = getelementptr inbounds %T4enum23MultiPayloadNoSpareBitsO, ptr %1, i32 0, i32 1
+// CHECK-64:   [[T0:%.*]] = getelementptr inbounds{{.*}} %T4enum23MultiPayloadNoSpareBitsO, ptr %1, i32 0, i32 1
 // CHECK-64:   store i8 0, ptr [[T0]]
 // CHECK-64:   ret void
 // CHECK-64: }
@@ -1547,10 +1547,10 @@ entry:
   return %u : $MultiPayloadNoSpareBits
 }
 
-// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_no_spare_bit_inject_a_indirect(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_no_spare_bit_inject_a_indirect(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   store i64 0, ptr %0
-// CHECK-64:   [[T0:%.*]] = getelementptr inbounds %T4enum23MultiPayloadNoSpareBitsO, ptr %0, i32 0, i32 1
+// CHECK-64:   [[T0:%.*]] = getelementptr inbounds{{.*}} %T4enum23MultiPayloadNoSpareBitsO, ptr %0, i32 0, i32 1
 // CHECK-64:   store i8 3, ptr [[T0]]
 // CHECK-64:   ret void
 // CHECK-64: }
@@ -1593,12 +1593,10 @@ enum MultiPayloadOneSpareBit {
 // CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_one_spare_bit_switch(i64 %0, i8 %1) {{.*}} {
 sil @multi_payload_one_spare_bit_switch : $(MultiPayloadOneSpareBit) -> () {
 entry(%u : $MultiPayloadOneSpareBit):
-// CHECK-64:   [[NATIVECC_TRUNC:%.*]] = trunc i8 %1 to i1
 // CHECK-64:   [[SPARE_TAG_LSHR:%.*]] = lshr i64 %0, 63
 // CHECK-64:   [[SPARE_TAG_TRUNC:%.*]] = trunc i64 [[SPARE_TAG_LSHR]] to i8
 // CHECK-64:   [[SPARE_TAG:%.*]] = and i8 [[SPARE_TAG_TRUNC]], 1
-// CHECK-64:   [[EXTRA_TAG_ZEXT:%.*]] = zext i1 [[NATIVECC_TRUNC]] to i8
-// CHECK-64:   [[EXTRA_TAG:%.*]] = shl i8 [[EXTRA_TAG_ZEXT]], 1
+// CHECK-64:   [[EXTRA_TAG:%.*]] = shl i8 %1, 1
 // CHECK-64:   [[TAG:%.*]] = or i8 [[SPARE_TAG]], [[EXTRA_TAG]]
 // CHECK-64:   switch i8 [[TAG]], label %[[UNREACHABLE:[0-9]+]] [
 // CHECK-64:     i8 0, label %[[X_PREDEST:[0-9]+]]
@@ -1680,8 +1678,8 @@ end:
 sil @multi_payload_one_spare_bit_switch_indirect : $(@inout MultiPayloadOneSpareBit) -> () {
 entry(%u : $*MultiPayloadOneSpareBit):
 // CHECK-64:   [[PAYLOAD:%.*]] = load i64, ptr %0
-// CHECK-64:   [[T0:%.*]] = getelementptr inbounds %T4enum23MultiPayloadOneSpareBitO, ptr %0, i32 0, i32 1
-// CHECK-64:   [[TAG:%.*]] = load i1, ptr [[T0]]
+// CHECK-64:   [[T0:%.*]] = getelementptr inbounds{{.*}} %T4enum23MultiPayloadOneSpareBitO, ptr %0, i32 0, i32 1
+// CHECK-64:   [[TAG:%.*]] = load i8, ptr [[T0]]
 // CHECK-64:   switch i8 {{%.*}}
 // CHECK-64:   switch i64 [[PAYLOAD]]
 // CHECK-64: {{[0-9]+}}:
@@ -1738,7 +1736,7 @@ entry(%0 : $Builtin.Int62):
   return %u : $MultiPayloadOneSpareBit
 }
 
-// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_one_spare_bit_inject_x_indirect(i64 %0, ptr nocapture dereferenceable({{.*}}) %1) {{.*}} {
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_one_spare_bit_inject_x_indirect(i64 %0, ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   [[NATIVECC_TRUNC:%.*]] = trunc i64 %0 to i62
 // CHECK-64:   [[BYTE:%.*]] = zext i62 [[NATIVECC_TRUNC]] to i64
@@ -1747,8 +1745,8 @@ entry(%0 : $Builtin.Int62):
 // --                                                   0x7FFF_FFFF_FFFF_FFFF
 // CHECK-64:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 9223372036854775807
 // CHECK-64:   store i64 [[PAYLOAD_MASKED]], ptr %1
-// CHECK-64:   [[T0:%.*]] = getelementptr inbounds %T4enum23MultiPayloadOneSpareBitO, ptr %1, i32 0, i32 1
-// CHECK-64:   store i1 false, ptr [[T0]]
+// CHECK-64:   [[T0:%.*]] = getelementptr inbounds{{.*}} %T4enum23MultiPayloadOneSpareBitO, ptr %1, i32 0, i32 1
+// CHECK-64:   store i8 0, ptr [[T0]]
 // CHECK-64:   ret void
 // CHECK-64: }
 sil @multi_payload_one_spare_bit_inject_x_indirect : $(Builtin.Int62, @inout MultiPayloadOneSpareBit) -> () {
@@ -1776,7 +1774,7 @@ entry(%0 : $Builtin.Int63):
   return %u : $MultiPayloadOneSpareBit
 }
 
-// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_one_spare_bit_inject_y_indirect(i64 %0, ptr nocapture dereferenceable({{.*}}) %1) {{.*}} {
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_one_spare_bit_inject_y_indirect(i64 %0, ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   [[NATIVECC_TRUNC:%.*]] = trunc i64 %0 to i63
 // CHECK-64:   [[BYTE:%.*]] = zext i63 [[NATIVECC_TRUNC]] to i64
@@ -1787,8 +1785,8 @@ entry(%0 : $Builtin.Int63):
 // --                                                          0x8000_0000_0000_0000
 // CHECK-64:   [[PAYLOAD_TAGGED:%.*]] = or i64 [[PAYLOAD_MASKED]], -9223372036854775808
 // CHECK-64:   store i64 [[PAYLOAD_TAGGED]], ptr %1
-// CHECK-64:   [[T0:%.*]] = getelementptr inbounds %T4enum23MultiPayloadOneSpareBitO, ptr %1, i32 0, i32 1
-// CHECK-64:   store i1 false, ptr [[T0]]
+// CHECK-64:   [[T0:%.*]] = getelementptr inbounds{{.*}} %T4enum23MultiPayloadOneSpareBitO, ptr %1, i32 0, i32 1
+// CHECK-64:   store i8 0, ptr [[T0]]
 // CHECK-64:   ret void
 // CHECK-64: }
 
@@ -1826,12 +1824,12 @@ entry:
   return %u : $MultiPayloadOneSpareBit
 }
 
-// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_one_spare_bit_inject_a_indirect(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_one_spare_bit_inject_a_indirect(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-64: entry:
 // --                0x8000_0000_0000_0000
 // CHECK-64:   store i64 -9223372036854775808, ptr %0
-// CHECK-64:   [[T0:%.*]] = getelementptr inbounds %T4enum23MultiPayloadOneSpareBitO, ptr %0, i32 0, i32 1
-// CHECK-64:   store i1 true, ptr [[T0]]
+// CHECK-64:   [[T0:%.*]] = getelementptr inbounds{{.*}} %T4enum23MultiPayloadOneSpareBitO, ptr %0, i32 0, i32 1
+// CHECK-64:   store i8 1, ptr [[T0]]
 // CHECK-64:   ret void
 // CHECK-64: }
 sil @multi_payload_one_spare_bit_inject_a_indirect : $(@inout MultiPayloadOneSpareBit) -> () {
@@ -1970,7 +1968,7 @@ entry(%0 : $Builtin.Int62):
   return %u : $MultiPayloadTwoSpareBits
 }
 
-// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_two_spare_bits_inject_x_indirect(i64 %0, ptr nocapture dereferenceable({{.*}}) %1) {{.*}} {
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_two_spare_bits_inject_x_indirect(i64 %0, ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   [[NATIVECC_TRUNC:%.*]] = trunc i64 %0 to i62
 // CHECK-64:   [[BYTE:%.*]] = zext i62 [[NATIVECC_TRUNC]] to i64
@@ -2004,7 +2002,7 @@ entry(%0 : $Builtin.Int60):
   return %u : $MultiPayloadTwoSpareBits
 }
 
-// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_two_spare_bits_inject_y_indirect(i64 %0, ptr nocapture dereferenceable({{.*}}) %1) {{.*}} {
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_two_spare_bits_inject_y_indirect(i64 %0, ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   [[NATIVECC_TRUNC:%.*]] = trunc i64 %0 to i60
 // CHECK-64:   [[BYTE:%.*]] = zext i60 [[NATIVECC_TRUNC]] to i64
@@ -2051,7 +2049,7 @@ entry:
   return %u : $MultiPayloadTwoSpareBits
 }
 
-// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_two_spare_bits_inject_a_indirect(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_two_spare_bits_inject_a_indirect(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-64: entry:
 // --                0xC000_0000_0000_0000
 // CHECK-64:   store i64 -4611686018427387904, ptr %0
@@ -2227,8 +2225,9 @@ enum MultiPayloadNested {
 // CHECK:   %3 = getelementptr
 // CHECK:   %4 = load i8, ptr %3
 // CHECK:   %5 = lshr i8 %4, 7
-// CHECK:   %6 = trunc i8 %5 to i1
-// CHECK:   br i1 %6
+// CHECK:   %6 = and i8 %5, 1
+// CHECK:   %7 = icmp ne i8 %6, 1
+// CHECK:   br i1 %7
 sil @multi_payload_nested_switch : $(@in MultiPayloadNested) -> () {
 entry(%c : $*MultiPayloadNested):
   switch_enum_addr %c : $*MultiPayloadNested, case #MultiPayloadNested.A!enumelt: a_dest, case #MultiPayloadNested.B!enumelt: b_dest
@@ -2255,12 +2254,14 @@ enum MultiPayloadNestedSpareBits {
   case B(MultiPayloadInnerSpareBits)
 }
 
-// CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_nested_spare_bits_switch(ptr noalias nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_nested_spare_bits_switch(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   %1 = load [[WORD]], ptr %0
 // CHECK-64:   %2 = lshr [[WORD]] %1, 61
-// CHECK-64:   %3 = trunc [[WORD]] %2 to i1
-// CHECK-64:   br i1 %3
+// CHECK-64:   %3 = trunc [[WORD]] %2 to i8
+// CHECK-64:   %4 = and i8 %3, 1
+// CHECK-64:   %5 = icmp ne i8 %4, 1
+// CHECK-64:   br i1 %5
 sil @multi_payload_nested_spare_bits_switch : $(@in MultiPayloadNestedSpareBits) -> () {
 entry(%c : $*MultiPayloadNestedSpareBits):
   switch_enum_addr %c : $*MultiPayloadNestedSpareBits, case #MultiPayloadNestedSpareBits.A!enumelt: a_dest, case #MultiPayloadNestedSpareBits.B!enumelt: b_dest
@@ -2325,7 +2326,7 @@ enum MultiPayloadAddressOnlyFixed {
   case Y(Builtin.Int32)
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_address_only_destroy(ptr noalias nocapture dereferenceable({{.*}}) %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_address_only_destroy(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0)
 sil @multi_payload_address_only_destroy : $@convention(thin) (@in MultiPayloadAddressOnlyFixed) -> () {
 entry(%m : $*MultiPayloadAddressOnlyFixed):
   destroy_addr %m : $*MultiPayloadAddressOnlyFixed
@@ -2459,7 +2460,7 @@ entry(%x : $Int32):
   // CHECK-64: [[INT_ZEXT:%.*]] = zext i32 %0 to i64
   // CHECK-64: [[INT_SHL:%.*]] = shl i64 [[INT_ZEXT]], 32
   %d = enum $Optional<(Optional<()>, Int32)>, #Optional.some!enumelt, %c : $(Optional<()>, Int32)
-  // CHECK-64: [[BIT:%.*]] = trunc i64 [[INT_SHL]] to i1
+  // CHECK-64: [[BIT:%.*]] = trunc i64 [[INT_SHL]] to i8
   // CHECK-64: [[INT_SHR:%.*]] = lshr i64 [[INT_SHL]], 32
   // CHECK-64: [[INT:%.*]] = trunc i64 [[INT_SHR]] to i32
   %e = unchecked_enum_data %d : $Optional<(Optional<()>, Int32)>, #Optional.some!enumelt
@@ -2611,11 +2612,11 @@ entry(%x : $*MyOptional):
 // CHECK:   [[T_VWT:%.*]] = load ptr, ptr [[T_VWT_ADDR]]
 // CHECK:   [[T_LAYOUT:%.*]] = getelementptr inbounds ptr, ptr [[T_VWT]], i32 8
 // CHECK:   call void @swift_initEnumMetadataSingleCase(ptr [[METADATA]], [[WORD]] 0, ptr [[T_LAYOUT]])
-// CHECK:   [[PAYLOAD_EXTRAINHABITANTCNT:%.*]] = getelementptr inbounds %swift.type_layout, ptr [[T_LAYOUT]], i32 0, i32 3
+// CHECK:   [[PAYLOAD_EXTRAINHABITANTCNT:%.*]] = getelementptr inbounds{{.*}} %swift.type_layout, ptr [[T_LAYOUT]], i32 0, i32 3
 // CHECK:   [[CNT:%.*]] = load i32, ptr [[PAYLOAD_EXTRAINHABITANTCNT]]
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr [[METADATA]], [[WORD]] -1
 // CHECK:   [[VWT:%.*]] = load ptr, ptr [[VWT_ADDR]]
-// CHECK:   [[XIC_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 11
+// CHECK:   [[XIC_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 11
 // CHECK:   store i32 [[CNT]], ptr [[XIC_ADDR]]
 // CHECK:   ret %swift.metadata_response
 

@@ -21,8 +21,11 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/Mangler.h"
 #include "swift/Basic/Platform.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/RemoteInspection/MetadataSourceBuilder.h"
 #include "swift/RemoteInspection/Records.h"
 #include "swift/SIL/SILModule.h"
@@ -173,6 +176,25 @@ public:
   }
 };
 
+/// Determine whether the given generic nominal that involves inverse
+/// requirements (e.g., Optional, Span) is always available for demangling
+/// purposes.
+static bool nominalIsAlwaysAvailableForDemangling(const NominalTypeDecl *nom) {
+  // Only consider standard library types for this.
+  if (!nom->getModuleContext()->isStdlibModule())
+    return false;
+
+  // If there's an @_originallyDefined(in:) attribute, then the nominal is
+  // not always available for demangling.
+  for (auto attr: nom->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
+    if (!attr->isInvalid() && attr->isActivePlatform(nom->getASTContext()))
+      return false;
+  }
+
+  // Everything else is available.
+  return true;
+}
+
 std::optional<llvm::VersionTuple>
 getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   enum VersionRequirement {
@@ -180,9 +202,11 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     Swift_5_2,
     Swift_5_5,
     Swift_6_0,
+    Swift_6_1,
+    Swift_6_2,
 
     // Short-circuit if we find this requirement.
-    Latest = Swift_6_0
+    Latest = Swift_6_2
   };
 
   VersionRequirement latestRequirement = None;
@@ -196,16 +220,34 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
 
   (void) type.findIf([&](CanType t) -> bool {
     if (auto fn = dyn_cast<AnyFunctionType>(t)) {
+      auto isolation = fn->getIsolation();
+      auto sendingResult = fn->hasSendingResult();
+
+      // The mangling for nonisolated(nonsending) function types was introduced
+      // in Swift 6.2.
+      if (isolation.isNonIsolatedCaller())
+        return addRequirement(Swift_6_2);
+
+      // The Swift 6.1 runtime fixes a bug preventing successful demangling
+      // when @isolated(any) or global actor isolation is combined with a
+      // sending result.
+      if (sendingResult &&
+          (isolation.isErased() || isolation.isGlobalActor()))
+        return addRequirement(Swift_6_1);
+
       // The Swift 6.0 runtime is the first version able to demangle types
-      // that involve typed throws or @isolated(any), or for that matter
-      // represent them at all at runtime.
-      if (!fn.getThrownError().isNull() || fn->getIsolation().isErased())
+      // that involve typed throws, @isolated(any), or a sending result, or
+      // for that matter to represent them at all at runtime.
+      if (!fn.getThrownError().isNull() ||
+          isolation.isErased() ||
+          sendingResult)
         return addRequirement(Swift_6_0);
 
       // The Swift 5.5 runtime is the first version able to demangle types
       // related to concurrency.
-      if (fn->isAsync() || fn->isSendable() ||
-          !fn->getIsolation().isNonIsolated())
+      if (fn->isAsync() ||
+          fn->isSendable() ||
+          !isolation.isNonIsolated())
         return addRequirement(Swift_5_5);
 
       return false;
@@ -224,10 +266,37 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
       // involving them.
     }
 
+    /// Any nominal type that has an inverse requirement in its generic
+    /// signature uses NoncopyableGenerics. Since inverses are mangled into
+    /// symbols, a Swift 6.0+ runtime is generally needed to demangle them.
+    ///
+    /// We make an exception for some types in the stdlib, like Optional, since
+    /// the runtime should still be able to demangle them, based on the
+    /// availability of the type.
+    if (auto nominalTy = dyn_cast<NominalOrBoundGenericNominalType>(t)) {
+      auto *nom = nominalTy->getDecl();
+      if (auto sig = nom->getGenericSignature()) {
+        SmallVector<InverseRequirement, 2> inverses;
+        SmallVector<Requirement, 2> reqs;
+        sig->getRequirementsWithInverses(reqs, inverses);
+        if (!inverses.empty() && !nominalIsAlwaysAvailableForDemangling(nom)) {
+          return addRequirement(Swift_6_0);
+        }
+      }
+    }
+
+    // Any composition with an inverse will need the 6.0 runtime to demangle.
+    if (auto pct = dyn_cast<ProtocolCompositionType>(t)) {
+      if (pct->hasInverse())
+        return addRequirement(Swift_6_0);
+    }
+
     return false;
   });
 
   switch (latestRequirement) {
+  case Swift_6_2: return llvm::VersionTuple(6, 2);
+  case Swift_6_1: return llvm::VersionTuple(6, 1);
   case Swift_6_0: return llvm::VersionTuple(6, 0);
   case Swift_5_5: return llvm::VersionTuple(5, 5);
   case Swift_5_2: return llvm::VersionTuple(5, 2);
@@ -248,7 +317,7 @@ static std::pair<llvm::Constant *, unsigned>
 getTypeRefByFunction(IRGenModule &IGM,
                      CanGenericSignature sig,
                      CanType t) {
-  IRGenMangler mangler;
+  IRGenMangler mangler(IGM.Context);
   std::string symbolName =
     mangler.mangleSymbolNameForMangledMetadataAccessorString(
                                                    "get_type_metadata", sig, t);
@@ -416,21 +485,31 @@ getTypeRefImpl(IRGenModule &IGM,
 
     bool isAlwaysNoncopyable = false;
     if (contextualTy->isNoncopyable()) {
+      isAlwaysNoncopyable = true;
+
       // If the contextual type has any archetypes in it, it's plausible that
-      // we could end up with a copyable type in some instances. Look for those.
+      // we could end up with a copyable type in some instances. Look for those
+      // so we can permit unsafe reflection of the field, by assuming it could
+      // be Copyable.
       if (contextualTy->hasArchetype()) {
         // If this is a nominal type, check whether it can ever be copyable.
         if (auto nominal = contextualTy->getAnyNominal()) {
-          if (!nominal->canBeCopyable())
-            isAlwaysNoncopyable = true;
+          // If it's a nominal that can ever be Copyable _and_ it's defined in
+          // the stdlib, assume that we could end up with a Copyable type.
+          if (nominal->canBeCopyable()
+              && nominal->getModuleContext()->isStdlibModule())
+            isAlwaysNoncopyable = false;
         } else {
-          // Assume that we could end up with a copyable type somehow.
+          // Assume that we could end up with a Copyable type somehow.
+          // This allows you to reflect a 'T: ~Copyable' stored in a type.
+          isAlwaysNoncopyable = false;
         }
-      } else {
-        isAlwaysNoncopyable = true;
       }
     }
 
+    // The getTypeRefByFunction strategy will emit a forward-compatible runtime
+    // check to see if the runtime can safely reflect such fields. Otherwise,
+    // the field will be artificially hidden to reflectors.
     if (isAlwaysNoncopyable) {
       IGM.IRGen.noteUseOfTypeMetadata(type);
       return getTypeRefByFunction(IGM, sig, type);
@@ -461,7 +540,7 @@ getTypeRefImpl(IRGenModule &IGM,
     break;
   }
 
-  IRGenMangler Mangler;
+  IRGenMangler Mangler(IGM.Context);
   auto SymbolicName =
     useFlatUnique ? Mangler.mangleTypeForFlatUniqueTypeRef(sig, type)
                   : Mangler.mangleTypeForReflection(IGM, sig, type);
@@ -515,7 +594,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
               [&](GenericRequirement reqt) { requirements.push_back(reqt); });
   auto *genericEnv = genericSig.getGenericEnvironment();
 
-  IRGenMangler mangler;
+  IRGenMangler mangler(Context);
   std::string symbolName =
     mangler.mangleSymbolNameForMangledConformanceAccessorString(
       "get_witness_table", genericSig, type, conformance);
@@ -548,7 +627,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
             type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
           }
           if (origType->hasTypeParameter()) {
-            conformance = conformance.subst(origType,
+            conformance = conformance.subst(
                 genericEnv->getForwardingSubstitutionMap());
           }
           auto ret = emitWitnessTableRef(IGF, type, conformance);
@@ -574,7 +653,7 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
                                   const NormalProtocolConformance *conformance,
                                   const AssociatedConformance &requirement) {
   // Figure out the name of the symbol to be used for the conformance.
-  IRGenMangler mangler;
+  IRGenMangler mangler(Context);
   auto symbolName =
     mangler.mangleSymbolNameForAssociatedConformanceWitness(
       conformance, requirement.getAssociation(),
@@ -705,7 +784,7 @@ protected:
                      MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
     if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-      IRGenMangler mangler;
+      IRGenMangler mangler(nominal->getASTContext());
       SymbolicMangling mangledStr;
       mangledStr.String = mangler.mangleBareProtocol(proto);
       auto mangledName =
@@ -892,9 +971,13 @@ private:
     B.addInt16(uint16_t(kind));
     B.addInt16(FieldRecordSize);
 
-    B.addInt32(getNumFields(NTD));
+    // Emit exportable fields, prefixed with a count
+    B.addInt32(countExportableFields(IGM, NTD));
+
+    // Filter to select which fields we'll export FieldDescriptor for.
     forEachField(IGM, NTD, [&](Field field) {
-      addField(field);
+      if (isExportableField(field))
+        addField(field);
     });
   }
 
@@ -905,7 +988,7 @@ private:
       flags.setIsIndirectCase();
 
     Type interfaceType = decl->isAvailableDuringLowering()
-                             ? decl->getArgumentInterfaceType()
+                             ? decl->getPayloadInterfaceType()
                              : nullptr;
 
     addField(flags, interfaceType, decl->getBaseIdentifier().str());
@@ -1107,7 +1190,7 @@ public:
 
     auto alignment = ti->getFixedAlignment().getValue();
     unsigned bitwiseTakable =
-      (ti->isBitwiseTakable(ResilienceExpansion::Minimal) == IsBitwiseTakable
+      (ti->getBitwiseTakable(ResilienceExpansion::Minimal) >= IsBitwiseTakableOnly
        ? 1 : 0);
     B.addInt32(alignment | (bitwiseTakable << 16));
 
@@ -1126,6 +1209,11 @@ public:
 };
 
 void IRGenModule::emitBuiltinTypeMetadataRecord(CanType builtinType) {
+  // If this builtin is generic, don't emit anything.
+  if (builtinType->hasTypeParameter()) {
+    return;
+  }
+
   FixedTypeMetadataBuilder builder(*this, builtinType);
   builder.emit();
 }
@@ -1188,7 +1276,8 @@ public:
   struct Entry {
     enum Kind {
       Metadata,
-      Shape
+      Shape,
+      Value
     };
 
     Kind kind;
@@ -1209,6 +1298,9 @@ public:
       SmallString<16> EncodeBuffer;
       llvm::raw_svector_ostream OS(EncodeBuffer);
       switch (Kind) {
+      case Entry::Kind::Value:
+        OS << "v";
+        break;
       case Entry::Kind::Shape:
         OS << "s";
         break;
@@ -1285,10 +1377,18 @@ public:
       switch (Bindings[i].getKind()) {
       case GenericRequirement::Kind::Shape:
       case GenericRequirement::Kind::Metadata:
-      case GenericRequirement::Kind::MetadataPack: {
-        auto Kind = (Bindings[i].getKind() == GenericRequirement::Kind::Shape
-                     ? Entry::Kind::Shape
-                     : Entry::Kind::Metadata);
+      case GenericRequirement::Kind::MetadataPack:
+      case GenericRequirement::Kind::Value: {
+        auto Kind = Entry::Kind::Metadata;
+
+        if (Bindings[i].getKind() == GenericRequirement::Kind::Shape) {
+          Kind = Entry::Kind::Shape;
+        }
+
+        if (Bindings[i].getKind() == GenericRequirement::Kind::Value) {
+          Kind = Entry::Kind::Value;
+        }
+
         auto Source = SourceBuilder.createClosureBinding(i);
         auto BindingType = Bindings[i].getTypeParameter().subst(Subs);
         auto InterfaceType = BindingType->mapTypeOutOfContext();
@@ -1345,6 +1445,10 @@ public:
         Kind = Entry::Kind::Metadata;
         break;
 
+      case GenericRequirement::Kind::Value:
+        Kind = Entry::Kind::Value;
+        break;
+
       case GenericRequirement::Kind::WitnessTable:
       case GenericRequirement::Kind::WitnessTablePack:
         llvm_unreachable("Bad kind");
@@ -1374,12 +1478,12 @@ public:
 
       // Erase pseudogeneric captures down to AnyObject.
       if (OrigCalleeType->isPseudogeneric()) {
-        SwiftType = SwiftType.transform([&](Type t) -> Type {
+        SwiftType = SwiftType.transformRec([&](Type t) -> std::optional<Type> {
           if (auto *archetype = t->getAs<ArchetypeType>()) {
             assert(archetype->requiresClass() && "don't know what to do");
             return IGM.Context.getAnyObjectType();
           }
-          return t;
+          return std::nullopt;
         })->getCanonicalType();
       }
       
@@ -1499,7 +1603,13 @@ llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
   if (entry.second)
     return entry.second;
 
-  entry = createStringConstant(Name, /*willBeRelativelyAddressed*/ true,
+  llvm::SmallString<256> ReflName;
+  if (Lexer::identifierMustAlwaysBeEscaped(Name)) {
+    Mangle::Mangler::appendRawIdentifierForRuntime(Name.str(), ReflName);
+  } else {
+    ReflName = Name;
+  }
+  entry = createStringConstant(ReflName, /*willBeRelativelyAddressed*/ true,
                                getReflectionStringsSectionName());
   disableAddressSanitizer(*this, entry.first);
   return entry.second;
@@ -1508,6 +1618,9 @@ llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
 llvm::Constant *
 IRGenModule::getAddrOfBoxDescriptor(SILType BoxedType,
                                     CanGenericSignature genericSig) {
+  if (BoxedType.hasLocalArchetype())
+    return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
+
   if (IRGen.Opts.ReflectionMetadata != ReflectionMetadataMode::Runtime)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
@@ -1621,7 +1734,7 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
   bool needsOpaqueDescriptor = false;
   bool needsFieldDescriptor = true;
 
-  if (auto *ED = dyn_cast<EnumDecl>(D)) {
+  if (isa<EnumDecl>(D)) {
     auto &strategy = getEnumImplStrategy(*this, T);
 
     // @objc enums never have generic parameters or payloads,

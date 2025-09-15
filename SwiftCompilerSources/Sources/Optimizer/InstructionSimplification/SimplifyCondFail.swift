@@ -12,7 +12,7 @@
 
 import SIL
 
-extension CondFailInst : OnoneSimplifyable {
+extension CondFailInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
 
     /// Eliminates

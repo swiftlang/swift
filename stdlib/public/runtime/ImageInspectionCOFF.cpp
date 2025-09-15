@@ -21,6 +21,8 @@
 #define NOMINMAX
 #include <Windows.h>
 #include <DbgHelp.h>
+
+#pragma comment(lib, "DbgHelp.Lib")
 #endif
 
 #include "swift/Runtime/Win32.h"
@@ -31,6 +33,7 @@ using namespace swift;
 #if defined(_WIN32)
 static LazyMutex mutex;
 static HANDLE dbgHelpHandle = nullptr;
+static bool isDbgHelpInitialized = false;
 
 void _swift_win32_withDbgHelpLibrary(
   void (* body)(HANDLE hProcess, void *context), void *context) {
@@ -54,8 +57,7 @@ void _swift_win32_withDbgHelpLibrary(
     }
 
     // If we have not previously initialized the Debug Help library, do so now.
-    bool isDbgHelpInitialized = false;
-    if (dbgHelpHandle) {
+    if (dbgHelpHandle && !isDbgHelpInitialized) {
       isDbgHelpInitialized = SymInitialize(dbgHelpHandle, nullptr, true);
     }
 

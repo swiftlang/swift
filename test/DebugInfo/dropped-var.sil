@@ -1,0 +1,98 @@
+ // RUN: %target-sil-opt --diagnose-unreachable -o - %s -sil-stats-lost-variables 2>&1 | %FileCheck %s
+ // REQUIRES:CPU=aarch64
+
+ // CHECK: function, lostvars, Pass List Pipeline, DiagnoseUnreachable, 1, 1, {{[0-9]+}}, $s4test3bar1yS2i_tF
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+sil_scope 1 { loc "file.swift":1:6 parent @$s4test3bar1yS2i_tF : $@convention(thin) (Int) -> Int }
+
+// main
+// Isolation: unspecified
+sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %2 = integer_literal $Builtin.Int32, 0          // user: %3;  auto_gen
+  %3 = struct $Int32 (%2 : $Builtin.Int32)        // user: %4;  auto_gen
+  return %3 : $Int32                              // id: %4;  auto_gen
+} // end sil function 'main'
+
+// bar(y:)
+// Isolation: unspecified
+sil hidden [ossa] @$s4test3bar1yS2i_tF : $@convention(thin) (Int) -> Int {
+// %0 "y"                                         // users: %5, %1
+bb0(%0 : $Int):
+  debug_value %0 : $Int, let, name "y", argno 1   // id: %1; line:1:10:in_prologue
+  %2 = integer_literal $Builtin.Int1, 0           // user: %3; line:2:11:minlined
+  cond_br %2, bb1, bb2                            // id: %3; line:2:11
+
+bb1:                                              // Preds: bb0
+  %4 = integer_literal $Builtin.Int64, 1          // user: %7; line:3:20:minlined
+  debug_value %4 : $Builtin.Int64, let, name "num"
+  %5 = struct_extract %0 : $Int, #Int._value      // user: %7; line:3:18:minlined
+  %6 = integer_literal $Builtin.Int1, -1          // user: %7; line:3:18:minlined
+  %7 = builtin "sadd_with_overflow_Int64"(%5 : $Builtin.Int64, %4 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %8; line:3:18:minlined
+  (%8, %9) = destructure_tuple %7 : $(Builtin.Int64, Builtin.Int1) // users: %11, %10; line:3:18:minlined
+  cond_fail %9 : $Builtin.Int1, "arithmetic overflow" // id: %10; line:3:18:minlined
+  %11 = struct $Int (%8 : $Builtin.Int64)         // user: %12; line:3:18:minlined
+  br bb3(%11 : $Int)                              // id: %12; line:3:9:return
+bb2:                                              // Preds: bb0
+  %13 = integer_literal $Builtin.Int64, 1         // user: %14; line:5:12:minlined
+  %14 = struct $Int (%13 : $Builtin.Int64)        // user: %15; line:5:12:minlined
+  br bb3(%14 : $Int)                              // id: %15; line:5:5:return
+
+// %16                                            // user: %17
+bb3(%16 : $Int):                                  // Preds: bb2 bb1
+  return %16 : $Int                               // id: %17; line:6:1:cleanup
+
+// Do not count as dropped variable if there is no instruction that belongs to the same scope as lost debug_value
+bb4:
+  %17 = integer_literal $Builtin.Int64, 1, loc "file.swift":1:6, scope 1
+  debug_value %17 : $Builtin.Int64, let, name "num", loc "file.swift":1:6, scope 1
+  %18 = struct $Int (%17 : $Builtin.Int64)
+  br bb3(%18: $Int)
+
+} // end sil function '$s4test3bar1yS2i_tF'
+
+// Int.init(_builtinIntegerLiteral:)
+// Isolation: unspecified
+sil public_external [transparent] [serialized] [canonical] [ossa] @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int {
+// %0                                             // user: %2
+bb0(%0 : $Builtin.IntLiteral, %1 : $@thin Int.Type):
+  %2 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1) // user: %3;  no_loc
+  (%3, %4) = destructure_tuple %2 : $(Builtin.Int64, Builtin.Int1) // user: %5;  no_loc
+  %5 = struct $Int (%3 : $Builtin.Int64)          // user: %6;  no_loc
+  return %5 : $Int                                // id: %6;  no_loc
+} // end sil function '$sSi22_builtinIntegerLiteralSiBI_tcfC'
+
+// static Int.> infix(_:_:)
+// Isolation: unspecified
+sil public_external [transparent] [serialized] [canonical] [ossa] @$sSi1goiySbSi_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Bool {
+// %0                                             // user: %4
+// %1                                             // user: %3
+bb0(%0 : $Int, %1 : $Int, %2 : $@thin Int.Type):
+  %3 = struct_extract %1 : $Int, #Int._value      // user: %5;  no_loc
+  %4 = struct_extract %0 : $Int, #Int._value      // user: %5;  no_loc
+  %5 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1 // user: %6;  no_loc
+  %6 = struct $Bool (%5 : $Builtin.Int1)          // user: %7;  no_loc
+  return %6 : $Bool                               // id: %7;  no_loc
+} // end sil function '$sSi1goiySbSi_SitFZ'
+
+// static Int.+ infix(_:_:)
+// Isolation: unspecified
+sil public_external [transparent] [serialized] [canonical] [ossa] @$sSi1poiyS2i_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Int {
+// %0                                             // user: %3
+// %1                                             // user: %4
+bb0(%0 : $Int, %1 : $Int, %2 : $@thin Int.Type):
+  %3 = struct_extract %0 : $Int, #Int._value      // user: %6;  no_loc
+  %4 = struct_extract %1 : $Int, #Int._value      // user: %6;  no_loc
+  %5 = integer_literal $Builtin.Int1, -1          // user: %6;  no_loc
+  %6 = builtin "sadd_with_overflow_Int64"(%3 : $Builtin.Int64, %4 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %7;  no_loc
+  (%7, %8) = destructure_tuple %6 : $(Builtin.Int64, Builtin.Int1) // users: %10, %9;  no_loc
+  cond_fail %8 : $Builtin.Int1, "arithmetic overflow" // id: %9;  no_loc
+  %10 = struct $Int (%7 : $Builtin.Int64)         // user: %11;  no_loc
+  return %10 : $Int                               // id: %11;  no_loc
+} // end sil function '$sSi1poiyS2i_SitFZ'

@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend %s -emit-sil -g -o - | %FileCheck -check-prefix=CHECK-SIL %s
+// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil -g -o - | %FileCheck -check-prefix=CHECK-SIL %s
 
 // Verify that -Onone shadow copies are emitted for debug_value_addr
 // instructions.
@@ -10,7 +10,7 @@
 // CHECK: define {{.*}}$s16debug_value_addr4testyyxlF
 // CHECK: entry:
 // CHECK-NEXT: %[[TADDR:.*]] = alloca
-// CHECK-NEXT: call void @llvm.dbg.declare({{.*}}%[[TADDR]]
+// CHECK-NEXT: #dbg_declare({{.*}}%[[TADDR]]
 // CHECK: store ptr %0, ptr %[[TADDR:.*]], align
 
 struct S<T> {

@@ -129,16 +129,9 @@ struct LLVM_LIBRARY_VISIBILITY Context {
   void verify() const;
 
   bool shouldPerform(ARCTransformKind testKind) const {
-    // When asserts are enabled, we allow for specific arc transforms to be
-    // turned on/off via LLVM args. So check that if we have asserts, perform
-    // all optimizations otherwise.
-#ifndef NDEBUG
     if (transformKind == ARCTransformKind::Invalid)
       return false;
     return bool(testKind & transformKind);
-#else
-    return true;
-#endif
   }
 
   void reset() {

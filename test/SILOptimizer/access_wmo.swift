@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-sil -enforce-exclusivity=checked -O -primary-file %s %S/Inputs/access_wmo_def.swift | %FileCheck %s --check-prefix=PRIMARY
-// RUN: %target-swift-frontend -parse-as-library -emit-sil -enforce-exclusivity=checked -O %s %S/Inputs/access_wmo_def.swift | %FileCheck %s --check-prefix=WMO
+// RUN: %target-swift-frontend -parse-as-library -Xllvm -sil-print-types -emit-sil -enforce-exclusivity=checked -O -primary-file %s %S/Inputs/access_wmo_def.swift | %FileCheck %s --check-prefix=PRIMARY
+// RUN: %target-swift-frontend -parse-as-library -Xllvm -sil-print-types -emit-sil -enforce-exclusivity=checked -O %s %S/Inputs/access_wmo_def.swift | %FileCheck %s --check-prefix=WMO
 
 // ===---------------------------------------------------------------------===//
 // testAccessGlobal: Access a global defined in another file.

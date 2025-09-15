@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Parser.h"
-#include "swift/Subsystems.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
@@ -23,18 +22,21 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Parse/ParseDeclName.h"
 #include "swift/Parse/ParseSILSupport.h"
+#include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/Compiler.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 
 static void getStringPartTokens(const swift::Token &Tok,
                                 const swift::LangOptions &LangOpts,
@@ -114,7 +116,7 @@ bool IDEInspectionSecondPassRequest::evaluate(
     IDEInspectionCallbacksFactory *Factory) const {
   // If we didn't find the code completion token, bail.
   auto *parserState = SF->getDelayedParserState();
-  if (!parserState->hasIDEInspectionDelayedDeclState())
+  if (!parserState || !parserState->hasIDEInspectionDelayedDeclState())
     return true;
 
   // Decrement the closure discriminator index by one so a top-level closure
@@ -122,6 +124,9 @@ bool IDEInspectionSecondPassRequest::evaluate(
   // pass.
   auto state = parserState->takeIDEInspectionDelayedDeclState();
   auto &Ctx = SF->getASTContext();
+
+  auto inspectionLoc = Ctx.SourceMgr.getIDEInspectionTargetLoc();
+  PrettyStackTraceLocation stackTrace(Ctx, "IDE inspecting", inspectionLoc);
 
   auto BufferID = Ctx.SourceMgr.getIDEInspectionTargetBufferID();
   Parser TheParser(BufferID, *SF, nullptr, parserState);
@@ -157,6 +162,7 @@ void Parser::performIDEInspectionSecondPassImpl(
   // Clear any ASTScopes that were expanded.
   SF.clearScope();
 
+  // FIXME: We shouldn't be mutating the AST after-the-fact like this.
   switch (info.Kind) {
   case IDEInspectionDelayedDeclKind::TopLevelCodeDecl: {
     // Re-enter the top-level code decl context.
@@ -574,6 +580,29 @@ SourceLoc Parser::getEndOfPreviousLoc() const {
   return Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
 }
 
+void Parser::diagnoseDollarIdentifier(const Token &tok,
+                                      bool diagnoseDollarPrefix) {
+  assert(tok.getText()[0] == '$');
+
+  // If '$' is not guarded by backticks, offer to replace it with '`$`'.
+  if (Tok.getRawText() == "$") {
+    diagnose(Tok.getLoc(), diag::standalone_dollar_identifier)
+        .fixItReplace(Tok.getLoc(), "`$`");
+    return;
+  }
+
+  if (!diagnoseDollarPrefix)
+    return;
+
+  if (tok.getText().size() == 1 || Context.LangOpts.EnableDollarIdentifiers ||
+      isInSILMode() || L->isSwiftInterface() ||
+      isInMacroExpansion(tok.getLoc()))
+    return;
+
+  diagnose(tok.getLoc(), diag::dollar_identifier_decl,
+           Context.getIdentifier(tok.getText()));
+}
+
 SourceLoc Parser::consumeAttributeLParen() {
   SourceLoc LastTokenEndLoc = getEndOfPreviousLoc();
   if (LastTokenEndLoc != Tok.getLoc() && !isInSILMode()) {
@@ -583,12 +612,47 @@ SourceLoc Parser::consumeAttributeLParen() {
   return consumeToken(tok::l_paren);
 }
 
-bool Parser::consumeIfAttributeLParen() {
-  if (!Tok.isFollowingLParen()) {
+bool Parser::consumeIfAttributeLParen(bool isCustomAttr) {
+  if (!isAtAttributeLParen(isCustomAttr))
     return false;
-  }
-  consumeAttributeLParen();
+  (void)consumeAttributeLParen();
   return true;
+}
+
+bool Parser::isAtAttributeLParen(bool isCustomAttr) {
+  if (!Tok.isFollowingLParen())
+    return false;
+
+  if (Context.isSwiftVersionAtLeast(6)) {
+    // No-space '(' are always arguments.
+    if (getEndOfPreviousLoc() == Tok.getLoc())
+      return true;
+
+    // Otherwise it's an error, but for recovery, parse it as an argument list
+    // if it's obvious.
+    BacktrackingScope backtrack(*this);
+    skipSingle();
+    return Tok.is(tok::at_sign) || isStartOfSwiftDecl();
+  } else {
+    // In <=5, builtin attributes only checks 'isFollowingLParen()'.
+    if (!isCustomAttr)
+      return true;
+
+    BacktrackingScope backtrack(*this);
+    if (skipSingle().hasCodeCompletion())
+      return true;
+
+    // If we have any keyword, identifier, or token that follows a function
+    // type's parameter list, this is a parameter list and not an attribute.
+    // Alternatively, we might have a token that illustrates we're not going to
+    // get anything following the attribute, which means the parentheses
+    // describe what follows the attribute.
+    return (!Tok.isAny(tok::arrow, tok::kw_throw, tok::kw_throws,
+                       tok::kw_rethrows, tok::r_paren, tok::r_brace,
+                       tok::r_square, tok::r_angle) &&
+            !Tok.isContextualKeyword("async") &&
+            !Tok.isContextualKeyword("reasync"));
+  }
 }
 
 SourceLoc Parser::consumeStartingCharacterOfCurrentToken(tok Kind, size_t Len) {
@@ -821,9 +885,11 @@ bool Parser::parseEndIfDirective(SourceLoc &Loc) {
     Loc = PreviousLoc;
     skipUntilConditionalBlockClose();
     return true;
-  } else if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
+  } else if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof)) {
     diagnose(Tok.getLoc(),
              diag::extra_tokens_conditional_compilation_directive);
+    skipUntilTokenOrEndOfLine(tok::NUM_TOKENS);
+  }
   return false;
 }
 
@@ -1027,11 +1093,18 @@ Parser::parseListItem(ParserStatus &Status, tok RightK, SourceLoc LeftLoc,
       return ParseListItemResult::Finished;
   }
   if (consumeIf(tok::comma)) {
-    if (Tok.isNot(RightK))
+    if (Tok.isNot(RightK) && !tokIsStringInterpolationEOF(Tok, RightK))
       return ParseListItemResult::Continue;
     if (!AllowSepAfterLast) {
       diagnose(Tok, diag::unexpected_separator, ",").fixItRemove(PreviousLoc);
     }
+    
+    // Enable trailing comma in string literal interpolation
+    if (tokIsStringInterpolationEOF(Tok, RightK)) {
+      RightLoc = Tok.getLoc();
+      return ParseListItemResult::FinishedInStringInterpolation;
+    }
+    
     return ParseListItemResult::Finished;
   }
   // If we're in a comma-separated list, the next token is at the
@@ -1123,27 +1196,28 @@ struct ParserUnit::Implementation {
   ClangImporterOptions clangImporterOpts;
   symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
   CASOptions CASOpts;
+  SerializationOptions SerializationOpts;
   DiagnosticEngine Diags;
   ASTContext &Ctx;
   SourceFile *SF;
   std::unique_ptr<Parser> TheParser;
 
   Implementation(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-                 const LangOptions &Opts, const TypeCheckerOptions &TyOpts,
-                 const SILOptions &silOpts, StringRef ModuleName)
-      : LangOpts(Opts), TypeCheckerOpts(TyOpts), SILOpts(silOpts), Diags(SM),
+                 const LangOptions &Opts, StringRef ModuleName)
+      : LangOpts(Opts), TypeCheckerOpts(TypeCheckerOptions()),
+        SILOpts(SILOptions()), Diags(SM),
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
-                             clangImporterOpts, symbolGraphOpts, CASOpts, SM,
-                             Diags)) {
+                             clangImporterOpts, symbolGraphOpts, CASOpts,
+                             SerializationOpts, SM, Diags)) {
     registerParseRequestFunctions(Ctx.evaluator);
 
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);
     parsingOpts |= ParsingFlags::DisableDelayedBodies;
     parsingOpts |= ParsingFlags::DisablePoundIfEvaluation;
+    parsingOpts |= ParsingFlags::PoundIfAllActive;
 
-    auto *M = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
+    auto *M = ModuleDecl::createEmpty(Ctx.getIdentifier(ModuleName), Ctx);
     SF = new (Ctx) SourceFile(*M, SFKind, BufferID, parsingOpts);
-    M->addAuxiliaryFile(*SF);
   }
 
   ~Implementation() {
@@ -1154,23 +1228,19 @@ struct ParserUnit::Implementation {
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
                        unsigned BufferID)
-    : ParserUnit(SM, SFKind, BufferID, LangOptions(), TypeCheckerOptions(),
-                 SILOptions(), "input") {}
+    : ParserUnit(SM, SFKind, BufferID, LangOptions(), "input") {}
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
                        unsigned BufferID, const LangOptions &LangOpts,
-                       const TypeCheckerOptions &TypeCheckOpts,
-                       const SILOptions &SILOpts, StringRef ModuleName)
-    : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, TypeCheckOpts,
-                               SILOpts, ModuleName)) {
+                       StringRef ModuleName)
+    : Impl(*new Implementation(SM, SFKind, BufferID, LangOpts, ModuleName)) {
   Impl.TheParser.reset(new Parser(BufferID, *Impl.SF, /*SIL=*/nullptr,
                                   /*PersistentState=*/nullptr));
 }
 
 ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
                        unsigned BufferID, unsigned Offset, unsigned EndOffset)
-    : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(),
-                               TypeCheckerOptions(), SILOptions(), "input")) {
+    : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(), "input")) {
 
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM,
@@ -1198,8 +1268,11 @@ void ParserUnit::parse() {
   if (auto tokens = P.takeTokenReceiver()->finalize())
     tokensRef = ctx.AllocateCopy(*tokens);
 
-  auto result = SourceFileParsingResult{ctx.AllocateCopy(items), tokensRef,
-                                        P.CurrentTokenHash};
+  std::optional<Fingerprint> fp;
+  if (P.CurrentTokenHash)
+    fp = Fingerprint(std::move(*P.CurrentTokenHash));
+
+  auto result = SourceFileParsingResult{ctx.AllocateCopy(items), tokensRef, fp};
   ctx.evaluator.cacheOutput(ParseSourceFileRequest{&P.SF}, std::move(result));
 }
 
@@ -1217,187 +1290,6 @@ const LangOptions &ParserUnit::getLangOptions() const {
 
 SourceFile &ParserUnit::getSourceFile() {
   return *Impl.SF;
-}
-
-ParsedDeclName swift::parseDeclName(StringRef name) {
-  if (name.empty()) return ParsedDeclName();
-
-  // Local function to handle the parsing of the base name + context.
-  //
-  // Returns true if an error occurred, without recording the base name.
-  ParsedDeclName result;
-  auto parseBaseName = [&](StringRef text) -> bool {
-    // Split the text into context name and base name.
-    StringRef contextName, baseName;
-    std::tie(contextName, baseName) = text.rsplit('.');
-    if (baseName.empty()) {
-      baseName = contextName;
-      contextName = StringRef();
-    } else if (contextName.empty()) {
-      return true;
-    }
-
-    auto isValidIdentifier = [](StringRef text) -> bool {
-      return Lexer::isIdentifier(text) && text != "_";
-    };
-
-    // Make sure we have an identifier for the base name.
-    if (!isValidIdentifier(baseName))
-      return true;
-
-    // If we have a context, make sure it is an identifier, or a series of
-    // dot-separated identifiers.
-    // FIXME: What about generic parameters?
-    if (!contextName.empty()) {
-      StringRef first;
-      StringRef rest = contextName;
-      do {
-        std::tie(first, rest) = rest.split('.');
-        if (!isValidIdentifier(first))
-          return true;
-      } while (!rest.empty());
-    }
-
-    // Record the results.
-    result.ContextName = contextName;
-    result.BaseName = baseName;
-    return false;
-  };
-
-  // If this is not a function name, just parse the base name and
-  // we're done.
-  if (name.back() != ')') {
-    if (Lexer::isOperator(name))
-      result.BaseName = name;
-    else if (parseBaseName(name))
-      return ParsedDeclName();
-    return result;
-  }
-
-  // We have a function name.
-  result.IsFunctionName = true;
-
-  // Split the base name from the parameters.
-  StringRef baseName, parameters;
-  std::tie(baseName, parameters) = name.split('(');
-  if (parameters.empty()) return ParsedDeclName();
-
-  // If the base name is prefixed by "getter:" or "setter:", it's an
-  // accessor.
-  if (baseName.starts_with("getter:")) {
-    result.IsGetter = true;
-    result.IsFunctionName = false;
-    baseName = baseName.substr(7);
-  } else if (baseName.starts_with("setter:")) {
-    result.IsSetter = true;
-    result.IsFunctionName = false;
-    baseName = baseName.substr(7);
-  }
-
-  // If the base name is prefixed by "subscript", it's an subscript.
-  if (baseName == "subscript") {
-    result.IsSubscript = true;
-  }
-
-  // Parse the base name.
-  if (parseBaseName(baseName)) return ParsedDeclName();
-
-  parameters = parameters.drop_back(); // ')'
-  if (parameters.empty()) return result;
-
-  if (parameters.back() != ':')
-    return ParsedDeclName();
-
-  bool isMember = !result.ContextName.empty();
-  do {
-    StringRef NextParam;
-    std::tie(NextParam, parameters) = parameters.split(':');
-
-    if (!Lexer::isIdentifier(NextParam))
-      return ParsedDeclName();
-    if (NextParam == "_") {
-      result.ArgumentLabels.push_back("");
-    } else if (isMember && NextParam == "self") {
-      // For a member, "self" indicates the self parameter. There can
-      // only be one such parameter.
-      if (result.SelfIndex) return ParsedDeclName();
-      result.SelfIndex = result.ArgumentLabels.size();
-    } else {
-      result.ArgumentLabels.push_back(NextParam);
-    }
-  } while (!parameters.empty());
-
-  return result;
-}
-
-DeclName ParsedDeclName::formDeclName(ASTContext &ctx, bool isSubscript,
-                                      bool isCxxClassTemplateSpec) const {
-  return formDeclNameRef(ctx, isSubscript, isCxxClassTemplateSpec).getFullName();
-}
-
-DeclNameRef ParsedDeclName::formDeclNameRef(ASTContext &ctx,
-                                            bool isSubscript,
-                                            bool isCxxClassTemplateSpec) const {
-  return swift::formDeclNameRef(ctx, BaseName, ArgumentLabels, IsFunctionName,
-                                /*IsInitializer=*/true, isSubscript,
-                                isCxxClassTemplateSpec);
-}
-
-DeclName swift::formDeclName(ASTContext &ctx,
-                             StringRef baseName,
-                             ArrayRef<StringRef> argumentLabels,
-                             bool isFunctionName,
-                             bool isInitializer,
-                             bool isSubscript,
-                             bool isCxxClassTemplateSpec) {
-  return formDeclNameRef(ctx, baseName, argumentLabels, isFunctionName,
-                         isInitializer, isSubscript,
-                         isCxxClassTemplateSpec).getFullName();
-}
-
-DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
-                                   StringRef baseName,
-                                   ArrayRef<StringRef> argumentLabels,
-                                   bool isFunctionName,
-                                   bool isInitializer,
-                                   bool isSubscript,
-                                   bool isCxxClassTemplateSpec) {
-  // We cannot import when the base name is not an identifier.
-  if (baseName.empty())
-    return DeclNameRef();
-
-  if (!Lexer::isIdentifier(baseName) && !Lexer::isOperator(baseName) &&
-      !isCxxClassTemplateSpec)
-    return DeclNameRef();
-
-  // Get the identifier for the base name. Special-case `init`.
-  DeclBaseName baseNameId;
-  if (isInitializer && baseName == "init")
-    baseNameId = DeclBaseName::createConstructor();
-  else if (isSubscript && baseName == "subscript")
-    baseNameId = DeclBaseName::createSubscript();
-  else
-    baseNameId = ctx.getIdentifier(baseName);
-
-  // For non-functions, just use the base name.
-  if (!isFunctionName && !baseNameId.isSubscript())
-    return DeclNameRef(baseNameId);
-
-  // For functions, we need to form a complete name.
-
-  // Convert the argument names.
-  SmallVector<Identifier, 4> argumentLabelIds;
-  for (auto argName : argumentLabels) {
-    if (argumentLabels.empty() || !Lexer::isIdentifier(argName)) {
-      argumentLabelIds.push_back(Identifier());
-      continue;
-    }
-
-    argumentLabelIds.push_back(ctx.getIdentifier(argName));
-  }
-
-  // Build the result.
-  return DeclNameRef({ ctx, baseNameId, argumentLabelIds });
 }
 
 void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {

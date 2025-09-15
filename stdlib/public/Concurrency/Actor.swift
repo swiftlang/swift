@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 /// Common marker protocol providing a shared "base" for both (local) `Actor`
 /// and (potentially remote) `DistributedActor` types.
@@ -99,11 +98,13 @@ internal func _enqueueOnMain(_ job: UnownedJob)
 @available(SwiftStdlib 5.1, *)
 @freestanding(expression)
 public macro isolation<T>() -> T = Builtin.IsolationMacro
+
 #endif
 
 #if $IsolatedAny
 @_alwaysEmitIntoClient
 @available(SwiftStdlib 5.1, *)
+@available(*, deprecated, message: "Use `.isolation` on @isolated(any) closure values instead.")
 public func extractIsolation<each Arg, Result>(
   _ fn: @escaping @isolated(any) (repeat each Arg) async throws -> Result
 ) -> (any Actor)? {

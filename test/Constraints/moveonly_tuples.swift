@@ -3,16 +3,14 @@
 // Tuples with noncopyable elements are not yet supported. Make sure we reject
 // them when code attempts to form such a type explicitly or by inference.
 
-@_moveOnly struct Butt {
+ struct Butt: ~Copyable {
     var x: Int
 }
 
-@_moveOnly
-struct Foo {
+struct Foo: ~Copyable {
     var t: (Int, Butt) // expected-error{{tuple with noncopyable element type 'Butt' is not supported}}
 }
-@_moveOnly
-struct Bar<T> {
+struct Bar<T>: ~Copyable {
     var t: (T, Butt) // expected-error{{tuple with noncopyable element type 'Butt' is not supported}}
     var u: (Int, (T, Butt)) // expected-error{{tuple with noncopyable element type 'Butt' is not supported}}
 }

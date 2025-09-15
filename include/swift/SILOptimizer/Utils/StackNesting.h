@@ -160,7 +160,11 @@ private:
   /// Returns the stack allocation instruction for a stack deallocation
   /// instruction.
   SILInstruction *getAllocForDealloc(SILInstruction *Dealloc) const {
-    return Dealloc->getOperand(0)->getDefiningInstruction();
+    SILValue op = Dealloc->getOperand(0);
+    while (auto *mvi = dyn_cast<MoveValueInst>(op)) {
+      op = mvi->getOperand();
+    }
+    return op->getDefiningInstruction();
   }
 
   /// Insert deallocations at block boundaries.

@@ -7,8 +7,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t-scratch)
 
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -plugin-path %swift-plugin-dir -parse-as-library -I %t %S/../Inputs/FakeDistributedActorSystems.swift -dump-macro-expansions %s -dump-macro-expansions 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-6.0-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-6.0-abi-triple -plugin-path %swift-plugin-dir -parse-as-library -I %t %S/../Inputs/FakeDistributedActorSystems.swift -dump-macro-expansions %s -dump-macro-expansions 2>&1 | %FileCheck %s
 
 import Distributed
 
@@ -24,7 +24,7 @@ protocol Greeter: DistributedActor where ActorSystem == FakeActorSystem {
 
 // CHECK: extension Greeter where Self: Distributed._DistributedActorStub {
 // CHECK:   distributed func greet(name: String) -> String {
-// CHECK:     if #available(SwiftStdlib 6.0, *) {
+// CHECK:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()
@@ -44,7 +44,7 @@ protocol Greeter2: DistributedActor where ActorSystem: DistributedActorSystem<an
 
 // CHECK: extension Greeter2 where Self: Distributed._DistributedActorStub {
 // CHECK:   distributed func greet(name: String) -> String {
-// CHECK:     if #available(SwiftStdlib 6.0, *) {
+// CHECK:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()
@@ -69,7 +69,7 @@ protocol Greeter3: DistributedActor where ActorSystem: DistributedActorSystem<an
 
 // CHECK: extension Greeter3 where Self: Distributed._DistributedActorStub {
 // CHECK:   distributed func greet(name: String) -> String {
-// CHECK:     if #available(SwiftStdlib 6.0, *) {
+// CHECK:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()
@@ -89,7 +89,7 @@ public protocol Greeter4: DistributedActor where ActorSystem == FakeActorSystem 
 
 // CHECK: extension Greeter4 where Self: Distributed._DistributedActorStub {
 // CHECK:   public distributed func greet(name: String) -> String {
-// CHECK:     if #available(SwiftStdlib 6.0, *) {
+// CHECK:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()
@@ -112,28 +112,28 @@ public protocol GreeterMore: DistributedActor where ActorSystem == FakeActorSyst
 
 // CHECK: extension GreeterMore where Self: Distributed._DistributedActorStub {
 // CHECK:   public distributed var  name : String {
-// CHECK:     if #available(SwiftStdlib 6.0, *) {
+// CHECK:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()
 // CHECK:     }
 // CHECK:   }
 // CHECK:   public distributed func greet(name: String) -> String {
-// CHECK:     if #available(SwiftStdlib 6.0, *) {
+// CHECK:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()
 // CHECK:     }
 // CHECK:   }
 // CHECK:   public distributed func another(string: String, int: Int) async throws -> Double {
-// CHECK:     if #available(SwiftStdlib 6.0, *) {
+// CHECK:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()
 // CHECK:     }
 // CHECK:   }
 // CHECK:   public distributed func generic<T: Codable>(value: T, int: Int) async throws -> T {
-// CHECK:     if #available(SwiftStdlib 6.0, *) {
+// CHECK:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
 // CHECK:       Distributed._distributedStubFatalError()
 // CHECK:     } else {
 // CHECK:       fatalError()

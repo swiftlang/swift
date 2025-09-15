@@ -1,0 +1,3 @@
+struct TopLevelModuleStruct {
+  int value;
+};

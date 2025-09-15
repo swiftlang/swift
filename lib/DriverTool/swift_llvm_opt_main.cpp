@@ -114,11 +114,11 @@ static llvm::cl::opt<std::string> PassPipeline(
 //                               Helper Methods
 //===----------------------------------------------------------------------===//
 
-static llvm::CodeGenOpt::Level GetCodeGenOptLevel(const SwiftLLVMOptOptions &options) {
+static llvm::CodeGenOptLevel GetCodeGenOptLevel(const SwiftLLVMOptOptions &options) {
   // TODO: Is this the right thing to do here?
   if (options.Optimized)
-    return llvm::CodeGenOpt::Default;
-  return llvm::CodeGenOpt::None;
+    return llvm::CodeGenOptLevel::Default;
+  return llvm::CodeGenOptLevel::None;
 }
 
 // Returns the TargetMachine instance or zero if no triple is provided.
@@ -214,7 +214,10 @@ int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     Opts.OutputKind = IRGenOutputKind::LLVMAssemblyAfterOptimization;
 
     // Then perform the optimizations.
-    performLLVMOptimizations(Opts, M.get(), TM.get(), &Out->os());
+    SourceManager SM;
+    DiagnosticEngine Diags(SM);
+    performLLVMOptimizations(Opts, Diags, nullptr, M.get(), TM.get(),
+                             &Out->os());
   } else {
     std::string Pipeline = PassPipeline;
     llvm::TargetLibraryInfoImpl TLII(ModuleTriple);

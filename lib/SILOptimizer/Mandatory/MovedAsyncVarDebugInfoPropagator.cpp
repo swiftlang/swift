@@ -61,6 +61,7 @@
 
 #define DEBUG_TYPE "sil-move-async-var-debuginfo-propagator"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/ApplySite.h"
@@ -95,7 +96,7 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original, SILBasicBlock *block) {
   builder.setCurrentDebugScope(original->getDebugScope());
   auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
   return builder.createDebugValue(original->getLoc(), undef,
-                                  *original.getVarInfo(), false,
+                                  *original.getVarInfo(), DontPoisonRefs,
                                   UsesMoveableValueDebugInfo);
 }
 
@@ -106,7 +107,7 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
   return builder.createDebugValue(original->getLoc(), undef,
-                                  *original.getVarInfo(), false,
+                                  *original.getVarInfo(), DontPoisonRefs,
                                   UsesMoveableValueDebugInfo);
 }
 
@@ -119,7 +120,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, UsesMoveableValueDebugInfo);
+      *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);
 }
 
 static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
@@ -131,7 +132,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, UsesMoveableValueDebugInfo);
+      *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);
 }
 
 namespace {

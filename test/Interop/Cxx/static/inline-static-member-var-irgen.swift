@@ -28,4 +28,4 @@ public func passingVarAsInout() {
 }
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$s4main17passingVarAsInoutyyF"()
-// CHECK: call swiftcc void @"$s4main11modifyInoutyys5Int32VzF"(ptr nocapture dereferenceable(4) @{{_ZN22WithInlineStaticMember12staticMemberE|"\?staticMember@WithInlineStaticMember@@2HA"}})
+// CHECK: call swiftcc void @"$s4main11modifyInoutyys5Int32VzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable(4) @{{_ZN22WithInlineStaticMember12staticMemberE|"\?staticMember@WithInlineStaticMember@@2HA"}})

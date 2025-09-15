@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/IRGen/Linking.h"
 #include "llvm/IR/Instructions.h"
@@ -62,6 +63,11 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
 }
 
 IRGenFunction::~IRGenFunction() {
+  // Move the trap basic blocks to the end of the function.
+  for (auto *FailBB : FailBBs) {
+    CurFn->splice(CurFn->end(), CurFn, FailBB->getIterator());
+  }
+
   emitEpilogue();
 
   // Restore the debug location.
@@ -308,6 +314,39 @@ IRGenFunction::emitTargetOSVersionAtLeastCall(llvm::Value *major,
   return Builder.CreateCall(fn, {platformID, major, minor, patch});
 }
 
+llvm::Value *
+IRGenFunction::emitTargetVariantOSVersionAtLeastCall(llvm::Value *major,
+                                                     llvm::Value *minor,
+                                                     llvm::Value *patch) {
+  auto *fn = cast<llvm::Function>(IGM.getPlatformVersionAtLeastFn());
+
+  llvm::Value *iOSPlatformID =
+    llvm::ConstantInt::get(IGM.Int32Ty, llvm::MachO::PLATFORM_IOS);
+  return Builder.CreateCall(fn->getFunctionType(), fn, {iOSPlatformID, major, minor, patch});
+}
+
+llvm::Value *
+IRGenFunction::emitTargetOSVersionOrVariantOSVersionAtLeastCall(
+    llvm::Value *major, llvm::Value *minor, llvm::Value *patch,
+    llvm::Value *variantMajor, llvm::Value *variantMinor,
+    llvm::Value *variantPatch) {
+  auto *fn = cast<llvm::Function>(
+      IGM.getTargetOSVersionOrVariantOSVersionAtLeastFn());
+
+  llvm::Value *macOSPlatformID =
+      llvm::ConstantInt::get(IGM.Int32Ty, llvm::MachO::PLATFORM_MACOS);
+
+  llvm::Value *iOSPlatformID =
+    llvm::ConstantInt::get(IGM.Int32Ty, llvm::MachO::PLATFORM_IOS);
+
+  return Builder.CreateCall(fn->getFunctionType(),
+                            fn, {macOSPlatformID, major, minor, patch,
+                                 iOSPlatformID, variantMajor, variantMinor,
+                                 variantPatch});
+}
+
+
+
 /// Initialize a relative indirectable pointer to the given value.
 /// This always leaves the value in the direct state; if it's not a
 /// far reference, it's the caller's responsibility to ensure that the
@@ -365,7 +404,7 @@ llvm::Value *IRGenFunction::emitLoadOfCompactFunctionPointer(
 void IRGenFunction::emitFakeExplosion(const TypeInfo &type,
                                       Explosion &explosion) {
   if (!isa<LoadableTypeInfo>(type)) {
-    explosion.add(llvm::UndefValue::get(type.getStorageType()->getPointerTo()));
+    explosion.add(llvm::UndefValue::get(IGM.PtrTy));
     return;
   }
 
@@ -373,7 +412,7 @@ void IRGenFunction::emitFakeExplosion(const TypeInfo &type,
   for (auto &element : schema) {
     llvm::Type *elementType;
     if (element.isAggregate()) {
-      elementType = element.getAggregateType()->getPointerTo();
+      elementType = IGM.PtrTy;
     } else {
       elementType = element.getScalarType();
     }
@@ -426,8 +465,7 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
     Size objectSize(IGM.DataLayout.getTypeAllocSize(objectTy));
     if (byteOffset.isMultipleOf(objectSize)) {
       // Cast to T*.
-      auto objectPtrTy = objectTy->getPointerTo();
-      base = Builder.CreateBitCast(base, objectPtrTy);
+      base = Builder.CreateBitCast(base, IGM.PtrTy);
 
       // GEP to the slot, computing the index as a signed number.
       auto scaledIndex =
@@ -441,8 +479,16 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
 
   // GEP to the slot.
   auto offsetValue = offset.getAsValue(*this);
-  auto slotPtr = emitByteOffsetGEP(base, offsetValue, objectTy);
+  auto slotPtr = emitByteOffsetGEP(base, offsetValue);
   return Address(slotPtr, objectTy, objectAlignment);
+}
+
+llvm::CallInst *IRBuilder::CreateExpectCond(IRGenModule &IGM,
+                                            llvm::Value *value,
+                                            bool expectedValue,
+                                            const Twine &name) {
+  unsigned flag = expectedValue ? 1 : 0;
+  return CreateExpect(value, llvm::ConstantInt::get(IGM.Int1Ty, flag), name);
 }
 
 llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
@@ -461,7 +507,7 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
     }
   }
 
-  if (IGM.IRGen.Opts.shouldOptimize()) {
+  if (IGM.IRGen.Opts.shouldOptimize() && !IGM.IRGen.Opts.MergeableTraps) {
     // Emit unique side-effecting inline asm calls in order to eliminate
     // the possibility that an LLVM optimization or code generation pass
     // will merge these blocks back together again. We emit an empty asm
@@ -499,6 +545,39 @@ void IRGenFunction::emitTrap(StringRef failureMessage, bool EmitUnreachable) {
   Builder.CreateNonMergeableTrap(IGM, failureMessage);
   if (EmitUnreachable)
     Builder.CreateUnreachable();
+}
+
+void IRGenFunction::emitConditionalTrap(llvm::Value *condition, StringRef failureMessage,
+                                        const SILDebugScope *debugScope) {
+  // The condition should be false, or we die.
+  auto expectedCond = Builder.CreateExpect(condition,
+                                           llvm::ConstantInt::get(IGM.Int1Ty, 0));
+
+  // Emit individual fail blocks so that we can map the failure back to a source
+  // line.
+  auto origInsertionPoint = Builder.GetInsertBlock();
+
+  llvm::BasicBlock *failBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+  llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+  auto br = Builder.CreateCondBr(expectedCond, failBB, contBB);
+
+  if (IGM.getOptions().AnnotateCondFailMessage && !failureMessage.empty())
+    br->addAnnotationMetadata(failureMessage);
+
+  Builder.SetInsertPoint(&CurFn->back());
+  Builder.emitBlock(failBB);
+  if (IGM.DebugInfo && debugScope) {
+    // If we are emitting DWARF, this does nothing. Otherwise the ``llvm.trap``
+    // instruction emitted from ``Builtin.condfail`` should have an inlined
+    // debug location. This is because zero is not an artificial line location
+    // in CodeView.
+    IGM.DebugInfo->setInlinedTrapLocation(Builder, debugScope);
+  }
+  emitTrap(failureMessage, /*EmitUnreachable=*/true);
+
+  Builder.SetInsertPoint(origInsertionPoint);
+  Builder.emitBlock(contBB);
+  FailBBs.push_back(failBB);
 }
 
 Address IRGenFunction::emitTaskAlloc(llvm::Value *size, Alignment alignment) {
@@ -776,6 +855,12 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     auto nullError = llvm::Constant::getNullValue(errorRes->getType());
     auto hasError = Builder.CreateICmpNE(errorRes, nullError);
     optionalErrorResult->addIncoming(errorRes, Builder.GetInsertBlock());
+
+    // Predict no error.
+    hasError =
+        getSILModule().getOptions().EnableThrowsPrediction ?
+        Builder.CreateExpectCond(IGM, hasError, false) : hasError;
+
     Builder.CreateCondBr(hasError, optionalErrorBB, normalContBB);
     Builder.emitBlock(normalContBB);
   }
@@ -792,8 +877,7 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     auto &resumeTI = cast<LoadableTypeInfo>(getTypeInfo(resumeTy));
     auto resultStorageTy = resumeTI.getStorageType();
     auto resultAddr =
-        Address(Builder.CreateBitOrPointerCast(resultAddrVal,
-                                               resultStorageTy->getPointerTo()),
+        Address(Builder.CreateBitOrPointerCast(resultAddrVal, IGM.PtrTy),
                 resultStorageTy, resumeTI.getFixedAlignment());
     resumeTI.loadAsTake(*this, resultAddr, outDirectResult);
   }
@@ -814,8 +898,8 @@ void IRGenFunction::emitResumeAsyncContinuationReturning(
   // pointer type.
   Address context = emitLoadOfContinuationContext(*this, continuation);
   auto destPtrAddr = emitAddrOfContinuationNormalResultPointer(*this, context);
-  auto destPtr = Builder.CreateBitCast(Builder.CreateLoad(destPtrAddr),
-                                     valueTI.getStorageType()->getPointerTo());
+  auto destPtr =
+      Builder.CreateBitCast(Builder.CreateLoad(destPtrAddr), IGM.PtrTy);
   Address destAddr = valueTI.getAddressForPointer(destPtr);
 
   valueTI.initializeWithTake(*this, destAddr, srcAddr, valueTy,
@@ -840,7 +924,8 @@ void IRGenFunction::emitResumeAsyncContinuationThrowing(
 void IRGenFunction::emitClearSensitive(Address address, llvm::Value *size) {
   // If our deployment target doesn't contain the new swift_clearSensitive,
   // fall back to memset_s
-  auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(IGM.Context);
+  auto deploymentAvailability =
+      AvailabilityRange::forDeploymentTarget(IGM.Context);
   auto clearSensitiveAvail = IGM.Context.getClearSensitiveAvailability();
   if (!deploymentAvailability.isContainedIn(clearSensitiveAvail)) {
     Builder.CreateCall(IGM.getMemsetSFunctionPointer(),
@@ -851,4 +936,3 @@ void IRGenFunction::emitClearSensitive(Address address, llvm::Value *size) {
   Builder.CreateCall(IGM.getClearSensitiveFunctionPointer(),
                          {address.getAddress(), size});
 }
-

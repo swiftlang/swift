@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -deinit-devirtualizer -module-name=test | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -deinit-devirtualizer -module-name=test -enable-experimental-cxx-interop -I %S/Inputs | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -7,47 +7,48 @@ sil_stage canonical
 import Builtin
 import Swift
 import SwiftShims
+import CXXTypesWithUserProvidedDestructor
 
 @inline(never) func log(_ s: StaticString)
 
-@_moveOnly struct S1 {
+struct S1: ~Copyable {
   deinit
 }
 
-@_moveOnly struct S2 {
+struct S2: ~Copyable {
   deinit
 }
 
-@_moveOnly struct S3<T> {
+struct S3<T>: ~Copyable {
   @_hasStorage let t: T
   deinit
 }
 
-@_moveOnly enum E1 {
+enum E1: ~Copyable {
   case A(Int)
   case B
   case C(S1)
 }
 
-@_moveOnly enum E2 {
+enum E2: ~Copyable {
   case A
   case B(E1)
   case C(S2)
 }
 
-@_moveOnly struct StrWithoutDeinit {
+struct StrWithoutDeinit: ~Copyable {
   @_hasStorage var a: S1
   @_hasStorage var b: S2
   @_hasStorage let c: Int
 }
 
-@_moveOnly struct S4 {
+struct S4: ~Copyable {
   @_hasStorage var a: S1
   @_hasStorage var b: S2
   deinit
 }
 
-@_moveOnly struct S5 {
+struct S5: ~Copyable {
   @_hasStorage let a: Int
   @_hasStorage let b: AnyObject
 }
@@ -272,6 +273,64 @@ bb0(%0 : $*S4):
   %r = tuple()
   return %r : $()
 }
+
+// CHECK-LABEL: sil [ossa] @nonCopyable_generic :
+// CHECK:         destroy_addr %0
+// CHECK:       } // end sil function 'nonCopyable_generic'
+sil [ossa] @nonCopyable_generic : $@convention(thin) <T where T : ~Copyable> (@in T) -> () {
+bb0(%0 : $*T):
+  destroy_addr %0 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nodevirt_of_cxx_type :
+// CHECK:         destroy_addr %0
+// CHECK:       } // end sil function 'nodevirt_of_cxx_type'
+sil [ossa] @nodevirt_of_cxx_type : $@convention(thin) (@in NonCopyable) -> () {
+bb0(%0 : $*NonCopyable):
+  destroy_addr %0
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil @test_non_ossa :
+// CHECK:         destroy_addr %0
+// CHECK:       } // end sil function 'test_non_ossa'
+sil @test_non_ossa : $@convention(thin) (@in S1) -> () {
+bb0(%0 : $*S1):
+  destroy_addr %0 : $*S1
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_destroyArray :
+// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK:         [[ONE:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK:         [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         [[PTA:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*S1
+// CHECK:         br bb1([[ZERO]] : $Builtin.Word)
+// CHECK:       bb1([[IV:%.*]] : $Builtin.Word):
+// CHECK:         [[CMP:%.*]] = builtin "cmp_slt_Word"([[IV]] : $Builtin.Word, %1 : $Builtin.Word)
+// CHECK:         cond_br [[CMP]], bb2, bb3
+// CHECK:       bb2:
+// CHECK:         [[ADDR:%.*]] = index_addr [[PTA]] :  $*S1, [[IV]]
+// CHECK:         [[DEINIT:%.*]] = function_ref @s1_deinit :
+// CHECK:         [[ELEMENT:%.*]] = load [take] [[ADDR]]
+// CHECK:         apply [[DEINIT]]([[ELEMENT]])
+// CHECK:         [[ADD:%.*]] = builtin "sadd_with_overflow_Word"([[IV]] : $Builtin.Word, [[ONE]] : $Builtin.Word, [[FALSE]] : $Builtin.Int1)
+// CHECK:         [[INCR:%.*]] = tuple_extract [[ADD]] : $(Builtin.Word, Builtin.Int1), 0
+// CHECK:         br bb1([[INCR]] : $Builtin.Word)
+// CHECKL       bb3:
+// CHECK:       } // end sil function 'test_destroyArray'
+sil [ossa] @test_destroyArray : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thin S1.Type                    // user: %10
+  %3 = builtin "destroyArray"<S1>(%2, %0, %1) : $()
+  %r = tuple ()
+  return %r
+}
+
 
 sil @s1_deinit : $@convention(method) (@owned S1) -> ()
 sil @s2_deinit : $@convention(method) (@owned S2) -> ()

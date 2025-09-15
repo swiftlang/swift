@@ -23,6 +23,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/BinaryByteStream.h"
+#include "llvm/Support/Endian.h"
 
 namespace swift {
 
@@ -34,13 +35,14 @@ class ExponentialGrowthAppendingBinaryByteStream
   SmallVector<uint8_t, 0> Data;
 
   /// Data in the stream is always encoded in little-endian byte order.
-  const llvm::support::endianness Endian = llvm::support::endianness::little;
+  const llvm::endianness Endian = llvm::endianness::little;
+
 public:
   ExponentialGrowthAppendingBinaryByteStream() = default;
 
   void reserve(size_t Size);
 
-  llvm::support::endianness getEndian() const override { return Endian; }
+  llvm::endianness getEndian() const override { return Endian; }
 
   llvm::Error readBytes(uint64_t Offset, uint64_t Size,
                         ArrayRef<uint8_t> &Buffer) override;

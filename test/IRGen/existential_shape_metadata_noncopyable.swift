@@ -4,6 +4,8 @@
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:   -module-name existential_shape_metadata | %IRGenFileCheck %s
 
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
+
 // NOTE: Once noncopyable generics are enabled by default, merge this back into existential_shape_metadata.swift
 
 // CHECK: @"$sl26existential_shape_metadata3QNC_px1ARts_XPXGMq" = linkonce_odr

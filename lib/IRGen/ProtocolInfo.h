@@ -124,9 +124,9 @@ public:
     return MethodEntry.Witness;
   }
 
-  static WitnessTableEntry forAssociatedType(AssociatedType ty) {
+  static WitnessTableEntry forAssociatedType(AssociatedTypeDecl *assocType) {
     WitnessTableEntry entry(WitnessKind::AssociatedTypeKind);
-    entry.AssociatedTypeEntry = {ty.getAssociation()};
+    entry.AssociatedTypeEntry = {assocType};
     return entry;
   }
   
@@ -134,9 +134,8 @@ public:
     return Kind == WitnessKind::AssociatedTypeKind;
   }
 
-  bool matchesAssociatedType(AssociatedType assocType) const {
-    return isAssociatedType() &&
-           AssociatedTypeEntry.Association == assocType.getAssociation();
+  bool matchesAssociatedType(AssociatedTypeDecl *assocType) const {
+    return isAssociatedType() && AssociatedTypeEntry.Association == assocType;
   }
 
   AssociatedTypeDecl *getAssociatedType() const {
@@ -231,6 +230,13 @@ class ProtocolInfo final :
                                               ProtocolInfoKind kind);
 
 public:
+  void operator delete(void *ptr) {
+    const auto *pThis = static_cast<ProtocolInfo *>(ptr);
+    const size_t count = pThis->NumTableEntries;
+    const size_t size = totalSizeToAlloc<WitnessTableEntry>(count);
+    ::operator delete(ptr, size);
+  }
+
   /// The number of witness slots in a conformance to this protocol;
   /// in other words, the size of the table in words.
   unsigned getNumWitnesses() const {
@@ -293,7 +299,7 @@ public:
   /// Return the witness index for the type metadata access function
   /// for the given associated type.
   WitnessIndex getAssociatedTypeIndex(IRGenModule &IGM,
-                                      AssociatedType assocType) const;
+                                      AssociatedTypeDecl *assocType) const;
 
   /// Return the witness index for the protocol witness table access
   /// function for the given associated protocol conformance.

@@ -4,7 +4,7 @@ protocol P { }
 
 protocol Q {
   associatedtype T
-  associatedtype U // expected-note 2{{protocol requires nested type 'U'; add nested type 'U' for conformance}}
+  associatedtype U // expected-note 2{{protocol requires nested type 'U'}}
 }
 
 protocol R: Q {
@@ -25,14 +25,18 @@ struct Y1: R {
   // okay: infers U = XU
 }
 
-struct Y2: R { // expected-error{{type 'Y2' does not conform to protocol 'Q'}}
+struct Y2: R { 
+  // expected-error@-1 {{type 'Y2' does not conform to protocol 'Q'}}
+  // expected-note@-2 {{add stubs for conformance}}
   typealias T = XTWithoutP
 
   // FIXME: More detail from diagnostic.
   // error: T: P fails
 }
 
-struct Y3: Q { // expected-error{{type 'Y3' does not conform to protocol 'Q'}}
+struct Y3: Q { 
+  // expected-error@-1 {{type 'Y3' does not conform to protocol 'Q'}}
+  // expected-note@-2 {{add stubs for conformance}}
   typealias T = XT
   // FIXME: More detail from diagnostic.
 }

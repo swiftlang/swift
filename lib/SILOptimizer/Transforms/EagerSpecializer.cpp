@@ -34,6 +34,7 @@
 
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -494,12 +495,10 @@ emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
   Builder.emitBlock(SuccessBB);
 }
 
-static SubstitutionMap getSingleSubstitutionMap(SILFunction *F,
-                                                  Type Ty) {
+static SubstitutionMap getSingleSubstitutionMap(SILFunction *F, Type Ty) {
   return SubstitutionMap::get(
-    F->getGenericEnvironment()->getGenericSignature(),
-    [&](SubstitutableType *type) { return Ty; },
-    MakeAbstractConformanceForGenericType());
+    F->getGenericEnvironment()->getGenericSignature(), Ty,
+    LookUpConformanceInModule());
 }
 
 void EagerDispatch::emitIsTrivialCheck(SILBasicBlock *FailedTypeCheckBB,
@@ -734,7 +733,7 @@ SILValue EagerDispatch::emitArgumentConversion(
     // loadable on the caller's side?
     auto argConv = substConv.getSILArgumentConvention(ArgIdx);
     SILValue Val;
-    if (!argConv.isGuaranteedConvention()) {
+    if (!argConv.isGuaranteedConventionInCaller()) {
       Val = Builder.emitLoadValueOperation(Loc, CastArg,
                                            LoadOwnershipQualifier::Take);
     } else {

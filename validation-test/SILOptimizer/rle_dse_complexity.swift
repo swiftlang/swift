@@ -13,7 +13,7 @@
 import Darwin
 
 // Check that redundant-load-elimination and dead-store-elimination don't take
-// extermely long when optimizing statfs, which contains a 1023-element tuple.
+// extremely long when optimizing statfs, which contains a 1023-element tuple.
 
 // CHECK-LABEL: test_rle_dse_compile_time
 public func test_rle_dse_compile_time(_ s: statfs) {

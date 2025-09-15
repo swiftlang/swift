@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt  -enable-sil-verify-all %s -copy-forwarding -enable-copyforwarding -allow-critical-edges=false | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types  -enable-sil-verify-all %s -copy-forwarding -enable-copyforwarding -allow-critical-edges=false | %FileCheck %s
 
 // This is the ossa version of CopyForwarding tests
 sil_stage raw

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2020 - 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2020 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,9 +11,20 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
-// TODO(swift): rename the file to ExecutorJob.swift eventually, we don't use PartialTask terminology anymore
+// N.B. It would be nice to rename this file to ExecutorJob.swift, but when
+//      trying that we hit an error from the API digester claiming that
+//
+//        +Var UnownedJob.context has mangled name changing from
+//          'Swift.UnownedJob.(context in #UNSTABLE ID#) : Builtin.Job' to
+//          'Swift.UnownedJob.(context in #UNSTABLE ID#) : Builtin.Job'
+//
+//      This is odd because `context` is private, so it isn't really part of
+//      the module API.
+
+// TODO: It would be better if some of the functions here could be inlined into
+// the Swift code.  In particular, some of the ones that deal with data held on
+// ExecutorJob.
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_job_run")
@@ -22,14 +33,14 @@ internal func _swiftJobRun(_ job: UnownedJob,
                            _ executor: UnownedSerialExecutor) -> ()
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 @_silgen_name("swift_job_run_on_task_executor")
 @usableFromInline
 internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
                                          _ executor: UnownedTaskExecutor) -> ()
 
 @_unavailableInEmbedded
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 @_silgen_name("swift_job_run_on_serial_and_task_executor")
 @usableFromInline
 internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
@@ -52,14 +63,14 @@ public struct UnownedJob: Sendable {
   private var context: Builtin.Job
 
   @usableFromInline
-  @available(SwiftStdlib 5.9, *)
+  @available(StdlibDeploymentTarget 5.9, *)
   internal init(context: Builtin.Job) {
     self.context = context
   }
 
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Create an `UnownedJob` whose lifetime must be managed carefully until it is run exactly once.
-  @available(SwiftStdlib 5.9, *)
+  @available(StdlibDeploymentTarget 5.9, *)
   public init(_ job: __owned Job) { // must remain '__owned' in order to not break ABI
     self.context = job.context
   }
@@ -67,20 +78,25 @@ public struct UnownedJob: Sendable {
 
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Create an `UnownedJob` whose lifetime must be managed carefully until it is run exactly once.
-  @available(SwiftStdlib 5.9, *)
+  @available(StdlibDeploymentTarget 5.9, *)
   public init(_ job: __owned ExecutorJob) { // must remain '__owned' in order to not break ABI
     self.context = job.context
   }
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
   /// The priority of this job.
-  @available(SwiftStdlib 5.9, *)
+  @available(StdlibDeploymentTarget 5.9, *)
   public var priority: JobPriority {
-    let raw = _swift_concurrency_jobPriority(self)
+    let raw: UInt8
+    if #available(StdlibDeploymentTarget 6.2, *) {
+      raw = _jobGetPriority(context)
+    } else {
+      fatalError("we shouldn't get here; if we have, availability is broken")
+    }
     return JobPriority(rawValue: raw)
   }
 
-  @available(SwiftStdlib 5.9, *)
+  @available(StdlibDeploymentTarget 5.9, *)
   internal var _context: Builtin.Job {
     context
   }
@@ -90,7 +106,7 @@ public struct UnownedJob: Sendable {
   @inlinable
   @available(*, deprecated, renamed: "ExecutorJob.runSynchronously(on:)")
   public func _runSynchronously(on executor: UnownedSerialExecutor) {
-    _swiftJobRun(self, executor)
+    unsafe _swiftJobRun(self, executor)
   }
 
   /// Run this job on the passed in executor.
@@ -106,7 +122,7 @@ public struct UnownedJob: Sendable {
   @_alwaysEmitIntoClient
   @inlinable
   public func runSynchronously(on executor: UnownedSerialExecutor) {
-    _swiftJobRun(self, executor)
+    unsafe _swiftJobRun(self, executor)
   }
 
   /// Run this job isolated to the passed task executor.
@@ -127,11 +143,11 @@ public struct UnownedJob: Sendable {
   ///
   /// - SeeAlso: ``runSynchronously(isolatedTo:taskExecutor:)``
   @_unavailableInEmbedded
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
   public func runSynchronously(on executor: UnownedTaskExecutor) {
-    _swiftJobRunOnTaskExecutor(self, executor)
+    unsafe _swiftJobRunOnTaskExecutor(self, executor)
   }
 
   /// Run this job isolated to the passed in serial executor, while executing it on the specified task executor.
@@ -145,20 +161,22 @@ public struct UnownedJob: Sendable {
   ///
   /// This operation consumes the job, preventing it accidental use after it has been run.
   ///
-  /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
-  /// as a job can only ever be run once, and must not be accessed after it has been run.
+  /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking
+  /// ``UnownedJob/runSynchronously(isolatedTo:taskExecutor:)` on it multiple times
+  /// is undefined behavior, as a job can only ever be run once, and must not be
+  /// accessed after it has been run.
   ///
   /// - Parameter serialExecutor: the executor this job will be semantically running on.
   /// - Parameter taskExecutor: the task executor this job will be run on.
   ///
   /// - SeeAlso: ``runSynchronously(on:)``
   @_unavailableInEmbedded
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
   public func runSynchronously(isolatedTo serialExecutor: UnownedSerialExecutor,
                                taskExecutor: UnownedTaskExecutor) {
-    _swiftJobRunOnTaskExecutor(self, serialExecutor, taskExecutor)
+    unsafe _swiftJobRunOnTaskExecutor(self, serialExecutor, taskExecutor)
   }
 
 }
@@ -188,11 +206,10 @@ extension UnownedJob: CustomStringConvertible {
 ///
 /// Unless you're implementing a scheduler,
 /// you don't generally interact with jobs directly.
-@available(SwiftStdlib 5.9, *)
+@available(StdlibDeploymentTarget 5.9, *)
 @available(*, deprecated, renamed: "ExecutorJob")
 @frozen
-@_moveOnly
-public struct Job: Sendable {
+public struct Job: Sendable, ~Copyable {
   internal var context: Builtin.Job
 
   @usableFromInline
@@ -209,7 +226,12 @@ public struct Job: Sendable {
   }
 
   public var priority: JobPriority {
-    let raw = _swift_concurrency_jobPriority(UnownedJob(context: self.context))
+    let raw: UInt8
+    if #available(StdlibDeploymentTarget 6.2, *) {
+      raw = _jobGetPriority(self.context)
+    } else {
+      fatalError("we shouldn't get here; if we have, availability is broken")
+    }
     return JobPriority(rawValue: raw)
   }
 
@@ -250,7 +272,7 @@ extension Job {
   @_alwaysEmitIntoClient
   @inlinable
   __consuming public func runSynchronously(on executor: UnownedSerialExecutor) {
-    _swiftJobRun(UnownedJob(self), executor)
+    unsafe _swiftJobRun(UnownedJob(self), executor)
   }
 }
 
@@ -258,10 +280,9 @@ extension Job {
 ///
 /// Unless you're implementing a scheduler,
 /// you don't generally interact with jobs directly.
-@available(SwiftStdlib 5.9, *)
+@available(StdlibDeploymentTarget 5.9, *)
 @frozen
-@_moveOnly
-public struct ExecutorJob: Sendable {
+public struct ExecutorJob: Sendable, ~Copyable {
   internal var context: Builtin.Job
 
   @usableFromInline
@@ -277,9 +298,68 @@ public struct ExecutorJob: Sendable {
     self.context = job.context
   }
 
-  public var priority: JobPriority {
-    let raw = _swift_concurrency_jobPriority(UnownedJob(context: self.context))
-    return JobPriority(rawValue: raw)
+  internal(set) public var priority: JobPriority {
+    get {
+      let raw: UInt8
+      if #available(StdlibDeploymentTarget 6.2, *) {
+        raw = _jobGetPriority(self.context)
+      } else {
+        fatalError("we shouldn't get here; if we have, availability is broken")
+      }
+      return JobPriority(rawValue: raw)
+    }
+    set {
+      if #available(StdlibDeploymentTarget 6.2, *) {
+        _jobSetPriority(self.context, newValue.rawValue)
+      } else {
+        fatalError("we shouldn't get here; if we have, availability is broken")
+      }
+    }
+  }
+
+  /// Execute a closure, passing it the bounds of the executor private data
+  /// for the job.  The executor is responsible for ensuring that any resources
+  /// referenced from the private data area are cleared up prior to running the
+  /// job.
+  ///
+  /// Parameters:
+  ///
+  /// - body: The closure to execute.
+  ///
+  /// Returns the result of executing the closure.
+  @available(StdlibDeploymentTarget 6.2, *)
+  public func withUnsafeExecutorPrivateData<R, E>(body: (UnsafeMutableRawBufferPointer) throws(E) -> R) throws(E) -> R {
+    let base = unsafe _jobGetExecutorPrivateData(self.context)
+    let size = unsafe 2 * MemoryLayout<OpaquePointer>.stride
+    return unsafe try body(UnsafeMutableRawBufferPointer(start: base,
+                                                         count: size))
+  }
+
+  /// Kinds of schedulable jobs
+  @available(StdlibDeploymentTarget 6.2, *)
+  @frozen
+  public struct Kind: Sendable, RawRepresentable {
+    public typealias RawValue = UInt8
+
+    /// The raw job kind value.
+    public var rawValue: RawValue
+
+    /// Creates a new instance with the specified raw value.
+    public init?(rawValue: Self.RawValue) {
+      self.rawValue = rawValue
+    }
+
+    /// A task.
+    public static let task = Kind(rawValue: RawValue(0))!
+
+    // Job kinds >= 192 are private to the implementation.
+    public static let firstReserved = Kind(rawValue: RawValue(192))!
+  }
+
+  /// What kind of job this is.
+  @available(StdlibDeploymentTarget 6.2, *)
+  public var kind: Kind {
+    return Kind(rawValue: _jobGetKind(self.context))!
   }
 
   // TODO: move only types cannot conform to protocols, so we can't conform to CustomStringConvertible;
@@ -298,7 +378,7 @@ public struct ExecutorJob: Sendable {
   }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(StdlibDeploymentTarget 5.9, *)
 extension ExecutorJob {
 
   /// Run this job on the passed in executor.
@@ -319,7 +399,7 @@ extension ExecutorJob {
   @_alwaysEmitIntoClient
   @inlinable
   __consuming public func runSynchronously(on executor: UnownedSerialExecutor) {
-    _swiftJobRun(UnownedJob(self), executor)
+    unsafe _swiftJobRun(UnownedJob(self), executor)
   }
 
   /// Run this job on the passed in task executor.
@@ -340,11 +420,11 @@ extension ExecutorJob {
   ///
   /// - SeeAlso: ``runSynchronously(isolatedTo:taskExecutor:)``
   @_unavailableInEmbedded
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
   __consuming public func runSynchronously(on executor: UnownedTaskExecutor) {
-    _swiftJobRunOnTaskExecutor(UnownedJob(self), executor)
+    unsafe _swiftJobRunOnTaskExecutor(UnownedJob(self), executor)
   }
 
   /// Run this job isolated to the passed in serial executor, while executing it on the specified task executor.
@@ -358,22 +438,133 @@ extension ExecutorJob {
   ///
   /// This operation consumes the job, preventing it accidental use after it has been run.
   ///
-  /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
-  /// as a job can only ever be run once, and must not be accessed after it has been run.
-  ///
   /// - Parameter serialExecutor: the executor this job will be semantically running on.
   /// - Parameter taskExecutor: the task executor this job will be run on.
   ///
   /// - SeeAlso: ``runSynchronously(on:)``
   @_unavailableInEmbedded
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @_alwaysEmitIntoClient
   @inlinable
   __consuming public func runSynchronously(isolatedTo serialExecutor: UnownedSerialExecutor,
                                taskExecutor: UnownedTaskExecutor) {
-    _swiftJobRunOnTaskExecutor(UnownedJob(self), serialExecutor, taskExecutor)
+    unsafe _swiftJobRunOnTaskExecutor(UnownedJob(self), serialExecutor, taskExecutor)
   }
 }
+
+// Helper to create a trampoline job to execute a job on a specified
+// executor.
+@available(StdlibDeploymentTarget 6.2, *)
+extension ExecutorJob {
+
+  /// Create a trampoline to enqueue the specified job on the specified
+  /// executor.
+  ///
+  /// This is useful in conjunction with the `Clock.run()` API, which
+  /// runs a job on an unspecified executor.
+  ///
+  /// Parameters:
+  ///
+  /// - to executor:   The `Executor` on which it should be enqueued.
+  ///
+  /// Returns:
+  ///
+  /// A new ExecutorJob that will enqueue the specified job on the specified
+  /// executor.
+  @available(StdlibDeploymentTarget 6.2, *)
+  public func createTrampoline(to executor: some Executor) -> ExecutorJob {
+    let flags = taskCreateFlags(
+      priority: TaskPriority(priority),
+      isChildTask: false,
+      copyTaskLocals: false,
+      inheritContext: false,
+      enqueueJob: false,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: false
+    )
+
+    let unownedJob = UnownedJob(context: self.context)
+    let (trampolineTask, _) = Builtin.createAsyncTask(flags) {
+      executor.enqueue(unownedJob)
+    }
+    let trampoline = Builtin.convertTaskToJob(trampolineTask)
+
+    return ExecutorJob(context: trampoline)
+  }
+
+}
+
+// Stack-disciplined job-local allocator support
+@available(StdlibDeploymentTarget 6.2, *)
+extension ExecutorJob {
+
+  /// Obtain a stack-disciplined job-local allocator.
+  ///
+  /// If the job does not support allocation, this property will be `nil`.
+  public var allocator: LocalAllocator? {
+    guard self.kind == .task else {
+      return nil
+    }
+
+    return LocalAllocator(context: self.context)
+  }
+
+  /// A job-local stack-disciplined allocator.
+  ///
+  /// This can be used to allocate additional data required by an
+  /// executor implementation; memory allocated in this manner must
+  /// be released by the executor before the job is executed.
+  ///
+  /// N.B. Because this allocator is stack disciplined, explicitly
+  /// deallocating memory out-of-order will cause your program to abort.
+  public struct LocalAllocator {
+    internal var context: Builtin.Job
+
+    /// Allocate a specified number of bytes of uninitialized memory.
+    public func allocate(capacity: Int) -> UnsafeMutableRawBufferPointer {
+      let base = unsafe _jobAllocate(context, capacity)
+      return unsafe UnsafeMutableRawBufferPointer(start: base, count: capacity)
+    }
+
+    /// Allocate uninitialized memory for a single instance of type `T`.
+    public func allocate<T>(as type: T.Type) -> UnsafeMutablePointer<T> {
+      let base = unsafe _jobAllocate(context, MemoryLayout<T>.size)
+      return unsafe base.bindMemory(to: type, capacity: 1)
+    }
+
+    /// Allocate uninitialized memory for the specified number of
+    /// instances of type `T`.
+    public func allocate<T>(capacity: Int, as type: T.Type)
+      -> UnsafeMutableBufferPointer<T> {
+      let base = unsafe _jobAllocate(context, MemoryLayout<T>.stride * capacity)
+      let typedBase = unsafe base.bindMemory(to: T.self, capacity: capacity)
+      return unsafe UnsafeMutableBufferPointer<T>(start: typedBase, count: capacity)
+    }
+
+    /// Deallocate previously allocated memory.  You must do this in
+    /// reverse order of allocations, prior to running the job.
+    public func deallocate(_ buffer: UnsafeMutableRawBufferPointer) {
+      unsafe _jobDeallocate(context, buffer.baseAddress!)
+    }
+
+    /// Deallocate previously allocated memory.  You must do this in
+    /// reverse order of allocations, prior to running the job.
+    public func deallocate<T>(_ pointer: UnsafeMutablePointer<T>) {
+      unsafe _jobDeallocate(context, UnsafeMutableRawPointer(pointer))
+    }
+
+    /// Deallocate previously allocated memory.    You must do this in
+    /// reverse order of allocations, prior to running the job.
+    public func deallocate<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
+      unsafe _jobDeallocate(context, UnsafeMutableRawPointer(buffer.baseAddress!))
+    }
+
+  }
+
+}
+
+
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 // ==== -----------------------------------------------------------------------
@@ -392,21 +583,31 @@ extension ExecutorJob {
 /// however, since not all jobs are tasks, represented as separate type.
 ///
 /// Conversions between the two priorities are available as initializers on the respective types.
-@available(SwiftStdlib 5.9, *)
+@available(StdlibDeploymentTarget 5.9, *)
 @frozen
 public struct JobPriority: Sendable {
   public typealias RawValue = UInt8
 
   /// The raw priority value.
   public var rawValue: RawValue
+
+  /// Construct from a raw value
+  public init(rawValue: RawValue) {
+    self.rawValue = rawValue
+  }
+
+  /// Construct from a TaskPriority
+  public init(_ p: TaskPriority) {
+    self.rawValue = p.rawValue
+  }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(StdlibDeploymentTarget 5.9, *)
 extension TaskPriority {
   /// Convert this ``UnownedJob/Priority`` to a ``TaskPriority``.
   ///
   /// Most values are directly interchangeable, but this initializer reserves the right to fail for certain values.
-  @available(SwiftStdlib 5.9, *)
+  @available(StdlibDeploymentTarget 5.9, *)
   public init?(_ p: JobPriority) {
     guard p.rawValue != 0 else {
       // 0 is "undefined"
@@ -416,7 +617,7 @@ extension TaskPriority {
   }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(StdlibDeploymentTarget 5.9, *)
 extension JobPriority: Equatable {
   public static func == (lhs: JobPriority, rhs: JobPriority) -> Bool {
     lhs.rawValue == rhs.rawValue
@@ -427,7 +628,7 @@ extension JobPriority: Equatable {
   }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(StdlibDeploymentTarget 5.9, *)
 extension JobPriority: Comparable {
   public static func < (lhs: JobPriority, rhs: JobPriority) -> Bool {
     lhs.rawValue < rhs.rawValue
@@ -483,12 +684,13 @@ extension JobPriority: Comparable {
 /// without making other changes.
 @available(SwiftStdlib 5.1, *)
 @frozen
+@unsafe
 public struct UnsafeContinuation<T, E: Error>: Sendable {
   @usableFromInline internal var context: Builtin.RawUnsafeContinuation
 
   @_alwaysEmitIntoClient
   internal init(_ context: Builtin.RawUnsafeContinuation) {
-    self.context = context
+    unsafe self.context = context
   }
 
   /// Resume the task that's awaiting the continuation
@@ -507,7 +709,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   @_alwaysEmitIntoClient
   public func resume(returning value: sending T) where E == Never {
     #if compiler(>=5.5) && $BuiltinContinuation
-    Builtin.resumeNonThrowingContinuationReturning(context, value)
+    unsafe Builtin.resumeNonThrowingContinuationReturning(context, value)
     #else
     fatalError("Swift compiler is incompatible with this SDK version")
     #endif
@@ -529,7 +731,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   @_alwaysEmitIntoClient
   public func resume(returning value: sending T) {
     #if compiler(>=5.5) && $BuiltinContinuation
-    Builtin.resumeThrowingContinuationReturning(context, value)
+    unsafe Builtin.resumeThrowingContinuationReturning(context, value)
     #else
     fatalError("Swift compiler is incompatible with this SDK version")
     #endif
@@ -551,7 +753,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   @_alwaysEmitIntoClient
   public func resume(throwing error: consuming E) {
     #if compiler(>=5.5) && $BuiltinContinuation
-    Builtin.resumeThrowingContinuationThrowing(context, error)
+    unsafe Builtin.resumeThrowingContinuationThrowing(context, error)
     #else
     fatalError("Swift compiler is incompatible with this SDK version")
     #endif
@@ -580,9 +782,9 @@ extension UnsafeContinuation {
   public func resume<Er: Error>(with result: __shared sending Result<T, Er>) where E == Error {
     switch result {
       case .success(let val):
-        self.resume(returning: val)
+        unsafe self.resume(returning: val)
       case .failure(let err):
-        self.resume(throwing: err)
+        unsafe self.resume(throwing: err)
     }
   }
 
@@ -606,9 +808,9 @@ extension UnsafeContinuation {
   public func resume(with result: __shared sending Result<T, E>) {
     switch result {
       case .success(let val):
-        self.resume(returning: val)
+        unsafe self.resume(returning: val)
       case .failure(let err):
-        self.resume(throwing: err)
+        unsafe self.resume(throwing: err)
     }
   }
 
@@ -624,7 +826,7 @@ extension UnsafeContinuation {
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
   public func resume() where T == Void {
-    self.resume(returning: ())
+    unsafe self.resume(returning: ())
   }
 }
 
@@ -637,7 +839,7 @@ internal func _resumeUnsafeContinuation<T>(
   _ continuation: UnsafeContinuation<T, Never>,
   _ value: sending T
 ) {
-  continuation.resume(returning: value)
+  unsafe continuation.resume(returning: value)
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -646,7 +848,7 @@ internal func _resumeUnsafeThrowingContinuation<T>(
   _ continuation: UnsafeContinuation<T, Error>,
   _ value: sending T
 ) {
-  continuation.resume(returning: value)
+  unsafe continuation.resume(returning: value)
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -655,7 +857,7 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
   _ continuation: UnsafeContinuation<T, Error>,
   _ error: consuming Error
 ) {
-  continuation.resume(throwing: error)
+  unsafe continuation.resume(throwing: error)
 }
 
 #endif
@@ -686,12 +888,13 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
+@unsafe
 public func withUnsafeContinuation<T>(
   isolation: isolated (any Actor)? = #isolation,
   _ fn: (UnsafeContinuation<T, Never>) -> Void
 ) async -> sending T {
   return await Builtin.withUnsafeContinuation {
-    fn(UnsafeContinuation<T, Never>($0))
+    unsafe fn(UnsafeContinuation<T, Never>($0))
   }
 }
 
@@ -722,12 +925,41 @@ public func withUnsafeContinuation<T>(
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
+@unsafe
 public func withUnsafeThrowingContinuation<T>(
   isolation: isolated (any Actor)? = #isolation,
   _ fn: (UnsafeContinuation<T, Error>) -> Void
 ) async throws -> sending T {
   return try await Builtin.withUnsafeThrowingContinuation {
-    fn(UnsafeContinuation<T, Error>($0))
+    unsafe fn(UnsafeContinuation<T, Error>($0))
+  }
+}
+
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@_unsafeInheritExecutor
+public func _unsafeInheritExecutor_withUnsafeContinuation<T>(
+  _ fn: (UnsafeContinuation<T, Never>) -> Void
+) async -> sending T {
+  return await Builtin.withUnsafeContinuation {
+    unsafe fn(UnsafeContinuation<T, Never>($0))
+  }
+}
+
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@_unsafeInheritExecutor
+public func _unsafeInheritExecutor_withUnsafeThrowingContinuation<T>(
+  _ fn: (UnsafeContinuation<T, Error>) -> Void
+) async throws -> sending T {
+  return try await Builtin.withUnsafeThrowingContinuation {
+    unsafe fn(UnsafeContinuation<T, Error>($0))
   }
 }
 
@@ -738,9 +970,18 @@ public func _abiEnableAwaitContinuation() {
   fatalError("never use this function")
 }
 
-// ==== -----------------------------------------------------------------------
-// MARK: Runtime functions
-
-@available(SwiftStdlib 5.9, *)
-@_silgen_name("swift_concurrency_jobPriority")
-internal func _swift_concurrency_jobPriority(_ job: UnownedJob) -> UInt8
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(StdlibDeploymentTarget 6.2, *)
+@_silgen_name("_swift_createJobForTestingOnly")
+public func _swift_createJobForTestingOnly(
+  priority: TaskPriority = TaskPriority.medium,
+  _ body: @escaping () -> ()
+) -> ExecutorJob {
+  let flags: Int = Int(priority.rawValue)
+  let (task, _) = Builtin.createAsyncTask(flags, body)
+  var job = ExecutorJob(unsafe unsafeBitCast(Builtin.convertTaskToJob(task),
+      to: UnownedJob.self))
+  job.priority = JobPriority(priority)
+  return job
+}
+#endif

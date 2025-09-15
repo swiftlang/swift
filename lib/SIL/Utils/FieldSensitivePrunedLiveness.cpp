@@ -14,6 +14,7 @@
 
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/AST/TypeExpansionContext.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SmallBitVector.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
@@ -147,6 +148,12 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
       continue;
     }
 
+    if (auto *uaci =
+            dyn_cast<UncheckedAddrCastInst>(projectionDerivedFromRoot)) {
+      projectionDerivedFromRoot = uaci->getOperand();
+      continue;
+    }
+
     if (auto *sbi = dyn_cast<StoreBorrowInst>(projectionDerivedFromRoot)) {
       projectionDerivedFromRoot = sbi->getDest();
       continue;
@@ -161,6 +168,12 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
     if (auto *oea =
             dyn_cast<OpenExistentialAddrInst>(projectionDerivedFromRoot)) {
       projectionDerivedFromRoot = oea->getOperand();
+      continue;
+    }
+
+    if (auto *iea =
+            dyn_cast<InitExistentialAddrInst>(projectionDerivedFromRoot)) {
+      projectionDerivedFromRoot = iea->getOperand();
       continue;
     }
 
@@ -581,7 +594,7 @@ void TypeTreeLeafTypeRange::get(
   }
 
   // An `inject_enum_addr` only initializes the enum tag.
-  if (auto inject = dyn_cast<InjectEnumAddrInst>(op->getUser())) {
+  if (isa<InjectEnumAddrInst>(op->getUser())) {
     // Subtract the deinit bit, if any: the discriminator bit is before it:
     //
     // [ case1 bits ..., case2 bits, ..., discriminator bit, deinit bit ]
@@ -1205,7 +1218,7 @@ namespace swift::test {
 // locations. In that case, the def nodes may be stores and the uses may be
 // destroy_addrs.
 static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
-    "fieldsensitive-multidefuse-liverange",
+    "fieldsensitive_multidefuse_liverange",
     [](auto &function, auto &arguments, auto &test) {
       SmallVector<SILBasicBlock *, 8> discoveredBlocks;
       auto value = arguments.takeValue();

@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: echo "public var x = Int()" | %target-swift-frontend -parse-as-library -module-name FooBar -emit-module -o %t -
-// RUN: %target-swift-emit-silgen -parse-stdlib -module-name expressions %s -I%t -disable-access-control | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib -module-name expressions %s -I%t -disable-access-control | %FileCheck %s
 
 import Swift
 import FooBar
@@ -541,6 +541,7 @@ func dontEmitIgnoredLoadExpr(_ a: NonTrivialStruct) -> NonTrivialStruct.Type {
 // CHECK-LABEL: dontEmitIgnoredLoadExpr
 // CHECK: bb0(%0 : @guaranteed $NonTrivialStruct):
 // CHECK-NEXT: debug_value
+// CHECK-NEXT: ignored_use
 // CHECK-NEXT: [[RESULT:%.*]] = metatype $@thin NonTrivialStruct.Type
 // CHECK-NEXT: return [[RESULT]] : $@thin NonTrivialStruct.Type
 
@@ -667,8 +668,10 @@ func implodeRecursiveTuple(_ expr: ((Int, Int), Int)?) {
   // CHECK-NEXT: ([[X:%[0-9]+]], [[Y:%[0-9]+]]) = destructure_tuple [[WHOLE]]
   // CHECK-NEXT: ([[X0:%[0-9]+]], [[X1:%[0-9]+]]) = destructure_tuple [[X]]
   // CHECK-NEXT: [[X:%[0-9]+]] = tuple ([[X0]] : $Int, [[X1]] : $Int)
-  // CHECK-NEXT: debug_value [[X]] : $(Int, Int), let, name "x"
-  // CHECK-NEXT: debug_value [[Y]] : $Int, let, name "y"
+  // CHECK-NEXT: [[MVX:%.*]] = move_value [var_decl] [[X]] : $(Int, Int)
+  // CHECK-NEXT: debug_value [[MVX]] : $(Int, Int), let, name "x"
+  // CHECK-NEXT: [[MVY:%.*]] = move_value [var_decl] [[Y]] : $Int
+  // CHECK-NEXT: debug_value [[MVY]] : $Int, let, name "y"
 
   let (x, y) = expr!
 }

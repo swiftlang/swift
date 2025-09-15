@@ -1,0 +1,7 @@
+---
+Name: cfuncs
+Functions:
+- Name: nullability_note
+  Parameters:
+  - Position: 0
+    Type: "const char * _Nullable const * _Nonnull"

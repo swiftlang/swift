@@ -169,10 +169,9 @@ extension ${Self}: LosslessStringConvertible {
       self.init(Substring(text))
     } else {
       self = 0.0
-#if $TypedThrows
-      let success = _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
-        text.withCString { chars -> Bool in
-          switch chars[0] {
+      let success = unsafe _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
+        unsafe text.withCString { chars -> Bool in
+          switch unsafe chars[0] {
           case 9, 10, 11, 12, 13, 32:
             return false // Reject leading whitespace
           case 0:
@@ -180,28 +179,11 @@ extension ${Self}: LosslessStringConvertible {
           default:
             break
           }
-          let endPtr = _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
+          let endPtr = unsafe _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
           // Succeed only if endPtr points to end of C string
-          return endPtr != nil && endPtr![0] == 0
+          return unsafe endPtr != nil && endPtr![0] == 0
         }
       }
-#else
-      let success = __abi_se0413_withUnsafeMutablePointer(to: &self) { p -> Bool in
-        text.withCString { chars -> Bool in
-          switch chars[0] {
-          case 9, 10, 11, 12, 13, 32:
-            return false // Reject leading whitespace
-          case 0:
-            return false // Reject empty string
-          default:
-            break
-          }
-          let endPtr = _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
-          // Succeed only if endPtr points to end of C string
-          return endPtr != nil && endPtr![0] == 0
-        }
-      }
-#endif
       if !success {
         return nil
       }
@@ -216,10 +198,9 @@ extension ${Self}: LosslessStringConvertible {
   @available(SwiftStdlib 5.3, *)
   public init?(_ text: Substring) {
     self = 0.0
-#if $TypedThrows
-    let success = _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
-      text.withCString { chars -> Bool in
-        switch chars[0] {
+    let success = unsafe _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
+      unsafe text.withCString { chars -> Bool in
+        switch unsafe chars[0] {
         case 9, 10, 11, 12, 13, 32:
           return false // Reject leading whitespace
         case 0:
@@ -227,28 +208,11 @@ extension ${Self}: LosslessStringConvertible {
         default:
           break
         }
-        let endPtr = _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
+        let endPtr = unsafe _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
         // Succeed only if endPtr points to end of C string
-        return endPtr != nil && endPtr![0] == 0
+        return unsafe endPtr != nil && endPtr![0] == 0
       }
     }
-#else
-    let success = __abi_se0413_withUnsafeMutablePointer(to: &self) { p -> Bool in
-      text.withCString { chars -> Bool in
-        switch chars[0] {
-        case 9, 10, 11, 12, 13, 32:
-          return false // Reject leading whitespace
-        case 0:
-          return false // Reject empty string
-        default:
-          break
-        }
-        let endPtr = _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
-        // Succeed only if endPtr points to end of C string
-        return endPtr != nil && endPtr![0] == 0
-      }
-    }
-#endif
     if !success {
       return nil
     }

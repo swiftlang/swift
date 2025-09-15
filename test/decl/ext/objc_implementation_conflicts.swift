@@ -11,7 +11,7 @@
 import objc_implementation_private
 #endif
 
-@_objcImplementation extension ObjCClass {
+@objc @implementation extension ObjCClass {
   @objc func method(fromHeader1: CInt) {
     // OK, provides an implementation for the header's method.
   }
@@ -108,6 +108,8 @@ import objc_implementation_private
     get { return 1 }
   }
 
+  @objc let readonlyPropertyFromHeader7: CInt
+
   @objc fileprivate var propertyNotFromHeader2: CInt
   // OK, provides a nonpublic but ObjC-compatible stored property
 
@@ -179,7 +181,7 @@ import objc_implementation_private
   let rdar122280735: (@escaping () -> ()) -> Void = { _ in }
 }
 
-@_objcImplementation(PresentAdditions) extension ObjCClass {
+@objc(PresentAdditions) @implementation extension ObjCClass {
   @objc func categoryMethod(fromHeader3: CInt) {
     // OK
   }
@@ -228,6 +230,17 @@ import objc_implementation_private
     // OK, provides an implementation with a computed property
     get { return 1 }
     set {}
+  }
+
+  @objc var categoryPropertyFromHeader5: CInt {
+    // OK, provides an implementation with a computed property
+    get { return 1 }
+    set {}
+  }
+
+  @objc var categoryReadonlyPropertyFromHeader1: CInt {
+    // OK, provides an implementation with a computed property
+    get { return 1 }
   }
 }
 

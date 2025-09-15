@@ -46,7 +46,8 @@ class LLVMTestCase(unittest.TestCase):
             compiler_vendor='none',
             clang_compiler_version=None,
             clang_user_visible_version=None,
-            darwin_deployment_version_osx='10.9')
+            darwin_deployment_version_osx='10.9',
+            use_linker=None)
 
         # Setup shell
         shell.dry_run = True
@@ -152,5 +153,37 @@ class LLVMTestCase(unittest.TestCase):
             build_dir='/path/to/build')
         self.assertIn(
             '-DCLANG_REPOSITORY_STRING=clang-2.2.3',
+            llvm.cmake_options
+        )
+
+    def test_use_linker(self):
+        self.args.use_linker = None
+        llvm = LLVM(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        for s in llvm.cmake_options:
+            self.assertFalse('CLANG_DEFAULT_LINKER' in s)
+
+        self.args.use_linker = 'gold'
+        llvm = LLVM(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn(
+            '-DCLANG_DEFAULT_LINKER=gold',
+            llvm.cmake_options
+        )
+
+        self.args.use_linker = 'lld'
+        llvm = LLVM(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn(
+            '-DCLANG_DEFAULT_LINKER=lld',
             llvm.cmake_options
         )

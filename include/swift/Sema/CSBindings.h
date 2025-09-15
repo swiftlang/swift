@@ -71,15 +71,12 @@ enum class LiteralBindingKind : uint8_t {
 /// along with information that can be used to construct related
 /// bindings, e.g., the supertypes of a given type.
 struct PotentialBinding {
-  friend class BindingSet;
-
   /// The type to which the type variable can be bound.
   Type BindingType;
 
   /// The kind of bindings permitted.
   AllowedBindingKind Kind;
 
-protected:
   /// The source of the type information.
   ///
   /// Determines whether this binding represents a "hole" in
@@ -91,10 +88,9 @@ protected:
                    PointerUnion<Constraint *, ConstraintLocator *> source)
       : BindingType(type), Kind(kind), BindingSource(source) {}
 
-public:
   PotentialBinding(Type type, AllowedBindingKind kind, Constraint *source)
       : PotentialBinding(
-            type->getWithoutParens(), kind,
+            type, kind,
             PointerUnion<Constraint *, ConstraintLocator *>(source)) {}
 
   bool isDefaultableBinding() const {
@@ -122,10 +118,10 @@ public:
   ConstraintLocator *getLocator() const {
     if (auto *constraint = BindingSource.dyn_cast<Constraint *>())
       return constraint->getLocator();
-    return BindingSource.get<ConstraintLocator *>();
+    return cast<ConstraintLocator *>(BindingSource);
   }
 
-  Constraint *getSource() const { return BindingSource.get<Constraint *>(); }
+  Constraint *getSource() const { return cast<Constraint *>(BindingSource); }
 
   PotentialBinding withType(Type type) const {
     return {type, Kind, BindingSource};
@@ -218,27 +214,11 @@ private:
 };
 
 struct PotentialBindings {
-  /// The constraint system this type variable and its bindings belong to.
-  ConstraintSystem &CS;
-
-  TypeVariableType *TypeVar;
+  /// The set of all constraints that have been added via infer().
+  llvm::SmallSetVector<Constraint *, 2> Constraints;
 
   /// The set of potential bindings.
   llvm::SmallVector<PotentialBinding, 4> Bindings;
-
-  /// The set of protocol requirements placed on this type variable.
-  llvm::SmallVector<Constraint *, 4> Protocols;
-
-  /// The set of unique literal protocol requirements placed on this
-  /// type variable or inferred transitively through subtype chains.
-  ///
-  /// Note that ordering is important when it comes to bindings, we'd
-  /// like to add any "direct" default types first to attempt them
-  /// before transitive ones.
-  llvm::SmallPtrSet<Constraint *, 2> Literals;
-
-  /// The set of constraints which would be used to infer default types.
-  llvm::SmallPtrSet<Constraint *, 2> Defaults;
 
   /// The set of constraints which delay attempting this type variable.
   llvm::TinyPtrVector<Constraint *> DelayedBy;
@@ -249,31 +229,21 @@ struct PotentialBindings {
   /// bindings (contained in the binding type e.g. `Foo<$T0>`), or
   /// reachable through subtype/conversion  relationship e.g.
   /// `$T0 subtype of $T1` or `$T0 arg conversion $T1`.
-  llvm::SmallDenseSet<std::pair<TypeVariableType *, Constraint *>, 2>
-      AdjacentVars;
-
-  ASTNode AssociatedCodeCompletionToken = ASTNode();
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 2> AdjacentVars;
 
   /// A set of all not-yet-resolved type variables this type variable
   /// is a subtype of, supertype of or is equivalent to. This is used
   /// to determine ordering inside of a chain of subtypes to help infer
   /// transitive bindings  and protocol requirements.
-  llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> SubtypeOf;
-  llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> SupertypeOf;
-  llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> EquivalentTo;
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> SubtypeOf;
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> SupertypeOf;
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> EquivalentTo;
 
-  PotentialBindings(ConstraintSystem &cs, TypeVariableType *typeVar)
-      : CS(cs), TypeVar(typeVar) {}
-
-  void addDefault(Constraint *constraint);
-
-  void addLiteral(Constraint *constraint);
+  ASTNode AssociatedCodeCompletionToken = ASTNode();
 
   /// Add a potential binding to the list of bindings,
   /// coalescing supertype bounds when we are able to compute the meet.
-  void addPotentialBinding(PotentialBinding binding);
-
-  bool isGenericParameter() const;
+  void addPotentialBinding(TypeVariableType *typeVar, PotentialBinding binding);
 
   bool isSubtypeOf(TypeVariableType *typeVar) const {
     return llvm::any_of(
@@ -288,17 +258,31 @@ private:
   /// Attempt to infer a new binding and other useful information
   /// (i.e. whether bindings should be delayed) from the given
   /// relational constraint.
-  std::optional<PotentialBinding> inferFromRelational(Constraint *constraint);
+  std::optional<PotentialBinding> inferFromRelational(
+      ConstraintSystem &CS,
+      TypeVariableType *TypeVar,
+      Constraint *constraint);
 
 public:
-  void infer(Constraint *constraint);
+  void infer(ConstraintSystem &CS,
+             TypeVariableType *TypeVar,
+             Constraint *constraint);
 
   /// Retract all bindings and other information related to a given
   /// constraint from this binding set.
   ///
   /// This would happen when constraint is simplified or solver backtracks
   /// (either from overload choice or (some) type variable binding).
-  void retract(Constraint *constraint);
+  void retract(ConstraintSystem &CS,
+               TypeVariableType *TypeVar,
+               Constraint *constraint);
+
+  void reset();
+
+  void dump(ConstraintSystem &CS,
+            TypeVariableType *TypeVar,
+            llvm::raw_ostream &out,
+            unsigned indent) const;
 };
 
 
@@ -378,31 +362,30 @@ class BindingSet {
 
 public:
   swift::SmallSetVector<PotentialBinding, 4> Bindings;
+
+  /// The set of protocol conformance requirements placed on this type variable.
+  llvm::SmallVector<Constraint *, 4> Protocols;
+
+  /// The set of unique literal protocol requirements placed on this
+  /// type variable or inferred transitively through subtype chains.
+  ///
+  /// Note that ordering is important when it comes to bindings, we'd
+  /// like to add any "direct" default types first to attempt them
+  /// before transitive ones.
   llvm::SmallMapVector<ProtocolDecl *, LiteralRequirement, 2> Literals;
+
   llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
 
   /// The set of transitive protocol requirements inferred through
   /// subtype/conversion/equivalence relations with other type variables.
   std::optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
 
-  BindingSet(const PotentialBindings &info)
-      : CS(info.CS), TypeVar(info.TypeVar), Info(info) {
-    for (const auto &binding : info.Bindings)
-      addBinding(binding, /*isTransitive=*/false);
-
-    for (auto *literal : info.Literals)
-      addLiteralRequirement(literal);
-
-    for (auto *constraint : info.Defaults)
-      addDefault(constraint);
-
-    for (auto &entry : info.AdjacentVars)
-      AdjacentVars.insert(entry.first);
-  }
+  BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
+             const PotentialBindings &info);
 
   ConstraintSystem &getConstraintSystem() const { return CS; }
 
-  TypeVariableType *getTypeVariable() const { return Info.TypeVar; }
+  TypeVariableType *getTypeVariable() const { return TypeVar; }
 
   /// Check whether this binding set belongs to a type variable
   /// that represents a result type of a closure.
@@ -504,7 +487,7 @@ public:
   }
 
   ArrayRef<Constraint *> getConformanceRequirements() const {
-    return Info.Protocols;
+    return Protocols;
   }
 
   unsigned getNumViableLiteralBindings() const;
@@ -544,6 +527,12 @@ public:
   void forEachLiteralRequirement(
       llvm::function_ref<void(KnownProtocolKind)> callback) const;
 
+  void forEachAdjacentVariable(
+      llvm::function_ref<void(TypeVariableType *)> callback) const {
+    for (auto *typeVar : AdjacentVars)
+      callback(typeVar);
+  }
+
   /// Return a literal requirement that has the most impact on the binding
   /// score.
   LiteralBindingKind getLiteralForScore() const;
@@ -564,64 +553,27 @@ public:
   ///
   /// \param inferredBindings The set of all bindings inferred for type
   /// variables in the workset.
-  void inferTransitiveBindings(
-      const llvm::SmallDenseMap<TypeVariableType *, BindingSet>
-          &inferredBindings);
+  void inferTransitiveBindings();
 
   /// Detect subtype, conversion or equivalence relationship
   /// between two type variables and attempt to propagate protocol
   /// requirements down the subtype or equivalence chain.
-  void inferTransitiveProtocolRequirements(
-      llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings);
+  void inferTransitiveProtocolRequirements();
 
   /// Finalize binding computation for this type variable by
   /// inferring bindings from context e.g. transitive bindings.
   ///
   /// \returns true if finalization successful (which makes binding set viable),
   /// and false otherwise.
-  bool finalize(
-      llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings);
+  bool finalize(bool transitive);
 
   static BindingScore formBindingScore(const BindingSet &b);
 
-  /// Compare two sets of bindings, where \c x < y indicates that
-  /// \c x is a better set of bindings that \c y.
-  friend bool operator<(const BindingSet &x, const BindingSet &y) {
-    auto xScore = formBindingScore(x);
-    auto yScore = formBindingScore(y);
+  bool operator==(const BindingSet &other);
 
-    if (xScore < yScore)
-      return true;
-
-    if (yScore < xScore)
-      return false;
-
-    auto xDefaults = x.getNumViableDefaultableBindings();
-    auto yDefaults = y.getNumViableDefaultableBindings();
-
-    // If there is a difference in number of default types,
-    // prioritize bindings with fewer of them.
-    if (xDefaults != yDefaults)
-      return xDefaults < yDefaults;
-
-    // If neither type variable is a "hole" let's check whether
-    // there is a subtype relationship between them and prefer
-    // type variable which represents superclass first in order
-    // for "subtype" type variable to attempt more bindings later.
-    // This is required because algorithm can't currently infer
-    // bindings for subtype transitively through superclass ones.
-    if (!(std::get<0>(xScore) && std::get<0>(yScore))) {
-      if (x.Info.isSubtypeOf(y.getTypeVariable()))
-        return false;
-
-      if (y.Info.isSubtypeOf(x.getTypeVariable()))
-        return true;
-    }
-
-    // As a last resort, let's check if the bindings are
-    // potentially incomplete, and if so, let's de-prioritize them.
-    return x.isPotentiallyIncomplete() < y.isPotentiallyIncomplete();
-  }
+  /// Compare two sets of bindings, where \c this < other indicates that
+  /// \c this is a better set of bindings that \c other.
+  bool operator<(const BindingSet &other);
 
   void dump(llvm::raw_ostream &out, unsigned indent) const;
 

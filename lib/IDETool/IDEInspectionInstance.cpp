@@ -20,6 +20,7 @@
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrettyStackTrace.h"
@@ -62,9 +63,10 @@ swift::ide::makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
 }
 
 namespace {
-/// Returns index number of \p D in \p Decls . If it's not found, returns ~0.
+/// Returns index number of \p D in \p Decls . If it's not found, returns
+/// \c nullopt.
 template <typename Range>
-unsigned findIndexInRange(Decl *D, const Range &Decls) {
+std::optional<unsigned> findIndexInRange(Decl *D, const Range &Decls) {
   unsigned N = 0;
   for (auto I = Decls.begin(), E = Decls.end(); I != E; ++I) {
     if ((*I)->isImplicit())
@@ -73,7 +75,7 @@ unsigned findIndexInRange(Decl *D, const Range &Decls) {
       return N;
     ++N;
   }
-  return ~0U;
+  return std::nullopt;
 }
 
 /// Return the element at \p N in \p Decls .
@@ -86,6 +88,23 @@ template <typename Range> Decl *getElementAt(const Range &Decls, unsigned N) {
     --N;
   }
   return nullptr;
+}
+
+static ArrayRef<AccessorDecl *>
+getParsedAccessors(AbstractStorageDecl *ASD,
+                   SmallVectorImpl<AccessorDecl *> &scratch) {
+  ASSERT(scratch.empty());
+  ASD->visitParsedAccessors([&](auto *AD) {
+    // Ignore accessors added by macro expansions.
+    // TODO: This ought to be the default behavior of `visitParsedAccessors`,
+    // we ought to have a different entrypoint for clients that care about
+    // the semantic set of "explicit" accessors.
+    if (AD->isInMacroExpansionInContext())
+      return;
+
+    scratch.push_back(AD);
+  });
+  return scratch;
 }
 
 /// Find the equivalent \c DeclContext with \p DC from \p SF AST.
@@ -105,7 +124,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     if (!D)
       return nullptr;
     auto *parentDC = newDC->getParent();
-    unsigned N = ~0U;
+    std::optional<unsigned> N;
 
     if (auto accessor = dyn_cast<AccessorDecl>(D)) {
       // The AST for accessors is like:
@@ -115,8 +134,13 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       auto *storage = accessor->getStorage();
       if (!storage)
         return nullptr;
-      auto accessorN = findIndexInRange(accessor, storage->getAllAccessors());
-      IndexStack.push_back(accessorN);
+
+      SmallVector<AccessorDecl *, 4> scratch;
+      auto accessorN =
+          findIndexInRange(accessor, getParsedAccessors(storage, scratch));
+      if (!accessorN)
+        return nullptr;
+      IndexStack.push_back(*accessorN);
       D = storage;
     }
 
@@ -124,7 +148,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       N = findIndexInRange(D, parentSF->getTopLevelDecls());
     } else if (auto parentIDC = dyn_cast_or_null<IterableDeclContext>(
                    parentDC->getAsDecl())) {
-      N = findIndexInRange(D, parentIDC->getMembers());
+      N = findIndexInRange(D, parentIDC->getParsedMembers());
     } else {
 #ifndef NDEBUG
       llvm_unreachable("invalid DC kind for finding equivalent DC (indexpath)");
@@ -133,11 +157,10 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     }
 
     // Not found in the decl context tree.
-    if (N == ~0U) {
+    if (!N)
       return nullptr;
-    }
 
-    IndexStack.push_back(N);
+    IndexStack.push_back(*N);
     newDC = parentDC;
   } while (!newDC->isModuleScopeContext());
 
@@ -152,7 +175,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     if (auto parentSF = dyn_cast<SourceFile>(newDC))
       D = getElementAt(parentSF->getTopLevelDecls(), N);
     else if (auto parentIDC = dyn_cast<IterableDeclContext>(newDC->getAsDecl()))
-      D = getElementAt(parentIDC->getMembers(), N);
+      D = getElementAt(parentIDC->getParsedMembers(), N);
     else
       llvm_unreachable("invalid DC kind for finding equivalent DC (query)");
 
@@ -160,7 +183,8 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       if (IndexStack.empty())
         return nullptr;
       auto accessorN = IndexStack.pop_back_val();
-      D = getElementAt(storage->getAllAccessors(), accessorN);
+      SmallVector<AccessorDecl *, 4> scratch;
+      D = getElementAt(getParsedAccessors(storage, scratch), accessorN);
     }
 
     newDC = dyn_cast_or_null<DeclContext>(D);
@@ -189,8 +213,10 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
 
   // Check the invalidation first. Otherwise, in case no 'CacheCI' exists yet,
   // the flag will remain 'true' even after 'CachedCI' is populated.
-  if (CachedCIShouldBeInvalidated.exchange(false))
+  if (CachedCIShouldBeInvalidated.exchange(false)) {
+    CachedCI = nullptr;
     return false;
+  }
   if (!CachedCI)
     return false;
   if (CachedReuseCount >= Opts.MaxASTReuseCount)
@@ -199,7 +225,6 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
     return false;
 
   auto *oldSF = CachedCI->getIDEInspectionFile();
-  assert(oldSF->getBufferID());
 
   auto *oldState = oldSF->getDelayedParserState();
   assert(oldState->hasIDEInspectionDelayedDeclState());
@@ -207,7 +232,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
 
   auto &SM = CachedCI->getSourceMgr();
   auto bufferName = ideInspectionTargetBuffer->getBufferIdentifier();
-  if (SM.getIdentifierForBuffer(*oldSF->getBufferID()) != bufferName)
+  if (SM.getIdentifierForBuffer(oldSF->getBufferID()) != bufferName)
     return false;
 
   if (shouldCheckDependencies()) {
@@ -222,7 +247,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
     }
 
     if (areAnyDependentFilesInvalidated(
-            *CachedCI, *FileSystem, *oldSF->getBufferID(),
+            *CachedCI, *FileSystem, oldSF->getBufferID(),
             DependencyCheckedTimestamp, InMemoryDependencyHash))
       return false;
     DependencyCheckedTimestamp = std::chrono::system_clock::now();
@@ -241,9 +266,11 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
   ClangImporterOptions clangOpts;
   symbolgraphgen::SymbolGraphOptions symbolOpts;
   CASOptions casOpts;
+  SerializationOptions serializationOpts =
+      CachedCI->getASTContext().SerializationOpts;
   std::unique_ptr<ASTContext> tmpCtx(
       ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
-                      symbolOpts, casOpts, tmpSM, tmpDiags));
+                      symbolOpts, casOpts, serializationOpts, tmpSM, tmpDiags));
   tmpCtx->CancellationFlag = CancellationFlag;
   registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);
@@ -251,10 +278,9 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
   registerClangImporterRequestFunctions(tmpCtx->evaluator);
   registerConstExtractRequestFunctions(tmpCtx->evaluator);
   registerSILGenRequestFunctions(tmpCtx->evaluator);
-  ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
+  ModuleDecl *tmpM = ModuleDecl::createEmpty(Identifier(), *tmpCtx);
   SourceFile *tmpSF = new (*tmpCtx)
       SourceFile(*tmpM, oldSF->Kind, tmpBufferID, oldSF->getParsingOptions());
-  tmpM->addAuxiliaryFile(*tmpSF);
 
   // FIXME: Since we don't setup module loaders on the temporary AST context,
   // 'canImport()' conditional compilation directive always fails. That causes
@@ -355,6 +381,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
           nullptr
         }
     );
+    SM.recordSourceFile(newBufferID, oldSF);
 
     AFD->setBodyToBeReparsed(newBodyRange);
     oldSF->clearScope();
@@ -387,20 +414,21 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
 
     // Create a new module and a source file using the current AST context.
     auto &Ctx = oldM->getASTContext();
-    auto *newM = ModuleDecl::createMainModule(Ctx, oldM->getName(),
-                                              oldM->getImplicitImportInfo());
+    auto *newM = ModuleDecl::createMainModule(
+        Ctx, oldM->getName(), oldM->getImplicitImportInfo(),
+        [&](ModuleDecl *newM, auto addFile) {
+      addFile(new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID,
+                                   oldSF->getParsingOptions()));
+    });
     newM->setABIName(oldM->getABIName());
-    auto *newSF = new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID,
-                                       oldSF->getParsingOptions());
-    newM->addFile(*newSF);
 
     // Tell the compiler instance we've replaced the main module.
     CachedCI->setMainModule(newM);
 
     // Re-process the whole file (parsing will be lazily triggered). Still
     // re-use imported modules.
+    auto *newSF = &newM->getMainSourceFile();
     performImportResolution(*newSF);
-    bindExtensions(*newM);
 
     traceDC = newM;
 #ifndef NDEBUG
@@ -489,7 +517,7 @@ void IDEInspectionInstance::performNewOperation(
     CI->getASTContext().CancellationFlag = CancellationFlag;
     registerIDERequestFunctions(CI->getASTContext().evaluator);
 
-    CI->performParseAndResolveImportsOnly();
+    performImportResolution(CI->getMainModule());
 
     bool DidFindIDEInspectionTarget = CI->getIDEInspectionFile()
                                         ->getDelayedParserState()
@@ -795,6 +823,71 @@ void swift::ide::IDEInspectionInstance::conformingMethodList(
 
               performIDEInspectionSecondPass(
                   *Result.CI->getIDEInspectionFile(), *callbacksFactory);
+              if (!Consumer.HandleResultsCalled) {
+                // If we didn't receive a handleResult call from the second
+                // pass, we didn't receive any results. To make sure Callback
+                // gets called exactly once, call it manually with no results
+                // here.
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
+              }
+            },
+            Callback);
+      });
+}
+
+void swift::ide::IDEInspectionInstance::signatureHelp(
+    swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
+    DiagnosticConsumer *DiagC,
+    std::shared_ptr<std::atomic<bool>> CancellationFlag,
+    llvm::function_ref<void(CancellableResult<SignatureHelpResults>)>
+        Callback) {
+  using ResultType = CancellableResult<SignatureHelpResults>;
+
+  struct ConsumerToCallbackAdapter : public swift::ide::SignatureHelpConsumer {
+    bool ReusingASTContext;
+    std::shared_ptr<std::atomic<bool>> CancellationFlag;
+    llvm::function_ref<void(ResultType)> Callback;
+    bool HandleResultsCalled = false;
+
+    ConsumerToCallbackAdapter(
+        bool ReusingASTContext,
+        std::shared_ptr<std::atomic<bool>> CancellationFlag,
+        llvm::function_ref<void(ResultType)> Callback)
+        : ReusingASTContext(ReusingASTContext),
+          CancellationFlag(CancellationFlag), Callback(Callback) {}
+
+    void handleResult(const SignatureHelpResult &result) override {
+      HandleResultsCalled = true;
+      if (CancellationFlag &&
+          CancellationFlag->load(std::memory_order_relaxed)) {
+        Callback(ResultType::cancelled());
+      } else {
+        Callback(ResultType::success({&result, ReusingASTContext}));
+      }
+    }
+  };
+
+  performOperation(
+      Invocation, Args, FileSystem, ideInspectionTargetBuffer, Offset, DiagC,
+      CancellationFlag,
+      [&](CancellableResult<IDEInspectionInstanceResult> CIResult) {
+        CIResult.mapAsync<SignatureHelpResults>(
+            [&CancellationFlag](auto &Result, auto DeliverTransformed) {
+              ConsumerToCallbackAdapter Consumer(
+                  Result.DidReuseAST, CancellationFlag, DeliverTransformed);
+              std::unique_ptr<IDEInspectionCallbacksFactory> callbacksFactory(
+                  ide::makeSignatureHelpCallbacksFactory(Consumer));
+
+              if (!Result.DidFindIDEInspectionTarget) {
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
+              }
+
+              performIDEInspectionSecondPass(*Result.CI->getIDEInspectionFile(),
+                                             *callbacksFactory);
               if (!Consumer.HandleResultsCalled) {
                 // If we didn't receive a handleResult call from the second
                 // pass, we didn't receive any results. To make sure Callback

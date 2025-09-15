@@ -18,12 +18,20 @@ class TrivialDestructor {
   deinit { }
 }
 
+class Klass {}
+
+struct NonTrivialStruct {
+  var k : Klass
+  init()
+}
+
 // Remove a dead array.
 // rdar://20980377 Add dead array elimination to DeadObjectElimination
 // Swift._allocateUninitializedArray <A> (Builtin.Word) -> (Swift.Array<A>, Builtin.RawPointer)
 sil [_semantics "array.uninitialized_intrinsic"] @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
 
 sil [_semantics "array.uninitialized"] @adoptStorageSpecializedForInt : $@convention(method) (@guaranteed _ContiguousArrayStorage<Int>, Builtin.Word, @thin Array<Int>.Type) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
+sil [_semantics "array.uninitialized"] @allocUninitialized : $@convention(thin) (Int) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
 
 sil [_semantics "array.finalize_intrinsic"] @finalize : $@convention(thin) (@owned Array<Int>) -> @owned Array<Int>
 
@@ -165,5 +173,41 @@ bb3:
 bb2:
   %18 = tuple ()
   return %18 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dead_debuginfo
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'dead_debuginfo'
+sil [ossa] @dead_debuginfo : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack [lexical] [var_decl] $NonTrivialStruct, var, name "x", type $NonTrivialStruct
+  %2 = integer_literal $Builtin.Int64, 0
+  %4 = struct $NonTrivialStruct (%0 : $Klass)
+  apply undef(%4) : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  store %4 to [init] %1 : $*NonTrivialStruct
+  destroy_addr %1 : $*NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  %t = tuple ()
+  return %t : $()
+}
+
+
+// CHECK-LABEL: sil [ossa] @dead_array_with_borrow :
+// CHECK-NOT:     apply
+// CHECK:         %1 = tuple
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'dead_array_with_borrow'
+sil [ossa] @dead_array_with_borrow : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = function_ref @allocUninitialized : $@convention(thin) (Int) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
+  %3 = apply %2(%0) : $@convention(thin) (Int) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
+  (%4, %5) = destructure_tuple %3
+  debug_value %4, let, name "a"
+  %7 = begin_borrow [lexical] %4
+  fix_lifetime %7
+  end_borrow %7
+  destroy_value %4
+  %11 = tuple ()
+  return %11
 }
 

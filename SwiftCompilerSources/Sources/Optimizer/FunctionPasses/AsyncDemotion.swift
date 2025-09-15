@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 private struct Stats: CustomStringConvertible {
@@ -122,8 +123,7 @@ enum Executor: CustomStringConvertible, Hashable {
         assert(enm.payload == nil, "expected empty payload case for a def")
         def = .nonisolated
 
-      } else if value.type.isNominal {
-        let nom = value.type.nominal
+      } else if let nom = value.type.nominal {
         def = nom.isGlobalActor ? .globalActor(nom) : .unknown(value.hashable)
 
       } else {
@@ -590,7 +590,7 @@ private func analyzeForDemotion(_ function: Function) -> Node? {
   // because it may be a caller of a function that can be demoted.
 
   var executors = Set<Executor>()
-  var knownAsyncApplys: [ApplySite] = []
+  var knownAsyncApplySites: [ApplySite] = []
   var hops: [Instruction] = []
   var unknownAsyncOp: Instruction? = nil
 
@@ -614,7 +614,7 @@ private func analyzeForDemotion(_ function: Function) -> Node? {
       if apply.referencedFunction == nil {
         unknownAsyncOp.setIfUnset(inst)
       } else {
-        knownAsyncApplys.append(apply)
+        knownAsyncApplySites.append(apply)
         stats.tick(.asyncKnownCallsCount)
       }
 
@@ -630,7 +630,7 @@ private func analyzeForDemotion(_ function: Function) -> Node? {
 
   let data: AnalysisResult.Data =
     (function: function,
-     knownAsyncCalls: knownAsyncApplys,
+     knownAsyncCalls: knownAsyncApplySites,
      executors: executors,
      hops: hops)
 

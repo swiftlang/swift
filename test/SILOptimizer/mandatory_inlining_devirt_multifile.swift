@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name test -primary-file %s %S/Inputs/mandatory_inlining_devirt_other.swift -emit-sil -o - | %FileCheck %s
+// RUN: %target-swift-frontend -module-name test -primary-file %s %S/Inputs/mandatory_inlining_devirt_other.swift -Xllvm -sil-print-types -emit-sil -o - | %FileCheck %s
 
 // rdar://45110471
 

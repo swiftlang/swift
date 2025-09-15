@@ -18,6 +18,14 @@ func asyncReplacement() async -> Int { }
 @available(*, noasync, renamed: "IOActor.readString()")
 func readStringFromIO() -> String {}
 
+// expected-warning@+1 {{'noasync' cannot be used in '@available' attribute for Swift}}
+@available(swift, noasync)
+func swiftNoAsync() { }
+
+// expected-warning@+1 {{'noasync' cannot be used in '@available' attribute for PackageDescription}}
+@available(_PackageDescription, noasync)
+func packageDescriptionNoAsync() { }
+
 @available(SwiftStdlib 5.5, *)
 actor IOActor {
     func readString() -> String {
@@ -30,13 +38,13 @@ func asyncFunc() async {
     // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}
     basicNoAsync()
 
-    // expected-warning@+1{{global function 'messageNoAsync' is unavailable from asynchronous contexts; a message from the author}}
+    // expected-warning@+1{{global function 'messageNoAsync' is unavailable from asynchronous contexts; a message from the author; this is an error in the Swift 6 language mode}}
     messageNoAsync()
 
-    // expected-warning@+1{{global function 'renamedNoAsync' is unavailable from asynchronous contexts}}{{5-19=asyncReplacement}}
+    // expected-warning@+1{{global function 'renamedNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}{{5-19=asyncReplacement}}
     renamedNoAsync() { _ in }
 
-    // expected-warning@+1{{global function 'readStringFromIO' is unavailable from asynchronous contexts}}{{13-29=IOActor.readString}}
+    // expected-warning@+1{{global function 'readStringFromIO' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}{{13-29=IOActor.readString}}
     let _ = readStringFromIO()
 }
 
@@ -44,6 +52,17 @@ func asyncFunc() async {
 @available(SwiftStdlib 5.5, *)
 @available(*, noasync)
 func unavailableAsyncFunc() async {
+}
+
+do {
+  struct S {
+    @available(*, noasync)
+    subscript(_: Int) -> Int {
+      get async {}
+      // expected-error@+1 {{'set' accessor is not allowed on property with 'get' accessor that is 'async' or 'throws'}}
+      set {}
+    }
+  }
 }
 
 @available(SwiftStdlib 5.5, *)

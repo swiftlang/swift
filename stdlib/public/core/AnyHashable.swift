@@ -103,7 +103,7 @@ internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
   internal
   func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool {
     guard let value = _baseHashable as? T else { return false }
-    result.initialize(to: value)
+    unsafe result.initialize(to: value)
     return true
   }
 }
@@ -165,8 +165,8 @@ public struct AnyHashable {
     }
 
     self.init(_box: _ConcreteHashableBox(false)) // Dummy value
-    _withUnprotectedUnsafeMutablePointer(to: &self) {
-      _makeAnyHashableUpcastingToHashableBaseType(
+    unsafe _withUnprotectedUnsafeMutablePointer(to: &self) {
+      unsafe _makeAnyHashableUpcastingToHashableBaseType(
         base,
         storingResultInto: $0)
     }
@@ -197,13 +197,13 @@ public struct AnyHashable {
   internal
   func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool {
     // Attempt the downcast.
-    if _box._downCastConditional(into: result) { return true }
+    if unsafe _box._downCastConditional(into: result) { return true }
 
     #if _runtime(_ObjC)
     // Bridge to Objective-C and then attempt the cast from there.
     // FIXME: This should also work without the Objective-C runtime.
     if let value = _bridgeAnythingToObjectiveC(_box._base) as? T {
-      result.initialize(to: value)
+      unsafe result.initialize(to: value)
       return true
     }
     #endif
@@ -308,7 +308,7 @@ internal func _makeAnyHashableUsingDefaultRepresentation<H: Hashable>(
   of value: H,
   storingResultInto result: UnsafeMutablePointer<AnyHashable>
 ) {
-  result.pointee = AnyHashable(_usingDefaultRepresentationOf: value)
+  unsafe result.pointee = AnyHashable(_usingDefaultRepresentationOf: value)
 }
 
 /// Provided by AnyHashable.cpp.
@@ -333,7 +333,7 @@ internal func _convertToAnyHashableIndirect<H: Hashable>(
   _ value: H,
   _ target: UnsafeMutablePointer<AnyHashable>
 ) {
-  target.initialize(to: AnyHashable(value))
+  unsafe target.initialize(to: AnyHashable(value))
 }
 
 /// Called by the casting machinery.
@@ -343,5 +343,5 @@ internal func _anyHashableDownCastConditionalIndirect<T>(
   _ value: UnsafePointer<AnyHashable>,
   _ target: UnsafeMutablePointer<T>
 ) -> Bool {
-  return value.pointee._downCastConditional(into: target)
+  return unsafe value.pointee._downCastConditional(into: target)
 }

@@ -83,8 +83,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   if (auto *A = ParsedArgs.getLastArg(OPT_target)) {
     Target = llvm::Triple(A->getValue());
   } else {
-    Diags.diagnose(SourceLoc(), diag::error_option_required, "-target");
-    return EXIT_FAILURE;
+    Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
   }
 
   std::string OutputDir;
@@ -119,7 +118,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     Invocation.getClangImporterOptions().ExtraArgs.push_back(A->getValue());
   }
 
-  std::vector<SearchPathOptions::FrameworkSearchPath> FrameworkSearchPaths;
+  std::vector<SearchPathOptions::SearchPath> FrameworkSearchPaths;
   for (const auto *A : ParsedArgs.filtered(OPT_F)) {
     FrameworkSearchPaths.push_back({A->getValue(), /*isSystem*/ false});
   }
@@ -129,7 +128,14 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   Invocation.setFrameworkSearchPaths(FrameworkSearchPaths);
   Invocation.getSearchPathOptions().LibrarySearchPaths =
       ParsedArgs.getAllArgValues(OPT_L);
-  Invocation.setImportSearchPaths(ParsedArgs.getAllArgValues(OPT_I));
+  std::vector<SearchPathOptions::SearchPath> ImportSearchPaths;
+  for (const auto *A : ParsedArgs.filtered(OPT_I)) {
+    ImportSearchPaths.push_back({A->getValue(), /*isSystem*/ false});
+  }
+  for (const auto *A : ParsedArgs.filtered(OPT_Isystem)) {
+    ImportSearchPaths.push_back({A->getValue(), /*isSystem*/ true});
+  }
+  Invocation.setImportSearchPaths(ImportSearchPaths);
 
   Invocation.getLangOptions().EnableObjCInterop = Target.isOSDarwin();
   Invocation.getLangOptions().DebuggerSupport = true;
@@ -196,7 +202,19 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
             .Default(AccessLevel::Public);
   }
 
-  Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags);
+  if (auto *A = ParsedArgs.getLastArg(OPT_allow_availability_platforms,
+        OPT_block_availability_platforms)) {
+    llvm::SmallVector<StringRef> AvailabilityPlatforms;
+    StringRef(A->getValue())
+        .split(AvailabilityPlatforms, ',', /*MaxSplits*/ -1,
+               /*KeepEmpty*/ false);
+    Options.AvailabilityPlatforms = llvm::DenseSet<StringRef>(
+        AvailabilityPlatforms.begin(), AvailabilityPlatforms.end());
+    Options.AvailabilityIsBlockList = A->getOption().matches(OPT_block_availability_platforms);
+  }
+
+  Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags,
+                                                    Invocation.getFrontendOptions());
 
   std::string InstanceSetupError;
   if (CI.setup(Invocation, InstanceSetupError)) {

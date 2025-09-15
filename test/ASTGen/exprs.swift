@@ -1,21 +1,20 @@
-
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only > %t/cpp-parser.ast.raw
-
-// Filter out any addresses in the dump, since they can differ.
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/astgen.ast.raw > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-parse -target %target-swift-5.1-abi-triple -enable-experimental-move-only -enable-experimental-feature ParserASTGen \
+// RUN:   -enable-experimental-feature OldOwnershipOperatorSpellings \
+// RUN:   | %sanitize-address > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-parse -target %target-swift-5.1-abi-triple -enable-experimental-move-only \
+// RUN:   -enable-experimental-feature OldOwnershipOperatorSpellings \
+// RUN:   | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen)
+// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -enable-experimental-feature OldOwnershipOperatorSpellings -enable-experimental-feature ParserASTGen)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_ParserASTGen
+// REQUIRES: swift_feature_OldOwnershipOperatorSpellings
 
-// -enable-experimental-feature requires an asserts build
-// REQUIRES: asserts
 // rdar://116686158
 // UNSUPPORTED: asan
 
@@ -29,8 +28,8 @@ func test1(x: Int, fn: (Int) -> Int) async throws -> Int {
     true
 
   let arlit = [0]
-  let tuple = (0, 1)
-  let diclit = [0: 1, 2: 3]
+  let tuple = (0, -21.4)
+  let diclit = [0: 1, 2: -3]
 
   return fn(x)
 }
@@ -67,6 +66,8 @@ struct TestStruct {
     _ = self.method(arg:_:).self
     _ = Ty.`Self` ==  Ty.`self`
   }
+
+  var optSelf: Self? { self }
 }
 
 func testSequence(arg1: Int, arg2: () -> Int, arg3: Any) {
@@ -87,6 +88,11 @@ func testUnaryExprs() async throws {
   let bar = copy foo
   let baz = consume foo
 }
+func throwsFunc() throws -> Int { 1 }
+func testOptionalTry() {
+  let _ = try! 1 + throwsFunc()
+  let _ = try? throwsFunc() + throwsFunc()
+}
 
 func testRepeatEach<each T>(_ t: repeat each T) -> (repeat each T) {
   return (repeat each t)
@@ -95,6 +101,8 @@ func testRepeatEach<each T>(_ t: repeat each T) -> (repeat each T) {
 func acceptClosures(x: () -> Void) {}
 func acceptClosures(x: () -> Void, y: () -> Int) {}
 func acceptClosures(x: () -> Void, y: () -> Int, _ z: () -> Void) {}
+func acceptClosures(x: (Int, String) -> Void) {}
+func acceptClosures(x: (Int, String, inout String) -> Void) {}
 func testTrailingClsure() {
   acceptClosures {}
   acceptClosures() {}
@@ -102,6 +110,40 @@ func testTrailingClsure() {
   acceptClosures(x: {}) { 12 } _: {}
   acceptClosures {} y: { 42 }
   acceptClosures(x: {}, y: { 12 }) {}
+
+  acceptClosures { (x, y: String) -> Void in  }
+  acceptClosures { x, y in  }
+  acceptClosures { @Sendable x, y in  }
+
+  acceptClosures { $1.count == $0.bitWidth }
+  acceptClosures { $1.count }
+  acceptClosures {
+    _ = $1
+    acceptClosures { $2 = $1 }
+  }
+}
+class TestClosure {
+  func testCaptureList() {
+    var val = self
+    var str = "t"
+    acceptClosures { [self] in _ = self }
+    acceptClosures { [self] in _ = $1 }
+    acceptClosures { [foo = self] in }
+    acceptClosures { [self = self] in }
+    acceptClosures { [weak self] in }
+    acceptClosures { [unowned self] in }
+    acceptClosures { [unowned(safe) self] in }
+    acceptClosures { [unowned(unsafe) self] in }
+    acceptClosures { [unowned(unsafe) self = val] in }
+    acceptClosures { [val = self] in }
+    acceptClosures { [val = self, str, self = val] in }
+  }
+}
+
+func testInOut() {
+  func acceptInOut(arg: inout Int) { arg += 1 }
+  var value = 42
+  acceptInOut(arg: &value)
 }
 
 func testStringLiteral(arg: Int) {
@@ -128,4 +170,64 @@ func testStringLiteral(arg: Int) {
     )
     baz
     """
+}
+
+func testNumberLiteral() {
+  _ = 12
+  _ = 1_2
+  _ = 0xab
+  _ = 0xab_p2
+  _ = 12.42
+  _ = 0b0000_1100_1000
+  _ = 1_
+  _ = 1_000
+  _ = 0b1111_0000_
+  _ = 0b1111_0000
+  _  = 0o127_777_
+  _ = 0o127_777
+  _ = 0x12FF_FFFF
+  _ = 0x12FF_FFFF_
+  _ = 1.0e42
+  _ = 0x1.0p0
+  _ = 0x1.fffffep+2
+  _ = 1_000.200_001e1_000
+  _ =  0x1_0000.0FFF_ABCDp10_001
+}
+
+class BaseCls {
+  init(base: Int) {}
+}
+class DerivedCls: BaseCls {
+  init(testSuperRef arg: Int) { super.init(base: arg) }
+}
+
+struct HasSubscript {
+  subscript(label label: Int, args: Int) -> Int { return 1 }
+}
+func testSubscript(intArry: [Int], val: HasSubscript) {
+  _ = intArry[12]
+  _ = val[label: 42, 14]
+}
+
+struct Generic<T: Comparable> {}
+func testSpecializeExpr() {
+  _ = Generic<Int>.self
+  _ = Generic<Int>()
+}
+
+func testOptionalChain(value: TestStruct) {
+  let _: TestStruct? = value.optSelf?.optSelf!
+  let _: TestStruct = value.optSelf!
+  let _: TestStruct = value.optSelf.self!
+
+  var value: Int? = 1
+  value? += 1
+}
+
+func testSwitchExpr(value: Int) {
+  let _ = switch value {
+    case 0: "foo"
+    case ...100: "bar"
+    default: "baz"
+  }
 }

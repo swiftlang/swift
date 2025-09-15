@@ -13,6 +13,8 @@
 - (void)superclassMethod:(int)param;
 @property (assign) int superclassProperty;
 
++ (void)superclassClassMethod;
+
 @end
 
 @protocol ObjCProto
@@ -51,6 +53,7 @@
 @property (readonly) int readonlyPropertyFromHeader4;
 @property (readonly) int readonlyPropertyFromHeader5;
 @property (readonly) int readonlyPropertyFromHeader6;
+@property (readonly) int readonlyPropertyFromHeader7;
 
 + (void)classMethod1:(int)param;
 + (void)classMethod2:(int)param;
@@ -82,6 +85,10 @@
 @property int categoryPropertyFromHeader2;
 @property int categoryPropertyFromHeader3;
 @property int categoryPropertyFromHeader4;
+@property int categoryPropertyFromHeader5;
+
+@property (readonly) int categoryReadonlyPropertyFromHeader1;
+
 
 @end
 
@@ -116,6 +123,7 @@
 - (void)doSomethingAsynchronousWithCompletionHandler:(void (^ _Nonnull)(id _Nullable result, NSError * _Nullable error))completionHandler;
 - (void)doSomethingElseAsynchronousWithCompletionHandler:(void (^ _Nullable)(id _Nonnull result))completionHandler;
 - (void)doSomethingFunAndAsynchronousWithCompletionHandler:(void (^ _Nonnull)(id _Nullable result, NSError * _Nullable error))completionHandler;
+- (void)doSomethingMissingAndAsynchronousWithCompletionHandler:(void (^ _Nonnull)(id _Nullable result, NSError * _Nullable error))completionHandler;
 
 - (void)doSomethingOverloadedWithCompletionHandler:(void (^ _Nonnull)())completionHandler;
 - (void)doSomethingOverloaded __attribute__((__swift_attr__("@_unavailableFromAsync(message: \"Use async doSomethingOverloaded instead.\")")));
@@ -124,6 +132,13 @@
 - (BOOL)doSomethingElseThatCanFail:(NSError **)error handler:(void (^ _Nonnull)())handler;
 - (BOOL)doSomethingThatCanFailWithWeirdParameterWithHandler:(void (^ _Nonnull)())handler :(NSError **)error;
 - (int)doSomethingThatCanFailWithWeirdReturnCodeWithError:(NSError **)error __attribute__((swift_error(nonzero_result)));
+
+@end
+
+@interface ObjCClass (InvalidMembers)
+
+- (void)unimplementedMember;
+- (void)nonObjCMethod:(id)value;
 
 @end
 
@@ -161,6 +176,10 @@
 
 - (nullable id)nullableResult;
 - (void)nullableArgument:(nullable id)arg;
+
+@end
+
+@interface ObjCClass (TypeMatchOptionalityInvalid)
 
 - (int)nonPointerResult;
 - (void)nonPointerArgument:(int)arg;
@@ -203,10 +222,16 @@
 @protocol EmptyObjCProto
 @end
 
+@interface ObjCClassWithWeirdSwiftAttributeCombo : ObjCBaseClass
+
+@end
+
 #endif
 
 void CImplFunc1(int param);
 void CImplFunc2(int param);
+
+void CImplFuncRenamed_C(int param) __attribute__((swift_name("CImplFuncRenamed_Swift(arg:)")));
 
 void CImplFuncMismatch1(int param);
 void CImplFuncMismatch2(int param);

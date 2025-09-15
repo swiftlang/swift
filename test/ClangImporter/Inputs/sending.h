@@ -27,8 +27,8 @@ SWIFT_SENDING
 @end
 
 NSObject *returnNSObjectFromGlobalFunction(NSObject *other);
-NSObject *transferNSObjectFromGlobalFunction(NSObject *other) SWIFT_SENDING;
-void transferNSObjectToGlobalFunction(NSObject *arg SWIFT_SENDING);
+NSObject *sendNSObjectFromGlobalFunction(NSObject *other) SWIFT_SENDING;
+void sendNSObjectToGlobalFunction(NSObject *arg SWIFT_SENDING);
 
 #endif
 
@@ -39,8 +39,11 @@ typedef struct {
 NonSendableCStruct
 returnUserDefinedFromGlobalFunction(NonSendableCStruct other);
 NonSendableCStruct
-transferUserDefinedFromGlobalFunction(NonSendableCStruct other) SWIFT_SENDING;
-void transferUserDefinedIntoGlobalFunction(
+sendUserDefinedFromGlobalFunction(NonSendableCStruct other) SWIFT_SENDING;
+void sendUserDefinedIntoGlobalFunction(
     NonSendableCStruct arg SWIFT_SENDING);
+
+void sendingWithCompletionHandler(void (^completion)(SWIFT_SENDING NonSendableCStruct arg));
+SWIFT_SENDING NonSendableCStruct sendingWithLazyReturn(SWIFT_SENDING NonSendableCStruct (^makeLazily)(void));
 
 #pragma clang assume_nonnull end

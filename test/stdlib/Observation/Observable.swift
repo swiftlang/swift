@@ -8,6 +8,7 @@
 // REQUIRES: observation
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_Macros
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
@@ -185,6 +186,39 @@ class RecursiveInner {
 }
 
 @Observable
+class GenericClass<T> {
+  var value = 3
+}
+
+struct StructParent {
+  @Observable
+  class NestedGenericClass<T> {
+    var value = 3
+  }
+}
+
+struct GenericStructParent<T> {
+  @Observable
+  class NestedClass {
+    var value = 3
+  }
+}
+
+class ClassParent {
+  @Observable
+  class NestedGenericClass<T> {
+    var value = 3
+  }
+}
+
+class GenericClassParent<T> {
+  @Observable
+  class NestedClass {
+    var value = 3
+  }
+}
+
+@Observable
 class RecursiveOuter {
   var inner = RecursiveInner()
   var value = "prefix"
@@ -252,6 +286,21 @@ struct CowContainer {
 final class CowTest {
   var container = CowContainer()
 }
+
+@Observable
+final class DeinitTriggeredObserver {
+  var property: Int = 3
+  let deinitTrigger: () -> Void
+
+  init(_ deinitTrigger: @escaping () -> Void) {
+    self.deinitTrigger = deinitTrigger
+  }
+
+  deinit {
+    deinitTrigger()
+  }
+}
+
 
 @main
 struct Validator {
@@ -475,6 +524,22 @@ struct Validator {
       expectEqual(subject.container.id, startId)
       subject.container.mutate()
       expectEqual(subject.container.id, startId)
+    }
+
+    suite.test("weak container observation") {
+      let changed = CapturedState(state: false)
+      let deinitialized = CapturedState(state: false)
+      var test = DeinitTriggeredObserver {
+        deinitialized.state = true
+      }
+      withObservationTracking { [weak test] in
+        _blackHole(test?.property)
+      } onChange: {
+        changed.state = true
+      }
+      test = DeinitTriggeredObserver { }
+      expectEqual(deinitialized.state, true)
+      expectEqual(changed.state, true)
     }
 
     runAllTests()

@@ -18,11 +18,13 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
@@ -79,10 +81,10 @@ SILLinkage swift::getSILLinkage(FormalLinkage linkage,
 }
 
 SILLinkage
-swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
+swift::getLinkageForProtocolConformance(const ProtocolConformance *C,
                                         ForDefinition_t definition) {
   // If the conformance was synthesized, give it shared linkage.
-  if (C->isSynthesized())
+  if (C->getRootConformance()->isSynthesized())
     return SILLinkage::Shared;
 
   auto typeDecl = C->getDeclContext()->getSelfNominalTypeDecl();
@@ -286,7 +288,7 @@ static bool isTypeMetadataForLayoutAccessible(SILModule &M, SILType type) {
 bool SILModule::isTypeABIAccessible(SILType type,
                                     TypeExpansionContext forExpansion) {
   // Fixed-ABI types can have value operations done without metadata.
-  if (Types.getTypeLowering(type, forExpansion).isFixedABI())
+  if (Types.getTypeProperties(type, forExpansion).isFixedABI())
     return true;
 
   assert(!type.is<ReferenceStorageType>() &&
@@ -306,18 +308,106 @@ bool SILModule::isTypeMetadataForLayoutAccessible(SILType type) {
   return ::isTypeMetadataForLayoutAccessible(*this, type);
 }
 
-static bool isUnsupportedKeyPathValueType(Type ty) {
+// Given the type `ty`, which should be in the generic environment of the signature
+// `sig`, return a generic signature with all of the requirements of `sig`,
+// combined with all of the requirements necessary for `ty` to be both
+// `Copyable` and `Escapable`, if possible. Returns `nullopt` if the type
+// can never be both Copyable and Escapable.
+static std::optional<GenericSignature>
+getKeyPathSupportingGenericSignature(Type ty, GenericSignature contextSig) {
+  auto &C = ty->getASTContext();
+  
+  // If the type is already unconditionally Copyable and Escapable, we don't
+  // need any further requirements.
+  if (ty->isCopyable() && ty->isEscapable()) {
+    return contextSig;
+  }
+  
+  ProtocolConformanceRef copyable, escapable;
+  auto copyableProtocol = C.getProtocol(KnownProtocolKind::Copyable);
+  auto escapableProtocol = C.getProtocol(KnownProtocolKind::Escapable);
+  
+  // If the type is an archetype, then it just needs Copyable and Escapable
+  // constraints imposed.
+  if (ty->is<ArchetypeType>()) {
+    copyable = ProtocolConformanceRef::forAbstract(ty->mapTypeOutOfContext(),
+                                                   copyableProtocol);
+    escapable = ProtocolConformanceRef::forAbstract(ty->mapTypeOutOfContext(),
+                                                    escapableProtocol);
+  } else {
+    // Look for any conditional conformances.
+    copyable = lookupConformance(ty, copyableProtocol);
+    escapable = lookupConformance(ty, escapableProtocol);
+  }
+
+  // If the type is never copyable or escapable, that's it.
+  if (copyable.isInvalid() || escapable.isInvalid()) {
+    return std::nullopt;
+  }
+  
+  // Otherwise, let's see if we get a viable generic signature combining the
+  // requirements for those conformances with the requirements of the
+  // declaration context.
+  SmallVector<Requirement, 2> ceRequirements;
+
+  auto getRequirementsFromConformance = [&](ProtocolConformanceRef ref) {
+    if (ref.isAbstract()) {
+      // The only requirements are that the abstract type itself be copyable
+      // and escapable.
+      ceRequirements.push_back(Requirement(RequirementKind::Conformance,
+               ty->mapTypeOutOfContext(), copyableProtocol->getDeclaredType()));
+      ceRequirements.push_back(Requirement(RequirementKind::Conformance,
+              ty->mapTypeOutOfContext(), escapableProtocol->getDeclaredType()));
+      return;
+    }
+    
+    if (!ref.isConcrete()) {
+      return;
+    }
+    auto conformance = ref.getConcrete();
+    
+    for (auto reqt : conformance->getRootConformance()
+                                ->getConditionalRequirements()) {
+      ceRequirements.push_back(reqt);
+    }
+  };
+  getRequirementsFromConformance(copyable);
+  getRequirementsFromConformance(escapable);
+
+  auto regularSignature = buildGenericSignatureWithError(C,
+                                               contextSig,
+                                               {},
+                                               std::move(ceRequirements),
+                                               /*allowInverses*/ false);
+  
+  // If the resulting signature has conflicting requirements, then it is
+  // impossible for the type to be copyable and equatable.
+  if (regularSignature.getInt()) {
+    return std::nullopt;
+  }
+  
+  // Otherwise, we have the signature we're looking for.
+  return regularSignature.getPointer();
+}
+
+static std::optional<GenericSignature>
+getKeyPathSupportingGenericSignatureForValueType(Type ty,
+                                                 GenericSignature sig) {
+  std::optional<GenericSignature> contextSig = sig;
+  
   // Visit lowered positions.
   if (auto tupleTy = ty->getAs<TupleType>()) {
     for (auto eltTy : tupleTy->getElementTypes()) {
       if (eltTy->is<PackExpansionType>())
-        return true;
+        return std::nullopt;
 
-      if (isUnsupportedKeyPathValueType(eltTy))
-        return true;
+      contextSig = getKeyPathSupportingGenericSignatureForValueType(
+                                                            eltTy, *contextSig);
+      if (!contextSig)
+        return std::nullopt;
     }
 
-    return false;
+    return contextSig;
   }
 
   if (auto objTy = ty->getOptionalObjectType())
@@ -329,61 +419,78 @@ static bool isUnsupportedKeyPathValueType(Type ty) {
     for (auto param : funcTy->getParams()) {
       auto paramTy = param.getPlainType();
       if (paramTy->is<PackExpansionType>())
-        return true;
+        return std::nullopt;
 
-      if (isUnsupportedKeyPathValueType(paramTy))
-        return true;
+      contextSig = getKeyPathSupportingGenericSignatureForValueType(paramTy,
+                                                                    *contextSig);
+      if (!contextSig) {
+        return std::nullopt;
+      }
     }
 
-    if (isUnsupportedKeyPathValueType(funcTy->getResult()))
-      return true;
+    contextSig = getKeyPathSupportingGenericSignatureForValueType(funcTy->getResult(),
+                                                                  *contextSig);
+
+    if (!contextSig) {
+      return std::nullopt;
+    }
   }
 
   // Noncopyable types aren't supported by key paths in their current form.
   // They would also need a new ABI that's yet to be implemented in order to
   // be properly supported, so let's suppress the descriptor for now if either
   // the container or storage type of the declaration is non-copyable.
-  if (ty->isNoncopyable())
-    return true;
-
-  return false;
+  return getKeyPathSupportingGenericSignature(ty, *contextSig);
 }
 
-bool AbstractStorageDecl::exportsPropertyDescriptor() const {
+std::optional<GenericSignature>
+AbstractStorageDecl::getPropertyDescriptorGenericSignature() const {
   // The storage needs a descriptor if it sits at a module's ABI boundary,
-  // meaning it has public linkage.
+  // meaning it has public linkage, and it is eligible to be part of a key path.
   
-  if (!isStatic()) {
-    if (auto contextTy = getDeclContext()->getDeclaredTypeInContext()) {
-      if (contextTy->isNoncopyable()) {
-        return false;
-      }
+  auto contextTy = getDeclContext()->getDeclaredTypeInContext();
+  auto contextSig = getInnermostDeclContext()->getGenericSignatureOfContext();
+  
+  // If the root type is never `Copyable` or `Escapable`, then instance
+  // members can't be used in key paths, at least as they are implemented
+  // today.
+  if (!isStatic() && contextTy) {
+    auto ceContextSig = getKeyPathSupportingGenericSignature(contextTy,
+                                                             contextSig);
+    if (!ceContextSig) {
+      return std::nullopt;
     }
+    contextSig = *ceContextSig;
   }
-  
-  // TODO: Global and static properties ought to eventually be referenceable
-  // as key paths from () or T.Type too.
-  if (!getDeclContext()->isTypeContext() || isStatic())
-    return false;
+
+  // TODO: Global properties ought to eventually be referenceable
+  // as key paths from ().
+  if (!getDeclContext()->isTypeContext())
+    return std::nullopt;
   
   // Protocol requirements do not need property descriptors.
   if (isa<ProtocolDecl>(getDeclContext()))
-    return false;
-  
+    return std::nullopt;
+
+  // Static properties declared directly in protocol do not need
+  // descriptors as existential Any.Type will not resolve to a value.
+  if (isStatic() && isa<ProtocolDecl>(getDeclContext()))
+    return std::nullopt;
+
   // FIXME: We should support properties and subscripts with '_read' accessors;
   // 'get' is not part of the opaque accessor set there.
   auto *getter = getOpaqueAccessor(AccessorKind::Get);
   if (!getter)
-    return false;
+    return std::nullopt;
 
   // If the getter is mutating, we cannot form a keypath to it at all.
   if (isGetterMutating())
-    return false;
+    return std::nullopt;
 
   // If the storage is an ABI-compatible override of another declaration, we're
   // not going to be emitting a property descriptor either.
   if (!isValidKeyPathComponent())
-    return false;
+    return std::nullopt;
 
   // TODO: If previous versions of an ABI-stable binary needed the descriptor,
   // then we still do.
@@ -403,7 +510,7 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   case SILLinkage::Private:
   case SILLinkage::Hidden:
     // Don't need a public descriptor.
-    return false;
+    return std::nullopt;
     
   case SILLinkage::HiddenExternal:
   case SILLinkage::PublicExternal:
@@ -411,19 +518,22 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
     llvm_unreachable("should be definition linkage?");
   }
 
-  auto typeInContext = getInnermostDeclContext()->mapTypeIntoContext(
+  auto typeInContext = contextSig.getGenericEnvironment()->mapTypeIntoContext(
       getValueInterfaceType());
-  if (isUnsupportedKeyPathValueType(typeInContext)) {
-    return false;
+  auto valueTypeSig = getKeyPathSupportingGenericSignatureForValueType(typeInContext, contextSig);
+  if (!valueTypeSig) {
+    return std::nullopt;
   }
+  contextSig = *valueTypeSig;
 
   // Subscripts with inout arguments (FIXME)and reabstracted arguments(/FIXME)
   // don't have descriptors either.
   if (auto sub = dyn_cast<SubscriptDecl>(this)) {
     for (auto *index : *sub->getIndices()) {
       // Keypaths can't capture inout indices.
-      if (index->isInOut())
-        return false;
+      if (index->isInOut()) {
+        return std::nullopt;
+      }
       
       auto indexTy = index->getInterfaceType()
                         ->getReducedType(sub->getGenericSignatureOfContext());
@@ -433,7 +543,7 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
       // had only one abstraction level and no explosion.
       
       if (isa<TupleType>(indexTy))
-        return false;
+        return std::nullopt;
       
       auto indexObjTy = indexTy;
       if (auto objTy = indexObjTy.getOptionalObjectType())
@@ -441,9 +551,9 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
       
       if (isa<AnyFunctionType>(indexObjTy)
           || isa<AnyMetatypeType>(indexObjTy))
-        return false;
+        return std::nullopt;
     }
   }
 
-  return true;
+  return contextSig;
 }

@@ -19,6 +19,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 
 #include "llvm/ADT/bit.h"
 
@@ -42,6 +43,11 @@ AccessLevel
 AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   assert(!D->hasAccess());
 
+  // ABI decls share the access level of their API decl.
+  auto abiRole = ABIRoleInfo(D);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getFormalAccess();
+
   // Check if the decl has an explicit access control attribute.
   if (auto *AA = D->getAttrs().getAttribute<AccessControlAttr>())
     return AA->getAccess();
@@ -55,18 +61,22 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     case AccessorKind::DistributedGet:
     case AccessorKind::Address:
     case AccessorKind::Read:
+    case AccessorKind::Read2:
+    case AccessorKind::Borrow:
       return storage->getFormalAccess();
     case AccessorKind::Set:
     case AccessorKind::MutableAddress:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
+    case AccessorKind::Mutate:
       return storage->getSetterFormalAccess();
     case AccessorKind::WillSet:
     case AccessorKind::DidSet:
       // These are only needed to synthesize the setter.
       return AccessLevel::Private;
     case AccessorKind::Init:
-      // These are only called from designated initializers.
-      return AccessLevel::Private;
+      // These are only called from within the same module.
+      return AccessLevel::Internal;
     }
   }
 
@@ -198,6 +208,12 @@ AccessLevel
 SetterAccessLevelRequest::evaluate(Evaluator &evaluator,
                                    AbstractStorageDecl *ASD) const {
   assert(!ASD->Accessors.getInt().hasValue());
+
+  // ABI decls share the access level of their API decl.
+  auto abiRole = ABIRoleInfo(ASD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getSetterFormalAccess();
+
   if (auto *SAA = ASD->getAttrs().getAttribute<SetterAccessAttr>())
     return SAA->getAccess();
 

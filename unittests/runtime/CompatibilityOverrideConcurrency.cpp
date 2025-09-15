@@ -92,6 +92,14 @@ swift_task_checkIsolated_override(SerialExecutorRef executor,
 }
 
 SWIFT_CC(swift)
+static int8_t
+swift_task_isIsolatingCurrentContext_override(SerialExecutorRef executor,
+                                      swift_task_isIsolatingCurrentContext_original original) {
+  Ran = true;
+  return 0;
+}
+
+SWIFT_CC(swift)
 static void swift_task_enqueueGlobalWithDelay_override(
     unsigned long long delay, Job *job,
     swift_task_enqueueGlobalWithDelay_original original) {
@@ -106,6 +114,11 @@ static void swift_task_enqueueMainExecutor_override(
 
 SWIFT_CC(swift)
 static void swift_task_startOnMainActor_override(AsyncTask* task) {
+  Ran = true;
+}
+
+SWIFT_CC(swift)
+static void swift_task_immediate_override(AsyncTask* task, SerialExecutorRef targetExecutor) {
   Ran = true;
 }
 
@@ -139,6 +152,8 @@ protected:
         swift_task_enqueueMainExecutor_override;
     swift_task_checkIsolated_hook =
         swift_task_checkIsolated_override;
+    swift_task_isIsolatingCurrentContext_hook =
+        swift_task_isIsolatingCurrentContext_override;
 #ifdef RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
     swift_task_asyncMainDrainQueue_hook =
         swift_task_asyncMainDrainQueue_override_fn;
@@ -194,6 +209,11 @@ TEST_F(CompatibilityOverrideConcurrencyTest,
 TEST_F(CompatibilityOverrideConcurrencyTest,
        test_swift_task_checkIsolated) {
   swift_task_checkIsolated(SerialExecutorRef::generic());
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest,
+       test_swift_task_isIsolatingCurrentContext) {
+  swift_task_isIsolatingCurrentContext(SerialExecutorRef::generic());
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest,
@@ -328,6 +348,16 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_escalate) {
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_startOnMainActorImpl) {
   swift_task_startOnMainActor(nullptr);
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_immediately) {
+  swift_task_immediate(nullptr, SerialExecutorRef::generic());
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest,
+       test_swift_task_isCurrentExecutorWithFlags) {
+  swift_task_isCurrentExecutorWithFlags(
+      swift_task_getMainExecutor(), swift_task_is_current_executor_flag::None);
 }
 
 #if RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST

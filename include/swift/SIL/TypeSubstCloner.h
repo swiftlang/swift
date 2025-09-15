@@ -36,7 +36,7 @@ namespace swift {
 /// subclasses. Used to break a circular dependency from SIL <=>
 /// SILOptimizer that would be caused by us needing to use
 /// SILOptFunctionBuilder here.
-template<typename ImplClass, typename FunctionBuilderTy>
+template<typename ImplClass>
 class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
   friend class SILInstructionVisitor<ImplClass>;
   friend class SILCloner<ImplClass>;
@@ -244,16 +244,20 @@ protected:
     auto FalseCount = inst->getFalseBBCount();
 
     // Try to use the scalar cast instruction.
-    if (canSILUseScalarCheckedCastInstructions(B.getModule(),
-                                               sourceType, targetType)) {
+    if (canOptimizeToScalarCheckedCastInstructions(
+            &B.getFunction(), sourceType, targetType,
+            inst->getConsumptionKind())) {
       emitIndirectConditionalCastWithScalar(
-          B, SwiftMod, loc, inst->getConsumptionKind(), src, sourceType, dest,
+          B, SwiftMod, loc, inst->getCheckedCastOptions(),
+          inst->getConsumptionKind(), src, sourceType, dest,
           targetType, succBB, failBB, TrueCount, FalseCount);
       return;
     }
 
     // Otherwise, use the indirect cast.
-    B.createCheckedCastAddrBranch(loc, inst->getConsumptionKind(),
+    B.createCheckedCastAddrBranch(loc,
+                                  inst->getCheckedCastOptions(),
+                                  inst->getConsumptionKind(),
                                   src, sourceType,
                                   dest, targetType,
                                   succBB, failBB);
@@ -281,6 +285,16 @@ protected:
     super::visitCopyValueInst(Copy);
   }
 
+  void visitExplicitCopyValueInst(ExplicitCopyValueInst *Copy) {
+    // If the substituted type is trivial, ignore the copy.
+    SILType copyTy = getOpType(Copy->getType());
+    if (copyTy.isTrivial(*Copy->getFunction())) {
+      recordFoldedValue(SILValue(Copy), getOpValue(Copy->getOperand()));
+      return;
+    }
+    super::visitExplicitCopyValueInst(Copy);
+  }
+
   void visitDestroyValueInst(DestroyValueInst *Destroy) {
     // If the substituted type is trivial, ignore the destroy.
     SILType destroyTy = getOpType(Destroy->getOperand()->getType());
@@ -288,6 +302,24 @@ protected:
       return;
     }
     super::visitDestroyValueInst(Destroy);
+  }
+
+  void visitEndLifetimeInst(EndLifetimeInst *endLifetime) {
+    // If the substituted type is trivial, ignore the end_lifetime.
+    SILType ty = getOpType(endLifetime->getOperand()->getType());
+    if (ty.isTrivial(*endLifetime->getFunction())) {
+      return;
+    }
+    super::visitEndLifetimeInst(endLifetime);
+  }
+
+  void visitExtendLifetimeInst(ExtendLifetimeInst *extendLifetime) {
+    // If the substituted type is trivial, ignore the extend_lifetime.
+    SILType ty = getOpType(extendLifetime->getOperand()->getType());
+    if (ty.isTrivial(*extendLifetime->getFunction())) {
+      return;
+    }
+    super::visitExtendLifetimeInst(extendLifetime);
   }
 
   void visitDifferentiableFunctionExtractInst(
@@ -331,7 +363,7 @@ protected:
                 remappedOrigFnType->getDifferentiabilityResultIndices(),
                 dfei->getDerivativeFunctionKind(),
                 getBuilder().getModule().Types,
-                LookUpConformanceInModule(SwiftMod))
+                LookUpConformanceInModule())
             ->getWithoutDifferentiability();
     SILType remappedDerivativeFnType = getOpType(dfei->getType());
     // If remapped derivative type and derivative remapped type are equal, do
@@ -354,6 +386,7 @@ protected:
   /// necessary when inlining said function into a new generic context.
   /// \param SubsMap - the substitutions of the inlining/specialization process.
   /// \param RemappedSig - the generic signature.
+  template<typename FunctionBuilderTy>
   static SILFunction *remapParentFunction(FunctionBuilderTy &FuncBuilder,
                                           SILModule &M,
                                           SILFunction *ParentFunction,
@@ -366,7 +399,7 @@ protected:
     if (!RemappedSig || !OriginalEnvironment)
       return ParentFunction;
 
-    if (SubsMap.hasArchetypes())
+    if (SubsMap.getRecursiveProperties().hasPrimaryArchetype())
       SubsMap = SubsMap.mapReplacementTypesOutOfContext();
 
     // One abstract function in the debug info can only have one set of variables
@@ -379,11 +412,11 @@ protected:
     // Note that mapReplacementTypesOutOfContext() can't do anything for
     // opened existentials, and since archetypes can't be mangled, ignore
     // this case for now.
-    if (SubsMap.hasArchetypes())
+    if (SubsMap.getRecursiveProperties().hasLocalArchetype())
       return ParentFunction;
 
     // Clone the function with the substituted type for the debug info.
-    Mangle::GenericSpecializationMangler Mangler(ParentFunction,
+    Mangle::GenericSpecializationMangler Mangler(M.getASTContext(), ParentFunction,
                                                  IsNotSerialized);
     std::string MangledName =
       Mangler.mangleForDebugInfo(RemappedSig, SubsMap, ForInlining);

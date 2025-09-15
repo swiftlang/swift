@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,9 +12,16 @@
 
 import ASTBridging
 import BasicBridging
+import SwiftIfConfig
 @_spi(RawSyntax) import SwiftSyntax
 
-protocol BridgedNullable: ExpressibleByNilLiteral {
+public typealias Identifier = swift.Identifier
+public typealias DeclBaseName = swift.DeclBaseName
+public typealias SourceLoc = swift.SourceLoc
+public typealias SourceRange = swift.SourceRange
+public typealias CharSourceRange = swift.CharSourceRange
+
+public protocol BridgedNullable: ExpressibleByNilLiteral {
   associatedtype RawPtr
   init(raw: RawPtr?)
 }
@@ -24,18 +31,23 @@ extension BridgedNullable {
   }
 }
 
-extension BridgedSourceLoc: BridgedNullable {}
-extension BridgedIdentifier: BridgedNullable {}
-extension BridgedNullableExpr: BridgedNullable {}
-extension BridgedNullableStmt: BridgedNullable {}
-extension BridgedNullableTypeRepr: BridgedNullable {}
-extension BridgedNullablePattern: BridgedNullable {}
-extension BridgedNullableGenericParamList: BridgedNullable {}
-extension BridgedNullableTrailingWhereClause: BridgedNullable {}
-extension BridgedNullableParameterList: BridgedNullable {}
-extension BridgedNullablePatternBindingInitializer: BridgedNullable {}
+extension SourceLoc: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension Identifier: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableDecl: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableExpr: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableStmt: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableTypeRepr: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullablePattern: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableGenericParamList: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableTrailingWhereClause: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableParameterList: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullablePatternBindingInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableDefaultArgumentInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableCustomAttributeInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableArgumentList: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableVarDecl: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 
-extension BridgedIdentifier: Equatable {
+extension Identifier: /*@retroactive*/ Swift.Equatable {
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.raw == rhs.raw
   }
@@ -58,6 +70,9 @@ extension Optional where Wrapped: BridgedHasNullable {
 extension BridgedStmt: BridgedHasNullable {
   typealias Nullable = BridgedNullableStmt
 }
+extension BridgedDecl: BridgedHasNullable {
+  typealias Nullable = BridgedNullableDecl
+}
 extension BridgedExpr: BridgedHasNullable {
   typealias Nullable = BridgedNullableExpr
 }
@@ -79,19 +94,33 @@ extension BridgedParameterList: BridgedHasNullable {
 extension BridgedPatternBindingInitializer: BridgedHasNullable {
   typealias Nullable = BridgedNullablePatternBindingInitializer
 }
+extension BridgedDefaultArgumentInitializer: BridgedHasNullable {
+  typealias Nullable = BridgedNullableDefaultArgumentInitializer
+}
+extension BridgedCustomAttributeInitializer: BridgedHasNullable {
+  typealias Nullable = BridgedNullableCustomAttributeInitializer
+}
+extension BridgedArgumentList: BridgedHasNullable {
+  typealias Nullable = BridgedNullableArgumentList
+}
+extension BridgedVarDecl: BridgedHasNullable {
+  typealias Nullable = BridgedNullableVarDecl
+}
 
-public extension BridgedSourceLoc {
-  /// Form a source location at the given absolute position in `buffer`.
+public extension SourceLoc {
+  /// Form a C++ source location at the given absolute position in `buffer`.
   init(
     at position: AbsolutePosition,
     in buffer: UnsafeBufferPointer<UInt8>
   ) {
     precondition(position.utf8Offset >= 0 && position.utf8Offset <= buffer.count)
-    self = BridgedSourceLoc(raw: buffer.baseAddress!).advanced(by: position.utf8Offset)
+    self = SourceLoc(raw: buffer.baseAddress!.advanced(by: position.utf8Offset))
   }
+
+  var isValid: Bool { isValid() }
 }
 
-extension BridgedLabeledStmtInfo: ExpressibleByNilLiteral {
+extension BridgedLabeledStmtInfo: /*@retroactive*/ Swift.ExpressibleByNilLiteral {
   public init(nilLiteral: ()) {
     self.init()
   }
@@ -105,7 +134,7 @@ extension String {
     )
   }
 
-  mutating func withBridgedString<R>(_ body: (BridgedStringRef) throws -> R) rethrows -> R {
+  public mutating func withBridgedString<R>(_ body: (BridgedStringRef) throws -> R) rethrows -> R {
     try withUTF8 { buffer in
       try body(BridgedStringRef(data: buffer.baseAddress, count: buffer.count))
     }
@@ -119,7 +148,7 @@ extension SyntaxText {
 }
 
 /// Allocate a copy of the given string as a null-terminated UTF-8 string.
-func allocateBridgedString(
+public func allocateBridgedString(
   _ string: String
 ) -> BridgedStringRef {
   var string = string
@@ -143,61 +172,74 @@ public func freeBridgedString(bridged: BridgedStringRef) {
   bridged.data?.deallocate()
 }
 
-extension BridgedStringRef {
-  var isEmptyInitialized: Bool {
-    return self.data == nil && self.count == 0
-  }
-}
-
-extension BridgedStringRef: ExpressibleByStringLiteral {
+extension BridgedStringRef: /*@retroactive*/ Swift.ExpressibleByStringLiteral {
   public init(stringLiteral str: StaticString) {
     self.init(data: str.utf8Start, count: str.utf8CodeUnitCount)
   }
 }
 
+extension VersionTuple {
+  var bridged: BridgedVersionTuple {
+    switch self.components.count {
+    case 4:
+      return BridgedVersionTuple(CUnsignedInt(components[0]), CUnsignedInt(components[1]), CUnsignedInt(components[2]), CUnsignedInt(components[3]))
+    case 3:
+      return BridgedVersionTuple(CUnsignedInt(components[0]), CUnsignedInt(components[1]), CUnsignedInt(components[2]))
+    case 2:
+      return BridgedVersionTuple(CUnsignedInt(components[0]), CUnsignedInt(components[1]))
+    case 1:
+      return BridgedVersionTuple(CUnsignedInt(components[0]))
+    case 0:
+      return BridgedVersionTuple()
+    default:
+      fatalError("unsuported version form")
+    }
+  }
+}
+
 extension SyntaxProtocol {
-  /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`
+  /// Obtains the C++ start location of the node excluding leading trivia in the source buffer provided by `astgen`
   ///
   /// - Parameter astgen: The visitor providing the source buffer.
   @available(*, deprecated, message: "use ASTContext.bridgedSourceLoc(syntax:)")
   @inline(__always)
-  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc {
+  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> SourceLoc {
     astgen.generateSourceLoc(self)
   }
 }
 
 extension Optional where Wrapped: SyntaxProtocol {
-  /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`.
+  /// Obtains the C++ start location of the node excluding leading trivia in the source buffer provided by `astgen`.
   ///
   /// - Parameter astgen: The visitor providing the source buffer.
   @available(*, deprecated, message: "use ASTContext.bridgedSourceLoc(syntax:)")
   @inline(__always)
-  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc {
+  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> SourceLoc {
     astgen.generateSourceLoc(self)
   }
 }
 
 extension TokenSyntax {
-  /// Obtains a bridged, `ASTContext`-owned copy of this token's text.
+  /// Obtains an `ASTContext`-owned copy of this token's text.
   ///
   /// - Parameter astgen: The visitor providing the `ASTContext`.
   @available(*, deprecated, message: "use ASTContext.bridgedIdentifier(token:)")
   @inline(__always)
-  func bridgedIdentifier(in astgen: ASTGenVisitor) -> BridgedIdentifier {
+  func bridgedIdentifier(in astgen: ASTGenVisitor) -> Identifier {
     astgen.generateIdentifier(self)
   }
 
-  /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
+  /// Obtains a `ASTContext`-owned copy of this token's text, and its C++ start location in the
   /// source buffer provided by `astgen`.
   ///
   /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
   @available(*, deprecated, message: "use ASTContext.bridgedIdentifierAndSourceLoc(token:)")
   @inline(__always)
-  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (BridgedIdentifier, BridgedSourceLoc) {
+  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (Identifier, SourceLoc) {
     astgen.generateIdentifierAndSourceLoc(self)
   }
 
-  /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
+  /// Obtains a `ASTContext`-owned copy of this token's text, and its C++ start location in the
   /// source buffer provided by `astgen`.
   ///
   /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
@@ -209,31 +251,37 @@ extension TokenSyntax {
 }
 
 extension Optional<TokenSyntax> {
-  /// Obtains a bridged, `ASTContext`-owned copy of this token's text.
+  /// Obtains a `ASTContext`-owned copy of this token's text.
   ///
   /// - Parameter astgen: The visitor providing the `ASTContext`.
   @available(*, deprecated, message: "use ASTContext.bridgedIdentifier(token:)")
   @inline(__always)
-  func bridgedIdentifier(in astgen: ASTGenVisitor) -> BridgedIdentifier {
+  func bridgedIdentifier(in astgen: ASTGenVisitor) -> Identifier {
     astgen.generateIdentifier(self)
   }
 
-  /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
+  /// Obtains a `ASTContext`-owned copy of this token's text, and its C++ start location in the
   /// source buffer provided by `astgen` excluding leading trivia.
   ///
   /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
   @available(*, deprecated, message: "use ASTContext.bridgedIdentifierAndSourceLoc(token:)")
   @inline(__always)
-  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (BridgedIdentifier, BridgedSourceLoc) {
+  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (Identifier, SourceLoc) {
     astgen.generateIdentifierAndSourceLoc(self)
   }
 }
 
-extension BridgedSourceRange {
+extension SourceRange {
   @available(*, deprecated, message: "use ASTContext.bridgedSourceRange(startToken:endToken:)")
   @inline(__always)
   init(startToken: TokenSyntax, endToken: TokenSyntax, in astgen: ASTGenVisitor) {
     self = astgen.generateSourceRange(start: startToken, end: endToken)
+  }
+}
+
+extension Fingerprint {
+  var bridged: BridgedFingerprint {
+    BridgedFingerprint(v1: self.core.0, v2: self.core.1)
   }
 }
 
@@ -277,4 +325,29 @@ extension ConcatCollection: LazyCollectionProtocol {
     case .c2(let i): return c2[i]
     }
   }
+}
+
+extension BridgedArrayRef {
+  public func withElements<T, R>(ofType ty: T.Type, _ c: (UnsafeBufferPointer<T>) -> R) -> R {
+    let start = data?.assumingMemoryBound(to: ty)
+    let buffer = UnsafeBufferPointer(start: start, count: count)
+    return c(buffer)
+  }
+}
+
+/// Utility to pass Swift closure to C/C++ bridging API.
+///
+/// C/C++ API can call the closure via `BridgedSwiftClosure::operator()` which
+/// calls `bridgedSwiftClosureCall_1(_:_:)` function below.
+func withBridgedSwiftClosure(closure: (UnsafeRawPointer?) -> Void, call: (BridgedSwiftClosure) -> Void) {
+  withoutActuallyEscaping(closure) { escapingClosure in
+    withUnsafePointer(to: escapingClosure) { ptr in
+      call(BridgedSwiftClosure(closure: ptr))
+    }
+  }
+}
+
+@_cdecl("swift_ASTGen_bridgedSwiftClosureCall_1")
+func bridgedSwiftClosureCall_1(_ bridged: BridgedSwiftClosure, _ arg: UnsafeRawPointer?) {
+  bridged.closure.assumingMemoryBound(to: ((UnsafeRawPointer?) -> Void).self).pointee(arg)
 }

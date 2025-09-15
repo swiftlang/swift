@@ -760,9 +760,13 @@ public struct PublicVars {
 
     public var k = PublicImportType()
     public var l = PackageImportType() // expected-error {{property cannot be declared public because its type 'PackageImportType' uses a package type}}
+// expected-note @-1 {{is imported by this file as}}
     public var m = InternalImportType() // expected-error {{property cannot be declared public because its type 'InternalImportType' uses an internal type}}
+// expected-note @-1 {{is imported by this file as}}
     public var n = FileprivateImportType() // expected-error {{property cannot be declared public because its type 'FileprivateImportType' uses a fileprivate type}}
+// expected-note @-1 {{is imported by this file as}}
     public var o = PrivateImportType() // expected-error {{property cannot be declared public because its type 'PrivateImportType' uses a private type}}
+// expected-note @-1 {{is imported by this file as}}
 }
 
 package struct PackageVars {
@@ -792,8 +796,11 @@ package struct PackageVars {
     package var k = PublicImportType()
     package var l = PackageImportType()
     package var m = InternalImportType() // expected-error {{property cannot be declared package because its type 'InternalImportType' uses an internal type}}
+// expected-note @-1 {{is imported by this file as}}
     package var n = FileprivateImportType() // expected-error {{property cannot be declared package because its type 'FileprivateImportType' uses a fileprivate type}}
+// expected-note @-1 {{is imported by this file as}}
     package var o = PrivateImportType() // expected-error {{property cannot be declared package because its type 'PrivateImportType' uses a private type}}
+// expected-note @-1 {{is imported by this file as}}
 }
 
 internal struct InternalVars {
@@ -822,7 +829,9 @@ internal struct InternalVars {
     internal var l = PackageImportType()
     internal var m = InternalImportType()
     internal var n = FileprivateImportType() // expected-error {{property cannot be declared internal because its type 'FileprivateImportType' uses a fileprivate type}}
+// expected-note @-1 {{is imported by this file as}}
     internal var o = PrivateImportType() // expected-error {{property cannot be declared internal because its type 'PrivateImportType' uses a private type}}
+// expected-note @-1 {{is imported by this file as}}
 }
 
 fileprivate struct FileprivateVars {

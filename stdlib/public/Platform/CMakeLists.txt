@@ -4,127 +4,9 @@ set(swift_platform_sources
 set(swift_platform_gyb_sources
     tgmath.swift.gyb)
 
-set(darwin_depends)
-if(NOT BUILD_STANDALONE)
-  # This is overly conservative, but we have so few API notes files that
-  # haven't migrated to the Swift repo that it's probably fine in practice.
-  list(APPEND darwin_depends copy_apinotes)
-endif()
-
 set(swift_platform_compile_flags)
 if(SWIFT_ENABLE_REFLECTION)
   list(APPEND swift_platform_compile_flags "-DSWIFT_ENABLE_REFLECTION")
-endif()
-
-set(swiftDarwin_target_sdks ALL_APPLE_PLATFORMS)
-if(SWIFT_FREESTANDING_FLAVOR STREQUAL "apple" AND NOT SWIFT_FREESTANDING_IS_DARWIN)
-  set(swiftDarwin_target_sdks ALL_APPLE_PLATFORMS FREESTANDING)
-endif()
-
-set(swiftDarwin_common_options
-      IS_SDK_OVERLAY
-      ${swift_platform_sources}
-      POSIXError.swift
-      MachError.swift
-
-      "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
-
-      GYB_SOURCES
-        ${swift_platform_gyb_sources}
-        Darwin.swift.gyb
-
-      SWIFT_COMPILE_FLAGS
-        ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
-        ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-        -Xfrontend -disable-objc-attr-requires-foundation-module
-        ${swift_platform_compile_flags}
-      LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-      DEPENDS ${darwin_depends})
-
-
-if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING" AND
-   SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-
-  set(swiftDarwin_common_bootstrapping_options
-      ${swiftDarwin_common_options}
-      SHARED
-      IS_STDLIB
-      SDK ${SWIFT_HOST_VARIANT_SDK}
-      ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-      INSTALL_IN_COMPONENT "never_install")
-
-  set(b0_deps swiftCore-bootstrapping0)
-  set(b1_deps swiftCore-bootstrapping1)
-  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(b0_deps ${b0_deps} swiftSwiftOnoneSupport-bootstrapping0)
-    set(b1_deps ${b1_deps} swiftSwiftOnoneSupport-bootstrapping1)
-  endif()
-
-  add_swift_target_library_single(swiftDarwin-bootstrapping0 swiftDarwin
-      ${swiftDarwin_common_bootstrapping_options}
-      FILE_DEPENDS ${b0_deps}
-      BOOTSTRAPPING 0)
-
-  add_swift_target_library_single(swiftDarwin-bootstrapping1 swiftDarwin
-      ${swiftDarwin_common_bootstrapping_options}
-      FILE_DEPENDS ${b1_deps}
-      BOOTSTRAPPING 1)
-endif()
-
-add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
-    ${swiftDarwin_common_options}
-    TARGET_SDKS "${swiftDarwin_target_sdks}"
-    INSTALL_IN_COMPONENT sdk-overlay
-    MACCATALYST_BUILD_FLAVOR "zippered"
-    INSTALL_BINARY_SWIFTMODULE FALSE)
-
-if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
-  set(SWIFT_ENABLE_REFLECTION OFF)
-
-  add_custom_target(embedded-darwin ALL)
-  foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
-    string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
-    list(GET list 0 arch)
-    list(GET list 1 mod)
-    list(GET list 2 triple)
-
-    if(NOT "${mod}" MATCHES "-macos$")
-      continue()
-    endif()
-
-    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
-    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
-    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
-    set(SWIFT_SDK_embedded_PATH ${SWIFT_SDK_OSX_PATH})
-    set(SWIFT_SDK_embedded_ARCH_${arch}_PATH ${SWIFT_SDK_OSX_PATH})
-    set(SWIFT_SDK_embedded_USE_ISYSROOT TRUE)
-    add_swift_target_library_single(
-      embedded-darwin-${mod}
-      swiftDarwin
-      ONLY_SWIFTMODULE
-      IS_SDK_OVERLAY IS_FRAGILE
-
-      Platform.swift
-      TiocConstants.swift
-      POSIXError.swift
-      MachError.swift
-
-      GYB_SOURCES
-        tgmath.swift.gyb
-        Darwin.swift.gyb
-      
-      SWIFT_COMPILE_FLAGS
-        -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding -enable-experimental-feature Embedded
-      C_COMPILE_FLAGS
-        -D__MACH__ -D__APPLE__ -ffreestanding
-      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
-      SDK "embedded"
-      ARCHITECTURE "${arch}"
-      DEPENDS embedded-stdlib-${mod}
-      INSTALL_IN_COMPONENT stdlib
-      )
-    add_dependencies(embedded-darwin embedded-darwin-${mod})
-  endforeach()
 endif()
 
 set(swiftGlibc_target_sdks CYGWIN FREEBSD OPENBSD LINUX HAIKU)
@@ -472,6 +354,25 @@ if("ANDROID" IN_LIST SWIFT_SDKS)
                                  COMPONENT sdk-overlay)
     endif()
   endforeach()
+
+  add_custom_command_target(
+    copy_android_posix_filesystem_apinotes_resource
+    COMMAND
+      ${CMAKE_COMMAND} -E make_directory "${SWIFTLIB_DIR}/apinotes"
+    COMMAND
+      ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/posix_filesystem.apinotes" "${SWIFTLIB_DIR}/apinotes"
+    COMMAND
+      ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/spawn.apinotes" "${SWIFTLIB_DIR}/apinotes"
+    OUTPUT
+      "${SWIFTLIB_DIR}/apinotes/posix_filesystem.apinotes"
+      "${SWIFTLIB_DIR}/apinotes/spawn.apinotes"
+    COMMENT
+      "Copying Android API Notes to resource directories")
+  add_dependencies(sdk-overlay ${copy_android_posix_filesystem_apinotes_resource})
+  list(APPEND android_modulemap_target_list ${copy_android_posix_filesystem_apinotes_resource})
+  swift_install_in_component(FILES posix_filesystem.apinotes spawn.apinotes
+                             DESTINATION "lib/swift/apinotes"
+                             COMPONENT sdk-overlay)
 endif()
 add_custom_target(android_modulemap DEPENDS ${android_modulemap_target_list})
 set_property(TARGET android_modulemap PROPERTY FOLDER "Miscellaneous")
@@ -484,6 +385,7 @@ if("WASI" IN_LIST SWIFT_SDKS)
     set(arch_subdir "${SWIFT_SDK_WASI_LIB_SUBDIR}/${arch}")
     set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
     set(module_dir_static "${SWIFTSTATICLIB_DIR}/${arch_subdir}")
+    set(module_dir_embedded "${SWIFTLIB_DIR}/embedded/${arch}")
 
     add_custom_command_target(
       copy_wasilibc_modulemap_resource
@@ -508,6 +410,52 @@ if("WASI" IN_LIST SWIFT_SDKS)
                                  DESTINATION "lib/swift_static/${arch_subdir}"
                                  COMPONENT sdk-overlay)
     endif()
+
+    if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+      add_custom_command_target(
+        copy_wasilibc_modulemap_embedded_resource
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir} ${module_dir_embedded}
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "copy_if_different"
+            "${CMAKE_CURRENT_SOURCE_DIR}/${wasilibc_modulemap_source}" ${module_dir_embedded}
+        OUTPUT "${module_dir_embedded}/${wasilibc_modulemap_source}"
+        COMMENT "Copying WASILibc modulemap to resource directories")
+      add_dependencies(sdk-overlay ${copy_wasilibc_modulemap_embedded_resource})
+      list(APPEND wasilibc_modulemap_target_list ${copy_wasilibc_modulemap_embedded_resource})
+
+      swift_install_in_component(FILES "${wasilibc_modulemap_source}"
+                                 DESTINATION "lib/swift/embedded/${arch}"
+                                 COMPONENT sdk-overlay)
+    endif()
+
+    set(wasilibc_apinotes_source "SwiftWASILibc.apinotes")
+    add_custom_command_target(
+      copy_wasilibc_apinotes_resource
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "make_directory" ${SWIFTLIB_DIR}/apinotes ${SWIFTSTATICLIB_DIR}/apinotes
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${wasilibc_apinotes_source}" ${SWIFTLIB_DIR}/apinotes
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${wasilibc_apinotes_source}" ${SWIFTSTATICLIB_DIR}/apinotes
+      OUTPUT
+        ${SWIFTLIB_DIR}/apinotes/${wasilibc_apinotes_source}
+        ${SWIFTSTATICLIB_DIR}/apinotes/${wasilibc_apinotes_source}
+      COMMENT "Copying WASILibc API notes to resource directories")
+
+    list(APPEND wasilibc_modulemap_target_list ${copy_wasilibc_apinotes_resource})
+    add_dependencies(sdk-overlay ${copy_wasilibc_apinotes_resource})
+    swift_install_in_component(FILES "${wasilibc_apinotes_source}"
+                               DESTINATION "lib/swift/apinotes"
+                               COMPONENT sdk-overlay)
+    if(SWIFT_BUILD_STATIC_STDLIB)
+      swift_install_in_component(FILES "${wasilibc_apinotes_source}"
+                                 DESTINATION "lib/swift_static/apinotes"
+                                 COMPONENT sdk-overlay)
+    endif()
+
   endforeach()
 endif()
 add_custom_target(wasilibc_modulemap DEPENDS ${wasilibc_modulemap_target_list})
@@ -519,7 +467,46 @@ if(WINDOWS IN_LIST SWIFT_SDKS)
       ucrt.modulemap
       vcruntime.apinotes
       vcruntime.modulemap
-      winsdk.modulemap
+      winsdk_um.modulemap
+      winsdk_shared.modulemap
     DESTINATION "share"
     COMPONENT sdk-overlay)
+endif()
+
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+  add_custom_target(embedded-stdlib-platform)
+  add_dependencies(embedded-libraries embedded-stdlib-platform)
+
+  if(SWIFT_WASI_SYSROOT_PATH)
+    set(arch "wasm32")
+    set(triple "wasm32-unknown-wasip1")
+
+    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${triple}")
+    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
+    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
+    add_swift_target_library_single(
+      embedded-stdlib-platform-${triple}
+      swiftWASILibc
+      ONLY_SWIFTMODULE
+      IS_STDLIB IS_FRAGILE
+        ${swift_platform_sources}
+        POSIXError.swift
+
+      GYB_SOURCES
+        ${swift_platform_gyb_sources}
+        WASILibc.swift.gyb
+
+      SWIFT_COMPILE_FLAGS
+        -enable-experimental-feature Embedded
+        -Xfrontend -emit-empty-object-file
+
+      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
+      SDK "embedded"
+      ARCHITECTURE "${arch}"
+      ARCHITECTURE_SUBDIR_NAME "${triple}"
+      DEPENDS embedded-stdlib-${triple} wasilibc_modulemap
+      INSTALL_IN_COMPONENT sdk-overlay
+    )
+    add_dependencies(embedded-stdlib-platform embedded-stdlib-platform-${triple})
+  endif()
 endif()

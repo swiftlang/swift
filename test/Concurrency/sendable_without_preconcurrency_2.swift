@@ -1,10 +1,12 @@
 // RUN: %empty-directory(%t)
+
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/StrictModule.swiftmodule -module-name StrictModule -swift-version 6 %S/Inputs/StrictModule.swift
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
+
 // RUN: %target-swift-frontend -strict-concurrency=minimal -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null
 // RUN: %target-swift-frontend -strict-concurrency=targeted -verify-additional-prefix targeted-complete- -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null
-// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix targeted-complete- -verify-additional-prefix complete- -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix targeted-complete- -verify-additional-prefix complete- -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null
+
+// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix targeted-complete- -verify-additional-prefix complete- -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null -verify-additional-prefix tns-
 
 // REQUIRES: concurrency
 
@@ -16,25 +18,42 @@ actor A {
 }
 
 class NS { } // expected-note {{class 'NS' does not conform to the 'Sendable' protocol}}
-// expected-targeted-complete-note@-1 {{class 'NS' does not conform to the 'Sendable' protocol}}
 
-struct MyType { // expected-complete-note {{consider making struct 'MyType' conform to the 'Sendable' protocol}}
+struct MyType {
   var nsc: NonStrictClass
 }
 
 struct MyType2: Sendable {
-  var nsc: NonStrictClass // expected-warning{{stored property 'nsc' of 'Sendable'-conforming struct 'MyType2' has non-sendable type 'NonStrictClass'}}
-  var ns: NS // expected-warning{{stored property 'ns' of 'Sendable'-conforming struct 'MyType2' has non-sendable type 'NS'}}
+  var nsc: NonStrictClass // expected-warning{{stored property 'nsc' of 'Sendable'-conforming struct 'MyType2' has non-Sendable type 'NonStrictClass'}}
+  var ns: NS // expected-warning{{stored property 'ns' of 'Sendable'-conforming struct 'MyType2' has non-Sendable type 'NS'}}
 }
 
 func testA(ns: NS, mt: MyType, mt2: MyType2, sc: StrictClass, nsc: NonStrictClass) async {
-  Task {
-    print(ns) // expected-targeted-complete-warning{{capture of 'ns' with non-sendable type 'NS' in a `@Sendable` closure}}
-    print(mt) // no warning with targeted: MyType is Sendable because we suppressed NonStrictClass's warning
-    // expected-complete-warning @-1 {{capture of 'mt' with non-sendable type 'MyType' in a `@Sendable` closure}}
+  Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+    print(ns) // expected-tns-note {{closure captures 'ns' which is accessible to code in the current task}}
+    print(mt)
     print(mt2)
-    print(sc) // expected-warning {{capture of 'sc' with non-sendable type 'StrictClass' in a `@Sendable` closure}}
-    print(nsc) // expected-targeted-complete-warning {{capture of 'nsc' with non-sendable type 'NonStrictClass' in a `@Sendable` closure}}
+    print(sc)
+    print(nsc)
+  }
+}
+
+// No warning with targeted: MyType is Sendable because we suppressed NonStrictClass's warning.
+func testB(mt: MyType) async {
+  Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+    print(mt) // expected-tns-note {{closure captures 'mt' which is accessible to code in the current task}}
+  }
+}
+
+func testNonStrictClass(_ mt: NonStrictClass) async {
+  Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+    print(mt) // expected-tns-note {{closure captures 'mt' which is accessible to code in the current task}}
+  }
+}
+
+func testStrictClass(_ mt: StrictClass) async {
+  Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+    print(mt) // expected-tns-note {{closure captures 'mt' which is accessible to code in the current task}}
   }
 }
 

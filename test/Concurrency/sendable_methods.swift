@@ -2,7 +2,7 @@
 // RUN: %target-swift-emit-silgen %s -verify -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -module-name sendable_methods -strict-concurrency=complete | %FileCheck %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_InferSendableFromCaptures
 
 func outer() {
     @Sendable func sendable() {}
@@ -10,7 +10,7 @@ func outer() {
     func nonSendable() {}
 
     let _ : @Sendable () -> Void = sendable
-    let _ : @Sendable () -> Void = nonSendable // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+    let _ : @Sendable () -> Void = nonSendable // expected-warning{{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
 }
 
 
@@ -42,6 +42,7 @@ struct InferredSendableS: P {
 
 enum InferredSendableE: P {
   case a, b
+  case c(Int)
   
   func f() { }
 }
@@ -59,6 +60,13 @@ struct GenericS<T> : P {
 
   func g() async { }
 }
+
+enum GenericE<T> {
+  case a
+  case b(T)
+}
+
+extension GenericE: Sendable where T: Sendable { }
 
 class NonSendable {
   func f() {}
@@ -110,7 +118,7 @@ h(GenericQ<NonSendable>().f) // ok
 h(GenericS(NonSendable()).f) // ok
 h(GenericS<Int>().f)
 h(GenericS(1).f)
-h(NonSendable().f) // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+h(NonSendable().f) // expected-warning{{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
 
 func executeAsTask (_ f: @escaping  @Sendable () -> Void) {
   Task {
@@ -120,7 +128,7 @@ func executeAsTask (_ f: @escaping  @Sendable () -> Void) {
 executeAsTask(S().f)
 executeAsTask(C().f)
 executeAsTask(E().f)
-executeAsTask(NonSendable().f) // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+executeAsTask(NonSendable().f) // expected-warning{{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
 
 do {
   let f = S.f
@@ -140,9 +148,9 @@ var partialClass : @Sendable () -> Void = C().f
 var partialEnum : @Sendable () -> Void = E().f
 
 // Reassign
-partialClass = NonSendable().f // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
-partialStruct = NonSendable().f // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
-partialEnum = NonSendable().f // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+partialClass = NonSendable().f // expected-warning{{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
+partialStruct = NonSendable().f // expected-warning{{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
+partialEnum = NonSendable().f // expected-warning{{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
 
 // Static Functions 
 struct World {
@@ -263,5 +271,64 @@ do {
 
   func test(c: C) -> (any Sendable)? {
     true ? nil : c // Ok
+  }
+}
+
+func acceptSendableFunc<T, U>(_: @Sendable (T) -> U) { }
+
+acceptSendableFunc(InferredSendableE.c)
+acceptSendableFunc(GenericE<Int>.b)
+acceptSendableFunc(GenericE<NonSendable>.b)
+
+// Make sure pattern matching isn't affected by @Sendable on cases.
+func testPatternMatch(ge: [GenericE<Int>]) {
+  if case .b(let a) = ge.first {
+    _ = a
+  }
+}
+
+// rdar://131321053 - cannot pass an operator to parameter that expectes a @Sendable type
+do {
+  func test(_: @Sendable (Int, Int) -> Bool) {
+  }
+
+  test(<) // Ok
+}
+
+// Partially applied instance method
+do {
+  struct S {
+    func foo() {}
+  }
+
+  func bar(_ x: @Sendable () -> Void) {}
+
+  let fn = S.foo(S())
+  bar(fn) // Ok
+
+  let _: @Sendable (S) -> @Sendable () -> Void = S.foo // Ok
+
+  let classFn = NonSendable.f(NonSendable())
+  bar(classFn) // expected-warning {{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
+
+  let _: @Sendable (NonSendable) -> () -> Void = NonSendable.f // Ok
+
+  class Test {
+    static func staticFn() {}
+  }
+
+  bar(Test.staticFn) // Ok
+}
+
+// Reference to static method
+do {
+  struct Outer {
+    struct Inner: Sendable {
+      var f: @Sendable () -> Void
+    }
+
+    var g = Inner(f: Outer.ff)
+
+    static func ff() {}
   }
 }

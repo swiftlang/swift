@@ -8,9 +8,9 @@
 // RUN:   -emit-module-interface-path %t/API.swiftinterface
 
 // Build client with module
-// RUN: %target-swift-emit-silgen \
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
 // RUN:   -I %t \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.1-abi-triple \
 // RUN:   -module-name Client \
 // RUN:   -enable-upcoming-feature DynamicActorIsolation \
 // RUN:    %t/src/Client.swift -verify | %FileCheck %s
@@ -19,15 +19,15 @@
 // RUN: rm %t/API.swiftmodule
 
 // Build client from interface
-// RUN: %target-swift-emit-silgen \
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
 // RUN:   -I %t \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.1-abi-triple \
 // RUN:   -module-name Client \
 // RUN:   -enable-upcoming-feature DynamicActorIsolation \
 // RUN:    %t/src/Client.swift -verify | %FileCheck %s
 
-// REQUIRES: asserts
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_DynamicActorIsolation
 
 //--- API.swift
 public func compute<T>(_: ((T) -> Void)?) {}
@@ -41,6 +41,10 @@ public struct S<T> {
     get { fn() }
   }
 }
+
+public class NS {}
+
+public func testNoIsolation(_: @escaping (NS) -> Void) {}
 
 //--- Client.swift
 import API
@@ -60,7 +64,7 @@ import API
 // CHECK-NEXT: [[OPTIONAL_TEST:%.*]] = enum $Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <Optional<Int>>>, #Optional.some!enumelt, [[CONVERTED_REABSTRACTED_TEST_REF]] :
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[COMPUTE_REF:%.*]] = function_ref @$s3API7computeyyyxcSglF : $@convention(thin) <τ_0_0> (@guaranteed Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0>>) -> ()
-// CHECK-NEXT: {{.*}} = apply [[COMPUTE_REF]]<Int?>([[OPTIONAL_TEST]]) : $@convention(thin) <τ_0_0> (@guaranteed Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0>>) -> ()
+// CHECK-NEXT: {{.*}} = apply [[COMPUTE_REF]]<Optional<Int>>([[OPTIONAL_TEST]]) : $@convention(thin) <τ_0_0> (@guaranteed Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0>>) -> ()
 @MainActor
 func testMainActorContext() {
   compute(test) // no warning
@@ -164,3 +168,14 @@ func testMembers<X>(v: X, s: S<X>, fn: @escaping @MainActor (X) -> Int) {
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR_ACCESS]] : $MainActor
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 // CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
+
+@MainActor
+class Test {
+  @Sendable func compute(_: NS) {}
+  // expected-warning@-1 {{main actor-isolated synchronous instance method 'compute' cannot be marked as '@Sendable'; this is an error in the Swift 6 language mode}}
+
+  func test() {
+    // Triggers loss of @Sendable and actor isolation erasure at the same time
+    testNoIsolation(compute)
+  }
+}

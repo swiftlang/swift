@@ -1,8 +1,8 @@
 // REQUIRES: objc_interop
 
-// RUN: %target-swift-frontend -emit-sil %s -Onone -Xllvm \
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s -Onone -Xllvm \
 // RUN:   -sil-print-after=mandatory-inlining \
-// RUN:   -Xllvm -sil-print-debuginfo -o /dev/null 2>&1 | %FileCheck %s
+// RUN:   -Xllvm -sil-print-types -Xllvm -sil-print-debuginfo -o /dev/null 2>&1 | %FileCheck %s
 
 // CHECK: sil_scope [[S0:[0-9]+]] { {{.*}} parent @$s4null3baryyF
 // CHECK: sil_scope [[S1:[0-9]+]] { loc "{{.*}}":18:3 parent [[S0]] }

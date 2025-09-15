@@ -15,7 +15,7 @@ func testLocalFn() {
 func testLocalBinding() {
   bar() {
     let _ = if .random() { return () } else { 0 }
-    // expected-error@-1 {{cannot 'return' in 'if' when used as expression}}
+    // expected-error@-1 {{cannot use 'return' to transfer control out of 'if' expression}}
     return ()
   }
 }

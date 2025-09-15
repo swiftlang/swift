@@ -20,11 +20,14 @@
 #include "RValue.h"
 #include "SILGen.h"
 #include "Scope.h"
+#include "StorageRefResult.h"
 #include "SwitchEnumBuilder.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/ProfileCounter.h"
-#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -314,16 +317,13 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   for (auto &ESD : S->getElements()) {
     
     if (auto D = ESD.dyn_cast<Decl*>()) {
-      if (isa<IfConfigDecl>(D))
-        continue;
-
       // Hoisted declarations are emitted at the top level by emitSourceFile().
       if (D->isHoisted())
         continue;
 
       // PatternBindingBecls represent local variable bindings that execute
       // as part of the function's execution.
-      if (!isa<PatternBindingDecl>(D)) {
+      if (!isa<PatternBindingDecl>(D) && !isa<VarDecl>(D)) {
         // Other decls define entities that may be used by the program, such as
         // local function declarations. So handle them here, before checking for
         // reachability, and then continue looping.
@@ -428,13 +428,10 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
     } else if (auto *E = ESD.dyn_cast<Expr*>()) {
       SGF.emitIgnoredExpr(E);
     } else {
-      auto *D = ESD.get<Decl*>();
-
-      // Only PatternBindingDecls should be emitted here.
-      // Other decls were handled above.
-      auto PBD = cast<PatternBindingDecl>(D);
-
-      SGF.visit(PBD);
+      auto *D = cast<Decl *>(ESD);
+      assert((isa<PatternBindingDecl>(D) || isa<VarDecl>(D)) &&
+             "other decls should be handled before the reachability check");
+      SGF.visit(D);
     }
   }
 }
@@ -486,7 +483,7 @@ createIndirectResultInit(SILGenFunction &SGF, SILValue addr,
   if (cleanup.isValid())
     cleanups.push_back(cleanup);
 
-  return InitializationPtr(temporary.release());
+  return temporary;
 }
 
 static InitializationPtr
@@ -672,7 +669,7 @@ prepareIndirectResultInit(SILGenFunction &SGF, SILLocation loc,
 ///   components of the result
 /// \param cleanups - will be filled (after initialization completes)
 ///   with all the active cleanups managing the result values
-std::unique_ptr<Initialization>
+InitializationPtr
 SILGenFunction::prepareIndirectResultInit(
                                  SILLocation loc,
                                  AbstractionPattern origResultType,
@@ -700,6 +697,14 @@ SILGenFunction::prepareIndirectResultInit(
   assert(indirectResultAddrs.empty());
 
   return init;
+}
+
+static Expr *lookThroughProjections(Expr *expr) {
+  auto *lookupExpr = dyn_cast<LookupExpr>(expr);
+  if (!lookupExpr) {
+    return expr;
+  }
+  return lookThroughProjections(lookupExpr->getBase());
 }
 
 void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
@@ -730,9 +735,68 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     for (auto cleanup : resultCleanups) {
       Cleanups.forwardCleanup(cleanup);
     }
+  } else if (F.getConventions().hasGuaranteedResult() ||
+             F.getConventions().hasGuaranteedAddressResult()) {
+    // If the return expression is a literal, emit as a regular return
+    // expression/
+    if (isa<LiteralExpr>(ret)) {
+      auto RV = emitRValue(ret);
+      std::move(RV).forwardAll(*this, directResults);
+    } else {
+      // If the return expression is not a projection, diagnose as error.
+      FormalEvaluationScope scope(*this);
+      auto storageRefResult =
+          StorageRefResult::findStorageReferenceExprForBorrow(ret);
+      auto lvExpr = storageRefResult.getTransitiveRoot();
+      if (!lvExpr) {
+        diagnose(getASTContext(), ret->getStartLoc(),
+                 diag::invalid_borrow_accessor_return);
+        diagnose(getASTContext(), ret->getStartLoc(),
+                 diag::borrow_accessor_not_a_projection_note);
+        return;
+      }
+      // If the return expression is not a projection of self, diagnose as
+      // error.
+      auto *baseExpr = lookThroughProjections(storageRefResult.getStorageRef());
+      if (!baseExpr->isSelfExprOf(
+              cast<AbstractFunctionDecl>(FunctionDC->getAsDecl()))) {
+        diagnose(getASTContext(), ret->getStartLoc(),
+                 diag::invalid_borrow_accessor_return);
+        diagnose(getASTContext(), ret->getStartLoc(),
+                 diag::borrow_accessor_not_a_projection_note);
+        return;
+      }
+      // Emit return value at +0.
+      LValueOptions options;
+      auto lvalue = emitLValue(ret,
+                               F.getConventions().hasGuaranteedResult()
+                                   ? SGFAccessKind::BorrowedObjectRead
+                                   : SGFAccessKind::BorrowedAddressRead,
+                               options.withBorrow(true));
+      auto result =
+          tryEmitProjectedLValue(ret, std::move(lvalue), TSanKind::None);
+      if (!result) {
+        diagnose(getASTContext(), ret->getStartLoc(),
+                 diag::invalid_borrow_accessor_return);
+        diagnose(getASTContext(), ret->getStartLoc(),
+                 diag::borrow_accessor_not_a_projection_note);
+        return;
+      }
+      // Address type phis are banned in SIL.
+      // For now diagnose multiple return statements in such cases.
+      // TODO: Support multiple epilog blocks in SILGen and SILOptimizer.
+      if (F.getConventions().hasGuaranteedAddressResult() &&
+          !ReturnDest.getBlock()->getPredecessorBlocks().empty()) {
+        diagnose(getASTContext(), ret->getStartLoc(),
+                 diag::invalid_multiple_return_borrow_accessor);
+        return;
+      }
+      directResults.push_back(result->forward(*this));
+    }
   } else {
     // SILValue return.
     FullExpr scope(Cleanups, CleanupLocation(ret));
+    FormalEvaluationScope writeback(*this);
     
     // Does the return context require reabstraction?
     RValue RV;
@@ -778,7 +842,11 @@ void StmtEmitter::visitThrowStmt(ThrowStmt *S) {
     return;
   }
 
-  ManagedValue exn = SGF.emitRValueAsSingleValue(S->getSubExpr());
+  ManagedValue exn;
+  {
+    FormalEvaluationScope scope(SGF);
+    exn = SGF.emitRValueAsSingleValue(S->getSubExpr());
+  }
   SGF.emitThrow(S, exn, /* emit a call to willThrow */ true);
 }
 
@@ -1593,7 +1661,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
         SubstitutionMap subMap = SubstitutionMap::get(
             genericSig, [&](SubstitutableType *dependentType) {
               return exnMV.getType().getASTType();
-            }, LookUpConformanceInModule(getModule().getSwiftModule()));
+            }, LookUpConformanceInModule());
 
         // Generic errors are passed indirectly.
         if (!exnMV.getType().isAddress() && useLoweredAddresses()) {
@@ -1635,7 +1703,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     assert(destErrorType == SILType::getExceptionType(getASTContext()));
 
     ProtocolConformanceRef conformances[1] = {
-      getModule().getSwiftModule()->checkConformance(
+      checkConformance(
         exn->getType().getASTType(), getASTContext().getErrorDecl())
     };
 

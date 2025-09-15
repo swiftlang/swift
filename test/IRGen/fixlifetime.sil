@@ -8,7 +8,7 @@
 // unnecessary.
 // ONONE-NOT: @__swift_fixLifetime
 
-// CHECK-objc-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test(ptr %0, ptr %1, ptr %2, ptr %3, ptr %4, ptr noalias nocapture dereferenceable({{.*}}) %5, {{(i64|i32)}} %6, {{(i64|i32)}} %7) {{.*}} {
+// CHECK-objc-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test(ptr %0, ptr %1, ptr %2, ptr %3, ptr %4, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %5, {{(i64|i32)}} %6, {{(i64|i32)}} %7) {{.*}} {
 // CHECK-objc: entry:
 // CHECK-objc:  call void @__swift_fixLifetime(ptr
 // CHECK-objc:  call void @__swift_fixLifetime(ptr
@@ -20,7 +20,7 @@
 // CHECK-objc:  call void @__swift_fixLifetime(ptr [[TEMP]])
 // CHECK-objc:  call void @__swift_fixLifetime(ptr
 
-// CHECK-native-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test(ptr %0, ptr %1, ptr %2, ptr %3, ptr %4, ptr noalias nocapture dereferenceable({{.*}}) %5, {{(i64|i32)}} %6, {{(i64|i32)}} %7) {{.*}} {
+// CHECK-native-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test(ptr %0, ptr %1, ptr %2, ptr %3, ptr %4, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %5, {{(i64|i32)}} %6, {{(i64|i32)}} %7) {{.*}} {
 // CHECK-native: entry:
 // CHECK-native:  call void @__swift_fixLifetime(ptr
 // CHECK-native:  call void @__swift_fixLifetime(ptr

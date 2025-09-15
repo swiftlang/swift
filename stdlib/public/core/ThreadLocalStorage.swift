@@ -20,18 +20,18 @@ internal class _TLSAtomicInt {
   internal init() { self.value = 0 }
 
   internal var valuePtr: UnsafeMutablePointer<Int> {
-    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+    return unsafe _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
       to: Int.self)
   }
 
   internal func increment() {
-    _ = _swift_stdlib_atomicFetchAddInt(
+    _ = unsafe _swift_stdlib_atomicFetchAddInt(
       object: valuePtr,
       operand: 1)
   }
 
   internal func load() -> Int {
-    return _swift_stdlib_atomicLoadInt(object: valuePtr)
+    return unsafe _swift_stdlib_atomicLoadInt(object: valuePtr)
   }
 }
 
@@ -59,7 +59,7 @@ internal struct _ThreadLocalStorage {
   internal static func getPointer()
     -> UnsafeMutablePointer<_ThreadLocalStorage>
   {
-    return _swift_stdlib_threadLocalStorageGet().assumingMemoryBound(
+    return unsafe _swift_stdlib_threadLocalStorageGet().assumingMemoryBound(
       to: _ThreadLocalStorage.self)
   }
 }
@@ -68,11 +68,11 @@ internal struct _ThreadLocalStorage {
 // owned.
 @_silgen_name("_stdlib_destroyTLS")
 internal func _destroyTLS(_ ptr: UnsafeMutableRawPointer?) {
-  _internalInvariant(ptr != nil,
+  unsafe _internalInvariant(ptr != nil,
     "_destroyTLS was called, but with nil...")
-  let tlsPtr = ptr!.assumingMemoryBound(to: _ThreadLocalStorage.self)
-  tlsPtr.deinitialize(count: 1)
-  tlsPtr.deallocate()
+  let tlsPtr = unsafe ptr!.assumingMemoryBound(to: _ThreadLocalStorage.self)
+  unsafe tlsPtr.deinitialize(count: 1)
+  unsafe tlsPtr.deallocate()
 
 #if INTERNAL_CHECKS_ENABLED
   // Log the fact we've destroyed our storage
@@ -88,7 +88,7 @@ internal func _createThreadLocalStorage()
     = UnsafeMutablePointer<_ThreadLocalStorage>.allocate(
       capacity: 1
   )
-  tlsPtr.initialize(to: _ThreadLocalStorage())
+  unsafe tlsPtr.initialize(to: _ThreadLocalStorage())
 
-  return tlsPtr
+  return unsafe tlsPtr
 }

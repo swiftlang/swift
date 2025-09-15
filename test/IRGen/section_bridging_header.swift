@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -enforce-exclusivity=unchecked -parse-as-library -emit-sil -import-objc-header %t/bridge.h %t/file.swift -o /dev/null
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_SymbolLinkageMarkers
 
 // BEGIN bridge.h
 struct MyStruct1 {

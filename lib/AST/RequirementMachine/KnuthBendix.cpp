@@ -29,11 +29,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
-#include <deque>
 #include <vector>
 
 #include "RewriteContext.h"
@@ -341,9 +341,9 @@ RewriteSystem::computeCriticalPair(ArrayRef<Symbol>::const_iterator from,
 std::pair<CompletionResult, unsigned>
 RewriteSystem::performKnuthBendix(unsigned maxRuleCount,
                                   unsigned maxRuleLength) {
-  assert(Initialized);
-  assert(!Minimized);
-  assert(!Frozen);
+  ASSERT(Initialized);
+  ASSERT(!Minimized);
+  ASSERT(!Frozen);
 
   // Complete might already be set, if we're re-running completion after
   // adding new rules in the property map's concrete type unification procedure.
@@ -399,7 +399,8 @@ RewriteSystem::performKnuthBendix(unsigned maxRuleCount,
 
           // We don't have to consider the same pair of rules more than once,
           // since those critical pairs were already resolved.
-          if (!CheckedOverlaps.insert(std::make_pair(i, j)).second)
+          unsigned k = from - lhs.getLHS().begin();
+          if (!CheckedOverlaps.insert(std::make_tuple(i, j, k)).second)
             return;
 
           // Try to repair the confluence violation by adding a new rule.
@@ -442,7 +443,7 @@ RewriteSystem::performKnuthBendix(unsigned maxRuleCount,
       }
     }
 
-    assert(ruleCount == Rules.size());
+    ASSERT(ruleCount == Rules.size());
 
     simplifyLeftHandSides();
 

@@ -1,0 +1,8 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -disable-objc-attr-requires-foundation-module -target arm64-apple-macosx15.0 -enable-objc-interop -enable-library-evolution -module-link-name swift_Concurrency -parse-stdlib -swift-version 5 -O -library-level api -enforce-exclusivity=unchecked -target-min-inlining-version min -module-name _Concurrency
+
+import Swift
+
+@frozen public enum Task {}
+
+public let x: Swift.Int

@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -primary-file %s -parse-as-library -sil-verify-all -Xllvm -enable-deinit-devirtualizer -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -primary-file %s -parse-as-library -O -sil-verify-all -module-name=test -Xllvm -sil-disable-pass=function-signature-opts -emit-sil | %FileCheck %s
 
 // Also do an end-to-end test and check if the compiled executable works as expected.
-// RUN: %target-run-simple-swift(-target %target-cpu-apple-macos14 -Xllvm -enable-deinit-devirtualizer -parse-as-library) | %FileCheck -check-prefix CHECK-OUTPUT %s
+// RUN: %target-run-simple-swift(-target %target-cpu-apple-macos14 -parse-as-library -O -Xllvm -sil-disable-pass=function-signature-opts) | %FileCheck -check-prefix CHECK-OUTPUT %s
 
 // Check if it works in embedded mode.
 // RUN: %target-run-simple-swift(-target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck -check-prefix CHECK-OUTPUT %s
@@ -19,6 +19,9 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: embedded_stdlib
+// REQUIRES: swift_feature_Embedded
+
+// UNSUPPORTED: use_os_stdlib
 
 @inline(never)
 func log(_ s: StaticString) {
@@ -47,6 +50,16 @@ struct S3: ~Copyable {
     log("deinit S3")
   }
 }
+
+struct S4: ~Copyable {
+  var x: Int
+
+  @inline(never)
+  deinit {
+    print(x)
+  }
+}
+
 
 enum EnumWithDeinit: ~Copyable {
   case A(Int)
@@ -98,8 +111,8 @@ func testTwoFieldDeinits(_ s: consuming StrWithoutDeinit) {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @$s4test0A5Enum1yyAA2E1OnF :
-// CHECK:         switch_enum_addr
-// CHECK:       bb1:
+// CHECK:         switch_enum
+// CHECK:       bb1({{.*}}):
 // CHECK:         [[D:%.*]] = function_ref @$s4test2S1VfD :
 // CHECK:         apply [[D]]
 // CHECK:       } // end sil function '$s4test0A5Enum1yyAA2E1OnF'
@@ -109,13 +122,13 @@ func testEnum1(_ s: consuming E1) {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @$s4test0A5Enum2yyAA2E2OnF :
-// CHECK:         switch_enum_addr
-// CHECK:       bb1:
+// CHECK:         switch_enum
+// CHECK:       bb1({{.*}}):
 // CHECK:         [[D:%.*]] = function_ref @$s4test2S2VfD :
 // CHECK:         apply [[D]]
-// CHECK:       bb2:
-// CHECK:         switch_enum_addr
-// CHECK:       bb3:
+// CHECK:       bb2({{.*}}):
+// CHECK:         switch_enum
+// CHECK:       bb3({{.*}}):
 // CHECK:         [[D:%.*]] = function_ref @$s4test2S1VfD :
 // CHECK:         apply [[D]]
 // CHECK:       } // end sil function '$s4test0A5Enum2yyAA2E2OnF'
@@ -132,6 +145,18 @@ func testEnum2(_ s: consuming E2) {
 func testNestedDeinit(_ s: consuming S3) {
   log("### testNestedDeinit")
 }
+
+// CHECK-LABEL: sil hidden [noinline] @$s4test0A12DestroyArrayyySryAA2S4VGF :
+// CHECK-NOT:     "destroyArray"
+// CHECK:         [[D:%.*]] = function_ref @$s4test2S4VfD :
+// CHECK:         apply [[D]]
+// CHECK-NOT:     "destroyArray"
+// CHECK:       } // end sil function '$s4test0A12DestroyArrayyySryAA2S4VGF'
+@inline(never)
+func testDestroyArray(_ p: UnsafeMutableBufferPointer<S4>) {
+  p.deinitialize()
+}
+
 
 @main
 struct Main {
@@ -178,6 +203,21 @@ struct Main {
     // CHECK-OUTPUT-NEXT:  deinit S1
     // CHECK-OUTPUT-NEXT:  ---
     testNestedDeinit(S3())
+    log("---")
+
+    let b = UnsafeMutableBufferPointer<S4>.allocate(capacity: 3)
+    for i in 0..<3 {
+      b.initializeElement(at: i, to: S4(x: i))
+    }
+
+    // CHECK-OUTPUT-LABEL: ### testDestroyArray
+    // CHECK-OUTPUT-NEXT:  0
+    // CHECK-OUTPUT-NEXT:  1
+    // CHECK-OUTPUT-NEXT:  2
+    // CHECK-OUTPUT-NEXT:  ---
+    log("### testDestroyArray")
+    testDestroyArray(b)
+    b.deallocate()
     log("---")
   }
 }

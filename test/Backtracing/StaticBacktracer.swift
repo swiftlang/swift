@@ -52,7 +52,7 @@ struct StaticBacktracer {
 // CHECK-NEXT: 4 [ra]          0x{{[0-9a-f]+}} level1() + {{[0-9]+}} in StaticBacktracer at {{.*}}/StaticBacktracer.swift:16:3
 // CHECK-NEXT: 5 [ra]          0x{{[0-9a-f]+}} static StaticBacktracer.main() + {{[0-9]+}} in StaticBacktracer at {{.*}}/StaticBacktracer.swift:40:5
 // CHECK-NEXT: 6 [ra] [system] 0x{{[0-9a-f]+}} static StaticBacktracer.$main() + {{[0-9]+}} in StaticBacktracer at {{.*}}/<compiler-generated>
-// CHECK-NEXT: 7 [ra] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in StaticBacktracer at {{.*}}/StaticBacktracer.swift
+// CHECK-NEXT: 7 [ra] [system] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in StaticBacktracer at {{.*}}/StaticBacktracer.swift
 
 // CHECK: Registers:
 

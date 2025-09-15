@@ -106,7 +106,7 @@ sil @genericReturn : $@convention(thin) <τ_0_0> (@guaranteed C) -> @out τ_0_0
 // incomplete. Since the store_borrow produces an address, the load
 // borrow is considered a ScopedAddressUse, and all of its uses,
 // including the Apply will contribute to the store_borrow liveness.
-// CHECK-LABEL: testInnerUnreachable: scoped-address-liveness
+// CHECK-LABEL: testInnerUnreachable: scoped_address_liveness
 // CHECK: Scoped address analysis: [[SB:%.*]] = store_borrow %0
 // CHECK: bb0: LiveWithin
 // CHECK-NEXT: regular user: %{{.*}} = apply
@@ -115,7 +115,7 @@ sil shared [ossa] @testInnerUnreachable : $@convention(thin) (@guaranteed C, @th
 bb0(%0 : @guaranteed $C, %1 : $@thick Never.Type):
   %2 = alloc_stack $C
   %3 = store_borrow %0 to %2 : $*C
-  specify_test "scoped-address-liveness @trace[0]"
+  specify_test "scoped_address_liveness @trace[0]"
   debug_value [trace] %3 : $*C
   %5 = load_borrow %3 : $*C
   %6 = function_ref @genericReturn : $@convention(thin) <τ_0_0> (@guaranteed C) -> @out τ_0_0

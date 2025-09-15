@@ -1,6 +1,6 @@
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -enable-objc-interop -import-objc-header %S/Inputs/modify_objc.h %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -enable-objc-interop -import-objc-header %S/Inputs/modify_objc.h %s -enable-library-evolution | %FileCheck %s --check-prefix=RESILIENT
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -enable-objc-interop -import-objc-header %S/Inputs/modify_objc.h %s -enable-testing | %FileCheck %s --check-prefix=TESTING
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -enable-objc-interop -import-objc-header %S/Inputs/modify_objc.h %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -enable-objc-interop -import-objc-header %S/Inputs/modify_objc.h %s -enable-library-evolution | %FileCheck %s --check-prefix=RESILIENT
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -enable-objc-interop -import-objc-header %S/Inputs/modify_objc.h %s -enable-testing | %FileCheck %s --check-prefix=TESTING
 
 // REQUIRES: objc_interop
 

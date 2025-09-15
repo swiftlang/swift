@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name partial_apply_protocol_class_refinement_method %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name partial_apply_protocol_class_refinement_method %s | %FileCheck %s
 
 protocol P { func foo() }
 protocol Q: class, P {}

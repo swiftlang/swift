@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -enable-type-layout -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
-// RUN: %target-swift-frontend -enable-type-layout -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT --check-prefix=OPT-%target-ptrsize
+// RUN: %target-swift-frontend -enable-type-layout -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT --check-prefix=OPT-%target-ptrsize --check-prefix=OPT-%target-ptrauth
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=NOTL
+
+// REQUIRES: PTRSIZE=64
 
 public struct B<T> {
   var x: T
@@ -79,21 +81,33 @@ public enum ForwardEnum<T> {
 // CHECK: }
 
 
-// OPT: define{{.*}} void @"$s30typelayout_based_value_witness1AVwxx"(ptr noalias %object, ptr nocapture readonly %"A<T>")
-// OPT:   [[T_PARAM:%.*]] = getelementptr inbounds ptr, ptr %"A<T>", {{(i64|i32)}} 2
+// OPT: define{{.*}} void @"$s30typelayout_based_value_witness1AVwxx"(ptr noalias %object, ptr{{( nocapture)?}} readonly{{( captures\(none\))?}} %"A<T>")
+// OPT:   [[T_PARAM:%.*]] = getelementptr inbounds{{.*}} i8, ptr %"A<T>", i64 16
 // OPT:   [[T:%.*]] = load ptr, ptr [[T_PARAM]]
-// OPT:   [[VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr [[T]], {{(i64|i32)}} -1
-// OPT:   [[VWT:%.*]] = load ptr, ptr [[VWT_ADDR]]
-// OPT:   [[DESTROY_VW:%.*]] = getelementptr inbounds ptr, ptr [[VWT]], {{(i64|i32)}} 1
+// OPT:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8, ptr [[T]], {{(i64|i32)}} -8
+
+// OPT-noptrauth:   [[VWT:%.*]] = load ptr, ptr [[VWT_ADDR]]
+
+// OPT-ptrauth: [[ADDR_INT:%.*]] = ptrtoint ptr [[VWT_ADDR]] to i64
+// OPT-ptrauth: [[DISCRIMINANT:%.*]] = tail call i64 @llvm.ptrauth.blend(i64 [[ADDR_INT]], i64 11839)
+// OPT-ptrauth: [[SIGNED_VWT:%.*]] = ptrtoint ptr %T.valueWitnesses
+// OPT-ptrauth: [[VWT_INT:%.*]] = tail call i64 @llvm.ptrauth.auth(i64 [[SIGNED_VWT]], i32 2, i64 [[DISCRIMINANT]])
+// OPT-ptrauth: [[VWT:%.*]] = inttoptr i64 [[VWT_INT]] to ptr
+
+// OPT:   [[DESTROY_VW:%.*]] = getelementptr inbounds{{.*}} i8, ptr [[VWT]], {{(i64|i32)}} 8
 // OPT:   [[DESTROY:%.*]] = load ptr, ptr [[DESTROY_VW]]
+
+// OPT-ptrauth: [[DESTROY_ADDR:%.*]] = ptrtoint ptr [[DESTROY_VW]] to i64
+// OPT-ptrauth: [[DISCRIMINANT:%.*]] = tail call i64 @llvm.ptrauth.blend(i64 [[DESTROY_ADDR]], i64 1272)
+
 // OPT:   tail call void [[DESTROY]](ptr noalias %object, ptr [[T]])
-// OPT:   [[SIZE_VW:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], {{i64|i32}} 0, {{(i64|i32)}} 8
+// OPT:   [[SIZE_VW:%.*]] = getelementptr inbounds{{.*}} i8, ptr [[VWT]], {{(i64|i32)}} 64
 // OPT:   [[SIZE_T:%.*]] = load {{(i64|i32)}}, ptr [[SIZE_VW]]
 // OPT:   [[OBJECT:%.*]] = ptrtoint ptr %object to {{(i64|i32)}}
-// OPT:   [[FLAGS_VW:%.*]] = getelementptr inbounds {{.*}}, ptr [[VWT]], {{i64|i32}} 0, {{(i64|i32)}} 10
+// OPT:   [[FLAGS_VW:%.*]] = getelementptr inbounds{{.*}} i8, ptr [[VWT]], {{(i64|i32)}} 80
 // OPT:   [[FLAGS3:%.*]] = load i32, ptr [[FLAGS_VW]]
 // OPT:   [[FLAGS:%.*]] = and i32 [[FLAGS3]], 255
-// OPT-64:   %flags.alignmentMask = zext i32 [[FLAGS]] to i64
+// OPT-64:   %flags.alignmentMask = zext nneg i32 [[FLAGS]] to i64
 // OPT-64:   [[TMP:%.*]] = add {{(i64|i32)}} [[SIZE_T]], %flags.alignmentMask
 // OPT-32:   [[TMP:%.*]] = add {{(i64|i32)}} %flags.alignmentMask, [[SIZE_T]]
 // OPT:   [[TMP2:%.*]] = add {{(i64|i32)}} [[TMP]], [[OBJECT]]
@@ -113,6 +127,11 @@ public enum ForwardEnum<T> {
 // OPT:   ret void
 // CHECK: }
 
+// OPT: define internal void @"$s30typelayout_based_value_witness2E3Owui"(ptr noalias{{( nocapture)?}} writeonly{{( captures\(none\))?}} %value, i32 %tag, ptr{{( nocapture)?}} readonly{{( captures\(none\))?}} %"E3<T>")
+// OPT:  [[IS_EMPTY:%.*]] = icmp eq i32 {{%.*}}, 0
+// OPT:  br i1 [[IS_EMPTY]], label %empty-payload, label %non-empty-payload
+// OPT: }
+
 // Let's not crash on the following example.
 public protocol P {}
 
@@ -130,4 +149,10 @@ public struct S<T: P> {
 public enum E2<T: P> {
     case first(Ref<T>)
     case second(String)
+}
+
+public enum E3<T> {
+  case empty
+  case first(T)
+  case second(T)
 }

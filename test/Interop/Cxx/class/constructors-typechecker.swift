@@ -1,6 +1,9 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs -enable-experimental-cxx-interop
+// XFAIL: OS=linux-androideabi
 
 import Constructors
+
+func takesCopyable<T: Copyable>(_ x: T.Type) {}
 
 let explicit = ExplicitDefaultConstructor()
 
@@ -12,3 +15,8 @@ let onlyCopyAndMove = CopyAndMoveConstructor() // expected-warning {{'init()' is
 let deletedExplicitly = DefaultConstructorDeleted() // expected-error {{missing argument for parameter 'a' in call}}
 
 let withArg = ConstructorWithParam(42)
+
+let _ = TemplatedCopyConstructor(123)
+let _ = TemplatedCopyConstructorWithExtraArg(123)
+takesCopyable(TemplatedCopyConstructor.self)
+takesCopyable(TemplatedCopyConstructorWithExtraArg.self)

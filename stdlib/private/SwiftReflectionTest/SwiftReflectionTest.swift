@@ -29,8 +29,12 @@ let RequestPointerSize = "p"
 
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-import MachO
-import Darwin
+internal import MachO
+internal import Darwin
+internal import var Darwin.errno
+internal import var Darwin.stdout
+internal import var Darwin.stderr
+internal import var Darwin.stdin
 
 #if arch(x86_64) || arch(arm64)
 typealias MachHeader = mach_header_64
@@ -208,6 +212,7 @@ public enum InstanceKind: UInt8 {
   case Enum
   case EnumValue
   case AsyncTask
+  case LogString
 }
 
 /// Represents a section in a loaded image in this process.
@@ -639,6 +644,15 @@ public func reflect(function: @escaping (Int, String, AnyObject?) -> Void) {
 /// Reflect an AsyncTask.
 public func reflect(asyncTask: UInt) {
   reflect(instanceAddress: asyncTask, kind: .AsyncTask)
+}
+
+/// Log a string to the test's output. Use instead of print, which gets
+/// captured by the parent and read as commands.
+public func reflectionLog(str: String) {
+  str.withCString {
+    let addr = UInt(bitPattern: $0)
+    reflect(instanceAddress: addr, kind: .LogString);
+  }
 }
 
 /// Call this function to indicate to the parent that there are

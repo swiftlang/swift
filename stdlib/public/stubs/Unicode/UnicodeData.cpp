@@ -73,7 +73,7 @@ __swift_intptr_t _swift_stdlib_getMphIdx(__swift_uint32_t scalar,
       // within each bit array every 512 bits. Say our level (bit array)
       // contains 16 uint64 integers to represent all of the required bits.
       // There would be a total of 1024 bits, so our rankings for this level
-      // would contain two values for precomputed counted bits for both halfs
+      // would contain two values for precomputed counted bits for both halves
       // of this bit array (1024 / 512 = 2).
       auto rank = ranks[i][idx / 512];
 
@@ -189,7 +189,7 @@ __swift_intptr_t _swift_stdlib_getScalarBitArrayIdx(__swift_uint32_t scalar,
   auto chunkRank = ranks[idx];
 
   // If our specific bit within the chunk isn't the first bit, then count the
-  // number of bits turned on preceeding our chunk bit.
+  // number of bits turned on preceding our chunk bit.
   if (chunkBit != 0) {
     chunkRank += __builtin_popcountll(quickLook << (64 - chunkBit));
   }

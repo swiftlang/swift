@@ -11,7 +11,7 @@
 
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -I %S/Inputs/custom-modules -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/dynamicself.swiftmodule -typecheck -I %S/Inputs/custom-modules -emit-objc-header-path %t/dynamicself.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/dynamicself.swiftmodule -typecheck -verify -emit-objc-header-path %t/dynamicself.h -I %S/Inputs/custom-modules -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/dynamicself.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ %t/dynamicself.h
 

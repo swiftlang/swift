@@ -16,10 +16,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILInstruction.h"
@@ -32,6 +34,12 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   // If the conformance is invalid, crash deterministically even in noassert
   // builds.
   if (conformanceRef.isInvalid()) {
+    // When lazy type checking is enabled, a conformance may only be diagnosed
+    // as invalid during SILGen. Ignore it instead of asserting.
+    auto &ctx = getASTContext();
+    if (ctx.TypeCheckerOpts.EnableLazyTypecheck && ctx.hadError())
+      return;
+
     llvm::report_fatal_error("Invalid conformance in type-checked AST");
   }
 
@@ -102,11 +110,18 @@ void SILGenModule::useConformancesFromType(CanType type) {
     if (isa<ProtocolDecl>(decl))
       return;
 
+    // If this is an imported noncopyable type with a deinitializer, record it.
+    if (decl->hasClangNode() && !decl->canBeCopyable() &&
+        decl->getValueTypeDestructor() &&
+        importedNontrivialNoncopyableTypes.insert(decl).second) {
+      visitImportedNontrivialNoncopyableType(decl);
+    }
+
     auto genericSig = decl->getGenericSignature();
     if (!genericSig)
       return;
 
-    auto subMap = t->getContextSubstitutionMap(SwiftModule, decl);
+    auto subMap = t->getContextSubstitutionMap();
     useConformancesFromSubstitutions(subMap);
     return;
   });
@@ -133,14 +148,12 @@ void SILGenModule::useConformancesFromObjectiveCType(CanType type) {
       return;
 
     if (objectiveCBridgeable) {
-      if (auto subConformance =
-              SwiftModule->lookupConformance(t, objectiveCBridgeable))
+      if (auto subConformance = lookupConformance(t, objectiveCBridgeable))
         useConformance(subConformance);
     }
 
     if (bridgedStoredNSError) {
-      if (auto subConformance =
-              SwiftModule->lookupConformance(t, bridgedStoredNSError))
+      if (auto subConformance = lookupConformance(t, bridgedStoredNSError))
         useConformance(subConformance);
     }
   });
@@ -350,7 +363,7 @@ void SILGenModule::emitLazyConformancesForType(NominalTypeDecl *NTD) {
   if (auto *ED = dyn_cast<EnumDecl>(NTD)) {
     for (auto *EED : ED->getAllElements()) {
       if (EED->hasAssociatedValues()) {
-        useConformancesFromType(EED->getArgumentInterfaceType()
+        useConformancesFromType(EED->getPayloadInterfaceType()
                                    ->getReducedType(genericSig));
       }
     }

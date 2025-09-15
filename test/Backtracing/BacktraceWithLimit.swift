@@ -9,7 +9,7 @@
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx || OS=linux-gnu
 
-import _Backtracing
+import Runtime
 
 func doFrames(_ count: Int) {
   if count <= 0 {

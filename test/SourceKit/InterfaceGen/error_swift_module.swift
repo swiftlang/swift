@@ -13,9 +13,9 @@ import Transitive
 
 import WrongName
 
-//--- LibraryNonExistant.swift
+//--- LibraryNonExistent.swift
 
-import NonExistant
+import NonExistent
 
 // RUN: %target-swift-frontend -emit-module %t/Inputs/Transitive.swift -module-name Transitive -o %t/WrongName.swiftmodule
 // RUN: %target-swift-frontend -emit-module %t/Inputs/Transitive.swift -module-name Transitive -o %t/Transitive.swiftmodule
@@ -45,14 +45,14 @@ import NonExistant
 // RUN: not %sourcekitd-test -req=interface-gen -module LibraryWrong -- -I %t -target %target-triple %s 2>&1 | %FileCheck --check-prefix TRANSITIVE-FAIL %s
 // TRANSITIVE-FAIL: Could not load module: LibraryWrong (cannot load module 'Transitive' as 'WrongName')
 
-// Try a non-existant module
+// Try a non-existent module
 
-// RUN: not %sourcekitd-test -req=interface-gen -module NonExistant -- -I %t -target %target-triple %s 2>&1 | %FileCheck --check-prefix DIRECT-NONEXISTANT %s
-// DIRECT-NONEXISTANT: Could not load module: NonExistant
+// RUN: not %sourcekitd-test -req=interface-gen -module NonExistent -- -I %t -target %target-triple %s 2>&1 | %FileCheck --check-prefix DIRECT-NONEXISTENT %s
+// DIRECT-NONEXISTENT: Could not load module: NonExistent
 
-// RUN: %target-swift-frontend -emit-module %t/Inputs/Transitive.swift -module-name NonExistant -o %t
-// RUN: %target-swift-frontend -emit-module %t/Inputs/LibraryNonExistant.swift -module-name LibraryNonExistant -I %t -o %t
-// RUN: rm -rf %t/NonExistant.swiftmodule
+// RUN: %target-swift-frontend -emit-module %t/Inputs/Transitive.swift -module-name NonExistent -o %t
+// RUN: %target-swift-frontend -emit-module %t/Inputs/LibraryNonExistent.swift -module-name LibraryNonExistent -I %t -o %t
+// RUN: rm -rf %t/NonExistent.swiftmodule
 
-// RUN: not %sourcekitd-test -req=interface-gen -module LibraryNonExistant -- -I %t -target %target-triple %s 2>&1 | %FileCheck --check-prefix TRANSITIVE-NONEXISTANT %s
-// TRANSITIVE-NONEXISTANT: Could not load module: LibraryNonExistant (missing required module 'NonExistant')
+// RUN: not %sourcekitd-test -req=interface-gen -module LibraryNonExistent -- -I %t -target %target-triple %s 2>&1 | %FileCheck --check-prefix TRANSITIVE-NONEXISTENT %s
+// TRANSITIVE-NONEXISTENT: Could not load module: LibraryNonExistent (missing required module 'NonExistent')

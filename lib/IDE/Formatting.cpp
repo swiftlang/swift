@@ -11,13 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/IDE/SourceEntityWalker.h"
-#include "swift/Parse/Parser.h"
-#include "swift/Frontend/Frontend.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/IDE/Indenting.h"
+#include "swift/IDE/SourceEntityWalker.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
 
 using namespace swift;
@@ -486,15 +488,6 @@ private:
     if (D->isImplicit())
       return Action::Continue();
 
-    // Walk into inactive config regions.
-    if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-      for (auto Clause : ICD->getClauses()) {
-        for (auto Member : Clause.Elements)
-          Member.walk(*this);
-      }
-      return Action::SkipNode();
-    }
-
     SourceLoc ContextLoc = D->getStartLoc();
 
     if (auto *GC = D->getAsGenericContext()) {
@@ -525,15 +518,13 @@ private:
         if (!handleBraces(cast<SubscriptDecl>(D)->getBracesRange(), ContextLoc))
           return Action::Stop();
       }
-      auto *PL = getParameterList(cast<ValueDecl>(D));
+      auto *PL = cast<ValueDecl>(D)->getParameterList();
       if (!handleParens(PL->getLParenLoc(), PL->getRParenLoc(), ContextLoc))
         return Action::Stop();
     } else if (auto *PGD = dyn_cast<PrecedenceGroupDecl>(D)) {
       SourceRange Braces(PGD->getLBraceLoc(), PGD->getRBraceLoc());
       if (!handleBraces(Braces, ContextLoc))
         return Action::Stop();
-    } else if (auto *PDD = dyn_cast<PoundDiagnosticDecl>(D)) {
-      // TODO: add paren locations to PoundDiagnosticDecl
     }
 
     return Action::Continue();
@@ -588,7 +579,7 @@ private:
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       if (!handleBraceStmt(WS->getBody(), WS->getWhileLoc()))
         return Action::Stop();
-    } else if (auto *PAS = dyn_cast<PoundAssertStmt>(S)) {
+    } else if (isa<PoundAssertStmt>(S)) {
       // TODO: add paren locations to PoundAssertStmt
     }
 
@@ -596,15 +587,6 @@ private:
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    // Walk through error expressions.
-    if (auto *EE = dyn_cast<ErrorExpr>(E)) {
-      if (auto *OE = EE->getOriginalExpr()) {
-        llvm::SaveAndRestore<ASTWalker::ParentTy>(Parent, EE);
-        OE->walk(*this);
-      }
-      return Action::Continue(E);
-    }
-
     if (E->isImplicit())
       return Action::Continue(E);
 
@@ -1269,7 +1251,7 @@ private:
         getLocForContentStartOnSameLine(SM, StringLiteralRange.getEnd());
     bool HaveEndQuotes = CharSourceRange(SM, EndLineContentLoc,
                                          StringLiteralRange.getEnd())
-        .str().equals(StringRef("\"\"\""));
+        .str() == "\"\"\"";
 
     if (!HaveEndQuotes) {
       // Indent to the same indentation level as the first non-empty line
@@ -1395,17 +1377,6 @@ private:
       }
     }
 
-    // Walk into inactive config regions.
-    if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-      if (Action.shouldVisitChildren()) {
-        for (auto Clause : ICD->getClauses()) {
-          for (auto Member : Clause.Elements)
-            Member.walk(*this);
-        }
-      }
-      return Action::SkipNode();
-    }
-
     // FIXME: We ought to be able to use Action::VisitChildrenIf here, but we'd
     // need to ensure the AST is walked in source order (currently not the case
     // for things like postfix operators).
@@ -1433,6 +1404,12 @@ private:
       // interpolated string literal.
       if (E->getArgs() == Args)
         ContextLoc = getContextLocForArgs(SM, E);
+    } else if (auto *D = Parent.getAsDecl()) {
+      if (auto *MED = dyn_cast<MacroExpansionDecl>(D)) {
+        if (MED->getArgs() == Args) {
+          ContextLoc = MED->getStartLoc();
+        }
+      }
     }
 
     auto Action = HandlePre(Args, Args->isImplicit());
@@ -1501,17 +1478,6 @@ private:
           StringLiteralRange =
               Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange());
 
-        return Action::SkipNode(E);
-      }
-    }
-
-    // Walk through error expressions.
-    if (auto *EE = dyn_cast<ErrorExpr>(E)) {
-      if (Action.shouldVisitChildren()) {
-        if (auto *OE = EE->getOriginalExpr()) {
-          llvm::SaveAndRestore<ASTWalker::ParentTy>(Parent, EE);
-          OE->walk(*this);
-        }
         return Action::SkipNode(E);
       }
     }
@@ -1919,30 +1885,6 @@ private:
       }
 
       return IndentContext {ContextLoc, !OutdentChecker::hasOutdent(SM, D)};
-    }
-
-    if (auto *PDD = dyn_cast<PoundDiagnosticDecl>(D)) {
-      SourceLoc ContextLoc = PDD->getStartLoc();
-      // FIXME: add paren source locations to the AST Node.
-      if (auto *SLE = PDD->getMessage()) {
-        SourceRange MessageRange = SLE->getSourceRange();
-        if (MessageRange.isValid() && overlapsTarget(MessageRange))
-          return IndentContext {ContextLoc, true};
-      }
-      return IndentContext {ContextLoc, !OutdentChecker::hasOutdent(SM, D)};
-    }
-
-    if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-      for (auto &Clause: ICD->getClauses()) {
-        if (Clause.Loc == TargetLocation)
-          break;
-        if (auto *Cond = Clause.Cond) {
-          SourceRange CondRange = Cond->getSourceRange();
-          if (CondRange.isValid() && overlapsTarget(CondRange))
-            return IndentContext {Clause.Loc, true};
-        }
-      }
-      return IndentContext { ICD->getStartLoc(), false };
     }
 
     switch (D->getKind()) {
@@ -2732,10 +2674,17 @@ private:
     if (TrailingTarget)
       return std::nullopt;
 
-    auto *ParentE = Parent.getAsExpr();
-    assert(ParentE && "Trailing closures can only occur in expr contexts");
-    return IndentContext{
-        ContextLoc, !OutdentChecker::hasOutdent(SM, ContextToEnd, ParentE)};
+    bool hasOutdent;
+    if (auto *ParentE = Parent.getAsExpr()) {
+      hasOutdent = OutdentChecker::hasOutdent(SM, ContextToEnd, ParentE);
+    } else if (auto *ParentD = Parent.getAsDecl()) {
+      assert(isa<MacroExpansionDecl>(ParentD) && "Trailing closures in decls can only occur in macro expansions");
+      hasOutdent = OutdentChecker::hasOutdent(SM, ContextToEnd, ParentD);
+    } else {
+      assert(false && "Trailing closures can only occur in expr contexts and macro expansions");
+      return std::nullopt;
+    }
+    return IndentContext{ContextLoc, !hasOutdent};
   }
 
   std::optional<IndentContext>
@@ -3072,7 +3021,7 @@ std::pair<LineRange, std::string> swift::ide::reformat(LineRange Range,
     // default value.
     Options.TabWidth = Options.IndentWidth ? Options.IndentWidth : 4;
   }
-  auto SourceBufferID = SF.getBufferID().value();
+  auto SourceBufferID = SF.getBufferID();
   StringRef Text = SM.getLLVMSourceMgr()
     .getMemoryBuffer(SourceBufferID)->getBuffer();
   size_t Offset = getOffsetOfLine(Range.startLine(), Text, /*Trim*/true);

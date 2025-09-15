@@ -28,11 +28,11 @@ if #available(SwiftStdlib 5.7, *) {
     // Divide by 1000 to get back to a duration with representable components:
     let smallerDuration = duration / 1000
     expectEqual(smallerDuration.components, (170_000_000_000_000_000, 0))
-    #if !os(WASI)
+#if !os(WASI)
     // Now check that the components of the original value trap:
     expectCrashLater()
     let _ = duration.components
-    #endif
+#endif
   }
   
   suite.test("milliseconds from Double") {
@@ -233,5 +233,47 @@ if #available(SwiftStdlib 6.0, *) {
     expectCrashLater()
     let _ = Duration.nanoseconds( 170141183460469231731687303716 as Int128)
     #endif
+  }
+  
+  suite.test("attoseconds init") {
+    let zero = Duration(attoseconds: 0)
+    expectEqual(zero._high, 0)
+    expectEqual(zero._low, 0)
+    let one = Duration(attoseconds: 1)
+    expectEqual(one._high, 0)
+    expectEqual(one._low, 1)
+    let mone = Duration(attoseconds: -1)
+    expectEqual(mone._high, -1)
+    expectEqual(mone._low, .max)
+    let max = Duration(attoseconds: .max)
+    expectEqual(max._high, 9_223_372_036_854_775_807)
+    expectEqual(max._low, 18_446_744_073_709_551_615)
+    let min = Duration(attoseconds: .min)
+    expectEqual(min._high, -9_223_372_036_854_775_808)
+    expectEqual(min._low, 0)
+  }
+  
+  suite.test("attoseconds var") {
+    let zero = Duration(_high: 0, low: 0)
+    expectEqual(zero.attoseconds, 0)
+    let one = Duration(_high: 0, low: 1)
+    expectEqual(one.attoseconds, 1)
+    let mone = Duration(_high: -1, low: .max)
+    expectEqual(mone.attoseconds, -1)
+    let max = Duration(_high: 9_223_372_036_854_775_807, low: 18_446_744_073_709_551_615)
+    expectEqual(max.attoseconds, .max)
+    let min = Duration(_high: -9_223_372_036_854_775_808, low: 0)
+    expectEqual(min.attoseconds, .min)
+  }
+}
+
+if #available(SwiftStdlib 6.2, *) {
+  suite.test("nanoseconds from Double") {
+    for _ in 0 ..< 100 {
+      let integerValue = Double(Int64.random(in: 0 ... 0x7fff_ffff_ffff_fc00))
+      let (sec, attosec) = Duration.nanoseconds(integerValue).components
+      expectEqual(sec, Int64(integerValue) / 1_000_000_000)
+      expectEqual(attosec, Int64(integerValue) % 1_000_000_000 * 1_000_000_000)
+    }
   }
 }

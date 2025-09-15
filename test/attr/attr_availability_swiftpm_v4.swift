@@ -37,6 +37,9 @@ func fourPointOh() {}
 @available(_PackageDescription 4)
 class ShortFour {}
 
+@available(_PackageDescription 99)
+func ninetyNine() {} // expected-note {{'ninetyNine()' was introduced in PackageDescription 99}}
+
 shortThree()
 threePointOh()
 threePointOhOnly() // expected-error {{is unavailable}}
@@ -51,6 +54,7 @@ shortFourPointOh()
 four()
 fourPointOh()
 let aa : ShortFour
+ninetyNine() // expected-error {{'ninetyNine()' is unavailable}}
 
 @available(_PackageDescription, introduced: 4.0)
 @available(*, deprecated, message: "test deprecated")
@@ -58,8 +62,27 @@ func unconditionallyDeprecated() {}
 
 unconditionallyDeprecated() // expected-warning {{test deprecated}}
 
-@available(_PackageDescription 4.0, iOS 2.0, *) // expected-error {{'_PackageDescription' version-availability must be specified alone}}
-func shouldBeAlone() {} 
+@available(_PackageDescription 4.0, iOS 2.0, *) // expected-error {{PackageDescription version availability must be specified alone}}
+func shouldBeAlone() {}
 
-@available(_PackageDescription 4.0, swift 2.0, *) // expected-error {{'_PackageDescription' version-availability must be specified alone}} // expected-error {{'swift' version-availability must be specified alone}}
-func shouldBeAlone2() {} 
+@available(_PackageDescription 4.0, swift 2.0, *) // expected-error {{PackageDescription version availability must be specified alone}} // expected-error {{Swift version availability must be specified alone}}
+func shouldBeAlone2() {}
+
+@available(*, unavailable, renamed: "shortFour")
+@available(_PackageDescription 3)
+func unconditionallyRenamed() {} // expected-note {{'unconditionallyRenamed()' has been explicitly marked unavailable here}}
+
+unconditionallyRenamed() // expected-error {{'unconditionallyRenamed()' has been renamed to 'shortFour'}}
+
+@available(*, unavailable, renamed: "shortFour")
+@available(_PackageDescription 5)
+func unconditionallyRenamedAndIntroducedLater() {} // expected-note {{'unconditionallyRenamedAndIntroducedLater()' has been explicitly marked unavailable here}}
+
+unconditionallyRenamedAndIntroducedLater() // expected-error {{'unconditionallyRenamedAndIntroducedLater()' has been renamed to 'shortFour'}}
+
+func testQuery() {
+  if #available(_PackageDescription 4.0) { // expected-error {{PackageDescription version checks not allowed in #available(...)}}
+    // expected-error@-1 {{condition required for target platform}}
+    shortFourPointOh()
+  }
+}

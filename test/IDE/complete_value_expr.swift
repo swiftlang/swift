@@ -775,7 +775,7 @@ class TestResolveFuncParam2 {
 
 func testResolveFuncParam3<Foo : FooProtocol>(_ foo: Foo) {
   foo.#^RESOLVE_FUNC_PARAM_3^#
-// RESOLVE_FUNC_PARAM_3-DAG: Keyword[self]/CurrNominal: self[#Foo#]; name=self
+// RESOLVE_FUNC_PARAM_3-DAG: Keyword[self]/CurrNominal: self[#FooProtocol#]; name=self
 // RESOLVE_FUNC_PARAM_3-DAG: Decl[InstanceVar]/CurrNominal: fooInstanceVar1[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_3-DAG: Decl[InstanceVar]/CurrNominal: fooInstanceVar2[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_3-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
@@ -784,7 +784,7 @@ func testResolveFuncParam3<Foo : FooProtocol>(_ foo: Foo) {
 
 func testResolveFuncParam4<FooBar : FooProtocol & BarProtocol>(_ fooBar: FooBar) {
   fooBar.#^RESOLVE_FUNC_PARAM_4^#
-// RESOLVE_FUNC_PARAM_4-DAG: Keyword[self]/CurrNominal: self[#FooBar#]; name=self
+// RESOLVE_FUNC_PARAM_4-DAG: Keyword[self]/CurrNominal: self[#BarProtocol & FooProtocol#]; name=self
 // RESOLVE_FUNC_PARAM_4-DAG: Decl[InstanceVar]/CurrNominal:    barInstanceVar[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_4-DAG: Decl[InstanceMethod]/CurrNominal: barInstanceFunc0()[#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_4-DAG: Decl[InstanceMethod]/CurrNominal: barInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
@@ -796,7 +796,7 @@ func testResolveFuncParam4<FooBar : FooProtocol & BarProtocol>(_ fooBar: FooBar)
 
 func testResolveFuncParam5<FooExBarEx : FooExProtocol & BarExProtocol>(_ a: FooExBarEx) {
   a.#^RESOLVE_FUNC_PARAM_5^#
-// RESOLVE_FUNC_PARAM_5-DAG: Keyword[self]/CurrNominal: self[#FooExBarEx#]; name=self
+// RESOLVE_FUNC_PARAM_5-DAG: Keyword[self]/CurrNominal: self[#BarExProtocol & FooExProtocol#]; name=self
 // RESOLVE_FUNC_PARAM_5-DAG: Decl[InstanceMethod]/CurrNominal: barExInstanceFunc0()[#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_5-DAG: Decl[InstanceVar]/Super: barInstanceVar[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_5-DAG: Decl[InstanceMethod]/Super: barInstanceFunc0()[#Double#]{{; name=.+$}}
@@ -810,7 +810,7 @@ func testResolveFuncParam5<FooExBarEx : FooExProtocol & BarExProtocol>(_ a: FooE
 
 func testResolveFuncParam6<Foo : FooProtocol where Foo : FooClass>(_ foo: Foo) {
   foo.#^RESOLVE_FUNC_PARAM_6^#
-// RESOLVE_FUNC_PARAM_6-DAG: Keyword[self]/CurrNominal: self[#Foo#]; name=self
+// RESOLVE_FUNC_PARAM_6-DAG: Keyword[self]/CurrNominal: self[#FooClass & FooProtocol#]; name=self
 // RESOLVE_FUNC_PARAM_6-DAG: Decl[InstanceVar]/CurrNominal: fooInstanceVar1[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_6-DAG: Decl[InstanceVar]/CurrNominal: fooInstanceVar2[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_6-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
@@ -829,7 +829,7 @@ class TestResolveConstructorParam1 {
 class TestResolveConstructorParam2 {
   init<Foo : FooProtocol>(foo: Foo) {
     foo.#^RESOLVE_CONSTRUCTOR_PARAM_2^#
-// RESOLVE_CONSTRUCTOR_PARAM_2-DAG: Keyword[self]/CurrNominal: self[#Foo#]; name=self
+// RESOLVE_CONSTRUCTOR_PARAM_2-DAG: Keyword[self]/CurrNominal: self[#FooProtocol#]; name=self
 // RESOLVE_CONSTRUCTOR_PARAM_2-DAG: Decl[InstanceVar]/CurrNominal:  fooInstanceVar1[#Int#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_2-DAG: Decl[InstanceVar]/CurrNominal:  fooInstanceVar2[#Int#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_2-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
@@ -840,7 +840,7 @@ class TestResolveConstructorParam2 {
 class TestResolveConstructorParam3<Foo : FooProtocol> {
   init(foo: Foo) {
     foo.#^RESOLVE_CONSTRUCTOR_PARAM_3^#
-// RESOLVE_CONSTRUCTOR_PARAM_3-DAG: Keyword[self]/CurrNominal: self[#Foo#]; name=self
+// RESOLVE_CONSTRUCTOR_PARAM_3-DAG: Keyword[self]/CurrNominal: self[#FooProtocol#]; name=self
 // RESOLVE_CONSTRUCTOR_PARAM_3-DAG: Decl[InstanceVar]/CurrNominal:  fooInstanceVar1[#Int#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_3-DAG: Decl[InstanceVar]/CurrNominal:  fooInstanceVar2[#Int#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_3-DAG: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
@@ -953,7 +953,7 @@ func testResolveGenericParams2<Foo : FooProtocol>(_ foo: Foo) {
 // RESOLVE_GENERIC_PARAMS_2-DAG: Decl[InstanceMethod]/CurrNominal: .fooVoidInstanceFunc1({#(a): FooProtocol#})[#Void#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_2-DAG: Decl[InstanceMethod]/CurrNominal: .fooTInstanceFunc1({#(a): FooProtocol#})[#FooProtocol#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_2-DAG: Decl[InstanceMethod]/CurrNominal: .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<Foo>#]; name=self
+// RESOLVE_GENERIC_PARAMS_2-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooProtocol>#]; name=self
 
   FooGenericStruct<Foo>#^RESOLVE_GENERIC_PARAMS_2_STATIC^#
 // RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ()[#FooGenericStruct<FooProtocol>#]; name=()
@@ -966,8 +966,8 @@ func testResolveGenericParams2<Foo : FooProtocol>(_ foo: Foo) {
 // RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooVoidStaticFunc1({#(a): FooProtocol#})[#Void#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooTStaticFunc1({#(a): FooProtocol#})[#FooProtocol#]{{; name=.+$}}
 // RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Decl[StaticMethod]/CurrNominal:   .fooUInstanceFunc1({#(a): U#})[#U#]{{; name=.+$}}
-// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<Foo>.Type#]; name=self
-// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Keyword/CurrNominal:              .Type[#FooGenericStruct<Foo>.Type#]; name=Type
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Keyword[self]/CurrNominal:        .self[#FooGenericStruct<FooProtocol>.Type#]; name=self
+// RESOLVE_GENERIC_PARAMS_2_STATIC-DAG: Keyword/CurrNominal:              .Type[#FooGenericStruct<FooProtocol>.Type#]; name=Type
 
 }
 
@@ -1123,13 +1123,13 @@ func testInterpolatedString1() {
 
 // INTERPOLATED_STRING_1-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      lazyInstanceVar[#Int#]{{; name=.+$}}
 // INTERPOLATED_STRING_1-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      instanceVar[#Int#]{{; name=.+$}}
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc0()[#Void#]{{; name=.+$}}
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc2({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc3({#(a): Int#}, {#(Float, Double)#})[#Void#]{{; name=.+$}}
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc4({#(a): Int?#}, {#b: Int!#}, {#c: &Int?#}, {#d: &Int!#})[#Void#]{{; name=.+$}}
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal:   instanceFunc5()[#Int?#]{{; name=.+$}}
-// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal:   instanceFunc6()[#Int!#]{{; name=.+$}}
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: instanceFunc0[#() -> ()#]; name=instanceFunc0
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: instanceFunc1(_:)[#(Int) -> ()#]; name=instanceFunc1(_:)
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: instanceFunc2(_:b:)[#(Int, inout Double) -> ()#]; name=instanceFunc2(_:b:)
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: instanceFunc3(_:_:)[#(Int, (Float, Double)) -> ()#]; name=instanceFunc3(_:_:)
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: instanceFunc4(_:b:c:d:)[#(Int?, Int?, inout Int?, inout Int?) -> ()#]; name=instanceFunc4(_:b:c:d:)
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: instanceFunc5()[#Int?#]; name=instanceFunc5()
+// INTERPOLATED_STRING_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: instanceFunc6()[#Int!#]; name=instanceFunc6()
 
 //===--- Check protocol extensions
 
@@ -1523,8 +1523,8 @@ func testUnusableProtExt(_ x: PWithT) {
   x.#^PROTOCOL_EXT_UNUSABLE_EXISTENTIAL^#
 }
 // FIXME(https://github.com/apple/swift/issues/65696): We should not be showing these because (1) they cannot be accessed on the existential (2) we don't have the syntax and features to represent the projected type sigs anyway.
-// PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Decl[InstanceMethod]/CurrNominal:   foo({#(x): any PWithT.T#})[#any PWithT.T#]{{; name=.+}}
-// PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Decl[InstanceMethod]/CurrNominal:   bar({#(x): any PWithT.T#})[#any PWithT.T#]{{; name=.+}}
+// PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Decl[InstanceMethod]/CurrNominal:   foo({#(x): PWithT.T#})[#PWithT.T#]{{; name=.+}}
+// PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Decl[InstanceMethod]/CurrNominal:   bar({#(x): PWithT.T#})[#PWithT.T#]{{; name=.+}}
 
 protocol dedupP {
   associatedtype T
@@ -1559,10 +1559,10 @@ func testDeDuped(_ x: dedupS) {
 func testDeDuped2(_ x: dedupP) {
   x#^PROTOCOL_EXT_DEDUP_2^#
 // PROTOCOL_EXT_DEDUP_2: Begin completions, 5 items
-// PROTOCOL_EXT_DEDUP_2-DAG: Decl[InstanceMethod]/CurrNominal:   .foo()[#any dedupP.T#]; name=foo()
-// PROTOCOL_EXT_DEDUP_2-DAG: Decl[InstanceVar]/CurrNominal:      .bar[#any dedupP.T#]; name=bar
+// PROTOCOL_EXT_DEDUP_2-DAG: Decl[InstanceMethod]/CurrNominal:   .foo()[#dedupP.T#]; name=foo()
+// PROTOCOL_EXT_DEDUP_2-DAG: Decl[InstanceVar]/CurrNominal:      .bar[#dedupP.T#]; name=bar
 // FIXME(https://github.com/apple/swift/issues/65696): We should not be showing this because (1) it cannot be accessed on the existential (2) we don't have the syntax and features to represent the projected type sig anyway.
-// PROTOCOL_EXT_DEDUP_2-DAG: Decl[Subscript]/CurrNominal:        [{#(x): any dedupP.T#}][#any dedupP.T#]; name=[:]
+// PROTOCOL_EXT_DEDUP_2-DAG: Decl[Subscript]/CurrNominal:        [{#(x): dedupP.T#}][#dedupP.T#]; name=[:]
 // PROTOCOL_EXT_DEDUP_2-DAG: Keyword[self]/CurrNominal:          .self[#any dedupP#]; name=self
 }
 func testDeDuped3<T : dedupP where T.T == Int>(_ x: T) {
@@ -1571,7 +1571,7 @@ func testDeDuped3<T : dedupP where T.T == Int>(_ x: T) {
 // PROTOCOL_EXT_DEDUP_3-DAG: Decl[InstanceMethod]/CurrNominal:   .foo()[#Int#]; name=foo()
 // PROTOCOL_EXT_DEDUP_3-DAG: Decl[InstanceVar]/CurrNominal:      .bar[#Int#]; name=bar
 // PROTOCOL_EXT_DEDUP_3-DAG: Decl[Subscript]/CurrNominal:        [{#(x): Int#}][#Int#]; name=[:]
-// PROTOCOL_EXT_DEDUP_3-DAG: Keyword[self]/CurrNominal:          .self[#T#]; name=self
+// PROTOCOL_EXT_DEDUP_3-DAG: Keyword[self]/CurrNominal:          .self[#dedupP#]; name=self
 }
 
 //===--- Check calls that may throw
@@ -1826,13 +1826,13 @@ protocol MetaProto {
   static func staticFunc() -> Int
   static var staticVar: Int { get }
   func instanceFunc() -> Int
-  var intanceVar: Int { get }
+  var instanceVar: Int { get }
 }
 extension MetaProto {
   static func staticFuncExtension() -> Int { 1 }
   static var staticVarExtension: Int { 1 }
   func instanceFuncExtension() -> Int { 1 }
-  var intanceVarExtension: Int { 1 }
+  var instanceVarExtension: Int { 1 }
 }
 func testProtocolMetatype(protoProto: MetaProto.Protocol, protoType: MetaProto.Type) {
     let _ = BrokenConformanceP.#^PROTOCOLMETA_1^#

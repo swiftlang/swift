@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "RequirementMachine.h"
 #include "RewriteSystem.h"
 
@@ -202,7 +203,7 @@ bool swift::rewriting::diagnoseRequirementErrors(
       if (requirement.hasError())
         break;
 
-      assert(requirement.getKind() == RequirementKind::SameType ||
+      ASSERT(requirement.getKind() == RequirementKind::SameType ||
              requirement.getKind() == RequirementKind::Superclass);
 
       ctx.Diags.diagnose(loc,
@@ -221,6 +222,63 @@ bool swift::rewriting::diagnoseRequirementErrors(
         break;
 
       ctx.Diags.diagnose(loc, diag::unsupported_same_element);
+      diagnosedError = true;
+      break;
+    }
+
+    case RequirementError::Kind::UnsupportedPackSameType: {
+      if (error.getRequirement().hasError())
+        break;
+
+      ctx.Diags.diagnose(loc, diag::unsupported_pack_same_type);
+      diagnosedError = true;
+      break;
+    }
+
+    case RequirementError::Kind::InvalidValueGenericType: {
+      auto req = error.getRequirement();
+
+      if (req.hasError())
+        break;
+
+      ctx.Diags.diagnose(loc, diag::invalid_value_type_value_generic,
+                         req.getSecondType(), req.getFirstType());
+      diagnosedError = true;
+      break;
+    }
+
+    case RequirementError::Kind::InvalidValueGenericConformance: {
+      auto req = error.getRequirement();
+
+      if (req.hasError())
+        break;
+
+      ctx.Diags.diagnose(loc, diag::invalid_value_generic_conformance,
+                         req.getFirstType(), req.getSecondType());
+      diagnosedError = true;
+      break;
+    }
+
+    case RequirementError::Kind::InvalidValueGenericSameType: {
+      auto req = error.getRequirement();
+
+      if (req.hasError())
+        break;
+
+      ctx.Diags.diagnose(loc, diag::invalid_value_generic_same_type,
+                         req.getFirstType(), req.getSecondType());
+      diagnosedError = true;
+      break;
+    }
+
+    case RequirementError::Kind::InvalidValueForTypeSameType: {
+      auto req = error.getRequirement();
+
+      if (req.hasError())
+        break;
+
+      ctx.Diags.diagnose(loc, diag::invalid_value_for_type_same_type,
+                         req.getFirstType(), req.getSecondType());
       diagnosedError = true;
       break;
     }
@@ -259,8 +317,9 @@ getRequirementForDiagnostics(Type subject, Symbol property,
                        property.getLayoutConstraint());
 
   default:
-    llvm::errs() << "Bad property symbol: " << property << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "Bad property symbol: " << property;
+    });
   }
 }
 
@@ -272,7 +331,7 @@ void RewriteSystem::computeConflictingRequirementDiagnostics(
     const auto &firstRule = getRule(pair.first);
     const auto &secondRule = getRule(pair.second);
 
-    assert(firstRule.isPropertyRule() && secondRule.isPropertyRule());
+    ASSERT(firstRule.isPropertyRule() && secondRule.isPropertyRule());
 
     if (firstRule.isSubstitutionSimplified() ||
         secondRule.isSubstitutionSimplified())
@@ -308,7 +367,7 @@ void RewriteSystem::computeRecursiveRequirementDiagnostics(
   for (unsigned ruleID : RecursiveRules) {
     const auto &rule = getRule(ruleID);
 
-    assert(isInMinimizationDomain(rule.getRHS()[0].getRootProtocol()));
+    ASSERT(isInMinimizationDomain(rule.getRHS()[0].getRootProtocol()));
 
     Type subjectType = propertyMap.getTypeForTerm(rule.getRHS(), genericParams);
     errors.push_back(RequirementError::forRecursiveRequirement(

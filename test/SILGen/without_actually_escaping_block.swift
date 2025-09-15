@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
-// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name without_actually_escaping %s -sdk %S/Inputs -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-print-types -module-name without_actually_escaping %s -sdk %S/Inputs -enable-objc-interop | %FileCheck %s
 
 // REQUIRES: objc_interop
 

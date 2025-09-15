@@ -114,10 +114,11 @@ var x15: Int {
   // For the purpose of this test we need to use an attribute that cannot be
   // applied to the getter.
   weak
-  var foo: SomeClass? = SomeClass()  // expected-warning {{variable 'foo' was written to, but never read}}
-  // expected-warning@-1 {{instance will be immediately deallocated because variable 'foo' is 'weak'}}
-  // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
-  // expected-note@-3 {{'foo' declared here}}
+  var foo: SomeClass? = SomeClass()
+  // expected-warning@-1 {{variable 'foo' was never used; consider replacing with '_' or removing it}}
+  // expected-warning@-2 {{instance will be immediately deallocated because variable 'foo' is 'weak'}}
+  // expected-note@-3 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@-4 {{'foo' declared here}}
   return 0
 }
 
@@ -378,12 +379,12 @@ var x12: X {
   }
 }
 
-var x13: X {} // expected-error {{missing return in accessor expected to return 'X'}}
+var x13: X {} // missing return expectations moved to `SILOptimizer/missing_returns`
 
 struct X14 {}
 extension X14 {
   var x14: X {
-  } // expected-error {{missing return in accessor expected to return 'X'}}
+  } // missing return expectations moved to `SILOptimizer/missing_returns`
 }
 
 // Type checking problems
@@ -481,6 +482,13 @@ protocol ProtocolWithExtension1 {
 extension ProtocolWithExtension1 {
   var fooExt: Int // expected-error{{extensions must not contain stored properties}}
   static var fooExtStatic = 4 // expected-error{{static stored properties not supported in protocol extensions}}
+}
+
+// https://github.com/swiftlang/swift/issues/83969
+// Make sure we don't crash.
+public struct PublicTypeWithExt {}
+extension PublicTypeWithExt {
+  public var foo: Int? // expected-error {{extensions must not contain stored properties}}
 }
 
 protocol ProtocolWithExtension2 {
@@ -1342,14 +1350,4 @@ class C3_51744 {
 class LazyPropInClass {
   lazy var foo: Int = { return 0 } // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}}
   // expected-note@-1 {{Remove '=' to make 'foo' a computed property}}{{21-23=}}{{3-8=}}
-}
-
-// https://github.com/apple/swift/issues/57936
-
-enum E1_57936 {
-  var foo: Int {} // expected-error{{missing return in accessor expected to return 'Int'}}
-}
-
-enum E2_57936<T> {
-  var foo: T {} // expected-error{{missing return in accessor expected to return 'T'}}
 }

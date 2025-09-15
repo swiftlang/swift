@@ -52,13 +52,13 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ResultBuilderBodyResult:
   case ConstraintLocator::InstanceType:
   case ConstraintLocator::AutoclosureResult:
-  case ConstraintLocator::OptionalPayload:
+  case ConstraintLocator::OptionalInjection:
   case ConstraintLocator::Member:
   case ConstraintLocator::MemberRefBase:
   case ConstraintLocator::UnresolvedMember:
   case ConstraintLocator::ParentType:
   case ConstraintLocator::ExistentialConstraintType:
-  case ConstraintLocator::ProtocolCompositionSuperclassType:
+  case ConstraintLocator::ProtocolCompositionMemberType:
   case ConstraintLocator::LValueConversion:
   case ConstraintLocator::DynamicType:
   case ConstraintLocator::SubscriptMember:
@@ -176,8 +176,8 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "apply function";
     break;
 
-  case ConstraintLocator::OptionalPayload:
-    out << "optional payload";
+  case ConstraintLocator::OptionalInjection:
+    out << "optional injection";
     break;
 
   case ConstraintLocator::ApplyArgToParam: {
@@ -278,9 +278,11 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "existential constraint type";
     break;
 
-  case ConstraintLocator::ProtocolCompositionSuperclassType:
-    out << "protocol composition superclass type";
+  case ConstraintLocator::ProtocolCompositionMemberType: {
+    auto memberElt = elt.castTo<LocatorPathElt::ProtocolCompositionMemberType>();
+    out << "protocol composition member " << llvm::utostr(memberElt.getIndex());
     break;
+  }
 
   case ConstraintLocator::LValueConversion:
     out << "@lvalue-to-inout conversion";
@@ -543,9 +545,17 @@ void LocatorPathElt::dump(raw_ostream &out) const {
 /// e.g. `foo[0]` or `\Foo.[0]`
 bool ConstraintLocator::isSubscriptMemberRef() const {
   auto anchor = getAnchor();
-  auto path = getPath();
+  if (!anchor)
+    return false;
 
-  if (!anchor || path.empty())
+  // Look through dynamic member lookup since for a subscript reference the
+  // dynamic member lookup is also a subscript reference.
+  auto path = getPath();
+  using KPDynamicMemberElt = LocatorPathElt::KeyPathDynamicMember;
+  while (!path.empty() && path.back().is<KPDynamicMemberElt>())
+    path = path.drop_back();
+
+  if (path.empty())
     return false;
 
   return path.back().getKind() == ConstraintLocator::SubscriptMember;
@@ -586,22 +596,41 @@ bool ConstraintLocator::isResultOfKeyPathDynamicMemberLookup() const {
   });
 }
 
-bool ConstraintLocator::isKeyPathSubscriptComponent() const {
-  auto *anchor = getAsExpr(getAnchor());
-  auto *KPE = dyn_cast_or_null<KeyPathExpr>(anchor);
+static bool hasKeyPathComponent(
+    const ConstraintLocator *loc,
+    llvm::function_ref<bool(KeyPathExpr::Component::Kind)> predicate) {
+  auto *KPE = getAsExpr<KeyPathExpr>(loc->getAnchor());
   if (!KPE)
     return false;
 
-  using ComponentKind = KeyPathExpr::Component::Kind;
-  return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
+  return llvm::any_of(loc->getPath(), [&](const LocatorPathElt &elt) {
     auto keyPathElt = elt.getAs<LocatorPathElt::KeyPathComponent>();
     if (!keyPathElt)
       return false;
 
-    auto index = keyPathElt->getIndex();
-    auto &component = KPE->getComponents()[index];
-    return component.getKind() == ComponentKind::Subscript ||
-           component.getKind() == ComponentKind::UnresolvedSubscript;
+    auto &component = KPE->getComponents()[keyPathElt->getIndex()];
+    return predicate(component.getKind());
+  });
+}
+
+bool ConstraintLocator::isKeyPathSubscriptComponent() const {
+  return hasKeyPathComponent(this, [](auto kind) {
+    return kind == KeyPathExpr::Component::Kind::Subscript ||
+           kind == KeyPathExpr::Component::Kind::UnresolvedSubscript;
+  });
+}
+
+bool ConstraintLocator::isKeyPathMemberComponent() const {
+  return hasKeyPathComponent(this, [](auto kind) {
+    return kind == KeyPathExpr::Component::Kind::Member ||
+           kind == KeyPathExpr::Component::Kind::UnresolvedMember;
+  });
+}
+
+bool ConstraintLocator::isKeyPathApplyComponent() const {
+  return hasKeyPathComponent(this, [](auto kind) {
+    return kind == KeyPathExpr::Component::Kind::Apply ||
+           kind == KeyPathExpr::Component::Kind::UnresolvedApply;
   });
 }
 

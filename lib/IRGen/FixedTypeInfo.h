@@ -46,8 +46,9 @@ protected:
                 IsBitwiseTakable_t bt,
                 IsCopyable_t copy,
                 IsFixedSize_t alwaysFixedSize,
+                IsABIAccessible_t isABIAccessible,
                 SpecialTypeInfoKind stik = SpecialTypeInfoKind::Fixed)
-      : TypeInfo(type, align, pod, bt, copy, alwaysFixedSize, IsABIAccessible, stik),
+      : TypeInfo(type, align, pod, bt, copy, alwaysFixedSize, isABIAccessible, stik),
         SpareBits(spareBits) {
     assert(SpareBits.size() == size.getValueInBits());
     assert(isFixedSize());
@@ -61,8 +62,9 @@ protected:
                 IsBitwiseTakable_t bt,
                 IsCopyable_t copy,
                 IsFixedSize_t alwaysFixedSize,
+                IsABIAccessible_t isABIAccessible,
                 SpecialTypeInfoKind stik = SpecialTypeInfoKind::Fixed)
-      : TypeInfo(type, align, pod, bt, copy, alwaysFixedSize, IsABIAccessible, stik),
+      : TypeInfo(type, align, pod, bt, copy, alwaysFixedSize, isABIAccessible, stik),
         SpareBits(std::move(spareBits)) {
     assert(SpareBits.size() == size.getValueInBits());
     assert(isFixedSize());
@@ -73,7 +75,6 @@ protected:
 public:
   // This is useful for metaprogramming.
   static bool isFixed() { return true; }
-  static IsABIAccessible_t isABIAccessible() { return IsABIAccessible; }
 
   /// Whether this type is known to be empty.
   bool isKnownEmpty(ResilienceExpansion expansion) const {
@@ -82,8 +83,6 @@ public:
 
   StackAddress allocateStack(IRGenFunction &IGF, SILType T,
                              const llvm::Twine &name) const override;
-  StackAddress allocateVector(IRGenFunction &IGF, SILType T,
-                              llvm::Value *capacity, const Twine &name) const override;
   void deallocateStack(IRGenFunction &IGF, StackAddress addr, SILType T) const override;
   void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,
                     bool isOutlined) const override;

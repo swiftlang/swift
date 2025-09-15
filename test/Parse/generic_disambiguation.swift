@@ -1,6 +1,7 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-additional-prefix swift5-
+// RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix swift6-
 
-struct A<B> { // expected-note{{generic type 'A' declared here}}
+struct A<B> { // expected-note{{generic struct 'A' declared here}}
   init(x:Int) {}
   static func c() {}
 
@@ -19,22 +20,30 @@ protocol Fungible {}
 func meta<T>(_ m: T.Type) {}
 func meta2<T>(_ m: T.Type, _ x: Int) {}
 
-func generic<T>(_ x: T) {}
+func generic<T>(_ x: T) {} // expected-note {{'generic' declared here}}
 
 var a, b, c, d : Int
 
 _ = a < b
 _ = (a < b, c > d)
 // Parses as generic because of lparen after '>'
-(a < b, c > (d)) // expected-error{{cannot specialize a non-generic definition}}
-// expected-note@-1 {{while parsing this '<' as a type parameter bracket}}
+(a < b, c > (d)) // expected-error{{cannot find type 'b' in scope}}
+// expected-note@-1 2 {{while parsing this '<' as a type parameter bracket}}
+// expected-error@-2 {{cannot specialize non-generic type 'Int'}}
+// expected-error@-3 {{cannot call value of non-function type 'Int'}}
+// expected-error@-4 {{cannot find type 'c' in scope}}
 // Parses as generic because of lparen after '>'
-(a<b, c>(d)) // expected-error{{cannot specialize a non-generic definition}}
-// expected-note@-1 {{while parsing this '<' as a type parameter bracket}}
+(a<b, c>(d)) // expected-error{{cannot find type 'b' in scope}}
+// expected-note@-1 2 {{while parsing this '<' as a type parameter bracket}}
+// expected-error@-2 {{cannot specialize non-generic type 'Int'}}
+// expected-error@-3 {{cannot call value of non-function type 'Int'}}
+// expected-error@-4 {{cannot find type 'c' in scope}}
 _ = a>(b)
 _ = a > (b)
 
-generic<Int>(0) // expected-error{{cannot explicitly specialize a generic function}} expected-note{{while parsing this '<' as a type parameter bracket}}
+generic<Int>(0)
+// expected-swift5-warning@-1{{cannot explicitly specialize global function 'generic'}}
+// expected-swift6-error@-2 {{cannot explicitly specialize global function 'generic'}}
 
 A<B>.c()
 A<A<B>>.c()

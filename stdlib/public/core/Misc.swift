@@ -62,8 +62,8 @@ public // SPI (Distributed)
 func _getFunctionFullNameFromMangledName(mangledName: String) -> String? {
   let mangledNameUTF8 = Array(mangledName.utf8)
   let (stringPtr, count) =
-    mangledNameUTF8.withUnsafeBufferPointer { (mangledNameUTF8) in
-    return _getFunctionFullNameFromMangledNameImpl(
+    unsafe mangledNameUTF8.withUnsafeBufferPointer { (mangledNameUTF8) in
+    return unsafe _getFunctionFullNameFromMangledNameImpl(
       mangledNameUTF8.baseAddress!,
       UInt(mangledNameUTF8.endIndex))
   }
@@ -72,7 +72,7 @@ func _getFunctionFullNameFromMangledName(mangledName: String) -> String? {
     return nil
   }
 
-  return String._fromUTF8Repairing(
+  return unsafe String._fromUTF8Repairing(
     UnsafeBufferPointer(start: stringPtr, count: Int(count))).0
 }
 
@@ -90,27 +90,29 @@ public func _getTypeName(_ type: Any.Type, qualified: Bool)
 @_unavailableInEmbedded
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
-  let (stringPtr, count) = _getTypeName(type, qualified: qualified)
-  return String._fromUTF8Repairing(
+  let (stringPtr, count) = unsafe _getTypeName(type, qualified: qualified)
+  return unsafe String._fromUTF8Repairing(
     UnsafeBufferPointer(start: stringPtr, count: count)).0
 }
 
 @available(SwiftStdlib 5.3, *)
 @_silgen_name("swift_getMangledTypeName")
-public func _getMangledTypeName(_ type: Any.Type)
+@_preInverseGenerics
+public func _getMangledTypeName(_ type: any (~Copyable & ~Escapable).Type)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the mangled name for a given type.
 @available(SwiftStdlib 5.3, *)
 @_unavailableInEmbedded
+@_preInverseGenerics
 public // SPI
-func _mangledTypeName(_ type: Any.Type) -> String? {
-  let (stringPtr, count) = _getMangledTypeName(type)
+func _mangledTypeName(_ type: any (~Copyable & ~Escapable).Type) -> String? {
+  let (stringPtr, count) = unsafe _getMangledTypeName(type)
   guard count > 0 else {
     return nil
   }
 
-  let (result, repairsMade) = String._fromUTF8Repairing(
+  let (result, repairsMade) = unsafe String._fromUTF8Repairing(
       UnsafeBufferPointer(start: stringPtr, count: count))
 
   _precondition(!repairsMade, "repairs made to _mangledTypeName, this is not expected since names should be valid UTF-8")
@@ -124,8 +126,8 @@ func _mangledTypeName(_ type: Any.Type) -> String? {
 public // SPI(Foundation)
 func _typeByName(_ name: String) -> Any.Type? {
   let nameUTF8 = Array(name.utf8)
-  return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
-    return  _getTypeByMangledNameUntrusted(nameUTF8.baseAddress!,
+  return unsafe nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
+    return  unsafe _getTypeByMangledNameUntrusted(nameUTF8.baseAddress!,
                                   UInt(nameUTF8.endIndex))
   }
 }
@@ -155,6 +157,7 @@ public func _getTypeByMangledNameInContext(
 /// Prevents performance diagnostics in the passed closure.
 @_alwaysEmitIntoClient
 @_semantics("no_performance_analysis")
+@unsafe
 public func _unsafePerformance<T>(_ c: () -> T) -> T {
   return c()
 }
@@ -167,6 +170,15 @@ public func _unsafePerformance<T>(_ c: () -> T) -> T {
 @inline(__always)
 func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
   try fn()
+}
+
+@available(SwiftStdlib 9999, *)
+@usableFromInline internal var swift_deletedCalleeAllocatedCoroutineMethodError: () {
+  // TODO: CoroutineAccessors: Change to read from _read.
+  @_silgen_name("swift_deletedCalleeAllocatedCoroutineMethodError")
+  _read {
+    fatalError("Fatal error: Call of deleted method")
+  }
 }
 
 /// A type whose values can be implicitly or explicitly copied.
@@ -200,7 +212,7 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 /// all of the following pairs of declarations are equivalent:
 ///
 ///     struct MyStructure { }
-///     struct MyStructere: Copyable { }
+///     struct MyStructure: Copyable { }
 ///
 ///     protocol MyProtocol { }
 ///     protocol MyProtocol: Copyable { }
@@ -225,25 +237,12 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 ///     protocol NoRequirements: ~Copyable { }
 ///
 /// Extensions to the `Copyable` protocol are not allowed.
-@_marker public protocol Copyable {}
+@_marker public protocol Copyable/*: ~Escapable*/ {}
 
 @_documentation(visibility: internal)
-@_marker public protocol Escapable {}
+@_marker public protocol Escapable/*: ~Copyable*/ {}
 
-#if $BitwiseCopyable2
-#if $NoncopyableGenerics && $NonescapableTypes
 @_marker public protocol BitwiseCopyable: ~Escapable { }
-#else
-@_marker public protocol BitwiseCopyable { }
-#endif
 
 @available(*, deprecated, message: "Use BitwiseCopyable")
 public typealias _BitwiseCopyable = BitwiseCopyable
-#else
-#if $NoncopyableGenerics && $NonescapableTypes
-@_marker public protocol _BitwiseCopyable: ~Escapable { }
-#else
-@_marker public protocol _BitwiseCopyable { }
-#endif
-public typealias BitwiseCopyable = _BitwiseCopyable
-#endif

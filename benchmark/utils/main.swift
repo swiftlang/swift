@@ -55,9 +55,12 @@ import CodableTest
 import Combos
 import CountAlgo
 import CreateObjects
-import CxxSetToCollection
+// rdar://128520766
+// import CxxSetToCollection
+import CxxSpanTests
 import CxxStringConversion
-import CxxVectorSum
+// rdar://128520766
+// import CxxVectorSum
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition
@@ -114,6 +117,7 @@ import LuhnAlgoLazy
 import MapReduce
 import Memset
 import MirrorTest
+import Monoids
 import MonteCarloE
 import MonteCarloPi
 import NaiveRangeReplaceableCollectionConformance
@@ -160,6 +164,7 @@ import RandomShuffle
 import RandomTree
 import RandomValues
 import RangeAssignment
+import RangeContains
 import RangeIteration
 import RangeOverlaps
 import RangeReplaceableCollectionPlusDefault
@@ -251,9 +256,12 @@ register(Combos.benchmarks)
 register(CountAlgo.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
-register(CxxSetToCollection.benchmarks)
+// rdar://128520766
+// register(CxxSetToCollection.benchmarks)
+register(CxxSpanTests.benchmarks)
 register(CxxStringConversion.benchmarks)
-register(CxxVectorSum.benchmarks)
+// rdar://128520766
+// register(CxxVectorSum.benchmarks)
 register(DataBenchmarks.benchmarks)
 register(DeadArray.benchmarks)
 register(DevirtualizeProtocolComposition.benchmarks)
@@ -310,6 +318,7 @@ register(LuhnAlgoLazy.benchmarks)
 register(MapReduce.benchmarks)
 register(Memset.benchmarks)
 register(MirrorTest.benchmarks)
+register(Monoids.benchmarks)
 register(MonteCarloE.benchmarks)
 register(MonteCarloPi.benchmarks)
 register(NaiveRangeReplaceableCollectionConformance.benchmarks)
@@ -356,6 +365,7 @@ register(RandomShuffle.benchmarks)
 register(RandomTree.benchmarks)
 register(RandomValues.benchmarks)
 register(RangeAssignment.benchmarks)
+register(RangeContains.benchmarks)
 register(RangeIteration.benchmarks)
 register(RangeOverlaps.benchmarks)
 register(RangeReplaceableCollectionPlusDefault.benchmarks)
@@ -411,4 +421,4 @@ register(Walsh.benchmarks)
 register(WordCount.benchmarks)
 register(XorLoop.benchmarks)
 
-main()
+await main()

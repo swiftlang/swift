@@ -36,155 +36,6 @@ ActiveTaskStatus::getStatusRecordParent(TaskStatusRecord *ptr) {
 /************************* RECORD LOCK MANAGEMENT *************************/
 /**************************************************************************/
 
-/// A lock used to protect management of task-specific status
-/// record locks.
-static LazyMutex StatusRecordLockLock;
-
-namespace {
-
-/// A lock record which can be used to protect a task's active
-/// status records.
-///
-/// For the most part, the active task status records of a task are
-/// only accessed by the task itself.  If that were always true,
-/// no synchronization would be required to change them.  However,
-/// cancellation and escalation can occur asynchronously, and they
-/// must be able to inspect the status records without worrying about
-/// their concurrent modification or destruction of the records.
-/// Therefore, these operations freeze the active status records
-/// for their duration.  They do this by (1) setting a bit in the
-/// task's `Status` field state which says that the records are
-/// locked and (2) creating a lock record as the new innermost
-/// status record.  When the operation is complete, it removes this
-/// record and clears the lock bit, then notifies the lock record that
-/// the locking operation is complete.
-///
-/// Note that this status record lock only protects concurrent
-/// modifications/access from *other* threads which may be trying to
-/// inspect/modify a task's status records. A thread which already
-/// owns the StatusRecordLock may recursively take it and modify
-/// the status record list.
-///
-/// When a task wants to iterate task status records, but
-/// it sees that the locked bit is set in the `Status` field, it
-/// must acquire the global status-record lock, find this record
-/// (which should be the innermost record), and wait for an unlock if
-/// the task is not the lock owner. If it already owns the
-/// status record lock, it may proceed.
-///
-class StatusRecordLockRecord
-    : public AtomicWaitQueue<StatusRecordLockRecord, LazyMutex>,
-      public TaskStatusRecord {
-  Thread Owner;
-public:
-
-  StatusRecordLockRecord(TaskStatusRecord *parent)
-    : TaskStatusRecord(TaskStatusRecordKind::Private_RecordLock, parent) {
-    // When we create a lock record, we always take it pre-locked
-    Owner = Thread::current();
-  }
-
-  void updateForNewArguments(TaskStatusRecord *parent) {
-    Parent = parent;
-  }
-
-  static bool classof(const TaskStatusRecord *record) {
-    return record->getKind() == TaskStatusRecordKind::Private_RecordLock;
-  }
-
-  bool isStatusRecordLockedBySelf() {
-    return Owner == Thread::current();
-  }
-
-};
-}
-
-/// If the status record is already self locked, returns true
-///
-/// If the status record is not self locked, then wait for the owner to unlock
-/// before we return. We still have to retry getting the lock ourselves and may
-/// still run into a race here.
-static bool waitForStatusRecordUnlockIfNotSelfLocked(AsyncTask *task,
-  ActiveTaskStatus &status) {
-  StatusRecordLockRecord::Waiter waiter(StatusRecordLockLock);
-
-  while (true) {
-    assert(status.isStatusRecordLocked());
-    bool selfLocked = false;
-
-    bool waited = waiter.tryReloadAndWait([&]() -> StatusRecordLockRecord* {
-      // Pairs with the store_release in installation of lock record in
-      // withStatusRecordLock so that lock record contents are visible due to
-      // load-through HW address dependency
-      status = task->_private()._status().load(SWIFT_MEMORY_ORDER_CONSUME);
-      _swift_tsan_consume(task);
-
-      if (!status.isStatusRecordLocked())
-        return nullptr;
-
-      auto record = cast<StatusRecordLockRecord>(status.getInnermostRecord());
-      // We can safely look inside the record now
-      if (record->isStatusRecordLockedBySelf()) {
-        selfLocked = true;
-        return nullptr;
-      }
-      return record;
-    });
-
-    if (!waited)
-      return selfLocked;
-
-    // Reload the status before trying to relock
-    status = task->_private()._status().load(SWIFT_MEMORY_ORDER_CONSUME);
-    _swift_tsan_consume(task);
-    if (!status.isStatusRecordLocked())
-      return false;
-  }
-}
-
-/// Wait for a task's status record lock to be unlocked. This asserts that the
-/// lock is not owned by self as that would result in a deadlock.
-///
-/// When this function returns, `status` will have been updated
-/// to the last value read and `isStatusRecordLocked()` will be false.
-/// Of course, another thread may still be concurrently trying
-/// to acquire the record lock.
-static void waitForStatusRecordUnlock(AsyncTask *task,
-                                      ActiveTaskStatus &status) {
-  // Acquire the lock.
-  StatusRecordLockRecord::Waiter waiter(StatusRecordLockLock);
-
-  while (true) {
-    assert(status.isStatusRecordLocked());
-
-    bool waited = waiter.tryReloadAndWait([&]() -> StatusRecordLockRecord* {
-      // Pairs with the store_release in installation of lock record in
-      // withStatusRecordLock so that lock record contents are visible due to
-      // load-through HW address dependency
-      status = task->_private()._status().load(SWIFT_MEMORY_ORDER_CONSUME);
-      _swift_tsan_consume(task);
-      if (!status.isStatusRecordLocked())
-        return nullptr;
-
-      // The innermost entry should be a record lock record; Verify that we are
-      // not the owner and then wait for it to be unlocked.
-      auto record = cast<StatusRecordLockRecord>(status.getInnermostRecord());
-      if (record->isStatusRecordLockedBySelf()) {
-        swift_Concurrency_fatalError(0, "Waiting on a status record lock that is owned by self");
-      }
-      return record;
-    });
-    if (!waited)
-      return;
-
-    // Reload the status before trying to relock.
-    status = task->_private()._status().load(SWIFT_MEMORY_ORDER_CONSUME);
-    _swift_tsan_consume(task);
-    if (!status.isStatusRecordLocked())
-      return;
-  }
-}
-
 /// This function grabs the status record lock of the input task and invokes
 /// `fn` while holding the StatusRecordLock of the input task.
 ///
@@ -197,63 +48,75 @@ static void waitForStatusRecordUnlock(AsyncTask *task,
 /// from the ActiveTaskStatus so that callers may make additional modifications
 /// to ActiveTaskStatus flags. `statusUpdate` can be called multiple times in a
 /// RMW loop and so much be idempotent.
-static bool withStatusRecordLock(AsyncTask *task, ActiveTaskStatus status,
-    llvm::function_ref<void(ActiveTaskStatus)>fn,
-    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)> statusUpdate = nullptr) {
+static void withStatusRecordLock(
+    AsyncTask *task, ActiveTaskStatus status,
+    llvm::function_ref<void(ActiveTaskStatus)> fn,
+    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus &)>
+        statusUpdate = nullptr) {
+  // We need to acquire the lock AND set the is-locked bit in the status so that
+  // other threads attempting lockless operations can atomically check whether
+  // another thread holds the lock. Various operations can be done with a
+  // compare and swap if nothing holds the lock, but need to wait for the lock
+  // to be released if something does hold it.
+  //
+  // Setting the bit can't be done atomically with acquiring the lock, but
+  // that's OK. If we hold the lock but haven't yet set the bit, then we haven't
+  // actually done any work and other threads can operate without violating our
+  // assumptions. Once we swap in the is-locked bit and begin work, any
+  // in-progress lockless work will fail its compare and swap operation, retry,
+  // see that the is-locked bit is now set, and then wait for the lock.
+  task->_private().statusLock.lock();
 
-  StatusRecordLockRecord::Worker worker(StatusRecordLockLock);
+  bool alreadyLocked = false;
 
-  TaskStatusRecord *oldRecord;
-  StatusRecordLockRecord *lockingRecord;
+  // `status` was loaded before we acquired the lock. If its is-locked bit is
+  // not set, then we know that this thread doesn't already hold the lock.
+  // However, if the is-locked bit is set, then we don't know if this thread
+  // held the lock or another thread did. In that case, we reload the status
+  // after acquiring the lock. If the reloaded status still has the is-locked
+  // bit set, then we know it's this thread. If it doesn't, then we know it was
+  // a different thread.
+  if (status.isStatusRecordLocked()) {
+    status = task->_private()._status().load(std::memory_order_relaxed);
+    alreadyLocked = status.isStatusRecordLocked();
+  }
 
-  // Take the lock record
-  bool installedLockRecord = false;
-  while (true) {
-    if (status.isStatusRecordLocked() &&
-        waitForStatusRecordUnlockIfNotSelfLocked(task, status)) {
-      // Top record is status record lock and we own it.
-      SWIFT_TASK_DEBUG_LOG("[StatusRecordLock] Lock for task %p is already owned by thread", task);
-      break;
-    }
+  // If it's already locked then this thread is the thread that locked it, and
+  // we can leave that bit alone here.
+  if (!alreadyLocked) {
+    while (true) {
+      ActiveTaskStatus newStatus = status.withStatusRecordLocked();
 
-    // Make (or reconfigure) a lock record
-    oldRecord = status.getInnermostRecord();
-    lockingRecord = worker.createQueue(oldRecord);
-
-    // Publish the lock record
-    // * We need an acquire to pair with release of someone else who might have
-    // unlocked
-    // * We need a store release to publish the lock record contents
-    ActiveTaskStatus newStatus = status.withLockingRecord(lockingRecord);
-    if (task->_private()._status().compare_exchange_weak(status, newStatus,
-            /*success*/ std::memory_order_acq_rel,
-            /*failure*/ std::memory_order_relaxed)) {
-      _swift_tsan_acquire(task);
-      _swift_tsan_release(task);
-
-      status = newStatus;
-
-      status.traceStatusChanged(task, false);
-      worker.flagQueueIsPublished(lockingRecord);
-      installedLockRecord = true;
-
-      // We've locked the status
-      assert(worker.isWorkerThread());
-      break;
+      // The caller may be reading a record that was locklessly emplaced. The
+      // CONSUME here pairs with the release in addStatusRecord to ensure the
+      // record's memory is visible to this thread.
+      if (task->_private()._status().compare_exchange_weak(
+              status, newStatus,
+              /*success*/ SWIFT_MEMORY_ORDER_CONSUME,
+              /*failure*/ std::memory_order_relaxed)) {
+        bool wasRunning = status.isRunning();
+        status = newStatus;
+        status.traceStatusChanged(task, false, wasRunning);
+        break;
+      }
     }
   }
 
-  // Call the function.
+  // We now hold the lock and we've set the bit (or the bit was already set).
+  // Call the function to do the work.
   fn(status);
 
-  // Release lock record if we installed it earlier and restore the old record
-  // at the top.
   while (true) {
-    auto newStatus = status;
+    // If we were already locked and there's no status update, then we can skip
+    // updating the status field.
+    if (alreadyLocked && !statusUpdate)
+      break;
 
-    assert(status.isStatusRecordLocked());
-    if (installedLockRecord) {
-      newStatus = status.withoutLockingRecord();
+    ActiveTaskStatus newStatus = status;
+
+    // If we set the is-locked bit, clear it.
+    if (!alreadyLocked) {
+      newStatus = newStatus.withoutStatusRecordLocked();
     }
 
     // If the caller of the function wanted to modify something, let them.
@@ -261,36 +124,32 @@ static bool withStatusRecordLock(AsyncTask *task, ActiveTaskStatus status,
       statusUpdate(status, newStatus);
     }
 
-    // We are releasing the status record lock, all modifications done while
-    // holding the lock should now be published to anyone else who is waiting to
-    // acquire the lock next
-    _swift_tsan_release(task);
-    if (task->_private()._status().compare_exchange_weak(status, newStatus,
-            /*success*/ std::memory_order_release,
+    // Records can only be read with the status lock held, so the lock's
+    // memory barriers will ensure that a newly emplaced record will be
+    // visible to any reader, and we can use relaxed ordering here.
+    if (task->_private()._status().compare_exchange_weak(
+            status, newStatus,
+            /*success*/ std::memory_order_relaxed,
             /*failure*/ std::memory_order_relaxed)) {
-      newStatus.traceStatusChanged(task, false);
+      newStatus.traceStatusChanged(task, false, status.isRunning());
       break;
     }
   }
 
-  if (installedLockRecord) {
-    // Unblock any waiters.
-    worker.finishAndUnpublishQueue([]{});
-  }
-
-  return true;
+  task->_private().statusLock.unlock();
 }
 
 /// A convenience version of the above for contexts that haven't already
 /// done the load.
 template <class Fn>
-static bool withStatusRecordLock(
+static void withStatusRecordLock(
     AsyncTask *task, Fn &&fn,
-    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)> statusUpdate = nullptr) {
+    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus &)>
+        statusUpdate = nullptr) {
   ActiveTaskStatus status = task->_private()._status().load(std::memory_order_relaxed);
-  return withStatusRecordLock(task, status, [&](ActiveTaskStatus taskStatus) {
-    fn(taskStatus);
-  }, /*statusUpdate=*/statusUpdate);
+  withStatusRecordLock(
+      task, status, [&](ActiveTaskStatus taskStatus) { fn(taskStatus); },
+      /*statusUpdate=*/statusUpdate);
 }
 
 /**************************************************************************/
@@ -304,11 +163,28 @@ bool swift::addStatusRecord(AsyncTask *task, TaskStatusRecord *newRecord,
 
   SWIFT_TASK_DEBUG_LOG("Adding %p record to task %p", newRecord, task);
   while (true) {
-    // Wait for any active lock to be released.
     if (oldStatus.isStatusRecordLocked()) {
-      bool selfLocked = waitForStatusRecordUnlockIfNotSelfLocked(task, oldStatus);
-      assert(!selfLocked);
+      // If the record is locked, then acquire the lock and emplace the new
+      // record with the lock held. We don't have any other work to do, so we
+      // pass an empty function for `fn`, and give a `statusUpdate` that puts
+      // the new record in place.
+      bool addRecord = false;
+      withStatusRecordLock(
+          task, oldStatus, [](ActiveTaskStatus) {},
+          [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+            // Reset the parent of the new record.
+            newRecord->resetParent(newStatus.getInnermostRecord());
+            ActiveTaskStatus modifiedStatus =
+                newStatus.withInnermostRecord(newRecord);
+            addRecord = shouldAddRecord(newStatus, modifiedStatus);
+            if (addRecord)
+              newStatus = modifiedStatus;
+          });
+      return addRecord;
     }
+
+    // If the status record is not locked, try emplacing the new record without
+    // locking.
 
     // Reset the parent of the new record.
     newRecord->resetParent(oldStatus.getInnermostRecord());
@@ -316,13 +192,12 @@ bool swift::addStatusRecord(AsyncTask *task, TaskStatusRecord *newRecord,
     ActiveTaskStatus newStatus = oldStatus.withInnermostRecord(newRecord);
     if (shouldAddRecord(oldStatus, newStatus)) {
       // We have to use a release on success to make the initialization of
-      // the new record visible to an asynchronous thread trying to modify the
-      // status records.
+      // the new record visible to another thread reading the new record.
       _swift_tsan_release(task);
       if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /*success*/ std::memory_order_release,
               /*failure*/ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(task, false);
+        newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
         return true;
       } else {
         // Retry
@@ -353,10 +228,14 @@ bool swift::addStatusRecordToSelf(TaskStatusRecord *record, ActiveTaskStatus &st
   return addStatusRecord(swift_task_getCurrent(), record, status, testAddRecord);
 }
 
-static void removeStatusRecordLocked(ActiveTaskStatus status, TaskStatusRecord *record) {
+// Remove a status record that is not the innermost record. The status record
+// lock must be held.
+static void removeNonInnermostStatusRecordLocked(ActiveTaskStatus status,
+                                                 TaskStatusRecord *record) {
   bool removedRecord = false;
   auto cur = status.getInnermostRecord();
-  assert(cur->getKind() == TaskStatusRecordKind::Private_RecordLock);
+  assert(status.isStatusRecordLocked());
+  assert(cur != record);
 
   // Cut the record out.
   while (cur != nullptr) {
@@ -368,6 +247,7 @@ static void removeStatusRecordLocked(ActiveTaskStatus status, TaskStatusRecord *
     }
     cur = next;
   }
+  static_cast<void>(removedRecord);
   assert(removedRecord);
 }
 
@@ -381,78 +261,55 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
   SWIFT_TASK_DEBUG_LOG("remove status record = %p, from task = %p",
                        record, task);
 
-  if (oldStatus.isStatusRecordLocked() &&
-        waitForStatusRecordUnlockIfNotSelfLocked(task, oldStatus)) {
-    SWIFT_TASK_DEBUG_LOG("[StatusRecordLock] Lock for task %p is already owned by thread", task);
-    // Case 1: Top record is status record lock and this thread owns it.
-    //
-    // Since we have the lock, we can just remove the record we care about which
-    // should be in the list somewhere and then modify the flags
-    removeStatusRecordLocked(oldStatus, record);
+  while (true) {
+    // If the record is locked, then either we wait for the lock or we own the
+    // lock. Either way, acquire the status record lock and perform the removal.
+    // If the record to be removed is not the innermost record, then we need to
+    // acquire the lock to safely remove it.
+    if (oldStatus.isStatusRecordLocked() ||
+        oldStatus.getInnermostRecord() != record) {
+      withStatusRecordLock(
+          task, oldStatus,
+          [&](ActiveTaskStatus lockedStatus) {
+            // If the record is the innermost (always was, or became that way
+            // while we waited) then we have to remove it in the status change
+            // function, since changing the head of the list requires changing
+            // the status. If it's not the innermost then we can remove it here.
+            if (lockedStatus.getInnermostRecord() != record)
+              removeNonInnermostStatusRecordLocked(lockedStatus, record);
+          },
+          [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+            // We're removing the innermost record, set a new status with the
+            // record removed.
+            if (newStatus.getInnermostRecord() == record)
+              newStatus = newStatus.withInnermostRecord(record->getParent());
 
-    if (fn) {
-      // Client wants to modify the flags on the status - do it in a loop to
-      // make sure we handle other concurrent updates.
-      while (true) {
-        auto newStatus = oldStatus;
-        fn(oldStatus, newStatus);
-
-        // We should still remain status record locked no matter what since we
-        // came in with the lock already
-        assert(newStatus.isStatusRecordLocked());
-
-        if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
-               /*success*/ std::memory_order_relaxed,
-               /*failure*/ std::memory_order_relaxed)) {
-          newStatus.traceStatusChanged(task, false);
-          return;
-        }
-      }
-    } else {
-      // Client doesn't have any other flags to change on status, we came in
-      // self-locked and leave with the lock held. No other flags changed.
+            if (fn) {
+              fn(oldStatus, newStatus);
+            }
+          });
       return;
     }
-  }
 
-  assert(!oldStatus.isStatusRecordLocked());
+    // Nobody holds the lock, and the record is the innermost record. Attempt to
+    // remove it locklessly.
+    auto newStatus = oldStatus.withInnermostRecord(record->getParent());
 
-  while (true) {
-    // We raced with some *other* thread which concurrently locked this task.
-    if (oldStatus.isStatusRecordLocked()) {
-      waitForStatusRecordUnlock(task, oldStatus);
+    if (fn) {
+      fn(oldStatus, newStatus);
     }
 
-    // Case 2: No status record lock, see if the record we are trying to pop off
-    // is the topmost record and if so, just get it out and modify the status
-    // flags if needed
-    if (oldStatus.getInnermostRecord() == record) {
-      auto newStatus = oldStatus.withInnermostRecord(record->getParent());
-
-      if (fn) {
-        fn(oldStatus, newStatus);
-      }
-
-      if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
-             /*success*/ std::memory_order_relaxed,
-             /*failure*/ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(task, false);
-        return;
-      }
-      // Restart the loop again - someone else modified status concurrently
-      continue;
+    if (task->_private()._status().compare_exchange_weak(
+            oldStatus, newStatus,
+            /*success*/ std::memory_order_relaxed,
+            /*failure*/ std::memory_order_relaxed)) {
+      newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
+      return;
     }
 
-    // Case 3: If the record is not the innermost record, we need to acquire the
-    // status record lock; there's no way to splice the record list safely
-    // otherwise
-    break;
+    // We failed to remove the record locklessly. Go back to the top and retry
+    // removing it.
   }
-
-  withStatusRecordLock(task, oldStatus, [&](ActiveTaskStatus status) {
-    removeStatusRecordLocked(status, record);
-  }, fn);
-
 }
 
 // For when we are trying to remove a record and also optionally trying to
@@ -464,54 +321,66 @@ void swift::removeStatusRecordWhere(
      llvm::function_ref<bool(ActiveTaskStatus, TaskStatusRecord*)> condition,
      llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)> updateStatus) {
   assert(condition && "condition is required");
-  SWIFT_TASK_DEBUG_LOG("remove status record = %p, from task = %p",
-                       record, task);
+  SWIFT_TASK_DEBUG_LOG("remove status record where(), from task = %p",
+                       task);
 
-  if (oldStatus.isStatusRecordLocked() &&
-        waitForStatusRecordUnlockIfNotSelfLocked(task, oldStatus)) {
-    SWIFT_TASK_DEBUG_LOG("[StatusRecordLock] Lock for task %p is already owned by thread", task);
-    // Case 1: Top record is status record lock and this thread owns it.
-    //
-    // Since we have the lock, we can just remove the record we care about which
-    // should be in the list somewhere and then modify the flags
-    for (auto cur : oldStatus.records()) {
-      if (condition(oldStatus, cur)) {
-        removeStatusRecordLocked(oldStatus, cur);
-      }
-    }
-
-    if (updateStatus) {
-      // Client wants to modify the flags on the status - do it in a loop to
-      // make sure we handle other concurrent updates.
-      while (true) {
-        auto newStatus = oldStatus;
-        updateStatus(oldStatus, newStatus);
-
-        // We should still remain status record locked no matter what since we
-        // came in with the lock already
-        assert(newStatus.isStatusRecordLocked());
-
-        if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
-               /*success*/ std::memory_order_relaxed,
-               /*failure*/ std::memory_order_relaxed)) {
-          newStatus.traceStatusChanged(task, false);
-          return;
+  // We're expected to look at the contents of the records, so we must hold the
+  // status record lock to do this safely.
+  bool removeInnermost = false;
+  withStatusRecordLock(
+      task, oldStatus,
+      [&](ActiveTaskStatus status) {
+        for (auto curr : status.records()) {
+          // If the record is the innermost then we have to remove it in the
+          // status change function, since changing the head of the list
+          // requires changing the status. If it's not the innermost then we can
+          // remove it here.
+          //
+          // We'll check the condition on the innermost record here so that we
+          // only call it once on the innermost record, as callers expect it to
+          // be called once per record, and the status update callback can be
+          // called more than once. We hold the record lock throughout so we
+          // know that the innermost record will be the same in the status
+          // update callback as it was here.
+          if (condition(status, curr)) {
+            if (curr == status.getInnermostRecord())
+              removeInnermost = true;
+            else
+              removeNonInnermostStatusRecordLocked(status, curr);
+          }
         }
-      }
-    }
-  }
+      },
+      [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+        // Remove the innermost record here, if it's a match.
+        if (removeInnermost) {
+          auto *innermost = newStatus.getInnermostRecord();
+          newStatus = newStatus.withInnermostRecord(innermost->getParent());
+        }
 
-  assert(!oldStatus.isStatusRecordLocked());
-  // Case 2: Since we're expected to look at more than jut the innermost record,
-  // we need to acquire the status record lock; there's no way to splice the
-  // record list safely otherwise
-  withStatusRecordLock(task, oldStatus, [&](ActiveTaskStatus status) {
-    for (auto curr : status.records()) {
-      if (condition(status, curr)) {
-        removeStatusRecordLocked(status, curr);
-      }
+        if (updateStatus) {
+          updateStatus(oldStatus, newStatus);
+        }
+      });
+}
+
+template <typename TaskStatusRecordT>
+SWIFT_CC(swift)
+TaskStatusRecordT* swift::popStatusRecordOfType(AsyncTask *task) {
+  TaskStatusRecordT *record = nullptr;
+  bool alreadyRemovedRecord = false;
+  removeStatusRecordWhere(task, [&](ActiveTaskStatus s, TaskStatusRecord *r) {
+    if (alreadyRemovedRecord)
+      return false;
+
+    if (auto *match = dyn_cast<TaskStatusRecordT>(r)) {
+      record = match;
+      alreadyRemovedRecord = true;
+      return true; // Remove this record.
     }
-  }, updateStatus);
+
+    return false;
+  });
+  return record;
 }
 
 // Convenience wrapper for when client hasn't already done the load of the
@@ -595,7 +464,7 @@ static bool swift_task_hasTaskGroupStatusRecordImpl() {
 ///************************** TASK EXECUTORS ********************************/
 ///**************************************************************************/
 
-TaskExecutorRef AsyncTask::getPreferredTaskExecutor() {
+TaskExecutorRef AsyncTask::getPreferredTaskExecutor(bool assumeHasRecord) {
   // We first check the executor preference status flag, in order to avoid
   // having to scan through the records of the task checking if there was
   // such record.
@@ -644,10 +513,17 @@ swift_task_pushTaskExecutorPreferenceImpl(TaskExecutorRef taskExecutor) {
   void *allocation = _swift_task_alloc_specific(
       task, sizeof(class TaskExecutorPreferenceStatusRecord));
   auto record =
-      ::new (allocation) TaskExecutorPreferenceStatusRecord(taskExecutor);
+      ::new (allocation) TaskExecutorPreferenceStatusRecord(
+          taskExecutor,
+          // we don't retain the executor by the task/record, because the "push"
+          // is implemented as a scope which keeps the executor alive by itself
+          // already, so we save the retain/release pair by the task doing it
+          // as well. In contrast, unstructured task creation always retains
+          // the executor.
+          /*retainedExecutor=*/false);
   SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Create task executor "
-                       "preference record %p for task:%p",
-                       allocation, task);
+                       "preference record:%p taskExecutor:%p for task:%p",
+                       allocation, taskExecutor.getIdentity(), task);
 
 
   addStatusRecord(task, record,
@@ -669,7 +545,7 @@ static void swift_task_popTaskExecutorPreferenceImpl(
     TaskExecutorPreferenceStatusRecord *record) {
   SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Remove task executor "
                        "preference record %p from task:%p",
-                       allocation, swift_task_getCurrent());
+                       record, swift_task_getCurrent());
   // We keep count of how many records there are because if there is more than
   // one, it means the task status flag should still be "has task preference".
   int preferenceRecordsCount = 0;
@@ -702,15 +578,20 @@ static void swift_task_popTaskExecutorPreferenceImpl(
   swift_task_dealloc(record);
 }
 
+// Since the header would have incomplete declarations, we instead instantiate a concrete version of the function here
+template SWIFT_CC(swift)
+CancellationNotificationStatusRecord* swift::popStatusRecordOfType<CancellationNotificationStatusRecord>(AsyncTask *);
+
 void AsyncTask::pushInitialTaskExecutorPreference(
-    TaskExecutorRef preferredExecutor) {
+    TaskExecutorRef preferredExecutor, bool owned) {
   void *allocation = _swift_task_alloc_specific(
       this, sizeof(class TaskExecutorPreferenceStatusRecord));
   auto record =
-      ::new (allocation) TaskExecutorPreferenceStatusRecord(preferredExecutor);
+      ::new (allocation) TaskExecutorPreferenceStatusRecord(
+          preferredExecutor, /*ownsExecutor=*/owned);
   SWIFT_TASK_DEBUG_LOG("[InitialTaskExecutorPreference] Create a task "
-                       "preference record %p for task:%p",
-                       record, this);
+                       "preference record:%p taskExecutor:%p for task:%p",
+                       record, preferredExecutor.getIdentity(), this);
 
   addStatusRecord(this, record,
                   [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
@@ -731,23 +612,109 @@ void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
   SWIFT_TASK_DEBUG_LOG("[InitialTaskExecutorPreference] Drop initial task "
                        "preference record from task:%p",
                        this);
-  assert(this->hasInitialTaskExecutorPreferenceRecord());
+  assert(hasInitialTaskExecutorPreferenceRecord());
 
+  TaskExecutorPreferenceStatusRecord *record =
+      popStatusRecordOfType<TaskExecutorPreferenceStatusRecord>(this);
+
+  assert(record && "dropInitialTaskExecutorPreferenceRecord must only be "
+                   "called when there is an executor preference record");
+
+  if (record->hasRetainedExecutor()) {
+    // Release the "initial" preferred task executor, because it was
+    // specifically set in a Task initializer, which retained it.
+    //
+    // This should not be done for withTaskExecutorPreference executors,
+    // however in that case, we would not enter this function here to clean up.
+    //
+    // NOTE: This MUST NOT assume that the object is a swift object (and use
+    // swift_release), because a dispatch_queue_t conforms to TaskExecutor,
+    // and may be passed in here; in which case swift_releasing it would be
+    // incorrect.
+    HeapObject *executorIdentityToRelease =
+        record->getPreferredExecutor().getIdentity();
+    SWIFT_TASK_DEBUG_LOG("Destroying executor %p", executorIdentityToRelease);
+    swift_unknownObjectRelease(executorIdentityToRelease);
+  }
+
+  _swift_task_dealloc_specific(this, record);
+}
+
+/******************************************************************************/
+/************************** TASK NAMING ***************************************/
+/******************************************************************************/
+
+void AsyncTask::pushInitialTaskName(const char* _taskName) {
+  assert(_taskName && "Task name must not be null!");
+  assert(hasInitialTaskNameRecord() && "Attempted pushing name but task has no initial task name flag!");
+
+  void *allocation = _swift_task_alloc_specific(
+      this, sizeof(class TaskNameStatusRecord));
+
+  // TODO: Copy the string maybe into the same allocation at an offset or retain the swift string?
+  auto taskNameLen = strlen(_taskName);
+  char* taskNameCopy = reinterpret_cast<char*>(
+      _swift_task_alloc_specific(this, taskNameLen + 1/*null terminator*/));
+#if defined(_WIN32)
+  static_cast<void>(strncpy_s(taskNameCopy, taskNameLen + 1,
+                              _taskName, _TRUNCATE));
+#else
+  (void) strncpy(/*dst=*/taskNameCopy, /*src=*/_taskName, taskNameLen);
+  taskNameCopy[taskNameLen] = '\0'; // make sure we null-terminate
+#endif
+
+  auto record =
+      ::new (allocation) TaskNameStatusRecord(taskNameCopy);
+  SWIFT_TASK_DEBUG_LOG("[TaskName] Create initial task name record %p "
+                       "for task:%p, name:%s", record, this, taskNameCopy);
+
+  addStatusRecord(this, record,
+                  [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+                    return true; // always add the record
+                  });
+}
+
+void AsyncTask::dropInitialTaskNameRecord() {
+  if (!hasInitialTaskNameRecord()) {
+    return;
+  }
+
+  SWIFT_TASK_DEBUG_LOG("[TaskName] Drop initial task name record for task:%p", this);
+  TaskNameStatusRecord *record =
+      popStatusRecordOfType<TaskNameStatusRecord>(this);
+  assert(record &&
+         "hasInitialTaskNameRecord is true but we did not find a name record");
+  // Since we first allocated the record, and then the string copy, deallocate
+  // in LIFO order.
+  char *name = const_cast<char *>(record->getName());
+  _swift_task_dealloc_specific(this, name);
+  _swift_task_dealloc_specific(this, record);
+}
+
+const char*
+AsyncTask::getTaskName() {
+  // We first check the executor preference status flag, in order to avoid
+  // having to scan through the records of the task checking if there was
+  // such record.
+  //
+  // This is an optimization in order to make the enqueue/run
+  // path of a task avoid excessive work if a task had many records.
+  if (!hasInitialTaskNameRecord()) {
+    return nullptr;
+  }
+
+  const char *data = nullptr;
   withStatusRecordLock(this, [&](ActiveTaskStatus status) {
-    for (auto r : status.records()) {
-      if (r->getKind() == TaskStatusRecordKind::TaskExecutorPreference) {
-        auto record = cast<TaskExecutorPreferenceStatusRecord>(r);
-        removeStatusRecordLocked(status, record);
-        _swift_task_dealloc_specific(this, record);
+    for (auto record : status.records()) {
+      if (record->getKind() == TaskStatusRecordKind::TaskName) {
+        auto nameRecord = cast<TaskNameStatusRecord>(record);
+        data = nameRecord->getName();
         return;
       }
     }
-
-    // This drop mirrors the push "initial" preference during task creation;
-    // so it must always reliably always have a preference to drop.
-    assert(false && "dropInitialTaskExecutorPreferenceRecord must be "
-                    "guaranteed to drop the last preference");
   });
+
+  return data;
 }
 
 /**************************************************************************/
@@ -827,6 +794,37 @@ void swift::_swift_taskGroup_detachChild(TaskGroup *group,
   });
 }
 
+/// Cancel the task group and all the child tasks that belong to `group`.
+///
+/// The caller must guarantee that this is called while holding the owning
+/// task's status record lock.
+void swift::_swift_taskGroup_cancel(TaskGroup *group) {
+  (void) group->statusCancel();
+
+  // Because only the owning task of the task group can modify the
+  // child list of a task group status record, and it can only do so
+  // while holding the owning task's status record lock, we do not need
+  // any additional synchronization within this function.
+  for (auto childTask : group->getTaskRecord()->children())
+    swift_task_cancel(childTask);
+}
+
+/// Cancel the task group and all the child tasks that belong to `group`.
+///
+/// The caller must guarantee that this is called from the owning task.
+void swift::_swift_taskGroup_cancel_unlocked(TaskGroup *group,
+                                                        AsyncTask *owningTask) {
+  // Early out. If there are no children, there's nothing to do. We can safely
+  // check this without locking, since this can only be concurrently mutated
+  // from a child task. If there are no children then no more can be added.
+  if (!group->getTaskRecord()->getFirstChild())
+    return;
+
+  withStatusRecordLock(owningTask, [&group](ActiveTaskStatus status) {
+    _swift_taskGroup_cancel(group);
+  });
+}
+
 /**************************************************************************/
 /****************************** CANCELLATION ******************************/
 /**************************************************************************/
@@ -847,7 +845,7 @@ static void performCancellationAction(TaskStatusRecord *record) {
   // under the synchronous control of the task that owns the group.
   case TaskStatusRecordKind::TaskGroup: {
     auto groupRecord = cast<TaskGroupTaskStatusRecord>(record);
-    _swift_taskGroup_cancelAllChildren(groupRecord->getGroup());
+    _swift_taskGroup_cancel(groupRecord->getGroup());
     return;
   }
 
@@ -863,17 +861,20 @@ static void performCancellationAction(TaskStatusRecord *record) {
   case TaskStatusRecordKind::EscalationNotification:
     return;
 
-  // Record locks shouldn't be found this way, but they don't have
-  // anything to do anyway.
-  case TaskStatusRecordKind::Private_RecordLock:
-    return;
-
   // No cancellation action needs to be taken for dependency status records
   case TaskStatusRecordKind::TaskDependency:
     break;
 
   // Cancellation has no impact on executor preference.
   case TaskStatusRecordKind::TaskExecutorPreference:
+    break;
+
+  // Cancellation has no impact on task names.
+  case TaskStatusRecordKind::TaskName:
+    break;
+
+  // This should never be found, but the compiler complains if we don't check.
+  case TaskStatusRecordKind::First_Reserved:
     break;
   }
 
@@ -904,8 +905,8 @@ static void swift_task_cancelImpl(AsyncTask *task) {
     }
   }
 
-  newStatus.traceStatusChanged(task, false);
-  if (newStatus.getInnermostRecord() == NULL) {
+  newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
+  if (newStatus.getInnermostRecord() == nullptr) {
      // No records, nothing to propagate
      return;
   }
@@ -927,6 +928,7 @@ static void swift_task_cancelImpl(AsyncTask *task) {
 
 /// Perform any escalation actions required by the given record.
 static void performEscalationAction(TaskStatusRecord *record,
+                                    JobPriority oldPriority,
                                     JobPriority newPriority) {
   switch (record->getKind()) {
   // Child tasks need to be recursively escalated.
@@ -943,34 +945,36 @@ static void performEscalationAction(TaskStatusRecord *record,
     return;
   }
 
-  // Cancellation notifications can be ignore.
-  case TaskStatusRecordKind::CancellationNotification:
-    return;
-
-  /// Executor preference we can ignore.
-  case TaskStatusRecordKind::TaskExecutorPreference:
-    return;
-
   // Escalation notifications need to be called.
   case TaskStatusRecordKind::EscalationNotification:  {
     auto notification =
       cast<EscalationNotificationStatusRecord>(record);
-    notification->run(newPriority);
+    SWIFT_TASK_DEBUG_LOG("[Dependency] Trigger task escalation handler record %p, escalate from %#x to %#x",
+                         record, oldPriority, newPriority);
+    notification->run(oldPriority, newPriority);
     return;
   }
 
   case TaskStatusRecordKind::TaskDependency: {
     auto dependencyRecord = cast<TaskDependencyStatusRecord>(record);
-    SWIFT_TASK_DEBUG_LOG("[Dependency] Escalating a task dependency record %p to %#x",
-                    record, newPriority);
-    dependencyRecord->performEscalationAction(newPriority);
+    SWIFT_TASK_DEBUG_LOG("[Dependency] Escalating a task dependency record %p from %#x to %#x",
+                    record, oldPriority, newPriority);
+    dependencyRecord->performEscalationAction(oldPriority, newPriority);
     return;
   }
 
-  // Record locks shouldn't be found this way, but they don't have
-  // anything to do anyway.
-  case TaskStatusRecordKind::Private_RecordLock:
+  // Cancellation notifications can be ignore.
+  case TaskStatusRecordKind::CancellationNotification:
     return;
+  /// Executor preference we can ignore.
+  case TaskStatusRecordKind::TaskExecutorPreference:
+    return;
+  /// Task names don't matter to priority escalation.
+  case TaskStatusRecordKind::TaskName:
+    return;
+  // This should never be found, but the compiler complains if we don't check.
+  case TaskStatusRecordKind::First_Reserved:
+    break;
   }
 
   // Other cases can fall through here and be ignored.
@@ -980,17 +984,20 @@ static void performEscalationAction(TaskStatusRecord *record,
 SWIFT_CC(swift)
 JobPriority
 static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
-
   SWIFT_TASK_DEBUG_LOG("Escalating %p to %#zx priority", task, newPriority);
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
+  auto oldPriority = oldStatus.getStoredPriority();
   auto newStatus = oldStatus;
 
   while (true) {
+    // Ensure oldPriority is up to date if we retry the compare_exchange.
+    oldPriority = oldStatus.getStoredPriority();
+
     // Fast path: check that the stored priority is already at least
     // as high as the desired priority.
-    if (oldStatus.getStoredPriority() >= newPriority) {
-      SWIFT_TASK_DEBUG_LOG("Task is already at %#zx priority", oldStatus.getStoredPriority());
-      return oldStatus.getStoredPriority();
+    if (oldPriority >= newPriority) {
+      SWIFT_TASK_DEBUG_LOG("Task is already at %#zx priority", oldPriority);
+      return oldPriority;
     }
 
     if (oldStatus.isRunning() || oldStatus.isEnqueued()) {
@@ -1024,8 +1031,11 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     taskStatus = (ActiveTaskStatus *) &task->_private()._status();
     executionLock = (dispatch_lock_t *) ((char*)taskStatus + ActiveTaskStatus::executionLockOffset());
 
-    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is running on %#x to %#x", task, newStatus.currentExecutionLockOwner(), newPriority);
-    swift_dispatch_lock_override_start_with_debounce(executionLock, newStatus.currentExecutionLockOwner(), (qos_class_t) newPriority);
+    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is running on %#x from %#x to %#x",
+                         task, newStatus.currentExecutionLockOwner(),
+                         oldPriority, newPriority);
+    swift_dispatch_lock_override_start_with_debounce(
+        executionLock, newStatus.currentExecutionLockOwner(), (qos_class_t) newPriority);
 #endif
   } else if (newStatus.isEnqueued()) {
     //  Task is not running, it's enqueued somewhere waiting to be run
@@ -1044,7 +1054,8 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     return newStatus.getStoredPriority();
   }
 
-  SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended to %#x", task, newPriority);
+  SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended from %#x to %#x",
+                       task, oldPriority, newPriority);
   // We must have at least one record - the task dependency one.
   assert(newStatus.getInnermostRecord() != NULL);
 
@@ -1052,14 +1063,15 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     // We know that none of the escalation actions will recursively
     // modify the task status record list by adding or removing task records
     for (auto cur: status.records()) {
-      performEscalationAction(cur, newPriority);
+      performEscalationAction(cur, oldPriority, newPriority);
     }
   });
 
   return newStatus.getStoredPriority();
 }
 
-void TaskDependencyStatusRecord::performEscalationAction(JobPriority newPriority) {
+void TaskDependencyStatusRecord::performEscalationAction(
+    JobPriority oldPriority, JobPriority newPriority) {
   switch (this->DependencyKind) {
     case WaitingOnTask:
       SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent task %p noted in %p record",
@@ -1081,12 +1093,12 @@ void TaskDependencyStatusRecord::performEscalationAction(JobPriority newPriority
         this->DependentOn.TaskGroup, this);
       break;
     case EnqueuedOnExecutor:
-      SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent executor %p noted in %p record",
-        this->DependentOn.Executor, this);
+      SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent executor %p noted in %p record from %#x to %#x",
+        this->DependentOn.Executor, this, oldPriority, newPriority);
       swift_executor_escalate(this->DependentOn.Executor, this->WaitingTask, newPriority);
       break;
   }
 }
 
 #define OVERRIDE_TASK_STATUS COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

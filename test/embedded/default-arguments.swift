@@ -3,6 +3,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
 
 // Check that this doesn't crash the compiler in embedded mode.
 

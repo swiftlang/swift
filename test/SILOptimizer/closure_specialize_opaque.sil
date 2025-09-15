@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all -closure-specialize %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-opaque-values -enable-sil-verify-all -closure-specialize %s | %FileCheck %s
 
 struct TestView {}
 struct TestRange {}

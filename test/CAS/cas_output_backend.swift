@@ -2,7 +2,7 @@
 // RUN: mkdir -p %t/cas
 
 // RUN: not %target-swift-frontend -c -cache-compile-job -cas-path %t/cas %s -o %t/test.o 2>&1 | %FileCheck %s --check-prefix=NO-CASFS
-// NO-CASFS: caching is enabled without -cas-fs option
+// NO-CASFS: caching is enabled without CAS file-system options
 
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
@@ -12,6 +12,9 @@
 // RUN: echo "\"-disable-implicit-string-processing-module-import\"" >> %t/MyApp.cmd
 // RUN: echo "\"-disable-implicit-concurrency-module-import\"" >> %t/MyApp.cmd
 // RUN: echo "\"-parse-stdlib\"" >> %t/MyApp.cmd
+
+// RUN: not %target-swift-frontend -c -cache-compile-job %s -o %t/test.o @%t/MyApp.cmd 2>&1 | %FileCheck %s --check-prefix=NOT-CONFIG
+// NOT-CONFIG: error: CAS cannot be initialized from the specified '-cas-*' options: no CAS options provided
 
 // RUN: %target-swift-frontend -c -cache-compile-job -cas-path %t/cas %s -o %t/test.o @%t/MyApp.cmd
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \

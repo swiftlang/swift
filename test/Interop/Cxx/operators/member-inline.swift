@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=swift-5.9)
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=swift-6)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=upcoming-swift)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++23 -D CPP23)
 //
 // REQUIRES: executable_test
 
@@ -184,6 +184,20 @@ OperatorsTestSuite.test("ReadWriteIntArray.subscript (inline)") {
   let resultAfter = arr[1]
   expectEqual(234, resultAfter)
 }
+
+#if CPP23
+OperatorsTestSuite.test("Subscript operators with parameter number != 1") {
+  var ns = NullarySubscript()
+  expectEqual(42, ns[])
+  ns[] = 5
+  expectEqual(5, ns.field)
+
+  var bs = BinarySubscript()
+  expectEqual(10, bs[3, 7])
+  bs[1, 2] = 6
+  expectEqual(6, bs.field)
+}
+#endif
 
 OperatorsTestSuite.test("DerivedFromReadWriteIntArray.subscript (inline, base class)") {
   var arr = DerivedFromReadWriteIntArray()
@@ -435,6 +449,39 @@ OperatorsTestSuite.test("HasOperatorCallWithDefaultArg.call") {
   let h = HasOperatorCallWithDefaultArg(value: 321)
   let res = h(123)
   expectEqual(444, res)
+}
+
+OperatorsTestSuite.test("HasStaticOperatorCallBase.call") {
+  let h = HasStaticOperatorCallBase()
+  let res = h(1)
+  expectEqual(43, res)
+}
+
+OperatorsTestSuite.test("HasStaticOperatorCallBase2.call") {
+  let m = NonTrivial()
+  let h = HasStaticOperatorCallBaseNonTrivial()
+  let res = h(m)
+  expectEqual(48, res)
+}
+
+OperatorsTestSuite.test("HasStaticOperatorCallDerived.call") {
+  let h = HasStaticOperatorCallDerived()
+  let res = h(0)
+  expectEqual(42, res)
+}
+
+OperatorsTestSuite.test("HasStaticOperatorCallWithConstOperator.call") {
+  let h = HasStaticOperatorCallWithConstOperator()
+  let res = h(10)
+  expectEqual(9, res)
+  let res2 = h(3, 5)
+  expectEqual(8, res2)
+}
+
+OperatorsTestSuite.test("UnnamedParameterInOperator.equal") {
+  let lhs = ClassWithOperatorEqualsParamUnnamed()
+  let rhs = ClassWithOperatorEqualsParamUnnamed()
+  expectFalse(lhs == rhs)
 }
 
 runAllTests()

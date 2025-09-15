@@ -13,6 +13,7 @@
 #include "FormalEvaluation.h"
 #include "LValue.h"
 #include "SILGenFunction.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -193,6 +194,20 @@ void FormalEvaluationScope::verify() const {
     i->verify(SGF);
   }
 }
+
+void FormalEvaluationScope::deferPop() && {
+  ASSERT(previous && "no previous scope to defer the pop for!");
+  auto &context = SGF.FormalEvalContext;
+
+  // Remove ourselves as the innermost scope of the chain.
+  ASSERT(context.innermostScope == this &&
+         "popping formal-evaluation scopes out of order");
+  context.innermostScope = previous;
+
+  // Clear-out our saved depth to deactivate our pop-on-deinit.
+  savedDepth.reset();
+}
+
 
 //===----------------------------------------------------------------------===//
 //                         Formal Evaluation Context

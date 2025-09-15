@@ -115,7 +115,7 @@ public struct ObservationTracking: Sendable {
     })
   }
 
-  struct State {
+  struct State: @unchecked Sendable {
     var values = [ObjectIdentifier: ObservationTracking.Id]()
     var cancelled = false
     var changed: AnyKeyPath?

@@ -28,6 +28,7 @@ class raw_ostream;
 
 namespace swift {
 class DeclContext;
+class Initializer;
 class ModuleDecl;
 class VarDecl;
 class NominalTypeDecl;
@@ -69,6 +70,11 @@ public:
     /// The actor isolation iss statically erased, as for a call to
     /// an isolated(any) function.  This is not possible for declarations.
     Erased,
+    /// Inherits isolation from the caller of the given function.
+    ///
+    /// DISCUSSION: This is used for nonisolated asynchronous functions that we
+    /// want to inherit from their context the context's actor isolation.
+    CallerIsolationInheriting,
   };
 
 private:
@@ -83,30 +89,88 @@ private:
   /// Set to true if this was parsed from SIL.
   unsigned silParsed : 1;
 
-  unsigned parameterIndex : 27;
+  /// The opaque value of an EncodedParameterIndex.
+  /// Only meaningful for ActorInstance.
+  unsigned encodedParameterIndex : 27;
 
-  ActorIsolation(Kind kind, NominalTypeDecl *actor, unsigned parameterIndex);
+  class EncodedParameterIndex {
+    enum : unsigned {
+      SpecialIndex_Capture,
+      SpecialIndex_Self,
+      NumSpecialIndexes
+    };
 
-  ActorIsolation(Kind kind, VarDecl *actor, unsigned parameterIndex);
+    /// Either a special index or (parameter index + NumSpecialIndexes).
+    unsigned value;
 
-  ActorIsolation(Kind kind, Expr *actor, unsigned parameterIndex);
+    constexpr EncodedParameterIndex(unsigned value) : value(value) {}
 
-  ActorIsolation(Kind kind, Type globalActor)
-      : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false),
-        silParsed(false), parameterIndex(0) {}
+  public:
+    static constexpr EncodedParameterIndex parameter(unsigned index) {
+      return EncodedParameterIndex(NumSpecialIndexes + index);
+    }
+    static constexpr EncodedParameterIndex self() {
+      return EncodedParameterIndex(SpecialIndex_Self);
+    }
+    static constexpr EncodedParameterIndex capture() {
+      return EncodedParameterIndex(SpecialIndex_Capture);
+    }
+
+    unsigned getParameterIndex() const {
+      assert(value >= NumSpecialIndexes);
+      return value - NumSpecialIndexes;
+    }
+    bool isSelf() const {
+      return value == SpecialIndex_Self;
+    }
+    bool isCapture() const {
+      return value == SpecialIndex_Capture;
+    }
+
+    static EncodedParameterIndex fromOpaqueValue(unsigned value) {
+      return EncodedParameterIndex(value);
+    }
+    unsigned getOpaqueValue() const {
+      return value;
+    }
+  };
+
+  ActorIsolation(Kind kind, NominalTypeDecl *actor,
+                 EncodedParameterIndex parameterIndex);
+
+  ActorIsolation(Kind kind, VarDecl *actor,
+                 EncodedParameterIndex parameterIndex);
+
+  ActorIsolation(Kind kind, Expr *actor,
+                 EncodedParameterIndex parameterIndex);
+
+  ActorIsolation(Kind kind, Type globalActor);
+
+  EncodedParameterIndex getEncodedParameterIndex() const {
+    return EncodedParameterIndex::fromOpaqueValue(encodedParameterIndex);
+  }
 
 public:
   // No-argument constructor needed for DenseMap use in PostfixCompletion.cpp
   explicit ActorIsolation(Kind kind = Unspecified, bool isSILParsed = false)
       : pointer(nullptr), kind(kind), isolatedByPreconcurrency(false),
-        silParsed(isSILParsed), parameterIndex(0) {}
+        silParsed(isSILParsed), encodedParameterIndex(0) {
+    // SIL's use of this has weaker invariants for now.
+    assert(kind != ActorInstance || isSILParsed);
+  }
 
   static ActorIsolation forUnspecified() {
-    return ActorIsolation(Unspecified, nullptr);
+    return ActorIsolation(Unspecified);
   }
 
   static ActorIsolation forNonisolated(bool unsafe) {
-    return ActorIsolation(unsafe ? NonisolatedUnsafe : Nonisolated, nullptr);
+    return ActorIsolation(unsafe ? NonisolatedUnsafe : Nonisolated);
+  }
+
+  static ActorIsolation forCallerIsolationInheriting() {
+    // NOTE: We do not use parameter indices since the parameter is implicit
+    // from the perspective of the AST.
+    return ActorIsolation(CallerIsolationInheriting);
   }
 
   static ActorIsolation forActorInstanceSelf(ValueDecl *decl);
@@ -116,24 +180,29 @@ public:
 
   static ActorIsolation forActorInstanceParameter(NominalTypeDecl *actor,
                                                   unsigned parameterIndex) {
-    return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
+    return ActorIsolation(ActorInstance, actor,
+                          EncodedParameterIndex::parameter(parameterIndex));
   }
 
   static ActorIsolation forActorInstanceParameter(VarDecl *actor,
                                                   unsigned parameterIndex) {
-    return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
+    return ActorIsolation(ActorInstance, actor,
+                          EncodedParameterIndex::parameter(parameterIndex));
   }
 
   static ActorIsolation forActorInstanceParameter(Expr *actor,
                                                   unsigned parameterIndex);
 
   static ActorIsolation forActorInstanceCapture(VarDecl *capturedActor) {
-    return ActorIsolation(ActorInstance, capturedActor, 0);
+    return ActorIsolation(ActorInstance, capturedActor,
+                          EncodedParameterIndex::capture());
   }
 
   static ActorIsolation forGlobalActor(Type globalActor) {
     return ActorIsolation(GlobalActor, globalActor);
   }
+
+  static ActorIsolation forMainActor(ASTContext &ctx);
 
   static ActorIsolation forErased() {
     return ActorIsolation(Erased);
@@ -142,18 +211,14 @@ public:
   static std::optional<ActorIsolation> forSILString(StringRef string) {
     auto kind =
         llvm::StringSwitch<std::optional<ActorIsolation::Kind>>(string)
-            .Case("unspecified",
-                  std::optional<ActorIsolation>(ActorIsolation::Unspecified))
-            .Case("actor_instance",
-                  std::optional<ActorIsolation>(ActorIsolation::ActorInstance))
-            .Case("nonisolated",
-                  std::optional<ActorIsolation>(ActorIsolation::Nonisolated))
-            .Case("nonisolated_unsafe", std::optional<ActorIsolation>(
-                                            ActorIsolation::NonisolatedUnsafe))
-            .Case("global_actor",
-                  std::optional<ActorIsolation>(ActorIsolation::GlobalActor))
-            .Case("global_actor_unsafe", std::optional<ActorIsolation>(
-                                             ActorIsolation::GlobalActor))
+            .Case("unspecified", ActorIsolation::Unspecified)
+            .Case("actor_instance", ActorIsolation::ActorInstance)
+            .Case("nonisolated", ActorIsolation::Nonisolated)
+            .Case("nonisolated_unsafe", ActorIsolation::NonisolatedUnsafe)
+            .Case("global_actor", ActorIsolation::GlobalActor)
+            .Case("global_actor_unsafe", ActorIsolation::GlobalActor)
+            .Case("caller_isolation_inheriting",
+                  ActorIsolation::CallerIsolationInheriting)
             .Default(std::nullopt);
     if (kind == std::nullopt)
       return std::nullopt;
@@ -173,11 +238,22 @@ public:
   bool isNonisolatedUnsafe() const { return kind == NonisolatedUnsafe; }
 
   /// Retrieve the parameter to which actor-instance isolation applies.
-  ///
-  /// Parameter 0 is `self`.
-  unsigned getActorInstanceParameter() const {
+  unsigned getActorInstanceParameterIndex() const {
     assert(getKind() == ActorInstance);
-    return parameterIndex;
+    return getEncodedParameterIndex().getParameterIndex();
+  }
+
+  /// Given that this is actor instance isolation, is it a capture?
+  bool isActorInstanceForCapture() const {
+    assert(getKind() == ActorInstance);
+    return getEncodedParameterIndex().isCapture();
+  }
+
+  /// Returns true if this is an actor-instance isolation that additionally
+  /// applies to the self parameter of a method.
+  bool isActorInstanceForSelfParameter() const {
+    assert(getKind() == ActorInstance);
+    return getEncodedParameterIndex().isSelf();
   }
 
   bool isSILParsed() const { return silParsed; }
@@ -192,12 +268,16 @@ public:
     case Unspecified:
     case Nonisolated:
     case NonisolatedUnsafe:
+    case CallerIsolationInheriting:
       return false;
     }
   }
 
+  /// In the debugger return the index for the stored actorInstance pointer
+  /// union index. Asserts if not an actor instance.
+  SWIFT_DEBUG_HELPER(unsigned getActorInstanceUnionIndex() const);
+
   NominalTypeDecl *getActor() const;
-  NominalTypeDecl *getActorOrNullPtr() const;
 
   VarDecl *getActorInstance() const;
 
@@ -212,6 +292,10 @@ public:
   bool isMainActor() const;
 
   bool isDistributedActor() const;
+
+  bool isCallerIsolationInheriting() const {
+    return getKind() == CallerIsolationInheriting;
+  }
 
   Type getGlobalActor() const {
     assert(isGlobalActor());
@@ -257,21 +341,25 @@ public:
     id.AddPointer(pointer);
     id.AddBoolean(isolatedByPreconcurrency);
     id.AddBoolean(silParsed);
-    id.AddInteger(parameterIndex);
+    id.AddInteger(encodedParameterIndex);
   }
 
   friend llvm::hash_code hash_value(const ActorIsolation &state) {
     return llvm::hash_combine(state.kind, state.pointer,
                               state.isolatedByPreconcurrency, state.silParsed,
-                              state.parameterIndex);
+                              state.encodedParameterIndex);
   }
 
   void print(llvm::raw_ostream &os) const;
 
   void printForSIL(llvm::raw_ostream &os) const;
-
+  
+  /// Print the given isolation for diagnostics. If \c asNoun is \c false,
+  /// the participle adjective form is printed, e.g. "main actor-isolated".
+  /// Otherwise, the noun form is printed, e.g. "main actor isolation".
   void printForDiagnostics(llvm::raw_ostream &os,
-                           StringRef openingQuotationMark = "'") const;
+                           StringRef openingQuotationMark = "'",
+                           bool asNoun = false) const;
 
   SWIFT_DEBUG_DUMPER(dump());
 
@@ -281,12 +369,75 @@ public:
   SWIFT_DEBUG_DUMPER(dumpForDiagnostics());
 };
 
+struct IsolationSource {
+  enum Kind : uint8_t {
+    /// Isolation is written in an explicit attribute.
+    Explicit,
+    /// Isolation is inferred from the enclosing lexical context.
+    LexicalContext,
+    /// Isolation is inferred from conformance to a protocol.
+    Conformance,
+    /// Isolation is inherited from a superclass.
+    Superclass,
+    /// Isolation is inferred from an overridden superclass method.
+    Override,
+    /// Isolation is inferred from \c @main.
+    MainFunction,
+    /// Isolation is inferred in top-level code.
+    TopLevelCode,
+    /// Unspecified isolation, which defaults to \c nonisolated.
+    None,
+  };
+
+  using InferenceSource =
+      llvm::PointerUnion<Decl *, AbstractClosureExpr *>;
+
+  /// The declaration with the original isolation attribute.
+  InferenceSource inferenceSource;
+  Kind kind;
+
+  IsolationSource(InferenceSource inferenceSource = nullptr,
+                  Kind kind = Kind::None)
+      : inferenceSource(inferenceSource), kind(kind) {}
+
+  bool isInferred() const {
+    return (kind != None) && (kind != Explicit);
+  }
+
+  void printForDiagnostics(llvm::raw_ostream &os,
+                           StringRef openingQuotationMark = "'") const;
+};
+
+struct InferredActorIsolation {
+  ActorIsolation isolation;
+  IsolationSource source;
+
+  static InferredActorIsolation forUnspecified() {
+    return {
+      ActorIsolation::forUnspecified(),
+      IsolationSource()
+    };
+  }
+
+  bool preconcurrency() const {
+    return isolation.preconcurrency();
+  }
+};
+
 /// Determine how the given value declaration is isolated.
 ActorIsolation getActorIsolation(ValueDecl *value);
+
+/// Infer the actor isolation of the given declaration, including
+/// the source of isolation inference.
+InferredActorIsolation getInferredActorIsolation(ValueDecl *value);
 
 /// Trampoline for AbstractClosureExpr::getActorIsolation.
 ActorIsolation
 __AbstractClosureExpr_getActorIsolation(AbstractClosureExpr *CE);
+
+/// Determine how the given initialization context is isolated.
+ActorIsolation getActorIsolation(Initializer *init,
+                                 bool ignoreDefaultArguments = false);
 
 /// Determine how the given declaration context is isolated.
 /// \p getClosureActorIsolation allows the specification of actor isolation for

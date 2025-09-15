@@ -1,6 +1,7 @@
 // RUN: %target-run-stdlib-swift(-O -enable-experimental-feature MoveOnly)
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_MoveOnly
 
 import Swift
 import StdlibUnittest

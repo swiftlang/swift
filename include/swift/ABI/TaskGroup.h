@@ -44,6 +44,12 @@ public:
   /// Checks the cancellation status of the group.
   bool isCancelled();
 
+  /// Only mark the task group as cancelled, without performing the follow-up
+  /// work of cancelling all the child tasks.
+  ///
+  /// Returns true if the group was already cancelled before this call.
+  bool statusCancel();
+
   // Add a child task to the task group. Always called while holding the
   // status record lock of the task group's owning task.
   void addChildTask(AsyncTask *task);

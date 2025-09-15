@@ -22,6 +22,7 @@
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/GlobalDecl.h"
+#include "clang/AST/RecordLayout.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/Sema/Sema.h"
@@ -69,7 +70,7 @@ public:
           // underlying Clang function that was also synthesized.
           BraceStmt *body = defaultArgGenerator->getTypecheckedBody();
           auto returnStmt =
-              cast<ReturnStmt>(body->getSingleActiveElement().get<Stmt *>());
+              cast<ReturnStmt>(cast<Stmt *>(body->getSingleActiveElement()));
           auto callExpr = cast<CallExpr>(returnStmt->getResult());
           auto calledFuncDecl = cast<FuncDecl>(callExpr->getCalledValue());
           auto calledClangFuncDecl =
@@ -85,8 +86,19 @@ public:
   bool VisitCXXConstructorDecl(clang::CXXConstructorDecl *CXXCD) {
     callback(CXXCD);
     for (clang::CXXCtorInitializer *CXXCI : CXXCD->inits()) {
-      if (clang::FieldDecl *FD = CXXCI->getMember())
+      if (clang::FieldDecl *FD = CXXCI->getMember()) {
         callback(FD);
+        // A throwing constructor might throw after the field is initialized,
+        // emitting additional cleanup code that destroys the field. Make sure
+        // we record the destructor of the field in that case as it might need
+        // to be potentially emitted.
+        if (auto *recordType = FD->getType()->getAsCXXRecordDecl()) {
+          if (auto *destructor = recordType->getDestructor()) {
+            if (!destructor->isDeleted())
+              callback(destructor);
+          }
+        }
+      }
     }
     return true;
   }
@@ -263,6 +275,10 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     // Unfortunately, implicitly defined CXXDestructorDecls don't have a real
     // body, so we need to traverse these manually.
     if (auto *dtor = dyn_cast<clang::CXXDestructorDecl>(next)) {
+      if (dtor->isImplicit() && dtor->isDefaulted() && !dtor->isDeleted() &&
+          !dtor->doesThisDeclarationHaveABody())
+        clangSema.DefineImplicitDestructor(dtor->getLocation(), dtor);
+
       if (dtor->isImplicit() || dtor->hasBody()) {
         auto cxxRecord = dtor->getParent();
 
@@ -284,6 +300,12 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     // class because they might be emitted in the vtable even if not used
     // directly from Swift.
     if (auto *record = dyn_cast<clang::CXXRecordDecl>(next->getDeclContext())) {
+      if (auto *destructor = record->getDestructor()) {
+        // Ensure virtual destructors have the body defined, even if they're
+        // not used directly, as they might be referenced by the emitted vtable.
+        if (destructor->isVirtual() && !destructor->isDeleted())
+          ensureImplicitCXXDestructorBodyIsDefined(destructor);
+      }
       for (auto *method : record->methods()) {
         if (method->isVirtual()) {
           callback(method);
@@ -332,4 +354,58 @@ void IRGenModule::finalizeClangCodeGen() {
 
   ClangCodeGen->HandleTranslationUnit(
       *const_cast<clang::ASTContext *>(ClangASTContext));
+}
+
+void IRGenModule::ensureImplicitCXXDestructorBodyIsDefined(
+    clang::CXXDestructorDecl *destructor) {
+  if (destructor->isUserProvided() ||
+      destructor->doesThisDeclarationHaveABody())
+    return;
+  assert(!destructor->isDeleted() &&
+         "Swift cannot handle a type with no known destructor.");
+  // Make sure we define the destructor so we have something to call.
+  auto &sema = Context.getClangModuleLoader()->getClangSema();
+  sema.DefineImplicitDestructor(clang::SourceLocation(), destructor);
+}
+
+/// Retrieves the base classes of a C++ struct/class ordered by their offset in
+/// the derived type's memory layout.
+SmallVector<CXXBaseRecordLayout, 1>
+irgen::getBasesAndOffsets(const clang::CXXRecordDecl *decl) {
+  auto &layout = decl->getASTContext().getASTRecordLayout(decl);
+
+  // Collect the offsets and sizes of base classes within the memory layout
+  // of the derived class.
+  SmallVector<CXXBaseRecordLayout, 1> baseOffsetsAndSizes;
+  for (auto base : decl->bases()) {
+    if (base.isVirtual())
+      continue;
+
+    auto baseType = base.getType().getCanonicalType();
+    auto baseRecordType = cast<clang::RecordType>(baseType);
+    auto baseRecord = baseRecordType->getAsCXXRecordDecl();
+    assert(baseRecord && "expected a base C++ record");
+
+    if (baseRecord->isEmpty())
+      continue;
+
+    auto offset = Size(layout.getBaseClassOffset(baseRecord).getQuantity());
+    // A base type might have different size and data size (sizeof != dsize).
+    // Make sure we are using data size here, since fields of the derived type
+    // might be packed into the base's tail padding.
+    auto size = Size(decl->getASTContext()
+                         .getTypeInfoDataSizeInChars(baseType)
+                         .Width.getQuantity());
+
+    baseOffsetsAndSizes.push_back({baseRecord, offset, size});
+  }
+
+  // In C++, base classes might get reordered if the primary base was not
+  // the first base type on the declaration of the class.
+  llvm::sort(baseOffsetsAndSizes, [](const CXXBaseRecordLayout &lhs,
+                                     const CXXBaseRecordLayout &rhs) {
+    return lhs.offset < rhs.offset;
+  });
+
+  return baseOffsetsAndSizes;
 }

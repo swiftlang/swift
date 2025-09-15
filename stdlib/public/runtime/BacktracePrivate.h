@@ -18,6 +18,7 @@
 #define SWIFT_RUNTIME_BACKTRACE_UTILS_H
 
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/Backtrace.h"
 #include "swift/shims/Visibility.h"
 
 #include <inttypes.h>
@@ -94,12 +95,18 @@ enum class OutputTo {
   Auto = -1,
   Stdout = 0,
   Stderr = 2,
+  File = 3
 };
 
 enum class Symbolication {
   Off = 0,
   Fast = 1,
   Full = 2,
+};
+
+enum class OutputFormat {
+  Text = 0,
+  JSON = 1
 };
 
 struct BacktraceSettings {
@@ -119,7 +126,10 @@ struct BacktraceSettings {
   bool             cache;
   OutputTo         outputTo;
   Symbolication    symbolicate;
+  bool             suppressWarnings;
+  OutputFormat     format;
   const char      *swiftBacktracePath;
+  const char      *outputPath;
 };
 
 SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings;
@@ -131,9 +141,10 @@ inline bool _swift_backtrace_isEnabled() {
 SWIFT_RUNTIME_STDLIB_INTERNAL ErrorCode _swift_installCrashHandler();
 
 #ifdef __linux__
-SWIFT_RUNTIME_STDLIB_INTERNAL bool _swift_spawnBacktracer(const ArgChar * const *argv, int memserver_fd);
+SWIFT_RUNTIME_STDLIB_INTERNAL bool _swift_spawnBacktracer(CrashInfo *crashInfo,
+                                                          int memserver_fd);
 #else
-SWIFT_RUNTIME_STDLIB_INTERNAL bool _swift_spawnBacktracer(const ArgChar * const *argv);
+SWIFT_RUNTIME_STDLIB_INTERNAL bool _swift_spawnBacktracer(CrashInfo *crashInfo);
 #endif
 
 SWIFT_RUNTIME_STDLIB_INTERNAL void _swift_displayCrashMessage(int signum, const void *pc);

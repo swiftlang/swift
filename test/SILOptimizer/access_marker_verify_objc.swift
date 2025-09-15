@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -enforce-exclusivity=checked -import-objc-header %S/Inputs/access_marker_verify_objc.h -Onone -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-verify-exclusivity -enforce-exclusivity=checked -import-objc-header %S/Inputs/access_marker_verify_objc.h -Onone -emit-sil -swift-version 4 -parse-as-library %s
+// RUN: %target-swift-frontend -enforce-exclusivity=checked -import-objc-header %S/Inputs/access_marker_verify_objc.h -Onone -Xllvm -sil-print-types -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-verify-exclusivity -enforce-exclusivity=checked -import-objc-header %S/Inputs/access_marker_verify_objc.h -Onone -Xllvm -sil-print-types -emit-sil -swift-version 4 -parse-as-library %s
 // REQUIRES: asserts
 // REQUIRES: OS=macosx
 

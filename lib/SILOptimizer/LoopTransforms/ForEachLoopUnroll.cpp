@@ -121,6 +121,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
@@ -302,10 +303,9 @@ void ArrayInfo::classifyUsesOfArray(SILValue arrayValue) {
     // above as the array would be passed indirectly.
     if (isFixLifetimeUseOfArray(user, arrayValue))
       continue;
-    if (auto *MDI = dyn_cast<MarkDependenceInst>(user)) {
-      if (MDI->getBase() == arrayValue) {
+    if (auto mdi = MarkDependenceInstruction(user)) {
+      if (mdi.getBase() == arrayValue)
         continue;
-      }
     }
     // Check if this is a forEach call on the array.
     if (TryApplyInst *forEachCall = isForEachUseOfArray(user, arrayValue)) {
@@ -337,7 +337,7 @@ void ArrayInfo::classifyUsesOfArray(SILValue arrayValue) {
     if (arrayOp.doesNotChangeArray())
       continue;
     
-    if (arrayOp.getKind() == swift::ArrayCallKind::kArrayFinalizeIntrinsic) {
+    if (arrayOp.getKind() == ArrayCallKind::kArrayFinalizeIntrinsic) {
       classifyUsesOfArray((ApplyInst *)arrayOp);
       continue;
     }

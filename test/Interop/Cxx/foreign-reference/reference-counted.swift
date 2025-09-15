@@ -2,10 +2,10 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -Xfrontend -disable-availability-checking -O)
 //
 // REQUIRES: executable_test
-// XFAIL: OS=windows-msvc
 
-// Temporarily disable on arm64e (rdar://128681137)
-// UNSUPPORTED: CPU=arm64e
+// Temporarily disable when running with an older runtime (rdar://128681137)
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import StdlibUnittest
 import ReferenceCounted
@@ -19,7 +19,7 @@ public func blackHole<T>(_ _: T) {  }
 func localTest() {
     var x = NS.LocalCount.create()
 #if NO_OPTIMIZATIONS
-    expectEqual(x.value, 8) // This is 8 because of "var x" "x.value" * 2, two method calls on x, and "(x, x, x)".
+    expectEqual(x.value, 2)
 #endif
 
     expectEqual(x.returns42(), 42)

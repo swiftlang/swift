@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-expand-all -sil-lower-agg-instrs-expand-all -lower-aggregate-instrs %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-expand-all -sil-lower-agg-instrs-expand-all -lower-aggregate-instrs %s | %FileCheck %s
 
 // This file makes sure that the mechanics of expanding aggregate instructions
 // work. With that in mind, we expand all structs here ignoring code-size

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -395,6 +395,15 @@ public:
   /// identifier, without escaping characters.
   static bool isIdentifier(StringRef identifier);
 
+  // Returns true if the given string is a raw identifier that must always
+  // be escaped by backticks when printing it back in source form or writing
+  // its name into runtime metadata.
+  static bool identifierMustAlwaysBeEscaped(StringRef str);
+
+  /// Determines if the given string is a valid non-operator
+  /// identifier if it were surrounded by backticks.
+  static bool isValidAsEscapedIdentifier(StringRef identifier);
+
   /// Determine the token kind of the string, given that it is a valid
   /// non-operator identifier. Return tok::identifier if the string is not a
   /// reserved word.
@@ -405,7 +414,7 @@ public:
   static bool isOperator(StringRef string);
 
   SourceLoc getLocForStartOfBuffer() const {
-    return SourceLoc(llvm::SMLoc::getFromPointer(BufferStart));
+    return SourceLoc::getFromPointer(BufferStart);
   }
   
   /// StringSegment - A segment of a (potentially interpolated) string.
@@ -507,7 +516,7 @@ public:
   }
 
   static SourceLoc getSourceLoc(const char *Loc) {
-    return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
+    return SourceLoc::getFromPointer(Loc);
   }
 
   /// Get the token that starts at the given location.

@@ -117,6 +117,7 @@ enum class TypeInfoKind : unsigned {
   Reference,
   Invalid,
   Enum,
+  Array,
 };
 
 class TypeInfo {
@@ -350,12 +351,30 @@ public:
   }
 };
 
+/// Array based layouts like Builtin.FixedArray<N, T>
+class ArrayTypeInfo : public TypeInfo {
+  const TypeInfo *ElementTI;
+
+public:
+  explicit ArrayTypeInfo(intptr_t size, const TypeInfo *elementTI);
+
+  bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *extraInhabitantIndex) const override;
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
+  const TypeInfo *getElementTypeInfo() const { return ElementTI; }
+  static bool classof(const TypeInfo *TI) {
+    return TI->getKind() == TypeInfoKind::Array;
+  }
+};
+
 /// This class owns the memory for all TypeInfo instances that it vends.
 class TypeConverter {
   TypeRefBuilder &Builder;
   std::vector<std::unique_ptr<const TypeInfo>> Pool;
-  llvm::DenseMap<std::pair<const TypeRef *, remote::TypeInfoProvider::IdType>,
-                 const TypeInfo *> Cache;
+  using KeyT = std::pair<const TypeRef *, remote::TypeInfoProvider::IdType>;
+  llvm::DenseMap<KeyT, const TypeInfo *> Cache;
   llvm::DenseSet<const TypeRef *> RecursionCheck;
   llvm::DenseMap<std::pair<unsigned, unsigned>,
                  const ReferenceTypeInfo *> ReferenceCache;
@@ -372,8 +391,24 @@ class TypeConverter {
   const TypeInfo *DefaultActorStorageTI = nullptr;
   const TypeInfo *EmptyTI = nullptr;
 
+  /// Used for lightweight error handling. We don't have access to
+  /// llvm::Expected<> here, so TypeConverter just stores a pointer to the last
+  /// encountered error instead that is stored in the cache.
+  using TCError = std::pair<const char *, const TypeRef *>;
+  TCError LastError = {nullptr, nullptr};
+  std::unique_ptr<llvm::DenseMap<KeyT, TCError>> ErrorCache;
+
 public:
   explicit TypeConverter(TypeRefBuilder &Builder) : Builder(Builder) {}
+
+  /// Called by LLDB.
+  void enableErrorCache() {
+    ErrorCache = std::make_unique<llvm::DenseMap<KeyT, TCError>>();
+  }
+  void setError(const char *msg, const TypeRef *TR) { LastError = {msg, TR}; }
+
+  /// Retreive the error and reset it.
+  std::string takeLastError();
 
   TypeRefBuilder &getBuilder() { return Builder; }
 
@@ -428,6 +463,7 @@ private:
   const TypeInfo *getThickFunctionTypeInfo();
   const TypeInfo *getAnyMetatypeTypeInfo();
   const TypeInfo *getDefaultActorStorageTypeInfo();
+  const TypeInfo *getRawUnsafeContinuationTypeInfo();
   const TypeInfo *getEmptyTypeInfo();
 
   template <typename TypeInfoTy, typename... Args>
@@ -454,8 +490,10 @@ public:
     : TC(TC), Size(0), Alignment(1), NumExtraInhabitants(0),
       BitwiseTakable(true), Kind(Kind), Empty(true), Invalid(false) {}
 
-  bool isInvalid() const {
-    return Invalid;
+  bool isInvalid() const { return Invalid; }
+  void markInvalid(const char *msg, const TypeRef *TR = nullptr) {
+    Invalid = true;
+    TC.setError(msg, TR);
   }
 
   unsigned addField(unsigned fieldSize, unsigned fieldAlignment,

@@ -12,10 +12,12 @@
 
 #include "swift/IDE/CursorInfo.h"
 #include "ExprContextAnalysis.h"
+#include "ReadyForTypeCheckingCallback.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/SelectedOverloadInfo.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
@@ -174,7 +176,12 @@ private:
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
-    if (!rangeContainsLocToResolve(D->getSourceRangeIncludingAttrs())) {
+    // If the decl doesn't contain the location to resolve, we can skip walking
+    // it. One exception to this is for VarDecls, they can contain accessors
+    // which are not included in their SourceRange. For e.g `var x: Int { 0 }`,
+    // the VarDecl's range is just `x`, but the location may be in the accessor.
+    if (!isa<VarDecl>(D) &&
+        !rangeContainsLocToResolve(D->getSourceRangeIncludingAttrs())) {
       return Action::SkipNode();
     }
 
@@ -208,23 +215,6 @@ private:
     return Action::Continue();
   }
 
-  /// Retrieve the name location for an expression that supports cursor info.
-  DeclNameLoc getExprNameLoc(Expr *E) {
-    if (auto *DRE = dyn_cast<DeclRefExpr>(E))
-      return DRE->getNameLoc();
-    
-    if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E))
-      return UDRE->getNameLoc();
-
-    if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(E))
-      return ODRE->getNameLoc();
-
-    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E))
-      return UDE->getNameLoc();
-
-    return DeclNameLoc();
-  }
-
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
     if (auto closure = dyn_cast<ClosureExpr>(E)) {
       DeclContextStack.push_back(closure);
@@ -241,7 +231,7 @@ private:
       }
     }
 
-    if (getExprNameLoc(E).getBaseNameLoc() != LocToResolve)
+    if (E->getNameLoc().getBaseNameLoc() != LocToResolve)
       return Action::Continue(E);
 
     assert(Result == nullptr);
@@ -385,14 +375,14 @@ public:
 
 // MARK: - CursorInfoDoneParsingCallback
 
-class CursorInfoDoneParsingCallback : public DoneParsingCallback {
+class CursorInfoDoneParsingCallback : public ReadyForTypeCheckingCallback {
   CursorInfoConsumer &Consumer;
   SourceLoc RequestedLoc;
 
 public:
   CursorInfoDoneParsingCallback(Parser &P, CursorInfoConsumer &Consumer,
                                 SourceLoc RequestedLoc)
-      : DoneParsingCallback(), Consumer(Consumer), RequestedLoc(RequestedLoc) {}
+      : Consumer(Consumer), RequestedLoc(RequestedLoc) {}
 
 private:
   /// Shared core of `getExprResult` and `getDeclResult`.
@@ -417,7 +407,7 @@ private:
       return {};
     }
 
-    if (Node.is<Expr *>()) {
+    if (isa<Expr *>(Node)) {
       // If we are performing cursor info on an expression, type check the
       // referenced decls so that all their parent closures are type-checked
       // (see comment in typeCheckDeclAndParentClosures).
@@ -500,7 +490,7 @@ public:
                      SrcFile, Finder);
   }
 
-  void doneParsing(SourceFile *SrcFile) override {
+  void readyForTypeChecking(SourceFile *SrcFile) override {
     if (!SrcFile) {
       return;
     }

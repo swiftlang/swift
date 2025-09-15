@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s -DINT=i%target-ptrsize
 
-// REQUIRES: CPU=i386 || CPU=x86_64
+// REQUIRES: CPU=i386 || CPU=x86_64 || CPU=arm64
 
 sil_stage canonical
 
@@ -11,11 +11,14 @@ struct NotClass {}
 
 class A {}
 class B: A {}
+final class F: A {}
+protocol Q {}
 
 sil_vtable A {}
 sil_vtable B {}
+sil_vtable F {}
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unchecked_addr_cast(ptr noalias nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unchecked_addr_cast(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 sil @unchecked_addr_cast : $(@in A) -> B {
 entry(%a : $*A):
   %b = unchecked_addr_cast %a : $*A to $*B
@@ -115,6 +118,42 @@ entry(%a : $@thick Any.Type):
   return %p : $@thick (CP & OP & CP2).Type
 }
 
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unconditional_fast_class_cast(ptr %0)
+// CHECK:         [[ISA:%.*]] = load ptr, ptr %0
+// CHECK:         [[NE:%.*]] = icmp ne {{.*}}, [[ISA]]
+// CHECK:         [[E:%.*]] = call i1 @llvm.expect.i1(i1 [[NE]], i1 false) 
+// CHECK:         br i1 [[E]], label %[[TRAPBB:[0-9]*]], label %[[RETBB:[0-9]*]]
+// CHECK:       [[RETBB]]:
+// CHECK-NEXT:    ret ptr %0
+// CHECK:       [[TRAPBB]]:
+// CHECK-NEXT:    call void @llvm.trap()
+sil @unconditional_fast_class_cast : $@convention(thin) (@owned A) -> @owned F {
+entry(%0 : $A):
+  %1 = unconditional_checked_cast %0 to F
+  return %1
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unconditional_optional_fast_class_cast(i64 %0)
+// CHECK:         [[PTR:%.*]] = inttoptr i64 %0 to ptr
+// CHECK:         [[ISNULL:%.*]] = icmp eq ptr [[PTR]], null
+// CHECK:         [[ENN:%.*]] = call i1 @llvm.expect.i1(i1 [[ISNULL]], i1 false) 
+// CHECK:         br i1 [[ENN]], label %[[NULLTRAPBB:[0-9]*]], label %[[CONTBB:[0-9]*]]
+// CHECK:       [[CONTBB]]:
+// CHECK:         [[ISA:%.*]] = load ptr, ptr [[PTR]]
+// CHECK:         [[NE:%.*]] = icmp ne {{.*}}, [[ISA]]
+// CHECK:         [[E:%.*]] = call i1 @llvm.expect.i1(i1 [[NE]], i1 false) 
+// CHECK:         br i1 [[E]], label %[[TRAPBB:[0-9]*]], label %[[RETBB:[0-9]*]]
+// CHECK:       [[RETBB]]:
+// CHECK-NEXT:    ret ptr [[PTR]]
+// CHECK:       [[NULLTRAPBB]]:
+// CHECK-NEXT:    call void @llvm.trap()
+// CHECK:       [[TRAPBB]]:
+// CHECK-NEXT:    call void @llvm.trap()
+sil @unconditional_optional_fast_class_cast : $@convention(thin) (@owned Optional<A>) -> @owned F {
+entry(%0 : $Optional<A>):
+  %1 = unconditional_checked_cast %0 to F
+  return %1
+}
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @c_cast_to_class_existential(ptr %0)
 // CHECK:         call { ptr, ptr } @dynamic_cast_existential_1_conditional(ptr {{.*}}, ptr %.Type, {{.*}} @"$s5casts2CPMp"
@@ -396,4 +435,25 @@ bb2:
 
 bb3(%11 : $Optional<C & PAnyObject>):
   return %11 : $Optional<C & PAnyObject>
+}
+
+// CHECK-LABEL: define{{.*}} @checked_cast_optional_metatype
+// CHECK: [[COND:%.*]] = icmp ne ptr {{%.*}}, null
+// CHECK-NEXT: br i1 [[COND]], label %is-non-nil, label %is-nil
+// CHECK: nil-checked-cont:
+// CHECK:   %4 = phi { ptr, ptr } [ {{%.*}}, %is-non-nil ], [ zeroinitializer, %is-nil ]
+sil @checked_cast_optional_metatype : $@convention(thin) (Optional<@thick any Any.Type>) -> Optional<@thick any Q.Type> {
+bb0(%0 : $Optional<@thick any Any.Type>):
+  checked_cast_br Optional<any Any.Type> in %0 to any Q.Type, bb1, bb2
+
+bb1(%3 : $@thick any Q.Type):
+  %4 = enum $Optional<@thick any Q.Type>, #Optional.some!enumelt, %3
+  br bb3(%4)
+
+bb2:
+  %6 = enum $Optional<@thick any Q.Type>, #Optional.none!enumelt
+  br bb3(%6)
+
+bb3(%8 : $Optional<@thick any Q.Type>):
+  return %8
 }

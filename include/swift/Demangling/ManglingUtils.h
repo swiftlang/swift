@@ -58,10 +58,16 @@ inline bool isWordEnd(char ch, char prevCh) {
   return false;
 }
 
+/// Returns true if \p ch is a valid character which may appear at the start
+/// of a symbol mangling.
+inline bool isValidSymbolStart(char ch) {
+  return isLetter(ch) || ch == '_' || ch == '$';
+}
+
 /// Returns true if \p ch is a valid character which may appear in a symbol
-/// mangling.
+/// mangling anywhere other than the first character.
 inline bool isValidSymbolChar(char ch) {
-  return isLetter(ch) || isDigit(ch) || ch == '_' || ch == '$';
+  return isValidSymbolStart(ch) || isDigit(ch);
 }
 
 /// Returns true if \p str contains any character which may not appear in a

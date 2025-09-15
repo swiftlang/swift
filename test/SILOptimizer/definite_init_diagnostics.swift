@@ -103,6 +103,7 @@ func test2() {
   
   
   // Weak
+  // expected-warning@+1 {{weak variable 'w1' was never mutated; consider changing to 'let' constant}} {{8-11=let}}
   weak var w1 : SomeClass?
   _ = w1                // ok: default-initialized
 
@@ -110,7 +111,7 @@ func test2() {
   // expected-warning@+3 {{instance will be immediately deallocated because variable 'w2' is 'weak'}}
   // expected-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@+1 {{'w2' declared here}}
-  weak var w2 = SomeClass()
+  weak let w2 = SomeClass()
   _ = w2                // ok
   
   
@@ -125,6 +126,18 @@ func test2() {
   // expected-note@+1 {{'u2' declared here}}
   unowned let u2 = SomeClass()
   _ = u2                // ok
+
+  // Array
+  var arr1: [String] // expected-note {{variable defined here}}
+  arr1.append("item") // expected-error {{variable 'arr1' used before being initialized}}
+  var arr2: [String] = []
+  arr2.append("item") // ok
+
+  // Dictionary
+  var d1: [String: Int] // expected-note {{variable defined here}}
+  d1["key"] = 1 // expected-error {{variable 'd1' used before being initialized}}
+  var d2: [String: Int] = [:]
+  d2["key"] = 1 // ok
 }
 
 
@@ -1483,8 +1496,7 @@ func testOptionalChainingWithGenerics<T: DIOptionalTestProtocol>(p: T) -> T? {
             // expected-note@-2 {{constant defined here}}
 
   // note that here assignment to 'f' is a call to the setter.
-  x?.f = 0  // expected-error {{constant 'x' used before being initialized}}
-            // expected-error@-1 {{constant 'x' passed by reference before being initialized}}
+  x?.f = 0  // expected-error 2 {{constant 'x' used before being initialized}}
   return x  // expected-error {{constant 'x' used before being initialized}}
 }
 
@@ -1624,6 +1636,14 @@ struct S {
     rotation.0 = 0
     rotation.1 = rotation.0
   }
+}
+
+// rdar://135028163 - trying local 'lets' of tuple type as immutable rvalues, i.e.,
+// the same issue as the above rdar://129031705.
+func tupleAsLocal() {
+  let rotation: (Int, Int)
+  rotation.0 = 0
+  rotation.1 = rotation.0
 }
 
 // rdar://128890586: Init accessors

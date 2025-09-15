@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -sil-inline-generics -enable-sil-verify-all %s -O | %FileCheck %s
-// RUN: %target-sil-opt -jumpthread-simplify-cfg -enable-sil-verify-all %s -O | %FileCheck --check-prefix=CHECK-SIMPLIFY-CFG %s
+// RUN: %target-sil-opt -sil-print-types -sil-inline-generics -enable-sil-verify-all %s -O | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -jumpthread-simplify-cfg -enable-sil-verify-all %s -O | %FileCheck --check-prefix=CHECK-SIMPLIFY-CFG %s
 
 // REQUIRES: swift_in_compiler
 

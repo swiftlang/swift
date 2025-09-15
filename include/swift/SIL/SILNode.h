@@ -120,14 +120,15 @@ public:
   enum { NumStoreOwnershipQualifierBits = 2 };
   enum { NumLoadOwnershipQualifierBits = 2 };
   enum { NumAssignOwnershipQualifierBits = 2 };
-  enum { NumAssignByWrapperModeBits = 2 };
   enum { NumSILAccessKindBits = 2 };
   enum { NumSILAccessEnforcementBits = 3 };
   enum { NumAllocRefTailTypesBits = 4 };
   enum { NumMarkDependenceKindBits = 2 };
 
   enum { numCustomBits = 20 };
-  enum { maxBitfieldID = std::numeric_limits<uint64_t>::max() >> numCustomBits };
+
+  constexpr static const uint64_t maxBitfieldID =
+      std::numeric_limits<uint64_t>::max() >> numCustomBits;
 
 protected:
   friend class SILInstruction;
@@ -194,7 +195,6 @@ protected:
     SHARED_FIELD(StoreInst, uint8_t ownershipQualifier);
     SHARED_FIELD(LoadInst, uint8_t ownershipQualifier);
     SHARED_FIELD(AssignInst, uint8_t ownershipQualifier);
-    SHARED_FIELD(AssignByWrapperInst, uint8_t mode);
     SHARED_FIELD(AssignOrInitInst, uint8_t mode);
     SHARED_FIELD(StringLiteralInst, uint8_t encoding);
     SHARED_FIELD(SwitchValueInst, bool hasDefault);
@@ -205,7 +205,9 @@ protected:
     SHARED_FIELD(AddressToPointerInst, bool needsStackProtection);
     SHARED_FIELD(IndexAddrInst, bool needsStackProtection);
     SHARED_FIELD(HopToExecutorInst, bool mandatory);
-    SHARED_FIELD(DestroyValueInst, bool poisonRefs);
+    SHARED_FIELD(DestroyValueInst, uint8_t
+        poisonRefs : 1,
+        deadEnd : 1);
     SHARED_FIELD(EndCOWMutationInst, bool keepUnique);
     SHARED_FIELD(ConvertFunctionInst, bool withoutActuallyEscaping);
     SHARED_FIELD(BeginCOWMutationInst, bool native);
@@ -246,6 +248,9 @@ protected:
                  fromVarDecl : 1,
                  fixed : 1);
 
+    SHARED_FIELD(DeallocBoxInst, uint8_t
+                 deadEnd : 1);
+
     SHARED_FIELD(CopyAddrInst, uint8_t
       isTakeOfSrc : 1,
       isInitializationOfDest : 1);
@@ -278,8 +283,8 @@ protected:
                  pointerEscape : 1,
                  fromVarDecl : 1);
 
-    SHARED_FIELD(MarkDependenceInst, uint8_t
-                 dependenceKind : NumMarkDependenceKindBits);
+    SHARED_TEMPLATE2_FIELD(SILInstructionKind, typename, MarkDependenceInstBase,
+                           uint8_t dependenceKind : NumMarkDependenceKindBits);
 
   // Do not use `_sharedUInt8_private` outside of SILNode.
   } _sharedUInt8_private;
@@ -312,6 +317,7 @@ protected:
     SHARED_FIELD(SILFunctionArgument, uint32_t noImplicitCopy : 1,
                  lifetimeAnnotation : 2, closureCapture : 1,
                  parameterPack : 1);
+    SHARED_FIELD(MergeRegionIsolationInst, uint32_t numOperands);
 
     // Do not use `_sharedUInt32_private` outside of SILNode.
   } _sharedUInt32_private;

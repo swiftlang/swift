@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -access-enforcement-opts -I %S/Inputs/abi %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -access-enforcement-opts -I %S/Inputs/abi %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -976,17 +976,17 @@ bb0:
 
 
 // public func testOldToNewMapReadMayRelease() {
-// Checks merging 2 out of 3 scopes resulting in a larger read scope
-// Due to a MayRelease instruction before the 3rd scope
+// Checks merging 3 of 3 scopes resulting in a larger read scope
+// There is a MayRelease instruction but we recognize it to be harmless
 //
 // CHECK-LABEL: sil @testOldToNewMapReadMayRelease : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
 // CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
-// CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK-NEXT: strong_release
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK-LABEL: } // end sil function 'testOldToNewMapReadMayRelease'
 sil @testOldToNewMapReadMayRelease : $@convention(thin) () -> () {
 bb0:
@@ -1697,3 +1697,46 @@ bb0(%0 : ${ var Int64 }):
   end_access %access : $*Int64
   return %val : $Int64
 }
+
+// CHECK-LABEL: sil @willThrow : $@convention(thin) (RefElemNoConflictClass, @guaranteed any Error) -> () {
+// CHECK:  begin_access [modify] [dynamic] [no_nested_conflict]
+// CHECK-LABEL: } // end sil function 'willThrow'
+
+sil @willThrow : $@convention(thin) (RefElemNoConflictClass, @guaranteed any Error) -> () {
+bb0(%0 : $RefElemNoConflictClass, %1 : $any Error):
+  %x = ref_element_addr %0 : $RefElemNoConflictClass, #RefElemNoConflictClass.x
+  %b3 = begin_access [modify] [dynamic] %x : $*Int32
+  %w = builtin "willThrow"(%1 : $any Error) : $()
+  end_access %b3 : $*Int32
+  %10 = tuple ()
+  return %10 : $()
+}
+
+public class MayHaveDeinit {
+  deinit
+}
+
+sil @releaseArg : $@convention(thin) (@owned MayHaveDeinit) -> () {
+bb0(%0 : $MayHaveDeinit):
+  release_value %0 : $MayHaveDeinit
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil @testSummarizeFunction : $@convention(method) (@guaranteed TestClass, @owned MayHaveDeinit) -> () {
+bb0(%0 : $TestClass, %1: $MayHaveDeinit):
+  %2 = ref_element_addr %0 : $TestClass, #TestClass.flags
+  %3 = begin_access [modify] [dynamic] %2 : $*Int64
+  %4 = integer_literal $Builtin.Int64, 3
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  store %5 to %3 : $*Int64
+  %6 = function_ref @releaseArg : $@convention(thin) (@owned MayHaveDeinit) -> ()
+  %7 = apply %6(%1) : $@convention(thin) (@owned MayHaveDeinit) -> ()
+  end_access %3 : $*Int64
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil @testSummarizeFunction
+// CHECK-NOT: begin_access {{.*}}no_nested_conflict
+// CHECK: } // end sil function 'testSummarizeFunction'

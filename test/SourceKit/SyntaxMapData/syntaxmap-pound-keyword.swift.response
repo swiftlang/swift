@@ -84,7 +84,7 @@
       key.length: 10
     },
     {
-      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.kind: source.lang.swift.syntaxtype.identifier,
       key.offset: 191,
       key.length: 3
     },
@@ -177,6 +177,38 @@
       key.kind: source.lang.swift.syntaxtype.buildconfig.keyword,
       key.offset: 336,
       key.length: 6
+    }
+  ],
+  key.diagnostics: [
+    {
+      key.line: 12,
+      key.column: 8,
+      key.filepath: syntaxmap-pound-keyword.swift,
+      key.severity: source.diagnostic.severity.error,
+      key.id: "pound_error",
+      key.description: "Error",
+      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+      key.ranges: [
+        {
+          key.offset: 224,
+          key.length: 7
+        }
+      ]
+    },
+    {
+      key.line: 14,
+      key.column: 10,
+      key.filepath: syntaxmap-pound-keyword.swift,
+      key.severity: source.diagnostic.severity.warning,
+      key.id: "pound_warning",
+      key.description: "Warning",
+      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+      key.ranges: [
+        {
+          key.offset: 255,
+          key.length: 9
+        }
+      ]
     }
   ]
 }

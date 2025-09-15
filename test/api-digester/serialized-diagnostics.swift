@@ -9,5 +9,5 @@
 // RUN: c-index-test -read-diagnostics %t/result.dia 2>&1 | %FileCheck %s -check-prefix CHECK-DIA
 
 // Ensure the 'api-digester-breaking-change' category is included in the serialized diagnostics file.
-// CHECK-DIA: warning: ABI breakage: enum Color is a new API without @available attribute [] [api-digester-breaking-change]
-// CHECK-STDERR: warning: ABI breakage: enum Color is a new API without @available attribute
+// CHECK-DIA: warning: ABI breakage: enum Color is a new API without '@available' [] [api-digester-breaking-change]
+// CHECK-STDERR: warning: ABI breakage: enum Color is a new API without '@available'

@@ -13,6 +13,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/IDEBridging.h"
 #include "swift/Parse/Lexer.h"
@@ -27,7 +28,7 @@ swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
                                    StringRef NewName, SourceFile &SF,
                                    DiagnosticEngine &Diags) {
   SourceManager &SM = SF.getASTContext().SourceMgr;
-  unsigned BufferID = SF.getBufferID().value();
+  unsigned BufferID = SF.getBufferID();
 
   std::vector<SourceLoc> UnresolvedLocs;
   for (const RenameLoc &RenameLoc : RenameLocs) {

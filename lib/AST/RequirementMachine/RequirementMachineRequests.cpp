@@ -90,6 +90,7 @@
 #include "swift/AST/RequirementSignature.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include <memory>
@@ -162,15 +163,16 @@ static void splitConcreteEquivalenceClasses(
       ctx.LangOpts.RequirementMachineMaxSplitConcreteEquivClassAttempts;
 
   if (attempt >= maxAttempts) {
-    llvm::errs() << "Splitting concrete equivalence classes did not "
-                 << "reach fixed point after " << attempt << " attempts.\n";
-    llvm::errs() << "Last attempt produced these requirements:\n";
-    for (auto req : requirements) {
-      req.dump(llvm::errs());
-      llvm::errs() << "\n";
-    }
-    machine->dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Splitting concrete equivalence classes did not "
+          << "reach fixed point after " << attempt << " attempts.\n";
+      out << "Last attempt produced these requirements:\n";
+      for (auto req : requirements) {
+        req.dump(out);
+        out << "\n";
+      }
+      machine->dump(out);
+    });
   }
 
   splitRequirements.clear();
@@ -236,7 +238,7 @@ llvm::DenseMap<const ProtocolDecl *, RequirementSignature>
 RequirementMachine::computeMinimalProtocolRequirements() {
   auto protos = System.getProtocols();
 
-  assert(protos.size() > 0 &&
+  ASSERT(protos.size() > 0 &&
          "Not a protocol connected component rewrite system");
 
   System.minimizeRewriteSystem(Map);
@@ -487,11 +489,11 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
 GenericSignature
 RequirementMachine::computeMinimalGenericSignature(
     bool reconstituteSugar) {
-  assert(!Sig &&
+  ASSERT(!Sig &&
          "Already computed minimal generic signature");
-  assert(System.getProtocols().empty() &&
+  ASSERT(System.getProtocols().empty() &&
          "Not a top-level generic signature rewrite system");
-  assert(!Params.empty() &&
+  ASSERT(!Params.empty() &&
          "Not a from-source top-level generic signature rewrite system");
 
   System.minimizeRewriteSystem(Map);
@@ -508,7 +510,7 @@ RequirementMachine::computeMinimalGenericSignature(
 
   buildRequirementsFromRules(rules, ArrayRef<unsigned>(), getGenericParams(),
                              reconstituteSugar, reqs, aliases);
-  assert(aliases.empty());
+  ASSERT(aliases.empty());
 
   auto sig = GenericSignature::get(getGenericParams(), reqs);
 
@@ -613,7 +615,7 @@ AbstractGenericSignatureRequest::evaluate(
                                  baseSignature.getGenericParams().end());
     }
     resugaredParameters.append(addedParameters.begin(), addedParameters.end());
-    assert(resugaredParameters.size() ==
+    ASSERT(resugaredParameters.size() ==
                canSignature.getGenericParams().size());
 
     SmallVector<Requirement, 2> resugaredRequirements;
@@ -627,8 +629,7 @@ AbstractGenericSignatureRequest::evaluate(
             }
             return Type(type);
           },
-          MakeAbstractConformanceForGenericType(),
-          SubstFlags::AllowLoweredTypes |
+          LookUpConformanceInModule(),
           SubstFlags::PreservePackExpansionLevel);
       resugaredRequirements.push_back(resugaredReq);
     }
@@ -671,7 +672,8 @@ AbstractGenericSignatureRequest::evaluate(
 
   SmallVector<StructuralRequirement, 2> defaults;
   InverseRequirement::expandDefaults(ctx, paramsAsTypes, defaults);
-  applyInverses(ctx, paramsAsTypes, inverses, defaults, errors);
+  applyInverses(ctx, paramsAsTypes, inverses, requirements,
+                defaults, errors);
   requirements.append(defaults);
 
   auto &rewriteCtx = ctx.getRewriteContext();
@@ -755,6 +757,9 @@ static GenericSignature getPlaceholderGenericSignature(
     ASTContext &ctx, ArrayRef<GenericTypeParamType *> genericParams) {
   SmallVector<Requirement, 2> requirements;
   for (auto param : genericParams) {
+    if (param->isValue())
+      continue;
+
     for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
       requirements.emplace_back(RequirementKind::Conformance, param,
@@ -773,7 +778,7 @@ InferredGenericSignatureRequest::evaluate(
         WhereClauseOwner whereClause,
         SmallVector<Requirement, 2> addedRequirements,
         SmallVector<TypeBase *, 2> inferenceSources,
-        SourceLoc loc, bool isExtension, bool allowInverses) const {
+        SourceLoc loc, ExtensionDecl *forExtension, bool allowInverses) const {
   GenericSignature parentSig(parentSigImpl);
 
   SmallVector<GenericTypeParamType *, 4> genericParams(
@@ -781,8 +786,7 @@ InferredGenericSignatureRequest::evaluate(
       parentSig.getGenericParams().end());
 
   unsigned numOuterParams = genericParams.size();
-  if (isExtension) {
-    assert(allowInverses);
+  if (forExtension) {
     numOuterParams = 0;
   }
 
@@ -805,7 +809,7 @@ InferredGenericSignatureRequest::evaluate(
   if (genericParamList) {
     // If we have multiple parameter lists, we're in SIL mode, and there's
     // no parent signature from context.
-    assert(genericParamList->getOuterParameters() == nullptr || !parentSig);
+    ASSERT(genericParamList->getOuterParameters() == nullptr || !parentSig);
 
     // Collect all outer generic parameter lists.
     SmallVector<GenericParamList *, 2> gpLists;
@@ -819,7 +823,7 @@ InferredGenericSignatureRequest::evaluate(
     // We walk them backwards to order outer parameters before inner
     // parameters.
     for (auto *gpList : llvm::reverse(gpLists)) {
-      assert(gpList->size() > 0 &&
+      ASSERT(gpList->size() > 0 &&
              "Parsed an empty generic parameter list?");
 
       for (auto *gpDecl : *gpList) {
@@ -868,7 +872,7 @@ InferredGenericSignatureRequest::evaluate(
   // inferred same-type requirements when building the generic signature of
   // an extension whose extended type is a generic typealias.
   for (const auto &req : addedRequirements)
-    requirements.push_back({req, SourceLoc()});
+    requirements.push_back({req, loc});
 
   desugarRequirements(requirements, inverses, errors);
 
@@ -882,7 +886,70 @@ InferredGenericSignatureRequest::evaluate(
 
   SmallVector<StructuralRequirement, 2> defaults;
   InverseRequirement::expandDefaults(ctx, paramTypes, defaults);
-  applyInverses(ctx, paramTypes, inverses, defaults, errors);
+  applyInverses(ctx, paramTypes, inverses, requirements,
+                defaults, errors);
+  
+  // Any remaining implicit defaults in a conditional inverse requirement
+  // extension must be made explicit.
+  if (forExtension) {
+    auto invertibleProtocol = forExtension->isAddingConformanceToInvertible();
+    // FIXME: to workaround a reverse condfail, always infer the requirements if
+    //  the extension is in a swiftinterface file. This is temporary and should
+    //  be removed soon. (rdar://130424971)
+    if (auto *sf = forExtension->getOutermostParentSourceFile()) {
+      if (sf->Kind == SourceFileKind::Interface
+          && !ctx.LangOpts.hasFeature(Feature::SE427NoInferenceOnExtension)) {
+        invertibleProtocol = std::nullopt;
+      }
+    }
+    if (invertibleProtocol) {
+      for (auto &def : defaults) {
+        // Check whether a corresponding explicit requirement was provided.
+        for (auto &req : requirements) {
+          // An explicit requirement can match the default exactly.
+          if (req.req.getCanonical() == def.req.getCanonical()) {
+            goto next;
+          }
+          
+          // Disregard requirements on other parameters.
+          if (!req.req.getFirstType()->isEqual(def.req.getFirstType())) {
+            continue;
+          }
+          
+          // Or it can be implied by a requirement on something that's inherently
+          // copyable.
+          if (req.req.getKind() == RequirementKind::Superclass) {
+            // classes are currently always escapable and copyable
+            goto next;
+          }
+          if (req.req.getKind() == RequirementKind::Layout) {
+            // layout constraints currently always imply escapable and copyable
+            goto next;
+          }
+          if (req.req.getKind() == RequirementKind::Conformance
+              && req.req.getProtocolDecl()
+                        ->inheritsFrom(def.req.getProtocolDecl())) {
+            goto next;
+          }
+
+          // A same-type constraint removes the ability for the copyability
+          // to vary independently at all.
+          if (req.req.getKind() == RequirementKind::SameType) {
+            goto next;
+          }
+        }
+        ctx.Diags.diagnose(loc,diag::inverse_conditional_must_be_fully_explicit,
+           ctx.getProtocol(getKnownProtocolKind(*invertibleProtocol)),
+                           def.req.getFirstType(),
+                           def.req.getProtocolDecl());
+      next:;
+      }
+      // Don't actually apply the inferred requirements since they should be
+      // stated explicitly.
+      defaults.clear();
+    }
+  }
+  
   requirements.append(defaults);
 
   auto &rewriteCtx = ctx.getRewriteContext();
@@ -948,7 +1015,7 @@ InferredGenericSignatureRequest::evaluate(
     if (attempt == 0) {
       machine->computeRequirementDiagnostics(errors, inverses, loc);
       diagnoseRequirementErrors(ctx, errors,
-                                (isExtension || !genericParamList)
+                                (forExtension || !genericParamList)
                                 ? AllowConcreteTypePolicy::All
                                 : AllowConcreteTypePolicy::AssocTypes);
     }
@@ -979,20 +1046,20 @@ InferredGenericSignatureRequest::evaluate(
                                            std::move(machine));
     }
 
-    if (genericParamList && !isExtension) {
+    if (genericParamList && !forExtension) {
       for (auto genericParam : result.getInnermostGenericParams()) {
         auto reduced = result.getReducedType(genericParam);
 
         if (reduced->hasError() || reduced->isEqual(genericParam))
           continue;
 
-        if (reduced->isTypeParameter()) {
-          // If one side is a parameter pack and the other is not, this is a
-          // same-element requirement that cannot be expressed with only one
-          // type parameter.
-          if (genericParam->isParameterPack() != reduced->isParameterPack())
-            continue;
+        // If one side is a parameter pack and the other is not, this is a
+        // same-element requirement that cannot be expressed with only one
+        // type parameter.
+        if (genericParam->isParameterPack() != reduced->isParameterPack())
+          continue;
 
+        if (reduced->isTypeParameter()) {
           ctx.Diags.diagnose(loc, diag::requires_generic_params_made_equal,
                              genericParam, result->getSugaredType(reduced))
             .warnUntilSwiftVersion(6);

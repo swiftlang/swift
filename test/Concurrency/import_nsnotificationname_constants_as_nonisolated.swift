@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %t/src/main.swift \
 // RUN:   -import-objc-header %t/src/Test.h \
 // RUN:   -strict-concurrency=complete \
-// RUN:   -disable-availability-checking \
+// RUN:   -target %target-swift-5.1-abi-triple \
 // RUN:   -module-name main -I %t -verify
 
 // REQUIRES: objc_interop
@@ -34,8 +34,7 @@ extern NSNotificationName const TestIsolatedTrigger __attribute__((swift_name("T
 func testAsync() async {
   print(Test.didTrigger) // Ok (property is nonisolated)
   print(Test.isolatedTrigger)
-  // expected-warning@-1 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
-  // expected-note@-2 {{property access is 'async'}}
+  // expected-warning@-1 {{main actor-isolated class property 'isolatedTrigger' cannot be accessed from outside of the actor}}
 }
 
 @MainActor

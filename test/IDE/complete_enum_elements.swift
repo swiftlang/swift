@@ -34,6 +34,15 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_DOT-DAG: Decl[TypeAlias]/CurrNominal: AllCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_DOT-DAG: Decl[StaticVar]/CurrNominal: allCases[#[FooEnum]#]{{; name=.+$}}
 
+// FOO_ENUM_DOT_INVALID-DAG: Keyword[self]/CurrNominal: self[#FooEnum.Type#]; name=self
+// FOO_ENUM_DOT_INVALID-DAG: Keyword/CurrNominal: Type[#FooEnum.Type#]; name=Type
+// FOO_ENUM_DOT_INVALID-DAG: Decl[EnumElement]/CurrNominal: Foo1[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_INVALID-DAG: Decl[EnumElement]/CurrNominal: Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_INVALID-DAG: Decl[StaticVar]/CurrNominal: alias1[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_INVALID-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): FooEnum#})[#(into: inout Hasher) -> Void#]{{; name=.+$}}
+// FOO_ENUM_DOT_INVALID-DAG: Decl[TypeAlias]/CurrNominal: AllCases[#[FooEnum]#]{{; name=.+$}}
+// FOO_ENUM_DOT_INVALID-DAG: Decl[StaticVar]/CurrNominal: allCases[#[FooEnum]#]{{; name=.+$}}
+
 // FOO_ENUM_DOT_CONTEXT-DAG: Keyword[self]/CurrNominal: self[#FooEnum.Type#]; name=self
 // FOO_ENUM_DOT_CONTEXT-DAG: Keyword/CurrNominal: Type[#FooEnum.Type#]; name=Type
 // FOO_ENUM_DOT_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: Foo1[#FooEnum#]{{; name=.+$}}
@@ -75,26 +84,26 @@ enum BarEnum {
 // BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: .Bar2()[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: .Bar3({#Int#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: .Bar4({#a: Int#}, {#b: Float#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: .Bar5({#a: Int#}, {#(Float)#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: .Bar6({#a: Int#}, {#b: (Float)#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: .Bar5({#a: Int#}, {#Float#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: .Bar6({#a: Int#}, {#b: Float#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: .Bar7({#a: Int#}, {#(b: Float, c: Double)#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: .Bar8({#a: Int#}, {#b: (c: Float, d: Double)#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: .Bar9({#Int#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: .Bar10({#Int#}, {#Float#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: .Bar11({#Int#}, {#(Float)#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: .Bar11({#Int#}, {#Float#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/TypeRelation[Convertible]: .Bar12({#Int#}, {#(Float, Double)#})[#BarEnum#]{{; name=.+$}}
 
 // BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar1[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar2()[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar3({#Int#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar4({#a: Int#}, {#b: Float#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar5({#a: Int#}, {#(Float)#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar6({#a: Int#}, {#b: (Float)#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar5({#a: Int#}, {#Float#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar6({#a: Int#}, {#b: Float#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar7({#a: Int#}, {#(b: Float, c: Double)#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar8({#a: Int#}, {#b: (c: Float, d: Double)#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar9({#Int#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar10({#Int#}, {#Float#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar11({#Int#}, {#(Float)#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar11({#Int#}, {#Float#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:      .Bar12({#Int#}, {#(Float, Double)#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   .barInstanceFunc({#(self): &BarEnum#})[#() -> Void#]{{; name=.+$}}
 // BAR_ENUM_NO_DOT-DAG: Decl[StaticVar]/CurrNominal:        .staticVar[#Int#]{{; name=.+$}}
@@ -108,13 +117,13 @@ enum BarEnum {
 // BAR_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      Bar2()[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      Bar3({#Int#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      Bar4({#a: Int#}, {#b: Float#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      Bar5({#a: Int#}, {#(Float)#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      Bar6({#a: Int#}, {#b: (Float)#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      Bar5({#a: Int#}, {#Float#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      Bar6({#a: Int#}, {#b: Float#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      Bar7({#a: Int#}, {#(b: Float, c: Double)#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      Bar8({#a: Int#}, {#b: (c: Float, d: Double)#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      Bar9({#Int#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      Bar10({#Int#}, {#Float#})[#BarEnum#]{{; name=.+$}}
-// BAR_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      Bar11({#Int#}, {#(Float)#})[#BarEnum#]{{; name=.+$}}
+// BAR_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      Bar11({#Int#}, {#Float#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      Bar12({#Int#}, {#(Float, Double)#})[#BarEnum#]{{; name=.+$}}
 // BAR_ENUM_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   barInstanceFunc({#(self): &BarEnum#})[#() -> Void#]{{; name=.+$}}
 // BAR_ENUM_DOT-DAG: Decl[StaticVar]/CurrNominal:        staticVar[#Int#]{{; name=.+$}}
@@ -256,7 +265,7 @@ func testSwitchWithQualification1(e: FooEnum) {
 
 func testSwitchExprError1() {
   switch unknown_var {
-  case FooEnum.#^ENUM_SW_EXPR_ERROR_1?check=FOO_ENUM_DOT^#
+  case FooEnum.#^ENUM_SW_EXPR_ERROR_1?check=FOO_ENUM_DOT_INVALID^#
   }
 }
 

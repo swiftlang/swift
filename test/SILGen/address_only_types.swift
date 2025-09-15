@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name address_only_types -parse-as-library -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name address_only_types -parse-as-library -parse-stdlib %s | %FileCheck %s
 
 precedencegroup AssignmentPrecedence { assignment: true }
 

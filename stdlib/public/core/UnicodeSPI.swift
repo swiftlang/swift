@@ -153,9 +153,9 @@ extension Unicode.Scalar.Properties {
   @available(SwiftStdlib 5.7, *)
   public var _scriptExtensions: [UInt8] {
     var count: UInt8 = 0
-    let pointer = _swift_stdlib_getScriptExtensions(_scalar.value, &count)
+    let pointer = unsafe _swift_stdlib_getScriptExtensions(_scalar.value, &count)
 
-    guard let pointer = pointer else {
+    guard let pointer = unsafe pointer else {
       return [_script]
     }
 
@@ -163,7 +163,7 @@ extension Unicode.Scalar.Properties {
     result.reserveCapacity(Int(count))
 
     for i in 0 ..< count {
-      let rawValue = pointer[Int(i)]
+      let rawValue = unsafe pointer[Int(i)]
 
       _internalInvariant(rawValue != .max, "Unknown script rawValue")
 
@@ -184,18 +184,18 @@ extension Unicode.Scalar.Properties {
   public var _caseFolded: String {
     var buffer: (UInt32, UInt32, UInt32) = (.max, .max, .max)
 
-    withUnsafeMutableBytes(of: &buffer) {
+    unsafe withUnsafeMutableBytes(of: &buffer) {
       // This is safe because the memory is already UInt32
-      let ptr = $0.baseAddress!.assumingMemoryBound(to: UInt32.self)
-      _swift_stdlib_getCaseMapping(_scalar.value, ptr)
+      let ptr = unsafe $0.baseAddress!.assumingMemoryBound(to: UInt32.self)
+      unsafe _swift_stdlib_getCaseMapping(_scalar.value, ptr)
     }
 
     var result = ""
     // Max mapping is 3 scalars and the max UTF8 bytes of a scalar is 4.
     result.reserveCapacity(12)
 
-    withUnsafeBytes(of: &buffer) {
-      for scalar in $0.bindMemory(to: UInt32.self) {
+    unsafe withUnsafeBytes(of: &buffer) {
+      for unsafe scalar in unsafe $0.bindMemory(to: UInt32.self) {
         guard scalar != .max else {
           break
         }
@@ -205,37 +205,5 @@ extension Unicode.Scalar.Properties {
     }
 
     return result
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// String Word Breaking
-//===----------------------------------------------------------------------===//
-
-extension String {
-  @_spi(_Unicode)
-  @available(SwiftStdlib 5.7, *)
-  public func _wordIndex(after i: String.Index) -> String.Index {
-    let i = _guts.validateWordIndex(i)
-
-    let next = _guts.nextWordIndex(startingAt: i._encodedOffset)
-    return String.Index(_encodedOffset: next)
-  }
-
-  @_spi(_Unicode)
-  @available(SwiftStdlib 5.7, *)
-  public func _wordIndex(before i: String.Index) -> String.Index {
-    let i = _guts.validateInclusiveWordIndex(i)
-
-    _precondition(i > startIndex, "String index is out of bounds")
-
-    let previous = _guts.previousWordIndex(endingAt: i._encodedOffset)
-    return String.Index(_encodedOffset: previous)
-  }
-
-  @_spi(_Unicode)
-  @available(SwiftStdlib 5.7, *)
-  public func _nearestWordIndex(atOrBelow i: String.Index) -> String.Index {
-    _guts.validateInclusiveWordIndex(i)
   }
 }

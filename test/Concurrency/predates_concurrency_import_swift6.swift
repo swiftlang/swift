@@ -3,7 +3,6 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
 
 // RUN: %target-swift-frontend -swift-version 6 -I %t %s -emit-sil -o /dev/null -verify -parse-as-library
-// RUN: %target-swift-frontend -swift-version 6 -I %t %s -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation -parse-as-library
 
 @preconcurrency import NonStrictModule
 @preconcurrency import StrictModule
@@ -18,7 +17,7 @@ func test(ss: StrictStruct, ns: NonStrictClass) {
 
 let nonStrictGlobal = NonStrictClass()
 let strictGlobal = StrictStruct() // expected-warning{{let 'strictGlobal' is not concurrency-safe because non-'Sendable' type 'StrictStruct' may have shared mutable state}}
-// expected-note@-1{{annotate 'strictGlobal' with '@MainActor' if property should only be accessed from the main actor}}
+// expected-note@-1{{add '@MainActor' to make let 'strictGlobal' part of global actor 'MainActor'}}
 // expected-note@-2{{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
 
 extension NonStrictClass {

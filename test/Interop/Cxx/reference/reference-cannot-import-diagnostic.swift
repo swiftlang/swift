@@ -22,9 +22,7 @@ import Test
 
 public func test() {
   var x: CInt = 2
-  acceptRValueRef(x) // expected-error {{cannot find 'acceptRValueRef' in scope}}
-  // CHECK: note: function 'acceptRValueRef' unavailable (cannot import)
-  // CHECK: note: C++ functions with rvalue reference parameters are unavailable in Swift
+  acceptRValueRef(consuming: x)
 
   notStdMove(x) // expected-error {{cannot find 'notStdMove' in scope}}
   // CHECK: note: function 'notStdMove' unavailable (cannot import)

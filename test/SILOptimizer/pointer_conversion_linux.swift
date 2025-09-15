@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name pointer_conversion -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name pointer_conversion -Xllvm -sil-print-types -emit-sil -O %s | %FileCheck %s
 // REQUIRES: optimized_stdlib
 // UNSUPPORTED: objc_interop
 

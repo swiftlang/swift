@@ -19,11 +19,13 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Test.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/Sema/Concurrency.h"
 #include <tuple>
 
 using namespace swift;
@@ -37,8 +39,8 @@ using namespace swift::Lowering;
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
 /// \returns The found archetype or empty type otherwise.
-CanOpenedArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
-  return dyn_cast_or_null<OpenedArchetypeType>(getLocalArchetypeOf(Ty));
+CanExistentialArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
+  return dyn_cast_or_null<ExistentialArchetypeType>(getLocalArchetypeOf(Ty));
 }
 CanLocalArchetypeType swift::getLocalArchetypeOf(CanType Ty) {
   if (!Ty)
@@ -118,18 +120,18 @@ SILType SILType::getOpaqueIsolationType(const ASTContext &C) {
 bool SILType::isTrivial(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
   
-  return F.getTypeLowering(contextType).isTrivial();
+  return F.getTypeProperties(contextType).isTrivial();
 }
 
 bool SILType::isOrContainsRawPointer(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
-  return F.getTypeLowering(contextType).isOrContainsRawPointer();
+  return F.getTypeProperties(contextType).isOrContainsRawPointer();
 }
 
 bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction *f) const {
   auto contextType = hasTypeParameter() ? f->mapTypeIntoContext(*this) : *this;
-  const TypeLowering &tyLowering = f->getTypeLowering(contextType);
-  bool result = !tyLowering.isTrivial() || tyLowering.isOrContainsRawPointer();
+  auto props = f->getTypeProperties(contextType);
+  bool result = !props.isTrivial() || props.isOrContainsRawPointer();
   assert((result || !isFunctionTypeWithContext()) &&
          "a function type with context must either be non trivial or marked as containing a pointer");
   return result;
@@ -137,12 +139,12 @@ bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction *f) const {
 
 bool SILType::isOrContainsPack(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
-  return F.getTypeLowering(contextType).isOrContainsPack();
+  return F.getTypeProperties(contextType).isOrContainsPack();
 }
 
 bool SILType::isEmpty(const SILFunction &F) const {
   // Infinite types are never empty.
-  if (F.getTypeLowering(*this).getRecursiveProperties().isInfinite()) {
+  if (F.getTypeProperties(*this).isInfinite()) {
     return false;
   }
   
@@ -155,6 +157,7 @@ bool SILType::isEmpty(const SILFunction &F) const {
     }
     return true;
   }
+
   if (StructDecl *structDecl = getStructOrBoundGenericStruct()) {
     // Also, a struct is empty if it either has no fields or if all fields are
     // empty.
@@ -166,6 +169,13 @@ bool SILType::isEmpty(const SILFunction &F) const {
     }
     return true;
   }
+
+  if (auto bfa = getAs<BuiltinFixedArrayType>()) {
+    if (auto size = bfa->getFixedInhabitedSize()) {
+      return size == 0;
+    }
+  }
+
   return false;
 }
 
@@ -189,15 +199,14 @@ bool SILType::isNoReturnFunction(SILModule &M,
 
 Lifetime SILType::getLifetime(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
-  const auto &lowering = F.getTypeLowering(contextType);
-  auto properties = lowering.getRecursiveProperties();
+  auto properties = F.getTypeProperties(contextType);
   if (properties.isTrivial())
     return Lifetime::None;
   return properties.isLexical() ? Lifetime::Lexical : Lifetime::EagerMove;
 }
 
 std::string SILType::getMangledName() const {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   return mangler.mangleTypeWithoutPrefix(getRawASTType());
 }
 
@@ -323,7 +332,7 @@ static void addFieldSubstitutionsIfNeeded(TypeConverter &TC, SILType ty,
                                           AbstractionPattern &origType) {
   if (needsFieldSubstitutions(origType)) {
     auto subMap = ty.getASTType()->getContextSubstitutionMap(
-                    &TC.M, field->getDeclContext());
+                    field->getDeclContext());
     origType = origType.withSubstitutions(subMap);
   }
 }
@@ -347,7 +356,7 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
     // to ensure that we can correctly get our substituted field type. If we
     // need to rewrap the type layer, we do it below.
     substFieldTy =
-        getASTType()->getTypeOfMember(&TC.M, field)->getCanonicalType();
+        getASTType()->getTypeOfMember(field)->getCanonicalType();
   }
 
   auto loweredTy =
@@ -412,7 +421,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
   addFieldSubstitutionsIfNeeded(TC, *this, elt, origEltType);
 
   auto substEltTy = getASTType()->getTypeOfMember(
-      &TC.M, elt, elt->getArgumentInterfaceType());
+      elt, elt->getPayloadInterfaceType());
   auto loweredTy = TC.getLoweredRValueType(
       context, TC.getAbstractionPattern(elt), substEltTy);
 
@@ -450,6 +459,11 @@ bool SILType::isAddressOnly(const SILFunction &F) const {
   return F.getTypeLowering(contextType).isAddressOnly();
 }
 
+bool SILType::isFixedABI(const SILFunction &F) const {
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  return F.getTypeProperties(contextType).isFixedABI();
+}
+
 SILType SILType::substGenericArgs(SILModule &M, SubstitutionMap SubMap,
                                   TypeExpansionContext context) const {
   auto fnTy = castTo<SILFunctionType>();
@@ -468,56 +482,6 @@ bool SILType::isHeapObjectReferenceType() const {
     return true;
   if (is<SILBoxType>())
     return true;
-  return false;
-}
-
-bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod,
-                                      TypeExpansionContext context) const {
-  assert(!hasArchetype() && "Agg should be proven to not be generic "
-                             "before passed to this function.");
-  assert(!Record.hasArchetype() && "Record should be proven to not be generic "
-                                    "before passed to this function.");
-
-  llvm::SmallVector<SILType, 8> Worklist;
-  Worklist.push_back(*this);
-
-  // For each "subrecord" of agg in the worklist...
-  while (!Worklist.empty()) {
-    SILType Ty = Worklist.pop_back_val();
-
-    // If it is record, we succeeded. Return true.
-    if (Ty == Record)
-      return true;
-
-    // Otherwise, we gather up sub-records that need to be checked for
-    // checking... First handle the tuple case.
-    if (CanTupleType TT = Ty.getAs<TupleType>()) {
-      for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i)
-        Worklist.push_back(Ty.getTupleElementType(i));
-      continue;
-    }
-
-    // Then if we have an enum...
-    if (EnumDecl *E = Ty.getEnumOrBoundGenericEnum()) {
-      for (auto Elt : E->getAllElements())
-        if (Elt->hasAssociatedValues())
-          Worklist.push_back(Ty.getEnumElementType(Elt, Mod, context));
-      continue;
-    }
-
-    // Then if we have a struct address...
-    if (StructDecl *S = Ty.getStructOrBoundGenericStruct())
-      for (VarDecl *Var : S->getStoredProperties())
-        Worklist.push_back(Ty.getFieldType(Var, Mod, context));
-
-    // If we have a class address, it is a pointer so it cannot contain other
-    // types.
-
-    // If we reached this point, then this type has no subrecords. Since it does
-    // not equal our record, we can skip it.
-  }
-
-  // Could not find the record in the aggregate.
   return false;
 }
 
@@ -695,6 +659,10 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
     if (IsTrivial)
       return OwnershipKind::None;
     return OwnershipKind::Unowned;
+  case ResultConvention::GuaranteedAddress:
+    return OwnershipKind::None;
+  case ResultConvention::Guaranteed:
+    return OwnershipKind::Guaranteed;
   }
 
   llvm_unreachable("Unhandled ResultConvention in switch.");
@@ -706,7 +674,7 @@ SILModuleConventions::SILModuleConventions(SILModule &M)
 bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
                                                      SILModule &M) {
   if (SILModuleConventions(M).loweredAddresses) {
-    return M.Types.getTypeLowering(type, TypeExpansionContext::minimal())
+    return M.Types.getTypeProperties(type, TypeExpansionContext::minimal())
         .isAddressOnly();
   }
 
@@ -715,7 +683,7 @@ bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
 
 bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
   if (SILModuleConventions(M).loweredAddresses) {
-    return M.Types.getTypeLowering(type, TypeExpansionContext::minimal())
+    return M.Types.getTypeProperties(type, TypeExpansionContext::minimal())
         .isAddressOnly();
   }
 
@@ -724,7 +692,7 @@ bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
 
 bool SILModuleConventions::isThrownIndirectlyInSIL(SILType type, SILModule &M) {
   if (SILModuleConventions(M).loweredAddresses) {
-    return M.Types.getTypeLowering(type, TypeExpansionContext::minimal())
+    return M.Types.getTypeProperties(type, TypeExpansionContext::minimal())
         .isAddressOnly();
   }
 
@@ -738,6 +706,39 @@ bool SILFunctionType::isNoReturnFunction(SILModule &M,
       return true;
   }
 
+  return false;
+}
+
+bool SILFunctionType::isAddressable(unsigned paramIdx, SILFunction *caller) {
+  return isAddressable(paramIdx, caller->getModule(),
+                       caller->getGenericEnvironment(),
+                       caller->getModule().Types,
+                       caller->getTypeExpansionContext());
+}
+
+// 'genericEnv' may be null.
+bool SILFunctionType::isAddressable(unsigned paramIdx, SILModule &module,
+                                    GenericEnvironment *genericEnv,
+                                    Lowering::TypeConverter &typeConverter,
+                                    TypeExpansionContext expansion) {
+  SILParameterInfo paramInfo = getParameters()[paramIdx];
+  for (auto &depInfo : getLifetimeDependencies()) {
+    auto *addressableIndices = depInfo.getAddressableIndices();
+    if (addressableIndices && addressableIndices->contains(paramIdx)) {
+      return true;
+    }
+    auto *condAddressableIndices = depInfo.getConditionallyAddressableIndices();
+    if (condAddressableIndices && condAddressableIndices->contains(paramIdx)) {
+      CanType argType = paramInfo.getArgumentType(module, this, expansion);
+      CanType contextType = genericEnv
+        ? genericEnv->mapTypeIntoContext(argType)->getCanonicalType()
+        : argType;
+      assert(!contextType->hasTypeParameter());
+      if (typeConverter.getTypeProperties(contextType, expansion)
+            .isAddressableForDependencies())
+        return true;
+    }
+  }
   return false;
 }
 
@@ -821,12 +822,11 @@ bool SILType::hasAbstractionDifference(SILFunctionTypeRepresentation rep,
 
 bool SILType::isLoweringOf(TypeExpansionContext context, SILModule &Mod,
                            CanType formalType) {
+  formalType =
+      substOpaqueTypesWithUnderlyingTypes(formalType, context)
+        ->getCanonicalType();
+
   SILType loweredType = *this;
-  if (formalType->hasOpaqueArchetype() &&
-      context.shouldLookThroughOpaqueTypeArchetypes() &&
-      loweredType.getASTType() ==
-          Mod.Types.getLoweredRValueType(context, formalType))
-    return true;
 
   // Optional lowers its contained type.
   SILType loweredObjectType = loweredType.getOptionalObjectType();
@@ -893,13 +893,13 @@ bool SILType::isLoweringOf(TypeExpansionContext context, SILModule &Mod,
 
 bool SILType::isDifferentiable(SILModule &M) const {
   return getASTType()
-      ->getAutoDiffTangentSpace(LookUpConformanceInModule(M.getSwiftModule()))
+      ->getAutoDiffTangentSpace(LookUpConformanceInModule())
       .has_value();
 }
 
 Type
 TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) const {
-  return Type(const_cast<TypeBase *>(this)).transform([&](Type t) -> Type {
+  return Type(const_cast<TypeBase *>(this)).transformRec([&](TypeBase *t) -> std::optional<Type> {
     if (auto *f = t->getAs<SILFunctionType>()) {
       auto sft = f->getUnsubstitutedType(M);
       
@@ -951,7 +951,7 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
                                   SubstitutionMap(),
                                   M.getASTContext());
     }
-    return t;
+    return std::nullopt;
   });
 }
 
@@ -1136,28 +1136,11 @@ bool SILType::isValueTypeWithDeinit() const {
   return false;
 }
 
-SILType SILType::getInstanceTypeOfMetatype(SILFunction *function) const {
+SILType SILType::getLoweredInstanceTypeOfMetatype(SILFunction *function) const {
   auto metaType = castTo<MetatypeType>();
   CanType instanceTy = metaType.getInstanceType();
   auto &tl = function->getModule().Types.getTypeLowering(instanceTy, TypeExpansionContext(*function));
   return tl.getLoweredType();
-}
-
-MetatypeRepresentation SILType::getRepresentationOfMetatype(SILFunction *function) const {
-  auto metaType = castTo<MetatypeType>();
-  return metaType->getRepresentation();
-}
-
-bool SILType::isOrContainsObjectiveCClass() const {
-  return getASTType().findIf([](Type ty) {
-    if (ClassDecl *cd = ty->getClassOrBoundGenericClass()) {
-      if (cd->isForeign() || cd->getObjectModel() == ReferenceCounting::ObjC)
-        return true;
-    }
-    if (ty->is<ProtocolCompositionType>())
-      return true;
-    return false;
-  });
 }
 
 static bool hasImmortalAttr(NominalTypeDecl *nominal) {
@@ -1199,6 +1182,13 @@ bool SILType::isMarkedAsImmortal() const {
     }
   }
   return false;
+}
+
+bool SILType::isAddressableForDeps(const SILFunction &function) const {
+  auto contextType =
+    hasTypeParameter() ? function.mapTypeIntoContext(*this) : *this;
+  auto properties = function.getTypeProperties(contextType);
+  return properties.isAddressableForDependencies();
 }
 
 intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {
@@ -1253,7 +1243,7 @@ SILType SILType::addingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
   auto oldField = oldLayout->getFields()[0];
   if (oldField.getLoweredType()->is<SILMoveOnlyWrappedType>())
     return *this;
-  assert(!oldField.getLoweredType()->isNoncopyable() &&
+  assert(oldField.getLoweredType()->isCopyable() &&
          "Cannot moveonlywrapped in a moveonly type");
   auto newField =
       SILField(SILMoveOnlyWrappedType::get(oldField.getLoweredType()),
@@ -1266,7 +1256,7 @@ SILType SILType::addingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
   return SILType::getPrimitiveObjectType(newBoxType);
 }
 
-SILType SILType::removingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
+SILType SILType::removingMoveOnlyWrapperFromBoxedType(const SILFunction *fn) {
   auto boxTy = castTo<SILBoxType>();
   auto *oldLayout = boxTy->getLayout();
   auto oldField = oldLayout->getFields()[0];
@@ -1284,8 +1274,60 @@ SILType SILType::removingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
   return SILType::getPrimitiveObjectType(newBoxType);
 }
 
+SILType SILType::removingAnyMoveOnlyWrapping(const SILFunction *fn) {
+  if (!isMoveOnlyWrapped() && !isBoxedMoveOnlyWrappedType(fn))
+    return *this;
+
+  if (isMoveOnlyWrapped())
+    return removingMoveOnlyWrapper();
+
+  assert(isBoxedMoveOnlyWrappedType(fn));
+  return removingMoveOnlyWrapperFromBoxedType(fn);
+}
+
 bool SILType::isSendable(SILFunction *fn) const {
   return getASTType()->isSendableType();
+}
+
+Type SILType::getRawLayoutSubstitutedLikeType() const {
+  auto rawLayout = getRawLayout();
+
+  if (!rawLayout)
+    return Type();
+
+  if (rawLayout->getSizeAndAlignment())
+    return Type();
+
+  auto structDecl = getStructOrBoundGenericStruct();
+  auto likeType = rawLayout->getResolvedLikeType(structDecl);
+  auto astT = getASTType();
+  auto subs = astT->getContextSubstitutionMap();
+  return likeType.subst(subs);
+}
+
+Type SILType::getRawLayoutSubstitutedCountType() const {
+  auto rawLayout = getRawLayout();
+
+  if (!rawLayout)
+    return Type();
+
+  if (rawLayout->getSizeAndAlignment() || rawLayout->getScalarLikeType())
+    return Type();
+
+  auto structDecl = getStructOrBoundGenericStruct();
+  auto countType = rawLayout->getResolvedCountType(structDecl);
+  auto astT = getASTType();
+  auto subs = astT->getContextSubstitutionMap();
+  return countType.subst(subs);
+}
+
+std::optional<DiagnosticBehavior>
+SILType::getConcurrencyDiagnosticBehavior(SILFunction *fn) const {
+  auto declRef = fn->getDeclRef();
+  if (!declRef)
+    return {};
+  auto *fromDC = declRef.getInnermostDeclContext();
+  return getASTType()->getConcurrencyDiagnosticBehaviorLimit(fromDC);
 }
 
 namespace swift::test {
@@ -1293,7 +1335,7 @@ namespace swift::test {
 // - SILValue: value
 // Dumps:
 // - message
-static FunctionTest IsSILTrivial("is-sil-trivial", [](auto &function,
+static FunctionTest IsSILTrivial("is_sil_trivial", [](auto &function,
                                                       auto &arguments,
                                                       auto &test) {
   SILValue value = arguments.takeValue();

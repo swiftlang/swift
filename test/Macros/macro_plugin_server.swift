@@ -1,4 +1,5 @@
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_Macros
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/plugins)
@@ -30,6 +31,26 @@
 // RUN:   2>&1 | tee %t/macro-expansions.txt
 
 // RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions.txt
+
+/// Create file with matching name in alt directories and test
+/// `-load-resolved-plugin` takes the priority over other options.
+// RUN: %empty-directory(%t/alt)
+// RUN: touch %t/alt/%target-library-name(MacroDefinition)
+
+// RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %target-swift-frontend \
+// RUN:   -typecheck -verify \
+// RUN:   -swift-version 5 -enable-experimental-feature Macros \
+// RUN:   -external-plugin-path %t/alt#%swift-plugin-server \
+// RUN:   -load-resolved-plugin lib-do-not-exist.dylib##MacroDefinition \
+// RUN:   -load-resolved-plugin %t/plugins/%target-library-name(MacroDefinition)#%swift-plugin-server#MacroDefinition \
+// RUN:   -load-resolved-plugin %t/plugins/%target-library-name(EvilMacros)#%swift-plugin-server#EvilMacros \
+// RUN:   -external-plugin-path %t/alt#%swift-plugin-server \
+// RUN:   -Rmacro-loading -verify-ignore-unknown \
+// RUN:   -module-name MyApp \
+// RUN:   %s \
+// RUN:   2>&1 | tee %t/macro-expansions-2.txt
+
+// RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions-2.txt
 
 // RUN: not %target-swift-frontend \
 // RUN:   -typecheck \
@@ -64,10 +85,10 @@
 // CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"stringify","typeName":"StringifyMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{{{.+}}},"source":"#stringify(b + a)"}}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"expandMacroResult":{"diagnostics":[],"expandedSource":"(b + a, \"b + a\")"}}
 
-// CHECK-NEXT ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"missing","typeName":"TypeDoesNotExist"},"macroRole":"expression","syntax":{"kind":"expression","location":{{{*}}},"source":" #missing()"}}}
-// CHECK-NEXT <-(plugin:[[#PID2]]) {"expandMacroResult":{"diagnostics":[{"fixIts":[],"highlights":[{{{.*}}}],"message":"macro implementation type 'MacroDefinition.TypeDoesNotExist' could not be found in library plugin '{{.*}}MacroDefinition.{{dylib|so|dll}}'","notes":[],"position":{{{.*}}},"severity":"error"}]}}
-// CHECK-NEXT ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"missing","typeName":"TypeDoesNotExist"},"macroRole":"expression","syntax":{"kind":"expression","location":{{{*}}},"source":" #notMacro()"}}}
-// CHECK-NEXT <-(plugin:[[#PID2]]) {"expandMacroResult":{"diagnostics":[{"fixIts":[],"highlights":[{{{.*}}}],"message":"type 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '{{.*}}MacroDefinition.{{dylib|so|dll}}'","notes":[],"position":{{{.*}}},"severity":"error"}]}}
+// CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"missing","typeName":"TypeDoesNotExist"},"macroRole":"expression","syntax":{"kind":"expression","location":{{({.+})}},"source":"#missing()"}}}
+// CHECK-NEXT: <-(plugin:[[#PID2]]) {"expandMacroResult":{"diagnostics":[{"fixIts":[],"highlights":[{{{.*}}}],"message":"type 'MacroDefinition.TypeDoesNotExist' could not be found in library plugin '{{.*}}MacroDefinition.{{dylib|so|dll}}'","notes":[],"position":{{{.*}}},"severity":"error"}]}}
+// CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"notMacro","typeName":"NotMacroStruct"},"macroRole":"expression","syntax":{"kind":"expression","location":{{({.+})}},"source":"#notMacro()"}}}
+// CHECK-NEXT: <-(plugin:[[#PID2]]) {"expandMacroResult":{"diagnostics":[{"fixIts":[],"highlights":[{{{.*}}}],"message":"type 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '{{.*}}MacroDefinition.{{dylib|so|dll}}'","notes":[],"position":{{{.*}}},"severity":"error"}]}}
 
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 @freestanding(expression) macro evil(_ value: Int) -> String = #externalMacro(module: "EvilMacros", type: "CrashingMacro")

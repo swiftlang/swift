@@ -1,10 +1,9 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -enable-upcoming-feature IsolatedDefaultValues -parse-as-library -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature IsolatedDefaultValues -enable-upcoming-feature RegionBasedIsolation %s
+// RUN: %target-swift-frontend -I %t  -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature InferSendableFromCaptures %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_InferSendableFromCaptures
 
 @globalActor
 actor SomeGlobalActor {
@@ -60,12 +59,10 @@ func nonisolatedCaller() {
 }
 
 func nonisolatedAsyncCaller() async {
-  // expected-error@+2 {{expression is 'async' but is not marked with 'await'}}
-  // expected-note@+1 {{calls to global function 'mainActorDefaultArg(value:)' from outside of its actor context are implicitly asynchronous}}
+  // expected-error@+1 {{main actor-isolated global function 'mainActorDefaultArg(value:)' cannot be called from outside of the actor}} {{3-3=await }}
   mainActorDefaultArg()
 
-  // expected-error@+2 {{expression is 'async' but is not marked with 'await'}}
-  // expected-note@+1 {{calls to global function 'mainActorClosure(closure:)' from outside of its actor context are implicitly asynchronous}}
+  // expected-error@+1 {{main actor-isolated global function 'mainActorClosure(closure:)' cannot be called from outside of the actor}} {{3-3=await }}
   mainActorClosure()
 
   await mainActorDefaultArg(value: requiresMainActor())
@@ -215,6 +212,17 @@ class C3 {
   @SomeGlobalActor var y = 2
 }
 
+class C4 {
+  let task1 = Task {
+    // expected-error@+1 {{main actor-isolated global function 'requiresMainActor()' cannot be called from outside of the actor}} {{5-5=await }}
+    requiresMainActor()
+  }
+
+  let task2 = Task {
+    await requiresMainActor() // okay
+  }
+}
+
 @MainActor struct NonIsolatedInit {
   var x = 0
   var y = 0
@@ -254,8 +262,7 @@ struct UseRequiresMain {
 }
 
 nonisolated func test() async {
-  // expected-warning@+2 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
-  // expected-note@+1 {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+  // expected-warning@+1 {{main actor-isolated initializer 'init()' cannot be called from outside of the actor; this is an error in the Swift 6 language mode}} {{7-7=await }}
   _ = UseRequiresMain()
 }
 
@@ -282,3 +289,46 @@ struct InitAccessors {
 struct CError: Error, RawRepresentable {
   var rawValue: CInt
 }
+
+// Consider isolated key-paths when computing initializer isolation
+
+@MainActor
+class UseIsolatedKeyPath {
+  let kp: KeyPath<UseIsolatedKeyPath, Nested> = \.x // okay
+
+  // expected-error@+1 {{default argument cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
+  let kp2: KeyPath<UseIsolatedKeyPath, Bool> = \.x.y // okay
+
+  var x: Nested = .init()
+
+  class Nested {
+    @SomeGlobalActor var y: Bool = true
+  }
+}
+
+@MainActor
+protocol InferMainActor {}
+
+struct UseIsolatedPropertyWrapperInit: InferMainActor {
+  @Wrapper(\.value) var value: Int // okay
+
+  // expected-warning@+1 {{global actor 'SomeGlobalActor'-isolated default value in a main actor-isolated context; this is an error in the Swift 6 language mode}}
+  @Wrapper(\.otherValue) var otherValue: Int
+}
+
+@propertyWrapper struct Wrapper<T> {
+  init(_: KeyPath<Values, T>) {}
+  var wrappedValue: T { fatalError() }
+}
+
+struct Values {
+  @MainActor var value: Int { 0 }
+  @SomeGlobalActor var otherValue: Int { 0 }
+}
+
+class PreconcurrencyInit {
+  @preconcurrency @MainActor init() {}
+}
+
+// expected-warning@+1 {{main actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
+func downgrade(_: PreconcurrencyInit = .init()) {}

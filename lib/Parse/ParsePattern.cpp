@@ -17,11 +17,13 @@
 #include "swift/Parse/Parser.h"
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "llvm/ADT/SmallString.h"
@@ -30,16 +32,10 @@
 
 using namespace swift;
 
-void Parser::DefaultArgumentInfo::setFunctionContext(
-    DeclContext *DC, ParameterList *paramList){
-  for (auto context : ParsedContexts) {
-    context->changeFunction(DC, paramList);
-  }
-}
-
 static ParserStatus
 parseDefaultArgument(Parser &P, Parser::DefaultArgumentInfo *defaultArgs,
                      unsigned argIndex, Expr *&init,
+                     DefaultArgumentInitializer *&initContext,
                      Parser::ParameterContextKind paramContext) {
   assert(P.Tok.is(tok::equal) ||
        (P.Tok.isBinaryOperator() && P.Tok.getText() == "=="));
@@ -48,17 +44,10 @@ parseDefaultArgument(Parser &P, Parser::DefaultArgumentInfo *defaultArgs,
   // Enter a fresh default-argument context with a meaningless parent.
   // We'll change the parent to the function later after we've created
   // that declaration.
-  auto initDC = new (P.Context) DefaultArgumentInitializer(P.CurDeclContext,
-                                                           argIndex);
-  Parser::ParseFunctionBody initScope(P, initDC);
+  initContext = DefaultArgumentInitializer::create(P.CurDeclContext, argIndex);
+  Parser::ParseFunctionBody initScope(P, initContext);
 
   ParserResult<Expr> initR = P.parseExpr(diag::expected_init_value);
-
-  // Record the default-argument context if we're supposed to accept default
-  // arguments here.
-  if (defaultArgs) {
-    defaultArgs->ParsedContexts.push_back(initDC);
-  }
 
   Diag<> diagID = { DiagID() };
   switch (paramContext) {
@@ -124,8 +113,6 @@ bool Parser::startsParameterName(bool isClosure) {
         !Tok.isContextualKeyword("__shared") &&
         !Tok.isContextualKeyword("__owned") &&
         !Tok.isContextualKeyword("borrowing") &&
-        (!Context.LangOpts.hasFeature(Feature::TransferringArgsAndResults) ||
-         !Tok.isContextualKeyword("transferring")) &&
         (!Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) ||
          !Tok.isContextualKeyword("sending")) &&
         !Tok.isContextualKeyword("consuming") && !Tok.is(tok::kw_repeat))
@@ -151,6 +138,27 @@ bool Parser::startsParameterName(bool isClosure) {
   // assume it's a name, because the type can be inferred. Elsewhere, we
   // assume it's a type.
   return isClosure;
+}
+
+SourceLoc Parser::tryCompleteFunctionParamTypeBeginning() {
+  if (!L->isCodeCompletion())
+    return SourceLoc();
+
+  // Skip over any starting parameter specifiers.
+  {
+    CancellableBacktrackingScope backtrack(*this);
+    ParsedTypeAttributeList attrs(ParseTypeReason::Unspecified);
+    attrs.parse(*this);
+    if (!Tok.is(tok::code_complete))
+      return SourceLoc();
+
+    backtrack.cancelBacktrack();
+  }
+
+  if (CodeCompletionCallbacks)
+    CodeCompletionCallbacks->completeTypePossibleFunctionParamBeginning();
+
+  return consumeToken(tok::code_complete);
 }
 
 ParserStatus
@@ -192,7 +200,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
   // Parse the parameter list.
   bool isClosure = paramContext == ParameterContextKind::Closure;
   return parseList(tok::r_paren, leftParenLoc, rightParenLoc,
-                      /*AllowSepAfterLast=*/false,
+                      /*AllowSepAfterLast=*/true,
                       diag::expected_rparen_parameter,
                       [&]() -> ParserStatus {
     ParsedParameter param;
@@ -262,31 +270,6 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         }
 
         if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
-            Tok.isContextualKeyword("transferring")) {
-          diagnose(Tok, diag::parameter_specifier_as_attr_disallowed, Tok.getText())
-                    .warnUntilSwiftVersion(6);
-          if (param.TransferringLoc.isValid()) {
-            diagnose(Tok, diag::parameter_specifier_repeated)
-                .fixItRemove(Tok.getLoc());
-            consumeToken();
-            continue;
-          }
-
-          diagnose(Tok, diag::transferring_is_now_sendable)
-              .fixItReplace(Tok.getLoc(), "sending");
-
-          if (param.SendingLoc.isValid()) {
-            diagnose(Tok, diag::sending_and_transferring_used_together)
-                .fixItRemove(Tok.getLoc());
-            consumeToken();
-            continue;
-          }
-
-          param.TransferringLoc = consumeToken();
-          continue;
-        }
-
-        if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
             Tok.isContextualKeyword("sending")) {
           diagnose(Tok, diag::parameter_specifier_as_attr_disallowed,
                    Tok.getText())
@@ -294,13 +277,6 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           if (param.SendingLoc.isValid()) {
             diagnose(Tok, diag::parameter_specifier_repeated)
                 .fixItRemove(Tok.getLoc());
-            consumeToken();
-            continue;
-          }
-
-          if (param.TransferringLoc.isValid()) {
-            diagnose(Tok, diag::sending_and_transferring_used_together)
-                .fixItRemove(param.TransferringLoc);
             consumeToken();
             continue;
           }
@@ -355,6 +331,19 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
     }
 
+    auto parseParamType = [&]() -> ParserResult<TypeRepr> {
+      // Currently none of the parameter type completions are relevant for
+      // enum cases, so don't include them. We'll complete for a regular type
+      // beginning instead.
+      if (paramContext != ParameterContextKind::EnumElement) {
+        if (auto CCLoc = tryCompleteFunctionParamTypeBeginning()) {
+          auto *ET = ErrorTypeRepr::create(Context, CCLoc);
+          return makeParserCodeCompletionResult<TypeRepr>(ET);
+        }
+      }
+      return parseType(diag::expected_parameter_type);
+    };
+
     if (startsParameterName(isClosure)) {
       // identifier-or-none for the first name
       param.FirstNameLoc = consumeArgumentLabel(param.FirstName,
@@ -402,7 +391,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       // (':' type)?
       if (consumeIf(tok::colon)) {
 
-        auto type = parseType(diag::expected_parameter_type);
+        auto type = parseParamType();
         status |= type;
         param.Type = type.getPtrOrNull();
 
@@ -425,7 +414,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
 
       if (isBareType && paramContext == ParameterContextKind::EnumElement) {
-        auto type = parseType(diag::expected_parameter_type);
+        auto type = parseParamType();
         status |= type;
         param.Type = type.getPtrOrNull();
         param.FirstName = Identifier();
@@ -440,7 +429,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // the user is about to type the parameter label and we shouldn't
         // suggest types.
         SourceLoc typeStartLoc = Tok.getLoc();
-        auto type = parseType(diag::expected_parameter_type);
+        auto type = parseParamType();
         status |= type;
         param.Type = type.getPtrOrNull();
 
@@ -505,7 +494,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
 
       status |= parseDefaultArgument(*this, defaultArgs, defaultArgIndex,
-                                     param.DefaultArg, paramContext);
+                                     param.DefaultArg,
+                                     param.DefaultArgInitContext, paramContext);
     }
 
     // If we haven't made progress, don't add the parameter.
@@ -563,14 +553,14 @@ mapParsedParameters(Parser &parser,
   auto &ctx = parser.Context;
 
   // Local function to create a pattern for a single parameter.
-  auto createParam = [&](Parser::ParsedParameter &paramInfo,
-                         Identifier argName, SourceLoc argNameLoc,
-                         Identifier paramName, SourceLoc paramNameLoc)
-  -> ParamDecl * {
+  auto createParam = [&](Parser::ParsedParameter &paramInfo, Identifier argName,
+                         SourceLoc argNameLoc, Identifier paramName,
+                         SourceLoc paramNameLoc) -> ParamDecl * {
     auto param = ParamDecl::createParsed(
         ctx, paramInfo.SpecifierLoc, argNameLoc, argName, paramNameLoc,
-        paramName, paramInfo.DefaultArg, parser.CurDeclContext);
-    param->getAttrs() = paramInfo.Attrs;
+        paramName, paramInfo.DefaultArg, paramInfo.DefaultArgInitContext,
+        parser.CurDeclContext);
+    param->attachParsedAttrs(paramInfo.Attrs);
 
     bool parsingEnumElt
       = (paramContext == Parser::ParameterContextKind::EnumElement);
@@ -605,15 +595,15 @@ mapParsedParameters(Parser &parser,
       }
 
       if (paramInfo.CompileConstLoc.isValid()) {
-        type = new (parser.Context) CompileTimeConstTypeRepr(
+        type = new (parser.Context) CompileTimeLiteralTypeRepr(
             type, paramInfo.CompileConstLoc);
-        param->setCompileTimeConst();
+        param->setCompileTimeLiteral();
       }
 
-      if (paramInfo.TransferringLoc.isValid()) {
-        type = new (parser.Context)
-            TransferringTypeRepr(type, paramInfo.TransferringLoc);
-        param->setSending();
+      if (paramInfo.Attrs.hasAttribute<ConstValAttr>()) {
+        type = new (parser.Context) ConstValueTypeRepr(
+            type, paramInfo.Attrs.getAttribute<ConstValAttr>()->AtLoc);
+        param->setConstValue();
       }
 
       if (paramInfo.SendingLoc.isValid()) {
@@ -623,40 +613,6 @@ mapParsedParameters(Parser &parser,
 
       param->setTypeRepr(type);
 
-      // Dig through the type to find any attributes or modifiers that are
-      // associated with the type but should also be reflected on the
-      // declaration.
-      {
-        auto unwrappedType = type;
-        while (true) {
-          if (auto *ATR = dyn_cast<AttributedTypeRepr>(unwrappedType)) {
-            // At this point we actually don't know if that's valid to mark
-            // this parameter declaration as `autoclosure` because type has
-            // not been resolved yet - it should either be a function type
-            // or typealias with underlying function type.
-            if (ATR->has(TypeAttrKind::Autoclosure))
-              param->setAutoClosure(true);
-
-            unwrappedType = ATR->getTypeRepr();
-            continue;
-          }
-
-          if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
-            if (isa<IsolatedTypeRepr>(STR))
-              param->setIsolated(true);
-            else if (isa<CompileTimeConstTypeRepr>(STR))
-              param->setCompileTimeConst(true);
-            else if (isa<TransferringTypeRepr>(STR))
-              param->setSending(true);
-            else if (isa<SendingTypeRepr>(STR))
-              param->setSending(true);
-            unwrappedType = STR->getBase();
-            continue;
-          }
-
-          break;
-        }
-      }
     } else if (paramInfo.SpecifierLoc.isValid()) {
       llvm::SmallString<16> specifier;
       {
@@ -669,10 +625,6 @@ mapParsedParameters(Parser &parser,
                       specifier);
       paramInfo.SpecifierLoc = SourceLoc();
       paramInfo.SpecifierKind = ParamDecl::Specifier::Default;
-
-      param->setSpecifier(ParamSpecifier::Default);
-    } else {
-      param->setSpecifier(ParamSpecifier::Default);
     }
 
     return param;
@@ -1277,24 +1229,23 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
 
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
-  ParserStatus ListStatus =
-    parseList(tok::r_paren, LPLoc, RPLoc,
-              /*AllowSepAfterLast=*/false,
-              diag::expected_rparen_tuple_pattern_list,
-              [&] () -> ParserStatus {
-    // Parse the pattern tuple element.
-    ParserStatus EltStatus;
-    std::optional<TuplePatternElt> elt;
-    std::tie(EltStatus, elt) = parsePatternTupleElement();
-    if (EltStatus.hasCodeCompletion())
-      return makeParserCodeCompletionStatus();
-    if (!elt)
-      return makeParserError();
+  ParserStatus ListStatus = parseList(
+      tok::r_paren, LPLoc, RPLoc,
+      /*AllowSepAfterLast=*/true, diag::expected_rparen_tuple_pattern_list,
+      [&]() -> ParserStatus {
+        // Parse the pattern tuple element.
+        ParserStatus EltStatus;
+        std::optional<TuplePatternElt> elt;
+        std::tie(EltStatus, elt) = parsePatternTupleElement();
+        if (EltStatus.hasCodeCompletion())
+          return makeParserCodeCompletionStatus();
+        if (!elt)
+          return makeParserError();
 
-    // Add this element to the list.
-    elts.push_back(*elt);
-    return makeParserSuccess();
-  });
+        // Add this element to the list.
+        elts.push_back(*elt);
+        return makeParserSuccess();
+      });
 
   return makeParserResult(
            ListStatus,
@@ -1377,7 +1328,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
     // binding, which isn't yet supported.
     if (peekToken().isAny(tok::period, tok::period_prefix, tok::l_paren,
                           tok::l_square)
-        || (peekToken().isAnyOperator() && peekToken().getText().equals("<"))) {
+        || (peekToken().isAnyOperator() && peekToken().getText() == "<")) {
 
       // Diagnose the unsupported production.
       diagnose(Tok.getLoc(),

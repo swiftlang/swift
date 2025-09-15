@@ -153,7 +153,9 @@ public:
   ~SILBasicBlock();
 
   enum { numCustomBits = std::numeric_limits<CustomBitsType>::digits };
-  enum { maxBitfieldID = std::numeric_limits<uint64_t>::max() };
+
+  constexpr static const uint64_t maxBitfieldID =
+      std::numeric_limits<uint64_t>::max();
 
   /// Gets the ID (= index in the function's block list) of the block.
   ///
@@ -366,8 +368,6 @@ public:
   const SILArgument *getArgument(unsigned i) const { return ArgumentList[i]; }
   SILArgument *getArgument(unsigned i) { return ArgumentList[i]; }
 
-  void cloneArgumentList(SILBasicBlock *Other);
-
   void moveArgumentList(SILBasicBlock *from);
 
   /// Erase a specific argument from the arg list.
@@ -376,18 +376,18 @@ public:
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.
   SILFunctionArgument *createFunctionArgument(SILType Ty,
-                                              const ValueDecl *D = nullptr,
+                                              ValueDecl *D = nullptr,
                                               bool disableEntryBlockVerification = false);
 
   SILFunctionArgument *insertFunctionArgument(unsigned AtArgPos, SILType Ty,
                                               ValueOwnershipKind OwnershipKind,
-                                              const ValueDecl *D = nullptr);
+                                              ValueDecl *D = nullptr);
 
   /// Replace the \p{i}th Function arg with a new Function arg with SILType \p
   /// Ty and ValueDecl \p D.
   SILFunctionArgument *replaceFunctionArgument(unsigned i, SILType Ty,
                                                ValueOwnershipKind Kind,
-                                               const ValueDecl *D = nullptr);
+                                               ValueDecl *D = nullptr);
 
   /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
   /// ValueDecl \p D.
@@ -397,21 +397,21 @@ public:
   /// replacePhiArgumentAndRAUW.
   SILPhiArgument *replacePhiArgument(unsigned i, SILType type,
                                      ValueOwnershipKind kind,
-                                     const ValueDecl *decl = nullptr,
+                                     ValueDecl *decl = nullptr,
                                      bool isReborrow = false,
                                      bool isEscaping = false);
 
   /// Replace phi argument \p i and RAUW all uses.
   SILPhiArgument *replacePhiArgumentAndReplaceAllUses(
       unsigned i, SILType type, ValueOwnershipKind kind,
-      const ValueDecl *decl = nullptr, bool isReborrow = false,
+      ValueDecl *decl = nullptr, bool isReborrow = false,
       bool isEscaping = false);
 
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter, reborrow flag and
   /// escaping flag.
   SILPhiArgument *createPhiArgument(SILType Ty, ValueOwnershipKind Kind,
-                                    const ValueDecl *D = nullptr,
+                                    ValueDecl *D = nullptr,
                                     bool isReborrow = false,
                                     bool isEscaping = false);
 
@@ -419,7 +419,7 @@ public:
   /// AtArgPos.
   SILPhiArgument *insertPhiArgument(unsigned AtArgPos, SILType Ty,
                                     ValueOwnershipKind Kind,
-                                    const ValueDecl *D = nullptr,
+                                    ValueDecl *D = nullptr,
                                     bool isReborrow = false,
                                     bool isEscaping = false);
 
@@ -555,6 +555,9 @@ public:
   /// Pretty-print the SILBasicBlock.
   void dump() const;
 
+  /// Pretty-print the SILBasicBlock with Debug Info.
+  void dump(bool DebugInfo) const;
+
   /// Pretty-print the SILBasicBlock with the designated stream.
   void print(llvm::raw_ostream &OS) const;
 
@@ -563,7 +566,6 @@ public:
 
   void printAsOperand(raw_ostream &OS, bool PrintType = true);
 
-#ifndef NDEBUG
   /// Print the ID of the block, bbN.
   void dumpID(bool newline = true) const;
 
@@ -572,7 +574,6 @@ public:
 
   /// Print the ID of the block with \p Ctx, bbN.
   void printID(SILPrintContext &Ctx, bool newline = true) const;
-#endif
 
   /// getSublistAccess() - returns pointer to member of instruction list
   static InstListType SILBasicBlock::*getSublistAccess() {

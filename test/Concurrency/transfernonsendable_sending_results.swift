@@ -1,13 +1,15 @@
-// RUN: %target-swift-frontend -emit-sil -parse-as-library -strict-concurrency=complete -disable-availability-checking -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability -verify-additional-prefix ni-
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature NonisolatedNonsendingByDefault -verify-additional-prefix ni-ns-
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 ////////////////////////
 // MARK: Declarations //
 ////////////////////////
 
-class NonSendableKlass {} // expected-note {{}}
+class NonSendableKlass {} // expected-note 2{{}}
 
 struct NonSendableStruct {
   var first = NonSendableKlass()
@@ -17,6 +19,8 @@ struct NonSendableStruct {
 func getValue<T>() -> T { fatalError() }
 func getValueAsync<T>() async -> T { fatalError() }
 func getValueAsyncTransferring<T>() async -> sending T { fatalError() }
+@MainActor func getMainActorValueAsync<T>() async -> T { fatalError() }
+@MainActor func getMainActorValueAsyncTransferring<T>() async -> sending T { fatalError() }
 
 func useValue<T>(_ t: T) {}
 func getAny() -> Any { fatalError() }
@@ -68,6 +72,30 @@ enum MainActorIsolatedEnum {
   case second(NonSendableKlass)
 }
 
+struct GenericNonSendableStruct<T> {
+  var t: T
+  var t2: T?
+  var x: NonSendableKlass
+}
+
+class GenericNonSendableKlass<T> {
+  var t: T
+  var t2: T?
+  var x: NonSendableKlass?
+
+  init(_ inputT: T) {
+    t = inputT
+    t2 = nil
+    x = NonSendableKlass()
+  }
+}
+
+func sendParameter<T>(_ t: sending T) {}
+
+actor MyActor {
+  private var ns = NonSendableKlass()
+}
+
 /////////////////
 // MARK: Tests //
 /////////////////
@@ -79,7 +107,7 @@ func simpleTest() async {
   useValue(y)
 }
 
-// Since y is transfered, we should emit the error on useValue(x). We generally
+// Since y is transferred, we should emit the error on useValue(x). We generally
 // emit the first seen error on a path, so if we were to emit an error on
 // useValue(y), we would have emitted that error.
 func simpleTest2() async {
@@ -115,7 +143,8 @@ func transferInAndOut(_ x: sending NonSendableKlass) -> sending NonSendableKlass
 
 func transferReturnArg(_ x: NonSendableKlass) -> sending NonSendableKlass {
   return x // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{task-isolated 'x' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+  // expected-ni-note @-1 {{task-isolated 'x' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+  // expected-ni-ns-note @-2 {{task-isolated 'x' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
 }
 
 // TODO: This will be fixed once I represent @MainActor on func types.
@@ -175,7 +204,7 @@ extension MainActorIsolatedEnum {
     }
     return nil
   } // expected-warning {{sending 'ns.some' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'ns.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}} 
+  // expected-note @-1 {{main actor-isolated 'ns.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 
   func testIfLetReturnNoTransfer() -> NonSendableKlass? {
     if case .second(let ns) = self {
@@ -209,9 +238,23 @@ func asyncLetReabstractionThunkTest() async {
   let _ = await newValue2
 }
 
+func asyncLetReabstractionThunkTest2() async {
+  // We emit the error here since we are returning a MainActor-isolated value.
+  async let newValue: NonSendableKlass = await getMainActorValueAsync()
+  // expected-ni-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to nonisolated context}}
+  // expected-ni-ns-warning @-2 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to @concurrent context}}
+
+  let _ = await newValue
+
+  // Without thunk.
+  async let newValue2: NonSendableKlass = await getMainActorValueAsyncTransferring()
+  let _ = await newValue2
+}
+
 @MainActor func asyncLetReabstractionThunkTestGlobalActor() async {
-  // With thunk. We emit the sema error here.
-  async let newValue: NonSendableKlass = await getValueAsync() // expected-warning {{non-sendable type 'NonSendableKlass' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
+  // With thunk we do not emit an error since our async let is not main actor
+  // isolated despite being in an @MainActor function.
+  async let newValue: NonSendableKlass = await getValueAsync()
   let _ = await newValue
 
   // Without thunk.
@@ -219,4 +262,61 @@ func asyncLetReabstractionThunkTest() async {
   let _ = await newValue2
 }
 
+@MainActor func asyncLetReabstractionThunkTestGlobalActor2() async {
+  // We emit the error here since we are returning a MainActor-isolated value.
+  async let newValue: NonSendableKlass = await getMainActorValueAsync()
+  // expected-ni-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to nonisolated context}}
+  // expected-ni-ns-warning @-2 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from main actor-isolated global function 'getMainActorValueAsync()' to @concurrent context}}
 
+  let _ = await newValue
+
+  // Without thunk.
+  async let newValue2: NonSendableKlass = await getMainActorValueAsyncTransferring()
+  let _ = await newValue2
+}
+
+///////////////////////////////////
+// MARK: Indirect Sending Result //
+///////////////////////////////////
+
+func indirectSending<T>(_ t: T) -> sending T {
+  return t // expected-warning {{returning task-isolated 't' as a 'sending' result risks causing data races}}
+  // expected-note @-1 {{returning task-isolated 't' risks causing data races since the caller assumes that 't' can be safely sent to other isolation domains}}
+}
+
+func indirectSendingStructField<T>(_ t: GenericNonSendableStruct<T>) -> sending T {
+  return t.t // expected-warning {{returning task-isolated 't.t' as a 'sending' result risks causing data races}}
+  // expected-note @-1 {{returning task-isolated 't.t' risks causing data races since the caller assumes that 't.t' can be safely sent to other isolation domains}}
+}
+
+func indirectSendingStructOptionalField<T>(_ t: GenericNonSendableStruct<T>) -> sending T {
+  return t.t2! // expected-warning {{returning task-isolated 't.t2.some' as a 'sending' result risks causing data races}}
+  // expected-note @-1 {{returning task-isolated 't.t2.some' risks causing data races since the caller assumes that 't.t2.some' can be safely sent to other isolation domains}}
+}
+
+func indirectSendingClassField<T>(_ t: GenericNonSendableKlass<T>) -> sending T {
+  return t.t // expected-warning {{returning task-isolated 't.t' as a 'sending' result risks causing data races}}
+  // expected-note @-1 {{returning task-isolated 't.t' risks causing data races since the caller assumes that 't.t' can be safely sent to other isolation domains}}
+}
+
+func indirectSendingOptionalClassField<T>(_ t: GenericNonSendableKlass<T>) -> sending T {
+  return t.t2! // expected-warning {{returning a task-isolated 'Optional<T>' value as a 'sending' result risks causing data races}}
+  // expected-note @-1 {{returning a task-isolated 'Optional<T>' value risks causing races since the caller assumes the value can be safely sent to other isolation domains}}
+  // expected-note @-2 {{'Optional<T>' is a non-Sendable type}}
+}
+
+func useBlock<T>(block: () throws -> T) throws -> sending T {
+  fatalError()
+}
+
+extension MyActor {
+  // This shouldn't emit any errors. We used to error on returning result.
+  public func withContext<T>(_ block: sending () throws -> T) async throws -> sending T {
+    let value: T = try useBlock {
+      _ = ns
+      return try block()
+    }
+
+    return value
+  }
+}

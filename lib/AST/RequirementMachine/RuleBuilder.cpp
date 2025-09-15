@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/RequirementSignature.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "RequirementMachine.h"
@@ -37,7 +38,7 @@ using namespace rewriting;
 void RuleBuilder::initWithGenericSignature(
     ArrayRef<GenericTypeParamType *> genericParams,
     ArrayRef<Requirement> requirements) {
-  assert(!Initialized);
+  ASSERT(!Initialized);
   Initialized = 1;
 
   // Collect all protocols transitively referenced from these requirements.
@@ -60,7 +61,7 @@ void RuleBuilder::initWithGenericSignature(
 void RuleBuilder::initWithWrittenRequirements(
     ArrayRef<GenericTypeParamType *> genericParams,
     ArrayRef<StructuralRequirement> requirements) {
-  assert(!Initialized);
+  ASSERT(!Initialized);
   Initialized = 1;
 
   // Collect all protocols transitively referenced from these requirements.
@@ -87,7 +88,7 @@ void RuleBuilder::initWithWrittenRequirements(
 /// using initWithProtocolWrittenRequirements().
 void RuleBuilder::initWithProtocolSignatureRequirements(
     ArrayRef<const ProtocolDecl *> protos) {
-  assert(!Initialized);
+  ASSERT(!Initialized);
   Initialized = 1;
 
   // Add all protocols to the referenced set, so that subsequent calls
@@ -111,7 +112,7 @@ void RuleBuilder::initWithProtocolSignatureRequirements(
     // between getTypeForTerm() and isValidTypeParameter(), we need to add rules
     // for inherited protocols.
     if (reqs.getErrors().contains(GenericSignatureErrorFlags::CompletionFailed)) {
-      for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {
+      for (auto *inheritedProto : proto->getAllInheritedProtocols()) {
         Requirement req(RequirementKind::Conformance,
                         proto->getSelfInterfaceType(),
                         inheritedProto->getDeclaredInterfaceType());
@@ -145,7 +146,7 @@ void RuleBuilder::initWithProtocolWrittenRequirements(
     ArrayRef<const ProtocolDecl *> component,
     const llvm::DenseMap<const ProtocolDecl *,
                          SmallVector<StructuralRequirement, 4>> protos) {
-  assert(!Initialized);
+  ASSERT(!Initialized);
   Initialized = 1;
 
   // Add all protocols to the referenced set, so that subsequent calls
@@ -156,7 +157,7 @@ void RuleBuilder::initWithProtocolWrittenRequirements(
 
   for (const auto *proto : component) {
     auto found = protos.find(proto);
-    assert(found != protos.end());
+    ASSERT(found != protos.end());
     const auto &reqs = found->second;
 
     if (Dump) {
@@ -201,7 +202,7 @@ void RuleBuilder::initWithProtocolWrittenRequirements(
 void RuleBuilder::initWithConditionalRequirements(
     ArrayRef<Requirement> requirements,
     ArrayRef<Term> substitutions) {
-  assert(!Initialized);
+  ASSERT(!Initialized);
   Initialized = 1;
 
   // Collect all protocols transitively referenced from these requirements.
@@ -237,7 +238,7 @@ void RuleBuilder::addPermanentProtocolRules(const ProtocolDecl *proto) {
   for (auto *assocType : proto->getAssociatedTypeMembers())
     addAssociatedType(assocType, proto);
 
-  for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {
+  for (auto *inheritedProto : proto->getAllInheritedProtocols()) {
     for (auto *assocType : inheritedProto->getAssociatedTypeMembers())
       addAssociatedType(assocType, proto);
   }
@@ -287,7 +288,7 @@ void RuleBuilder::addRequirement(const Requirement &req,
     llvm::dbgs() << "\n";
   }
 
-  assert(!substitutions.has_value() || proto == nullptr && "Can't have both");
+  ASSERT(!substitutions.has_value() || proto == nullptr && "Can't have both");
 
   // Compute the left hand side.
   auto subjectType = CanType(req.getFirstType());
@@ -307,7 +308,7 @@ void RuleBuilder::addRequirement(const Requirement &req,
     //
     //    T.[shape] => U.[shape]
     auto otherType = CanType(req.getSecondType());
-    assert(otherType->isParameterPack());
+    ASSERT(otherType->isParameterPack());
 
     constraintTerm = (substitutions
                       ? Context.getRelativeTermForType(
@@ -379,6 +380,14 @@ void RuleBuilder::addRequirement(const Requirement &req,
                    : Context.getSubstitutionSchemaFromType(
                         otherType, proto, result));
 
+      // If 'T' is a parameter pack, this is a same-element
+      // requirement that becomes the following rewrite rule:
+      //
+      //   [element].T.[concrete: C<X, Y>] => [element].T
+      if (subjectType->isParameterPack()) {
+        subjectTerm.prepend(Symbol::forPackElement(Context));
+      }
+
       constraintTerm = subjectTerm;
       constraintTerm.add(Symbol::forConcreteType(otherType, result, Context));
       break;
@@ -389,6 +398,16 @@ void RuleBuilder::addRequirement(const Requirement &req,
                             otherType, *substitutions)
                       : Context.getMutableTermForType(
                             otherType, proto));
+
+    if (subjectType->isParameterPack() != otherType->isParameterPack()) {
+      // This is a same-element requirement.
+      if (subjectType->isParameterPack()) {
+        subjectTerm.prepend(Symbol::forPackElement(Context));
+      } else {
+        constraintTerm.prepend(Symbol::forPackElement(Context));
+      }
+    }
+
     break;
   }
   }
@@ -552,7 +571,7 @@ void RuleBuilder::collectPackShapeRules(ArrayRef<GenericTypeParamType *> generic
       addMemberShapeRule(proto, assocType);
     }
 
-    for (auto *inheritedProto : Context.getInheritedProtocols(proto)) {
+    for (auto *inheritedProto : proto->getAllInheritedProtocols()) {
       for (auto *assocType : inheritedProto->getAssociatedTypeMembers()) {
         addMemberShapeRule(proto, assocType);
       }

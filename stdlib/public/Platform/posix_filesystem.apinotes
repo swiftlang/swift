@@ -1,0 +1,7 @@
+---
+Name: bionic
+Functions:
+- Name: fts_open
+  Parameters:
+  - Position: 0
+    Type: "char * const _Nullable * _Nonnull"

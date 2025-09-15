@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 // None of TaskExecutor APIs are available in task-to-thread concurrency model.
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -113,7 +112,7 @@ import Swift
 ///
 ///           // child tasks execute on default executor (same as case 0):
 ///           async let x = ...
-///           await withTaskGroup(of: Int.self) { group in g.addTask { 7 } }
+///           await withTaskGroup(of: Int.self) { group in group.addTask { 7 } }
 ///         }
 ///       }
 ///     }
@@ -147,11 +146,11 @@ public func withTaskExecutorPreference<T, Failure>(
   }
 
   let taskExecutorBuiltin: Builtin.Executor =
-      taskExecutor.asUnownedTaskExecutor().executor
+    unsafe taskExecutor.asUnownedTaskExecutor().executor
 
-  let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
+  let record = unsafe _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
-    _popTaskExecutorPreference(record: record)
+    unsafe _popTaskExecutorPreference(record: record)
   }
 
   // No need to manually hop to the target executor, because as we execute
@@ -159,11 +158,17 @@ public func withTaskExecutorPreference<T, Failure>(
   return try await operation()
 }
 
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
-@_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
+@_unsafeInheritExecutor // for ABI compatibility
 @_silgen_name("$ss26withTaskExecutorPreference_9operationxSch_pSg_xyYaYbKXEtYaKs8SendableRzlF")
-public func __abi__withTaskExecutorPreference<T: Sendable>(
+public func _unsafeInheritExecutor_withTaskExecutorPreference<T: Sendable>(
   _ taskExecutor: (any TaskExecutor)?,
   operation: @Sendable () async throws -> T
 ) async rethrows -> T {
@@ -172,265 +177,18 @@ public func __abi__withTaskExecutorPreference<T: Sendable>(
   }
 
   let taskExecutorBuiltin: Builtin.Executor =
-    taskExecutor.asUnownedTaskExecutor().executor
+    unsafe taskExecutor.asUnownedTaskExecutor().executor
 
-  let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
+  let record = unsafe _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
-    _popTaskExecutorPreference(record: record)
+    unsafe _popTaskExecutorPreference(record: record)
   }
 
   return try await operation()
 }
 
-/// Task with specified executor -----------------------------------------------
-
 @available(SwiftStdlib 6.0, *)
-extension Task where Failure == Never {
-  /// Runs the given nonthrowing operation asynchronously
-  /// as part of a new top-level task on behalf of the current actor.
-  ///
-  /// This overload allows specifying a preferred ``TaskExecutor`` on which
-  /// the `operation`, as well as all child tasks created from this task will be
-  /// executing whenever possible. Refer to ``TaskExecutor`` for a detailed discussion
-  /// of the effect of task executors on execution semantics of asynchronous code.
-  ///
-  /// Use this function when creating asynchronous work
-  /// that operates on behalf of the synchronous function that calls it.
-  /// Like `Task.detached(priority:operation:)`,
-  /// this function creates a separate, top-level task.
-  /// Unlike `Task.detached(priority:operation:)`,
-  /// the task created by `Task.init(priority:operation:)`
-  /// inherits the priority and actor context of the caller,
-  /// so the operation is treated more like an asynchronous extension
-  /// to the synchronous operation.
-  ///
-  /// You need to keep a reference to the task
-  /// if you want to cancel it by calling the `Task.cancel()` method.
-  /// Discarding your reference to a detached task
-  /// doesn't implicitly cancel that task,
-  /// it only makes it impossible for you to explicitly cancel the task.
-  ///
-  /// - Parameters:
-  ///   - taskExecutor: the preferred task executor for this task,
-  ///       and any child tasks created by it. Explicitly passing `nil` is
-  ///       interpreted as "no preference".
-  ///   - priority: The priority of the task.
-  ///     Pass `nil` to use the priority from `Task.currentPriority`.
-  ///   - operation: The operation to perform.
-  /// - SeeAlso: ``withTaskExecutorPreference(_:operation:)``
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public init(
-    executorPreference taskExecutor: (any TaskExecutor)?,
-    priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Success
-  ) {
-    guard let taskExecutor else {
-      self = Self.init(priority: priority, operation: operation)
-      return
-    }
-    #if $BuiltinCreateAsyncTaskWithExecutor
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: true,
-      inheritContext: true, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    // Create the asynchronous task.
-    let executorBuiltin: Builtin.Executor =
-      taskExecutor.asUnownedTaskExecutor().executor
-
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, executorBuiltin, operation)
-    self._task = task
-    #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskWithExecutor")
-    #endif
-  }
-}
-
-@available(SwiftStdlib 6.0, *)
-extension Task where Failure == Error {
-  /// Runs the given throwing operation asynchronously
-  /// as part of a new top-level task on behalf of the current actor.
-  ///
-  /// Use this function when creating asynchronous work
-  /// that operates on behalf of the synchronous function that calls it.
-  /// Like `Task.detached(priority:operation:)`,
-  /// this function creates a separate, top-level task.
-  /// Unlike `detach(priority:operation:)`,
-  /// the task created by `Task.init(priority:operation:)`
-  /// inherits the priority and actor context of the caller,
-  /// so the operation is treated more like an asynchronous extension
-  /// to the synchronous operation.
-  ///
-  /// You need to keep a reference to the task
-  /// if you want to cancel it by calling the `Task.cancel()` method.
-  /// Discarding your reference to a detached task
-  /// doesn't implicitly cancel that task,
-  /// it only makes it impossible for you to explicitly cancel the task.
-  ///
-  /// - Parameters:
-  ///   - taskExecutor: the preferred task executor for this task,
-  ///       and any child tasks created by it. Explicitly passing `nil` is
-  ///       interpreted as "no preference".
-  ///   - priority: The priority of the task.
-  ///     Pass `nil` to use the priority from `Task.currentPriority`.
-  ///   - operation: The operation to perform.
-  /// - SeeAlso: ``withTaskExecutorPreference(_:operation:)``
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public init(
-    executorPreference taskExecutor: (any TaskExecutor)?,
-    priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> Success
-  ) {
-    guard let taskExecutor else {
-      self = Self.init(priority: priority, operation: operation)
-      return
-    }
-    #if $BuiltinCreateAsyncTaskWithExecutor
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: true,
-      inheritContext: true, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    // Create the asynchronous task.
-    let executorBuiltin: Builtin.Executor =
-      taskExecutor.asUnownedTaskExecutor().executor
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, executorBuiltin, operation)
-    self._task = task
-    #else
-    fatalError("Unsupported Swift compiler, missing support for $BuiltinCreateAsyncTaskWithExecutor")
-    #endif
-  }
-}
-
-// ==== Detached tasks ---------------------------------------------------------
-
-@available(SwiftStdlib 6.0, *)
-extension Task where Failure == Never {
-  /// Runs the given nonthrowing operation asynchronously
-  /// as part of a new top-level task.
-  ///
-  /// Don't use a detached task if it's possible
-  /// to model the operation using structured concurrency features like child tasks.
-  /// Child tasks inherit the parent task's priority and task-local storage,
-  /// and canceling a parent task automatically cancels all of its child tasks.
-  /// You need to handle these considerations manually with a detached task.
-  ///
-  /// You need to keep a reference to the detached task
-  /// if you want to cancel it by calling the `Task.cancel()` method.
-  /// Discarding your reference to a detached task
-  /// doesn't implicitly cancel that task,
-  /// it only makes it impossible for you to explicitly cancel the task.
-  ///
-  /// - Parameters:
-  ///   - taskExecutor: the preferred task executor for this task,
-  ///       and any child tasks created by it. Explicitly passing `nil` is
-  ///       interpreted as "no preference".
-  ///   - priority: The priority of the task.
-  ///     Pass `nil` to use the priority from `Task.currentPriority`.
-  ///   - operation: The operation to perform.
-  /// - Returns: A reference to the newly created task.
-  /// - SeeAlso: ``withTaskExecutorPreference(_:operation:)``
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public static func detached(
-    executorPreference taskExecutor: (any TaskExecutor)?,
-    priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Success
-  ) -> Task<Success, Failure> {
-    guard let taskExecutor else {
-      return Self.detached(priority: priority, operation: operation)
-    }
-    #if $BuiltinCreateAsyncTaskWithExecutor
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    // Create the asynchronous task.
-    let executorBuiltin: Builtin.Executor =
-        taskExecutor.asUnownedTaskExecutor().executor
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, executorBuiltin, operation)
-
-    return Task(task)
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
-  }
-}
-
-@available(SwiftStdlib 6.0, *)
-extension Task where Failure == Error {
-  /// Runs the given throwing operation asynchronously
-  /// as part of a new top-level task.
-  ///
-  /// If the operation throws an error, this method propagates that error.
-  ///
-  /// Don't use a detached task if it's possible
-  /// to model the operation using structured concurrency features like child tasks.
-  /// Child tasks inherit the parent task's priority and task-local storage,
-  /// and canceling a parent task automatically cancels all of its child tasks.
-  /// You need to handle these considerations manually with a detached task.
-  ///
-  /// You need to keep a reference to the detached task
-  /// if you want to cancel it by calling the `Task.cancel()` method.
-  /// Discarding your reference to a detached task
-  /// doesn't implicitly cancel that task,
-  /// it only makes it impossible for you to explicitly cancel the task.
-  ///
-  /// - Parameters:
-  ///   - taskExecutor: the preferred task executor for this task,
-  ///       and any child tasks created by it. Explicitly passing `nil` is
-  ///       interpreted as "no preference".
-  ///   - priority: The priority of the task.
-  ///     Pass `nil` to use the priority from `Task.currentPriority`.
-  ///   - operation: The operation to perform.
-  /// - Returns: A reference to the newly created task.
-  /// - SeeAlso: ``withTaskExecutorPreference(_:operation:)``
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public static func detached(
-    executorPreference taskExecutor: (any TaskExecutor)?,
-    priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> Success
-  ) -> Task<Success, Failure> {
-    guard let taskExecutor else {
-      return Self.detached(priority: priority, operation: operation)
-    }
-    #if $BuiltinCreateAsyncTaskWithExecutor
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    // Create the asynchronous task.
-    let executorBuiltin: Builtin.Executor =
-        taskExecutor.asUnownedTaskExecutor().executor
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, executorBuiltin, operation)
-
-    return Task(task)
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
-  }
-}
-
-// ==== Unsafe Current Task ----------------------------------------------------
-
-@available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension UnsafeCurrentTask {
 
   /// The current ``TaskExecutor`` preference, if this task has one configured.
@@ -442,8 +200,8 @@ extension UnsafeCurrentTask {
   /// means to guarantee the executor remains alive while it is in use.
   @available(SwiftStdlib 6.0, *)
   public var unownedTaskExecutor: UnownedTaskExecutor? {
-    let ref = _getPreferredTaskExecutor()
-    return UnownedTaskExecutor(ref)
+    let ref = _getPreferredUnownedTaskExecutor()
+    return unsafe UnownedTaskExecutor(ref)
   }
 }
 
@@ -451,7 +209,7 @@ extension UnsafeCurrentTask {
 
 @available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_task_getPreferredTaskExecutor")
-internal func _getPreferredTaskExecutor() -> Builtin.Executor
+internal func _getPreferredUnownedTaskExecutor() -> Builtin.Executor
 
 typealias TaskExecutorPreferenceStatusRecord = UnsafeRawPointer
 
@@ -481,7 +239,7 @@ internal func _getUndefinedTaskExecutor() -> Builtin.Executor {
   // Rather than call into the runtime to return the
   // `TaskExecutorRef::undefined()`` we this information to bitcast
   // and return it directly.
-  unsafeBitCast((UInt(0), UInt(0)), to: Builtin.Executor.self)
+  unsafe unsafeBitCast((UInt(0), UInt(0)), to: Builtin.Executor.self)
 }
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
@@ -129,6 +130,7 @@ SHOULD_NEVER_VISIT_INST(IncrementProfilerCounter)
 SHOULD_NEVER_VISIT_INST(SpecifyTest)
 SHOULD_NEVER_VISIT_INST(ScalarPackIndex)
 SHOULD_NEVER_VISIT_INST(Vector)
+SHOULD_NEVER_VISIT_INST(TypeValue)
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   SHOULD_NEVER_VISIT_INST(StrongRetain##Name)                                  \
@@ -149,7 +151,6 @@ OPERAND_OWNERSHIP(TrivialUse, AwaitAsyncContinuation)
 OPERAND_OWNERSHIP(TrivialUse, AddressToPointer)
 OPERAND_OWNERSHIP(TrivialUse, AllocRef)        // with tail operand
 OPERAND_OWNERSHIP(TrivialUse, AllocRefDynamic) // with tail operand
-OPERAND_OWNERSHIP(TrivialUse, AllocVector)
 OPERAND_OWNERSHIP(TrivialUse, BeginAccess)
 OPERAND_OWNERSHIP(TrivialUse, MoveOnlyWrapperToCopyableAddr)
 OPERAND_OWNERSHIP(TrivialUse, CopyableToMoveOnlyWrapperAddr)
@@ -170,6 +171,7 @@ OPERAND_OWNERSHIP(TrivialUse, DestroyAddr)
 OPERAND_OWNERSHIP(TrivialUse, EndAccess)
 OPERAND_OWNERSHIP(TrivialUse, EndUnpairedAccess)
 OPERAND_OWNERSHIP(TrivialUse, GetAsyncContinuationAddr)
+OPERAND_OWNERSHIP(TrivialUse, VectorBaseAddr)
 OPERAND_OWNERSHIP(TrivialUse, IndexAddr)
 OPERAND_OWNERSHIP(TrivialUse, IndexRawPointer)
 OPERAND_OWNERSHIP(TrivialUse, InitBlockStorageHeader)
@@ -212,6 +214,7 @@ OPERAND_OWNERSHIP(TrivialUse, GlobalAddr)
 // The dealloc_stack_ref operand needs to have NonUse ownership because
 // this use comes after the last consuming use (which is usually a dealloc_ref).
 OPERAND_OWNERSHIP(NonUse, DeallocStackRef)
+OPERAND_OWNERSHIP(InstantaneousUse, IgnoredUse)
 
 // Use an owned or guaranteed value only for the duration of the operation.
 OPERAND_OWNERSHIP(InstantaneousUse, ExistentialMetatype)
@@ -219,13 +222,13 @@ OPERAND_OWNERSHIP(InstantaneousUse, FixLifetime)
 OPERAND_OWNERSHIP(InstantaneousUse, WitnessMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, DynamicMethodBranch)
 OPERAND_OWNERSHIP(InstantaneousUse, ValueMetatype)
-OPERAND_OWNERSHIP(InstantaneousUse, IsEscapingClosure)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, SuperMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassifyBridgeObject)
 OPERAND_OWNERSHIP(InstantaneousUse, UnownedCopyValue)
 OPERAND_OWNERSHIP(InstantaneousUse, WeakCopyValue)
 OPERAND_OWNERSHIP(InstantaneousUse, ExtendLifetime)
+OPERAND_OWNERSHIP(InstantaneousUse, MergeIsolationRegion)
 #define REF_STORAGE(Name, ...)                                                 \
   OPERAND_OWNERSHIP(InstantaneousUse, StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
@@ -295,9 +298,11 @@ OPERAND_OWNERSHIP(DestroyingConsume, DeallocBox)
 OPERAND_OWNERSHIP(DestroyingConsume, DeallocExistentialBox)
 OPERAND_OWNERSHIP(DestroyingConsume, DeallocRef)
 OPERAND_OWNERSHIP(DestroyingConsume, DestroyValue)
+OPERAND_OWNERSHIP(DestroyingConsume, DestroyNotEscapedClosure)
 OPERAND_OWNERSHIP(DestroyingConsume, EndLifetime)
 OPERAND_OWNERSHIP(DestroyingConsume, BeginCOWMutation)
 OPERAND_OWNERSHIP(DestroyingConsume, EndCOWMutation)
+OPERAND_OWNERSHIP(TrivialUse, EndCOWMutationAddr)
 OPERAND_OWNERSHIP(DestroyingConsume, EndInitLetRef)
 // The move_value instruction creates a distinct lifetime.
 OPERAND_OWNERSHIP(DestroyingConsume, MoveValue)
@@ -307,6 +312,7 @@ OPERAND_OWNERSHIP(ForwardingConsume, InitExistentialValue)
 OPERAND_OWNERSHIP(ForwardingConsume, DeinitExistentialValue)
 OPERAND_OWNERSHIP(ForwardingConsume, MarkUninitialized)
 OPERAND_OWNERSHIP(ForwardingConsume, Throw)
+OPERAND_OWNERSHIP(ForwardingConsume, Thunk)
 
 // Instructions that expose a pointer within a borrow scope.
 OPERAND_OWNERSHIP(InteriorPointer, RefElementAddr)
@@ -425,7 +431,7 @@ OperandOwnershipClassifier::visitBeginBorrowInst(BeginBorrowInst *borrow) {
 OperandOwnership
 OperandOwnershipClassifier::visitBorrowedFromInst(BorrowedFromInst *bfi) {
   return getOperandIndex() == 0 ? OperandOwnership::GuaranteedForwarding
-                                : OperandOwnership::InstantaneousUse;
+                                : OperandOwnership::Borrow;
 }
 
 // MARK: Instructions whose use ownership depends on the operand in question.
@@ -478,9 +484,11 @@ OperandOwnershipClassifier::visitDropDeinitInst(DropDeinitInst *i) {
 // This does not apply to uses that begin an explicit borrow scope in the
 // caller, such as begin_apply.
 static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
-                                                bool hasScopeInCaller) {
+                                                bool hasScopeInCaller,
+                                                bool forwardsGuaranteedValues) {
 
   switch (argConv) {
+  case SILArgumentConvention::Indirect_In_CXX:
   case SILArgumentConvention::Indirect_In:
   case SILArgumentConvention::Direct_Owned:
   case SILArgumentConvention::Pack_Owned:
@@ -494,7 +502,6 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
   // explicit borrow scope in the caller so we must treat arguments passed to it
   // as being borrowed for the entire region of coroutine execution.
   case SILArgumentConvention::Indirect_In_Guaranteed:
-  case SILArgumentConvention::Direct_Guaranteed:
   case SILArgumentConvention::Pack_Guaranteed:
   case SILArgumentConvention::Pack_Inout:
   case SILArgumentConvention::Pack_Out:
@@ -503,13 +510,23 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
     return hasScopeInCaller ? OperandOwnership::Borrow
                             : OperandOwnership::InstantaneousUse;
 
+  case SILArgumentConvention::Direct_Guaranteed: {
+    if (hasScopeInCaller) {
+      return OperandOwnership::Borrow;
+    }
+    if (forwardsGuaranteedValues) {
+      return OperandOwnership::GuaranteedForwarding;
+    }
+    return OperandOwnership::InstantaneousUse;
+  }
+
   case SILArgumentConvention::Direct_Unowned:
     return OperandOwnership::UnownedInstantaneousUse;
 
   case SILArgumentConvention::Indirect_Out:
   case SILArgumentConvention::Indirect_Inout:
   case SILArgumentConvention::Indirect_InoutAliasable:
-    llvm_unreachable("Illegal convention for non-address types");
+    ASSERT(false && "Illegal convention for non-address types");
   }
   llvm_unreachable("covered switch");
 }
@@ -534,7 +551,8 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
   }();
 
   auto argOwnership = getFunctionArgOwnership(
-    argConv, /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation());
+      argConv, /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation(),
+      /*forwardsGuaranteedValues*/ apply.hasGuaranteedResult());
 
   // OSSA cleanup needs to handle each of these callee ownership cases.
   //
@@ -597,14 +615,16 @@ OperandOwnership OperandOwnershipClassifier::visitYieldInst(YieldInst *i) {
   auto fnType = i->getFunction()->getLoweredFunctionType();
   SILArgumentConvention argConv(
     fnType->getYields()[getOperandIndex()].getConvention());
-  return getFunctionArgOwnership(argConv, /*hasScopeInCaller*/ false);
+  return getFunctionArgOwnership(argConv, /*hasScopeInCaller*/ false,
+                                 /*forwardsGuaranteedValues*/ false);
 }
 
 OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {
   switch (i->getOwnershipKind()) {
   case OwnershipKind::Any:
-  case OwnershipKind::Guaranteed:
     llvm_unreachable("invalid value ownership");
+  case OwnershipKind::Guaranteed:
+    return OperandOwnership::GuaranteedForwarding;
   case OwnershipKind::None:
     return OperandOwnership::TrivialUse;
   case OwnershipKind::Unowned:
@@ -620,17 +640,6 @@ OperandOwnership OperandOwnershipClassifier::visitAssignInst(AssignInst *i) {
     return OperandOwnership::TrivialUse;
   }
   return OperandOwnership::DestroyingConsume;
-}
-
-OperandOwnership
-OperandOwnershipClassifier::visitAssignByWrapperInst(AssignByWrapperInst *i) {
-  if (getValue() == i->getSrc()) {
-    return OperandOwnership::DestroyingConsume;
-  }
-  if (getValue() == i->getDest()) {
-    return OperandOwnership::TrivialUse;
-  }
-  return OperandOwnership::InstantaneousUse; // initializer/setter closure
 }
 
 OperandOwnership
@@ -659,26 +668,42 @@ OperandOwnership OperandOwnershipClassifier::visitCopyBlockWithoutEscapingInst(
   return OperandOwnership::UnownedInstantaneousUse;
 }
 
+template<SILInstructionKind Opc, typename Derived>
+static OperandOwnership
+visitMarkDependenceInstBase(MarkDependenceInstBase<Opc, Derived> *mdi) {
+}
+
 OperandOwnership
 OperandOwnershipClassifier::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   // If we are analyzing "the value", we forward ownership.
-  if (getOperandIndex() == MarkDependenceInst::Value) {
+  if (getOperandIndex() == MarkDependenceInst::Dependent) {
     return getOwnershipKind().getForwardingOperandOwnership(
       /*allowUnowned*/true);
   }
   if (mdi->isNonEscaping()) {
-    // This creates a "dependent value", just like on-stack partial_apply, which
-    // we treat like a borrow.
-    return OperandOwnership::Borrow;
+    if (auto *svi = dyn_cast<SingleValueInstruction>(mdi)) {
+      if (!svi->getType().isAddress()) {
+        // This creates a "dependent value", just like on-stack partial_apply,
+        // which we treat like a borrow.
+        return OperandOwnership::Borrow;
+      }
+    }
+    return OperandOwnership::AnyInteriorPointer;
   }
   if (mdi->hasUnresolvedEscape()) {
     // This creates a dependent value that may extend beyond the parent's
     // lifetime.
     return OperandOwnership::UnownedInstantaneousUse;
   }
-  // FIXME: Add an end_dependence instruction so we can treat mark_dependence as
-  // a borrow of the base (mark_dependence %base -> end_dependence is analogous
-  // to a borrow scope).
+  return OperandOwnership::PointerEscape;
+}
+
+OperandOwnership OperandOwnershipClassifier::
+visitMarkDependenceAddrInst(MarkDependenceAddrInst *mdai) {
+  // If we are analyzing "the value", this is a trivial use
+  if (getOperandIndex() == MarkDependenceInst::Dependent) {
+    return OperandOwnership::TrivialUse;
+  }
   return OperandOwnership::PointerEscape;
 }
 
@@ -864,7 +889,10 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, SToUCheckedTrunc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Expect)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Shl)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericShl)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Select)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ShuffleVector)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Interleave)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Deinterleave)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Sizeof)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, StaticReport)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Strideof)
@@ -893,10 +921,14 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericXor)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ZExt)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ZExtOrBitCast)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ZeroInitializer)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PrepareInitialization)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PoundAssert)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GlobalStringTablePointer)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TargetOSVersionAtLeast)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TargetVariantOSVersionAtLeast)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse,
+                          TargetOSVersionOrVariantOSVersionAtLeast)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GetEnumTag)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InjectEnumTag)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DistributedActorAsAnyActor)
@@ -913,6 +945,27 @@ BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, COWBufferForReading)
 // This should actually never be seen in SIL
 BUILTIN_OPERAND_OWNERSHIP(GuaranteedForwarding, ExtractFunctionIsolation)
 
+static OperandOwnership
+visitAnyFlowSensitiveSelfIsolation(BuiltinInst *bi) {
+  // In potentially-delegating initializers, the operand will be the
+  // address of the box instead of the actor instance.
+  auto operand = bi->getOperand(0);
+  if (operand->getType().isAddress())
+    return OperandOwnership::TrivialUse;
+  return OperandOwnership::InstantaneousUse;
+}
+
+OperandOwnership
+OperandOwnershipBuiltinClassifier
+::visitFlowSensitiveSelfIsolation(BuiltinInst *bi, StringRef attr) {
+  return visitAnyFlowSensitiveSelfIsolation(bi);
+}
+OperandOwnership
+OperandOwnershipBuiltinClassifier
+::visitFlowSensitiveDistributedSelfIsolation(BuiltinInst *bi, StringRef attr) {
+  return visitAnyFlowSensitiveSelfIsolation(bi);
+}
+
 OperandOwnership
 OperandOwnershipBuiltinClassifier
 ::visitStartAsyncLetWithLocalBuffer(BuiltinInst *bi, StringRef attr) {
@@ -928,6 +981,12 @@ OperandOwnershipBuiltinClassifier
 OperandOwnership
 OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
                                                         StringRef attr) {
+  if (&op == &bi->getOperandRef(4)) {
+    // The (any TaskExecutor)? (optional) must be consumed by the builtin,
+    // as we will keep it alive and later destroy it as the task runs to completion.
+    return OperandOwnership::ForwardingConsume;
+  }
+
   // The function operand is consumed by the new task.
   if (&op == &bi->getArgumentOperands().back())
     return OperandOwnership::DestroyingConsume;

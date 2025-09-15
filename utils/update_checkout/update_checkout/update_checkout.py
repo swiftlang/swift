@@ -16,6 +16,7 @@ import re
 import sys
 import traceback
 from multiprocessing import Lock, Pool, cpu_count, freeze_support
+from typing import Optional, Set, List, Any
 
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
@@ -67,14 +68,17 @@ def check_parallel_results(results, op):
         if r is not None:
             if fail_count == 0:
                 print("======%s FAILURES======" % op)
-            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
             fail_count += 1
+            if isinstance(r, str):
+                print(r)
+                continue
+            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
             if r.stderr:
                 print(r.stderr)
     return fail_count
 
 
-def confirm_tag_in_repo(tag, repo_name):
+def confirm_tag_in_repo(tag, repo_name) -> Optional[str]:
     # type: (str, str) -> str | None
     """Confirm that a given tag exists in a git repository. This function
     assumes that the repository is already a current working directory before
@@ -99,8 +103,15 @@ def confirm_tag_in_repo(tag, repo_name):
 
 
 def find_rev_by_timestamp(timestamp, repo_name, refspec):
+    refspec_exists = True
+    try:
+        shell.run(["git", "rev-parse", "--verify", refspec])
+    except Exception:
+        refspec_exists = False
     args = ["git", "log", "-1", "--format=%H", "--first-parent",
-            '--before=' + timestamp, refspec]
+            '--before=' + timestamp]
+    if refspec_exists:
+        args.append(refspec)
     rev = shell.capture(args).strip()
     if rev:
         return rev
@@ -329,6 +340,30 @@ def get_scheme_map(config, scheme_name):
 
     return None
 
+def _is_any_repository_locked(pool_args: List[Any]) -> Set[str]:
+    """Returns the set of locked repositories.
+
+    A repository is considered to be locked if its .git directory contains a
+    file ending in ".lock".
+
+    Args:
+        pool_args (List[Any]): List of arguments passed to the
+        `update_single_repository` function.
+
+    Returns:
+        Set[str]: The names of the locked repositories if any.
+    """
+
+    repos = [(x[0], x[2]) for x in pool_args]
+    locked_repositories = set()
+    for source_root, repo_name in repos:
+        dot_git_path = os.path.join(source_root, repo_name, ".git")
+        if not os.path.exists(dot_git_path) or not os.path.isdir(dot_git_path):
+            continue
+        for file in os.listdir(dot_git_path):
+            if file.endswith(".lock"):
+                locked_repositories.add(repo_name)
+    return locked_repositories
 
 def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_pr):
     pool_args = []
@@ -363,12 +398,18 @@ def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_p
                    cross_repos_pr]
         pool_args.append(my_args)
 
+    locked_repositories: set[str] = _is_any_repository_locked(pool_args)
+    if len(locked_repositories) > 0:
+        return [
+            f"'{repo_name}' is locked by git. Cannot update it."
+            for repo_name in locked_repositories
+        ]
     return run_parallel(update_single_repository, pool_args, args.n_processes)
 
 
 def obtain_additional_swift_sources(pool_args):
     (args, repo_name, repo_info, repo_branch, remote, with_ssh, scheme_name,
-     skip_history, skip_tags, skip_repository_list) = pool_args
+     skip_history, skip_tags, skip_repository_list, use_submodules) = pool_args
 
     env = dict(os.environ)
     env.update({'GIT_TERMINAL_PROMPT': '0'})
@@ -380,6 +421,11 @@ def obtain_additional_swift_sources(pool_args):
         if skip_history:
             shell.run(['git', 'clone', '--recursive', '--depth', '1',
                        '--branch', repo_branch, remote, repo_name] +
+                      (['--no-tags'] if skip_tags else []),
+                      env=env,
+                      echo=True)
+        elif use_submodules:
+            shell.run(['git', 'submodule', 'add', remote, repo_name] +
                       (['--no-tags'] if skip_tags else []),
                       env=env,
                       echo=True)
@@ -406,7 +452,7 @@ def obtain_additional_swift_sources(pool_args):
 
 def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
                                         skip_history, skip_tags,
-                                        skip_repository_list):
+                                        skip_repository_list, use_submodules):
 
     pool_args = []
     with shell.pushd(args.source_root, dry_run=False, echo=False):
@@ -416,7 +462,20 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
                       "user")
                 continue
 
-            if os.path.isdir(os.path.join(repo_name, ".git")):
+            if use_submodules:
+              repo_exists = False
+              submodules_status = shell.capture(['git', 'submodule', 'status'],
+                                                echo=False)
+              if submodules_status:
+                for line in submodules_status.splitlines():
+                  if line[0].endswith(repo_name):
+                    repo_exists = True
+                    break
+
+            else:
+              repo_exists = os.path.isdir(os.path.join(repo_name, ".git"))
+
+            if repo_exists:
                 print("Skipping clone of '" + repo_name + "', directory "
                       "already exists")
                 continue
@@ -450,16 +509,25 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
             if repo_not_in_scheme:
                 continue
 
-            pool_args.append([args, repo_name, repo_info, repo_branch, remote,
+
+            new_args = [args, repo_name, repo_info, repo_branch, remote,
                               with_ssh, scheme_name, skip_history, skip_tags,
-                              skip_repository_list])
+                              skip_repository_list, use_submodules]
 
-    if not pool_args:
-        print("Not cloning any repositories.")
-        return
+            if use_submodules:
+              obtain_additional_swift_sources(new_args)
+            else:
+              pool_args.append(new_args)
 
-    return run_parallel(
-        obtain_additional_swift_sources, pool_args, args.n_processes)
+    # Only use `run_parallel` when submodules are not used, since `.git` dir
+    # can't be accessed concurrently.
+    if not use_submodules:
+      if not pool_args:
+          print("Not cloning any repositories.")
+          return
+
+      return run_parallel(
+          obtain_additional_swift_sources, pool_args, args.n_processes)
 
 
 def dump_repo_hashes(args, config, branch_scheme_name='repro'):
@@ -499,6 +567,40 @@ def print_repo_hashes(args, config):
     for repo_name, repo_hash in sorted(repos.items(),
                                        key=lambda x: x[0]):
         print("{:<35}: {:<35}".format(repo_name, repo_hash))
+
+
+def merge_no_duplicates(a: dict, b: dict) -> dict:
+    result = {**a}
+    for key, value in b.items():
+        if key in a:
+            raise ValueError(f"Duplicate scheme {key}")
+
+        result[key] = value
+    return result
+
+
+def merge_config(config: dict, new_config: dict) -> dict:
+    """
+    Merge two configs, with a 'last-wins' strategy.
+
+    The branch-schemes are rejected if they define duplicate schemes.
+    """
+
+    result = {**config}
+    for key, value in new_config.items():
+        if key == "branch-schemes":
+            # We reject duplicates here since this is the most conservative
+            # behavior, so it can be relaxed in the future.
+            # TODO: Another semantics might be nicer, define that as it is needed.
+            result[key] = merge_no_duplicates(config.get(key, {}), value)
+        elif key == "repos":
+            # The "repos" object is last-wins on a key-by-key basis
+            result[key] = {**config.get(key, {}), **value}
+        else:
+            # Anything else is just last-wins
+            result[key] = value
+
+    return result
 
 
 def validate_config(config):
@@ -544,7 +646,7 @@ def full_target_name(repository, target):
 
 def skip_list_for_platform(config, all_repos):
     """Computes a list of repositories to skip when updating or cloning, if not
-    overriden by `--all-repositories` CLI argument.
+    overridden by `--all-repositories` CLI argument.
 
     Args:
         config (Dict[str, Any]): deserialized `update-checkout-config.json`
@@ -634,9 +736,12 @@ repositories.
     )
     parser.add_argument(
         "--config",
-        default=os.path.join(SCRIPT_DIR, os.pardir,
-                             "update-checkout-config.json"),
-        help="Configuration file to use")
+        help="""The configuration file to use. Can be specified multiple times,
+        each config will be merged together with a 'last-wins' strategy.
+        Overwriting branch-schemes is not allowed.""",
+        action="append",
+        default=[],
+        dest="configs")
     parser.add_argument(
         "--github-comment",
         help="""Check out related pull requests referenced in the given
@@ -672,6 +777,10 @@ repositories.
         help="The root directory to checkout repositories",
         default=SWIFT_SOURCE_ROOT,
         dest='source_root')
+    parser.add_argument(
+        "--use-submodules",
+        help="Checkout repositories as git submodules.",
+        action='store_true')
     args = parser.parse_args()
 
     if not args.scheme:
@@ -693,14 +802,25 @@ repositories.
     scheme_name = args.scheme
     github_comment = args.github_comment
     all_repos = args.all_repositories
+    use_submodules = args.use_submodules
 
-    with open(args.config) as f:
-        config = json.load(f)
+    # Set the default config path if none are specified
+    if not args.configs:
+        default_path = os.path.join(SCRIPT_DIR, os.pardir,
+                                    "update-checkout-config.json")
+        args.configs.append(default_path)
+    config = {}
+    for config_path in args.configs:
+        with open(config_path) as f:
+            config = merge_config(config, json.load(f))
     validate_config(config)
 
     cross_repos_pr = {}
     if github_comment:
-        regex_pr = r'(apple/[-a-zA-Z0-9_]+/pull/\d+|apple/[-a-zA-Z0-9_]+#\d+)'
+        regex_pr = r'(apple/[-a-zA-Z0-9_]+/pull/\d+'\
+            r'|apple/[-a-zA-Z0-9_]+#\d+'\
+            r'|swiftlang/[-a-zA-Z0-9_]+/pull/\d+'\
+            r'|swiftlang/[-a-zA-Z0-9_]+#\d+)'
         repos_with_pr = re.findall(regex_pr, github_comment)
         print("Found related pull requests:", str(repos_with_pr))
         repos_with_pr = [pr.replace('/pull/', '#') for pr in repos_with_pr]
@@ -723,7 +843,8 @@ repositories.
                                                             scheme_name,
                                                             skip_history,
                                                             skip_tags,
-                                                            skip_repo_list)
+                                                            skip_repo_list,
+                                                            use_submodules)
 
     swift_repo_path = os.path.join(args.source_root, 'swift')
     if 'swift' not in skip_repo_list and os.path.exists(swift_repo_path):
@@ -739,8 +860,10 @@ repositories.
                           prefix="[swift] ")
 
                 # Re-read the config after checkout.
-                with open(args.config) as f:
-                    config = json.load(f)
+                config = {}
+                for config_path in args.configs:
+                    with open(config_path) as f:
+                        config = merge_config(config, json.load(f))
                 validate_config(config)
                 scheme_map = get_scheme_map(config, scheme_name)
 

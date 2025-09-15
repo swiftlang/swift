@@ -33,6 +33,7 @@
 #include "ForeignClassMetadataVisitor.h"
 #include "TupleMetadataVisitor.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILModule.h"
 #include <optional>
@@ -273,6 +274,19 @@ llvm::Value *irgen::emitArgumentPackShapeRef(IRGenFunction &IGF,
                                              unsigned reqtIndex,
                                              llvm::Value *metadata) {
   assert(reqts.getRequirements()[reqtIndex].isShape());
+  return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
+                                      IGF.IGM.SizeTy);
+}
+
+/// Given a reference to nominal type metadata of the given type,
+/// derive a reference to the value for the nth argument metadata.
+/// The type must have generic arguments.
+llvm::Value *irgen::emitValueGenericRef(IRGenFunction &IGF,
+                                        NominalTypeDecl *decl,
+                                        const GenericTypeRequirements &reqts,
+                                        unsigned reqtIndex,
+                                        llvm::Value *metadata) {
+  assert(reqts.getRequirements()[reqtIndex].isValue());
   return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
                                       IGF.IGM.SizeTy);
 }

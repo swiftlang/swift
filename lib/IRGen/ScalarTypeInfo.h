@@ -128,8 +128,7 @@ public:
       auto nextByteSizedIntTy =
           llvm::IntegerType::get(IGM.getLLVMContext(), nextByteSize);
       auto newAddr =
-          Address(Builder.CreatePointerCast(addr.getAddress(),
-                                            nextByteSizedIntTy->getPointerTo()),
+          Address(Builder.CreatePointerCast(addr.getAddress(), IGF.IGM.PtrTy),
                   nextByteSizedIntTy, addr.getAlignment());
       auto newValue = Builder.CreateZExt(src.claimNext(), nextByteSizedIntTy);
       Builder.CreateStore(newValue, newAddr);
@@ -280,6 +279,7 @@ protected:
                                           IsTriviallyDestroyable,
                                           IsCopyable,
                                           IsFixedSize,
+                                          IsABIAccessible,
                                           ::std::forward<T>(args)...) {}
 
   const Derived &asDerived() const {

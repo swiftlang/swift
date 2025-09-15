@@ -1,5 +1,5 @@
 // RUN: %target-build-swift %s
-// RUN: %target-swift-frontend -emit-sil -O -g %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -O -g %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // UNSUPPORTED: OS=linux-gnu

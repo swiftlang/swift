@@ -19,6 +19,7 @@
 
 #include "Address.h"
 #include "Callee.h"
+#include "Explosion.h"
 #include "Temporary.h"
 
 namespace llvm {
@@ -71,11 +72,17 @@ protected:
   /// Whether this is a coroutine invocation.
   bool IsCoroutine;
 
+  /// Whether this is a invocation for a coroutine that dynamically allocates
+  /// in the callee.
+  bool IsCalleeAllocatedCoroutine;
+
   /// Whether we've emitted the call for the current callee yet.  This
   /// is just for debugging purposes --- e.g. the destructor asserts
   /// that it's true --- but is otherwise derivable from
   /// RemainingArgsForCallee, at least between calls.
   bool EmittedCall;
+
+  bool UseProfilingThunk = false;
 
   /// The basic block to which the call to a potentially throwing foreign
   /// function should jump to continue normal execution of the program.
@@ -88,6 +95,7 @@ protected:
 
   unsigned IndirectTypedErrorArgIdx = 0;
 
+  std::optional<Explosion> typedErrorExplosion;
 
   virtual void setFromCallee();
   void emitToUnmappedMemory(Address addr);
@@ -108,6 +116,11 @@ protected:
                                    TemporarySet &temporaries,
                                    bool isOutlined);
 
+  bool mayReturnTypedErrorDirectly() const;
+  void emitToUnmappedExplosionWithDirectTypedError(SILType resultType,
+                                                   llvm::Value *result,
+                                                   Explosion &out);
+
   CallEmission(IRGenFunction &IGF, llvm::Value *selfValue, Callee &&callee)
       : IGF(IGF), selfValue(selfValue), CurCallee(std::move(callee)) {}
 
@@ -121,6 +134,14 @@ public:
 
   SubstitutionMap getSubstitutions() const {
     return CurCallee.getSubstitutions();
+  }
+
+  void useProfilingThunk() {
+    UseProfilingThunk = true;
+  }
+
+  std::optional<Explosion> &getTypedErrorExplosion() {
+    return typedErrorExplosion;
   }
 
   virtual void begin();
@@ -160,6 +181,9 @@ public:
 
   virtual llvm::Value *getResumeFunctionPointer() = 0;
   virtual llvm::Value *getAsyncContext() = 0;
+
+  virtual StackAddress getCoroStaticFrame() = 0;
+  virtual llvm::Value *getCoroAllocator() = 0;
 
   void setIndirectTypedErrorResultSlot(llvm::Value *addr) {
     Args[IndirectTypedErrorArgIdx] = addr;

@@ -19,11 +19,12 @@ protocol VeryThrowing {
 
   var prop1: Int { get throws }
   var prop2: Int { get throws(MyError) }
-  var prop3: Int { get throws(HomeworkError) } // expected-note{{protocol requires property 'prop3' with type 'Int'; add a stub for conformance}}
+  var prop3: Int { get throws(HomeworkError) } // expected-note{{protocol requires property 'prop3' with type 'Int'}}
                                                // FIXME: poor diagnostic above
   var prop4: Int { get throws(SuperError) }
 }
 
+// expected-note@+2 {{add stubs for conformance}}
 // expected-error@+1{{type 'ConformingToVeryThrowing' does not conform to protocol 'VeryThrowing'}}
 struct ConformingToVeryThrowing: VeryThrowing {
   func f() throws(MyError) { } // okay to make type more specific
@@ -61,7 +62,7 @@ struct S3: FailureAssociatedType {
 func testAssociatedTypes() {
   let _ = S1.Failure() // expected-error{{'S1.Failure' (aka 'MyError') cannot be constructed because it has no accessible initializers}}
   let _ = S2.Failure() // expected-error{{'S2.Failure' (aka 'any Error') cannot be constructed because it has no accessible initializers}}
-  let _: Int = S3.Failure() // expected-error{{cannot convert value of type 'S3.Failure' (aka 'Never') to specified type 'Int'}}
+  let _: Int = S3.Failure() // expected-error{{cannot convert value of type 'Never' to specified type 'Int'}}
   // expected-error@-1{{missing argument for parameter 'from' in call}}
 }
 
@@ -76,3 +77,17 @@ public protocol HasRethrowingMap: Sequence {
 }
 
 extension Array: HasRethrowingMap {}
+
+// rdar://149438520 -- incorrect handling of subtype relation between type parameter and Never
+protocol DependentThrowing {
+  associatedtype E: Error
+  func f() throws(E)
+}
+
+extension DependentThrowing {
+  func f() {}
+}
+
+struct DefaultDependentThrowing: DependentThrowing {
+  typealias E = Error
+}

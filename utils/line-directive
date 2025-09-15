@@ -208,11 +208,8 @@ def map_line_from_source_file(source_filename, source_line_num,
 
 def read_response_file(file_path):
     with open(file_path, 'r') as files:
-        # "Make an iterator out of shlex.shlex.get_token, then consume items
-        # until it returns None." (Then eagerly convert the result to a list so
-        # that we can close the file.)
-        return list(iter(shlex.shlex(files, file_path, posix=True).get_token,
-                         None))
+        # Read a response file and return a list of files (one per line).
+        return [line.strip() for line in files if line.strip()]
 
 
 def expand_response_files(files):
@@ -340,7 +337,7 @@ def run():
     ... // Licensed under Apache License v2.0 with Runtime Library Exception
     ... //
     ... // See https://swift.org/LICENSE.txt for license information
-    ... // See https://swift.org/CONTRIBUTORS.txt for the list of Swift projec
+    ... // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project
     ... //
     ... //===-----------------------------------------------------------------
     ...
@@ -408,7 +405,7 @@ def run():
     ...     return _base.underestimatedCount
     ...   }
     ...
-    ...   /// Creates an instance with elements `transform(x)` for each elemen
+    ...   /// Creates an instance with elements `transform(x)` for each element
     ...   /// `x` of base.
     ...   @_inlineable
     ...   @_versioned
@@ -433,7 +430,7 @@ def run():
     ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 108)
     ...
     ... /// A `Collection` whose elements consist of those in a `Base`
-    ... /// `Collection` passed through a transform function returning `Elemen
+    ... /// `Collection` passed through a transform function returning `Element`
     ... /// These elements are computed lazily, each time they're read, by
     ... /// calling the transform function on a base element.
     ... @_fixed_layout
@@ -471,7 +468,7 @@ def run():
     ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 108)
     ...
     ... /// A `Collection` whose elements consist of those in a `Base`
-    ... /// `Collection` passed through a transform function returning `Elemen
+    ... /// `Collection` passed through a transform function returning `Element`
     ... /// These elements are computed lazily, each time they're read, by
     ... /// calling the transform function on a base element.
     ... @_fixed_layout
@@ -509,7 +506,7 @@ def run():
     ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 108)
     ...
     ... /// A `Collection` whose elements consist of those in a `Base`
-    ... /// `Collection` passed through a transform function returning `Elemen
+    ... /// `Collection` passed through a transform function returning `Element`
     ... /// These elements are computed lazily, each time they're read, by
     ... /// calling the transform function on a base element.
     ... @_fixed_layout
@@ -683,16 +680,21 @@ def run():
         # delegates to the Win32 CreateProcess API. Unix systems handle
         # non-normalized paths, so don't have this problem.
         # Arguments passed to the process are normalized by the process.
-        command_args = expand_response_files(sys.argv[dashes + 1:])
+        command_args = sys.argv[dashes + 1:]
         command_args[0] = os.path.normpath(command_args[0])
 
-        command = subprocess.Popen(
-            command_args,
-            stderr=subprocess.STDOUT,
-            stdout=subprocess.PIPE,
-            universal_newlines=True,
-            encoding='UTF-8'
-        )
+        try:
+            command = subprocess.Popen(
+                command_args,
+                stderr=subprocess.STDOUT,
+                stdout=subprocess.PIPE,
+                universal_newlines=True,
+                encoding='UTF-8'
+            )
+        except Exception as e:
+            sys.stderr.write(f"Error executing command: {e}\n")
+            sys.stderr.write(f"Command: {' '.join(shlex.quote(arg) for arg in command_args)}\n")
+            sys.exit(1)
 
         sources = '(?P<file>' + '|'.join(re.escape(s) for s in sources) + ')'
 
@@ -731,7 +733,12 @@ def run():
                         m.group('tail'))
             sys.stdout.write(output)
 
-        sys.exit(command.wait())
+        exit_code = command.wait()
+        if exit_code != 0:
+            sys.stderr.write(f"Command failed with exit code {exit_code}\n")
+            sys.stderr.write(f"Command: {' '.join(shlex.quote(arg) for arg in command_args)}\n")
+
+        sys.exit(exit_code)
 
 
 if __name__ == '__main__':

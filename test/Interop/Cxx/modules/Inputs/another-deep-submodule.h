@@ -1,0 +1,2 @@
+namespace NS {
+} // namespace NS

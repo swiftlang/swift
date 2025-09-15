@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// expected-error@+1{{unexpected platform condition}}
+// expected-error@+1{{invalid conditional compilation expression}}
 #if hasGreeble(blah)
 #endif
 
@@ -13,16 +13,16 @@
 #endif
 
 // This compiler, don't short-circuit.
-// expected-error@+1{{unexpected platform condition}}
+// expected-error@+1{{invalid conditional compilation expression}}
 #if compiler(>=5.7) && hasGreeble(blah)
 #endif
 
 // This compiler, don't short-circuit.
-// expected-error@+1{{unexpected platform condition}}
+// expected-error@+1{{invalid conditional compilation expression}}
 #if compiler(<5.8) || hasGreeble(blah)
 #endif
 
 // Not a "version" check, so don't short-circuit.
-// expected-error@+1{{unexpected platform condition}}
+// expected-error@+1{{invalid conditional compilation expression}}
 #if os(macOS) && hasGreeble(blah)
 #endif

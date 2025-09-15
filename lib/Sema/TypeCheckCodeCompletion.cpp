@@ -35,6 +35,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Statistic.h"
@@ -197,7 +198,7 @@ void TypeChecker::filterSolutionsForCodeCompletion(
 }
 
 bool TypeChecker::typeCheckForCodeCompletion(
-    SyntacticElementTarget &target, bool needsPrecheck,
+    SyntacticElementTarget &target,
     llvm::function_ref<void(const Solution &)> callback) {
   auto *DC = target.getDeclContext();
   auto &Context = DC->getASTContext();
@@ -210,91 +211,32 @@ bool TypeChecker::typeCheckForCodeCompletion(
       return false;
   }
 
-  CompletionContextFinder contextAnalyzer(target, DC);
+  CompletionContextFinder contextAnalyzer(target);
 
   // If there was no completion expr (e.g. if the code completion location was
   // among tokens that were skipped over during parser error recovery) bail.
   if (!contextAnalyzer.hasCompletion())
     return false;
 
-  if (needsPrecheck) {
-    // First, pre-check the expression, validating any types that occur in the
-    // expression and folding sequence expressions.
-    auto failedPreCheck =
-        ConstraintSystem::preCheckTarget(target,
-                                         /*replaceInvalidRefsWithErrors=*/true);
+  ConstraintSystemOptions options;
+  options |= ConstraintSystemFlags::AllowFixes;
+  options |= ConstraintSystemFlags::SuppressDiagnostics;
+  options |= ConstraintSystemFlags::ForCodeCompletion;
 
-    if (failedPreCheck)
-      return false;
-  }
+  ConstraintSystem cs(DC, options);
 
-  enum class CompletionResult { Ok, NotApplicable, Fallback };
+  llvm::SmallVector<Solution, 4> solutions;
 
-  auto solveForCodeCompletion =
-      [&](SyntacticElementTarget &target) -> CompletionResult {
-    ConstraintSystemOptions options;
-    options |= ConstraintSystemFlags::AllowFixes;
-    options |= ConstraintSystemFlags::SuppressDiagnostics;
-    options |= ConstraintSystemFlags::ForCodeCompletion;
-    
-    ConstraintSystem cs(DC, options);
-
-    llvm::SmallVector<Solution, 4> solutions;
-
-    // If solve failed to generate constraints or with some other
-    // issue, we need to fallback to type-checking a sub-expression.
-    cs.setTargetFor(target.getAsExpr(), target);
-    if (!cs.solveForCodeCompletion(target, solutions))
-      return CompletionResult::Fallback;
-
-    // Similarly, if the type-check didn't produce any solutions, fall back
-    // to type-checking a sub-expression in isolation.
-    if (solutions.empty())
-      return CompletionResult::Fallback;
-
-    // FIXME: instead of filtering, expose the score and viability to clients.
-    // Remove solutions that skipped over/ignored the code completion point
-    // or that require fixes and have a score that is worse than the best.
-    filterSolutionsForCodeCompletion(solutions, contextAnalyzer);
-
-    llvm::for_each(solutions, callback);
-    return CompletionResult::Ok;
-  };
-
-  switch (solveForCodeCompletion(target)) {
-  case CompletionResult::Ok:
+  cs.setTargetFor(target.getAsExpr(), target);
+  if (!cs.solveForCodeCompletion(target, solutions) || solutions.empty())
     return true;
 
-  case CompletionResult::NotApplicable:
-    return false;
+  // FIXME: instead of filtering, expose the score and viability to clients.
+  // Remove solutions that skipped over/ignored the code completion point
+  // or that require fixes and have a score that is worse than the best.
+  filterSolutionsForCodeCompletion(solutions, contextAnalyzer);
 
-  case CompletionResult::Fallback:
-    break;
-  }
-
-  // Determine the best subexpression to use based on the collected context
-  // of the code completion expression.
-  auto fallback = contextAnalyzer.getFallbackCompletionExpr();
-  if (!fallback) {
-    return true;
-  }
-  if (isa<AbstractClosureExpr>(fallback->DC)) {
-    // If the expression is embedded in a closure, the constraint system tries
-    // to retrieve that closure's type, which will fail since we won't have
-    // generated any type variables for it. Thus, fallback type checking isn't
-    // available in this case.
-    return true;
-  }
-  if (auto *expr = target.getAsExpr()) {
-    assert(fallback->E != expr);
-    (void)expr;
-  }
-  SyntacticElementTarget completionTarget(fallback->E, fallback->DC,
-                                          CTP_Unused,
-                                          /*contextualType=*/Type(),
-                                          /*isDiscarded=*/true);
-  typeCheckForCodeCompletion(completionTarget, fallback->SeparatePrecheck,
-                             callback);
+  llvm::for_each(solutions, callback);
   return true;
 }
 
@@ -302,10 +244,12 @@ static std::optional<Type>
 getTypeOfCompletionContextExpr(DeclContext *DC, CompletionTypeCheckKind kind,
                                Expr *&parsedExpr,
                                ConcreteDeclRef &referencedDecl) {
-  if (constraints::ConstraintSystem::preCheckExpression(
-          parsedExpr, DC,
-          /*replaceInvalidRefsWithErrors=*/true))
+  auto target = SyntacticElementTarget(parsedExpr, DC, CTP_Unused, Type(),
+                                       /*isDiscarded*/ true);
+  if (constraints::ConstraintSystem::preCheckTarget(target))
     return std::nullopt;
+
+  parsedExpr = target.getAsExpr();
 
   switch (kind) {
   case CompletionTypeCheckKind::Normal:
@@ -319,7 +263,7 @@ getTypeOfCompletionContextExpr(DeclContext *DC, CompletionTypeCheckKind kind,
       if (!components.empty()) {
         auto &last = components.back();
         if (last.isResolved()) {
-          if (last.getKind() == KeyPathExpr::Component::Kind::Property)
+          if (last.getKind() == KeyPathExpr::Component::Kind::Member)
             referencedDecl = last.getDeclRef();
           Type lookupTy = last.getComponentType();
           ASTContext &Ctx = DC->getASTContext();

@@ -1,13 +1,12 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -disable-availability-checking
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables %S/Inputs/GlobalVariables.swift -disable-availability-checking -parse-as-library
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -target %target-swift-5.1-abi-triple
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables %S/Inputs/GlobalVariables.swift -target %target-swift-5.1-abi-triple -parse-as-library
 
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature RegionBasedIsolation -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
+// RUN: %target-swift-frontend -I %t  -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
 
 import GlobalVariables
 import OtherActors // expected-warning{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'OtherActors'}}{{1-1=@preconcurrency }}
@@ -98,23 +97,27 @@ actor Camera {
 func checkAsyncPropertyAccess() async {
   let act = MyActor()
   let _ : Int = await act.mutable + act.mutable
-  act.mutable += 1  // expected-error {{actor-isolated property 'mutable' can not be mutated from a non-isolated context}}
+  act.mutable += 1  // expected-error {{actor-isolated property 'mutable' can not be mutated from a nonisolated context}}
+  // expected-note@-1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
 
-  act.superState += 1 // expected-error {{actor-isolated property 'superState' can not be mutated from a non-isolated context}}
+  act.superState += 1 // expected-error {{actor-isolated property 'superState' can not be mutated from a nonisolated context}}
+  // expected-note@-1{{consider declaring an isolated method on 'MySuperActor' to perform the mutation}}
 
-  act.text[0].append("hello") // expected-error{{actor-isolated property 'text' can not be mutated from a non-isolated context}}
+  act.text[0].append("hello") // expected-error{{actor-isolated property 'text' can not be mutated from a nonisolated context}}
+  // expected-note@-1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
 
   // this is not the same as the above, because Array is a value type
   var arr = await act.text
   arr[0].append("hello")
 
-  act.text.append("no") // expected-error{{actor-isolated property 'text' can not be mutated from a non-isolated context}}
+  act.text.append("no") // expected-error{{actor-isolated property 'text' can not be mutated from a nonisolated context}}
+  // expected-note@-1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
 
-  act.text[0] += "hello" // expected-error{{actor-isolated property 'text' can not be mutated from a non-isolated context}}
+  act.text[0] += "hello" // expected-error{{actor-isolated property 'text' can not be mutated from a nonisolated context}}
+  // expected-note@-1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
 
-  _ = act.point  // expected-warning{{non-sendable type 'Point' in implicitly asynchronous access to actor-isolated property 'point' cannot cross actor boundary}}
-  // expected-warning@-1 {{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-2 {{property access is 'async'}}
+  _ = act.point  // expected-warning{{non-Sendable type 'Point' of property 'point' cannot exit actor-isolated context}}
+  // expected-warning@-1 {{actor-isolated property 'point' cannot be accessed from outside of the actor}} {{7-7=await }}
 }
 
 /// ------------------------------------------------------------------
@@ -139,8 +142,7 @@ struct InferredFromContext {
     get { [] }
   }
 
-  nonisolated var status: Bool = true // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}{{3-15=}}{{3-15=}}{{14-14=(unsafe)}}
-  // expected-note@-1{{convert 'status' to a 'let' constant or consider declaring it 'nonisolated(unsafe)' if manually managing concurrency safety}}
+  nonisolated var status: Bool = true // okay
 
   nonisolated let flag: Bool = false
 
@@ -153,20 +155,20 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
                              _ ext: InferredFromContext,
                              _ anno: NoGlobalActorValueType) async {
   // these still do need an await in Swift 5
-  _ = await ext.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to main actor-isolated property 'point' cannot cross actor boundary}}
-  _ = await anno.point // expected-warning {{non-sendable type 'Point' in implicitly asynchronous access to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
-  // expected-warning@-1 {{non-sendable type 'NoGlobalActorValueType' passed in implicitly asynchronous call to global actor 'SomeGlobalActor'-isolated property 'point' cannot cross actor boundary}}
+  _ = await ext.point // expected-warning {{non-Sendable type 'Point' of property 'point' cannot exit main actor-isolated context}}
+  _ = await anno.point // expected-warning {{non-Sendable type 'Point' of property 'point' cannot exit global actor 'SomeGlobalActor'-isolated context}}
+  // expected-warning@-1 {{non-Sendable type 'NoGlobalActorValueType' cannot be sent into global actor 'SomeGlobalActor'-isolated context in call to property 'point'}}
 
   _ = formance.counter
   _ = anno.counter
 
   // these will always need an await
-  _ = await (formance as MainCounter).counter // expected-warning {{non-sendable type 'any MainCounter' passed in implicitly asynchronous call to main actor-isolated property 'counter' cannot cross actor boundary}}
+  _ = await (formance as MainCounter).counter // expected-warning {{non-Sendable type 'any MainCounter' cannot be sent into main actor-isolated context in call to property 'counter'}}
   _ = await ext[1]
   _ = await formance.ticker
-  _ = await ext.polygon // expected-warning {{non-sendable type '[Point]' in implicitly asynchronous access to main actor-isolated property 'polygon' cannot cross actor boundary}}
+  _ = await ext.polygon // expected-warning {{non-Sendable type '[Point]' of property 'polygon' cannot exit main actor-isolated context}}
   _ = await InferredFromContext.stuff
-  _ = await NoGlobalActorValueType.polygon // expected-warning {{non-sendable type '[Point]' in implicitly asynchronous access to main actor-isolated static property 'polygon' cannot cross actor boundary}}
+  _ = await NoGlobalActorValueType.polygon // expected-warning {{non-Sendable type '[Point]' of static property 'polygon' cannot exit main actor-isolated context}}
 }
 
 // expected-warning@+2 {{memberwise initializer for 'NoGlobalActorValueType' cannot be both nonisolated and global actor 'SomeGlobalActor'-isolated; this is an error in the Swift 6 language mode}}
@@ -189,10 +191,13 @@ extension MyActor {
     set { }
   }
 
+  // expected-warning@+1{{'nonisolated(unsafe)' has no effect on instance method 'nonisolatedUnsafe(otherActor:)', consider using 'nonisolated'}}{{3-14=nonisolated}}
+  nonisolated(unsafe) func nonisolatedUnsafe(otherActor: MyActor) -> Int { }
+
   nonisolated func actorIndependentFunc(otherActor: MyActor) -> Int {
     _ = immutable
-    _ = mutable // expected-error{{actor-isolated property 'mutable' can not be referenced from a non-isolated}}
-    _ = text[0] // expected-error{{actor-isolated property 'text' can not be referenced from a non-isolated context}}
+    _ = mutable // expected-error{{actor-isolated property 'mutable' can not be referenced from a nonisolated}}
+    _ = text[0] // expected-error{{actor-isolated property 'text' can not be referenced from a nonisolated context}}
     _ = synchronous() // expected-error{{call to actor-isolated instance method 'synchronous()' in a synchronous nonisolated context}}
 
     // nonisolated
@@ -225,9 +230,9 @@ extension MyActor {
 
     // FIXME: The reference here isn't strictly a call
     _ = super.superMethod // expected-error{{call to actor-isolated instance method 'superMethod()' in a synchronous nonisolated context}}
-    acceptClosure(synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}
-    acceptClosure(self.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}
-    acceptClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}
+    acceptClosure(synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a nonisolated context}}
+    acceptClosure(self.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a nonisolated context}}
+    acceptClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a nonisolated context}}
     acceptEscapingClosure(synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
     acceptEscapingClosure(self.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
     acceptEscapingClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
@@ -264,22 +269,23 @@ extension MyActor {
     // Accesses on other actors can only reference immutable data synchronously,
     // otherwise the access is treated as async
     _ = otherActor.immutable // okay
-    _ = otherActor.mutable  // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-1{{property access is 'async'}}
+    _ = otherActor.mutable  // expected-error{{actor-isolated property 'mutable' cannot be accessed from outside of the actor}}{{9-9=await }}
     _ = await otherActor.mutable
-    otherActor.mutable = 0  // expected-error{{actor-isolated property 'mutable' can not be mutated on a non-isolated actor instance}}
-    acceptInout(&otherActor.mutable)  // expected-error{{actor-isolated property 'mutable' can not be used 'inout' on a non-isolated actor instance}}
-    // expected-error@+2{{actor-isolated property 'mutable' can not be mutated on a non-isolated actor instance}}
-    // expected-warning@+1{{no 'async' operations occur within 'await' expression}}
+    otherActor.mutable = 0  // expected-error{{actor-isolated property 'mutable' can not be mutated on a nonisolated actor instance}}
+    // expected-note@-1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
+    acceptInout(&otherActor.mutable)  // expected-error{{actor-isolated property 'mutable' can not be used 'inout' on a nonisolated actor instance}}
+    // expected-error@+3{{actor-isolated property 'mutable' can not be mutated on a nonisolated actor instance}}
+    // expected-warning@+2{{no 'async' operations occur within 'await' expression}}
+    // expected-note@+1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
     await otherActor.mutable = 0
 
     _ = otherActor.synchronous()
-    // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-2{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
+    // expected-error@-1{{actor-isolated instance method 'synchronous()' cannot be called from outside of the actor}}{{9-9=await }}
+
     _ = await otherActor.asynchronous()
     _ = otherActor.text[0]
-    // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-2{{property access is 'async'}}
+    // expected-error@-1{{actor-isolated property 'text' cannot be accessed from outside of the actor}}{{9-9=await }}
+
     _ = await otherActor.text[0] // okay
 
     // Global data is okay if it is immutable.
@@ -294,8 +300,7 @@ extension MyActor {
     Self.synchronousStatic()
 
     // Global actors
-    syncGlobalActorFunc() // expected-error{{expression is 'async' but is not marked with 'await'}}{{5-5=await }}
-    // expected-note@-1{{calls to global function 'syncGlobalActorFunc()' from outside of its actor context are implicitly asynchronous}}
+    syncGlobalActorFunc() // expected-error{{global actor 'SomeGlobalActor'-isolated global function 'syncGlobalActorFunc()' cannot be called from outside of the actor}}{{5-5=await }}
 
     await asyncGlobalActorFunc()
 
@@ -363,7 +368,7 @@ extension MyActor {
 
     @Sendable func localFn2() {
       acceptClosure {
-        _ = text[0]  // expected-error{{actor-isolated property 'text' can not be referenced from a non-isolated context}}
+        _ = text[0]  // expected-error{{actor-isolated property 'text' can not be referenced from a nonisolated context}}
         _ = self.synchronous() // expected-error{{call to actor-isolated instance method 'synchronous()' in a synchronous nonisolated context}}
         _ = localVar // expected-warning{{reference to captured var 'localVar' in concurrently-executing code}}
         localVar = 25 // expected-warning{{mutation of captured var 'localVar' in concurrently-executing code}}
@@ -383,7 +388,7 @@ extension MyActor {
     _ = super.superMethod
     acceptClosure(synchronous)
     acceptClosure(self.synchronous)
-    acceptClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced on a non-isolated actor instance}}
+    acceptClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced on a nonisolated actor instance}}
     acceptEscapingClosure(synchronous)
     acceptEscapingClosure(self.synchronous)
     acceptEscapingClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
@@ -442,8 +447,10 @@ actor Crystal {
     _ = await globActorVar + globActorProp
 
     globActorProp = 20 // expected-error {{global actor 'SomeGlobalActor'-isolated property 'globActorProp' can not be mutated on a different actor instance}}
+    // expected-note@-1{{consider declaring an isolated method on 'SomeGlobalActor' to perform the mutation}}
 
     globActorVar = 30 // expected-error {{global actor 'SomeGlobalActor'-isolated property 'globActorVar' can not be mutated on a different actor instance}}
+    // expected-note@-1{{consider declaring an isolated method on 'SomeGlobalActor' to perform the mutation}}
 
     // expected-error@+2 {{global actor 'SomeGlobalActor'-isolated property 'globActorVar' can not be used 'inout' on a different actor instance}}
     // expected-error@+1 {{actor-isolated property 'globActorVar' cannot be passed 'inout' to implicitly 'async' function call}}
@@ -473,8 +480,7 @@ func crossIsolationBoundary(_ closure: () -> Void) async {}
 func testGlobalActorClosures() {
   let _: Int = acceptAsyncClosure { @SomeGlobalActor in
     syncGlobalActorFunc()
-    syncOtherGlobalActorFunc() // expected-error{{expression is 'async' but is not marked with 'await'}}{{5-5=await }}
-    // expected-note@-1{{calls to global function 'syncOtherGlobalActorFunc()' from outside of its actor context are implicitly asynchronous}}
+    syncOtherGlobalActorFunc() // expected-error{{global actor 'SomeOtherGlobalActor'-isolated global function 'syncOtherGlobalActorFunc()' cannot be called from outside of the actor}}{{5-5=await }}
 
     await syncOtherGlobalActorFunc()
     return 17
@@ -504,54 +510,43 @@ extension MyActor {
     await asyncOtherGlobalActorFunc()
 
     _ = immutable
-    _ = mutable // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-1{{property access is 'async'}}
+    _ = mutable // expected-error{{actor-isolated property 'mutable' cannot be accessed from outside of the actor}}{{9-9=await }}
     _ = await mutable
-    _ = synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-1{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
+    _ = synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be called from outside of the actor}}{{9-9=await }}
     _ = await synchronous()
-    _ = text[0] // expected-error{{expression is 'async' but is not marked with 'await'}}
-    // expected-note@-1{{property access is 'async'}}
+    _ = text[0] // expected-error{{actor-isolated property 'text' cannot be accessed from outside of the actor}} {{9-9=await }}
 
     _ = await text[0]
 
     // Accesses on 'self' are only okay for immutable and asynchronous, because
     // we are outside of the actor instance.
     _ = self.immutable
-    _ = self.synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-1{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
+    _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be called from outside of the actor}}{{9-9=await }}
     _ = await self.synchronous()
 
     _ = await self.asynchronous()
-    _ = self.text[0] // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-1{{property access is 'async'}}
-    _ = self[0] // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-1{{subscript access is 'async'}}
+    _ = self.text[0] // expected-error{{actor-isolated property 'text' cannot be accessed from outside of the actor}}{{9-9=await }}
+    _ = self[0] // expected-error{{actor-isolated subscript 'subscript(_:)' cannot be accessed from outside of the actor}}{{9-9=await }}
     _ = await self.text[0]
     _ = await self[0]
 
     // Accesses on 'super' are not okay without 'await'; we're outside of the actor.
-    _ = super.superState // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-1{{property access is 'async'}}
+    _ = super.superState // expected-error{{actor-isolated property 'superState' cannot be accessed from outside of the actor}}{{9-9=await }}
     _ = await super.superState
-    super.superMethod() // expected-error{{expression is 'async' but is not marked with 'await'}}{{5-5=await }}
-  // expected-note@-1{{calls to instance method 'superMethod()' from outside of its actor context are implicitly asynchronous}}
+    super.superMethod() // expected-error{{actor-isolated instance method 'superMethod()' cannot be called from outside of the actor}}{{5-5=await }}
 
     await super.superMethod()
     await super.superAsyncMethod()
-    _ = super[0] // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-1{{subscript access is 'async'}}
+    _ = super[0] // expected-error{{actor-isolated subscript 'subscript(_:)' cannot be accessed from outside of the actor}}{{9-9=await }}
     _ = await super[0]
 
     // Accesses on other actors can only reference immutable data or
     // call asynchronous methods
     _ = otherActor.immutable // okay
-    _ = otherActor.synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-1{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
+    _ = otherActor.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be called from outside of the actor}}{{9-9=await }}
     _ = otherActor.synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
     _ = await otherActor.asynchronous()
-    _ = otherActor.text[0] // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-1{{property access is 'async'}}
+    _ = otherActor.text[0] // expected-error{{actor-isolated property 'text' cannot be accessed from outside of the actor}}{{9-9=await }}
     _ = await otherActor.text[0]
   }
 }
@@ -592,7 +587,7 @@ var number: Int = 42 // expected-note {{var declared here}}
 
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'badNumberUser()' part of global actor 'SomeGlobalActor'}}
 func badNumberUser() {
-  //expected-error@+1{{global actor 'SomeGlobalActor'-isolated var 'number' can not be referenced from a non-isolated context}}
+  //expected-error@+1{{global actor 'SomeGlobalActor'-isolated var 'number' can not be referenced from a nonisolated context}}
   print("The protected number is: \(number)")
 }
 
@@ -613,10 +608,8 @@ func testGlobalRestrictions(actor: MyActor) async {
   _ = actor.asynchronous
 
   // any kind of method can be called from outside the actor, so long as it's marked with 'await'
-  _ = actor.synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
-  // expected-note@-1{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
-  _ = actor.asynchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
-  // expected-note@-1{{call is 'async'}}
+  _ = actor.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be called from outside of the actor}}{{7-7=await }}
+  _ = actor.asynchronous() // expected-error{{actor-isolated instance method 'asynchronous()' cannot be called from outside of the actor}}{{7-7=await }}
 
   _ = await actor.synchronous()
   _ = await actor.asynchronous()
@@ -624,14 +617,11 @@ func testGlobalRestrictions(actor: MyActor) async {
   // stored and computed properties can be accessed. Only immutable stored properties can be accessed without 'await'
   _ = actor.immutable
   _ = await actor.immutable // expected-warning {{no 'async' operations occur within 'await' expression}}
-  _ = actor.mutable  // expected-error{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
-  // expected-note@-1{{property access is 'async'}}
+  _ = actor.mutable  // expected-error{{actor-isolated property 'mutable' cannot be accessed from outside of the actor}}{{7-7=await }}
   _ = await actor.mutable
-  _ = actor.text[0] // expected-error{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
-  // expected-note@-1{{property access is 'async'}}
+  _ = actor.text[0] // expected-error{{actor-isolated property 'text' cannot be accessed from outside of the actor}}{{7-7=await }}
   _ = await actor.text[0]
-  _ = actor[0] // expected-error{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
-  // expected-note@-1{{subscript access is 'async'}}
+  _ = actor[0] // expected-error{{actor-isolated subscript 'subscript(_:)' cannot be accessed from outside of the actor}}{{7-7=await }}
   _ = await actor[0]
 
   // nonisolated declarations are permitted.
@@ -659,8 +649,7 @@ func testGlobalRestrictions(actor: MyActor) async {
     _ = i
   }
 
-  print("\(number)") //expected-error {{expression is 'async' but is not marked with 'await'}}{{12-12=await }}
-  //expected-note@-1{{property access is 'async'}}
+  print("\(number)") //expected-error {{global actor 'SomeGlobalActor'-isolated var 'number' cannot be accessed from outside of the actor}}{{12-12=await }}
 
 }
 
@@ -696,7 +685,7 @@ actor AnActorWithClosures {
           self.counter += 1 // expected-error{{actor-isolated property 'counter' can not be mutated from a Sendable closure}}
 
           acceptEscapingClosure {
-            self.counter += 1 // expected-error{{actor-isolated property 'counter' can not be mutated from a non-isolated context}}
+            self.counter += 1 // expected-error{{actor-isolated property 'counter' can not be mutated from a nonisolated context}}
           }
         }
       }
@@ -724,7 +713,7 @@ func checkLocalFunctions() async {
   local1()
   local2()
 
-  // non-sendable closures don't cause problems.
+  // non-Sendable closures don't cause problems.
   acceptClosure {
     local1()
     local2()
@@ -732,7 +721,7 @@ func checkLocalFunctions() async {
 
   // Escaping closures can make the local function execute concurrently.
   acceptConcurrentClosure {
-    local2() // expected-warning{{capture of 'local2()' with non-sendable type '() -> ()' in a `@Sendable` closure}}
+    local2() // expected-warning{{capture of 'local2()' with non-Sendable type '() -> ()' in a '@Sendable' closure}}
     // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }
 
@@ -742,7 +731,7 @@ func checkLocalFunctions() async {
   var k = 17
   func local4() {
     acceptConcurrentClosure {
-      local3() // expected-warning{{capture of 'local3()' with non-sendable type '() -> ()' in a `@Sendable` closure}}
+      local3() // expected-warning{{capture of 'local3()' with non-Sendable type '() -> ()' in a '@Sendable' closure}}
       // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     }
   }
@@ -824,21 +813,31 @@ actor LazyActor {
     lazy var l25: Int = { [unowned self] in self.l }()
 
     nonisolated lazy var l31: Int = { v }()
-    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l32: Int = v
-    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l33: Int = { self.v }()
-    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l34: Int = self.v
-    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l35: Int = { [unowned self] in self.v }()
-    // expected-warning@-1 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
 
     nonisolated lazy var l41: Int = { l }()
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l42: Int = l
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l43: Int = { self.l }()
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l44: Int = self.l
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l45: Int = { [unowned self] in self.l }()
+    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
 }
 
 // Infer global actors from context only for instance members.
@@ -863,13 +862,13 @@ extension SomeClassInActor.ID {
 @available(SwiftStdlib 5.1, *)
 actor SomeActorWithInits {
   // expected-note@+2 2 {{property declared here}}
-  // expected-note@+1 3 {{mutation of this property is only permitted within the actor}}
+  // expected-note@+1 4 {{mutation of this property is only permitted within the actor}}
   var mutableState: Int = 17
   var otherMutableState: Int
   // expected-note@+1 {{mutation of this property is only permitted within the actor}}
   let nonSendable: SomeClass
 
-  // Sema should not complain about referencing non-sendable members
+  // Sema should not complain about referencing non-Sendable members
   // in an actor init or deinit, as those are diagnosed later by flow-isolation.
   init(_ x: SomeClass) {
     self.nonSendable = x
@@ -879,26 +878,34 @@ actor SomeActorWithInits {
     self.mutableState = 42
     self.otherMutableState = 17
 
-    self.isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
+    self.isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.nonisolated()
 
     defer {
-      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
+      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
       mutableState += 1 // okay through typechecking, since flow-isolation will verify it.
       nonisolated()
     }
 
     func local() {
-      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
-      mutableState += 1 // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context; this is an error in the Swift 6 language mode}}
+      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+      mutableState += 1 // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
       nonisolated()
     }
     local()
 
+    func localAsync() async {
+      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+      mutableState += 1 // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+      // expected-note@-1{{consider declaring an isolated method on 'SomeActorWithInits' to perform the mutation}}
+      nonisolated()
+    }
+    Task { await localAsync() }
+
     let _ = {
       defer {
-        isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
-        mutableState += 1  // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context; this is an error in the Swift 6 language mode}}
+        isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+        mutableState += 1  // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
         nonisolated()
       }
       nonisolated()
@@ -915,7 +922,7 @@ actor SomeActorWithInits {
 
   convenience init(i3: Bool) { // expected-warning{{initializers in actors are not marked with 'convenience'; this is an error in the Swift 6 language mode}}{{3-15=}}
     self.init(i1: i3)
-    _ = mutableState    // expected-error{{actor-isolated property 'mutableState' can not be referenced from a non-isolated context}}
+    _ = mutableState    // expected-error{{actor-isolated property 'mutableState' can not be referenced from a nonisolated context}}
     self.isolated()     // expected-error{{call to actor-isolated instance method 'isolated()' in a synchronous nonisolated context}}
     self.nonisolated()
   }
@@ -974,23 +981,22 @@ actor SomeActorWithInits {
     let _ = self.nonSendable // OK only through typechecking, not SIL.
 
     defer {
-      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
+      isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
       mutableState += 1 // okay
       nonisolated()
     }
 
     let _ = {
       defer {
-        isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
-        mutableState += 1  // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a non-isolated context; this is an error in the Swift 6 language mode}}
+        isolated() // expected-warning{{actor-isolated instance method 'isolated()' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+        mutableState += 1  // expected-warning{{actor-isolated property 'mutableState' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
         nonisolated()
       }
       nonisolated()
     }()
   }
 
-
-  func isolated() { } // expected-note 9 {{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
+  func isolated() { } // expected-note 10 {{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
   nonisolated func nonisolated() {}
 }
 
@@ -1011,7 +1017,7 @@ class SomeClassWithInits {
 
   deinit {
     print(mutableState) // Okay, we're actor-isolated
-    print(SomeClassWithInits.shared) // expected-error{{main actor-isolated static property 'shared' can not be referenced from a non-isolated context}}
+    print(SomeClassWithInits.shared) // expected-error{{main actor-isolated static property 'shared' can not be referenced from a nonisolated context}}
     beets_ma() //expected-error{{call to main actor-isolated global function 'beets_ma()' in a synchronous nonisolated context}}
   }
 
@@ -1026,8 +1032,7 @@ class SomeClassWithInits {
       // okay
       await self.isolated()
       self.isolated()
-      // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
-      // expected-note@-2{{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
+      // expected-error@-1{{main actor-isolated instance method 'isolated()' cannot be called from outside of the actor}}{{7-7=await }}
 
       print(await self.mutableState)
     }
@@ -1037,7 +1042,7 @@ class SomeClassWithInits {
 @available(SwiftStdlib 5.1, *)
 func outsideSomeClassWithInits() { // expected-note 3 {{add '@MainActor' to make global function 'outsideSomeClassWithInits()' part of global actor 'MainActor'}}
   _ = SomeClassWithInits() // expected-error{{call to main actor-isolated initializer 'init()' in a synchronous nonisolated context}}
-  _ = SomeClassWithInits.shared // expected-error{{main actor-isolated static property 'shared' can not be referenced from a non-isolated context}}
+  _ = SomeClassWithInits.shared // expected-error{{main actor-isolated static property 'shared' can not be referenced from a nonisolated context}}
   SomeClassWithInits.staticIsolated() // expected-error{{call to main actor-isolated static method 'staticIsolated()' in a synchronous nonisolated context}}
 }
 
@@ -1045,14 +1050,12 @@ func outsideSomeClassWithInits() { // expected-note 3 {{add '@MainActor' to make
 // nonisolated let and cross-module let
 // ----------------------------------------------------------------------
 func testCrossModuleLets(actor: OtherModuleActor) async {
-  _ = actor.a         // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{property access is 'async'}}
+  _ = actor.a         // expected-error{{actor-isolated property 'a' cannot be accessed from outside of the actor}} {{7-7=await }}
   _ = await actor.a   // okay
   _ = actor.b         // okay
-  _ = actor.c // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{property access is 'async'}}
-  // expected-warning@-2{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
-  _ = await actor.c // expected-warning{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
+  _ = actor.c // expected-error{{actor-isolated property 'c' cannot be accessed from outside of the actor}} {{7-7=await }}
+  // expected-warning@-1{{non-Sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
+  _ = await actor.c // expected-warning{{non-Sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
   _ = await actor.d // okay
 }
 
@@ -1074,21 +1077,19 @@ extension OtherModuleActor {
 
 actor CrossModuleFromInitsActor {
   init(v1 actor: OtherModuleActor) {
-    _ = actor.a   // expected-error {{actor-isolated property 'a' can not be referenced from a non-isolated context}}
+    _ = actor.a   // expected-error {{actor-isolated property 'a' can not be referenced from a nonisolated context}}
     _ = actor.b   // okay
 
-    _ = actor.c   // expected-error {{actor-isolated property 'c' can not be referenced from a non-isolated context}}
+    _ = actor.c   // expected-error {{actor-isolated property 'c' can not be referenced from a nonisolated context}}
   }
 
   init(v2 actor: OtherModuleActor) async {
-    _ = actor.a         // expected-error{{expression is 'async' but is not marked with 'await'}}
-    // expected-note@-1{{property access is 'async'}}
+    _ = actor.a         // expected-error{{actor-isolated property 'a' cannot be accessed from outside of the actor}} {{9-9=await }}
     _ = await actor.a   // okay
     _ = actor.b         // okay
-    _ = actor.c // expected-error{{expression is 'async' but is not marked with 'await'}}
-    // expected-note@-1{{property access is 'async'}}
-    // expected-warning@-2{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
-    _ = await actor.c // expected-warning{{non-sendable type 'SomeClass' in implicitly asynchronous access to actor-isolated property 'c' cannot cross actor boundary}}
+    _ = actor.c // expected-error{{actor-isolated property 'c' cannot be accessed from outside of the actor}} {{9-9=await }}
+    // expected-warning@-1{{non-Sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
+    _ = await actor.c // expected-warning{{non-Sendable type 'SomeClass' of property 'c' cannot exit actor-isolated context}}
     _ = await actor.d // okay
   }
 }
@@ -1156,11 +1157,9 @@ func testCrossActorProtocol<T: P>(t: T) async {
   await t.f()
   await t.g()
   t.f()
-  // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
-  // expected-note@-2{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  // expected-error@-1{{actor-isolated instance method 'f()' cannot be called from outside of the actor}}{{3-3=await }}
   t.g()
-  // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
-  // expected-note@-2{{calls to instance method 'g()' from outside of its actor context are implicitly asynchronous}}
+  // expected-error@-1{{actor-isolated instance method 'g()' cannot be called from outside of the actor}}{{3-3=await }}
   ASP.s()
   ASPD.sd()
 }
@@ -1183,6 +1182,8 @@ actor MyServer : Server {
 func acceptAsyncSendableClosure<T>(_: @Sendable () async -> T) { }
 @available(SwiftStdlib 5.1, *)
 func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable () async -> T) { }
+@available(SwiftStdlib 5.1, *)
+func acceptAsyncSendableClosureInheritingAlways<T>(@_inheritActorContext(always) _: @Sendable () async -> T) { }
 
 @available(SwiftStdlib 5.1, *)
 extension MyActor {
@@ -1190,8 +1191,7 @@ extension MyActor {
     var counter = 0
 
     acceptAsyncSendableClosure {
-      _ = synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}
-      // expected-note@-1{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
+      _ = synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be called from outside of the actor}} {{11-11=await }}
 
       counter += 1 // expected-warning{{mutation of captured var 'counter' in concurrently-executing code}}
     }
@@ -1209,6 +1209,10 @@ extension MyActor {
     acceptAsyncSendableClosureInheriting {
       _ = await synchronous() // expected-warning{{no 'async' operations occur within 'await' expression}}
       counter += 1 // okay
+    }
+
+    acceptAsyncSendableClosureInheritingAlways {
+      counter += 1 // Ok
     }
   }
 }
@@ -1230,6 +1234,32 @@ func testGlobalActorInheritance() {
   acceptAsyncSendableClosureInheriting {
     counter += 1 // ok
   }
+
+  acceptAsyncSendableClosureInheritingAlways {
+    counter += 1 // ok
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+func testIsolatedParameter1(_: isolated any Actor, v: inout Int) {
+  acceptAsyncSendableClosureInheriting {
+    v += 1 // expected-warning {{mutable capture of 'inout' parameter 'v' is not allowed in concurrently-executing code}}
+  }
+
+  acceptAsyncSendableClosureInheritingAlways {
+    v += 1 // Ok
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+func testIsolatedParameter2(_: isolated (any Actor)? = #isolation, v: inout Int) {
+  acceptAsyncSendableClosureInheriting {
+    v += 1 // expected-warning {{mutable capture of 'inout' parameter 'v' is not allowed in concurrently-executing code}}
+  }
+
+  acceptAsyncSendableClosureInheritingAlways {
+    v += 1 // Ok
+  }
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -1237,11 +1267,17 @@ func testGlobalActorInheritance() {
 protocol GloballyIsolatedProto {
 }
 
-// rdar://75849035 - trying to conform an actor to a global-actor isolated protocol should result in an error
+// rdar://75849035 - trying to conform an actor to a global-actor-isolated protocol should result in an error
 func test_conforming_actor_to_global_actor_protocol() {
   @available(SwiftStdlib 5.1, *)
   actor MyValue : GloballyIsolatedProto {}
-  // expected-error@-1 {{actor 'MyValue' cannot conform to global actor isolated protocol 'GloballyIsolatedProto'}}
+  // expected-error@-1 {{actor 'MyValue' cannot conform to global-actor-isolated protocol 'GloballyIsolatedProto'}}
+}
+
+func test_nonisolated_variable() {
+  struct S: GloballyIsolatedProto {
+    nonisolated var x: Int = 0 // okay
+  }
 }
 
 func test_invalid_reference_to_actor_member_without_a_call_note() {
@@ -1287,11 +1323,11 @@ actor Counter {
   }
 
   init() {
-    _ = self.next() // expected-warning {{actor-isolated instance method 'next()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
-    defer { _ = self.next() } // expected-warning {{actor-isolated instance method 'next()' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
+    _ = self.next() // expected-warning {{actor-isolated instance method 'next()' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+    defer { _ = self.next() } // expected-warning {{actor-isolated instance method 'next()' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
 
-    _ = computedProp  // expected-warning {{actor-isolated property 'computedProp' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
-    computedProp = 1  // expected-warning {{actor-isolated property 'computedProp' can not be mutated from a non-isolated context; this is an error in the Swift 6 language mode}}
+    _ = computedProp  // expected-warning {{actor-isolated property 'computedProp' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+    computedProp = 1  // expected-warning {{actor-isolated property 'computedProp' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
 
   }
 
@@ -1305,11 +1341,11 @@ actor Counter {
 class C2 { }
 
 @SomeGlobalActor
-class C3: C2 { // expected-note {{class 'C3' does not conform to the 'Sendable' protocol}}
+class C3: C2 {
   func requireSendableSelf() {
+    // self is Sendable here.
     Task.detached {
       _ = self
-      // expected-warning@-1 {{capture of 'self' with non-sendable type 'C3' in a `@Sendable` closure; this is an error in the Swift 6 language mode}}
     }
   }
 }
@@ -1333,17 +1369,18 @@ actor Butterfly {
 
   nonisolated init(icecream: Void) { // expected-warning {{'nonisolated' on an actor's synchronous initializer is invalid; this is an error in the Swift 6 language mode}} {{3-15=}}
     self.init()
-    self.flapsPerSec += 1 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a non-isolated context}}
+    self.flapsPerSec += 1 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a nonisolated context}}
   }
 
   nonisolated init(cookies: Void) async {
     self.init()
-    self.flapsPerSec += 1 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a non-isolated context}}
+    self.flapsPerSec += 1 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a nonisolated context}}
+    // expected-note@-1 {{consider declaring an isolated method on 'Butterfly' to perform the mutation}}
   }
 
   init(brownies: Void) {
     self.init()
-    self.flapsPerSec = 0 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a non-isolated context}}
+    self.flapsPerSec = 0 // expected-error {{actor-isolated property 'flapsPerSec' can not be mutated from a nonisolated context}}
   }
 }
 
@@ -1353,12 +1390,10 @@ func take(_ val: SelfParamIsolationNonMethod) {}
 
 actor SelfParamIsolationNonMethod {
   init(s0: Void) {
-    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{44-44=await }}
     acceptAsyncSendableClosureInheriting { self.f() }
 
-    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{34-34=await }}
     acceptAsyncSendableClosure { self.f() }
 
     // expected-error@+1 {{call to actor-isolated global function 'takeIsolated' in a synchronous nonisolated context}}
@@ -1368,20 +1403,17 @@ actor SelfParamIsolationNonMethod {
   }
 
   @MainActor init(s1: Void) {
-    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{44-44=await }}
     acceptAsyncSendableClosureInheriting { self.f() }
 
-    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{34-34=await }}
     acceptAsyncSendableClosure { self.f() }
   }
 
   init(a1: Void) async {
     acceptAsyncSendableClosureInheriting { self.f() }
 
-    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{34-34=await }}
     acceptAsyncSendableClosure { self.f() }
 
     takeIsolated(self)
@@ -1390,32 +1422,26 @@ actor SelfParamIsolationNonMethod {
   }
 
   @MainActor init(a2: Void) async {
-    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{44-44=await }}
     acceptAsyncSendableClosureInheriting { self.f() }
 
-    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{34-34=await }}
     acceptAsyncSendableClosure { self.f() }
   }
 
   nonisolated init(a3: Void) async {
-    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{44-44=await }}
     acceptAsyncSendableClosureInheriting { self.f() }
 
-    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{34-34=await }}
     acceptAsyncSendableClosure { self.f() }
   }
 
   deinit {
-    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{44-44=await }}
     acceptAsyncSendableClosureInheriting { self.f() }
 
-    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{34-34=await }}
     acceptAsyncSendableClosure { self.f() }
 
     // expected-error@+1 {{call to actor-isolated global function 'takeIsolated' in a synchronous nonisolated context}}
@@ -1432,18 +1458,15 @@ final class MainActorInit: Sendable {
   init() {
     acceptAsyncSendableClosureInheriting { self.f() }
 
-    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{34-34=await }}
     acceptAsyncSendableClosure { self.f() }
   }
 
   deinit {
-    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{44-44=await }}
     acceptAsyncSendableClosureInheriting { self.f() }
 
-    // expected-note@+2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-    // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+    // expected-error@+1 {{actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{34-34=await }}
     acceptAsyncSendableClosure { self.f() }
   }
 
@@ -1455,7 +1478,7 @@ actor DunkTracker {
   private var curry: Int? // expected-note {{property declared here}}
 
   deinit {
-    // expected-warning@+1 {{actor-isolated property 'curry' can not be referenced from a non-isolated autoclosure; this is an error in the Swift 6 language mode}}
+    // expected-warning@+1 {{actor-isolated property 'curry' can not be referenced from a nonisolated autoclosure; this is an error in the Swift 6 language mode}}
     if lebron != nil || curry != nil {
       
     }
@@ -1470,15 +1493,18 @@ class MA {
 @SomeGlobalActor class SGA: MA {} // expected-error {{global actor 'SomeGlobalActor'-isolated class 'SGA' has different actor isolation from main actor-isolated superclass 'MA'}}
 
 protocol SGA_Proto {
-  @SomeGlobalActor func method() // expected-note {{mark the protocol requirement 'method()' 'async' to allow actor-isolated conformances}}
+  @SomeGlobalActor func method()
 }
 
 // try to override a MA method with inferred isolation from a protocol requirement
+// expected-warning@+1{{conformance of 'SGA_MA' to protocol 'SGA_Proto' involves isolation mismatches and can cause data races}}
 class SGA_MA: MA, SGA_Proto {
+  // expected-note@-1{{mark all declarations used in the conformance 'nonisolated'}}
+  // expected-note@-2{{turn data races into runtime errors with '@preconcurrency'}}
+  
   // expected-error@+2 {{call to global actor 'SomeGlobalActor'-isolated global function 'onions_sga()' in a synchronous main actor-isolated context}}
-  // expected-warning@+1 {{main actor-isolated instance method 'method()' cannot be used to satisfy global actor 'SomeGlobalActor'-isolated protocol requirement}}
+  // expected-note@+1 {{main actor-isolated instance method 'method()' cannot satisfy global actor 'SomeGlobalActor'-isolated requirement}}
   override func method() { onions_sga() }
-  // expected-note@-1{{add 'nonisolated' to 'method()' to make this instance method not isolated to the actor}}{{3-3=nonisolated }}
 }
 
 class None_MA: MA {
@@ -1492,9 +1518,6 @@ class None {
 // try to add inferred isolation while overriding
 @MainActor
 class MA_None1: None {
-
-  // FIXME: bad note, since the problem is a mismatch in overridden vs inferred isolation; this wont help.
-  // expected-note@+1 {{add '@MainActor' to make instance method 'method()' part of global actor 'MainActor'}}
   override func method() {
     beets_ma() // expected-error {{call to main actor-isolated global function 'beets_ma()' in a synchronous nonisolated context}}
   }
@@ -1541,8 +1564,10 @@ extension MyActor {
         _ = self
         _ = sc
 
+        // A test that validates that we treat this as a true send was added
+        // into transfernonsendable.swift.
         Task {
-          _ = sc // expected-warning{{capture of 'sc' with non-sendable type 'SomeClass' in a `@Sendable` closure}}
+          _ = sc
         }
       }
     }
@@ -1567,12 +1592,12 @@ class OverridesNonsiolatedInit: SuperWithNonisolatedInit {
   override nonisolated init() {
     super.init()
 
-    // expected-error@+1 {{main actor-isolated property 'x' can not be mutated from a non-isolated context}}
+    // expected-error@+1 {{main actor-isolated property 'x' can not be mutated from a nonisolated context}}
     super.x = 10
   }
 
   nonisolated func f() {
-    // expected-error@+1 {{main actor-isolated property 'x' can not be mutated from a non-isolated context}}
+    // expected-error@+1 {{main actor-isolated property 'x' can not be mutated from a nonisolated context}}
     super.x = 10
   }
 }
@@ -1581,13 +1606,14 @@ class OverridesNonsiolatedInit: SuperWithNonisolatedInit {
 class NonSendable {}
 
 protocol NonisolatedProtocol {
-  var ns: NonSendable { get } // expected-note {{'ns' declared here}}
+  var ns: NonSendable { get }
 }
 
+// expected-warning@+1{{conformance of 'ActorWithNonSendableLet' to protocol 'NonisolatedProtocol' crosses into actor-isolated code and can cause data races}}
 actor ActorWithNonSendableLet: NonisolatedProtocol {
-  // expected-note@-1{{add '@preconcurrency' to the 'NonisolatedProtocol' conformance to defer isolation checking to run time}}{{32-32=@preconcurrency }}
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{32-32=@preconcurrency }}
 
-  // expected-warning@+1 {{actor-isolated property 'ns' cannot be used to satisfy nonisolated protocol requirement; this is an error in the Swift 6 language mode}}
+  // expected-note@+1 {{actor-isolated property 'ns' cannot satisfy nonisolated requirement}}
   let ns = NonSendable()
 }
 
@@ -1610,9 +1636,8 @@ class ReferenceActor {
   init() async {
     self.a = ProtectNonSendable()
 
-    // expected-warning@+3 {{non-sendable type 'NonSendable' in implicitly asynchronous access to actor-isolated property 'ns' cannot cross actor boundary}}
-    // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
-    // expected-note@+1 {{property access is 'async'}}
+    // expected-warning@+2 {{non-Sendable type 'NonSendable' of property 'ns' cannot exit actor-isolated context}}
+    // expected-warning@+1 {{actor-isolated property 'ns' cannot be accessed from outside of the actor}} {{9-9=await }}
     _ = a.ns
   }
 }
@@ -1623,7 +1648,7 @@ actor AnotherActor {
   init() {
     self.a = ProtectNonSendable()
 
-    // expected-warning@+1 {{actor-isolated property 'ns' can not be referenced from a non-isolated context}}
+    // expected-warning@+1 {{actor-isolated property 'ns' can not be referenced from a nonisolated context}}
     _ = a.ns
   }
 }
@@ -1637,7 +1662,7 @@ class MainActorIsolated {
 }
 
 nonisolated func accessAcrossActors() {
-  // expected-warning@+1 {{main actor-isolated static property 'shared' can not be referenced from a non-isolated context; this is an error in the Swift 6 language mode}}
+  // expected-warning@+1 {{main actor-isolated static property 'shared' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
   let _ = MainActorIsolated.shared
 }
 
@@ -1654,5 +1679,102 @@ actor SafeMutatingCall {
   public init() async throws {
     self.iterator = Iterator()
     _ = try await self.iterator.next()
+  }
+}
+
+
+@MainActor
+func testLocalFunctionIsolation() {
+  func isolatedLocalFn() {}
+  // expected-note@-1 {{calls to local function 'isolatedLocalFn()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2 {{main actor isolation inferred from enclosing context}}
+
+
+  nonisolated func nonisolatedLocalFn() {
+    isolatedLocalFn()
+    // expected-error@-1 {{call to main actor-isolated local function 'isolatedLocalFn()' in a synchronous nonisolated context}}
+  }
+}
+
+class SuperWithIsolatedMethod {
+  @MainActor
+  func isolatedMethod() {}
+}
+
+class InferIsolationViaOverride: SuperWithIsolatedMethod {
+  override func isolatedMethod() {}
+  // expected-note@-1 {{calls to instance method 'isolatedMethod()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@-2 {{main actor isolation inferred from overridden superclass method}}
+
+  nonisolated func callIsolated() {
+    isolatedMethod()
+    // expected-error@-1 {{call to main actor-isolated instance method 'isolatedMethod()' in a synchronous nonisolated context}}
+  }
+}
+
+struct ReferenceSelfDotMethods {
+  @MainActor
+  func mainActorAffinedFunction() {}
+
+  nonisolated
+  private func testCurry() -> (Self) -> (@MainActor () -> Void) {
+    let functionRef = Self.mainActorAffinedFunction
+    // warning goes away with InferSendableFromCaptures, see actor_isolation_swift6.swift
+    return functionRef // expected-warning {{converting non-Sendable function value to '@MainActor @Sendable () -> Void' may introduce data races}}
+  }
+
+  @MainActor
+  private func callOnMainActorOk() {
+    let mainActorAffinedClosure = testCurry()(self)
+    mainActorAffinedClosure()
+  }
+
+  nonisolated
+  private func nonisolatedCallErrors() {
+    let mainActorAffinedClosure = testCurry()(self)
+    // expected-note@-1 {{calls to let 'mainActorAffinedClosure' from outside of its actor context are implicitly asynchronous}}
+    mainActorAffinedClosure()
+    // expected-error@-1 {{call to main actor-isolated let 'mainActorAffinedClosure' in a synchronous nonisolated context}}
+  }
+}
+
+actor UserDefinedActorSelfDotMethod {
+  func actorAffinedFunc() {} // expected-note {{calls to instance method 'actorAffinedFunc()' from outside of its actor context are implicitly asynchronous}}
+
+  // Unfortunately we can't express the desired isolation of this returned closure statically to
+  // be able to call it on the desired actor. This may be possible with the acceptance of
+  // https://forums.swift.org/t/closure-isolation-control/70378 but I think we need more expressivity
+  // in the type system to express this sort of curry.
+  nonisolated
+  private func testCurry() -> (UserDefinedActorSelfDotMethod) -> (@isolated(any) () -> Void) {
+    let functionRef = Self.actorAffinedFunc // expected-error {{call to actor-isolated instance method 'actorAffinedFunc()' in a synchronous nonisolated context}}
+    // error message changes with InferSendabaleFromCaptures - see actor_isolation_swift6.swift
+    return functionRef // expected-error {{cannot convert return expression of type '(isolated Self) -> () -> ()' to return type '(UserDefinedActorSelfDotMethod) -> @isolated(any) () -> Void'}}
+  }
+}
+
+func requireSendableInheritContext(@_inheritActorContext _: @Sendable () -> ()) {}
+// expected-warning@-1 {{@_inheritActorContext only applies to '@isolated(any)' parameters or parameters with asynchronous function types; this will be an error in a future Swift language mode}}
+
+actor InvalidInheritedActorIsolation {
+  func actorFunction() {} // expected-note {{calls to instance method 'actorFunction()' from outside of its actor context are implicitly asynchronous}}
+
+  func test() {
+    requireSendableInheritContext {
+      self.actorFunction()
+      // expected-error@-1 {{call to actor-isolated instance method 'actorFunction()' in a synchronous nonisolated context}}
+    }
+  }
+}
+
+@MainActor
+class InvalidInheritedGlobalActorIsolation {
+  func mainActorFunction() {} // expected-note {{calls to instance method 'mainActorFunction()' from outside of its actor context are implicitly asynchronous}}
+
+  func test() {
+    requireSendableInheritContext {
+      self.mainActorFunction()
+      // expected-error@-1 {{call to main actor-isolated instance method 'mainActorFunction()' in a synchronous nonisolated context}}
+    }
   }
 }

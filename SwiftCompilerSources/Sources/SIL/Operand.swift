@@ -13,7 +13,7 @@
 import SILBridging
 
 /// An operand of an instruction.
-public struct Operand : CustomStringConvertible, NoReflectionChildren {
+public struct Operand : CustomStringConvertible, NoReflectionChildren, Equatable {
   public let bridged: BridgedOperand
 
   public init(bridged: BridgedOperand) {
@@ -26,6 +26,10 @@ public struct Operand : CustomStringConvertible, NoReflectionChildren {
   }
 
   public var value: Value { bridged.getValue().value }
+
+  public func set(to value: Value, _ context: some MutatingContext) {
+    instruction.setOperand(at: index, to: value, context)
+  }
 
   public static func ==(lhs: Operand, rhs: Operand) -> Bool {
     return lhs.bridged.op == rhs.bridged.op
@@ -44,6 +48,12 @@ public struct Operand : CustomStringConvertible, NoReflectionChildren {
   public var endsLifetime: Bool { bridged.isLifetimeEnding() }
 
   public func canAccept(ownership: Ownership) -> Bool { bridged.canAcceptOwnership(ownership._bridged) }
+
+  public func changeOwnership(from: Ownership, to: Ownership, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.changeOwnership(from._bridged, to._bridged)
+    context.notifyInstructionChanged(instruction)
+  }
 
   public var description: String { "operand #\(index) of \(instruction)" }
 }
@@ -87,7 +97,7 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
   
   /// Returns a sub-array defined by `bounds`.
   ///
-  /// Note: this does not return a Slice. The first index of the returnd array is always 0.
+  /// Note: this does not return a Slice. The first index of the returned array is always 0.
   public subscript(bounds: Range<Int>) -> OperandArray {
     assert(bounds.lowerBound >= startIndex && bounds.upperBound <= endIndex)
     return OperandArray(
@@ -105,8 +115,16 @@ public struct UseList : CollectionLikeSequence {
     var currentOpPtr: OptionalBridgedOperand
     
     public mutating func next() -> Operand? {
-      if let op = currentOpPtr.operand {
-        currentOpPtr = op.getNextUse()
+      if let bridgedOp = currentOpPtr.operand {
+        var op = bridgedOp
+        // Skip operands of deleted instructions.
+        while op.isDeleted() {
+          guard let nextOp = op.getNextUse().operand else {
+            return nil
+          }
+          op = nextOp
+        }
+        currentOpPtr = op.getNextUse();
         return Operand(bridged: op)
       }
       return nil
@@ -146,11 +164,15 @@ extension Sequence where Element == Operand {
     self.lazy.filter { !($0.instruction is DebugValueInst) }
   }
 
-  public func filterUsers<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
+  public func filterUses<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
     self.lazy.filter { $0.instruction is I }
   }
 
-  public func ignoreUsers<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
+  public func filterUsers<I: Instruction>(ofType: I.Type) -> LazyMapSequence<LazyFilterSequence<Self>, I> {
+    self.lazy.filter { $0.instruction is I }.lazy.map { $0.instruction as! I }
+  }
+
+  public func ignoreUses<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
     self.lazy.filter { !($0.instruction is I) }
   }
 
@@ -159,15 +181,39 @@ extension Sequence where Element == Operand {
   }
 
   public func getSingleUser<I: Instruction>(ofType: I.Type) -> I? {
-    filterUsers(ofType: I.self).singleUse?.instruction as? I
+    filterUses(ofType: I.self).singleUse?.instruction as? I
   }
 
   public func getSingleUser<I: Instruction>(notOfType: I.Type) -> Instruction? {
-    ignoreUsers(ofType: I.self).singleUse?.instruction
+    ignoreUses(ofType: I.self).singleUse?.instruction
   }
 
   public var endingLifetime: LazyFilterSequence<Self> {
     return self.lazy.filter { $0.endsLifetime }
+  }
+
+  public var users: LazyMapSequence<Self, Instruction> {
+    return self.lazy.map { $0.instruction }
+  }
+
+  public func users<I: Instruction>(ofType: I.Type) -> LazyMapSequence<LazyFilterSequence<Self>, I> {
+    self.lazy.filter{ $0.instruction is I }.lazy.map { $0.instruction as! I }
+  }
+
+  public func replaceAll(with replacement: Value, _ context: some MutatingContext) {
+    for use in self {
+      use.set(to: replacement, context)
+    }
+  }
+}
+
+extension Value {
+  public var users: LazyMapSequence<UseList, Instruction> { uses.users }
+}
+
+extension Instruction {
+  public func isUsing(_ value: Value) -> Bool {
+    return operands.contains { $0.value == value }
   }
 }
 
@@ -186,6 +232,19 @@ extension Operand {
       return true
     case let apply as FullApplySite:
       return apply.isIndirectResult(operand: self)
+    default:
+      return false
+    }
+  }
+}
+
+extension Operand {
+  /// A scope ending use is a consuming use for normal borrow scopes, but it also applies to intructions that end the
+  /// scope of an address (end_access) or a token (end_apply, abort_apply),
+  public var isScopeEndingUse: Bool {
+    switch instruction {
+    case is EndBorrowInst, is EndAccessInst, is EndApplyInst, is AbortApplyInst:
+      return true
     default:
       return false
     }
@@ -223,7 +282,7 @@ public enum OperandOwnership {
   
   /// Escape a pointer into a value which cannot be tracked or verified.
   ///
-  /// PointerEscape  operands indicate a SIL deficiency to suffuciently model dependencies. They never arise from user-level escapes.
+  /// PointerEscape  operands indicate a SIL deficiency to sufficiently model dependencies. They never arise from user-level escapes.
   case pointerEscape
   
   /// Bitwise escape. Escapes the nontrivial contents of the value. OSSA does not enforce the lifetime of the escaping bits. The programmer must explicitly force lifetime extension. (ref_to_unowned, unchecked_trivial_bitcast)
@@ -241,7 +300,11 @@ public enum OperandOwnership {
   /// Interior Pointer. Propagates a trivial value (e.g. address, pointer, or no-escape closure) that depends on the guaranteed value within the base's borrow scope. The verifier checks that all uses of the trivial
   /// value are in scope. (ref_element_addr, open_existential_box)
   case interiorPointer
-  
+
+  /// Any Interior Pointer. An interior pointer that allows any operand ownership. This will be removed as soon as SIL
+  /// migrates away from extraneous borrow scopes.
+  case anyInteriorPointer
+
   /// Forwarded Borrow. Propagates the guaranteed value within the base's borrow scope. (tuple_extract, struct_extract, cast, switch)
   case guaranteedForwarding
   
@@ -255,7 +318,7 @@ public enum OperandOwnership {
     switch self {
     case .nonUse, .trivialUse, .instantaneousUse, .unownedInstantaneousUse,
          .forwardingUnowned, .pointerEscape, .bitwiseEscape, .borrow,
-         .interiorPointer, .guaranteedForwarding:
+         .interiorPointer, .anyInteriorPointer, .guaranteedForwarding:
       return false
     case .destroyingConsume, .forwardingConsume, .endBorrow, .reborrow:
       return true
@@ -286,6 +349,8 @@ public enum OperandOwnership {
       return BridgedOperand.OperandOwnership.ForwardingConsume
     case .interiorPointer:
       return BridgedOperand.OperandOwnership.InteriorPointer
+    case .anyInteriorPointer:
+      return BridgedOperand.OperandOwnership.AnyInteriorPointer
     case .guaranteedForwarding:
       return BridgedOperand.OperandOwnership.GuaranteedForwarding
     case .endBorrow:
@@ -310,6 +375,7 @@ extension Operand {
     case .DestroyingConsume: return .destroyingConsume
     case .ForwardingConsume: return .forwardingConsume
     case .InteriorPointer: return .interiorPointer
+    case .AnyInteriorPointer: return .anyInteriorPointer
     case .GuaranteedForwarding: return .guaranteedForwarding
     case .EndBorrow: return .endBorrow
     case .Reborrow: return .reborrow

@@ -15,6 +15,7 @@ func testGlobalFunctions() {
   let _: Int = publicFunc()
   let _: Int = publicFuncReturnsTypealias()
   let _: Int = publicFuncWithDefaultArg()
+  let _: Int = publicInlinableFunc()
   #if TEST_PACKAGE
   let _: Int = packageFunc()
   #endif
@@ -140,4 +141,9 @@ func testTypealiases() {
 func testOperators() {
   var a: PublicStruct
   a <<< PublicStruct(x: 2)
+}
+
+func testLazyPropertyWithInitClosureReference(t: LazyPropertyWithClosureType) {
+  _ = t.lazyVar
+  t.lazyVar = 42
 }

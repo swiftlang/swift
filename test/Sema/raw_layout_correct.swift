@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature RawLayout -typecheck -verify %s
 
+// REQUIRES: swift_feature_RawLayout
+
 @_rawLayout(like: T)
 struct RawStorage<T>: ~Copyable {}
 

@@ -17,7 +17,6 @@
 #ifndef SWIFT_ABI_TASK_OPTIONS_H
 #define SWIFT_ABI_TASK_OPTIONS_H
 
-#include "swift/ABI/TaskLocal.h"
 #include "swift/ABI/Executor.h"
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/Metadata.h"
@@ -77,23 +76,78 @@ class TaskGroupTaskOptionRecord : public TaskOptionRecord {
 
 /// Task option to specify on what executor the task should be executed.
 ///
-/// Not passing this option implies that an inferred (e.g. surrounding actor
-/// when we inherit execution context) or the default executor should be used.
+/// Not passing this option (or it's alternative "owned" version) implies that
+/// an inferred (e.g. surrounding actor when we inherit execution context)
+/// or the default executor should be used.
 ///
 /// Lack of this option usually means that the global concurrent executor, or
 /// the executor of the enclosing actor will be used.
-class InitialTaskExecutorPreferenceTaskOptionRecord : public TaskOptionRecord {
+class InitialTaskExecutorRefPreferenceTaskOptionRecord : public TaskOptionRecord {
   const TaskExecutorRef Executor;
 
 public:
-  InitialTaskExecutorPreferenceTaskOptionRecord(TaskExecutorRef executor)
-      : TaskOptionRecord(TaskOptionRecordKind::InitialTaskExecutor),
+  InitialTaskExecutorRefPreferenceTaskOptionRecord(TaskExecutorRef executor)
+      : TaskOptionRecord(TaskOptionRecordKind::InitialTaskExecutorUnowned),
         Executor(executor) {}
 
   TaskExecutorRef getExecutorRef() const { return Executor; }
 
   static bool classof(const TaskOptionRecord *record) {
-    return record->getKind() == TaskOptionRecordKind::InitialTaskExecutor;
+    return record->getKind() == TaskOptionRecordKind::InitialTaskExecutorUnowned;
+  }
+};
+
+/// This is quite similar to `InitialTaskExecutorRefPreferenceTaskOptionRecord`
+/// however it takes a "raw" TaskExecutor existential in the form of an Identity
+/// and WitnessTable - rather than the specific UnownedTaskExecutor which already
+/// may have specific "flags" set on it.
+///
+/// In order to use the executor in the runtime, we need to call into the type's
+/// `asUnownedTaskExecutor` which is done by
+/// `getExecutorRefFromUnownedTaskExecutor`.
+class InitialTaskExecutorOwnedPreferenceTaskOptionRecord
+    : public TaskOptionRecord {
+
+  // These look similar to TaskExecutorRef but are NOT the same!
+  // A TaskExecutorRef is obtained through calling user defined
+  // `asUnownedTaskExecutor` which is what we need to do on these to get a real executor ref.
+  HeapObject *Identity;
+  const TaskExecutorWitnessTable *WitnessTable;
+
+public:
+  InitialTaskExecutorOwnedPreferenceTaskOptionRecord(
+      HeapObject *executor, uintptr_t witnessTable)
+      : TaskOptionRecord(TaskOptionRecordKind::InitialTaskExecutorOwned),
+        Identity(executor) {
+    WitnessTable = reinterpret_cast<const TaskExecutorWitnessTable*>(witnessTable);
+  }
+
+  /// Invokes Swift implemented `asUnownedTaskExecutor` in order to obtain an
+  /// `TaskExecutorRef` which is properly populated with any flags it might need.
+  TaskExecutorRef getExecutorRefFromUnownedTaskExecutor() const;
+
+  static bool classof(const TaskOptionRecord *record) {
+    return record->getKind() == TaskOptionRecordKind::InitialTaskExecutorOwned;
+  }
+};
+
+class InitialTaskNameTaskOptionRecord
+    : public TaskOptionRecord {
+
+  const char* TaskName;
+
+public:
+  InitialTaskNameTaskOptionRecord(
+      const char* taskName)
+      : TaskOptionRecord(TaskOptionRecordKind::InitialTaskName),
+        TaskName(taskName) {}
+
+  const char* getTaskName() const {
+    return TaskName;
+  }
+
+  static bool classof(const TaskOptionRecord *record) {
+    return record->getKind() == TaskOptionRecordKind::InitialTaskName;
   }
 };
 
@@ -145,7 +199,7 @@ public:
   AsyncLet *getAsyncLet() const {
     return asyncLet;
   }
-  
+
   void *getResultBuffer() const {
     return resultBuffer;
   }
@@ -160,9 +214,17 @@ class ResultTypeInfoTaskOptionRecord : public TaskOptionRecord {
  public:
   size_t size;
   size_t alignMask;
-  void (*initializeWithCopy)(OpaqueValue *, OpaqueValue *);
-  void (*storeEnumTagSinglePayload)(OpaqueValue *, unsigned, unsigned);
-  void (*destroy)(OpaqueValue *);
+
+  OpaqueValue *(*__ptrauth_swift_value_witness_function_pointer(
+      SpecialPointerAuthDiscriminators::InitializeWithCopy)
+            initializeWithCopy)(OpaqueValue *, OpaqueValue *, void *);
+
+  void (*__ptrauth_swift_value_witness_function_pointer(
+      SpecialPointerAuthDiscriminators::StoreEnumTagSinglePayload)
+            storeEnumTagSinglePayload)(OpaqueValue *, unsigned, unsigned, void *);
+
+  void (*__ptrauth_swift_value_witness_function_pointer(
+      SpecialPointerAuthDiscriminators::Destroy) destroy)(OpaqueValue *, void *);
 
   static bool classof(const TaskOptionRecord *record) {
     return record->getKind() == TaskOptionRecordKind::ResultTypeInfo;

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2021 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,15 +26,177 @@ public protocol Executor: AnyObject, Sendable {
   // Cannot introduce these methods in SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   // since it lacks move-only type support.
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(SwiftStdlib 5.9, *)
+  @available(StdlibDeploymentTarget 5.9, *)
   @available(*, deprecated, message: "Implement 'enqueue(_: consuming ExecutorJob)' instead")
   func enqueue(_ job: consuming Job)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(SwiftStdlib 5.9, *)
+  @available(StdlibDeploymentTarget 5.9, *)
   func enqueue(_ job: consuming ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+  #if os(WASI) || !$Embedded
+  /// `true` if this is the main executor.
+  @available(StdlibDeploymentTarget 6.2, *)
+  var isMainExecutor: Bool { get }
+  #endif // os(WASI) || !$Embedded
+
+  #if !$Embedded
+  /// Return this executable as a SchedulingExecutor, or nil if that is
+  /// unsupported.
+  ///
+  /// Executors that implement SchedulingExecutor should provide their
+  /// own copy of this method, which will allow the compiler to avoid a
+  /// potentially expensive runtime cast.
+  @available(StdlibDeploymentTarget 6.2, *)
+  var asSchedulingExecutor: (any SchedulingExecutor)? { get }
+  #endif
+}
+
+@available(StdlibDeploymentTarget 6.2, *)
+public protocol SchedulingExecutor: Executor {
+
+  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+  /// Enqueue a job to run after a specified delay.
+  ///
+  /// You need only implement one of the two enqueue functions here;
+  /// the default implementation for the other will then call the one
+  /// you have implemented.
+  ///
+  /// Parameters:
+  ///
+  /// - job:       The job to schedule.
+  /// - after:     A `Duration` specifying the time after which the job
+  ///              is to run.  The job will not be executed before this
+  ///              time has elapsed.
+  /// - tolerance: The maximum additional delay permissible before the
+  ///              job is executed.  `nil` means no limit.
+  /// - clock:     The clock used for the delay.
+  @available(StdlibDeploymentTarget 6.2, *)
+  func enqueue<C: Clock>(_ job: consuming ExecutorJob,
+                         after delay: C.Duration,
+                         tolerance: C.Duration?,
+                         clock: C)
+
+  /// Enqueue a job to run at a specified time.
+  ///
+  /// You need only implement one of the two enqueue functions here;
+  /// the default implementation for the other will then call the one
+  /// you have implemented.
+  ///
+  /// Parameters:
+  ///
+  /// - job:       The job to schedule.
+  /// - at:        The `Instant` at which the job should run.  The job
+  ///              will not be executed before this time.
+  /// - tolerance: The maximum additional delay permissible before the
+  ///              job is executed.  `nil` means no limit.
+  /// - clock:     The clock used for the delay..
+  @available(StdlibDeploymentTarget 6.2, *)
+  func enqueue<C: Clock>(_ job: consuming ExecutorJob,
+                         at instant: C.Instant,
+                         tolerance: C.Duration?,
+                         clock: C)
+
+  #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+}
+
+extension Actor {
+
+  /// Perform an operation with the actor's ``SerialExecutor``.
+  ///
+  /// This converts the actor's ``Actor/unownedExecutor`` to a ``SerialExecutor`` while
+  /// retaining the actor for the duration of the operation. This is to ensure the lifetime
+  /// of the executor while performing the operation.
+  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 5.1, *)
+  public nonisolated func withSerialExecutor<T: ~Copyable, E: Error>(_ operation: (any SerialExecutor) throws(E) -> T) throws(E) -> T {
+    try operation(unsafe unsafeBitCast(self.unownedExecutor, to: (any SerialExecutor).self))
+  }
+
+  /// Perform an operation with the actor's ``SerialExecutor``.
+  ///
+  /// This converts the actor's ``Actor/unownedExecutor`` to a ``SerialExecutor`` while
+  /// retaining the actor for the duration of the operation. This is to ensure the lifetime
+  /// of the executor while performing the operation.
+  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 5.1, *)
+  public nonisolated func withSerialExecutor<T: ~Copyable, E: Error>(_ operation: nonisolated(nonsending) (any SerialExecutor) async throws(E) -> T) async throws(E) -> T {
+    try await operation(unsafe unsafeBitCast(self.unownedExecutor, to: (any SerialExecutor).self))
+  }
+}
+
+extension Executor {
+
+  #if !$Embedded
+  /// Return this executor as a SchedulingExecutor, or nil if that is
+  /// unsupported.
+  ///
+  /// Executors that implement SchedulingExecutor should provide their
+  /// own copy of this method, which will allow the compiler to avoid a
+  /// potentially expensive runtime cast.
+  @available(StdlibDeploymentTarget 6.2, *)
+  public var asSchedulingExecutor: (any SchedulingExecutor)? {
+    return self as? SchedulingExecutor
+  }
+  #endif
+
+}
+
+extension Executor {
+  @available(SwiftStdlib 6.2, *)
+  @usableFromInline
+  internal var _isComplexEquality: Bool { false }
+}
+
+extension Executor where Self: Equatable {
+  @available(SwiftStdlib 6.2, *)
+  @usableFromInline
+  internal var _isComplexEquality: Bool { true }
+}
+
+extension Executor {
+  #if os(WASI) || !$Embedded
+  // This defaults to `false` so that existing third-party Executor
+  // implementations will work as expected.
+  @available(StdlibDeploymentTarget 6.2, *)
+  public var isMainExecutor: Bool { false }
+  #endif // os(WASI) || !$Embedded
+
+}
+
+// Delay support
+@available(StdlibDeploymentTarget 6.2, *)
+extension SchedulingExecutor {
+
+  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+  @available(StdlibDeploymentTarget 6.2, *)
+  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
+                                after delay: C.Duration,
+                                tolerance: C.Duration? = nil,
+                                clock: C) {
+    // If you crash here with a mutual recursion, it's because you didn't
+    // implement one of these two functions
+    enqueue(job, at: clock.now.advanced(by: delay),
+            tolerance: tolerance, clock: clock)
+  }
+
+  @available(StdlibDeploymentTarget 6.2, *)
+  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
+                                at instant: C.Instant,
+                                tolerance: C.Duration? = nil,
+                                clock: C) {
+    // If you crash here with a mutual recursion, it's because you didn't
+    // implement one of these two functions
+    enqueue(job, after: clock.now.duration(to: instant),
+            tolerance: tolerance, clock: clock)
+  }
+
+  #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
 
 /// A service that executes jobs.
@@ -127,7 +289,7 @@ public protocol SerialExecutor: Executor {
   // avoid drilling down to the base conformance just for the basic
   // work-scheduling operation.
   @_nonoverride
-  @available(SwiftStdlib 5.9, *)
+  @available(StdlibDeploymentTarget 5.9, *)
   @available(*, deprecated, message: "Implement 'enqueue(_: consuming ExecutorJob)' instead")
   func enqueue(_ job: consuming Job)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -138,12 +300,13 @@ public protocol SerialExecutor: Executor {
   // avoid drilling down to the base conformance just for the basic
   // work-scheduling operation.
   @_nonoverride
-  @available(SwiftStdlib 5.9, *)
+  @available(StdlibDeploymentTarget 5.9, *)
   func enqueue(_ job: consuming ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
   /// Convert this executor value to the optimized form of borrowed
   /// executor references.
+  @unsafe
   func asUnownedSerialExecutor() -> UnownedSerialExecutor
 
   /// If this executor has complex equality semantics, and the runtime needs to
@@ -168,7 +331,7 @@ public protocol SerialExecutor: Executor {
   /// - Returns: `true`, if `self` and the `other` executor actually are
   ///            mutually exclusive and it is safe–from a concurrency
   ///            perspective–to execute code assuming one on the other.
-  @available(SwiftStdlib 5.9, *)
+  @available(StdlibDeploymentTarget 5.9, *)
   func isSameExclusiveExecutionContext(other: Self) -> Bool
 
   /// Last resort "fallback" isolation check, called when the concurrency runtime
@@ -191,21 +354,81 @@ public protocol SerialExecutor: Executor {
   ///
   /// - Warning: This method must crash and halt program execution if unable
   ///     to prove the isolation of the calling context.
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   func checkIsolated()
+
+  /// Checks if the current execution context is isolated by this executor.
+  ///
+  /// This function can be called by the runtime in order to perform assertions,
+  /// or attempt to issue warnings about unexpected isolation.
+  ///
+  /// This method will be invoked _before_ `checkIsolated` and may also be invoked
+  /// when crashing is not an acceptable outcome of a check (e.g. when attempting to issue isolation _warnings_).
+  ///
+  /// Implementations should prefer to implement this method rather than `checkIsolated()` since it can often
+  /// result in more tailored error messages. It is allowed, and useful for backwards compatibility with old
+  /// runtimes which are not able to invoke `isIsolatingCurrentContext()` to implement `checkIsolated()`,
+  /// even if an implementation is able to implement this method. Often times an implementation of `checkIsolated()`,
+  /// would then invoke `isIsolatingCurrentContext()` and crash if the returned value was `false`.
+  ///
+  /// The default implementation returns `nil` is used to indicate that it is "unknown" if the current context is
+  /// isolated by this serial executor. The runtime then _may_ proceed to invoke `checkIsolated()` as a last-resort
+  /// attempt to verify the isolation of the current context.
+  @available(StdlibDeploymentTarget 6.2, *)
+  func isIsolatingCurrentContext() -> Bool?
 
 }
 
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension SerialExecutor {
 
-  @available(SwiftStdlib 6.0, *)
+  #if os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+  @available(StdlibDeploymentTarget 6.2, *)
+  public var isMainExecutor: Bool { return MainActor.executor._isSameExecutor(self) }
+  #endif // os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+
+  @available(StdlibDeploymentTarget 6.0, *)
   public func checkIsolated() {
     #if !$Embedded
     fatalError("Unexpected isolation context, expected to be executing on \(Self.self)")
     #else
     Builtin.int_trap()
     #endif
+  }
+
+  #if SWIFT_CONCURRENCY_USES_DISPATCH
+  @available(StdlibDeploymentTarget 6.2, *)
+  private var _dispatchQueue: OpaquePointer? {
+    return unsafe _getDispatchQueueForExecutor(self.asUnownedSerialExecutor())
+  }
+  #endif
+
+  @available(StdlibDeploymentTarget 6.2, *)
+  internal func _isSameExecutor(_ rhs: some SerialExecutor) -> Bool {
+    if rhs === self {
+      return true
+    }
+    #if SWIFT_CONCURRENCY_USES_DISPATCH
+    if let rhsQueue = unsafe rhs._dispatchQueue {
+      if let ourQueue = unsafe _dispatchQueue, ourQueue == rhsQueue {
+        return true
+      }
+      return false
+    }
+    #endif
+    if let rhs = rhs as? Self {
+      return isSameExclusiveExecutionContext(other: rhs)
+    }
+    return false
+  }
+}
+
+@available(StdlibDeploymentTarget 6.2, *)
+extension SerialExecutor {
+
+  @available(StdlibDeploymentTarget 6.2, *)
+  public func isIsolatingCurrentContext() -> Bool? {
+    return nil
   }
 }
 
@@ -226,8 +449,7 @@ extension SerialExecutor {
 /// the provided task executor.
 ///
 /// Unstructured tasks do not inherit the task executor.
-@_unavailableInEmbedded
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 public protocol TaskExecutor: Executor {
   // This requirement is repeated here as a non-override so that we
   // get a redundant witness-table entry for it.  This allows us to
@@ -258,16 +480,15 @@ public protocol TaskExecutor: Executor {
   func asUnownedTaskExecutor() -> UnownedTaskExecutor
 }
 
-@_unavailableInEmbedded
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension TaskExecutor {
   public func asUnownedTaskExecutor() -> UnownedTaskExecutor {
-    UnownedTaskExecutor(ordinary: self)
+    unsafe UnownedTaskExecutor(ordinary: self)
   }
 }
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-@available(SwiftStdlib 5.9, *)
+@available(StdlibDeploymentTarget 5.9, *)
 extension Executor {
 
   // Delegation goes like this:
@@ -287,23 +508,234 @@ extension Executor {
 }
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-@available(SwiftStdlib 5.9, *)
+@available(StdlibDeploymentTarget 5.9, *)
 extension SerialExecutor {
-  @available(SwiftStdlib 5.9, *)
+  @available(StdlibDeploymentTarget 5.9, *)
   public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
-    UnownedSerialExecutor(ordinary: self)
+    unsafe UnownedSerialExecutor(ordinary: self)
   }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(StdlibDeploymentTarget 5.9, *)
 extension SerialExecutor {
 
-  @available(SwiftStdlib 5.9, *)
+  @available(StdlibDeploymentTarget 5.9, *)
   public func isSameExclusiveExecutionContext(other: Self) -> Bool {
     return self === other
   }
 
 }
+
+@available(StdlibDeploymentTarget 6.2, *)
+extension SerialExecutor where Self: Equatable {
+
+  @available(StdlibDeploymentTarget 6.2, *)
+  public func isSameExclusiveExecutionContext(other: Self) -> Bool {
+    return self == other
+  }
+
+}
+
+/// An executor that is backed by some kind of run loop.
+///
+/// The idea here is that some executors may work by running a loop
+/// that processes events of some sort; we want a way to enter that loop,
+/// and we would also like a way to trigger the loop to exit.
+@available(StdlibDeploymentTarget 6.2, *)
+public protocol RunLoopExecutor: Executor {
+  /// Run the executor's run loop.
+  ///
+  /// This method will synchronously block the calling thread.  Nested calls to
+  /// `run()` may be permitted, however it is not permitted to call `run()` on a
+  /// single executor instance from more than one thread.
+  func run() throws
+
+  /// Run the executor's run loop until a condition is satisfied.
+  ///
+  /// Not every `RunLoopExecutor` will support this method; you must not call
+  /// it unless you *know* that it is supported.  The default implementation
+  /// generates a fatal error.
+  ///
+  /// Parameters:
+  ///
+  /// - condition: A closure that returns `true` if the run loop should
+  ///              stop.
+  func runUntil(_ condition: () -> Bool) throws
+
+  /// Signal to the run loop to stop running and return.
+  ///
+  /// This method may be called from the same thread that is in the `run()`
+  /// method, or from some other thread.  It will not wait for the run loop to
+  /// stop; calling this method simply signals that the run loop *should*, as
+  /// soon as is practicable, stop the innermost `run()` invocation and make
+  /// that `run()` invocation return.
+  func stop()
+}
+
+@available(StdlibDeploymentTarget 6.2, *)
+extension RunLoopExecutor {
+
+  public func runUntil(_ condition: () -> Bool) throws {
+    fatalError("run(until condition:) not supported on this executor")
+  }
+
+}
+
+
+/// The main executor must conform to these two protocols; we have to
+/// make this a protocol for compatibility with Embedded Swift.
+@available(StdlibDeploymentTarget 6.2, *)
+public protocol MainExecutor: RunLoopExecutor, SerialExecutor {
+}
+
+
+/// An ExecutorFactory is used to create the default main and task
+/// executors.
+@available(StdlibDeploymentTarget 6.2, *)
+public protocol ExecutorFactory {
+  #if os(WASI) || !$Embedded
+  /// Constructs and returns the main executor, which is started implicitly
+  /// by the `async main` entry point and owns the "main" thread.
+  static var mainExecutor: any MainExecutor { get }
+  #endif // os(WASI) || !$Embedded
+
+  /// Constructs and returns the default or global executor, which is the
+  /// default place in which we run tasks.
+  static var defaultExecutor: any TaskExecutor { get }
+}
+
+@available(StdlibDeploymentTarget 6.2, *)
+typealias DefaultExecutorFactory = PlatformExecutorFactory
+
+@available(StdlibDeploymentTarget 6.2, *)
+@_silgen_name("swift_createExecutors")
+public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
+  #if os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+  MainActor._executor = factory.mainExecutor
+  #endif // os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+  Task._defaultExecutor = factory.defaultExecutor
+}
+
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_createDefaultExecutors")
+func _createDefaultExecutors() {
+  if Task._defaultExecutor == nil {
+    _createExecutors(factory: DefaultExecutorFactory.self)
+  }
+}
+
+#if os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+extension MainActor {
+  @available(StdlibDeploymentTarget 6.2, *)
+  static var _executor: (any MainExecutor)? = nil
+
+  /// The main executor, which is started implicitly by the `async main`
+  /// entry point and owns the "main" thread.
+  ///
+  /// Attempting to set this after the first `enqueue` on the main
+  /// executor is a fatal error.
+  @available(StdlibDeploymentTarget 6.2, *)
+  public static var executor: any MainExecutor {
+    // It would be good if there was a Swift way to do this
+    _createDefaultExecutorsOnce()
+    return _executor!
+  }
+
+  /// An unowned version of the above, for performance
+  @available(StdlibDeploymentTarget 6.2, *)
+  static var unownedExecutor: UnownedSerialExecutor {
+    _createDefaultExecutorsOnce()
+    return unsafe UnownedSerialExecutor(ordinary: _executor!)
+  }
+}
+#endif // os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+
+extension Task where Success == Never, Failure == Never {
+  @available(StdlibDeploymentTarget 6.2, *)
+  static var _defaultExecutor: (any TaskExecutor)? = nil
+
+  /// The default or global executor, which is the default place in which
+  /// we run tasks.
+  ///
+  /// Attempting to set this after the first `enqueue` on the global
+  /// executor is a fatal error.
+  @available(StdlibDeploymentTarget 6.2, *)
+  public static var defaultExecutor: any TaskExecutor {
+    // It would be good if there was a Swift way to do this
+    _createDefaultExecutorsOnce()
+    return _defaultExecutor!
+  }
+
+  /// An unowned version of the above, for performance
+  @available(StdlibDeploymentTarget 6.2, *)
+  static var unownedDefaultExecutor: UnownedTaskExecutor {
+    _createDefaultExecutorsOnce()
+    return unsafe UnownedTaskExecutor(_defaultExecutor!)
+  }
+}
+
+extension Task where Success == Never, Failure == Never {
+  /// Get the current executor; this is the executor that the currently
+  /// executing task is executing on.
+  ///
+  /// This will return, in order of preference:
+  ///
+  ///   1. The custom executor associated with an `Actor` on which we are
+  ///      currently running, or
+  ///   2. The preferred executor for the currently executing `Task`, or
+  ///   3. The task executor for the current thread
+  ///
+  ///  If none of these exist, returns the default executor.
+  @available(StdlibDeploymentTarget 6.2, *)
+  @_unavailableInEmbedded
+  public static var currentExecutor: any Executor {
+    if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor() {
+      return activeExecutor
+    } else if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor() {
+      return taskExecutor
+    } else if let taskExecutor = unsafe _getCurrentTaskExecutor().asTaskExecutor() {
+      return taskExecutor
+    }
+    return defaultExecutor
+  }
+
+  /// Get the preferred executor for the current `Task`, if any.
+  @available(StdlibDeploymentTarget 6.2, *)
+  public static var preferredExecutor: (any TaskExecutor)? {
+    if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor() {
+      return taskExecutor
+    }
+    return nil
+  }
+
+  #if !$Embedded
+  /// Get the current *scheduling* executor, if any.
+  ///
+  /// This follows the same logic as `currentExecutor`, except that it ignores
+  /// any executor that isn't a `SchedulingExecutor`.
+  @available(StdlibDeploymentTarget 6.2, *)
+  public static var currentSchedulingExecutor: (any SchedulingExecutor)? {
+    if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor(),
+       let scheduling = activeExecutor.asSchedulingExecutor {
+      return scheduling
+    }
+    if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor(),
+       let scheduling = taskExecutor.asSchedulingExecutor {
+      return scheduling
+    }
+    if let taskExecutor = unsafe _getCurrentTaskExecutor().asTaskExecutor(),
+       let scheduling = taskExecutor.asSchedulingExecutor {
+      return scheduling
+    }
+    if let scheduling = defaultExecutor.asSchedulingExecutor {
+      return scheduling
+    }
+    return nil
+  }
+  #endif
+
+}
+
 
 /// An unowned reference to a serial executor (a `SerialExecutor`
 /// value).
@@ -317,9 +749,9 @@ extension SerialExecutor {
 /// different objects, the executor must be referenced strongly by the
 /// actor.
 @available(SwiftStdlib 5.1, *)
+@unsafe
 @frozen
 public struct UnownedSerialExecutor: Sendable {
-  #if compiler(>=5.5) && $BuiltinExecutor
   @usableFromInline
   internal var executor: Builtin.Executor
 
@@ -327,24 +759,17 @@ public struct UnownedSerialExecutor: Sendable {
   /// which needs to reach for this from an @_transparent function which prevents @_spi use.
   @available(SwiftStdlib 5.9, *)
   public var _executor: Builtin.Executor {
-    self.executor
+    unsafe self.executor
   }
-  #endif
 
   @inlinable
   public init(_ executor: Builtin.Executor) {
-    #if compiler(>=5.5) && $BuiltinExecutor
-    self.executor = executor
-    #endif
+    unsafe self.executor = executor
   }
 
   @inlinable
   public init<E: SerialExecutor>(ordinary executor: __shared E) {
-    #if compiler(>=5.5) && $BuiltinBuildExecutor
-    self.executor = Builtin.buildOrdinarySerialExecutorRef(executor)
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
+    unsafe self.executor = Builtin.buildOrdinarySerialExecutorRef(executor)
   }
 
   /// Opts the executor into complex "same exclusive execution context" equality checks.
@@ -360,27 +785,38 @@ public struct UnownedSerialExecutor: Sendable {
   @available(SwiftStdlib 5.9, *)
   @inlinable
   public init<E: SerialExecutor>(complexEquality executor: __shared E) {
-    #if compiler(>=5.9) && $BuiltinBuildComplexEqualityExecutor
-    self.executor = Builtin.buildComplexEqualitySerialExecutorRef(executor)
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
+    unsafe self.executor = Builtin.buildComplexEqualitySerialExecutorRef(executor)
+  }
+
+  /// Automatically opt-in to complex equality semantics if the Executor
+  /// implements `Equatable`.
+  @available(SwiftStdlib 6.2, *)
+  @inlinable
+  public init<E: SerialExecutor>(_ executor: __shared E) {
+    if executor._isComplexEquality {
+      unsafe self.executor = Builtin.buildComplexEqualitySerialExecutorRef(executor)
+    } else {
+      unsafe self.executor = Builtin.buildOrdinarySerialExecutorRef(executor)
+    }
   }
 
   @_spi(ConcurrencyExecutors)
   @available(SwiftStdlib 5.9, *)
   public var _isComplexEquality: Bool {
-    _executor_isComplexEquality(self)
+    unsafe _executor_isComplexEquality(self)
   }
 
+  @available(StdlibDeploymentTarget 6.2, *)
+  public func asSerialExecutor() -> (any SerialExecutor)? {
+    return unsafe unsafeBitCast(executor, to: (any SerialExecutor)?.self)
+  }
 }
 
 
-@_unavailableInEmbedded
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
+@unsafe
 @frozen
 public struct UnownedTaskExecutor: Sendable {
-  #if $BuiltinExecutor
   @usableFromInline
   internal var executor: Builtin.Executor
 
@@ -388,33 +824,36 @@ public struct UnownedTaskExecutor: Sendable {
   /// which needs to reach for this from an @_transparent function which prevents @_spi use.
   @available(SwiftStdlib 6.0, *)
   public var _executor: Builtin.Executor {
-    self.executor
+    unsafe self.executor
   }
-  #endif
 
   @inlinable
   public init(_ executor: Builtin.Executor) {
-    #if $BuiltinExecutor
-    self.executor = executor
-    #endif
+    unsafe self.executor = executor
   }
 
   @inlinable
   public init<E: TaskExecutor>(ordinary executor: __shared E) {
-    #if $BuiltinBuildTaskExecutorRef
-    self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
+    unsafe self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
+  }
+
+  @available(StdlibDeploymentTarget 6.2, *)
+  @inlinable
+  public init<E: TaskExecutor>(_ executor: __shared E) {
+    unsafe self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
+  }
+
+  @available(StdlibDeploymentTarget 6.2, *)
+  public func asTaskExecutor() -> (any TaskExecutor)? {
+    return unsafe unsafeBitCast(executor, to: (any TaskExecutor)?.self)
   }
 }
 
-@_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
 extension UnownedTaskExecutor: Equatable {
   @inlinable
   public static func == (_ lhs: UnownedTaskExecutor, _ rhs: UnownedTaskExecutor) -> Bool {
-    unsafeBitCast(lhs.executor, to: (Int, Int).self) == unsafeBitCast(rhs.executor, to: (Int, Int).self)
+    unsafe unsafeBitCast(lhs.executor, to: (Int, Int).self) == unsafeBitCast(rhs.executor, to: (Int, Int).self)
   }
 }
 
@@ -467,7 +906,7 @@ func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
 /// otherwise returns only the job's 32bit Id.
 ///
 /// - Returns: the Id stored in this ExecutorJob or Task, for purposes of debug printing
-@available(SwiftStdlib 5.9, *)
+@available(StdlibDeploymentTarget 5.9, *)
 @_silgen_name("swift_task_getJobTaskId")
 internal func _getJobTaskId(_ job: UnownedJob) -> UInt64
 
@@ -485,39 +924,66 @@ internal func _task_serialExecutor_checkIsolated<E>(executor: E)
   executor.checkIsolated()
 }
 
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("_task_serialExecutor_isIsolatingCurrentContext")
+internal func _task_serialExecutor_isIsolatingCurrentContext<E>(executor: E) -> Int8
+  where E: SerialExecutor {
+  switch executor.isIsolatingCurrentContext() {
+  case nil: -1 // unknown
+  case .some(false): 0 // not isolated
+  case .some(true): 1 // isolated!
+  }
+}
+
 /// Obtain the executor ref by calling the executor's `asUnownedSerialExecutor()`.
 /// The obtained executor ref will have all the user-defined flags set on the executor.
 @available(SwiftStdlib 5.9, *)
 @_silgen_name("_task_serialExecutor_getExecutorRef")
 internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.Executor
     where E: SerialExecutor {
-  return executor.asUnownedSerialExecutor().executor
+  return unsafe executor.asUnownedSerialExecutor().executor
 }
 
 /// Obtain the executor ref by calling the executor's `asUnownedTaskExecutor()`.
 /// The obtained executor ref will have all the user-defined flags set on the executor.
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
-@_silgen_name("_task_executor_getTaskExecutorRef")
-internal func _task_executor_getTaskExecutorRef(_ taskExecutor: any TaskExecutor) -> Builtin.Executor {
-  return taskExecutor.asUnownedTaskExecutor().executor
+@_silgen_name("_task_taskExecutor_getTaskExecutorRef")
+internal func _task_taskExecutor_getTaskExecutorRef<E>(_ taskExecutor: E) -> Builtin.Executor
+    where E: TaskExecutor {
+  return unsafe taskExecutor.asUnownedTaskExecutor().executor
 }
 
+#if $Embedded
+@_silgen_name("_swift_task_enqueueOnExecutor")
+internal func _enqueueOnExecutor(job unownedJob: UnownedJob, executor: any SerialExecutor) {
+  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  if #available(StdlibDeploymentTarget 5.9, *) {
+    executor.enqueue(ExecutorJob(context: unownedJob._context))
+  } else {
+    fatalError("we shouldn't get here; if we have, availability is broken")
+  }
+  #else // SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  executor.enqueue(unownedJob)
+  #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+}
+#else
 // Used by the concurrency runtime
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("_swift_task_enqueueOnExecutor")
 internal func _enqueueOnExecutor<E>(job unownedJob: UnownedJob, executor: E)
 where E: SerialExecutor {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  if #available(SwiftStdlib 5.9, *) {
+  if #available(StdlibDeploymentTarget 5.9, *) {
     executor.enqueue(ExecutorJob(context: unownedJob._context))
   } else {
-    executor.enqueue(unownedJob)
+    fatalError("we shouldn't get here; if we have, availability is broken")
   }
   #else // SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   executor.enqueue(unownedJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
+#endif // #if $Embedded
 
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
@@ -554,7 +1020,15 @@ internal final class DispatchQueueShim: @unchecked Sendable, SerialExecutor {
   }
 
   func asUnownedSerialExecutor() -> UnownedSerialExecutor {
-    return UnownedSerialExecutor(ordinary: self)
+    return unsafe UnownedSerialExecutor(ordinary: self)
   }
 }
 #endif // SWIFT_CONCURRENCY_USES_DISPATCH
+
+@available(SwiftStdlib 6.1, *)
+@_silgen_name("swift_task_deinitOnExecutor")
+@usableFromInline
+internal func _deinitOnExecutor(_ object: __owned AnyObject,
+                                _ work: @convention(thin) (__owned AnyObject) -> Void,
+                                _ executor: Builtin.Executor,
+                                _ flags: Builtin.Word)

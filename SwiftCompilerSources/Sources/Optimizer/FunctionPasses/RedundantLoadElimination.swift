@@ -12,7 +12,7 @@
 
 import SIL
 
-/// Replaces redundant load instructions with already available values.
+/// Replaces redundant `load` or `copy_addr` instructions with already available values.
 ///
 /// A load is redundant if the loaded value is already available at that point.
 /// This can be via a preceding store to the same address:
@@ -52,6 +52,9 @@ import SIL
 ///     %f2 = load %fa2
 ///     %2 = struct (%f1, %f2)
 ///
+/// This works in a similar fashion for `copy_addr`. If the source value of the `copy_addr` is
+/// already available, the `copy_addr` is replaced by a `store` of the available value.
+///
 /// The algorithm is a data flow analysis which starts at the original load and searches
 /// for preceding stores or loads by following the control flow in backward direction.
 /// The preceding stores and loads provide the "available values" with which the original
@@ -63,21 +66,33 @@ import SIL
 ///
 let redundantLoadElimination = FunctionPass(name: "redundant-load-elimination") {
     (function: Function, context: FunctionPassContext) in
-  eliminateRedundantLoads(in: function, ignoreArrays: false, context)
+  _ = eliminateRedundantLoads(in: function, variant: .regular, context)
 }
 
 // Early RLE does not touch loads from Arrays. This is important because later array optimizations,
 // like ABCOpt, get confused if an array load in a loop is converted to a pattern with a phi argument.
 let earlyRedundantLoadElimination = FunctionPass(name: "early-redundant-load-elimination") {
     (function: Function, context: FunctionPassContext) in
-  eliminateRedundantLoads(in: function, ignoreArrays: true, context)
+  _ = eliminateRedundantLoads(in: function, variant: .early, context)
 }
 
-private func eliminateRedundantLoads(in function: Function, ignoreArrays: Bool, _ context: FunctionPassContext) {
+let mandatoryRedundantLoadElimination = FunctionPass(name: "mandatory-redundant-load-elimination") {
+    (function: Function, context: FunctionPassContext) in
+  _ = eliminateRedundantLoads(in: function, variant: .mandatory, context)
+}
 
+enum RedundantLoadEliminationVariant {
+  case mandatory, mandatoryInGlobalInit, early, regular
+}
+
+func eliminateRedundantLoads(in function: Function,
+                             variant: RedundantLoadEliminationVariant,
+                             _ context: FunctionPassContext) -> Bool
+{
   // Avoid quadratic complexity by limiting the number of visited instructions.
   // This limit is sufficient for most "real-world" functions, by far.
   var complexityBudget = 50_000
+  var changed = false
 
   for block in function.blocks.reversed() {
 
@@ -87,56 +102,135 @@ private func eliminateRedundantLoads(in function: Function, ignoreArrays: Bool, 
     while let i = inst {
       defer { inst = i.previous }
 
-      if let load = inst as? LoadInst {
+      if let load = inst as? LoadingInstruction {
         if !context.continueWithNextSubpassRun(for: load) {
-          return
+          return changed
         }
-        if ignoreArrays && load.type.isNominal && load.type.nominal == context.swiftArrayDecl {
-          continue
+        if complexityBudget < 20 {
+          complexityBudget = 20
         }
-        tryEliminate(load: load, complexityBudget: &complexityBudget, context)
+        if !load.isEligibleForElimination(in: variant, context) {
+          continue;
+        }
+        changed = tryEliminate(load: load, complexityBudget: &complexityBudget, context) || changed
       }
     }
   }
+  return changed
 }
 
-private func tryEliminate(load: LoadInst, complexityBudget: inout Int, _ context: FunctionPassContext) {
+/// Either a `load` or a `copy_addr` (which is equivalent to a load+store).
+private protocol LoadingInstruction: Instruction {
+  var address: Value { get }
+  var type: Type { get }
+  var ownership: Ownership { get }
+  var loadOwnership: LoadInst.LoadOwnership { get }
+  var canLoadValue: Bool { get }
+  func trySplit(_ context: FunctionPassContext) -> Bool
+  func materializeLoadForReplacement(_ context: FunctionPassContext) -> LoadInst
+}
+
+extension LoadInst : LoadingInstruction {
+  // We know that the type is loadable because - well - this is a load.
+  var canLoadValue: Bool { true }
+
+  // Nothing to materialize, because this is already a `load`.
+  func materializeLoadForReplacement(_ context: FunctionPassContext) -> LoadInst { return self }
+}
+
+extension CopyAddrInst : LoadingInstruction {
+  var address: Value { source }
+  var type: Type { address.type.objectType }
+  var typeIsLoadable: Bool { type.isLoadable(in: parentFunction) }
+
+  var ownership: Ownership {
+    if !parentFunction.hasOwnership || type.isTrivial(in: parentFunction) {
+      return .none
+    }
+    // Regardless of if the copy is taking or copying, the loaded value is an owned value.
+    return .owned
+  }
+
+  var canLoadValue: Bool {
+    if !source.type.isLoadable(in: parentFunction) {
+      // Although the original load's type is loadable (obviously), it can be projected-out
+      // from the copy_addr's type which might be not loadable.
+      return false
+    }
+    if !parentFunction.hasOwnership {
+      if !isTakeOfSource || !isInitializationOfDestination {
+        // For simplicity, bail if we would have to insert compensating retains and releases.
+        return false
+      }
+    }
+    return true
+  }
+
+  func materializeLoadForReplacement(_ context: FunctionPassContext) -> LoadInst {
+    return replaceWithLoadAndStore(context).load
+  }
+}
+
+private func tryEliminate(load: LoadingInstruction, complexityBudget: inout Int, _ context: FunctionPassContext) -> Bool {
   switch load.isRedundant(complexityBudget: &complexityBudget, context) {
   case .notRedundant:
-    break
+    return false
   case .redundant(let availableValues):
     replace(load: load, with: availableValues, context)
+    return true
   case .maybePartiallyRedundant(let subPath):
     // Check if the a partial load would really be redundant to avoid unnecessary splitting.
     switch load.isRedundant(at: subPath, complexityBudget: &complexityBudget, context) {
       case .notRedundant, .maybePartiallyRedundant:
-        break
+        return false
       case .redundant:
         // The new individual loads are inserted right before the current load and
         // will be optimized in the following loop iterations.
-        load.trySplit(context)
+        return load.trySplit(context)
     }
   }
 }
 
-private extension LoadInst {
+private extension LoadingInstruction {
 
-  enum DataflowResult {
-    case notRedundant
-    case redundant([AvailableValue])
-    case maybePartiallyRedundant(AccessPath)
-
-    init(notRedundantWith subPath: AccessPath?) {
-      if let subPath = subPath {
-        self = .maybePartiallyRedundant(subPath)
-      } else {
-        self = .notRedundant
-      }
+  func isEligibleForElimination(in variant: RedundantLoadEliminationVariant, _ context: FunctionPassContext) -> Bool {
+    if !canLoadValue {
+      return false
     }
+    switch variant {
+    case .mandatory, .mandatoryInGlobalInit:
+      if loadOwnership == .take {
+        // load [take] would require to shrinkMemoryLifetime. But we don't want to do this in the mandatory
+        // pipeline to not shrink or remove an alloc_stack which is relevant for debug info.
+        return false
+      }
+      switch address.accessBase {
+      case .box, .stack:
+        break
+      default:
+        return false
+      }
+    case .early:
+      // See the comment of `earlyRedundantLoadElimination`.
+      if let nominal = self.type.nominal, nominal == context.swiftArrayDecl {
+        return false
+      }
+    case .regular:
+      break
+    }
+    // Check if the type can be expanded without a significant increase to code size.
+    // We block redundant load elimination because it might increase register pressure for large values.
+    // Furthermore, this pass also splits values into its projections (e.g shrinkMemoryLifetimeAndSplit).
+    // But: it is required to remove loads, even of large structs, in global init functions to ensure
+    // that globals (containing large structs) can be statically initialized.
+    if variant != .mandatoryInGlobalInit, !self.type.shouldExpand(context) {
+       return false
+    }
+    return true
   }
 
   func isRedundant(complexityBudget: inout Int, _ context: FunctionPassContext) -> DataflowResult {
-    return isRedundant(at: address.accessPath, complexityBudget: &complexityBudget, context)
+    return isRedundant(at: address.constantAccessPath, complexityBudget: &complexityBudget, context)
   }
 
   func isRedundant(at accessPath: AccessPath, complexityBudget: inout Int, _ context: FunctionPassContext) -> DataflowResult {
@@ -235,11 +329,11 @@ private extension LoadInst {
   }
 }
 
-private func replace(load: LoadInst, with availableValues: [AvailableValue], _ context: FunctionPassContext) {
+private func replace(load: LoadingInstruction, with availableValues: [AvailableValue], _ context: FunctionPassContext) {
   var ssaUpdater = SSAUpdater(function: load.parentFunction,
                               type: load.type, ownership: load.ownership, context)
 
-  for availableValue in availableValues {
+  for availableValue in availableValues.replaceCopyAddrsWithLoadsAndStores(context) {
     let block = availableValue.instruction.parentBlock
     let availableValue = provideValue(for: load, from: availableValue, context)
     ssaUpdater.addAvailableValue(availableValue, in: block)
@@ -267,16 +361,21 @@ private func replace(load: LoadInst, with availableValues: [AvailableValue], _ c
     //
     newValue = ssaUpdater.getValue(inMiddleOf: load.parentBlock)
   }
-  load.uses.replaceAll(with: newValue, context)
-  context.erase(instruction: load)
+
+  let originalLoad = load.materializeLoadForReplacement(context)
+
+  // Make sure to keep dependencies valid after replacing the load
+  insertMarkDependencies(for: originalLoad, context)
+
+  originalLoad.replace(with: newValue, context)
 }
 
 private func provideValue(
-  for load: LoadInst,
+  for load: LoadingInstruction,
   from availableValue: AvailableValue,
   _ context: FunctionPassContext
 ) -> Value {
-  let projectionPath = availableValue.address.accessPath.getMaterializableProjection(to: load.address.accessPath)!
+  let projectionPath = availableValue.address.constantAccessPath.getMaterializableProjection(to: load.address.constantAccessPath)!
 
   switch load.loadOwnership {
   case .unqualified:
@@ -288,10 +387,43 @@ private func provideValue(
                                                         builder: availableValue.getBuilderForProjections(context))
   case .take:
     if projectionPath.isEmpty {
-      return shrinkMemoryLifetime(from: load, to: availableValue, context)
+      return shrinkMemoryLifetime(to: availableValue, context)
     } else {
-      return shrinkMemoryLifetimeAndSplit(from: load, to: availableValue, projectionPath: projectionPath, context)
+      return shrinkMemoryLifetimeAndSplit(to: availableValue, projectionPath: projectionPath, context)
     }
+  }
+}
+
+/// If the memory location depends on something, insert a dependency for the loaded value:
+///
+///     %2 = mark_dependence %1 on %0
+///     %3 = load %2
+/// ->
+///     %2 = mark_dependence %1 on %0 // not needed anymore, can be removed eventually
+///     %3 = load %2
+///     %4 = mark_dependence %3 on %0
+///     // replace %3 with %4
+///
+private func insertMarkDependencies(for load: LoadInst, _ context: FunctionPassContext) {
+  var inserter = MarkDependenceInserter(load: load, context: context)
+  _ = inserter.walkUp(address: load.address, path: UnusedWalkingPath())
+}
+
+private struct MarkDependenceInserter : AddressUseDefWalker {
+  let load: LoadInst
+  let context: FunctionPassContext
+
+  mutating func walkUp(address: Value, path: UnusedWalkingPath) -> WalkResult {
+    if let mdi = address as? MarkDependenceInst {
+      let builder = Builder(after: load, context)
+      let newMdi = builder.createMarkDependence(value: load, base: mdi.base, kind: mdi.dependenceKind)
+      load.uses.ignore(user: newMdi).replaceAll(with: newMdi, context)
+    }
+    return walkUpDefault(address: address, path: path)
+  }
+
+  mutating func rootDef(address: Value, path: UnusedWalkingPath) -> WalkResult {
+    return .continueWalk
   }
 }
 
@@ -306,7 +438,7 @@ private func provideValue(
 ///     ...
 ///     // replace %2 with %1
 ///
-private func shrinkMemoryLifetime(from load: LoadInst, to availableValue: AvailableValue, _ context: FunctionPassContext) -> Value {
+private func shrinkMemoryLifetime(to availableValue: AvailableValue, _ context: FunctionPassContext) -> Value {
   switch availableValue {
   case .viaLoad(let availableLoad):
     assert(availableLoad.loadOwnership == .copy)
@@ -331,6 +463,8 @@ private func shrinkMemoryLifetime(from load: LoadInst, to availableValue: Availa
       fatalError("unqualified store in ossa function?")
     }
     return valueToAdd
+  case .viaCopyAddr:
+    fatalError("copy_addr must be lowered before shrinking lifetime")
   }
 }
 
@@ -354,7 +488,7 @@ private func shrinkMemoryLifetime(from load: LoadInst, to availableValue: Availa
 ///     ...
 ///     // replace %3 with %1
 ///
-private func shrinkMemoryLifetimeAndSplit(from load: LoadInst, to availableValue: AvailableValue, projectionPath: SmallProjectionPath, _ context: FunctionPassContext) -> Value {
+private func shrinkMemoryLifetimeAndSplit(to availableValue: AvailableValue, projectionPath: SmallProjectionPath, _ context: FunctionPassContext) -> Value {
   switch availableValue {
   case .viaLoad(let availableLoad):
     assert(availableLoad.loadOwnership == .copy)
@@ -369,6 +503,22 @@ private func shrinkMemoryLifetimeAndSplit(from load: LoadInst, to availableValue
     let valueToAdd = builder.createLoad(fromAddress: addr, ownership: .take)
     availableStore.trySplit(context)
     return valueToAdd
+  case .viaCopyAddr:
+    fatalError("copy_addr must be lowered before shrinking lifetime")
+  }
+}
+
+private enum DataflowResult {
+  case notRedundant
+  case redundant([AvailableValue])
+  case maybePartiallyRedundant(AccessPath)
+
+  init(notRedundantWith subPath: AccessPath?) {
+    if let subPath = subPath {
+      self = .maybePartiallyRedundant(subPath)
+    } else {
+      self = .notRedundant
+    }
   }
 }
 
@@ -376,25 +526,29 @@ private func shrinkMemoryLifetimeAndSplit(from load: LoadInst, to availableValue
 private enum AvailableValue {
   case viaLoad(LoadInst)
   case viaStore(StoreInst)
+  case viaCopyAddr(CopyAddrInst)
 
   var value: Value {
     switch self {
     case .viaLoad(let load):   return load
     case .viaStore(let store): return store.source
+    case .viaCopyAddr:         fatalError("copy_addr must be lowered")
     }
   }
 
   var address: Value {
     switch self {
-    case .viaLoad(let load):   return load.address
-    case .viaStore(let store): return store.destination
+    case .viaLoad(let load):         return load.address
+    case .viaStore(let store):       return store.destination
+    case .viaCopyAddr(let copyAddr): return copyAddr.destination
     }
   }
 
   var instruction: Instruction {
     switch self {
-    case .viaLoad(let load):   return load
-    case .viaStore(let store): return store
+    case .viaLoad(let load):         return load
+    case .viaStore(let store):       return store
+    case .viaCopyAddr(let copyAddr): return copyAddr
     }
   }
 
@@ -402,12 +556,25 @@ private enum AvailableValue {
     switch self {
     case .viaLoad(let load):   return Builder(after: load, context)
     case .viaStore(let store): return Builder(before: store, context)
+    case .viaCopyAddr:         fatalError("copy_addr must be lowered")
+    }
+  }
+}
+
+private extension Array where Element == AvailableValue {
+  func replaceCopyAddrsWithLoadsAndStores(_ context: FunctionPassContext) -> [AvailableValue] {
+    return map {
+      if case .viaCopyAddr(let copyAddr) = $0 {
+        return .viaStore(copyAddr.replaceWithLoadAndStore(context).store)
+      } else {
+        return $0
+      }
     }
   }
 }
 
 private struct InstructionScanner {
-  private let load: LoadInst
+  private let load: LoadingInstruction
   private let accessPath: AccessPath
   private let storageDefBlock: BasicBlock?
   private let aliasAnalysis: AliasAnalysis
@@ -415,7 +582,7 @@ private struct InstructionScanner {
   private(set) var potentiallyRedundantSubpath: AccessPath? = nil
   private(set) var availableValues = Array<AvailableValue>()
 
-  init(load: LoadInst, accessPath: AccessPath, _ aliasAnalysis: AliasAnalysis) {
+  init(load: LoadingInstruction, accessPath: AccessPath, _ aliasAnalysis: AliasAnalysis) {
     self.load = load
     self.accessPath = accessPath
     self.storageDefBlock = accessPath.base.reference?.referenceRoot.parentBlock
@@ -468,16 +635,21 @@ private struct InstructionScanner {
 
   private mutating func visit(instruction: Instruction) -> ScanResult {
     switch instruction {
-    case is FixLifetimeInst, is EndAccessInst, is BeginBorrowInst, is EndBorrowInst:
-      return .transparent
-
+    case is FixLifetimeInst, is BeginAccessInst, is EndAccessInst, is EndBorrowInst:
+      // Those scope-ending instructions are only irrelevant if the preceding load is not changed.
+      // If it is changed from `load [copy]` -> `load [take]` the memory effects of those scope-ending
+      // instructions prevent that the `load [take]` will illegally mutate memory which is protected
+      // from mutation by the scope.
+      if load.loadOwnership != .take {
+        return .transparent
+      }
     case let precedingLoad as LoadInst:
       if precedingLoad == load {
         // We need to stop the data flow analysis when we visit the original load again.
         // This happens if the load is in a loop.
         return .available
       }
-      let precedingLoadPath = precedingLoad.address.accessPath
+      let precedingLoadPath = precedingLoad.address.constantAccessPath
       if precedingLoadPath.getMaterializableProjection(to: accessPath) != nil {
         availableValues.append(.viaLoad(precedingLoad))
         return .available
@@ -494,7 +666,7 @@ private struct InstructionScanner {
       if precedingStore.source is Undef {
         return .overwritten
       }
-      let precedingStorePath = precedingStore.destination.accessPath
+      let precedingStorePath = precedingStore.destination.constantAccessPath
       if precedingStorePath.getMaterializableProjection(to: accessPath) != nil {
         availableValues.append(.viaStore(precedingStore))
         return .available
@@ -502,6 +674,16 @@ private struct InstructionScanner {
       if accessPath.getMaterializableProjection(to: precedingStorePath) != nil,
          potentiallyRedundantSubpath == nil {
         potentiallyRedundantSubpath = precedingStorePath
+      }
+
+    case let preceedingCopy as CopyAddrInst where preceedingCopy.canLoadValue:
+      let copyPath = preceedingCopy.destination.constantAccessPath
+      if copyPath.getMaterializableProjection(to: accessPath) != nil {
+        availableValues.append(.viaCopyAddr(preceedingCopy))
+        return .available
+      }
+      if accessPath.getMaterializableProjection(to: copyPath) != nil, potentiallyRedundantSubpath == nil {
+        potentiallyRedundantSubpath = copyPath
       }
 
     default:

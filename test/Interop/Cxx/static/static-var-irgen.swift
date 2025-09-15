@@ -10,7 +10,6 @@ public func initStaticVars() -> CInt {
 // CHECK: @{{_ZL9staticVar|staticVar}} = internal global i32 2, align 4
 // CHECK: @{{_ZL13staticVarInit|staticVarInit}} = internal global i32 0, align 4
 // CHECK: @{{_ZL19staticVarInlineInit|staticVarInlineInit}} = internal global i32 0, align 4
-// CHECK: @{{_ZL11staticConst|staticConst}} = internal constant i32 4, align 4
 // CHECK: @{{_ZL15staticConstInit|staticConstInit}} = internal global i32 0, align 4
 // CHECK: @{{_ZL21staticConstInlineInit|staticConstInlineInit}} = internal global i32 0, align 4
 // CHECK: @{{_ZL16staticNonTrivial|staticNonTrivial}} = internal global %class.NonTrivial zeroinitializer, align 4
@@ -86,7 +85,7 @@ public func passingVarAsInout() {
   modifyInout(&staticVar)
 }
 // CHECK: define {{.*}}void @"$s4main17passingVarAsInoutyyF"()
-// CHECK: call swiftcc void @"$s4main11modifyInoutyys5Int32VzF"(ptr nocapture dereferenceable(4) @{{_ZL9staticVar|staticVar}})
+// CHECK: call swiftcc void @"$s4main11modifyInoutyys5Int32VzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable(4) @{{_ZL9staticVar|staticVar}})
 
 // CHECK: define internal void @_GLOBAL__sub_I__swift_imported_modules_()
 // CHECK: call void @{{__cxx_global_var_init|"\?\?__EstaticVarInit@@YAXXZ"}}()

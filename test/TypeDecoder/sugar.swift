@@ -11,5 +11,6 @@ func foo() {
   blackHole(a)
 }
 
+// ParenType (XSp) has been removed, make sure it demangles for compatibility.
 // DEMANGLE: $sSiXSq_SfXSaSdSSXSDSbXSptD
-// CHECK: (Int?, [Float], [Double : String], (Bool))
+// CHECK: (Int?, [Float], [Double : String], Bool)

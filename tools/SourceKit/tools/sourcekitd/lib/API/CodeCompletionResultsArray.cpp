@@ -90,8 +90,8 @@ public:
 
   static bool
   dictionary_apply(void *Buf, size_t Index,
-                   llvm::function_ref<bool(sourcekitd_uid_t,
-                                           sourcekitd_variant_t)> applier) {
+                   sourcekitd_variant_dictionary_applier_f_t applier,
+                   void *context) {
     CompactArrayReaderTy Reader(Buf);
 
     sourcekitd_uid_t Kind;
@@ -124,11 +124,12 @@ public:
     bool NotRecommended = Flags & 0x2;
     bool IsSystem = Flags & 0x1;
 
-#define APPLY(K, Ty, Field)                              \
-  do {                                                   \
-    sourcekitd_uid_t key = SKDUIDFromUIdent(K);          \
-    sourcekitd_variant_t var = make##Ty##Variant(Field); \
-    if (!applier(key, var)) return false;                \
+#define APPLY(K, Ty, Field)                                                    \
+  do {                                                                         \
+    sourcekitd_uid_t key = SKDUIDFromUIdent(K);                                \
+    sourcekitd_variant_t var = make##Ty##Variant(Field);                       \
+    if (!applier(key, var, context))                                           \
+      return false;                                                            \
   } while (0)
 
     APPLY(KeyKind, UID, Kind);

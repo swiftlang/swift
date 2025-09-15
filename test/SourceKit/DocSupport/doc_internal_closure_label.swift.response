@@ -1,5 +1,3 @@
-import SwiftOnoneSupport
-
 func foo(_ callback: (_ myInternalParam: Int) -> Void)
 
 
@@ -7,55 +5,45 @@ func foo(_ callback: (_ myInternalParam: Int) -> Void)
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 0,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 26,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 31,
+    key.offset: 5,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 35,
+    key.offset: 9,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 37,
+    key.offset: 11,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 48,
+    key.offset: 22,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 50,
+    key.offset: 24,
     key.length: 15
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 67,
+    key.offset: 41,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.ref.typealias,
     key.name: "Void",
     key.usr: "s:s4Voida",
-    key.offset: 75,
+    key.offset: 49,
     key.length: 4
   }
 ]
@@ -64,7 +52,7 @@ func foo(_ callback: (_ myInternalParam: Int) -> Void)
     key.kind: source.lang.swift.decl.function.free,
     key.name: "foo(_:)",
     key.usr: "s:5label3fooyyySiXEF",
-    key.offset: 26,
+    key.offset: 0,
     key.length: 54,
     key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>callback</decl.var.parameter.name>: <decl.var.parameter.type>(<decl.var.parameter>_ <decl.var.parameter.name>myInternalParam</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.typealias usr=\"s:s4Voida\">Void</ref.typealias></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
     key.entities: [
@@ -72,7 +60,7 @@ func foo(_ callback: (_ myInternalParam: Int) -> Void)
         key.kind: source.lang.swift.decl.var.local,
         key.keyword: "_",
         key.name: "callback",
-        key.offset: 47,
+        key.offset: 21,
         key.length: 32
       }
     ]

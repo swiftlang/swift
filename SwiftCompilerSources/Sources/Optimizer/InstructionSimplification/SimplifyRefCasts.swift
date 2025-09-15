@@ -12,17 +12,17 @@
 
 import SIL
 
-// Note: this simplifications are not SILCombineSimplifyable, because SILCombine has
+// Note: this simplifications are not SILCombineSimplifiable, because SILCombine has
 // its own simplifications for those cast instructions which are not ported to Swift, yet.
 
-extension CheckedCastBranchInst : OnoneSimplifyable {
+extension CheckedCastBranchInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     // Has only an effect if the source is an (existential) reference.
     simplifySourceOperandOfRefCast(context)
   }
 }
 
-extension UncheckedRefCastInst : OnoneSimplifyable {
+extension UncheckedRefCastInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     simplifySourceOperandOfRefCast(context)
   }
@@ -86,6 +86,13 @@ private extension UnaryInstruction {
       operand.set(to: replacement, context)
     }
 
+    if let ccb = self as? CheckedCastBranchInst {
+        // Make sure that updating the formal type with the operand type is
+        // legal.
+        if operand.value.type.isLegalFormalType {
+            ccb.updateSourceFormalTypeFromOperandLoweredType()
+        }
+    }
     if canEraseInst {
       context.erase(instructionIncludingDebugUses: inst)
     }
@@ -116,7 +123,10 @@ private func insertCompensatingInstructions(for inst: Instruction, in failureBlo
   let newInst: SingleValueInstruction
   switch inst {
   case let ier as InitExistentialRefInst:
-    newInst = builder.createInitExistentialRef(instance: newArg, existentialType: ier.type, useConformancesOf: ier)
+    newInst = builder.createInitExistentialRef(instance: newArg,
+                                               existentialType: ier.type,
+                                               formalConcreteType: ier.formalConcreteType,
+                                               conformances: ier.conformances)
   case let uc as UpcastInst:
     newInst = builder.createUpcast(from: newArg, to: uc.type)
   default:

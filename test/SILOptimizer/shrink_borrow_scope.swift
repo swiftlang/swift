@@ -27,10 +27,10 @@ public func eliminate_copy_of_returned_then_consumed_owned_value(arg: __owned An
   // no copy of 'x'
   _ = consumeAndProduce(x)
   // CHECK:       [[RESULT:%[^,]+]] = apply {{%[^,]+}}([[MOVE_X]])
-  // release result
   // release arg
-  // CHECK:       destroy_value [[ARG]]
+  // release result
   // CHECK:       destroy_value [[RESULT]]
+  // CHECK:       destroy_value [[ARG]]
   // CHECK-LABEL: } // end sil function 'eliminate_copy_of_returned_then_consumed_owned_value'
 }
 

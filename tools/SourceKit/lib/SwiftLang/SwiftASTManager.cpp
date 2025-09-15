@@ -42,8 +42,6 @@ using namespace SourceKit;
 using namespace swift;
 using namespace swift::sys;
 
-void SwiftASTConsumer::failed(StringRef Error) { }
-
 //===----------------------------------------------------------------------===//
 // SwiftInvocation
 //===----------------------------------------------------------------------===//
@@ -174,13 +172,13 @@ namespace SourceKit {
   void ASTUnit::Implementation::consumeAsync(SwiftASTConsumerRef ConsumerRef,
                                              ASTUnitRef ASTRef) {
 #if defined(_WIN32)
-	// Windows uses more up for stack space (why?) than macOS/Linux which
-	// causes stack overflows in a dispatch thread with 64k stack. Passing
-	// useDeepStack=true means it's given a _beginthreadex thread with an 8MB
-	// stack.
-	bool useDeepStack = true;
+    // Windows uses more up for stack space (why?) than macOS/Linux which
+    // causes stack overflows in a dispatch thread with 64k stack. Passing
+    // useDeepStack=true means it's given a _beginthreadex thread with an 8MB
+    // stack.
+    bool useDeepStack = true;
 #else
-	bool useDeepStack = false;
+    bool useDeepStack = ConsumerRef->requiresDeepStack();
 #endif
     Queue.dispatch([ASTRef, ConsumerRef]{
       SwiftASTConsumer &ASTConsumer = *ConsumerRef;
@@ -315,7 +313,7 @@ class ASTBuildOperation
   const std::vector<FileContent> FileContents;
 
   /// Guards \c DependencyStamps. This prevents reading from \c DependencyStamps
-  /// while it is being modified. It does not provide any ordering gurantees
+  /// while it is being modified. It does not provide any ordering guarantees
   /// that \c DependencyStamps have been computed in \c buildASTUnit before they
   /// are accessed in \c matchesSourceState but that's fine (see comment on
   /// \c DependencyStamps).
@@ -566,12 +564,11 @@ struct SwiftASTManager::Implementation {
       std::shared_ptr<SwiftStatistics> Stats,
       std::shared_ptr<RequestTracker> ReqTracker,
       std::shared_ptr<PluginRegistry> Plugins, StringRef SwiftExecutablePath,
-      StringRef RuntimeResourcePath, StringRef DiagnosticDocumentationPath)
+      StringRef RuntimeResourcePath)
       : EditorDocs(EditorDocs), Config(Config), Stats(Stats),
         ReqTracker(ReqTracker), Plugins(Plugins),
         SwiftExecutablePath(SwiftExecutablePath),
         RuntimeResourcePath(RuntimeResourcePath),
-        DiagnosticDocumentationPath(DiagnosticDocumentationPath),
         SessionTimestamp(llvm::sys::toTimeT(std::chrono::system_clock::now())) {
   }
 
@@ -584,7 +581,6 @@ struct SwiftASTManager::Implementation {
   /// Used to find clang relative to it.
   std::string SwiftExecutablePath;
   std::string RuntimeResourcePath;
-  std::string DiagnosticDocumentationPath;
   SourceManager SourceMgr;
   Cache<ASTKey, ASTProducerRef> ASTCache{ "sourcekit.swift.ASTCache" };
   llvm::sys::Mutex CacheMtx;
@@ -670,10 +666,9 @@ SwiftASTManager::SwiftASTManager(
     std::shared_ptr<SwiftStatistics> Stats,
     std::shared_ptr<RequestTracker> ReqTracker,
     std::shared_ptr<PluginRegistry> Plugins, StringRef SwiftExecutablePath,
-    StringRef RuntimeResourcePath, StringRef DiagnosticDocumentationPath)
+    StringRef RuntimeResourcePath)
     : Impl(*new Implementation(EditorDocs, Config, Stats, ReqTracker, Plugins,
-                               SwiftExecutablePath, RuntimeResourcePath,
-                               DiagnosticDocumentationPath)) {}
+                               SwiftExecutablePath, RuntimeResourcePath)) {}
 
 SwiftASTManager::~SwiftASTManager() {
   delete &Impl;
@@ -712,8 +707,8 @@ bool SwiftASTManager::initCompilerInvocation(
     std::string &Error) {
   return ide::initCompilerInvocation(
       Invocation, OrigArgs, Action, Diags, UnresolvedPrimaryFile, FileSystem,
-      Impl.SwiftExecutablePath, Impl.RuntimeResourcePath,
-      Impl.DiagnosticDocumentationPath, Impl.SessionTimestamp, Error);
+      Impl.SwiftExecutablePath, Impl.RuntimeResourcePath, Impl.SessionTimestamp,
+      Error);
 }
 
 bool SwiftASTManager::initCompilerInvocation(
@@ -1045,8 +1040,6 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
   if (!TopMod)
     return;
 
-  auto ClangModuleLoader = TopMod->getASTContext().getClangModuleLoader();
-
   ModuleDecl::ImportFilter ImportFilter = {
       ModuleDecl::ImportFilterKind::Exported,
       ModuleDecl::ImportFilterKind::Default};
@@ -1063,8 +1056,7 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     if (Mod->isSystemModule())
       continue;
     // FIXME: Setup dependencies on the included headers.
-    if (ClangModuleLoader &&
-        Mod == ClangModuleLoader->getImportedHeaderModule())
+    if (Mod->isClangHeaderImportModule())
       continue;
     bool NewVisit = Visited.insert(Mod).second;
     if (!NewVisit)
@@ -1219,6 +1211,10 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
       // flag and might thus fail, which SILGen cannot handle.
       llvm::SaveAndRestore<std::shared_ptr<std::atomic<bool>>> DisableCancellationDuringSILGen(CompIns.getASTContext().CancellationFlag, nullptr);
       SILOptions SILOpts = Invocation.getSILOptions();
+
+      // Disable diagnostics that require WMO (as SourceKit disables it).
+      SILOpts.EnableWMORequiredDiagnostics = false;
+
       auto &TC = CompIns.getSILTypes();
       std::unique_ptr<SILModule> SILMod = performASTLowering(*SF, TC, SILOpts);
       if (CancellationFlag->load(std::memory_order_relaxed)) {

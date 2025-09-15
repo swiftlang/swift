@@ -76,12 +76,7 @@ enum ContextualTypePurpose : uint8_t {
   CTP_CaseStmt,         ///< A single case statement associated with a `switch` or
                         ///  a `do-catch` statement. It has to be convertible
                         ///  to a type of a switch subject or an `Error` type.
-  CTP_ForEachStmt,      ///< "expression/sequence" associated with 'for-in' loop
-                        ///< is expected to conform to 'Sequence' protocol.
-  CTP_ForEachSequence,  ///< Sequence expression associated with `for-in` loop,
-                        ///  this element acts slightly differently compared to
-                        ///  \c CTP_ForEachStmt in a sence that it would
-                        ///  produce conformance constraints.
+  CTP_ForEachSequence,  ///< Sequence expression associated with `for-in` loop.
   CTP_WrappedProperty,  ///< Property type expected to match 'wrappedValue' type
   CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
                                ///< former 'wrappedValue' type
@@ -255,6 +250,14 @@ public:
   /// Determine whether this locator points to a subscript component
   /// of the key path at some index.
   bool isKeyPathSubscriptComponent() const;
+
+  /// Determine whether this locator points to a member component
+  /// of the key path at some index.
+  bool isKeyPathMemberComponent() const;
+
+  /// Determine whether this locator points to an apply component of the key
+  /// path at some index.
+  bool isKeyPathApplyComponent() const;
 
   /// Determine whether this locator points to the member found
   /// via key path dynamic member lookup.
@@ -751,6 +754,18 @@ public:
   }
 };
 
+class LocatorPathElt::ProtocolCompositionMemberType final : public StoredIntegerElement<1> {
+public:
+  ProtocolCompositionMemberType(unsigned index)
+      : StoredIntegerElement(ConstraintLocator::GenericArgument, index) {}
+
+  unsigned getIndex() const { return getValue(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ProtocolCompositionMemberType;
+  }
+};
+
 class LocatorPathElt::GenericArgument final : public StoredIntegerElement<1> {
 public:
   GenericArgument(unsigned index)
@@ -985,13 +1000,13 @@ public:
 };
 
 class LocatorPathElt::PlaceholderType final
-    : public StoredPointerElement<PlaceholderTypeRepr> {
+    : public StoredPointerElement<TypeRepr> {
 public:
-  PlaceholderType(PlaceholderTypeRepr *placeholderRepr)
+  PlaceholderType(TypeRepr *placeholderRepr)
       : StoredPointerElement(PathElementKind::PlaceholderType,
                              placeholderRepr) {}
 
-  PlaceholderTypeRepr *getPlaceholderRepr() const { return getStoredPointer(); }
+  TypeRepr *getPlaceholderRepr() const { return getStoredPointer(); }
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::PlaceholderType;
@@ -1094,7 +1109,7 @@ public:
 
   Stmt *asStmt() const {
     auto node = ASTNode::getFromOpaqueValue(getStoredPointer());
-    return node.get<Stmt *>();
+    return cast<Stmt *>(node);
   }
 
   static bool classof(const LocatorPathElt *elt) {
@@ -1263,7 +1278,7 @@ public:
 
     auto last = std::find_if(
         path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
-          return elt.getKind() != ConstraintLocator::OptionalPayload &&
+          return elt.getKind() != ConstraintLocator::OptionalInjection &&
                  elt.getKind() != ConstraintLocator::GenericArgument;
         });
 
@@ -1277,6 +1292,21 @@ public:
     if (auto lastElt = last()) {
       auto requirement = lastElt->getAs<LocatorPathElt::AnyRequirement>();
       return requirement && kind == requirement->getRequirementKind();
+    }
+    return false;
+  }
+
+  bool isForExistentialMemberAccessConversion() const {
+    for (auto prev = this; prev;
+         prev = prev->previous.dyn_cast<ConstraintLocatorBuilder *>()) {
+      if (auto elt = prev->element) {
+        if (elt->is<LocatorPathElt::ExistentialMemberAccessConversion>())
+          return true;
+      }
+
+      if (auto locator = prev->previous.dyn_cast<ConstraintLocator *>())
+        return bool(locator->findLast<
+                    LocatorPathElt::ExistentialMemberAccessConversion>());
     }
     return false;
   }

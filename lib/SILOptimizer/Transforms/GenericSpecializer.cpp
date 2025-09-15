@@ -17,6 +17,8 @@
 
 #define DEBUG_TYPE "sil-generic-specializer"
 
+#include "swift/AST/AvailabilityInference.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -26,8 +28,8 @@
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -38,8 +40,8 @@ static void transferSpecializeAttributeTargets(SILModule &M,
                                                SILOptFunctionBuilder &builder,
                                                Decl *d) {
   auto *vd = cast<AbstractFunctionDecl>(d);
-  for (auto *A : vd->getAttrs().getAttributes<SpecializeAttr>()) {
-    auto *SA = cast<SpecializeAttr>(A);
+  for (auto *A : vd->getAttrs().getAttributes<AbstractSpecializeAttr>()) {
+    auto *SA = cast<AbstractSpecializeAttr>(A);
     // Filter _spi.
     auto spiGroups = SA->getSPIGroups();
     auto hasSPIGroup = !spiGroups.empty();
@@ -50,12 +52,6 @@ static void transferSpecializeAttributeTargets(SILModule &M,
       }
     }
     if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(vd)) {
-      auto target = SILDeclRef(targetFunctionDecl);
-      auto targetSILFunction = builder.getOrCreateFunction(
-          SILLocation(vd), target, NotForDefinition,
-          [&builder](SILLocation loc, SILDeclRef constant) -> SILFunction * {
-            return builder.getOrCreateFunction(loc, constant, NotForDefinition);
-          });
       auto kind = SA->getSpecializationKind() ==
                           SpecializeAttr::SpecializationKind::Full
                       ? SILSpecializeAttr::SpecializationKind::Full
@@ -65,12 +61,20 @@ static void transferSpecializeAttributeTargets(SILModule &M,
         spiGroupIdent = spiGroups[0];
       }
       auto availability = AvailabilityInference::annotatedAvailableRangeForAttr(
-          SA, M.getSwiftModule()->getASTContext());
+          vd, SA, M.getSwiftModule()->getASTContext());
 
-      targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
+      auto *attr = SILSpecializeAttr::create(
           M, SA->getSpecializedSignature(vd), SA->getTypeErasedParams(),
           SA->isExported(), kind, nullptr,
-          spiGroupIdent, vd->getModuleContext(), availability));
+          spiGroupIdent, vd->getModuleContext(), availability);
+
+      auto target = SILDeclRef(targetFunctionDecl);
+      std::string targetName = target.mangle();
+      if (SILFunction *targetSILFunction = M.lookUpFunction(targetName)) {
+        targetSILFunction->addSpecializeAttr(attr);
+      } else {
+        M.addPendingSpecializeAttr(targetName, attr);
+      }
     }
   }
 }
@@ -102,6 +106,16 @@ bool swift::specializeAppliesInFunction(SILFunction &F,
       auto *Callee = Apply.getReferencedFunctionOrNull();
       if (!Callee)
         continue;
+
+      // TODO: Enable GenericSpecializer for borrow accessors in OSSA
+      // Currently disabled since GenericSpecializer generates store_borrow to a
+      // temporary stack location and returns a projection from the
+      // store_borrow. This does not work for borrow accessors that return the
+      // projection from within the store_borrow scope.
+      if (F.hasOwnership() &&
+          Callee->getConventions().hasGuaranteedAddressResult()) {
+        continue;
+      }
 
       FunctionBuilder.getModule().performOnceForPrespecializedImportedExtensions(
         [&FunctionBuilder](AbstractFunctionDecl *pre) {

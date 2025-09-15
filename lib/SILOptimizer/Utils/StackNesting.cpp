@@ -11,9 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/Test.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -207,12 +209,17 @@ static SILInstruction *createDealloc(SILInstruction *Alloc,
   SILBuilderWithScope B(InsertionPoint);
   switch (Alloc->getKind()) {
     case SILInstructionKind::PartialApplyInst:
-      assert(cast<PartialApplyInst>(Alloc)->isOnStack() && "wrong instruction");
-      LLVM_FALLTHROUGH;
     case SILInstructionKind::AllocStackInst:
-    case SILInstructionKind::AllocVectorInst:
+      assert((isa<AllocStackInst>(Alloc) ||
+              cast<PartialApplyInst>(Alloc)->isOnStack()) &&
+             "wrong instruction");
       return B.createDeallocStack(Location,
                                   cast<SingleValueInstruction>(Alloc));
+    case SILInstructionKind::BeginApplyInst: {
+      auto *bai = cast<BeginApplyInst>(Alloc);
+      assert(bai->isCalleeAllocated());
+      return B.createDeallocStack(Location, bai->getCalleeAllocationResult());
+    }
     case SILInstructionKind::AllocRefDynamicInst:
     case SILInstructionKind::AllocRefInst:
       assert(cast<AllocRefInstBase>(Alloc)->canAllocOnStack());
@@ -408,3 +415,11 @@ void StackNesting::dumpBits(const BitVector &Bits) {
   }
   llvm::dbgs() << '>';
 }
+
+namespace swift::test {
+static FunctionTest MyNewTest("stack_nesting_fixup",
+                              [](auto &function, auto &arguments, auto &test) {
+                                StackNesting::fixNesting(&function);
+                                function.print(llvm::outs());
+                              });
+} // end namespace swift::test

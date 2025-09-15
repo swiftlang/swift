@@ -52,7 +52,6 @@ do {
   _=/0/
   // expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
   // expected-error@-2 {{cannot find operator '=/' in scope}}
-  // expected-error@-3 {{'/' is not a postfix unary operator}}
 }
 
 // No closing '/' so a prefix operator.
@@ -408,7 +407,7 @@ _ = /\()/
 // expected-error@-1 {{'/' is not a prefix unary operator}}
 // expected-error@-2 {{'/' is not a postfix unary operator}}
 // expected-error@-3 {{invalid component of Swift key path}}
-
+  
 do {
   let _: Regex = (/whatever\)/
   // expected-note@-1 {{to match this opening '('}}
@@ -446,7 +445,7 @@ _ = ^/"/"
 _ = ^/"[/"
 // expected-error@-1 {{'^' is not a prefix unary operator}}
 // expected-error@-2 {{unterminated string literal}}
-// expected-error@-3 {{expected custom character class members}}
+// expected-error@-3 {{cannot parse regular expression: expected custom character class members}}
 
 _ = (^/)("/")
 

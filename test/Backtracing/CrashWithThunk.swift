@@ -38,7 +38,7 @@ struct CrashWithThunk {
 // CHECK-NEXT: 1 [ra] [thunk]  0x{{[0-9a-f]+}} thunk for @escaping @callee_guaranteed () -> () + {{[0-9]+}} in CrashWithThunk at {{.*}}/<compiler-generated>
 // CHECK-NEXT: 2 [ra]          0x{{[0-9a-f]+}} static CrashWithThunk.main() + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift:29:9
 // CHECK-NEXT: 3 [ra] [system] 0x{{[0-9a-f]+}} static CrashWithThunk.$main() + {{[0-9]+}} in CrashWithThunk at {{.*}}/<compiler-generated>
-// CHECK-NEXT: 4 [ra] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift
+// CHECK-NEXT: 4 [ra] [system] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashWithThunk at {{.*}}/CrashWithThunk.swift
 
 // CHECK: Registers:
 

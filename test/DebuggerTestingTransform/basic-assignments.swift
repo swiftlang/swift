@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -debugger-testing-transform -Xllvm -sil-full-demangle -emit-sil -module-name M %s | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend -debugger-testing-transform -Xllvm -sil-full-demangle -Xllvm -sil-print-types -emit-sil -module-name M %s | %FileCheck %s -check-prefix=CHECK-SIL
 
 // REQUIRES: executable_test
 // RUN: %target-build-swift -Xfrontend -debugger-testing-transform %s -o %t

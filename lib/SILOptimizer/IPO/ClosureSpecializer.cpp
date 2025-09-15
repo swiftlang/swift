@@ -57,6 +57,7 @@
 
 #define DEBUG_TYPE "closure-specialization"
 #include "swift/SILOptimizer/IPO/ClosureSpecializer.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Demangler.h"
@@ -95,7 +96,7 @@ STATISTIC(NumPropagatedClosuresNotEliminated,
 llvm::cl::opt<bool> EliminateDeadClosures(
     "closure-specialize-eliminate-dead-closures", llvm::cl::init(true),
     llvm::cl::desc("Do not eliminate dead closures after closure "
-                   "specialization. This is meant ot be used when testing."));
+                   "specialization. This is meant to be used when testing."));
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
@@ -161,7 +162,7 @@ static int getSpecializationLevelRecursive(StringRef funcName,
       continue;
     Node *payload = param->getChild(1);
     if (payload->getKind() !=
-        Node::Kind::FunctionSignatureSpecializationParamPayload) {
+        Node::Kind::Identifier) {
       return SpecializationLevelLimit + 1; // unrecognized format
     }
     // Check if the specialized function is a specialization itself.
@@ -378,11 +379,11 @@ public:
   }
 
   bool isClosureGuaranteed() const {
-    return getClosureParameterInfo().isGuaranteed();
+    return getClosureParameterInfo().isGuaranteedInCaller();
   }
 
   bool isClosureConsumed() const {
-    return getClosureParameterInfo().isConsumed();
+    return getClosureParameterInfo().isConsumedInCaller();
   }
 
   bool isClosureOnStack() const {
@@ -607,7 +608,7 @@ SerializedKind_t CallSiteDescriptor::getSerializedKind() const {
 
 std::string CallSiteDescriptor::createName() const {
   auto P = Demangle::SpecializationPass::ClosureSpecializer;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, getSerializedKind(),
+  Mangle::FunctionSignatureSpecializationMangler Mangler(getApplyCallee()->getASTContext(), P, getSerializedKind(),
                                                          getApplyCallee());
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure())) {
@@ -675,22 +676,43 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
     return false;
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(Closure)) {
-    // Bail if any of the arguments are passed by address and
-    // are not @inout.
-    // This is a temporary limitation.
+    // Check whether each argument is supported.
     auto ClosureCallee = FRI->getReferencedFunction();
     auto ClosureCalleeConv = ClosureCallee->getConventions();
-    unsigned ClosureArgIdx =
+    unsigned ClosureArgIdxBase =
         ClosureCalleeConv.getNumSILArguments() - PAI->getNumArguments();
-    for (auto Arg : PAI->getArguments()) {
+    for (auto pair : llvm::enumerate(PAI->getArguments())) {
+      auto Arg = pair.value();
+      auto ClosureArgIdx = pair.index() + ClosureArgIdxBase;
+      auto ArgConvention =
+          ClosureCalleeConv.getSILArgumentConvention(ClosureArgIdx);
+
       SILType ArgTy = Arg->getType();
+      // Specializing (currently) always produces a retain in the caller.
+      // That's not allowed for values of move-only type.
+      if (ArgTy.isMoveOnly()) {
+        return false;
+      }
+
+      // Bail if it's an ObjectiveC block which might _not_ be copied onto the heap, i.e
+      // optimized by SimplifyCopyBlock. We can't do this because the optimization inserts
+      // retains+releases for captured arguments. That's not possible for stack-allocated blocks.
+      // TODO: avoid inserting retains+releases at all for captures of `partial_apply [on_stack]`
+      if (ArgTy.is<SILFunctionType>() &&
+          ArgTy.getFunctionRepresentation() == SILFunctionTypeRepresentation::Block &&
+          // A `copy_block` ensures that the block is copied onto the heap.
+          !isa<CopyBlockInst>(Arg) &&
+          // SimplifyCopyBlock only works for `partial_apply [on_stack]`.
+          PAI->isOnStack()) {
+        return false;
+      }
+
+      // Only @inout/@inout_aliasable addresses are (currently) supported.
       // If our argument is an object, continue...
       if (ArgTy.isObject()) {
         ++ClosureArgIdx;
         continue;
       }
-      auto ArgConvention =
-          ClosureCalleeConv.getSILArgumentConvention(ClosureArgIdx);
       if (ArgConvention != SILArgumentConvention::Indirect_Inout &&
           ArgConvention != SILArgumentConvention::Indirect_InoutAliasable)
         return false;
@@ -1363,7 +1385,8 @@ bool SILClosureSpecializerTransform::gatherCallSites(
             isa<ThinToThickFunctionInst>(ClosureInst) && !HaveUsedReabstraction;
 
         llvm::TinyPtrVector<SILBasicBlock *> NonFailureExitBBs;
-        if ((ClosureParamInfo.isGuaranteed() || IsClosurePassedTrivially) &&
+        if ((ClosureParamInfo.isGuaranteedInCaller() ||
+             IsClosurePassedTrivially) &&
             !OnlyHaveThinToThickClosure &&
             !findAllNonFailureExitBBs(ApplyCallee, NonFailureExitBBs)) {
           continue;
@@ -1394,7 +1417,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         //   foo({ c() })
         // }
         //
-        // A limit of 2 is good enough and will not be exceed in "regular"
+        // A limit of 2 is good enough and will not be exceeded in "regular"
         // optimization scenarios.
         if (getSpecializationLevel(getClosureCallee(ClosureInst))
             > SpecializationLevelLimit) {

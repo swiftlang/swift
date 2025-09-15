@@ -279,7 +279,7 @@ extension Unicode._NFDNormalizer {
     // The buffer contains the decomposed segment *prior to*
     // any pending starter we might have.
 
-    return buffer.next() ?? pendingStarter._take()
+    return buffer.next() ?? pendingStarter.take()
   }
 
   @inline(__always)
@@ -287,7 +287,7 @@ extension Unicode._NFDNormalizer {
     _ nextFromSource: () -> Unicode.Scalar?
   ) -> ScalarAndNormData? {
 
-    if let pendingStarter = pendingStarter._take() {
+    if let pendingStarter = pendingStarter.take() {
       return pendingStarter
     } else if let nextScalar = nextFromSource() {
       return (nextScalar, Unicode._NormData(nextScalar))
@@ -366,11 +366,11 @@ extension Unicode._NFDNormalizer {
       return
     }
 
-    var utf8 = decompEntry.utf8
+    var utf8 = unsafe decompEntry.utf8
 
     while utf8.count > 0 {
-      let (scalar, len) = _decodeScalar(utf8, startingAt: 0)
-      utf8 = UnsafeBufferPointer(rebasing: utf8[len...])
+      let (scalar, len) = unsafe _decodeScalar(utf8, startingAt: 0)
+      unsafe utf8 = unsafe UnsafeBufferPointer(rebasing: utf8[len...])
 
       // Fast path: Because this will be emitted into the completed NFD buffer,
       // we don't need to look at NFD_QC anymore which lets us do a larger

@@ -21,6 +21,6 @@ final class SwiftPluginServer {
       connection: connection,
       provider: LibraryPluginProvider.shared
     )
-    listener.main()
+    try listener.main()
   }
 }

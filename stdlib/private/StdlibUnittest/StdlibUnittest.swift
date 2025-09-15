@@ -17,24 +17,25 @@ import SwiftPrivateLibcExtras
 
 #if canImport(Darwin)
 #if _runtime(_ObjC)
-import Foundation
+internal import Foundation
 #endif
-import Darwin
+internal import Darwin
+internal import var Darwin.errno
 #elseif canImport(Glibc)
-import Glibc
+internal import Glibc
 #elseif canImport(Musl)
-import Musl
+internal import Musl
 #elseif canImport(Android)
-import Android
+internal import Android
 #elseif os(WASI)
-import WASILibc
+internal import WASILibc
 #elseif os(Windows)
-import CRT
-import WinSDK
+internal import CRT
+internal import WinSDK
 #endif
 
 #if _runtime(_ObjC)
-import ObjectiveC
+internal import ObjectiveC
 #endif
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
@@ -738,24 +739,46 @@ public func expectDoesNotThrow(_ test: () throws -> Void,
   }
 }
 
-public func expectNil<T>(_ value: T?,
+public func expectNil<T>(
+  _ value: T?,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #file, line: UInt = #line
+) {
   if value != nil {
     expectationFailure(
-      "expected optional to be nil\nactual: \"\(value!)\"", trace: message(),
+      "expected optional to be nil\nactual: \"\(value!)\"",
+      trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
 
-@discardableResult
-public func expectNotNil<T>(_ value: T?,
+public func expectNil<T: ~Copyable & ~Escapable>(
+  _ value: borrowing T?,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) -> T? {
+  file: String = #file, line: UInt = #line
+) {
+  if value != nil {
+    expectationFailure(
+      "expected optional to be nil",
+      trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
+    )
+  }
+}
+
+@discardableResult
+@_lifetime(copy value)
+public func expectNotNil<T: ~Copyable & ~Escapable>(
+  _ value: consuming T?,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) -> T? {
   if value == nil {
     expectationFailure("expected optional to be non-nil", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
@@ -1106,7 +1129,7 @@ class _ParentProcess {
       var ret: CInt
       repeat {
         ret = _stdlib_select(&readfds, &writefds, &errorfds, nil)
-      } while ret == -1  &&  errno == EINTR
+      } while ret == -1 && errno == EINTR
       if ret <= 0 {
         fatalError("select() returned an error")
       }
@@ -1584,6 +1607,9 @@ class _ParentProcess {
         _testSuiteFailedCallback()
       } else {
         print("\(testSuite.name): All tests passed")
+        if testSuite._tests.isEmpty {
+          print("WARNING: SUITE '\(testSuite.name)' CONTAINED NO TESTS! NO TESTS WERE EXECUTED!")
+        }
       }
     }
     let (failed: failedOnShutdown, ()) = _shutdownChild()
@@ -2111,6 +2137,11 @@ public final class TestSuite {
       return self
     }
 
+    public func require(_ stdlibVersion: StdLibVersion) -> _TestBuilder {
+      _data._skip.append(.minimumStdlib(stdlibVersion))
+      return self
+    }
+
     public func stdin(_ stdinText: String, eof: Bool = false) -> _TestBuilder {
       _data._stdinText = stdinText
       _data._stdinEndsWithEOF = eof
@@ -2201,6 +2232,35 @@ func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
 }
 #endif
 #endif
+
+public enum StdLibVersion: String {
+  case stdlib_5_7  = "5.7"
+  case stdlib_5_8  = "5.8"
+  case stdlib_5_9  = "5.9"
+  case stdlib_5_10 = "5.10"
+  case stdlib_6_0  = "6.0"
+  case stdlib_6_1  = "6.1"
+  case stdlib_6_2  = "6.2"
+  
+  var isAvailable: Bool {
+    switch self {
+    case .stdlib_5_7:
+      return if #available(SwiftStdlib 5.7, *)  { true } else { false }
+    case .stdlib_5_8:
+      return if #available(SwiftStdlib 5.8, *)  { true } else { false }
+    case .stdlib_5_9:
+      return if #available(SwiftStdlib 5.9, *)  { true } else { false }
+    case .stdlib_5_10:
+      return if #available(SwiftStdlib 5.10, *) { true } else { false }
+    case .stdlib_6_0:
+      return if #available(SwiftStdlib 6.0, *)  { true } else { false }
+    case .stdlib_6_1:
+      return if #available(SwiftStdlib 6.1, *)  { true } else { false }
+    case .stdlib_6_2:
+      return if #available(SwiftStdlib 6.2, *)  { true } else { false }
+    }
+  }
+}
 
 public enum OSVersion : CustomStringConvertible {
   case osx(major: Int, minor: Int, bugFix: Int)
@@ -2409,9 +2469,13 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case haikuAny(reason: String)
 
+  case wasiAny(reason: String)
+
   case objCRuntime(/*reason:*/ String)
   case nativeRuntime(/*reason:*/ String)
 
+  case minimumStdlib(StdLibVersion)
+  
   public var description: String {
     switch self {
     case .custom(_, let reason):
@@ -2528,10 +2592,16 @@ public enum TestRunPredicate : CustomStringConvertible {
     case .haikuAny(reason: let reason):
       return "haikuAny(*, reason: \(reason))"
 
+    case .wasiAny(reason: let reason):
+      return "wasiAny(*, reason: \(reason))"
+
     case .objCRuntime(let reason):
       return "Objective-C runtime, reason: \(reason))"
     case .nativeRuntime(let reason):
       return "Native runtime (no ObjC), reason: \(reason))"
+      
+    case .minimumStdlib(let version):
+      return "Requires Swift \(version.rawValue)'s standard library"
     }
   }
 
@@ -2907,6 +2977,14 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
+    case .wasiAny:
+      switch _getRunningOSVersion() {
+      case .wasi:
+        return true
+      default:
+        return false
+      }
+
     case .objCRuntime:
 #if _runtime(_ObjC)
       return true
@@ -2920,6 +2998,9 @@ public enum TestRunPredicate : CustomStringConvertible {
 #else
       return true
 #endif
+      
+    case .minimumStdlib(let version):
+      return !version.isAvailable
     }
   }
 }

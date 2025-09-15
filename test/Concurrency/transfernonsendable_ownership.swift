@@ -1,11 +1,13 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s -o /dev/null -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // This test validates the behavior of transfer non sendable around ownership
 // constructs like non copyable types, consuming/borrowing parameters, and inout
 // parameters.
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 ////////////////////////
 // MARK: Declarations //
@@ -50,20 +52,20 @@ func testConsumingError(_ x: consuming Klass) async {
   print(x)
 }
 
-func testConsumingUseAfterConsumeError(_ x: consuming Klass) async { // expected-error {{'x' consumed more than once}}
+func testConsumingUseAfterConsumeError(_ x: consuming Klass) async { // expected-error {{'x' used after consume}}
   await consumeTransferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending task-isolated 'x' to main actor-isolated global function 'consumeTransferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
   // expected-note @-2 {{consumed here}}
   print(x)
-  // expected-note @-1 {{consumed again here}}
+  // expected-note @-1 {{used here}}
 }
 
-@CustomActor func testConsumingUseAfterConsumeErrorGlobalActor(_ x: consuming Klass) async { // expected-error {{'x' consumed more than once}}
+@CustomActor func testConsumingUseAfterConsumeErrorGlobalActor(_ x: consuming Klass) async { // expected-error {{'x' used after consume}}
   await consumeTransferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending global actor 'CustomActor'-isolated 'x' to main actor-isolated global function 'consumeTransferToMain' risks causing data races between main actor-isolated and global actor 'CustomActor'-isolated uses}}
   // expected-note @-2 {{consumed here}}
   print(x)
-  // expected-note @-1 {{consumed again here}}
+  // expected-note @-1 {{used here}}
 }
 
 func testBorrowing(_ x: borrowing Klass) async {
@@ -105,3 +107,19 @@ func testInOutError(_ x: inout Klass) async {
   // expected-note @-1 {{sending global actor 'CustomActor'-isolated 'x' to main actor-isolated global function 'transferToMain'}}
   _ = consume x // expected-note {{consumed here}}
 } // expected-note {{used here}}
+
+actor ActorTestCase {
+  let k = Klass()
+
+  // TODO: This crashes the compiler since we attempt to hop_to_executor to the
+  // value that is materialized onto disk.
+  //
+  // consuming func test() async {
+  //   await transferToMain(k)
+  // }
+
+  borrowing func test2() async {
+    await transferToMain(k) // expected-warning {{sending 'self.k' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'self.k' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+}

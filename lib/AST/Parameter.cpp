@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 using namespace swift;
 
 /// TODO: unique and reuse the () parameter list in ASTContext, it is common to
@@ -44,8 +45,11 @@ ParameterList::create(const ASTContext &C, SourceLoc LParenLoc,
 /// Change the DeclContext of any contained parameters to the specified
 /// DeclContext.
 void ParameterList::setDeclContextOfParamDecls(DeclContext *DC) {
-  for (auto P : *this)
+  for (ParamDecl *P : *this) {
     P->setDeclContext(DC);
+    if (auto initContext = P->getCachedDefaultArgumentInitContext())
+      (*initContext)->changeFunction(DC);
+  }
 }
 
 /// Make a duplicate copy of this parameter list.  This allocates copies of

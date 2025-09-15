@@ -22,5 +22,5 @@ import namespaces;
 
 // Swift's typechecker currently doesn't allow calling a function from inline namespace when it's referenced through the parent namespace.
 func test() {
-  Parent.functionInInlineChild() // expected-error {{type of expression is ambiguous without a type annotation}}
+  Parent.functionInInlineChild() // expected-error {{failed to produce diagnostic for expression}}
 }

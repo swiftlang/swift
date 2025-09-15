@@ -289,3 +289,46 @@ struct Test {
     )
     var doesNotWork: Thing
 }
+
+// Ensure that we don't crash when using closures within attached macros.
+struct Trait {
+  init(_: () -> Void) {}
+}
+
+@attached(peer) macro trait(_ trait: Trait) = #externalMacro(module: "MacroDefinition", type: "EmptyPeerMacro")
+
+@trait(Trait {})
+func closureInPeerMacroCrash() {}
+
+@trait(Trait {})
+@trait(Trait {})
+@trait(Trait {})
+func closuresInPeerMacroCrash() {}
+
+@trait(Trait {})
+@trait(Trait {})
+@trait(Trait {})
+var closuresInPeerMacroOnVariableCrash: Int = 0
+
+// Test that macros can't be used in @abi
+
+#if swift(>=5.3) && TEST_DIAGNOSTICS
+struct ABIAttrWithAttachedMacro {
+  // expected-error@+1 {{macro 'addCompletionHandler()' cannot be expanded in '@abi' attribute}}
+  @abi(@addCompletionHandler func fn1() async)
+  @addCompletionHandler func fn1() async {}
+  // From diagnostics in the expansion:
+  // expected-note@-2 3{{in expansion of macro 'addCompletionHandler' on instance method 'fn1()' here}}
+  // expected-note@-4 {{'fn1()' previously declared here}}
+
+  // expected-error@+1 {{macro 'addCompletionHandler()' cannot be expanded in '@abi' attribute}}
+  @abi(@addCompletionHandler func fn2() async)
+  func fn2() async {}
+
+  @abi(func fn3() async)
+  @addCompletionHandler func fn3() async {}
+  // From diagnostics in the expansion:
+  // expected-note@-2 2{{in expansion of macro 'addCompletionHandler' on instance method 'fn3()' here}}
+  // expected-note@-4 {{'fn3()' previously declared here}}
+}
+#endif

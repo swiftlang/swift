@@ -14,7 +14,7 @@ import SIL
 
 /// Dumps the results of escape analysis.
 ///
-/// Dumps the EscapeInfo query results for all `alloc_stack` instructions in a function.
+/// Dumps the EscapeInfo query results for all `alloc_ref` instructions in a function.
 ///
 /// This pass is used for testing EscapeInfo.
 let escapeInfoDumper = FunctionPass(name: "dump-escape-info") {
@@ -109,9 +109,7 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info") {
   for value in valuesToCheck {
     print("value:\(value)")
     for apply in applies {
-      let path = AliasAnalysis.getPtrOrAddressPath(for: value)
-      
-      if value.at(path).isEscaping(using: Visitor(apply: apply), context) {
+      if value.allContainedAddresses.isEscaping(using: Visitor(apply: apply), context) {
         print("  ==> \(apply)")
       } else {
         print("  -   \(apply)")
@@ -129,8 +127,8 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info") {
         print(lhs)
         print(rhs)
 
-        let projLhs = lhs.at(AliasAnalysis.getPtrOrAddressPath(for: lhs))
-        let projRhs = rhs.at(AliasAnalysis.getPtrOrAddressPath(for: rhs))
+        let projLhs = lhs.allContainedAddresses
+        let projRhs = rhs.allContainedAddresses
         let mayAlias = projLhs.canAddressAlias(with: projRhs, context)
         if mayAlias != projRhs.canAddressAlias(with: projLhs, context) {
           fatalError("canAddressAlias(with:) must be symmetric")

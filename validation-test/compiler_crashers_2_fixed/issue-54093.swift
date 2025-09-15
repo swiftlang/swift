@@ -13,11 +13,12 @@ class Test1 {
 }
 
 @propertyWrapper 
-struct Wrapper2 { // expected-note {{property wrapper type 'Wrapper2' declared here}}
+struct Wrapper2 {
   var wrappedValue: Int??
 }
 
 class Test2 {
   @Wrapper2 var user: Int? 
-  // expected-error@-1 {{property type 'Int?' does not match that of the 'wrappedValue' property of its wrapper type 'Wrapper2'}}
+  // expected-error@-1 {{property type 'Int?' does not match 'wrappedValue' type 'Int??'}}
+  // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Int' and 'Int?') are expected to be equal}}
 }

@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-silgen -enable-experimental-feature Extern %s | %FileCheck %s
 
+// REQUIRES: swift_feature_Extern
+
 // CHECK-DAG: sil hidden_external @my_c_name : $@convention(c) (Int) -> Int
 @_extern(c, "my_c_name")
 func withCName(_ x: Int) -> Int
@@ -14,7 +16,7 @@ public func publicVisibility(_ x: Int) -> Int
 
 // CHECK-DAG: sil @private_visible : $@convention(c) (Int) -> Int
 @_extern(c, "private_visible")
-private func privateVisiblity(_ x: Int) -> Int
+private func privateVisibility(_ x: Int) -> Int
 
 // CHECK-DAG: sil hidden_external @withoutCName : $@convention(c) () -> Int
 @_extern(c)
@@ -35,13 +37,13 @@ func main() {
   _ = publicVisibility(42)
   // CHECK-DAG: [[F4:%.+]] = function_ref @private_visible : $@convention(c) (Int) -> Int
   // CHECK-DAG: apply [[F4]]({{.*}}) : $@convention(c) (Int) -> Int
-  _ = privateVisiblity(24)
+  _ = privateVisibility(24)
   // CHECK-DAG: [[F5:%.+]] = function_ref @withoutCName : $@convention(c) () -> Int
   // CHECK-DAG: apply [[F5]]() : $@convention(c) () -> Int
   _ = withoutCName()
   // CHECK-DAG: [[F6:%.+]] = function_ref @$s8extern_c10defaultArgyySiFfA_ : $@convention(thin) () -> Int
   // CHECK-DAG: [[DEFAULT_V:%.+]] = apply [[F6]]() : $@convention(thin) () -> Int
-  // CHECK-DAG: [[F7:%.+]] = function_ref @default_arg : $@convention(c) (Int) -> () // user: %20
+  // CHECK-DAG: [[F7:%.+]] = function_ref @default_arg : $@convention(c) (Int) -> ()
   // CHECK-DAG: apply [[F7]]([[DEFAULT_V]]) : $@convention(c) (Int) -> ()
   defaultArg()
 }

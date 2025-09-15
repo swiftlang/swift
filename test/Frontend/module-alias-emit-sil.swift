@@ -10,7 +10,7 @@
 // RUN: test -f %t/AppleLogging.swiftmodule
 
 /// Verify generated SIL only contains AppleLogging
-// RUN: %target-swift-frontend -emit-sil %t/FileLib.swift -module-alias XLogging=AppleLogging -I %t > %t/result-sil.output
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %t/FileLib.swift -module-alias XLogging=AppleLogging -I %t > %t/result-sil.output
 // RUN: %FileCheck %s -input-file %t/result-sil.output
 // RUN: not %FileCheck %s -input-file %t/result-sil.output -check-prefix CHECK-NOT-FOUND
 // CHECK-NOT-FOUND: XLogging

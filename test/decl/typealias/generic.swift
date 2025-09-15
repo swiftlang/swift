@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-struct MyType<TyA, TyB> { // expected-note {{generic type 'MyType' declared here}}
+struct MyType<TyA, TyB> { // expected-note {{generic struct 'MyType' declared here}}
   // expected-note @-1 {{arguments to generic parameter 'TyB' ('S' and 'Int') are expected to be equal}}
 
   var a : TyA, b : TyB
@@ -71,7 +71,7 @@ func f() {
 }
 
 
-typealias A<T1, T2> = MyType<T2, T1>  // expected-note {{generic type 'A' declared here}}
+typealias A<T1, T2> = MyType<T2, T1>  // expected-note {{generic type alias 'A' declared here}}
 
 typealias B<T1> = MyType<T1, T1>
 
@@ -80,7 +80,7 @@ typealias C<T> = MyType<String, T>
 // Type aliases with unused generic params.
 typealias D<T1, T2, T3> = MyType<T2, T1>  // expected-note 3 {{'T3' declared as parameter to type 'D'}}
 
-typealias E<T1, T2> = Int  // expected-note {{generic type 'E' declared here}}
+typealias E<T1, T2> = Int  // expected-note {{generic type alias 'E' declared here}}
 // expected-note@-1 {{'T1' declared as parameter to type 'E'}}
 // expected-note@-2 {{'T2' declared as parameter to type 'E'}}
 
@@ -178,7 +178,7 @@ class GenericClass<T> {
   }
 
   func testCaptureInvalid1<S>(s: S, t: T) -> TA<Int> {
-    return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'GenericClass<T>.TA<S>' (aka 'MyType<T, S>') to return type 'GenericClass<T>.TA<Int>' (aka 'MyType<T, Int>')}}
+    return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'MyType<T, S>' to return type 'GenericClass<T>.TA<Int>' (aka 'MyType<T, Int>')}}
   }
 
   func testCaptureInvalid2<S>(s: Int, t: T) -> TA<S> {
@@ -333,12 +333,14 @@ protocol ErrorQ {
   associatedtype Y
 }
 protocol ErrorP {
-  associatedtype X: ErrorQ // expected-note {{protocol requires nested type 'X'; add nested type 'X' for conformance}}
+  associatedtype X: ErrorQ // expected-note {{protocol requires nested type 'X'}}
 }
 
 typealias ErrorA<T: ErrorP> = T.X.Y
 
-struct ErrorB : ErrorP { // expected-error {{type 'ErrorB' does not conform to protocol 'ErrorP'}}
+struct ErrorB : ErrorP { 
+  // expected-error@-1 {{type 'ErrorB' does not conform to protocol 'ErrorP'}}
+  // expected-note@-2 {{add stubs for conformance}}
   typealias X = ErrorC // expected-note {{possibly intended match 'ErrorB.X' (aka 'ErrorC') does not conform to 'ErrorQ'}}
 }
 
@@ -354,7 +356,7 @@ extension Id {} // expected-error {{non-nominal type 'Id' cannot be extended}}
 
 class OuterGeneric<T> {
   typealias Alias<U> = AnotherGeneric<U>
-  // expected-note@-1 {{generic type 'Alias' declared here}}
+  // expected-note@-1 {{generic type alias 'Alias' declared here}}
   class InnerNonGeneric : Alias {}
   // expected-error@-1 {{reference to generic type 'OuterGeneric<T>.Alias' requires arguments in <...>}}
 }

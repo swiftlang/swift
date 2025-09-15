@@ -29,6 +29,37 @@ func testSwitch() -> Bool {
   case (.case8, _): return true
   case (.case9, _): return true
   case (.case10, _): return true
+  }
+
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-warning {{switch must be exhaustive}}
+  // expected-note@-1 {{add missing case: '(.case11, _)'}}
+  case (.case0, _): return true
+  case (.case1, _): return true
+  case (.case2, _): return true
+  case (.case3, _): return true
+  case (.case4, _): return true
+  case (.case5, _): return true
+  case (.case6, _): return true
+  case (.case7, _): return true
+  case (.case8, _): return true
+  case (.case9, _): return true
+  case (.case10, _): return true
   @unknown default: return false
+  }
+
+  // No diagnostic
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) {
+  case (.case0, _): return true
+  case (.case1, _): return true
+  case (.case2, _): return true
+  case (.case3, _): return true
+  case (.case4, _): return true
+  case (.case5, _): return true
+  case (.case6, _): return true
+  case (.case7, _): return true
+  case (.case8, _): return true
+  case (.case9, _): return true
+  case (.case10, _): return true
+  case (.case11, _): return true
   }
 }

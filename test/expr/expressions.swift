@@ -619,8 +619,8 @@ class C {
 }
 
 _ = C(3) // expected-error {{missing argument label 'other:' in call}}
-// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'C?'}}
-_ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expected argument type 'C?'}}
+// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'C'}}
+_ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expected argument type 'C'}}
 
 //===----------------------------------------------------------------------===//
 // Unary Operators
@@ -758,15 +758,15 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
-_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns false}}
-_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns false}}
-_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns true}}
-_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns true}}
+_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns false}}
+_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns false}}
+_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns true}}
+_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns true}}
 
-_ = Int.self == .none  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns false}}
-_ = .none == Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns false}}
-_ = Int.self != .none  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns true}}
-_ = .none != Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns true}}
+_ = Int.self == .none  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns false}}
+_ = .none == Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns false}}
+_ = Int.self != .none  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns true}}
+_ = .none != Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns true}}
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
@@ -794,7 +794,7 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
 
   // ?? should have lower precedence than range and arithmetic operators.
   let r1 = r ?? (0...42) // ok
-  let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'ClosedRange<Int>?' and 'Int'}}
+  let r2 = (r ?? 0)...42 // not ok: expected-error {{cannot convert value of type 'ClosedRange<Int>?' to expected argument type 'Int?'}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
   
   
@@ -868,7 +868,7 @@ func r20802757(_ z: inout Int = &g20802757) { // expected-error {{cannot provide
   print(z)
 }
 
-_ = _.foo // expected-error {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
+_ = _.foo // expected-error {{type placeholder not allowed here}}
 
 // <rdar://problem/22211854> wrong arg list crashing sourcekit
 func r22211854() {

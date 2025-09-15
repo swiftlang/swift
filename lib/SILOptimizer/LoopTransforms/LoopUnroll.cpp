@@ -14,9 +14,12 @@
 
 #include "llvm/ADT/DepthFirstIterator.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
+#include "swift/SILOptimizer/Analysis/IsSelfRecursiveAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -208,7 +211,9 @@ static std::optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
 /// Check whether we can duplicate the instructions in the loop and use a
 /// heuristic that looks at the trip count and the cost of the instructions in
 /// the loop to determine whether we should unroll this loop.
-static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount) {
+static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount,
+                                   IsSelfRecursiveAnalysis *SRA,
+                                   DeadEndBlocks *deb) {
   assert(Loop->getSubLoops().empty() && "Expect innermost loops");
   if (TripCount > 32)
     return false;
@@ -224,13 +229,13 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount) {
     (Loop->getBlocks())[0]->getParent()->getModule().getOptions().UnrollThreshold;
   for (auto *BB : Loop->getBlocks()) {
     for (auto &Inst : *BB) {
-      if (!canDuplicateLoopInstruction(Loop, &Inst))
+      if (!canDuplicateLoopInstruction(Loop, &Inst, deb))
         return false;
       if (instructionInlineCost(Inst) != InlineCost::Free)
         ++Cost;
       if (auto AI = FullApplySite::isa(&Inst)) {
         auto Callee = AI.getCalleeFunction();
-        if (Callee && getEligibleFunction(AI, InlineSelection::Everything)) {
+        if (Callee && getEligibleFunction(AI, InlineSelection::Everything, SRA)) {
           // If callee is rather big and potentially inlinable, it may be better
           // not to unroll, so that the body of the callee can be inlined later.
           Cost += Callee->size() * InsnsPerBB;
@@ -385,7 +390,7 @@ updateSSA(SILFunction *Fn, SILLoop *Loop,
 
 /// Try to fully unroll the loop if we can determine the trip count and the trip
 /// count is below a threshold.
-static bool tryToUnrollLoop(SILLoop *Loop) {
+static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA, DeadEndBlocks *deb) {
   assert(Loop->getSubLoops().empty() && "Expecting innermost loops");
 
   LLVM_DEBUG(llvm::dbgs() << "Trying to unroll loop : \n" << *Loop);
@@ -406,7 +411,7 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
     return false;
   }
 
-  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.value())) {
+  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.value(), SRA, deb)) {
     LLVM_DEBUG(llvm::dbgs() << "Not unrolling, exceeds cost threshold\n");
     return false;
   }
@@ -486,6 +491,8 @@ class LoopUnrolling : public SILFunctionTransform {
     bool Changed = false;
     auto *Fun = getFunction();
     SILLoopInfo *LoopInfo = PM->getAnalysis<SILLoopAnalysis>()->get(Fun);
+    IsSelfRecursiveAnalysis *SRA = PM->getAnalysis<IsSelfRecursiveAnalysis>();
+    DeadEndBlocks *deb = PM->getAnalysis<DeadEndBlocksAnalysis>()->get(Fun);
 
     LLVM_DEBUG(llvm::dbgs() << "Loop Unroll running on function : "
                             << Fun->getName() << "\n");
@@ -513,7 +520,7 @@ class LoopUnrolling : public SILFunctionTransform {
 
     // Try to unroll innermost loops.
     for (auto *Loop : InnermostLoops)
-      Changed |= tryToUnrollLoop(Loop);
+      Changed |= tryToUnrollLoop(Loop, SRA, deb);
 
     if (Changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);

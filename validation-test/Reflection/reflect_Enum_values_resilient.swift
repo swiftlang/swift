@@ -10,7 +10,9 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop, OS=macosx
+// REQUIRES: reflection_test_support
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: asan
 
 import SwiftReflectionTest
 

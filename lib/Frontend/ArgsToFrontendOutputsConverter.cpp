@@ -14,6 +14,7 @@
 #include "ArgsToFrontendInputsConverter.h"
 #include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Frontend/Frontend.h"
@@ -297,6 +298,47 @@ SupplementaryOutputPathsComputer::computeOutputPaths() const {
       });
   if (hadError)
     return std::nullopt;
+
+  // In WMO mode compute supplementary output paths for optimization record
+  // data (opt-remarks). We need one path per LLVMModule that will be created as
+  // part of wmo.
+  if (!InputsAndOutputs.hasPrimaryInputs()) {
+    unsigned i = 0;
+    InputsAndOutputs.forEachInput([&](const InputFile &input) -> bool {
+      // First input is already computed.
+      if (InputsAndOutputs.firstInput().getFileName() == input.getFileName()) {
+        ++i;
+        return false;
+      }
+      SupplementaryOutputPaths outputs;
+
+      // Compute auxiliar opt record paths.
+      if(OutputFiles.size() > 1) {
+        StringRef defaultSupplementaryOutputPathExcludingExtension =
+            deriveDefaultSupplementaryOutputPathExcludingExtension(
+              OutputFiles[i], input);
+
+        auto YAMLOptRecordPath = determineSupplementaryOutputFilename(
+          options::OPT_save_optimization_record,
+          "",
+          file_types::TY_YAMLOptRecord, "",
+          defaultSupplementaryOutputPathExcludingExtension, true);
+        outputs.YAMLOptRecordPath = YAMLOptRecordPath;
+
+        auto bitstreamOptRecordPath = determineSupplementaryOutputFilename(
+          options::OPT_save_optimization_record,
+          "",
+          file_types::TY_BitstreamOptRecord, "",
+          defaultSupplementaryOutputPathExcludingExtension, true);
+
+        outputs.BitstreamOptRecordPath = bitstreamOptRecordPath;
+      }
+
+      outputPaths.emplace_back(std::move(outputs));
+      ++i;
+      return false;
+    });
+  }
   return outputPaths;
 }
 
@@ -316,8 +358,6 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_reference_dependencies_path);
   auto serializedDiagnostics = getSupplementaryFilenamesFromArguments(
       options::OPT_serialize_diagnostics_path);
-  auto fixItsOutput = getSupplementaryFilenamesFromArguments(
-      options::OPT_emit_fixits_path);
   auto loadedModuleTrace = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_loaded_module_trace_path);
   auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
@@ -342,7 +382,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_save_optimization_record_path);
   if (!clangHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
-      !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
+      !serializedDiagnostics || !loadedModuleTrace || !TBD ||
       !moduleInterfaceOutput || !privateModuleInterfaceOutput || !packageModuleInterfaceOutput ||
       !moduleSourceInfoOutput || !moduleSummaryOutput || !abiDescriptorOutput ||
       !moduleSemanticInfoOutput || !optRecordOutput) {
@@ -360,7 +400,6 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.DependenciesFilePath = (*dependenciesFile)[i];
     sop.ReferenceDependenciesFilePath = (*referenceDependenciesFile)[i];
     sop.SerializedDiagnosticsPath = (*serializedDiagnostics)[i];
-    sop.FixItsOutputPath = (*fixItsOutput)[i];
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
     sop.TBDPath = (*TBD)[i];
     sop.ModuleInterfaceOutputPath = (*moduleInterfaceOutput)[i];
@@ -410,6 +449,50 @@ SupplementaryOutputPathsComputer::getSupplementaryFilenamesFromArguments(
   return std::nullopt;
 }
 
+static bool shouldEmitFineModuleTrace(FrontendOptions::ActionType action) {
+  // Only full compilation jobs should emit fine module tracing file.
+  // Other partial compilation jobs, such as emitting modules, only typecheck partially
+  // so walking into every function bodies may be risky.
+  switch(action) {
+  case swift::FrontendOptions::ActionType::Typecheck:
+  case swift::FrontendOptions::ActionType::EmitSILGen:
+  case swift::FrontendOptions::ActionType::EmitSIL:
+  case swift::FrontendOptions::ActionType::EmitAssembly:
+  case swift::FrontendOptions::ActionType::EmitLoweredSIL:
+  case swift::FrontendOptions::ActionType::EmitIRGen:
+  case swift::FrontendOptions::ActionType::EmitIR:
+  case swift::FrontendOptions::ActionType::EmitBC:
+  case swift::FrontendOptions::ActionType::EmitObject:
+    return true;
+  case swift::FrontendOptions::ActionType::NoneAction:
+  case swift::FrontendOptions::ActionType::Parse:
+  case swift::FrontendOptions::ActionType::ResolveImports:
+  case swift::FrontendOptions::ActionType::DumpParse:
+  case swift::FrontendOptions::ActionType::DumpInterfaceHash:
+  case swift::FrontendOptions::ActionType::DumpAST:
+  case swift::FrontendOptions::ActionType::PrintAST:
+  case swift::FrontendOptions::ActionType::PrintASTDecl:
+  case swift::FrontendOptions::ActionType::DumpScopeMaps:
+  case swift::FrontendOptions::ActionType::EmitImportedModules:
+  case swift::FrontendOptions::ActionType::EmitPCH:
+  case swift::FrontendOptions::ActionType::EmitModuleOnly:
+  case swift::FrontendOptions::ActionType::MergeModules:
+  case swift::FrontendOptions::ActionType::CompileModuleFromInterface:
+  case swift::FrontendOptions::ActionType::TypecheckModuleFromInterface:
+  case swift::FrontendOptions::ActionType::EmitSIBGen:
+  case swift::FrontendOptions::ActionType::EmitSIB:
+  case swift::FrontendOptions::ActionType::Immediate:
+  case swift::FrontendOptions::ActionType::REPL:
+  case swift::FrontendOptions::ActionType::DumpTypeInfo:
+  case swift::FrontendOptions::ActionType::EmitPCM:
+  case swift::FrontendOptions::ActionType::DumpPCM:
+  case swift::FrontendOptions::ActionType::ScanDependencies:
+  case swift::FrontendOptions::ActionType::PrintVersion:
+  case swift::FrontendOptions::ActionType::PrintArguments:
+    return false;
+  }
+}
+
 std::optional<SupplementaryOutputPaths>
 SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
     StringRef outputFile, const SupplementaryOutputPaths &pathsFromArguments,
@@ -453,6 +536,26 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       OPT_emit_loaded_module_trace, pathsFromArguments.LoadedModuleTracePath,
       file_types::TY_ModuleTrace, "",
       defaultSupplementaryOutputPathExcludingExtension);
+
+  // We piggy-back on the loadedModuleTracePath to decide (1) whether
+  // to emit the fine module Trace file, and (2) where to emit the fine module
+  // trace file if the path isn't explicitly given by
+  // SWIFT_COMPILER_FINE_GRAINED_TRACE_PATH.
+  // FIXME: we probably need to move this to a frontend argument.
+  llvm::SmallString<128> FineModuleTracePath;
+  if (!loadedModuleTracePath.empty() &&
+      shouldEmitFineModuleTrace(RequestedAction) &&
+      !Args.hasArg(OPT_disable_fine_module_tracing)) {
+    if (const char *P = ::getenv("SWIFT_COMPILER_FINE_GRAINED_TRACE_PATH")) {
+      StringRef FilePath = P;
+      llvm::sys::path::append(FineModuleTracePath, FilePath);
+    } else {
+      llvm::sys::path::append(FineModuleTracePath, loadedModuleTracePath);
+      llvm::sys::path::remove_filename(FineModuleTracePath);
+      llvm::sys::path::append(FineModuleTracePath,
+                              ".SWIFT_FINE_DEPENDENCY_TRACE.json");
+    }
+  }
 
   auto tbdPath = determineSupplementaryOutputFilename(
       OPT_emit_tbd, pathsFromArguments.TBDPath, file_types::TY_TBD, "",
@@ -502,11 +605,11 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       defaultSupplementaryOutputPathExcludingExtension);
 
   auto YAMLOptRecordPath = determineSupplementaryOutputFilename(
-      OPT_save_optimization_record_path, pathsFromArguments.YAMLOptRecordPath,
+      OPT_save_optimization_record, pathsFromArguments.YAMLOptRecordPath,
       file_types::TY_YAMLOptRecord, "",
       defaultSupplementaryOutputPathExcludingExtension);
   auto bitstreamOptRecordPath = determineSupplementaryOutputFilename(
-      OPT_save_optimization_record_path, pathsFromArguments.BitstreamOptRecordPath,
+      OPT_save_optimization_record, pathsFromArguments.BitstreamOptRecordPath,
       file_types::TY_BitstreamOptRecord, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
@@ -519,6 +622,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.SerializedDiagnosticsPath = serializedDiagnosticsPath;
   sop.FixItsOutputPath = fixItsOutputPath;
   sop.LoadedModuleTracePath = loadedModuleTracePath;
+  sop.FineModuleTracePath = FineModuleTracePath.str().str();
   sop.TBDPath = tbdPath;
   sop.ModuleInterfaceOutputPath = ModuleInterfaceOutputPath;
   sop.PrivateModuleInterfaceOutputPath = PrivateModuleInterfaceOutputPath;
@@ -551,21 +655,45 @@ std::string
 SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
     options::ID emitOpt, std::string pathFromArguments, file_types::ID type,
     StringRef mainOutputIfUsable,
-    StringRef defaultSupplementaryOutputPathExcludingExtension) const {
+    StringRef defaultSupplementaryOutputPathExcludingExtension,
+    bool forceDefaultSupplementaryOutputPathExcludingExtension) const {
+
+  auto hasEmitOptArg = [&] () -> bool {
+    if (Args.hasArg(emitOpt))
+      return true;
+    if (emitOpt == options::OPT_save_optimization_record &&
+        Args.hasArg(options::OPT_save_optimization_record_EQ))
+      return true;
+    return false;
+  };
+
+  auto computeDefaultSupplementaryOutputPathExcludingExtension =
+    [&] () -> std::string {
+      llvm::SmallString<128> path(
+        defaultSupplementaryOutputPathExcludingExtension);
+
+      llvm::sys::path::replace_extension(path, file_types::getExtension(type));
+      return path.str().str();
+    };
+
+  if (forceDefaultSupplementaryOutputPathExcludingExtension) {
+    if (!hasEmitOptArg()) {
+      return std::string();
+    }
+    return computeDefaultSupplementaryOutputPathExcludingExtension();
+  }
 
   if (!pathFromArguments.empty())
     return pathFromArguments;
 
-  if (!Args.hasArg(emitOpt))
+  if (!hasEmitOptArg())
     return std::string();
 
   if (!mainOutputIfUsable.empty()) {
     return mainOutputIfUsable.str();
   }
 
-  llvm::SmallString<128> path(defaultSupplementaryOutputPathExcludingExtension);
-  llvm::sys::path::replace_extension(path, file_types::getExtension(type));
-  return path.str().str();
+  return computeDefaultSupplementaryOutputPathExcludingExtension();
 }
 
 void SupplementaryOutputPathsComputer::deriveModulePathParameters(

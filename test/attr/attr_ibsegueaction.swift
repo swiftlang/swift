@@ -34,7 +34,7 @@ class IBActionWrapperTy {
   func process(x: AnyObject, _: AnyObject, _: AnyObject) {}  // expected-error {{methods declared @IBSegueAction must return a value}}
 
   @IBSegueAction
-  func process(_: AnyObject, _: AnyObject, _: AnyObject) -> Int? {fatalError()}  // expected-error {{method cannot be marked @IBSegueAction because its result type cannot be represented in Objective-C}}
+  func process(_: AnyObject, _: AnyObject, _: AnyObject) -> Int? {fatalError()}  // expected-error {{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}}
 
   // @IBSegueAction does /not/ semantically imply @objc.
   @IBSegueAction // expected-note {{attribute already specified here}}
@@ -135,39 +135,39 @@ protocol CP2 : class { }
   @IBSegueAction func action6a(_: Any!, _: Any!, _: Any!) -> Any! {fatalError()}
 
   // Protocol types
-  @IBSegueAction func action7a(_: AnyObject, _: AnyObject, _: AnyObject) -> P1 {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because its result type cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'P1' cannot be represented in Objective-C}}
-  @IBSegueAction func action7b(_: P1, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 1 cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'P1' cannot be represented in Objective-C}}
-  @IBSegueAction func action7c(_: AnyObject, _: P1, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 2 cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'P1' cannot be represented in Objective-C}}
-  @IBSegueAction func action7d(_: AnyObject, _: AnyObject, _: P1) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 3 cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'P1' cannot be represented in Objective-C}}
+  @IBSegueAction func action7a(_: AnyObject, _: AnyObject, _: AnyObject) -> P1 {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'P1' cannot be represented in Objective-C}}
+  @IBSegueAction func action7b(_: P1, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 1 cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'P1' cannot be represented in Objective-C}}
+  @IBSegueAction func action7c(_: AnyObject, _: P1, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 2 cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'P1' cannot be represented in Objective-C}}
+  @IBSegueAction func action7d(_: AnyObject, _: AnyObject, _: P1) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 3 cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'P1' cannot be represented in Objective-C}}
 
-  @IBSegueAction func action8a(_: AnyObject, _: AnyObject, _: AnyObject) -> CP1 {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because its result type cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'CP1' cannot be represented in Objective-C}}
-  @IBSegueAction func action7b(_: CP1, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 1 cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'CP1' cannot be represented in Objective-C}}
-  @IBSegueAction func action7c(_: AnyObject, _: CP1, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 2 cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'CP1' cannot be represented in Objective-C}}
-  @IBSegueAction func action7d(_: AnyObject, _: AnyObject, _: CP1) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 3 cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'CP1' cannot be represented in Objective-C}}
+  @IBSegueAction func action8a(_: AnyObject, _: AnyObject, _: AnyObject) -> CP1 {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'CP1' cannot be represented in Objective-C}}
+  @IBSegueAction func action7b(_: CP1, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 1 cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'CP1' cannot be represented in Objective-C}}
+  @IBSegueAction func action7c(_: AnyObject, _: CP1, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 2 cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'CP1' cannot be represented in Objective-C}}
+  @IBSegueAction func action7d(_: AnyObject, _: AnyObject, _: CP1) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 3 cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'CP1' cannot be represented in Objective-C}}
 
   @IBSegueAction func action9(_: OP1, _: OP1, _: OP1) -> OP1 {fatalError()}
 
-  @IBSegueAction func action10a(_: AnyObject, _: AnyObject, _: AnyObject) -> P1? {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because its result type cannot be represented in Objective-C}}
-  @IBSegueAction func action10b(_: P1?, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 1 cannot be represented in Objective-C}}
-  @IBSegueAction func action10c(_: AnyObject, _: P1?, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 2 cannot be represented in Objective-C}}
-  @IBSegueAction func action10d(_: AnyObject, _: AnyObject, _: P1?) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 3 cannot be represented in Objective-C}}
+  @IBSegueAction func action10a(_: AnyObject, _: AnyObject, _: AnyObject) -> P1? {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}}
+  @IBSegueAction func action10b(_: P1?, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 1 cannot be represented in Objective-C}}
+  @IBSegueAction func action10c(_: AnyObject, _: P1?, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 2 cannot be represented in Objective-C}}
+  @IBSegueAction func action10d(_: AnyObject, _: AnyObject, _: P1?) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 3 cannot be represented in Objective-C}}
 
-  @IBSegueAction func action11a(_: AnyObject, _: AnyObject, _: AnyObject) -> CP1? {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because its result type cannot be represented in Objective-C}}
-  @IBSegueAction func action11b(_: CP1?, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 1 cannot be represented in Objective-C}}
-  @IBSegueAction func action11c(_: AnyObject, _: CP1?, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 2 cannot be represented in Objective-C}}
-  @IBSegueAction func action11d(_: AnyObject, _: AnyObject, _: CP1?) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 3 cannot be represented in Objective-C}}
+  @IBSegueAction func action11a(_: AnyObject, _: AnyObject, _: AnyObject) -> CP1? {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}}
+  @IBSegueAction func action11b(_: CP1?, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 1 cannot be represented in Objective-C}}
+  @IBSegueAction func action11c(_: AnyObject, _: CP1?, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 2 cannot be represented in Objective-C}}
+  @IBSegueAction func action11d(_: AnyObject, _: AnyObject, _: CP1?) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 3 cannot be represented in Objective-C}}
 
   @IBSegueAction func action12(_: OP1?, _: OP1?, _: OP1?) -> OP1? {fatalError()}
 
-  @IBSegueAction func action13a(_: AnyObject, _: AnyObject, _: AnyObject) -> P1! {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because its result type cannot be represented in Objective-C}}
-  @IBSegueAction func action13b(_: P1!, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 1 cannot be represented in Objective-C}}
-  @IBSegueAction func action13c(_: AnyObject, _: P1!, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 2 cannot be represented in Objective-C}}
-  @IBSegueAction func action13d(_: AnyObject, _: AnyObject, _: P1!) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 3 cannot be represented in Objective-C}}
+  @IBSegueAction func action13a(_: AnyObject, _: AnyObject, _: AnyObject) -> P1! {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}}
+  @IBSegueAction func action13b(_: P1!, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 1 cannot be represented in Objective-C}}
+  @IBSegueAction func action13c(_: AnyObject, _: P1!, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 2 cannot be represented in Objective-C}}
+  @IBSegueAction func action13d(_: AnyObject, _: AnyObject, _: P1!) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 3 cannot be represented in Objective-C}}
 
-  @IBSegueAction func action14a(_: AnyObject, _: AnyObject, _: AnyObject) -> CP1! {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because its result type cannot be represented in Objective-C}}
-  @IBSegueAction func action14b(_: CP1!, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 1 cannot be represented in Objective-C}}
-  @IBSegueAction func action14c(_: AnyObject, _: CP1!, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 2 cannot be represented in Objective-C}}
-  @IBSegueAction func action14d(_: AnyObject, _: AnyObject, _: CP1!) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 3 cannot be represented in Objective-C}}
+  @IBSegueAction func action14a(_: AnyObject, _: AnyObject, _: AnyObject) -> CP1! {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}}
+  @IBSegueAction func action14b(_: CP1!, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 1 cannot be represented in Objective-C}}
+  @IBSegueAction func action14c(_: AnyObject, _: CP1!, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 2 cannot be represented in Objective-C}}
+  @IBSegueAction func action14d(_: AnyObject, _: AnyObject, _: CP1!) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 3 cannot be represented in Objective-C}}
 
   @IBSegueAction func action15(_: OP1!, _: OP1!, _: OP1!) -> OP1! {fatalError()}
 
@@ -182,52 +182,52 @@ protocol CP2 : class { }
   @IBSegueAction func action20(_: AnyClass!, _: AnyClass!, _: AnyClass!) -> AnyClass! {fatalError()}
 
   // Protocol types
-  @IBSegueAction func action21a(_: AnyObject, _: AnyObject, _: AnyObject) -> P1.Type {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because its result type cannot be represented in Objective-C}}
-  @IBSegueAction func action21b(_: P1.Type, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 1 cannot be represented in Objective-C}}
-  @IBSegueAction func action21c(_: AnyObject, _: P1.Type, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 2 cannot be represented in Objective-C}}
-  @IBSegueAction func action21d(_: AnyObject, _: AnyObject, _: P1.Type) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 3 cannot be represented in Objective-C}}
+  @IBSegueAction func action21a(_: AnyObject, _: AnyObject, _: AnyObject) -> P1.Type {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}}
+  @IBSegueAction func action21b(_: P1.Type, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 1 cannot be represented in Objective-C}}
+  @IBSegueAction func action21c(_: AnyObject, _: P1.Type, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 2 cannot be represented in Objective-C}}
+  @IBSegueAction func action21d(_: AnyObject, _: AnyObject, _: P1.Type) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 3 cannot be represented in Objective-C}}
 
-  @IBSegueAction func action22a(_: AnyObject, _: AnyObject, _: AnyObject) -> CP1.Type {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because its result type cannot be represented in Objective-C}}
-  @IBSegueAction func action22b(_: CP1.Type, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 1 cannot be represented in Objective-C}}
-  @IBSegueAction func action22c(_: AnyObject, _: CP1.Type, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 2 cannot be represented in Objective-C}}
-  @IBSegueAction func action22d(_: AnyObject, _: AnyObject, _: CP1.Type) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 3 cannot be represented in Objective-C}}
+  @IBSegueAction func action22a(_: AnyObject, _: AnyObject, _: AnyObject) -> CP1.Type {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}}
+  @IBSegueAction func action22b(_: CP1.Type, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 1 cannot be represented in Objective-C}}
+  @IBSegueAction func action22c(_: AnyObject, _: CP1.Type, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 2 cannot be represented in Objective-C}}
+  @IBSegueAction func action22d(_: AnyObject, _: AnyObject, _: CP1.Type) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 3 cannot be represented in Objective-C}}
 
   @IBSegueAction func action23(_: OP1.Type, _: OP1.Type, _: OP1.Type) -> OP1.Type {fatalError()}
 
-  @IBSegueAction func action24a(_: AnyObject, _: AnyObject, _: AnyObject) -> P1.Type? {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because its result type cannot be represented in Objective-C}}
-  @IBSegueAction func action24b(_: P1.Type?, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 1 cannot be represented in Objective-C}}
-  @IBSegueAction func action24c(_: AnyObject, _: P1.Type?, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 2 cannot be represented in Objective-C}}
-  @IBSegueAction func action24d(_: AnyObject, _: AnyObject, _: P1.Type?) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 3 cannot be represented in Objective-C}}
+  @IBSegueAction func action24a(_: AnyObject, _: AnyObject, _: AnyObject) -> P1.Type? {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}}
+  @IBSegueAction func action24b(_: P1.Type?, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 1 cannot be represented in Objective-C}}
+  @IBSegueAction func action24c(_: AnyObject, _: P1.Type?, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 2 cannot be represented in Objective-C}}
+  @IBSegueAction func action24d(_: AnyObject, _: AnyObject, _: P1.Type?) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 3 cannot be represented in Objective-C}}
 
-  @IBSegueAction func action25a(_: AnyObject, _: AnyObject, _: AnyObject) -> CP1.Type? {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because its result type cannot be represented in Objective-C}}
-  @IBSegueAction func action25b(_: CP1.Type?, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 1 cannot be represented in Objective-C}}
-  @IBSegueAction func action25c(_: AnyObject, _: CP1.Type?, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 2 cannot be represented in Objective-C}}
-  @IBSegueAction func action25d(_: AnyObject, _: AnyObject, _: CP1.Type?) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 3 cannot be represented in Objective-C}}
+  @IBSegueAction func action25a(_: AnyObject, _: AnyObject, _: AnyObject) -> CP1.Type? {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}}
+  @IBSegueAction func action25b(_: CP1.Type?, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 1 cannot be represented in Objective-C}}
+  @IBSegueAction func action25c(_: AnyObject, _: CP1.Type?, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 2 cannot be represented in Objective-C}}
+  @IBSegueAction func action25d(_: AnyObject, _: AnyObject, _: CP1.Type?) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 3 cannot be represented in Objective-C}}
 
   @IBSegueAction func action26(_: OP1.Type?, _: OP1.Type?, _: OP1.Type?) -> OP1.Type? {fatalError()}
 
-  @IBSegueAction func action27a(_: AnyObject, _: AnyObject, _: AnyObject) -> P1.Type! {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because its result type cannot be represented in Objective-C}}
-  @IBSegueAction func action27b(_: P1.Type!, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 1 cannot be represented in Objective-C}}
-  @IBSegueAction func action27c(_: AnyObject, _: P1.Type!, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 2 cannot be represented in Objective-C}}
-  @IBSegueAction func action27d(_: AnyObject, _: AnyObject, _: P1.Type!) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 3 cannot be represented in Objective-C}}
+  @IBSegueAction func action27a(_: AnyObject, _: AnyObject, _: AnyObject) -> P1.Type! {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}}
+  @IBSegueAction func action27b(_: P1.Type!, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 1 cannot be represented in Objective-C}}
+  @IBSegueAction func action27c(_: AnyObject, _: P1.Type!, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 2 cannot be represented in Objective-C}}
+  @IBSegueAction func action27d(_: AnyObject, _: AnyObject, _: P1.Type!) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 3 cannot be represented in Objective-C}}
 
-  @IBSegueAction func action28a(_: AnyObject, _: AnyObject, _: AnyObject) -> CP1.Type! {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because its result type cannot be represented in Objective-C}}
-  @IBSegueAction func action28b(_: CP1.Type!, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 1 cannot be represented in Objective-C}}
-  @IBSegueAction func action28c(_: AnyObject, _: CP1.Type!, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 2 cannot be represented in Objective-C}}
-  @IBSegueAction func action28d(_: AnyObject, _: AnyObject, _: CP1.Type!) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 3 cannot be represented in Objective-C}}
+  @IBSegueAction func action28a(_: AnyObject, _: AnyObject, _: AnyObject) -> CP1.Type! {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}}
+  @IBSegueAction func action28b(_: CP1.Type!, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 1 cannot be represented in Objective-C}}
+  @IBSegueAction func action28c(_: AnyObject, _: CP1.Type!, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 2 cannot be represented in Objective-C}}
+  @IBSegueAction func action28d(_: AnyObject, _: AnyObject, _: CP1.Type!) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 3 cannot be represented in Objective-C}}
 
   @IBSegueAction func action29(_: OP1.Type!, _: OP1.Type!, _: OP1.Type!) -> OP1.Type! {fatalError()}
 
   // Other bad cases
-  @IBSegueAction func action30a(_: AnyObject, _: AnyObject, _: AnyObject) -> S {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because its result type cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
-  @IBSegueAction func action30b(_: S, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 1 cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
-  @IBSegueAction func action30c(_: AnyObject, _: S, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 2 cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
-  @IBSegueAction func action30d(_: AnyObject, _: AnyObject, _: S) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 3 cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
+  @IBSegueAction func action30a(_: AnyObject, _: AnyObject, _: AnyObject) -> S {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
+  @IBSegueAction func action30b(_: S, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 1 cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
+  @IBSegueAction func action30c(_: AnyObject, _: S, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 2 cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
+  @IBSegueAction func action30d(_: AnyObject, _: AnyObject, _: S) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 3 cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
 
-  @IBSegueAction func action31a(_: AnyObject, _: AnyObject, _: AnyObject) -> E {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because its result type cannot be represented in Objective-C}} expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
-  @IBSegueAction func action31b(_: E, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 1 cannot be represented in Objective-C}} expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
-  @IBSegueAction func action31c(_: AnyObject, _: E, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 2 cannot be represented in Objective-C}} expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
-  @IBSegueAction func action31d(_: AnyObject, _: AnyObject, _: E) -> AnyObject {fatalError()} // expected-error{{method cannot be marked @IBSegueAction because the type of the parameter 3 cannot be represented in Objective-C}} expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
+  @IBSegueAction func action31a(_: AnyObject, _: AnyObject, _: AnyObject) -> E {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}} expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
+  @IBSegueAction func action31b(_: E, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 1 cannot be represented in Objective-C}} expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
+  @IBSegueAction func action31c(_: AnyObject, _: E, _: AnyObject) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 2 cannot be represented in Objective-C}} expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
+  @IBSegueAction func action31d(_: AnyObject, _: AnyObject, _: E) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 3 cannot be represented in Objective-C}} expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
 
   // Supported arities
   @IBSegueAction func actionWith0() -> X {fatalError()} // expected-error{{@IBSegueAction methods must have 1 to 3 arguments}}

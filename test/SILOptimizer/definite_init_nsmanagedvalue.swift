@@ -31,4 +31,6 @@ extension Person {
 // Verify that the DI instructions share the scope of the adjacent instructions.
 // CHECK: sil {{.*}}$s28definite_init_nsmanagedvalue6PersonCyACSiKcfc
 // CHECK: integer_literal $Builtin.Int2, {{.*}}, scope [[SCOPE:[0-9]+]]
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: debug_value
 // CHECK-NEXT: store {{.*}}, scope [[SCOPE]]

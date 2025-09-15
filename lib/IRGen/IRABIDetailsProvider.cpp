@@ -30,6 +30,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
@@ -238,7 +239,7 @@ public:
       return MethodDispatchInfo::thunk(
           LinkEntity::forDispatchThunk(
               SILDeclRef(const_cast<AbstractFunctionDecl *>(funcDecl)))
-              .mangleAsString());
+              .mangleAsString(IGM.Context));
     auto &layout = IGM.getMetadataLayout(parentClass);
     if (!isa<ClassMetadataLayout>(layout))
       return {};
@@ -260,7 +261,7 @@ public:
       return MethodDispatchInfo::indirectVTableRelativeOffset(
           /*offset=*/mi->TheOffset.getRelativeOffset().getValue(),
           /*symbolName=*/
-          LinkEntity::forClassMetadataBaseOffset(parentClass).mangleAsString(),
+          LinkEntity::forClassMetadataBaseOffset(parentClass).mangleAsString(IGM.Context),
           getMethodPointerAuthInfo(funcDecl, silDecl));
     }
     llvm_unreachable("invalid kind");

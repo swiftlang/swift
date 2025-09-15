@@ -42,7 +42,7 @@ class SwiftToClangInteropContext;
 class DeclAndTypePrinter;
 
 struct ClangRepresentation {
-  enum Kind { representable, unsupported };
+  enum Kind { representable, objcxxonly, unsupported };
 
   ClangRepresentation(Kind kind) : kind(kind) {}
 
@@ -50,8 +50,14 @@ struct ClangRepresentation {
   /// language mode.
   bool isUnsupported() const { return kind == unsupported; }
 
+  /// Returns true if the given Swift node is only supported in
+  /// Objective C++ mode.
+  bool isObjCxxOnly() const { return kind == objcxxonly; }
+
   const ClangRepresentation &merge(ClangRepresentation other) {
-    if (kind != unsupported)
+    if (other.kind == unsupported)
+      kind = unsupported;
+    else if (kind == representable)
       kind = other.kind;
     return *this;
   }
@@ -143,10 +149,9 @@ public:
       std::optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo);
 
   /// Print Swift type as C/C++ type, as the return type of a C/C++ function.
-  ClangRepresentation
-  printClangFunctionReturnType(Type ty, OptionalTypeKind optKind,
-                               ModuleDecl *moduleContext,
-                               OutputLanguageMode outputLang);
+  ClangRepresentation printClangFunctionReturnType(
+      raw_ostream &stream, Type ty, OptionalTypeKind optKind,
+      ModuleDecl *moduleContext, OutputLanguageMode outputLang);
 
   static void printGenericReturnSequence(
       raw_ostream &os, const GenericTypeParamType *gtpt,
@@ -170,6 +175,9 @@ public:
                         SwiftToClangInteropContext &interopContext,
                         DeclAndTypePrinter &declPrinter,
                         const ModuleDecl *emittedModule, Type ty);
+
+  /// Prints the name of the type including generic arguments.
+  void printTypeName(Type ty, const ModuleDecl *moduleContext);
 
 private:
   void printCxxToCFunctionParameterUse(Type type, StringRef name,

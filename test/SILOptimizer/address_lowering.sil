@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -address-lowering -enable-sil-opaque-values -emit-sorted-sil -module-name Swift -sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -address-lowering -enable-sil-opaque-values -emit-sorted-sil -module-name Swift -sil-verify-all %s | %FileCheck %s
 //
 // The module name must be Swift so that declarations like Error are parsed as the correct loadable type.
 
@@ -1127,7 +1127,7 @@ bb0(%error_exi : @guaranteed $any Error):
 }
 
 // Test a chain of projections multiple nodes of which feature an opened
-// archetype AND the archetype-definining instruction for the first projection
+// archetype AND the archetype-defining instruction for the first projection
 // whose type has an opened archetype dominates all blocks but the
 // archetype-defining instruction for the SECOND projection does not.
 //

@@ -104,20 +104,15 @@
 // INFERRED_NAMED_DARWIN tests above: 'libLINKER.dylib'.
 // RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -o libLINKER.dylib | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
 
-// On Darwin, when C++ interop is turned on, we link against libc++ explicitly
-// regardless of whether -experimental-cxx-stdlib is specified or not. So also
-// run a test where C++ interop is turned off to make sure we don't link
+// On Darwin, when C++ interop is turned on, we link against libc++ explicitly.
+// So also run a test where C++ interop is turned off to make sure we don't link
 // against libc++ in this case.
 // RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios7.1 %s 2>&1 | %FileCheck -check-prefix IOS-no-cxx-interop %s
 // RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios7.1 -enable-experimental-cxx-interop %s 2>&1 | %FileCheck -check-prefix IOS-cxx-interop-libcxx %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios7.1 -enable-experimental-cxx-interop -experimental-cxx-stdlib libc++ %s 2>&1 | %FileCheck -check-prefix IOS-cxx-interop-libcxx %s
-// RUN: not %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-ios7.1 -enable-experimental-cxx-interop -experimental-cxx-stdlib libstdc++ %s 2>&1 | %FileCheck -check-prefix IOS-cxx-interop-libstdcxx %s
 
 // RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-linux-gnu -enable-experimental-cxx-interop %s 2>&1 | %FileCheck -check-prefix LINUX-cxx-interop %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-linux-gnu -enable-experimental-cxx-interop -experimental-cxx-stdlib libc++ %s 2>&1 | %FileCheck -check-prefix LINUX-cxx-interop-libcxx %s
 
 // RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-windows-msvc -enable-experimental-cxx-interop %s 2>&1 | %FileCheck -check-prefix WINDOWS-cxx-interop %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-windows-msvc -enable-experimental-cxx-interop -experimental-cxx-stdlib libc++ %s 2>&1 | %FileCheck -check-prefix WINDOWS-cxx-interop-libcxx %s
 
 // Check reading the SDKSettings.json from an SDK
 // RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15 %s
@@ -349,7 +344,6 @@
 
 // LINUX_DYNLIB-x86_64: clang{{(\.exe)?"? }}
 // LINUX_DYNLIB-x86_64-DAG: -shared
-// LINUX_DYNLIB-x86_64-DAG: -fuse-ld=gold
 // LINUX_DYNLIB-x86_64-NOT: -pie
 // LINUX_DYNLIB-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift(/|\\\\)linux]]
 // LINUX_DYNLIB-x86_64: [[STDLIB_PATH]]{{/|\\\\}}x86_64{{/|\\\\}}swiftrt.o
@@ -460,29 +454,9 @@
 // IOS-cxx-interop-libcxx-DAG: -lc++
 // IOS-cxx-interop-libcxx: -o linker
 
-// IOS-cxx-interop-libstdcxx: error: The only C++ standard library supported on Apple platforms is libc++
-
 // LINUX-cxx-interop-NOT: -stdlib
 
-// LINUX-cxx-interop-libcxx: swift
-// LINUX-cxx-interop-libcxx-DAG: -enable-experimental-cxx-interop
-// LINUX-cxx-interop-libcxx-DAG: -o [[OBJECTFILE:.*]]
-
-// LINUX-cxx-interop-libcxx: clang++{{(\.exe)?"? }}
-// LINUX-cxx-interop-libcxx-DAG: [[OBJECTFILE]]
-// LINUX-cxx-interop-libcxx-DAG: -stdlib=libc++
-// LINUX-cxx-interop-libcxx: -o linker
-
 // WINDOWS-cxx-interop-NOT: -stdlib
-
-// WINDOWS-cxx-interop-libcxx: swift
-// WINDOWS-cxx-interop-libcxx-DAG: -enable-experimental-cxx-interop
-// WINDOWS-cxx-interop-libcxx-DAG: -o [[OBJECTFILE:.*]]
-
-// WINDOWS-cxx-interop-libcxx: clang++{{(\.exe)?"? }}
-// WINDOWS-cxx-interop-libcxx-DAG: [[OBJECTFILE]]
-// WINDOWS-cxx-interop-libcxx-DAG: -stdlib=libc++
-// WINDOWS-cxx-interop-libcxx: -o linker
 
 // Test ld detection. We use hard links to make sure
 // the Swift driver really thinks it's been moved.

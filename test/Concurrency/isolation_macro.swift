@@ -63,7 +63,7 @@ func mainActorIsolated() {
   // CHECK-NEXT: inject_into_optional
   // CHECK-NEXT: erasure_expr
   // CHECK: member_ref_expr type="MainActor" location=@__swiftmacro_{{.*}} decl="_Concurrency.(file).MainActor.shared"
-  // CHECK-NEXT: type_expr type="MainActor.Type"
+  // CHECK-NEXT: type_expr implicit type="MainActor.Type"
   _ = #isolation
 }
 
@@ -101,6 +101,14 @@ extension A {
 
 #if TEST_DIAGNOSTICS
 @available(SwiftStdlib 5.1, *)
+actor ConcreteActor {}
+
+@available(SwiftStdlib 5.1, *)
+func concreteActorIsolation(
+  actor: isolated ConcreteActor = #isolation
+) async {}
+
+@available(SwiftStdlib 5.1, *)
 @MainActor
 func testContextualType() {
   let _: any Actor = #isolation
@@ -111,5 +119,26 @@ func testContextualType() {
   // CHECK-DIAGS: note: in expansion of macro 'isolation' here
   // CHECK-DIAGS: let _: Int = #isolation
   let _: Int = #isolation
+
+  // CHECK-DIAGS: error: cannot convert value of type 'MainActor' to expected argument type 'ConcreteActor'
+  // CHECK-DIAGS: note: in expansion of macro 'isolation' here
+  // CHECK-DIAGS: await concreteActorIsolation()
+  await concreteActorIsolation()
 }
 #endif
+
+func isolationMacroDefault(
+  isolation: isolated (any Actor)? = #isolation,
+) async -> Void {}
+
+class C {
+  @globalActor
+  actor NestedActor {
+    static let shared = NestedActor()
+  }
+
+  @NestedActor
+  func expandIsolation() async {
+    await isolationMacroDefault()
+  }
+}

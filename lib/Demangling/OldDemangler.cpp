@@ -528,7 +528,8 @@ private:
       if (!name || !Mangled.nextIf('_'))
         return false;
       parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropFunction), Factory);
-      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(name->getText()), Factory);
+      NodePointer pl = Factory.createNode(Node::Kind::Identifier, name->getText());
+      parent->addChild(pl, Factory);
       return true;
     }
 
@@ -537,7 +538,8 @@ private:
       if (!name || !Mangled.nextIf('_'))
         return false;
       parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropGlobal), Factory);
-      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(name->getText()), Factory);
+      NodePointer pl = Factory.createNode(Node::Kind::Identifier, name->getText());
+      parent->addChild(pl, Factory);
       return true;
     }
 
@@ -583,7 +585,8 @@ private:
 
       parent->addChild(FUNCSIGSPEC_CREATE_PARAM_KIND(ConstantPropString), Factory);
       parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(encodingStr), Factory);
-      parent->addChild(FUNCSIGSPEC_CREATE_PARAM_PAYLOAD(str->getText()), Factory);
+      NodePointer pl = Factory.createNode(Node::Kind::Identifier, str->getText());
+      parent->addChild(pl, Factory);
       return true;
     }
 
@@ -1212,6 +1215,9 @@ private:
     NodePointer name = nullptr;
     if (Mangled.nextIf('D')) {
       entityKind = Node::Kind::Deallocator;
+      hasType = false;
+    } else if (Mangled.nextIf('Z')) {
+      entityKind = Node::Kind::IsolatedDeallocator;
       hasType = false;
     } else if (Mangled.nextIf('d')) {
       entityKind = Node::Kind::Destructor;

@@ -2,7 +2,7 @@
 
 let f1: (Int) -> Int = { $0 }
 let f2: @convention(swift) (Int) -> Int = { $0 }
-let f2a: @convention(swift, cType: "int *(int)") (Int32) -> Int32 = { $0 } // expected-error{{convention 'swift' does not support the 'cType' argument label, did you mean @convention(c, cType: "int *(int)") or @convention(block, cType: "int *(int)") instead?}}
+let f2a: @convention(swift, cType: "int *(int)") (Int32) -> Int32 = { $0 } // expected-error{{convention 'swift' does not support the 'cType' argument label, did you mean '@convention(c, cType: "int *(int)")' or '@convention(block, cType: "int *(int)")' instead?}}
 let f3: @convention(block) (Int) -> Int = { $0 }
 let f4: @convention(c) (Int) -> Int = { $0 }
 let f4a: @convention(c, cType: "int (int)") (Int32) -> Int32 = { $0 } // expected-error{{unable to parse 'int (int)'; it should be a C function pointer type or a block pointer type}}

@@ -15,22 +15,22 @@
 //===----------------------------------------------------------------------===//
 
 #ifndef DECL_ATTR
-#define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE)
+#define DECL_ATTR(SPELLING, CLASS, REQUIREMENTS, BEHAVIORS, CODE)
 #endif
 
 #ifndef CONTEXTUAL_DECL_ATTR
-#define CONTEXTUAL_DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE) \
-                   DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE)
+#define CONTEXTUAL_DECL_ATTR(SPELLING, CLASS, REQUIREMENTS, BEHAVIORS, CODE) \
+                   DECL_ATTR(SPELLING, CLASS, REQUIREMENTS, BEHAVIORS, CODE)
 #endif
 
 #ifndef SIMPLE_DECL_ATTR
-#define SIMPLE_DECL_ATTR(X, CLASS, OPTIONS, CODE) \
-               DECL_ATTR(X, CLASS, OPTIONS, CODE)
+#define SIMPLE_DECL_ATTR(X, CLASS, REQUIREMENTS, BEHAVIORS, CODE) \
+               DECL_ATTR(X, CLASS, REQUIREMENTS, BEHAVIORS, CODE)
 #endif
 
 #ifndef CONTEXTUAL_SIMPLE_DECL_ATTR
-#define CONTEXTUAL_SIMPLE_DECL_ATTR(X, CLASS, OPTIONS, CODE) \
-                   SIMPLE_DECL_ATTR(X, CLASS, OPTIONS, CODE)
+#define CONTEXTUAL_SIMPLE_DECL_ATTR(X, CLASS, REQUIREMENTS, BEHAVIORS, CODE) \
+                   SIMPLE_DECL_ATTR(X, CLASS, REQUIREMENTS, BEHAVIORS, CODE)
 #endif
 
 #ifndef DECL_ATTR_ALIAS
@@ -42,454 +42,790 @@
                    DECL_ATTR_ALIAS(SPELLING, CLASS)
 #endif
 
+// Diagnose any use of the attribute CLASS without FEATURE_NAME enabled,
+// and also enable other special behavior. If you use this for an experimental
+// feature, please add test cases to:
+// 
+// * test/attr/feature_requirement.swift
+// * test/IDE/complete_decl_attribute_feature_requirement.swift
+#ifndef DECL_ATTR_FEATURE_REQUIREMENT
+#define DECL_ATTR_FEATURE_REQUIREMENT(CLASS, FEATURE_NAME)
+#endif
+
 #ifndef LAST_DECL_ATTR
 #define LAST_DECL_ATTR(CLASS)
 #endif
 
+//
 // Declaration Attributes and Modifers
+//
+// Please keep entries in serialization code order. If you remove an entry,
+// leave an "Unused 'NNN'" comment so the unused code is obvious. 
 DECL_ATTR(_silgen_name, SILGenName,
-  OnAbstractFunction | OnVar | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnAbstractFunction | OnVar,
+  LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   0)
+
 DECL_ATTR(available, Available,
-  OnAbstractFunction | OnAssociatedType | OnGenericType | OnVar | OnSubscript | OnEnumElement | OnMacro | OnExtension | AllowMultipleAttributes | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnAbstractFunction | OnAssociatedType | OnGenericType | OnVar | OnSubscript | OnEnumElement | OnMacro | OnExtension,
+  AllowMultipleAttributes | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   1)
-DECL_ATTR(objc, ObjC,
-  OnAbstractFunction | OnClass | OnProtocol | OnExtension | OnVar | OnSubscript | OnEnum | OnEnumElement | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
-  3)
-SIMPLE_DECL_ATTR(dynamicCallable, DynamicCallable,
-  OnNominalType | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  6)
-DECL_ATTR(main, MainType,
-  OnClass | OnStruct | OnEnum | OnExtension | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  7)
-SIMPLE_DECL_ATTR(_exported, Exported,
-  OnImport | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  8)
-SIMPLE_DECL_ATTR(dynamicMemberLookup, DynamicMemberLookup,
-  OnNominalType | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  9)
-SIMPLE_DECL_ATTR(NSCopying, NSCopying,
-  OnVar | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  10)
-SIMPLE_DECL_ATTR(IBAction, IBAction,
-  OnFunc | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  11)
-SIMPLE_DECL_ATTR(IBDesignable, IBDesignable,
-  OnClass | OnExtension | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  12)
-SIMPLE_DECL_ATTR(IBInspectable, IBInspectable,
-  OnVar | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  13)
-SIMPLE_DECL_ATTR(IBOutlet, IBOutlet,
-  OnVar | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  14)
-SIMPLE_DECL_ATTR(NSManaged, NSManaged,
-  OnVar | OnFunc | OnAccessor | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  15)
-SIMPLE_DECL_ATTR(LLDBDebuggerFunction, LLDBDebuggerFunction,
-  OnFunc | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  17)
-SIMPLE_DECL_ATTR(UIApplicationMain, UIApplicationMain,
-  OnClass | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  18)
-SIMPLE_DECL_ATTR(unsafe_no_objc_tagged_pointer, UnsafeNoObjCTaggedPointer,
-  OnProtocol | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  19)
-DECL_ATTR(inline, Inline,
-  OnVar | OnSubscript | OnAbstractFunction | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  20)
-DECL_ATTR(_semantics, Semantics,
-  OnAbstractFunction | OnSubscript | OnNominalType | OnVar | AllowMultipleAttributes | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  21)
-SIMPLE_DECL_ATTR(_transparent, Transparent,
-  OnFunc | OnAccessor | OnConstructor | OnVar | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  26)
-SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
-  OnClass | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  27)
-SIMPLE_DECL_ATTR(nonobjc, NonObjC,
-  OnExtension | OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  30)
-SIMPLE_DECL_ATTR(_fixed_layout, FixedLayout,
-  OnVar | OnClass | OnStruct | OnProtocol | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
-  31)
-SIMPLE_DECL_ATTR(inlinable, Inlinable,
-  OnVar | OnSubscript | OnAbstractFunction | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  32)
-DECL_ATTR(_specialize, Specialize,
-  OnConstructor | OnFunc | OnAccessor | AllowMultipleAttributes | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  33)
-SIMPLE_DECL_ATTR(objcMembers, ObjCMembers,
-  OnClass | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  34)
-CONTEXTUAL_SIMPLE_DECL_ATTR(_compilerInitialized, CompilerInitialized,
-  OnVar | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  35)
-SIMPLE_DECL_ATTR(_hasStorage, HasStorage,
-  OnVar | UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  45)
-DECL_ATTR(__raw_doc_comment, RawDocComment,
-  OnAnyDecl | UserInaccessible | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  48)
-DECL_ATTR(_effects, Effects,
-  OnAbstractFunction | AllowMultipleAttributes | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  50)
-DECL_ATTR(__objc_bridged, ObjCBridged,
-  OnClass | UserInaccessible | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  51)
-SIMPLE_DECL_ATTR(NSApplicationMain, NSApplicationMain,
-  OnClass | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  52)
-SIMPLE_DECL_ATTR(_objc_non_lazy_realization, ObjCNonLazyRealization,
-  OnClass | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  53)
-DECL_ATTR(__synthesized_protocol, SynthesizedProtocol,
-  OnConcreteNominalType | UserInaccessible | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  54)
-SIMPLE_DECL_ATTR(testable, Testable,
-  OnImport | UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  55)
-DECL_ATTR(_alignment, Alignment,
-  OnStruct | OnEnum | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
-  56)
-SIMPLE_DECL_ATTR(rethrows, AtRethrows,
-  OnProtocol | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  58)
-DECL_ATTR(_swift_native_objc_runtime_base, SwiftNativeObjCRuntimeBase,
-  OnClass | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
-  59)
-SIMPLE_DECL_ATTR(warn_unqualified_access, WarnUnqualifiedAccess,
-  OnFunc | OnAccessor | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  61)
-SIMPLE_DECL_ATTR(_show_in_interface, ShowInInterface,
-  OnProtocol | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  62)
-DECL_ATTR(_cdecl, CDecl,
-  OnFunc | OnAccessor | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  63)
-SIMPLE_DECL_ATTR(usableFromInline, UsableFromInline,
-  OnAbstractFunction | OnVar | OnSubscript | OnNominalType | OnTypeAlias | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  64)
-SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,
-  OnFunc | OnAccessor | OnConstructor | OnMacro | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  65)
-SIMPLE_DECL_ATTR(GKInspectable, GKInspectable,
-  OnVar | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  66)
-DECL_ATTR(_implements, Implements,
-  OnFunc | OnAccessor | OnVar | OnSubscript | OnTypeAlias | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  67)
-DECL_ATTR(_objcRuntimeName, ObjCRuntimeName,
-  OnClass | UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  68)
-SIMPLE_DECL_ATTR(_staticInitializeObjCMetadata, StaticInitializeObjCMetadata,
-  OnClass | UserInaccessible | LongAttribute | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  69)
-DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
-  OnProtocol | UserInaccessible | LongAttribute | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  70)
-DECL_ATTR(implementation, ObjCImplementation,
-  OnExtension | OnAbstractFunction | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  72)
-DECL_ATTR_ALIAS(_objcImplementation, ObjCImplementation)
-DECL_ATTR(_optimize, Optimize,
-  OnAbstractFunction | OnSubscript | OnVar | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  73)
-DECL_ATTR(_clangImporterSynthesizedType, ClangImporterSynthesizedType,
-  OnGenericType | LongAttribute | RejectByParser | UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  74)
-SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
-  OnNominalType | OnAssociatedType | OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnEnumElement | OnExtension | OnImport | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  75)
-SIMPLE_DECL_ATTR(frozen, Frozen,
-  OnEnum | OnStruct | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToRemove | APIStableToAdd,
-  76)
-DECL_ATTR_ALIAS(_frozen, Frozen)
-SIMPLE_DECL_ATTR(_forbidSerializingReference, ForbidSerializingReference,
-  OnAnyDecl | LongAttribute | RejectByParser | UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  77)
-SIMPLE_DECL_ATTR(_hasInitialValue, HasInitialValue,
-  OnVar | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  78)
-SIMPLE_DECL_ATTR(_nonoverride, NonOverride,
-  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnAssociatedType | UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  79)
-DECL_ATTR(_dynamicReplacement, DynamicReplacement,
-  OnAbstractFunction | OnVar | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  80)
-SIMPLE_DECL_ATTR(_borrowed, Borrowed,
-  OnVar | OnSubscript | UserInaccessible | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
-  81)
-DECL_ATTR(_private, PrivateImport,
-  OnImport | UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  82)
-SIMPLE_DECL_ATTR(_alwaysEmitIntoClient, AlwaysEmitIntoClient,
-  OnVar | OnSubscript | OnAbstractFunction | UserInaccessible | ABIBreakingToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  83)
-SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
-  OnImport | OnFunc | OnConstructor | OnVar | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  84)
-DECL_ATTR(_custom, Custom,
-  OnAnyDecl | RejectByParser | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  85)
-SIMPLE_DECL_ATTR(propertyWrapper, PropertyWrapper,
-  OnStruct | OnClass | OnEnum | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  86)
-SIMPLE_DECL_ATTR(_disfavoredOverload, DisfavoredOverload,
-  OnAbstractFunction | OnVar | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  87)
-SIMPLE_DECL_ATTR(resultBuilder, ResultBuilder,
-  OnNominalType | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  88)
-DECL_ATTR(_projectedValueProperty, ProjectedValueProperty,
-  OnVar | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  89)
-SIMPLE_DECL_ATTR(_nonEphemeral, NonEphemeral,
-  OnParam | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
-  90)
-DECL_ATTR(differentiable, Differentiable,
-  OnAccessor | OnConstructor | OnFunc | OnVar | OnSubscript | LongAttribute | AllowMultipleAttributes | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
-  91)
-SIMPLE_DECL_ATTR(_hasMissingDesignatedInitializers, HasMissingDesignatedInitializers,
-  OnClass | UserInaccessible | NotSerialized | APIBreakingToAdd | ABIBreakingToAdd | APIStableToRemove | ABIStableToRemove,
-  92)
-SIMPLE_DECL_ATTR(_inheritsConvenienceInitializers, InheritsConvenienceInitializers,
-  OnClass | UserInaccessible | NotSerialized | APIStableToAdd | ABIStableToAdd | APIBreakingToRemove | ABIBreakingToRemove,
-  93)
-DECL_ATTR(_typeEraser, TypeEraser,
-  OnProtocol | UserInaccessible | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
-  94)
-SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
-  OnFunc | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  95)
-DECL_ATTR(_originallyDefinedIn, OriginallyDefinedIn,
-  OnNominalType | OnFunc | OnVar | OnExtension | UserInaccessible | AllowMultipleAttributes | LongAttribute | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
-  96)
-DECL_ATTR(derivative, Derivative,
-  OnFunc | LongAttribute | AllowMultipleAttributes | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
-  97)
-DECL_ATTR(_spi, SPIAccessControl,
-  OnAbstractFunction | OnExtension | OnGenericType | OnVar | OnSubscript | OnImport | OnAccessor | OnEnumElement | OnMacro | AllowMultipleAttributes | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
-  98)
-DECL_ATTR(transpose, Transpose,
-  OnFunc | LongAttribute | AllowMultipleAttributes | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
-  99)
-SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
-  OnAbstractFunction | OnVar | OnSubscript | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  100)
-SIMPLE_DECL_ATTR(globalActor, GlobalActor,
-  OnClass | OnStruct | OnEnum | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
-  104)
-SIMPLE_DECL_ATTR(_specializeExtension, SpecializeExtension,
-  OnExtension | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  105)
-SIMPLE_DECL_ATTR(Sendable, Sendable,
-  OnFunc | OnConstructor | OnAccessor | OnAnyClangDecl | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  107)
-SIMPLE_DECL_ATTR(_marker, Marker,
-  OnProtocol | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  108)
-SIMPLE_DECL_ATTR(reasync, AtReasync,
-  OnProtocol | ConcurrencyOnly | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  110)
-SIMPLE_DECL_ATTR(_unsafeInheritExecutor, UnsafeInheritExecutor,
-  OnFunc | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
-  114)
-SIMPLE_DECL_ATTR(_implicitSelfCapture, ImplicitSelfCapture,
-  OnParam | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
-  115)
-SIMPLE_DECL_ATTR(_inheritActorContext, InheritActorContext,
-  OnParam | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  116)
-SIMPLE_DECL_ATTR(_eagerMove, EagerMove,
-  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | OnFunc | OnParam | OnVar | OnNominalType,
-  117)
-SIMPLE_DECL_ATTR(_lexicalLifetimes, LexicalLifetimes,
-  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | OnFunc,
-  36)
-SIMPLE_DECL_ATTR(_noEagerMove, NoEagerMove,
-  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | OnFunc | OnParam | OnVar | OnNominalType,
-  119)
-SIMPLE_DECL_ATTR(_assemblyVision, EmitAssemblyVisionRemarks,
-  OnFunc | UserInaccessible | NotSerialized | OnNominalType | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  120)
-DECL_ATTR(_nonSendable, NonSendable,
-  OnNominalType | UserInaccessible | AllowMultipleAttributes | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
-  121)
-SIMPLE_DECL_ATTR(_noImplicitCopy, NoImplicitCopy,
-  UserInaccessible | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove | OnFunc | OnParam | OnVar,
-  122)
-SIMPLE_DECL_ATTR(_noLocks, NoLocks,
-  OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  123)
-SIMPLE_DECL_ATTR(_noAllocation, NoAllocation,
-  OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  124)
-SIMPLE_DECL_ATTR(preconcurrency, Preconcurrency,
-  OnFunc | OnConstructor | OnProtocol | OnGenericType | OnVar | OnSubscript | OnEnumElement | OnImport | ABIStableToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  125)
-DECL_ATTR(_unavailableFromAsync, UnavailableFromAsync,
-  OnFunc | OnConstructor | OnMacro | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
-  127)
-DECL_ATTR(exclusivity, Exclusivity,
-  OnVar | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  128)
-DECL_ATTR(backDeployed, BackDeployed,
-  OnAbstractFunction | OnAccessor | OnSubscript | OnVar | AllowMultipleAttributes | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
-  129)
-DECL_ATTR_ALIAS(_backDeploy, BackDeployed)
-SIMPLE_DECL_ATTR(_moveOnly, MoveOnly,
-  OnNominalType | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  131)
-SIMPLE_DECL_ATTR(_alwaysEmitConformanceMetadata, AlwaysEmitConformanceMetadata,
-  OnProtocol | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  132)
-DECL_ATTR(_expose, Expose,
-  OnFunc | OnNominalType | OnVar | AllowMultipleAttributes | OnConstructor | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  133)
-SIMPLE_DECL_ATTR(_spiOnly, SPIOnly,
-  OnImport | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  135)
-DECL_ATTR(_documentation, Documentation,
-  OnAnyDecl | UserInaccessible | APIBreakingToAdd | APIStableToRemove | ABIStableToAdd | ABIStableToRemove,
-  136)
-SIMPLE_DECL_ATTR(_noMetadata, NoMetadata,
-  OnGenericTypeParam | UserInaccessible | NotSerialized | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
-  138)
-SIMPLE_DECL_ATTR(_used, Used,
-  OnAbstractFunction | OnVar | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  143)
-DECL_ATTR(_section, Section,
-  OnAbstractFunction | OnVar | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  144)
-DECL_ATTR(_rawLayout, RawLayout,
-  OnStruct | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
-  146)
-DECL_ATTR(_extern, Extern,
-  OnFunc | AllowMultipleAttributes | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
-  147)
-SIMPLE_DECL_ATTR(_nonescapable, NonEscapable,
-  OnNominalType | UserInaccessible | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
-  148)
-SIMPLE_DECL_ATTR(_unsafeNonescapableResult, UnsafeNonEscapableResult,
-  OnAbstractFunction | OnSubscript | OnAccessor | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  149)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(final, Final,
-  OnClass | OnFunc | OnAccessor | OnVar | OnSubscript | DeclModifier | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  OnClass | OnFunc | OnAccessor | OnVar | OnSubscript,
+  DeclModifier | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   2)
+
+DECL_ATTR(objc, ObjC,
+  OnAbstractFunction | OnClass | OnProtocol | OnExtension | OnVar | OnSubscript | OnEnum | OnEnumElement,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  3)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(required, Required,
-  OnConstructor | DeclModifier | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnConstructor,
+  DeclModifier | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | EquivalentInABIAttr,
   4)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(optional, Optional,
-  OnConstructor | OnFunc | OnAccessor | OnVar | OnSubscript | DeclModifier | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnConstructor | OnFunc | OnAccessor | OnVar | OnSubscript,
+  DeclModifier | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   5)
+
+SIMPLE_DECL_ATTR(dynamicCallable, DynamicCallable,
+  OnNominalType,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  6)
+
+SIMPLE_DECL_ATTR(main, MainType,
+  OnClass | OnStruct | OnEnum | OnExtension,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  7)
+
+SIMPLE_DECL_ATTR(_exported, Exported,
+  OnImport,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  8)
+
+SIMPLE_DECL_ATTR(dynamicMemberLookup, DynamicMemberLookup,
+  OnNominalType,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  9)
+
+SIMPLE_DECL_ATTR(NSCopying, NSCopying,
+  OnVar,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  10)
+
+SIMPLE_DECL_ATTR(IBAction, IBAction,
+  OnFunc,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  11)
+
+SIMPLE_DECL_ATTR(IBDesignable, IBDesignable,
+  OnClass | OnExtension,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  12)
+
+SIMPLE_DECL_ATTR(IBInspectable, IBInspectable,
+  OnVar,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  13)
+
+SIMPLE_DECL_ATTR(IBOutlet, IBOutlet,
+  OnVar,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  14)
+
+SIMPLE_DECL_ATTR(NSManaged, NSManaged,
+  OnVar | OnFunc | OnAccessor,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  15)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(lazy, Lazy,
-  DeclModifier | OnVar | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnVar,
+  DeclModifier | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   16)
+
+SIMPLE_DECL_ATTR(LLDBDebuggerFunction, LLDBDebuggerFunction,
+  OnFunc,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  17)
+
+SIMPLE_DECL_ATTR(UIApplicationMain, UIApplicationMain,
+  OnClass,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  18)
+
+SIMPLE_DECL_ATTR(unsafe_no_objc_tagged_pointer, UnsafeNoObjCTaggedPointer,
+  OnProtocol,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  19)
+
+DECL_ATTR(inline, Inline,
+  OnVar | OnSubscript | OnAbstractFunction,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  20)
+
+DECL_ATTR(_semantics, Semantics,
+  OnAbstractFunction | OnSubscript | OnNominalType | OnVar,
+  AllowMultipleAttributes | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  21)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(dynamic, Dynamic,
-  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | DeclModifier | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor,
+  DeclModifier | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   22)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(infix, Infix,
-  OnFunc | OnOperator | DeclModifier | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnOperator,
+  DeclModifier | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   23)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(prefix, Prefix,
-  OnFunc | OnOperator | DeclModifier | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnOperator,
+  DeclModifier | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   24)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(postfix, Postfix,
-  OnFunc | OnOperator | DeclModifier | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnOperator,
+  DeclModifier | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   25)
+
+SIMPLE_DECL_ATTR(_transparent, Transparent,
+  OnFunc | OnAccessor | OnConstructor | OnVar | OnDestructor,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  26)
+
+SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
+  OnClass,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  27)
+
+SIMPLE_DECL_ATTR(_neverEmitIntoClient, NeverEmitIntoClient,
+  OnVar | OnSubscript | OnAbstractFunction,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  28)
+
+// Unused '29'
+
+SIMPLE_DECL_ATTR(nonobjc, NonObjC,
+  OnExtension | OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  30)
+
+SIMPLE_DECL_ATTR(_fixed_layout, FixedLayout,
+  OnVar | OnClass | OnStruct | OnProtocol,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  31)
+
+SIMPLE_DECL_ATTR(inlinable, Inlinable,
+  OnVar | OnSubscript | OnAbstractFunction,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  32)
+
+DECL_ATTR(_specialize, Specialize,
+  OnConstructor | OnFunc | OnAccessor,
+  AllowMultipleAttributes | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  33)
+
+SIMPLE_DECL_ATTR(objcMembers, ObjCMembers,
+  OnClass,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  34)
+
+CONTEXTUAL_SIMPLE_DECL_ATTR(_compilerInitialized, CompilerInitialized,
+  OnVar,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  35)
+
+SIMPLE_DECL_ATTR(_lexicalLifetimes, LexicalLifetimes,
+  OnFunc,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  36)
+
+// Unused '37'
+// Unused '38'
+// Unused '39'
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(__consuming, LegacyConsuming,
-  OnFunc | OnAccessor | DeclModifier | UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor,
+  DeclModifier | UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   40)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(mutating, Mutating,
-  OnFunc | OnAccessor | DeclModifier | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor,
+  DeclModifier | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   41)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(nonmutating, NonMutating,
-  OnFunc | OnAccessor | DeclModifier | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor,
+  DeclModifier | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   42)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(convenience, Convenience,
-  OnConstructor | DeclModifier | NotSerialized | ABIBreakingToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnConstructor,
+  DeclModifier | NotSerialized | ABIBreakingToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | EquivalentInABIAttr,
   43)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(override, Override,
-  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnAssociatedType | DeclModifier | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnAssociatedType,
+  DeclModifier | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   44)
+
+SIMPLE_DECL_ATTR(_hasStorage, HasStorage,
+  OnVar,
+  UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  45)
+
 DECL_ATTR(private, AccessControl,
-  OnFunc | OnAccessor | OnExtension | OnGenericType | OnVar | OnSubscript | OnConstructor | OnMacro | OnImport | DeclModifier | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor | OnExtension | OnGenericType | OnVar | OnSubscript | OnConstructor | OnMacro | OnImport,
+  DeclModifier | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   46)
 DECL_ATTR_ALIAS(fileprivate, AccessControl)
 DECL_ATTR_ALIAS(internal, AccessControl)
 DECL_ATTR_ALIAS(public, AccessControl)
 CONTEXTUAL_DECL_ATTR_ALIAS(package, AccessControl)
 CONTEXTUAL_DECL_ATTR_ALIAS(open, AccessControl)
+
 DECL_ATTR(__setter_access, SetterAccess,
-  OnVar | OnSubscript | DeclModifier | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnVar | OnSubscript,
+  DeclModifier | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   47)
+
+DECL_ATTR(__raw_doc_comment, RawDocComment,
+  OnAnyDecl,
+  UserInaccessible | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  48)
+
 CONTEXTUAL_DECL_ATTR(weak, ReferenceOwnership,
-  OnVar | DeclModifier | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnVar,
+  DeclModifier | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   49)
 CONTEXTUAL_DECL_ATTR_ALIAS(unowned, ReferenceOwnership)
+
+DECL_ATTR(_effects, Effects,
+  OnAbstractFunction,
+  AllowMultipleAttributes | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  50)
+
+DECL_ATTR(__objc_bridged, ObjCBridged,
+  OnClass,
+  UserInaccessible | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  51)
+
+SIMPLE_DECL_ATTR(NSApplicationMain, NSApplicationMain,
+  OnClass,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  52)
+
+SIMPLE_DECL_ATTR(_objc_non_lazy_realization, ObjCNonLazyRealization,
+  OnClass,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  53)
+
+DECL_ATTR(__synthesized_protocol, SynthesizedProtocol,
+  OnConcreteNominalType,
+  UserInaccessible | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  54)
+
+SIMPLE_DECL_ATTR(testable, Testable,
+  OnImport,
+  UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  55)
+
+DECL_ATTR(_alignment, Alignment,
+  OnStruct | OnEnum,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  56)
+
 SIMPLE_DECL_ATTR(rethrows, Rethrows,
-  OnFunc | OnConstructor | RejectByParser | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  OnFunc | OnConstructor,
+  DeclModifier | RejectByParser | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
   57)
+
+SIMPLE_DECL_ATTR(rethrows, AtRethrows,
+  OnProtocol,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnreachableInABIAttr,
+  58)
+
+DECL_ATTR(_swift_native_objc_runtime_base, SwiftNativeObjCRuntimeBase,
+  OnClass,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  59)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(indirect, Indirect,
-  DeclModifier | OnEnum | OnEnumElement | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  OnEnum | OnEnumElement,
+  DeclModifier | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
   60)
+
+SIMPLE_DECL_ATTR(warn_unqualified_access, WarnUnqualifiedAccess,
+  OnFunc | OnAccessor,
+  LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  61)
+
+SIMPLE_DECL_ATTR(_show_in_interface, ShowInInterface,
+  OnProtocol,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  62)
+
+DECL_ATTR(_cdecl, CDecl,
+  OnFunc | OnAccessor | OnEnum,
+  LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  63)
+DECL_ATTR_ALIAS(cdecl, CDecl)
+
+SIMPLE_DECL_ATTR(usableFromInline, UsableFromInline,
+  OnAbstractFunction | OnVar | OnSubscript | OnNominalType | OnTypeAlias,
+  LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  64)
+
+SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,
+  OnFunc | OnAccessor | OnConstructor | OnMacro,
+  LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  65)
+
+SIMPLE_DECL_ATTR(GKInspectable, GKInspectable,
+  OnVar,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  66)
+
+DECL_ATTR(_implements, Implements,
+  OnFunc | OnAccessor | OnVar | OnSubscript | OnTypeAlias,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  67)
+
+DECL_ATTR(_objcRuntimeName, ObjCRuntimeName,
+  OnClass,
+  UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  68)
+
+SIMPLE_DECL_ATTR(_staticInitializeObjCMetadata, StaticInitializeObjCMetadata,
+  OnClass,
+  UserInaccessible | LongAttribute | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  69)
+
+DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
+  OnProtocol,
+  UserInaccessible | LongAttribute | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  70)
+
+// Unused '71'
+
+DECL_ATTR(implementation, ObjCImplementation,
+  OnExtension | OnAbstractFunction,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  72)
+DECL_ATTR_ALIAS(_objcImplementation, ObjCImplementation)
+
+DECL_ATTR(_optimize, Optimize,
+  OnAbstractFunction | OnSubscript | OnVar,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  73)
+
+DECL_ATTR(_clangImporterSynthesizedType, ClangImporterSynthesizedType,
+  OnGenericType,
+  LongAttribute | RejectByParser | UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  74)
+
+SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
+  OnNominalType | OnAssociatedType | OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnEnumElement | OnExtension | OnImport,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  75)
+
+SIMPLE_DECL_ATTR(frozen, Frozen,
+  OnEnum | OnStruct,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToRemove | APIStableToAdd | UnreachableInABIAttr,
+  76)
+DECL_ATTR_ALIAS(_frozen, Frozen)
+
+SIMPLE_DECL_ATTR(_forbidSerializingReference, ForbidSerializingReference,
+  OnAnyDecl,
+  LongAttribute | RejectByParser | UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  77)
+
+SIMPLE_DECL_ATTR(_hasInitialValue, HasInitialValue,
+  OnVar,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  78)
+
+SIMPLE_DECL_ATTR(_nonoverride, NonOverride,
+  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnAssociatedType,
+  UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  79)
+
+DECL_ATTR(_dynamicReplacement, DynamicReplacement,
+  OnAbstractFunction | OnVar | OnSubscript,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  80)
+
+SIMPLE_DECL_ATTR(_borrowed, Borrowed,
+  OnVar | OnSubscript,
+  UserInaccessible | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  81)
+
+DECL_ATTR(_private, PrivateImport,
+  OnImport,
+  UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  82)
+
+SIMPLE_DECL_ATTR(_alwaysEmitIntoClient, AlwaysEmitIntoClient,
+  OnVar | OnSubscript | OnAbstractFunction,
+  UserInaccessible | ABIBreakingToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  83)
+
+SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
+  OnImport | OnFunc | OnConstructor | OnVar | OnSubscript,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  84)
+
+DECL_ATTR(_custom, Custom,
+  OnAnyDecl,
+  RejectByParser | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  85)
+
+SIMPLE_DECL_ATTR(propertyWrapper, PropertyWrapper,
+  OnStruct | OnClass | OnEnum,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  86)
+
+SIMPLE_DECL_ATTR(_disfavoredOverload, DisfavoredOverload,
+  OnAbstractFunction | OnVar | OnSubscript,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  87)
+
+SIMPLE_DECL_ATTR(resultBuilder, ResultBuilder,
+  OnNominalType,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  88)
+
+DECL_ATTR(_projectedValueProperty, ProjectedValueProperty,
+  OnVar,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  89)
+
+SIMPLE_DECL_ATTR(_nonEphemeral, NonEphemeral,
+  OnParam,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  90)
+
+DECL_ATTR(differentiable, Differentiable,
+  OnAccessor | OnConstructor | OnFunc | OnVar | OnSubscript,
+  LongAttribute | AllowMultipleAttributes | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  91)
+
+SIMPLE_DECL_ATTR(_hasMissingDesignatedInitializers, HasMissingDesignatedInitializers,
+  OnClass,
+  UserInaccessible | NotSerialized | APIBreakingToAdd | ABIBreakingToAdd | APIStableToRemove | ABIStableToRemove | UnreachableInABIAttr,
+  92)
+
+SIMPLE_DECL_ATTR(_inheritsConvenienceInitializers, InheritsConvenienceInitializers,
+  OnClass,
+  UserInaccessible | NotSerialized | APIStableToAdd | ABIStableToAdd | APIBreakingToRemove | ABIBreakingToRemove | UnreachableInABIAttr,
+  93)
+
+DECL_ATTR(_typeEraser, TypeEraser,
+  OnProtocol,
+  UserInaccessible | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove | AllowMultipleAttributes | UnreachableInABIAttr,
+  94)
+
+SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
+  OnFunc,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  95)
+
+DECL_ATTR(_originallyDefinedIn, OriginallyDefinedIn,
+  OnNominalType | OnFunc | OnVar | OnExtension,
+  UserInaccessible | AllowMultipleAttributes | LongAttribute | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  96)
+
+DECL_ATTR(derivative, Derivative,
+  OnFunc,
+  LongAttribute | AllowMultipleAttributes | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  97)
+
+DECL_ATTR(_spi, SPIAccessControl,
+  OnAbstractFunction | OnExtension | OnGenericType | OnVar | OnSubscript | OnImport | OnAccessor | OnEnumElement | OnMacro,
+  AllowMultipleAttributes | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  98)
+
+DECL_ATTR(transpose, Transpose,
+  OnFunc,
+  LongAttribute | AllowMultipleAttributes | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  99)
+
+SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
+  OnAbstractFunction | OnVar | OnSubscript,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  100)
+
+// Unused '101'
+
+CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
+  OnClass,
+  DeclModifier | ConcurrencyOnly | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnreachableInABIAttr,
+  102)
+
+CONTEXTUAL_SIMPLE_DECL_ATTR(isolated, Isolated,
+  OnDestructor,
+  DeclModifier | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnreachableInABIAttr,
+  103)
+
+SIMPLE_DECL_ATTR(globalActor, GlobalActor,
+  OnClass | OnStruct | OnEnum,
+  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove | UnreachableInABIAttr,
+  104)
+
+SIMPLE_DECL_ATTR(_specializeExtension, SpecializeExtension,
+  OnExtension,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  105)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
-  DeclModifier | OnVar | OnFunc | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  OnVar | OnFunc,
+  DeclModifier | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
   106)
+
+SIMPLE_DECL_ATTR(Sendable, Sendable,
+  OnFunc | OnConstructor | OnAccessor | OnAnyClangDecl,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
+  107)
+
+SIMPLE_DECL_ATTR(_marker, Marker,
+  OnProtocol,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnreachableInABIAttr,
+  108)
+
 SIMPLE_DECL_ATTR(reasync, Reasync,
-  OnFunc | OnConstructor | RejectByParser | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  OnFunc | OnConstructor,
+  RejectByParser | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
   109)
+
+SIMPLE_DECL_ATTR(reasync, AtReasync,
+  OnProtocol,
+  ConcurrencyOnly | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnreachableInABIAttr,
+  110)
+
+// Unused '111'
+
 CONTEXTUAL_DECL_ATTR(nonisolated, Nonisolated,
-  DeclModifier | OnFunc | OnConstructor | OnVar | OnSubscript | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  OnFunc | OnConstructor | OnDestructor | OnVar | OnSubscript | OnProtocol | OnExtension | OnClass | OnStruct | OnEnum,
+  DeclModifier | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   112)
+
+// Unused '113'
+
+SIMPLE_DECL_ATTR(_unsafeInheritExecutor, UnsafeInheritExecutor,
+  OnFunc,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
+  114)
+
+SIMPLE_DECL_ATTR(_implicitSelfCapture, ImplicitSelfCapture,
+  OnParam,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  115)
+
+DECL_ATTR(_inheritActorContext, InheritActorContext,
+  OnParam,
+  // since the _inheritActorContext(always) forces an actor capture, it changes ABI of the closure this applies to
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
+  116)
+
+SIMPLE_DECL_ATTR(_eagerMove, EagerMove,
+  OnFunc | OnParam | OnVar | OnNominalType,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  117)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
-  DeclModifier | OnClass | OnFunc | OnAccessor | OnVar | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  OnClass | OnFunc | OnAccessor | OnVar,
+  DeclModifier | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
   118)
-CONTEXTUAL_SIMPLE_DECL_ATTR(_const, CompileTimeConst,
-  DeclModifier | OnParam | OnVar | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+
+SIMPLE_DECL_ATTR(_noEagerMove, NoEagerMove,
+  OnFunc | OnParam | OnVar | OnNominalType,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  119)
+
+SIMPLE_DECL_ATTR(_assemblyVision, EmitAssemblyVisionRemarks,
+  OnFunc | OnNominalType,
+  UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  120)
+
+DECL_ATTR(_nonSendable, NonSendable,
+  OnNominalType,
+  UserInaccessible | AllowMultipleAttributes | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
+  121)
+
+SIMPLE_DECL_ATTR(_noImplicitCopy, NoImplicitCopy,
+  OnFunc | OnParam | OnVar,
+  UserInaccessible | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  122)
+
+SIMPLE_DECL_ATTR(_noLocks, NoLocks,
+  OnAbstractFunction | OnSubscript,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  123)
+
+SIMPLE_DECL_ATTR(_noAllocation, NoAllocation,
+  OnAbstractFunction | OnSubscript,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  124)
+
+SIMPLE_DECL_ATTR(preconcurrency, Preconcurrency,
+  OnFunc | OnConstructor | OnProtocol | OnGenericType | OnVar | OnSubscript | OnEnumElement | OnImport,
+  ABIStableToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
+  125)
+
+CONTEXTUAL_SIMPLE_DECL_ATTR(_const, CompileTimeLiteral,
+  OnParam | OnVar,
+  DeclModifier | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   126)
+
+DECL_ATTR(_unavailableFromAsync, UnavailableFromAsync,
+  OnFunc | OnConstructor | OnMacro,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  127)
+
+DECL_ATTR(exclusivity, Exclusivity,
+  OnVar,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  128)
+
+DECL_ATTR(backDeployed, BackDeployed,
+  OnAbstractFunction | OnAccessor | OnSubscript | OnVar,
+  AllowMultipleAttributes | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  129)
+DECL_ATTR_ALIAS(_backDeploy, BackDeployed)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(_local, KnownToBeLocal,
-  DeclModifier | OnFunc | OnParam | OnVar | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  OnFunc | OnParam | OnVar,
+  DeclModifier | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
   130)
+
+SIMPLE_DECL_ATTR(_moveOnly, MoveOnly,
+  OnNominalType,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnreachableInABIAttr,
+  131)
+
+SIMPLE_DECL_ATTR(_alwaysEmitConformanceMetadata, AlwaysEmitConformanceMetadata,
+  OnProtocol,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  132)
+
+DECL_ATTR(_expose, Expose,
+  OnFunc | OnNominalType | OnVar | OnConstructor,
+  AllowMultipleAttributes | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  133)
+
+// Unused '134'
+
+SIMPLE_DECL_ATTR(_spiOnly, SPIOnly,
+  OnImport,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  135)
+
+DECL_ATTR(_documentation, Documentation,
+  OnAnyDecl,
+  UserInaccessible | APIBreakingToAdd | APIStableToRemove | ABIStableToAdd | ABIStableToRemove | ForbiddenInABIAttr,
+  136)
+
+// Unused '137'
+
+SIMPLE_DECL_ATTR(_noMetadata, NoMetadata,
+  OnGenericTypeParam,
+  UserInaccessible | NotSerialized | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  138)
+
+// Unused '139'
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(consuming, Consuming,
-  OnFunc | OnAccessor | DeclModifier | UserInaccessible | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor,
+  DeclModifier | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   140)
+
 CONTEXTUAL_SIMPLE_DECL_ATTR(borrowing, Borrowing,
-  OnFunc | OnAccessor | DeclModifier | UserInaccessible | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor,
+  DeclModifier | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   141)
+
 DECL_ATTR(attached, MacroRole,
-  OnMacro | AllowMultipleAttributes | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
+  OnMacro,
+  AllowMultipleAttributes | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove | UnreachableInABIAttr,
   142)
 DECL_ATTR_ALIAS(freestanding, MacroRole)
+
+SIMPLE_DECL_ATTR(_used, Used,
+  OnAbstractFunction | OnVar,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  143)
+
+DECL_ATTR(_section, Section,
+  OnAbstractFunction | OnVar,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  144)
+
 DECL_ATTR(storageRestrictions, StorageRestrictions,
-  OnAccessor | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  OnAccessor,
+  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove | UnreachableInABIAttr,
   145)
-CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
-  DeclModifier | OnClass | ConcurrencyOnly | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  102)
+
+DECL_ATTR(_rawLayout, RawLayout,
+  OnStruct,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  146)
+
+DECL_ATTR(_extern, Extern,
+  OnFunc,
+  AllowMultipleAttributes | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  147)
+
+SIMPLE_DECL_ATTR(_nonescapable, NonEscapable,
+  OnNominalType,
+  UserInaccessible | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | UnreachableInABIAttr,
+  148)
+
+SIMPLE_DECL_ATTR(_unsafeNonescapableResult, UnsafeNonEscapableResult,
+  OnAbstractFunction | OnSubscript | OnAccessor,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
+  149)
+
+// Unused '150'
+
 SIMPLE_DECL_ATTR(_staticExclusiveOnly, StaticExclusiveOnly,
-  OnStruct | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  OnStruct,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | UnreachableInABIAttr,
   151)
+
 SIMPLE_DECL_ATTR(extractConstantsFromMembers, ExtractConstantsFromMembers,
-  OnClass | OnEnum | OnProtocol | OnStruct | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnClass | OnEnum | OnProtocol | OnStruct,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
   152)
+
 SIMPLE_DECL_ATTR(_noRuntime, NoRuntime,
-  OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnAbstractFunction | OnSubscript,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   153)
+
 SIMPLE_DECL_ATTR(_noExistentials, NoExistentials,
-  OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnAbstractFunction | OnSubscript,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   154)
+
 SIMPLE_DECL_ATTR(_noObjCBridging, NoObjCBridging,
-  OnAbstractFunction | OnSubscript | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnAbstractFunction | OnSubscript,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   155)
+
 // Unused '156': Used to be `_distributedThunkTarget` but completed implementation in Swift 6.0 does not need it after all
+
 DECL_ATTR(_allowFeatureSuppression, AllowFeatureSuppression,
-  OnAnyDecl | UserInaccessible | NotSerialized | ABIStableToAdd | APIStableToAdd | ABIStableToRemove | APIStableToRemove,
+  OnAnyDecl,
+  UserInaccessible | NotSerialized | ABIStableToAdd | APIStableToAdd | ABIStableToRemove | APIStableToRemove | ForbiddenInABIAttr,
   157)
 DECL_ATTR_ALIAS(_disallowFeatureSuppression, AllowFeatureSuppression)
+
 SIMPLE_DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
-  OnAbstractFunction | OnSubscript | OnVar | OnExtension | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  OnAbstractFunction | OnSubscript | OnVar | OnExtension,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   158)
 
 // Declares that a struct contains "sensitive" data. It enforces that the contents of such a struct value
@@ -497,10 +833,73 @@ SIMPLE_DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
 // in memory after the value's lifetime.
 // TODO: enable @sensitive also for other nominal types than structs, e.g. for enums
 SIMPLE_DECL_ATTR(sensitive, Sensitive,
-  OnStruct | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  OnStruct,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | UnreachableInABIAttr,
   159)
 
-LAST_DECL_ATTR(PreInverseGenerics)
+SIMPLE_DECL_ATTR(unsafe, Unsafe,
+  OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType | OnExtension | OnTypeAlias | OnEnumElement | OnImport,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  160)
+
+DECL_ATTR(lifetime, Lifetime,
+  OnAccessor | OnConstructor | OnFunc | OnSubscript,
+  LongAttribute | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | AllowMultipleAttributes | EquivalentInABIAttr,
+  161)
+DECL_ATTR_ALIAS(_lifetime, Lifetime)
+
+SIMPLE_DECL_ATTR(_addressableSelf, AddressableSelf,
+  OnAccessor | OnConstructor | OnFunc | OnSubscript,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UserInaccessible | UnconstrainedInABIAttr,
+  162)
+
+SIMPLE_DECL_ATTR(_addressableForDependencies, AddressableForDependencies,
+  OnNominalType,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UserInaccessible | UnreachableInABIAttr,
+  163)
+
+SIMPLE_DECL_ATTR(safe, Safe,
+  OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType | OnExtension | OnEnumElement,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  164)
+
+DECL_ATTR(abi, ABI,
+  OnConstructor | OnFunc | OnSubscript | OnVar,
+  LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  165)
+
+// Unused '166': Used to be `@execution(caller | concurrent)` replaced with `@concurrent` and `nonisolated(nonsending)`
+
+SIMPLE_DECL_ATTR(const, ConstVal,
+  OnParam | OnVar | OnFunc,
+  ABIStableToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
+  167)
+DECL_ATTR_FEATURE_REQUIREMENT(ConstVal, CompileTimeValues)
+SIMPLE_DECL_ATTR(constInitialized, ConstInitialized,
+  OnVar,
+  ABIStableToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
+  168)
+DECL_ATTR_FEATURE_REQUIREMENT(ConstInitialized, CompileTimeValues)
+
+DECL_ATTR(nonexhaustive, Nonexhaustive,
+  OnEnum,
+  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  169)
+DECL_ATTR_FEATURE_REQUIREMENT(Nonexhaustive, NonexhaustiveAttribute)
+
+SIMPLE_DECL_ATTR(concurrent, Concurrent,
+  OnFunc | OnConstructor | OnSubscript | OnVar,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
+  170)
+
+// Unused '171': Used to be `@preEnumExtensibility`
+
+DECL_ATTR(specialized, Specialized,
+  OnConstructor | OnFunc | OnAccessor,
+  AllowMultipleAttributes | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  172)
+
+LAST_DECL_ATTR(Specialized)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS
@@ -508,4 +907,5 @@ LAST_DECL_ATTR(PreInverseGenerics)
 #undef CONTEXTUAL_SIMPLE_DECL_ATTR
 #undef DECL_ATTR
 #undef CONTEXTUAL_DECL_ATTR
+#undef DECL_ATTR_FEATURE_REQUIREMENT
 #undef LAST_DECL_ATTR

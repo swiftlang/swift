@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// SIL operates on three kinds of addressible memory:
+/// SIL operates on three kinds of addressable memory:
 ///
-/// 1. Temporary RValues. These are recognied by AddressInitializationWalker. These largely disappear with opaque SIL
+/// 1. Temporary RValues. These are recognized by AddressInitializationWalker. These largely disappear with opaque SIL
 /// values.
 ///
 /// 2. Local variables. These are always introduced by either a VarDeclInstruction or a Function argument with non-nil
@@ -27,24 +27,52 @@ import SIL
 
 private let verbose = false
 
-private func log(_ message: @autoclosure () -> String) {
+private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
   if verbose {
-    print("### \(message())")
+    debugLog(prefix: prefix, message())
   }
 }
 
 // Local variables are accessed in one of these ways.
 //
-// Note: @in is only immutable up to when it is destroyed, so still requies a local live range.
+// Note: @in is only immutable up to when it is destroyed, so still requires a local live range.
+//
+// A .dependenceSource access creates a new dependent value that keeps this local alive.
+//
+//     %local = alloc_stack // this local
+//     %md = mark_dependence %val on %local
+//     mark_dependence_addr %adr on %local
+//
+// The effect of .dependenceSource on reachability is like a load of this local. The dependent value depends on any
+// value in this local that reaches this point.
+//
+// A .dependenceDest access is the point where another value becomes dependent on this local:
+//
+//     %local = alloc_stack // this local
+//     %md = mark_dependence %local on %val
+//     mark_dependence_addr %local on %val
+//
+// The effect of .dependenceDest on reachability is like a store of this local. All uses of this local reachable from
+// this point are uses of the dependence base.
+//
+// Note that the same mark_dependence_addr often involves two locals:
+//
+//     mark_dependence_addr %localDest on %localSource
+//
 struct LocalVariableAccess: CustomStringConvertible {
   enum Kind {
     case incomingArgument // @in, @inout, @inout_aliasable
     case outgoingArgument // @inout, @inout_aliasable
-    case beginAccess // Reading or reassinging a 'var'
+    case inoutYield       // indirect yield from this accessor
+    case beginAccess // Reading or reassigning a 'var'
     case load        // Reading a 'let'. Returning 'var' from an initializer.
+    case dependenceSource // A value/address depends on this local here (like a load)
+    case dependenceDest  // This local depends on another value/address here (like a store)
     case store       // 'var' initialization and destruction
+    case storeBorrow // scoped initialization of temporaries
     case apply       // indirect arguments
     case escape      // alloc_box captures
+    case deadEnd     // unreachable
   }
   let kind: Kind
   // All access have an operand except .incomingArgument and .outgoingArgument.
@@ -75,9 +103,9 @@ struct LocalVariableAccess: CustomStringConvertible {
       case .`init`, .modify:
         return true
       }
-    case .load:
+    case .load, .dependenceSource, .dependenceDest, .deadEnd:
       return false
-    case .incomingArgument, .outgoingArgument, .store:
+    case .incomingArgument, .outgoingArgument, .store, .storeBorrow, .inoutYield:
       return true
     case .apply:
       let apply = instruction as! FullApplySite
@@ -108,16 +136,26 @@ struct LocalVariableAccess: CustomStringConvertible {
       str += "incomingArgument"
     case .outgoingArgument:
       str += "outgoingArgument"
+    case .inoutYield:
+      str += "inoutYield"
     case .beginAccess:
       str += "beginAccess"
     case .load:
       str += "load"
+    case .dependenceSource:
+      str += "dependenceSource"
+    case .dependenceDest:
+      str += "dependenceDest"
     case .store:
       str += "store"
+    case .storeBorrow:
+      str += "storeBorrow"
     case .apply:
       str += "apply"
     case .escape:
       str += "escape"
+    case .deadEnd:
+      str += "deadEnd"
     }
     if let inst = instruction {
       str += "\(inst)"
@@ -133,7 +171,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
   private var _isFullyAssigned: Bool?
 
   /// Cache whether the allocation has escaped prior to this access.
-  /// For alloc_box, this returns `nil` until reachability is computed.
+  /// This returns `nil` until reachability is computed.
   var hasEscaped: Bool?
 
   init(localAccess: LocalVariableAccess) {
@@ -146,10 +184,14 @@ class LocalVariableAccessInfo: CustomStringConvertible {
       case .`init`, .modify:
         break // lazily compute full assignment
       }
-    case .load:
+    case .load, .dependenceSource, .dependenceDest:
       self._isFullyAssigned = false
-    case .store:
-      self._isFullyAssigned = true
+    case .store, .storeBorrow:
+      if let store = localAccess.instruction as? StoringInstruction {
+        self._isFullyAssigned = LocalVariableAccessInfo.isBase(address: store.destination)
+      } else {
+        self._isFullyAssigned = true
+      }
     case .apply:
       let apply = localAccess.instruction as! FullApplySite
       if let convention = apply.convention(of: localAccess.operand!) {
@@ -160,7 +202,9 @@ class LocalVariableAccessInfo: CustomStringConvertible {
     case .escape:
       self._isFullyAssigned = false
       self.hasEscaped = true
-    case .incomingArgument, .outgoingArgument:
+    case .inoutYield:
+      self._isFullyAssigned = false
+    case .incomingArgument, .outgoingArgument, .deadEnd:
       fatalError("Function arguments are never mapped to LocalVariableAccessInfo")
     }
   }
@@ -188,12 +232,22 @@ class LocalVariableAccessInfo: CustomStringConvertible {
   }
 
   var description: String {
-    return "full-assign: \(_isFullyAssigned == nil ? "unknown" : String(describing: _isFullyAssigned!)) "
+    return "assign: \(_isFullyAssigned == nil ? "unknown" : String(describing: _isFullyAssigned!)), "
       + "\(access)"
+  }
+
+  // Does this address correspond to the local variable's base address? Any writes to this address will be a full
+  // assignment. This should match any instructions that the LocalVariableAccessMap initializer below recognizes as an
+  // allocation.
+  static private func isBase(address: Value) -> Bool {
+    // TODO: create an API alternative to 'accessPath' that bails out on the first path component and succeeds on the
+    // first begin_access.
+    let path = address.accessPath
+    return path.base.isLocal && path.projectionPath.isEmpty
   }
 }
 
-/// Model the formal accesses of an addressible variable introduced by an alloc_box, alloc_stack, or indirect
+/// Model the formal accesses of an addressable variable introduced by an alloc_box, alloc_stack, or indirect
 /// FunctionArgument.
 ///
 /// This instantiates a unique LocalVariableAccessInfo instances for each access instruction, caching it an an access
@@ -280,8 +334,8 @@ struct LocalVariableAccessMap: Collection, CustomStringConvertible {
 
   subscript(instruction: Instruction) -> LocalVariableAccessInfo? { accessMap[instruction] }
 
-  public var description: String {
-    "Access map:\n" + map({String(describing: $0)}).joined(separator: "\n")
+  var description: String {
+    "Access map for: \(allocation)\n" + map({String(describing: $0)}).joined(separator: "\n")
   }
 }
 
@@ -341,6 +395,9 @@ extension LocalVariableAccessWalker : ForwardingDefUseWalker {
       visit(LocalVariableAccess(.store, operand))
     case is DeallocBoxInst:
       break
+    case let markDep as MarkDependenceInst:
+      assert(markDep.baseOperand == operand)
+      visit(LocalVariableAccess(.dependenceSource, operand))
     default:
       visit(LocalVariableAccess(.escape, operand))
     }
@@ -363,24 +420,26 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
     return .continueWalk
   }
 
-  // Handle storage type projections, like MarkUninitializedInst. Path projections should not be visited. They only
-  // occur inside the access.
+  // Handle storage type projections, like MarkUninitializedInst. Path projections are visited for field
+  // initialization because SILGen does not emit begin_access [init] consistently.
   //
-  // Exception: stack-allocated temporaries may be treated like local variables for the purpose of finding all
-  // uses. Such temporaries do not have access scopes, so we need to walk down any projection that may be used to
-  // initialize the temporary.
+  // Stack-allocated temporaries are also treated like local variables for the purpose of finding all uses. Such
+  // temporaries do not have access scopes, so we need to walk down any projection that may be used to initialize the
+  // temporary.
   mutating func projectedAddressUse(of operand: Operand, into value: Value) -> WalkResult {
-    // TODO: we need an abstraction for path projections. For local variables, these cannot occur outside of an access.
-    switch operand.instruction {
-    case is StructElementAddrInst, is TupleElementAddrInst, is IndexAddrInst, is TailAddrInst,
-         is UncheckedTakeEnumDataAddrInst, is OpenExistentialAddrInst:
-      return .abortWalk
-    // Projections used to initialize a temporary
-    case is InitEnumDataAddrInst, is InitExistentialAddrInst:
-      fallthrough
-    default:
-      return walkDownAddressUses(address: value)
+    if let md = value as? MarkDependenceInst {
+      if operand == md.valueOperand {
+        // Intercept mark_dependence destination to record an access point which can be used like a store when finding
+        // all uses that affect the base after the point that the dependence was marked.
+        visit(LocalVariableAccess(.dependenceDest, operand))
+        // walk down the forwarded address as usual...
+      } else {
+        // A dependence is similar to loading from its source. Downstream uses are not accesses of the original local.
+        visit(LocalVariableAccess(.dependenceSource, operand))
+        return .continueWalk
+      }
     }
+    return walkDownAddressUses(address: value)
   }
 
   mutating func scopedAddressUse(of operand: Operand) -> WalkResult {
@@ -393,6 +452,9 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
       return .continueWalk
     case is LoadBorrowInst:
       visit(LocalVariableAccess(.load, operand))
+      return .continueWalk
+    case is StoreBorrowInst:
+      visit(LocalVariableAccess(.storeBorrow, operand))
       return .continueWalk
     default:
       // A StoreBorrow should be guarded by an access scope.
@@ -410,8 +472,17 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
     switch operand.instruction {
     case is StoringInstruction, is SourceDestAddrInstruction, is DestroyAddrInst, is DeinitExistentialAddrInst,
          is InjectEnumAddrInst, is TupleAddrConstructorInst, is InitBlockStorageHeaderInst, is PackElementSetInst:
-      // Handle instructions that initialize both temporaries and local variables.
+      // Handle instructions that initialize both temporaries and local variables. If operand's address is the same as
+      // the local variable's address, then this fully kills operand liveness. The original value in operand's address
+      // cannot be used in any way.
       visit(LocalVariableAccess(.store, operand))
+    case let md as MarkDependenceAddrInst:
+      assert(operand == md.addressOperand)
+      visit(LocalVariableAccess(.dependenceDest, operand))
+    case is SwitchEnumAddrInst:
+      // switch_enum_addr is truly a leaf address use. It does not produce a new value. But in every other respect it is
+      // like a load.
+      visit(LocalVariableAccess(.load, operand))
     case is DeallocStackInst:
       break
     default:
@@ -427,7 +498,12 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
     return .continueWalk
   }
 
-  mutating func dependentAddressUse(of operand: Operand, into value: Value) -> WalkResult {
+  mutating func yieldedAddressUse(of operand: Operand) -> WalkResult {
+    visit(LocalVariableAccess(.inoutYield, operand))
+    return .continueWalk
+  }
+
+  mutating func dependentAddressUse(of operand: Operand, dependentValue value: Value) -> WalkResult {
     // Find all uses of partial_apply [on_stack].
     if let pai = value as? PartialApplyInst, !pai.mayEscape {
       var walker = NonEscapingClosureDefUseWalker(context)
@@ -443,12 +519,17 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
     return .continueWalk
   }
 
-  mutating func loadedAddressUse(of operand: Operand, into value: Value) -> WalkResult {
+  mutating func dependentAddressUse(of operand: Operand, dependentAddress address: Value) -> WalkResult {
+    // No other dependent uses can access to memory at this address.
+    return .continueWalk
+  }
+
+  mutating func loadedAddressUse(of operand: Operand, intoValue value: Value) -> WalkResult {
     visit(LocalVariableAccess(.load, operand))
     return .continueWalk
   }
 
-  mutating func loadedAddressUse(of operand: Operand, into address: Operand) -> WalkResult {
+  mutating func loadedAddressUse(of operand: Operand, intoAddress address: Operand) -> WalkResult {
     visit(LocalVariableAccess(.load, operand))
     return .continueWalk
   }
@@ -568,13 +649,17 @@ struct LocalVariableReachableAccess {
 
 // Find reaching assignments...
 extension LocalVariableReachableAccess {
-  // Gather all fully assigned accesses that reach `instruction`.
+  // Gather all fully assigned accesses that reach 'instruction'. If 'instruction' is itself a modify access, it is
+  // ignored and the nearest assignments above 'instruction' are still gathered.
   func gatherReachingAssignments(for instruction: Instruction, in accessStack: inout Stack<LocalVariableAccess>)
     -> Bool {
     var blockList = BasicBlockWorklist(context)
     defer { blockList.deinitialize() }
 
-    let initialEffect = backwardScanAccesses(before: instruction, accessStack: &accessStack)
+    var initialEffect: BlockEffect? = nil
+    if let prev = instruction.previous {
+      initialEffect = backwardScanAccesses(before: prev, accessStack: &accessStack)
+    }
     if !backwardPropagateEffect(in: instruction.parentBlock, effect: initialEffect, blockList: &blockList,
                                 accessStack: &accessStack) {
       return false
@@ -585,7 +670,7 @@ extension LocalVariableReachableAccess {
       // lattice: none -> read -> modify -> escape -> assign
       //
       // `blockInfo.effect` is the same as `currentEffect` returned by backwardScanAccesses, except when an early escape
-      // happens after an assign.
+      // happens below an assign, in which case we report the escape here.
       switch currentEffect {
       case .none, .read, .modify, .escape:
         break
@@ -633,10 +718,10 @@ extension LocalVariableReachableAccess {
         continue
       case .assign:
         accessStack.push(accessInfo.access)
-        break
       case .escape:
         break
       }
+      break
     }
     return currentEffect
   }
@@ -646,27 +731,33 @@ extension LocalVariableReachableAccess {
 extension LocalVariableReachableAccess {
   /// This performs a forward CFG walk to find known reachable uses from `assignment`. This ignores aliasing and
   /// escapes.
-  func gatherKnownReachableUses(from assignment: LocalVariableAccess,
+  ///
+  /// The known live range is the range in which the assigned value is valid and may be used by dependent values. It
+  /// includes the destroy or reassignment of the local.
+  func gatherKnownLifetimeUses(from assignment: LocalVariableAccess,
                                 in accessStack: inout Stack<LocalVariableAccess>) {
     if let modifyInst = assignment.instruction {
-      _ = gatherReachableUses(after: modifyInst, in: &accessStack, allowEscape: true)
+      _ = gatherReachableUses(after: modifyInst, in: &accessStack, lifetime: true)
+      return
     }
-    gatherKnownReachableUsesFromEntry(in: &accessStack)
+    gatherKnownLifetimeUsesFromEntry(in: &accessStack)
   }
 
   /// This performs a forward CFG walk to find known reachable uses from the function entry. This ignores aliasing and
   /// escapes.
-  private func gatherKnownReachableUsesFromEntry(in accessStack: inout Stack<LocalVariableAccess>) {
+  private func gatherKnownLifetimeUsesFromEntry(in accessStack: inout Stack<LocalVariableAccess>) {
     assert(accessMap.liveInAccess!.kind == .incomingArgument, "only an argument access is live in to the function")
     let firstInst = accessMap.function.entryBlock.instructions.first!
-    _ = gatherReachableUses(onOrAfter: firstInst, in: &accessStack, allowEscape: true)
+    _ = gatherReachableUses(onOrAfter: firstInst, in: &accessStack, lifetime: true)
   }
 
   /// This performs a forward CFG walk to find all reachable uses of `modifyInst`. `modifyInst` may be a `begin_access
   /// [modify]` or instruction that initializes the local variable.
   ///
-  /// Returns true if all possible reachable uses were visited. Returns false if any escapes may reach `modifyInst` are
-  /// reachable from `modifyInst`.
+  /// This does not include the destroy or reassignment of the value set by `modifyInst`.
+  ///
+  /// Returns true if all possible reachable uses were visited. Returns false if any escapes may reach `modifyInst` or
+  /// are reachable from `modifyInst`.
   ///
   /// This does not gather the escaping accesses themselves. When escapes are reachable, it also does not guarantee that
   /// previously reachable accesses are gathered.
@@ -686,37 +777,40 @@ extension LocalVariableReachableAccess {
     if accessInfo.hasEscaped! {
       return false
     }
-    return gatherReachableUses(after: modifyInst, in: &accessStack, allowEscape: false)
+    return gatherReachableUses(after: modifyInst, in: &accessStack, lifetime: false)
   }
 
   /// This performs a forward CFG walk to find all uses of this local variable reachable after `begin`.
   ///
-  /// If `allowEscape` is true, then this returns false if the walk ended early because of a reachable escape.
+  /// If `lifetime` is true, then this gathers the full known lifetime, including destroys and reassignments ignoring
+  /// escapes.
+  ///
+  /// If `lifetime` is false, then this returns `false` if the walk ended early because of a reachable escape.
   private func gatherReachableUses(after begin: Instruction, in accessStack: inout Stack<LocalVariableAccess>,
-                                   allowEscape: Bool) -> Bool {
+                                   lifetime: Bool) -> Bool {
     if let term = begin as? TermInst {
       for succ in term.successors {
-        if !gatherReachableUses(onOrAfter: succ.instructions.first!, in: &accessStack, allowEscape: allowEscape) {
+        if !gatherReachableUses(onOrAfter: succ.instructions.first!, in: &accessStack, lifetime: lifetime) {
           return false
         }
       }
       return true
     } else {
-      return gatherReachableUses(onOrAfter: begin.next!, in: &accessStack, allowEscape: allowEscape)
+      return gatherReachableUses(onOrAfter: begin.next!, in: &accessStack, lifetime: lifetime)
     }
   }
 
   /// This performs a forward CFG walk to find all uses of this local variable reachable after and including `begin`.
   ///
-  /// If `allowEscape` is true, then this returns false if the walk ended early because of a reachable escape.
+  /// If `lifetime` is true, then this returns false if the walk ended early because of a reachable escape.
   private func gatherReachableUses(onOrAfter begin: Instruction, in accessStack: inout Stack<LocalVariableAccess>,
-                                   allowEscape: Bool) -> Bool {
+                                   lifetime: Bool) -> Bool {
     var blockList = BasicBlockWorklist(context)
     defer { blockList.deinitialize() }
 
     let initialBlock = begin.parentBlock
-    let initialEffect = forwardScanAccesses(after: begin, accessStack: &accessStack, allowEscape: allowEscape)
-    if !allowEscape, initialEffect == .escape {
+    let initialEffect = forwardScanAccesses(after: begin, accessStack: &accessStack, lifetime: lifetime)
+    if !lifetime, initialEffect == .escape {
       return false
     }
     forwardPropagateEffect(in: initialBlock, blockInfo: blockMap[initialBlock], effect: initialEffect,
@@ -732,22 +826,22 @@ extension LocalVariableReachableAccess {
       case .none:
         break
       case .escape:
-        if !allowEscape {
+        if !lifetime {
           break
         }
         fallthrough
       case .read, .modify, .assign:
         let firstInst = block.instructions.first!
-        currentEffect = forwardScanAccesses(after: firstInst, accessStack: &accessStack, allowEscape: allowEscape)
+        currentEffect = forwardScanAccesses(after: firstInst, accessStack: &accessStack, lifetime: lifetime)
       }
-      if !allowEscape, currentEffect == .escape {
+      if !lifetime, currentEffect == .escape {
         return false
       }
       forwardPropagateEffect(in: block, blockInfo: blockInfo, effect: currentEffect, blockList: &blockList,
                              accessStack: &accessStack)
     }
-    log("\(accessMap)")
-    log("Reachable access:\n\(accessStack.map({ String(describing: $0)}).joined(separator: "\n"))")
+    log("\n\(accessMap)")
+    log(prefix: false, "Reachable access:\n\(accessStack.map({ String(describing: $0)}).joined(separator: "\n"))")
     return true
   }
 
@@ -764,6 +858,8 @@ extension LocalVariableReachableAccess {
       }
       if block.terminator.isFunctionExiting {
         accessStack.push(LocalVariableAccess(.outgoingArgument, block.terminator))
+      } else if block.successors.isEmpty {
+        accessStack.push(LocalVariableAccess(.deadEnd, block.terminator))
       } else {
         for successor in block.successors { blockList.pushIfNotVisited(successor) }
       }
@@ -773,9 +869,9 @@ extension LocalVariableReachableAccess {
   }
 
   // Check all instructions in this block after and including `begin`. Return a BlockEffect indicating the combined
-  // effects seen before stopping the scan. An .assign stops the scan. A .escape stops the scan if allowEscape is false.
+  // effects seen before stopping the scan. An .assign stops the scan. A .escape stops the scan if lifetime is false.
   private func forwardScanAccesses(after first: Instruction, accessStack: inout Stack<LocalVariableAccess>,
-                                   allowEscape: Bool)
+                                   lifetime: Bool)
     -> BlockEffect? {
     var currentEffect: BlockEffect?
     for inst in InstructionList(first: first) {
@@ -785,9 +881,12 @@ extension LocalVariableReachableAccess {
       currentEffect = BlockEffect(for: accessInfo, accessMap.context).meet(currentEffect)
       switch currentEffect! {
       case .assign:
+        if lifetime {
+          accessStack.push(accessInfo.access)
+        }
         return currentEffect
       case .escape:
-        if !allowEscape {
+        if !lifetime {
           log("Local variable: \(accessMap.allocation)\n    escapes at \(inst)")
           return currentEffect
         }
@@ -811,7 +910,7 @@ extension LocalVariableReachableAccess {
   private func findAllEscapesPriorToAccess() {
     var visitedBlocks = BasicBlockSet(context)
     var escapedBlocks = BasicBlockSet(context)
-    var blockList = BasicBlockWorklist(context)
+    var blockList = Stack<BasicBlock>(context)
     defer {
       visitedBlocks.deinitialize()
       escapedBlocks.deinitialize()
@@ -824,19 +923,19 @@ extension LocalVariableReachableAccess {
       for successor in from.successors {
         if hasEscaped {
           if escapedBlocks.insert(successor) {
-            blockList.pushIfNotVisited(successor)
+            blockList.push(successor)
           }
         } else if visitedBlocks.insert(successor) {
-          blockList.pushIfNotVisited(successor)
+          blockList.push(successor)
         }
       }
     }
     var hasEscaped = propagateEscapeInBlock(after: accessMap.allocation.nextInstruction, hasEscaped: false)
     forwardPropagate(accessMap.allocation.parentBlock, hasEscaped)
     while let block = blockList.pop() {
-      hasEscaped = escapedBlocks.insert(block)
+      hasEscaped = escapedBlocks.contains(block)
       hasEscaped = propagateEscapeInBlock(after: block.instructions.first!, hasEscaped: hasEscaped)
-      forwardPropagate(accessMap.allocation.parentBlock, hasEscaped)
+      forwardPropagate(block, hasEscaped)
     }
   }
 
@@ -854,4 +953,50 @@ extension LocalVariableReachableAccess {
     }
     return hasEscaped
   }
+}
+
+let localVariableReachingAssignmentsTest = FunctionTest("local_variable_reaching_assignments") {
+  function, arguments, context in
+  let allocation = arguments.takeValue()
+  let instruction = arguments.takeInstruction()
+  print("### Allocation: \(allocation)")
+  let localReachabilityCache = LocalVariableReachabilityCache()
+  guard let localReachability = localReachabilityCache.reachability(for: allocation, context) else {
+    print("No reachability")
+    return
+  }
+  print("### Access map:")
+  print(localReachability.accessMap)
+  print("### Instruction: \(instruction)")
+  var reachingAssignments = Stack<LocalVariableAccess>(context)
+  defer { reachingAssignments.deinitialize() }
+  guard localReachability.gatherReachingAssignments(for: instruction, in: &reachingAssignments) else {
+    print("!!! Reaching escape")
+    return
+  }
+  print("### Reachable assignments:")
+  print(reachingAssignments.map({ String(describing: $0)}).joined(separator: "\n"))
+}
+
+let localVariableReachableUsesTest = FunctionTest("local_variable_reachable_uses") {
+  function, arguments, context in
+  let allocation = arguments.takeValue()
+  let modify = arguments.takeInstruction()
+  print("### Allocation: \(allocation)")
+  let localReachabilityCache = LocalVariableReachabilityCache()
+  guard let localReachability = localReachabilityCache.reachability(for: allocation, context) else {
+    print("No reachability")
+    return
+  }
+  print("### Access map:")
+  print(localReachability.accessMap)
+  print("### Modify: \(modify)")
+  var reachableUses = Stack<LocalVariableAccess>(context)
+  defer { reachableUses.deinitialize() }
+  guard localReachability.gatherAllReachableUses(of: modify, in: &reachableUses) else {
+    print("!!! Reachable escape")
+    return
+  }
+  print("### Reachable access:")
+  print(reachableUses.map({ String(describing: $0)}).joined(separator: "\n"))
 }

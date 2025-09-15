@@ -2,9 +2,8 @@
 // REQUIRES: swift_interpreter
 // RUN: %target-jit-run %s -enable-experimental-feature LazyImmediate | %FileCheck %s
 
-// -enable-experimental-feature requires an asserts build
-// REQUIRES: asserts
 // REQUIRES: rdar118189728
+// REQUIRES: swift_feature_LazyImmediate
 
 // Tests that parsing of function bodies is deferred
 // to runtime when the interpreter is invoked using

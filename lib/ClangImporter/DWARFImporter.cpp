@@ -13,6 +13,7 @@
 #include "ImporterImpl.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -111,27 +112,30 @@ ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
 
   // FIXME: Implement submodule support!
   Identifier name = path[0].Item;
-  auto it = DWARFModuleUnits.find(name);
-  if (it != DWARFModuleUnits.end())
+  auto [it, inserted] = DWARFModuleUnits.try_emplace(name, nullptr);
+  if (!inserted)
     return it->second->getParentModule();
 
-  auto *decl = ModuleDecl::create(name, SwiftContext);
-  decl->setIsNonSwiftModule();
-  decl->setHasResolvedImports();
-  auto *wrapperUnit = new (SwiftContext) DWARFModuleUnit(*decl, *this);
-  DWARFModuleUnits.insert({name, wrapperUnit});
-  decl->addFile(*wrapperUnit);
+  auto itCopy = it; // Capturing structured bindings is a C++20 feature.
+  auto *M = ModuleDecl::create(name, SwiftContext,
+                               [&](ModuleDecl *M, auto addFile) {
+    auto *wrapperUnit = new (SwiftContext) DWARFModuleUnit(*M, *this);
+    itCopy->second = wrapperUnit;
+    addFile(wrapperUnit);
+  });
+  M->setIsNonSwiftModule();
+  M->setHasResolvedImports();
 
   // Force load overlay modules for all imported modules.
-  assert(namelookup::getAllImports(decl).size() == 1 &&
-         namelookup::getAllImports(decl).front().importedModule == decl &&
+  assert(namelookup::getAllImports(M).size() == 1 &&
+         namelookup::getAllImports(M).front().importedModule == M &&
          "DWARF module depends on additional modules?");
 
   // Register the module with the ASTContext so it is available for lookups.
   if (!SwiftContext.getLoadedModule(name))
-    SwiftContext.addLoadedModule(decl);
+    SwiftContext.addLoadedModule(M);
 
-  return decl;
+  return M;
 }
 
 // This function exists to defeat the lazy member importing mechanism. The

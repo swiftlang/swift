@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module -o %t %S/Inputs/objc_protocols_Bas.swift
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -target %target-swift-abi-5.8-triple > %t/out.ir
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -target %target-swift-abi-5.7-triple > %t/out.old.ir
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -target %target-swift-5.8-abi-triple > %t/out.ir
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -target %target-swift-5.7-abi-triple > %t/out.old.ir
 // RUN: %FileCheck --input-file=%t/out.ir %s --check-prefix=CHECK --check-prefix=CHECK-%target-os
 // RUN: %FileCheck --input-file=%t/out.old.ir %s --check-prefix=CHECK-OLD --check-prefix=CHECK-%target-os-OLD
 

@@ -29,11 +29,11 @@ protocol Collection {
 @_typeEraser // expected-error {{expected '(' in '_typeEraser' attribute}}
 protocol A1 {}
 
-@_typeEraser() // expected-error {{expected a type name in @_typeEraser()}}
+@_typeEraser() // expected-error {{expected a type name in '@_typeEraser()'}}
 protocol A2 {}
 
 @_typeEraser(AnyP // expected-note {{to match this opening '('}}
-protocol A3 {} // expected-error {{expected ')' after type name for @_typeEraser}}
+protocol A3 {} // expected-error {{expected ')' after type name for '@_typeEraser'}}
 
 @_typeEraser(AnyP) // expected-error {{@_typeEraser may only be used on 'protocol' declarations}}
 func notAProtocol() {}
@@ -50,7 +50,7 @@ protocol InvalidTypeEraser {}
 @_typeEraser(InvalidTypeEraser) // expected-error {{type eraser must be a class, struct, or enum}}
 protocol B3 {}
 
-class Generic<Param>: B5 { // expected-note {{generic type 'Generic' declared here}}
+class Generic<Param>: B5 { // expected-note {{generic class 'Generic' declared here}}
   init<T: B5>(erasing t: T) {}
 }
 @_typeEraser(Generic) // expected-error {{reference to generic type 'Generic' requires arguments in <...>}}

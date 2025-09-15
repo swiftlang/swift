@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -devirtualizer -enable-library-evolution | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -devirtualizer -enable-library-evolution | %FileCheck %s
 sil_stage canonical
 
 import Builtin
@@ -43,7 +43,7 @@ public protocol ResilientProtocolWithGeneric {
   func defaultB<T: Q>(_: T)
 }
 
-sil @defaultB : $@convention(witness_method: ResilientProtocolWithGeneric) <Self where Self : ResilientProtocolWithGeneric><T where T : Q> (@in T, @in_guaranteed Self) -> () {
+sil @defaultB : $@convention(witness_method: ResilientProtocolWithGeneric) <Self where Self : ResilientProtocolWithGeneric><T where T : Q> (@in_guaranteed T, @in_guaranteed Self) -> () {
 bb0(%0 : $*T, %1 : $*Self):
   %result = tuple ()
   return %result : $()
@@ -89,8 +89,8 @@ bb0(%0 : $*ConformingGenericStruct<Int>):
 
 // CHECK-LABEL: test_devirt_of_inner_generic_default_witness_method
 // CHECK:       bb0(%0 : $*ConformingGenericStruct<Int>, %1 : $*Int):
-// CHECK:       [[FN:%[0-9]+]] = function_ref @defaultB : $@convention(witness_method: ResilientProtocolWithGeneric) <τ_0_0 where τ_0_0 : ResilientProtocolWithGeneric><τ_1_0 where τ_1_0 : Q> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
-// CHECK:       [[RESULT:%[0-9]+]] = apply [[FN]]<ConformingGenericStruct<Int>, Int>(%1, %0) : $@convention(witness_method: ResilientProtocolWithGeneric) <τ_0_0 where τ_0_0 : ResilientProtocolWithGeneric><τ_1_0 where τ_1_0 : Q> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+// CHECK:       [[FN:%[0-9]+]] = function_ref @defaultB : $@convention(witness_method: ResilientProtocolWithGeneric) <τ_0_0 where τ_0_0 : ResilientProtocolWithGeneric><τ_1_0 where τ_1_0 : Q> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> ()
+// CHECK:       [[RESULT:%[0-9]+]] = apply [[FN]]<ConformingGenericStruct<Int>, Int>(%1, %0) : $@convention(witness_method: ResilientProtocolWithGeneric) <τ_0_0 where τ_0_0 : ResilientProtocolWithGeneric><τ_1_0 where τ_1_0 : Q> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> ()
 // CHECK:       return [[RESULT]] : $()
 // CHECK:     }
 sil hidden [ossa] @test_devirt_of_inner_generic_default_witness_method : $@convention(thin) (@in_guaranteed ConformingGenericStruct<Int>, @in Int) -> () {

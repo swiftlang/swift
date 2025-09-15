@@ -9,6 +9,7 @@ set(sources
   LibcOverlayShims.h
   LibcShims.h
   MetadataSections.h
+  ObjCShims.h
   Random.h
   RefCount.h
   Reflection.h
@@ -154,6 +155,10 @@ add_custom_command_target(unused_var
 
 add_dependencies(copy_shim_headers symlink_clang_headers_static)
 
+# Add dependency to ensure that the static headers are installed. This is needed because no target
+# depends on the static headers, so they would not be installed otherwise.
+add_dependencies(symlink_clang_headers symlink_clang_headers_static)
+
 if(NOT SWIFT_BUILT_STANDALONE)
   if(TARGET clang-resource-headers) # LLVM > 8
     set(clang_resource_headers clang-resource-headers)
@@ -238,12 +243,12 @@ endif()
 swift_install_in_component(DIRECTORY "${clang_headers_location}/"
                            DESTINATION "lib/swift/clang"
                            COMPONENT clang-builtin-headers
-                           PATTERN "*.h")
+                           REGEX "\.(h|modulemap)$")
 
 swift_install_in_component(DIRECTORY "${clang_headers_location}/"
   DESTINATION "lib/swift_static/clang"
   COMPONENT clang-builtin-headers
-  PATTERN "*.h")
+  REGEX "\.(h|modulemap)$")
 
 if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER OR SWIFT_PREBUILT_CLANG)
   # This will still link against the Swift-forked clang headers if the Swift
@@ -274,4 +279,4 @@ file(TO_CMAKE_PATH "${LLVM_LIBRARY_OUTPUT_INTDIR}"
 swift_install_in_component(DIRECTORY "${_SWIFT_SHIMS_PATH_TO_CLANG_LIB_BUILD}/clang"
                            DESTINATION "lib"
                            COMPONENT clang-builtin-headers-in-clang-resource-dir
-                           PATTERN "*.h")
+                           REGEX "\.(h|modulemap)$")

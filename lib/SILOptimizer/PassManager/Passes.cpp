@@ -239,8 +239,9 @@ static void runBridgedModulePass(BridgedModulePassRunFn &runFunction,
     runFunction = bridgedModulePassRunFunctions[passName];
     if (!runFunction) {
       if (passesRegistered) {
-        llvm::errs() << "Swift pass " << passName << " is not registered\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Swift pass " << passName << " is not registered";
+        });
       }
       return;
     }
@@ -259,15 +260,15 @@ static void runBridgedFunctionPass(BridgedFunctionPassRunFn &runFunction,
     runFunction = bridgedFunctionPassRunFunctions[passName];
     if (!runFunction) {
       if (passesRegistered) {
-        llvm::errs() << "Swift pass " << passName << " is not registered\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Swift pass " << passName << " is not registered";
+        });
       }
       return;
     }
   }
   if (!f->isBridged()) {
-    llvm::errs() << "SILFunction metatype is not registered\n";
-    abort();
+    ABORT("SILFunction metatype is not registered");
   }
   runFunction({{f}, {passManager->getSwiftPassInvocation()}});
 }
@@ -285,19 +286,9 @@ void SILPassManager_registerFunctionPass(BridgedStringRef name,
   passesRegistered = true;
 }
 
-#define PASS(ID, TAG, DESCRIPTION)
+#define LEGACY_PASS(ID, TAG, DESCRIPTION)
 
-#define SWIFT_MODULE_PASS(ID, TAG, DESCRIPTION) \
-class ID##Pass : public SILModuleTransform {                               \
-  static BridgedModulePassRunFn runFunction;                               \
-  void run() override {                                                    \
-    runBridgedModulePass(runFunction, PM, TAG);                            \
-  }                                                                        \
-};                                                                         \
-BridgedModulePassRunFn ID##Pass::runFunction = nullptr;                    \
-SILTransform *swift::create##ID() { return new ID##Pass(); }               \
-
-#define SWIFT_FUNCTION_PASS(ID, TAG, DESCRIPTION) \
+#define PASS(ID, TAG, DESCRIPTION) \
 class ID##Pass : public SILFunctionTransform {                             \
   static BridgedFunctionPassRunFn runFunction;                             \
   void run() override {                                                    \
@@ -305,6 +296,16 @@ class ID##Pass : public SILFunctionTransform {                             \
   }                                                                        \
 };                                                                         \
 BridgedFunctionPassRunFn ID##Pass::runFunction = nullptr;                  \
+SILTransform *swift::create##ID() { return new ID##Pass(); }               \
+
+#define MODULE_PASS(ID, TAG, DESCRIPTION) \
+class ID##Pass : public SILModuleTransform {                               \
+  static BridgedModulePassRunFn runFunction;                               \
+  void run() override {                                                    \
+    runBridgedModulePass(runFunction, PM, TAG);                            \
+  }                                                                        \
+};                                                                         \
+BridgedModulePassRunFn ID##Pass::runFunction = nullptr;                    \
 SILTransform *swift::create##ID() { return new ID##Pass(); }               \
 
 #include "swift/SILOptimizer/PassManager/Passes.def"

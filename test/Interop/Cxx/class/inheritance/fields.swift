@@ -111,4 +111,24 @@ FieldsTestSuite.test("Get field without copying base in the getter accessor") {
   expectEqual(copyCounter, getCopyCounter().pointee - expectedCopyCountDiff)
 }
 
+FieldsTestSuite.test("Structs with virtual methods") {
+  var derived = InheritFromStructsWithVirtualMethod()
+  derived.d = 42
+  expectEqual(derived.d, 42)
+}
+
+FieldsTestSuite.test("Field in tail padding of base class") {
+  let usesBaseTailPadding = DerivedUsesBaseTailPadding()
+  expectEqual(usesBaseTailPadding.field2, 789)
+  expectEqual(usesBaseTailPadding.field4, 456)
+  expectEqual(usesBaseTailPadding.field8, 123)
+}
+
+FieldsTestSuite.test("Out-of-order inheritance") {
+  let d = DerivedOutOfOrder()
+  expectEqual(d.leafField, 789)
+  expectEqual(d.derivedField, 456)
+  expectEqual(d.baseField, 123)
+}
+
 runAllTests()

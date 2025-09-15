@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/SourceLoc.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -119,7 +120,7 @@ void SourceManager::createVirtualFile(SourceLoc Loc, StringRef Name,
   CharSourceRange Range = CharSourceRange(Loc, Length);
 
   // Skip if this range has already been added
-  VirtualFile &File = VirtualFiles[Range.getEnd().Value.getPointer()];
+  VirtualFile &File = VirtualFiles[Range.getEnd().getPointer()];
   if (File.Range.isValid()) {
     assert(Name == StringRef(File.Name));
     assert(LineOffset == File.LineOffset);
@@ -131,8 +132,8 @@ void SourceManager::createVirtualFile(SourceLoc Loc, StringRef Name,
   File.Name = Name.str();
   File.LineOffset = LineOffset;
 
-  if (CachedVFile.first && Range.contains(SourceLoc(llvm::SMLoc::getFromPointer(
-                               CachedVFile.first)))) {
+  if (CachedVFile.first &&
+      Range.contains(SourceLoc::getFromPointer(CachedVFile.first))) {
     CachedVFile = {nullptr, nullptr};
   }
 }
@@ -142,7 +143,7 @@ bool SourceManager::openVirtualFile(SourceLoc loc, StringRef name,
   CharSourceRange fullRange = getRangeForBuffer(findBufferContainingLoc(loc));
   SourceLoc end;
 
-  auto nextRangeIter = VirtualFiles.upper_bound(loc.Value.getPointer());
+  auto nextRangeIter = VirtualFiles.upper_bound(loc.getPointer());
   if (nextRangeIter != VirtualFiles.end() &&
       fullRange.contains(nextRangeIter->second.Range.getStart())) {
     const VirtualFile &existingFile = nextRangeIter->second;
@@ -159,7 +160,7 @@ bool SourceManager::openVirtualFile(SourceLoc loc, StringRef name,
   }
 
   CharSourceRange range = CharSourceRange(*this, loc, end);
-  VirtualFiles[end.Value.getPointer()] = {range, name.str(), lineOffset};
+  VirtualFiles[end.getPointer()] = {range, name.str(), lineOffset};
   CachedVFile = {nullptr, nullptr};
   return true;
 }
@@ -182,16 +183,16 @@ void SourceManager::closeVirtualFile(SourceLoc end) {
   CharSourceRange oldRange = virtualFile->Range;
   virtualFile->Range = CharSourceRange(*this, virtualFile->Range.getStart(),
                                        end);
-  VirtualFiles[end.Value.getPointer()] = std::move(*virtualFile);
+  VirtualFiles[end.getPointer()] = std::move(*virtualFile);
 
-  bool existed = VirtualFiles.erase(oldRange.getEnd().Value.getPointer());
+  bool existed = VirtualFiles.erase(oldRange.getEnd().getPointer());
   assert(existed);
   (void)existed;
 }
 
 const SourceManager::VirtualFile *
 SourceManager::getVirtualFile(SourceLoc Loc) const {
-  const char *p = Loc.Value.getPointer();
+  const char *p = Loc.getPointer();
 
   if (CachedVFile.first == p)
     return CachedVFile.second;
@@ -212,6 +213,19 @@ SourceManager::getIDForBufferIdentifier(StringRef BufIdentifier) const {
   if (It == BufIdentIDMap.end())
     return std::nullopt;
   return It->second;
+}
+
+void SourceManager::recordSourceFile(unsigned bufferID, SourceFile *sourceFile){
+  bufferIDToSourceFiles[bufferID].push_back(sourceFile);
+}
+
+llvm::TinyPtrVector<SourceFile *>
+SourceManager::getSourceFilesForBufferID(unsigned bufferID) const {
+  auto found = bufferIDToSourceFiles.find(bufferID);
+  if (found == bufferIDToSourceFiles.end())
+    return { };
+
+  return found->second;
 }
 
 SourceManager::~SourceManager() {
@@ -287,11 +301,13 @@ StringRef SourceManager::getIdentifierForBuffer(
   // If this is generated source code, and we're supposed to force it to disk
   // so external clients can see it, do so now.
   if (ForceGeneratedSourceToDisk) {
-    if (auto generatedInfo = getGeneratedSourceInfo(bufferID)) {
-      // We only care about macros, so skip everything else.
+    if (const GeneratedSourceInfo *generatedInfo =
+            getGeneratedSourceInfo(bufferID)) {
+      // We only care about macro expansion buffers, so skip everything else.
       if (generatedInfo->kind == GeneratedSourceInfo::ReplacedFunctionBody ||
           generatedInfo->kind == GeneratedSourceInfo::PrettyPrinted ||
-          generatedInfo->kind == GeneratedSourceInfo::DefaultArgument)
+          generatedInfo->kind == GeneratedSourceInfo::DefaultArgument ||
+          generatedInfo->kind == GeneratedSourceInfo::AttributeFromClang)
         return buffer->getBufferIdentifier();
 
       if (generatedInfo->onDiskBufferCopyFileName.empty()) {
@@ -312,7 +328,7 @@ StringRef SourceManager::getIdentifierForBuffer(
 
 CharSourceRange SourceManager::getRangeForBuffer(unsigned bufferID) const {
   auto *buffer = LLVMSourceMgr.getMemoryBuffer(bufferID);
-  SourceLoc start{llvm::SMLoc::getFromPointer(buffer->getBufferStart())};
+  auto start = SourceLoc::getFromPointer(buffer->getBufferStart());
   return CharSourceRange(start, buffer->getBufferSize());
 }
 
@@ -320,10 +336,10 @@ unsigned SourceManager::getLocOffsetInBuffer(SourceLoc Loc,
                                              unsigned BufferID) const {
   assert(Loc.isValid() && "location should be valid");
   auto *Buffer = LLVMSourceMgr.getMemoryBuffer(BufferID);
-  assert(Loc.Value.getPointer() >= Buffer->getBuffer().begin() &&
-         Loc.Value.getPointer() <= Buffer->getBuffer().end() &&
+  assert(Loc.getPointer() >= Buffer->getBuffer().begin() &&
+         Loc.getPointer() <= Buffer->getBuffer().end() &&
          "Location is not from the specified buffer");
-  return Loc.Value.getPointer() - Buffer->getBuffer().begin();
+  return Loc.getPointer() - Buffer->getBuffer().begin();
 }
 
 unsigned SourceManager::getByteDistance(SourceLoc Start, SourceLoc End) const {
@@ -332,13 +348,13 @@ unsigned SourceManager::getByteDistance(SourceLoc Start, SourceLoc End) const {
 #ifndef NDEBUG
   unsigned BufferID = findBufferContainingLoc(Start);
   auto *Buffer = LLVMSourceMgr.getMemoryBuffer(BufferID);
-  assert(End.Value.getPointer() >= Buffer->getBuffer().begin() &&
-         End.Value.getPointer() <= Buffer->getBuffer().end() &&
+  assert(End.getPointer() >= Buffer->getBuffer().begin() &&
+         End.getPointer() <= Buffer->getBuffer().end() &&
          "End location is not from the same buffer");
 #endif
   // When we have a rope buffer, could be implemented in terms of
   // getLocOffsetInBuffer().
-  return End.Value.getPointer() - Start.Value.getPointer();
+  return End.getPointer() - Start.getPointer();
 }
 
 unsigned SourceManager::getColumnInBuffer(SourceLoc Loc,
@@ -385,6 +401,7 @@ void SourceManager::setGeneratedSourceInfo(
 #include "swift/Basic/MacroRoles.def"
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::DefaultArgument:
+  case GeneratedSourceInfo::AttributeFromClang:
     break;
 
   case GeneratedSourceInfo::ReplacedFunctionBody:
@@ -402,12 +419,12 @@ bool SourceManager::hasGeneratedSourceInfo(unsigned bufferID) {
   return GeneratedSourceInfos.count(bufferID);
 }
 
-std::optional<GeneratedSourceInfo>
+const GeneratedSourceInfo *
 SourceManager::getGeneratedSourceInfo(unsigned bufferID) const {
   auto known = GeneratedSourceInfos.find(bufferID);
   if (known == GeneratedSourceInfos.end())
-    return std::nullopt;
-  return known->second;
+    return nullptr;
+  return &known->second;
 }
 
 namespace {
@@ -465,7 +482,7 @@ namespace {
 
 std::optional<unsigned>
 SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
-  assert(Loc.isValid());
+  ASSERT(Loc.isValid());
 
   // If the cache is out-of-date, update it now.
   unsigned numBuffers = LLVMSourceMgr.getNumBuffers();
@@ -495,10 +512,10 @@ SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
     auto less_equal = std::less_equal<const char *>();
     auto buffer = LLVMSourceMgr.getMemoryBuffer(bufferID);
 
-    return less_equal(buffer->getBufferStart(), Loc.Value.getPointer()) &&
+    return less_equal(buffer->getBufferStart(), Loc.getPointer()) &&
            // Use <= here so that a pointer to the null at the end of the
            // buffer is included as part of the buffer.
-           less_equal(Loc.Value.getPointer(), buffer->getBufferEnd());
+           less_equal(Loc.getPointer(), buffer->getBufferEnd());
   };
 
   // Check the last buffer we looked in.
@@ -552,15 +569,15 @@ SourceRange SourceRange::combine(ArrayRef<SourceRange> ranges) {
 }
 
 void SourceRange::widen(SourceRange Other) {
-  if (Other.Start.Value.getPointer() < Start.Value.getPointer())
+  if (Other.Start.getPointer() < Start.getPointer())
     Start = Other.Start;
-  if (Other.End.Value.getPointer() > End.Value.getPointer())
+  if (Other.End.getPointer() > End.getPointer())
     End = Other.End;
 }
 
 bool SourceRange::contains(SourceLoc Loc) const {
-  return Start.Value.getPointer() <= Loc.Value.getPointer() &&
-         Loc.Value.getPointer() <= End.Value.getPointer();
+  return Start.getPointer() <= Loc.getPointer() &&
+         Loc.getPointer() <= End.getPointer();
 }
 
 bool SourceRange::overlaps(SourceRange Other) const {
@@ -694,7 +711,11 @@ unsigned SourceManager::getExternalSourceBufferID(StringRef Path) {
     return It->getSecond();
   }
   unsigned Id = 0u;
-  auto InputFileOrErr = swift::vfs::getFileOrSTDIN(*getFileSystem(), Path);
+  auto InputFileOrErr =
+      swift::vfs::getFileOrSTDIN(*getFileSystem(), Path,
+                                 /* FileSize */ -1,
+                                 /* RequiresNullTerminator */ true,
+                                 /* isVolatile */ this->OpenSourcesAsVolatile);
   if (InputFileOrErr) {
     // This assertion ensures we can look up from the map in the future when
     // using the same Path.
@@ -808,18 +829,23 @@ static bool isBeforeInSource(
   auto [firstMismatch, secondMismatch] = std::mismatch(
       firstAncestors.begin(), firstAncestors.end(),
       secondAncestors.begin(), secondAncestors.end());
-  assert(firstMismatch != firstAncestors.begin() &&
-         secondMismatch != secondAncestors.begin() &&
-         "Ancestors don't have the same root source file");
+  if (firstMismatch == firstAncestors.begin() ||
+      secondMismatch == secondAncestors.begin()) {
+    // FIXME: This is currently being hit for code completion
+    // (rdar://134522702), possibly due to an invalid ASTScope node range. For
+    // now, let's bail with `false` in non-asserts builds.
+    assert(false && "Ancestors don't have the same root source file");
+    return false;
+  }
 
   SourceLoc firstLocInLCA = firstMismatch == firstAncestors.end()
       ? firstLoc
       : sourceMgr.getGeneratedSourceInfo(*firstMismatch)
-          ->originalSourceRange.getEnd();
+          ->originalSourceRange.getStart();
   SourceLoc secondLocInLCA = secondMismatch == secondAncestors.end()
       ? secondLoc
       : sourceMgr.getGeneratedSourceInfo(*secondMismatch)
-          ->originalSourceRange.getEnd();
+          ->originalSourceRange.getStart();
   return sourceMgr.isBeforeInBuffer(firstLocInLCA, secondLocInLCA) ||
     (allowEqual && firstLocInLCA == secondLocInLCA);
 }
@@ -843,4 +869,16 @@ bool SourceManager::containsLoc(SourceRange range, SourceLoc loc) const {
 bool SourceManager::encloses(SourceRange enclosing, SourceRange inner) const {
   return containsLoc(enclosing, inner.Start) &&
       isAtOrBefore(inner.End, enclosing.End);
+}
+
+bool SourceManager::isImportMacroGeneratedLoc(SourceLoc loc) {
+  if (loc.isInvalid())
+    return false;
+
+  auto buffer = findBufferContainingLoc(loc);
+  auto genInfo = getGeneratedSourceInfo(buffer);
+  if (genInfo && genInfo->macroName == "_SwiftifyImport")
+    return true;
+
+  return false;
 }

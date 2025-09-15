@@ -9,6 +9,7 @@
 // RUN: %FileCheck -input-file %t/ObjectiveC.NSObject.forward-decls.txt -check-prefix=NEGATIVE %s
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_ImportObjcForwardDeclarations
 
 // NEGATIVE-WITHOUT-FORWARD-DECLS-NOT: var description
 // NEGATIVE-NOT: NSCoder

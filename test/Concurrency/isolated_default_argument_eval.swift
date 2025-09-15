@@ -1,7 +1,7 @@
-// RUN: %target-swift-emit-silgen -I %t  -disable-availability-checking -strict-concurrency=complete -enable-upcoming-feature IsolatedDefaultValues -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -I %t  -target %target-swift-5.1-abi-triple -strict-concurrency=complete -enable-upcoming-feature IsolatedDefaultValues -parse-as-library %s | %FileCheck %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_IsolatedDefaultValues
 
 @MainActor
 func requiresMainActor() -> Int { 0 }

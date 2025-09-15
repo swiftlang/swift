@@ -257,10 +257,11 @@ public:
 
     // Otherwise, cast to a pointer to the correct type.
     auto origPtrType = address.getType();
-    return Address(
-        CreateBitCast(address.getAddress(),
-                      type->getPointerTo(origPtrType->getAddressSpace())),
-        type, address.getAlignment());
+
+    return Address(CreateBitCast(address.getAddress(),
+                                 llvm::PointerType::get(
+                                     Context, origPtrType->getAddressSpace())),
+                   type, address.getAlignment());
   }
 
   /// Insert the given basic block after the IP block and move the
@@ -410,6 +411,11 @@ public:
                                name);
   }
 
+  // Creates an @llvm.expect.i1 call, where the value should be an i1 type.
+  llvm::CallInst *CreateExpectCond(IRGenModule &IGM,
+                                   llvm::Value *value,
+                                   bool expectedValue, const Twine &name = "");
+
   /// Call the trap intrinsic. If optimizations are enabled, an inline asm
   /// gadget is emitted before the trap. The gadget inhibits transforms which
   /// merge trap calls together, which makes debugging crashes easier.
@@ -497,10 +503,10 @@ public:
   ~SavedInsertionPointRAII() {
     if (savedInsertionPoint.isNull()) {
       builder.ClearInsertionPoint();
-    } else if (savedInsertionPoint.is<llvm::Instruction *>()) {
-      builder.SetInsertPoint(savedInsertionPoint.get<llvm::Instruction *>());
+    } else if (isa<llvm::Instruction *>(savedInsertionPoint)) {
+      builder.SetInsertPoint(cast<llvm::Instruction *>(savedInsertionPoint));
     } else {
-      builder.SetInsertPoint(savedInsertionPoint.get<llvm::BasicBlock *>());
+      builder.SetInsertPoint(cast<llvm::BasicBlock *>(savedInsertionPoint));
     }
   }
 };

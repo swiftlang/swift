@@ -25,13 +25,14 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallString.h"
 
 using namespace swift;
 
-static std::string mangleConstant(RootProtocolConformance *C) {
-  Mangle::ASTMangler Mangler;
+static std::string mangleConstant(ProtocolConformance *C) {
+  Mangle::ASTMangler Mangler(C->getDeclContext()->getASTContext());
   return Mangler.mangleWitnessTable(C);
 }
 
@@ -48,19 +49,28 @@ NominalTypeDecl *SILWitnessTable::getConformingNominal() const {
 }
 
 void SILWitnessTable::addWitnessTable() {
-  // Make sure we have not seen this witness table yet.
-  assert(Mod.WitnessTableMap.find(Conformance) ==
-         Mod.WitnessTableMap.end() && "Attempting to create duplicate "
-         "witness table.");
-  Mod.WitnessTableMap[Conformance] = this;
+  if (isSpecialized()) {
+    // Make sure we have not seen this witness table yet.
+    assert(Mod.specializedWitnessTableMap.find(Conformance) ==
+           Mod.specializedWitnessTableMap.end() && "Attempting to create duplicate "
+           "witness table.");
+    Mod.specializedWitnessTableMap[Conformance] = this;
+  } else {
+    // Make sure we have not seen this witness table yet.
+    assert(Mod.WitnessTableMap.find(cast<RootProtocolConformance>(Conformance)) ==
+           Mod.WitnessTableMap.end() && "Attempting to create duplicate "
+           "witness table.");
+    Mod.WitnessTableMap[cast<RootProtocolConformance>(Conformance)] = this;
+  }
   Mod.witnessTables.push_back(this);
 }
 
 SILWitnessTable *SILWitnessTable::create(
     SILModule &M, SILLinkage Linkage, SerializedKind_t SerializedKind,
-    RootProtocolConformance *Conformance,
+    ProtocolConformance *Conformance,
     ArrayRef<SILWitnessTable::Entry> entries,
-    ArrayRef<ConditionalConformance> conditionalConformances) {
+    ArrayRef<ProtocolConformanceRef> conditionalConformances,
+    bool specialized) {
   assert(Conformance && "Cannot create a witness table for a null "
          "conformance.");
 
@@ -73,7 +83,7 @@ SILWitnessTable *SILWitnessTable::create(
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
   SILWitnessTable *wt = ::new (buf)
       SILWitnessTable(M, Linkage, SerializedKind, Name.str(), Conformance, entries,
-                      conditionalConformances);
+                      conditionalConformances, specialized);
 
   wt->addWitnessTable();
 
@@ -83,7 +93,8 @@ SILWitnessTable *SILWitnessTable::create(
 
 SILWitnessTable *
 SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
-                        RootProtocolConformance *Conformance) {
+                        ProtocolConformance *Conformance,
+                        bool specialized) {
   assert(Conformance && "Cannot create a witness table for a null "
          "conformance.");
 
@@ -94,7 +105,7 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
   SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, Name.str(),
-                                                    Conformance);
+                                                    Conformance, specialized);
 
   wt->addWitnessTable();
 
@@ -104,18 +115,18 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
 
 SILWitnessTable::SILWitnessTable(
     SILModule &M, SILLinkage Linkage, SerializedKind_t SerializedKind, StringRef N,
-    RootProtocolConformance *Conformance, ArrayRef<Entry> entries,
-    ArrayRef<ConditionalConformance> conditionalConformances)
+    ProtocolConformance *Conformance, ArrayRef<Entry> entries,
+    ArrayRef<ProtocolConformanceRef> conditionalConformances, bool specialized)
     : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
-      ConditionalConformances(), IsDeclaration(true),
-      SerializedKind(IsNotSerialized) {
+      ConditionalConformances(), IsDeclaration(true), specialized(specialized),
+      SerializedKind(SerializedKind) {
   convertToDefinition(entries, conditionalConformances, SerializedKind);
 }
 
 SILWitnessTable::SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef N,
-                                 RootProtocolConformance *Conformance)
+                                 ProtocolConformance *Conformance, bool specialized)
     : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
-      ConditionalConformances(), IsDeclaration(true),
+      ConditionalConformances(), IsDeclaration(true), specialized(specialized),
       SerializedKind(IsNotSerialized) {}
 
 SILWitnessTable::~SILWitnessTable() {
@@ -131,7 +142,7 @@ SILWitnessTable::~SILWitnessTable() {
       }
       break;
     case AssociatedType:
-    case AssociatedTypeProtocol:
+    case AssociatedConformance:
     case BaseProtocol:
     case Invalid:
       break;
@@ -141,7 +152,7 @@ SILWitnessTable::~SILWitnessTable() {
 
 void SILWitnessTable::convertToDefinition(
     ArrayRef<Entry> entries,
-    ArrayRef<ConditionalConformance> conditionalConformances,
+    ArrayRef<ProtocolConformanceRef> conditionalConformances,
     SerializedKind_t serializedKind) {
   assert(isDeclaration() && "Definitions should never call this method.");
   IsDeclaration = false;
@@ -159,7 +170,7 @@ void SILWitnessTable::convertToDefinition(
       }
       break;
     case AssociatedType:
-    case AssociatedTypeProtocol:
+    case AssociatedConformance:
     case BaseProtocol:
     case Invalid:
       break;
@@ -169,8 +180,7 @@ void SILWitnessTable::convertToDefinition(
 
 SerializedKind_t SILWitnessTable::conformanceSerializedKind(
                                                             const RootProtocolConformance *conformance) {
-  // Allow serializing conformance with package or public access level
-  // if package serialization is enabled.
+
   auto optInPackage = conformance->getDeclContext()->getParentModule()->serializePackageEnabled();
   auto accessLevelToCheck =
   optInPackage ? AccessLevel::Package : AccessLevel::Public;

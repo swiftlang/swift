@@ -77,6 +77,11 @@ extension ManagedBuffer where Element: ~Copyable {
   /// an initial `Header`.
   @_preInverseGenerics
   @inlinable
+  #if $Embedded
+  // Transparent in Embedded Swift to avoid needing "self" as a metatype. By
+  // inlining into the caller, we'll know the concrete type instead.
+  @_transparent
+  #endif
   public final class func create(
     minimumCapacity: Int,
     makingHeaderWith factory: (ManagedBuffer<Header, Element>) throws -> Header
@@ -86,7 +91,7 @@ extension ManagedBuffer where Element: ~Copyable {
          minimumCapacity._builtinWordValue, Element.self)
 
     let initHeaderVal = try factory(p)
-    p.headerAddress.initialize(to: initHeaderVal)
+    unsafe p.headerAddress.initialize(to: initHeaderVal)
     // The _fixLifetime is not really needed, because p is used afterwards.
     // But let's be conservative and fix the lifetime after we use the
     // headerAddress.
@@ -104,8 +109,8 @@ extension ManagedBuffer where Element: ~Copyable {
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
   public final var capacity: Int {
     let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(self))
-    let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
-    let realCapacity = endAddr.assumingMemoryBound(to: Element.self) -
+    let endAddr = unsafe storageAddr + _swift_stdlib_malloc_size(storageAddr)
+    let realCapacity = unsafe endAddr.assumingMemoryBound(to: Element.self) -
       firstElementAddress
     return realCapacity
   }
@@ -113,14 +118,14 @@ extension ManagedBuffer where Element: ~Copyable {
   @_preInverseGenerics
   @inlinable
   internal final var firstElementAddress: UnsafeMutablePointer<Element> {
-    return UnsafeMutablePointer(
+    return unsafe UnsafeMutablePointer(
       Builtin.projectTailElems(self, Element.self))
   }
 
   @_preInverseGenerics
   @inlinable
   internal final var headerAddress: UnsafeMutablePointer<Header> {
-    return UnsafeMutablePointer<Header>(Builtin.addressof(&header))
+    return unsafe UnsafeMutablePointer<Header>(Builtin.addressof(&header))
   }
 }
 
@@ -135,7 +140,7 @@ extension ManagedBuffer where Element: ~Copyable {
   public final func withUnsafeMutablePointerToHeader<E: Error, R: ~Copyable>(
     _ body: (UnsafeMutablePointer<Header>) throws(E) -> R
   ) throws(E) -> R {
-    try withUnsafeMutablePointers { (v, _) throws(E) in try body(v) }
+    try unsafe withUnsafeMutablePointers { (v, _) throws(E) in try unsafe body(v) }
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the `Element`
@@ -148,7 +153,7 @@ extension ManagedBuffer where Element: ~Copyable {
   public final func withUnsafeMutablePointerToElements<E: Error, R: ~Copyable>(
     _ body: (UnsafeMutablePointer<Element>) throws(E) -> R
   ) throws(E) -> R {
-    try withUnsafeMutablePointers { (_, v) throws(E) in try body(v) }
+    try unsafe withUnsafeMutablePointers { (_, v) throws(E) in try unsafe body(v) }
   }
 
   /// Call `body` with `UnsafeMutablePointer`s to the stored `Header`
@@ -164,7 +169,7 @@ extension ManagedBuffer where Element: ~Copyable {
     ) throws(E) -> R
   ) throws(E) -> R {
     defer { _fixLifetime(self) }
-    return try body(headerAddress, firstElementAddress)
+    return try unsafe body(headerAddress, firstElementAddress)
   }
 }
 
@@ -175,7 +180,7 @@ extension ManagedBuffer {
   internal final func __legacy_withUnsafeMutablePointerToHeader<R>(
     _ body: (UnsafeMutablePointer<Header>) throws -> R
   ) rethrows -> R {
-    return try withUnsafeMutablePointers { (v, _) in return try body(v) }
+    return try unsafe withUnsafeMutablePointers { (v, _) in return try unsafe body(v) }
   }
 
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
@@ -184,7 +189,7 @@ extension ManagedBuffer {
   internal final func __legacy_withUnsafeMutablePointerToElements<R>(
     _ body: (UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
-    return try withUnsafeMutablePointers { return try body($1) }
+    return try unsafe withUnsafeMutablePointers { return try unsafe body($1) }
   }
 
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
@@ -196,7 +201,7 @@ extension ManagedBuffer {
     ) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
-    return try body(headerAddress, firstElementAddress)
+    return try unsafe body(headerAddress, firstElementAddress)
   }
 }
 
@@ -273,8 +278,8 @@ public struct ManagedBufferPointer<
       bufferClass: bufferClass, minimumCapacity: minimumCapacity)
 
     // initialize the header field
-    try withUnsafeMutablePointerToHeader {
-      $0.initialize(to:
+    try unsafe withUnsafeMutablePointerToHeader {
+      unsafe $0.initialize(to:
         try factory(
           self.buffer,
           {
@@ -290,7 +295,9 @@ public struct ManagedBufferPointer<
   @_preInverseGenerics
   @inlinable
   public init(unsafeBufferObject buffer: AnyObject) {
+    #if !$Embedded
     ManagedBufferPointer._checkValidBufferClass(type(of: buffer))
+    #endif
 
     self._nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
@@ -308,7 +315,10 @@ public struct ManagedBufferPointer<
   @_preInverseGenerics
   @inlinable
   internal init(_uncheckedUnsafeBufferObject buffer: AnyObject) {
+    #if !$Embedded
     ManagedBufferPointer._internalInvariantValidBufferClass(type(of: buffer))
+    #endif
+
     self._nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
 
@@ -374,16 +384,19 @@ public struct ManagedBufferPointer<
   }
 }
 
+@available(*, unavailable)
+extension ManagedBufferPointer: Sendable where Element: ~Copyable {}
+
 extension ManagedBufferPointer where Element: ~Copyable {
   /// The stored `Header` instance.
   @_preInverseGenerics
   @inlinable
   public var header: Header {
     _read {
-      yield _headerPointer.pointee
+      yield unsafe _headerPointer.pointee
     }
     _modify {
-      yield &_headerPointer.pointee
+      yield unsafe &_headerPointer.pointee
     }
   }
 }
@@ -419,7 +432,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   public func withUnsafeMutablePointerToHeader<E: Error, R: ~Copyable>(
     _ body: (UnsafeMutablePointer<Header>) throws(E) -> R
   ) throws(E) -> R {
-    try withUnsafeMutablePointers { (v, _) throws(E) in try body(v) }
+    try unsafe withUnsafeMutablePointers { (v, _) throws(E) in try unsafe body(v) }
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the `Element`
@@ -431,7 +444,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   public func withUnsafeMutablePointerToElements<E: Error, R: ~Copyable>(
     _ body: (UnsafeMutablePointer<Element>) throws(E) -> R
   ) throws(E) -> R {
-    try withUnsafeMutablePointers { (_, v) throws(E) in try body(v) }
+    try unsafe withUnsafeMutablePointers { (_, v) throws(E) in try unsafe body(v) }
   }
 
   /// Call `body` with `UnsafeMutablePointer`s to the stored `Header`
@@ -446,7 +459,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
     ) throws(E) -> R
   ) throws(E) -> R {
     defer { _fixLifetime(_nativeBuffer) }
-    return try body(_headerPointer, _elementPointer)
+    return try unsafe body(_headerPointer, _elementPointer)
   }
 
   /// Returns `true` if `self` holds the only strong reference to its
@@ -467,7 +480,7 @@ extension ManagedBufferPointer {
   internal func withUnsafeMutablePointerToHeader<R>(
     _ body: (UnsafeMutablePointer<Header>) throws -> R
   ) rethrows -> R {
-    try withUnsafeMutablePointers { (v, _) in try body(v) }
+    try unsafe withUnsafeMutablePointers { (v, _) in try unsafe body(v) }
   }
 
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
@@ -476,7 +489,7 @@ extension ManagedBufferPointer {
   internal func withUnsafeMutablePointerToElements<R>(
     _ body: (UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
-    try withUnsafeMutablePointers { (_, v) in try body(v) }
+    try unsafe withUnsafeMutablePointers { (_, v) in try unsafe body(v) }
   }
 
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
@@ -488,7 +501,7 @@ extension ManagedBufferPointer {
     ) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(_nativeBuffer) }
-    return try body(_headerPointer, _elementPointer)
+    return try unsafe body(_headerPointer, _elementPointer)
   }
 }
 
@@ -498,7 +511,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   internal static func _checkValidBufferClass(
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
-    _debugPrecondition(
+    unsafe _debugPrecondition(
       _class_getInstancePositiveExtentSize(bufferClass) == MemoryLayout<_HeapObject>.size
       || (
         (!creating || bufferClass is ManagedBuffer<Header, Element>.Type)
@@ -517,7 +530,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   internal static func _internalInvariantValidBufferClass(
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
-    _internalInvariant(
+    unsafe _internalInvariant(
       _class_getInstancePositiveExtentSize(bufferClass) == MemoryLayout<_HeapObject>.size
       || (
         (!creating || bufferClass is ManagedBuffer<Header, Element>.Type)
@@ -537,7 +550,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @_preInverseGenerics
   @inlinable
   internal static var _alignmentMask: Int {
-    return max(
+    return unsafe max(
       MemoryLayout<_HeapObject>.alignment,
       max(MemoryLayout<Header>.alignment, MemoryLayout<Element>.alignment)) &- 1
   }
@@ -547,7 +560,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @inlinable
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
   internal var _capacityInBytes: Int {
-    return _swift_stdlib_malloc_size(_address)
+    return unsafe _swift_stdlib_malloc_size(_address)
   }
 
   /// The address of this instance in a convenient pointer-to-bytes form
@@ -562,7 +575,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @inlinable
   internal static var _headerOffset: Int {
     _onFastPath()
-    return _roundUp(
+    return unsafe _roundUp(
       MemoryLayout<_HeapObject>.size,
       toAlignment: MemoryLayout<Header>.alignment)
   }
@@ -574,7 +587,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @inlinable
   internal var _headerPointer: UnsafeMutablePointer<Header> {
     _onFastPath()
-    return (_address + ManagedBufferPointer._headerOffset).assumingMemoryBound(
+    return unsafe (_address + ManagedBufferPointer._headerOffset).assumingMemoryBound(
       to: Header.self)
   }
 
@@ -585,7 +598,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @inlinable
   internal var _elementPointer: UnsafeMutablePointer<Element> {
     _onFastPath()
-    return (_address + ManagedBufferPointer._elementOffset).assumingMemoryBound(
+    return unsafe (_address + ManagedBufferPointer._elementOffset).assumingMemoryBound(
       to: Element.self)
   }
 
@@ -600,13 +613,15 @@ extension ManagedBufferPointer where Element: ~Copyable {
   }
 }
 
-extension ManagedBufferPointer: Equatable {
+@_preInverseGenerics
+extension ManagedBufferPointer: Equatable where Element: ~Copyable {
+  @_preInverseGenerics
   @inlinable
   public static func == (
     lhs: ManagedBufferPointer,
     rhs: ManagedBufferPointer
   ) -> Bool {
-    return lhs._address == rhs._address
+    return unsafe lhs._address == rhs._address
   }
 }
 

@@ -60,6 +60,16 @@ inline bool lazy_mutex_try_lock(lazy_mutex_handle &handle) { return true; }
 inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) {}
 inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {}
 
+// .. Recursive mutex support .................................................
+
+using recursive_mutex_handle = unsigned;
+
+inline void recursive_mutex_init(recursive_mutex_handle &handle,
+                                 bool checked = false) {}
+inline void recursive_mutex_destroy(recursive_mutex_handle &handle) {}
+inline void recursive_mutex_lock(recursive_mutex_handle &handle) {}
+inline void recursive_mutex_unlock(recursive_mutex_handle &handle) {}
+
 // .. ConditionVariable support ..............................................
 
 using cond_handle = unsigned;

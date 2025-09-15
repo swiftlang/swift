@@ -1,5 +1,9 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -module-name test
 
+// Don't complain about <<error type>> not conforming to Error
+func invalidThrownType() throws(DoesNotExist) {}
+// expected-error@-1 {{cannot find type 'DoesNotExist' in scope}}
+
 // expected-note@+1{{type declared here}}
 enum MyError: Error {
   case fail
@@ -188,7 +192,7 @@ enum G_E<T> {
 
 func testArrMap(arr: [String]) {
   _ = mapArray(arr, body: G_E<Int>.tuple)
-  // expected-error@-1{{cannot convert value of type '((x: Int, y: Int)) -> G_E<Int>' to expected argument type '(String) -> G_E<Int>'}}
+  // expected-error@-1{{conflicting arguments to generic parameter 'T' ('String' vs. '(x: Int, y: Int)')}}
 }
 
 // Shadowing of typed-throws Result.get() addresses a source compatibility
@@ -207,3 +211,8 @@ extension Result {
     }
   }
 }
+
+struct NotAnError<T> {}
+
+func badThrowingFunctionType<T>(_: () throws(NotAnError<T>) -> ()) {}
+// expected-error@-1 {{thrown type 'NotAnError<T>' does not conform to the 'Error' protocol}}

@@ -26,6 +26,35 @@ bb0(%0: @owned $MyArray<MyClass>):
   unreachable
 }
 
+// CHECK-LABEL: sil [ossa] @load_within_loop : 
+// CHECK: bb1:
+// CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC1]]
+// CHECK: cond_br {{.*}}
+// CHECK: bb2:
+// CHECK:   br bb3
+// CHECK: bb3:
+// CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC2]]
+// CHECK-LABEL: } // end sil function 'load_within_loop'
+sil [ossa] @load_within_loop : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> MyBool {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
+  br bb1
+
+bb1:
+  %3 = load [copy] %0 : $*MyArray<MyClass>
+  %4 = load [trivial] %1 : $*MyBool
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  %5 = apply %2(%3) : $@convention(method) (@owned MyArray<MyClass>) -> Bool
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  return %4 : $MyBool
+}
+
 // CHECK-LABEL: sil [ossa] @load_and_copy_within_loop : 
 // CHECK: bb1:
 // CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative

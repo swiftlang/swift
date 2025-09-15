@@ -25,7 +25,7 @@ class ImportPathContext {
 public:
   ImportPathContext() = default;
 
-  /// Hepler routine for building ImportPath
+  /// Helper routine for building ImportPath
   /// Build()
   /// @see ImportPathBuilder
   inline ImportPath Build(StringRef Name) noexcept {

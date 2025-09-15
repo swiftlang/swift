@@ -17,6 +17,7 @@
 #include "swift/Sema/SyntacticElementTarget.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "TypeChecker.h"
 
 using namespace swift;
@@ -192,14 +193,6 @@ SyntacticElementTarget::forReturn(ReturnStmt *returnStmt, Type contextTy,
   return target;
 }
 
-SyntacticElementTarget
-SyntacticElementTarget::forForEachPreamble(ForEachStmt *stmt, DeclContext *dc,
-                                           bool ignoreWhereClause,
-                                           GenericEnvironment *packElementEnv) {
-  SyntacticElementTarget target(stmt, dc, ignoreWhereClause, packElementEnv);
-  return target;
-}
-
 SyntacticElementTarget SyntacticElementTarget::forPropertyWrapperInitializer(
     VarDecl *wrappedVar, DeclContext *dc, Expr *initializer) {
   SyntacticElementTarget target(initializer, dc, CTP_Initialization,
@@ -236,8 +229,8 @@ ContextualPattern SyntacticElementTarget::getContextualPattern() const {
   }
 
   if (isForEachPreamble()) {
-    return ContextualPattern::forRawPattern(forEachStmt.pattern,
-                                            forEachStmt.dc);
+    return ContextualPattern::forRawPattern(forEachPreamble.pattern,
+                                            forEachPreamble.dc);
   }
 
   auto ctp = getExprContextualTypePurpose();
@@ -268,7 +261,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   switch (getExprContextualTypePurpose()) {
   case CTP_Initialization:
     return !infersOpaqueReturnType() && !isOptionalSomePatternInit();
-  case CTP_ForEachStmt:
   case CTP_ForEachSequence:
     return true;
   case CTP_Unused:
@@ -303,10 +295,25 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
 
 void SyntacticElementTarget::markInvalid() const {
   class InvalidationWalker : public ASTWalker {
+    ASTContext &Ctx;
+
+  public:
+    InvalidationWalker(ASTContext &ctx) : Ctx(ctx) {}
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      // TODO: We ought to fill in ErrorTypes for expressions here; ultimately
-      // type-checking should always produce typed AST.
+      E->setType(ErrorType::get(Ctx));
       return Action::Continue(E);
+    }
+
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+      P->setType(ErrorType::get(Ctx));
+
+      // For a named pattern, set it on the variable. This stops us from
+      // attempting to double-type-check variables we've already type-checked.
+      if (auto *NP = dyn_cast<NamedPattern>(P))
+        NP->getDecl()->setNamingPattern(NP);
+
+      return Action::Continue(P);
     }
 
     PreWalkAction walkToDeclPre(Decl *D) override {
@@ -321,7 +328,7 @@ void SyntacticElementTarget::markInvalid() const {
       return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
     }
   };
-  InvalidationWalker walker;
+  InvalidationWalker walker(getDeclContext()->getASTContext());
   walk(walker);
 }
 
@@ -330,8 +337,8 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
   SyntacticElementTarget result = *this;
   switch (kind) {
   case Kind::expression: {
-    if (isForInitialization()) {
-      if (auto *newPattern = getInitializationPattern()->walk(walker)) {
+    if (auto *pattern = getPattern()) {
+      if (auto *newPattern = pattern->walk(walker)) {
         result.setPattern(newPattern);
       } else {
         return std::nullopt;
@@ -396,7 +403,7 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
     break;
   }
   case Kind::forEachPreamble: {
-    // We need to skip the where clause if requested, and we currently do not
+    // We need to skip the where clause, and we currently do not
     // type-check a for loop's BraceStmt as part of the SyntacticElementTarget,
     // so we need to skip it here.
     // TODO: We ought to be able to fold BraceStmt checking into the constraint
@@ -417,8 +424,7 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
       }
 
       PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-        // Ignore where clause if needed.
-        if (Target.ignoreForEachWhereClause() && E == ForStmt->getWhere())
+        if (E == ForStmt->getWhere())
           return Action::SkipNode(E);
 
         E = E->walk(Walker);
@@ -454,7 +460,7 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
     ForEachWalker forEachWalker(walker, *this);
 
     if (auto *newStmt = getAsForEachStmt()->walk(forEachWalker)) {
-      result.forEachStmt.stmt = cast<ForEachStmt>(newStmt);
+      result.forEachPreamble.stmt = cast<ForEachStmt>(newStmt);
     } else {
       return std::nullopt;
     }

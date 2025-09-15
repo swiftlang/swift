@@ -1,9 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies -enable-experimental-feature LifetimeDependence
 // RUN: %FileCheck %s < %t/Swift.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/Swift.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function -Wc++98-compat-extra-semi)
 // RUN: %check-interop-cxx-header-in-clang(%t/Swift.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function -Wc++98-compat-extra-semi -DDEBUG=1)
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 // CHECK: namespace swift SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("swift") {
 
@@ -48,6 +50,8 @@
 
 // CHECK: template<class T_0_0>
 // CHECK: template<class T_0_0>
+// CHECK: template<class T_0_0>
+// CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
@@ -77,15 +81,11 @@
 // CHECK:  }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK String &operator =(const String &other) noexcept {
 // CHECK:  }
-// CHECK-NEXT:  SWIFT_INLINE_THUNK String &operator =(String &&other) = delete;
-// CHECK-NEXT:  SWIFT_INLINE_PRIVATE_HELPER String(String &&) noexcept {
-// CHECK: }
 // CHECK-NEXT:  static SWIFT_INLINE_THUNK String init() SWIFT_SYMBOL({{.*}});
 // CHECK:  SWIFT_INLINE_THUNK void append(const String& other)
-// CHECK:  SWIFT_INLINE_THUNK UTF8View getUtf8() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT:  SWIFT_INLINE_THUNK void setUtf8(const UTF8View& newValue) SWIFT_SYMBOL({{.*}});
-// CHECK:  #if defined(__OBJC__)
-// CHECK-NEXT:  SWIFT_INLINE_THUNK operator NSString * _Nonnull () const noexcept {
+// CHECK:  SWIFT_INLINE_THUNK __StringNested::UTF8View getUtf8() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT:  SWIFT_INLINE_THUNK void setUtf8(const __StringNested::UTF8View& newValue) SWIFT_SYMBOL({{.*}});
+// CHECK:  SWIFT_INLINE_THUNK operator NSString * _Nonnull () const noexcept {
 // CHECK-NEXT:    return (__bridge_transfer NSString *)(_impl::$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF(_impl::swift_interop_passDirect_Swift_String(_getOpaquePointer())));
 // CHECK-NEXT:   }
 // CHECK-NEXT:  static SWIFT_INLINE_THUNK String init(NSString * _Nonnull nsString) noexcept {
@@ -95,7 +95,7 @@
 // CHECK-NEXT:  return result;
 // CHECK-NEXT:  }
 // CHECK-EMPTY:
-// CHECK-NEXT:  #endif
+// CHECK-NEXT:  #endif // defined(__OBJC__)
 // CHECK-NEXT: #define SWIFT_CXX_INTEROP_STRING_MIXIN
 
 // CHECK-NEXT: #pragma clang diagnostic push
@@ -115,13 +115,13 @@
 // CHECK-NEXT: private:
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) UTF8View final {
-// CHECK: SWIFT_INLINE_PRIVATE_HELPER UTF8View(UTF8View &&) noexcept {
+// CHECK: SWIFT_INLINE_THUNK UTF8View &operator =(const UTF8View &other) noexcept {
 // CHECK: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK String_Index getStartIndex() const SWIFT_SYMBOL({{.*}});
-// CHECK-NEXT:   SWIFT_INLINE_THUNK String_Index getEndIndex() const SWIFT_SYMBOL({{.*}});
-// CHECK:   SWIFT_INLINE_THUNK swift::Optional<String_Index> indexOffsetByLimitedBy(const String_Index& i, swift::Int n, const String_Index& limit) const SWIFT_SYMBOL({{.*}});
-// CHECK:   SWIFT_INLINE_THUNK swift::Int distanceFromTo(const String_Index& i, const String_Index& j) const SWIFT_SYMBOL({{.*}});
-// CHECK: SWIFT_INLINE_THUNK uint8_t operator [](const String_Index& i) const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT: SWIFT_INLINE_THUNK __StringNested::Index getStartIndex() const SWIFT_SYMBOL({{.*}});
+// CHECK-NEXT:   SWIFT_INLINE_THUNK __StringNested::Index getEndIndex() const SWIFT_SYMBOL({{.*}});
+// CHECK:   SWIFT_INLINE_THUNK swift::Optional<__StringNested::Index> indexOffsetByLimitedBy(const __StringNested::Index& i, swift::Int n, const __StringNested::Index& limit) const SWIFT_SYMBOL({{.*}});
+// CHECK:   SWIFT_INLINE_THUNK swift::Int distanceFromTo(const __StringNested::Index& i, const __StringNested::Index& j) const SWIFT_SYMBOL({{.*}});
+// CHECK: SWIFT_INLINE_THUNK uint8_t operator [](const __StringNested::Index& i) const SWIFT_SYMBOL({{.*}});
 // CHECK:   SWIFT_INLINE_THUNK String getDescription() const SWIFT_SYMBOL({{.*}});
 // CHECK:   SWIFT_INLINE_THUNK swift::Int getCount() const SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT: private:

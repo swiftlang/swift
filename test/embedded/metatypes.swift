@@ -2,7 +2,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 public func sink<T>(t: T) {}
 
@@ -18,6 +18,6 @@ func castToExistential<T>(x: T) {
 }
 
 public func callCastToExistential() {
-  castToExistential(x: 42)    // expected-note {{called from here}}
+  castToExistential(x: 42)    // expected-note {{generic specialization called here}}
 }
 

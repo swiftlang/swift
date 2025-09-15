@@ -1,0 +1,27 @@
+# RUN: %empty-directory(%t)
+# RUN: %empty-directory(%t/src/swift/utils)
+# RUN: %empty-directory(%t/out)
+# RUN: export PATH="%original_path_env"
+# RUN: export SWIFTCI_USE_LOCAL_DEPS=1
+# RUN: export SWIFT_BACKTRACE=
+
+# REQUIRES: OS=macosx
+# REQUIRES: standalone_build
+# REQUIRES: target-same-as-host
+
+# First copy swift-xcodegen to the temporary location
+# so we don't touch the user's build, and make sure
+# we're doing a clean build.
+# RUN: cp -R %swift_src_root/utils/swift-xcodegen %t/src/swift/utils/swift-xcodegen
+# RUN: rm -rf %t/src/swift/utils/swift-xcodegen/.build
+
+# Add symlinks for local dependencies
+# RUN: ln -s %swift_src_root/../swift-* %t/src
+# RUN: ln -s %swift_src_root/../llbuild %t/src
+
+# Run the xcodegen test suite
+# RUN: xcrun swift-test -c release --disable-dependency-cache --package-path %t/src/swift/utils/swift-xcodegen
+
+# Then check to see that xcodegen can generate a project successfully
+# RUN: xcrun swift-run -c release --disable-dependency-cache --skip-build --package-path %t/src/swift/utils/swift-xcodegen swift-xcodegen --project-root-dir %swift_src_root/.. --output-dir %t/out %swift_obj_root/..
+# RUN: ls %t/out/Swift.xcodeproj > /dev/null

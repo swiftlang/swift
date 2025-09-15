@@ -145,91 +145,22 @@ static malloc_type_summary_t
 computeMallocTypeSummary(const HeapMetadata *heapMetadata) {
   assert(isHeapMetadataKind(heapMetadata->getKind()));
   auto *classMetadata = heapMetadata->getClassObject();
-  auto *typeDesc = heapMetadata->getTypeContextDescriptor();
-
-  // Pruned metadata or unclassified
-  if (!classMetadata || !typeDesc)
-    return {.type_kind = MALLOC_TYPE_KIND_SWIFT};
 
   // Objc
-  if (classMetadata->isPureObjC())
+  if (classMetadata && classMetadata->isPureObjC())
     return {.type_kind = MALLOC_TYPE_KIND_OBJC};
 
-  malloc_type_summary_t summary = {.type_kind = MALLOC_TYPE_KIND_SWIFT};
-  summary.layout_semantics.reference_count =
-      (classMetadata->getFlags() & ClassFlags::UsesSwiftRefcounting);
-
-  auto *fieldDesc = typeDesc->Fields.get();
-  if (!fieldDesc)
-    return summary;
-
-  bool isGenericData = true;
-  for (auto &field : *fieldDesc) {
-    if (field.isIndirectCase()) {
-      isGenericData = false;
-      if (field.isVar())
-        summary.layout_semantics.data_pointer = true;
-      else
-        summary.layout_semantics.immutable_pointer = true;
-    }
-  }
-  summary.layout_semantics.generic_data = isGenericData;
-
-  return summary;
-
-// FIXME: these are all the things we are potentially interested in
-//  typedef struct {
-// 	  bool data_pointer : 1;
-// 	  bool struct_pointer : 1;
-// 	  bool immutable_pointer : 1;
-// 	  bool anonymous_pointer : 1;
-// 	  bool reference_count : 1;
-// 	  bool resource_handle : 1;
-// 	  bool spatial_bounds : 1;
-// 	  bool tainted_data : 1;
-// 	  bool generic_data : 1;
-// 	  uint16_t unused : 7;
-// } malloc_type_layout_semantics_t;
+  return {.type_kind = MALLOC_TYPE_KIND_SWIFT};
 }
-
-struct MallocTypeCacheEntry {
-// union malloc_type_descriptor_t {
-//   struct {
-//     uint32_t hash;
-//     malloc_type_summary_t summary;
-//   };
-//   malloc_type_id_t type_id;
-// };
-  malloc_type_descriptor_t desc;
-
-  friend llvm::hash_code hash_value(const MallocTypeCacheEntry &entry) {
-    return hash_value(entry.desc.hash);
-  }
-  bool matchesKey(uint32_t key) const { return desc.hash == key; }
-};
-static ConcurrentReadableHashMap<MallocTypeCacheEntry> MallocTypes;
 
 static malloc_type_id_t getMallocTypeId(const HeapMetadata *heapMetadata) {
   uint64_t metadataPtrBits = reinterpret_cast<uint64_t>(heapMetadata);
-  uint32_t key = (metadataPtrBits >> 32) ^ (metadataPtrBits >> 0);
-
-  {
-    auto snapshot = MallocTypes.snapshot();
-    if (auto *entry = snapshot.find(key))
-      return entry->desc.type_id;
-  }
+  uint32_t hash = (metadataPtrBits >> 32) ^ (metadataPtrBits >> 0);
 
   malloc_type_descriptor_t desc = {
-    .hash = key,
+    .hash = hash,
     .summary = computeMallocTypeSummary(heapMetadata)
   };
-
-  MallocTypes.getOrInsert(
-      key, [desc](MallocTypeCacheEntry *entry, bool created) {
-        if (created)
-          entry->desc = desc;
-        return true;
-      });
 
   return desc.type_id;
 }
@@ -616,6 +547,16 @@ HeapObject *swift::swift_unownedRetain(HeapObject *object) {
 #endif
 }
 
+// Assert that the metadata is a class or ErrorObject, for unowned operations.
+// Other types of metadata are not supposed to be used with unowned.
+static void checkMetadataForUnownedRR(HeapObject *object) {
+  assert(object->metadata->isClassObject() ||
+         object->metadata->getKind() == MetadataKind::ErrorObject);
+  if (object->metadata->isClassObject())
+    assert(
+        static_cast<const ClassMetadata *>(object->metadata)->isTypeMetadata());
+}
+
 void swift::swift_unownedRelease(HeapObject *object) {
 #ifdef SWIFT_THREADING_NONE
   swift_nonatomic_unownedRelease(object);
@@ -624,9 +565,7 @@ void swift::swift_unownedRelease(HeapObject *object) {
   if (!isValidPointerForNativeRetain(object))
     return;
 
-  // Only class objects can be unowned-retained and unowned-released.
-  assert(object->metadata->isClassObject());
-  assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
+  checkMetadataForUnownedRR(object);
 
   if (object->refCounts.decrementUnownedShouldFree(1)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
@@ -651,9 +590,7 @@ void swift::swift_nonatomic_unownedRelease(HeapObject *object) {
   if (!isValidPointerForNativeRetain(object))
     return;
 
-  // Only class objects can be unowned-retained and unowned-released.
-  assert(object->metadata->isClassObject());
-  assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
+  checkMetadataForUnownedRR(object);
 
   if (object->refCounts.decrementUnownedShouldFreeNonAtomic(1)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
@@ -684,9 +621,7 @@ void swift::swift_unownedRelease_n(HeapObject *object, int n) {
   if (!isValidPointerForNativeRetain(object))
     return;
 
-  // Only class objects can be unowned-retained and unowned-released.
-  assert(object->metadata->isClassObject());
-  assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
+  checkMetadataForUnownedRR(object);
 
   if (object->refCounts.decrementUnownedShouldFree(n)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
@@ -710,9 +645,7 @@ void swift::swift_nonatomic_unownedRelease_n(HeapObject *object, int n) {
   if (!isValidPointerForNativeRetain(object))
     return;
 
-  // Only class objects can be unowned-retained and unowned-released.
-  assert(object->metadata->isClassObject());
-  assert(static_cast<const ClassMetadata*>(object->metadata)->isTypeMetadata());
+  checkMetadataForUnownedRR(object);
 
   if (object->refCounts.decrementUnownedShouldFreeNonAtomic(n)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
@@ -944,7 +877,7 @@ void swift::swift_deallocPartialClassInstance(HeapObject *object,
   swift_deallocClassInstance(object, allocatedSize, allocatedAlignMask);
 }
 
-#if !defined(__APPLE__) && defined(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
+#if !defined(__APPLE__) && SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
 static inline void memset_pattern8(void *b, const void *pattern8, size_t len) {
   char *ptr = static_cast<char *>(b);
   while (len >= 8) {
@@ -967,9 +900,9 @@ static inline void swift_deallocObjectImpl(HeapObject *object,
   }
   assert(object->refCounts.isDeiniting());
   SWIFT_RT_TRACK_INVOCATION(object, swift_deallocObject);
-#ifdef SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
+#if SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
   memset_pattern8((uint8_t *)object + sizeof(HeapObject),
-                  "\xAB\xAD\x1D\xEA\xF4\xEE\xD0\bB9",
+                  "\xF0\xEF\xBE\xAD\xDE\xED\xFE\x0F", // 0x0ffeeddeadbeeff0
                   allocatedSize - sizeof(HeapObject));
 #endif
 
@@ -1113,7 +1046,7 @@ WeakReference *swift::swift_weakTakeAssign(WeakReference *dest,
   return dest;
 }
 
-#ifndef NDEBUG
+#ifndef NDEBUG // "not not debug", or "debug-able configurations"
 
 /// Returns true if the "immutable" flag is set on \p object.
 ///

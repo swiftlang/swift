@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -lswiftSwiftReflectionTest -I %S/Inputs/EmptyStruct/ %s -o %t/reflect_empty_struct
+// RUN: %target-build-swift -target %target-stable-abi-triple -lswiftSwiftReflectionTest -I %S/Inputs/EmptyStruct/ %s -o %t/reflect_empty_struct
 // RUN: %target-codesign %t/reflect_empty_struct
 // RUN: %target-run %target-swift-reflection-test %t/reflect_empty_struct | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --dump-input fail %add_num_extra_inhabitants
 
@@ -8,6 +8,7 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: asan
 
 import SwiftReflectionTest
 

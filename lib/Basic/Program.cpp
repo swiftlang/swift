@@ -123,11 +123,15 @@ swift::ExecuteWithPipe(llvm::StringRef program,
   posix_spawn_file_actions_t FileActions;
   posix_spawn_file_actions_init(&FileActions);
 
+  // Redirect file descriptors...
   posix_spawn_file_actions_adddup2(&FileActions, p1.read, STDIN_FILENO);
-  posix_spawn_file_actions_addclose(&FileActions, p1.write);
-
   posix_spawn_file_actions_adddup2(&FileActions, p2.write, STDOUT_FILENO);
+
+  // Close all file descriptors, not needed as we duped them to the stdio.
+  posix_spawn_file_actions_addclose(&FileActions, p1.read);
+  posix_spawn_file_actions_addclose(&FileActions, p1.write);
   posix_spawn_file_actions_addclose(&FileActions, p2.read);
+  posix_spawn_file_actions_addclose(&FileActions, p2.write);
 
   // Spawn the subtask.
   int error = posix_spawn(&pid, progCStr, &FileActions, nullptr,
@@ -156,12 +160,15 @@ swift::ExecuteWithPipe(llvm::StringRef program,
 
   // Child process.
   case 0:
-    close(p1.write);
-    close(p2.read);
-
     // Redirect file descriptors...
     dup2(p1.read, STDIN_FILENO);
     dup2(p2.write, STDOUT_FILENO);
+
+    // Close all file descriptors, not needed as we duped them to the stdio.
+    close(p1.read);
+    close(p1.write);
+    close(p2.read);
+    close(p2.write);
 
     // Execute the program.
     if (envp) {
@@ -180,11 +187,12 @@ swift::ExecuteWithPipe(llvm::StringRef program,
 
   // Parent process.
   default:
+    close(p1.read);
+    close(p2.write);
     break;
   }
 #endif
-  close(p1.read);
-  close(p2.write);
+
   llvm::sys::ProcessInfo proc;
   proc.Pid = pid;
   proc.Process = pid;

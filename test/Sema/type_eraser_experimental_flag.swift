@@ -38,6 +38,8 @@ public struct ConcreteP: P, Hashable {
 // CHECK-INTERFACE2: swift-module-flags:{{.*}} -enable-experimental-feature OpaqueTypeErasure
 
 // RUN: %target-swift-frontend -disable-availability-checking -I %t/test2/ -emit-sil %S/Inputs/import_with_opaque_type_erasure.swift | %FileCheck %s --check-prefix CHECK-UNDERLYING-TYPE2
+
+// REQUIRES: swift_feature_OpaqueTypeErasure
 // CHECK-UNDERLYING-TYPE2-LABEL: s31import_with_opaque_type_erasure6erasedQrvg
 // CHECK-UNDERLYING-TYPE2: bb0(%0 : $*AnyP):
 // CHECK-UNDERLYING-TYPE2: function_ref @$s7erasure14testTypeErasedQryF : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <AnyP>

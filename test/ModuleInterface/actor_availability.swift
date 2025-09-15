@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-module-interfaces(%t/Library.swiftinterface, %t/Library.private.swiftinterface) %s -module-name Library -target %target-swift-abi-5.3-triple
+// RUN: %target-swift-emit-module-interfaces(%t/Library.swiftinterface, %t/Library.private.swiftinterface) %s -module-name Library -target %target-swift-5.3-abi-triple
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -module-name Library
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.private.swiftinterface) -module-name Library
 // RUN: %FileCheck %s --check-prefixes=CHECK,CHECK-PUBLIC < %t/Library.swiftinterface
@@ -34,6 +34,20 @@ public actor ActorWithExplicitAvailability {
 public actor UnavailableActor {
   // CHECK:      @available(iOS 13.0, tvOS 13.0, watchOS 6.0, *)
   // CHECK-NEXT: @available(macOS, unavailable, introduced: 10.15)
+  // CHECK-NEXT: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
+  // CHECK-NEXT:   get
+  // CHECK-NEXT: }
+}
+
+// CHECK:      @_hasMissingDesignatedInitializers @available(*, deprecated, message: "Will be unavailable Swift 6")
+// CHECK-NEXT: @available(swift, obsoleted: 6)
+// CHECK-NEXT: public actor DeprecatedAndObsoleteInSwift6Actor {
+@available(*, deprecated, message: "Will be unavailable Swift 6")
+@available(swift, obsoleted: 6)
+public actor DeprecatedAndObsoleteInSwift6Actor {
+  // CHECK:      @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+  // CHECK-NEXT: @available(*, deprecated, message: "Will be unavailable Swift 6")
+  // CHECK-NEXT: @available(swift, obsoleted: 6)
   // CHECK-NEXT: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
   // CHECK-NEXT:   get
   // CHECK-NEXT: }

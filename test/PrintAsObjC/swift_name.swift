@@ -11,7 +11,7 @@
 // FIXME: END -enable-source-import hackaround
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/swift_name.h -emit-module -o %t %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/swift_name.h -parse-as-library %t/swift_name.swiftmodule -typecheck -emit-objc-header-path %t/swift_name.h
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/swift_name.h -parse-as-library %t/swift_name.swiftmodule -typecheck -verify -emit-objc-header-path %t/swift_name.h
 
 // RUN: %FileCheck %s < %t/swift_name.h
 // RUN: %check-in-clang %t/swift_name.h

@@ -18,7 +18,6 @@
 
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Availability.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -26,6 +25,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TBDGenRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
@@ -88,15 +88,18 @@ void TBDGenVisitor::addSymbolInternal(StringRef name, EncodeKind kind,
 
 static std::vector<OriginallyDefinedInAttr::ActiveVersion>
 getAllMovedPlatformVersions(Decl *D) {
+  StringRef Name = D->getDeclContext()->getParentModule()->getName().str();
+
   std::vector<OriginallyDefinedInAttr::ActiveVersion> Results;
   for (auto *attr: D->getAttrs()) {
     if (auto *ODA = dyn_cast<OriginallyDefinedInAttr>(attr)) {
       auto Active = ODA->isActivePlatform(D->getASTContext());
-      if (Active.has_value()) {
+      if (Active.has_value() && Active->LinkerModuleName != Name) {
         Results.push_back(*Active);
       }
     }
   }
+
   return Results;
 }
 
@@ -242,6 +245,8 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver,
   switch(Ver.Platform) {
   case swift::PlatformKind::none:
     llvm_unreachable("cannot find platform kind");
+  case swift::PlatformKind::FreeBSD:
+    llvm_unreachable("not used for this platform");
   case swift::PlatformKind::OpenBSD:
     llvm_unreachable("not used for this platform");
   case swift::PlatformKind::Windows:
@@ -324,16 +329,16 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(
     if (*IntroVer >= Ver.Version)
       continue;
     auto PlatformNumber = getLinkerPlatformId(Ver, Ctx);
-    auto It = previousInstallNameMap->find(Ver.ModuleName.str());
+    auto It = previousInstallNameMap->find(Ver.LinkerModuleName.str());
     if (It == previousInstallNameMap->end()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
+                         Ver.LinkerModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     auto InstallName = It->second.getInstallName(PlatformNumber);
     if (InstallName.empty()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
+                         Ver.LinkerModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     llvm::SmallString<64> Buffer;
@@ -454,7 +459,7 @@ void TBDGenVisitor::addFunction(StringRef name, SILDeclRef declRef) {
 }
 
 void TBDGenVisitor::addGlobalVar(VarDecl *VD) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(VD->getASTContext());
   addSymbol(mangler.mangleEntity(VD), SymbolSource::forGlobal(VD),
             SymbolFlags::Data);
 }
@@ -484,7 +489,7 @@ void TBDGenVisitor::addObjCMethod(AbstractFunctionDecl *AFD) {
 
 void TBDGenVisitor::addProtocolWitnessThunk(RootProtocolConformance *C,
                                             ValueDecl *requirementDecl) {
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(requirementDecl->getASTContext());
 
   std::string decorated = Mangler.mangleWitnessThunk(C, requirementDecl);
   // FIXME: We should have a SILDeclRef SymbolSource for this.
@@ -496,6 +501,11 @@ void TBDGenVisitor::addProtocolWitnessThunk(RootProtocolConformance *C,
       if (AFD->hasAsync())
         addSymbol(decorated + "Tu", SymbolSource::forUnknown(),
                   SymbolFlags::Text);
+    auto *accessor = dyn_cast<AccessorDecl>(PWT);
+    if (accessor &&
+        requiresFeatureCoroutineAccessors(accessor->getAccessorKind()))
+      addSymbol(decorated + "Twc", SymbolSource::forUnknown(),
+                SymbolFlags::Text);
   }
 }
 
@@ -700,6 +710,9 @@ public:
     apigen::APIAvailability availability;
     auto access = apigen::APIAccess::Public;
     if (decl) {
+      if (!shouldRecordDecl(decl))
+        return;
+
       availability = getAvailability(decl);
       if (isSPI(decl))
         access = apigen::APIAccess::Private;
@@ -725,6 +738,9 @@ public:
     auto access = apigen::APIAccess::Public;
     auto decl = method.hasDecl() ? method.getDecl() : nullptr;
     if (decl) {
+      if (!shouldRecordDecl(decl))
+        return;
+
       availability = getAvailability(decl);
       if (decl->getDescriptiveKind() == DescriptiveDeclKind::ClassMethod)
         isInstanceMethod = false;
@@ -744,7 +760,7 @@ public:
   }
 
 private:
-  apigen::APILoc getAPILocForDecl(const Decl *decl) {
+  apigen::APILoc getAPILocForDecl(const Decl *decl) const {
     if (!decl)
       return defaultLoc;
 
@@ -760,6 +776,15 @@ private:
     return apigen::APILoc(std::string(displayName), line, col);
   }
 
+  bool shouldRecordDecl(const Decl *decl) const {
+    // We cannot reason about API access for Clang declarations from header
+    // files as we don't know the header group. API records for header
+    // declarations should be deferred to Clang tools.
+    if (getAPILocForDecl(decl).getFilename().ends_with_insensitive(".h"))
+      return false;
+    return true;
+  }
+
   /// Follow the naming schema that IRGen uses for Categories (see
   /// ClassDataBuilder).
   using CategoryNameKey = std::pair<const ClassDecl *, const ModuleDecl *>;
@@ -770,20 +795,18 @@ private:
     std::string introduced, obsoleted;
     bool hasFallbackUnavailability = false;
     auto platform = targetPlatform(module->getASTContext().LangOpts);
-    for (auto *attr : decl->getAttrs()) {
-      if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
-        if (ava->Platform == PlatformKind::none) {
-          hasFallbackUnavailability = ava->isUnconditionallyUnavailable();
-          continue;
-        }
-        if (ava->Platform != platform)
-          continue;
-        unavailable = ava->isUnconditionallyUnavailable();
-        if (ava->Introduced)
-          introduced = ava->Introduced->getAsString();
-        if (ava->Obsoleted)
-          obsoleted = ava->Obsoleted->getAsString();
+    for (auto attr : decl->getSemanticAvailableAttrs()) {
+      if (!attr.isPlatformSpecific()) {
+        hasFallbackUnavailability = attr.isUnconditionallyUnavailable();
+        continue;
       }
+      if (attr.getPlatform() != platform)
+        continue;
+      unavailable = attr.isUnconditionallyUnavailable();
+      if (attr.getIntroduced())
+        introduced = attr.getIntroduced()->getAsString();
+      if (attr.getObsoleted())
+        obsoleted = attr.getObsoleted()->getAsString();
     }
     return {introduced, obsoleted,
             unavailable.value_or(hasFallbackUnavailability)};
@@ -803,6 +826,9 @@ private:
   }
 
   apigen::ObjCInterfaceRecord *addOrGetObjCInterface(const ClassDecl *decl) {
+    if (!shouldRecordDecl(decl))
+      return nullptr;
+
     auto entry = classMap.find(decl);
     if (entry != classMap.end())
       return entry->second;
@@ -841,6 +867,9 @@ private:
   }
 
   apigen::ObjCCategoryRecord *addOrGetObjCCategory(const ExtensionDecl *decl) {
+    if (!shouldRecordDecl(decl))
+      return nullptr;
+
     auto entry = categoryMap.find(decl);
     if (entry != categoryMap.end())
       return entry->second;

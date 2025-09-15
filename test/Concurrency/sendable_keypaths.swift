@@ -1,7 +1,8 @@
 // RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -strict-concurrency=complete -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
+// REQUIRES: swift_feature_InferSendableFromCaptures
 
 class NonSendable : Hashable {
   var data: Int
@@ -21,7 +22,7 @@ class NonSendable : Hashable {
 final class CondSendable<T> : Hashable {
   init(_: T) {}
   init(_: Int) {}
-  init(_: T, other: T = 42) {}
+  init<U>(_: T, other: U = 42) {}
   init<Q>(_: [Q] = []) {}
 
   static func == (x: CondSendable, y: CondSendable) -> Bool { false }
@@ -66,7 +67,7 @@ do {
   test(nonSendableKP) // expected-warning {{type 'KeyPath<K, Bool>' does not conform to the 'Sendable' protocol}}
 }
 
-// Test using sendable and non-sendable key paths.
+// Test using sendable and non-Sendable key paths.
 do {
   class V {
     var i: Int = 0
@@ -96,13 +97,13 @@ do {
   testSendableFn(v: v, \.[42]) // Ok
 
   testSendableKP(v: v, \.[NonSendable()]) // expected-warning {{type 'KeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
-  testSendableFn(v: v, \.[NonSendable()]) // expected-warning {{converting non-sendable function value to '@Sendable (V) -> Int' may introduce data races}}
+  testSendableFn(v: v, \.[NonSendable()]) // expected-warning {{converting non-Sendable function value to '@Sendable (V) -> Int' may introduce data races}}
 
   testNonSendableKP(v: v, \.[NonSendable()]) // Ok
   testNonSendableFn(v: v, \.[NonSendable()]) // Ok
 
   let _: @Sendable (V) -> Int = \.[NonSendable()]
-  // expected-warning@-1 {{converting non-sendable function value to '@Sendable (V) -> Int' may introduce data races}}
+  // expected-warning@-1 {{converting non-Sendable function value to '@Sendable (V) -> Int' may introduce data races}}
 
   let _: KeyPath<V, Int> & Sendable = \.[42, CondSendable(NonSendable(data: [1, 2, 3]))]
   // expected-warning@-1 {{type 'ReferenceWritableKeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
@@ -115,7 +116,7 @@ do {
   testSendableKP(v: v, \.[42, CondSendable(NonSendable(data: [1, 2, 3]))])
   // expected-warning@-1 {{type 'ReferenceWritableKeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
   testSendableFn(v: v, \.[42, CondSendable(NonSendable(data: [1, 2, 3]))])
-  // expected-warning@-1 {{converting non-sendable function value to '@Sendable (V) -> Int' may introduce data races}}
+  // expected-warning@-1 {{converting non-Sendable function value to '@Sendable (V) -> Int' may introduce data races}}
   testSendableKP(v: v, \.[42, CondSendable(42)]) // Ok
 
   let nonSendable = NonSendable()
@@ -123,7 +124,7 @@ do {
   // expected-warning@-1 {{type 'ReferenceWritableKeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
 
   testSendableFn(v: v, \.[42, CondSendable(nonSendable)])
-  // expected-warning@-1 {{converting non-sendable function value to '@Sendable (V) -> Int' may introduce data races}}
+  // expected-warning@-1 {{converting non-Sendable function value to '@Sendable (V) -> Int' may introduce data races}}
 }
 
 // @dynamicMemberLookup with Sendable requirement
@@ -140,7 +141,7 @@ do {
   _ = Test(obj: "Hello").utf8.count // Ok
 }
 
-// Global actor isolated properties.
+// global-actor-isolated properties.
 func testGlobalActorIsolatedReferences() {
   @MainActor struct Isolated {
     var data: Int = 42
@@ -223,7 +224,7 @@ do {
 
   // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
   func test() -> KeyPath<String, Int> {
-    true ? kp() : kp() // expected-error {{type of expression is ambiguous without a type annotation}}
+    true ? kp() : kp() // expected-error {{failed to produce diagnostic for expression}}
   }
 
   func forward<T>(_ v: T) -> T { v }
@@ -248,7 +249,7 @@ do {
 
   // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
   func fnRet(cond: Bool) -> () -> Void {
-    cond ? Test.fn : Test.otherFn // expected-error {{type of expression is ambiguous without a type annotation}}
+    cond ? Test.fn : Test.otherFn // expected-error {{failed to produce diagnostic for expression}}
   }
 
   func forward<T>(_: T) -> T {
@@ -256,4 +257,23 @@ do {
 
   // TODO(rdar://125948508): This shouldn't be ambiguous (@Sendable version should be preferred)
   let _: () -> Void = forward(Test.fn) // expected-error {{conflicting arguments to generic parameter 'T' ('@Sendable () -> ()' vs. '() -> Void')}}
+}
+
+// https://github.com/swiftlang/swift/issues/77105
+do {
+  @dynamicMemberLookup
+  struct S<T> {
+    subscript<U>(dynamicMember keyPath: KeyPath<T, U> & Sendable) -> U {
+      fatalError()
+    }
+  }
+
+  struct Foo {
+    subscript<T>(bar bar: T) -> Int { 42 }
+  }
+
+  func test(s: S<Foo>) {
+    _ = s[bar: NonSendable()]
+    // expected-warning@-1 {{type 'KeyPath<Foo, Int>' does not conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
+  }
 }

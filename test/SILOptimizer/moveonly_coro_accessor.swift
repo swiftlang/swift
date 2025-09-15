@@ -1,9 +1,8 @@
-// RUN: %target-swift-emit-sil -module-name test -sil-verify-all -verify %s | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -module-name test -sil-verify-all -verify %s | %FileCheck %s --enable-var-scope
 
 @inline(never) func someFunction() {}
 
-@_moveOnly
-public struct File {
+public struct File: ~Copyable {
   var x = 0
   var associatedFiles: ListOfFiles = ListOfFiles()
 

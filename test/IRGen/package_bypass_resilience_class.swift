@@ -10,7 +10,16 @@
 // RUN: -emit-tbd -emit-tbd-path %t/libCore.tbd \
 // RUN: -Xfrontend -tbd-install_name=libCore.dylib -Xfrontend -validate-tbd-against-ir=all
 
-/// Build without -experimental-allow-non-resilient-access
+/// Build with -allow-non-resilient-access
+// RUN: %target-build-swift %t/Core.swift \
+// RUN: -module-name=Core -package-name Pkg \
+// RUN: -Xfrontend -allow-non-resilient-access \
+// RUN: -enable-library-evolution -O -wmo \
+// RUN: -emit-ir -o %t/Core2.ir \
+// RUN: -emit-tbd -emit-tbd-path %t/libCore2.tbd \
+// RUN: -Xfrontend -tbd-install_name=libCore2.dylib -Xfrontend -validate-tbd-against-ir=all
+
+/// Build without -allow-non-resilient-access
 // RUN: %target-build-swift %t/Core.swift \
 // RUN: -module-name=Core -package-name Pkg \
 // RUN: -enable-library-evolution -O -wmo \
@@ -19,7 +28,9 @@
 // RUN: -Xfrontend -tbd-install_name=libCoreRes.dylib -Xfrontend -validate-tbd-against-ir=all
 
 // RUN: %FileCheck %s --check-prefixes=CHECK-COMMON,CHECK-OPT < %t/Core.ir
+// RUN: %FileCheck %s --check-prefixes=CHECK-COMMON,CHECK-OPT < %t/Core2.ir
 // RUN: %FileCheck %s --check-prefixes=CHECK-TBD-COMMON,CHECK-TBD-OPT < %t/libCore.tbd
+// RUN: %FileCheck %s --check-prefixes=CHECK-TBD-COMMON,CHECK-TBD-OPT < %t/libCore2.tbd
 // RUN: %FileCheck %s --check-prefixes=CHECK-COMMON,CHECK-RES < %t/CoreRes.ir
 // RUN: %FileCheck %s --check-prefixes=CHECK-TBD-COMMON,CHECK-TBD-RES < %t/libCoreRes.tbd
 
@@ -35,7 +46,7 @@ final public class Pub {
   // method lookup function for Core.Pub
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3PubCMu"(ptr %0, ptr %1)
 
-  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3PubCfd"(ptr readnone returned swiftself %0)
+  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3PubCfd"(ptr readnone returned swiftself{{.*}} %0)
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc void @"$s4Core3PubCfD"(ptr swiftself %0)
 }
 
@@ -47,7 +58,7 @@ package class Foo {
   // CHECK-COMMON-DAG: define linkonce_odr hidden swiftcc void @"$s4Core3FooC02myB0AA3PubCSgvpACTk"
 
   // variable initialization expression of Core.Foo.myFoo
-  // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swiftcc {{i32|i64}} @"$s4Core3FooC02myB0AA3PubCSgvpfi"() #0 {
+  // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swiftcc{{.*}} {{i32|i64}} @"$s4Core3FooC02myB0AA3PubCSgvpfi"() #0 {
 
   // Core.Foo.myFoo.getter
   // CHECK-RES-DAG: define hidden {{.*}}swiftcc {{i32|i64}} @"$s4Core3FooC02myB0AA3PubCSgvg"(ptr swiftself %0)
@@ -86,7 +97,7 @@ package class Foo {
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc { ptr, ptr } @"$s4Core3FooC02myB0AA3PubCSgvMTj"
 
   // Core.Foo.deinit
-  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3FooCfd"(ptr readonly returned swiftself %0)
+  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3FooCfd"(ptr readonly returned swiftself{{.*}} %0)
 
   // Core.Foo.__deallocating_deinit
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc void @"$s4Core3FooCfD"(ptr swiftself %0)
@@ -96,7 +107,7 @@ package class Foo {
 
 final package class Bar {
   
-  // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swiftcc {{i32|i64}} @"$s4Core3BarC02myB0AA3PubCSgvpfi"()
+  // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swiftcc{{.*}} {{i32|i64}} @"$s4Core3BarC02myB0AA3PubCSgvpfi"()
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc {{i32|i64}} @"$s4Core3BarC02myB0AA3PubCSgvg"(ptr swiftself %0)
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc void @"$s4Core3BarC02myB0AA3PubCSgvs"({{i32|i64}} %0, ptr swiftself %1)
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc { ptr, ptr } @"$s4Core3BarC02myB0AA3PubCSgvM"
@@ -108,7 +119,7 @@ final package class Bar {
   // method lookup function for Core.Bar
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3BarCMu"(ptr %0, ptr %1)
 
-  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3BarCfd"(ptr readonly returned swiftself %0)
+  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3BarCfd"(ptr readonly returned swiftself{{.*}} %0)
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc void @"$s4Core3BarCfD"(ptr swiftself %0)
 
   package var myBar: Pub?

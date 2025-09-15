@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend %t/test.swift -I %t/Inputs -typecheck -enable-library-evolution -enable-experimental-cxx-interop -verify
 
 // REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 
 //--- Inputs/module.modulemap
 module ObjCxxModule {

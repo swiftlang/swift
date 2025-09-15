@@ -702,7 +702,7 @@ sil_witness_table hidden SingleConformance: PublicProtocol module nix {
 
 sil @closureIntArg : $@convention(thin) (InitVal) -> ()
 
-// CHECK-LABEL-LABEL: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK: convert_escape_to_noescape
 // CHECK: apply %{{.*}}() : $@noescape @callee_guaranteed () -> ()
 // CHECK: Incomplete callee list? : No

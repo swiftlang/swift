@@ -1,18 +1,21 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded %s -c -o %t/a.o
+// RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern %s -c -o %t/a.o
 
-// RUN: grep DEP\: %s | sed 's#// DEP\: ##' | sort > %t/allowed-dependencies.txt
+// RUN: if [[ %target-os =~ "wasi" ]]; then pattern="DEP\:\|DEP-WASM\:"; else pattern="DEP\:"; fi; grep "$pattern" %s | sed "s#// .*\: ##" | sort > %t/allowed-dependencies.txt
 
-// Linux/ELF doesn't use the "_" prefix in symbol mangling.
-// RUN: if [ %target-os == "linux-gnu" ]; then sed -E -i -e 's/^_(.*)$/\1/' %t/allowed-dependencies.txt; fi
+// Linux/ELF and Wasm don't use the "_" prefix in symbol mangling.
+// RUN: if [ %target-os == "linux-gnu" ] || [[ %target-os =~ "wasi" ]]; then sed -E -i -e 's/^_(.*)$/\1/' %t/allowed-dependencies.txt; fi
 
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.o | sort | tee %t/actual-dependencies.txt
 
 // Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
 // RUN: test -z "`comm -13 %t/allowed-dependencies.txt %t/actual-dependencies.txt`"
 
+// DEP-WASM: ___indirect_function_table
+// DEP-WASM: ___memory_base
 // DEP: ___stack_chk_fail
 // DEP: ___stack_chk_guard
+// DEP-WASM: ___stack_pointer
 // DEP: _arc4random_buf
 // DEP: _free
 // DEP: _memmove
@@ -22,16 +25,16 @@
 
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
 // RUN: %target-clang -x c -c %S/Inputs/linux-rng-support.c -o %t/linux-rng-support.o
-// RUN: %target-clang %t/a.o %t/print.o %t/linux-rng-support.o -o %t/a.out
+// RUN: %target-clang %target-clang-resource-dir-opt %t/a.o %t/print.o %t/linux-rng-support.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 
-// REQUIRES: rdar121923818
+// REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_Extern
 
 @_extern(c, "putchar")
 @discardableResult

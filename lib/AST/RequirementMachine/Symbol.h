@@ -117,6 +117,10 @@ public:
     /// generic parameter.
     Shape,
 
+    /// A pack element [element].(each T) where 'each T' is a type
+    /// parameter pack.
+    PackElement,
+
     //////
     ////// "Property-like" symbol kinds:
     //////
@@ -206,6 +210,8 @@ public:
 
   static Symbol forShape(RewriteContext &ctx);
 
+  static Symbol forPackElement(RewriteContext &Ctx);
+
   static Symbol forLayout(LayoutConstraint layout,
                           RewriteContext &ctx);
 
@@ -235,6 +241,8 @@ public:
   Symbol prependPrefixToConcreteSubstitutions(
       const MutableTerm &prefix,
       RewriteContext &ctx) const;
+
+  bool containsNameSymbols() const;
 
   void dump(llvm::raw_ostream &out) const;
 

@@ -12,7 +12,7 @@ design for the Swift to C++ interoperability layer.
 **NOTE:** This document does not go over the following Swift language features yet:
 
 * Closures
-* overriden methods/properties in classes
+* overridden methods/properties in classes
 * Existential types (any P)
 * Nested types
 * Operators
@@ -72,7 +72,7 @@ Swift functions that are callable from C++ are available in their corresponding 
 
 Fundamental primitive types have a C++ fundamental type that represents them in C++:
 
-|Swift Type    |C++ Type    |C Type (if different)    |    |target specifc    |
+|Swift Type    |C++ Type    |C Type (if different)    |    |target specific    |
 |---    |---    |---    |---    |---    |
 |Void (or no return)    |void    |    |    |    |
 |Int    |swift::Int    |ptrdiff_t    |long or long long (windows)    |YES    |
@@ -295,12 +295,12 @@ As an example, this structure renames its second `init` overload in C++ to expos
 
 ```swift
 // Swift module 'Weather'
-struct Celcius {
-  var temperatureInCelcius: Double
+struct Celsius {
+  var temperatureInCelsius: Double
 
   // FEEDBACK: could provide a constructor here?
   // NOTE: concern about encouraging people not to use labels
-  init(_ t: Double) { self.temperatureInCelcius = t }
+  init(_ t: Double) { self.temperatureInCelsius = t }
 
   // FEEDBACK: could the compiler construct the 'initFromFahrenheit' c++ name?
   @expose(c++, initFromFahrenheit)
@@ -315,8 +315,8 @@ Both initializers can then be used from C++:
 using namespace Weather;
 
 void makeSunnyDay() {
-  auto morningTemperature = Celcius::init(25);
-  auto noonTemperature    = Celcius::initFromFahrenheit(90);
+  auto morningTemperature = Celsius::init(25);
+  auto noonTemperature    = Celsius::initFromFahrenheit(90);
 }
 ```
 
@@ -558,7 +558,7 @@ public:
 
   using UpcType = swift::Tuple<swift::Int, swift::Int, swift::Int, swift::Int>;
 
-  // Extracts the associated valus from Barcode.upc enum case
+  // Extracts the associated values from Barcode.upc enum case
   UpcType getUpc() const;
 
   bool isQrCode() const;
@@ -698,7 +698,7 @@ public final class Bicycle: Vehicle {
 }
 ```
 
-Get a corresponding C++ class hierachy in C++:
+Get a corresponding C++ class hierarchy in C++:
 
 ```c++
 class Vehicle { ... };

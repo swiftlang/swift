@@ -55,7 +55,7 @@ func inoutToSharedConversions() {
 // Autoclosure
 func f1(f: @autoclosure () -> Int) { }
 func f2() -> Int { }
-f1(f: f2) // expected-error{{add () to forward @autoclosure parameter}}{{9-9=()}}
+f1(f: f2) // expected-error{{add () to forward '@autoclosure' parameter}}{{9-9=()}}
 f1(f: 5)
 
 // Ternary in closure
@@ -96,9 +96,12 @@ do {
   }  
   inSubcall = false
 
-  // This is a problem, but isn't clear what was intended.
-  var somethingElse = true { // expected-error {{unexpected '{' in declaration}}
-  }  
+  // These are a problems, but it's not clear what was intended.
+  var somethingElse = true {
+  // expected-error@-1 {{computed property must have an explicit type}}
+  // expected-error@-2 {{variable with getter/setter cannot have an initial value}}
+  }
+  var somethingElseWithTypeAnno: Bool = true {} // expected-error {{variable with getter/setter cannot have an initial value}}
   inSubcall = false
 
   var v2 : Bool = false
@@ -270,7 +273,7 @@ func someFunc(_ foo: ((String) -> String)?,
 
 func verify_NotAC_to_AC_failure(_ arg: () -> ()) {
   func takesAC(_ arg: @autoclosure () -> ()) {}
-  takesAC(arg) // expected-error {{add () to forward @autoclosure parameter}} {{14-14=()}}
+  takesAC(arg) // expected-error {{add () to forward '@autoclosure' parameter}} {{14-14=()}}
 }
 
 // https://github.com/apple/swift/issues/43681
@@ -353,7 +356,7 @@ var afterMessageCount : Int?
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(_ a : () -> ()) {}
 takeVoidVoidFn { () -> Void in
-  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int?'}} {{23-23=Int(}} {{33-33=)}}
+  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int'}} {{23-23=Int(}} {{33-33=)}}
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
@@ -386,7 +389,7 @@ func rdar21078316() {
 
 // <rdar://problem/20978044> QoI: Poor diagnostic when using an incorrect tuple element in a closure
 var numbers = [1, 2, 3]
-zip(numbers, numbers).filter { $0.2 > 1 }  // expected-error {{value of tuple type '(Int, Int)' has no member '2'}}
+zip(numbers, numbers).filter { $0.2 > 1 }  // expected-error {{value of tuple type 'Zip2Sequence<[Int], [Int]>.Element' (aka '(Int, Int)') has no member '2'}}
 
 
 
@@ -800,7 +803,6 @@ overloaded { print("hi"); print("bye") } // multiple expression closure without 
 // expected-error@-1 {{ambiguous use of 'overloaded'}}
 
 func not_overloaded(_ handler: () -> Int) {}
-// expected-note@-1 {{'not_overloaded' declared here}}
 
 not_overloaded { } // empty body
 // expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}
@@ -1153,8 +1155,10 @@ struct R_76250381<Result, Failure: Error> {
 func rdar77022842(argA: Bool? = nil, argB: Bool? = nil) {
   if let a = argA ?? false, if let b = argB ?? {
     // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'Bool'}}
-    // expected-error@-2 {{closure passed to parameter of type 'Bool?' that does not accept a closure}}
+    // expected-error@-2 {{cannot convert value of type 'Bool?' to expected argument type '(() -> ())?'}}
     // expected-error@-3 {{cannot convert value of type 'Void' to expected condition type 'Bool'}}
+    // expected-error@-4 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+    // expected-error@-5 {{'if' must have an unconditional 'else' to be used as expression}}
   } // expected-error {{expected '{' after 'if' condition}}
 }
 
@@ -1262,3 +1266,152 @@ do {
 
 // Currently legal.
 let _: () -> Int = { return fatalError() }
+
+// Make sure that `Void` assigned to closure result doesn't get eagerly propagated into the body
+do {
+  class C {
+    func f(_: Any) -> Int! { fatalError() }
+    static func f(_: Any) -> Int! { fatalError() }
+  }
+
+  class G<T> {
+    func g<U>(_ u: U, _: (U, T) -> ()) {}
+
+    func g<U: C>(_ u: U) {
+        g(u) { $0.f($1) } // expected-warning {{result of call to 'f' is unused}}
+    }
+  }
+}
+
+// Make sure that closure gets both Void? and Void attempted
+// otherwise it won't be possible to type-check the second closure.
+do {
+  struct Semaphore {
+    func signal() -> Int {}
+  }
+
+  func compute(_ completion: (Semaphore?) -> Void?) {}
+
+  func test() {
+    compute { $0?.signal() }
+    // expected-warning@-1 {{result of call to 'signal()' is unused}}
+
+    true
+      ? compute({ $0?.signal() }) // expected-warning {{result of call to 'signal()' is unused}}
+      : compute({
+           let sem = $0!
+           sem.signal() // expected-warning {{result of call to 'signal()' is unused}}
+        })
+  }
+}
+
+// rdar://143474313 - invalid error: member 'init(item:)' in 'Test.Item?' produces result of type 'Test.Item', but context expects 'Test.Item?'
+do {
+  struct List {
+    struct Item {
+    }
+
+    var items: [Item] = []
+  }
+
+  struct Test {
+    struct Item {
+      init(item: List.Item) {
+      }
+    }
+
+    let list: List
+
+    var items: [Test.Item] { .init(list.items.compactMap { .init(item: $0) }) } // Ok
+  }
+}
+
+// This should type check
+func rdar143338891() {
+  func takesAny(_: Any?) {}
+
+  class Test {
+    func test() {
+      _ = { [weak self] in takesAny(self) }
+    }
+  }
+}
+
+do {
+  struct V {
+    init(value: @autoclosure @escaping () -> any Hashable) { }
+    init(other: @autoclosure @escaping () -> String) { }
+  }
+
+  let _ = V(value: { [Int]() }) // expected-error {{add () to forward '@autoclosure' parameter}} {{31-31=()}}
+  let _ = V(other: { [Int]() }) // expected-error {{cannot convert value of type '[Int]' to closure result type 'String'}}
+}
+
+// https://github.com/swiftlang/swift/issues/81770
+do {
+  func test(_: Int) {}
+  func test(_: Int = 42, _: (Int) -> Void) {}
+
+  test {
+    if let _ = $0.missing { // expected-error {{value of type 'Int' has no member 'missing'}}
+    }
+  }
+
+  test {
+    if let _ = (($0.missing)) { // expected-error {{value of type 'Int' has no member 'missing'}}
+    }
+  }
+
+  test { // expected-error {{invalid conversion from throwing function of type '(Int) throws -> Void' to non-throwing function type '(Int) -> Void'}}
+    try $0.missing // expected-error {{value of type 'Int' has no member 'missing'}}
+  }
+}
+
+// Generic requirement failures associated with closure parameters should be diagnosed.
+protocol Input {
+  associatedtype Value
+  var value: Value { get }
+}
+
+protocol Idable {
+  associatedtype ID
+}
+
+struct TestInput<ItemID: Hashable, Value: Collection<ItemID>> : Input { // expected-note {{where 'Value' = 'Item.ID'}}
+  var value: Value
+}
+
+struct Container<I: Input> {
+  var data: (I) -> Void
+}
+
+func test_generic_closure_parameter_requirement_failure<Item: Idable>(
+  for itemType: Item.Type = Item.self,
+  _ payload: @escaping (_ itemID: Item.ID) -> Void
+) where Item.ID : Sendable {
+  Container(data: { (input: TestInput) in payload(input.value) })
+  // expected-error@-1 {{generic struct 'TestInput' requires that 'Item.ID' conform to 'Collection'}}
+}
+
+// Since implicit result implies `()` it should be allowed to be converted to e.g. `Void` and `Any`
+func test_implicit_result_conversions() {
+  func test_optional(_ x: Int) {
+    let _: Any? = {
+      switch x {
+      case 0:
+        return 1
+      default:
+        return
+      }
+    }()
+  }
+
+  func testAny(_: () -> Any) {}
+
+  testAny { } // Ok
+  testAny { return } // Ok
+  testAny {
+    _ = 42
+    return // Ok
+  }
+}

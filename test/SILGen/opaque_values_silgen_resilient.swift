@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-opaque-values -Xllvm -sil-full-demangle -enable-library-evolution %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-sil-opaque-values -Xllvm -sil-full-demangle -enable-library-evolution %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 
 // CHECK-LABEL: sil [ossa] @$s30opaque_values_silgen_resilient10OneOfTheseO4hash4intoys6HasherVz_tF : {{.*}} {

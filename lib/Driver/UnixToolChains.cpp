@@ -14,6 +14,7 @@
 
 #include "ToolChains.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -47,31 +48,6 @@ toolchains::GenericUnix::sanitizerRuntimeLibName(StringRef Sanitizer,
           this->getTriple().getArchName() +
           (this->getTriple().isAndroid() ? "-android" : "") + ".a")
       .str();
-}
-
-void
-toolchains::GenericUnix::addPluginArguments(const ArgList &Args,
-                                            ArgStringList &Arguments) const {
-  SmallString<64> pluginPath;
-  auto programPath = getDriver().getSwiftProgramPath();
-  CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
-      programPath, /*shared=*/true, pluginPath);
-
-  auto defaultPluginPath = pluginPath;
-  llvm::sys::path::append(defaultPluginPath, "host", "plugins");
-
-  // Default plugin path.
-  Arguments.push_back("-plugin-path");
-  Arguments.push_back(Args.MakeArgString(defaultPluginPath));
-
-  // Local plugin path.
-  llvm::sys::path::remove_filename(pluginPath); // Remove "swift"
-  llvm::sys::path::remove_filename(pluginPath); // Remove "lib"
-  llvm::sys::path::append(pluginPath, "local", "lib");
-  llvm::sys::path::append(pluginPath, "swift");
-  llvm::sys::path::append(pluginPath, "host", "plugins");
-  Arguments.push_back("-plugin-path");
-  Arguments.push_back(Args.MakeArgString(pluginPath));
 }
 
 ToolChain::InvocationInfo
@@ -110,51 +86,9 @@ ToolChain::InvocationInfo toolchains::GenericUnix::constructInvocation(
 
   return II;
 }
-// Amazon Linux 2023 requires lld as the default linker.
-bool isAmazonLinux2023Host() {
-      std::ifstream file("/etc/os-release");
-      std::string line;
-
-      while (std::getline(file, line)) {
-        if (line.substr(0, 12) == "PRETTY_NAME=") {
-          if (line.substr(12) == "\"Amazon Linux 2023\"") {
-            file.close();
-            return true;
-          }
-        }
-      }
-      return false;
-    }
 
 std::string toolchains::GenericUnix::getDefaultLinker() const {
-  if (getTriple().isAndroid() || isAmazonLinux2023Host()
-      || (getTriple().isMusl()
-          && getTriple().getVendor() == llvm::Triple::Swift))
-    return "lld";
-
-  switch (getTriple().getArch()) {
-  case llvm::Triple::arm:
-  case llvm::Triple::aarch64:
-  case llvm::Triple::aarch64_32:
-  case llvm::Triple::armeb:
-  case llvm::Triple::thumb:
-  case llvm::Triple::thumbeb:
-    // BFD linker has issues wrt relocation of the protocol conformance
-    // section on these targets, it also generates COPY relocations for
-    // final executables, as such, unless specified, we default to gold
-    // linker.
-    return "gold";
-  case llvm::Triple::x86:
-  case llvm::Triple::x86_64:
-  case llvm::Triple::ppc64:
-  case llvm::Triple::ppc64le:
-  case llvm::Triple::systemz:
-    // BFD linker has issues wrt relocations against protected symbols.
-    return "gold";
-  default:
-    // Otherwise, use the default BFD linker.
-    return "";
-  }
+  return "";
 }
 
 bool toolchains::GenericUnix::addRuntimeRPath(const llvm::Triple &T,
@@ -235,6 +169,15 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
 #endif
   }
 
+  if (tripleBTCFIByDefaultInOpenBSD(getTriple())) {
+#ifndef SWIFT_OPENBSD_BTCFI
+    Arguments.push_back("-Xlinker");
+    Arguments.push_back("-z");
+    Arguments.push_back("-Xlinker");
+    Arguments.push_back("nobtcfi");
+#endif
+  }
+
   // Configure the toolchain.
   if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
@@ -290,11 +233,13 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   getResourceDirPath(SharedResourceDirPath, context.Args,
                      /*Shared=*/!(staticExecutable || staticStdlib));
 
-  SmallString<128> swiftrtPath = SharedResourceDirPath;
-  llvm::sys::path::append(swiftrtPath,
-                          swift::getMajorArchitectureName(getTriple()));
-  llvm::sys::path::append(swiftrtPath, "swiftrt.o");
-  Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+  if (!context.Args.hasArg(options::OPT_nostartfiles)) {
+    SmallString<128> swiftrtPath = SharedResourceDirPath;
+    llvm::sys::path::append(swiftrtPath,
+                            swift::getMajorArchitectureName(getTriple()));
+    llvm::sys::path::append(swiftrtPath, "swiftrt.o");
+    Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+  }
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
@@ -368,13 +313,6 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
     }
   }
 
-  // Link against the desired C++ standard library.
-  if (const Arg *A =
-          context.Args.getLastArg(options::OPT_experimental_cxx_stdlib)) {
-    Arguments.push_back(
-        context.Args.MakeArgString(Twine("-stdlib=") + A->getValue()));
-  }
-
   // Explicitly pass the target to the linker
   Arguments.push_back(
       context.Args.MakeArgString("--target=" + getTriple().str()));
@@ -396,10 +334,9 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
     SmallString<128> LibProfile(SharedResourceDirPath);
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
     llvm::sys::path::append(LibProfile, "clang", "lib");
-
-    llvm::sys::path::append(LibProfile, getTriple().getOSName(),
-                            Twine("libclang_rt.profile-") +
-                                getTriple().getArchName() + ".a");
+    llvm::sys::path::append(
+        LibProfile, getUnversionedTriple(getTriple()).getOSName(),
+        Twine("libclang_rt.profile-") + getTriple().getArchName() + ".a");
     Arguments.push_back(context.Args.MakeArgString(LibProfile));
     Arguments.push_back(context.Args.MakeArgString(
         Twine("-u", llvm::getInstrProfRuntimeHookVarName())));

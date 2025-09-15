@@ -219,6 +219,11 @@ public:
     assert(!EntitiesStack.empty());
     TextEntity Entity = std::move(EntitiesStack.back());
     EntitiesStack.pop_back();
+
+    // We only care about API for documentation purposes.
+    if (!ABIRoleInfo(D).providesAPI())
+      return;
+
     unsigned EndOffset = OS.tell();
     Entity.Range.Length = EndOffset - Entity.Range.Offset;
     if (EntitiesStack.empty()) {
@@ -274,7 +279,6 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
   // substitution).
   unsigned TypeContextDepth = 0;
   SubstitutionMap SubMap;
-  ModuleDecl *M = nullptr;
   Type BaseType;
   if (SynthesizedTarget) {
     BaseType = SynthesizedTarget.getBaseNominal()->getDeclaredInterfaceType();
@@ -284,8 +288,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
         DC = cast<ExtensionDecl>(D)->getExtendedNominal();
       else
         DC = D->getInnermostDeclContext()->getInnermostTypeContext();
-      M = DC->getParentModule();
-      SubMap = BaseType->getContextSubstitutionMap(M, DC);
+      SubMap = BaseType->getContextSubstitutionMap(DC);
       TypeContextDepth = SubMap.getGenericSignature().getNextDepth();
     }
   }
@@ -300,9 +303,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
           return Type(type).subst(SubMap);
         return type;
       },
-      [&](CanType depType, Type substType, ProtocolDecl *proto) {
-        return M->lookupConformance(substType, proto);
-      },
+      LookUpConformanceInModule(),
       SubstFlags::DesugarMemberTypes);
   };
 
@@ -430,7 +431,7 @@ static bool initDocEntityInfo(const Decl *D,
     SwiftLangSupport::printDisplayName(VD, NameOS);
     {
       llvm::raw_svector_ostream OS(Info.USR);
-      SwiftLangSupport::printUSR(VD, OS);
+      SwiftLangSupport::printUSR(VD, OS, /*distinguishSynthesizedDecls*/ true);
       if (SynthesizedTarget) {
         OS << SwiftLangSupport::SynthesizedUSRSeparator;
         SwiftLangSupport::printUSR(SynthesizedTargetNTD, OS);
@@ -447,14 +448,11 @@ static bool initDocEntityInfo(const Decl *D,
     SwiftLangSupport::printUSR((const ValueDecl*)DefaultImplementationOf, OS);
   }
 
-  Info.IsUnavailable = AvailableAttr::isUnavailable(D);
-  Info.IsDeprecated = D->getAttrs().getDeprecated(D->getASTContext()) != nullptr;
+  Info.IsUnavailable = D->isUnavailable();
+  Info.IsDeprecated = D->isDeprecated();
   Info.IsOptional = D->getAttrs().hasAttribute<OptionalAttr>();
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    Info.IsAsync = AFD->hasAsync();
-  } else if (auto *Storage = dyn_cast<AbstractStorageDecl>(D)) {
-    if (auto *Getter = Storage->getAccessor(AccessorKind::Get))
-      Info.IsAsync = Getter->hasAsync();
+  if (auto *valueDecl = dyn_cast<ValueDecl>(D)) {
+    Info.IsAsync = valueDecl->isAsync();
   }
 
   if (!IsRef) {
@@ -655,18 +653,17 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
   }
 }
 
-static ArrayRef<const DeclAttribute*>
-getDeclAttributes(const Decl *D, std::vector<const DeclAttribute*> &Scratch) {
-  for (auto Attr : D->getAttrs()) {
+static ArrayRef<SemanticAvailableAttr>
+getAvailableAttrs(const Decl *D, std::vector<SemanticAvailableAttr> &Scratch) {
+  for (auto Attr : D->getSemanticAvailableAttrs()) {
     Scratch.push_back(Attr);
   }
+  // FIXME: [availability] Special-casing enums and deprecation here is weird.
   // For enum elements, inherit their parent enum decls' deprecated attributes.
   if (auto *DE = dyn_cast<EnumElementDecl>(D)) {
-    for (auto Attr : DE->getParentEnum()->getAttrs()) {
-      if (auto Avail = dyn_cast<AvailableAttr>(Attr)) {
-        if (Avail->Deprecated || Avail->isUnconditionallyDeprecated()) {
-          Scratch.push_back(Attr);
-        }
+    for (auto Attr : DE->getParentEnum()->getSemanticAvailableAttrs()) {
+      if (Attr.getDeprecated() || Attr.isUnconditionallyDeprecated()) {
+        Scratch.push_back(Attr);
       }
     }
   }
@@ -675,10 +672,8 @@ getDeclAttributes(const Decl *D, std::vector<const DeclAttribute*> &Scratch) {
 }
 
 // Only reports @available.
-// FIXME: Handle all attributes.
-static void reportAttributes(ASTContext &Ctx,
-                             const Decl *D,
-                             DocInfoConsumer &Consumer) {
+static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
+                                         DocInfoConsumer &Consumer) {
   static UIdent AvailableAttrKind("source.lang.swift.attribute.availability");
   static UIdent PlatformIOS("source.availability.platform.ios");
   static UIdent PlatformMacCatalyst("source.availability.platform.maccatalyst");
@@ -690,63 +685,81 @@ static void reportAttributes(ASTContext &Ctx,
   static UIdent PlatformOSXAppExt("source.availability.platform.osx_app_extension");
   static UIdent PlatformtvOSAppExt("source.availability.platform.tvos_app_extension");
   static UIdent PlatformWatchOSAppExt("source.availability.platform.watchos_app_extension");
+  static UIdent PlatformFreeBSD("source.availability.platform.freebsd");
   static UIdent PlatformOpenBSD("source.availability.platform.openbsd");
   static UIdent PlatformWindows("source.availability.platform.windows");
-  std::vector<const DeclAttribute*> Scratch;
+  std::vector<SemanticAvailableAttr> Scratch;
 
-  for (auto Attr : getDeclAttributes(D, Scratch)) {
-    if (auto Av = dyn_cast<AvailableAttr>(Attr)) {
-      UIdent PlatformUID;
-      switch (Av->Platform) {
-      case PlatformKind::none:
-        PlatformUID = UIdent(); break;
-      case PlatformKind::iOS:
-        PlatformUID = PlatformIOS; break;
-      case PlatformKind::macCatalyst:
-        PlatformUID = PlatformMacCatalyst; break;
-      case PlatformKind::macOS:
-        PlatformUID = PlatformOSX; break;
-      case PlatformKind::tvOS:
-        PlatformUID = PlatformtvOS; break;
-      case PlatformKind::watchOS:
-        PlatformUID = PlatformWatchOS; break;
-      case PlatformKind::iOSApplicationExtension:
-        PlatformUID = PlatformIOSAppExt; break;
-      case PlatformKind::visionOS:
-        // FIXME: Formal platform support in SourceKit is needed.
-        PlatformUID = UIdent(); break;
-      case PlatformKind::macCatalystApplicationExtension:
-        PlatformUID = PlatformMacCatalystAppExt; break;
-      case PlatformKind::macOSApplicationExtension:
-        PlatformUID = PlatformOSXAppExt; break;
-      case PlatformKind::tvOSApplicationExtension:
-        PlatformUID = PlatformtvOSAppExt; break;
-      case PlatformKind::watchOSApplicationExtension:
-        PlatformUID = PlatformWatchOSAppExt; break;
-      case PlatformKind::visionOSApplicationExtension:
-        // FIXME: Formal platform support in SourceKit is needed.
-        PlatformUID = UIdent(); break;
-      case PlatformKind::OpenBSD:
-        PlatformUID = PlatformOpenBSD; break;
-      case PlatformKind::Windows:
-        PlatformUID = PlatformWindows; break;
-      }
-
-      AvailableAttrInfo Info;
-      Info.AttrKind = AvailableAttrKind;
-      Info.IsUnavailable = Av->isUnconditionallyUnavailable();
-      Info.IsDeprecated = Av->isUnconditionallyDeprecated();
-      Info.Platform = PlatformUID;
-      Info.Message = Av->Message;
-      if (Av->Introduced)
-        Info.Introduced = *Av->Introduced;
-      if (Av->Deprecated)
-        Info.Deprecated = *Av->Deprecated;
-      if (Av->Obsoleted)
-        Info.Obsoleted = *Av->Obsoleted;
-
-      Consumer.handleAvailableAttribute(Info);
+  for (auto Attr : getAvailableAttrs(D, Scratch)) {
+    UIdent PlatformUID;
+    switch (Attr.getPlatform()) {
+    case PlatformKind::none:
+      PlatformUID = UIdent();
+      break;
+    case PlatformKind::iOS:
+      PlatformUID = PlatformIOS;
+      break;
+    case PlatformKind::macCatalyst:
+      PlatformUID = PlatformMacCatalyst;
+      break;
+    case PlatformKind::macOS:
+      PlatformUID = PlatformOSX;
+      break;
+    case PlatformKind::tvOS:
+      PlatformUID = PlatformtvOS;
+      break;
+    case PlatformKind::watchOS:
+      PlatformUID = PlatformWatchOS;
+      break;
+    case PlatformKind::iOSApplicationExtension:
+      PlatformUID = PlatformIOSAppExt;
+      break;
+    case PlatformKind::visionOS:
+      // FIXME: Formal platform support in SourceKit is needed.
+      PlatformUID = UIdent();
+      break;
+    case PlatformKind::macCatalystApplicationExtension:
+      PlatformUID = PlatformMacCatalystAppExt;
+      break;
+    case PlatformKind::macOSApplicationExtension:
+      PlatformUID = PlatformOSXAppExt;
+      break;
+    case PlatformKind::tvOSApplicationExtension:
+      PlatformUID = PlatformtvOSAppExt;
+      break;
+    case PlatformKind::watchOSApplicationExtension:
+      PlatformUID = PlatformWatchOSAppExt;
+      break;
+    case PlatformKind::visionOSApplicationExtension:
+      // FIXME: Formal platform support in SourceKit is needed.
+      PlatformUID = UIdent();
+      break;
+    case PlatformKind::OpenBSD:
+      PlatformUID = PlatformOpenBSD;
+      break;
+    case PlatformKind::FreeBSD:
+      PlatformUID = PlatformFreeBSD;
+      break;
+    case PlatformKind::Windows:
+      PlatformUID = PlatformWindows;
+      break;
     }
+    // FIXME: [availability] Handle other availability domains?
+
+    AvailableAttrInfo Info;
+    Info.AttrKind = AvailableAttrKind;
+    Info.IsUnavailable = Attr.isUnconditionallyUnavailable();
+    Info.IsDeprecated = Attr.isUnconditionallyDeprecated();
+    Info.Platform = PlatformUID;
+    Info.Message = Attr.getMessage();
+    if (Attr.getIntroduced())
+      Info.Introduced = Attr.getIntroduced().value();
+    if (Attr.getDeprecated())
+      Info.Deprecated = Attr.getDeprecated().value();
+    if (Attr.getObsoleted())
+      Info.Obsoleted = Attr.getObsoleted().value();
+
+    Consumer.handleAvailableAttribute(Info);
   }
 }
 
@@ -763,7 +776,7 @@ static void reportDocEntities(ASTContext &Ctx,
                                                 : TypeOrExtensionDecl(),
                   Consumer);
     reportDocEntities(Ctx, Entity.SubEntities, Consumer);
-    reportAttributes(Ctx, Entity.Dcl, Consumer);
+    reportAvailabilityAttributes(Ctx, Entity.Dcl, Consumer);
     Consumer.finishSourceEntity(EntInfo.Kind);
   }
 }
@@ -1048,7 +1061,7 @@ static void addParameterEntities(CompilerInstance &CI,
     auto SF = dyn_cast<SourceFile>(Unit);
     if (!SF)
       continue;
-    FuncWalker Walker(CI.getSourceMgr(), *SF->getBufferID(), FuncEnts);
+    FuncWalker Walker(CI.getSourceMgr(), SF->getBufferID(), FuncEnts);
     SF->walk(Walker);
   }
 }
@@ -1062,7 +1075,7 @@ static void reportSourceAnnotations(const SourceTextInfo &IFaceInfo,
       continue;
 
     SyntaxModelContext SyntaxContext(*SF);
-    DocSyntaxWalker SyntaxWalker(CI.getSourceMgr(), *SF->getBufferID(),
+    DocSyntaxWalker SyntaxWalker(CI.getSourceMgr(), SF->getBufferID(),
                                  IFaceInfo.References, Consumer);
     SyntaxContext.walk(SyntaxWalker);
     SyntaxWalker.finished();
@@ -1089,7 +1102,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(OS);
 
-  printModuleInterface(M, std::nullopt, TraversalOptions, Printer, Options,
+  printModuleInterface(M, /*GroupNames*/ {}, TraversalOptions, Printer, Options,
                        true);
 
   Info.Text = std::string(OS.str());
@@ -1194,21 +1207,24 @@ public:
     return true;
   }
 
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type Ty,
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type Ty,
                           ReferenceMetaData Data) override {
     if (Data.isImplicit || !Range.isValid())
       return true;
     // Ignore things that don't come from this buffer.
-    if (!SM.getRangeForBuffer(BufferID).contains(Range.getStart()))
+    if (!SM.getRangeForBuffer(BufferID).contains(Range.Start))
       return true;
 
-    unsigned StartOffset = getOffset(Range.getStart());
-    References.emplace_back(D, StartOffset, Range.getByteLength(), Ty);
+    CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
+        D->getASTContext().SourceMgr, Range);
+
+    unsigned StartOffset = getOffset(CharRange.getStart());
+    References.emplace_back(D, StartOffset, CharRange.getByteLength(), Ty);
     return true;
   }
 
-  bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+  bool visitSubscriptReference(ValueDecl *D, SourceRange Range,
                                ReferenceMetaData Data,
                                bool IsOpenBracket) override {
     // Treat both open and close brackets equally
@@ -1409,7 +1425,8 @@ SwiftLangSupport::findRenameRanges(llvm::MemoryBuffer *InputBuf,
 
 void SwiftLangSupport::findLocalRenameRanges(
     StringRef Filename, unsigned Line, unsigned Column, unsigned Length,
-    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+    ArrayRef<const char *> Args, bool CancelOnSubsequentRequest,
+    SourceKitCancellationToken CancellationToken,
     CategorizedRenameRangesReceiver Receiver) {
   using ResultType = CancellableResult<std::vector<CategorizedRenameRanges>>;
   std::string Error;
@@ -1432,7 +1449,7 @@ void SwiftLangSupport::findLocalRenameRanges(
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &SF = AstUnit->getPrimarySourceFile();
-      swift::ide::RangeConfig Range{*SF.getBufferID(), Line, Column, Length};
+      swift::ide::RangeConfig Range{SF.getBufferID(), Line, Column, Length};
       SourceManager &SM = SF.getASTContext().SourceMgr;
       auto SyntacticRenameRanges =
           swift::ide::findLocalRenameRanges(&SF, Range);
@@ -1456,8 +1473,8 @@ void SwiftLangSupport::findLocalRenameRanges(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invok, ASTConsumer, &OncePerASTToken,
-                                   CancellationToken,
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  getASTManager()->processASTAsync(Invok, ASTConsumer, Once, CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }
 
@@ -1485,7 +1502,7 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
   unsigned BufferID = ParseCI.getInputBufferIDs().back();
   for (auto Unit : ParseCI.getMainModule()->getFiles()) {
     if (auto Current = dyn_cast<SourceFile>(Unit)) {
-      if (Current->getBufferID().value() == BufferID) {
+      if (Current->getBufferID() == BufferID) {
         SF = Current;
         break;
       }

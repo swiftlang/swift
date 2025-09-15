@@ -12,7 +12,7 @@
 
 import SIL
 
-extension CondBranchInst : OnoneSimplifyable {
+extension CondBranchInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     tryConstantFold(context)
   }

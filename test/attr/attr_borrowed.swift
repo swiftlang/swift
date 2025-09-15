@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
 
@@ -11,7 +11,7 @@ func foo() -> String {}
 var string = ""
 
 @objc protocol P {
-  @_borrowed // expected-error {{property cannot be '@_borrowed' if it is an @objc protocol requirement}}
+  @_borrowed // expected-error {{property cannot be '@_borrowed' if it is an '@objc' protocol requirement}}
   var title: String { get }
 }
 

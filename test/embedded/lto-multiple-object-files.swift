@@ -21,6 +21,7 @@
 // ASan cannot work in ("Interceptors are not working, AddressSanitizer is
 // loaded too late").
 // REQUIRES: no_asan
+// REQUIRES: swift_feature_Embedded
 
 // BEGIN MyFile1.swift
 

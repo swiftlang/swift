@@ -47,6 +47,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILCloner.h"
@@ -402,8 +403,9 @@ computeNewArgInterfaceTypes(SILFunction *f, IndicesSet &promotableIndices,
     } else if (paramTL.isTrivial()) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
-      convention = param.isGuaranteed() ? ParameterConvention::Direct_Guaranteed
-                                        : ParameterConvention::Direct_Owned;
+      convention = param.isGuaranteedInCallee()
+                       ? ParameterConvention::Direct_Guaranteed
+                       : ParameterConvention::Direct_Owned;
     }
     outTys.push_back(SILParameterInfo(paramBoxedTy.getASTType(), convention,
                                       param.getOptions()));
@@ -414,7 +416,7 @@ static std::string getSpecializedName(SILFunction *f,
                                       SerializedKind_t serialized,
                                       IndicesSet &promotableIndices) {
   auto p = Demangle::SpecializationPass::CapturePromotion;
-  Mangle::FunctionSignatureSpecializationMangler mangler(p, serialized, f);
+  Mangle::FunctionSignatureSpecializationMangler mangler(f->getASTContext(), p, serialized, f);
   auto fnConv = f->getConventions();
 
   for (unsigned argIdx = 0, endIdx = fnConv.getNumSILArguments();
@@ -1069,14 +1071,9 @@ public:
   ALWAYS_NON_ESCAPING_INST(StrongRelease)
   ALWAYS_NON_ESCAPING_INST(DestroyValue)
   ALWAYS_NON_ESCAPING_INST(EndBorrow)
+  ALWAYS_NON_ESCAPING_INST(DeallocBox)
+  ALWAYS_NON_ESCAPING_INST(EndAccess)
 #undef ALWAYS_NON_ESCAPING_INST
-
-  bool visitDeallocBoxInst(DeallocBoxInst *dbi) {
-    markCurrentOpAsMutation();
-    return true;
-  }
-
-  bool visitEndAccessInst(EndAccessInst *) { return true; }
 
   bool visitApplyInst(ApplyInst *ai) {
     auto argIndex = currentOp.get()->getOperandNumber() - 1;
@@ -1220,7 +1217,7 @@ static bool findEscapeOrMutationUses(Operand *op,
       if (isa<PartialApplyInst>(parent))
         return false;
       state.accumulatedEscapes.push_back(
-          &userMDI->getOperandRef(MarkDependenceInst::Value));
+          &userMDI->getOperandRef(MarkDependenceInst::Dependent));
       return true;
     }
   }

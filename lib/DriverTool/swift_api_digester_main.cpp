@@ -29,6 +29,7 @@
 #include "swift/APIDigester/ModuleAnalyzerNodes.h"
 #include "swift/APIDigester/ModuleDiagsConsumer.h"
 #include "swift/AST/DiagnosticsModuleDiffer.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -37,6 +38,7 @@
 #include "swift/Option/Options.h"
 #include "swift/Parse/ParseVersion.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
@@ -851,8 +853,8 @@ public:
       auto *LSub = dyn_cast<SDKNodeDeclSubscript>(Left);
       auto *RSub = dyn_cast<SDKNodeDeclSubscript>(Right);
       SequentialNodeMatcher(LSub->getChildren(), RSub->getChildren(), *this).match();
-#define ACCESSOR(ID)                                                          \
-      singleMatch(LSub->getAccessor(AccessorKind::ID),                        \
+#define ACCESSOR(ID, KEYWORD)                                                  \
+      singleMatch(LSub->getAccessor(AccessorKind::ID),                         \
                   RSub->getAccessor(AccessorKind::ID), *this);
 #include "swift/AST/AccessorKinds.def"
       break;
@@ -862,8 +864,8 @@ public:
       auto *RVar = dyn_cast<SDKNodeDeclVar>(Right);
       // Match property type.
       singleMatch(LVar->getType(), RVar->getType(), *this);
-#define ACCESSOR(ID)                                                          \
-      singleMatch(LVar->getAccessor(AccessorKind::ID),                        \
+#define ACCESSOR(ID, KEYWORD)                                                  \
+      singleMatch(LVar->getAccessor(AccessorKind::ID),                         \
                   RVar->getAccessor(AccessorKind::ID), *this);
 #include "swift/AST/AccessorKinds.def"
       break;
@@ -1913,6 +1915,7 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
                                 llvm::StringSet<> ProtocolReqAllowlist,
                                 bool DisableFailOnError,
                                 bool CompilerStyleDiags,
+                                bool ExplicitErrOnABIBreakage,
                                 StringRef SerializedDiagPath,
                                 StringRef BreakageAllowlistPath,
                                 bool DebugMapping) {
@@ -1935,11 +1938,16 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
     Ctx.getDiags().diagnose(SourceLoc(), diag::cannot_read_allowlist,
                             BreakageAllowlistPath);
   }
+  auto shouldDowngrade = false;
+  // If explicitly specified, avoid downgrading ABI breakage errors to warnings.
+  if (ExplicitErrOnABIBreakage) {
+    shouldDowngrade = false;
+  }
   auto pConsumer = std::make_unique<FilteringDiagnosticConsumer>(
       createDiagConsumer(*OS, FailOnError, DisableFailOnError, CompilerStyleDiags,
                          SerializedDiagPath),
       std::move(allowedBreakages),
-      /*DowngradeToWarning*/false);
+      /*DowngradeToWarning*/shouldDowngrade);
   SWIFT_DEFER { pConsumer->finishProcessing(); };
   Ctx.addDiagConsumer(*pConsumer);
   Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
@@ -1961,6 +1969,7 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
                                 llvm::StringSet<> ProtocolReqAllowlist,
                                 bool DisableFailOnError,
                                 bool CompilerStyleDiags,
+                                bool ExplicitErrOnABIBreakage,
                                 StringRef SerializedDiagPath,
                                 StringRef BreakageAllowlistPath,
                                 bool DebugMapping) {
@@ -1979,7 +1988,8 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
   RightCollector.deSerialize(RightPath);
   return diagnoseModuleChange(
       Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(), OutputPath,
-      std::move(ProtocolReqAllowlist), DisableFailOnError, CompilerStyleDiags, SerializedDiagPath,
+      std::move(ProtocolReqAllowlist), DisableFailOnError,
+      ExplicitErrOnABIBreakage, CompilerStyleDiags, SerializedDiagPath,
       BreakageAllowlistPath, DebugMapping);
 }
 
@@ -2239,6 +2249,7 @@ private:
   std::string OutputFile;
   std::string OutputDir;
   bool CompilerStyleDiags;
+  bool ExplicitErrOnABIBreakage;
   std::string SerializedDiagPath;
   std::string BaselineFilePath;
   std::string BaselineDirPath;
@@ -2251,11 +2262,12 @@ private:
   std::string BaselineSDK;
   std::string Triple;
   std::string SwiftVersion;
-  std::vector<std::string> CCSystemFrameworkPaths;
+  std::vector<std::string> SystemFrameworkPaths;
   std::vector<std::string> BaselineFrameworkPaths;
   std::vector<std::string> FrameworkPaths;
-  std::vector<std::string> BaselineModuleInputPaths;
-  std::vector<std::string> ModuleInputPaths;
+  std::vector<std::string> SystemModuleImportPaths;
+  std::vector<std::string> BaselineModuleImportPaths;
+  std::vector<std::string> ModuleImportPaths;
   std::string ModuleList;
   std::vector<std::string> ModuleNames;
   std::vector<std::string> PreferInterfaceForModules;
@@ -2338,6 +2350,7 @@ public:
     OutputFile = ParsedArgs.getLastArgValue(OPT_o).str();
     OutputDir = ParsedArgs.getLastArgValue(OPT_output_dir).str();
     CompilerStyleDiags = ParsedArgs.hasArg(OPT_compiler_style_diags);
+    ExplicitErrOnABIBreakage = ParsedArgs.hasArg(OPT_error_on_abi_breakage);
     SerializedDiagPath =
         ParsedArgs.getLastArgValue(OPT_serialize_diagnostics_path).str();
     BaselineFilePath = ParsedArgs.getLastArgValue(OPT_baseline_path).str();
@@ -2351,11 +2364,13 @@ public:
     BaselineSDK = ParsedArgs.getLastArgValue(OPT_bsdk).str();
     Triple = ParsedArgs.getLastArgValue(OPT_target).str();
     SwiftVersion = ParsedArgs.getLastArgValue(OPT_swift_version).str();
-    CCSystemFrameworkPaths = ParsedArgs.getAllArgValues(OPT_iframework);
+    SystemFrameworkPaths = ParsedArgs.getAllArgValues(OPT_Fsystem);
+    llvm::append_range(SystemFrameworkPaths, ParsedArgs.getAllArgValues(OPT_iframework));
     BaselineFrameworkPaths = ParsedArgs.getAllArgValues(OPT_BF);
     FrameworkPaths = ParsedArgs.getAllArgValues(OPT_F);
-    BaselineModuleInputPaths = ParsedArgs.getAllArgValues(OPT_BI);
-    ModuleInputPaths = ParsedArgs.getAllArgValues(OPT_I);
+    SystemModuleImportPaths = ParsedArgs.getAllArgValues(OPT_Isystem);
+    BaselineModuleImportPaths = ParsedArgs.getAllArgValues(OPT_BI);
+    ModuleImportPaths = ParsedArgs.getAllArgValues(OPT_I);
     ModuleList = ParsedArgs.getLastArgValue(OPT_module_list_file).str();
     ModuleNames = ParsedArgs.getAllArgValues(OPT_module);
     PreferInterfaceForModules =
@@ -2410,7 +2425,7 @@ public:
   }
 
   bool hasBaselineInput() {
-    return !BaselineModuleInputPaths.empty() ||
+    return !BaselineModuleImportPaths.empty() ||
            !BaselineFrameworkPaths.empty() || !BaselineSDK.empty();
   }
 
@@ -2442,8 +2457,6 @@ public:
     InitInvoke.getLangOptions().EnableObjCInterop =
         InitInvoke.getLangOptions().Target.isOSDarwin();
     InitInvoke.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
-    // Module recovery issue shouldn't bring down the tool.
-    InitInvoke.getLangOptions().AllowDeserializingImplementationOnly = true;
 
     if (!SwiftVersion.empty()) {
       using version::Version;
@@ -2464,22 +2477,31 @@ public:
     if (!ResourceDir.empty()) {
       InitInvoke.setRuntimeResourcePath(ResourceDir);
     }
-    std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
-    for (const auto &path : CCSystemFrameworkPaths) {
+    std::vector<SearchPathOptions::SearchPath> FramePaths;
+    for (const auto &path : SystemFrameworkPaths) {
       FramePaths.push_back({path, /*isSystem=*/true});
+    }
+    std::vector<SearchPathOptions::SearchPath> ImportPaths;
+    for (const auto &path : SystemModuleImportPaths) {
+      ImportPaths.push_back({path, /*isSystem=*/true});
     }
     if (IsBaseline) {
       for (const auto &path : BaselineFrameworkPaths) {
         FramePaths.push_back({path, /*isSystem=*/false});
       }
-      InitInvoke.setImportSearchPaths(BaselineModuleInputPaths);
+      for (const auto &path : BaselineModuleImportPaths) {
+        ImportPaths.push_back({path, /*isSystem=*/false});
+      }
     } else {
       for (const auto &path : FrameworkPaths) {
         FramePaths.push_back({path, /*isSystem=*/false});
       }
-      InitInvoke.setImportSearchPaths(ModuleInputPaths);
+      for (const auto &path : ModuleImportPaths) {
+        ImportPaths.push_back({path, /*isSystem=*/false});
+      }
     }
     InitInvoke.setFrameworkSearchPaths(FramePaths);
+    InitInvoke.setImportSearchPaths(ImportPaths);
     if (!ModuleList.empty()) {
       if (readFileLineByLine(ModuleList, Modules))
         exit(1);
@@ -2577,21 +2599,24 @@ public:
         return diagnoseModuleChange(
             SDKJsonPaths[0], SDKJsonPaths[1], OutputFile, CheckerOpts,
             std::move(protocolAllowlist), DisableFailOnError, CompilerStyleDiags,
-            SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
+            ExplicitErrOnABIBreakage, SerializedDiagPath,
+            BreakageAllowlistPath, DebugMapping);
       }
       case ComparisonInputMode::BaselineJson: {
         SDKContext Ctx(CheckerOpts);
         return diagnoseModuleChange(
             Ctx, getBaselineFromJson(Ctx), getSDKRoot(Ctx, false), OutputFile,
             std::move(protocolAllowlist), DisableFailOnError, CompilerStyleDiags,
-            SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
+            ExplicitErrOnABIBreakage, SerializedDiagPath, BreakageAllowlistPath,
+            DebugMapping);
       }
       case ComparisonInputMode::BothLoad: {
         SDKContext Ctx(CheckerOpts);
         return diagnoseModuleChange(
             Ctx, getSDKRoot(Ctx, true), getSDKRoot(Ctx, false), OutputFile,
             std::move(protocolAllowlist), DisableFailOnError, CompilerStyleDiags,
-            SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
+            ExplicitErrOnABIBreakage, SerializedDiagPath, BreakageAllowlistPath,
+            DebugMapping);
       }
       }
     }

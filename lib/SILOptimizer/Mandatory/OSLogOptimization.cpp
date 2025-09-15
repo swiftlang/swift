@@ -78,6 +78,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Demangler.h"
@@ -162,9 +163,9 @@ public:
 
     this->stringInitIntrinsic = callee;
 
-    MetatypeInst *stringMetatypeInst =
-        dyn_cast<MetatypeInst>(inst->getOperand(4)->getDefiningInstruction());
-    this->stringMetatype = stringMetatypeInst->getType();
+    auto stringMetatype = inst->getOperand(4)->getType();
+    assert(stringMetatype.isMetatype());
+    this->stringMetatype = stringMetatype;
   }
 
   bool isInitialized() { return stringInitIntrinsic != nullptr; }
@@ -517,8 +518,7 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
   // call returns a two-element tuple, where the first element is the newly
   // created array and the second element is a pointer to the internal storage
   // of the array.
-  SubstitutionMap subMap = arrayType->getContextSubstitutionMap(
-      module.getSwiftModule(), astContext.getArrayDecl());
+  SubstitutionMap subMap = arrayType->getContextSubstitutionMap();
   FunctionRefInst *arrayAllocateRef =
       builder.createFunctionRef(loc, arrayAllocateFun);
   ApplyInst *applyInst = builder.createApply(
@@ -682,8 +682,7 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
            "aggregate symbolic value's type and expected type do not match");
 
     VarDecl *propertyDecl = structDecl->getStoredProperties().front();
-    Type propertyType = expectedType->getTypeOfMember(
-        propertyDecl->getModuleContext(), propertyDecl);
+    Type propertyType = expectedType->getTypeOfMember(propertyDecl);
     SymbolicValue propertyVal = symVal.lookThroughSingleElementAggregates();
     SILValue newPropertySIL = emitCodeForSymbolicValue(
         propertyVal, propertyType, builder, loc, stringInfo);
@@ -939,6 +938,16 @@ static void substituteConstants(FoldState &foldState) {
   for (SILValue constantSILValue : foldState.getConstantSILValues()) {
     SymbolicValue constantSymbolicVal =
         evaluator.lookupConstValue(constantSILValue).value();
+    CanType instType = constantSILValue->getType().getASTType();
+
+    // If the SymbolicValue is a string but the instruction that is folded is
+    // not String typed, we are tracking a StaticString which is represented as
+    // a raw pointer. Skip folding StaticString as they are already efficiently
+    // represented.
+    if (constantSymbolicVal.getKind() == SymbolicValue::String &&
+        !instType->isString())
+      continue;
+
     // Make sure that the symbolic value tracked in the foldState is a constant.
     // In the case of ArraySymbolicValue, the array storage could be a non-constant
     // if some instruction in the array initialization sequence was not evaluated
@@ -977,7 +986,6 @@ static void substituteConstants(FoldState &foldState) {
 
     SILBuilderWithScope builder(insertionPoint);
     SILLocation loc = insertionPoint->getLoc();
-    CanType instType = constantSILValue->getType().getASTType();
     SILValue foldedSILVal = emitCodeForSymbolicValue(
         constantSymbolicVal, instType, builder, loc, foldState.stringInfo);
 
