@@ -458,6 +458,9 @@ extension ResultInfo {
     self.hasLoweredAddresses = hasLoweredAddresses
     self.options = bridged.options
   }
+  public var _bridged: BridgedResultInfo {
+    BridgedResultInfo(type.bridged, convention.bridged, options)
+  }
 }
 
 extension ResultConvention {
@@ -473,6 +476,17 @@ extension ResultConvention {
       case .GuaranteedAddress:   self = .guaranteedAddress
       default:
         fatalError("unsupported result convention")
+    }
+  }
+
+  var bridged: BridgedResultConvention {
+    switch self {
+    case .indirect: return .Indirect
+    case .owned: return .Owned
+    case .unowned: return .Unowned
+    case .unownedInnerPointer: return .UnownedInnerPointer
+    case .autoreleased: return .Autoreleased
+    case .pack: return .Pack
     }
   }
 }

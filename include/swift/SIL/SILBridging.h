@@ -119,6 +119,8 @@ struct BridgedResultInfo {
 
   BRIDGED_INLINE static BridgedResultConvention castToResultConvention(swift::ResultConvention convention);
   BRIDGED_INLINE BridgedResultInfo(swift::SILResultInfo resultInfo);
+  BridgedResultInfo(BridgedCanType type, BridgedResultConvention conv, uint8_t options)
+    : type(type), convention(conv), options(options) {}
   swift::SILResultInfo unbridged() const;
 };
 
