@@ -17,14 +17,17 @@ Person(name: "John", age: )
       key.name: "init(name: String, age: Int, profession: String)",
       key.parameters: [
         {
+          key.name: "name",
           key.nameoffset: 5,
           key.namelength: 12
         },
         {
+          key.name: "age",
           key.nameoffset: 19,
           key.namelength: 8
         },
         {
+          key.name: "job",
           key.nameoffset: 29,
           key.namelength: 18
         }

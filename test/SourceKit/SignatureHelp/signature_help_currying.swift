@@ -82,6 +82,7 @@ func testCurryMemberFull() {
       key.name: "add(_ self: Adder) -> (Int, Int) -> Int",
       key.parameters: [
         {
+          key.name: "self",
           key.nameoffset: 4,
           key.namelength: 13
         }
@@ -92,6 +93,7 @@ func testCurryMemberFull() {
       key.name: "add(_ self: Adder) -> (inout Int) -> ()",
       key.parameters: [
         {
+          key.name: "self",
           key.nameoffset: 4,
           key.namelength: 13
         }
@@ -102,6 +104,7 @@ func testCurryMemberFull() {
       key.name: "add(_ self: Adder) -> (AdditiveArithmetic, AdditiveArithmetic) -> AdditiveArithmetic",
       key.parameters: [
         {
+          key.name: "self",
           key.nameoffset: 4,
           key.namelength: 13
         }
@@ -112,6 +115,7 @@ func testCurryMemberFull() {
       key.name: "add(_ self: Adder) -> (Double?, Float, Int) -> Double",
       key.parameters: [
         {
+          key.name: "self",
           key.nameoffset: 4,
           key.namelength: 13
         }
@@ -122,6 +126,7 @@ func testCurryMemberFull() {
       key.name: "add(_ self: Adder) -> (Double, Float, Int) -> Double",
       key.parameters: [
         {
+          key.name: "self",
           key.nameoffset: 4,
           key.namelength: 13
         }
@@ -132,6 +137,7 @@ func testCurryMemberFull() {
       key.name: "add(_ self: Adder) -> (Double...) -> Double",
       key.parameters: [
         {
+          key.name: "self",
           key.nameoffset: 4,
           key.namelength: 13
         }
@@ -142,6 +148,7 @@ func testCurryMemberFull() {
       key.name: "add(_ self: Adder) -> (Int, Int, (Int, Int) throws -> Int) throws -> Int?",
       key.parameters: [
         {
+          key.name: "self",
           key.nameoffset: 4,
           key.namelength: 13
         }
@@ -152,6 +159,7 @@ func testCurryMemberFull() {
       key.name: "add(_ self: Adder) -> (Int) -> (Int) -> Int",
       key.parameters: [
         {
+          key.name: "self",
           key.nameoffset: 4,
           key.namelength: 13
         }
@@ -168,10 +176,12 @@ func testCurryMemberFull() {
       key.name: "(_ x: Int, to: Int) -> Int",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 1,
           key.namelength: 8
         },
         {
+          key.name: "y",
           key.nameoffset: 11,
           key.namelength: 7
         }
@@ -182,6 +192,7 @@ func testCurryMemberFull() {
       key.name: "(oneTo: inout Int)",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 1,
           key.namelength: 16
         }
@@ -192,10 +203,12 @@ func testCurryMemberFull() {
       key.name: "(_ x: AdditiveArithmetic, to: AdditiveArithmetic) -> AdditiveArithmetic",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 1,
           key.namelength: 23
         },
         {
+          key.name: "y",
           key.nameoffset: 26,
           key.namelength: 22
         }
@@ -206,14 +219,17 @@ func testCurryMemberFull() {
       key.name: "(first: Double!, second: Float, third: Int) -> Double",
       key.parameters: [
         {
+          key.name: "first",
           key.nameoffset: 1,
           key.namelength: 14
         },
         {
+          key.name: "second",
           key.nameoffset: 17,
           key.namelength: 13
         },
         {
+          key.name: "third",
           key.nameoffset: 32,
           key.namelength: 10
         }
@@ -224,14 +240,17 @@ func testCurryMemberFull() {
       key.name: "(arg1: Double, arg2: Float, arg3: Int) -> Double",
       key.parameters: [
         {
+          key.name: "param1",
           key.nameoffset: 1,
           key.namelength: 12
         },
         {
+          key.name: "arg2",
           key.nameoffset: 15,
           key.namelength: 11
         },
         {
+          key.name: "param3",
           key.nameoffset: 28,
           key.namelength: 9
         }
@@ -242,6 +261,7 @@ func testCurryMemberFull() {
       key.name: "(numbers: Double...) -> Double",
       key.parameters: [
         {
+          key.name: "numbers",
           key.nameoffset: 1,
           key.namelength: 18
         }
@@ -252,14 +272,17 @@ func testCurryMemberFull() {
       key.name: "(x: Int, y: Int, with: (Int, Int) throws -> Int) throws -> Int!",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 1,
           key.namelength: 6
         },
         {
+          key.name: "y",
           key.nameoffset: 9,
           key.namelength: 6
         },
         {
+          key.name: "adder",
           key.nameoffset: 17,
           key.namelength: 30
         }
@@ -270,6 +293,7 @@ func testCurryMemberFull() {
       key.name: "(x: Int) -> (Int) -> Int",
       key.parameters: [
         {
+          key.name: "x",
           key.nameoffset: 1,
           key.namelength: 6
         }
