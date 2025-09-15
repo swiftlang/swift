@@ -1401,8 +1401,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto clangTy = IGF.IGM.getClangType(valueTy->getCanonicalType());
     std::string encoding;
     IGF.IGM.getClangASTContext().getObjCEncodingForType(clangTy, encoding);
-    
-    auto globalString = IGF.IGM.getAddrOfGlobalString(encoding);
+
+    auto globalString = IGF.IGM.getAddrOfGlobalString(
+        encoding, /*sectionName=*/"__TEXT,__objc_methtype,cstring_literals");
     out.add(globalString);
     return;
   }

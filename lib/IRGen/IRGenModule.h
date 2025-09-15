@@ -1204,6 +1204,7 @@ public:
       StringRef Str, bool willBeRelativelyAddressed = false,
       StringRef sectionName = "", StringRef name = "");
   llvm::Constant *getAddrOfGlobalString(StringRef utf8,
+                                        StringRef sectionName = "",
                                         bool willBeRelativelyAddressed = false,
                                         bool useOSLogSection = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
