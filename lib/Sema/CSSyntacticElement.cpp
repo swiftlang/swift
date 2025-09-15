@@ -309,10 +309,13 @@ static bool isViableElement(ASTNode element,
       // Skip if we're doing completion for a SingleValueStmtExpr, and have a
       // brace that doesn't involve a single expression, and doesn't have a
       // code completion token, as it won't contribute to the type of the
-      // SingleValueStmtExpr.
+      // SingleValueStmtExpr. We also need to skip if the body has a ReturnStmt,
+      // which isn't something that's currently allowed, but is necessary to
+      // correctly infer the contextual type without leaving it unbound.
       if (isForSingleValueStmtCompletion &&
           !SingleValueStmtExpr::hasResult(braceStmt) &&
-          !cs.containsIDEInspectionTarget(braceStmt)) {
+          !cs.containsIDEInspectionTarget(braceStmt) &&
+          !braceStmt->hasExplicitReturnStmt(cs.getASTContext())) {
         return false;
       }
     }
