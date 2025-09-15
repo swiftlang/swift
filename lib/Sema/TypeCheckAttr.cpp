@@ -18,6 +18,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
+#include "TypeCheckEmbedded.h"
 #include "TypeCheckMacros.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
@@ -5501,12 +5502,14 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   }
 
   // Embedded Swift prohibits weak/unowned but allows unowned(unsafe).
-  if (ctx.LangOpts.hasFeature(Feature::Embedded)) {
+  if (auto behavior = shouldDiagnoseEmbeddedLimitations(
+          dc, attr->getLocation(),
+          /*wasAlwaysEmbeddedError=*/true)) {
     if (ownershipKind == ReferenceOwnership::Weak ||
         ownershipKind == ReferenceOwnership::Unowned) {
       Diags.diagnose(attr->getLocation(), diag::weak_unowned_in_embedded_swift,
-               ownershipKind);
-      attr->setInvalid();
+               ownershipKind)
+        .limitBehavior(*behavior);
     }
   }
 
