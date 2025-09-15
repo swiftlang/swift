@@ -58,7 +58,8 @@ class ExecutorBreadcrumb;
 struct LValueOptions {
   bool IsNonAccessing = false;
   bool TryAddressable = false;
-  bool NeedsBorrow = false;
+  bool ForGuaranteedReturn = false;
+  bool ForGuaranteedAddressReturn = false;
 
   /// Derive options for accessing the base of an l-value, given that
   /// applying the derived component might touch the memory.
@@ -83,9 +84,15 @@ struct LValueOptions {
     return copy;
   }
 
-  LValueOptions withBorrow(bool borrow) const {
+  LValueOptions forGuaranteedReturn(bool value) const {
     auto copy = *this;
-    copy.NeedsBorrow = borrow;
+    copy.ForGuaranteedReturn = value;
+    return copy;
+  }
+
+  LValueOptions forGuaranteedAddressReturn(bool value) const {
+    auto copy = *this;
+    copy.ForGuaranteedAddressReturn = value;
     return copy;
   }
 };

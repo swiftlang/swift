@@ -3053,11 +3053,16 @@ public:
   SILGenLValue &SGL;
   SILGenFunction &SGF;
   AbstractionPattern Orig;
+  bool forGuaranteedReturn;
+  bool forGuaranteedAddressReturn;
 
-  SILGenBorrowedBaseVisitor(SILGenLValue &SGL,
-                            SILGenFunction &SGF,
-                            AbstractionPattern Orig)
-      : SGL(SGL), SGF(SGF), Orig(Orig) {}
+  SILGenBorrowedBaseVisitor(SILGenLValue &SGL, SILGenFunction &SGF,
+                            AbstractionPattern Orig,
+                            bool forGuaranteedReturn = false,
+                            bool forGuaranteedAddressReturn = false)
+      : SGL(SGL), SGF(SGF), Orig(Orig),
+        forGuaranteedReturn(forGuaranteedReturn),
+        forGuaranteedAddressReturn(forGuaranteedAddressReturn) {}
 
   static bool isNonCopyableBaseBorrow(SILGenFunction &SGF, Expr *e) {
     if (auto *m = dyn_cast<MemberRefExpr>(e)) {
@@ -3261,8 +3266,9 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
   // apply the lvalue within a formal access to the original value instead of
   // an actual loaded copy.
   if (SILGenBorrowedBaseVisitor::isNonCopyableBaseBorrow(SGF, e) ||
-      options.NeedsBorrow) {
-    SILGenBorrowedBaseVisitor visitor(*this, SGF, orig);
+      options.ForGuaranteedReturn) {
+    SILGenBorrowedBaseVisitor visitor(*this, SGF, orig,
+                                      options.ForGuaranteedReturn);
     auto accessKind = SGFAccessKind::BorrowedObjectRead;
     assert(!e->getType()->is<LValueType>()
         && "maybe need SGFAccessKind::BorrowedAddressRead ?");
