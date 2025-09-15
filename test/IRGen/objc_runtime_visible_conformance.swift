@@ -15,4 +15,4 @@ extension A : YourProtocol {}
 // CHECK-SAME:    @"$sSo1AC32objc_runtime_visible_conformance10MyProtocolACWP"
 //   DirectObjCClassName
 // CHECK-SAME:    i32 16
-// CHECK:       @.str.21.MyRuntimeVisibleClass = private constant [22 x i8] c"MyRuntimeVisibleClass\00"
+// CHECK:       @.str.21.MyRuntimeVisibleClass = {{.*}} [22 x i8] c"MyRuntimeVisibleClass\00"
