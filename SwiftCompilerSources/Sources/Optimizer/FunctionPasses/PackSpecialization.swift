@@ -33,7 +33,7 @@ let packSpecialization = FunctionPass(name: "pack-specialization") {
 
 private func createSpecializedDeclaration(for callee: Function, at apply: FullApplySite, in context: FunctionPassContext) -> Function {
 
-    let packArgs: [Int] = callee.parameters.filter { $0.isConcretePack() }.map { $0.index }
+    let packArgs: [Int] = callee.arguments.filter { $0.isConcretePack() }.map { $0.index }
     let specializedName = context.mangle(withExplodedPackArguments: packArgs, from: callee)
     if let specialized = context.lookupFunction(name: specializedName) {
       print("Reusing existing specialized definition of ", specializedName)
