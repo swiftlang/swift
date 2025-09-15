@@ -5221,7 +5221,9 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
     assert(!silConv.useLoweredAddresses() ||
            (dest->getType().isAddressOnly(F) == rvalue->getType().isAddress()));
     if (rvalue->getType().isAddress()) {
-      B.createCopyAddr(loc, rvalue, dest, IsTake, isInit);
+      B.createCopyAddr(loc, rvalue, dest,
+                       rvalue->getType().isTrivial(F) ? IsNotTake : IsTake,
+                       isInit);
     } else {
       emitUnloweredStoreOfCopy(B, loc, rvalue, dest, isInit);
     }
