@@ -2993,7 +2993,7 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
                                         VD->getLoc(), StorageName,
                                         VD->getDeclContext());
   Storage->setInterfaceType(StorageInterfaceTy);
-  Storage->setLazyStorageProperty(true);
+  Storage->setLazyStorageFor(VD);
   Storage->setUserAccessible(false);
 
   // The storage is implicit and private.
