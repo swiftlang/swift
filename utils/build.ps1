@@ -190,6 +190,8 @@ param
   [int] $AndroidAPILevel = 28,
   [string[]] $AndroidSDKVersions = @("Android", "AndroidExperimental"),
   [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
+  [ValidateSet("static", "dynamic")]
+  [string[]] $AndroidSDKLinkage = @("static", "dynamic"),
 
   # Windows SDK Options
   [switch] $Windows = $true,
@@ -197,6 +199,8 @@ param
   [string] $WinSDKVersion = "",
   [string[]] $WindowsSDKVersions = @("Windows", "WindowsExperimental"),
   [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
+  [ValidateSet("static", "dynamic")]
+  [string[]] $WindowsSDKLinkage = @("static", "dynamic"),
 
   # Incremental Build Support
   [switch] $Clean,
@@ -291,6 +295,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin64a";
     Cache = @{};
+    Linkage = $WindowsSDKLinkage;
   };
 
   WindowsX64 = @{
@@ -304,6 +309,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin64";
     Cache = @{};
+    Linkage = $WindowsSDKLinkage;
   };
 
   WindowsX86  = @{
@@ -317,6 +323,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin32";
     Cache = @{};
+    Linkage = $WindowsSDKLinkage;
   };
 
   AndroidARMv7 = @{
@@ -330,6 +337,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin32a";
     Cache = @{};
+    Linkage = $AndroidSDKLinkage;
   };
 
   AndroidARM64 = @{
@@ -343,6 +351,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin64a";
     Cache = @{};
+    Linkage = $AndroidSDKLinkage;
   };
 
   AndroidX86 = @{
@@ -356,6 +365,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin32";
     Cache = @{};
+    Linkage = $AndroidSDKLinkage;
   };
 
   AndroidX64 = @{
@@ -369,6 +379,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin64";
     Cache = @{};
+    Linkage = $AndroidSDKLinkage;
   };
 }
 
@@ -3082,9 +3093,11 @@ function Install-SDK([Hashtable[]] $Platforms, [OS] $OS = $Platforms[0].OS, [str
   # Copy SDK header files
   foreach ($Module in ("Block", "dispatch", "os", "_foundation_unicode", "_FoundationCShims")) {
     foreach ($ResourceType in ("swift", "swift_static")) {
-      $ModuleDirectory = "$(Get-SwiftSDK $OS -Identifier $Identifier)\usr\lib\$ResourceType\$Module"
-      if (Test-Path $ModuleDirectory) {
-        Move-Directory $ModuleDirectory "$(Get-SwiftSDK $OS -Identifier $Identifier)\usr\include\"
+      if ($Platforms[0].Linkage.Contains($(if ($ResourceType -eq "swift") { "dynamic" } else { "static" }))) {
+        $ModuleDirectory = "$(Get-SwiftSDK $OS -Identifier $Identifier)\usr\lib\$ResourceType\$Module"
+        if (Test-Path $ModuleDirectory) {
+          Move-Directory $ModuleDirectory "$(Get-SwiftSDK $OS -Identifier $Identifier)\usr\include\"
+        }
       }
     }
   }
@@ -3092,11 +3105,13 @@ function Install-SDK([Hashtable[]] $Platforms, [OS] $OS = $Platforms[0].OS, [str
   # Copy files from the arch subdirectory, including "*.swiftmodule" which need restructuring
   foreach ($Platform in $Platforms) {
     foreach ($ResourceType in ("swift", "swift_static")) {
-      $PlatformResources = "$(Get-SwiftSDK $OS -Identifier $Identifier)\usr\lib\$ResourceType\$($OS.ToString().ToLowerInvariant())"
-      Get-ChildItem -Recurse "$PlatformResources\$($Platform.Architecture.LLVMName)" | ForEach-Object {
-        if (".swiftmodule", ".swiftdoc", ".swiftinterface" -contains $_.Extension) {
-          Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not in a thick module layout"
-          Copy-File $_.FullName "$PlatformResources\$($_.BaseName).swiftmodule\$(Get-ModuleTriple $Platform)$($_.Extension)"
+      if ($Platform.Linkage.Contains($(if ($ResourceType -eq "swift") { "dynamic" } else { "static" }))) {
+        $PlatformResources = "$(Get-SwiftSDK $OS -Identifier $Identifier)\usr\lib\$ResourceType\$($OS.ToString().ToLowerInvariant())"
+        Get-ChildItem -Recurse "$PlatformResources\$($Platform.Architecture.LLVMName)" | ForEach-Object {
+          if (".swiftmodule", ".swiftdoc", ".swiftinterface" -contains $_.Extension) {
+            Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not in a thick module layout"
+            Copy-File $_.FullName "$PlatformResources\$($_.BaseName).swiftmodule\$(Get-ModuleTriple $Platform)$($_.Extension)"
+          }
         }
       }
     }
@@ -3119,14 +3134,16 @@ function Build-SDK([Hashtable] $Platform) {
 function Build-ExperimentalSDK([Hashtable] $Platform) {
   Invoke-BuildStep Build-CDispatch $Platform
 
-  Invoke-BuildStep Build-ExperimentalRuntime $Platform
-  Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
+  if ($Platform.Linkage.Contains("dynamic")) {
+    Invoke-BuildStep Build-ExperimentalRuntime $Platform
+  }
+  if ($Platform.Linkage.Contains("static")) {
+    Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
+  }
 
   $SDKROOT = Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental"
 
-  Invoke-IsolatingEnvVars {
-    $env:Path = "$(Get-CMarkBinaryCache $Platform)\src;$(Get-PinnedToolchainRuntime);${env:Path}"
-
+  if ($Platform.Linkage.Contains("dynamic")) {
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-libdispatch `
       -Bin (Get-ProjectBinaryCache $Platform ExperimentalDynamicDispatch) `
@@ -3141,7 +3158,9 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
 
         ENABLE_SWIFT = "YES";
       }
+  }
 
+  if ($Platform.Linkage.Contains("static")) {
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-libdispatch `
       -Bin (Get-ProjectBinaryCache $Platform ExperimentalStaticDispatch) `
@@ -3158,67 +3177,71 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
       }
   }
 
-  Build-CMakeProject `
-    -Src $SourceCache\swift-corelibs-foundation `
-    -Bin (Get-ProjectBinaryCache $Platform ExperimentalDynamicFoundation) `
-    -InstallTo "${SDKROOT}\usr" `
-    -Platform $Platform `
-    -UseBuiltCompilers ASM,C,CXX,Swift `
-    -SwiftSDK "${SDKROOT}" `
-    -Defines @{
-      BUILD_SHARED_LIBS = "YES";
-      CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-      CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
-      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-      ENABLE_TESTING = "NO";
+  if ($Platform.Linkage.Contains("dynamic")) {
+    Build-CMakeProject `
+      -Src $SourceCache\swift-corelibs-foundation `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalDynamicFoundation) `
+      -InstallTo "${SDKROOT}\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers ASM,C,CXX,Swift `
+      -SwiftSDK "${SDKROOT}" `
+      -Defines @{
+        BUILD_SHARED_LIBS = "YES";
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        ENABLE_TESTING = "NO";
 
-      FOUNDATION_BUILD_TOOLS = "NO";
-      CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
-      LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
-      ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
-      ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
-      } else {
-        "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
-      };
-      dispatch_DIR = $(Get-ProjectCMakeModules $Platform ExperimentalDynamicDispatch);
-      SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
-      _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
-      _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
-      _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
-      SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
-    }
+        FOUNDATION_BUILD_TOOLS = "NO";
+        CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
+        LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
+        ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+        ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+          "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
+        } else {
+          "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
+        };
+        dispatch_DIR = $(Get-ProjectCMakeModules $Platform ExperimentalDynamicDispatch);
+        SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
+        _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
+        _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
+        _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
+        SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
+      }
+  }
 
-  Build-CMakeProject `
-    -Src $SourceCache\swift-corelibs-foundation `
-    -Bin (Get-ProjectBinaryCache $Platform ExperimentalStaticFoundation) `
-    -InstallTo "${SDKROOT}\usr" `
-    -Platform $Platform `
-    -UseBuiltCompilers ASM,C,CXX,Swift `
-    -SwiftSDK ${SDKROOT} `
-    -Defines @{
-      BUILD_SHARED_LIBS = "NO";
-      CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-      CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
-      CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
-      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-      ENABLE_TESTING = "NO";
+  if ($Platform.Linkage.Contains("static")) {
+    Build-CMakeProject `
+      -Src $SourceCache\swift-corelibs-foundation `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalStaticFoundation) `
+      -InstallTo "${SDKROOT}\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers ASM,C,CXX,Swift `
+      -SwiftSDK ${SDKROOT} `
+      -Defines @{
+        BUILD_SHARED_LIBS = "NO";
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
+        CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        ENABLE_TESTING = "NO";
 
-      FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
-      CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
-      LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
-      ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
-      ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
-      } else {
-        "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
-      };
-      dispatch_DIR = $(Get-ProjectCMakeModules $Platform ExperimentalStaticDispatch);
-      SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
-      _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
-      _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
-      _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
-      SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
+        FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
+        CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
+        LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
+        ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+        ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+          "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
+        } else {
+          "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
+        };
+        dispatch_DIR = $(Get-ProjectCMakeModules $Platform ExperimentalStaticDispatch);
+        SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
+        _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
+        _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
+        _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
+        SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
+      }
     }
 }
 
@@ -3989,14 +4012,18 @@ if (-not $SkipBuild) {
 
             $SDKROOT = Get-SwiftSDK Windows -Identifier WindowsExperimental
 
-            Get-ChildItem "${SDKROOT}\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
-              Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-              Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
+            if ($WindowsSDKLinkage.Contains("dynamic")) {
+              Get-ChildItem "${SDKROOT}\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+                Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+                Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
+              }
             }
 
-            Get-ChildItem "${SDKROOT}\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
-              Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-              Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\windows\$($Build.Architecture.LLVMName)\" | Out-Null
+            if ($WindowsSDKLinkage.Contains("static")) {
+              Get-ChildItem "${SDKROOT}\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+                Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+                Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\windows\$($Build.Architecture.LLVMName)\" | Out-Null
+              }
             }
 
             # FIXME(compnerd) how do we select which SDK is meant to be re-distributed?
@@ -4045,14 +4072,18 @@ if (-not $SkipBuild) {
 
             $SDKROOT = Get-SwiftSDK Android -Identifier AndroidExperimental
 
-            Get-ChildItem "${SDKROOT}\usr\lib\swift\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
-              Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-              Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\android\$($Build.Architecture.LLVMName)\" | Out-Null
+            if ($AndroidSDKLinkage.Contains("dynamic")) {
+              Get-ChildItem "${SDKROOT}\usr\lib\swift\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
+                Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+                Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\android\$($Build.Architecture.LLVMName)\" | Out-Null
+              }
             }
 
-            Get-ChildItem "${SDKROOT}\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
-              Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-              Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\android\$($Build.Architecture.LLVMName)\" | Out-Null
+            if ($AndroidSDKLinkage.Contains("static")) {
+              Get-ChildItem "${SDKROOT}\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
+                Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+                Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\android\$($Build.Architecture.LLVMName)\" | Out-Null
+              }
             }
           }
 
