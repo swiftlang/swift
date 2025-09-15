@@ -411,6 +411,14 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     }
   }
 
+  // If this is a key path to function conversion, the requirements come
+  // from a key path type implicitly formed by the solver.
+  if (isExpr<KeyPathExpr>(getRawAnchor()) &&
+      getLocator()->isFirstElement<LocatorPathElt::KeyPathType>() &&
+      getOwnerType()->is<FunctionType>()) {
+    return getASTContext().getKeyPathDecl();
+  }
+
   return getAffectedDeclFromType(getOwnerType());
 }
 

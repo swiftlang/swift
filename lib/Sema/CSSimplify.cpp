@@ -12982,8 +12982,29 @@ ConstraintSystem::simplifyKeyPathConstraint(
       auto paramFnTy = FunctionType::get(paramParam, fnTy->getResult(),
                                          fnTy->getExtInfo());
 
+      // Form a key path type as well to make sure that root and value
+      // types satisfy all of its requirements.
+      // Note that `KeyPath` types used to have no requirements but now
+      // they do require `Root` and `Value` to be `Copyable` and `Escapable`.
+      {
+        auto keyPathTy =
+            openUnboundGenericType(
+                getASTContext().getKeyPathDecl(),
+                /*parent=*/Type(),
+                locator.withPathElement(LocatorPathElt::KeyPathType()),
+                /*isTypeResolution=*/false)
+                ->castTo<BoundGenericType>();
+        addConstraint(ConstraintKind::Bind, keyPathTy->getGenericArgs()[0],
+                      rootTy,
+                      locator.withPathElement(LocatorPathElt::KeyPathRoot()));
+        addConstraint(ConstraintKind::Bind, keyPathTy->getGenericArgs()[1],
+                      valueTy,
+                      locator.withPathElement(LocatorPathElt::KeyPathValue()));
+      }
+
       return !matchTypes(kpFnTy, paramFnTy, ConstraintKind::Conversion,
-                         subflags, locator).isFailure();
+                         subflags, locator)
+                  .isFailure();
     }
 
     assert(contextualRootTy && contextualValueTy);
