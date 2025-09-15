@@ -340,26 +340,6 @@ private func collectMovableInstructions(
         if !beginBorrowInst.isLexical && beginBorrowInst.canScopedInstructionBeHoisted(outOf: loop, analyzedInstructions: analyzedInstructions, context) {
           movableInstructions.scopedInsts.append(beginBorrowInst)
         }
-      case let fullApplySite as FullApplySite:
-        guard analyzedInstructions.readOnlyApplies.contains(where: { $0 == fullApplySite }) else {
-          break
-        }
-        
-        // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
-        if readOnlyApplyCounter * analyzedInstructions.loopSideEffects.count < 8000,
-           fullApplySite.isSafeReadOnlyApply(
-             for: analyzedInstructions.loopSideEffects,
-             context.aliasAnalysis,
-             context.calleeAnalysis
-           ) {
-          if let beginApplyInst = fullApplySite as? BeginApplyInst {
-            movableInstructions.scopedInsts.append(beginApplyInst)
-          } else {
-            movableInstructions.hoistUp.append(fullApplySite)
-          }
-          
-          readOnlyApplyCounter += 1
-        }
       default:
         if inst.canBeHoisted(outOf: loop, context) {
           movableInstructions.hoistUp.append(inst)
@@ -626,7 +606,7 @@ private extension MovableInstructions {
   /// Only hoists instructions in blocks that dominate all exit and latch blocks.
   /// It doesn't hoist instructions speculatively.
   mutating func hoistInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
-    let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(context)
+    let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(excludeColdExits: false, context)
     var changed = false
 
     for inst in hoistUp where dominatingBlocks.contains(inst.parentBlock) {
@@ -638,7 +618,7 @@ private extension MovableInstructions {
 
   /// Sink instructions.
   mutating func sinkInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
-    let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(context)
+    let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(excludeColdExits: false, context)
     var changed = false
 
     for inst in sinkDown where dominatingBlocks.contains(inst.parentBlock) {
@@ -845,7 +825,7 @@ private extension Instruction {
     case is RefElementAddrInst, is IntegerLiteralInst, is StringLiteralInst,
          is BaseAddrForOffsetInst, is FloatLiteralInst, is FunctionRefInst,
          is GlobalAddrInst, is StructElementAddrInst, is TupleElementAddrInst,
-         is VectorBaseAddrInst, is RefTailAddrInst, is PointerToAddressInst:
+         is VectorBaseAddrInst, is RefTailAddrInst:
       return true
     default:
       return false
