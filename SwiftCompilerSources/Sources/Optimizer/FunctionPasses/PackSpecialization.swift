@@ -26,11 +26,18 @@ let packSpecialization = FunctionPass(name: "pack-specialization") {
           callee.isSpecialization,
           callee.argumentTypes.contains(where: { $0.isPack }) else { continue }
 
-    var packArgs: [Int] = callee.parameters.filter { $0.isConcretePack() }.map { $0.index }
+    let f = createSpecializedDeclaration(for: callee, at: apply, in: context)
+  }
+
+}
+
+private func createSpecializedDeclaration(for callee: Function, at apply: FullApplySite, in context: FunctionPassContext) -> Function {
+
+    let packArgs: [Int] = callee.parameters.filter { $0.isConcretePack() }.map { $0.index }
     let specializedName = context.mangle(withExplodedPackArguments: packArgs, from: callee)
     if let specialized = context.lookupFunction(name: specializedName) {
       print("Reusing existing specialized definition of ", specializedName)
-      return
+      return specialized
     }
 
     var newParams = [ParameterInfo]()
@@ -48,7 +55,6 @@ let packSpecialization = FunctionPass(name: "pack-specialization") {
         }
 
       } else {
-        print("Adding non-pack parameter as-is")
         let param = apply.parameter(for: apply.argumentOperands[arg.index])!
         newParams.append(param)
       }
@@ -71,18 +77,17 @@ let packSpecialization = FunctionPass(name: "pack-specialization") {
       }
     }
 
-    // for res in callee.argu
-    var explodedDeclaration = context.createPackExplodedFunctionDeclaration(from: callee,
-                                                                   withName: specializedName,
-                                                                   withParams: newParams,
-                                                                   withResults: newResults)
+    let explodedDeclaration = context.createSpecializedFunctionDeclaration(from: callee,
+                                                         withName: specializedName,
+                                                         withParams: newParams,
+                                                         withResults: newResults)
 
     print(packArgs, [Int](callee.arguments.filter { $0.isIndirectResult }.map { $0.index }))
     print("specializing:", callee.name, "\n\tto", specializedName)
     print(newParams)
     print(explodedDeclaration)
-  }
 
+    return explodedDeclaration
 }
 
 private func explodedPackElementArgumentConvention(pack: FunctionArgument, elem: Type) -> ArgumentConvention {
