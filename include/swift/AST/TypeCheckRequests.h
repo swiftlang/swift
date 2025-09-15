@@ -1962,11 +1962,9 @@ public:
 private:
   friend SimpleRequest;
 
+  // Evaluation.
   ArrayRef<VarDecl *>
   evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -1984,11 +1982,9 @@ public:
 private:
   friend SimpleRequest;
 
+  // Evaluation.
   ArrayRef<VarDecl *>
   evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
 
 public:
   bool isCached() const { return true; }
