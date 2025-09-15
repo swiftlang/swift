@@ -161,6 +161,10 @@ static StringRef getCodeForAccessorKind(AccessorKind kind) {
     return "x";
   case AccessorKind::Read2:
     return "y";
+  case AccessorKind::Borrow:
+    return "b";
+  case AccessorKind::Mutate:
+    return "z";
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -2278,6 +2282,10 @@ static char getResultConvention(ResultConvention conv) {
     case ResultConvention::UnownedInnerPointer: return 'u';
     case ResultConvention::Autoreleased: return 'a';
     case ResultConvention::Pack: return 'k';
+    case ResultConvention::GuaranteedAddress:
+      return 'g';
+    case ResultConvention::Guaranteed:
+      return 'G';
   }
   llvm_unreachable("bad result convention");
 }

@@ -1033,3 +1033,52 @@ bb0(%0 : @owned $Wrapper, %1 : $*Klass):
   %4 = mark_dependence [nonescaping] %1 : $*Klass on %0 : $Wrapper
   unreachable
 }
+
+sil @get_wrapper : $@convention(thin) () -> @owned Wrapper
+sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+sil [ossa] [noinline] @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
+bb0(%0 : @guaranteed $Wrapper):
+  %2 = struct_extract %0, #Wrapper.c
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrow_accessor1 :
+// CHECK:  [[F:%.*]] = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:  [[A:%.*]] = apply [[F]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:  end_borrow {{.*}}
+// CHECK:  destroy_value {{.*}}
+// CHECK:  unreachable
+// CHECK-LABEL: } // end sil function 'test_borrow_accessor1'
+sil [ossa] @test_borrow_accessor1 : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  specify_test "ossa_complete_lifetime @instruction[0] liveness"
+  %copy = copy_value %0
+  %1 = begin_borrow %copy
+  %2 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %4 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrow_accessor2 :
+// CHECK:  [[F:%.*]] = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:  [[A:%.*]] = apply [[F]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:  end_borrow {{.*}}
+// CHECK:  destroy_value {{.*}}
+// CHECK:  unreachable
+// CHECK-LABEL: } // end sil function 'test_borrow_accessor2'
+sil [ossa] @test_borrow_accessor2 : $@convention(thin) () -> () {
+bb0:
+  specify_test "ossa_complete_lifetime @instruction[1] liveness"
+  %1 = function_ref @get_wrapper : $@convention(thin) () -> @owned Wrapper
+  %2 = apply %1() : $@convention(thin) () -> @owned Wrapper
+  %3 = begin_borrow %2
+  %4 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %6 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  unreachable
+}
+

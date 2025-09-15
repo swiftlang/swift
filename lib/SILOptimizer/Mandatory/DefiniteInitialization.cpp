@@ -1799,6 +1799,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
         case AccessorKind::Read:
         case AccessorKind::Read2:
         case AccessorKind::Address:
+        case AccessorKind::Borrow:
           return false;
         case AccessorKind::Set:
         case AccessorKind::Modify:
@@ -1807,6 +1808,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
         case AccessorKind::DidSet:
         case AccessorKind::WillSet:
         case AccessorKind::Init:
+        case AccessorKind::Mutate:
           return true;
         }
         llvm_unreachable("bad kind");

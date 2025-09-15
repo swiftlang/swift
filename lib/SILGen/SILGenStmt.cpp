@@ -20,13 +20,14 @@
 #include "RValue.h"
 #include "SILGen.h"
 #include "Scope.h"
+#include "StorageRefResult.h"
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ProfileCounter.h"
-#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -698,6 +699,14 @@ SILGenFunction::prepareIndirectResultInit(
   return init;
 }
 
+static Expr *lookThroughProjections(Expr *expr) {
+  auto *lookupExpr = dyn_cast<LookupExpr>(expr);
+  if (!lookupExpr) {
+    return expr;
+  }
+  return lookThroughProjections(lookupExpr->getBase());
+}
+
 void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                                     Expr *ret) {
   SmallVector<SILValue, 4> directResults;
@@ -725,6 +734,64 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     // Deactivate all the cleanups for the result values.
     for (auto cleanup : resultCleanups) {
       Cleanups.forwardCleanup(cleanup);
+    }
+  } else if (F.getConventions().hasGuaranteedResult() ||
+             F.getConventions().hasGuaranteedAddressResult()) {
+    // If the return expression is a literal, emit as a regular return
+    // expression/
+    if (isa<LiteralExpr>(ret)) {
+      auto RV = emitRValue(ret);
+      std::move(RV).forwardAll(*this, directResults);
+    } else {
+      // If the return expression is not a projection, diagnose as error.
+      FormalEvaluationScope scope(*this);
+      auto storageRefResult =
+          StorageRefResult::findStorageReferenceExprForBorrow(ret);
+      auto lvExpr = storageRefResult.getTransitiveRoot();
+      if (!lvExpr) {
+        diagnose(getASTContext(), ret->getStartLoc(),
+                 diag::invalid_borrow_accessor_return);
+        diagnose(getASTContext(), ret->getStartLoc(),
+                 diag::borrow_accessor_not_a_projection_note);
+        return;
+      }
+      // If the return expression is not a projection of self, diagnose as
+      // error.
+      auto *baseExpr = lookThroughProjections(storageRefResult.getStorageRef());
+      if (!baseExpr->isSelfExprOf(
+              cast<AbstractFunctionDecl>(FunctionDC->getAsDecl()))) {
+        diagnose(getASTContext(), ret->getStartLoc(),
+                 diag::invalid_borrow_accessor_return);
+        diagnose(getASTContext(), ret->getStartLoc(),
+                 diag::borrow_accessor_not_a_projection_note);
+        return;
+      }
+      // Emit return value at +0.
+      LValueOptions options;
+      auto lvalue = emitLValue(ret,
+                               F.getConventions().hasGuaranteedResult()
+                                   ? SGFAccessKind::BorrowedObjectRead
+                                   : SGFAccessKind::BorrowedAddressRead,
+                               options.withBorrow(true));
+      auto result =
+          tryEmitProjectedLValue(ret, std::move(lvalue), TSanKind::None);
+      if (!result) {
+        diagnose(getASTContext(), ret->getStartLoc(),
+                 diag::invalid_borrow_accessor_return);
+        diagnose(getASTContext(), ret->getStartLoc(),
+                 diag::borrow_accessor_not_a_projection_note);
+        return;
+      }
+      // Address type phis are banned in SIL.
+      // For now diagnose multiple return statements in such cases.
+      // TODO: Support multiple epilog blocks in SILGen and SILOptimizer.
+      if (F.getConventions().hasGuaranteedAddressResult() &&
+          !ReturnDest.getBlock()->getPredecessorBlocks().empty()) {
+        diagnose(getASTContext(), ret->getStartLoc(),
+                 diag::invalid_multiple_return_borrow_accessor);
+        return;
+      }
+      directResults.push_back(result->forward(*this));
     }
   } else {
     // SILValue return.
