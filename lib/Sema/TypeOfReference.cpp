@@ -2009,12 +2009,12 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   } else if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
     unsigned numApplies = getNumApplications(hasAppliedSelf, functionRefInfo);
     openedType = adjustFunctionTypeForConcurrency(
-        origOpenedType->castTo<FunctionType>(), baseRValueTy, value, useDC,
+        origOpenedType->castTo<FunctionType>(), baseObjTy, value, useDC,
         numApplies, isMainDispatchQueueMember(locator),
         /*openGlobalActorType=*/true, locator);
   } else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
     openedType = adjustFunctionTypeForConcurrency(
-        origOpenedType->castTo<FunctionType>(), baseRValueTy, subscript, useDC,
+        origOpenedType->castTo<FunctionType>(), baseObjTy, subscript, useDC,
         /*numApplies=*/2, /*isMainDispatchQueue=*/false,
         /*openGlobalActorType=*/true, locator);
   } else if (auto var = dyn_cast<VarDecl>(value)) {
