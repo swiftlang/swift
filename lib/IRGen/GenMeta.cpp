@@ -845,9 +845,8 @@ namespace {
       IRGenMangler mangler(IGM.Context);
       auto mangledName = mangler.mangleAnonymousDescriptorName(Name);
       auto mangledNameConstant =
-          IGM.getAddrOfGlobalString(mangledName,
-                                    /*sectionName=*/"",
-                                    /*willBeRelativelyAddressed*/ true);
+        IGM.getAddrOfGlobalString(mangledName,
+                                  /*willBeRelativelyAddressed*/ true);
       B.addRelativeAddress(mangledNameConstant);
     }
 
@@ -1278,7 +1277,6 @@ namespace {
       llvm::Constant *global = nullptr;
       if (!AssociatedTypeNames.empty()) {
         global = IGM.getAddrOfGlobalString(AssociatedTypeNames,
-                                           /*sectionName=*/"",
                                            /*willBeRelativelyAddressed=*/true);
       }
       B.addRelativeAddressOrNull(global);
@@ -1517,11 +1515,9 @@ namespace {
         name.pop_back();
         assert(name.back() == '\0');
       }
-
-      auto nameStr =
-          IGM.getAddrOfGlobalString(name,
-                                    /*sectionName=*/"",
-                                    /*willBeRelativelyAddressed*/ true);
+      
+      auto nameStr = IGM.getAddrOfGlobalString(name,
+                                               /*willBeRelativelyAddressed*/ true);
       B.addRelativeAddress(nameStr);
     }
       
