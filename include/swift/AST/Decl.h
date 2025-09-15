@@ -10170,6 +10170,11 @@ getAccessorNameForDiagnostic(AccessorDecl *accessor, bool article,
 StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind, bool article,
                                        bool underscored);
 
+/// Retrieve a textual representation for a particular kind of memberwise
+/// initializer in a given nominal decl.
+void printMemberwiseInit(NominalTypeDecl *nominal, MemberwiseInitKind initKind,
+                         llvm::raw_ostream &out);
+
 void simple_display(llvm::raw_ostream &out,
                     OptionSet<NominalTypeDecl::LookupDirectFlags> options);
 

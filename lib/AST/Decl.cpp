@@ -12990,6 +12990,70 @@ MacroDiscriminatorContext::getParentOf(FreestandingMacroExpansion *expansion) {
       expansion->getPoundLoc(), expansion->getDeclContext());
 }
 
+void swift::printMemberwiseInit(NominalTypeDecl *nominal,
+                                MemberwiseInitKind initKind,
+                                llvm::raw_ostream &out) {
+  auto &ctx = nominal->getASTContext();
+  auto &SM = ctx.SourceMgr;
+
+  SmallVector<VarDecl *, 4> propsToPrint;
+  for (auto *prop : nominal->getMemberwiseInitProperties(
+           MemberwiseInitKind::Compatibility)) {
+    auto varDecl = dyn_cast<VarDecl>(prop);
+    if (!varDecl)
+      continue;
+
+    // Skip printing lazy properties since we don't have a way of spelling
+    // their initialization in source (since we'd be initializing the backing
+    // variable).
+    if (varDecl->getAttrs().hasAttribute<LazyAttr>())
+      continue;
+
+    propsToPrint.push_back(varDecl);
+  }
+
+  out << "init(";
+
+  // Process the list of members, inserting commas as appropriate.
+  for (const auto &[idx, prop] : llvm::enumerate(propsToPrint)) {
+    if (idx > 0)
+      out << ", ";
+
+    auto name = prop->getName();
+    out << name << ": ";
+
+    // Unconditionally print '@escaping' if we print out a function type -
+    // the assignments we generate below will escape this parameter.
+    auto ty = prop->getTypeInContext();
+    if (ty->is<AnyFunctionType>())
+      out << "@" << TypeAttribute::getAttrName(TypeAttrKind::Escaping) << " ";
+
+    out << ty.getString();
+
+    bool hasAddedDefault = false;
+    if (auto *PBD = prop->getParentPatternBinding()) {
+      auto idx = PBD->getPatternEntryIndexForVarDecl(prop);
+      auto *init = PBD->getOriginalInit(idx);
+      if (auto range = init ? init->getSourceRange() : SourceRange()) {
+        auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, range);
+        out << " = " << SM.extractText(charRange);
+        hasAddedDefault = true;
+      }
+    }
+    if (!hasAddedDefault && ty->isOptional())
+      out << " = nil";
+  }
+
+  // Print the body.
+  out << ") {\n";
+  for (auto *prop : propsToPrint) {
+    // self.<property> = <property>
+    auto name = prop->getName();
+    out << "self." << name << " = " << name << "\n";
+  }
+  out << "}";
+}
+
 std::optional<Type>
 CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
   if (auto func = dyn_cast<AbstractFunctionDecl *>()) {
