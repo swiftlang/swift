@@ -194,6 +194,10 @@ toolchains::WebAssembly::constructInvocation(const DynamicLinkJobAction &job,
   Arguments.push_back(context.Args.MakeArgString(
       Twine("--global-base=") +
       std::to_string(SWIFT_ABI_WASM32_LEAST_VALID_POINTER)));
+  Arguments.push_back("-Xlinker");
+  Arguments.push_back(context.Args.MakeArgString(
+      Twine("--table-base=") +
+      std::to_string(SWIFT_ABI_WASM32_LEAST_VALID_POINTER)));
 
   // These custom arguments should be right before the object file at the end.
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
