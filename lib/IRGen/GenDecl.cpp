@@ -297,8 +297,7 @@ public:
     // protocol. If so, use it.
     SmallString<32> buf;
     auto protocolName = IGM.getAddrOfGlobalString(
-        proto->getObjCRuntimeName(buf),
-        /*sectionName=*/"__TEXT,__objc_classname,cstring_literals");
+        proto->getObjCRuntimeName(buf), IRGenModule::ObjCClassNameSectionName);
 
     auto existing = Builder.CreateCall(objc_getProtocol, protocolName);
     auto isNull = Builder.CreateICmpEQ(existing,
@@ -1057,16 +1056,16 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
   case llvm::Triple::MachO:
     switch (Type) {
     case ObjCLabelType::ClassName:
-      GV->setSection("__TEXT,__objc_classname,cstring_literals");
+      GV->setSection(IRGenModule::ObjCClassNameSectionName);
       return;
     case ObjCLabelType::MethodVarName:
-      GV->setSection("__TEXT,__objc_methname,cstring_literals");
+      GV->setSection(IRGenModule::ObjCMethodNameSectionName);
       return;
     case ObjCLabelType::MethodVarType:
-      GV->setSection("__TEXT,__objc_methtype,cstring_literals");
+      GV->setSection(IRGenModule::ObjCMethodTypeSectionName);
       return;
     case ObjCLabelType::PropertyName:
-      GV->setSection("__TEXT,__objc_methname,cstring_literals");
+      GV->setSection(IRGenModule::ObjCPropertyNameSectionName);
       return;
     }
   case llvm::Triple::ELF:
@@ -4241,10 +4240,10 @@ static TypeEntityReference
 getObjCClassByNameReference(IRGenModule &IGM, ClassDecl *cls) {
   auto kind = TypeReferenceKind::DirectObjCClassName;
   SmallString<64> objcRuntimeNameBuffer;
-  auto ref = IGM.getAddrOfGlobalString(
-      cls->getObjCRuntimeName(objcRuntimeNameBuffer),
-      /*sectionName=*/"__TEXT,__objc_classname,cstring_literals",
-      /*willBeRelativelyAddressed=*/true);
+  auto ref =
+      IGM.getAddrOfGlobalString(cls->getObjCRuntimeName(objcRuntimeNameBuffer),
+                                IRGenModule::ObjCClassNameSectionName,
+                                /*willBeRelativelyAddressed=*/true);
 
   return TypeEntityReference(kind, ref);
 }

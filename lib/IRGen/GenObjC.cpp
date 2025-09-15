@@ -1318,9 +1318,8 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
   encodingString += llvm::itostr(parmOffset);
   encodingString += fixedParamsString;
   encodingString += paramsString;
-  return IGM.getAddrOfGlobalString(
-      encodingString,
-      /*sectionName=*/"__TEXT,__objc_methtype,cstring_literals");
+  return IGM.getAddrOfGlobalString(encodingString,
+                                   IRGenModule::ObjCMethodTypeSectionName);
 }
 
 static llvm::Constant *
@@ -1335,12 +1334,12 @@ getObjectEncodingFromClangNode(IRGenModule &IGM, Decl *d,
     if (auto objcMethodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
       typeStr = clangASTContext.getObjCEncodingForMethodDecl(
           objcMethodDecl, useExtendedEncoding /*extended*/);
-      sectionName = "__TEXT,__objc_methtype,cstring_literals";
+      sectionName = IRGenModule::ObjCMethodTypeSectionName;
     }
     if (auto objcPropertyDecl = dyn_cast<clang::ObjCPropertyDecl>(clangDecl)) {
       typeStr = clangASTContext.getObjCEncodingForPropertyDecl(objcPropertyDecl,
                                                                nullptr);
-      sectionName = "__TEXT,__objc_methname,cstring_literals";
+      sectionName = IRGenModule::ObjCPropertyNameSectionName;
     }
     if (!typeStr.empty()) {
       return IGM.getAddrOfGlobalString(typeStr.c_str(), sectionName);
@@ -1440,8 +1439,7 @@ irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM, VarDecl *property) {
   TypeStr += "@0:";
   TypeStr += llvm::itostr(PtrSize.getValue());
   descriptor.typeEncoding = IGM.getAddrOfGlobalString(
-      TypeStr.c_str(),
-      /*sectionName=*/"__TEXT,__objc_methtype,cstring_literals");
+      TypeStr.c_str(), IRGenModule::ObjCMethodTypeSectionName);
   descriptor.silFunction = nullptr;
   descriptor.impl = getObjCGetterPointer(IGM, property, descriptor.silFunction);
   return descriptor;
@@ -1519,8 +1517,7 @@ irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   clangASTContext.getObjCEncodingForType(clangType, TypeStr);
   TypeStr += llvm::itostr(ParmOffset);
   descriptor.typeEncoding = IGM.getAddrOfGlobalString(
-      TypeStr.c_str(),
-      /*sectionName=*/"__TEXT,__objc_methtype,cstring_literals");
+      TypeStr.c_str(), IRGenModule::ObjCMethodTypeSectionName);
   descriptor.silFunction = nullptr;
   descriptor.impl = getObjCSetterPointer(IGM, property, descriptor.silFunction);
   return descriptor;
@@ -1627,7 +1624,7 @@ void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
   llvm::SmallString<8> signature;
   signature = "v" + llvm::itostr(ptrSize * 2) + "@0:" + llvm::itostr(ptrSize);
   descriptor.typeEncoding = IGM.getAddrOfGlobalString(
-      signature, /*sectionName=*/"__TEXT,__objc_methtype,cstring_literals");
+      signature, IRGenModule::ObjCMethodTypeSectionName);
 
   /// The third element is the method implementation pointer.
   descriptor.impl = llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
