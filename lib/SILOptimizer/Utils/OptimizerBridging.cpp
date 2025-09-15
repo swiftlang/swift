@@ -464,6 +464,60 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
   return {specializedApplySiteCallee};
 }
 
+BridgedFunction BridgedPassContext::createPackExplodedFunctionDeclaration(
+    BridgedStringRef explodedName,
+    const BridgedParameterInfo *_Nullable explodedBridgedParams,
+    SwiftInt paramCount,
+    const BridgedResultInfo *_Nullable explodedBridgedResults,
+    SwiftInt resultCount, BridgedFunction bridgedOriginal) const {
+  auto *original = bridgedOriginal.getFunction();
+  auto originalType = original->getLoweredFunctionType();
+
+  llvm::SmallVector<SILParameterInfo> explodedParams;
+  for (unsigned idx = 0; idx < paramCount; ++idx) {
+    explodedParams.push_back(explodedBridgedParams[idx].unbridged());
+  }
+
+  llvm::SmallVector<SILResultInfo> explodedResults;
+  for (unsigned idx = 0; idx < resultCount; ++idx) {
+    explodedResults.push_back(explodedBridgedResults[idx].unbridged());
+  }
+
+  auto extInfo = originalType->getExtInfo();
+
+  auto ClonedTy = SILFunctionType::get(
+      originalType->getInvocationGenericSignature(), extInfo,
+      originalType->getCoroutineKind(), originalType->getCalleeConvention(),
+      explodedParams, originalType->getYields(), explodedResults,
+      originalType->getOptionalErrorResult(),
+      originalType->getPatternSubstitutions(),
+      originalType->getInvocationSubstitutions(),
+      original->getModule().getASTContext());
+
+  SILOptFunctionBuilder functionBuilder(*invocation->getTransform());
+
+  // This function should be quietly substituted in place of the corresponding
+  // unoptimised generic specialization, so most of its properties should be the
+  // same.
+  auto *specializedApplySiteCallee = functionBuilder.createFunction(
+      original->getLinkage(), explodedName.unbridged(), ClonedTy,
+      original->getGenericEnvironment(), original->getLocation(),
+      original->isBare(), original->isTransparent(),
+      original->getSerializedKind(), IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible, original->getEntryCount(), original->isThunk(),
+      original->getClassSubclassScope(), original->getInlineStrategy(),
+      original->getEffectsKind(), original, original->getDebugScope());
+
+  if (!original->hasOwnership()) {
+    specializedApplySiteCallee->setOwnershipEliminated();
+  }
+
+  for (auto &Attr : original->getSemanticsAttrs())
+    specializedApplySiteCallee->addSemanticsAttr(Attr);
+
+  return {specializedApplySiteCallee};
+}
+
 bool BridgedPassContext::completeLifetime(BridgedValue value) const {
   SILValue v = value.getSILValue();
   SILFunction *f = v->getFunction();

@@ -165,6 +165,25 @@ struct FunctionPassContext : MutatingContext {
     return buildFn(specializedFunction, nestedContext)
   }
 
+  func createPackExplodedFunctionDeclaration(from original: Function, withName explodedName: String,
+                                             withParams explodedParameters: [ParameterInfo],
+                                             withResults explodedResults: [ResultInfo]) -> Function
+  {
+    return explodedName._withBridgedStringRef { nameRef in
+      let bridgedParamInfos = explodedParameters.map { $0._bridged }
+      let bridgedResultInfos = explodedResults.map { $0._bridged }
+
+      return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
+        bridgedResultInfos.withUnsafeBufferPointer { resultBuf in
+          bridgedPassContext.createPackExplodedFunctionDeclaration(
+            nameRef, paramBuf.baseAddress, paramBuf.count,
+            resultBuf.baseAddress, resultBuf.count,
+            original.bridged).function
+        }
+      }
+    }
+  }
+
   /// Makes sure that the lifetime of `value` ends at all control flow paths, even in dead-end blocks.
   /// Inserts destroys in dead-end blocks if those are missing.
   func completeLifetime(of value: Value) {
