@@ -269,14 +269,15 @@ struct BridgedPassContext {
                                                         bool makeThin,
                                                         bool makeBare,
                                                         bool preserveGenericSignature) const;
-
-  // Pack argument exploder
-  SWIFT_IMPORT_UNSAFE BridgedFunction createPackExplodedFunctionDeclaration(
-      BridgedStringRef explodedName,
-      const BridgedParameterInfo *_Nullable explodedBridgedParams,
-      SwiftInt paramCount,
-      const BridgedResultInfo *_Nullable explodedBridgedResults,
-      SwiftInt resultCount, BridgedFunction bridgedOriginal) const;
+  SWIFT_IMPORT_UNSAFE BridgedFunction createSpecializedFunctionDeclarationWithResults(BridgedStringRef specializedName,
+                                                        const BridgedParameterInfo * _Nullable specializedBridgedParams,
+                                                        SwiftInt paramCount,
+                                                        const BridgedResultInfo *_Nullable specializedBridgedResults,
+                                                        SwiftInt resultCount,
+                                                        BridgedFunction bridgedOriginal,
+                                                        bool makeThin,
+                                                        bool makeBare,
+                                                        bool preserveGenericSignature) const;
 
   bool completeLifetime(BridgedValue value) const;
 };

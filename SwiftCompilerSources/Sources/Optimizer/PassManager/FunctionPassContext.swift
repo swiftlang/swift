@@ -144,15 +144,30 @@ struct FunctionPassContext : MutatingContext {
                                             withParams specializedParameters: [ParameterInfo],
                                             makeThin: Bool = false,
                                             makeBare: Bool = false,
-                                            preserveGenericSignature: Bool = true) -> Function
-  {
+                                            preserveGenericSignature: Bool = true,
+                                            withResults specializedResults: [ResultInfo]? = nil) -> Function {
     return specializedFunctionName._withBridgedStringRef { nameRef in
       let bridgedParamInfos = specializedParameters.map { $0._bridged }
 
       return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
-        bridgedPassContext.createSpecializedFunctionDeclaration(nameRef, paramBuf.baseAddress, paramBuf.count,
-                                                                original.bridged, makeThin, makeBare,
-                                                                preserveGenericSignature).function
+
+        if let bridgedResultInfos = specializedResults?.map({ $0._bridged }) {
+
+          return bridgedResultInfos.withUnsafeBufferPointer { resultBuf in
+            return bridgedPassContext.createSpecializedFunctionDeclarationWithResults(
+              nameRef, paramBuf.baseAddress, paramBuf.count,
+              resultBuf.baseAddress, resultBuf.count,
+              original.bridged, makeThin, makeBare,
+              preserveGenericSignature
+            ).function
+          }
+        } else {
+          return bridgedPassContext.createSpecializedFunctionDeclaration(
+            nameRef, paramBuf.baseAddress, paramBuf.count,
+            original.bridged, makeThin, makeBare,
+            preserveGenericSignature
+          ).function
+        }
       }
     }
   }
@@ -163,25 +178,6 @@ struct FunctionPassContext : MutatingContext {
     defer { bridgedPassContext.deinitializedNestedPassContext() }
 
     return buildFn(specializedFunction, nestedContext)
-  }
-
-  func createPackExplodedFunctionDeclaration(from original: Function, withName explodedName: String,
-                                             withParams explodedParameters: [ParameterInfo],
-                                             withResults explodedResults: [ResultInfo]) -> Function
-  {
-    return explodedName._withBridgedStringRef { nameRef in
-      let bridgedParamInfos = explodedParameters.map { $0._bridged }
-      let bridgedResultInfos = explodedResults.map { $0._bridged }
-
-      return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
-        bridgedResultInfos.withUnsafeBufferPointer { resultBuf in
-          bridgedPassContext.createPackExplodedFunctionDeclaration(
-            nameRef, paramBuf.baseAddress, paramBuf.count,
-            resultBuf.baseAddress, resultBuf.count,
-            original.bridged).function
-        }
-      }
-    }
   }
 
   /// Makes sure that the lifetime of `value` ends at all control flow paths, even in dead-end blocks.

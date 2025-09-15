@@ -405,12 +405,36 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
                                      bool makeThin,
                                      bool makeBare,
                                      bool preserveGenericSignature) const {
+
+  return createSpecializedFunctionDeclarationWithResults(
+      specializedName, specializedBridgedParams, paramCount, nullptr, 0,
+      bridgedOriginal, makeThin, makeBare, preserveGenericSignature);
+}
+
+BridgedFunction BridgedPassContext::
+createSpecializedFunctionDeclarationWithResults(BridgedStringRef specializedName,
+                                                const BridgedParameterInfo * _Nullable specializedBridgedParams,
+                                                SwiftInt paramCount,
+                                                const BridgedResultInfo * _Nullable specializedBridgedResults,
+                                                SwiftInt resultCount,
+                                                BridgedFunction bridgedOriginal,
+                                                bool makeThin,
+                                                bool makeBare,
+                                                bool preserveGenericSignature) const {
   auto *original = bridgedOriginal.getFunction();
   auto originalType = original->getLoweredFunctionType();
 
   llvm::SmallVector<SILParameterInfo> specializedParams;
   for (unsigned idx = 0; idx < paramCount; ++idx) {
     specializedParams.push_back(specializedBridgedParams[idx].unbridged());
+  }
+
+  // If no results list is passed, use the original function's results.
+  llvm::SmallVector<SILResultInfo> specializedResults;
+  if (specializedBridgedResults != nullptr) {
+    for (unsigned idx = 0; idx < resultCount; ++idx) {
+      specializedResults.push_back(specializedBridgedResults[idx].unbridged());
+    }
   }
 
   // The specialized function is always a thin function. This is important
@@ -425,7 +449,7 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
       extInfo,
       originalType->getCoroutineKind(),
       originalType->getCalleeConvention(), specializedParams,
-      originalType->getYields(), originalType->getResults(),
+      originalType->getYields(), specializedBridgedResults ? specializedResults : originalType->getResults(),
       originalType->getOptionalErrorResult(),
       preserveGenericSignature ? originalType->getPatternSubstitutions() : SubstitutionMap(),
       preserveGenericSignature ? originalType->getInvocationSubstitutions() : SubstitutionMap(),
@@ -458,60 +482,6 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
     specializedApplySiteCallee->setOwnershipEliminated();
   }
   
-  for (auto &Attr : original->getSemanticsAttrs())
-    specializedApplySiteCallee->addSemanticsAttr(Attr);
-
-  return {specializedApplySiteCallee};
-}
-
-BridgedFunction BridgedPassContext::createPackExplodedFunctionDeclaration(
-    BridgedStringRef explodedName,
-    const BridgedParameterInfo *_Nullable explodedBridgedParams,
-    SwiftInt paramCount,
-    const BridgedResultInfo *_Nullable explodedBridgedResults,
-    SwiftInt resultCount, BridgedFunction bridgedOriginal) const {
-  auto *original = bridgedOriginal.getFunction();
-  auto originalType = original->getLoweredFunctionType();
-
-  llvm::SmallVector<SILParameterInfo> explodedParams;
-  for (unsigned idx = 0; idx < paramCount; ++idx) {
-    explodedParams.push_back(explodedBridgedParams[idx].unbridged());
-  }
-
-  llvm::SmallVector<SILResultInfo> explodedResults;
-  for (unsigned idx = 0; idx < resultCount; ++idx) {
-    explodedResults.push_back(explodedBridgedResults[idx].unbridged());
-  }
-
-  auto extInfo = originalType->getExtInfo();
-
-  auto ClonedTy = SILFunctionType::get(
-      originalType->getInvocationGenericSignature(), extInfo,
-      originalType->getCoroutineKind(), originalType->getCalleeConvention(),
-      explodedParams, originalType->getYields(), explodedResults,
-      originalType->getOptionalErrorResult(),
-      originalType->getPatternSubstitutions(),
-      originalType->getInvocationSubstitutions(),
-      original->getModule().getASTContext());
-
-  SILOptFunctionBuilder functionBuilder(*invocation->getTransform());
-
-  // This function should be quietly substituted in place of the corresponding
-  // unoptimised generic specialization, so most of its properties should be the
-  // same.
-  auto *specializedApplySiteCallee = functionBuilder.createFunction(
-      original->getLinkage(), explodedName.unbridged(), ClonedTy,
-      original->getGenericEnvironment(), original->getLocation(),
-      original->isBare(), original->isTransparent(),
-      original->getSerializedKind(), IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible, original->getEntryCount(), original->isThunk(),
-      original->getClassSubclassScope(), original->getInlineStrategy(),
-      original->getEffectsKind(), original, original->getDebugScope());
-
-  if (!original->hasOwnership()) {
-    specializedApplySiteCallee->setOwnershipEliminated();
-  }
-
   for (auto &Attr : original->getSemanticsAttrs())
     specializedApplySiteCallee->addSemanticsAttr(Attr);
 
