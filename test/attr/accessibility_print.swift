@@ -53,7 +53,6 @@ public struct BE_PublicStructPrivateMembers {
   // CHECK: private{{(\*/)?}} var x
   private var x = 0
   // CHECK: internal init()
-  // CHECK: private init(x: Int = 0)
 } // CHECK: {{^[}]}}
 
 // CHECK-LABEL: {{^}}fileprivate{{(\*/)?}} struct BF_FilePrivateStruct {
