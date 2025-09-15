@@ -814,27 +814,24 @@ void ConstraintSystem::recordOpenedTypes(
 
   // If the last path element is an archetype or associated type, ignore it.
   SmallVector<LocatorPathElt, 2> pathElts;
-  auto anchor = locator.getLocatorParts(pathElts);
+  (void) locator.getLocatorParts(pathElts);
   if (!pathElts.empty() &&
       pathElts.back().getKind() == ConstraintLocator::GenericParameter)
-    return;
-
-  // If the locator is empty, ignore it.
-  if (!anchor && pathElts.empty())
     return;
 
   ConstraintLocator *locatorPtr = getConstraintLocator(locator);
   assert(locatorPtr && "No locator for opened types?");
 
-  OpenedType *openedTypes
-    = Allocator.Allocate<OpenedType>(replacements.size());
-  std::copy(replacements.begin(), replacements.end(), openedTypes);
-
   // FIXME: Get rid of fixmeAllowDuplicates.
-  if (!fixmeAllowDuplicates || OpenedTypes.count(locatorPtr) == 0)
+  if (!fixmeAllowDuplicates || OpenedTypes.count(locatorPtr) == 0) {
+    OpenedType *openedTypes
+      = Allocator.Allocate<OpenedType>(replacements.size());
+    std::copy(replacements.begin(), replacements.end(), openedTypes);
+
     recordOpenedType(
       locatorPtr, llvm::ArrayRef(openedTypes, replacements.size()),
       preparedOverload);
+  }
 }
 
 /// Determine how many levels of argument labels should be removed from the
@@ -1730,8 +1727,7 @@ static bool isExistentialMemberAccessWithExplicitBaseExpression(
 
 Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     Type type, Type baseObjTy, ValueDecl *value,
-    ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
-    ArrayRef<OpenedType> replacements) {
+    ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup) {
   auto *outerDC = value->getDeclContext();
 
   // Cope with dynamic 'Self'.
@@ -1763,8 +1759,8 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
           baseObjTy, value, locator, isDynamicLookup) &&
       // If there are no type variables, there were no references to 'Self'.
       type->hasTypeVariable()) {
-    auto selfGP = outerDC->getSelfInterfaceType();
-    ASSERT(selfGP->isEqual(replacements[0].first));
+    auto replacements = getOpenedTypes(locator);
+    ASSERT(replacements[0].first->isEqual(getASTContext().TheSelfType));
     auto openedTypeVar = replacements[0].second;
 
     type = typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar,
@@ -2044,14 +2040,14 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   // Handle DynamicSelfType and a couple of other things.
   Type type = getMemberReferenceTypeFromOpenedType(
       openedType, baseObjTy, value, locator, hasAppliedSelf,
-      isDynamicLookup, replacements);
+      isDynamicLookup);
 
   // Do the same thing for the original type, if there can be any difference.
   Type origType = type;
   if (openedType.getPointer() != origOpenedType.getPointer()) {
     origType = getMemberReferenceTypeFromOpenedType(
         origOpenedType, baseObjTy, value, locator, hasAppliedSelf,
-        isDynamicLookup, replacements);
+        isDynamicLookup);
   }
 
   return { origOpenedType, openedType, origType, type, thrownErrorType };
