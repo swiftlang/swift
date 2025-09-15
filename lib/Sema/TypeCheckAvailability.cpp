@@ -3017,6 +3017,15 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   if (!isAccessorWithDeprecatedStorage)
     diagnoseIfDeprecated(R, Where, D, call);
 
+  // A reference to a compatibility memberwise initializer should be diagnosed
+  // as if it were deprecated.
+  if (auto *init = dyn_cast<ConstructorDecl>(D)) {
+    if (init->isMemberwiseInitializer() == MemberwiseInitKind::Compatibility) {
+      WarnOnCompatMemberwiseInitRequest req({init, R.Start});
+      evaluateOrDefault(ctx.evaluator, req, {});
+    }
+  }
+
   if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)
         && isa<ProtocolDecl>(D))
     return false;

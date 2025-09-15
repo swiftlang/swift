@@ -392,7 +392,8 @@ InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
 
 ArrayRef<VarDecl *>
 MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
-                                          NominalTypeDecl *decl) const {
+                                          NominalTypeDecl *decl,
+                                          MemberwiseInitKind initKind) const {
   auto initableVars =
       evaluateOrDefault(evaluator, InitializablePropertiesRequest{decl}, {});
   if (initableVars.empty())
@@ -412,7 +413,7 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
     }
 
     // We only care about properties that are memberwise initialized.
-    if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+    if (!var->isMemberwiseInitialized(initKind, /*preferDeclared=*/true))
       continue;
 
     // Add this property.
@@ -428,6 +429,48 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
   }
 
   return decl->getASTContext().AllocateCopy(results);
+}
+
+evaluator::SideEffect WarnOnCompatMemberwiseInitRequest::evaluate(
+    Evaluator &evaluator, WarnOnCompatMemberwiseInitDescriptor desc) const {
+  auto *init = desc.compatInit;
+  ASSERT(init->isMemberwiseInitializer() == MemberwiseInitKind::Compatibility);
+
+  auto *NTD = cast<NominalTypeDecl>(init->getDeclContext());
+  auto &ctx = NTD->getASTContext();
+
+  NTD->diagnose(diag::warn_use_of_compat_memberwise_init);
+
+  // Emit a fix-it that inserts the initializer.
+  if (auto braceRange = NTD->getBraces()) {
+    // Insert after the last VarDecl.
+    SourceLoc insertLoc;
+    for (auto *member : NTD->getParsedMembers()) {
+      if (isa<VarDecl>(member) || isa<PatternBindingDecl>(member))
+        continue;
+
+      auto loc = member->getSourceRangeIncludingAttrs().Start;
+      if (!loc)
+        continue;
+
+      insertLoc = loc;
+      break;
+    }
+    if (!insertLoc)
+      insertLoc = braceRange.End;
+
+    llvm::SmallString<64> insertText;
+    llvm::raw_svector_ostream out(insertText);
+    out << "private ";
+    printMemberwiseInit(NTD, MemberwiseInitKind::Compatibility, out);
+    out << "\n";
+
+    NTD->diagnose(diag::insert_compat_memberwise_init)
+        .fixItInsert(insertLoc, insertText);
+  }
+
+  ctx.Diags.diagnose(desc.firstUseLoc, diag::compat_memberwise_init_used_here);
+  return {};
 }
 
 /// Validate the \c entryNumber'th entry in \c binding.
