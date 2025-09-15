@@ -225,6 +225,10 @@ public:
 
   ASTNode findAsyncNode();
 
+  /// Whether the body contains an explicit `return` statement. This computation
+  /// is cached.
+  bool hasExplicitReturnStmt(ASTContext &ctx) const;
+
   /// If this brace contains a single ASTNode, or a \c #if that has a single active
   /// element, returns it. This will always be the last element of the brace.
   /// Otherwise returns \c nullptr.
