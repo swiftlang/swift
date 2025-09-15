@@ -33,29 +33,44 @@ void SILGenFunction::prepareEpilog(
     // emits unreachable if there is no source level return.
     NeedsReturn = !(*directResultType)->isEqual(TupleType::getEmpty(getASTContext()));
     if (NeedsReturn) {
-      for (auto directResult : fnConv.getDirectSILResults()) {
-        SILType resultType = F.getLoweredType(F.mapTypeIntoContext(
-            fnConv.getSILType(directResult, getTypeExpansionContext())));
-        // @out tuples do not get flattened in the function's return type, but
-        // the epilog block expects (recursively) flattened arguments. Flatten
-        // the type now.
-        SmallVector<SILType, 4> worklist;
-        worklist.push_back(resultType);
-        while (!worklist.empty()) {
-          auto ty = worklist.pop_back_val();
-          if (auto tupleType = ty.getASTType()->getAs<TupleType>()) {
-            assert(!fnConv.useLoweredAddresses() &&
-                   "expanding tuple in non-opaque-values exit block?!");
-            // Push tuple elements in reverse order (resulting in later tuple
-            // elements appearing earlier in worklist) so that as the worklist
-            // is drained by popping the back, arguments are created for the
-            // earlier types first.
-            for (auto index :
-                 llvm::reverse(indices(tupleType->getElementTypes()))) {
-              worklist.push_back(ty.getTupleElementType(index));
+      if (fnConv.hasGuaranteedAddressResult() || fnConv.hasGuaranteedResult()) {
+        // Do not explode tuples for borrow/mutate accessors
+        SILType resultType =
+            F.getLoweredType(F.mapTypeIntoContext(*directResultType));
+        epilogBB->createPhiArgument(resultType, fnConv.hasGuaranteedResult()
+                                                    ? OwnershipKind::Guaranteed
+                                                    : OwnershipKind::None);
+      } else {
+        for (auto directResult : fnConv.getDirectSILResults()) {
+          SILType resultType = F.getLoweredType(F.mapTypeIntoContext(
+              fnConv.getSILType(directResult, getTypeExpansionContext())));
+          // @out tuples do not get flattened in the function's return type, but
+          // the epilog block expects (recursively) flattened arguments. Flatten
+          // the type now.
+          SmallVector<SILType, 4> worklist;
+          worklist.push_back(resultType);
+          while (!worklist.empty()) {
+            auto ty = worklist.pop_back_val();
+            if (auto tupleType = ty.getASTType()->getAs<TupleType>()) {
+              assert(!fnConv.useLoweredAddresses() &&
+                     "expanding tuple in non-opaque-values exit block?!");
+              // Push tuple elements in reverse order (resulting in later tuple
+              // elements appearing earlier in worklist) so that as the worklist
+              // is drained by popping the back, arguments are created for the
+              // earlier types first.
+              for (auto index :
+                   llvm::reverse(indices(tupleType->getElementTypes()))) {
+                worklist.push_back(ty.getTupleElementType(index));
+              }
+            } else {
+              if (fnConv.hasGuaranteedResult()) {
+                epilogBB->createPhiArgument(ty, OwnershipKind::Guaranteed);
+              } else if (fnConv.hasGuaranteedAddressResult()) {
+                epilogBB->createPhiArgument(ty, OwnershipKind::None);
+              } else {
+                epilogBB->createPhiArgument(ty, OwnershipKind::Owned);
+              }
             }
-          } else {
-            epilogBB->createPhiArgument(ty, OwnershipKind::Owned);
           }
         }
       }

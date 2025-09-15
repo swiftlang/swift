@@ -179,6 +179,14 @@ public:
     return TheFunction.dyn_cast<AbstractClosureExpr*>();
   }
 
+  AccessorDecl *getAccessorDecl() const {
+    if (auto *accessor = dyn_cast_or_null<AccessorDecl>(
+            TheFunction.dyn_cast<AbstractFunctionDecl *>())) {
+      return accessor;
+    }
+    return nullptr;
+  }
+
   /// Whether this function is @Sendable.
   bool isSendable() const {
     if (auto *fnType = getType()->getAs<AnyFunctionType>())

@@ -776,7 +776,13 @@ bool swift::isRepresentableInLanguage(
           .limitBehavior(behavior);
       Reason.describe(accessor);
       return false;
-
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
+      diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
+                            diag::objc_borrow_mutate_accessor)
+          .limitBehavior(behavior);
+      Reason.describe(accessor);
+      return false;
     case AccessorKind::Read:
     case AccessorKind::Read2:
     case AccessorKind::Modify:
@@ -1519,6 +1525,8 @@ shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit,
       case AccessorKind::WillSet:
       case AccessorKind::Init:
       case AccessorKind::DistributedGet:
+      case AccessorKind::Borrow:
+      case AccessorKind::Mutate:
         return false;
 
       case AccessorKind::MutableAddress:

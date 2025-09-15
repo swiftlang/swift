@@ -2667,6 +2667,8 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       }
       AddAccessorToPrint(AccessorKind::Read2);
       break;
+    case ReadImplKind::Borrow:
+      AddAccessorToPrint(AccessorKind::Borrow);
     }
     switch (impl.getWriteImpl()) {
     case WriteImplKind::Immutable:
@@ -2700,6 +2702,9 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
         AddAccessorToPrint(AccessorKind::Modify);
       }
       AddAccessorToPrint(AccessorKind::Modify2);
+      break;
+    case WriteImplKind::Mutate:
+      AddAccessorToPrint(AccessorKind::Mutate);
       break;
     }
   }
@@ -4252,6 +4257,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::Modify2:
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
+  case AccessorKind::Borrow:
     recordDeclLoc(decl,
       [&]{
         Printer << getAccessorLabel(decl->getAccessorKind());
@@ -4260,6 +4266,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::Set:
   case AccessorKind::WillSet:
   case AccessorKind::Init:
+  case AccessorKind::Mutate:
     recordDeclLoc(decl,
       [&]{
         Printer << getAccessorLabel(decl->getAccessorKind());
@@ -7926,6 +7933,10 @@ static StringRef getStringForResultConvention(ResultConvention conv) {
   case ResultConvention::UnownedInnerPointer: return "@unowned_inner_pointer ";
   case ResultConvention::Autoreleased: return "@autoreleased ";
   case ResultConvention::Pack: return "@pack_out ";
+  case ResultConvention::GuaranteedAddress:
+    return "@guaranteed_addr ";
+  case ResultConvention::Guaranteed:
+    return "@guaranteed ";
   }
   llvm_unreachable("bad result convention");
 }

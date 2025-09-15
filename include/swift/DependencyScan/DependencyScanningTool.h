@@ -15,20 +15,50 @@
 
 #include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/DependencyScan/ScanDependencies.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/StringSaver.h"
 
 namespace swift {
 namespace dependencies {
 class DependencyScanningTool;
-class DependencyScanDiagnosticCollector;
+class DepScanInMemoryDiagnosticCollector;
 
-struct ScanQueryInstance {
+struct ScanQueryContext {
+  /// Primary CompilerInstance configured for this scanning action
   std::unique_ptr<CompilerInstance> ScanInstance;
-  std::shared_ptr<DependencyScanDiagnosticCollector> ScanDiagnostics;
+  /// An thread-safe diagnostic consumer which collects all emitted
+  /// diagnostics in the scan to be reporte via libSwiftScan API
+  std::unique_ptr<DepScanInMemoryDiagnosticCollector> InMemoryDiagnosticCollector;
+  /// A thread-safe serialized diagnostics consumer.
+  /// Note, although type-erased, this must be an instance of
+  /// 'ThreadSafeSerializedDiagnosticConsumer'
+  std::unique_ptr<DiagnosticConsumer> SerializedDiagnosticConsumer;
+
+  ScanQueryContext(
+      std::unique_ptr<CompilerInstance> ScanInstance,
+      std::unique_ptr<DepScanInMemoryDiagnosticCollector>
+          InMemoryDiagnosticCollector,
+      std::unique_ptr<DiagnosticConsumer> SerializedDiagnosticConsumer)
+      : ScanInstance(std::move(ScanInstance)),
+        InMemoryDiagnosticCollector(std::move(InMemoryDiagnosticCollector)),
+        SerializedDiagnosticConsumer(std::move(SerializedDiagnosticConsumer)) {}
+
+  ScanQueryContext(ScanQueryContext &&other)
+      : ScanInstance(std::move(other.ScanInstance)),
+        InMemoryDiagnosticCollector(
+            std::move(other.InMemoryDiagnosticCollector)),
+        SerializedDiagnosticConsumer(
+            std::move(other.SerializedDiagnosticConsumer)) {}
+
+  ~ScanQueryContext() {
+    if (SerializedDiagnosticConsumer)
+      SerializedDiagnosticConsumer->finishProcessing();
+  }
 };
 
 /// Pure virtual Diagnostic consumer intended for collecting
@@ -47,12 +77,16 @@ public:
 };
 
 /// Diagnostic consumer that simply collects the diagnostics emitted so-far
-class DependencyScanDiagnosticCollector : public ThreadSafeDiagnosticCollector {
-private:
+/// and uses a representation agnostic from any specific CompilerInstance state
+/// which may have been used to emit the diagnostic
+class DepScanInMemoryDiagnosticCollector
+    : public ThreadSafeDiagnosticCollector {
+public:
   struct ScannerDiagnosticInfo {
     std::string Message;
     llvm::SourceMgr::DiagKind Severity;
-    std::optional<ScannerImportStatementInfo::ImportDiagnosticLocationInfo> ImportLocation;
+    std::optional<ScannerImportStatementInfo::ImportDiagnosticLocationInfo>
+        ImportLocation;
   };
   std::vector<ScannerDiagnosticInfo> Diagnostics;
 
@@ -61,9 +95,12 @@ protected:
 
 public:
   friend DependencyScanningTool;
-  DependencyScanDiagnosticCollector() {}
+  DepScanInMemoryDiagnosticCollector() {}
   void reset() { Diagnostics.clear(); }
-  const std::vector<ScannerDiagnosticInfo> &getDiagnostics() const {
+  std::vector<ScannerDiagnosticInfo> getDiagnostics() const {
+    return Diagnostics;
+  }
+  const std::vector<ScannerDiagnosticInfo> &getDiagnosticsRef() const {
     return Diagnostics;
   }
 };
@@ -97,10 +134,10 @@ public:
 
   /// Using the specified invocation command, instantiate a CompilerInstance
   /// that will be used for this scan.
-  llvm::ErrorOr<ScanQueryInstance>
-  initCompilerInstanceForScan(ArrayRef<const char *> Command,
-                              StringRef WorkingDirectory,
-                              std::shared_ptr<DependencyScanDiagnosticCollector> scannerDiagnosticsCollector);
+  llvm::ErrorOr<ScanQueryContext> createScanQueryContext(
+      ArrayRef<const char *> Command, StringRef WorkingDirectory,
+      std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+          &initializationDiagnostics);
 
 private:
   /// Shared cache of module dependencies, re-used by individual full-scan queries
@@ -113,7 +150,9 @@ private:
   llvm::StringSaver Saver;
 };
 
-swiftscan_diagnostic_set_t *mapCollectedDiagnosticsForOutput(const DependencyScanDiagnosticCollector *diagnosticCollector);
+swiftscan_diagnostic_set_t *mapCollectedDiagnosticsForOutput(
+    ArrayRef<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+        diagnostics);
 
 } // end namespace dependencies
 } // end namespace swift

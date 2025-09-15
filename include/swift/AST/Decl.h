@@ -215,7 +215,9 @@ enum class DescriptiveDeclKind : uint8_t {
   OpaqueVarType,
   Macro,
   MacroExpansion,
-  Using
+  Using,
+  BorrowAccessor,
+  MutateAccessor,
 };
 
 /// Describes which spelling was used in the source for the 'static' or 'class'
@@ -6251,7 +6253,7 @@ public:
   bool requiresOpaqueRead2Coroutine() const;
 
   /// Does this storage require a 'set' accessor in its opaque-accessors set?
-  bool requiresOpaqueSetter() const { return supportsMutation(); }
+  bool requiresOpaqueSetter() const;
 
   /// Does this storage require a '_modify' accessor in its opaque-accessors
   /// set?
@@ -8721,6 +8723,13 @@ public:
   /// use the implicit oldValue parameter in its body or does not have
   /// an explicit parameter in its parameter list.
   bool isSimpleDidSet() const;
+
+  bool isBorrowAccessor() const {
+    return getAccessorKind() == AccessorKind::Borrow;
+  }
+  bool isMutateAccessor() const {
+    return getAccessorKind() == AccessorKind::Mutate;
+  }
 
   void setIsTransparent(bool transparent) {
     Bits.AccessorDecl.IsTransparent = transparent;

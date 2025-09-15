@@ -1537,6 +1537,13 @@ static void emitIndirectResultParameters(SILGenFunction &SGF,
                                          Type resultType,
                                          AbstractionPattern origResultType,
                                          DeclContext *DC) {
+  // Borrow and mutate accessors do not return indirectly.
+  if (auto *accessor = dyn_cast<AccessorDecl>(DC)) {
+    if (accessor->isBorrowAccessor() || accessor->isMutateAccessor()) {
+      return;
+    }
+  }
+
   CanType resultTypeInContext =
     DC->mapTypeIntoContext(resultType)->getCanonicalType();
 

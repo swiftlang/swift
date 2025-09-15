@@ -533,6 +533,7 @@ static uint8_t getRawReadImplKind(swift::ReadImplKind kind) {
   CASE(Address)
   CASE(Read)
   CASE(Read2)
+  CASE(Borrow)
 #undef CASE
   }
   llvm_unreachable("bad kind");
@@ -551,6 +552,7 @@ static unsigned getRawWriteImplKind(swift::WriteImplKind kind) {
   CASE(MutableAddress)
   CASE(Modify)
   CASE(Modify2)
+  CASE(Mutate)
 #undef CASE
   }
   llvm_unreachable("bad kind");
@@ -569,6 +571,7 @@ static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
   CASE(Modify2)
   CASE(StoredWithDidSet)
   CASE(InheritedWithDidSet)
+  CASE(Mutate)
 #undef CASE
   }
   llvm_unreachable("bad kind");
@@ -5520,6 +5523,8 @@ static uint8_t getRawStableResultConvention(swift::ResultConvention rc) {
   SIMPLE_CASE(ResultConvention, UnownedInnerPointer)
   SIMPLE_CASE(ResultConvention, Autoreleased)
   SIMPLE_CASE(ResultConvention, Pack)
+  SIMPLE_CASE(ResultConvention, GuaranteedAddress)
+  SIMPLE_CASE(ResultConvention, Guaranteed)
   }
   llvm_unreachable("bad result convention kind");
 }
