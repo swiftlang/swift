@@ -156,6 +156,9 @@ ERROR(error_load_resolved_plugin,none,
 NOTE(note_valid_swift_versions, none,
      "valid arguments to '-swift-version' are %0", (StringRef))
 
+ERROR(error_module_interface_requires_language_mode,none,
+      "emitting module interface files requires '-language-mode'", ())
+
 ERROR(error_mode_cannot_emit_dependencies,none,
       "this mode does not support emitting dependency files", ())
 ERROR(error_mode_cannot_emit_reference_dependencies,none,
