@@ -265,13 +265,6 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BridgedFunction createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
                                                         const BridgedParameterInfo * _Nullable specializedBridgedParams,
                                                         SwiftInt paramCount,
-                                                        BridgedFunction bridgedOriginal,
-                                                        bool makeThin,
-                                                        bool makeBare,
-                                                        bool preserveGenericSignature) const;
-  SWIFT_IMPORT_UNSAFE BridgedFunction createSpecializedFunctionDeclarationWithResults(BridgedStringRef specializedName,
-                                                        const BridgedParameterInfo * _Nullable specializedBridgedParams,
-                                                        SwiftInt paramCount,
                                                         const BridgedResultInfo *_Nullable specializedBridgedResults,
                                                         SwiftInt resultCount,
                                                         BridgedFunction bridgedOriginal,

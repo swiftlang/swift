@@ -154,7 +154,7 @@ struct FunctionPassContext : MutatingContext {
         if let bridgedResultInfos = specializedResults?.map({ $0._bridged }) {
 
           return bridgedResultInfos.withUnsafeBufferPointer { resultBuf in
-            return bridgedPassContext.createSpecializedFunctionDeclarationWithResults(
+            return bridgedPassContext.createSpecializedFunctionDeclaration(
               nameRef, paramBuf.baseAddress, paramBuf.count,
               resultBuf.baseAddress, resultBuf.count,
               original.bridged, makeThin, makeBare,
@@ -164,6 +164,7 @@ struct FunctionPassContext : MutatingContext {
         } else {
           return bridgedPassContext.createSpecializedFunctionDeclaration(
             nameRef, paramBuf.baseAddress, paramBuf.count,
+            nil, 0,
             original.bridged, makeThin, makeBare,
             preserveGenericSignature
           ).function

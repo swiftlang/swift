@@ -401,26 +401,12 @@ BridgedFunction BridgedPassContext::
 createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
                                      const BridgedParameterInfo * _Nullable specializedBridgedParams,
                                      SwiftInt paramCount,
+                                     const BridgedResultInfo * _Nullable specializedBridgedResults,
+                                     SwiftInt resultCount,
                                      BridgedFunction bridgedOriginal,
                                      bool makeThin,
                                      bool makeBare,
                                      bool preserveGenericSignature) const {
-
-  return createSpecializedFunctionDeclarationWithResults(
-      specializedName, specializedBridgedParams, paramCount, nullptr, 0,
-      bridgedOriginal, makeThin, makeBare, preserveGenericSignature);
-}
-
-BridgedFunction BridgedPassContext::
-createSpecializedFunctionDeclarationWithResults(BridgedStringRef specializedName,
-                                                const BridgedParameterInfo * _Nullable specializedBridgedParams,
-                                                SwiftInt paramCount,
-                                                const BridgedResultInfo * _Nullable specializedBridgedResults,
-                                                SwiftInt resultCount,
-                                                BridgedFunction bridgedOriginal,
-                                                bool makeThin,
-                                                bool makeBare,
-                                                bool preserveGenericSignature) const {
   auto *original = bridgedOriginal.getFunction();
   auto originalType = original->getLoweredFunctionType();
 
