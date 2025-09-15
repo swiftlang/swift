@@ -2351,8 +2351,10 @@ void DisjunctionChoiceProducer::partitionDisjunction(
     return false;
   });
 
-  // Then unavailable constraints if we're skipping them.
-  if (!CS.shouldAttemptFixes()) {
+  // Then unavailable constraints if we're skipping them. Also do this for
+  // completion since we enable fixes there but still want to try unavailable
+  // overloads last.
+  if (!CS.shouldAttemptFixes() || CS.isForCodeCompletion()) {
     forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
       if (constraint->getKind() != ConstraintKind::BindOverload)
         return false;
