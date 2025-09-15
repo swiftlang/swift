@@ -28,6 +28,7 @@
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -791,7 +792,16 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                  diag::invalid_multiple_return_borrow_accessor);
         return;
       }
-      directResults.push_back(result->forward(*this));
+
+      auto resultValue = result->getValue();
+      SILType selfType = F.getSelfArgument()->getType();
+      if (selfType.isMoveOnly() && F.getConventions().hasGuaranteedResult()) {
+        // If we are returning the result of borrow accessor, strip the
+        // unnecessary copy_value + mark_unresolved_non_copyable_value
+        // instructions.
+        resultValue = lookThroughMoveOnlyCheckerPattern(resultValue);
+      }
+      directResults.push_back(resultValue);
     }
   } else {
     // SILValue return.

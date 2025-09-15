@@ -5442,6 +5442,17 @@ ManagedValue CallEmission::applyBorrowAccessor() {
       origFormalType.getLifetimeDependencies(), calleeTypeInfo.foreign,
       uncurriedArgs, uncurriedLoc);
 
+  auto selfArgMV = uncurriedArgs.back();
+
+  // Strip the unnecessary copy_value + mark_unresolved_non_copyable_value +
+  // begin_borrow instructions added for move-only self argument.
+  if (selfArgMV.getValue()->getType().isMoveOnly() &&
+      selfArgMV.getValue()->getType().isObject()) {
+    uncurriedArgs[uncurriedArgs.size() - 1] =
+        ManagedValue::forBorrowedObjectRValue(
+            lookThroughMoveOnlyCheckerPattern(selfArgMV.getValue()));
+  }
+
   auto value = SGF.applyBorrowAccessor(uncurriedLoc.value(), fnValue, canUnwind,
                                        callee.getSubstitutions(), uncurriedArgs,
                                        calleeTypeInfo.substFnType, options);
@@ -5459,13 +5470,21 @@ ManagedValue SILGenFunction::applyBorrowAccessor(
                /*indirect results*/ {}, /*indirect errors*/ {}, rawResults,
                ExecutorBreadcrumb());
   assert(rawResults.size() == 1);
-  auto result = rawResults[0];
-  if (result->getType().isMoveOnly()) {
-    result = B.createMarkUnresolvedNonCopyableValueInst(
-        loc, result,
-        MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+  auto rawResult = rawResults[0];
+  if (!rawResult->getType().isMoveOnly()) {
+    return ManagedValue::forForwardedRValue(*this, rawResult);
   }
-  return ManagedValue::forForwardedRValue(*this, result);
+  if (rawResult->getType().isAddress()) {
+    auto result = B.createMarkUnresolvedNonCopyableValueInst(
+        loc, rawResult,
+        MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+    return ManagedValue::forRValueWithoutOwnership(result);
+  }
+  auto result = emitManagedCopy(loc, rawResult);
+  result = B.createMarkUnresolvedNonCopyableValueInst(
+      loc, result,
+      MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+  return emitManagedBeginBorrow(loc, result.getValue());
 }
 
 RValue CallEmission::applyFirstLevelCallee(SGFContext C) {

@@ -196,11 +196,7 @@ bool ValueBase::isGuaranteedForwarding() const {
     return phi->isGuaranteedForwarding();
   }
 
-  auto *applyInst = dyn_cast_or_null<ApplyInst>(getDefiningInstruction());
-  if (!applyInst) {
-    return false;
-  }
-  return applyInst->hasGuaranteedResult();
+  return isBorrowAccessorResult();
 }
 
 bool ValueBase::isBeginApplyToken() const {
@@ -208,6 +204,13 @@ bool ValueBase::isBeginApplyToken() const {
   if (!result)
     return false;
   return result->isBeginApplyToken();
+}
+
+bool ValueBase::isBorrowAccessorResult() const {
+  auto *apply = dyn_cast_or_null<ApplyInst>(getDefiningInstruction());
+  if (!apply)
+    return false;
+  return apply->hasGuaranteedResult();
 }
 
 bool ValueBase::hasDebugTrace() const {
