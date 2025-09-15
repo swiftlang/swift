@@ -4437,8 +4437,15 @@ public:
   FunctionType *adjustFunctionTypeForConcurrency(
       FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
       unsigned numApplies, bool isMainDispatchQueue,
-      ArrayRef<OpenedType> replacements, ConstraintLocatorBuilder locator,
-      PreparedOverloadBuilder *preparedOverload);
+      bool openGlobalActorType, ConstraintLocatorBuilder locator);
+
+  /// \returns The opened type and the thrown error type.
+  std::pair<Type, Type> getTypeOfReferenceImpl(
+                          ValueDecl *decl,
+                          FunctionRefInfo functionRefInfo,
+                          ConstraintLocatorBuilder locator,
+                          DeclContext *useDC,
+                          PreparedOverloadBuilder *preparedOverload);
 
   /// Retrieve the type of a reference to the given value declaration.
   ///

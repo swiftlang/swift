@@ -956,16 +956,22 @@ static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
 
 FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
     FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
-    unsigned numApplies, bool isMainDispatchQueue, ArrayRef<OpenedType> replacements,
-    ConstraintLocatorBuilder locator, PreparedOverloadBuilder *preparedOverload) {
+    unsigned numApplies, bool isMainDispatchQueue, bool openGlobalActorType,
+    ConstraintLocatorBuilder locator) {
 
   auto *adjustedTy = swift::adjustFunctionTypeForConcurrency(
       fnType, decl, dc, numApplies, isMainDispatchQueue, GetClosureType{*this},
       ClosureIsolatedByPreconcurrency{*this}, [&](Type type) {
-        if (replacements.empty())
+        if (!type->hasTypeParameter())
           return type;
 
-        return openType(type, replacements, locator, preparedOverload);
+        // FIXME: This should be handled elsewhere.
+        if (!openGlobalActorType)
+          return type;
+
+        auto replacements = getOpenedTypes(getConstraintLocator(locator));
+        ASSERT(!replacements.empty());
+        return openType(type, replacements, locator, /*preparedOverload=*/nullptr);
       });
 
   // Infer @Sendable for global actor isolated function types under the
@@ -1105,13 +1111,14 @@ recordFixIfNeededForPlaceholderInDecl(ConstraintSystem &cs, ValueDecl *D,
   cs.recordFix(IgnoreInvalidPlaceholderInDeclRef::create(cs, loc));
 }
 
-DeclReferenceType
-ConstraintSystem::getTypeOfReference(ValueDecl *value,
-                                     FunctionRefInfo functionRefInfo,
-                                     ConstraintLocatorBuilder locator,
-                                     DeclContext *useDC,
-                                     PreparedOverloadBuilder *preparedOverload) {
+std::pair<Type, Type>
+ConstraintSystem::getTypeOfReferenceImpl(ValueDecl *value,
+                                         FunctionRefInfo functionRefInfo,
+                                         ConstraintLocatorBuilder locator,
+                                         DeclContext *useDC,
+                                         PreparedOverloadBuilder *preparedOverload) {
   ASSERT(!!preparedOverload == PreparingOverload);
+
   recordFixIfNeededForPlaceholderInDecl(*this, value, locator);
 
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
@@ -1130,39 +1137,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements, preparedOverload);
 
-    auto origOpenedType = openedType;
-    if (!isRequirementOrWitness(locator)) {
-      unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
-                                               functionRefInfo);
-      openedType = adjustFunctionTypeForConcurrency(
-          origOpenedType, /*baseType=*/Type(), func, useDC, numApplies, false,
-          replacements, locator, preparedOverload);
-    }
-
-    // If this is a method whose result type is dynamic Self, replace
-    // DynamicSelf with the actual object type. Repeat the adjustment
-    // for the original and adjusted types.
-    auto type = openedType;
-    if (openedType->hasDynamicSelfType()) {
-      auto params = openedType->getParams();
-      assert(params.size() == 1);
-      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
-      type = openedType->replaceDynamicSelfType(selfTy)
-                       ->castTo<FunctionType>();
-    }
-
-    auto origType = origOpenedType;
-    if (origOpenedType->hasDynamicSelfType()) {
-      auto params = origOpenedType->getParams();
-      assert(params.size() == 1);
-      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
-      origType = origOpenedType->replaceDynamicSelfType(selfTy)
-                               ->castTo<FunctionType>();
-    }
-
-    // The reference implicitly binds 'self'.
-    return {origOpenedType, openedType,
-            origType->getResult(), type->getResult(), Type()};
+    return {openedType, Type()};
   }
 
   // Unqualified reference to a local or global function.
@@ -1191,16 +1166,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements, preparedOverload);
 
-    auto origOpenedType = openedType;
-    if (!isRequirementOrWitness(locator)) {
-      unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
-                                               functionRefInfo);
-      openedType = adjustFunctionTypeForConcurrency(
-          origOpenedType->castTo<FunctionType>(), /*baseType=*/Type(), funcDecl,
-          useDC, numApplies, false, replacements, locator, preparedOverload);
-    }
-
-    return { origOpenedType, openedType, origOpenedType, openedType, Type() };
+    return {openedType, Type()};
   }
 
   // Unqualified reference to a type.
@@ -1222,11 +1188,11 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // Module types are not wrapped in metatypes.
     if (type->is<ModuleType>())
-      return { type, type, type, type, Type() };
+      return { type, Type() };
 
     // If it's a value reference, refer to the metatype.
     type = MetatypeType::get(type);
-    return { type, type, type, type, Type() };
+    return {type, Type()};
   }
 
   // Unqualified reference to a macro.
@@ -1245,7 +1211,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // FIXME: Should we use replaceParamErrorTypeByPlaceholder() here?
 
-    return { openedType, openedType, openedType, openedType, Type() };
+    return {openedType, Type()};
   }
 
   // Only remaining case: unqualified reference to a property.
@@ -1267,17 +1233,103 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
         accessor->getEffectiveThrownErrorType().value_or(Type());
   }
 
+  return {valueType, thrownErrorType};
+}
+
+DeclReferenceType
+ConstraintSystem::getTypeOfReference(ValueDecl *value,
+                                     FunctionRefInfo functionRefInfo,
+                                     ConstraintLocatorBuilder locator,
+                                     DeclContext *useDC,
+                                     PreparedOverloadBuilder *preparedOverload) {
+  ASSERT(!!preparedOverload == PreparingOverload);
+
+  Type openedType, thrownErrorType;
+  std::tie(openedType, thrownErrorType) = getTypeOfReferenceImpl(
+      value, functionRefInfo, locator, useDC, preparedOverload);
+
+  if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
+    auto *openedFnType = openedType->castTo<FunctionType>();
+
+    // Unqualified lookup can find operator names within nominal types.
+    auto func = cast<FuncDecl>(value);
+    assert(func->isOperator() && "Lookup should only find operators");
+
+
+    auto origOpenedType = openedFnType;
+    if (!isRequirementOrWitness(locator)) {
+      unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
+                                               functionRefInfo);
+      openedFnType = adjustFunctionTypeForConcurrency(
+          origOpenedType, /*baseType=*/Type(), func, useDC, numApplies,
+          /*isMainDispatchQueue=*/false, /*openGlobalActorType=*/true, locator);
+    }
+
+    // If this is a method whose result type is dynamic Self, replace
+    // DynamicSelf with the actual object type. Repeat the adjustment
+    // for the original and adjusted types.
+    auto type = openedFnType;
+    if (openedFnType->hasDynamicSelfType()) {
+      auto params = openedFnType->getParams();
+      assert(params.size() == 1);
+      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
+      type = openedFnType->replaceDynamicSelfType(selfTy)
+          ->castTo<FunctionType>();
+    }
+
+    auto origType = origOpenedType;
+    if (origOpenedType->hasDynamicSelfType()) {
+      auto params = origOpenedType->getParams();
+      assert(params.size() == 1);
+      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
+      origType = origOpenedType->replaceDynamicSelfType(selfTy)
+          ->castTo<FunctionType>();
+    }
+
+    // The reference implicitly binds 'self'.
+    return {origOpenedType, openedType,
+            origType->getResult(), type->getResult(), Type()};
+  }
+
+  // Unqualified reference to a local or global function.
+  if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(value)) {
+    auto origOpenedType = openedType;
+    if (!isRequirementOrWitness(locator)) {
+      unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
+                                               functionRefInfo);
+      openedType = adjustFunctionTypeForConcurrency(
+          origOpenedType->castTo<FunctionType>(), /*baseType=*/Type(), funcDecl,
+          useDC, numApplies, /*isMainDispatchQueue=*/false,
+          /*openGlobalActorType=*/true, locator);
+    }
+
+    return { origOpenedType, openedType, origOpenedType, openedType, Type() };
+  }
+
+  // Unqualified reference to a type.
+  if (isa<TypeDecl>(value)) {
+    return { openedType, openedType, openedType, openedType, Type() };
+  }
+
+  // Unqualified reference to a macro.
+  if (isa<MacroDecl>(value)) {
+    return { openedType, openedType, openedType, openedType, Type() };
+  }
+
+  // Only remaining case: unqualified reference to a property.
+  auto *varDecl = cast<VarDecl>(value);
+
   // Adjust the type for concurrency.
-  auto origValueType = valueType;
+  auto origOpenedType = openedType;
 
   if (!isRequirementOrWitness(locator)) {
-    valueType = adjustVarTypeForConcurrency(
-        valueType, varDecl, useDC,
+    openedType = adjustVarTypeForConcurrency(
+        openedType, varDecl, useDC,
         GetClosureType{*this},
         ClosureIsolatedByPreconcurrency{*this});
   }
 
-  return { origValueType, valueType, origValueType, valueType, thrownErrorType };
+  return { origOpenedType, openedType, origOpenedType, openedType, thrownErrorType };
 }
 
 /// Bind type variables for archetypes that are determined from
@@ -1990,13 +2042,13 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     unsigned numApplies = getNumApplications(hasAppliedSelf, functionRefInfo);
     openedType = adjustFunctionTypeForConcurrency(
         origOpenedType->castTo<FunctionType>(), baseRValueTy, value, useDC,
-        numApplies, isMainDispatchQueueMember(locator), replacements, locator,
-        preparedOverload);
+        numApplies, isMainDispatchQueueMember(locator),
+        /*openGlobalActorType=*/true, locator);
   } else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
     openedType = adjustFunctionTypeForConcurrency(
         origOpenedType->castTo<FunctionType>(), baseRValueTy, subscript, useDC,
-        /*numApplies=*/2, /*isMainDispatchQueue=*/false, replacements, locator,
-        preparedOverload);
+        /*numApplies=*/2, /*isMainDispatchQueue=*/false,
+        /*openGlobalActorType=*/true, locator);
   } else if (auto var = dyn_cast<VarDecl>(value)) {
     // Adjust the function's result type, since that's the Var's actual type.
     auto origFnType = origOpenedType->castTo<AnyFunctionType>();
@@ -2131,9 +2183,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       FunctionType::ExtInfo info;
       type = adjustFunctionTypeForConcurrency(
           FunctionType::get(indices, elementTy, info), overload.getBaseType(),
-          subscript, useDC,
-          /*numApplies=*/1, /*isMainDispatchQueue=*/false, emptyReplacements,
-          locator, /*preparedOverload=*/nullptr);
+          subscript, useDC, /*numApplies=*/1, /*isMainDispatchQueue=*/false,
+          /*openGlobalActorType=*/false, locator);
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       type = var->getValueInterfaceType();
       if (doesStorageProduceLValue(
@@ -2178,8 +2229,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       type = adjustFunctionTypeForConcurrency(
                  type->castTo<FunctionType>(), overload.getBaseType(), decl,
                  useDC, numApplies, /*isMainDispatchQueue=*/false,
-                 emptyReplacements, locator, /*preparedOverload=*/nullptr)
-                 ->getResult();
+                 /*openGlobalActorType=*/false, locator)
+                    ->getResult();
     }
   }
 
