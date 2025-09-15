@@ -14,6 +14,8 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
+#include "clang/Frontend/SerializedDiagnosticReader.h"
+#include "clang/Frontend/SerializedDiagnostics.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Host.h"
@@ -244,12 +246,125 @@ public func overlayFuncA() { }\n"));
     CommandB.push_back(command.c_str());
   }
 
-  auto ScanDiagnosticConsumer = std::make_shared<DependencyScanDiagnosticCollector>();
-  auto instanceA = ScannerTool.initCompilerInstanceForScan(CommandA, {}, ScanDiagnosticConsumer);
-  auto instanceB = ScannerTool.initCompilerInstanceForScan(CommandB, {}, ScanDiagnosticConsumer);
+  std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+      InitializationDiagnostics;
+  auto queryAContext = ScannerTool.createScanQueryContext(CommandA, {},
+                                                          InitializationDiagnostics);
+  auto queryBContext = ScannerTool.createScanQueryContext(CommandB, {},
+                                                          InitializationDiagnostics);
   // Ensure that scans that only differ in module name have distinct scanning context hashes
-  ASSERT_NE(instanceA->ScanInstance.get()->getInvocation().getModuleScanningHash(),
-            instanceB->ScanInstance.get()->getInvocation().getModuleScanningHash());
+  ASSERT_NE(queryAContext->ScanInstance.get()->getInvocation().getModuleScanningHash(),
+            queryBContext->ScanInstance.get()->getInvocation().getModuleScanningHash());
+}
+
+namespace {
+class DiagnosticChecker : public clang::serialized_diags::SerializedDiagnosticReader {
+public:
+  std::vector<std::string> errorMessages;
+  std::vector<std::string> warningMessages;
+
+protected:
+  std::error_code visitDiagnosticRecord(
+      unsigned Severity, const clang::serialized_diags::Location &Location,
+      unsigned Category, unsigned Flag, StringRef Message) override {
+      switch (static_cast<clang::serialized_diags::Level>(Severity)) {
+        case clang::serialized_diags::Warning:
+          warningMessages.push_back(Message.str());
+          break;
+        case clang::serialized_diags::Error:
+          errorMessages.push_back(Message.str());
+          break;
+        default:
+          break;
+      }
+      return std::error_code();
+  }
+};
+}
+
+
+TEST_F(ScanTest, TestSerializedDiagnosticOutput) {
+  SmallString<256> tempDir;
+  ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory(
+      "ScanTest.TestSerializedDiagnosticOutput", tempDir));
+  SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
+
+  // Create test input file
+  std::string TestPathStr = createFilename(tempDir, "foo.swift");
+  ASSERT_FALSE(emitFileWithContents(tempDir, "foo.swift", "import A\n\
+#warning(\"This is a warning\")\n"));
+
+  // Create include directory
+  std::string SwiftDirPath = createFilename(tempDir, "Swift");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(SwiftDirPath));
+
+  // Create output directory
+  std::string OutputDirPath = createFilename(tempDir, "Output");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(OutputDirPath));
+  std::string SerializedDiagnosticsOutputPath =
+      createFilename(OutputDirPath, "scan-diags.dia");
+
+  // Create imported module Swift interface files
+  ASSERT_FALSE(emitFileWithContents(SwiftDirPath, "A.swiftinterface",
+                                    "// swift-interface-format-version: 1.0\n\
+// swift-module-flags: -module-name A\n\
+import Swift\n\
+#error(\"This is an error\")\n\
+public func funcA() { }\n"));
+
+  // Paths to shims and stdlib
+  llvm::SmallString<128> ShimsLibDir = StdLibDir;
+  llvm::sys::path::append(ShimsLibDir, "shims");
+  auto Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
+  llvm::sys::path::append(StdLibDir, getPlatformNameForTriple(Target));
+
+  // Generate command line
+  std::vector<std::string> CommandStr = {
+      TestPathStr,
+      std::string("-I ") + SwiftDirPath,
+      std::string("-I ") + StdLibDir.str().str(),
+      std::string("-I ") + ShimsLibDir.str().str(),
+      "-serialize-diagnostics-path",
+      SerializedDiagnosticsOutputPath,
+      "-module-name",
+      "testSerializedDiagnosticOutput"};
+  // On Windows we need to add an extra escape for path separator characters
+  // because otherwise the command line tokenizer will treat them as escape
+  // characters.
+  for (size_t i = 0; i < CommandStr.size(); ++i) {
+    std::replace(CommandStr[i].begin(), CommandStr[i].end(), '\\', '/');
+  }
+  std::vector<const char *> Command;
+  for (auto &command : CommandStr)
+    Command.push_back(command.c_str());
+
+  {
+    auto ScanningService = std::make_unique<SwiftDependencyScanningService>();
+    std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+        InitializationDiagnostics;
+    auto QueryContext = ScannerTool.createScanQueryContext(Command, {},
+                                                           InitializationDiagnostics);
+    ASSERT_FALSE(QueryContext.getError());
+
+    ModuleDependenciesCache ScanCache(
+        QueryContext->ScanInstance.get()->getMainModule()->getNameStr().str(),
+        QueryContext->ScanInstance.get()
+            ->getInvocation()
+            .getModuleScanningHash());
+    auto DependenciesOrErr =
+        performModuleScan(*ScanningService, ScanCache, *QueryContext);
+
+    ASSERT_FALSE(DependenciesOrErr.getError());
+  }
+  ASSERT_TRUE(llvm::sys::fs::exists(SerializedDiagnosticsOutputPath));
+
+  auto DiagnosticsReader = DiagnosticChecker();
+  auto ReadError = DiagnosticsReader.readDiagnostics(SerializedDiagnosticsOutputPath);
+  ASSERT_FALSE(ReadError);
+  ASSERT_TRUE(DiagnosticsReader.errorMessages.size() == 1);
+  ASSERT_TRUE(DiagnosticsReader.warningMessages.size() == 1);
+  ASSERT_TRUE(DiagnosticsReader.errorMessages.front() == "This is an error");
+  ASSERT_TRUE(DiagnosticsReader.warningMessages.front() == "This is a warning");
 }
 
 TEST_F(ScanTest, TestModuleCycle) {
