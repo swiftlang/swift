@@ -689,6 +689,12 @@ def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-valid
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
 
+def verbose_asm : Flag<["-"], "verbose-asm">,
+  HelpText<"Generate verbose assembly output with comments">;
+
+def no_verbose_asm : Flag<["-"], "no-verbose-asm">,
+  HelpText<"Disable verbose assembly output (default is enabled)">;
+
 def emit_pch : Flag<["-"], "emit-pch">,
   HelpText<"Emit PCH for imported Objective-C header file">, ModeOpt;
 

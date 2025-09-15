@@ -159,6 +159,8 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
   // command-line flags.
   TargetOpts.EmulatedTLS = Clang->getCodeGenOpts().EmulatedTLS;
 
+  TargetOpts.MCOptions.AsmVerbose = Opts.VerboseAsm;
+
   // WebAssembly doesn't support atomics yet, see
   // https://github.com/apple/swift/issues/54533 for more details.
   if (Clang->getTargetInfo().getTriple().isOSBinFormatWasm())
