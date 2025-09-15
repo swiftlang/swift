@@ -336,6 +336,8 @@ SWIFT_REQUEST(TypeChecker, StoredPropertiesAndMissingMembersRequest,
               ArrayRef<Decl *>(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, StoredPropertiesRequest,
               ArrayRef<VarDecl *>(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, InitializablePropertiesRequest,
+              ArrayRef<VarDecl *>(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InitAccessorPropertiesRequest,
               ArrayRef<VarDecl *>(NominalTypeDecl *),
               Cached, NoLocationInfo)
