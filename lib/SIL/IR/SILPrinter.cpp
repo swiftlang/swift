@@ -3658,6 +3658,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     case PerformanceConstraints::NoRuntime:      OS << "[no_runtime] "; break;
     case PerformanceConstraints::NoExistentials: OS << "[no_existentials] "; break;
     case PerformanceConstraints::NoObjCBridging: OS << "[no_objc_bridging] "; break;
+    case PerformanceConstraints::ManualOwnership: OS << "[manual_ownership] "; break;
   }
 
   if (isPerformanceConstraint())
