@@ -302,6 +302,17 @@ bool Implementation::gatherUses(SILValue value) {
       // copyable values as normal uses.
       if (auto *cvi = dyn_cast<CopyValueInst>(nextUse->getUser())) {
         if (cvi->getOperand()->getType().isMoveOnly()) {
+          // Borrow accessor's callsite consists of copy_value +
+          // mark_unresolved_non_copyable_value instructions.
+          // It's diagnostics are driven by the
+          // mark_unresolved_non_copyable_value instruction.
+          // Ignore the copy_value uses to avoid an incoherent error.
+          if (cvi->getOperand()->isBorrowAccessorResult()) {
+            assert(isa<MarkUnresolvedNonCopyableValueInst>(
+                cvi->getSingleConsumingUse()->getUser()));
+            continue;
+          }
+
           LLVM_DEBUG(llvm::dbgs() << "        Found copy value of move only "
                                      "field... looking through!\n");
           for (auto *use : cvi->getUses())
