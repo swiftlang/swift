@@ -581,6 +581,7 @@ $WindowsSDKBuilds = @($WindowsSDKArchitectures | ForEach-Object {
 ## Helpers for logging and timing build steps.
 
 $TimingData = New-Object System.Collections.Generic.List[System.Object]
+$CurrentOperation = $null
 
 function Add-TimingData {
   param
@@ -589,16 +590,86 @@ function Add-TimingData {
     [Hashtable] $Platform,
     [Parameter(Mandatory)]
     [string] $BuildStep,
-    [Parameter(Mandatory)]
-    [System.TimeSpan] $ElapsedTime
+    [PSCustomObject] $Parent = $null
   )
 
-  $TimingData.Add([PSCustomObject]@{
+  $TimingEntry = [PSCustomObject]@{
     Arch = $Platform.Architecture.LLVMName
     Platform = $Platform.OS.ToString()
     "Build Step" = $BuildStep
-    "Elapsed Time" = $ElapsedTime
-  })
+    "Elapsed Time" = [TimeSpan]::Zero
+    "Child Time" = [TimeSpan]::Zero
+    Parent = $Parent
+    Children = @()
+  }
+
+  if ($Parent) {
+    $Parent.Children += $TimingEntry
+  }
+
+  $TimingData.Add($TimingEntry)
+  return $TimingEntry
+}
+
+function Record-OperationTime {
+  param
+  (
+    [Parameter(Mandatory)]
+    [Hashtable] $Platform,
+    [Parameter(Mandatory)]
+    [string] $BuildStep,
+    [Parameter(Mandatory)]
+    [ScriptBlock] $ScriptBlock
+  )
+  if (!$Summary) {
+    & $ScriptBlock
+    return
+  }
+
+  $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
+  $TimingEntry = Add-TimingData $Platform $BuildStep $script:CurrentOperation
+  $script:CurrentOperation = $TimingEntry
+
+  try {
+    & $ScriptBlock
+  } finally {
+    $Stopwatch.Stop()
+    $TimingEntry."Elapsed Time" = $Stopwatch.Elapsed
+    if ($TimingEntry.Parent) {
+      $TimingEntry.Parent."Child Time" = $TimingEntry.Parent."Child Time".Add($Stopwatch.Elapsed)
+    }
+    $script:CurrentOperation = $TimingEntry.Parent
+  }
+}
+
+function Flatten-TimingEntry {
+  param(
+    [Parameter(Mandatory)]
+    [PSCustomObject] $Entry,
+    [Parameter(Mandatory)]
+    [TimeSpan] $TotalTime,
+    [int] $Depth = 0
+  )
+
+  $Indent = "  " * $Depth
+  $Percentage = [math]::Round(($Entry."Elapsed Time".TotalSeconds / $TotalTime.TotalSeconds) * 100, 1)
+  $FormattedTime = "{0:hh\:mm\:ss\.ff}" -f $Entry."Elapsed Time"
+  $SelfTime = $Entry."Elapsed Time".Subtract($Entry."Child Time")
+  $FormattedSelfTime = "{0:hh\:mm\:ss\.ff}" -f $SelfTime
+
+  [PSCustomObject]@{
+    "Total Time" = $FormattedTime
+    "Self Time" = $FormattedSelfTime
+    "%" = "$Percentage%"
+    "Build Step" = "$Indent$($Entry.'Build Step')"
+    Platform = $Entry.Platform
+    Arch = $Entry.Arch
+  }
+
+  $SortedChildren = $Entry.Children | Sort-Object -Descending -Property "Elapsed Time"
+  foreach ($Child in $SortedChildren) {
+    Flatten-TimingEntry $Child $TotalTime ($Depth + 1)
+  }
 }
 
 function Write-Summary {
@@ -611,31 +682,27 @@ function Write-Summary {
 
   $TotalTime = [TimeSpan]::Zero
   foreach ($Entry in $TimingData) {
-    $TotalTime = $TotalTime.Add($Entry."Elapsed Time")
+    if (-not $Entry.Parent) {
+      $TotalTime = $TotalTime.Add($Entry."Elapsed Time")
+    }
   }
 
-  $SortedData = $TimingData | ForEach-Object {
-    $Percentage = [math]::Round(($_.("Elapsed Time").TotalSeconds / $TotalTime.TotalSeconds) * 100, 1)
-    $FormattedTime = "{0:hh\:mm\:ss\.ff}" -f $_."Elapsed Time"
-    [PSCustomObject]@{
-      "Build Step" = $_."Build Step"
-      Platform = $_.Platform
-      Arch = $_.Arch
-      "Elapsed Time" = $FormattedTime
-      "%" = "$Percentage%"
-    }
-  } | Sort-Object -Descending -Property "Elapsed Time"
+  $RootEntries = $TimingData | Where-Object { -not $_.Parent } | Sort-Object -Descending -Property "Elapsed Time"
+  $Result = foreach ($RootEntry in $RootEntries) {
+    Flatten-TimingEntry $RootEntry $TotalTime
+  }
 
   $FormattedTotalTime = "{0:hh\:mm\:ss\.ff}" -f $TotalTime
   $TotalRow = [PSCustomObject]@{
+    "Total Time" = $FormattedTotalTime
+    "Self Time" = $FormattedTotalTime
+    "%" = "100.0%"
     "Build Step" = "TOTAL"
     Platform = ""
     Arch = ""
-    "Elapsed Time" = $FormattedTotalTime
-    "%" = "100.0%"
   }
 
-  @($SortedData) + $TotalRow | Format-Table -AutoSize
+  @($Result) + $TotalRow | Format-Table -AutoSize
 }
 
 function Get-AndroidNDK {
@@ -720,10 +787,6 @@ function Invoke-BuildStep {
     [Object[]] $RemainingArgs
   )
 
-  if ($Summary) {
-    $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
-  }
-
   $SplatArgs = @{}
   if ($RemainingArgs) {
     $Enumerator = $RemainingArgs.GetEnumerator()
@@ -750,10 +813,8 @@ function Invoke-BuildStep {
     }
   }
 
-  & $Name $Platform @SplatArgs
-
-  if ($Summary) {
-    Add-TimingData $Platform $Name $Stopwatch.Elapsed
+  Record-OperationTime $Platform $Name {
+    & $Name $Platform @SplatArgs
   }
 }
 
@@ -1044,7 +1105,7 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
   }
 }
 
-function Get-Dependencies {
+function Get-Dependencies-Impl {
   Write-Host "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies ..." -ForegroundColor Cyan
   $ProgressPreference = "SilentlyContinue"
 
@@ -1285,8 +1346,11 @@ function Get-Dependencies {
     Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies took $($Stopwatch.Elapsed)"
     Write-Host ""
   }
-  if ($Summary) {
-    Add-TimingData $BuildPlatform "Get-Dependencies" $Stopwatch.Elapsed
+}
+
+function Get-Dependencies {
+  Record-OperationTime $BuildPlatform "Get-Dependencies" {
+    Get-Dependencies-Impl
   }
 }
 
