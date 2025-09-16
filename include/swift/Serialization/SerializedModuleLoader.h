@@ -466,6 +466,9 @@ public:
                 const ModuleDecl *importedModule,
                 llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
 
+  virtual bool isModuleImportedPreconcurrency(
+      const ModuleDecl *importedModule) const override;
+
   std::optional<CommentInfo> getCommentForDecl(const Decl *D) const override;
 
   bool hasLoadedSwiftDoc() const override;
