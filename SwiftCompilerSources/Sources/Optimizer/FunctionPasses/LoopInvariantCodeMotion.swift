@@ -606,10 +606,17 @@ private extension MovableInstructions {
   /// Only hoists instructions in blocks that dominate all exit and latch blocks.
   /// It doesn't hoist instructions speculatively.
   mutating func hoistInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
-    let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(excludeColdExits: false, context)
+    lazy var blocksDominatingExits = loop.getBlocksThatDominateAllExitingAndLatchBlocks(excludeColdExits: false, context)
+    let blocksDominatingExitsExcludingCold = loop.getBlocksThatDominateAllExitingAndLatchBlocks(excludeColdExits: true, context)
     var changed = false
 
-    for inst in hoistUp where dominatingBlocks.contains(inst.parentBlock) {
+    for inst in hoistUp where blocksDominatingExitsExcludingCold.contains(inst.parentBlock) {
+      if let valueInst = inst as? Value,
+         valueInst.type.hasLocalArchetype,
+         !blocksDominatingExits.contains(inst.parentBlock) {
+        continue // Don't hoist speculatively value with local archetype.
+      }
+      
       changed = inst.hoist(outOf: loop, context) || changed
     }
 
@@ -618,7 +625,7 @@ private extension MovableInstructions {
 
   /// Sink instructions.
   mutating func sinkInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
-    let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(excludeColdExits: false, context)
+    let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(excludeColdExits: true, context)
     var changed = false
 
     for inst in sinkDown where dominatingBlocks.contains(inst.parentBlock) {
