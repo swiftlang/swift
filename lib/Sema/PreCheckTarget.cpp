@@ -682,7 +682,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           }
 
           auto owningModule = decl->getModuleContext();
-          candidateModules.insert({ owningModule->getName(), kind });
+          candidateModules.insert(
+            { owningModule->getNameForModuleSelector(), kind });
         }
 
         for (auto pair : candidateModules) {

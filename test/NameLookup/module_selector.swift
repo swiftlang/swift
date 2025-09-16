@@ -104,7 +104,6 @@ extension B: @retroactive main::Equatable {
       (main::+)
       // expected-error@-1 {{declaration '+' is not imported through module 'main'}}
       // expected-note@-2 {{did you mean module 'Swift'?}} {{8-12=Swift}}
-      // expected-note@-3 {{did you mean module '_Concurrency'?}} {{8-12=_Concurrency}} FIXME: Accept and suggest 'Swift::' instead?
 
     let magnitude: Int.main::Magnitude = main::magnitude
     // expected-error@-1 {{type 'Magnitude' is not imported through module 'main'}}
@@ -178,7 +177,6 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
       (ModuleSelectorTestingKit::+)
       // expected-error@-1 {{declaration '+' is not imported through module 'ModuleSelectorTestingKit'}}
       // expected-note@-2 {{did you mean module 'Swift'?}} {{8-32=Swift}}
-      // expected-note@-3 {{did you mean module '_Concurrency'?}} {{8-32=_Concurrency}} FIXME: Accept and suggest 'Swift::' instead?
 
     let magnitude: Int.ModuleSelectorTestingKit::Magnitude = ModuleSelectorTestingKit::magnitude
     // expected-error@-1 {{type 'Magnitude' is not imported through module 'ModuleSelectorTestingKit'}}
@@ -373,4 +371,18 @@ func badModuleNames() {
 
 func builtinModuleLookups(_ int: Builtin::Int64) -> Builtin::Int64 {
   return Builtin::int_bswap_Int64(int)
+}
+
+func concurrencyModuleLookups(
+  _: any Swift::Clock,
+  _: any _Concurrency::Clock,
+  _: any ModuleSelectorTestingKit::Clock
+  // expected-error@-1 {{type 'Clock' is not imported through module 'ModuleSelectorTestingKit'}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{10-34=Swift}}
+) async {
+  await Swift::withTaskCancellationHandler {} onCancel: {}
+  await _Concurrency::withTaskCancellationHandler {} onCancel: {}
+  await ModuleSelectorTestingKit::withTaskCancellationHandler {} onCancel: {}
+  // expected-error@-1 {{declaration 'withTaskCancellationHandler' is not imported through module 'ModuleSelectorTestingKit'}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{9-33=Swift}}
 }

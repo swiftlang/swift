@@ -1515,7 +1515,8 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
 
         for (auto result : anyModuleResults) {
           TypeDecl * decl = static_cast<TypeDecl*>(result.getValueDecl());
-          Identifier moduleName = decl->getModuleContext()->getName();
+          Identifier moduleName =
+              decl->getModuleContext()->getNameForModuleSelector();
 
           diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
                          moduleName)
@@ -1632,7 +1633,8 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
 
       for (auto result : anyModuleResults) {
         TypeDecl * decl = result.Member;
-        Identifier moduleName = decl->getModuleContext()->getName();
+        Identifier moduleName =
+            decl->getModuleContext()->getNameForModuleSelector();
 
         diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
                        moduleName)

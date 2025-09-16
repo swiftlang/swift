@@ -3843,9 +3843,9 @@ diagnoseCandidatesEliminatedByModuleSelector(DeclNameRefWithLoc replacedDeclName
 
   for (auto candidate : results)
     Diags.diagnose(selectorLoc, diag::note_change_module_selector,
-                   candidate->getModuleContext()->getBaseIdentifier())
+                   candidate->getModuleContext()->getNameForModuleSelector())
       .fixItReplace(selectorLoc,
-                    candidate->getModuleContext()->getBaseIdentifier().str());
+                    candidate->getModuleContext()->getNameForModuleSelector().str());
 }
 
 /// Remove any argument labels from the interface type of the given value that
