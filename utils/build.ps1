@@ -1803,7 +1803,7 @@ function Build-CMakeProject {
     }
 
     if ($UseBuiltCompilers.Contains("Swift")) {
-      $env:Path = "$([IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", $ProductVersion, "usr", "bin"));$(Get-CMarkBinaryCache $BuildPlatform)\src;$($BuildPlatform.ToolchainInstallRoot)\usr\bin;$(Get-PinnedToolchainRuntime);${env:Path}"
+      $env:Path = "$(Get-PinnedToolchainRuntime);$(Get-PinnedToolchainToolsDir);${env:Path}"
     } elseif ($UsePinnedCompilers.Contains("Swift")) {
       $env:Path = "$(Get-PinnedToolchainRuntime);$(Get-PinnedToolchainToolsDir);${env:Path}"
     }
