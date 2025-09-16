@@ -1851,28 +1851,19 @@ static FunctionType *applyOptionality(ValueDecl *value, FunctionType *fnTy) {
                            fnTy->getExtInfo());
 }
 
-DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
+std::tuple<Type, Type, Type>
+ConstraintSystem::getTypeOfMemberReferenceImpl(
     Type baseTy, ValueDecl *value, DeclContext *useDC, bool isDynamicLookup,
     FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
     SmallVectorImpl<OpenedType> *replacementsPtr,
     PreparedOverloadBuilder *preparedOverload) {
+  ASSERT(!isa<TypeDecl>(value));
   ASSERT(!!preparedOverload == PreparingOverload);
   recordFixIfNeededForPlaceholderInDecl(*this, value, locator);
 
   // Figure out the instance type used for the base.
   Type baseRValueTy = baseTy->getRValueType();
   auto baseObjTy = baseRValueTy->getMetatypeInstanceType();
-
-  // If the base is a module type, just use the type of the decl.
-  if (baseObjTy->is<ModuleType>()) {
-    return getTypeOfReference(value, functionRefInfo, locator, useDC,
-                              preparedOverload);
-  }
-
-  if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
-    return getTypeOfMemberTypeReference(baseObjTy, typeDecl,
-                                        locator, preparedOverload);
-  }
 
   // Figure out the declaration context to use when opening this type.
   DeclContext *innerDC = value->getInnermostDeclContext();
@@ -1914,7 +1905,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
       isa<MacroDecl>(value)) {
     auto interfaceType = value->getInterfaceType();
     if (interfaceType->is<ErrorType>() || isa<MacroDecl>(value))
-      return { interfaceType, interfaceType, interfaceType, interfaceType, Type() };
+      return { interfaceType, Type(), baseObjTy };
 
     if (outerDC->getSelfClassDecl()) {
       if (isa<ConstructorDecl>(value)) {
@@ -2029,6 +2020,40 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
                             fullFunctionType->getExtInfo());
     }
   }
+
+  return { openedType, thrownErrorType, baseObjTy };
+}
+
+DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
+    Type baseTy, ValueDecl *value, DeclContext *useDC, bool isDynamicLookup,
+    FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
+    SmallVectorImpl<OpenedType> *replacementsPtr,
+    PreparedOverloadBuilder *preparedOverload) {
+  ASSERT(!!preparedOverload == PreparingOverload);
+
+  // Figure out the instance type used for the base.
+  Type baseRValueTy = baseTy;
+  Type baseObjTy = baseRValueTy->getMetatypeInstanceType();
+
+  // If the base is a module type, just use the type of the decl.
+  if (baseObjTy->getMetatypeInstanceType()->is<ModuleType>()) {
+    return getTypeOfReference(value, functionRefInfo, locator, useDC,
+                              preparedOverload);
+  }
+
+  if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
+    return getTypeOfMemberTypeReference(baseObjTy, typeDecl,
+                                        locator, preparedOverload);
+  }
+
+  Type openedType, thrownErrorType;
+  std::tie(openedType, thrownErrorType, baseObjTy)
+      = getTypeOfMemberReferenceImpl(baseTy, value, useDC,
+                                     isDynamicLookup, functionRefInfo,
+                                     locator, replacementsPtr,
+                                     preparedOverload);
+
+  auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseRValueTy, value);
 
   // Adjust the opened type for concurrency.
   Type origOpenedType = openedType;
