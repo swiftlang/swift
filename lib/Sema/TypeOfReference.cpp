@@ -1858,7 +1858,7 @@ static FunctionType *applyOptionality(ValueDecl *value, FunctionType *fnTy) {
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReferenceImpl(
     OverloadChoice choice, DeclContext *useDC,
-    ConstraintLocator *locator, SmallVectorImpl<OpenedType> *replacementsPtr,
+    ConstraintLocator *locator,
     PreparedOverloadBuilder *preparedOverload) {
   ASSERT(!!preparedOverload == PreparingOverload);
 
@@ -1888,27 +1888,22 @@ ConstraintSystem::getTypeOfMemberReferenceImpl(
   auto genericSig = innerDC->getGenericSignatureOfContext();
 
   // Open the type of the generic function or member of a generic type.
-  ArrayRef<OpenedType> replacements;
-  SmallVector<OpenedType, 4> localReplacements;
-  {
-    auto &_replacements = replacementsPtr ? *replacementsPtr : localReplacements;
+  SmallVector<OpenedType, 4> replacements;
 
-    // If we have a generic signature, open the parameters. We delay opening
-    // requirements to allow contextual types to affect the situation.
-    if (genericSig) {
-      openGenericParameters(outerDC, genericSig, _replacements, locator,
-                            preparedOverload);
-    }
-
-    // If we opened up any type variables, record the replacements. We do this
-    // up-front to allow requirement fix coalescing logic to work correctly with
-    // requirements imposed on base type (since that relies on being able to
-    // find the recorded opened type). We then make the array immutable for the
-    // following logic to ensure they don't attempt to add any additional opened
-    // types.
-    recordOpenedTypes(locator, _replacements, preparedOverload);
-    replacements = _replacements;
+  // If we have a generic signature, open the parameters. We delay opening
+  // requirements to allow contextual types to affect the situation.
+  if (genericSig) {
+    openGenericParameters(outerDC, genericSig, replacements, locator,
+                          preparedOverload);
   }
+
+  // If we opened up any type variables, record the replacements. We do this
+  // up-front to allow requirement fix coalescing logic to work correctly with
+  // requirements imposed on base type (since that relies on being able to
+  // find the recorded opened type). We then make the array immutable for the
+  // following logic to ensure they don't attempt to add any additional opened
+  // types.
+  recordOpenedTypes(locator, replacements, preparedOverload);
 
   // Check to see if the self parameter is applied, in which case we'll want to
   // strip it off later.
@@ -2039,7 +2034,6 @@ ConstraintSystem::getTypeOfMemberReferenceImpl(
 
 DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
-    SmallVectorImpl<OpenedType> *replacementsPtr,
     PreparedOverloadBuilder *preparedOverload) {
   ASSERT(!!preparedOverload == PreparingOverload);
 
@@ -2056,8 +2050,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
 
   Type openedType, thrownErrorType;
   std::tie(openedType, thrownErrorType)
-      = getTypeOfMemberReferenceImpl(choice, useDC, locator, replacementsPtr,
-                                     preparedOverload);
+      = getTypeOfMemberReferenceImpl(choice, useDC, locator, preparedOverload);
 
   if (isa<TypeDecl>(value)) {
     auto type = openedType->castTo<FunctionType>()->getResult();
@@ -2852,11 +2845,9 @@ ConstraintSystem::prepareOverloadImpl(ConstraintLocator *locator,
       return getTypeOfReference(choice, locator, useDC, preparedOverload);
     }
 
-    return getTypeOfMemberReference(
-        choice, useDC, locator, /*replacements=*/nullptr, preparedOverload);
+    return getTypeOfMemberReference(choice, useDC, locator, preparedOverload);
   } else {
-    return getTypeOfReference(
-        choice, locator, useDC, preparedOverload);
+    return getTypeOfReference(choice, locator, useDC, preparedOverload);
   }
 }
 

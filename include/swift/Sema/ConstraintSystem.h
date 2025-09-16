@@ -4462,8 +4462,7 @@ public:
   /// \returns the opened type and the thrown error type.
   std::pair<Type, Type> getTypeOfMemberReferenceImpl(
       OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
-      SmallVectorImpl<OpenedType> *replacements = nullptr,
-      PreparedOverloadBuilder *preparedOverload = nullptr);
+      PreparedOverloadBuilder *preparedOverload);
 
   /// Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
@@ -4475,8 +4474,7 @@ public:
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfMemberReference(
       OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
-      SmallVectorImpl<OpenedType> *replacements = nullptr,
-      PreparedOverloadBuilder *preparedOverload = nullptr);
+      PreparedOverloadBuilder *preparedOverload);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.
