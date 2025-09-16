@@ -1815,10 +1815,21 @@ function Build-CMakeProject {
         # Single token value, no need to quote spaces, the splat operator does the right thing.
         $Value = $Define.Value.Replace("\", "/")
       } else {
-        # Linker flags are escaped differently, depending on the CMake version.
-        $IsLinkerFlag = $Define.Key -match "_LINKER_FLAGS" -and ($Platform.OS -ne [OS]::Android)
-
         # Flags array, multiple tokens, quoting needed for tokens containing spaces
+        $EscapedArgs = $Define.Value | ForEach-Object {
+          $Arg = $_.Replace("\", "/")
+          if ($Arg.Contains(" ")) {
+            # Escape the quote so it makes it through. PowerShell 5 and Core
+            # handle quotes differently, so we need to check the version.
+            $quote = if ($PSEdition  -eq "Core") { '"' } else { '\"' }
+            "$quote$Arg$quote"
+          } else {
+            $Arg
+          }
+        }
+
+        # Linker flags are handled differently depending on the CMake version.
+        $IsLinkerFlag = $Define.Key -match "_LINKER_FLAGS" -and ($Platform.OS -ne [OS]::Android)
         $Value = if ($IsLinkerFlag) {
           if ($CMakeSupportsCMP0181) { "LINKER:" } elseif ($PrefixLinkerFlags) { "-Xlinker " } else { "" }
         } else {
@@ -1830,26 +1841,8 @@ function Build-CMakeProject {
           " "
         }
 
-        $FirstArg = $true
-        foreach ($Arg in $Define.Value) {
-          if ($FirstArg) {
-            $FirstArg = $false
-          } else {
-            $Value += $Separator
-          }
-
-          $ArgWithForwardSlashes = $Arg.Replace("\", "/")
-          if ($ArgWithForwardSlashes.Contains(" ")) {
-            # Escape the quote so it makes it through. PowerShell 5 and Core
-            # handle quotes differently, so we need to check the version.
-            $quote = if ($PSEdition  -eq "Core") { '"' } else { '\"' }
-            $Value += "$quote$ArgWithForwardSlashes$quote"
-          } else {
-            $Value += $ArgWithForwardSlashes
-          }
-        }
+        $Value += $EscapedArgs -join $Separator
       }
-
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
     }
 
