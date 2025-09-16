@@ -154,8 +154,37 @@ public class AnyKeyPath: _AppendKeyPath {
   ) -> Self {
     _internalInvariant(bytes > 0 && bytes % 4 == 0,
                  "capacity must be multiple of 4 bytes")
-    let result = Builtin.allocWithTailElems_1(self, (bytes/4)._builtinWordValue,
-                                              Int32.self)
+
+    // Subtract the buffer header and any padding it may have from the number of
+    // bytes we need to allocate. The alloc below has a 0 sized 16 byte aligned
+    // tail element that will force the compiler to insert buffer header + any
+    // padding necessary to accomodate.
+    let bytesWithoutHeader = bytes &- MemoryLayout<Int>.size
+
+    let result = Builtin.allocWithTailElems_2(
+      self,
+
+      // This tail element accomplishes two things:
+      //   1. Guarantees a 16 byte alignment for the allocated object pointer.
+      //   2. Forces the compiler to add padding after the kvc string to support
+      //      this 16 byte aligned tail element.
+      //
+      // The size of keypath objects before any tail elements is 24 bytes large
+      // on 64 bit platforms and 12 bytes large on 32 bit platforms.
+      // (Isa, RC, and KVC). The amount of padding bytes needed after the kvc
+      // string pointer to support a 16 byte aligned tail element is the exact
+      // same amount of bytes that the keypath buffer header occupies on both
+      // 64 & 32 bit platforms (because we always start component headers on
+      // pointer aligned addresses). That is the purpose for the subtraction
+      // above. The result of this tail element should just be the 16 byte
+      // pointer aligned requirement and no extra bytes allocated.
+      0._builtinWordValue,
+      SIMD16<Int8>.self,
+
+      (bytesWithoutHeader/4)._builtinWordValue,
+      Int32.self
+    )
+
     unsafe result._kvcKeyPathStringPtr = nil
     let base = UnsafeMutableRawPointer(Builtin.projectTailElems(result,
                                                                 Int32.self))
@@ -3071,7 +3100,7 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   // Instantiate a new key path object modeled on the pattern.
   // Do a pass to determine the class of the key path we'll be instantiating
   // and how much space we'll need for it.
-  let (keyPathClass, rootType, size, sizeWithMaxSize, _)
+  let (keyPathClass, rootType, size, sizeWithMaxSize)
     = unsafe _getKeyPathClassAndInstanceSizeFromPattern(patternPtr, arguments)
 
   var pureStructOffset: UInt32? = nil
@@ -3633,6 +3662,9 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
   // start with one word for the header
   var size: Int = MemoryLayout<Int>.size
   var sizeWithMaxSize: Int = 0
+  var sizeWithObjectHeaderAndKvc: Int {
+    size &+ MemoryLayout<Int>.size * 3
+  }
 
   var capability: KeyPathKind = .value
   var didChain: Bool = false
@@ -3735,13 +3767,24 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
       // Argument size and witnesses ptr.
       unsafe size &+= MemoryLayout<Int>.size &* 2
 
+      // If we also have external arguments, we need to store the size of the
+      // local arguments so we can find the external component arguments.
+      if unsafe externalArgs != nil {
+        unsafe size &+= RawKeyPathComponent.Header.externalWithArgumentsExtraSize
+      }
+
       let (typeSize, typeAlignMask) = unsafe arguments.getLayout(patternArgs)
 
       // We are known to be pointer aligned at this point in the KeyPath buffer.
       // However, for types who have an alignment large than pointers, we need
       // to determine if the current position is suitable for the argument, or
       // if we need to add padding bytes to align ourselves.
-      let misaligned = unsafe size & typeAlignMask
+      //
+      // Note: We need to account for the object header and kvc pointer because
+      // it's an odd number of words which will affect whether the size visitor
+      // determines if we need padding. It would cause out of sync answers when
+      // going to actually instantiate the buffer.
+      let misaligned = unsafe sizeWithObjectHeaderAndKvc & typeAlignMask
 
       if misaligned != 0 {
         // We were misaligned, add the padding to the total size of the keypath
@@ -3759,12 +3802,6 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
       // Argument size and witnesses ptr if we didn't have local arguments.
       if unsafe arguments == nil {
         unsafe size &+= MemoryLayout<Int>.size &* 2
-      }
-
-      // We also need to store the size of the local arguments so we can
-      // find the external component arguments.
-      if unsafe arguments != nil {
-        unsafe size &+= RawKeyPathComponent.Header.externalWithArgumentsExtraSize
       }
 
       unsafe size &+= MemoryLayout<Int>.size &* externalArgs.count
@@ -3813,8 +3850,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
   keyPathClass: AnyKeyPath.Type,
   rootType: Any.Type,
   size: Int,
-  sizeWithMaxSize: Int,
-  alignmentMask: Int
+  sizeWithMaxSize: Int
 ) {
   var walker = unsafe GetKeyPathClassAndInstanceSizeFromPattern(patternArgs: arguments)
   unsafe _walkKeyPathPattern(pattern, walker: &walker)
@@ -3840,12 +3876,12 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
   }
   let classTy = unsafe _openExistential(walker.root!, do: openRoot)
 
-  return unsafe (keyPathClass: classTy,
-          rootType: walker.root!,
-          size: walker.size,
-          sizeWithMaxSize: walker.sizeWithMaxSize,
-          // FIXME: Handle overalignment
-          alignmentMask: MemoryLayout<Int>._alignmentMask)
+  return unsafe (
+    keyPathClass: classTy,
+    rootType: walker.root!,
+    size: walker.size,
+    sizeWithMaxSize: walker.sizeWithMaxSize
+  )
 }
 
 internal func _getTypeSize<Type>(_: Type.Type) -> Int {
@@ -4279,7 +4315,6 @@ internal struct ValidatingInstantiateKeyPathBuffer: KeyPathPatternVisitor {
                                             offset: offset)
     unsafe checkSizeConsistency()
     unsafe structOffset = unsafe instantiateVisitor.structOffset
-    unsafe isPureStruct.append(contentsOf: instantiateVisitor.isPureStruct)
   }
   mutating func visitComputedComponent(mutating: Bool,
                                    idKind: KeyPathComputedIDKind,
@@ -4311,31 +4346,26 @@ internal struct ValidatingInstantiateKeyPathBuffer: KeyPathPatternVisitor {
     // Note: For this function and the ones below, modification of structOffset
     // is omitted since these types of KeyPaths won't have a pureStruct
     // offset anyway.
-    unsafe isPureStruct.append(contentsOf: instantiateVisitor.isPureStruct)
     unsafe checkSizeConsistency()
   }
   mutating func visitOptionalChainComponent() {
     unsafe sizeVisitor.visitOptionalChainComponent()
     unsafe instantiateVisitor.visitOptionalChainComponent()
-    unsafe isPureStruct.append(contentsOf: instantiateVisitor.isPureStruct)
     unsafe checkSizeConsistency()
   }
   mutating func visitOptionalWrapComponent() {
     unsafe sizeVisitor.visitOptionalWrapComponent()
     unsafe instantiateVisitor.visitOptionalWrapComponent()
-    unsafe isPureStruct.append(contentsOf: instantiateVisitor.isPureStruct)
     unsafe checkSizeConsistency()
   }
   mutating func visitOptionalForceComponent() {
     unsafe sizeVisitor.visitOptionalForceComponent()
     unsafe instantiateVisitor.visitOptionalForceComponent()
-    unsafe isPureStruct.append(contentsOf: instantiateVisitor.isPureStruct)
     unsafe checkSizeConsistency()
   }
   mutating func visitIntermediateComponentType(metadataRef: MetadataReference) {
     unsafe sizeVisitor.visitIntermediateComponentType(metadataRef: metadataRef)
     unsafe instantiateVisitor.visitIntermediateComponentType(metadataRef: metadataRef)
-    unsafe isPureStruct.append(contentsOf: instantiateVisitor.isPureStruct)
     unsafe checkSizeConsistency()
   }
 
