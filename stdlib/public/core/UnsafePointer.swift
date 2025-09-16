@@ -913,7 +913,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable & ~Escapable {
   ///   - value: The instance to initialize this pointer's pointee to.
   @_alwaysEmitIntoClient
   public func initialize(to value: consuming Pointee) {
-    Builtin.initialize(value, self._rawValue)
+    unsafe Builtin.initialize(_overrideLifetime(value, borrowing: ()), self._rawValue)
   }
 }
 
