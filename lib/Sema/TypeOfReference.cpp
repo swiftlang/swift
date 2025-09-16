@@ -1084,11 +1084,12 @@ static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value, bool
 }
 
 std::pair<Type, Type>
-ConstraintSystem::getTypeOfReferenceImpl(ValueDecl *value,
-                                         FunctionRefInfo functionRefInfo,
+ConstraintSystem::getTypeOfReferenceImpl(OverloadChoice choice,
                                          ConstraintLocatorBuilder locator,
                                          DeclContext *useDC,
                                          PreparedOverloadBuilder *preparedOverload) {
+  auto *value = choice.getDecl();
+
   ASSERT(!!preparedOverload == PreparingOverload);
 
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
@@ -1112,6 +1113,8 @@ ConstraintSystem::getTypeOfReferenceImpl(ValueDecl *value,
 
   // Unqualified reference to a local or global function.
   if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(value)) {
+    auto functionRefInfo = choice.getFunctionRefInfo();
+
     SmallVector<OpenedType, 4> replacements;
 
     auto funcType = funcDecl->getInterfaceType()->castTo<AnyFunctionType>();
@@ -1207,8 +1210,7 @@ ConstraintSystem::getTypeOfReferenceImpl(ValueDecl *value,
 }
 
 DeclReferenceType
-ConstraintSystem::getTypeOfReference(ValueDecl *value,
-                                     FunctionRefInfo functionRefInfo,
+ConstraintSystem::getTypeOfReference(OverloadChoice choice,
                                      ConstraintLocatorBuilder locator,
                                      DeclContext *useDC,
                                      PreparedOverloadBuilder *preparedOverload) {
@@ -1216,7 +1218,9 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
   Type openedType, thrownErrorType;
   std::tie(openedType, thrownErrorType) = getTypeOfReferenceImpl(
-      value, functionRefInfo, locator, useDC, preparedOverload);
+      choice, locator, useDC, preparedOverload);
+
+  auto *value = choice.getDecl();
 
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
     auto *openedFnType = openedType->castTo<FunctionType>();
@@ -1225,6 +1229,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto func = cast<FuncDecl>(value);
     assert(func->isOperator() && "Lookup should only find operators");
 
+    auto functionRefInfo = choice.getFunctionRefInfo();
 
     auto origOpenedType = openedFnType;
     if (!isRequirementOrWitness(locator)) {
@@ -1266,7 +1271,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto origOpenedType = openedType;
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
-                                               functionRefInfo);
+                                               choice.getFunctionRefInfo());
       openedType = adjustFunctionTypeForConcurrency(
           origOpenedType->castTo<FunctionType>(), /*baseType=*/Type(), funcDecl,
           useDC, numApplies, /*isMainDispatchQueue=*/false,
@@ -1496,10 +1501,10 @@ void ConstraintSystem::openGenericRequirement(
                 preparedOverload);
 }
 
-DeclReferenceType ConstraintSystem::getTypeOfMemberTypeReference(
+Type ConstraintSystem::getTypeOfMemberTypeReference(
     Type baseObjTy, TypeDecl *typeDecl, ConstraintLocator *locator,
     PreparedOverloadBuilder *preparedOverload) {
-  assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
+  ASSERT(!isa<ModuleDecl>(typeDecl) && "Nested module?");
 
   auto memberTy = TypeChecker::substMemberTypeWithBase(typeDecl, baseObjTy);
 
@@ -1525,8 +1530,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberTypeReference(
   }
 
   FunctionType::Param baseObjParam(baseObjTy);
-  auto openedType = FunctionType::get({baseObjParam}, memberTy);
-  return { openedType, openedType, memberTy, memberTy, Type() };
+  return FunctionType::get({baseObjParam}, memberTy);
 }
 
 std::pair<Type, Type> ConstraintSystem::getOpenedStorageType(
@@ -1826,16 +1830,27 @@ static FunctionType *applyOptionality(ValueDecl *value, FunctionType *fnTy) {
 
 std::tuple<Type, Type, Type>
 ConstraintSystem::getTypeOfMemberReferenceImpl(
-    Type baseTy, ValueDecl *value, DeclContext *useDC, bool isDynamicLookup,
-    FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
-    SmallVectorImpl<OpenedType> *replacementsPtr,
+    OverloadChoice choice, DeclContext *useDC,
+    ConstraintLocator *locator, SmallVectorImpl<OpenedType> *replacementsPtr,
     PreparedOverloadBuilder *preparedOverload) {
-  ASSERT(!isa<TypeDecl>(value));
   ASSERT(!!preparedOverload == PreparingOverload);
 
+  auto *value = choice.getDecl();
+  auto functionRefInfo = choice.getFunctionRefInfo();
+
   // Figure out the instance type used for the base.
+  auto baseTy = choice.getBaseType();
   Type baseRValueTy = baseTy->getRValueType();
   auto baseObjTy = baseRValueTy->getMetatypeInstanceType();
+
+  Type openedType;
+  Type thrownErrorType;
+
+  if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
+    openedType = getTypeOfMemberTypeReference(baseObjTy, typeDecl,
+                                              locator, preparedOverload);
+    return {openedType, thrownErrorType, baseObjTy};
+  }
 
   // Figure out the declaration context to use when opening this type.
   DeclContext *innerDC = value->getInnermostDeclContext();
@@ -1870,8 +1885,6 @@ ConstraintSystem::getTypeOfMemberReferenceImpl(
   // strip it off later.
   auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseRValueTy, value);
 
-  Type openedType;
-  Type thrownErrorType;
   if (isa<AbstractFunctionDecl>(value) ||
       isa<EnumElementDecl>(value) ||
       isa<MacroDecl>(value)) {
@@ -1959,7 +1972,7 @@ ConstraintSystem::getTypeOfMemberReferenceImpl(
     addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
                   getConstraintLocator(locator), /*isFavored=*/false,
                   preparedOverload);
-  } else if (!isDynamicLookup) {
+  } else if (choice.getKind() != OverloadChoiceKind::DeclViaDynamic) {
     addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator, preparedOverload);
   }
 
@@ -1997,33 +2010,30 @@ ConstraintSystem::getTypeOfMemberReferenceImpl(
 }
 
 DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
-    Type baseTy, ValueDecl *value, DeclContext *useDC, bool isDynamicLookup,
-    FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
+    OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
     SmallVectorImpl<OpenedType> *replacementsPtr,
     PreparedOverloadBuilder *preparedOverload) {
   ASSERT(!!preparedOverload == PreparingOverload);
 
+  auto *value = choice.getDecl();
+
   // Figure out the instance type used for the base.
-  Type baseRValueTy = baseTy;
+  Type baseRValueTy = choice.getBaseType();
   Type baseObjTy = baseRValueTy->getMetatypeInstanceType();
 
-  // If the base is a module type, just use the type of the decl.
-  if (baseObjTy->getMetatypeInstanceType()->is<ModuleType>()) {
-    return getTypeOfReference(value, functionRefInfo, locator, useDC,
-                              preparedOverload);
-  }
-
-  if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
-    return getTypeOfMemberTypeReference(baseObjTy, typeDecl,
-                                        locator, preparedOverload);
-  }
+  // A reference to a module member is really unqualified, and should
+  // be handled by the caller via getTypeOfReference().
+  ASSERT(!baseObjTy->is<ModuleType>());
 
   Type openedType, thrownErrorType;
   std::tie(openedType, thrownErrorType, baseObjTy)
-      = getTypeOfMemberReferenceImpl(baseTy, value, useDC,
-                                     isDynamicLookup, functionRefInfo,
-                                     locator, replacementsPtr,
+      = getTypeOfMemberReferenceImpl(choice, useDC, locator, replacementsPtr,
                                      preparedOverload);
+
+  if (isa<TypeDecl>(value)) {
+    auto type = openedType->castTo<FunctionType>()->getResult();
+    return { openedType, openedType, type, type, Type() };
+  }
 
   auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseRValueTy, value);
 
@@ -2032,7 +2042,8 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   if (isRequirementOrWitness(locator)) {
     // Don't adjust when doing witness matching, because that can cause cycles.
   } else if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
-    unsigned numApplies = getNumApplications(hasAppliedSelf, functionRefInfo);
+    unsigned numApplies = getNumApplications(
+        hasAppliedSelf, choice.getFunctionRefInfo());
     openedType = adjustFunctionTypeForConcurrency(
         origOpenedType->castTo<FunctionType>(), baseObjTy, value, useDC,
         numApplies, isMainDispatchQueueMember(locator),
@@ -2053,6 +2064,8 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     openedType = FunctionType::get(
                   origFnType->getParams(), resultTy, origFnType->getExtInfo());
   }
+
+  bool isDynamicLookup = (choice.getKind() == OverloadChoiceKind::DeclViaDynamic);
 
   // Check if we need to apply a layer of optionality to the type.
   if (!isRequirementOrWitness(locator)) {
@@ -2805,14 +2818,16 @@ ConstraintSystem::prepareOverloadImpl(ConstraintLocator *locator,
     // Retrieve the type of a reference to the specific declaration choice.
     assert(!baseTy->hasTypeParameter());
 
+    // If the base is a module type, it's an unqualified reference.
+    if (baseTy->getMetatypeInstanceType()->is<ModuleType>()) {
+      return getTypeOfReference(choice, locator, useDC, preparedOverload);
+    }
+
     return getTypeOfMemberReference(
-        baseTy, choice.getDecl(), useDC,
-        (choice.getKind() == OverloadChoiceKind::DeclViaDynamic),
-        choice.getFunctionRefInfo(), locator, nullptr, preparedOverload);
+        choice, useDC, locator, /*replacements=*/nullptr, preparedOverload);
   } else {
     return getTypeOfReference(
-        choice.getDecl(), choice.getFunctionRefInfo(), locator, useDC,
-        preparedOverload);
+        choice, locator, useDC, preparedOverload);
   }
 }
 

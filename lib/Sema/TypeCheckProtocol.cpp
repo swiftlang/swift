@@ -1172,11 +1172,9 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
     reqLocator =
         cs->getConstraintLocator(req, ConstraintLocator::ProtocolRequirement);
+    OverloadChoice reqChoice(selfTy, req, FunctionRefInfo::doubleBaseNameApply());
     auto reqTypeInfo =
-        cs->getTypeOfMemberReference(selfTy, req, dc,
-                                     /*isDynamicResult=*/false,
-                                     FunctionRefInfo::doubleBaseNameApply(),
-                                     reqLocator, &reqReplacements);
+        cs->getTypeOfMemberReference(reqChoice, dc, reqLocator, &reqReplacements);
     reqType = reqTypeInfo.adjustedReferenceType;
     reqType = reqType->getRValueType();
 
@@ -1202,23 +1200,23 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     }
 
     // Open up the witness type.
-    SmallVector<OpenedType, 4> witnessReplacements;
-
     witnessType = witness->getInterfaceType();
     witnessLocator =
         cs->getConstraintLocator(req, LocatorPathElt::Witness(witness));
     DeclReferenceType openWitnessTypeInfo;
 
     if (witness->getDeclContext()->isTypeContext()) {
+      OverloadChoice witnessChoice(selfTy, witness, FunctionRefInfo::doubleBaseNameApply());
       openWitnessTypeInfo =
-          cs->getTypeOfMemberReference(selfTy, witness, dc,
-                                       /*isDynamicResult=*/false,
-                                       FunctionRefInfo::doubleBaseNameApply(),
-                                       witnessLocator, &witnessReplacements);
+          cs->getTypeOfMemberReference(witnessChoice, dc,
+                                       witnessLocator,
+                                       /*replacements=*/nullptr,
+                                       /*preparedOverload=*/nullptr);
     } else {
+      OverloadChoice witnessChoice(Type(), witness, FunctionRefInfo::doubleBaseNameApply());
       openWitnessTypeInfo =
           cs->getTypeOfReference(
-                witness, FunctionRefInfo::doubleBaseNameApply(), witnessLocator,
+                witnessChoice, witnessLocator,
                 /*useDC=*/nullptr, /*preparedOverload=*/nullptr);
     }
 

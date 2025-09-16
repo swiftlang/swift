@@ -4441,8 +4441,7 @@ public:
 
   /// \returns The opened type and the thrown error type.
   std::pair<Type, Type> getTypeOfReferenceImpl(
-                          ValueDecl *decl,
-                          FunctionRefInfo functionRefInfo,
+                          OverloadChoice choice,
                           ConstraintLocatorBuilder locator,
                           DeclContext *useDC,
                           PreparedOverloadBuilder *preparedOverload);
@@ -4453,20 +4452,16 @@ public:
   /// the type by replacing each instance of an archetype with a fresh type
   /// variable.
   ///
-  /// \param decl The declarations whose type is being computed.
-  ///
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfReference(
-                          ValueDecl *decl,
-                          FunctionRefInfo functionRefInfo,
+                          OverloadChoice choice,
                           ConstraintLocatorBuilder locator,
                           DeclContext *useDC,
                           PreparedOverloadBuilder *preparedOverload);
 
   /// \returns the opened type, the thrown error type, and the base object type.
   std::tuple<Type, Type, Type> getTypeOfMemberReferenceImpl(
-      Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
-      FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
+      OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
       SmallVectorImpl<OpenedType> *replacements = nullptr,
       PreparedOverloadBuilder *preparedOverload = nullptr);
 
@@ -4477,13 +4472,9 @@ public:
   /// this routine "opens up" the type by replacing each instance of a generic
   /// parameter with a fresh type variable.
   ///
-  /// \param isDynamicLookup Indicates that this declaration was found via
-  /// dynamic lookup.
-  ///
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfMemberReference(
-      Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
-      FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
+      OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
       SmallVectorImpl<OpenedType> *replacements = nullptr,
       PreparedOverloadBuilder *preparedOverload = nullptr);
 
@@ -4497,7 +4488,7 @@ public:
   }
 
 private:
-  DeclReferenceType getTypeOfMemberTypeReference(
+  Type getTypeOfMemberTypeReference(
       Type baseObjTy, TypeDecl *typeDecl, ConstraintLocator *locator,
       PreparedOverloadBuilder *preparedOverload);
 
