@@ -366,6 +366,8 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 8);
     } else if (value == "6.0") {
       runtimeCompatibilityVersion = llvm::VersionTuple(6, 0);
+    } else if (value == "6.2") {
+      runtimeCompatibilityVersion = llvm::VersionTuple(6, 2);
     } else if (value == "none") {
       runtimeCompatibilityVersion = std::nullopt;
     } else {
