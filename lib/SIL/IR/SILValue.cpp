@@ -210,7 +210,7 @@ bool ValueBase::isBorrowAccessorResult() const {
   auto *apply = dyn_cast_or_null<ApplyInst>(getDefiningInstruction());
   if (!apply)
     return false;
-  return apply->hasGuaranteedResult();
+  return apply->hasGuaranteedResult() || apply->hasGuaranteedAddressResult();
 }
 
 bool ValueBase::hasDebugTrace() const {
