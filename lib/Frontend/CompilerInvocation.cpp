@@ -1035,10 +1035,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (!isValid)
       diagnoseSwiftVersion(vers, A, Args, Diags);
   } else if (FrontendOpts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
-    Diags.diagnose({}, diag::error_module_interface_requires_language_mode)
-        .limitBehavior(DiagnosticBehavior::Warning);
-    // FIXME: Make this an error again (rdar://145168219)
-    // HadError = true;
+    Diags.diagnose({}, diag::error_module_interface_requires_language_mode);
+    HadError = true;
   }
 
   if (auto A = Args.getLastArg(OPT_package_description_version)) {
