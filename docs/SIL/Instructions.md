@@ -832,7 +832,7 @@ load-ownership-kind ::= 'take'
 ```
 
 Loads the value at address `%0` from memory. `T` must be a loadable
-type. This does not affect the reference count, if any, of the loaded
+type. An unqualified load does not affect the reference count, if any, of the loaded
 value; the value must be retained explicitly if necessary. It is
 undefined behavior to load from uninitialized memory or to load from an
 address that points to deallocated storage.
@@ -840,8 +840,8 @@ address that points to deallocated storage.
 In OSSA the ownership kind specifies how to handle ownership:
 -  **trivial**: the loaded value is trivial and no further action must be taken
                 than to load the raw bits of the value
--  **copy**: the loaded value is copied and the original value stays in the
-             memory location.
+-  **copy**: the loaded value is copied (e.g., retained) and the original value
+                stays in the memory location.
 -  **take**: the value is _moved_ from the memory location without copying.
              After the `load`, the memory location remains uninitialized.
 
