@@ -1013,11 +1013,26 @@ bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
                                                 const DeclContext *dc,
                                                 SourceLoc loc,
                                                 DiagnosticBehavior limit) {
+  // Only diagnose references in source files.
+  auto sf = dc->getParentSourceFile();
+  if (!sf)
+    return false;
+
+  auto &ctx = dc->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                          /*allowMigration=*/true))
+    return false;
+
+  // Only diagnose members.
+  if (!decl->getDeclContext()->isTypeContext())
+    return false;
+
+  // Only diagnose declarations that haven't been imported.
   if (dc->isDeclImported(decl))
     return false;
 
   auto definingModule = decl->getModuleContextForNameLookup();
-  if (dc->getASTContext().LangOpts.EnableCXXInterop) {
+  if (ctx.LangOpts.EnableCXXInterop) {
     // With Cxx interop enabled, there are some declarations that always belong
     // to the Clang header import module which should always be implicitly
     // visible. However, that module is not implicitly imported in source files
@@ -1025,12 +1040,6 @@ bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
     if (definingModule->isClangHeaderImportModule())
       return false;
   }
-
-  auto sf = dc->getParentSourceFile();
-  if (!sf)
-    return false;
-
-  auto &ctx = dc->getASTContext();
 
   // In lazy typechecking mode just emit the diagnostic immediately without a
   // fix-it since there won't be an opportunity to emit delayed diagnostics.
