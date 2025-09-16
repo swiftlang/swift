@@ -124,7 +124,7 @@ extension OutputRawSpan {
     }
     _precondition(
       0 <= initializedCount && initializedCount <= buffer.count,
-      "OutputSpan count is not within capacity"
+      "OutputRawSpan count is not within capacity"
     )
     unsafe self.init(
       _uncheckedBuffer: buffer, initializedCount: initializedCount
