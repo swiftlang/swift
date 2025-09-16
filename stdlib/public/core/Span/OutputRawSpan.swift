@@ -106,7 +106,7 @@ extension OutputRawSpan {
   /// memory.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeMutableBufferPointer` to be initialized
+  ///   - buffer: an `UnsafeMutableRawBufferPointer` to be initialized
   ///   - initializedCount: the number of initialized bytes
   ///                       at the beginning of `buffer`.
   @unsafe
@@ -139,7 +139,7 @@ extension OutputRawSpan {
   /// memory.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeMutableBufferPointer` to be initialized
+  ///   - buffer: a `Slice<UnsafeMutableRawBufferPointer>` to be initialized
   ///   - initializedCount: the number of initialized bytes
   ///                       at the beginning of `buffer`.
   @unsafe
