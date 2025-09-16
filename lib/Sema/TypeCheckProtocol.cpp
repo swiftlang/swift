@@ -1168,13 +1168,13 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
 
     // Open up the type of the requirement.
-    SmallVector<OpenedType, 4> reqReplacements;
-
     reqLocator =
         cs->getConstraintLocator(req, ConstraintLocator::ProtocolRequirement);
     OverloadChoice reqChoice(selfTy, req, FunctionRefInfo::doubleBaseNameApply());
     auto reqTypeInfo =
-        cs->getTypeOfMemberReference(reqChoice, dc, reqLocator, &reqReplacements);
+        cs->getTypeOfMemberReference(reqChoice, dc, reqLocator,
+                                     /*preparedOverload=*/nullptr);
+
     reqType = reqTypeInfo.adjustedReferenceType;
     reqType = reqType->getRValueType();
 
@@ -1182,7 +1182,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
     // For any type parameters we replaced in the witness, map them
     // to the corresponding archetypes in the witness's context.
-    for (const auto &replacement : reqReplacements) {
+    for (const auto &replacement : cs->getOpenedTypes(reqLocator)) {
       auto replacedInReq = Type(replacement.first).subst(reqSubMap);
 
       // If substitution failed, skip the requirement. This only occurs in
@@ -1210,7 +1210,6 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       openWitnessTypeInfo =
           cs->getTypeOfMemberReference(witnessChoice, dc,
                                        witnessLocator,
-                                       /*replacements=*/nullptr,
                                        /*preparedOverload=*/nullptr);
     } else {
       OverloadChoice witnessChoice(Type(), witness, FunctionRefInfo::doubleBaseNameApply());
