@@ -16742,16 +16742,17 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     if (!preparedOverload) {
       if (enablePreparedOverloads &&
           constraint.getOverloadChoice().canBePrepared()) {
-        preparedOverload = prepareOverload(constraint.getLocator(),
-                                           constraint.getOverloadChoice(),
-                                           constraint.getDeclContext());
+        preparedOverload = prepareOverload(constraint.getOverloadChoice(),
+                                           constraint.getDeclContext(),
+                                           constraint.getLocator());
         const_cast<Constraint &>(constraint).setPreparedOverload(preparedOverload);
       }
     }
 
-    resolveOverload(constraint.getLocator(), constraint.getFirstType(),
-                    constraint.getOverloadChoice(),
+    resolveOverload(constraint.getOverloadChoice(),
                     constraint.getDeclContext(),
+                    constraint.getLocator(),
+                    constraint.getFirstType(),
                     preparedOverload);
     return SolutionKind::Solved;
   }

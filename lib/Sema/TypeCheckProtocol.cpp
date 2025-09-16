@@ -1208,15 +1208,14 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     if (witness->getDeclContext()->isTypeContext()) {
       OverloadChoice witnessChoice(selfTy, witness, FunctionRefInfo::doubleBaseNameApply());
       openWitnessTypeInfo =
-          cs->getTypeOfMemberReference(witnessChoice, dc,
-                                       witnessLocator,
+          cs->getTypeOfMemberReference(witnessChoice, dc, witnessLocator,
                                        /*preparedOverload=*/nullptr);
     } else {
       OverloadChoice witnessChoice(Type(), witness, FunctionRefInfo::doubleBaseNameApply());
       openWitnessTypeInfo =
           cs->getTypeOfReference(
-                witnessChoice, witnessLocator,
-                /*useDC=*/nullptr, /*preparedOverload=*/nullptr);
+                witnessChoice, /*useDC=*/nullptr, witnessLocator,
+                /*preparedOverload=*/nullptr);
     }
 
     openWitnessType = openWitnessTypeInfo.adjustedReferenceType;
