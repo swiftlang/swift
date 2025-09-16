@@ -35,7 +35,7 @@ public protocol _Pointer:
   /// A type that represents the distance between two pointers.
   typealias Distance = Int
 
-  associatedtype Pointee: ~Copyable
+  associatedtype Pointee: ~Copyable & ~Escapable
 
   /// The underlying raw pointer value.
   var _rawValue: Builtin.RawPointer { get }
