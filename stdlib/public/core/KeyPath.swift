@@ -2380,6 +2380,7 @@ internal struct KeyPathBuffer {
     }
   }
   
+  @inline(never)
   internal mutating func next() -> (RawKeyPathComponent, Any.Type?) {
     let header = unsafe _pop(from: &data, as: RawKeyPathComponent.Header.self)
     // Track if this is the last component of the reference prefix.
@@ -3663,7 +3664,7 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
   var size: Int = MemoryLayout<Int>.size
   var sizeWithMaxSize: Int = 0
   var sizeWithObjectHeaderAndKvc: Int {
-    size &+ MemoryLayout<Int>.size * 3
+    unsafe size &+ MemoryLayout<Int>.size &* 3
   }
 
   var capability: KeyPathKind = .value
