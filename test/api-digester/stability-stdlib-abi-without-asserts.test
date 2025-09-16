@@ -868,4 +868,42 @@ Func ==(_:_:) has parameter 0 type change from (any Any.Type)? to τ_0_0
 Func ==(_:_:) has parameter 1 type change from (any Any.Type)? to τ_0_0                              
 Func type(of:) has been removed
 
+// Adoption of typed throws for Dictionary._Variant.mapValues(_:)
+Func Dictionary._Variant.mapValues(_:) has been renamed to Func __abi_mapValues(_:)
+Func Dictionary._Variant.mapValues(_:) has mangled name changing from 'Swift.Dictionary._Variant.mapValues<A>((B) throws -> A1) throws -> Swift._NativeDictionary<A, A1>' to 'Swift.Dictionary._Variant.__abi_mapValues<A>((B) throws -> A1) throws -> Swift._NativeDictionary<A, A1>'
+
+// Adoption of typed throws for Dictionary.compactMapValues(_:)
+Func Dictionary.compactMapValues(_:) has been renamed to Func __abi_compactMapValues(_:)
+Func Dictionary.compactMapValues(_:) has mangled name changing from 'Swift.Dictionary.compactMapValues<A>((B) throws -> Swift.Optional<A1>) throws -> Swift.Dictionary<A, A1>' to 'Swift.Dictionary.__abi_compactMapValues<A>((B) throws -> Swift.Optional<A1>) throws -> Swift.Dictionary<A, A1>'
+
+// Adoption of typed throws for Dictionary.mapValues(_:)
+Func Dictionary.mapValues(_:) has been renamed to Func __abi_mapValues(_:)
+Func Dictionary.mapValues(_:) has mangled name changing from 'Swift.Dictionary.mapValues<A>((B) throws -> A1) throws -> Swift.Dictionary<A, A1>' to 'Swift.Dictionary.__abi_mapValues<A>((B) throws -> A1) throws -> Swift.Dictionary<A, A1>'
+
+// Adoption of typed throws Sequence.filter(_:)
+Func Sequence._filter(_:) has been renamed to Func __abi__filter(_:)
+Func Sequence._filter(_:) has mangled name changing from '(extension in Swift):Swift.Sequence._filter((A.Element) throws -> Swift.Bool) throws -> Swift.Array<A.Element>' to '(extension in Swift):Swift.Sequence.__abi__filter((A.Element) throws -> Swift.Bool) throws -> Swift.Array<A.Element>'
+Func Sequence.filter(_:) has been renamed to Func __abi_filter(_:)
+Func Sequence.filter(_:) has mangled name changing from '(extension in Swift):Swift.Sequence.filter((A.Element) throws -> Swift.Bool) throws -> Swift.Array<A.Element>' to '(extension in Swift):Swift.Sequence.__abi_filter((A.Element) throws -> Swift.Bool) throws -> Swift.Array<A.Element>'
+
+// Adoption of typed throws for Sequence.forEach(_:)
+Func Sequence.forEach(_:) has been renamed to Func __abi_forEach(_:)
+Func Sequence.forEach(_:) has mangled name changing from '(extension in Swift):Swift.Sequence.forEach((A.Element) throws -> ()) throws -> ()' to '(extension in Swift):Swift.Sequence.__abi_forEach((A.Element) throws -> ()) throws -> ()'
+
+// Adoption of typed throws for Sequence.reduce(_:_:)
+Func Sequence.reduce(_:_:) has been renamed to Func __abi_reduce(_:_:)
+Func Sequence.reduce(_:_:) has mangled name changing from '(extension in Swift):Swift.Sequence.reduce<A>(A1, (A1, A.Element) throws -> A1) throws -> A1' to '(extension in Swift):Swift.Sequence.__abi_reduce<A>(A1, (A1, A.Element) throws -> A1) throws -> A1'
+
+// Adoption of typed throws for Sequence.reduce(into:_:)
+Func Sequence.reduce(into:_:) has been renamed to Func __abi_reduce(into:_:)
+Func Sequence.reduce(into:_:) has mangled name changing from '(extension in Swift):Swift.Sequence.reduce<A>(into: __owned A1, _: (inout A1, A.Element) throws -> ()) throws -> A1' to '(extension in Swift):Swift.Sequence.__abi_reduce<A>(into: __owned A1, _: (inout A1, A.Element) throws -> ()) throws -> A1'
+
+// Adoption of typed throws for _NativeDictionary.mapValues(_:)
+Func _NativeDictionary.mapValues(_:) has been renamed to Func __abi_mapValues(_:)
+Func _NativeDictionary.mapValues(_:) has mangled name changing from 'Swift._NativeDictionary.mapValues<A>((B) throws -> A1) throws -> Swift._NativeDictionary<A, A1>' to 'Swift._NativeDictionary.__abi_mapValues<A>((B) throws -> A1) throws -> Swift._NativeDictionary<A, A1>'
+
+// Adoption of typed throws for __CocoaDictionary.mapValues(_:)
+Func __CocoaDictionary.mapValues(_:) has been renamed to Func __abi_mapValues(_:)
+Func __CocoaDictionary.mapValues(_:) has mangled name changing from 'Swift.__CocoaDictionary.mapValues<A, B, C where A: Swift.Hashable>((B) throws -> C) throws -> Swift._NativeDictionary<A, C>' to 'Swift.__CocoaDictionary.__abi_mapValues<A, B, C where A: Swift.Hashable>((B) throws -> C) throws -> Swift._NativeDictionary<A, C>'
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

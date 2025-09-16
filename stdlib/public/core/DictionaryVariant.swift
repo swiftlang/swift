@@ -452,10 +452,10 @@ extension Dictionary._Variant {
 }
 
 extension Dictionary._Variant {
-  @inlinable
-  internal func mapValues<T>(
-    _ transform: (Value) throws -> T
-  ) rethrows -> _NativeDictionary<Key, T> {
+  @_alwaysEmitIntoClient
+  internal func mapValues<T, E: Error>(
+    _ transform: (Value) throws(E) -> T
+  ) throws(E) -> _NativeDictionary<Key, T> {
 #if _runtime(_ObjC)
     guard isNative else {
       return try asCocoa.mapValues(transform)

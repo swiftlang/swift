@@ -379,3 +379,28 @@ Accessor UnsafeMutableBufferPointer.indices.Get() has generic signature change f
 
 Func type(of:) has generic signature change from <T, Metatype> to <T, Metatype where T : ~Copyable, T : ~Escapable>
 Func type(of:) has parameter 0 changing from Default to Shared
+
+// Adoption of typed throws for Dictionary.compactMapValues(_:)
+Func Dictionary.compactMapValues(_:) has generic signature change from <Key, Value, T where Key : Swift.Hashable> to <Key, Value, T, E where Key : Swift.Hashable, E : Swift.Error>
+Func Dictionary.compactMapValues(_:) is now without rethrows
+
+// Adoption of typed throws for Dictionary.mapValues(_:)
+Func Dictionary.mapValues(_:) has generic signature change from <Key, Value, T where Key : Swift.Hashable> to <Key, Value, T, E where Key : Swift.Hashable, E : Swift.Error>
+Func Dictionary.mapValues(_:) is now without rethrows
+
+// Adoption of typed throws for Sequence.filter(_:)
+Func Sequence.filter(_:) has generic signature change from <Self where Self : Swift.Sequence> to <Self, E where Self : Swift.Sequence, E : Swift.Error>
+Func Sequence.filter(_:) is now without rethrows
+
+// Adoption of typed throws for Sequence.forEach(_:)
+Func Sequence.forEach(_:) has generic signature change from <Self where Self : Swift.Sequence> to <Self, E where Self : Swift.Sequence, E : Swift.Error>
+Func Sequence.forEach(_:) is now without rethrows
+
+// Adoption of typed throws for Sequence.reduce(_:_:)
+Func Sequence.reduce(_:_:) has generic signature change from <Self, Result where Self : Swift.Sequence> to <Self, Result, E where Self : Swift.Sequence, E : Swift.Error>
+Func Sequence.reduce(_:_:) is now without rethrows
+
+// Adoption of typed throws for Sequence.reduce(into:_:)
+Func Sequence.reduce(into:_:) has generic signature change from <Self, Result where Self : Swift.Sequence> to <Self, Result, E where Self : Swift.Sequence, E : Swift.Error>
+Func Sequence.reduce(into:_:) has parameter 1 type change from (inout Result, Self.Element) throws -> () to (inout Result, Self.Element) throws(E) -> ()
+Func Sequence.reduce(into:_:) is now without rethrows
