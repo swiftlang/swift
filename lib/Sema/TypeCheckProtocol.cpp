@@ -1172,13 +1172,15 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
     reqLocator =
         cs->getConstraintLocator(req, ConstraintLocator::ProtocolRequirement);
-    reqType =
+    auto reqTypeInfo =
         cs->getTypeOfMemberReference(selfTy, req, dc,
                                      /*isDynamicResult=*/false,
                                      FunctionRefInfo::doubleBaseNameApply(),
-                                     reqLocator, &reqReplacements)
-            .adjustedReferenceType;
+                                     reqLocator, &reqReplacements);
+    reqType = reqTypeInfo.adjustedReferenceType;
     reqType = reqType->getRValueType();
+
+    Type reqThrownError = reqTypeInfo.thrownErrorTypeOnAccess;
 
     // For any type parameters we replaced in the witness, map them
     // to the corresponding archetypes in the witness's context.
@@ -1205,50 +1207,25 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     witnessType = witness->getInterfaceType();
     witnessLocator =
         cs->getConstraintLocator(req, LocatorPathElt::Witness(witness));
+    DeclReferenceType openWitnessTypeInfo;
+
     if (witness->getDeclContext()->isTypeContext()) {
-      openWitnessType =
+      openWitnessTypeInfo =
           cs->getTypeOfMemberReference(selfTy, witness, dc,
                                        /*isDynamicResult=*/false,
                                        FunctionRefInfo::doubleBaseNameApply(),
-                                       witnessLocator, &witnessReplacements)
-              .adjustedReferenceType;
+                                       witnessLocator, &witnessReplacements);
     } else {
-      openWitnessType =
+      openWitnessTypeInfo =
           cs->getTypeOfReference(
                 witness, FunctionRefInfo::doubleBaseNameApply(), witnessLocator,
-                /*useDC=*/nullptr, /*preparedOverload=*/nullptr)
-              .adjustedReferenceType;
+                /*useDC=*/nullptr, /*preparedOverload=*/nullptr);
     }
+
+    openWitnessType = openWitnessTypeInfo.adjustedReferenceType;
     openWitnessType = openWitnessType->getRValueType();
 
-    Type reqThrownError;
-    Type witnessThrownError;
-
-    if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
-      auto *reqASD = cast<AbstractStorageDecl>(req);
-
-      // Dig out the thrown error types from the getter so we can compare them
-      // later.
-      auto getThrownErrorType = [](AbstractStorageDecl *asd) -> Type {
-        if (auto getter = asd->getEffectfulGetAccessor()) {
-          if (Type thrownErrorType = getter->getThrownInterfaceType()) {
-            return thrownErrorType;
-          } else if (getter->hasThrows()) {
-            return asd->getASTContext().getErrorExistentialType();
-          }
-        }
-
-        return asd->getASTContext().getNeverType();
-      };
-
-      reqThrownError = getThrownErrorType(reqASD);
-      reqThrownError = cs->openType(reqThrownError, reqReplacements,
-                                    reqLocator, /*preparedOverload=*/nullptr);
-
-      witnessThrownError = getThrownErrorType(witnessASD);
-      witnessThrownError = cs->openType(witnessThrownError, witnessReplacements,
-                                        witnessLocator, /*preparedOverload=*/nullptr);
-    }
+    Type witnessThrownError = openWitnessTypeInfo.thrownErrorTypeOnAccess;
 
     return std::make_tuple(std::nullopt, reqType, openWitnessType,
                            reqThrownError, witnessThrownError);
