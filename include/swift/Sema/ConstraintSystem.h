@@ -4463,6 +4463,13 @@ public:
                           DeclContext *useDC,
                           PreparedOverloadBuilder *preparedOverload);
 
+  /// \returns the opened type, the thrown error type, and the base object type.
+  std::tuple<Type, Type, Type> getTypeOfMemberReferenceImpl(
+      Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
+      FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
+      SmallVectorImpl<OpenedType> *replacements = nullptr,
+      PreparedOverloadBuilder *preparedOverload = nullptr);
+
   /// Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
   ///
