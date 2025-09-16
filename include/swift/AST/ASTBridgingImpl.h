@@ -566,6 +566,26 @@ bool BridgedASTType::isBuiltinType() const {
   return unbridged()->isBuiltinType();
 }
 
+BridgedASTType BridgedASTType::getAnyPointerElementType() const {
+  return {unbridged()->getCanonicalType()->getAnyPointerElementType().getPointer()};
+}
+
+bool BridgedASTType::isUnsafeBufferPointerType() const {
+  return unbridged()->isUnsafeBufferPointer();
+}
+
+bool BridgedASTType::isUnsafeMutableBufferPointerType() const {
+  return unbridged()->isUnsafeMutableBufferPointer();
+}
+
+bool BridgedASTType::isUnsafeRawBufferPointerType() const {
+  return unbridged()->isUnsafeRawBufferPointer();
+}
+
+bool BridgedASTType::isUnsafeMutableRawBufferPointerType() const {
+  return unbridged()->isUnsafeMutableRawBufferPointer();
+}
+
 OptionalBridgedDeclObj BridgedASTType::getNominalOrBoundGenericNominal() const {
   return {unbridged()->getNominalOrBoundGenericNominal()};
 }

@@ -2955,6 +2955,11 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isBuiltinFixedWidthInteger(SwiftInt width) const;
   BRIDGED_INLINE bool isOptional() const;
   BRIDGED_INLINE bool isBuiltinType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getAnyPointerElementType() const;
+  BRIDGED_INLINE bool isUnsafeBufferPointerType() const;
+  BRIDGED_INLINE bool isUnsafeMutableBufferPointerType() const;
+  BRIDGED_INLINE bool isUnsafeRawBufferPointerType() const;
+  BRIDGED_INLINE bool isUnsafeMutableRawBufferPointerType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getNominalOrBoundGenericNominal() const;
   BRIDGED_INLINE TraitResult canBeClass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getAnyNominal() const;
