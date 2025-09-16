@@ -3916,9 +3916,6 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-XML2 $BuildPlatform
     Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts"
   }
-  if ($IncludeDS2) {
-    Invoke-BuildStep Build-RegsGen2 $BuildPlatform
-  }
 
   Invoke-BuildStep Build-CMark $HostPlatform
   Invoke-BuildStep Build-XML2 $HostPlatform
@@ -3932,146 +3929,6 @@ if (-not $SkipBuild) {
     }
   } | ForEach-Object {
     Invoke-BuildStep Build-CompilerRuntime $_
-  }
-
-  # Build Macros
-  Build-CMakeProject `
-    -Src $SourceCache\swift-foundation\Sources\FoundationMacros `
-    -Bin (Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros) `
-    -BuildTargets default `
-    -Platform $BuildPlatform `
-    -UsePinnedCompilers Swift `
-    -SwiftSDK (Get-PinnedToolchainSDK -OS $BuildPlatform.OS) `
-    -Defines @{
-      SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Compilers);
-    }
-
-  Build-CMakeProject `
-    -Src $SourceCache\swift-testing\Sources\TestingMacros `
-    -Bin (Get-ProjectBinaryCache $BuildPlatform BootstrapTestingMacros) `
-    -BuildTargets default `
-    -Platform $BuildPlatform `
-    -UsePinnedCompilers Swift `
-    -SwiftSDK (Get-PinnedToolchainSDK -OS $BuildPlatform.OS) `
-    -Defines @{
-      SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Compilers);
-    }
-
-  if ($Windows) {
-    foreach ($Build in $WindowsSDKBuilds) {
-      if ($IncludeDS2) {
-        Invoke-BuildStep Build-DS2 $Build
-      }
-
-      Invoke-BuildStep Build-ZLib $Build
-      Invoke-BuildStep Build-XML2 $Build
-      Invoke-BuildStep Build-CURL $Build
-    }
-
-    foreach ($SDK in $WindowsSDKVersions) {
-      switch ($SDK) {
-        Windows {
-          foreach ($Build in $WindowsSDKBuilds) {
-            Invoke-BuildStep Build-SDK $Build
-
-            Get-ChildItem "$(Get-SwiftSDK Windows)\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
-              Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-              Move-Item $_.FullName "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
-            }
-
-            # FIXME(compnerd) how do we select which SDK is meant to be re-distributed?
-            Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", $ProductVersion, "usr"))"
-          }
-
-          Install-SDK $WindowsSDKBuilds
-          Write-SDKSettings Windows
-        }
-
-        WindowsExperimental {
-          foreach ($Build in $WindowsSDKBuilds) {
-            Invoke-BuildStep Build-ExperimentalSDK $Build
-
-            $SDKROOT = Get-SwiftSDK Windows -Identifier WindowsExperimental
-
-            Get-ChildItem "${SDKROOT}\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
-              Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-              Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
-            }
-
-            Get-ChildItem "${SDKROOT}\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
-              Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-              Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\windows\$($Build.Architecture.LLVMName)\" | Out-Null
-            }
-
-            # FIXME(compnerd) how do we select which SDK is meant to be re-distributed?
-            Copy-Directory "${SDKROOT}\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", "$ProductVersion.experimental", "usr"))"
-          }
-
-          Install-SDK $WindowsSDKBuilds -Identifier WindowsExperimental
-          Write-SDKSettings Windows -Identifier WindowsExperimental
-        }
-      }
-    }
-
-    Write-PlatformInfoPlist Windows
-  }
-
-  if ($Android) {
-    foreach ($Build in $AndroidSDKBuilds) {
-      if ($IncludeDS2) {
-        Invoke-BuildStep Build-DS2 $Build
-      }
-
-      Invoke-BuildStep Build-ZLib $Build
-      Invoke-BuildStep Build-XML2 $Build
-      Invoke-BuildStep Build-CURL $Build
-    }
-
-    foreach ($SDK in $AndroidSDKVersions) {
-      switch ($SDK) {
-        Android {
-          foreach ($Build in $AndroidSDKBuilds) {
-            Invoke-BuildStep Build-SDK $Build
-
-            Get-ChildItem "$(Get-SwiftSDK Android)\usr\lib\swift\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
-              Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-              Move-Item $_.FullName "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Build.Architecture.LLVMName)\" | Out-Null
-            }
-          }
-
-          Install-SDK $AndroidSDKBuilds
-          Write-SDKSettings Android
-        }
-
-        AndroidExperimental {
-          foreach ($Build in $AndroidSDKBuilds) {
-            Invoke-BuildStep Build-ExperimentalSDK $Build
-
-            $SDKROOT = Get-SwiftSDK Android -Identifier AndroidExperimental
-
-            Get-ChildItem "${SDKROOT}\usr\lib\swift\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
-              Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-              Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\android\$($Build.Architecture.LLVMName)\" | Out-Null
-            }
-
-            Get-ChildItem "${SDKROOT}\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
-              Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-              Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\android\$($Build.Architecture.LLVMName)\" | Out-Null
-            }
-          }
-
-          Install-SDK $AndroidSDKBuilds -Identifiers AndroidExperimental
-          Write-SDKSettings Android -Identifier AndroidExperimental
-        }
-      }
-    }
-
-    Write-PlatformInfoPlist Android
-
-    # Android swift-inspect only supports 64-bit platforms.
-    $AndroidSDKBuilds | Where-Object { @("arm64-v8a", "x86_64") -contains $_.Architecture.ABI } | ForEach-Object {
-      Invoke-BuildStep Build-Inspect $_
-    }
   }
 
   # Build Macros for distribution
@@ -4115,6 +3972,161 @@ if (-not $SkipBuild -and -not $IsCrossCompiling) {
 
 if (-not $SkipBuild) {
   Invoke-BuildStep Patch-mimalloc $HostPlatform
+}
+
+if ($Windows -Or $Android) {
+  if ($IncludeDS2) {
+    Invoke-BuildStep Build-RegsGen2 $BuildPlatform
+  }
+
+  # Build Macros
+  Build-CMakeProject `
+    -Src $SourceCache\swift-foundation\Sources\FoundationMacros `
+    -Bin (Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros) `
+    -BuildTargets default `
+    -Platform $BuildPlatform `
+    -UsePinnedCompilers Swift `
+    -SwiftSDK (Get-PinnedToolchainSDK -OS $BuildPlatform.OS) `
+    -Defines @{
+      SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Compilers);
+    }
+
+  Build-CMakeProject `
+    -Src $SourceCache\swift-testing\Sources\TestingMacros `
+    -Bin (Get-ProjectBinaryCache $BuildPlatform BootstrapTestingMacros) `
+    -BuildTargets default `
+    -Platform $BuildPlatform `
+    -UsePinnedCompilers Swift `
+    -SwiftSDK (Get-PinnedToolchainSDK -OS $BuildPlatform.OS) `
+    -Defines @{
+      SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Compilers);
+    }
+}
+
+if ($Windows) {
+  foreach ($Build in $WindowsSDKBuilds) {
+    if ($IncludeDS2) {
+      Invoke-BuildStep Build-DS2 $Build
+    }
+
+    Invoke-BuildStep Build-ZLib $Build
+    Invoke-BuildStep Build-XML2 $Build
+    Invoke-BuildStep Build-CURL $Build
+  }
+
+  foreach ($SDK in $WindowsSDKVersions) {
+    switch ($SDK) {
+      Windows {
+        foreach ($Build in $WindowsSDKBuilds) {
+          Invoke-BuildStep Build-SDK $Build
+
+          Get-ChildItem "$(Get-SwiftSDK Windows)\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+            Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+            Move-Item $_.FullName "$(Get-SwiftSDK Windows)\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
+          }
+
+          # FIXME(compnerd) how do we select which SDK is meant to be re-distributed?
+          Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", $ProductVersion, "usr"))"
+        }
+
+        Install-SDK $WindowsSDKBuilds
+        Write-SDKSettings Windows
+      }
+
+      WindowsExperimental {
+        foreach ($Build in $WindowsSDKBuilds) {
+          Invoke-BuildStep Build-ExperimentalSDK $Build
+
+          $SDKROOT = Get-SwiftSDK Windows -Identifier WindowsExperimental
+
+          Get-ChildItem "${SDKROOT}\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+            Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+            Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
+          }
+
+          Get-ChildItem "${SDKROOT}\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+            Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+            Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\windows\$($Build.Architecture.LLVMName)\" | Out-Null
+          }
+
+          # FIXME(compnerd) how do we select which SDK is meant to be re-distributed?
+          Copy-Directory "${SDKROOT}\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", "$ProductVersion.experimental", "usr"))"
+        }
+
+        Install-SDK $WindowsSDKBuilds -Identifier WindowsExperimental
+        Write-SDKSettings Windows -Identifier WindowsExperimental
+      }
+    }
+  }
+
+  foreach ($Build in $WindowsSDKBuilds) {
+    Invoke-BuildStep Build-XCTest $Build
+    Invoke-BuildStep Build-Testing $Build
+  }
+
+  Write-PlatformInfoPlist Windows
+}
+
+if ($Android) {
+  foreach ($Build in $AndroidSDKBuilds) {
+    if ($IncludeDS2) {
+      Invoke-BuildStep Build-DS2 $Build
+    }
+
+    Invoke-BuildStep Build-ZLib $Build
+    Invoke-BuildStep Build-XML2 $Build
+    Invoke-BuildStep Build-CURL $Build
+  }
+
+  foreach ($SDK in $AndroidSDKVersions) {
+    switch ($SDK) {
+      Android {
+        foreach ($Build in $AndroidSDKBuilds) {
+          Invoke-BuildStep Build-SDK $Build
+
+          Get-ChildItem "$(Get-SwiftSDK Android)\usr\lib\swift\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
+            Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+            Move-Item $_.FullName "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Build.Architecture.LLVMName)\" | Out-Null
+          }
+        }
+
+        Install-SDK $AndroidSDKBuilds
+        Write-SDKSettings Android
+      }
+
+      AndroidExperimental {
+        foreach ($Build in $AndroidSDKBuilds) {
+          Invoke-BuildStep Build-ExperimentalSDK $Build
+
+          $SDKROOT = Get-SwiftSDK Android -Identifier AndroidExperimental
+
+          Get-ChildItem "${SDKROOT}\usr\lib\swift\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
+            Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+            Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\android\$($Build.Architecture.LLVMName)\" | Out-Null
+          }
+
+          Get-ChildItem "${SDKROOT}\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
+            Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+            Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\android\$($Build.Architecture.LLVMName)\" | Out-Null
+          }
+        }
+
+        Install-SDK $AndroidSDKBuilds -Identifiers AndroidExperimental
+        Write-SDKSettings Android -Identifier AndroidExperimental
+      }
+    }
+  }
+
+  foreach ($Build in $AndroidSDKBuilds) {
+    Invoke-BuildStep Build-XCTest $Build
+  }
+
+  Write-PlatformInfoPlist Android
+
+  # Android swift-inspect only supports 64-bit platforms.
+  $AndroidSDKBuilds | Where-Object { @("arm64-v8a", "x86_64") -contains $_.Architecture.ABI } | ForEach-Object {
+    Invoke-BuildStep Build-Inspect $_
+  }
 }
 
 if (-not $SkipPackaging) {
