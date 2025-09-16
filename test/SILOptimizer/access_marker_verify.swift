@@ -1023,7 +1023,7 @@ func testPointerInit(x: Int, y: UnsafeMutablePointer<Int>) {
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify15testPointerInit1x1yySi_SpySiGtF : $@convention(thin) (Int, UnsafeMutablePointer<Int>) -> () {
 // CHECK: bb0(%0 : $Int, %1 : $UnsafeMutablePointer<Int>):
 // call addressor
-// CHECK: [[POINTEE:%.*]] = apply %{{.*}}<Int>(%1) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
+// CHECK: [[POINTEE:%.*]] = apply %{{.*}}<Int>(%1) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK: [[RAWPTR:%.*]] = struct_extract [[POINTEE]] : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
 // CHECK: [[ADR:%.*]] = pointer_to_address [[RAWPTR]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK: [[MD:%.*]] = mark_dependence [unresolved] [[ADR]] : $*Int on %1 : $UnsafeMutablePointer<Int> // user: %9
