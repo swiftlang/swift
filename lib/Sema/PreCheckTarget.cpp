@@ -568,6 +568,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   //       chance to diagnose name shadowing which requires explicit
   //       name/module qualifier to access top-level name.
   lookupOptions |= NameLookupFlags::IncludeOuterResults;
+  lookupOptions |= NameLookupFlags::IgnoreMissingImports;
 
   LookupResult Lookup;
 
@@ -656,19 +657,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
         auto *VD = lookupResult.getValueDecl();
         VD->diagnose(diag::decl_declared_here, VD);
       }
-
-      // Don't try to recover here; we'll get more access-related diagnostics
-      // downstream if the type of the inaccessible decl is also inaccessible.
-      return errorResult();
-    }
-
-    // Try ignoring missing imports.
-    relookupOptions |= NameLookupFlags::IgnoreMissingImports;
-    auto nonImportedResults =
-        TypeChecker::lookupUnqualified(DC, LookupName, Loc, relookupOptions);
-    if (nonImportedResults) {
-      const ValueDecl *first = nonImportedResults.front().getValueDecl();
-      maybeDiagnoseMissingImportForMember(first, DC, Loc);
 
       // Don't try to recover here; we'll get more access-related diagnostics
       // downstream if the type of the inaccessible decl is also inaccessible.
@@ -791,6 +779,14 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   // FIXME: Need to refactor the way we build an AST node from a lookup result!
 
   auto buildTypeExpr = [&](TypeDecl *D) -> Expr * {
+    auto *LookupDC = Lookup[0].getDeclContext();
+
+    // If the type decl is a member that wasn't imported, diagnose it now when
+    // MemberImportVisibility is enabled.
+    if (!UDRE->isImplicit() && LookupDC)
+      maybeDiagnoseMissingImportForMember(D, LookupDC,
+                                          UDRE->getNameLoc().getStartLoc());
+
     // FIXME: This is odd.
     if (isa<ModuleDecl>(D)) {
       return new (Context) DeclRefExpr(
@@ -798,7 +794,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           /*Implicit=*/false, AccessSemantics::Ordinary, D->getInterfaceType());
     }
 
-    auto *LookupDC = Lookup[0].getDeclContext();
     bool makeTypeValue = false;
 
     if (isa<GenericTypeParamDecl>(D) &&
@@ -888,6 +883,13 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     if (enclosingUnsafeInheritsExecutor(DC)) {
       introduceUnsafeInheritExecutorReplacements(
           DC, UDRE->getNameLoc().getBaseNameLoc(), ResultValues);
+    }
+
+    // If there is a single result and it's a member that wasn't imported,
+    // diagnose it now when MemberImportVisibility is enabled.
+    if (ResultValues.size() == 1) {
+      maybeDiagnoseMissingImportForMember(ResultValues.front(), DC,
+                                          UDRE->getNameLoc().getStartLoc());
     }
 
     return buildRefExpr(ResultValues, DC, UDRE->getNameLoc(),
