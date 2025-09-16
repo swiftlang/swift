@@ -1915,6 +1915,14 @@ void SerializedASTFile::lookupImportedSPIGroups(
   }
 }
 
+bool SerializedASTFile::isModuleImportedPreconcurrency(
+    const ModuleDecl *importedModule) const {
+  // This method should only be queried during `-merge-modules` jobs, which are
+  // deprecated, and thus no effort has been made to answer this query correctly
+  // (@preconcurrency is not encoded on imports in serialized modules).
+  return false;
+}
+
 std::optional<CommentInfo>
 SerializedASTFile::getCommentForDecl(const Decl *D) const {
   return File.getCommentForDecl(D);

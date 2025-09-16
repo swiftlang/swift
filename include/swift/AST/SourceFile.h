@@ -471,6 +471,11 @@ public:
                 const ModuleDecl *importedModule,
                 llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
 
+  /// Returns true if any import of \p importedModule has the `@preconcurrency`
+  /// attribute.
+  virtual bool isModuleImportedPreconcurrency(
+      const ModuleDecl *importedModule) const override;
+
   // Is \p targetDecl accessible as an explicitly imported SPI from this file?
   bool isImportedAsSPI(const ValueDecl *targetDecl) const;
 

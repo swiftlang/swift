@@ -1044,6 +1044,20 @@ void ModuleDecl::lookupImportedSPIGroups(
   FORWARD(lookupImportedSPIGroups, (importedModule, spiGroups));
 }
 
+bool ModuleDecl::isModuleImportedPreconcurrency(
+    const ModuleDecl *importedModule) const {
+  for (const FileUnit *file : getFiles()) {
+    if (file->isModuleImportedPreconcurrency(importedModule))
+      return true;
+
+    if (auto *synth = file->getSynthesizedFile()) {
+      if (synth->isModuleImportedPreconcurrency(importedModule))
+        return true;
+    }
+  }
+  return false;
+}
+
 void ModuleDecl::lookupAvailabilityDomains(
     Identifier identifier,
     llvm::SmallVectorImpl<AvailabilityDomain> &results) const {
@@ -3048,6 +3062,20 @@ void SourceFile::lookupImportedSPIGroups(
       spiGroups.insert(import.spiGroups.begin(), import.spiGroups.end());
     }
   }
+}
+
+bool SourceFile::isModuleImportedPreconcurrency(
+    const ModuleDecl *importedModule) const {
+  auto &imports = getASTContext().getImportCache();
+  for (auto &import : *Imports) {
+    if (import.options.contains(ImportFlags::Preconcurrency) &&
+        (importedModule == import.module.importedModule ||
+         imports.isImportedByViaSwiftOnly(importedModule,
+                                          import.module.importedModule))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool shouldImplicitImportAsSPI(ArrayRef<Identifier> spiGroups) {

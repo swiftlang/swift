@@ -271,6 +271,9 @@ static void printImports(raw_ostream &out,
       ModuleDecl::ImportFilterKind::Default,
       ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay};
 
+  // FIXME: Scan over all imports in the module once to build up the attribute
+  // set for printed imports, instead of repeatedly doing linear scans for each
+  // kind of attribute.
   using ImportSet = llvm::SmallSet<ImportedModule, 8, ImportedModule::Order>;
   auto getImports = [M](ModuleDecl::ImportFilter filter) -> ImportSet {
     SmallVector<ImportedModule, 8> matchingImports;
@@ -354,6 +357,9 @@ static void printImports(raw_ostream &out,
       for (auto spiName : spis)
         out << "@_spi(" << spiName << ") ";
     }
+
+    if (M->isModuleImportedPreconcurrency(importedModule))
+      out << "@preconcurrency ";
 
     if (Opts.printPackageInterface() &&
         !publicImportSet.count(import) &&

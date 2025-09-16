@@ -965,6 +965,10 @@ public:
                          const ModuleDecl *importedModule,
                          llvm::SmallSetVector<Identifier, 4> &spiGroups) const;
 
+  /// Returns true if any import of \p importedModule has the `@preconcurrency`
+  /// attribute.
+  bool isModuleImportedPreconcurrency(const ModuleDecl *importedModule) const;
+
   /// Finds the custom availability domain defined by this module with the
   /// given identifier and if one exists adds it to results.
   void
