@@ -1184,7 +1184,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable & ~Escapable {
     // Note: When count is statically known to be 1 the compiler will optimize
     // away a call to swift_arrayDestroy into the type's specific destroy.
     Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)
-    return UnsafeMutableRawPointer(self)
+    return unsafe UnsafeMutableRawPointer(self)
   }
 }
 
