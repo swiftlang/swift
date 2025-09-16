@@ -1628,8 +1628,8 @@ std::pair<Type, Type> ConstraintSystem::getOpenedStorageType(
   FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
 
   FunctionType::ExtInfo info;
-  return std::make_pair(thrownErrorType,
-                        FunctionType::get({selfParam}, refType, info));
+  return std::make_pair(FunctionType::get({selfParam}, refType, info),
+                        thrownErrorType);
 }
 
 /// Add the constraint on the type used for the 'Self' type for a member
@@ -1855,7 +1855,7 @@ static FunctionType *applyOptionality(ValueDecl *value, FunctionType *fnTy) {
                            fnTy->getExtInfo());
 }
 
-std::tuple<Type, Type, Type>
+std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReferenceImpl(
     OverloadChoice choice, DeclContext *useDC,
     ConstraintLocator *locator, SmallVectorImpl<OpenedType> *replacementsPtr,
@@ -1878,7 +1878,7 @@ ConstraintSystem::getTypeOfMemberReferenceImpl(
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
     openedType = getTypeOfMemberTypeReference(baseObjTy, typeDecl,
                                               locator, preparedOverload);
-    return {openedType, thrownErrorType, baseObjTy};
+    return {openedType, thrownErrorType};
   }
 
   // Figure out the declaration context to use when opening this type.
@@ -1919,7 +1919,7 @@ ConstraintSystem::getTypeOfMemberReferenceImpl(
       isa<MacroDecl>(value)) {
     auto interfaceType = value->getInterfaceType();
     if (interfaceType->is<ErrorType>() || isa<MacroDecl>(value))
-      return { interfaceType, Type(), baseObjTy };
+      return { interfaceType, Type() };
 
     if (outerDC->getSelfClassDecl()) {
       if (isa<ConstructorDecl>(value)) {
@@ -1939,7 +1939,7 @@ ConstraintSystem::getTypeOfMemberReferenceImpl(
   } else {
     auto *storage = cast<AbstractStorageDecl>(value);
 
-    std::tie(thrownErrorType, openedType) = getOpenedStorageType(
+    std::tie(openedType, thrownErrorType) = getOpenedStorageType(
         baseTy, storage, useDC, hasAppliedSelf, replacements, locator,
         preparedOverload);
   }
@@ -1976,7 +1976,6 @@ ConstraintSystem::getTypeOfMemberReferenceImpl(
           // to make sure that it's opened before use.
           baseOpenedTy = openType(concreteSelf, replacements, locator,
                                   preparedOverload);
-          baseObjTy = baseOpenedTy;
         }
       }
     } else {
@@ -2035,7 +2034,7 @@ ConstraintSystem::getTypeOfMemberReferenceImpl(
     }
   }
 
-  return { openedType, thrownErrorType, baseObjTy };
+  return { openedType, thrownErrorType };
 }
 
 DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
@@ -2047,7 +2046,8 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   auto *value = choice.getDecl();
 
   // Figure out the instance type used for the base.
-  Type baseRValueTy = choice.getBaseType();
+  Type baseTy = choice.getBaseType();
+  Type baseRValueTy = baseTy->getRValueType();
   Type baseObjTy = baseRValueTy->getMetatypeInstanceType();
 
   // A reference to a module member is really unqualified, and should
@@ -2055,7 +2055,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   ASSERT(!baseObjTy->is<ModuleType>());
 
   Type openedType, thrownErrorType;
-  std::tie(openedType, thrownErrorType, baseObjTy)
+  std::tie(openedType, thrownErrorType)
       = getTypeOfMemberReferenceImpl(choice, useDC, locator, replacementsPtr,
                                      preparedOverload);
 

@@ -4459,8 +4459,8 @@ public:
                           DeclContext *useDC,
                           PreparedOverloadBuilder *preparedOverload);
 
-  /// \returns the opened type, the thrown error type, and the base object type.
-  std::tuple<Type, Type, Type> getTypeOfMemberReferenceImpl(
+  /// \returns the opened type and the thrown error type.
+  std::pair<Type, Type> getTypeOfMemberReferenceImpl(
       OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
       SmallVectorImpl<OpenedType> *replacements = nullptr,
       PreparedOverloadBuilder *preparedOverload = nullptr);
