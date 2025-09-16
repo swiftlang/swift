@@ -3795,7 +3795,7 @@ public:
   /// Add a constraint that binds an overload set to a specific choice.
   void addBindOverloadConstraint(Type boundTy, OverloadChoice choice,
                                  ConstraintLocator *locator, DeclContext *useDC) {
-    resolveOverload(locator, boundTy, choice, useDC,
+    resolveOverload(choice, useDC, locator, boundTy,
                     /*preparedOverload=*/nullptr);
   }
 
@@ -4439,13 +4439,6 @@ public:
       unsigned numApplies, bool isMainDispatchQueue,
       bool openGlobalActorType, ConstraintLocatorBuilder locator);
 
-  /// \returns The opened type and the thrown error type.
-  std::pair<Type, Type> getTypeOfReferenceImpl(
-                          OverloadChoice choice,
-                          ConstraintLocatorBuilder locator,
-                          DeclContext *useDC,
-                          PreparedOverloadBuilder *preparedOverload);
-
   /// Retrieve the type of a reference to the given value declaration.
   ///
   /// For references to polymorphic function types, this routine "opens up"
@@ -4454,14 +4447,7 @@ public:
   ///
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfReference(
-                          OverloadChoice choice,
-                          ConstraintLocatorBuilder locator,
-                          DeclContext *useDC,
-                          PreparedOverloadBuilder *preparedOverload);
-
-  /// \returns the opened type and the thrown error type.
-  std::pair<Type, Type> getTypeOfMemberReferenceImpl(
-      OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
+      OverloadChoice choice, DeclContext *useDC, ConstraintLocatorBuilder locator,
       PreparedOverloadBuilder *preparedOverload);
 
   /// Retrieve the type of a reference to the given value declaration,
@@ -4486,6 +4472,24 @@ public:
   }
 
 private:
+  /// \returns The opened type and the thrown error type.
+  std::pair<Type, Type> getTypeOfReferencePre(
+       OverloadChoice choice, DeclContext *useDC, ConstraintLocatorBuilder locator,
+       PreparedOverloadBuilder *preparedOverload);
+
+  DeclReferenceType getTypeOfReferencePost(
+       OverloadChoice choice, DeclContext *useDC, ConstraintLocatorBuilder locator,
+       Type openedType, Type thrownErrorType);
+
+  /// \returns the opened type and the thrown error type.
+  std::pair<Type, Type> getTypeOfMemberReferencePre(
+      OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
+      PreparedOverloadBuilder *preparedOverload);
+
+  DeclReferenceType getTypeOfMemberReferencePost(
+      OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
+      Type openedType, Type thrownErrorType);
+
   Type getTypeOfMemberTypeReference(
       Type baseObjTy, TypeDecl *typeDecl, ConstraintLocator *locator,
       PreparedOverloadBuilder *preparedOverload);
@@ -4920,17 +4924,17 @@ public:
                               SelectedOverload choice);
 
   /// Build and allocate a prepared overload in the solver arena.
-  PreparedOverload *prepareOverload(ConstraintLocator *locator,
-                                    OverloadChoice choice,
-                                    DeclContext *useDC);
+  PreparedOverload *prepareOverload(OverloadChoice choice,
+                                    DeclContext *useDC,
+                                    ConstraintLocator *locator);
 
   /// Populate the prepared overload with all type variables and constraints
   /// that are to be introduced into the constraint system when this choice
   /// is taken.
   DeclReferenceType
-  prepareOverloadImpl(ConstraintLocator *locator,
-                      OverloadChoice choice,
+  prepareOverloadImpl(OverloadChoice choice,
                       DeclContext *useDC,
+                      ConstraintLocator *locator,
                       PreparedOverloadBuilder *preparedOverload);
 
   void replayChanges(
@@ -4938,8 +4942,8 @@ public:
       PreparedOverload *preparedOverload);
 
   /// Resolve the given overload set to the given choice.
-  void resolveOverload(ConstraintLocator *locator, Type boundType,
-                       OverloadChoice choice, DeclContext *useDC,
+  void resolveOverload(OverloadChoice choice, DeclContext *useDC,
+                       ConstraintLocator *locator, Type boundType,
                        PreparedOverload *preparedOverload);
 
   /// Simplify a type, by replacing type variables with either their

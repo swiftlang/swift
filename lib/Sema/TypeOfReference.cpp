@@ -1084,10 +1084,10 @@ static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value, bool
 }
 
 std::pair<Type, Type>
-ConstraintSystem::getTypeOfReferenceImpl(OverloadChoice choice,
-                                         ConstraintLocatorBuilder locator,
-                                         DeclContext *useDC,
-                                         PreparedOverloadBuilder *preparedOverload) {
+ConstraintSystem::getTypeOfReferencePre(OverloadChoice choice,
+                                        DeclContext *useDC,
+                                        ConstraintLocatorBuilder locator,
+                                        PreparedOverloadBuilder *preparedOverload) {
   auto *value = choice.getDecl();
 
   ASSERT(!!preparedOverload == PreparingOverload);
@@ -1210,16 +1210,10 @@ ConstraintSystem::getTypeOfReferenceImpl(OverloadChoice choice,
 }
 
 DeclReferenceType
-ConstraintSystem::getTypeOfReference(OverloadChoice choice,
-                                     ConstraintLocatorBuilder locator,
-                                     DeclContext *useDC,
-                                     PreparedOverloadBuilder *preparedOverload) {
-  ASSERT(!!preparedOverload == PreparingOverload);
-
-  Type openedType, thrownErrorType;
-  std::tie(openedType, thrownErrorType) = getTypeOfReferenceImpl(
-      choice, locator, useDC, preparedOverload);
-
+ConstraintSystem::getTypeOfReferencePost(OverloadChoice choice,
+                                         DeclContext *useDC,
+                                         ConstraintLocatorBuilder locator,
+                                         Type openedType, Type thrownErrorType) {
   auto *value = choice.getDecl();
 
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
@@ -1304,7 +1298,24 @@ ConstraintSystem::getTypeOfReference(OverloadChoice choice,
         ClosureIsolatedByPreconcurrency{*this});
   }
 
-  return { origOpenedType, openedType, origOpenedType, openedType, thrownErrorType };
+  return { origOpenedType, openedType,
+           origOpenedType, openedType,
+           thrownErrorType };
+}
+
+DeclReferenceType
+ConstraintSystem::getTypeOfReference(OverloadChoice choice,
+                                     DeclContext *useDC,
+                                     ConstraintLocatorBuilder locator,
+                                     PreparedOverloadBuilder *preparedOverload) {
+  ASSERT(!!preparedOverload == PreparingOverload);
+
+  Type openedType, thrownErrorType;
+  std::tie(openedType, thrownErrorType) = getTypeOfReferencePre(
+      choice, useDC, locator, preparedOverload);
+
+  return getTypeOfReferencePost(choice, useDC, locator,
+                                openedType, thrownErrorType);
 }
 
 /// Bind type variables for archetypes that are determined from
@@ -1829,7 +1840,7 @@ static FunctionType *applyOptionality(ValueDecl *value, FunctionType *fnTy) {
 }
 
 std::pair<Type, Type>
-ConstraintSystem::getTypeOfMemberReferenceImpl(
+ConstraintSystem::getTypeOfMemberReferencePre(
     OverloadChoice choice, DeclContext *useDC,
     ConstraintLocator *locator,
     PreparedOverloadBuilder *preparedOverload) {
@@ -2003,12 +2014,15 @@ ConstraintSystem::getTypeOfMemberReferenceImpl(
   return { openedType, thrownErrorType };
 }
 
-DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
+DeclReferenceType ConstraintSystem::getTypeOfMemberReferencePost(
     OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
-    PreparedOverloadBuilder *preparedOverload) {
-  ASSERT(!!preparedOverload == PreparingOverload);
-
+    Type openedType, Type thrownErrorType) {
   auto *value = choice.getDecl();
+
+  if (isa<TypeDecl>(value)) {
+    auto type = openedType->castTo<FunctionType>()->getResult();
+    return { openedType, openedType, type, type, Type() };
+  }
 
   // Figure out the instance type used for the base.
   Type baseTy = choice.getBaseType();
@@ -2018,15 +2032,6 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   // A reference to a module member is really unqualified, and should
   // be handled by the caller via getTypeOfReference().
   ASSERT(!baseObjTy->is<ModuleType>());
-
-  Type openedType, thrownErrorType;
-  std::tie(openedType, thrownErrorType)
-      = getTypeOfMemberReferenceImpl(choice, useDC, locator, preparedOverload);
-
-  if (isa<TypeDecl>(value)) {
-    auto type = openedType->castTo<FunctionType>()->getResult();
-    return { openedType, openedType, type, type, Type() };
-  }
 
   auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseRValueTy, value);
 
@@ -2082,6 +2087,19 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   }
 
   return { origOpenedType, openedType, origType, type, thrownErrorType };
+}
+
+DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
+    OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
+    PreparedOverloadBuilder *preparedOverload) {
+  ASSERT(!!preparedOverload == PreparingOverload);
+
+  Type openedType, thrownErrorType;
+  std::tie(openedType, thrownErrorType)
+      = getTypeOfMemberReferencePre(choice, useDC, locator, preparedOverload);
+
+  return getTypeOfMemberReferencePost(
+      choice, useDC, locator, openedType, thrownErrorType);
 }
 
 Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
@@ -2796,9 +2814,9 @@ void ConstraintSystem::replayChanges(
 /// FIXME: As a transitional mechanism, if preparedOverload is nullptr, this
 /// immediately performs all operations.
 DeclReferenceType
-ConstraintSystem::prepareOverloadImpl(ConstraintLocator *locator,
-                                      OverloadChoice choice,
+ConstraintSystem::prepareOverloadImpl(OverloadChoice choice,
                                       DeclContext *useDC,
+                                      ConstraintLocator *locator,
                                       PreparedOverloadBuilder *preparedOverload) {
   // If we refer to a top-level decl with special type-checking semantics,
   // handle it now.
@@ -2813,23 +2831,23 @@ ConstraintSystem::prepareOverloadImpl(ConstraintLocator *locator,
 
     // If the base is a module type, it's an unqualified reference.
     if (baseTy->getMetatypeInstanceType()->is<ModuleType>()) {
-      return getTypeOfReference(choice, locator, useDC, preparedOverload);
+      return getTypeOfReference(choice, useDC, locator, preparedOverload);
     }
 
     return getTypeOfMemberReference(choice, useDC, locator, preparedOverload);
   } else {
-    return getTypeOfReference(choice, locator, useDC, preparedOverload);
+    return getTypeOfReference(choice, useDC, locator, preparedOverload);
   }
 }
 
-PreparedOverload *ConstraintSystem::prepareOverload(ConstraintLocator *locator,
-                                                    OverloadChoice choice,
-                                                    DeclContext *useDC) {
+PreparedOverload *ConstraintSystem::prepareOverload(OverloadChoice choice,
+                                                    DeclContext *useDC,
+                                                    ConstraintLocator *locator) {
   ASSERT(!PreparingOverload);
   PreparingOverload = true;
 
   PreparedOverloadBuilder builder;
-  auto declRefType = prepareOverloadImpl(locator, choice, useDC, &builder);
+  auto declRefType = prepareOverloadImpl(choice, useDC, locator, &builder);
 
   PreparingOverload = false;
 
@@ -2840,9 +2858,8 @@ PreparedOverload *ConstraintSystem::prepareOverload(ConstraintLocator *locator,
   return new (mem) PreparedOverload(declRefType, builder.Changes);
 }
 
-void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
-                                       Type boundType, OverloadChoice choice,
-                                       DeclContext *useDC,
+void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC,
+                                       ConstraintLocator *locator, Type boundType,
                                        PreparedOverload *preparedOverload) {
   // Determine the type to which we'll bind the overload set's type.
   Type openedType;
@@ -2867,7 +2884,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       adjustedRefType = preparedOverload->getAdjustedReferenceType();
       thrownErrorTypeOnAccess = preparedOverload->getThrownErrorTypeOnAccess();
     } else {
-      auto declRefType = prepareOverloadImpl(locator, choice, useDC, nullptr);
+      auto declRefType = prepareOverloadImpl(choice, useDC, locator, nullptr);
 
       openedType = declRefType.openedType;
       adjustedOpenedType = declRefType.adjustedOpenedType;
