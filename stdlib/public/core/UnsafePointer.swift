@@ -310,6 +310,7 @@ extension UnsafePointer where Pointee: ~Copyable & ~Escapable {
   /// - Parameter i: The offset from this pointer at which to access an
   ///   instance, measured in strides of the pointer's `Pointee` type.
   @_alwaysEmitIntoClient
+  @lifetime(borrow self)
   public subscript(i: Int) -> Pointee {
     @_transparent
     unsafeAddress {
@@ -943,6 +944,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable & ~Escapable {
   /// - Returns: The instance referenced by this pointer.
   @inlinable
   @_preInverseGenerics
+  @lifetime(borrow self)
   public func move() -> Pointee {
     return Builtin.take(_rawValue)
   }
@@ -1304,6 +1306,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable & ~Escapable {
   /// - Parameter i: The offset from this pointer at which to access an
   ///   instance, measured in strides of the pointer's `Pointee` type.
   @_alwaysEmitIntoClient
+  @lifetime(borrow self)
   public subscript(i: Int) -> Pointee {
     @_transparent
     unsafeAddress {
