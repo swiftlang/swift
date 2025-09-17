@@ -2317,9 +2317,17 @@ static Type validateParameterType(ParamDecl *decl) {
                      : TypeResolverContext::FunctionInput);
   options |= TypeResolutionFlags::Direct;
 
+  // We allow placeholders in parameter types to improve recovery since if a
+  // default argument is present we can suggest the inferred type. Avoid doing
+  // this for protocol requirements though since those can't ever have default
+  // arguments anyway.
+  HandlePlaceholderTypeReprFn placeholderOpener;
+  if (!isa<ProtocolDecl>(dc->getParent()))
+    placeholderOpener = PlaceholderType::get;
+
   const auto resolution =
       TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                   PlaceholderType::get,
+                                   placeholderOpener,
                                    /*packElementOpener*/ nullptr);
 
   if (isa<VarargTypeRepr>(nestedRepr)) {

@@ -294,13 +294,12 @@ do {
 
 // Make sure we reject placeholders here.
 protocol TestPlaceholderRequirement {
-  func foo(_:_) // expected-error {{type placeholder may not appear in top-level parameter}}
+  func foo(_:_) // expected-error {{type placeholder not allowed here}}
   func bar() -> _ // expected-error {{type placeholder not allowed here}}
   func baz() -> [_] // expected-error {{type placeholder not allowed here}}
-  func qux(_: [_]) // expected-error {{type placeholder may not appear in top-level parameter}}
+  func qux(_: [_]) // expected-error {{type placeholder not allowed here}}
 
-  // FIXME: Shouldn't diagnose twice
-  subscript(_: _) -> Void { get } // expected-error 2{{type placeholder may not appear in top-level parameter}}
+  subscript(_: _) -> Void { get } // expected-error {{type placeholder not allowed here}}
   subscript() -> _ { get } // expected-error {{type placeholder not allowed here}}
 }
 
@@ -311,6 +310,7 @@ var testPlaceholderComputed1: _ { 0 } // expected-error {{type placeholder not a
 var testPlaceholderComputed2: [_] { [0] } // expected-error {{type placeholder not allowed here}}
 
 struct TestPlaceholderSubscript {
+  // FIXME: Shouldn't diagnose twice.
   subscript(_: _) -> Void { () } // expected-error 2{{type placeholder may not appear in top-level parameter}}
   subscript(_: [_]) -> Void { () } // expected-error 2{{type placeholder may not appear in top-level parameter}}
   subscript() -> _ { () } // expected-error {{type placeholder not allowed here}}
