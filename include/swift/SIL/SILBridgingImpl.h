@@ -2316,6 +2316,18 @@ BridgedInstruction BridgedBuilder::createAllocStack(BridgedType type,
       swift::UsesMoveableValueDebugInfo_t(wasMoved), /*skipVarDeclAssert=*/ true)};
 }
 
+BridgedInstruction BridgedBuilder::createAllocPack(BridgedType type) const {
+  return {unbridged().createAllocPack(regularLoc(), type.unbridged())};
+}
+
+BridgedInstruction BridgedBuilder::createAllocPackMetadata() const {
+  return {unbridged().createAllocPackMetadata(regularLoc())};
+}
+
+BridgedInstruction BridgedBuilder::createAllocPackMetadata(BridgedType type) const {
+  return {unbridged().createAllocPackMetadata(regularLoc(), type.unbridged())};
+}
+
 BridgedInstruction BridgedBuilder::createDeallocStack(BridgedValue operand) const {
   return {unbridged().createDeallocStack(regularLoc(), operand.getSILValue())};
 }
@@ -2323,6 +2335,14 @@ BridgedInstruction BridgedBuilder::createDeallocStack(BridgedValue operand) cons
 BridgedInstruction BridgedBuilder::createDeallocStackRef(BridgedValue operand) const {
   return {
       unbridged().createDeallocStackRef(regularLoc(), operand.getSILValue())};
+}
+
+BridgedInstruction BridgedBuilder::createDeallocPack(BridgedValue operand) const {
+  return {unbridged().createDeallocPack(regularLoc(), operand.getSILValue())};
+}
+
+BridgedInstruction BridgedBuilder::createDeallocPackMetadata(BridgedValue operand) const {
+  return {unbridged().createDeallocPackMetadata(regularLoc(), operand.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createAddressToPointer(BridgedValue address, BridgedType pointerTy,
