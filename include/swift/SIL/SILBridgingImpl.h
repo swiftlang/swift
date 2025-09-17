@@ -2745,6 +2745,23 @@ BridgedInstruction BridgedBuilder::createInitExistentialMetatype(BridgedValue me
       conformances.pcArray.unbridged<swift::ProtocolConformanceRef>())};
 }
 
+BridgedInstruction
+BridgedBuilder::createPackElementGet(BridgedValue packIndex, BridgedValue pack,
+                                     BridgedType elementType) const {
+  return {unbridged().createPackElementGet(
+      regularLoc(), packIndex.getSILValue(), pack.getSILValue(),
+      elementType.unbridged())};
+}
+
+BridgedInstruction
+BridgedBuilder::createPackElementSet(BridgedValue elementValue,
+                                     BridgedValue packIndex,
+                                     BridgedValue pack) const {
+  return {unbridged().createPackElementSet(
+      regularLoc(), elementValue.getSILValue(), packIndex.getSILValue(),
+      pack.getSILValue())};
+}
+
 BridgedInstruction BridgedBuilder::createMetatype(BridgedCanType instanceType,
                                                   BridgedASTType::MetatypeRepresentation representation) const {
   auto *mt =
