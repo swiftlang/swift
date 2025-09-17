@@ -863,15 +863,20 @@ CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
 }
 
 llvm::Constant *irgen::getCoroFrameAllocStubFn(IRGenModule &IGM) {
+  // If the coroutine allocation function is always available, call it directly.
+  auto coroAllocPtr = IGM.getCoroFrameAllocFn();
+  auto coroAllocFn = dyn_cast<llvm::Function>(coroAllocPtr);
+  if (coroAllocFn->getLinkage() != llvm::GlobalValue::ExternalWeakLinkage)
+    return coroAllocFn;
+
+  // Otherwise, create a stub function to call it when available, or malloc
+  // when it isn't.
   return IGM.getOrCreateHelperFunction(
     "__swift_coroFrameAllocStub", IGM.Int8PtrTy,
     {IGM.SizeTy, IGM.Int64Ty},
     [&](IRGenFunction &IGF) {
       auto parameters = IGF.collectParameters();
       auto *size = parameters.claimNext();
-      auto coroAllocPtr = IGF.IGM.getCoroFrameAllocFn();
-      auto coroAllocFn = dyn_cast<llvm::Function>(coroAllocPtr);
-      coroAllocFn->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
       auto *coroFrameAllocFn = IGF.IGM.getOpaquePtr(coroAllocPtr);
       auto *nullSwiftCoroFrameAlloc = IGF.Builder.CreateCmp(
         llvm::CmpInst::Predicate::ICMP_NE, coroFrameAllocFn,
