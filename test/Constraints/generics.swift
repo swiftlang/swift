@@ -1113,3 +1113,18 @@ func testHolePropagation() {
   _ = { () -> (S<R>, Int) in return (makeT(), 0) } // expected-error {{type 'R' does not conform to protocol 'P'}}
   _ = { () -> (S<R>, Int) in (); return (makeT(), 0) } // expected-error {{type 'R' does not conform to protocol 'P'}}
 }
+
+@freestanding(expression) macro overloadedMacro<T>() -> String = #file
+@freestanding(expression) macro overloadedMacro<T>(_ x: T = 0) -> String = #file
+
+do {
+  func foo(_ fn: () -> Int) {}
+  func foo(_ fn: () -> String) {}
+
+  // Make sure we only emit a single note here.
+  foo {
+    #overloadedMacro < Undefined >
+    // expected-error@-1 {{cannot find type 'Undefined' in scope}}
+    // expected-note@-2 {{while parsing this '<' as a type parameter bracket}}
+  }
+}

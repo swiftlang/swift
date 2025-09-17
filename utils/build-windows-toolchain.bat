@@ -73,10 +73,15 @@ if not "%SKIP_PACKAGING%"=="1" set "SkipPackagingArg= "
 set "WindowsSDKArchitecturesArg= "
 if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArchitecturesArg=-WindowsSDKArchitectures %WINDOWS_SDKS%"
 
+:: Build the -HostArchName argument, if any.
+set "HostArchNameArg="
+if not "%HOST_ARCH_NAME%"=="" set "HostArchNameArg=-HostArchName %HOST_ARCH_NAME%"
+
 call :CloneRepositories || (exit /b 1)
 
 :: We only have write access to BuildRoot, so use that as the image root.
 powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
+  %HostArchName% ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
   -ImageRoot %BuildRoot% ^

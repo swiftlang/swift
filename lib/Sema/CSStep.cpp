@@ -887,23 +887,24 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
     if (Solutions.size() > 1)
       filterSolutions(Solutions, /*minimize=*/true);
 
-    // In diagnostic mode we need to stop a conjunction
-    // but consider it successful if there are:
+    // In diagnostic mode we need to stop a conjunction but consider it
+    // successful if there are:
     //
-    // - More than one solution for this element. Ambiguity
-    //   needs to get propagated back to the outer context
-    //   to be diagnosed.
-    // - A single solution that requires one or more fixes,
-    //   continuing would result in more errors associated
-    //   with the failed element.
+    // - More than one solution for this element. Ambiguity needs to get
+    //   propagated back to the outer context to be diagnosed.
+    // - A single solution that requires one or more fixes or holes, since
+    //   continuing would result in more errors associated with the failed
+    //   element, and we don't preserve scores across elements.
     if (CS.shouldAttemptFixes()) {
       if (Solutions.size() > 1)
         Producer.markExhausted();
 
       if (Solutions.size() == 1) {
         auto score = Solutions.front().getFixedScore();
-        if (score.Data[SK_Fix] > 0 && !CS.isForCodeCompletion())
-          Producer.markExhausted();
+        if (!CS.isForCodeCompletion()) {
+          if (score.Data[SK_Fix] > 0 || score.Data[SK_Hole] > 0)
+            Producer.markExhausted();
+        }
       }
     } else if (Solutions.size() != 1) {
       return failConjunction();
@@ -1053,7 +1054,7 @@ void ConjunctionStep::SolverSnapshot::replaySolution(const Solution &solution) {
 
   // If inference succeeded, we are done.
   auto score = solution.getFixedScore();
-  if (score.Data[SK_Fix] == 0)
+  if (score.Data[SK_Fix] == 0 && score.Data[SK_Hole] == 0)
     return;
 
   // If this conjunction represents a closure and inference

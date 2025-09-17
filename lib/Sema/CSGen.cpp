@@ -1957,6 +1957,8 @@ namespace {
     void addSpecializationConstraint(ConstraintLocator *locator, Type boundType,
                                      SourceLoc lAngleLoc,
                                      ArrayRef<TypeRepr *> specializationArgs) {
+      auto &ctx = CS.getASTContext();
+
       // Resolve each type.
       SmallVector<Type, 2> specializationArgTypes;
       auto options =
@@ -1971,6 +1973,7 @@ namespace {
           options |= TypeResolutionFlags::AllowPackReferences;
           elementEnv = OuterExpansions.back();
         }
+        auto alreadyInvalid = specializationArg->isInvalid();
         auto result = TypeResolution::resolveContextualType(
             specializationArg, CurDC, options,
             // Introduce type variables for unbound generics.
@@ -1980,17 +1983,20 @@ namespace {
             OpenGenericTypeRequirements(CS, locator,
                                         /*preparedOverload*/ nullptr));
         if (result->hasError()) {
-          auto &ctxt = CS.getASTContext();
-          result = PlaceholderType::get(ctxt, specializationArg);
-          ctxt.Diags.diagnose(lAngleLoc,
-                              diag::while_parsing_as_left_angle_bracket);
+          if (!alreadyInvalid) {
+            ctx.Diags.diagnose(lAngleLoc,
+                               diag::while_parsing_as_left_angle_bracket);
+          }
+          CS.recordFix(IgnoreInvalidASTNode::create(
+              CS, CS.getConstraintLocator(argLocator)));
+          result = PlaceholderType::get(ctx, specializationArg);
         }
         specializationArgTypes.push_back(result);
       }
 
       auto constraint = Constraint::create(
           CS, ConstraintKind::ExplicitGenericArguments, boundType,
-          PackType::get(CS.getASTContext(), specializationArgTypes), locator);
+          PackType::get(ctx, specializationArgTypes), locator);
       CS.addUnsolvedConstraint(constraint);
       CS.activateConstraint(constraint);
     }
