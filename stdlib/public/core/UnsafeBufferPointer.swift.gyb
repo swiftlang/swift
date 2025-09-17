@@ -31,7 +31,7 @@
 /// referenced memory and into the new collection.
 @frozen // unsafe-performance
 @unsafe
-public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
+public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable & ~Escapable>: Copyable, Escapable {
 
   @usableFromInline
   @_preInverseGenerics
@@ -116,12 +116,12 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
 
 // FIXME: The ASTPrinter should print this synthesized conformance.
 // rdar://140291657
-extension Unsafe${Mutable}BufferPointer: BitwiseCopyable where Element: ~Copyable {}
+extension Unsafe${Mutable}BufferPointer: BitwiseCopyable where Element: ~Copyable & ~Escapable {}
 
 @available(*, unavailable)
-extension Unsafe${Mutable}BufferPointer: Sendable where Element: ~Copyable {}
+extension Unsafe${Mutable}BufferPointer: Sendable where Element: ~Copyable & ~Escapable {}
 
-extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
+extension Unsafe${Mutable}BufferPointer where Element: ~Copyable & ~Escapable {
   /// A pointer to the first element of the buffer.
   ///
   /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
@@ -225,7 +225,7 @@ extension Unsafe${Mutable}BufferPointer: @unsafe Sequence {
   }
 }
 
-extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
+extension Unsafe${Mutable}BufferPointer where Element: ~Copyable & ~Escapable {
   public typealias Index = Int
 
   /// A Boolean value indicating whether the buffer is empty.
@@ -479,7 +479,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
 
 }
 
-extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
+extension Unsafe${Mutable}BufferPointer where Element: ~Copyable & ~Escapable {
   /// Constructs a standalone buffer pointer over the items within the supplied
   /// range of positions in the memory region addressed by this buffer pointer.
   ///
@@ -574,6 +574,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   }
 }
 
+// TODO: Support Span<Element: ~Escapable>
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
@@ -795,7 +796,7 @@ extension Unsafe${Mutable}BufferPointer:
 %  end
 }
 
-extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
+extension Unsafe${Mutable}BufferPointer where Element: ~Copyable & ~Escapable {
   @safe
   @_alwaysEmitIntoClient
   public func _isWellAligned() -> Bool {
@@ -872,7 +873,7 @@ extension Unsafe${Mutable}BufferPointer {
   }
 }
 
-extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
+extension Unsafe${Mutable}BufferPointer where Element: ~Copyable & ~Escapable {
   /// Deallocates the memory block previously allocated at this buffer pointer’s
   /// base address.
   ///
@@ -890,7 +891,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
 }
 
 % if Mutable:
-extension UnsafeMutableBufferPointer where Element: ~Copyable {
+extension UnsafeMutableBufferPointer where Element: ~Copyable & ~Escapable {
   /// Allocates uninitialized memory for the specified number of instances of
   /// type `Element`.
   ///
@@ -1141,7 +1142,7 @@ extension UnsafeMutableBufferPointer {
   }
 }
 
-extension UnsafeMutableBufferPointer where Element: ~Copyable {
+extension UnsafeMutableBufferPointer where Element: ~Copyable & ~Escapable {
   /// Moves every element of an initialized source buffer into the uninitialized
   /// memory referenced by this buffer, leaving the source memory uninitialized
   /// and this buffer's memory initialized.
@@ -1220,7 +1221,7 @@ extension UnsafeMutableBufferPointer {
   }
 }
 
-extension UnsafeMutableBufferPointer where Element: ~Copyable {
+extension UnsafeMutableBufferPointer where Element: ~Copyable & ~Escapable {
   /// Updates this buffer's initialized memory by moving
   /// every element from the source buffer, leaving the source memory
   /// uninitialized.
@@ -1292,7 +1293,7 @@ extension UnsafeMutableBufferPointer {
   }
 }
 
-extension UnsafeMutableBufferPointer where Element: ~Copyable {
+extension UnsafeMutableBufferPointer where Element: ~Copyable & ~Escapable {
   /// Deinitializes every instance in this buffer.
   ///
   /// The region of memory underlying this buffer must be fully initialized.
@@ -1362,7 +1363,7 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
 }
 % end
 
-extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
+extension Unsafe${Mutable}BufferPointer where Element: ~Copyable & ~Escapable {
   /// Executes the given closure while temporarily binding the memory referenced
   /// by this buffer to the given type.
   ///
@@ -1419,7 +1420,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///   - buffer: The buffer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient @_transparent
-  public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
+  public func withMemoryRebound<T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     _ body: (_ buffer: ${Self}<T>) throws(E) -> Result
   ) throws(E) -> Result {
@@ -1473,7 +1474,7 @@ extension Unsafe${Mutable}BufferPointer {
 @_unavailableInEmbedded
 @_preInverseGenerics
 extension Unsafe${Mutable}BufferPointer: CustomDebugStringConvertible
-where Element: ~Copyable {
+where Element: ~Copyable & ~Escapable {
   /// A textual representation of the buffer, suitable for debugging.
   @_preInverseGenerics
   @safe
