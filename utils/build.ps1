@@ -658,12 +658,12 @@ function Flatten-TimingEntry {
   $FormattedSelfTime = "{0:hh\:mm\:ss\.ff}" -f $SelfTime
 
   [PSCustomObject]@{
-    "Total Time" = $FormattedTime
-    "Self Time" = $FormattedSelfTime
-    "%" = "$Percentage%"
     "Build Step" = "$Indent$($Entry.'Build Step')"
     Platform = $Entry.Platform
     Arch = $Entry.Arch
+    "Total Time" = $FormattedTime
+    "Self Time" = $FormattedSelfTime
+    "%" = "$Percentage%"
   }
 
   $SortedChildren = $Entry.Children | Sort-Object -Descending -Property "Elapsed Time"
@@ -694,12 +694,12 @@ function Write-Summary {
 
   $FormattedTotalTime = "{0:hh\:mm\:ss\.ff}" -f $TotalTime
   $TotalRow = [PSCustomObject]@{
-    "Total Time" = $FormattedTotalTime
-    "Self Time" = $FormattedTotalTime
-    "%" = "100.0%"
     "Build Step" = "TOTAL"
     Platform = ""
     Arch = ""
+    "Total Time" = $FormattedTotalTime
+    "Self Time" = $FormattedTotalTime
+    "%" = "100.0%"
   }
 
   @($Result) + $TotalRow | Format-Table -AutoSize
