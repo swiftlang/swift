@@ -56,6 +56,8 @@ function(copy_library_sources name from_prefix to_prefix)
     "${ARG_ROOT}/${from_prefix}/${name}/*.c"
     "${ARG_ROOT}/${from_prefix}/${name}/*.mm"
     "${ARG_ROOT}/${from_prefix}/${name}/*.m"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.S"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.asm"
     "${ARG_ROOT}/${from_prefix}/${name}/*.def"
     "${ARG_ROOT}/${from_prefix}/${name}/*.gyb"
     "${ARG_ROOT}/${from_prefix}/${name}/*.apinotes"
@@ -115,6 +117,9 @@ copy_files("" "Supplemental/Synchronization" FILES "Info.plist.in")
 
 message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Volatile/Info.plist.in")
 copy_files("" "Supplemental/Volatile" FILES "Info.plist.in")
+
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Runtime/Info.plist.in")
+copy_files("" "Supplemental/Runtime" FILES "Info.plist.in")
 
 # Platform Overlays
 
@@ -185,6 +190,7 @@ copy_library_sources(Distributed "public" "Supplemental")
 copy_library_sources(Observation "public" "Supplemental")
 copy_library_sources(Synchronization "public" "Supplemental")
 copy_library_sources(Volatile "public" "Supplemental")
+copy_library_sources("" "public/RuntimeModule" "Supplemental/Runtime")
 
 copy_library_sources(_RegexParser "Sources" "Supplemental/StringProcessing"
   ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
