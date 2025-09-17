@@ -552,7 +552,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
-  case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::BorrowedFromInst:
@@ -626,6 +625,14 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::TypeValueInst:
   case SILInstructionKind::IgnoredUseInst:
     return RuntimeEffect::NoEffect;
+
+  case SILInstructionKind::LoadInst: {
+    if (cast<LoadInst>(inst)->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+      return ifNonTrivial(inst->getOperand(0)->getType(),
+                          RuntimeEffect::RefCounting);
+    }
+    return RuntimeEffect::NoEffect;
+  }
       
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialBoxInst:
