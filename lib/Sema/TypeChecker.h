@@ -1147,6 +1147,9 @@ std::optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
 /// Attempt to omit needless words from the name of the given declaration.
 std::optional<Identifier> omitNeedlessWords(VarDecl *var);
 
+/// Method to strip Self parameter from types for diagnostics
+Type removeSelfParam(ValueDecl *value, Type type);
+
 /// Calculate edit distance between declaration names.
 unsigned getCallEditDistance(DeclNameRef writtenName, DeclName correctedName,
                              unsigned maxEditDistance);

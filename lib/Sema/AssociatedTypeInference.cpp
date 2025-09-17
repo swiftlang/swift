@@ -2047,13 +2047,13 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
 }
 
 /// Remove the 'self' type from the given type, if it's a method type.
-static Type removeSelfParam(ValueDecl *value, Type type) {
+/*Type removeSelfParam(ValueDecl *value, Type type) {
   if (value->hasCurriedSelf()) {
     return type->castTo<AnyFunctionType>()->getResult();
   }
 
   return type;
-}
+}*/
 
 InferredAssociatedTypesByWitnesses
 AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
@@ -2227,7 +2227,7 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
   InferredAssociatedTypesByWitness inferred;
   inferred.Witness = witness;
 
-  auto reqType = removeSelfParam(req, req->getInterfaceType());
+  auto reqType = swift::TypeChecker::removeSelfParam(req, req->getInterfaceType());
   Type witnessType;
 
   if (witness->isRecursiveValidation()) {
@@ -2249,7 +2249,7 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
     LLVM_DEBUG(llvm::dbgs() << "Witness type for matching is "
                             << witnessType << "\n";);
 
-    witnessType = removeSelfParam(witness, witnessType);
+    witnessType = swift::TypeChecker::removeSelfParam(witness, witnessType);
 
     Type reqThrownError;
     Type witnessThrownError;

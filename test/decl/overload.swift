@@ -5,10 +5,10 @@ var_redecl1 = 0
 var var_redecl1: UInt // expected-error {{invalid redeclaration of 'var_redecl1'}}
 
 var var_redecl2: Int // expected-note {{previously declared here}}
-// expected-note@-1 {{found this candidate}}
+// expected-note@-1 {{found candidate with type 'Int'}}
 var_redecl2 = 0 // expected-error {{ambiguous use of 'var_redecl2'}}
 var var_redecl2: Int // expected-error {{invalid redeclaration of 'var_redecl2'}}
-// expected-note@-1 {{found this candidate}}
+// expected-note@-1 {{found candidate with type 'Int'}}
 
 var var_redecl3: (Int) -> () { get {} } // expected-note {{previously declared here}}
 var var_redecl3: () -> () { get {} } // expected-error {{invalid redeclaration of 'var_redecl3'}}
@@ -74,17 +74,17 @@ class mixed_redecl2 {} // expected-note {{previously declared here}}
 struct mixed_redecl2 {} // expected-error {{invalid redeclaration}}
 
 class mixed_redecl3 {} // expected-note {{previously declared here}}
-// expected-note @-1 2{{found this candidate}}
+// expected-note @-1 2{{found candidate with type 'mixed_redecl3'}}
 enum mixed_redecl3 {} // expected-error {{invalid redeclaration}}
-// expected-note @-1 2{{found this candidate}}
+// expected-note @-1 2{{found candidate with type 'mixed_redecl3'}}
 enum mixed_redecl3a : mixed_redecl3 {} // expected-error {{'mixed_redecl3' is ambiguous for type lookup in this context}}
 // expected-error@-1 {{an enum with no cases cannot declare a raw type}}
 class mixed_redecl3b : mixed_redecl3 {} // expected-error {{'mixed_redecl3' is ambiguous for type lookup in this context}}
 
 class mixed_redecl4 {} // expected-note {{previously declared here}}
-// expected-note@-1{{found this candidate}}
+// expected-note@-1{{found candidate with type 'mixed_redecl4'}}
 protocol mixed_redecl4 {} // expected-error {{invalid redeclaration}}
-// expected-note@-1{{found this candidate}}
+// expected-note@-1{{found candidate with type 'mixed_redecl4'}}
 protocol mixed_redecl4a : mixed_redecl4 {} // expected-error {{'mixed_redecl4' is ambiguous for type lookup in this context}}
 
 class mixed_redecl5 {} // expected-note {{previously declared here}}
@@ -579,27 +579,27 @@ enum E8_52486 {
 }
 
 enum E9_52486 {
-  case A // expected-note {{'A' previously declared here}} expected-note {{found this candidate}}
+  case A // expected-note {{'A' previously declared here}} expected-note {{found candidate with type 'E9_52486'}}
   static let A: E9_52486 = .A // expected-error {{invalid redeclaration of 'A'}}
-  // expected-error@-1 {{ambiguous use of 'A'}} expected-note@-1 {{found this candidate}}
+  // expected-error@-1 {{ambiguous use of 'A'}} expected-note@-1 {{found candidate with type 'E9_52486'}}
 }
 
 enum E10_52486 {
   static let A: E10_52486 = .A // expected-note {{'A' previously declared here}}
-  // expected-error@-1 {{ambiguous use of 'A'}} expected-note@-1 {{found this candidate}}
-  case A // expected-error {{invalid redeclaration of 'A'}} expected-note {{found this candidate}}
+  // expected-error@-1 {{ambiguous use of 'A'}} expected-note@-1 {{found candidate with type 'E10_52486'}}
+  case A // expected-error {{invalid redeclaration of 'A'}} expected-note {{found candidate with type 'E10_52486'}}
 }
 
 enum E11_52486 {
-  case A // expected-note {{'A' previously declared here}} expected-note {{found this candidate}}
+  case A // expected-note {{'A' previously declared here}} expected-note {{found candidate with type 'E11_52486'}}
   static var A: E11_52486 = .A // expected-error {{invalid redeclaration of 'A'}}
-  // expected-error@-1 {{ambiguous use of 'A'}} expected-note@-1 {{found this candidate}}
+  // expected-error@-1 {{ambiguous use of 'A'}} expected-note@-1 {{found candidate with type 'E11_52486'}}
 }
 
 enum E12_52486 {
   static var A: E12_52486 = .A // expected-note {{'A' previously declared here}}
-  // expected-error@-1 {{ambiguous use of 'A'}} expected-note@-1 {{found this candidate}}
-  case A // expected-error {{invalid redeclaration of 'A'}} expected-note {{found this candidate}}
+  // expected-error@-1 {{ambiguous use of 'A'}} expected-note@-1 {{found candidate with type 'E12_52486'}}
+  case A // expected-error {{invalid redeclaration of 'A'}} expected-note {{found candidate with type 'E12_52486'}}
 }
 
 enum E13_52486 {

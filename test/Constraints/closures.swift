@@ -792,8 +792,8 @@ func f20371273() {
 
 // rdar://problem/42337247
 
-func overloaded(_ handler: () -> Int) {} // expected-note {{found this candidate}}
-func overloaded(_ handler: () -> Void) {} // expected-note {{found this candidate}}
+func overloaded(_ handler: () -> Int) {} // expected-note {{found candidate with type '(() -> Int) -> ()'}}
+func overloaded(_ handler: () -> Void) {} // expected-note {{found candidate with type '(() -> ()) -> ()'}}
 
 overloaded { } // empty body => inferred as returning ()
 
@@ -1045,8 +1045,8 @@ func rdar52204414() {
 // Note that this was accepted prior to Swift 5.3. SE-0286 changed the
 // order of argument resolution and made it ambiguous.
 
-func overloaded_with_default(a: () -> Int, b: Int = 0, c: Int = 0) {} // expected-note{{found this candidate}}
-func overloaded_with_default(b: Int = 0, c: Int = 0, a: () -> Int) {} // expected-note{{found this candidate}}
+func overloaded_with_default(a: () -> Int, b: Int = 0, c: Int = 0) {} // expected-note{{found candidate with type '(() -> Int, Int, Int) -> ()'}}
+func overloaded_with_default(b: Int = 0, c: Int = 0, a: () -> Int) {} // expected-note{{found candidate with type '(() -> Int, Int, Int) -> ()'}}
 
 overloaded_with_default { 0 } // expected-error{{ambiguous use of 'overloaded_with_default'}}
 
