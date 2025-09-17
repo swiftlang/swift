@@ -3026,9 +3026,11 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 
 Type
 ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
-  auto error = [&ext]() {
+  auto &ctx = ext->getASTContext();
+
+  auto error = [&]() {
     ext->setInvalid();
-    return ErrorType::get(ext->getASTContext());
+    return ErrorType::get(ctx);
   };
 
   // If we didn't parse a type, fill in an error type and bail out.
@@ -3052,6 +3054,15 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   if (extendedType->hasError())
     return error();
 
+  auto &diags = ctx.Diags;
+
+  // Cannot extend types who contain placeholders.
+  if (extendedType->hasPlaceholder()) {
+    diags.diagnose(ext->getLoc(), diag::extension_placeholder)
+      .highlight(extendedRepr->getSourceRange());
+    return error();
+  }
+
   // Hack to allow extending a generic typealias.
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
@@ -3069,8 +3080,6 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     }
   }
 
-  auto &diags = ext->getASTContext().Diags;
-
   // Cannot extend a metatype.
   if (extendedType->is<AnyMetatypeType>()) {
     diags.diagnose(ext->getLoc(), diag::extension_metatype, extendedType)
@@ -3084,13 +3093,6 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
       !extendedType->is<ParameterizedProtocolType>()) {
     diags.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
          .highlight(extendedRepr->getSourceRange());
-    return error();
-  }
-
-  // Cannot extend types who contain placeholders.
-  if (extendedType->hasPlaceholder()) {
-    diags.diagnose(ext->getLoc(), diag::extension_placeholder)
-      .highlight(extendedRepr->getSourceRange());
     return error();
   }
 
