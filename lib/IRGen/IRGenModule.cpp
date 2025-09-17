@@ -902,6 +902,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability TypedCoroAllocAvailability(ASTContext &context) {
+    auto featureAvailability = context.getTypedCoroAllocAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability ConcurrencyDiscardingTaskGroupAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getConcurrencyDiscardingTaskGroupAvailability();
