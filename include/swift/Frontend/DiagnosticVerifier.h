@@ -22,6 +22,10 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
 
+namespace {
+struct ExpectedDiagnosticInfo;
+}
+
 namespace swift {
 class DependencyTracker;
 class FileUnit;
@@ -133,6 +137,10 @@ private:
   /// got all of the expected diagnostics and check to see if there were any
   /// unexpected ones.
   Result verifyFile(unsigned BufferID);
+  unsigned parseExpectedDiagInfo(unsigned BufferID, StringRef MatchStart,
+                                 std::vector<llvm::SMDiagnostic> &Errors,
+                                 unsigned &PrevExpectedContinuationLine,
+                                 ExpectedDiagnosticInfo &Expected) const;
 
   bool checkForFixIt(const std::vector<ExpectedFixIt> &ExpectedAlts,
                      const CapturedDiagnosticInfo &D, unsigned BufferID) const;
