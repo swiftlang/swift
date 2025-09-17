@@ -291,3 +291,42 @@ do {
     _ = X(content: <#T##() -> _#>) // expected-error {{editor placeholder in source file}}
   }
 }
+
+// Make sure we reject placeholders here.
+protocol TestPlaceholderRequirement {
+  func foo(_:_) // expected-error {{type placeholder may not appear in top-level parameter}}
+  func bar() -> _ // expected-error {{type placeholder not allowed here}}
+  func baz() -> [_] // expected-error {{type placeholder not allowed here}}
+  func qux(_: [_]) // expected-error {{type placeholder may not appear in top-level parameter}}
+
+  // FIXME: Shouldn't diagnose twice
+  subscript(_: _) -> Void { get } // expected-error 2{{type placeholder may not appear in top-level parameter}}
+  subscript() -> _ { get } // expected-error {{type placeholder not allowed here}}
+}
+
+func testPlaceholderFn1(_:_) {} // expected-error {{type placeholder may not appear in top-level parameter}}
+func testPlaceholderFn2() -> _ {} // expected-error {{type placeholder may not appear in function return type}}
+
+var testPlaceholderComputed1: _ { 0 } // expected-error {{type placeholder not allowed here}}
+var testPlaceholderComputed2: [_] { [0] } // expected-error {{type placeholder not allowed here}}
+
+struct TestPlaceholderSubscript {
+  subscript(_: _) -> Void { () } // expected-error 2{{type placeholder may not appear in top-level parameter}}
+  subscript(_: [_]) -> Void { () } // expected-error 2{{type placeholder may not appear in top-level parameter}}
+  subscript() -> _ { () } // expected-error {{type placeholder not allowed here}}
+  subscript() -> [_] { [0] } // expected-error {{type placeholder not allowed here}}
+}
+
+enum TestPlaceholderInEnumElement {
+  case a(_) // expected-error {{type placeholder may not appear in top-level parameter}}
+  case b([_]) // expected-error {{type placeholder may not appear in top-level parameter}}
+}
+
+@freestanding(expression) macro testPlaceholderMacro(_ x: _) -> String = #file
+// expected-error@-1 {{type placeholder may not appear in top-level parameter}}
+
+@freestanding(expression) macro testPlaceholderMacro(_ x: [_]) -> String = #file
+// expected-error@-1 {{type placeholder may not appear in top-level parameter}}
+
+@freestanding(expression) macro testPlaceholderMacro() -> _ = #file
+// expected-error@-1 {{type placeholder not allowed here}}

@@ -2121,10 +2121,17 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (decl->preconcurrency())
     options |= TypeResolutionFlags::Preconcurrency;
 
+  // Placeholders are only currently allowed for FuncDecls with bodies, which
+  // we diagnose in ReturnTypePlaceholderReplacer.
+  HandlePlaceholderTypeReprFn placeholderOpener;
+  if (auto *FD = dyn_cast<FuncDecl>(decl)) {
+    if (FD->hasBody() && !FD->isBodySkipped())
+      placeholderOpener = PlaceholderType::get;
+  }
   auto *const dc = decl->getInnermostDeclContext();
   return TypeResolution::forInterface(dc, options,
                                       /*unboundTyOpener*/ nullptr,
-                                      PlaceholderType::get,
+                                      placeholderOpener,
                                       /*packElementOpener*/ nullptr)
       .resolveType(resultTyRepr);
 }
