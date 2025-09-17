@@ -8,6 +8,8 @@ enum MyBadError {
   case fail
 }
 
+struct GenericError<T>: Error {}
+
 func testClosures() {
   let c1 = { () throws(MyError) in
     throw .fail
@@ -36,5 +38,8 @@ func testClosures() {
   let c2 = { throw MyError.fail }
   let _: Int = c2
   // expected-error@-1{{cannot convert value of type '() throws -> ()'}}
+
+  _ = { () throws(_) in } // expected-error {{type placeholder not allowed here}}
+  _ = { () throws(GenericError<_>) in } // expected-error {{type placeholder not allowed here}}
 }
 
