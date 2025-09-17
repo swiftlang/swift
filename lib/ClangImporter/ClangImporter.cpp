@@ -8094,85 +8094,10 @@ bool importer::isViewType(const clang::CXXRecordDecl *decl) {
   return !hasOwnedValueAttr(decl) && hasPointerInSubobjects(decl);
 }
 
-static bool copyConstructorIsDefaulted(const clang::CXXRecordDecl *decl) {
-  auto ctor = llvm::find_if(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-    return ctor->isCopyConstructor();
-  });
-
-  assert(ctor != decl->ctor_end());
-  return ctor->isDefaulted();
-}
-
-static bool copyAssignOperatorIsDefaulted(const clang::CXXRecordDecl *decl) {
-  auto copyAssignOp = llvm::find_if(decl->decls(), [](clang::Decl *member) {
-    if (auto method = dyn_cast<clang::CXXMethodDecl>(member))
-      return method->isCopyAssignmentOperator();
-    return false;
-  });
-
-  assert(copyAssignOp != decl->decls_end());
-  return cast<clang::CXXMethodDecl>(*copyAssignOp)->isDefaulted();
-}
-
-/// Recursively checks that there are no user-provided copy constructors or
-/// destructors in any fields or base classes.
-/// Does not check C++ records with specific API annotations.
-static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
-  // Probably a class template that has not yet been specialized:
-  if (!decl->getDefinition())
-    return true;
-
-  if ((decl->hasUserDeclaredCopyConstructor() &&
-       !copyConstructorIsDefaulted(decl)) ||
-      (decl->hasUserDeclaredCopyAssignment() &&
-       !copyAssignOperatorIsDefaulted(decl)) ||
-      (decl->hasUserDeclaredDestructor() && decl->getDestructor() &&
-       !decl->getDestructor()->isDefaulted()))
-    return false;
-
-  auto checkType = [](clang::QualType t) {
-    if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
-      if (auto cxxRecord =
-              dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
-        if (hasImportAsRefAttr(cxxRecord) || hasOwnedValueAttr(cxxRecord) ||
-            hasUnsafeAPIAttr(cxxRecord))
-          return true;
-
-        if (!isSufficientlyTrivial(cxxRecord))
-          return false;
-      }
-    }
-
-    return true;
-  };
-
-  for (auto field : decl->fields()) {
-    if (!checkType(field->getType()))
-      return false;
-  }
-
-  for (auto base : decl->bases()) {
-    if (!checkType(base.getType()))
-      return false;
-  }
-
-  return true;
-}
-
-/// Checks if a record provides the required value type lifetime operations
-/// (copy and destroy).
 static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
-  // Hack for a base type of std::optional from the Microsoft standard library.
-  if (decl->isInStdNamespace() && decl->getIdentifier() &&
-      decl->getName() == "_Optional_construct_base")
-    return true;
-
   if (decl->hasSimpleCopyConstructor())
     return true;
 
-  // If we have no way of copying the type we can't import the class
-  // at all because we cannot express the correct semantics as a swift
-  // struct.
   return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
     return ctor->isCopyConstructor() && !ctor->isDeleted() &&
            !ctor->isIneligibleOrNotSelected() &&
@@ -8183,12 +8108,10 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
 }
 
 static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
-  // If we have no way of copying the type we can't import the class
-  // at all because we cannot express the correct semantics as a swift
-  // struct.
   if (llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
         return ctor->isMoveConstructor() &&
-               (ctor->isDeleted() || ctor->getAccess() != clang::AS_public);
+               (ctor->isDeleted() || ctor->isIneligibleOrNotSelected() ||
+                ctor->getAccess() != clang::AS_public);
       }))
     return false;
 
@@ -8201,7 +8124,8 @@ static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
 
 static bool hasDestroyTypeOperations(const clang::CXXRecordDecl *decl) {
   if (auto dtor = decl->getDestructor()) {
-    if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
+    if (dtor->isDeleted() || dtor->isIneligibleOrNotSelected() ||
+        dtor->getAccess() != clang::AS_public) {
       return false;
     }
     return true;
@@ -8257,49 +8181,17 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
 
   auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl);
   if (!cxxDecl) {
-    if (hasNonCopyableAttr(decl))
-      return CxxRecordSemanticsKind::MoveOnly;
-
-    return CxxRecordSemanticsKind::Trivial;
+    return CxxRecordSemanticsKind::Value;
   }
 
   if (isSwiftClassType(cxxDecl))
     return CxxRecordSemanticsKind::SwiftClassType;
 
-  if (!hasDestroyTypeOperations(cxxDecl) ||
-      (!hasCopyTypeOperations(cxxDecl) && !hasMoveTypeOperations(cxxDecl))) {
-
-    if (hasConstructorWithUnsupportedDefaultArgs(cxxDecl))
-      return CxxRecordSemanticsKind::UnavailableConstructors;
-
-    return CxxRecordSemanticsKind::MissingLifetimeOperation;
-  }
-
-  if (hasNonCopyableAttr(cxxDecl) && hasMoveTypeOperations(cxxDecl)) {
-    return CxxRecordSemanticsKind::MoveOnly;
-  }
-
-  if (hasOwnedValueAttr(cxxDecl)) {
-    return CxxRecordSemanticsKind::Owned;
-  }
-
   if (hasIteratorAPIAttr(cxxDecl) || isIterator(cxxDecl)) {
     return CxxRecordSemanticsKind::Iterator;
   }
 
-  if (hasCopyTypeOperations(cxxDecl)) {
-    return CxxRecordSemanticsKind::Owned;
-  }
-
-  if (hasMoveTypeOperations(cxxDecl)) {
-    return CxxRecordSemanticsKind::MoveOnly;
-  }
-
-  if (isSufficientlyTrivial(cxxDecl)) {
-    return CxxRecordSemanticsKind::Trivial;
-  }
-
-  llvm_unreachable("Could not classify C++ type.");
+  return CxxRecordSemanticsKind::Value;
 }
 
 ValueDecl *
@@ -8328,6 +8220,74 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
       return results[0];
   }
   return nullptr;
+}
+
+CxxValueSemanticsKind
+CxxValueSemantics::evaluate(Evaluator &evaluator,
+                            CxxValueSemanticsDescriptor desc) const {
+
+  const auto *type = desc.type;
+
+  auto desugared = type->getUnqualifiedDesugaredType();
+  const auto *recordType = desugared->getAs<clang::RecordType>();
+  if (!recordType)
+    return CxxValueSemanticsKind::Copyable;
+
+  auto recordDecl = recordType->getDecl();
+
+  // When a reference type is copied, the pointer’s value is copied rather than
+  // the object’s storage. This means reference types can be imported as
+  // copyable to Swift, even when they are non-copyable in C++.
+  if (recordHasReferenceSemantics(recordDecl, desc.importerImpl))
+    return CxxValueSemanticsKind::Copyable;
+
+  if (recordDecl->isInStdNamespace()) {
+    // Hack for a base type of std::optional from the Microsoft standard
+    // library.
+    if (recordDecl->getIdentifier() &&
+        recordDecl->getName() == "_Optional_construct_base")
+      return CxxValueSemanticsKind::Copyable;
+  }
+
+  const auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
+  if (!cxxRecordDecl) {
+    if (hasNonCopyableAttr(recordDecl))
+      return CxxValueSemanticsKind::MoveOnly;
+    return CxxValueSemanticsKind::Copyable;
+  }
+
+  bool isCopyable = hasCopyTypeOperations(cxxRecordDecl);
+  bool isMovable = hasMoveTypeOperations(cxxRecordDecl);
+
+  if (!hasDestroyTypeOperations(cxxRecordDecl) || (!isCopyable && !isMovable)) {
+
+    if (hasConstructorWithUnsupportedDefaultArgs(cxxRecordDecl))
+      return CxxValueSemanticsKind::UnavailableConstructors;
+
+    return CxxValueSemanticsKind::MissingLifetimeOperation;
+  }
+
+  if (hasNonCopyableAttr(cxxRecordDecl) && isMovable)
+    return CxxValueSemanticsKind::MoveOnly;
+
+  if (isCopyable)
+    return CxxValueSemanticsKind::Copyable;
+
+  if (isMovable)
+    return CxxValueSemanticsKind::MoveOnly;
+
+  llvm_unreachable("Could not classify C++ type.");
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           CxxValueSemanticsDescriptor desc) {
+  out << "Checking if '";
+  out << clang::QualType(desc.type, 0).getAsString();
+  out << "' is copyable or movable.";
+}
+
+SourceLoc swift::extractNearestSourceLoc(CxxValueSemanticsDescriptor) {
+  return SourceLoc();
 }
 
 static bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
