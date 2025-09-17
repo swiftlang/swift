@@ -1170,7 +1170,8 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     // Open up the type of the requirement.
     reqLocator =
         cs->getConstraintLocator(req, ConstraintLocator::ProtocolRequirement);
-    OverloadChoice reqChoice(selfTy, req, FunctionRefInfo::doubleBaseNameApply());
+    auto reqChoice = OverloadChoice::getDecl(
+        selfTy, req, FunctionRefInfo::doubleBaseNameApply());
     auto reqTypeInfo =
         cs->getTypeOfMemberReference(reqChoice, dc, reqLocator,
                                      /*preparedOverload=*/nullptr);
@@ -1206,12 +1207,14 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     DeclReferenceType openWitnessTypeInfo;
 
     if (witness->getDeclContext()->isTypeContext()) {
-      OverloadChoice witnessChoice(selfTy, witness, FunctionRefInfo::doubleBaseNameApply());
+      auto witnessChoice = OverloadChoice::getDecl(
+          selfTy, witness, FunctionRefInfo::doubleBaseNameApply());
       openWitnessTypeInfo =
           cs->getTypeOfMemberReference(witnessChoice, dc, witnessLocator,
                                        /*preparedOverload=*/nullptr);
     } else {
-      OverloadChoice witnessChoice(Type(), witness, FunctionRefInfo::doubleBaseNameApply());
+      auto witnessChoice = OverloadChoice::getDecl(
+          witness, FunctionRefInfo::doubleBaseNameApply());
       openWitnessTypeInfo =
           cs->getTypeOfReference(
                 witnessChoice, /*useDC=*/nullptr, witnessLocator,

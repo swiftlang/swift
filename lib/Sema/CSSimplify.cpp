@@ -10502,8 +10502,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         auto choice =
             instanceTy->isAnyObject()
                 ? candidate
-                : OverloadChoice(instanceTy, decl,
-                                 FunctionRefInfo::singleBaseNameApply());
+                : OverloadChoice::getDecl(instanceTy, decl,
+                                          FunctionRefInfo::singleBaseNameApply());
 
         const bool invalidMethodRef = isa<FuncDecl>(decl) && !hasInstanceMethods;
         const bool invalidMemberRef = !isa<FuncDecl>(decl) && !hasInstanceMembers;
@@ -10738,7 +10738,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       }
     }
 
-    return OverloadChoice(baseTy, cand, functionRefInfo);
+    return OverloadChoice::getDecl(baseTy, cand, functionRefInfo);
   };
 
   // Add all results from this lookup.
@@ -11877,7 +11877,8 @@ ConstraintSystem::simplifyValueWitnessConstraint(
   if (!witness)
     return fail();
 
-  auto choice = OverloadChoice(resolvedBaseType, witness.getDecl(), functionRefInfo);
+  auto choice = OverloadChoice::getDecl(
+      resolvedBaseType, witness.getDecl(), functionRefInfo);
   addBindOverloadConstraint(memberType, choice, getConstraintLocator(locator),
                             useDC);
   return SolutionKind::Solved;
@@ -14100,8 +14101,8 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   SmallVector<OverloadChoice, 4> choices;
   for (auto candidate : candidates) {
     if (candidate->isInvalid()) continue;
-    choices.push_back(OverloadChoice(type2, candidate,
-                                     FunctionRefInfo::singleBaseNameApply()));
+    choices.push_back(OverloadChoice::getDecl(type2, candidate,
+                                              FunctionRefInfo::singleBaseNameApply()));
   }
 
   if (choices.empty()) {

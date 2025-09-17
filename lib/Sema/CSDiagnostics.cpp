@@ -2457,9 +2457,10 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
       const auto &declRef = SE->getDecl();
       if (auto *subscript =
               dyn_cast_or_null<SubscriptDecl>(declRef.getDecl())) {
-        if (isImmutable(subscript))
-          return {expr, OverloadChoice(getType(SE->getBase()), subscript,
-                                       FunctionRefInfo::doubleBaseNameApply())};
+        if (isImmutable(subscript)) {
+          return {expr, OverloadChoice::getDecl(getType(SE->getBase()), subscript,
+                                                FunctionRefInfo::doubleBaseNameApply())};
+        }
       }
     }
 
@@ -2514,8 +2515,8 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     // If the member isn't settable, then it is the problem: return it.
     if (auto member = dyn_cast<AbstractStorageDecl>(MRE->getMember().getDecl()))
       if (isImmutable(member))
-        return {expr, OverloadChoice(getType(MRE->getBase()), member,
-                                     FunctionRefInfo::singleBaseNameApply())};
+        return {expr, OverloadChoice::getDecl(getType(MRE->getBase()), member,
+                                              FunctionRefInfo::singleBaseNameApply())};
 
     // If we weren't able to resolve a member or if it is mutable, then the
     // problem must be with the base, recurse.
@@ -2535,8 +2536,8 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
   }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
-    return {expr, OverloadChoice(Type(), DRE->getDecl(),
-                                 FunctionRefInfo::unappliedBaseName())};
+    return {expr, OverloadChoice::getDecl(DRE->getDecl(),
+                                          FunctionRefInfo::unappliedBaseName())};
 
   // Look through x!
   if (auto *FVE = dyn_cast<ForceValueExpr>(expr))
