@@ -2862,11 +2862,7 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
                                        ConstraintLocator *locator, Type boundType,
                                        PreparedOverload *preparedOverload) {
   // Determine the type to which we'll bind the overload set's type.
-  Type openedType;
-  Type adjustedOpenedType;
-  Type refType;
-  Type adjustedRefType;
-  Type thrownErrorType;
+  DeclReferenceType declRefType;
 
   switch (choice.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -2875,6 +2871,8 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
+    Type openedType, thrownErrorType;
+
     if (preparedOverload) {
       replayChanges(locator, preparedOverload);
 
@@ -2888,12 +2886,12 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
     auto semantics =
         TypeChecker::getDeclTypeCheckingSemantics(choice.getDecl());
     if (semantics != DeclTypeCheckingSemantics::Normal) {
-      adjustedOpenedType = openedType;
-      refType = openedType;
-      adjustedRefType = openedType;
+      declRefType.openedType = openedType;
+      declRefType.adjustedOpenedType = openedType;
+      declRefType.referenceType = openedType;
+      declRefType.adjustedReferenceType = openedType;
+      declRefType.thrownErrorTypeOnAccess = thrownErrorType;
     } else {
-      DeclReferenceType declRefType;
-
       if (choice.getBaseType()) {
         declRefType = getTypeOfMemberReferencePost(
             choice, useDC, locator, openedType, thrownErrorType);
@@ -2901,12 +2899,6 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
         declRefType = getTypeOfReferencePost(
             choice, useDC, locator, openedType, thrownErrorType);
       }
-
-      openedType = declRefType.openedType;
-      adjustedOpenedType = declRefType.adjustedOpenedType;
-      refType = declRefType.referenceType;
-      adjustedRefType = declRefType.adjustedReferenceType;
-      thrownErrorType = declRefType.thrownErrorTypeOnAccess;
     }
 
     break;
@@ -2916,14 +2908,16 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
     if (auto lvalueTy = choice.getBaseType()->getAs<LValueType>()) {
       // When the base of a tuple lvalue, the member is always an lvalue.
       auto tuple = lvalueTy->getObjectType()->castTo<TupleType>();
-      adjustedRefType = tuple->getElementType(choice.getTupleIndex())->getRValueType();
-      adjustedRefType = LValueType::get(adjustedRefType);
+      declRefType.adjustedReferenceType =
+          LValueType::get(
+              tuple->getElementType(choice.getTupleIndex())->getRValueType());
     } else {
       // When the base is a tuple rvalue, the member is always an rvalue.
       auto tuple = choice.getBaseType()->castTo<TupleType>();
-      adjustedRefType = tuple->getElementType(choice.getTupleIndex())->getRValueType();
+      declRefType.adjustedReferenceType =
+          tuple->getElementType(choice.getTupleIndex())->getRValueType();
     }
-    refType = adjustedRefType;
+    declRefType.referenceType = declRefType.adjustedReferenceType;
     break;
 
   case OverloadChoiceKind::MaterializePack: {
@@ -2933,18 +2927,18 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
     // In the future, _if_ the syntax allows for multiple expansions
     // this code would have to be adjusted to project l-value from the
     // base type just like TupleIndex does.
-    adjustedRefType =
+    declRefType.adjustedReferenceType =
         getPatternTypeOfSingleUnlabeledPackExpansionTuple(choice.getBaseType());
-    refType = adjustedRefType;
+    declRefType.referenceType = declRefType.adjustedReferenceType;
     break;
   }
 
   case OverloadChoiceKind::ExtractFunctionIsolation: {
     // The type of `.isolation` is `(any Actor)?`
     auto actor = getASTContext().getProtocol(KnownProtocolKind::Actor);
-    adjustedRefType =
+    declRefType.adjustedReferenceType =
         OptionalType::get(actor->getDeclaredExistentialType());
-    refType = adjustedRefType;
+    declRefType.referenceType = declRefType.adjustedReferenceType;
     break;
   }
 
@@ -2975,11 +2969,11 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo fullInfo;
     auto fullTy = FunctionType::get({baseParam}, subscriptTy, fullInfo);
-    openedType = fullTy;
-    adjustedOpenedType = fullTy;
+    declRefType.openedType = fullTy;
+    declRefType.adjustedOpenedType = fullTy;
     // FIXME: @preconcurrency
-    refType = subscriptTy;
-    adjustedRefType = subscriptTy;
+    declRefType.referenceType = subscriptTy;
+    declRefType.adjustedReferenceType = subscriptTy;
 
     // Increase the score so that actual subscripts get preference.
     // ...except if we're solving for code completion and the index expression
@@ -2992,8 +2986,9 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
     break;
   }
   }
-  assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
-  assert(!adjustedRefType->hasTypeParameter() &&
+  assert(!declRefType.referenceType->hasTypeParameter() &&
+         "Cannot have a dependent type here");
+  assert(!declRefType.adjustedReferenceType->hasTypeParameter() &&
          "Cannot have a dependent type here");
 
   if (auto *decl = choice.getDeclOrNull()) {
@@ -3013,7 +3008,7 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
       if (locator->isResultOfKeyPathDynamicMemberLookup() ||
           locator->isKeyPathSubscriptComponent()) {
         // Subscript type has a format of (Self[.Type) -> (Arg...) -> Result
-        auto declTy = adjustedOpenedType->castTo<FunctionType>();
+        auto declTy = declRefType.adjustedOpenedType->castTo<FunctionType>();
         auto subscriptTy = declTy->getResult()->castTo<FunctionType>();
         // If we have subscript, each of the arguments has to conform to
         // Hashable, because it would be used as a component inside key path.
@@ -3085,7 +3080,7 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
 
       // The default type of the #isolation builtin macro is `(any Actor)?`
       if (macro->getBuiltinKind() == BuiltinMacroKind::IsolationMacro) {
-        auto *fnType = openedType->getAs<FunctionType>();
+        auto *fnType = declRefType.openedType->getAs<FunctionType>();
         auto actor = getASTContext().getProtocol(KnownProtocolKind::Actor);
         addConstraint(
             ConstraintKind::Defaultable, fnType->getResult(),
@@ -3097,14 +3092,20 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
 
   // If accessing this declaration could throw an error, record this as a
   // potential throw site.
-  if (thrownErrorType) {
+  if (declRefType.thrownErrorTypeOnAccess) {
     recordPotentialThrowSite(
-        PotentialThrowSite::PropertyAccess, thrownErrorType, locator);
+        PotentialThrowSite::PropertyAccess,
+        declRefType.thrownErrorTypeOnAccess,
+        locator);
   }
 
   // Note that we have resolved this overload.
   auto overload = SelectedOverload{
-      choice, openedType, adjustedOpenedType, refType, adjustedRefType,
+      choice,
+      declRefType.openedType,
+      declRefType.adjustedOpenedType,
+      declRefType.referenceType,
+      declRefType.adjustedReferenceType,
       boundType};
   recordResolvedOverload(locator, overload);
 
@@ -3120,7 +3121,7 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
     log << "(overload set choice binding ";
     boundType->print(log, PO);
     log << " := ";
-    adjustedRefType->print(log, PO);
+    declRefType.adjustedReferenceType->print(log, PO);
 
     auto openedAtLoc = getOpenedTypes(locator);
     if (!openedAtLoc.empty()) {
@@ -3152,8 +3153,9 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
                   OverloadChoiceKind::DeclViaDynamic)) {
 
         // Strip curried 'self' parameters.
-        auto fromTy = openedType->castTo<AnyFunctionType>()->getResult();
-        auto toTy = refType;
+        auto fromTy = declRefType.openedType
+            ->castTo<AnyFunctionType>()->getResult();
+        auto toTy = declRefType.referenceType;
         if (!doesMemberRefApplyCurriedSelf(baseTy, decl)) {
           toTy = toTy->castTo<AnyFunctionType>()->getResult();
         }
