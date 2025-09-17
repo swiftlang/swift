@@ -4321,15 +4321,9 @@ Type constraints::getConcreteReplacementForProtocolSelfType(ValueDecl *member) {
   if (!DC->getSelfProtocolDecl())
     return Type();
 
-  GenericSignature signature;
-  if (auto *genericContext = member->getAsGenericContext()) {
-    signature = genericContext->getGenericSignature();
-  } else {
-    signature = DC->getGenericSignatureOfContext();
-  }
-
+  auto sig = member->getInnermostDeclContext()->getGenericSignatureOfContext();
   auto selfTy = DC->getSelfInterfaceType();
-  return signature->getConcreteType(selfTy);
+  return sig->getConcreteType(selfTy);
 }
 
 static bool isOperator(Expr *expr, StringRef expectedName) {
