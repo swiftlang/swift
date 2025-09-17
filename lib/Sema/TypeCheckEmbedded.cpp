@@ -26,6 +26,14 @@
 
 using namespace swift;
 
+static DiagnosticBehavior
+defaultEmbeddedLimitationForError(const DeclContext *dc, SourceLoc loc) {
+  if (dc->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return DiagnosticBehavior::Unspecified;
+
+  return DiagnosticBehavior::Warning;
+}
+
 std::optional<DiagnosticBehavior>
 swift::shouldDiagnoseEmbeddedLimitations(const DeclContext *dc, SourceLoc loc,
                                          bool wasAlwaysEmbeddedError) {
@@ -33,7 +41,7 @@ swift::shouldDiagnoseEmbeddedLimitations(const DeclContext *dc, SourceLoc loc,
   // as errors. Use "unspecified" so we don't change anything.
   if (dc->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
       wasAlwaysEmbeddedError) {
-    return DiagnosticBehavior::Unspecified;
+    return defaultEmbeddedLimitationForError(dc, loc);
   }
 
   // Check one of the Embedded restriction diagnostics that is ignored by
@@ -66,6 +74,42 @@ swift::shouldDiagnoseEmbeddedLimitations(const DeclContext *dc, SourceLoc loc,
   return DiagnosticBehavior::Unspecified;
 }
 
+/// Determine whether the inner signature is more generic than the outer
+/// signature, ignoring differences that
+static bool isABIMoreGenericThan(GenericSignature innerSig, GenericSignature outerSig) {
+  auto canInnerSig = innerSig.getCanonicalSignature();
+  auto canOuterSig = outerSig.getCanonicalSignature();
+  if (canInnerSig == canOuterSig)
+    return false;
+
+  // The inner signature added generic parameters.
+  if (canOuterSig.getGenericParams().size() !=
+        canInnerSig.getGenericParams().size())
+    return true;
+
+  // Look at the requirements of the inner signature that aren't satisfied
+  // by the outer signature, to see if there are any requirements that aren't
+  // just marker protocols.
+  auto requirements = canInnerSig.requirementsNotSatisfiedBy(canOuterSig);
+  for (const auto &req : requirements) {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+      if (req.getProtocolDecl()->isMarkerProtocol())
+        continue;
+
+      return true;
+
+    case RequirementKind::Superclass:
+    case RequirementKind::Layout:
+    case RequirementKind::SameShape:
+    case RequirementKind::SameType:
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /// Check embedded restrictions in the signature of the given function.
 void swift::checkEmbeddedRestrictionsInSignature(
     const AbstractFunctionDecl *func) {
@@ -79,6 +123,20 @@ void swift::checkEmbeddedRestrictionsInSignature(
   if (throwsLoc.isValid() && !func->getThrownTypeRepr() &&
       !func->hasPolymorphicEffect(EffectKind::Throws)) {
     diagnoseUntypedThrowsInEmbedded(func, throwsLoc);
+  }
+
+  // If we're in a class, one cannot have a non-final generic function.
+  if (auto classDecl = dyn_cast<ClassDecl>(func->getDeclContext())) {
+    if (!classDecl->isSemanticallyFinal() &&
+        ((isa<FuncDecl>(func) && !func->isSemanticallyFinal()) ||
+         (isa<ConstructorDecl>(func) &&
+          cast<ConstructorDecl>(func)->isRequired())) &&
+        isABIMoreGenericThan(func->getGenericSignature(),
+                             classDecl->getGenericSignature())) {
+      func->diagnose(diag::generic_nonfinal_in_embedded_swift, func,
+                     isa<ConstructorDecl>(func))
+        .limitBehavior(defaultEmbeddedLimitationForError(func, func->getLoc()));
+    }
   }
 }
 

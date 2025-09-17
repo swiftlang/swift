@@ -65,6 +65,27 @@ public struct MyStruct {
 }
 
 // ---------------------------------------------------------------------------
+// generic, non-final functions
+// ---------------------------------------------------------------------------
+
+protocol P { }
+
+class MyGenericClass<T> {
+  func f<U>(value: U) { } // expected-nonembedded-warning{{generic instance method 'f(value:)' in a class must be 'final' in Embedded Swift}}
+  // expected-embedded-error@-1{{generic instance method 'f(value:)' in a class must be 'final' in Embedded Swift}}
+  func g() { }
+  class func h() where T: P { } // expected-nonembedded-warning{{generic class method 'h()' in a class must be 'final' in Embedded Swift}}
+  // expected-embedded-error@-1{{generic class method 'h()' in a class must be 'final' in Embedded Swift}}
+
+  init<U>(value: U) { } // okay, can be directly called
+
+  required init() { } // non-generic is okay
+
+  required init<V>(something: V) { } // expected-nonembedded-warning{{generic initializer 'init(something:)' in a class cannot be 'required' in Embedded Swift}}
+  // expected-embedded-error@-1{{generic initializer 'init(something:)' in a class cannot be 'required' in Embedded Swift}}
+}
+
+// ---------------------------------------------------------------------------
 // #if handling to suppress diagnostics for non-Embedded-only code
 // ---------------------------------------------------------------------------
 

@@ -4,7 +4,7 @@
 // REQUIRES: swift_feature_Embedded
 
 public class MyClass {
-  public func foo<T>(t: T) { } // expected-error {{classes cannot have a non-final, generic method 'foo(t:)' in embedded Swift}}
+  public func foo<T>(t: T) { } // expected-error {{generic instance method 'foo(t:)' in a class must be 'final' in Embedded Swift}}
   public func bar() { }
 }
 
@@ -24,7 +24,7 @@ func testit2() -> C2<S> {
 }
 
 open class C3<X> {
-  public func foo<T>(t: T) {} // expected-error {{classes cannot have a non-final, generic method 'foo(t:)' in embedded Swift}}
+  public func foo<T>(t: T) {} // expected-error {{generic instance method 'foo(t:)' in a class must be 'final' in Embedded Swift}}
 }
 
 func testit3() -> C3<S> {

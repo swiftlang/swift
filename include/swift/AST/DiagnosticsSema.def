@@ -8612,6 +8612,9 @@ GROUPED_ERROR(weak_unowned_in_embedded_swift, EmbeddedRestrictions, none,
 GROUPED_WARNING(untyped_throws_in_embedded_swift, EmbeddedRestrictions,
                 DefaultIgnore,
                 "untyped throws is not available in Embedded Swift; add a thrown error type with '(type)'", ())
+GROUPED_ERROR(generic_nonfinal_in_embedded_swift, EmbeddedRestrictions, none,
+              "generic %kind0 in a class %select{must be 'final'|cannot be 'required'}1 in Embedded Swift",
+              (const Decl *, bool))
 
 //===----------------------------------------------------------------------===//
 // MARK: @abi Attribute
