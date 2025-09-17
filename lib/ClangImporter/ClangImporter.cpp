@@ -3805,7 +3805,23 @@ ImportDecl *swift::createImportDecl(ASTContext &Ctx,
   auto *ImportedMod = ClangN.getClangModule();
   assert(ImportedMod);
 
-  ImportPath::Builder importPath = getSwiftModulePath(Ctx, ImportedMod);
+  ImportPath::Builder importPath;
+  auto *TmpMod = ImportedMod;
+  while (TmpMod) {
+    // If this is a C++ stdlib module, print its name as `CxxStdlib` instead of
+    // `std`. `CxxStdlib` is the only accepted spelling of the C++ stdlib module
+    // name in Swift. In libc++ versions 17-19 there are multiple TLMs, named
+    // std_vector, std_array etc. We don't support importing those modules, but
+    // when printing the module interface it'd be weird to print "import
+    // CxxStdlib" over and over, so those are still printed as "import
+    // std_vector". This only affects the module interface for CxxStdlib.
+    Identifier moduleName = !TmpMod->isSubModule() && TmpMod->Name == "std"
+                                ? Ctx.Id_CxxStdlib
+                                : Ctx.getIdentifier(TmpMod->Name);
+    importPath.push_back(moduleName);
+    TmpMod = TmpMod->Parent;
+  }
+  std::reverse(importPath.begin(), importPath.end());
 
   bool IsExported = false;
   for (auto *ExportedMod : Exported) {
@@ -4653,8 +4669,8 @@ void ClangModuleUnit::getImportedModulesForLookup(
     if (owner.SwiftContext.LangOpts.EnableCXXInterop && topLevel &&
         isCxxStdModule(topLevel) && wrapper->clangModule &&
         isCxxStdModule(wrapper->clangModule)) {
-      // The CxxStdlib overlay re-exports the clang module std, which in recent
-      // libc++ versions re-exports top-level modules for different std headers
+      // The CxxStdlib overlay re-exports the clang module std, which in libc++
+      // versions 17-19 re-exports top-level modules for different std headers
       // (std_string, std_vector, etc). The overlay module for each of the std
       // modules is the CxxStdlib module itself. Make sure we return the actual
       // clang modules (std_xyz) as transitive dependencies instead of just
@@ -8759,7 +8775,7 @@ bool importer::isCxxStdModule(const clang::Module *module) {
 bool importer::isCxxStdModule(StringRef moduleName, bool IsSystem) {
   if (moduleName == "std")
     return true;
-  // In recent libc++ versions the module is split into multiple top-level
+  // In libc++ versions 17-19 the module is split into multiple top-level
   // modules (std_vector, std_utility, etc).
   if (IsSystem && moduleName.starts_with("std_")) {
     if (moduleName == "std_errno_h")
@@ -8769,7 +8785,7 @@ bool importer::isCxxStdModule(StringRef moduleName, bool IsSystem) {
   return false;
 }
 
-ImportPath::Builder importer::getSwiftModulePath(ASTContext &SwiftContext, const clang::Module *M) {
+ImportPath::Builder ClangImporter::Implementation::getSwiftModulePath(const clang::Module *M) {
   ImportPath::Builder builder;
   while (M) {
     if (!M->isSubModule() && isCxxStdModule(M))
@@ -8780,10 +8796,6 @@ ImportPath::Builder importer::getSwiftModulePath(ASTContext &SwiftContext, const
   }
   std::reverse(builder.begin(), builder.end());
   return builder;
-}
-
-ImportPath::Builder ClangImporter::Implementation::getSwiftModulePath(const clang::Module *M) {
-  return ::getSwiftModulePath(SwiftContext, M);
 }
 
 std::optional<clang::QualType>
