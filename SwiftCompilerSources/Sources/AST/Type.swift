@@ -243,6 +243,9 @@ extension TypeProperties {
   public func checkConformance(to protocol: ProtocolDecl) -> Conformance {
     return Conformance(bridged: rawType.bridged.checkConformance(`protocol`.bridged))
   }
+
+  public var containsPackExpansionType: Bool { rawType.bridged.containsPackExpansionType() }
+  public var numPackElements: Int { rawType.bridged.getNumPackElements() }
 }
 
 public struct TypeArray : RandomAccessCollection, CustomReflectable {

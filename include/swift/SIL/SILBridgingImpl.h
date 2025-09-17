@@ -1791,6 +1791,10 @@ BridgedCanType BridgedInstruction::TypeValueInst_getParamType() const {
   return getAs<swift::TypeValueInst>()->getParamType();
 }
 
+BridgedCanType BridgedInstruction::PackLengthInst_getPackType() const {
+  return getAs<swift::PackLengthInst>()->getPackType();
+}
+
 //===----------------------------------------------------------------------===//
 //                     VarDeclInst and DebugVariableInst
 //===----------------------------------------------------------------------===//

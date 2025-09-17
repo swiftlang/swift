@@ -609,7 +609,15 @@ BridgedASTType BridgedASTType::subst(BridgedSubstitutionMap substMap) const {
 
 BridgedConformance BridgedASTType::checkConformance(BridgedDeclObj proto) const {
   return swift::checkConformance(unbridged(), proto.getAs<swift::ProtocolDecl>(), /*allowMissing=*/ false);
-}  
+}
+
+bool BridgedASTType::containsPackExpansionType() const {
+  return unbridged()->castTo<swift::PackType>()->containsPackExpansionType();
+}
+
+SwiftInt BridgedASTType::getNumPackElements() const {
+  return unbridged()->castTo<swift::PackType>()->getNumElements();
+}
 
 static_assert((int)BridgedASTType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);
 static_assert((int)BridgedASTType::TraitResult::CanBe == (int)swift::TypeTraitResult::CanBe);

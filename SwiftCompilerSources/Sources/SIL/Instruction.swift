@@ -1807,7 +1807,11 @@ final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation
 final public class DeallocPackMetadataInst : Instruction, Deallocation {}
 
 final public class OpenPackElementInst : SingleValueInstruction {}
-final public class PackLengthInst : SingleValueInstruction {}
+final public class PackLengthInst : SingleValueInstruction {
+  public var packType: CanonicalType {
+    CanonicalType(bridged: bridged.PackLengthInst_getPackType())
+  }
+}
 final public class DynamicPackIndexInst : SingleValueInstruction {}
 final public class PackPackIndexInst : SingleValueInstruction {}
 final public class ScalarPackIndexInst : SingleValueInstruction {}
