@@ -17,4 +17,14 @@ inline UnorderedMap initUnorderedMap() { return {{1, 3}, {3, 3}, {2, 2}}; }
 inline Map initEmptyMap() { return {}; }
 inline UnorderedMap initEmptyUnorderedMap() { return {}; }
 
+struct NonCopyable {
+  NonCopyable() = default;
+  NonCopyable(const NonCopyable &other) = delete;
+  NonCopyable(NonCopyable &&other) = default;
+  ~NonCopyable() {}
+};
+
+using MapNonCopyableKey = std::map<NonCopyable, int>;
+using MapNonCopyableValue = std::map<int, NonCopyable>;
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_MAP_H
