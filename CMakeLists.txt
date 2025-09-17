@@ -1711,7 +1711,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         # To ensure incremental builds work as expected
         BUILD_ALWAYS 1
         CMAKE_ARGS
-          -DSwift_ENABLE_RUNTIMES=StringProcessing|Synchronization|Distributed|Observation
+          -DSwift_ENABLE_RUNTIMES=StringProcessing|Synchronization|Distributed|Observation|Runtime
           -DBUILD_SHARED_LIBS=YES
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
@@ -1722,6 +1722,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_Swift_COMPILER_TARGET:STRING=${stdlib_target_triple}
           -DCMAKE_C_COMPILER_TARGET:STRING=${stdlib_target_triple}
           -DCMAKE_CXX_COMPILER_TARGET:STRING=${stdlib_target_triple}
+          -DCMAKE_ASM_COMPILER_TARGET:STRING=${stdlib_target_triple}
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=TRUE)
