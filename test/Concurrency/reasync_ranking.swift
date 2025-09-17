@@ -18,8 +18,8 @@ func referencesAsyncOverloadAsync() async {
   _ = asyncOverload // we prefer the async overload
 }
 
-func reasyncOverload(_: () async -> (), _: Int) reasync {} // expected-note {{found this candidate}}
-func reasyncOverload(_: () -> (), _: String) {} // expected-note {{found this candidate}}
+func reasyncOverload(_: () async -> (), _: Int) reasync {} // expected-note {{found  candidate with type '(() -> (), Int) async -> ()}}
+func reasyncOverload(_: () -> (), _: String) {} // expected-note {{found candidate with type '(() -> (), String) -> ()'}}
 
 func referencesReasyncOverload() {
   _ = reasyncOverload // expected-error {{ambiguous use of 'reasyncOverload'}}

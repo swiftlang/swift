@@ -5,15 +5,15 @@ func f0(_ d: Double, _ i: Int) {} // expected-note{{found candidate with type '(
 
 f0(1, 2) // expected-error{{ambiguous use of 'f0'}}
 
-func f1(_ i: Int16) {} // expected-note{{found this candidate}}
-func f1(_ i: Int32) {} // expected-note{{found this candidate}}
+func f1(_ i: Int16) {} // expected-note{{found candidate with type '(Int16) -> ()'}}
+func f1(_ i: Int32) {} // expected-note{{found candidate type '(Int32) -> ()'}}
 
 f1(0) // expected-error{{ambiguous use of 'f1'}}
 
 infix operator +++
 
-func +++(i: Int, d: Double) {} // expected-note{{found this candidate}}
-func +++(d: Double, i: Int) {} // expected-note{{found this candidate}}
+func +++(i: Int, d: Double) {} // expected-note{{found candidate with type '(Int, Double) -> ()'}}
+func +++(d: Double, i: Int) {} // expected-note{{found candidate with type '(Double, Int) -> ()'}}
 
 1 +++ 2 // expected-error{{ambiguous use of operator '+++'}}
 

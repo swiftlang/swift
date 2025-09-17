@@ -9,8 +9,8 @@ protocol P {
 
 // We currently only apply the constructor ranking rule to X() and not X.init().
 struct S<T : P> {
-  init(_ x: T = .init()) {} // expected-note {{found candidate with type '(P) -> S'}}
-  init(_ x: T? = nil) {} // expected-note {{found candidate with type '(P?) -> S'}}
+  init(_ x: T = .init()) {} // expected-note {{found candidate with type '(T) -> S'}}
+  init(_ x: T? = nil) {} // expected-note {{found candidate with type '(T?) -> S'}}
   func testInitRanking() {
     _ = S<T>() // Okay
     _ = S<T>.init() // expected-error {{ambiguous use of 'init(_:)'}}
@@ -28,8 +28,8 @@ struct S1 {
 
 // Ambiguous because we don't prefer one label over the other.
 struct S2 {
-  init(x: Int...) {} // expected-note {{found this candidate}}
-  init(y: Int...) {} // expected-note {{found this candidate}}
+  init(x: Int...) {} // expected-note {{found candidate with type '(Int...) -> S2'}}
+  init(y: Int...) {} // expected-note {{found candidate with type '(Int...) -> S2'}}
 
   func testInitRanking() {
     _ = S2() // expected-error {{ambiguous use of 'init'}}
@@ -39,8 +39,8 @@ struct S2 {
 // Ambiguous because we don't apply the prefer-unlabeled rule if the types
 // aren't compatible.
 struct S3 {
-  init(x: Int...) {} // expected-note {{found this candidate}}
-  init(_: String...) {} // expected-note {{found this candidate}}
+  init(x: Int...) {} // expected-note {{found candidate with type '(Int...) -> S3'}}
+  init(_: String...) {} // expected-note {{found candidate with type '(String...) -> S3'}}
 
   func testInitRanking() {
     _ = S3() // expected-error {{ambiguous use of 'init'}}
@@ -51,8 +51,8 @@ struct S3 {
 // parameter list, and we don't have a special case for it. Ideally we would
 // align this behavior with the variadic behavior.
 struct S4 {
-  init(x: Int = 0) {} // expected-note {{found this candidate}}
-  init(_: Int = 0) {} // expected-note {{found this candidate}}
+  init(x: Int = 0) {} // expected-note {{found candidate with type '(Int) -> S4'}}
+  init(_: Int = 0) {} // expected-note {{found candidate with type '(Int) -> S4'}}
 
   func testInitRanking() {
     _ = S4() // expected-error {{ambiguous use of 'init'}}
@@ -60,8 +60,8 @@ struct S4 {
 }
 
 infix operator ^^^
-func ^^^ (lhs: (Int, Int), rhs: Int) -> Int { 0 }  // expected-note {{found this candidate}}
-func ^^^ (lhs: (Int, Int), rhs: Int) -> String { "" }  // expected-note {{found this candidate}}
+func ^^^ (lhs: (Int, Int), rhs: Int) -> Int { 0 }  // expected-note {{found candidate with type '((Int, Int), Int) -> Int'}}
+func ^^^ (lhs: (Int, Int), rhs: Int) -> String { "" }  // expected-note {{found candidate with type '((Int, Int), Int) -> String'}}
 
 // We shouldn't favor based on the type of a tuple element.
 struct S5 {

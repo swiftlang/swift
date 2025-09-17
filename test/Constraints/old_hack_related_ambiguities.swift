@@ -364,8 +364,8 @@ class TestFailableOnly {
 do {
   @_disfavoredOverload
   func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) async throws {}
-  func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) throws {} // expected-note {{found candidate with type '(Int, String, Int) -> ()'}}
-  func test(over: Int, other: String = "", block: @escaping (Int) throws -> Void) throws {} // expected-note {{found candidate with type '(Int, String, Int) -> ()'}}
+  func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) throws {} // expected-note {{found candidate with type '(Int, String, @escaping (Int) throws -> Void) throws -> ()'}}
+  func test(over: Int, other: String = "", block: @escaping (Int) throws -> Void) throws {} // expected-note {{found candidate with type '(Int, String, @escaping (Int) throws -> Void) throws -> ()'}}
 
   func performLocal(v: Int, block: @escaping (Int) throws -> Void) async throws {
     try await test(over: v, block: block) // expected-error {{ambiguous use of 'test'}}

@@ -68,8 +68,8 @@ protocol Overload {
   func getB() -> B
   func f1(_: A) -> A // expected-note {{candidate expects value of type 'OtherOvl.A' for parameter #1}}
   func f1(_: B) -> B // expected-note {{candidate expects value of type 'OtherOvl.B' for parameter #1}}
-  func f2(_: Int) -> A // expected-note{{found this candidate}}
-  func f2(_: Int) -> B // expected-note{{found this candidate}}
+  func f2(_: Int) -> A // expected-note{{found candidate with type '(Int) -> Self.A'}}
+  func f2(_: Int) -> B // expected-note{{found candidate with type '(Int) -> Self.B'}}
   func f3(_: Int) -> Int // expected-note {{found candidate with type '(Int) -> Int'}}
   func f3(_: Float) -> Float // expected-note {{found candidate with type '(Float) -> Float'}}
   func f3(_: Self) -> Self // expected-note {{found candidate with type '(OtherOvl) -> OtherOvl'}}

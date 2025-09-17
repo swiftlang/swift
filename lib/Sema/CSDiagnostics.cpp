@@ -16,6 +16,7 @@
 
 #include "CSDiagnostics.h"
 #include "MiscDiagnostics.h"
+#include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
@@ -4100,7 +4101,7 @@ bool SubscriptMisuseFailure::diagnoseAsError() {
 bool SubscriptMisuseFailure::diagnoseAsNote() {
   if (auto overload = getOverloadChoiceIfAvailable(getLocator())) {
     auto decl = overload->choice.getDecl();
-    emitDiagnosticAt(decl, diag::found_candidate_type, decl->getOverloadSignatureType());
+    emitDiagnosticAt(decl, diag::found_candidate_type, swift::TypeChecker::removeSelfParam(decl,decl->getInterfaceType()));
     return true;
   }
   return false;

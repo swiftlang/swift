@@ -295,8 +295,8 @@ func test_init_refs_with_single_pack_expansion_param() {
   _ = Data(42, "") // Ok
 
   struct EmptyAmbiguous<each V> {
-    init(_: repeat each V) {} // expected-note {{found this candidate}}
-    init(x: repeat each V) {} // expected-note {{found this candidate}}
+    init(_: repeat each V) {} // expected-note {{found candidate with type '(repeat each V) -> EmptyAmbiguous<repeat each V>'}}
+    init(x: repeat each V) {} // expected-note {{found candidate with type '(repeat each V) -> EmptyAmbiguous<repeat each V>'}}
   }
 
   _ = EmptyAmbiguous() // expected-error {{ambiguous use of 'init'}}
@@ -630,25 +630,25 @@ do {
 // rdar://112029630 - incorrect variadic generic overload ranking
 do {
   func test1<T>(_: T...) {}
-  // expected-note@-1 {{found this candidate}}
+  // expected-note@-1 {{found candidate with type '(T...) -> ()'}}
   func test1<each T>(_: repeat each T) {}
-  // expected-note@-1 {{found this candidate}}
+  // expected-note@-1 {{found candidate with type '<each T> (repeat each T) -> ()'}}
 
   test1(1, 2, 3) // expected-error {{ambiguous use of 'test1'}}
   test1(1, "a") // Ok
 
   func test2<each T>(_: repeat each T) {}
-  // expected-note@-1 {{found this candidate}}
+  // expected-note@-1 {{found candidate with type '<each T> (repeat each T) -> ()'}}
   func test2<each T>(vals: repeat each T) {}
-  // expected-note@-1 {{found this candidate}}
+  // expected-note@-1 {{found candidate with type '<each T> (vals:repeat each T) -> ()'}}
 
   test2() // expected-error {{ambiguous use of 'test2'}}
 
   func test_different_requirements<A: BinaryInteger & StringProtocol>(_ a: A) {
     func test3<each T: BinaryInteger>(str: String, _: repeat each T) {}
-    // expected-note@-1 {{found this candidate}}
+    // expected-note@-1 {{found candidate with type '<A, each T where A : BInaryInteger, A : StringProtocol, repeat each T : StringProtocol> (str: repeat each T) -> ()'}}
     func test3<each U: StringProtocol>(str: repeat each U) {}
-    // expected-note@-1 {{found this candidate}}
+    // expected-note@-1 {{found candidate with type '<A, each U where A : BinaryInteger, A : StringProtocol, repeat each U : StringProtocol> (str: repeat each U) -> ()'}}
 
     test3(str: "", a, a)  // expected-error {{ambiguous use of 'test3'}}
   }

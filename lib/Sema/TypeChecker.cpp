@@ -765,6 +765,13 @@ bool TypeChecker::diagnoseInvalidFunctionType(
   return hadAnyError;
 }
 
+Type swift::TypeChecker::removeSelfParam(ValueDecl *value, Type type){
+ if (value->hasCurriedSelf()) {
+   return type->castTo<AnyFunctionType>()->getResult();
+ }
+ return type;
+}
+
 extern "C" intptr_t swift_ASTGen_evaluatePoundIfCondition(
                         BridgedASTContext astContext,
                         void *_Nonnull diagEngine,
