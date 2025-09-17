@@ -418,6 +418,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable & ~Escapable {
   /// - Parameter i: The position of the element to access. `i` must be in the
   ///   range `0..<count`.
   @_alwaysEmitIntoClient
+  @lifetime(borrow self)
   public subscript(i: Int) -> Element {
     @_transparent
     unsafeAddress {
@@ -437,6 +438,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable & ~Escapable {
 
   // Skip all debug and runtime checks
   @_alwaysEmitIntoClient
+  @lifetime(borrow self)
   internal subscript(_unchecked i: Int) -> Element {
     @_transparent
     unsafeAddress {
@@ -1341,9 +1343,11 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable & ~Escapable {
   ///   - index: The index of the buffer element to retrieve and deinitialize.
   /// - Returns: The instance referenced by this index in this buffer.
   @_alwaysEmitIntoClient
+  @lifetime(borrow self)
   public func moveElement(from index: Index) -> Element {
     _debugPrecondition(startIndex <= index && index < endIndex)
-    return unsafe baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index).move()
+    let p = unsafe baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index)
+    return unsafe _overrideLifetime(p.move(), copying: self)
   }
 
   /// Deinitializes the memory underlying the element at `index`.
