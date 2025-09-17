@@ -133,10 +133,13 @@ export *\n\
     swiftscan_string_ref_t path =
         swiftscan_scanner_out_of_date_file_system_entry_get_path(entry);
 
+    SmallString<256> nativePath;
+    llvm::sys::path::native(c_string_utils::get_C_string(path), nativePath);
+
     switch (kind) {
     case SWIFTSCAN_OOD_FS_ENTRY_NEGATIVELY_CACHED:
       CheckedNegativelyCached = true;
-      EXPECT_STREQ(c_string_utils::get_C_string(path), MissingDirPath.c_str());
+      EXPECT_STREQ(nativePath.c_str(), MissingDirPath.c_str());
       break;
     case SWIFTSCAN_OOD_FS_ENTRY_SIZE_CHANGED:
       CheckedSizeChanged = true;
