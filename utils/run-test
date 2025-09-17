@@ -160,6 +160,9 @@ def main():
     parser.add_argument("--unified", action="store_true",
                         help="The build directory is an unified LLVM build, "
                              "not a standalone Swift build")
+    parser.add_argument("--update-tests", action="store_true",
+                        help="Invoke lit with --update-tests to auto-repair failing tests "
+                             "(when possible)")
 
     args = parser.parse_args()
 
@@ -279,6 +282,9 @@ def main():
 
     if args.filter:
         test_args += ['--filter', args.filter]
+
+    if args.update_tests:
+        test_args.append('--update-tests')
 
     test_cmd = [sys.executable, args.lit] + test_args + paths
 
