@@ -4931,7 +4931,12 @@ public:
   /// Populate the prepared overload with all type variables and constraints
   /// that are to be introduced into the constraint system when this choice
   /// is taken.
-  DeclReferenceType
+  ///
+  /// Returns a pair consisting of the opened type, and the thrown error type.
+  ///
+  /// FIXME: As a transitional mechanism, if preparedOverload is nullptr, this
+  /// immediately performs all operations.
+  std::pair<Type, Type>
   prepareOverloadImpl(OverloadChoice choice,
                       DeclContext *useDC,
                       ConstraintLocator *locator,

@@ -144,38 +144,29 @@ public:
   using Change = PreparedOverloadChange;
 
 private:
+  Type OpenedType;
+  Type ThrownErrorType;
   size_t Count;
-  DeclReferenceType DeclType;
 
   size_t numTrailingObjects(OverloadToken<Change>) const {
     return Count;
   }
 
 public:
-  PreparedOverload(const DeclReferenceType &declType, ArrayRef<Change> changes)
-    : Count(changes.size()), DeclType(declType) {
+  PreparedOverload(Type openedType, Type thrownErrorType,
+                   ArrayRef<Change> changes)
+    : OpenedType(openedType), ThrownErrorType(thrownErrorType),
+      Count(changes.size()) {
     std::uninitialized_copy(changes.begin(), changes.end(),
                             getTrailingObjects<Change>());
   }
 
   Type getOpenedType() const {
-    return DeclType.openedType;
+    return OpenedType;
   }
 
-  Type getAdjustedOpenedType() const {
-    return DeclType.adjustedOpenedType;
-  }
-
-  Type getReferenceType() const {
-    return DeclType.referenceType;
-  }
-
-  Type getAdjustedReferenceType() const {
-    return DeclType.adjustedReferenceType;
-  }
-
-  Type getThrownErrorTypeOnAccess() const {
-    return DeclType.thrownErrorTypeOnAccess;
+  Type getThrownErrorType() const {
+    return ThrownErrorType;
   }
 
   ArrayRef<Change> getChanges() const {
