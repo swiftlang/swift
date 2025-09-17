@@ -107,7 +107,7 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
     var cloner = Cloner(cloneBefore: self, context)
     defer { cloner.deinitialize() }
 
-    let initVal = cloner.cloneRecursively(globalInitValue: globalInitVal)
+    let initVal = cloner.cloneRecursivelyToGlobal(value: globalInitVal)
 
     uses.replaceAll(with: initVal, context)
     // Also erases a builtin "once" on which the global_addr depends on. This is fine

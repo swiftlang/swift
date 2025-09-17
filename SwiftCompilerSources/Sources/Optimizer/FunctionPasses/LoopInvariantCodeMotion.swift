@@ -17,10 +17,6 @@ let loopInvariantCodeMotionPass = FunctionPass(name: "loop-invariant-code-motion
   for loop in context.loopTree.loops {
     optimizeTopLevelLoop(topLevelLoop: loop, context)
   }
-  
-  if context.needFixStackNesting {
-    context.fixStackNesting(in: function)
-  }
 }
 
 private func optimizeTopLevelLoop(topLevelLoop: Loop, _ context: FunctionPassContext) {
@@ -61,7 +57,7 @@ private struct MovableInstructions {
   var loadsAndStores: [Instruction] = []
   var hoistUp: [Instruction] = []
   var sinkDown: [Instruction] = []
-  var scopedInsts: [ScopedInstruction] = []
+  var scopedInsts: [Instruction] = []
 }
 
 /// Analyzed instructions inside the currently processed loop.
@@ -84,10 +80,10 @@ private struct AnalyzedInstructions {
   /// * an apply to the addressor of the global
   /// * a builtin "once" of the global initializer
   var globalInitCalls: Stack<Instruction>
-  var readOnlyApplies: Stack<FullApplySite>
+  var readOnlyApplies: Stack<ApplyInst>
   var loads: Stack<LoadInst>
   var stores: Stack<StoreInst>
-  var scopedInsts: Stack<UnaryInstruction>
+  var beginAccesses: Stack<BeginAccessInst>
   var fullApplies: Stack<FullApplySite>
   
   /// `true` if the loop has instructions which (may) read from memory, which are not in `Loads` and not in `sideEffects`.
@@ -101,10 +97,10 @@ private struct AnalyzedInstructions {
     self.blockSideEffectBottomMarker = loopSideEffects.top
     
     self.globalInitCalls = Stack<Instruction>(context)
-    self.readOnlyApplies = Stack<FullApplySite>(context)
+    self.readOnlyApplies = Stack<ApplyInst>(context)
     self.loads = Stack<LoadInst>(context)
     self.stores = Stack<StoreInst>(context)
-    self.scopedInsts = Stack<UnaryInstruction>(context)
+    self.beginAccesses = Stack<BeginAccessInst>(context)
     self.fullApplies = Stack<FullApplySite>(context)
   }
   
@@ -114,7 +110,7 @@ private struct AnalyzedInstructions {
     loopSideEffects.deinitialize()
     loads.deinitialize()
     stores.deinitialize()
-    scopedInsts.deinitialize()
+    beginAccesses.deinitialize()
     fullApplies.deinitialize()
   }
   
@@ -138,6 +134,8 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
 
   analyzeInstructions(in: loop, &analyzedInstructions, &movableInstructions, context)
 
+  collectHoistableReadOnlyApplies(analyzedInstructions, &movableInstructions, context)
+
   collectHoistableGlobalInitCalls(in: loop, analyzedInstructions, &movableInstructions, context)
 
   collectProjectableAccessPathsAndSplitLoads(in: loop, &analyzedInstructions, &movableInstructions, context)
@@ -160,46 +158,60 @@ private func analyzeInstructions(
     analyzedInstructions.markBeginOfBlock()
     
     for inst in bb.instructions {
+      // TODO: Remove once support for values with ownership implemented.
+      if inst.hasOwnershipOperandsOrResults {
+        analyzedInstructions.analyzeSideEffects(ofInst: inst)
+        
+        // Collect fullApplies to be checked in analyzeBeginAccess
+        if let fullApply = inst as? FullApplySite {
+          analyzedInstructions.fullApplies.append(fullApply)
+        }
+        
+        continue
+      }
+      
       switch inst {
       case is FixLifetimeInst:
         break // We can ignore the side effects of FixLifetimes
       case let loadInst as LoadInst:
         analyzedInstructions.loads.append(loadInst)
-      case let uncheckedOwnershipConversionInst as UncheckedOwnershipConversionInst:
-        analyzedInstructions.analyzeSideEffects(ofInst: uncheckedOwnershipConversionInst)
       case let storeInst as StoreInst:
+        switch storeInst.storeOwnership {
+        case .assign, .initialize:
+          continue  // TODO: Add support
+        case .unqualified, .trivial:
+          break
+        }
         analyzedInstructions.stores.append(storeInst)
         analyzedInstructions.analyzeSideEffects(ofInst: storeInst)
       case let beginAccessInst as BeginAccessInst:
-        analyzedInstructions.scopedInsts.append(beginAccessInst)
+        analyzedInstructions.beginAccesses.append(beginAccessInst)
         analyzedInstructions.analyzeSideEffects(ofInst: beginAccessInst)
-      case let beginBorrowInst as BeginBorrowInstruction:
-        analyzedInstructions.analyzeSideEffects(ofInst: beginBorrowInst)
       case let refElementAddrInst as RefElementAddrInst:
         movableInstructions.speculativelyHoistable.append(refElementAddrInst)
       case let condFailInst as CondFailInst:
         analyzedInstructions.analyzeSideEffects(ofInst: condFailInst)
-      case let fullApply as FullApplySite:
-        if fullApply.isSafeReadOnlyApply(context.calleeAnalysis) {
-          analyzedInstructions.readOnlyApplies.append(fullApply)
-        } else if let callee = fullApply.referencedFunction,
+      case let applyInst as ApplyInst:
+        if applyInst.isSafeReadOnlyApply(context.calleeAnalysis) {
+          analyzedInstructions.readOnlyApplies.append(applyInst)
+        } else if let callee = applyInst.referencedFunction,
                   callee.isGlobalInitFunction, // Calls to global inits are different because we don't care about side effects which are "after" the call in the loop.
-                  !fullApply.globalInitMayConflictWith(
+                  !applyInst.globalInitMayConflictWith(
                     blockSideEffectSegment: analyzedInstructions.sideEffectsOfCurrentBlock,
                     context.aliasAnalysis
                   ) {
           // Check against side-effects within the same block.
           // Side-effects in other blocks are checked later (after we
           // scanned all blocks of the loop) in `collectHoistableGlobalInitCalls`.
-          analyzedInstructions.globalInitCalls.append(fullApply)
+          analyzedInstructions.globalInitCalls.append(applyInst)
         }
-        
-        analyzedInstructions.fullApplies.append(fullApply)
         
         // Check for array semantics and side effects - same as default
         fallthrough
       default:
         switch inst {
+        case let fullApply as FullApplySite:
+          analyzedInstructions.fullApplies.append(fullApply)
         case let builtinInst as BuiltinInst:
           switch builtinInst.id {
           case .Once, .OnceWithContext:
@@ -221,6 +233,27 @@ private func analyzeInstructions(
         }
       }
     }
+  }
+}
+
+/// Process collected read only applies. Moves them to `hoistUp` if they don't conflict with any side effects.
+private func collectHoistableReadOnlyApplies(
+  _ analyzedInstructions: AnalyzedInstructions,
+  _ movableInstructions: inout MovableInstructions,
+  _ context: FunctionPassContext
+) {
+  var counter = 0
+  for readOnlyApply in analyzedInstructions.readOnlyApplies {
+    // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
+    if counter * analyzedInstructions.loopSideEffects.count < 8000,
+       readOnlyApply.isSafeReadOnlyApply(
+         for: analyzedInstructions.loopSideEffects,
+         context.aliasAnalysis,
+         context.calleeAnalysis
+       ) {
+      movableInstructions.hoistUp.append(readOnlyApply)
+    }
+    counter += 1
   }
 }
 
@@ -287,9 +320,13 @@ private func collectMovableInstructions(
   _ context: FunctionPassContext
 ) {
   var loadInstCounter = 0
-  var readOnlyApplyCounter = 0
   for bb in loop.loopBlocks {
     for inst in bb.instructions {
+      // TODO: Remove once support for values with ownership implemented.
+      if inst.hasOwnershipOperandsOrResults {
+        continue
+      }
+      
       switch inst {
       case let fixLifetimeInst as FixLifetimeInst:
         guard fixLifetimeInst.parentBlock.dominates(loop.preheader!, context.dominatorTree) else {
@@ -302,20 +339,19 @@ private func collectMovableInstructions(
       case let loadInst as LoadInst:
         // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
         if loadInstCounter * analyzedInstructions.loopSideEffects.count < 8000,
-           !analyzedInstructions.loopSideEffectsMayWriteTo(address: loadInst.operand.value, context.aliasAnalysis) {
+           !analyzedInstructions.loopSideEffectsMayWriteTo(address: loadInst.operand.value, context.aliasAnalysis),
+           loadInst.loadOwnership != .take, loadInst.loadOwnership != .copy { // TODO: Add support for take and copy loads.
           movableInstructions.hoistUp.append(loadInst)
         }
         
         loadInstCounter += 1
         
         movableInstructions.loadsAndStores.append(loadInst)
-      case is UncheckedOwnershipConversionInst:
-        break // TODO: Add support
       case let storeInst as StoreInst:
         switch storeInst.storeOwnership {
-        case .assign:
+        case .assign, .initialize:
           continue  // TODO: Add support
-        case .unqualified, .trivial, .initialize:
+        case .unqualified, .trivial:
           break
         }
         movableInstructions.loadsAndStores.append(storeInst)
@@ -326,32 +362,8 @@ private func collectMovableInstructions(
         // must - after hoisting - also be executed before said access.
         movableInstructions.hoistUp.append(condFailInst)
       case let beginAccessInst as BeginAccessInst:
-        if beginAccessInst.canScopedInstructionBeHoisted(outOf: loop, analyzedInstructions: analyzedInstructions, context) {
+        if beginAccessInst.canBeHoisted(outOf: loop, analyzedInstructions: analyzedInstructions, context) {
           movableInstructions.scopedInsts.append(beginAccessInst)
-        }
-      case let beginBorrowInst as BeginBorrowInstruction:
-        if !beginBorrowInst.isLexical && beginBorrowInst.canScopedInstructionBeHoisted(outOf: loop, analyzedInstructions: analyzedInstructions, context) {
-          movableInstructions.scopedInsts.append(beginBorrowInst)
-        }
-      case let fullApplySite as FullApplySite:
-        guard analyzedInstructions.readOnlyApplies.contains(where: { $0 == fullApplySite }) else {
-          break
-        }
-        
-        // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
-        if readOnlyApplyCounter * analyzedInstructions.loopSideEffects.count < 8000,
-           fullApplySite.isSafeReadOnlyApply(
-             for: analyzedInstructions.loopSideEffects,
-             context.aliasAnalysis,
-             context.calleeAnalysis
-           ) {
-          if let beginApplyInst = fullApplySite as? BeginApplyInst {
-            movableInstructions.scopedInsts.append(beginApplyInst)
-          } else {
-            movableInstructions.hoistUp.append(fullApplySite)
-          }
-          
-          readOnlyApplyCounter += 1
         }
       default:
         break
@@ -421,7 +433,7 @@ private extension AnalyzedInstructions {
     if (loopSideEffects.contains { sideEffect in
       switch sideEffect {
       case let storeInst as StoreInst:
-        if storeInst.storesTo(accessPath) {
+        if storeInst.isNonInitializingStoreTo(accessPath) {
           return false
         }
       case let loadInst as LoadInst:
@@ -438,13 +450,13 @@ private extension AnalyzedInstructions {
     }
         
     if (loads.contains { loadInst in
-      loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis) && !loadInst.overlaps(accessPath: accessPath)
+      loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis) && loadInst.loadOwnership != .take && !loadInst.overlaps(accessPath: accessPath)
     }) {
       return false
     }
           
     if (stores.contains { storeInst in
-      storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis) && !storeInst.storesTo(accessPath)
+      storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis) && !storeInst.isNonInitializingStoreTo(accessPath)
     }) {
       return false
     }
@@ -649,29 +661,18 @@ private extension MovableInstructions {
     
     var changed = false
 
-    for scopedInst in scopedInsts {
-      if let storeBorrowInst = scopedInst as? StoreBorrowInst {
-        _ = storeBorrowInst.allocStack.hoist(outOf: loop, context)
-        
-        var sankFirst = false
-        for deallocStack in storeBorrowInst.allocStack.deallocations {
-          if sankFirst {
-            context.erase(instruction: deallocStack)
-          } else {
-            sankFirst = deallocStack.sink(outOf: loop, context)
-          }
-        }
-        
-        context.notifyInvalidatedStackNesting()
+    for specialInst in scopedInsts {
+      guard let beginAccessInst = specialInst as? BeginAccessInst else {
+        continue
       }
 
-      guard scopedInst.hoist(outOf: loop, context) else {
+      guard specialInst.hoist(outOf: loop, context) else {
         continue
       }
 
       // We only want to sink the first end_access and erase the rest to not introduce duplicates.
       var sankFirst = false
-      for endAccess in scopedInst.endInstructions {
+      for endAccess in beginAccessInst.endAccessInstructions {
         if sankFirst {
           context.erase(instruction: endAccess)
         } else {
@@ -692,10 +693,10 @@ private extension MovableInstructions {
   ) -> Bool {
     // Initially load the value in the loop pre header.
     let builder = Builder(before: loop.preheader!.terminator, context)
-    var firstStore: StoreInst?
+    var storeAddr: Value?
     
     // If there are multiple stores in a block, only the last one counts.
-    for case let storeInst as StoreInst in loadsAndStores where storeInst.storesTo(accessPath) {
+    for case let storeInst as StoreInst in loadsAndStores where storeInst.isNonInitializingStoreTo(accessPath) {
       // If a store just stores the loaded value, bail. The operand (= the load)
       // will be removed later, so it cannot be used as available value.
       // This corner case is surprisingly hard to handle, so we just give up.
@@ -704,9 +705,9 @@ private extension MovableInstructions {
         return false
       }
       
-      if firstStore == nil {
-        firstStore = storeInst
-      } else if storeInst.destination.type != firstStore!.destination.type {
+      if storeAddr == nil {
+        storeAddr = storeInst.destination
+      } else if storeInst.destination.type != storeAddr!.type {
         // This transformation assumes that the values of all stores in the loop
         // must be interchangeable. It won't work if stores different types
         // because of casting or payload extraction even though they have the
@@ -715,26 +716,26 @@ private extension MovableInstructions {
       }
     }
     
-    guard let firstStore else {
+    guard let storeAddr else {
       return false
     }
     
     var ssaUpdater = SSAUpdater(
-      function: firstStore.parentFunction,
-      type: firstStore.destination.type.objectType,
-      ownership: firstStore.source.ownership,
+      function: storeAddr.parentFunction,
+      type: storeAddr.type.objectType,
+      ownership: .none,
       context
     )
     
     // Set all stored values as available values in the ssaUpdater.
-    for case let storeInst as StoreInst in loadsAndStores where storeInst.storesTo(accessPath) {
+    for case let storeInst as StoreInst in loadsAndStores where storeInst.isNonInitializingStoreTo(accessPath) {
       ssaUpdater.addAvailableValue(storeInst.source, in: storeInst.parentBlock)
     }
     
     var cloner = Cloner(cloneBefore: loop.preheader!.terminator, context)
     defer { cloner.deinitialize() }
     
-    guard let initialAddr = (cloner.cloneRecursively(value: firstStore.destination) { srcAddr, cloner in
+    guard let initialAddr = (cloner.cloneRecursively(value: storeAddr) { srcAddr, cloner in
       switch srcAddr {
       case is AllocStackInst, is BeginBorrowInst, is MarkDependenceInst:
         return .stopCloning
@@ -753,7 +754,7 @@ private extension MovableInstructions {
       return false
     }
     
-    let ownership: LoadInst.LoadOwnership = firstStore.parentFunction.hasOwnership ? (firstStore.storeOwnership == .initialize ? .take : .trivial) : .unqualified
+    let ownership: LoadInst.LoadOwnership = loop.preheader!.terminator.parentFunction.hasOwnership ? .trivial : .unqualified
     
     let initialLoad = builder.createLoad(fromAddress: initialAddr, ownership: ownership)
     ssaUpdater.addAvailableValue(initialLoad, in: loop.preheader!)
@@ -773,7 +774,7 @@ private extension MovableInstructions {
         currentVal = nil
       }
       
-      if let storeInst = inst as? StoreInst, storeInst.storesTo(accessPath) {
+      if let storeInst = inst as? StoreInst, storeInst.isNonInitializingStoreTo(accessPath) {
         currentVal = storeInst.source
         context.erase(instruction: storeInst)
         changed = true
@@ -813,10 +814,11 @@ private extension MovableInstructions {
       
       let builder = Builder(before: exitBlock.instructions.first!, context)
       
+      let ownership: StoreInst.StoreOwnership = exitBlock.instructions.first!.parentFunction.hasOwnership ? .trivial : .unqualified
       builder.createStore(
         source: ssaUpdater.getValue(inMiddleOf: exitBlock),
         destination: initialAddr,
-        ownership: firstStore.storeOwnership
+        ownership: ownership
       )
       changed = true
     }
@@ -831,6 +833,13 @@ private extension MovableInstructions {
 }
 
 private extension Instruction {
+  var hasOwnershipOperandsOrResults: Bool {
+    guard parentFunction.hasOwnership else { return false }
+
+    return results.contains(where: { $0.ownership != .none })
+      || operands.contains(where: { $0.value.ownership != .none })
+  }
+  
   /// Returns `true` if this instruction follows the default hoisting heuristic which means it
   /// is not a terminator, allocation or deallocation and either a hoistable array semantics call or doesn't have memory effects.
   func canBeHoisted(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
@@ -852,8 +861,7 @@ private extension Instruction {
       break
     }
 
-    if memoryEffects == .noEffects,
-       !results.contains(where: { $0.ownership == .owned }) {
+    if memoryEffects == .noEffects {
       return true
     }
 
@@ -869,16 +877,11 @@ private extension Instruction {
     if canHoistArraySemanticsCall(to: terminator, context) {
       hoistArraySemanticsCall(before: terminator, context)
     } else {
-      if let loadCopyInst = self as? LoadInst, loadCopyInst.loadOwnership == .copy {
-        hoist(loadCopyInst: loadCopyInst, outOf: loop, context)
-        return true
-      } else {
-        move(before: terminator, context)
-      }
+      move(before: terminator, context)
     }
     
     if let singleValueInst = self as? SingleValueInstruction,
-       !(self is ScopedInstruction || self is AllocStackInst),
+       !(self is BeginAccessInst),
        let identicalInst = (loop.preheader!.instructions.first { otherInst in
          return singleValueInst != otherInst && singleValueInst.isIdenticalTo(otherInst)
     }) {
@@ -892,30 +895,11 @@ private extension Instruction {
     return true
   }
   
-  private func hoist(loadCopyInst: LoadInst, outOf loop: Loop, _ context: FunctionPassContext) {
-    if loop.hasNoExitBlocks {
-      return
-    }
-    
-    let preheaderBuilder = Builder(before: loop.preheader!.terminator, context)
-    let preheaderLoadBorrow = preheaderBuilder.createLoadBorrow(fromAddress: loadCopyInst.address)
-    
-    let headerBuilder = Builder(before: loadCopyInst, context)
-    let copyValue = headerBuilder.createCopyValue(operand: preheaderLoadBorrow)
-    loadCopyInst.replace(with: copyValue, context)
-    
-    for exitBlock in loop.exitBlocks where !context.deadEndBlocks.isDeadEnd(exitBlock) {
-      assert(exitBlock.hasSinglePredecessor, "Exiting edge should not be critical.")
-      
-      let exitBlockBuilder = Builder(before: exitBlock.instructions.first!, context)
-      exitBlockBuilder.createEndBorrow(of: preheaderLoadBorrow)
-    }
-  }
-  
   func sink(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
+    let exitBlocks = loop.exitBlocks
     var changed = false
 
-    for exitBlock in loop.exitBlocks where !context.deadEndBlocks.isDeadEnd(exitBlock) {
+    for exitBlock in exitBlocks {
       assert(exitBlock.hasSinglePredecessor, "Exiting edge should not be critical.")
       
       if changed {
@@ -985,7 +969,11 @@ private extension Instruction {
 
 private extension StoreInst {
   /// Returns a `true` if this store is a store to `accessPath`.
-  func storesTo(_ accessPath: AccessPath) -> Bool {
+  func isNonInitializingStoreTo(_ accessPath: AccessPath) -> Bool {
+    if self.storeOwnership == .initialize {
+      return false
+    }
+
     return accessPath == self.destination.accessPath
   }
 }
@@ -1003,7 +991,7 @@ private extension LoadInst {
   }
 }
 
-private extension FullApplySite {
+private extension ApplyInst {
   /// Returns `true` if this apply inst could be safely hoisted.
   func isSafeReadOnlyApply(_ calleeAnalysis: CalleeAnalysis) -> Bool {
     guard functionConvention.results.allSatisfy({ $0.convention == .unowned }) else {
@@ -1052,10 +1040,6 @@ private extension FullApplySite {
         is KeyPathInst, is DeallocStackInst, is DeallocStackRefInst,
         is DeallocRefInst:
         break
-      case let endApply as EndApplyInst:
-        if endApply.beginApply != self {
-          return false
-        }
       default:
         if sideEffect.mayWriteToMemory {
           return false
@@ -1067,89 +1051,54 @@ private extension FullApplySite {
   }
 }
 
-private extension ScopedInstruction {
+private extension BeginAccessInst {
   /// Returns `true` if this begin access is safe to hoist.
-  func canScopedInstructionBeHoisted(
+  func canBeHoisted(
     outOf loop: Loop,
     analyzedInstructions: AnalyzedInstructions,
     _ context: FunctionPassContext
   ) -> Bool {
-    guard endInstructions.allSatisfy({ loop.contains(block: $0.parentBlock) && !($0 is TermInst) }) else {
+    guard endAccessInstructions.allSatisfy({ loop.contains(block: $0.parentBlock)}) else {
       return false
     }
     
-    // Instruction specific preconditions
-    switch self {
-    case is BeginAccessInst, is LoadBorrowInst:
-      guard (analyzedInstructions.scopedInsts
-        .allSatisfy { otherScopedInst in
-          guard self != otherScopedInst else { return true }
+    let areBeginAccessesSafe = analyzedInstructions.beginAccesses
+      .allSatisfy { otherBeginAccessInst in
+        guard self != otherBeginAccessInst else { return true }
 
-          return operands.first!.value.accessPath.isDistinct(from: otherScopedInst.operand.value.accessPath)
-        }) else {
+        return self.accessPath.isDistinct(from: otherBeginAccessInst.accessPath)
+      }
+
+    guard areBeginAccessesSafe else { return false }
+    
+    var scope = InstructionRange(begin: self, ends: endAccessInstructions, context)
+    defer { scope.deinitialize() }
+
+    for fullApplyInst in analyzedInstructions.fullApplies {
+      guard mayWriteToMemory && fullApplyInst.mayReadOrWrite(address: address, context.aliasAnalysis) ||
+            !mayWriteToMemory && fullApplyInst.mayWrite(toAddress: address, context.aliasAnalysis) else {
+        continue
+      }
+
+      // After hoisting the begin/end_access the apply will be within the scope, so it must not have a conflicting access.
+      if !scope.contains(fullApplyInst) {
         return false
       }
-    default:
-      break
     }
-    
-    var scope = InstructionRange(begin: self, ends: endInstructions, context)
-    defer { scope.deinitialize() }
-    
-    // Instruction specific range related conditions
-    switch self {
-    case is BeginApplyInst:
-      return true // Has already been checked with other full applies.
-    case let loadBorrowInst as LoadBorrowInst:
-      for case let destroyAddrInst as DestroyAddrInst in analyzedInstructions.loopSideEffects {
-        if context.aliasAnalysis.mayAlias(loadBorrowInst.address, destroyAddrInst.destroyedAddress) {
-          if !scope.contains(destroyAddrInst) {
-            return false
-          }
-        }
-      }
-      
-      for storeInst in analyzedInstructions.stores {
-        if storeInst.mayWrite(toAddress: loadBorrowInst.address, context.aliasAnalysis) {
-          if !scope.contains(storeInst) {
-            return false
-          }
-        }
-      }
-      
-      fallthrough
-    case is BeginAccessInst:
-      for fullApplyInst in analyzedInstructions.fullApplies {
-        guard mayWriteToMemory && fullApplyInst.mayReadOrWrite(address: operands.first!.value, context.aliasAnalysis) ||
-              !mayWriteToMemory && fullApplyInst.mayWrite(toAddress: operands.first!.value, context.aliasAnalysis) else {
-          continue
-        }
 
-        // After hoisting the begin/end_access the apply will be within the scope, so it must not have a conflicting access.
-        if !scope.contains(fullApplyInst) {
+    switch accessPath.base {
+    case .class, .global:
+      for sideEffect in analyzedInstructions.loopSideEffects where sideEffect.mayRelease {
+        // Since a class might have a deinitializer, hoisting begin/end_access pair could violate
+        // exclusive access if the deinitializer accesses address used by begin_access.
+        if !scope.contains(sideEffect) {
           return false
         }
       }
-      
-      switch operands.first!.value.accessPath.base {
-      case .class, .global:
-        for sideEffect in analyzedInstructions.loopSideEffects where sideEffect.mayRelease {
-          // Since a class might have a deinitializer, hoisting begin/end_access pair could violate
-          // exclusive access if the deinitializer accesses address used by begin_access.
-          if !scope.contains(sideEffect) {
-            return false
-          }
-        }
 
-        return true
-      default:
-        return true
-      }
-    case is BeginBorrowInst, is StoreBorrowInst:
-      // Ensure the value is produced outside the loop.
-      return !loop.contains(block: operands.first!.value.parentBlock)
+      return true
     default:
-      return false
+      return true
     }
   }
 }
