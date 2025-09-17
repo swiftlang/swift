@@ -839,6 +839,9 @@ ASTContext::ASTContext(
   // Initialize all of the known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Id_##Name = getIdentifier(IdStr);
 #include "swift/AST/KnownIdentifiers.def"
+  
+  StdlibOverlayNames[0] = Id_Concurrency;
+  StdlibOverlayNames[1] = Id_StringProcessing;
 
   // Record the initial set of search paths.
   for (const auto &path : SearchPathOpts.getImportSearchPaths())
