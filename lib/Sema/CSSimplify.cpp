@@ -16725,7 +16725,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     }
 
     // FIXME: Transitional hack.
-    bool enablePreparedOverloads = false;
+    bool enablePreparedOverloads = getASTContext().TypeCheckerOpts.SolverEnablePreparedOverloads;
 
     auto *preparedOverload = constraint.getPreparedOverload();
     if (!preparedOverload) {
