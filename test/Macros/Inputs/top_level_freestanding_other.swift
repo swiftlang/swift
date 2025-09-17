@@ -17,3 +17,4 @@ var globalVar3 = #stringify({ deprecated() })
 var globalVar4 = #stringify({ deprecated() })
 // expected-note@-1 {{in expansion of macro 'stringify' here}}
 // expected-warning@-2{{'deprecated()' is deprecated}}
+

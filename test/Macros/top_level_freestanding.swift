@@ -94,8 +94,8 @@ func testArbitraryAtGlobal() {
 }
 #endif
 
-// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser0039top_level_freestanding_otherswift_jrGEmfMX12_17_33_7FDB3F9D78D0279543373AD342C3C331Ll9stringifyfMf1{{.*}}: warning: 'deprecated()' is deprecated
-// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser0039top_level_freestanding_otherswift_jrGEmfMX16_17_33_7FDB3F9D78D0279543373AD342C3C331Ll9stringifyfMf2{{.*}}: warning: 'deprecated()' is deprecated
+// expected-warning@@__swiftmacro_9MacroUser0039top_level_freestanding_otherswift_jrGEmfMX12_17_33_7FDB3F9D78D0279543373AD342C3C331Ll9stringifyfMf1_.swift:2:9{{'deprecated()' is deprecated}}
+// expected-warning@@__swiftmacro_9MacroUser0039top_level_freestanding_otherswift_jrGEmfMX16_17_33_7FDB3F9D78D0279543373AD342C3C331Ll9stringifyfMf2_.swift:2:9{{'deprecated()' is deprecated}}
 
 #varValue
 
@@ -106,10 +106,20 @@ func testGlobalVariable() {
 #if TEST_DIAGNOSTICS
 
 // expected-note @+1 6 {{in expansion of macro 'anonymousTypes' here}}
+// expected-note@@__swiftmacro_9MacroUser0033top_level_freestandingswift_DbGHjfMX109_0_33_082AE7CFEFA6960C804A9FE7366EB5A0Ll14anonymousTypesfMf0_.swift:24:3 3{{in expansion of macro 'introduceTypeCheckingErrors' here}}
 #anonymousTypes(causeErrors: true) { "foo" }
-// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser0033top_level_freestandingswift_DbGHjfMX108_0_33_082AE7CFEFA6960C804A9FE7366EB5A0Ll14anonymousTypesfMf0_{{.*}}: warning: use of protocol 'Equatable' as a type must be written 'any Equatable'
-// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser00142___swiftmacro_9MacroUser0033top_level_freestandingswift_DbGHjfMX108_0_33_082AE7CFEFA6960C804A9FE7366EB5A0Ll14anonymousTypesfMf0_swift_DAIABdjIbfMX23_2_33_082AE7CFEFA6960C804A9FE7366EB5A0Ll27introduceTypeCheckingErrorsfMf_{{.*}}: warning: use of protocol 'Hashable' as a type must be written 'any Hashable'
+// expected-expansion@-1 {{
+//   expected-warning@23:8{{same-type requirement makes generic parameter 'T' non-generic; this is an error in the Swift 6 language mode}}
+//   expected-note@23:135{{'T' previously declared here}}
+//   expected-warning@23:149{{use of protocol 'Equatable' as a type must be written 'any Equatable'}}
 
+//   expected-warning@5:16{{use of protocol 'Equatable' as a type must be written 'any Equatable'}}
+//   expected-warning@20:16{{use of protocol 'Equatable' as a type must be written 'any Equatable'}}
+//   expected-warning@2:273{{use of protocol 'Hashable' as a type must be written 'any Hashable'}}
+
+//   expected-warning@2:10{{same-type requirement makes generic parameter 'T' non-generic; this is an error in the Swift 6 language mode}}
+//   expected-warning@2:259{{generic parameter 'T' shadows generic parameter from outer scope with the same name; this is an error in the Swift 6 language mode}}
+// }}
 // expected-note @+1 2 {{in expansion of macro 'anonymousTypes' here}}
 #anonymousTypes { () -> String in
   // expected-warning @+1 {{use of protocol 'Equatable' as a type must be written 'any Equatable'}}
@@ -165,3 +175,4 @@ func testFunctionCallWithInoutParam() {
   #functionCallWithTwoInoutParams(&a, &b)
   #functionCallWithInoutParamPlusOthers(string: "", double: 1.0, &a)
 }
+

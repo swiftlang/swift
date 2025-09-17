@@ -18,6 +18,7 @@
 #ifndef SWIFT_FRONTEND_DIAGNOSTIC_VERIFIER_H
 #define SWIFT_FRONTEND_DIAGNOSTIC_VERIFIER_H
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallString.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
@@ -133,14 +134,25 @@ private:
   bool
   verifyUnknown(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const;
 
+  std::vector<llvm::SMDiagnostic> Errors;
+
   /// verifyFile - After the file has been processed, check to see if we
   /// got all of the expected diagnostics and check to see if there were any
   /// unexpected ones.
   Result verifyFile(unsigned BufferID);
   unsigned parseExpectedDiagInfo(unsigned BufferID, StringRef MatchStart,
-                                 std::vector<llvm::SMDiagnostic> &Errors,
                                  unsigned &PrevExpectedContinuationLine,
-                                 ExpectedDiagnosticInfo &Expected) const;
+                                 ExpectedDiagnosticInfo &Expected);
+  void
+  verifyDiagnostics(std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics,
+                    unsigned BufferID);
+  void verifyRemaining(std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics,
+                       const char *FileStart);
+  void addError(const char *Loc, const Twine &message,
+                ArrayRef<llvm::SMFixIt> FixIts = {});
+
+  std::optional<LineColumnRange>
+  parseExpectedFixItRange(StringRef &Str, unsigned DiagnosticLineNo);
 
   bool checkForFixIt(const std::vector<ExpectedFixIt> &ExpectedAlts,
                      const CapturedDiagnosticInfo &D, unsigned BufferID) const;
@@ -148,6 +160,8 @@ private:
   // Render the verifier syntax for a given set of fix-its.
   std::string renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
                            unsigned BufferID, unsigned DiagnosticLineNo) const;
+
+  llvm::DenseMap<SourceLoc, unsigned> Expansions;
 
   void printRemainingDiagnostics() const;
 };
