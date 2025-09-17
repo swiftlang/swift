@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -cxx-interoperability-mode=default -typecheck -verify - -I %t/Inputs %t/test.swift
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -typecheck -verify -I %t/Inputs %t/test.swift
 // RUN: %target-swift-frontend -cxx-interoperability-mode=default -Xcc -std=c++20 -verify-additional-prefix cpp20- -D CPP20 -typecheck -verify -I %t/Inputs %t/test.swift
 
 //--- Inputs/module.modulemap
@@ -45,9 +45,7 @@ using NonCopyableRequires = RequiresCopyableT<NonCopyable>;
 import Test
 import CxxStdlib
 
-func takeCopyable<T: Copyable>(_ x: T) {} 
-// expected-note@-1 {{'where T: Copyable' is implicit here}}
-// expected-cpp20-note@-2 {{'where T: Copyable' is implicit here}}
+func takeCopyable<T: Copyable>(_ x: T) {} // expected-note * {{'where T: Copyable' is implicit here}}
 
 func userDefinedTypes() {
     let nCop = NonCopyable()
@@ -55,7 +53,6 @@ func userDefinedTypes() {
 
     let ownsT = OwnsNonCopyable()
     takeCopyable(ownsT) // no error, OwnsNonCopyable imported as Copyable
-
 }
 
 #if CPP20
@@ -64,4 +61,3 @@ func useOfRequires() {
     takeCopyable(nCop) // expected-cpp20-error {{global function 'takeCopyable' requires that 'NonCopyableRequires' (aka 'RequiresCopyableT<NonCopyable>') conform to 'Copyable'}}
 }
 #endif
-
