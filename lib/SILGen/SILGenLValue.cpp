@@ -3756,7 +3756,7 @@ RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
     // This is a 'let', so we can make guarantees.
     return RValue(*this, loc, formalRValueType,
                   C.isGuaranteedPlusZeroOk()
-                    ? Result : Result.copyUnmanaged(*this, loc));
+                    ? Result : Result.ensurePlusOne(*this, loc));
   }
 
   LValue lv = emitLValueForNonMemberVarDecl(
@@ -5582,7 +5582,7 @@ RValue SILGenFunction::emitRValueForStorageLoad(
 
     // Otherwise, bring the component up to +1 so we can reabstract it.
     result = std::move(loaded).getAsSingleValue(*this, loc)
-                              .copyUnmanaged(*this, loc);
+                              .copy(*this, loc);
   } else if (!base.getType().isAddress()) {
     // For non-address-only structs, we emit a struct_extract sequence.
     result = B.createStructExtract(loc, base, field);
@@ -5601,7 +5601,7 @@ RValue SILGenFunction::emitRValueForStorageLoad(
       // guaranteed consumer. Otherwise, since we do not have enough information
       // to know if the base's lifetime last's as long as our use of the access,
       // we can only emit at +0 for immediate clients.
-      result = result.copyUnmanaged(*this, loc);
+      result = result.copy(*this, loc);
     }
   } else {
     // Create a tiny unenforced access scope around a load from local memory. No
