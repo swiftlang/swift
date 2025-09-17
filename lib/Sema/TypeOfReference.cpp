@@ -1883,6 +1883,10 @@ ConstraintSystem::getTypeOfMemberReferencePre(
   Type baseRValueTy = baseTy->getRValueType();
   auto baseObjTy = baseRValueTy->getMetatypeInstanceType();
 
+  if (baseObjTy->is<ModuleType>()) {
+    return getTypeOfReferencePre(choice, useDC, locator, preparedOverload);
+  }
+
   Type openedType;
   Type thrownErrorType;
 
@@ -2048,19 +2052,20 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReferencePost(
     Type openedType, Type thrownErrorType) {
   auto *value = choice.getDecl();
 
-  if (isa<TypeDecl>(value)) {
-    auto type = openedType->castTo<FunctionType>()->getResult();
-    return { openedType, openedType, type, type, Type() };
-  }
-
   // Figure out the instance type used for the base.
   Type baseTy = choice.getBaseType();
   Type baseRValueTy = baseTy->getRValueType();
   Type baseObjTy = baseRValueTy->getMetatypeInstanceType();
 
-  // A reference to a module member is really unqualified, and should
-  // be handled by the caller via getTypeOfReference().
-  ASSERT(!baseObjTy->is<ModuleType>());
+  if (baseObjTy->is<ModuleType>()) {
+    return getTypeOfReferencePost(choice, useDC, locator,
+                                  openedType, thrownErrorType);
+  }
+
+  if (isa<TypeDecl>(value)) {
+    auto type = openedType->castTo<FunctionType>()->getResult();
+    return { openedType, openedType, type, type, Type() };
+  }
 
   auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseRValueTy, value);
 
@@ -2854,15 +2859,7 @@ ConstraintSystem::prepareOverloadImpl(OverloadChoice choice,
     auto openedType = getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         *this, locator, semantics, preparedOverload);
     return {openedType, Type()};
-  } else if (auto baseTy = choice.getBaseType()) {
-    // Retrieve the type of a reference to the specific declaration choice.
-    assert(!baseTy->hasTypeParameter());
-
-    // If the base is a module type, it's an unqualified reference.
-    if (baseTy->getMetatypeInstanceType()->is<ModuleType>()) {
-      return getTypeOfReferencePre(choice, useDC, locator, preparedOverload);
-    }
-
+  } else if (choice.getBaseType()) {
     return getTypeOfMemberReferencePre(choice, useDC, locator, preparedOverload);
   } else {
     return getTypeOfReferencePre(choice, useDC, locator, preparedOverload);
@@ -2926,15 +2923,9 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
     } else {
       DeclReferenceType declRefType;
 
-      if (auto baseTy = choice.getBaseType()) {
-        // If the base is a module type, it's an unqualified reference.
-        if (baseTy->getMetatypeInstanceType()->is<ModuleType>()) {
-          declRefType = getTypeOfReferencePost(
-              choice, useDC, locator, openedType, thrownErrorType);
-        } else {
-          declRefType = getTypeOfMemberReferencePost(
-              choice, useDC, locator, openedType, thrownErrorType);
-        }
+      if (choice.getBaseType()) {
+        declRefType = getTypeOfMemberReferencePost(
+            choice, useDC, locator, openedType, thrownErrorType);
       } else {
         declRefType = getTypeOfReferencePost(
             choice, useDC, locator, openedType, thrownErrorType);
