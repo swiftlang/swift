@@ -2596,7 +2596,7 @@ isInvalidPartialApplication(ConstraintSystem &cs,
 /// checking semantics, compute the type of the reference.  For now, follow
 /// the lead of \c getTypeOfMemberReference and return a pair of
 /// the full opened type and the reference's type.
-static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
+static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     ConstraintSystem &CS, ConstraintLocator *locator,
     DeclTypeCheckingSemantics semantics,
     PreparedOverloadBuilder *preparedOverload) {
@@ -2625,8 +2625,7 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         /*isFavored=*/false, preparedOverload);
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
-    auto refType = FunctionType::get({inputArg}, output, info);
-    return {refType, refType, refType, refType, Type()};
+    return FunctionType::get({inputArg}, output, info);
   }
   case DeclTypeCheckingSemantics::WithoutActuallyEscaping: {
     // Proceed with a "WithoutActuallyEscaping" operation. The body closure
@@ -2673,14 +2672,13 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
       withoutEscapingIsolation = FunctionTypeIsolation::forNonIsolatedCaller();
     }
 
-    auto refType = FunctionType::get(args, result,
-                                     FunctionType::ExtInfoBuilder()
-                                         .withNoEscape(false)
-                                         .withIsolation(withoutEscapingIsolation)
-                                         .withAsync(true)
-                                         .withThrows(true, thrownError)
-                                         .build());
-    return {refType, refType, refType, refType, Type()};
+    return FunctionType::get(args, result,
+                             FunctionType::ExtInfoBuilder()
+                                 .withNoEscape(false)
+                                 .withIsolation(withoutEscapingIsolation)
+                                 .withAsync(true)
+                                 .withThrows(true, thrownError)
+                                 .build());
   }
   case DeclTypeCheckingSemantics::OpenExistential: {
     // The body closure receives a freshly-opened archetype constrained by the
@@ -2726,14 +2724,13 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
       openExistentialIsolation = FunctionTypeIsolation::forNonIsolatedCaller();
     }
 
-    auto refType = FunctionType::get(args, result,
-                                     FunctionType::ExtInfoBuilder()
-                                         .withNoEscape(false)
-                                         .withThrows(true, thrownError)
-                                         .withIsolation(openExistentialIsolation)
-                                         .withAsync(true)
-                                         .build());
-    return {refType, refType, refType, refType, Type()};
+    return FunctionType::get(args, result,
+                             FunctionType::ExtInfoBuilder()
+                                 .withNoEscape(false)
+                                 .withThrows(true, thrownError)
+                                 .withIsolation(openExistentialIsolation)
+                                 .withAsync(true)
+                                 .build());
   }
   }
 
@@ -2811,9 +2808,11 @@ void ConstraintSystem::replayChanges(
 /// that are to be introduced into the constraint system when this choice
 /// is taken.
 ///
+/// Returns a pair consisting of the opened type, and the thrown error type.
+///
 /// FIXME: As a transitional mechanism, if preparedOverload is nullptr, this
 /// immediately performs all operations.
-DeclReferenceType
+std::pair<Type, Type>
 ConstraintSystem::prepareOverloadImpl(OverloadChoice choice,
                                       DeclContext *useDC,
                                       ConstraintLocator *locator,
@@ -2823,20 +2822,21 @@ ConstraintSystem::prepareOverloadImpl(OverloadChoice choice,
   auto semantics =
       TypeChecker::getDeclTypeCheckingSemantics(choice.getDecl());
   if (semantics != DeclTypeCheckingSemantics::Normal) {
-    return getTypeOfReferenceWithSpecialTypeCheckingSemantics(
+    auto openedType = getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         *this, locator, semantics, preparedOverload);
+    return {openedType, Type()};
   } else if (auto baseTy = choice.getBaseType()) {
     // Retrieve the type of a reference to the specific declaration choice.
     assert(!baseTy->hasTypeParameter());
 
     // If the base is a module type, it's an unqualified reference.
     if (baseTy->getMetatypeInstanceType()->is<ModuleType>()) {
-      return getTypeOfReference(choice, useDC, locator, preparedOverload);
+      return getTypeOfReferencePre(choice, useDC, locator, preparedOverload);
     }
 
-    return getTypeOfMemberReference(choice, useDC, locator, preparedOverload);
+    return getTypeOfMemberReferencePre(choice, useDC, locator, preparedOverload);
   } else {
-    return getTypeOfReference(choice, useDC, locator, preparedOverload);
+    return getTypeOfReferencePre(choice, useDC, locator, preparedOverload);
   }
 }
 
@@ -2847,7 +2847,10 @@ PreparedOverload *ConstraintSystem::prepareOverload(OverloadChoice choice,
   PreparingOverload = true;
 
   PreparedOverloadBuilder builder;
-  auto declRefType = prepareOverloadImpl(choice, useDC, locator, &builder);
+  Type openedType;
+  Type thrownErrorType;
+  std::tie(openedType, thrownErrorType) = prepareOverloadImpl(
+      choice, useDC, locator, &builder);
 
   PreparingOverload = false;
 
@@ -2855,7 +2858,7 @@ PreparedOverload *ConstraintSystem::prepareOverload(OverloadChoice choice,
   auto size = PreparedOverload::totalSizeToAlloc<PreparedOverload::Change>(count);
   auto mem = Allocator.Allocate(size, alignof(PreparedOverload));
 
-  return new (mem) PreparedOverload(declRefType, builder.Changes);
+  return new (mem) PreparedOverload(openedType, thrownErrorType, builder.Changes);
 }
 
 void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC,
@@ -2866,7 +2869,7 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
   Type adjustedOpenedType;
   Type refType;
   Type adjustedRefType;
-  Type thrownErrorTypeOnAccess;
+  Type thrownErrorType;
 
   switch (choice.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -2879,18 +2882,40 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
       replayChanges(locator, preparedOverload);
 
       openedType = preparedOverload->getOpenedType();
-      adjustedOpenedType = preparedOverload->getAdjustedOpenedType();
-      refType = preparedOverload->getReferenceType();
-      adjustedRefType = preparedOverload->getAdjustedReferenceType();
-      thrownErrorTypeOnAccess = preparedOverload->getThrownErrorTypeOnAccess();
+      thrownErrorType = preparedOverload->getThrownErrorType();
     } else {
-      auto declRefType = prepareOverloadImpl(choice, useDC, locator, nullptr);
+      std::tie(openedType, thrownErrorType) = prepareOverloadImpl(
+          choice, useDC, locator, nullptr);
+    }
+
+    auto semantics =
+        TypeChecker::getDeclTypeCheckingSemantics(choice.getDecl());
+    if (semantics != DeclTypeCheckingSemantics::Normal) {
+      adjustedOpenedType = openedType;
+      refType = openedType;
+      adjustedRefType = openedType;
+    } else {
+      DeclReferenceType declRefType;
+
+      if (auto baseTy = choice.getBaseType()) {
+        // If the base is a module type, it's an unqualified reference.
+        if (baseTy->getMetatypeInstanceType()->is<ModuleType>()) {
+          declRefType = getTypeOfReferencePost(
+              choice, useDC, locator, openedType, thrownErrorType);
+        } else {
+          declRefType = getTypeOfMemberReferencePost(
+              choice, useDC, locator, openedType, thrownErrorType);
+        }
+      } else {
+        declRefType = getTypeOfReferencePost(
+            choice, useDC, locator, openedType, thrownErrorType);
+      }
 
       openedType = declRefType.openedType;
       adjustedOpenedType = declRefType.adjustedOpenedType;
       refType = declRefType.referenceType;
       adjustedRefType = declRefType.adjustedReferenceType;
-      thrownErrorTypeOnAccess = declRefType.thrownErrorTypeOnAccess;
+      thrownErrorType = declRefType.thrownErrorTypeOnAccess;
     }
 
     break;
@@ -3081,9 +3106,9 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
 
   // If accessing this declaration could throw an error, record this as a
   // potential throw site.
-  if (thrownErrorTypeOnAccess) {
+  if (thrownErrorType) {
     recordPotentialThrowSite(
-        PotentialThrowSite::PropertyAccess, thrownErrorTypeOnAccess, locator);
+        PotentialThrowSite::PropertyAccess, thrownErrorType, locator);
   }
 
   // Note that we have resolved this overload.
