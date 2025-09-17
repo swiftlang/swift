@@ -3,6 +3,19 @@
 > [!NOTE]
 > This is in reverse chronological order, so newer entries are added to the top.
 
+## Swift (next)
+
+* Concurrency-related APIs like `Task` and string-processing-related APIs like `Regex` can now be qualified by the name
+  `Swift`, just like other standard library APIs:
+  
+  ```swift
+  Swift.Task { ... }
+  func match(_ regex: Swift.Regex<(Substring)>) { ... }
+  ```
+  
+  The old `_Concurrency` and `_StringProcessing` names are still supported for backwards compatibility, and Embedded
+  Swift projects must still explicitly `import _Concurrency` to access concurrency APIs.
+
 ## Swift 6.2
 
 * [SE-0472][]:
