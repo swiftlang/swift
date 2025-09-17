@@ -3701,8 +3701,7 @@ RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
     // If we have self, see if we are in an 'init' delegation sequence. If so,
     // call out to the special delegation init routine. Otherwise, use the
     // normal RValue emission logic.
-    if (var->getName() == getASTContext().Id_self &&
-        SelfInitDelegationState != NormalSelf) {
+    if (var->isSelfParameter() && SelfInitDelegationState != NormalSelf) {
       auto rvalue =
         emitRValueForSelfInDelegationInit(loc, formalRValueType, accessAddr, C);
       return propagateRValuePastAccess(std::move(rvalue));
