@@ -330,3 +330,30 @@ enum TestPlaceholderInEnumElement {
 
 @freestanding(expression) macro testPlaceholderMacro() -> _ = #file
 // expected-error@-1 {{type placeholder not allowed here}}
+
+// Make sure we can use decls with placeholders in their interface type.
+func usePlaceholderDecls(
+  _ fromProto: some TestPlaceholderRequirement, _ hasSubscript: TestPlaceholderSubscript
+) {
+  _ = optInt
+
+  _ = testPlaceholderComputed1
+  _ = testPlaceholderComputed2
+
+  fromProto.foo(0)
+  _ = fromProto.bar()
+  _ = fromProto.baz()
+  fromProto.qux([])
+  fromProto[0]
+
+  _ = hasSubscript[0]
+
+  _ = TestPlaceholderInEnumElement.a(0)
+  _ = TestPlaceholderInEnumElement.b([])
+
+  _ = #testPlaceholderMacro(0)
+  _ = #testPlaceholderMacro([])
+
+  _ = testPlaceholderFn1(0)
+  _ = testPlaceholderFn2()
+}
