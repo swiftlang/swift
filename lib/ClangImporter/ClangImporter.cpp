@@ -1377,8 +1377,9 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
     // The Clang modules produced by ClangImporter are always embedded in an
     // ObjectFilePCHContainer and contain -gmodules debug info.
     importer->Impl.Invocation->getCodeGenOpts().DebugTypeExtRefs = true;
-    importer->Impl.Invocation->getCodeGenOpts().setDebugInfo(
-        llvm::codegenoptions::FullDebugInfo);
+    if (importerOpts.DebuggerSupport)
+      importer->Impl.Invocation->getCodeGenOpts().setDebugInfo(
+          llvm::codegenoptions::FullDebugInfo);
 
     auto PCHContainerOperations =
       std::make_shared<clang::PCHContainerOperations>();
