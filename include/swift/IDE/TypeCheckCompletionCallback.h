@@ -86,19 +86,16 @@ struct WithSolutionSpecificVarTypesRAII {
 
   WithSolutionSpecificVarTypesRAII(
       llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes) {
-    for (auto SolutionVarType : SolutionSpecificVarTypes) {
-      if (SolutionVarType.first->hasInterfaceType()) {
-        RestoreVarTypes[SolutionVarType.first] =
-            SolutionVarType.first->getInterfaceType();
+    for (auto &[var, ty] : SolutionSpecificVarTypes) {
+      if (var->hasInterfaceType()) {
+        RestoreVarTypes[var] = var->getInterfaceType();
       } else {
-        RestoreVarTypes[SolutionVarType.first] = Type();
+        RestoreVarTypes[var] = Type();
       }
-      if (!SolutionVarType.second->hasArchetype()) {
-        setInterfaceType(const_cast<VarDecl *>(SolutionVarType.first),
-                         SolutionVarType.second);
+      if (!ty->hasArchetype() && !ty->hasUnresolvedType()) {
+        setInterfaceType(const_cast<VarDecl *>(var), ty);
       } else {
-        setInterfaceType(const_cast<VarDecl *>(SolutionVarType.first),
-                         ErrorType::get(SolutionVarType.second));
+        setInterfaceType(const_cast<VarDecl *>(var), ErrorType::get(ty));
       }
     }
   }
