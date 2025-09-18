@@ -225,7 +225,7 @@ private indirect enum GlobalInitValue {
       fatalError("cannot materialize undefined init value")
 
     case .constant(let value):
-      return cloner.cloneRecursively(globalInitValue: value)
+      return cloner.cloneRecursivelyToGlobal(value: value)
 
     case .aggregate(let fields):
       if type.isStruct {
