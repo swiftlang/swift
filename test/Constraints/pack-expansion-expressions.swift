@@ -630,7 +630,7 @@ do {
 // rdar://112029630 - incorrect variadic generic overload ranking
 do {
   func test1<T>(_: T...) {}
-  // expected-note@-1 {{found candidate with type '(T...) -> ()'}}
+  // expected-note@-1 {{found candidate with type '<T> (T...) -> ()'}}
   func test1<each T>(_: repeat each T) {}
   // expected-note@-1 {{found candidate with type '<each T> (repeat each T) -> ()'}}
 
@@ -640,13 +640,13 @@ do {
   func test2<each T>(_: repeat each T) {}
   // expected-note@-1 {{found candidate with type '<each T> (repeat each T) -> ()'}}
   func test2<each T>(vals: repeat each T) {}
-  // expected-note@-1 {{found candidate with type '<each T> (vals:repeat each T) -> ()'}}
+  // expected-note@-1 {{found candidate with type '<each T> (vals: repeat each T) -> ()'}}
 
   test2() // expected-error {{ambiguous use of 'test2'}}
 
   func test_different_requirements<A: BinaryInteger & StringProtocol>(_ a: A) {
     func test3<each T: BinaryInteger>(str: String, _: repeat each T) {}
-    // expected-note@-1 {{found candidate with type '<A, each T where A : BInaryInteger, A : StringProtocol, repeat each T : StringProtocol> (str: repeat each T) -> ()'}}
+    // expected-note@-1 {{found candidate with type '<A, each T where A : BinaryInteger, A : StringProtocol, repeat each T : BinaryInteger> (str: String, repeat each T) -> ()'}}
     func test3<each U: StringProtocol>(str: repeat each U) {}
     // expected-note@-1 {{found candidate with type '<A, each U where A : BinaryInteger, A : StringProtocol, repeat each U : StringProtocol> (str: repeat each U) -> ()'}}
 

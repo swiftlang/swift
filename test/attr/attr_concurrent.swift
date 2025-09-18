@@ -2,11 +2,11 @@
 // REQUIRES: concurrency
 
 // Concurrent attribute on a function type.
-// expected-note@+1{{found candidate with type '@Sendable (Int) -> Int'}}
+// expected-note@+1{{found candidate with type '(@Sendable (Int) -> Int) -> ()'}}
 func f(_ fn: @Sendable (Int) -> Int) { }
 
 // Okay to overload @Sendable vs. not concurrent
-// expected-note@+1{{found candidate with type '(Int) -> Int'}}
+// expected-note@+1{{found candidate with type '((Int) -> Int) -> ()'}}
 func f(_ fn: (Int) -> Int) { }
 
 // Concurrent attribute with other function attributes.

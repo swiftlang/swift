@@ -165,11 +165,11 @@ Overrides.test("contravariant return type override, protocol to protocol") {
   // FIXME: https://github.com/apple/swift/issues/43348
   // Contravariant overrides on return type don't work with protocols
   class Base {
-    // expected-note@+1 {{found this candidate}}
+    // expected-note@+1 {{found candidate with type '() -> P1'}}
     func foo() -> P1 { which = "Base.foo() -> P1"; return P1ImplS1() }
   }
   class Derived : Base {
-    // expected-note@+1 {{found this candidate}}
+    // expected-note@+1 {{found candidate with type '() -> P1x'}}
     /*FIXME: override */ func foo() -> P1x {
       which = "Derived.foo() -> P1x"; return P1xImplS1()
     }
@@ -189,11 +189,11 @@ Overrides.test("contravariant return type override, protocol to struct") {
   // FIXME: https://github.com/apple/swift/issues/43348
   // Contravariant overrides on return type don't work with protocols
   class Base {
-    // expected-note@+1 {{found this candidate}}
+    // expected-note@+1 {{found candidate with type '() -> P1'}}
     func foo() -> P1 { which = "Base.foo() -> P1"; return P1ImplS1() }
   }
   class Derived : Base {
-    // expected-note@+1 {{found this candidate}}
+    // expected-note@+1 {{found candidate with type '() -> P1ImpleS1'}}
     /*FIXME: override */ func foo() -> P1ImplS1 {
       which = "Derived.foo() -> P1ImplS1"; return P1ImplS1()
     }
@@ -307,8 +307,8 @@ Overloads.test("implicit conversion to a protocol existential is better than con
 
 Overloads.test("implicit conversion to a superclass is ambiguous with conversion to a protocol existential") {
   class Base {
-    func foo(_: C1) { which = "foo(C1)" } // expected-note {{found this candidate}}
-    func foo(_: P1) { which = "foo(P1)" } // expected-note {{found this candidate}}
+    func foo(_: C1) { which = "foo(C1)" } // expected-note {{found candidate with type '(C1) -> ()'}}
+    func foo(_: P1) { which = "foo(P1)" } // expected-note {{found candidate with type '(P1) -> ()'}}
   }
 
   Base().foo(C1());       expectEqual("foo(C1)", which)

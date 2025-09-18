@@ -2046,15 +2046,6 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
   });
 }
 
-/// Remove the 'self' type from the given type, if it's a method type.
-/*Type removeSelfParam(ValueDecl *value, Type type) {
-  if (value->hasCurriedSelf()) {
-    return type->castTo<AnyFunctionType>()->getResult();
-  }
-
-  return type;
-}*/
-
 InferredAssociatedTypesByWitnesses
 AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
                    AssociatedTypeDecl *assocType) {

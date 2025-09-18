@@ -327,10 +327,10 @@ protocol DuplicateSuper : Concrete, Concrete {}
 // Ambiguous name lookup situation
 protocol Amb : Concrete {}
 // expected-note@-1 {{'Amb' previously declared here}}
-// expected-note@-2 {{found candidate with type 'Amb'}}
+// expected-note@-2 {{found candidate 'Amb'}}
 protocol Amb : Concrete {}
 // expected-error@-1 {{invalid redeclaration of 'Amb'}}
-// expected-note@-2 {{found candidate with type 'Amb'}}
+// expected-note@-2 {{found candidate 'Amb'}}
 
 extension Amb { // expected-error {{'Amb' is ambiguous for type lookup in this context}}
   func extensionMethodUsesClassTypes() {
