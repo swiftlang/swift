@@ -890,7 +890,7 @@ def experimental_package_interface_load:
 def experimental_serialize_debug_info:
   Flag<["-"], "experimental-serialize-debug-info">,
   Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Enables seriailzation/deserialization of debug scopes">;
+  HelpText<"Enables serialization/deserialization of debug scopes">;
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
@@ -1171,7 +1171,7 @@ def ExperimentalPackageCMO : Flag<["-"], "experimental-package-cmo">,
 
 def PackageCMO : Flag<["-"], "package-cmo">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable optimization to perform defalut CMO within a package boundary">;
+  HelpText<"Enable optimization to perform default CMO within a package boundary">;
 
 def EnableDefaultCMO : Flag<["-"], "enable-default-cmo">,
   Flags<[HelpHidden, FrontendOption]>,
@@ -2322,7 +2322,7 @@ def load_resolved_plugin:
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Path to resolved plugin configuration and a comma-separated list "
            "of module names where the macro types are declared. Library path "
-           "and exectuable path can be empty if not used">,
+           "and executable path can be empty if not used">,
   MetaVarName<"<library-path>#<executable-path>#<module-names>">;
 
 def resolved_plugin_verification : Flag<["-"], "resolved-plugin-verification">,
