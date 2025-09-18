@@ -63,6 +63,18 @@ def emit_module_semantic_info_path
   : Separate<["-"], "emit-module-semantic-info-path">, MetaVarName<"<path>">,
     HelpText<"Output semantic info of current module to <path>">;
 
+def sil_output_path
+  : Separate<["-"], "sil-output-path">, MetaVarName<"<path>">,
+    Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+           SupplementaryOutput, CacheInvariant]>,
+    HelpText<"Output SIL to <path> as additional output during compilation">;
+
+def ir_output_path
+  : Separate<["-"], "ir-output-path">, MetaVarName<"<path>">,
+    Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+           SupplementaryOutput, CacheInvariant]>,
+    HelpText<"Output LLVM IR to <path> as additional output during compilation">;
+
 def diagnostic_documentation_path
   : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
   HelpText<"Path to diagnostic documentation resources">;
@@ -266,7 +278,7 @@ def serialize_dependency_scan_cache : Flag<["-"], "serialize-dependency-scan-cac
 
 def reuse_dependency_scan_cache : Flag<["-"], "load-dependency-scan-cache">,
    HelpText<"For performing a dependency scan, deserialize the scanner's internal state from a prior scan.">;
-   
+
 def validate_prior_dependency_scan_cache : Flag<["-"], "validate-prior-dependency-scan-cache">,
    HelpText<"For performing a dependency scan with a prior scanner state, validate module dependencies.">;
 
