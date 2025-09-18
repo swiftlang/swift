@@ -6560,7 +6560,8 @@ ArgumentList *ExprRewriter::coerceCallArguments(
           cs.getConstraintLocator(argLoc));
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         argExpr = openExistentialReference(
-            argExpr, knownOpened->second, callee.getDecl(), apply->getLoc());
+            argExpr, knownOpened->second, callee.getDecl(),
+            apply ? apply->getLoc() : argExpr->getLoc());
         argType = cs.getType(argExpr);
       }
     }
