@@ -3817,12 +3817,6 @@ public:
 
     printFoot();
   }
-  void visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E,
-                                         Label label) {
-    printCommon(E, "unresolvedtype_conversion_expr", label);
-    printRec(E->getSubExpr(), Label::optional("sub_expr"));
-    printFoot();
-  }
   void visitFunctionConversionExpr(FunctionConversionExpr *E, Label label) {
     printCommon(E, "function_conversion_expr", label);
     printRec(E->getSubExpr(), Label::optional("sub_expr"));

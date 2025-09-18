@@ -3268,9 +3268,6 @@ namespace {
       auto type = simplifyType(openedType);
       cs.setType(expr, type);
 
-      if (type->is<UnresolvedType>())
-        return expr;
-
       Type conformingType = type;
       if (auto baseType = conformingType->getOptionalObjectType()) {
         // The type may be optional due to a failable initializer in the
@@ -3288,14 +3285,11 @@ namespace {
 
       ConcreteDeclRef witness = conformance.getWitnessByName(constrName);
 
-      auto selectedOverload = solution.getOverloadChoiceIfAvailable(
+      auto selectedOverload = solution.getOverloadChoice(
           cs.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
 
-      if (!selectedOverload)
-        return nullptr;
-
-      auto fnType =
-          simplifyType(selectedOverload->adjustedOpenedType)->castTo<FunctionType>();
+      auto fnType = simplifyType(selectedOverload.adjustedOpenedType)
+                        ->castTo<FunctionType>();
 
       auto newArgs = coerceCallArguments(
           expr->getArgs(), fnType, witness, /*applyExpr=*/nullptr,
@@ -3461,14 +3455,7 @@ namespace {
     }
 
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
-      // If constraint solving resolved this to an UnresolvedType, then we're in
-      // an ambiguity tolerant mode used for diagnostic generation.  Just leave
-      // this as an unresolved member reference.
       Type resultTy = simplifyType(cs.getType(expr));
-      if (resultTy->hasUnresolvedType()) {
-        cs.setType(expr, resultTy);
-        return expr;
-      }
 
       // Find the selected member and base type.
       auto memberLocator = cs.getConstraintLocator(
@@ -3628,18 +3615,8 @@ namespace {
       // Determine the declaration selected for this overloaded reference.
       auto memberLocator = cs.getConstraintLocator(expr,
                                                    ConstraintLocator::Member);
-      auto selectedElt = solution.getOverloadChoiceIfAvailable(memberLocator);
+      auto selected = solution.getOverloadChoice(memberLocator);
 
-      if (!selectedElt) {
-        // If constraint solving resolved this to an UnresolvedType, then we're
-        // in an ambiguity tolerant mode used for diagnostic generation.  Just
-        // leave this as whatever type of member reference it already is.
-        Type resultTy = simplifyType(cs.getType(expr));
-        cs.setType(expr, resultTy);
-        return expr;
-      }
-
-      auto selected = *selectedElt;
       if (!selected.choice.getBaseType()) {
         // This is one of the "outer alternatives", meaning the innermost
         // methods didn't work out.
@@ -3958,39 +3935,17 @@ namespace {
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
       auto *memberLocator =
           cs.getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
-      auto overload = solution.getOverloadChoiceIfAvailable(memberLocator);
-
-      // Handles situation where there was a solution available but it didn't
-      // have a proper overload selected from subscript call, might be because
-      // solver was allowed to return free or unresolved types, which can
-      // happen while running diagnostics on one of the expressions.
-      if (!overload) {
-        auto *base = expr->getBase();
-        auto &de = ctx.Diags;
-        auto baseType = cs.getType(base);
-
-        if (auto errorType = baseType->getAs<ErrorType>()) {
-          de.diagnose(base->getLoc(), diag::cannot_subscript_base,
-                      errorType->getOriginalType())
-              .highlight(base->getSourceRange());
-        } else {
-          de.diagnose(base->getLoc(), diag::cannot_subscript_ambiguous_base)
-              .highlight(base->getSourceRange());
-        }
-
-        return nullptr;
-      }
-
-      if (overload->choice.isKeyPathDynamicMemberLookup()) {
+      auto overload = solution.getOverloadChoice(memberLocator);
+      if (overload.choice.isKeyPathDynamicMemberLookup()) {
         return buildDynamicMemberLookupRef(
             expr, expr->getBase(), expr->getArgs()->getStartLoc(), SourceLoc(),
-            *overload, memberLocator);
+            overload, memberLocator);
       }
 
       return buildSubscript(expr->getBase(), expr->getArgs(),
                             cs.getConstraintLocator(expr), memberLocator,
                             expr->isImplicit(), expr->getAccessSemantics(),
-                            *overload);
+                            overload);
     }
 
     /// "Finish" an array expression by filling in the semantic expression.
@@ -4971,7 +4926,6 @@ namespace {
     Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
       simplifyExprType(E);
       auto valueType = cs.getType(E);
-      assert(!valueType->hasUnresolvedType());
 
       // Synthesize a call to _undefined() of appropriate type.
       FuncDecl *undefinedDecl = ctx.getUndefined();
@@ -5300,13 +5254,6 @@ namespace {
       auto componentTy = baseTy;
       for (unsigned i : indices(E->getComponents())) {
         auto &origComponent = E->getMutableComponents()[i];
-        
-        // If there were unresolved types, we may end up with a null base for
-        // following components.
-        if (!componentTy) {
-          resolvedComponents.push_back(origComponent);
-          continue;
-        }
 
         auto kind = origComponent.getKind();
         auto componentLocator =
@@ -5321,15 +5268,8 @@ namespace {
         // If this is an unresolved link, make sure we resolved it.
         if (kind == KeyPathExpr::Component::Kind::UnresolvedMember ||
             kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
-          auto foundDecl = solution.getOverloadChoiceIfAvailable(calleeLoc);
-          if (!foundDecl) {
-            // If we couldn't resolve the component, leave it alone.
-            resolvedComponents.push_back(origComponent);
-            componentTy = origComponent.getComponentType();
-            continue;
-          }
-
-          isDynamicMember = foundDecl->choice.isAnyDynamicMemberLookup();
+          auto foundDecl = solution.getOverloadChoice(calleeLoc);
+          isDynamicMember = foundDecl.choice.isAnyDynamicMemberLookup();
 
           // If this was a @dynamicMemberLookup property, then we actually
           // form a subscript reference, so switch the kind.
@@ -5370,9 +5310,6 @@ namespace {
           // Chaining always forces the element to be an rvalue.
           auto objectTy =
               componentTy->getWithoutSpecifierType()->getOptionalObjectType();
-          if (componentTy->hasUnresolvedType() && !objectTy) {
-            objectTy = componentTy;
-          }
           assert(objectTy);
           
           auto loc = origComponent.getLoc();
@@ -5395,19 +5332,18 @@ namespace {
           }
           break;
         }
-        case KeyPathExpr::Component::Kind::Invalid:
-        case KeyPathExpr::Component::Kind::CodeCompletion: {
-          auto component = origComponent;
-          component.setComponentType(leafTy);
-          resolvedComponents.push_back(component);
-          break;
-        }
         case KeyPathExpr::Component::Kind::Identity: {
           auto component = origComponent;
           component.setComponentType(componentTy);
           resolvedComponents.push_back(component);
           break;
         }
+        case KeyPathExpr::Component::Kind::CodeCompletion:
+          llvm_unreachable("solver-based completion shouldn't do CSApply");
+          break;
+        case KeyPathExpr::Component::Kind::Invalid:
+          llvm_unreachable("should have been diagnosed");
+          break;
         case KeyPathExpr::Component::Kind::Member:
         case KeyPathExpr::Component::Kind::Subscript:
         case KeyPathExpr::Component::Kind::Apply:
@@ -5423,8 +5359,7 @@ namespace {
       }
 
       // Wrap a non-optional result if there was chaining involved.
-      if (didOptionalChain && componentTy &&
-          !componentTy->hasUnresolvedType() &&
+      if (didOptionalChain &&
           !componentTy->getWithoutSpecifierType()->isEqual(leafTy)) {
         auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
         resolvedComponents.push_back(component);
@@ -5553,15 +5488,9 @@ namespace {
       Type objectTy;
       if (auto lvalue = optionalTy->getAs<LValueType>()) {
         objectTy = lvalue->getObjectType()->getOptionalObjectType();
-        if (optionalTy->hasUnresolvedType() && !objectTy) {
-          objectTy = optionalTy;
-        }
         objectTy = LValueType::get(objectTy);
       } else {
         objectTy = optionalTy->getOptionalObjectType();
-        if (optionalTy->hasUnresolvedType() && !objectTy) {
-          objectTy = optionalTy;
-        }
       }
       assert(objectTy);
 
@@ -7161,12 +7090,10 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   Type openedFromInstanceType = openedFromType;
 
   // Look through metatypes.
-  while ((fromInstanceType->is<UnresolvedType>() ||
-          fromInstanceType->is<AnyMetatypeType>()) &&
+  while (fromInstanceType->is<AnyMetatypeType>() &&
          toInstanceType->is<ExistentialMetatypeType>()) {
-    if (!fromInstanceType->is<UnresolvedType>())
-      fromInstanceType = fromInstanceType->getMetatypeInstanceType();
-    if (openedFromInstanceType && !openedFromInstanceType->is<UnresolvedType>())
+    fromInstanceType = fromInstanceType->getMetatypeInstanceType();
+    if (openedFromInstanceType)
       openedFromInstanceType = openedFromInstanceType->getMetatypeInstanceType();
     toInstanceType = toInstanceType->getMetatypeInstanceType();
   }
@@ -7271,6 +7198,9 @@ Expr *ConstraintSystem::addImplicitLoadExpr(Expr *expr) {
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator) {
+  ASSERT(toType && !toType->hasError() && !toType->hasUnresolvedType() &&
+         !toType->hasTypeVariableOrPlaceholder());
+
   // Diagnose conversions to invalid function types that couldn't be performed
   // beforehand because of placeholders.
   if (auto *fnTy = toType->getAs<FunctionType>()) {
@@ -7298,9 +7228,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   if (knownRestriction != solution.ConstraintRestrictions.end()) {
     switch (knownRestriction->second) {
     case ConversionRestrictionKind::DeepEquality: {
-      if (toType->hasUnresolvedType())
-        break;
-
       // HACK: Fix problem related to Swift 4 mode (with assertions),
       // since Swift 4 mode allows passing arguments with extra parens
       // to parameters which don't expect them, it should be supported
@@ -8173,10 +8100,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
   }
 
-  // Unresolved types come up in diagnostics for lvalue and inout types.
-  if (fromType->hasUnresolvedType() || toType->hasUnresolvedType())
-    return cs.cacheType(new (ctx) UnresolvedTypeConversionExpr(expr, toType));
-
   ABORT([&](auto &out) {
     out << "Unhandled coercion:\n";
     fromType->dump(out);
@@ -8279,13 +8202,6 @@ Expr *ExprRewriter::convertLiteralInPlace(
     Identifier literalType, DeclName literalFuncName,
     ProtocolDecl *builtinProtocol, DeclName builtinLiteralFuncName,
     Diag<> brokenProtocolDiag, Diag<> brokenBuiltinProtocolDiag) {
-  // If coercing a literal to an unresolved type, we don't try to look up the
-  // witness members, just do it.
-  if (type->is<UnresolvedType>() || type->is<ErrorType>()) {
-    cs.setType(literal, type);
-    return literal;
-  }
-
   // Check whether this literal type conforms to the builtin protocol. If so,
   // initialize via the builtin protocol.
   if (builtinProtocol) {
@@ -8724,12 +8640,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // FIXME: Handle unwrapping everywhere else.
 
-  // If this is an UnresolvedType in the system, preserve it.
-  if (cs.getType(fn)->is<UnresolvedType>()) {
-    cs.setType(apply, cs.getType(fn));
-    return apply;
-  }
-
   // We have a type constructor.
   auto metaTy = cs.getType(fn)->castTo<AnyMetatypeType>();
   auto ty = metaTy->getInstanceType();
@@ -8755,22 +8665,16 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   auto *ctorLocator =
       cs.getConstraintLocator(locator, {ConstraintLocator::ApplyFunction,
                                         ConstraintLocator::ConstructorMember});
-  auto selected = solution.getOverloadChoiceIfAvailable(ctorLocator);
-  if (!selected) {
-    assert(ty->hasError() || ty->hasUnresolvedType());
-    cs.setType(apply, ty);
-    return apply;
-  }
+  auto selected = solution.getOverloadChoice(ctorLocator);
 
   assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
          ty->isExistentialType() || ty->is<ArchetypeType>());
 
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.
-  Expr *declRef = buildMemberRef(fn, /*dotLoc=*/SourceLoc(), *selected,
-                                 DeclNameLoc(fn->getEndLoc()), locator,
-                                 ctorLocator, /*implicit=*/true,
-                                 AccessSemantics::Ordinary);
+  Expr *declRef = buildMemberRef(
+      fn, /*dotLoc=*/SourceLoc(), selected, DeclNameLoc(fn->getEndLoc()),
+      locator, ctorLocator, /*implicit=*/true, AccessSemantics::Ordinary);
   if (!declRef)
     return nullptr;
 
@@ -10098,6 +10002,26 @@ ConstraintSystem::applySolution(Solution &solution,
     if (score.Data[SK_Fix] > numResolvableFixes || score.Data[SK_Hole] > 0) {
       maybeProduceFallbackDiagnostic(target.getLoc());
       return std::nullopt;
+    }
+  }
+
+  // If the score indicates the solution is valid, ensure we don't have any
+  // unresolved types.
+  {
+    auto isValidType = [&](Type ty) {
+      return !ty->hasUnresolvedType() && !ty->hasError() &&
+             !ty->hasTypeVariableOrPlaceholder();
+    };
+    for (auto &[_, type] : solution.typeBindings) {
+      ASSERT(isValidType(type) && "type binding has invalid type");
+    }
+    for (auto &[_, type] : solution.nodeTypes) {
+      ASSERT(isValidType(solution.simplifyType(type)) &&
+             "node type has invalid type");
+    }
+    for (auto &[_, type] : solution.keyPathComponentTypes) {
+      ASSERT(isValidType(solution.simplifyType(type)) &&
+             "key path type has invalid type");
     }
   }
 
