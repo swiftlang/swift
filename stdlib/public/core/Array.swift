@@ -1509,6 +1509,7 @@ extension Array {
 }
 
 extension Array {
+#if !$Embedded
   /// Implementation preserved (for ABI reasons) for:
   /// Array(unsafeUninitializedCapacity:initializingWith:)
   /// and ContiguousArray(unsafeUninitializedCapacity:initializingWith:)
@@ -1525,6 +1526,7 @@ extension Array {
       initializingWithTypedThrowsInitializer: initializer
     )
   }
+#endif
 
   /// Implementation for:
   /// Array(unsafeUninitializedCapacity:initializingWith:)

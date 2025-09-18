@@ -1334,6 +1334,7 @@ extension AnySequence {
     }
   }
 
+#if !$Embedded
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
@@ -1345,6 +1346,7 @@ extension AnySequence {
   ) throws -> [T] {
     try map(transform)
   }
+#endif
 
   @inlinable
   public __consuming func filter(
@@ -1438,6 +1440,7 @@ extension AnyCollection {
     }
   }
 
+#if !$Embedded
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
@@ -1449,6 +1452,7 @@ extension AnyCollection {
   ) throws -> [T] {
     try map(transform)
   }
+#endif
 
   @inlinable
   public __consuming func filter(
@@ -1548,6 +1552,7 @@ extension AnyBidirectionalCollection {
     }
   }
 
+#if !$Embedded
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
@@ -1559,6 +1564,7 @@ extension AnyBidirectionalCollection {
   ) throws -> [T] {
     try map(transform)
   }
+#endif
 
   @inlinable
   public __consuming func filter(
@@ -1660,6 +1666,7 @@ extension AnyRandomAccessCollection {
     }
   }
 
+#if !$Embedded
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
@@ -1671,6 +1678,7 @@ extension AnyRandomAccessCollection {
   ) throws -> [T] {
     try map(transform)
   }
+#endif
 
   @inlinable
   public __consuming func filter(

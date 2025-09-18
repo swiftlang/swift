@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -Wwarning EmbeddedRestrictions -verify-additional-prefix nonembedded-
-// RUN: %target-typecheck-verify-swift -Wwarning EmbeddedRestrictions -enable-experimental-feature Embedded -verify-additional-prefix embedded-
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Embedded -verify-additional-prefix embedded-
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
