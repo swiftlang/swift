@@ -56,6 +56,24 @@ public func basic_return3() -> Triangle {
   return Triangle()
 }
 
+// FIXME: we need copy propagation in -Onone to eliminate all these copies
+@_manualOwnership
+func reassign_with_lets() -> Triangle {
+  let x = Triangle()
+  let y = x // expected-error {{explicit 'copy' required here}}
+  let z = y // expected-error {{explicit 'copy' required here}}
+  return z // expected-error {{explicit 'copy' required here}}
+}
+
+// FIXME: we need copy propagation in -Onone to eliminate all but the copies for returning
+@_manualOwnership
+func renamed_return(_ cond: Bool, _ a: Triangle) -> Triangle {
+  let b = a // expected-error {{explicit 'copy' required here}}
+  let c = b // expected-error {{explicit 'copy' required here}}
+  if cond { return b } // expected-error {{explicit 'copy' required here}}
+  return c // expected-error {{explicit 'copy' required here}}
+}
+
 /// MARK: method calls
 
 @_manualOwnership
