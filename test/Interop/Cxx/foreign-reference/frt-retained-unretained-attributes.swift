@@ -276,3 +276,16 @@ func testDefaultOwnershipAnnotation() {
   let _ = DefaultOwnershipInheritance.createDerivedTypeNonDefaultUnretained()
   // CHECK: function_ref {{.*}}createDerivedTypeNonDefaultUnretained{{.*}} : $@convention(c) () -> DefaultOwnershipInheritance.DerivedTypeNonDefault
 }
+
+func testTemplateMemberFunctions() {
+  let refTemplate = FRTStructRef()
+
+  let ptr = refTemplate.ptr()
+  // CHECK: function_ref {{.*}}ptr{{.*}} : $@convention(cxx_method) (@in_guaranteed RefTemplate<FRTStruct>) -> @owned FRTStruct
+
+  let get = refTemplate.get()
+  // CHECK: function_ref {{.*}}get{{.*}} : $@convention(cxx_method) (@in_guaranteed RefTemplate<FRTStruct>) -> FRTStruct
+
+  let value = refTemplate.value()
+  // CHECK: function_ref {{.*}}value{{.*}} : $@convention(cxx_method) (@in_guaranteed RefTemplate<FRTStruct>) -> FRTStruct
+}
