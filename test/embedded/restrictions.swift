@@ -112,6 +112,30 @@ public func existentials(q: any AnyObject & Q, i: Int) {
 }
 
 // ---------------------------------------------------------------------------
+// Dynamic casting restrictions
+// ---------------------------------------------------------------------------
+
+class ConformsToQ: Q {
+  final func f<T>(_ value: T) { }
+  func okay() { }
+}
+
+func dynamicCasting(object: AnyObject, cq: ConformsToQ) {
+  // expected-warning@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  if let q = object as? any AnyObject & Q {
+    _ = q
+  }
+
+  // expected-warning@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  if object is any AnyObject & Q { }
+
+  // expected-warning@+1{{cannot perform a dynamic cast to a type involving protocol 'Q' in Embedded Swift}}
+  _ = object as! AnyObject & Q
+
+  _ = cq as AnyObject & Q
+}
+
+// ---------------------------------------------------------------------------
 // #if handling to suppress diagnostics for non-Embedded-only code
 // ---------------------------------------------------------------------------
 

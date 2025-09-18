@@ -19,6 +19,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
@@ -157,7 +159,7 @@ void swift::diagnoseGenericMemberOfExistentialInEmbedded(
     const DeclContext *dc, SourceLoc loc,
     Type baseType, const ValueDecl *member) {
   // If we are not supposed to diagnose Embedded Swift limitations, do nothing.
-  auto behavior = shouldDiagnoseEmbeddedLimitations(dc, loc, true);
+  auto behavior = shouldDiagnoseEmbeddedLimitations(dc, loc);
   if (!behavior)
     return;
 
@@ -167,5 +169,30 @@ void swift::diagnoseGenericMemberOfExistentialInEmbedded(
     dc->getASTContext().Diags.diagnose(loc, diag::use_generic_member_of_existential_in_embedded_swift, member,
         baseType)
       .limitBehavior(*behavior);
+  }
+}
+
+void swift::diagnoseDynamicCastInEmbedded(
+    const DeclContext *dc, const CheckedCastExpr *cast) {
+  // If we are not supposed to diagnose Embedded Swift limitations, do nothing.
+  auto behavior = shouldDiagnoseEmbeddedLimitations(dc, cast->getLoc());
+  if (!behavior)
+    return;
+
+  // We only care about casts to existential types.
+  Type toType = cast->getCastType()->lookThroughAllOptionalTypes();
+  if (!toType->isAnyExistentialType())
+    return;
+
+  ExistentialLayout layout = toType->getExistentialLayout();
+  for (auto proto : layout.getProtocols()) {
+    if (proto->isMarkerProtocol())
+      continue;
+
+    dc->getASTContext().Diags.diagnose(
+        cast->getLoc(),
+        diag::dynamic_cast_involving_protocol_in_embedded_swift, proto)
+      .limitBehaviorIf(behavior);
+    return;
   }
 }

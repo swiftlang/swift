@@ -24,6 +24,7 @@ namespace swift {
 class AbstractFunctionDecl;
 class DeclContext;
 struct DiagnosticBehavior;
+class CheckedCastExpr;
 class SourceLoc;
 class Type;
 class ValueDecl;
@@ -53,5 +54,11 @@ void diagnoseUntypedThrowsInEmbedded(const DeclContext *dc, SourceLoc throwsLoc)
 void diagnoseGenericMemberOfExistentialInEmbedded(
     const DeclContext *dc, SourceLoc loc,
     Type baseType, const ValueDecl *member);
+
+/// Diagnose dynamic casts (is/as?/as!) to a type, which is not always available
+/// in Embedded Swift.
+void diagnoseDynamicCastInEmbedded(
+    const DeclContext *dc, const CheckedCastExpr *cast);
+
 }
 #endif // SWIFT_SEMA_TYPECHECKEMBEDDED_H

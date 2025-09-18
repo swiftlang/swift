@@ -12,6 +12,15 @@ Diagnostics in the `EmbeddedRestrictions` group describe those language features
       weak var parent: Node?    // error: attribute 'weak' cannot be used in Embedded Swift
     }
 
+* Dynamic casts to a type involving a protocol are not supported, because Embedded Swift does not include runtime metadata about protocol conformances. For example:
+
+    protocol P: AnyObject { }
+    func casting(object: AnyObject) {
+      if let p = object as? P { // error: cannot perform a dynamic cast to a type involving protocol 'P' in Embedded Swift
+        // ...
+      }
+    }
+
 * Non-final generic methods in a class, which are prohibited because they cannot be specialized for every possible call site. For example:
 
     class MyGenericClass<T> {

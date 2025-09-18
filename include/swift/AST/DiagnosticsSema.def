@@ -8620,6 +8620,10 @@ GROUPED_WARNING(use_generic_member_of_existential_in_embedded_swift,
                 EmbeddedRestrictions, DefaultIgnore,
                 "cannot use generic %kind0 on a value of type %1 in Embedded Swift",
                 (const Decl *, Type))
+GROUPED_WARNING(dynamic_cast_involving_protocol_in_embedded_swift,
+                EmbeddedRestrictions, DefaultIgnore,
+                "cannot perform a dynamic cast to a type involving %kind0 in Embedded Swift",
+                (const Decl *))
 
 //===----------------------------------------------------------------------===//
 // MARK: @abi Attribute
