@@ -3,6 +3,16 @@
 // Android.
 #if __arm64__ && __LP64__ && !defined(__ANDROID__)
 
+// Use the CAS instructions where available.
+#if __ARM_FEATURE_ATOMICS
+#define USE_CAS 1
+#else
+#define USE_CAS 0
+#endif
+
+// If CAS is not available, we use load/store exclusive.
+#define USE_LDX_STX !USE_CAS
+
 // The value of 1 strong refcount in the overall refcount field.
 #define STRONG_RC_ONE (1 << 33)
 
@@ -23,6 +33,16 @@ _retainRelease_slowpath_mask:
 
 
 .text
+
+// Macro for conditionally emitting instructions. When `condition` is true, the
+// rest of the line is emitted. When false, nothing is emitted. More readable
+// shorthand for #if blocks when there's only one instruction to conditionalize.
+.macro CONDITIONAL condition line:vararg
+.if \condition
+\line
+.endif
+.endmacro
+
 
 // Save or load all of the registers that we promise to preserve that aren't
 // preserved by the standard calling convention. The macro parameter is either
@@ -86,11 +106,17 @@ _swift_releaseInlined:
 // the object.
   add   x0, x0, #8
 
-// Load the current value in the refcount field.
-  ldr   x16, [x0]
+// Load the current value in the refcount field when using CAS.
+  CONDITIONAL USE_CAS, \
+    ldr x16, [x0]
 
 // The compare-and-swap goes back to here when it needs to retry.
 Lrelease_retry:
+// Load-exclusive of the current value in the refcount field when using LLSC.
+// stxr does not update x16 like cas does, so this load must be inside the loop.
+  CONDITIONAL USE_LDX_STX, \
+    ldxr x16, [x0]
+
 // Get the slow path mask and see if the refcount field has any of those bits
 // set.
   adrp  x17, _retainRelease_slowpath_mask@PAGE
@@ -112,6 +138,7 @@ Lrelease_retry:
 // refcount field.
   sub   x17, x16, x17
 
+#if USE_CAS
 // Save a copy of the old value so we can determine if the CAS succeeded.
   mov   x1, x16
 
@@ -124,6 +151,15 @@ Lrelease_retry:
 // value is the same as the old value we had before. If we failed, retry.
   cmp   x1, x16
   b.ne  Lrelease_retry
+#elif USE_LDX_STX
+// Try to store the updated value.
+  stxr  w16, x17, [x0]
+
+// On failure, retry.
+  cbnz  w16, Lrelease_retry
+#else
+#error Either USE_CAS or USE_LDX_STX must be set.
+#endif
 
 // On success, return.
 Lrelease_ret:
@@ -143,10 +179,16 @@ _swift_retainInlined:
 // the object.
   add   x0, x0, #8
 
-// Load the current value of the refcount field.
-  ldr   x16, [x0]
+// Load the current value of the refcount field when using CAS.
+  CONDITIONAL USE_CAS, \
+    ldr   x16, [x0]
 
 Lretain_retry:
+// Load-exclusive of the current value in the refcount field when using LLSC.
+// stxr does not update x16 like cas does, so this load must be inside the loop.
+  CONDITIONAL USE_LDX_STX, \
+    ldxr x16, [x0]
+
 // Get the slow path mask and see if the refcount field has any of those bits
 // set. If it does, go to the slow path.
   adrp  x17, _retainRelease_slowpath_mask@PAGE
@@ -159,6 +201,7 @@ Lretain_retry:
   mov   x17, #STRONG_RC_ONE
   add   x17, x16, x17
 
+#if USE_CAS
 // Save the old value so we can check if the CAS succeeded.
   mov   x1, x16
 
@@ -170,6 +213,16 @@ Lretain_retry:
 // value is the same as the old value we had before. If we failed, retry.
   cmp   x1, x16
   b.ne  Lretain_retry
+
+#elif USE_LDX_STX
+// Try to store the updated value.
+  stxr  w16, x17, [x0]
+
+// On failure, retry.
+  cbnz  w16, Lretain_retry
+#else
+#error Either USE_CAS or USE_LDX_STX must be set.
+#endif
 
 // If we succeeded, return. Retain returns the object pointer being retained.
 // Readjust x0 to point to the object again instead of the refcount field of the
