@@ -2317,9 +2317,9 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
     /// Deduce associated types from dependent member types in the witness.
     bool mismatch(DependentMemberType *firstDepMember,
                   TypeBase *secondType, Type sugaredFirstType) {
-      // If the second type is an error, don't look at it further, but proceed
-      // to find other matches.
-      if (secondType->hasError())
+      // If the second type is an error or placeholder, don't look at it
+      // further, but proceed to find other matches.
+      if (secondType->hasError() || secondType->hasPlaceholder())
         return true;
 
       // If the second type is a generic parameter of the witness, the match

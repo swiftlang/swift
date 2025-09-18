@@ -7101,6 +7101,14 @@ public:
       Identifier parameterName, Expr *defaultValue,
       DefaultArgumentInitializer *defaultValueInitContext, DeclContext *dc);
 
+  SourceLoc getLocFromSource() const {
+    // If we have a name loc, use it, otherwise fallback to the start loc for
+    // e.g enum elements without parameter names.
+    if (auto nameLoc = getNameLoc())
+      return nameLoc;
+    return getStartLoc();
+  }
+
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const {
     return ArgumentNameAndFlags.getPointer();

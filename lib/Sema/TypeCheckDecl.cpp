@@ -2121,10 +2121,17 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (decl->preconcurrency())
     options |= TypeResolutionFlags::Preconcurrency;
 
+  // Placeholders are only currently allowed for FuncDecls with bodies, which
+  // we diagnose in ReturnTypePlaceholderReplacer.
+  HandlePlaceholderTypeReprFn placeholderOpener;
+  if (auto *FD = dyn_cast<FuncDecl>(decl)) {
+    if (FD->hasBody() && !FD->isBodySkipped())
+      placeholderOpener = PlaceholderType::get;
+  }
   auto *const dc = decl->getInnermostDeclContext();
   return TypeResolution::forInterface(dc, options,
                                       /*unboundTyOpener*/ nullptr,
-                                      PlaceholderType::get,
+                                      placeholderOpener,
                                       /*packElementOpener*/ nullptr)
       .resolveType(resultTyRepr);
 }
@@ -2310,9 +2317,17 @@ static Type validateParameterType(ParamDecl *decl) {
                      : TypeResolverContext::FunctionInput);
   options |= TypeResolutionFlags::Direct;
 
+  // We allow placeholders in parameter types to improve recovery since if a
+  // default argument is present we can suggest the inferred type. Avoid doing
+  // this for protocol requirements though since those can't ever have default
+  // arguments anyway.
+  HandlePlaceholderTypeReprFn placeholderOpener;
+  if (!isa<ProtocolDecl>(dc->getParent()))
+    placeholderOpener = PlaceholderType::get;
+
   const auto resolution =
       TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                   PlaceholderType::get,
+                                   placeholderOpener,
                                    /*packElementOpener*/ nullptr);
 
   if (isa<VarargTypeRepr>(nestedRepr)) {
@@ -3026,9 +3041,11 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 
 Type
 ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
-  auto error = [&ext]() {
+  auto &ctx = ext->getASTContext();
+
+  auto error = [&]() {
     ext->setInvalid();
-    return ErrorType::get(ext->getASTContext());
+    return ErrorType::get(ctx);
   };
 
   // If we didn't parse a type, fill in an error type and bail out.
@@ -3052,6 +3069,15 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   if (extendedType->hasError())
     return error();
 
+  auto &diags = ctx.Diags;
+
+  // Cannot extend types who contain placeholders.
+  if (extendedType->hasPlaceholder()) {
+    diags.diagnose(ext->getLoc(), diag::extension_placeholder)
+      .highlight(extendedRepr->getSourceRange());
+    return error();
+  }
+
   // Hack to allow extending a generic typealias.
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
@@ -3069,8 +3095,6 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     }
   }
 
-  auto &diags = ext->getASTContext().Diags;
-
   // Cannot extend a metatype.
   if (extendedType->is<AnyMetatypeType>()) {
     diags.diagnose(ext->getLoc(), diag::extension_metatype, extendedType)
@@ -3084,13 +3108,6 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
       !extendedType->is<ParameterizedProtocolType>()) {
     diags.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
          .highlight(extendedRepr->getSourceRange());
-    return error();
-  }
-
-  // Cannot extend types who contain placeholders.
-  if (extendedType->hasPlaceholder()) {
-    diags.diagnose(ext->getLoc(), diag::extension_placeholder)
-      .highlight(extendedRepr->getSourceRange());
     return error();
   }
 

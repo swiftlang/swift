@@ -117,6 +117,12 @@ private:
 #define SINGLETON_TYPE(SHORT_ID, ID) TRIVIAL_CASE(ID##Type)
 #include "swift/AST/TypeNodes.def"
 
+    bool visitPlaceholderType(CanPlaceholderType firstType, Type secondType,
+                              Type sugaredFirstType) {
+      // Placeholder types never match.
+      return mismatch(firstType.getPointer(), secondType, sugaredFirstType);
+    }
+
     bool visitUnresolvedType(CanUnresolvedType firstType, Type secondType,
                              Type sugaredFirstType) {
       // Unresolved types never match.

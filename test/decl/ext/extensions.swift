@@ -402,3 +402,5 @@ extension BitwiseCopyable {} // expected-error {{cannot extend protocol 'Bitwise
 
 @_marker protocol MyMarkerProto {}
 extension MyMarkerProto {} // OK
+
+extension _ {} // expected-error {{cannot extend a type that contains placeholders}}
