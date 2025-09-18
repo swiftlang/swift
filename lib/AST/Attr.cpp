@@ -1143,9 +1143,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
           cast<InlineAttr>(this)->getKind() == InlineKind::Always &&
           Options.SuppressInlineAlways) {
         attrName = "inline(__always)";
+        Printer.printSimpleAttr(attrName, /*needAt=*/true);
+        Printer << ' ';
+        // Add @inlinable
+        Printer.printSimpleAttr("inlinable", /*needAt=*/true);
+      } else {
+        Printer.printSimpleAttr(attrName, /*needAt=*/true);
       }
-
-      Printer.printSimpleAttr(attrName, /*needAt=*/true);
     }
     return true;
 

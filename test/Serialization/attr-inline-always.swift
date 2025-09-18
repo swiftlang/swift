@@ -7,8 +7,7 @@
 
 // BC-CHECK: <Inline_DECL_ATTR
 
-// MODULE-CHECK: @inline(always) @inlinable func inlineAlwaysFunc()
+// MODULE-CHECK: @inline(always) func inlineAlwaysFunc()
 
 @inline(always)
-@inlinable
 public func inlineAlwaysFunc() {}
