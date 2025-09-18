@@ -815,7 +815,10 @@ SIMPLE_DECL_ATTR(_noObjCBridging, NoObjCBridging,
   UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   155)
 
-// Unused '156': Used to be `_distributedThunkTarget` but completed implementation in Swift 6.0 does not need it after all
+SIMPLE_DECL_ATTR(_manualOwnership, ManualOwnership,
+  OnAbstractFunction | OnSubscript,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  156)
 
 DECL_ATTR(_allowFeatureSuppression, AllowFeatureSuppression,
   OnAnyDecl,

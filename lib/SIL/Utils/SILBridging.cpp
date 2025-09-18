@@ -186,6 +186,7 @@ static_assert((int)BridgedFunction::PerformanceConstraints::NoLocks == (int)swif
 static_assert((int)BridgedFunction::PerformanceConstraints::NoRuntime == (int)swift::PerformanceConstraints::NoRuntime);
 static_assert((int)BridgedFunction::PerformanceConstraints::NoExistentials == (int)swift::PerformanceConstraints::NoExistentials);
 static_assert((int)BridgedFunction::PerformanceConstraints::NoObjCBridging == (int)swift::PerformanceConstraints::NoObjCBridging);
+static_assert((int)BridgedFunction::PerformanceConstraints::ManualOwnership == (int)swift::PerformanceConstraints::ManualOwnership);
 
 static_assert((int)BridgedFunction::InlineStrategy::InlineDefault == (int)swift::InlineDefault);
 static_assert((int)BridgedFunction::InlineStrategy::NoInline == (int)swift::NoInline);

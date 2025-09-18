@@ -428,6 +428,8 @@ ERROR(wrong_linkage_for_serialized_function,none,
       "function has wrong linkage to be called from %0", (StringRef))
 NOTE(performance_called_from,none,
       "called from here", ())
+ERROR(manualownership_copy,none,
+      "explicit 'copy' required here", ())
 
 // 'transparent' diagnostics
 ERROR(circular_transparent,none,
