@@ -2138,6 +2138,10 @@ ERROR(attr_static_exclusive_only_mutating,none,
 ERROR(attr_static_exclusive_no_setters,none,
       "variable of type %0 must not have a setter", (Type))
 
+// @_manualOwnership
+ERROR(attr_manual_ownership_experimental,none,
+      "'@_manualOwnership' requires '-enable-experimental-feature ManualOwnership'", ())
+
 // @extractConstantsFromMembers
 ERROR(attr_extractConstantsFromMembers_experimental,none,
       "'@extractConstantsFromMembers' requires "

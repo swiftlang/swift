@@ -447,6 +447,9 @@ EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
+/// Enable the `@_manualOwnership` attribute.
+EXPERIMENTAL_FEATURE(ManualOwnership, false)
+
 /// Enable the @extractConstantsFromMembers attribute.
 EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
 

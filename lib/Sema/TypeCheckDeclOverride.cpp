@@ -1621,6 +1621,7 @@ namespace  {
     UNINTERESTING_ATTR(NoRuntime)
     UNINTERESTING_ATTR(NoExistentials)
     UNINTERESTING_ATTR(NoObjCBridging)
+    UNINTERESTING_ATTR(ManualOwnership)
     UNINTERESTING_ATTR(Inlinable)
     UNINTERESTING_ATTR(Effects)
     UNINTERESTING_ATTR(Expose)
