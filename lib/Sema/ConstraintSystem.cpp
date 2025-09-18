@@ -3508,8 +3508,10 @@ void OpenGenericTypeRequirements::operator()(GenericTypeDecl *decl,
   cs.recordOpenedTypes(locator, replacements, preparedOverload,
                        /*fixmeAllowDuplicates*/ true);
 
-  for (auto [gp, typeVar] : replacements)
-    cs.addConstraint(ConstraintKind::Bind, typeVar, subst(gp), locator);
+  for (auto [gp, typeVar] : replacements) {
+    cs.addConstraint(ConstraintKind::Bind, typeVar, subst(gp), locator,
+                     /*isFavored=*/false, preparedOverload);
+  }
 
   auto openType = [&](Type ty) -> Type {
     return cs.openType(ty, replacements, locator, preparedOverload);

@@ -303,7 +303,8 @@ public:
     // an invalid AST node.
     if (type->hasError()) {
       cs.recordFix(
-          IgnoreInvalidASTNode::create(cs, cs.getConstraintLocator(locator)));
+          IgnoreInvalidASTNode::create(cs, cs.getConstraintLocator(locator)),
+          /*impact=*/1, preparedOverload);
     }
     return type.transformRec([&](Type type) -> std::optional<Type> {
       if (!type->hasUnboundGenericType() && !type->hasPlaceholder() &&
