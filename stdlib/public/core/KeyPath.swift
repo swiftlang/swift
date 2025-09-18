@@ -2860,6 +2860,7 @@ internal func _tryToAppendKeyPaths<Result: AnyKeyPath>(
   return _openExistential(rootRoot, do: open)
 }
 
+@_unavailableInEmbedded
 internal func calculateAppendedKeyPathSize(
   _ root: AnyKeyPath,
   _ leaf: AnyKeyPath,
