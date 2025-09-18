@@ -1155,9 +1155,9 @@ internal struct ComputedArgumentSize {
   @_unavailableInEmbedded
   static var sizeMask: UInt {
 #if _pointerBitWidth(_64)
-    0x7FFF_FFFF_FFFF_FFFF
+    0x3FFF_FFFF_FFFF_FFFF
 #elseif _pointerBitWidth(_32)
-    0x1FFF_FFFF
+    0xFFF_FFFF
 #else
 #warning("Unsupported platform")
     fatalError()
@@ -1166,6 +1166,30 @@ internal struct ComputedArgumentSize {
 
   @_unavailableInEmbedded
   static var paddingMask: UInt {
+#if _pointerBitWidth(_64)
+    0x4000_0000_0000_0000
+#elseif _pointerBitWidth(_32)
+    0x3000_0000
+#else
+#warning("Unsupported platform")
+    fatalError()
+#endif
+  }
+
+  @_unavailableInEmbedded
+  static var paddingShift: UInt {
+#if _pointerBitWidth(_64)
+    62
+#elseif _pointerBitWidth(_32)
+    28
+#else
+#warning("Unsupported platform")
+    fatalError()
+#endif
+  }
+
+  @_unavailableInEmbedded
+  static var alignmentMask: UInt {
 #if _pointerBitWidth(_64)
     0x8000_0000_0000_0000
 #elseif _pointerBitWidth(_32)
@@ -1177,24 +1201,11 @@ internal struct ComputedArgumentSize {
   }
 
   @_unavailableInEmbedded
-  static var paddingShift: UInt {
+  static var alignmentShift: UInt {
 #if _pointerBitWidth(_64)
     63
 #elseif _pointerBitWidth(_32)
-    29
-#else
-#warning("Unsupported platform")
-    fatalError()
-#endif
-  }
-
-  @_unavailableInEmbedded
-  static var alignmentShift: UInt {
-#if _pointerBitWidth(_64)
-    // On 64 bit platforms, we don't need to record alignment in this structure.
-    0
-#elseif _pointerBitWidth(_32)
-    31
+    30
 #else
 #warning("Unsupported platform")
     fatalError()
@@ -1207,18 +1218,18 @@ internal struct ComputedArgumentSize {
 
   // The size of just the arguments only, ignoring padding.
   var argumentSize: Int {
-    totalSize &- padding
-  }
-
-  // The total size of the argument buffer is in the bottom 29/63 bits.
-  var totalSize: Int {
     Int(truncatingIfNeeded: value & Self.sizeMask)
   }
 
+  // The total size of the argument buffer.
+  var totalSize: Int {
+    argumentSize &+ padding
+  }
+
   // The number of padding bytes required so that the argument is properly
-  // aligned in the keypath buffer. This is in the top 2 bits for 32 bit
-  // platforms (because they need to represent 8 and 16 overaligned types) and
-  // top 1 bit for 64 bit platforms (because they only need to represent 16
+  // aligned in the keypath buffer. This is in the top 3rd and 4th bits for 32
+  // bit platforms (because they need to represent 8 and 16 overaligned types)
+  // and top 2nd bit for 64 bit platforms (because they only need to represent 16
   // alignment).
   var padding: Int {
     get {
@@ -1237,47 +1248,59 @@ internal struct ComputedArgumentSize {
   }
 
   // If the arguments have an alignment greater than the platform's pointer
-  // alignment, then this structure records the argument's alignment. On 64 bit
-  // platforms, we don't actually record this in the bit pattern anywhere, but
-  // on 32 bit platforms we use the top bit to indicate either 8 or 16 byte
-  // alignment. This returns 0 if no padding was recorded.
+  // alignment, then this structure records the argument's alignment. Even if
+  // the argument didn't require padding, we still record the argument's
+  // alignment here to prevent overallocation on keypath appends (because a leaf
+  // component may suddenly need padding or lose padding). This returns 0 if the
+  // argument had less than or equal to the platform's pointer alignment. The
+  // only valid values of this on 64 bit are 16 and 0, while on 32 it is 16, 8,
+  // and 0. Top bit on 64 bit platforms and top 2 bits on 32 bit platforms.
   @_unavailableInEmbedded
   var alignment: Int {
     get {
-      // If we didn't record a padding value, then this argument's alignment was
-      // either equal to or less than pointer value alignment.
-      guard padding != 0 else {
-        return 0
-      }
+      let mask = value & Self.alignmentMask
+      let shift = mask &>> Self.alignmentShift
 
 #if _pointerBitWidth(_64)
       // On 64 bit, the only higher alignment a type could have is 16 byte.
-      return 16
+      return shift == 1 ? 16 : 0
 #elseif _pointerBitWidth(_32)
-      // 0 = 8 byte
-      // 1 = 16 byte
-      let shift = value &>> Self.alignmentShift
-      return shift == 1 ? 16 : 8
+      switch shift {
+      case 1:
+        return 8
+      case 2:
+        return 16
+      default:
+        return 0
+      }
 #else
 #warning("Unsupported platform")
       fatalError()
 #endif
     }
 
-    // The setter should only be called when there is or will be padding.
     set {
 #if _pointerBitWidth(_64)
-      // Nop on 64 bit.
-      return
-#elseif _pointerBitWidth(_32)
       let reduced: UInt = newValue == 16 ? 1 : 0
-      let shift = reduced &<< Self.alignmentShift
-      value &= ~(1 &<< Self.alignmentShift)
-      value |= shift
+#elseif _pointerBitWidth(_32)
+      let reduced: UInt
+
+      switch newValue {
+      case 8:
+        reduced = 1
+      case 16:
+        reduced = 2
+      default:
+        reduced = 0
+      }
 #else
 #warning("Unsupported platform")
       fatalError()
 #endif
+
+      let shift = reduced &<< Self.alignmentShift
+      value &= ~Self.alignmentMask
+      value |= shift
     }
   }
 }
@@ -1919,8 +1942,7 @@ internal struct RawKeyPathComponent {
         let argumentSizePtr = unsafe buffer.baseAddress._unsafelyUnwrappedUnchecked + componentSize
 
         // If we don't need to adjust for alignment, then the current argument
-        // size is correct. Or, if the arguments themselves don't require any
-        // padding whatsoever. If alignment is 0, then the arguments had equal
+        // size is correct. If alignment is 0, then the arguments had equal
         // to or less than alignment to the platform's word alignment.
         if !adjustForAlignment || argumentSize.alignment == 0 {
           unsafe buffer.storeBytes(
@@ -1951,24 +1973,31 @@ internal struct RawKeyPathComponent {
         var argumentDest =
           unsafe buffer.baseAddress.unsafelyUnwrapped + componentSize
 
+        // If we're not adjusting for alignment, but we had existing padding, we
+        // need to mimic the exact padding.
+        if !adjustForAlignment, argumentSize.padding != 0 {
+          unsafe argumentDest += argumentSize.padding
+          componentSize &+= argumentSize.padding
+        }
+
         // We've been asked to adjust for alignment and the original argument
         // was overaligned. Check for misalignment at our current destination.
         if adjustForAlignment, argumentSize.alignment != 0 {
+          var newArgumentSize = ComputedArgumentSize(argumentSize.argumentSize)
           let argumentAlignmentMask = argumentSize.alignment &- 1
           let misaligned = Int(bitPattern: argumentDest) & argumentAlignmentMask
 
-          // Ok, this is no longer misaligned. We don't need to record any
-          // padding.
           if misaligned == 0 {
+            newArgumentSize.padding = 0
+            newArgumentSize.alignment = argumentSize.alignment
+
             unsafe argumentSizePtr.storeBytes(
-              of: argumentSize.argumentSize,
-              as: Int.self
+              of: newArgumentSize,
+              as: ComputedArgumentSize.self
             )
           } else {
             // Otherwise, this is still misaligned and we need to calculate
             // how much padding we need.
-            var newArgumentSize = ComputedArgumentSize(argumentSize.argumentSize)
-
             newArgumentSize.padding = argumentSize.alignment &- misaligned
             newArgumentSize.alignment = argumentSize.alignment
 
@@ -2831,6 +2860,100 @@ internal func _tryToAppendKeyPaths<Result: AnyKeyPath>(
   return _openExistential(rootRoot, do: open)
 }
 
+internal func calculateAppendedKeyPathSize(
+  _ root: AnyKeyPath,
+  _ leaf: AnyKeyPath,
+  _ rootBuffer: KeyPathBuffer,
+  _ leafBuffer: KeyPathBuffer
+) -> (Int, Int, Int, Int, Int, Int) {
+  var result = MemoryLayout<Int>.size // Header size (padding if needed)
+  var resultWithObjectHeaderAndKVC: Int {
+    result &+ MemoryLayout<Int>.size &* 3
+  }
+
+  // Result buffer has room for both key paths' components, plus the
+  // header, plus space for the middle type.
+  // Align up the root so that we can put the component type after it.
+  result &+= unsafe MemoryLayout<Int>._roundingUpToAlignment(rootBuffer.data.count)
+  result &+= MemoryLayout<Int>.size // Middle type
+
+  var leafIter = unsafe leafBuffer
+  while true {
+    let (component, nextType) = unsafe leafIter.next()
+    let isLast = nextType == nil
+
+    result &+= MemoryLayout<RawKeyPathComponent.Header>.size
+
+    if component.header.kind == .computed,
+       component.header.hasComputedArguments,
+       component._computedArgumentSize.alignment != 0 {
+      result = MemoryLayout<Int>._roundingUpToAlignment(result)
+
+      // Id and getter
+      result &+= MemoryLayout<Int>.size &* 2
+
+      if component.header.isComputedSettable {
+        result &+= MemoryLayout<Int>.size
+      }
+
+      // Argument size and witness table
+      result &+= MemoryLayout<Int>.size &* 2
+
+      // If we also have external arguments, we need to store the size of the
+      // local arguments so we can find the external component arguments.
+      if component.header.isComputedInstantiatedFromExternalWithArguments {
+        result &+= RawKeyPathComponent.Header.externalWithArgumentsExtraSize
+      }
+
+      let alignmentMask = component._computedArgumentSize.alignment &- 1
+      let misaligned = resultWithObjectHeaderAndKVC & alignmentMask
+
+      if misaligned != 0 {
+        result &+= component._computedArgumentSize.alignment &- misaligned
+      }
+
+      result &+= component._computedArgumentSize.argumentSize
+    } else {
+      result &+= component.bodySize
+    }
+
+    if isLast {
+      break
+    }
+  }
+
+  // Size of just our components is equal to root + middle + leaf (get rid of
+  // the header and any padding needed).
+  let componentSize = result &- MemoryLayout<Int>.size
+
+  // The first member after the components is the maxSize of the keypath.
+  result = MemoryLayout<Int>._roundingUpToAlignment(result)
+  result &+= MemoryLayout<Int>.size
+
+  // Reserve room for the appended KVC string, if both key paths are
+  // KVC-compatible.
+  let appendedKVCLength: Int, rootKVCLength: Int, leafKVCLength: Int
+
+  if root.getOffsetFromStorage() == nil, leaf.getOffsetFromStorage() == nil,
+    let rootPtr = unsafe root._kvcKeyPathStringPtr,
+    let leafPtr = unsafe leaf._kvcKeyPathStringPtr {
+    rootKVCLength = unsafe Int(_swift_stdlib_strlen(rootPtr))
+    leafKVCLength = unsafe Int(_swift_stdlib_strlen(leafPtr))
+    // root + "." + leaf
+    appendedKVCLength = rootKVCLength &+ 1 &+ leafKVCLength &+ 1
+  } else {
+    rootKVCLength = 0
+    leafKVCLength = 0
+    appendedKVCLength = 0
+  }
+
+  // Immediately following is the tail-allocated space for the KVC string.
+  let totalResultSize = MemoryLayout<Int32>._roundingUpToAlignment(result &+ appendedKVCLength)
+
+  return (result, totalResultSize, componentSize, appendedKVCLength,
+          rootKVCLength, leafKVCLength)
+}
+
 @usableFromInline
 @_unavailableInEmbedded
 internal func _appendingKeyPaths<
@@ -2855,44 +2978,19 @@ internal func _appendingKeyPaths<
         return unsafe unsafeDowncast(leaf, to: Result.self)
       }
 
-      // Reserve room for the appended KVC string, if both key paths are
-      // KVC-compatible.
-      let appendedKVCLength: Int, rootKVCLength: Int, leafKVCLength: Int
-
-      if root.getOffsetFromStorage() == nil, leaf.getOffsetFromStorage() == nil,
-        let rootPtr = unsafe root._kvcKeyPathStringPtr,
-        let leafPtr = unsafe leaf._kvcKeyPathStringPtr {
-        rootKVCLength = unsafe Int(_swift_stdlib_strlen(rootPtr))
-        leafKVCLength = unsafe Int(_swift_stdlib_strlen(leafPtr))
-        // root + "." + leaf
-        appendedKVCLength = rootKVCLength + 1 + leafKVCLength + 1
-      } else {
-        rootKVCLength = 0
-        leafKVCLength = 0
-        appendedKVCLength = 0
-      }
-
-      // Result buffer has room for both key paths' components, plus the
-      // header, plus space for the middle type.
-      // Align up the root so that we can put the component type after it.
-      let rootSize = unsafe MemoryLayout<Int>._roundingUpToAlignment(rootBuffer.data.count)
-      var resultSize = unsafe rootSize + // Root component size
-                       leafBuffer.data.count + // Leaf component size
-                       MemoryLayout<Int>.size // Middle type
-
-      // Size of just our components is equal to root + leaf + middle
-      let componentSize = resultSize
-
-      resultSize += MemoryLayout<Int>.size // Header size (padding if needed)
-
-      // The first member after the components is the maxSize of the keypath.
-      resultSize = MemoryLayout<Int>._roundingUpToAlignment(resultSize)
-      resultSize += MemoryLayout<Int>.size
-
-      // Immediately following is the tail-allocated space for the KVC string.
-      let totalResultSize = MemoryLayout<Int32>
-        ._roundingUpToAlignment(resultSize + appendedKVCLength)
-
+      let (
+        resultSize,
+        totalResultSize,
+        componentSize,
+        appendedKVCLength,
+        rootKVCLength,
+        leafKVCLength
+      ) = unsafe calculateAppendedKeyPathSize(
+        root,
+        leaf,
+        rootBuffer,
+        leafBuffer
+      )
       var kvcStringBuffer: UnsafeMutableRawPointer? = nil
 
       let result = unsafe resultTy._create(capacityInBytes: totalResultSize) {
@@ -3408,7 +3506,7 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
     default:
       unsafe offset = unsafe .inline(header.storedOffsetPayload)
     }
-    let kind: KeyPathStructOrClass = header.kind == .struct 
+    let kind: KeyPathStructOrClass = header.kind == .struct
       ? .struct : .class
     unsafe walker.visitStoredComponent(kind: kind,
                                 mutable: header.isStoredMutable,
@@ -4168,6 +4266,8 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
       )
 
       var totalSize = ComputedArgumentSize(argumentSize)
+      let typeAlignment = typeAlignMask &+ 1
+      totalSize.alignment = typeAlignment
 
       // We are known to be pointer aligned at this point in the KeyPath buffer.
       // However, for types who have an alignment large than pointers, we need
@@ -4177,9 +4277,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
       let misaligned = Int(bitPattern: argumentAddress) & typeAlignMask
 
       if misaligned != 0 {
-        let typeAlignment = typeAlignMask &+ 1
         totalSize.padding = typeAlignment &- misaligned
-        totalSize.alignment = typeAlignment
 
         // Go ahead and append the padding.
         for _ in 0 ..< totalSize.padding {
