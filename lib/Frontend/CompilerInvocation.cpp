@@ -2525,6 +2525,21 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   return false;
 }
 
+/// Determine whether the given argument list enables Embedded Swift.
+static bool isEmbedded(ArgList &args) {
+  using namespace swift::options;
+
+  for (const Arg *arg : args.filtered_reverse(
+           OPT_enable_experimental_feature, OPT_disable_experimental_feature)) {
+    if (llvm::StringRef(arg->getValue()) != "Embedded")
+      continue;
+
+    return arg->getOption().matches(OPT_enable_experimental_feature);
+  }
+
+  return false;
+}
+
 static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags) {
   // NOTE: This executes at the beginning of parsing the command line and cannot
@@ -2590,6 +2605,14 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                        arg->getOption().getPrefixedName());
       }
     }
+  }
+
+  // If the "embedded" flag was provided, enable the EmbeddedRestrictions
+  // warning group. This group is opt-in in non-Embedded builds.
+  if (isEmbedded(Args)) {
+    Opts.WarningsAsErrorsRules.push_back(
+        WarningAsErrorRule(WarningAsErrorRule::Action::Disable,
+                           "EmbeddedRestrictions"));
   }
 
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
