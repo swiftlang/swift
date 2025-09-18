@@ -203,6 +203,8 @@ void SILFunctionBuilder::addFunctionAttributes(
     F->setPerfConstraints(PerformanceConstraints::NoExistentials);
   } else if (Attrs.hasAttribute<NoObjCBridgingAttr>()) {
     F->setPerfConstraints(PerformanceConstraints::NoObjCBridging);
+  } else if (Attrs.hasAttribute<ManualOwnershipAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::ManualOwnership);
   }
 
   if (Attrs.hasAttribute<LexicalLifetimesAttr>()) {
