@@ -268,6 +268,8 @@ public:
   /// A textual reason why the compiler rejected a binary module load
   /// attempt with a given status, to be used for diagnostic output.
   static std::optional<std::string> invalidModuleReason(serialization::Status status);
+
+  virtual void addExplicitModulePath(StringRef name, std::string path) {};
 };
 
 /// Imports serialized Swift modules into an ASTContext.

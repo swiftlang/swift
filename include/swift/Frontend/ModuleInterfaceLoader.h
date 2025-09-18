@@ -181,6 +181,7 @@ public:
          const llvm::StringMap<std::string> &ExplicitSwiftModuleInputs,
          bool IgnoreSwiftSourceInfoFile);
 
+  void addExplicitModulePath(StringRef name, std::string path) override;
   /// Append visible module names to \p names. Note that names are possibly
   /// duplicated, and not guaranteed to be ordered in any way.
   void collectVisibleTopLevelModuleNames(

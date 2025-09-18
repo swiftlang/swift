@@ -121,6 +121,7 @@ public:
   /// Represents another module that has been imported as a dependency.
   class Dependency {
   public:
+    const StringRef BinaryModulePath;
     const StringRef RawPath;
     const StringRef RawSPIs;
 
@@ -139,11 +140,11 @@ public:
 
     Dependency(StringRef path, StringRef spiGroups, bool isHeader,
                ImportFilterKind importControl, bool isScoped)
-        : RawPath(path),
+        : BinaryModulePath(path.take_while([](char c) { return c; })),
+          RawPath(path.drop_front(BinaryModulePath.size() + 1)),
           RawSPIs(spiGroups),
           RawImportControl(rawControlFromKind(importControl)),
-          IsHeader(isHeader),
-          IsScoped(isScoped) {
+          IsHeader(isHeader), IsScoped(isScoped) {
       assert(llvm::popcount(static_cast<unsigned>(importControl)) == 1 &&
              "must be a particular filter option, not a bitset");
       assert(getImportControl() == importControl && "not enough bits");

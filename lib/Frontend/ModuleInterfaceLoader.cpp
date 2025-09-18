@@ -2473,6 +2473,12 @@ ExplicitSwiftModuleLoader::create(ASTContext &ctx,
   return result;
 }
 
+void ExplicitSwiftModuleLoader::addExplicitModulePath(StringRef name,
+                                                      std::string path) {
+  ExplicitSwiftModuleInputInfo entry(path, {}, {}, {});
+  Impl.ExplicitModuleMap.try_emplace(name, std::move(entry));
+}
+
 struct ExplicitCASModuleLoader::Implementation {
   ASTContext &Ctx;
   llvm::BumpPtrAllocator Allocator;
