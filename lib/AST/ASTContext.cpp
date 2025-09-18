@@ -19,8 +19,8 @@
 #include "ClangTypeConverter.h"
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
-#include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/AST/AvailabilityContextStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -67,6 +67,8 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
@@ -444,6 +446,9 @@ struct ASTContext::Implementation {
 
   /// Singleton used to cache the import graph.
   swift::namelookup::ImportCache TheImportCache;
+
+  /// The module loader used to load explicit Swift modules.
+  SerializedModuleLoaderBase *TheExplicitSwiftModuleLoader = nullptr;
 
   /// The module loader used to load Clang modules.
   ClangModuleLoader *TheClangModuleLoader = nullptr;
@@ -2159,14 +2164,23 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
     clangLoader->addSearchPath(searchPath, isFramework, isSystem);
 }
 
+void ASTContext::addExplicitModulePath(StringRef name, std::string path) {
+  if (getImpl().TheExplicitSwiftModuleLoader)
+    getImpl().TheExplicitSwiftModuleLoader->addExplicitModulePath(name, path);
+}
+
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
-                                 bool IsClang, bool IsDwarf, bool IsInterface) {
+                                 bool IsClang, bool IsDwarf, bool IsInterface,
+                                 bool IsExplicit) {
   if (IsClang && !IsDwarf && !getImpl().TheClangModuleLoader)
     getImpl().TheClangModuleLoader =
         static_cast<ClangModuleLoader *>(loader.get());
   if (IsClang && IsDwarf && !getImpl().TheDWARFModuleLoader)
     getImpl().TheDWARFModuleLoader =
         static_cast<ClangModuleLoader *>(loader.get());
+  if (IsExplicit && !getImpl().TheExplicitSwiftModuleLoader)
+    getImpl().TheExplicitSwiftModuleLoader =
+        static_cast<SerializedModuleLoaderBase *>(loader.get());
   getImpl().ModuleLoaders.push_back(std::move(loader));
 }
 
