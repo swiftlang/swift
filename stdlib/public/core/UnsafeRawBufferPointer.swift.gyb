@@ -1278,6 +1278,7 @@ public func withUnsafeMutableBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
   return try unsafe body(unsafe .init(start: pointer, count: MemoryLayout<T>.size))
 }
 
+#if !$Embedded
 /// ABI: Historical withUnsafeMutableBytes(of:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
@@ -1292,6 +1293,7 @@ func __abi_se0413_withUnsafeMutableBytes<T, Result>(
         start: $0, count: MemoryLayout<T>.size))
   }
 }
+#endif
 
 /// Invokes the given closure with a buffer pointer covering the raw bytes of
 /// the given argument.
@@ -1345,6 +1347,7 @@ public func withUnsafeBytes<T: ~Copyable, E: Error, Result: ~Copyable>(
   return try unsafe body(unsafe .init(start: address, count: MemoryLayout<T>.size))
 }
 
+#if !$Embedded
 /// ABI: Historical withUnsafeBytes(of:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
@@ -1358,6 +1361,7 @@ func __abi_se0413_withUnsafeBytes<T, Result>(
     try unsafe body(unsafe UnsafeRawBufferPointer(start: $0, count: MemoryLayout<T>.size))
   }
 }
+#endif
 
 /// Invokes the given closure with a buffer pointer covering the raw bytes of
 /// the given argument.
@@ -1409,6 +1413,7 @@ public func withUnsafeBytes<
   return try unsafe body(unsafe .init(start: addr, count: MemoryLayout<T>.size))
 }
 
+#if !$Embedded
 /// ABI: Historical withUnsafeBytes(of:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
@@ -1422,6 +1427,7 @@ func __abi_se0413_withUnsafeBytes<T, Result>(
   let buffer = unsafe UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
   return try unsafe body(buffer)
 }
+#endif
 
 /// Invokes the given closure with a buffer pointer covering the raw bytes of
 /// the given argument.
