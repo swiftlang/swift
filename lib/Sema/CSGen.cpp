@@ -2542,8 +2542,11 @@ namespace {
       Type thrownErrorTy = [&] {
         // Explicitly-specified thrown type.
         if (closure->getExplicitThrownTypeRepr()) {
-          if (Type explicitType = closure->getExplicitThrownType())
-            return explicitType;
+          if (Type explicitType = closure->getExplicitThrownType()) {
+            // The thrown type may have errors, open as placeholders if needed.
+            return CS.replaceInferableTypesWithTypeVars(explicitType,
+                                                        thrownErrorLocator);
+          }
         }
 
         // Explicitly-specified 'throws' without a type is untyped throws.

@@ -4686,6 +4686,8 @@ isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 // For now, generic function types cannot be dependent (in fact,
 // they erase dependence) or contain type variables, and they're
 // always materializable.
+// FIXME: This doesn't seem great, we should consider changing it to be opt-out
+// rather than opt-in.
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result, Type globalActor,
@@ -4694,34 +4696,25 @@ getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
-  for (auto param : params) {
-    if (param.getPlainType()->getRecursiveProperties().hasError())
-      properties |= RecursiveTypeProperties::HasError;
-    if (param.getPlainType()->getRecursiveProperties().isUnsafe())
-      properties |= RecursiveTypeProperties::IsUnsafe;
-  }
+  using Prop = RecursiveTypeProperties::Property;
+  auto mask = (unsigned)Prop::HasError | Prop::IsUnsafe | Prop::HasPlaceholder;
+
+  auto unionBits = [&](Type ty) {
+    if (!ty)
+      return;
+    auto bits = ty->getRecursiveProperties().getBits();
+    properties |= Prop(bits & mask);
+  };
+
+  for (auto param : params)
+    unionBits(param.getPlainType());
 
   if (result->getRecursiveProperties().hasDynamicSelf())
     properties |= RecursiveTypeProperties::HasDynamicSelf;
-  if (result->getRecursiveProperties().hasError())
-    properties |= RecursiveTypeProperties::HasError;
-  if (result->getRecursiveProperties().isUnsafe())
-    properties |= RecursiveTypeProperties::IsUnsafe;
-  
-  if (globalActor) {
-    if (globalActor->getRecursiveProperties().hasError())
-      properties |= RecursiveTypeProperties::HasError;
-    if (globalActor->getRecursiveProperties().isUnsafe())
-      properties |= RecursiveTypeProperties::IsUnsafe;
-  }
 
-  if (thrownError) {
-    if (thrownError->getRecursiveProperties().hasError())
-      properties |= RecursiveTypeProperties::HasError;
-    if (thrownError->getRecursiveProperties().isUnsafe())
-      properties |= RecursiveTypeProperties::IsUnsafe;
-  }
-
+  unionBits(result);
+  unionBits(globalActor);
+  unionBits(thrownError);
   return properties;
 }
 
