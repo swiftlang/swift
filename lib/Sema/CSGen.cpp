@@ -3848,6 +3848,7 @@ namespace {
 
         switch (auto kind = component.getKind()) {
         case KeyPathExpr::Component::Kind::Invalid:
+          CS.recordFix(IgnoreInvalidASTNode::create(CS, memberLocator));
           break;
         case KeyPathExpr::Component::Kind::CodeCompletion:
           // We don't know what the code completion might resolve to, so we are

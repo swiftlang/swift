@@ -481,8 +481,6 @@ namespace {
     RValue visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E,
                                               SGFContext C);
     RValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
-    RValue visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E,
-                                             SGFContext C);
     RValue visitABISafeConversionExpr(ABISafeConversionExpr *E, SGFContext C) {
       llvm_unreachable("cannot appear in rvalue");
     }
@@ -1033,12 +1031,6 @@ RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
   auto result = SGF.B.createUpcast(E, Self, SGF.getLoweredType(E->getType()));
 
   return RValue(SGF, E, result);
-}
-
-RValue RValueEmitter::
-visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E,
-                                  SGFContext C) {
-  llvm_unreachable("invalid code made its way into SILGen");
 }
 
 RValue RValueEmitter::visitOtherConstructorDeclRefExpr(

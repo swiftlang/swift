@@ -1764,7 +1764,7 @@ public:
   /// Retrieve the overload choice associated with the given
   /// locator.
   SelectedOverload getOverloadChoice(ConstraintLocator *locator) const {
-    return *getOverloadChoiceIfAvailable(locator);
+    return getOverloadChoiceIfAvailable(locator).value();
   }
 
   /// Retrieve the overload choice for the callee associated with the given
