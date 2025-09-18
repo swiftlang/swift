@@ -13,10 +13,9 @@
 // REQUIRES: swift_feature_InlineAlways
 
 // CHECK: #if compiler(>=5.3) && $InlineAlways
-// CHECK: @inline(always) @inlinable public func inlineAlwaysFunc() {}
+// CHECK: @inline(always) public func inlineAlwaysFunc() {}
 // CHECK: #else
 // CHECK: @inline(__always) @inlinable public func inlineAlwaysFunc() {}
 // CHECK: #endif
 @inline(always)
-@inlinable
 public func inlineAlwaysFunc() {}

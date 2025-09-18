@@ -590,7 +590,14 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
       // Inherit the @inlinable attribute.
       auto *clonedAttr = new (ctx) InlinableAttr(/*implicit=*/true);
       ctor->getAttrs().add(clonedAttr);
-
+    } else if (superclassCtor->getAttrs().hasAttribute<InlineAttr>() &&
+               superclassCtor->getAttrs().getAttribute<InlineAttr>()->getKind()
+               == InlineKind::Always) {
+      // Inherit the @inline(always) attribute.
+      auto *clonedAttr = new (ctx) InlineAttr(SourceLoc(), SourceRange(),
+                                              InlineKind::Always,
+                                              /*implicit=*/true);
+      ctor->getAttrs().add(clonedAttr);
     } else if (access == AccessLevel::Internal && !superclassCtor->isDynamic()){
       // Inherit the @usableFromInline attribute.
       auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);

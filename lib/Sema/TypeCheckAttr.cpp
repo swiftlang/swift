@@ -3707,19 +3707,8 @@ void AttributeChecker::visitInlineAttr(InlineAttr *attr) {
   if (attr->getKind() != InlineKind::Always)
     return;
 
-  // Check '@inline(always)' properties.
-  auto *VD = cast<ValueDecl>(D);
-  auto access = VD->getFormalAccess();
-
-  // @inline(always) requires @inlinable for package and public declarations.
-  if (access >= AccessLevel::Package &&
-      !(VD->getAttrs().hasAttribute<InlinableAttr>() ||
-        VD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())) {
-    diagnoseAndRemoveAttr(attr, diag::attr_inline_always_requires_inlinable);
-    return;
-  }
-
   // Can't have @inline(always) on @usableFromInline.
+  auto *VD = cast<ValueDecl>(D);
   if (VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::attr_inline_always_no_usable_from_inline);
     return;
