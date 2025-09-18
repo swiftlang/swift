@@ -829,8 +829,8 @@ bool RValue::isPlusOneOrTrivial(SILGenFunction &SGF) const & {
       });
 }
 
-bool RValue::isPlusZero(SILGenFunction &SGF) const & {
-  return llvm::none_of(values,
+bool RValue::isPlusZero() const & {
+  return llvm::all_of(values,
                        [](ManagedValue mv) -> bool { return mv.isPlusZero(); });
 }
 
