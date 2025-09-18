@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 //
 // Pre-checking resolves unqualified name references, type expressions and
-// operators.
+// operators. Target in this context refers to `SyntacticElementTarget`, which
+// is a unit of type-checking.
 //
 //===----------------------------------------------------------------------===//
 
@@ -1190,6 +1191,11 @@ class PreCheckTarget final : public ASTWalker {
   /// For the given statement, mark any valid SingleValueStmtExpr children.
   void markAnyValidSingleValueStmts(Stmt *S);
 
+  /// For the given single value expr that's a `for`-expression, run the
+  /// desugaring transformation. For all other kinds of single value statement
+  /// expressions do nothing.
+  void transformForExpression(SingleValueStmtExpr *E);
+
   PreCheckTarget(DeclContext *dc) : Ctx(dc->getASTContext()), DC(dc) {}
 
 public:
@@ -1386,8 +1392,10 @@ public:
     if (auto *assignment = dyn_cast<AssignExpr>(expr))
       markAcceptableDiscardExprs(assignment->getDest());
 
-    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr))
+    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
       checkSingleValueStmtExpr(SVE);
+      transformForExpression(SVE);
+    }
 
     return finish(true, expr);
   }
@@ -1697,6 +1705,49 @@ void PreCheckTarget::checkSingleValueStmtExpr(SingleValueStmtExpr *SVE) {
     break;
   case IsSingleValueStmtResult::Kind::UnhandledStmt:
     break;
+  }
+}
+
+void PreCheckTarget::transformForExpression(SingleValueStmtExpr *SVE) {
+  if (SVE->getStmtKind() != SingleValueStmtExpr::Kind::For) {
+    return;
+  }
+
+  auto *declCtx = SVE->getDeclContext();
+  auto &astCtx = declCtx->getASTContext();
+
+  auto sveLoc = SVE->getLoc();
+
+  auto *varDecl = new(astCtx) VarDecl(false, VarDecl::Introducer::Var, sveLoc,
+                                   astCtx.getIdentifier("$forExpressionResult"), declCtx);
+
+  auto namedPattern = NamedPattern::createImplicit(astCtx, varDecl);
+
+  auto *initFunc = new(astCtx) UnresolvedMemberExpr(sveLoc, DeclNameLoc(), DeclNameRef(DeclBaseName::createConstructor()), true);
+  auto *callExpr = CallExpr::createImplicitEmpty(astCtx, initFunc);
+  auto *initExpr = new(astCtx) UnresolvedMemberChainResultExpr(callExpr, initFunc);
+
+  auto *bindingDecl = PatternBindingDecl::createImplicit(astCtx, StaticSpellingKind::None, namedPattern, initExpr, declCtx);
+
+  SVE->setForExpressionPreamble({ varDecl, bindingDecl });
+
+  // For-expressions always have a single branch.
+  SmallVector<Stmt *, 1> scratch;
+  for (auto *branch : SVE->getBranches(scratch)) {
+    auto *BS = dyn_cast<BraceStmt>(branch);
+    if (!BS)
+      continue;
+
+    auto &result = BS->getElements().back();
+    if (auto stmt = result.dyn_cast<Stmt *>()) {
+      if (auto *then = dyn_cast<ThenStmt>(stmt)) {
+        auto *declRefExpr = new(astCtx) DeclRefExpr(varDecl, DeclNameLoc(), true);
+        auto *dotExpr = new(astCtx) UnresolvedDotExpr(declRefExpr, sveLoc, DeclNameRef(DeclBaseName(astCtx.Id_append)), DeclNameLoc(), true);
+        auto *argumentList = ArgumentList::createImplicit(astCtx, { Argument::unlabeled(then->getResult()) });
+        auto *callExpr = CallExpr::createImplicit(astCtx, dotExpr, argumentList);
+        result = callExpr;
+      }
+    }
   }
 }
 
