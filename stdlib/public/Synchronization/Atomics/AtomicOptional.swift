@@ -42,7 +42,7 @@ public protocol AtomicOptionalRepresentable: AtomicRepresentable {
   ///   representation used in atomic operations on `Optional` back into the
   ///   logical type for normal use, `Self?`.
   ///
-  /// - Parameter storage: The optional storage representation for `Self?`
+  /// - Parameter representation: The optional storage representation for `Self?`
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   static func decodeAtomicOptionalRepresentation(
@@ -101,7 +101,7 @@ where
   ///   representation used in atomic operations on `Optional` back into the
   ///   logical type for normal use, `Self?`.
   ///
-  /// - Parameter storage: The optional storage representation for `Self?`
+  /// - Parameter representation: The optional storage representation for `Self?`
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
@@ -153,7 +153,7 @@ extension Optional: AtomicRepresentable where Wrapped: AtomicOptionalRepresentab
   ///   representation used in atomic operations back into the logical type for
   ///   normal use, `Self`.
   ///
-  /// - Parameter storage: The storage representation for `Self` that's used
+  /// - Parameter representation: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
