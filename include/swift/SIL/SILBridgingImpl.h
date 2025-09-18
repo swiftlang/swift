@@ -67,6 +67,14 @@ swift::SILResultInfo BridgedResultInfo::unbridged() const {
                               static_cast<swift::ResultConvention>(convention),
                               swift::SILResultInfo::Options(options));
 }
+
+BridgedCanType BridgedResultInfo::getReturnValueType(BridgedFunction f) const {
+  const auto function = f.getFunction();
+  return BridgedCanType(unbridged().getReturnValueType(
+      function->getModule(), function->getLoweredFunctionType().getPointer(),
+      function->getTypeExpansionContext()));
+}
+
 SwiftInt BridgedResultInfoArray::count() const {
   return resultInfoArray.unbridged<swift::SILResultInfo>().size();
 }
@@ -140,6 +148,10 @@ BridgedParameterInfo::BridgedParameterInfo(swift::SILParameterInfo parameterInfo
 swift::SILParameterInfo BridgedParameterInfo::unbridged() const {
   return swift::SILParameterInfo(type.unbridged(), getParameterConvention(convention),
                                  swift::SILParameterInfo::Options(options));
+}
+
+BridgedCanType BridgedParameterInfo::getArgumentType(BridgedFunction f) const {
+  return {unbridged().getArgumentType(f.getFunction())};
 }
 
 SwiftInt BridgedParameterInfoArray::count() const {
