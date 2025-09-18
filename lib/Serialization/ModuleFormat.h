@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 961; // borrow/mutate accessors
+const uint16_t SWIFTMODULE_VERSION_MINOR = 962; // Module import paths
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1134,9 +1134,9 @@ namespace input_block {
     ImportControlField, // import kind
     BCFixed<1>,         // scoped?
     BCFixed<1>,         // has spis?
-    BCBlob // module name, with submodule path pieces separated by \0s.
-           // If the 'scoped' flag is set, the final path piece is an access
-           // path within the module.
+    BCBlob // module file, module name, with submodule path pieces separated by
+           // \0s.  If the 'scoped' flag is set, the final path piece is an
+           // access path within the module.
   >;
 
   using ImportedModuleLayoutSPI = BCRecordLayout<

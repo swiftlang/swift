@@ -45,7 +45,7 @@ enum class ModuleLoadingMode {
   PreferInterface,
   PreferSerialized,
   OnlyInterface,
-  OnlySerialized
+  OnlySerialized,
 };
 
 /// A single module search path that can come from different sources, e.g.

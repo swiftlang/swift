@@ -210,6 +210,12 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     auto importPath = builder.copyTo(ctx);
     auto modulePath = importPath.getModulePath(dependency.isScoped());
     auto accessPath = importPath.getAccessPath(dependency.isScoped());
+    // Doesn't work because this is only consulted at loader creation time.
+    //ctx.SearchPathOpts.ExplicitSwiftModuleInputs.insert(
+    //  {modulePath.front().Item.str(), dependency.Core.BinaryModulePath.str()});
+    if (!dependency.Core.BinaryModulePath.empty())
+      ctx.addExplicitModulePath(modulePath.front().Item.str(),
+                                dependency.Core.BinaryModulePath.str());
 
     auto module = getModule(modulePath, /*allowLoading*/true);
     if (!module || module->failedToLoad()) {
