@@ -72,6 +72,7 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Passes/StandardInstrumentations.h"
+#include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Remarks/Remark.h"
 #include "llvm/Remarks/RemarkStreamer.h"
 #include "llvm/Support/CommandLine.h"
@@ -214,8 +215,57 @@ static void align(llvm::Module *Module) {
     }
 }
 
+static std::unique_ptr<llvm::IndexedInstrProfReader>
+getProfileReader(const Twine &ProfileName, llvm::vfs::FileSystem &FS,
+                 DiagnosticEngine &Diags) {
+  auto ReaderOrErr = llvm::IndexedInstrProfReader::create(ProfileName, FS);
+  if (auto E = ReaderOrErr.takeError()) {
+    llvm::handleAllErrors(std::move(E), [&](const llvm::ErrorInfoBase &EI) {
+      Diags.diagnose(SourceLoc(), diag::ir_profile_read_failed,
+                     ProfileName.str(), EI.message());
+    });
+    return nullptr;
+  }
+  return std::move(*ReaderOrErr);
+}
+
+static std::optional<PGOOptions> buildIRUseOptions(const IRGenOptions &Opts,
+                                                   DiagnosticEngine &Diags) {
+  if (Opts.UseIRProfile.empty())
+    return std::nullopt;
+
+  auto FS = llvm::vfs::getRealFileSystem();
+  std::unique_ptr<llvm::IndexedInstrProfReader> Reader =
+      getProfileReader(Opts.UseIRProfile.c_str(), *FS, Diags);
+  if (!Reader)
+    return std::nullopt;
+
+  // Currently memprof profiles are only added at the IR level. Mark the
+  // profile type as IR in that case as well and the subsequent matching
+  // needs to detect which is available (might be one or both).
+  const bool IsIR = Reader->isIRLevelProfile() || Reader->hasMemoryProfile();
+  if (!IsIR) {
+    Diags.diagnose(SourceLoc(), diag::ir_profile_invalid,
+                   Opts.UseIRProfile.c_str());
+    return std::nullopt;
+  }
+
+  const bool IsCS = Reader->hasCSIRLevelProfile();
+  return PGOOptions(
+      /*ProfileFile=*/Opts.UseIRProfile,
+      /*CSProfileGenFile=*/"",
+      /*ProfileRemappingFile=*/"",
+      /*MemoryProfile=*/"",
+      /*FS=*/FS,
+      /*Action=*/PGOOptions::IRUse,
+      /*CSPGOAction=*/IsCS ? PGOOptions::CSIRUse : PGOOptions::NoCSAction,
+      /*ColdType=*/PGOOptions::ColdFuncOpt::Default,
+      /*DebugInfoForProfiling=*/Opts.DebugInfoForProfiling);
+}
+
 static void populatePGOOptions(std::optional<PGOOptions> &Out,
-                               const IRGenOptions &Opts) {
+                               const IRGenOptions &Opts,
+                               DiagnosticEngine &Diags) {
   if (!Opts.UseSampleProfile.empty()) {
     Out = PGOOptions(
       /*ProfileFile=*/ Opts.UseSampleProfile,
@@ -234,31 +284,34 @@ static void populatePGOOptions(std::optional<PGOOptions> &Out,
   if (Opts.EnableCSIRProfileGen) {
     const bool hasUse = !Opts.UseIRProfile.empty();
     Out = PGOOptions(
-      /*ProfileFile=*/ Opts.UseIRProfile,
-      /*CSProfileGenFile=*/ Opts.InstrProfileOutput,
-      /*ProfileRemappingFile=*/ "",
-      /*MemoryProfile=*/ "",
-      /*FS=*/ llvm::vfs::getRealFileSystem(),
-      /*Action=*/ hasUse ? PGOOptions::IRUse : PGOOptions::NoAction,
-      /*CSPGOAction=*/ PGOOptions::CSIRInstr,
-      /*ColdType=*/ PGOOptions::ColdFuncOpt::Default,
-      /*DebugInfoForProfiling=*/ Opts.DebugInfoForProfiling
-    );
+        /*ProfileFile=*/Opts.UseIRProfile,
+        /*CSProfileGenFile=*/Opts.InstrProfileOutput,
+        /*ProfileRemappingFile=*/"",
+        /*MemoryProfile=*/"",
+        /*FS=*/llvm::vfs::getRealFileSystem(),
+        /*Action=*/hasUse ? PGOOptions::IRUse : PGOOptions::NoAction,
+        /*CSPGOAction=*/PGOOptions::CSIRInstr,
+        /*ColdType=*/PGOOptions::ColdFuncOpt::Default,
+        /*DebugInfoForProfiling=*/Opts.DebugInfoForProfiling);
     return;
   }
 
   if (Opts.EnableIRProfileGen) {
     Out = PGOOptions(
-      /*ProfileFile=*/ Opts.InstrProfileOutput,
-      /*CSProfileGenFile=*/ "",
-      /*ProfileRemappingFile=*/ "",
-      /*MemoryProfile=*/ "",
-      /*FS=*/ llvm::vfs::getRealFileSystem(),
-      /*Action=*/ PGOOptions::IRInstr,
-      /*CSPGOAction=*/ PGOOptions::NoCSAction,
-      /*ColdType=*/ PGOOptions::ColdFuncOpt::Default,
-      /*DebugInfoForProfiling=*/ Opts.DebugInfoForProfiling
-    );
+        /*ProfileFile=*/Opts.InstrProfileOutput,
+        /*CSProfileGenFile=*/"",
+        /*ProfileRemappingFile=*/"",
+        /*MemoryProfile=*/"",
+        /*FS=*/llvm::vfs::getRealFileSystem(),
+        /*Action=*/PGOOptions::IRInstr,
+        /*CSPGOAction=*/PGOOptions::NoCSAction,
+        /*ColdType=*/PGOOptions::ColdFuncOpt::Default,
+        /*DebugInfoForProfiling=*/Opts.DebugInfoForProfiling);
+    return;
+  }
+
+  if (auto IRUseOptions = buildIRUseOptions(Opts, Diags)) {
+    Out = *IRUseOptions;
     return;
   }
 
@@ -297,7 +350,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                                      llvm::TargetMachine *TargetMachine,
                                      llvm::raw_pwrite_stream *out) {
   std::optional<PGOOptions> PGOOpt;
-  populatePGOOptions(PGOOpt, Opts);
+  populatePGOOptions(PGOOpt, Opts, Diags);
 
   PipelineTuningOptions PTO;
 
