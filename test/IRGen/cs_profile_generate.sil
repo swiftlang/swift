@@ -1,4 +1,9 @@
-// RUN: %target-swift-frontend -cs-profile-generate -O -emit-ir %s | %FileCheck %s
+// Without directory
+// RUN: %target-swift-frontend -O -cs-profile-generate -emit-ir %s | %FileCheck %s
+
+// With directory
+// RUN: %empty-directory(%t.dir)
+// RUN: %target-swift-frontend -O -cs-profile-generate=%t.dir -emit-ir %s | %FileCheck %s
 
 sil_stage canonical
 
