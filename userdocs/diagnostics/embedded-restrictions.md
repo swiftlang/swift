@@ -48,6 +48,11 @@ Diagnostics in the `EmbeddedRestrictions` group describe those language features
       value.doSomething(on: i) // warning: cannot use generic instance method 'doSomething(on:)' on a value of type 'any P' in Embedded Swift
     }
 
+* Use of untyped throws, which depends on `any Error` and is not available in Embedded Swift. Use typed throws instead:
+
+    func mayFail() throws { } // error: untyped throws is not available in Embedded Swift; add a thrown error type with '(type)'
+    func mayFail() throws(MyError) // okay
+
 ## See Also
 
 - [A Vision for Embedded Swift](https://github.com/swiftlang/swift-evolution/blob/main/visions/embedded-swift.md)
