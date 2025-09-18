@@ -2515,6 +2515,16 @@ RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,
 
 RValue RValueEmitter::visitSingleValueStmtExpr(SingleValueStmtExpr *E,
                                                SGFContext C) {
+  if (E->getStmtKind() == SingleValueStmtExpr::Kind::For) {
+    auto *decl = E->getForExpressionPreamble()->ForAccumulatorDecl;
+    auto *binding = E->getForExpressionPreamble()->ForAccumulatorBinding;
+    SGF.visit(decl);
+    SGF.visit(binding);
+    SGF.emitStmt(E->getStmt());
+
+    return SGF.emitRValueForDecl(E, ConcreteDeclRef(decl), E->getType(), AccessSemantics::Ordinary);
+  }
+
   auto emitStmt = [&]() {
     SGF.emitStmt(E->getStmt());
 
