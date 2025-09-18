@@ -25,7 +25,9 @@ class AbstractFunctionDecl;
 class DeclContext;
 struct DiagnosticBehavior;
 class SourceLoc;
-  
+class Type;
+class ValueDecl;
+
 /// Whether we should diagnose language-level limitations of Embedded Swift
 /// at the given source location, and how.
 ///
@@ -46,5 +48,10 @@ void checkEmbeddedRestrictionsInSignature(const AbstractFunctionDecl *func);
 /// Diagnose a declaration of typed throws at the given location.
 void diagnoseUntypedThrowsInEmbedded(const DeclContext *dc, SourceLoc throwsLoc);
 
+/// Diagnose references to a generic member via an existential type, which are
+/// not available in Embedded Swift.
+void diagnoseGenericMemberOfExistentialInEmbedded(
+    const DeclContext *dc, SourceLoc loc,
+    Type baseType, const ValueDecl *member);
 }
 #endif // SWIFT_SEMA_TYPECHECKEMBEDDED_H

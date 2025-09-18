@@ -86,6 +86,35 @@ class MyGenericClass<T> {
 }
 
 // ---------------------------------------------------------------------------
+// generic functions on existentials
+// ---------------------------------------------------------------------------
+
+public protocol Q {
+  func f<T>(_ value: T)
+  func okay()
+}
+
+extension Q {
+  public func g<T>(_ value: T) {
+    f(value)
+  }
+
+  public mutating func h<T>(_ value: T) {
+    f(value)
+  }
+}
+
+public func existentials(q: any AnyObject & Q, i: Int) {
+  q.okay()
+  q.f(i) // expected-warning{{cannot use generic instance method 'f' on a value of type 'any AnyObject & Q' in Embedded Swift}}
+
+  q.g(i) // expected-warning{{cannot use generic instance method 'g' on a value of type 'any AnyObject & Q' in Embedded Swift}}
+
+  var qm = q
+  qm.h(i) // expected-warning{{cannot use generic instance method 'h' on a value of type 'any AnyObject & Q' in Embedded Swift}}
+}
+
+// ---------------------------------------------------------------------------
 // #if handling to suppress diagnostics for non-Embedded-only code
 // ---------------------------------------------------------------------------
 

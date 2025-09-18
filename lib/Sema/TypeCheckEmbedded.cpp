@@ -152,3 +152,20 @@ void swift::diagnoseUntypedThrowsInEmbedded(
     .limitBehavior(*behavior)
     .fixItInsertAfter(throwsLoc, "(<#thrown error type#>)");
 }
+
+void swift::diagnoseGenericMemberOfExistentialInEmbedded(
+    const DeclContext *dc, SourceLoc loc,
+    Type baseType, const ValueDecl *member) {
+  // If we are not supposed to diagnose Embedded Swift limitations, do nothing.
+  auto behavior = shouldDiagnoseEmbeddedLimitations(dc, loc, true);
+  if (!behavior)
+    return;
+
+  if (isABIMoreGenericThan(
+          member->getInnermostDeclContext()->getGenericSignatureOfContext(),
+          member->getDeclContext()->getGenericSignatureOfContext())) {
+    dc->getASTContext().Diags.diagnose(loc, diag::use_generic_member_of_existential_in_embedded_swift, member,
+        baseType)
+      .limitBehavior(*behavior);
+  }
+}
