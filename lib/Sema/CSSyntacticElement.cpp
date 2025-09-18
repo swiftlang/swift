@@ -1503,18 +1503,19 @@ bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
     Type elementType = DependentMemberType::get(resultType, sequenceProtocol->getAssociatedType(ctx.Id_Element));
 
     addConstraint(ConstraintKind::Bind, elementTypeVar, elementType, loc);
-    addConstraint(ConstraintKind::Bind, resultType, ArraySliceType::get(elementTypeVar), loc);
+    addConstraint(ConstraintKind::Defaultable, resultType, ArraySliceType::get(elementTypeVar), loc);
 
     auto *binding = E->getForExpressionPreamble()->ForAccumulatorBinding;
 
     auto *initializer = binding->getInit(0);
     auto target = SyntacticElementTarget::forInitialization(initializer, Type(), binding, 0, false);
+    setTargetFor({ binding, 0 }, target);
 
     if (generateConstraints(target)) {
       return true;
     }
 
-    addConstraint(ConstraintKind::Conversion, getType(initializer), resultType, loc);
+    addConstraint(ConstraintKind::Bind, getType(initializer), resultType, loc);
   }
 
   // Propagate the implied result kind from the if/switch expression itself
@@ -2691,6 +2692,18 @@ bool ConstraintSystem::applySolutionToSingleValueStmt(
   auto *stmt = application.apply();
   if (!stmt || application.hadError)
     return true;
+
+  if (SVE->getStmtKind() == SingleValueStmtExpr::Kind::For) {
+    auto *binding = SVE->getForExpressionPreamble()->ForAccumulatorBinding;
+    auto target = getTargetFor({ binding, 0 }).value();
+
+    auto newTarget = rewriter.rewriteTarget(target);
+    if (!newTarget) {
+      return true;
+    }
+
+    binding->setInit(0, newTarget->getAsExpr());
+  }
 
   SVE->setStmt(stmt);
   return false;
