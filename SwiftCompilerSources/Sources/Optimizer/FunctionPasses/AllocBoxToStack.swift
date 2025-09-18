@@ -261,7 +261,7 @@ private struct FunctionSpecializations {
 
     switch apply {
     case let applyInst as ApplyInst:
-      let newApply = builder.createApply(function: specializedCallee, applyInst.substitutionMap, arguments: newArgs)
+      let newApply = builder.createApply(function: specializedCallee, applyInst.substitutionMap, arguments: newArgs, isNonThrowing: applyInst.isNonThrowing)
       applyInst.replace(with: newApply, context)
     case let partialAp as PartialApplyInst:
       let newApply = builder.createPartialApply(function: specializedCallee, substitutionMap:
