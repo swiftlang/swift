@@ -6999,7 +6999,7 @@ Type ExplicitCaughtTypeRequest::evaluate(
 
     return TypeResolution::forInterface(func, options,
                                         /*unboundTyOpener*/ nullptr,
-                                        PlaceholderType::get,
+                                        /*placeholderOpener*/ nullptr,
                                         /*packElementOpener*/ nullptr)
         .resolveType(thrownTypeRepr);
   }
@@ -7011,7 +7011,7 @@ Type ExplicitCaughtTypeRequest::evaluate(
       return TypeResolution::resolveContextualType(
                thrownTypeRepr, closure,
                TypeResolutionOptions(TypeResolverContext::None),
-               /*unboundTyOpener*/ nullptr, PlaceholderType::get,
+               /*unboundTyOpener*/ nullptr, /*placeholderOpener*/ nullptr,
                /*packElementOpener*/ nullptr);
     }
 
@@ -7045,7 +7045,7 @@ Type ExplicitCaughtTypeRequest::evaluate(
     return TypeResolution::resolveContextualType(
         typeRepr, doCatch->getDeclContext(),
         TypeResolutionOptions(TypeResolverContext::None),
-        /*unboundTyOpener*/ nullptr, PlaceholderType::get,
+        /*unboundTyOpener*/ nullptr, /*placeholderOpener*/ nullptr,
         /*packElementOpener*/ nullptr);
   }
 

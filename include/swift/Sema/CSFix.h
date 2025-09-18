@@ -362,6 +362,9 @@ enum class FixKind : uint8_t {
   /// resolved.
   SpecifyTypeForPlaceholder,
 
+  /// Ignore an invalid placeholder in a decl's interface type.
+  IgnoreInvalidPlaceholderInDeclRef,
+
   /// Allow Swift -> C pointer conversion in an argument position
   /// of a Swift function.
   AllowSwiftToCPointerConversion,
@@ -3188,6 +3191,30 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::SpecifyTypeForPlaceholder;
+  }
+};
+
+class IgnoreInvalidPlaceholderInDeclRef final : public ConstraintFix {
+  IgnoreInvalidPlaceholderInDeclRef(ConstraintSystem &cs,
+                                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreInvalidPlaceholderInDeclRef, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore invalid placeholder in decl ref";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreInvalidPlaceholderInDeclRef *create(ConstraintSystem &cs,
+                                                   ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreInvalidPlaceholderInDeclRef;
   }
 };
 

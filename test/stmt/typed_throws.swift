@@ -12,6 +12,8 @@ case dogAteIt
 case forgot
 }
 
+struct GenericError<T>: Error {}
+
 func processMyError(_: MyError) { }
 
 func doSomething() throws(MyError) { }
@@ -417,4 +419,13 @@ func testSequenceExpr() async throws(Never) {
 
   try true ? 0 : try! getInt() ~~~ getInt()
   // expected-error@-1 {{'try!' following conditional operator does not cover everything to its right}}
+}
+
+func testPlaceholder() {
+  do throws(_) {} catch {}
+  // expected-error@-1 {{type placeholder not allowed here}}
+  // expected-warning@-2 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+  do throws(GenericError<_>) {} catch {}
+  // expected-error@-1 {{type placeholder not allowed here}}
+  // expected-warning@-2 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
 }

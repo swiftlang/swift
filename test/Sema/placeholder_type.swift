@@ -291,3 +291,69 @@ do {
     _ = X(content: <#T##() -> _#>) // expected-error {{editor placeholder in source file}}
   }
 }
+
+// Make sure we reject placeholders here.
+protocol TestPlaceholderRequirement {
+  func foo(_:_) // expected-error {{type placeholder not allowed here}}
+  func bar() -> _ // expected-error {{type placeholder not allowed here}}
+  func baz() -> [_] // expected-error {{type placeholder not allowed here}}
+  func qux(_: [_]) // expected-error {{type placeholder not allowed here}}
+
+  subscript(_: _) -> Void { get } // expected-error {{type placeholder not allowed here}}
+  subscript() -> _ { get } // expected-error {{type placeholder not allowed here}}
+}
+
+func testPlaceholderFn1(_:_) {} // expected-error {{type placeholder may not appear in top-level parameter}}
+func testPlaceholderFn2() -> _ {} // expected-error {{type placeholder may not appear in function return type}}
+
+var testPlaceholderComputed1: _ { 0 } // expected-error {{type placeholder not allowed here}}
+var testPlaceholderComputed2: [_] { [0] } // expected-error {{type placeholder not allowed here}}
+
+struct TestPlaceholderSubscript {
+  // FIXME: Shouldn't diagnose twice.
+  subscript(_: _) -> Void { () } // expected-error 2{{type placeholder may not appear in top-level parameter}}
+  subscript(_: [_]) -> Void { () } // expected-error 2{{type placeholder may not appear in top-level parameter}}
+  subscript() -> _ { () } // expected-error {{type placeholder not allowed here}}
+  subscript() -> [_] { [0] } // expected-error {{type placeholder not allowed here}}
+}
+
+enum TestPlaceholderInEnumElement {
+  case a(_) // expected-error {{type placeholder may not appear in top-level parameter}}
+  case b([_]) // expected-error {{type placeholder may not appear in top-level parameter}}
+}
+
+@freestanding(expression) macro testPlaceholderMacro(_ x: _) -> String = #file
+// expected-error@-1 {{type placeholder may not appear in top-level parameter}}
+
+@freestanding(expression) macro testPlaceholderMacro(_ x: [_]) -> String = #file
+// expected-error@-1 {{type placeholder may not appear in top-level parameter}}
+
+@freestanding(expression) macro testPlaceholderMacro() -> _ = #file
+// expected-error@-1 {{type placeholder not allowed here}}
+
+// Make sure we can use decls with placeholders in their interface type.
+func usePlaceholderDecls(
+  _ fromProto: some TestPlaceholderRequirement, _ hasSubscript: TestPlaceholderSubscript
+) {
+  _ = optInt
+
+  _ = testPlaceholderComputed1
+  _ = testPlaceholderComputed2
+
+  fromProto.foo(0)
+  _ = fromProto.bar()
+  _ = fromProto.baz()
+  fromProto.qux([])
+  fromProto[0]
+
+  _ = hasSubscript[0]
+
+  _ = TestPlaceholderInEnumElement.a(0)
+  _ = TestPlaceholderInEnumElement.b([])
+
+  _ = #testPlaceholderMacro(0)
+  _ = #testPlaceholderMacro([])
+
+  _ = testPlaceholderFn1(0)
+  _ = testPlaceholderFn2()
+}
