@@ -552,9 +552,9 @@ public:
   /// or the empty string.
   std::string UseSampleProfile = "";
 
-  /// Path to the context-sensitive profile file to be used for CS-IR PGO,
-  /// or the default string.
-  std::string CSProfileGenFile = "default_%m.profraw";
+  /// Name of the profile file to use as output for -ir-profile-generate,
+  /// and -cs-profile-generate, or the default string.
+  std::string InstrProfileOutput = "default_%m.profraw";
 
   /// Whether to enable context-sensitive IR PGO generation.
   bool EnableCSIRProfileGen = false;

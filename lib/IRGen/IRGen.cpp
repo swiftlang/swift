@@ -234,8 +234,8 @@ static void populatePGOOptions(std::optional<PGOOptions> &Out,
   if (Opts.EnableCSIRProfileGen) {
     const bool hasUse = !Opts.UseProfile.empty();
     Out = PGOOptions(
-      /*ProfileFile=*/ hasUse ? Opts.UseProfile : "",
-      /*CSProfileGenFile=*/ Opts.CSProfileGenFile,
+      /*ProfileFile=*/ Opts.UseProfile,
+      /*CSProfileGenFile=*/ Opts.InstrProfileOutput,
       /*ProfileRemappingFile=*/ "",
       /*MemoryProfile=*/ "",
       /*FS=*/ llvm::vfs::getRealFileSystem(),
@@ -249,7 +249,7 @@ static void populatePGOOptions(std::optional<PGOOptions> &Out,
 
   if (Opts.EnableIRProfileGen) {
     Out = PGOOptions(
-      /*ProfileFile=*/ "",
+      /*ProfileFile=*/ Opts.InstrProfileOutput,
       /*CSProfileGenFile=*/ "",
       /*ProfileRemappingFile=*/ "",
       /*MemoryProfile=*/ "",

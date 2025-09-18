@@ -3501,7 +3501,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.EnableCSIRProfileGen = Args.hasArg(OPT_cs_profile_generate) ||
                               Args.hasArg(OPT_cs_profile_generate_EQ);
   if (auto V = Args.getLastArgValue(OPT_cs_profile_generate_EQ); !V.empty())
-    Opts.CSProfileGenFile = V.str();
+    Opts.InstrProfileOutput = V.str();
 
   Opts.DebugInfoForProfiling |= Args.hasArg(OPT_debug_info_for_profiling);
 
