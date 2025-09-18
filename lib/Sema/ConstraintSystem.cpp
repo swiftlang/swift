@@ -905,6 +905,73 @@ ConstraintLocator *ConstraintSystem::getOpenOpaqueLocator(
       { LocatorPathElt::OpenedOpaqueArchetype(opaqueDecl) }, 0);
 }
 
+void ConstraintSystem::setType(ASTNode node, Type type,
+                               PreparedOverloadBuilder *preparedOverload) {
+  ASSERT(PreparingOverload == !!preparedOverload);
+
+  ASSERT(!node.isNull() && "Cannot set type information on null node");
+  ASSERT(type && "Expected non-null type");
+
+  if (preparedOverload) {
+    preparedOverload->recordedNodeType(node, type);
+    return;
+  }
+
+  // Record the type.
+  Type &entry = NodeTypes[node];
+  Type oldType = entry;
+  entry = type;
+
+  if (oldType.getPointer() != type.getPointer()) {
+    // Record the fact that we assigned a type to this node.
+    if (solverState)
+      recordChange(SolverTrail::Change::RecordedNodeType(node, oldType));
+  }
+}
+
+void ConstraintSystem::restoreType(ASTNode node, Type oldType) {
+  ASSERT(!node.isNull() && "Cannot set type information on null node");
+
+  if (oldType) {
+    auto found = NodeTypes.find(node);
+    ASSERT(found != NodeTypes.end());
+    found->second = oldType;
+  } else {
+    bool erased = NodeTypes.erase(node);
+    ASSERT(erased);
+  }
+}
+
+void ConstraintSystem::setType(const KeyPathExpr *KP, unsigned I, Type T) {
+  ASSERT(KP && "Expected non-null key path parameter!");
+  ASSERT(T && "Expected non-null type!");
+
+  Type &entry = KeyPathComponentTypes[{KP, I}];
+  Type oldType = entry;
+  entry = T;
+
+  if (oldType.getPointer() != T.getPointer()) {
+    if (solverState) {
+      recordChange(
+        SolverTrail::Change::RecordedKeyPathComponentType(
+          KP, I, oldType));
+    }
+  }
+}
+
+void ConstraintSystem::restoreType(const KeyPathExpr *KP, unsigned I, Type T) {
+  ASSERT(KP && "Expected non-null key path parameter!");
+
+  if (T) {
+    auto found = KeyPathComponentTypes.find({KP, I});
+    ASSERT(found != KeyPathComponentTypes.end());
+    found->second = T;
+  } else {
+    bool erased = KeyPathComponentTypes.erase({KP, I});
+    ASSERT(erased);
+  }
+}
+
 std::pair<Type, ExistentialArchetypeType *>
 ConstraintSystem::openAnyExistentialType(Type type,
                                          ConstraintLocator *locator) {

@@ -2834,6 +2834,10 @@ void ConstraintSystem::replayChanges(
     case PreparedOverload::Change::AddedFix:
       recordFix(change.Fix.TheFix, change.Fix.Impact);
       break;
+
+    case PreparedOverload::Change::RecordedNodeType:
+      setType(change.Node.Node, change.Node.TheType);
+      break;
     }
   }
 }

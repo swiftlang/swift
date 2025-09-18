@@ -88,7 +88,10 @@ struct PreparedOverloadChange {
     AppliedPropertyWrapper,
 
     /// A fix was recorded because a property wrapper application failed.
-    AddedFix
+    AddedFix,
+
+    /// The type of an AST node was changed.
+    RecordedNodeType
   };
 
   /// The kind of change.
@@ -132,7 +135,17 @@ struct PreparedOverloadChange {
       ConstraintFix *TheFix;
       unsigned Impact;
     } Fix;
+
+    /// For ChangeKind::RecordedNodeType.
+    struct {
+      ASTNode Node;
+      Type TheType;
+    } Node;
   };
+
+  PreparedOverloadChange()
+      : Kind(ChangeKind::AddedTypeVariable),
+        TypeVar(nullptr) { }
 };
 
 /// A "pre-cooked" representation of all type variables and constraints
@@ -236,6 +249,14 @@ struct PreparedOverloadBuilder {
     change.Kind = PreparedOverload::Change::AddedFix;
     change.Fix.TheFix = fix;
     change.Fix.Impact = impact;
+    Changes.push_back(change);
+  }
+
+  void recordedNodeType(ASTNode node, Type type) {
+    PreparedOverload::Change change;
+    change.Kind = PreparedOverload::Change::RecordedNodeType;
+    change.Node.Node = node;
+    change.Node.TheType = type;
     Changes.push_back(change);
   }
 };

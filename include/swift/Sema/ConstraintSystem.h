@@ -3068,7 +3068,7 @@ public:
     return nullptr;
   }
 
-  TypeBase* getFavoredType(Expr *E) {
+  TypeBase *getFavoredType(Expr *E) {
     assert(E != nullptr);
     return this->FavoredTypes[E];
   }
@@ -3082,39 +3082,15 @@ public:
   ///
   /// The side tables are used through the expression type checker to avoid
   /// mutating nodes until we know we have successfully type-checked them.
-  void setType(ASTNode node, Type type) {
-    ASSERT(!node.isNull() && "Cannot set type information on null node");
-    ASSERT(type && "Expected non-null type");
-
-    // Record the type.
-    Type &entry = NodeTypes[node];
-    Type oldType = entry;
-    entry = type;
-
-    if (oldType.getPointer() != type.getPointer()) {
-      // Record the fact that we assigned a type to this node.
-      if (solverState)
-        recordChange(SolverTrail::Change::RecordedNodeType(node, oldType));
-    }
-  }
+  void setType(ASTNode node, Type type,
+               PreparedOverloadBuilder *preparedOverload=nullptr);
 
   /// Undo the above change.
-  void restoreType(ASTNode node, Type oldType) {
-    ASSERT(!node.isNull() && "Cannot set type information on null node");
-
-    if (oldType) {
-      auto found = NodeTypes.find(node);
-      ASSERT(found != NodeTypes.end());
-      found->second = oldType;
-    } else {
-      bool erased = NodeTypes.erase(node);
-      ASSERT(erased);
-    }
-  }
+  void restoreType(ASTNode node, Type oldType);
 
   /// Check to see if we have a type for a node.
   bool hasType(ASTNode node) const {
-    assert(!node.isNull() && "Expected non-null node");
+    ASSERT(!node.isNull() && "Expected non-null node");
     return NodeTypes.count(node) > 0;
   }
 
@@ -3122,55 +3098,30 @@ public:
   /// map is used throughout the expression type checker in order to
   /// avoid mutating expressions until we know we have successfully
   /// type-checked them.
-  void setType(const KeyPathExpr *KP, unsigned I, Type T) {
-    ASSERT(KP && "Expected non-null key path parameter!");
-    ASSERT(T && "Expected non-null type!");
+  void setType(const KeyPathExpr *KP, unsigned I, Type T);
 
-    Type &entry = KeyPathComponentTypes[{KP, I}];
-    Type oldType = entry;
-    entry = T;
-
-    if (oldType.getPointer() != T.getPointer()) {
-      if (solverState) {
-        recordChange(
-          SolverTrail::Change::RecordedKeyPathComponentType(
-            KP, I, oldType));
-      }
-    }
-  }
-
-  void restoreType(const KeyPathExpr *KP, unsigned I, Type T) {
-    ASSERT(KP && "Expected non-null key path parameter!");
-
-    if (T) {
-      auto found = KeyPathComponentTypes.find({KP, I});
-      ASSERT(found != KeyPathComponentTypes.end());
-      found->second = T;
-    } else {
-      bool erased = KeyPathComponentTypes.erase({KP, I});
-      ASSERT(erased);
-    }
-  }
+  void restoreType(const KeyPathExpr *KP, unsigned I, Type T);
 
   bool hasType(const KeyPathExpr *KP, unsigned I) const {
-    assert(KP && "Expected non-null key path parameter!");
+    ASSERT(KP && "Expected non-null key path parameter!");
     return KeyPathComponentTypes.find(std::make_pair(KP, I))
               != KeyPathComponentTypes.end();
   }
 
   /// Get the type for an node.
   Type getType(ASTNode node) const {
-    assert(hasType(node) && "Expected type to have been set!");
-    // FIXME: lvalue differences
-    //    assert((!E->getType() ||
-    //            E->getType()->isEqual(ExprTypes.find(E)->second)) &&
-    //           "Mismatched types!");
-    return NodeTypes.find(node)->second;
+    ASSERT(!node.isNull() && "Expected non-null node");
+    auto found = NodeTypes.find(node);
+    ASSERT(found != NodeTypes.end() && "Expected type to have been set!");
+    return found->second;
   }
 
   Type getType(const KeyPathExpr *KP, unsigned I) const {
-    assert(hasType(KP, I) && "Expected type to have been set!");
-    return KeyPathComponentTypes.find(std::make_pair(KP, I))->second;
+    ASSERT(KP && "Expected non-null key path parameter!");
+    auto found = KeyPathComponentTypes.find(std::make_pair(KP, I));
+    ASSERT(found != KeyPathComponentTypes.end() &&
+           "Expected type to have been set!");
+    return found->second;
   }
 
   /// Retrieve the type of the node, if known.
@@ -3181,11 +3132,6 @@ public:
 
     return known->second;
   }
-
-  /// Retrieve type of the given declaration to be used in
-  /// constraint system, this is better than calling `getType()`
-  /// directly because it accounts of constraint system flags.
-  Type getVarType(const VarDecl *var);
 
   /// Cache the type of the expression argument and return that same
   /// argument.

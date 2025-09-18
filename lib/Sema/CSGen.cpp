@@ -2811,6 +2811,9 @@ namespace {
           // interface type request via `var->getType()` that would
           // attempt to validate `weak` attribute, and produce a
           // diagnostic in the middle of the solver path.
+          //
+          // FIXME: getVarType() is now gone. Is the above still
+          // relevant?
 
           CS.addConstraint(ConstraintKind::OneWayEqual, oneWayVarType,
                            varType, locator);
@@ -5241,7 +5244,8 @@ ConstraintSystem::applyPropertyWrapperToParameter(
                   locator,
                   /*isFavored=*/false,
                   preparedOverload);
-    setType(param->getPropertyWrapperWrappedValueVar(), wrappedValueType);
+    setType(param->getPropertyWrapperWrappedValueVar(), wrappedValueType,
+            preparedOverload);
 
     applyPropertyWrapper(anchor,
                          { wrapperType, PropertyWrapperInitKind::WrappedValue },
