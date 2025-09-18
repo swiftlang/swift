@@ -152,3 +152,17 @@ public func basic_loop_nontrivial_values_fixed(_ t: Triangle, _ xs: [Triangle]) 
   }
   (copy t.nontrivial).a = p // expected-error {{explicit 'copy' required here}}
 }
+
+
+/// MARK: Globals
+let ref_result = [5, 13, 29]
+
+@_manualOwnership
+func access_global_1() -> Int {
+  return ref_result[2] // expected-error {{explicit 'copy' required here}}
+}
+@_manualOwnership
+func access_global_1_fixed() -> Int {
+return (copy ref_result)[2]
+}
+
