@@ -89,15 +89,15 @@ public struct Cloner<Context: MutatingContext> {
     }
     return cloned
   }
-  
-  public mutating func cloneRecursively(globalInitValue: Value) -> Value {
-    guard let cloned = cloneRecursively(value: globalInitValue, customGetCloned: { value, cloner in
+
+  public mutating func cloneRecursivelyToGlobal(value: Value) -> Value {
+    guard let cloned = cloneRecursively(value: value, customGetCloned: { value, cloner in
       guard let beginAccess = value as? BeginAccessInst else {
         return .defaultValue
       }
       
       // Skip access instructions, which might be generated for UnsafePointer globals which point to other globals.
-      let clonedOperand = cloner.cloneRecursively(globalInitValue: beginAccess.address)
+      let clonedOperand = cloner.cloneRecursivelyToGlobal(value: beginAccess.address)
       cloner.recordFoldedValue(beginAccess, mappedTo: clonedOperand)
       return .customValue(clonedOperand)
     }) else {
