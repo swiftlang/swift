@@ -598,7 +598,6 @@ function Add-TimingData {
     Platform = $Platform.OS.ToString()
     "Build Step" = $BuildStep
     "Elapsed Time" = [TimeSpan]::Zero
-    "Child Time" = [TimeSpan]::Zero
     Parent = $Parent
     Children = @()
   }
@@ -635,9 +634,6 @@ function Record-OperationTime {
   } finally {
     $Stopwatch.Stop()
     $TimingEntry."Elapsed Time" = $Stopwatch.Elapsed
-    if ($TimingEntry.Parent) {
-      $TimingEntry.Parent."Child Time" = $TimingEntry.Parent."Child Time".Add($Stopwatch.Elapsed)
-    }
     $script:CurrentOperation = $TimingEntry.Parent
   }
 }
@@ -654,15 +650,12 @@ function Flatten-TimingEntry {
   $Indent = "  " * $Depth
   $Percentage = [math]::Round(($Entry."Elapsed Time".TotalSeconds / $TotalTime.TotalSeconds) * 100, 1)
   $FormattedTime = "{0:hh\:mm\:ss\.ff}" -f $Entry."Elapsed Time"
-  $SelfTime = $Entry."Elapsed Time".Subtract($Entry."Child Time")
-  $FormattedSelfTime = "{0:hh\:mm\:ss\.ff}" -f $SelfTime
 
   [PSCustomObject]@{
     "Build Step" = "$Indent$($Entry.'Build Step')"
     Platform = $Entry.Platform
     Arch = $Entry.Arch
-    "Total Time" = $FormattedTime
-    "Self Time" = $FormattedSelfTime
+    "Elapsed Time" = $FormattedTime
     "%" = "$Percentage%"
   }
 
@@ -697,8 +690,7 @@ function Write-Summary {
     "Build Step" = "TOTAL"
     Platform = ""
     Arch = ""
-    "Total Time" = $FormattedTotalTime
-    "Self Time" = $FormattedTotalTime
+    "Elapsed Time" = $FormattedTotalTime
     "%" = "100.0%"
   }
 
@@ -1105,252 +1097,248 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
   }
 }
 
-function Get-Dependencies-Impl {
-  Write-Host "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies ..." -ForegroundColor Cyan
-  $ProgressPreference = "SilentlyContinue"
-
-  $WebClient = New-Object Net.WebClient
-
-  function DownloadAndVerify($URL, $Destination, $Hash) {
-    if (Test-Path $Destination) {
-      return
-    }
-
-    Write-Output "$Destination not found. Downloading ..."
-    if ($ToBatch) {
-      Write-Output "md `"$(Split-Path -Path $Destination -Parent)`""
-      Write-Output "curl.exe -sL $URL -o $Destination"
-      Write-Output "(certutil -HashFile $Destination SHA256) == $Hash || (exit /b)"
-    } else {
-      New-Item -ItemType Directory (Split-Path -Path $Destination -Parent) -ErrorAction Ignore | Out-Null
-      $WebClient.DownloadFile($URL, $Destination)
-      $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
-      if ($SHA256.Hash -ne $Hash) {
-        throw "SHA256 mismatch ($($SHA256.Hash) vs $Hash)"
-      }
-    }
-  }
-
-  function Expand-ZipFile {
-    param
-    (
-        [string]$ZipFileName,
-        [string]$BinaryCache,
-        [string]$ExtractPath,
-        [bool]$CreateExtractPath = $true
-    )
-
-    $source = Join-Path -Path $BinaryCache -ChildPath $ZipFileName
-    $destination = Join-Path -Path $BinaryCache -ChildPath $ExtractPath
-
-    # Check if the extracted directory already exists and is up to date.
-    if (Test-Path $destination) {
-        $zipLastWriteTime = (Get-Item $source).LastWriteTime
-        $extractedLastWriteTime = (Get-Item $destination).LastWriteTime
-        # Compare the last write times
-        if ($zipLastWriteTime -le $extractedLastWriteTime) {
-            Write-Output "'$ZipFileName' is already extracted and up to date."
-            return
-        }
-    }
-
-    $destination = if ($CreateExtractPath) { $destination } else { $BinaryCache }
-
-    Write-Output "Extracting '$ZipFileName' ..."
-    New-Item -ItemType Directory -ErrorAction Ignore -Path $BinaryCache | Out-Null
-    Expand-Archive -Path $source -DestinationPath $destination -Force
-  }
-
-  function Extract-Toolchain {
-    param
-    (
-        [string]$InstallerExeName,
-        [string]$BinaryCache,
-        [string]$ToolchainName
-    )
-
-    $source = Join-Path -Path $BinaryCache -ChildPath $InstallerExeName
-    $destination = Join-Path -Path $BinaryCache -ChildPath toolchains\$ToolchainName
-
-    # Check if the extracted directory already exists and is up to date.
-    if (Test-Path $destination) {
-        $installerWriteTime = (Get-Item $source).LastWriteTime
-        $extractedWriteTime = (Get-Item $destination).LastWriteTime
-        if ($installerWriteTime -le $extractedWriteTime) {
-            Write-Output "'$InstallerExeName' is already extracted and up to date."
-            return
-        }
-    }
-
-    Write-Output "Extracting '$InstallerExeName' ..."
-
-    # The new runtime MSI is built to expand files into the immediate directory. So, setup the installation location.
-    New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin | Out-Null
-    Invoke-Program "$($WiX.Path)\wix.exe" -- burn extract $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
-    Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
-      $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
-      $TARGETDIR = if ($_.Name -eq "rtl.msi") { "$BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin" } else { "$BinaryCache\toolchains\$ToolchainName" }
-      Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
-    }
-  }
-
-  if ($IncludeSBoM) {
-    $syft = Get-Syft
-    DownloadAndVerify $syft.URL "$BinaryCache\syft-$SyftVersion.zip" $syft.SHA256
-    Expand-ZipFile syft-$SyftVersion.zip $BinaryCache syft-$SyftVersion
-  }
-
-  if ($SkipBuild -and $SkipPackaging) { return }
-
-  $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
-  if ($ToBatch) {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies..."
-  }
-
-  DownloadAndVerify $WiX.URL "$BinaryCache\WiX-$($WiX.Version).zip" $WiX.SHA256
-  Expand-ZipFile WiX-$($WiX.Version).zip $BinaryCache WiX-$($WiX.Version)
-
-  if ($SkipBuild) { return }
-
-  if ($EnableCaching) {
-    $SCCache = Get-SCCache
-    DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion.zip" $SCCache.SHA256
-    Expand-ZipFile sccache-$SCCacheVersion.zip $BinaryCache sccache-$SCCacheVersion
-  }
-
-  DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
-
-  if ($Test -contains "lldb") {
-    # The make tool isn't part of MSYS
-    $GnuWin32MakeURL = "https://downloads.sourceforge.net/project/ezwinports/make-4.4.1-without-guile-w32-bin.zip"
-    $GnuWin32MakeHash = "fb66a02b530f7466f6222ce53c0b602c5288e601547a034e4156a512dd895ee7"
-    DownloadAndVerify $GnuWin32MakeURL "$BinaryCache\GnuWin32Make-4.4.1.zip" $GnuWin32MakeHash
-    Expand-ZipFile GnuWin32Make-4.4.1.zip $BinaryCache GnuWin32Make-4.4.1
-  }
-
-  # TODO(compnerd) stamp/validate that we need to re-extract
-  New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
-  Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain.TrimStart("swift-").TrimEnd("-a-windows10")
-
-  function Get-KnownPython([string] $ArchName) {
-    if (-not $KnownPythons.ContainsKey($PythonVersion)) {
-      throw "Unknown python version: $PythonVersion"
-    }
-    return $KnownPythons[$PythonVersion].$ArchName
-  }
-
-  function Install-Python([string] $ArchName) {
-    $Python = Get-KnownPython $ArchName
-    DownloadAndVerify $Python.URL "$BinaryCache\Python$ArchName-$PythonVersion.zip" $Python.SHA256
-    if (-not $ToBatch) {
-      Expand-ZipFile Python$ArchName-$PythonVersion.zip "$BinaryCache" Python$ArchName-$PythonVersion
-    }
-  }
-
-  function Install-PIPIfNeeded() {
-    try {
-      Invoke-Program -Silent "$(Get-PythonExecutable)" -m pip
-    } catch {
-      Write-Output "Installing pip ..."
-      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m ensurepip -U --default-pip
-    } finally {
-      Write-Output "pip installed."
-    }
-  }
-
-  function Test-PythonModuleInstalled([string] $ModuleName) {
-    try {
-      Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import $ModuleName"
-      return $true;
-    } catch {
-      return $false;
-    }
-  }
-
-  function Install-PythonModule([string] $ModuleName) {
-    if (Test-PythonModuleInstalled $ModuleName) {
-      Write-Output "$ModuleName already installed."
-      return;
-    }
-    $TempRequirementsTxt = New-TemporaryFile
-    $Module = $PythonModules[$ModuleName]
-    $Dependencies = $Module["Dependencies"]
-    Write-Output "$ModuleName==$($Module.Version) --hash=`"sha256:$($Module.SHA256)`"" >> $TempRequirementsTxt
-    for ($i = 0; $i -lt $Dependencies.Length; $i++) {
-      $Dependency = $PythonModules[$Dependencies[$i]]
-      Write-Output "$($Dependencies[$i])==$($Dependency.Version) --hash=`"sha256:$($Dependency.SHA256)`"" >> $TempRequirementsTxt
-    }
-    Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --no-binary==:all: --disable-pip-version-check
-    Write-Output "$ModuleName installed."
-  }
-
-  function Install-PythonModules() {
-    Install-PIPIfNeeded
-    Install-PythonModule "packaging" # For building LLVM 18+
-    Install-PythonModule "setuptools" # Required for SWIG support
-    if ($Test -contains "lldb") {
-      Install-PythonModule "psutil" # Required for testing LLDB
-    }
-  }
-
-  Install-Python $HostArchName
-  if ($IsCrossCompiling) {
-    Install-Python $BuildArchName
-  }
-
-  # Ensure Python modules that are required as host build tools
-  Install-PythonModules
-
-  if ($Android) {
-    $NDK = Get-AndroidNDK
-    DownloadAndVerify $NDK.URL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDK.SHA256
-    Expand-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
-  }
-
-  if ($IncludeDS2) {
-    $WinFlexBisonVersion = "2.5.25"
-    $WinFlexBisonURL = "https://github.com/lexxmark/winflexbison/releases/download/v$WinFlexBisonVersion/win_flex_bison-$WinFlexBisonVersion.zip"
-    $WinFlexBisonHash = "8D324B62BE33604B2C45AD1DD34AB93D722534448F55A16CA7292DE32B6AC135"
-    DownloadAndVerify $WinFlexBisonURL "$BinaryCache\win_flex_bison-$WinFlexBisonVersion.zip" $WinFlexBisonHash
-
-    Expand-ZipFile -ZipFileName "win_flex_bison-$WinFlexBisonVersion.zip" -BinaryCache $BinaryCache -ExtractPath "win_flex_bison"
-  }
-
-  if ($WinSDKVersion) {
-    try {
-      # Check whether VsDevShell can already resolve the requested Windows SDK Version
-      Invoke-IsolatingEnvVars { Invoke-VsDevShell $HostPlatform }
-    } catch {
-      $Package = Microsoft.Windows.SDK.CPP
-
-      Write-Output "Windows SDK $WinSDKVersion not found. Downloading from nuget.org ..."
-      Invoke-Program nuget install $Package -Version $WinSDKVersion -OutputDirectory $NugetRoot
-
-      # Set to script scope so Invoke-VsDevShell can read it.
-      $script:CustomWinSDKRoot = "$NugetRoot\$Package.$WinSDKVersion\c"
-
-      # Install each required architecture package and move files under the base /lib directory.
-      $Builds = $WindowsSDKBuilds.Clone()
-      if (-not ($HostPlatform -in $Builds)) {
-        $Builds += $HostPlatform
-      }
-
-      foreach ($Build in $Builds) {
-        Invoke-Program nuget install $Package.$($Build.Architecture.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
-        Copy-Directory "$NugetRoot\$Package.$($Build.Architecture.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
-      }
-    }
-  }
-
-  if (-not $ToBatch) {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies took $($Stopwatch.Elapsed)"
-    Write-Host ""
-  }
-}
-
 function Get-Dependencies {
   Record-OperationTime $BuildPlatform "Get-Dependencies" {
-    Get-Dependencies-Impl
+    Write-Host "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies ..." -ForegroundColor Cyan
+    $ProgressPreference = "SilentlyContinue"
+
+    $WebClient = New-Object Net.WebClient
+
+    function DownloadAndVerify($URL, $Destination, $Hash) {
+      if (Test-Path $Destination) {
+        return
+      }
+
+      Write-Output "$Destination not found. Downloading ..."
+      if ($ToBatch) {
+        Write-Output "md `"$(Split-Path -Path $Destination -Parent)`""
+        Write-Output "curl.exe -sL $URL -o $Destination"
+        Write-Output "(certutil -HashFile $Destination SHA256) == $Hash || (exit /b)"
+      } else {
+        New-Item -ItemType Directory (Split-Path -Path $Destination -Parent) -ErrorAction Ignore | Out-Null
+        $WebClient.DownloadFile($URL, $Destination)
+        $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
+        if ($SHA256.Hash -ne $Hash) {
+          throw "SHA256 mismatch ($($SHA256.Hash) vs $Hash)"
+        }
+      }
+    }
+
+    function Expand-ZipFile {
+      param
+      (
+          [string]$ZipFileName,
+          [string]$BinaryCache,
+          [string]$ExtractPath,
+          [bool]$CreateExtractPath = $true
+      )
+
+      $source = Join-Path -Path $BinaryCache -ChildPath $ZipFileName
+      $destination = Join-Path -Path $BinaryCache -ChildPath $ExtractPath
+
+      # Check if the extracted directory already exists and is up to date.
+      if (Test-Path $destination) {
+          $zipLastWriteTime = (Get-Item $source).LastWriteTime
+          $extractedLastWriteTime = (Get-Item $destination).LastWriteTime
+          # Compare the last write times
+          if ($zipLastWriteTime -le $extractedLastWriteTime) {
+              Write-Output "'$ZipFileName' is already extracted and up to date."
+              return
+          }
+      }
+
+      $destination = if ($CreateExtractPath) { $destination } else { $BinaryCache }
+
+      Write-Output "Extracting '$ZipFileName' ..."
+      New-Item -ItemType Directory -ErrorAction Ignore -Path $BinaryCache | Out-Null
+      Expand-Archive -Path $source -DestinationPath $destination -Force
+    }
+
+    function Extract-Toolchain {
+      param
+      (
+          [string]$InstallerExeName,
+          [string]$BinaryCache,
+          [string]$ToolchainName
+      )
+
+      $source = Join-Path -Path $BinaryCache -ChildPath $InstallerExeName
+      $destination = Join-Path -Path $BinaryCache -ChildPath toolchains\$ToolchainName
+
+      # Check if the extracted directory already exists and is up to date.
+      if (Test-Path $destination) {
+          $installerWriteTime = (Get-Item $source).LastWriteTime
+          $extractedWriteTime = (Get-Item $destination).LastWriteTime
+          if ($installerWriteTime -le $extractedWriteTime) {
+              Write-Output "'$InstallerExeName' is already extracted and up to date."
+              return
+          }
+      }
+
+      Write-Output "Extracting '$InstallerExeName' ..."
+
+      # The new runtime MSI is built to expand files into the immediate directory. So, setup the installation location.
+      New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin | Out-Null
+      Invoke-Program "$($WiX.Path)\wix.exe" -- burn extract $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
+      Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
+        $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
+        $TARGETDIR = if ($_.Name -eq "rtl.msi") { "$BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin" } else { "$BinaryCache\toolchains\$ToolchainName" }
+        Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
+      }
+    }
+
+    if ($IncludeSBoM) {
+      $syft = Get-Syft
+      DownloadAndVerify $syft.URL "$BinaryCache\syft-$SyftVersion.zip" $syft.SHA256
+      Expand-ZipFile syft-$SyftVersion.zip $BinaryCache syft-$SyftVersion
+    }
+
+    if ($SkipBuild -and $SkipPackaging) { return }
+
+    $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    if ($ToBatch) {
+      Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies..."
+    }
+
+    DownloadAndVerify $WiX.URL "$BinaryCache\WiX-$($WiX.Version).zip" $WiX.SHA256
+    Expand-ZipFile WiX-$($WiX.Version).zip $BinaryCache WiX-$($WiX.Version)
+
+    if ($SkipBuild) { return }
+
+    if ($EnableCaching) {
+      $SCCache = Get-SCCache
+      DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion.zip" $SCCache.SHA256
+      Expand-ZipFile sccache-$SCCacheVersion.zip $BinaryCache sccache-$SCCacheVersion
+    }
+
+    DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
+
+    if ($Test -contains "lldb") {
+      # The make tool isn't part of MSYS
+      $GnuWin32MakeURL = "https://downloads.sourceforge.net/project/ezwinports/make-4.4.1-without-guile-w32-bin.zip"
+      $GnuWin32MakeHash = "fb66a02b530f7466f6222ce53c0b602c5288e601547a034e4156a512dd895ee7"
+      DownloadAndVerify $GnuWin32MakeURL "$BinaryCache\GnuWin32Make-4.4.1.zip" $GnuWin32MakeHash
+      Expand-ZipFile GnuWin32Make-4.4.1.zip $BinaryCache GnuWin32Make-4.4.1
+    }
+
+    # TODO(compnerd) stamp/validate that we need to re-extract
+    New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
+    Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain.TrimStart("swift-").TrimEnd("-a-windows10")
+
+    function Get-KnownPython([string] $ArchName) {
+      if (-not $KnownPythons.ContainsKey($PythonVersion)) {
+        throw "Unknown python version: $PythonVersion"
+      }
+      return $KnownPythons[$PythonVersion].$ArchName
+    }
+
+    function Install-Python([string] $ArchName) {
+      $Python = Get-KnownPython $ArchName
+      DownloadAndVerify $Python.URL "$BinaryCache\Python$ArchName-$PythonVersion.zip" $Python.SHA256
+      if (-not $ToBatch) {
+        Expand-ZipFile Python$ArchName-$PythonVersion.zip "$BinaryCache" Python$ArchName-$PythonVersion
+      }
+    }
+
+    function Install-PIPIfNeeded() {
+      try {
+        Invoke-Program -Silent "$(Get-PythonExecutable)" -m pip
+      } catch {
+        Write-Output "Installing pip ..."
+        Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m ensurepip -U --default-pip
+      } finally {
+        Write-Output "pip installed."
+      }
+    }
+
+    function Test-PythonModuleInstalled([string] $ModuleName) {
+      try {
+        Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import $ModuleName"
+        return $true;
+      } catch {
+        return $false;
+      }
+    }
+
+    function Install-PythonModule([string] $ModuleName) {
+      if (Test-PythonModuleInstalled $ModuleName) {
+        Write-Output "$ModuleName already installed."
+        return;
+      }
+      $TempRequirementsTxt = New-TemporaryFile
+      $Module = $PythonModules[$ModuleName]
+      $Dependencies = $Module["Dependencies"]
+      Write-Output "$ModuleName==$($Module.Version) --hash=`"sha256:$($Module.SHA256)`"" >> $TempRequirementsTxt
+      for ($i = 0; $i -lt $Dependencies.Length; $i++) {
+        $Dependency = $PythonModules[$Dependencies[$i]]
+        Write-Output "$($Dependencies[$i])==$($Dependency.Version) --hash=`"sha256:$($Dependency.SHA256)`"" >> $TempRequirementsTxt
+      }
+      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --no-binary==:all: --disable-pip-version-check
+      Write-Output "$ModuleName installed."
+    }
+
+    function Install-PythonModules() {
+      Install-PIPIfNeeded
+      Install-PythonModule "packaging" # For building LLVM 18+
+      Install-PythonModule "setuptools" # Required for SWIG support
+      if ($Test -contains "lldb") {
+        Install-PythonModule "psutil" # Required for testing LLDB
+      }
+    }
+
+    Install-Python $HostArchName
+    if ($IsCrossCompiling) {
+      Install-Python $BuildArchName
+    }
+
+    # Ensure Python modules that are required as host build tools
+    Install-PythonModules
+
+    if ($Android) {
+      $NDK = Get-AndroidNDK
+      DownloadAndVerify $NDK.URL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDK.SHA256
+      Expand-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
+    }
+
+    if ($IncludeDS2) {
+      $WinFlexBisonVersion = "2.5.25"
+      $WinFlexBisonURL = "https://github.com/lexxmark/winflexbison/releases/download/v$WinFlexBisonVersion/win_flex_bison-$WinFlexBisonVersion.zip"
+      $WinFlexBisonHash = "8D324B62BE33604B2C45AD1DD34AB93D722534448F55A16CA7292DE32B6AC135"
+      DownloadAndVerify $WinFlexBisonURL "$BinaryCache\win_flex_bison-$WinFlexBisonVersion.zip" $WinFlexBisonHash
+
+      Expand-ZipFile -ZipFileName "win_flex_bison-$WinFlexBisonVersion.zip" -BinaryCache $BinaryCache -ExtractPath "win_flex_bison"
+    }
+
+    if ($WinSDKVersion) {
+      try {
+        # Check whether VsDevShell can already resolve the requested Windows SDK Version
+        Invoke-IsolatingEnvVars { Invoke-VsDevShell $HostPlatform }
+      } catch {
+        $Package = Microsoft.Windows.SDK.CPP
+
+        Write-Output "Windows SDK $WinSDKVersion not found. Downloading from nuget.org ..."
+        Invoke-Program nuget install $Package -Version $WinSDKVersion -OutputDirectory $NugetRoot
+
+        # Set to script scope so Invoke-VsDevShell can read it.
+        $script:CustomWinSDKRoot = "$NugetRoot\$Package.$WinSDKVersion\c"
+
+        # Install each required architecture package and move files under the base /lib directory.
+        $Builds = $WindowsSDKBuilds.Clone()
+        if (-not ($HostPlatform -in $Builds)) {
+          $Builds += $HostPlatform
+        }
+
+        foreach ($Build in $Builds) {
+          Invoke-Program nuget install $Package.$($Build.Architecture.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
+          Copy-Directory "$NugetRoot\$Package.$($Build.Architecture.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
+        }
+      }
+    }
+
+    if (-not $ToBatch) {
+      Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies took $($Stopwatch.Elapsed)"
+      Write-Host ""
+    }
   }
 }
 
