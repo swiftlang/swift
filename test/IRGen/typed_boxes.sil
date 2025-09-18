@@ -38,7 +38,7 @@ sil @pod_box_32_16 : $@convention(thin) () -> () {
 entry:
   // CHECK: [[BOX:%.*]] = call noalias ptr @swift_allocObject(ptr {{.*}} [[POD_32_16_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 48, [[WORD]] 15)
   %a = alloc_box $<τ_0_0> { var τ_0_0 } <OverAligned>
-  // CHECK-32: [[BOX_DATA:%.*]] = getelementptr inbounds [[POD_32_16_LAYOUT:<\{ %swift.refcounted, \[8 x i8\], \[32 x i8\] \}>]], ptr [[BOX]], i32 0, i32 2
+  // CHECK-32: [[BOX_DATA:%.*]] = getelementptr inbounds{{.*}} [[POD_32_16_LAYOUT:<\{ %swift.refcounted, \[8 x i8\], \[32 x i8\] \}>]], ptr [[BOX]], i32 0, i32 2
   %b = project_box %a : $<τ_0_0> { var τ_0_0 } <OverAligned>, 0
   // CHECK: call void @swift_deallocUninitializedObject(ptr [[BOX]], [[WORD]] 48, [[WORD]] 15)
   dealloc_box %a : $<τ_0_0> { var τ_0_0 } <OverAligned>
