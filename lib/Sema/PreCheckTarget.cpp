@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 //
 // Pre-checking resolves unqualified name references, type expressions and
-// operators.
+// operators. Target in this context refers to `SyntacticElementTarget`, which
+// is a unit of type-checking.
 //
 //===----------------------------------------------------------------------===//
 
@@ -697,7 +698,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     }
 
     auto emitBasicError = [&] {
-      
+
       if (Name.isSimpleName(Context.Id_self)) {
         // `self` gets diagnosed with a different error when it can't be found.
         Context.Diags
@@ -968,7 +969,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
         BaseExpr, SourceLoc(), Name, UDRE->getNameLoc(), UDRE->isImplicit(),
         Context.AllocateCopy(outerAlternatives));
   }
-  
+
   // FIXME: If we reach this point, the program we're being handed is likely
   // very broken, but it's still conceivable that this may happen due to
   // invalid shadowed declarations.
@@ -1163,6 +1164,11 @@ class PreCheckTarget final : public ASTWalker {
   /// For the given statement, mark any valid SingleValueStmtExpr children.
   void markAnyValidSingleValueStmts(Stmt *S);
 
+  /// For the given single value expr that's a `for`-expression, run the
+  /// desugaring transformation. For all other kinds of single value statement
+  /// expressions do nothing.
+  void transformForExpression(SingleValueStmtExpr *E);
+
   PreCheckTarget(DeclContext *dc) : Ctx(dc->getASTContext()), DC(dc) {}
 
 public:
@@ -1318,7 +1324,7 @@ public:
           lastInnerParenLoc = PE->getLParenLoc();
           parent = nextParent;
         }
-        
+
         if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent) ||
             isa<MacroExpansionExpr>(parent)) {
           // If outermost paren is associated with a call or
@@ -1359,8 +1365,10 @@ public:
     if (auto *assignment = dyn_cast<AssignExpr>(expr))
       markAcceptableDiscardExprs(assignment->getDest());
 
-    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr))
+    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
       checkSingleValueStmtExpr(SVE);
+      transformForExpression(SVE);
+    }
 
     return finish(true, expr);
   }
@@ -1670,6 +1678,49 @@ void PreCheckTarget::checkSingleValueStmtExpr(SingleValueStmtExpr *SVE) {
     break;
   case IsSingleValueStmtResult::Kind::UnhandledStmt:
     break;
+  }
+}
+
+void PreCheckTarget::transformForExpression(SingleValueStmtExpr *SVE) {
+  if (SVE->getStmtKind() != SingleValueStmtExpr::Kind::For) {
+    return;
+  }
+
+  auto *declCtx = SVE->getDeclContext();
+  auto &astCtx = declCtx->getASTContext();
+
+  auto sveLoc = SVE->getLoc();
+
+  auto *varDecl = new(astCtx) VarDecl(false, VarDecl::Introducer::Var, sveLoc,
+                                   astCtx.getIdentifier("$forExpressionResult"), declCtx);
+
+  auto namedPattern = NamedPattern::createImplicit(astCtx, varDecl);
+
+  auto *initFunc = new(astCtx) UnresolvedMemberExpr(sveLoc, DeclNameLoc(), DeclNameRef(DeclBaseName::createConstructor()), true);
+  auto *callExpr = CallExpr::createImplicitEmpty(astCtx, initFunc);
+  auto *initExpr = new(astCtx) UnresolvedMemberChainResultExpr(callExpr, initFunc);
+
+  auto *bindingDecl = PatternBindingDecl::createImplicit(astCtx, StaticSpellingKind::None, namedPattern, initExpr, declCtx);
+
+  SVE->setForExpressionPreamble({ varDecl, bindingDecl });
+
+  // For-expressions always have a single branch.
+  SmallVector<Stmt *, 1> scratch;
+  for (auto *branch : SVE->getBranches(scratch)) {
+    auto *BS = dyn_cast<BraceStmt>(branch);
+    if (!BS)
+      continue;
+
+    auto &result = BS->getElements().back();
+    if (auto stmt = result.dyn_cast<Stmt *>()) {
+      if (auto *then = dyn_cast<ThenStmt>(stmt)) {
+        auto *declRefExpr = new(astCtx) DeclRefExpr(varDecl, DeclNameLoc(), true);
+        auto *dotExpr = new(astCtx) UnresolvedDotExpr(declRefExpr, sveLoc, DeclNameRef(DeclBaseName(astCtx.Id_append)), DeclNameLoc(), true);
+        auto *argumentList = ArgumentList::createImplicit(astCtx, { Argument::unlabeled(then->getResult()) });
+        auto *callExpr = CallExpr::createImplicit(astCtx, dotExpr, argumentList);
+        result = callExpr;
+      }
+    }
   }
 }
 
@@ -2165,7 +2216,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
     assert(!TyExpr->isImplicit() && InnerTypeRepr &&
            "This doesn't work on implicit TypeExpr's, "
            "the TypeExpr should have been built correctly in the first place");
-    
+
     // The optional evaluation is passed through.
     if (isa<OptionalEvaluationExpr>(E))
       return TyExpr;
@@ -2195,7 +2246,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
   if (auto *PE = dyn_cast<ParenExpr>(E)) {
     auto *TyExpr = dyn_cast<TypeExpr>(PE->getSubExpr());
     if (!TyExpr) return nullptr;
-    
+
     TupleTypeReprElement InnerTypeRepr[] = { TyExpr->getTypeRepr() };
     assert(!TyExpr->isImplicit() && InnerTypeRepr[0].Type &&
            "SubscriptExpr doesn't work on implicit TypeExpr's, "
@@ -2205,7 +2256,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
                                               PE->getSourceRange());
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
-  
+
   // Fold a tuple expr like (T1,T2) into a tuple type (T1,T2).
   if (auto *TE = dyn_cast<TupleExpr>(E)) {
     // FIXME: Decide what to do about ().  It could be a type or an expr.
@@ -2239,7 +2290,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
         Ctx, Elts, TE->getSourceRange());
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
-  
+
 
   // Fold [T] into an array type.
   if (auto *AE = dyn_cast<ArrayExpr>(E)) {
@@ -2262,7 +2313,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
       return nullptr;
 
     TypeRepr *keyTypeRepr, *valueTypeRepr;
-    
+
     if (auto EltTuple = dyn_cast<TupleExpr>(DE->getElement(0))) {
       auto *KeyTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(0));
       if (!KeyTyExpr)
@@ -2271,13 +2322,13 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
       auto *ValueTyExpr = dyn_cast<TypeExpr>(EltTuple->getElement(1));
       if (!ValueTyExpr)
         return nullptr;
-     
+
       keyTypeRepr = KeyTyExpr->getTypeRepr();
       valueTypeRepr = ValueTyExpr->getTypeRepr();
     } else {
       auto *TE = dyn_cast<TypeExpr>(DE->getElement(0));
       if (!TE) return nullptr;
-      
+
       auto *TRE = dyn_cast_or_null<TupleTypeRepr>(TE->getTypeRepr());
       while (TRE->isParenType()) {
         TRE = dyn_cast_or_null<TupleTypeRepr>(TRE->getElementType(0));
@@ -2386,7 +2437,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
                          ResultTypeRepr);
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
-  
+
   // Fold '~P' into a composition type.
   if (auto *unaryExpr = dyn_cast<PrefixUnaryExpr>(E)) {
     if (isTildeOperator(unaryExpr->getFn())) {
@@ -2457,7 +2508,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
 void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
   if (KPE->isObjC())
     return;
-  
+
   if (!KPE->getComponents().empty())
     return;
 
