@@ -3502,6 +3502,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                               Args.hasArg(OPT_cs_profile_generate_EQ);
   if (auto V = Args.getLastArgValue(OPT_cs_profile_generate_EQ); !V.empty())
     Opts.InstrProfileOutput = V.str();
+  const Arg *IRProfileUse = Args.getLastArg(OPT_ir_profile_use);
+  Opts.UseIRProfile = IRProfileUse ? IRProfileUse->getValue() : "";
 
   Opts.DebugInfoForProfiling |= Args.hasArg(OPT_debug_info_for_profiling);
 

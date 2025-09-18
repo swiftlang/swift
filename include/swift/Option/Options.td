@@ -1621,6 +1621,11 @@ def ir_profile_generate: Flag<["-"], "ir-profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate instrumented code to collect execution counts into default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
 
+def ir_profile_use : CommaJoined<["-"], "ir-profile-use=">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
+  MetaVarName<"<profdata>">,
+  HelpText<"Supply an IR-level PGO profdata file to enable profile-guided optimization">;
+
 def embed_bitcode : Flag<["-"], "embed-bitcode">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Embed LLVM IR bitcode as data">;

@@ -232,9 +232,9 @@ static void populatePGOOptions(std::optional<PGOOptions> &Out,
   }
 
   if (Opts.EnableCSIRProfileGen) {
-    const bool hasUse = !Opts.UseProfile.empty();
+    const bool hasUse = !Opts.UseIRProfile.empty();
     Out = PGOOptions(
-      /*ProfileFile=*/ Opts.UseProfile,
+      /*ProfileFile=*/ Opts.UseIRProfile,
       /*CSProfileGenFile=*/ Opts.InstrProfileOutput,
       /*ProfileRemappingFile=*/ "",
       /*MemoryProfile=*/ "",

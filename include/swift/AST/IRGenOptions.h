@@ -548,6 +548,9 @@ public:
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
 
+  /// Path to the profdata file to be used for IR/CS-IR PGO, or the empty string.
+  std::string UseIRProfile = "";
+
   /// Path to the data file to be used for sampling-based PGO,
   /// or the empty string.
   std::string UseSampleProfile = "";

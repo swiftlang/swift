@@ -219,19 +219,28 @@ static void validateProfilingArgs(DiagnosticEngine &diags,
   const Arg *ProfileUse = args.getLastArg(options::OPT_profile_use);
   const Arg *IRProfileGenerate =
       args.getLastArg(options::OPT_ir_profile_generate);
+  const Arg *IRProfileUse = args.getLastArg(options::OPT_ir_profile_use);
   if (ProfileGenerate && ProfileUse) {
     diags.diagnose(SourceLoc(), diag::error_conflicting_options,
                    "-profile-generate", "-profile-use");
+  }
+  if (ProfileGenerate && IRProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-profile-generate", "-ir-profile-use");
   }
   if (IRProfileGenerate && ProfileUse) {
     diags.diagnose(SourceLoc(), diag::error_conflicting_options,
                    "-ir-profile-generate", "-profile-use");
   }
-
+  if (IRProfileGenerate && IRProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate", "-ir-profile-use");
+  }
   // Check if the profdata is missing
-  if (ProfileUse && !llvm::sys::fs::exists(ProfileUse->getValue())) {
-    diags.diagnose(SourceLoc(), diag::error_profile_missing,
-                   ProfileUse->getValue());
+  for (const Arg *use : {ProfileUse, IRProfileUse}) {
+    if (use && !llvm::sys::fs::exists(use->getValue())) {
+      diags.diagnose(SourceLoc(), diag::error_profile_missing, use->getValue());
+    }
   }
 }
 
