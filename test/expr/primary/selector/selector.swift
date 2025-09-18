@@ -12,11 +12,11 @@ class C1 {
   @objc func method1(_ a: A, b: B) { }
   @objc(someMethodWithA:B:) func method2(_ a: A, b: B) { }
 
-  @objc class func method3(_ a: A, b: B) { } // expected-note{{found this candidate}}
-  @objc class func method3(a: A, b: B) { } // expected-note{{found this candidate}}
+  @objc class func method3(_ a: A, b: B) { } // expected-note{{found candidate with type '(A, B) -> ()'}}
+  @objc class func method3(a: A, b: B) { } // expected-note{{found candidate with type '(A, B) -> ()'}}
 
-  @objc(ambiguous1:b:) class func ambiguous(a: A, b: A) { } // expected-note{{found this candidate}}
-  @objc(ambiguous2:b:) class func ambiguous(a: A, b: B) { } // expected-note{{found this candidate}}
+  @objc(ambiguous1:b:) class func ambiguous(a: A, b: A) { } // expected-note{{found candidate with type '(A, A) -> ()'}}
+  @objc(ambiguous2:b:) class func ambiguous(a: A, b: B) { } // expected-note{{found candidate with type '(A, B) -> ()'}}
 
   @objc func getC1() -> AnyObject { return self }
 

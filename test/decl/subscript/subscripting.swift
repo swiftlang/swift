@@ -359,9 +359,9 @@ func testUnresolvedMemberSubscriptFixit(_ s0: GenSubscriptFixitTest) {
 
 struct SubscriptTest1 {
   subscript(keyword:String) -> Bool { return true }
-  // expected-note@-1 5 {{found candidate 'subscript(_:)'}} expected-note@-1 {{'subscript(_:)' produces 'Bool', not the expected contextual result type 'Int'}}
+  // expected-note@-1 5 {{found candidate with type '(String) -> Bool'}} expected-note@-1 {{'subscript(_:)' produces 'Bool', not the expected contextual result type 'Int'}}
   subscript(keyword:String) -> String? {return nil }
-  // expected-note@-1 5 {{found candidate with type '(String) -> String'}} expected-note@-1 {{'subscript(_:)' produces 'String?', not the expected contextual result type 'Int'}}
+  // expected-note@-1 5 {{found candidate with type '(String) -> String?'}} expected-note@-1 {{'subscript(_:)' produces 'String?', not the expected contextual result type 'Int'}}
 
   subscript(arg: SubClass) -> Bool { return true } // expected-note {{declared here}}
   // expected-note@-1 2 {{found candidate with type '(SubClass) -> Bool'}}

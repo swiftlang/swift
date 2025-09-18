@@ -9,8 +9,8 @@ protocol P {
 
 // We currently only apply the constructor ranking rule to X() and not X.init().
 struct S<T : P> {
-  init(_ x: T = .init()) {} // expected-note {{found candidate with type '(T) -> S'}}
-  init(_ x: T? = nil) {} // expected-note {{found candidate with type '(T?) -> S'}}
+  init(_ x: T = .init()) {} // expected-note {{found candidate with type '(T) -> S<T>'}}
+  init(_ x: T? = nil) {} // expected-note {{found candidate with type '(T?) -> S<T>'}}
   func testInitRanking() {
     _ = S<T>() // Okay
     _ = S<T>.init() // expected-error {{ambiguous use of 'init(_:)'}}

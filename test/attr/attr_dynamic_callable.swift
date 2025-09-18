@@ -163,11 +163,11 @@ class InvalidDerived : InvalidBase {
 
 @dynamicCallable
 struct OverloadedCallable {
-  // expected-note @+1 {{found candidate 'dynamicallyCall'}}
+  // expected-note @+1 {{found candidate with type '([Int]) -> Int'}}
   func dynamicallyCall(withArguments arguments: [Int]) -> Int {
     return 1
   }
-  // expected-note @+1 {{found candidate with type '([Int])->Float'}}
+  // expected-note @+1 {{found candidate with type '([Int]) -> Float'}}
   func dynamicallyCall(withArguments arguments: [Int]) -> Float {
     return 1.0
   }

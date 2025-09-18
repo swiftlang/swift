@@ -20,8 +20,8 @@ func operators(_ x1: Int8) {
 // Check coercion failure due to overflow.
 struct X { }
 struct Y { }
-func accept_integer(_ x: Int8) -> X { } // expected-note 2{{found this candidate}}
-func accept_integer(_ x: Int16) -> Y { } // expected-note 2{{found this candidate}}
+func accept_integer(_ x: Int8) -> X { } // expected-note 2{{found candidate with type '(Int8) -> X'}}
+func accept_integer(_ x: Int16) -> Y { } // expected-note 2{{found candidate with type '(Int16) -> Y'}}
 
 func overflow_check() {
   var y : Y = accept_integer(500)

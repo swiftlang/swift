@@ -12,4 +12,3 @@ maybeTrans(0) // expected-error{{ambiguous use of 'maybeTrans'}}
 // CHECK: maybeTrans(_ i: Int16)
 // CHECK-NOT: transparent
 // CHECK: maybeTrans(_ i: Int32)
-// CHECK: found candidate with type '(Int32) -> ()' in module 'has_ambiquities'

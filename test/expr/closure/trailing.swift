@@ -301,23 +301,23 @@ func overloadOnLabelDefaultArgs(x: Int = 1, b: () -> Void) {}
 func overloadOnLabelSomeDefaultArgs(_: Int, x: Int = 0, a: () -> Void) {}
 func overloadOnLabelSomeDefaultArgs(_: Int, x: Int = 1, b: () -> Void) {}
 
-func overloadOnDefaultArgsOnly(x: Int = 0, a: () -> Void) {} // expected-note 2 {{found this candidate}}
-func overloadOnDefaultArgsOnly(y: Int = 1, a: () -> Void) {} // expected-note 2 {{found this candidate}}
+func overloadOnDefaultArgsOnly(x: Int = 0, a: () -> Void) {} // expected-note 2 {{found candidate with type '(Int, () -> Void) -> ()'}}
+func overloadOnDefaultArgsOnly(y: Int = 1, a: () -> Void) {} // expected-note 2 {{found candidate with type '(Int, () -> Void) -> ()'}}
 
-func overloadOnDefaultArgsOnly2(x: Int = 0, a: () -> Void) {} // expected-note 2 {{found this candidate}}
-func overloadOnDefaultArgsOnly2(y: Bool = true, a: () -> Void) {} // expected-note 2 {{found this candidate}}
+func overloadOnDefaultArgsOnly2(x: Int = 0, a: () -> Void) {} // expected-note 2 {{found candidate with type '(Int, () -> Void) -> ()'}}
+func overloadOnDefaultArgsOnly2(y: Bool = true, a: () -> Void) {} // expected-note 2 {{found candidate with type '(Bool, () -> Void) -> ()'}}
 
-func overloadOnDefaultArgsOnly3(x: Int = 0, a: () -> Void) {} // expected-note 2 {{found this candidate}}
-func overloadOnDefaultArgsOnly3(x: Bool = true, a: () -> Void) {} // expected-note 2 {{found this candidate}}
+func overloadOnDefaultArgsOnly3(x: Int = 0, a: () -> Void) {} // expected-note 2 {{found candidate with type '(Int, () -> Void) -> ()'}}
+func overloadOnDefaultArgsOnly3(x: Bool = true, a: () -> Void) {} // expected-note 2 {{found candidate with type '(Bool, () -> Void) -> ()'}}
 
-func overloadOnSomeDefaultArgsOnly(_: Int, x: Int = 0, a: () -> Void) {} // expected-note {{found this candidate}}
-func overloadOnSomeDefaultArgsOnly(_: Int, y: Int = 1, a: () -> Void) {} // expected-note {{found this candidate}}
+func overloadOnSomeDefaultArgsOnly(_: Int, x: Int = 0, a: () -> Void) {} // expected-note {{found candidate with type '(Int, Int, () -> Void) -> ()'}}
+func overloadOnSomeDefaultArgsOnly(_: Int, y: Int = 1, a: () -> Void) {} // expected-note {{found candidate with type '(Int, Int, () -> Void) -> ()'}}
 
-func overloadOnSomeDefaultArgsOnly2(_: Int, x: Int = 0, a: () -> Void) {} // expected-note {{found this candidate}}
-func overloadOnSomeDefaultArgsOnly2(_: Int, y: Bool = true, a: () -> Void) {} // expected-note {{found this candidate}}
+func overloadOnSomeDefaultArgsOnly2(_: Int, x: Int = 0, a: () -> Void) {} // expected-note {{found candidate with type '(Int, Int, () -> Void) -> ()'}}
+func overloadOnSomeDefaultArgsOnly2(_: Int, y: Bool = true, a: () -> Void) {} // expected-note {{found candidate with type '(Int, Bool, () -> Void) -> ()'}}
 
-func overloadOnSomeDefaultArgsOnly3(_: Int, x: Int = 0, a: () -> Void) {} // expected-note {{found this candidate}}
-func overloadOnSomeDefaultArgsOnly3(_: Int, x: Bool = true, a: () -> Void) {} // expected-note {{found this candidate}}
+func overloadOnSomeDefaultArgsOnly3(_: Int, x: Int = 0, a: () -> Void) {} // expected-note {{found candidate with type '(Int, Int, () -> Void) -> ()'}}
+func overloadOnSomeDefaultArgsOnly3(_: Int, x: Bool = true, a: () -> Void) {} // expected-note {{found candidate with type '(Int, Bool, () -> Void) -> ()'}}
 
 func testOverloadAmbiguity() {
   overloadOnLabel {} // expected-error {{ambiguous use of 'overloadOnLabel'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabel(a:)'}} {{18-19=(a: }} {{21-21=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabel(b:)'}} {{18-19=(b: }} {{21-21=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabel(c:)'}} {{18-19=(c: }} {{21-21=)}}
