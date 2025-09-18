@@ -1742,10 +1742,14 @@ void PreCheckTarget::transformForExpression(SingleValueStmtExpr *SVE) {
     if (auto stmt = result.dyn_cast<Stmt *>()) {
       if (auto *then = dyn_cast<ThenStmt>(stmt)) {
         auto *declRefExpr = new(astCtx) DeclRefExpr(varDecl, DeclNameLoc(), true);
-        auto *dotExpr = new(astCtx) UnresolvedDotExpr(declRefExpr, sveLoc, DeclNameRef(DeclBaseName(astCtx.Id_append)), DeclNameLoc(), true);
+        auto *dotExpr = new(astCtx) UnresolvedDotExpr(declRefExpr,
+                                                      SourceLoc(),
+                                                      DeclNameRef(DeclBaseName(astCtx.Id_append)),
+                                                      DeclNameLoc(),
+                                                      true);
         auto *argumentList = ArgumentList::createImplicit(astCtx, { Argument::unlabeled(then->getResult()) });
         auto *callExpr = CallExpr::createImplicit(astCtx, dotExpr, argumentList);
-        result = callExpr;
+        then->setResult(callExpr);
       }
     }
   }

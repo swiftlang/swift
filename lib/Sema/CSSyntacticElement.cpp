@@ -1292,8 +1292,12 @@ private:
 
     // First check to make sure the ThenStmt is in a valid position.
     SmallVector<ThenStmt *, 4> validThenStmts;
-    if (auto SVE = context.getAsSingleValueStmtExpr())
+    if (auto SVE = context.getAsSingleValueStmtExpr()) {
       (void)SVE.get()->getThenStmts(validThenStmts);
+      if (SVE.get()->getStmtKind() == SingleValueStmtExpr::Kind::For) {
+        contextInfo = std::nullopt;
+      }
+    }
 
     if (!llvm::is_contained(validThenStmts, thenStmt)) {
       auto *thenLoc = cs.getConstraintLocator(thenStmt);
@@ -2251,7 +2255,9 @@ private:
     // not the branch result type. This is necessary as there may be
     // an additional conversion required for the branch.
     auto target = solution.getTargetFor(thenStmt->getResult());
-    target->setExprConversionType(ty);
+    if (SVE.get()->getStmtKind() != SingleValueStmtExpr::Kind::For) {
+      target->setExprConversionType(ty);
+    }
 
     auto *resultExpr = thenStmt->getResult();
     if (auto newResultTarget = rewriter.rewriteTarget(*target))
