@@ -1851,8 +1851,12 @@ void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
       llvm::ConstantDataArray::getString(IGM.getLLVMContext(),
                                          Buffer, /*AddNull=*/false);
   auto &M = *IGM.getModule();
+  // Use PrivateLinkage here. The ".swift_ast" section is specially recognized
+  // by LLVM’s object emission and classified as a "metadata" section. On
+  // WebAssembly, metadata symbols must not appear in the object file symbol
+  // table, so using PrivateLinkage avoids exposing the symbol.
   auto *ASTSym = new llvm::GlobalVariable(M, Ty, /*constant*/ true,
-                                          llvm::GlobalVariable::InternalLinkage,
+                                          llvm::GlobalValue::PrivateLinkage,
                                           Data, "__Swift_AST");
 
   std::string Section;
