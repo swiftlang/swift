@@ -17,7 +17,6 @@
     return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
       return unsafe simple(len, _pPtr.baseAddress!)
     }
->>>>>>> 04da61bf237 (update tests)
 }
 ------------------------------
 @__swiftmacro_So9swiftAttr15_SwiftifyImportfMp_.swift
@@ -299,3 +298,4 @@
       return unsafe keywordType(len, _pPtr.baseAddress!, p2)
     }
 }
+------------------------------
