@@ -1222,10 +1222,10 @@ std::optional<Type> InterfaceTypeRequest::getCachedResult() const {
 void InterfaceTypeRequest::cacheResult(Type type) const {
   auto *decl = std::get<0>(getStorage());
   if (type) {
-    assert(!type->hasTypeVariable() && "Type variable in interface type");
-    assert(!type->is<InOutType>() && "Interface type must be materializable");
-    assert(!type->hasPrimaryArchetype() && "Archetype in interface type");
-    assert(decl->getDeclContext()->isLocalContext() || !type->hasLocalArchetype() &&
+    ASSERT(!type->hasTypeVariable() && "Type variable in interface type");
+    ASSERT(!type->is<InOutType>() && "Interface type must be materializable");
+    ASSERT(!type->hasPrimaryArchetype() && "Archetype in interface type");
+    ASSERT(decl->getDeclContext()->isLocalContext() || !type->hasLocalArchetype() &&
            "Local archetype in interface type of non-local declaration");
   }
   decl->TypeAndAccess.setPointer(type);
