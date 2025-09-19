@@ -3868,71 +3868,6 @@ public:
   }
 };
 
-class ReturnTypePlaceholderReplacer : public ASTWalker {
-  FuncDecl *Implementation;
-  BraceStmt *Body;
-  SmallVector<Type, 4> Candidates;
-
-  bool HasInvalidReturn = false;
-
-public:
-  ReturnTypePlaceholderReplacer(FuncDecl *Implementation, BraceStmt *Body)
-      : Implementation(Implementation), Body(Body) {}
-
-  void check() {
-    auto *resultRepr = Implementation->getResultTypeRepr();
-    if (!resultRepr) {
-      return;
-    }
-
-    Implementation->getASTContext()
-        .Diags
-        .diagnose(resultRepr->getLoc(),
-                  diag::placeholder_type_not_allowed_in_return_type)
-        .highlight(resultRepr->getSourceRange());
-
-    Body->walk(*this);
-
-    // If given function has any invalid returns in the body
-    // let's not try to validate the types, since it wouldn't
-    // be accurate.
-    if (HasInvalidReturn)
-      return;
-
-    auto writtenType = Implementation->getResultInterfaceType();
-    llvm::SmallPtrSet<TypeBase *, 8> seenTypes;
-    for (auto candidate : Candidates) {
-      if (!seenTypes.insert(candidate.getPointer()).second) {
-        continue;
-      }
-      TypeChecker::notePlaceholderReplacementTypes(writtenType, candidate);
-    }
-  }
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::ArgumentsAndExpansion;
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *E) override { return Action::Continue(E); }
-
-  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    if (auto *RS = dyn_cast<ReturnStmt>(S)) {
-      if (RS->hasResult()) {
-        auto resultTy = RS->getResult()->getType();
-        HasInvalidReturn |= resultTy.isNull() || resultTy->hasError();
-        Candidates.push_back(resultTy);
-      }
-    }
-
-    return Action::Continue(S);
-  }
-
-  // Don't descend into nested decls.
-  PreWalkAction walkToDeclPre(Decl *D) override {
-    return Action::SkipNode();
-  }
-};
-
 } // end anonymous namespace
 
 SourceLoc swift::getFixItLocForVarToLet(VarDecl *var) {
@@ -4544,13 +4479,6 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
                           = accessor->getStorage()->getOpaqueResultTypeDecl()) {
         OpaqueUnderlyingTypeChecker(AFD, opaqueResultTy, body).check();
       }
-    }
-  } else if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-    auto resultIFaceTy = FD->getResultInterfaceType();
-    // If the result has a placeholder, we need to try to use the contextual
-    // type inferred in the body to replace it.
-    if (resultIFaceTy && resultIFaceTy->hasPlaceholder()) {
-      ReturnTypePlaceholderReplacer(FD, body).check();
     }
   }
 }
