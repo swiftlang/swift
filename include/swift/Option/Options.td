@@ -347,12 +347,12 @@ def import_underlying_module : Flag<["-"], "import-underlying-module">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Implicitly imports the Objective-C half of a module">;
 
+def import_bridging_header : Separate<["-"], "import-bridging-header">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Implicitly imports a C header file">;
 def import_objc_header : Separate<["-"], "import-objc-header">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
-  HelpText<"Implicitly imports an Objective-C header file">;
-def import_bridging_header : Separate<["-"], "import-bridging-header">,
-  Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
-  Alias<import_objc_header>;
+  Alias<import_bridging_header>;
 def import_pch : Separate<["-"], "import-pch">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Import bridging header PCH file">;

@@ -913,7 +913,7 @@ static inline bool isPCHFilenameExtension(StringRef path) {
 
 void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
-  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
+  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_bridging_header)) {
     // Legacy support for passing PCH file through `-import-objc-header`.
     if (isPCHFilenameExtension(A->getValue()))
       Opts.ImplicitObjCPCHPath = A->getValue();

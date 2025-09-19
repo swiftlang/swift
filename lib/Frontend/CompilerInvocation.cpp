@@ -2109,7 +2109,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   else if (Args.hasArg(OPT_emit_pcm) || Args.hasArg(OPT_dump_pcm))
     Opts.Mode = ClangImporterOptions::Modes::PrecompiledModule;
 
-  if (auto *A = Args.getLastArg(OPT_import_objc_header))
+  if (auto *A = Args.getLastArg(OPT_import_bridging_header))
     Opts.BridgingHeader = A->getValue();
   if (auto *A = Args.getLastArg(OPT_import_pch))
     Opts.BridgingHeaderPCH = A->getValue();

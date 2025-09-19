@@ -524,7 +524,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   // Pass along an -import-objc-header arg, replacing the argument with the name
   // of any input PCH to the current action if one is present.
-  if (context.Args.hasArgNoClaim(options::OPT_import_objc_header)) {
+  if (context.Args.hasArgNoClaim(options::OPT_import_bridging_header)) {
     bool ForwardAsIs = true;
     bool bridgingPCHIsEnabled =
         context.Args.hasFlag(options::OPT_enable_bridging_pch,
@@ -543,7 +543,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       }
     }
     if (ForwardAsIs) {
-      context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
+      context.Args.AddLastArg(Arguments, options::OPT_import_bridging_header);
     }
     if (usePersistentPCH) {
       context.Args.AddLastArg(Arguments, options::OPT_pch_output_dir);
@@ -972,7 +972,7 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
   addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
   addRuntimeLibraryFlags(context.OI, Arguments);
 
-  context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
+  context.Args.AddLastArg(Arguments, options::OPT_import_bridging_header);
 
   context.Args.AddLastArg(Arguments, options::OPT_parse_sil);
 
@@ -1233,7 +1233,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                           options::OPT_omit_extension_block_symbols);
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_minimum_access_level);
 
-  context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
+  context.Args.AddLastArg(Arguments, options::OPT_import_bridging_header);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
@@ -1276,7 +1276,7 @@ ToolChain::constructInvocation(const VerifyModuleInterfaceJobAction &job,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
 
-  context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
+  context.Args.AddLastArg(Arguments, options::OPT_import_bridging_header);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
@@ -1342,7 +1342,7 @@ ToolChain::constructInvocation(const REPLJobAction &job,
   addCommonFrontendArgs(context.OI, context.Output, context.Args, FrontendArgs);
   addRuntimeLibraryFlags(context.OI, FrontendArgs);
 
-  context.Args.AddLastArg(FrontendArgs, options::OPT_import_objc_header);
+  context.Args.AddLastArg(FrontendArgs, options::OPT_import_bridging_header);
   context.Args.addAllArgs(FrontendArgs,
                           {options::OPT_framework, options::OPT_L});
   ToolChain::addLinkedLibArgs(context.Args, FrontendArgs);
