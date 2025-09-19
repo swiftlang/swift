@@ -1084,31 +1084,6 @@ static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value, bool
                            funcType->getExtInfo());
 }
 
-/// We allow placeholder types in interface types in certain cases to allow
-/// better recovery since we can suggest the inferred type as a replacement.
-/// When referencing those decls though we need to make sure we record a fix
-/// since we cannot form a valid solution with them.
-static void
-recordFixIfNeededForPlaceholderInDecl(ConstraintSystem &cs, ValueDecl *D,
-                                      ConstraintLocatorBuilder locator) {
-  auto mayHavePlaceholder = [&]() -> bool {
-    // Parameters with types may have placeholders, since this allows us to
-    // suggest an inferred type from a default argument. Match the logic in
-    // `getUnopenedTypeOfReference` and only query the interface type if we have
-    // one already.
-    if (auto *PD = dyn_cast<ParamDecl>(D))
-      return PD->hasInterfaceType();
-
-    // Therefore decls with parameter lists may also have placeholders.
-    return D->getParameterList();
-  };
-  if (!mayHavePlaceholder() || !D->getInterfaceType()->hasPlaceholder())
-    return;
-
-  auto *loc = cs.getConstraintLocator(locator);
-  cs.recordFix(IgnoreInvalidPlaceholderInDeclRef::create(cs, loc));
-}
-
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfReferencePre(OverloadChoice choice,
                                         DeclContext *useDC,
@@ -1117,8 +1092,6 @@ ConstraintSystem::getTypeOfReferencePre(OverloadChoice choice,
   auto *value = choice.getDecl();
 
   ASSERT(!!preparedOverload == PreparingOverload);
-
-  recordFixIfNeededForPlaceholderInDecl(*this, value, locator);
 
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
     // Unqualified lookup can find operator names within nominal types.
@@ -1876,8 +1849,6 @@ ConstraintSystem::getTypeOfMemberReferencePre(
 
   auto *value = choice.getDecl();
   auto functionRefInfo = choice.getFunctionRefInfo();
-
-  recordFixIfNeededForPlaceholderInDecl(*this, value, locator);
 
   // Figure out the instance type used for the base.
   auto baseTy = choice.getBaseType();

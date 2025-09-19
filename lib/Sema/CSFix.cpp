@@ -2264,20 +2264,6 @@ SpecifyTypeForPlaceholder::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) SpecifyTypeForPlaceholder(cs, locator);
 }
 
-IgnoreInvalidPlaceholderInDeclRef *
-IgnoreInvalidPlaceholderInDeclRef::create(ConstraintSystem &cs, ConstraintLocator *locator) {
-  return new (cs.getAllocator()) IgnoreInvalidPlaceholderInDeclRef(cs, locator);
-}
-
-bool
-IgnoreInvalidPlaceholderInDeclRef::diagnose(const Solution &solution,
-                                            bool asNote) const {
-  // These are diagnosed separately. Unfortunately we can't enforce that a
-  // diagnostic has already been emitted since their diagnosis depends on e.g
-  // type-checking a function body for a placeholder result of a function.
-  return true;
-}
-
 bool AllowRefToInvalidDecl::diagnose(const Solution &solution,
                                      bool asNote) const {
   ReferenceToInvalidDeclaration failure(solution, getLocator());
