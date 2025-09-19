@@ -24,6 +24,10 @@ public class Argument : Value, Hashable {
     return bridged.getParent().block
   }
 
+  public var ownership: Ownership {
+    return Ownership(bridged: bridged.getOwnership())
+  }
+
   public var bridged: BridgedArgument { BridgedArgument(obj: SwiftObject(self)) }
 
   public var index: Int {

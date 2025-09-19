@@ -969,6 +969,7 @@ struct BridgedArgument {
 
   BRIDGED_INLINE swift::SILArgument * _Nonnull getArgument() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getParent() const;
+  BRIDGED_INLINE BridgedValue::Ownership getOwnership() const;
   BRIDGED_INLINE bool isReborrow() const;
   BRIDGED_INLINE bool FunctionArgument_isLexical() const;
   BRIDGED_INLINE bool FunctionArgument_isClosureCapture() const;
