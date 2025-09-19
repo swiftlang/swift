@@ -3477,19 +3477,6 @@ namespace {
         }
       }
 
-      // The constraint solver may not have chosen legal casts.
-      if (auto funcConv = dyn_cast<FunctionConversionExpr>(expr)) {
-        checkFunctionConversion(funcConv,
-                                funcConv->getSubExpr()->getType(),
-                                funcConv->getType());
-      }
-
-      if (auto *isolationErasure = dyn_cast<ActorIsolationErasureExpr>(expr)) {
-        checkFunctionConversion(isolationErasure,
-                                isolationErasure->getSubExpr()->getType(),
-                                isolationErasure->getType());
-      }
-
       if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(expr)) {
         checkDefaultArgument(defaultArg);
       }
@@ -3579,6 +3566,19 @@ namespace {
             }
           }
         }
+      }
+
+      // The constraint solver may not have chosen legal casts.
+      if (auto funcConv = dyn_cast<FunctionConversionExpr>(expr)) {
+        checkFunctionConversion(funcConv,
+                                funcConv->getSubExpr()->getType(),
+                                funcConv->getType());
+      }
+
+      if (auto *isolationErasure = dyn_cast<ActorIsolationErasureExpr>(expr)) {
+        checkFunctionConversion(isolationErasure,
+                                isolationErasure->getSubExpr()->getType(),
+                                isolationErasure->getType());
       }
 
       return Action::Continue(expr);
