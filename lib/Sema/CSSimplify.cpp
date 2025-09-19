@@ -16099,7 +16099,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowValueExpansionWithoutPackReferences:
   case FixKind::IgnoreInvalidPatternInExpr:
   case FixKind::IgnoreInvalidPlaceholder:
-  case FixKind::IgnoreInvalidPlaceholderInDeclRef:
   case FixKind::IgnoreOutOfPlaceThenStmt:
   case FixKind::IgnoreMissingEachKeyword:
   case FixKind::AllowInlineArrayLiteralCountMismatch:
