@@ -13,6 +13,13 @@
 // If CAS is not available, we use load/store exclusive.
 #define USE_LDX_STX !USE_CAS
 
+// Use ptrauth instructions where needed.
+#if __ARM_FEATURE_PAUTH
+#define PTRAUTH 1
+#else
+#define PTRAUTH 0
+#endif
+
 // The value of 1 strong refcount in the overall refcount field.
 #define STRONG_RC_ONE (1 << 33)
 
@@ -38,6 +45,9 @@ _retainRelease_slowpath_mask:
 // rest of the line is emitted. When false, nothing is emitted. More readable
 // shorthand for #if blocks when there's only one instruction to conditionalize.
 .macro CONDITIONAL condition line:vararg
+.ifb \line
+.err CONDITIONAL used with no instruction
+.endif
 .if \condition
 \line
 .endif
@@ -71,6 +81,8 @@ _retainRelease_slowpath_mask:
 
 .macro CALL_SLOWPATH func
 // Push a stack frame.
+  CONDITIONAL PTRAUTH, \
+    pacibsp
   stp   fp, lr, [sp, #-16]!
   mov   fp, sp
 
@@ -88,7 +100,10 @@ _retainRelease_slowpath_mask:
 // Pop the stack frame and return.
   mov   sp, fp
   ldp   fp, lr, [sp], #16
-  ret
+  CONDITIONAL PTRAUTH, \
+    retab
+  CONDITIONAL !PTRAUTH, \
+    ret
 .endmacro
 
 
