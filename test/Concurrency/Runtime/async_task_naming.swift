@@ -20,6 +20,13 @@ func test() async {
     return 12
   }.value
 
+  let task = Task(name: "Caplin the Task Handle") {
+    return 12
+  }
+  _ = await task.value
+  // CHECK: task.name = Caplin the Task Handle
+  print("task.name = \(task.name ?? "NONE")")
+
   _ = try? await Task(name: "Caplin the Throwing Task") {
     // CHECK: Task.name = Caplin the Throwing Task
     print("Task.name = \(Task.name ?? "NONE")")
