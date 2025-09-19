@@ -41,3 +41,24 @@ inline void releaseSharedFRT(SharedFRT *_Nonnull x) {
   if (x->_refCount == 0)
     delete x;
 }
+
+struct LargeStructWithRefCountedField {
+  void const *a;
+  void const *b;
+  unsigned long c;
+  unsigned d;
+  SharedFRT *e;
+};
+
+struct LargeStructWithRefCountedFieldNested {
+  int a;
+  LargeStructWithRefCountedField b;
+};
+
+inline LargeStructWithRefCountedField getStruct() {
+  return {0, 0, 0, 0, new SharedFRT()};
+}
+
+inline LargeStructWithRefCountedFieldNested getNestedStruct() {
+  return {0, {0, 0, 0, 0, new SharedFRT()}};
+}
