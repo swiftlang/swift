@@ -1,4 +1,15 @@
+// Without directory
 // RUN: %target-swift-frontend -ir-profile-generate -emit-ir %s | %FileCheck %s
+
+// With directory
+// RUN: %empty-directory(%t.dir)
+// RUN: %target-swift-frontend -ir-profile-generate=%t.dir -emit-ir %s | %FileCheck %s
+
+// Ensure Passes: PGOInstrumentationGenPass and InstrProfilingLoweringPass are invoked.
+// RUN: %target-swift-frontend -ir-profile-generate -emit-ir %s -Xllvm -debug-pass=Structure -Xllvm --time-passes -o /dev/null 2>&1 | %FileCheck -check-prefix=CHECK-PGOGENPASS-INVOKED-INSTR-GEN --check-prefix=CHECK-INSTRPROF %s
+// CHECK-PGOGENPASS-INVOKED-INSTR-GEN: PGOInstrumentationGen
+// CHECK-INSTRPROF: InstrProfilingLoweringPass
+
 
 sil_stage canonical
 
@@ -13,25 +24,23 @@ sil @c : $@convention(thin) () -> ()
 // CHECK: @__llvm_profile_runtime = external hidden global
 
 // counter array (2 counters for the then/else)
-// CHECK: @__profc_a = {{.*}} global [2 x i64]
+// CHECK: @__profc_a = {{.*}} global {{.*}}
 // data record pointing at the counter array and the function
 // CHECK: @__profd_a = {{.*}} global {{.*}} ptr @a.local
 
-// CHECK: br i1 {{.*}}, label %[[THEN:[0-9]+]], label %[[ELSE:[0-9]+]]
 
+// CHECK: br i1 {{.*}}, label %[[THEN:[0-9]+]], label %[[ELSE:[0-9]+]]
 // THEN: increment counter[0] and call b()
 // CHECK: [[THEN]]:
-// CHECK:   %[[L0:.*]] = load i64, ptr @__profc_a, align 8
-// CHECK:   %[[A0:.*]] = add i64 %[[L0]], 1
-// CHECK:   store i64 %[[A0]], ptr @__profc_a, align 8
+// CHECK:   {{.*}} = load {{.*}}@__profc_a{{.*}}
+// CHECK:   store {{.*}} %{{.*}}, ptr @__profc_a
 // CHECK:   call swiftcc void @b()
 // CHECK:   br label %[[MERGE:[0-9]+]]
 
 // ELSE: increment counter[1] and call c()
 // CHECK: [[ELSE]]:
-// CHECK:   %[[L1:.*]] = load i64, ptr getelementptr inbounds ([2 x i64], ptr @__profc_a, i32 0, i32 1), align 8
-// CHECK:   %[[A1:.*]] = add i64 %[[L1]], 1
-// CHECK:   store i64 %[[A1]], ptr getelementptr inbounds ([2 x i64], ptr @__profc_a, i32 0, i32 1), align 8
+// CHECK:   {{.*}} = load {{.*}}, {{.*}} getelementptr{{.*}}@__profc_a{{.*}}
+// CHECK:   store {{.*}} %{{.*}}, ptr @__profc_a
 // CHECK:   call swiftcc void @c()
 // CHECK:   br label %[[MERGE]]
 

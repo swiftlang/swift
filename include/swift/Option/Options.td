@@ -1621,6 +1621,11 @@ def ir_profile_generate: Flag<["-"], "ir-profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate instrumented code to collect execution counts into default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
 
+def ir_profile_generate_EQ : Joined<["-"], "ir-profile-generate=">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  MetaVarName<"<directory>">,
+  HelpText<"Generate instrumented code to collect execution counts into <directory>/default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
 def ir_profile_use : CommaJoined<["-"], "ir-profile-use=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
   MetaVarName<"<profdata>">,

@@ -3497,7 +3497,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   const Arg *ProfileSampleUse = Args.getLastArg(OPT_profile_sample_use);
   Opts.UseSampleProfile = ProfileSampleUse ? ProfileSampleUse->getValue() : "";
 
-  Opts.EnableIRProfileGen = Args.hasArg(OPT_ir_profile_generate);
+  Opts.EnableIRProfileGen = Args.hasArg(OPT_ir_profile_generate) ||
+                            Args.hasArg(OPT_ir_profile_generate_EQ);
+  if (auto V = Args.getLastArgValue(OPT_ir_profile_generate_EQ); !V.empty())
+    Opts.InstrProfileOutput = V.str();
   Opts.EnableCSIRProfileGen = Args.hasArg(OPT_cs_profile_generate) ||
                               Args.hasArg(OPT_cs_profile_generate_EQ);
   if (auto V = Args.getLastArgValue(OPT_cs_profile_generate_EQ); !V.empty())

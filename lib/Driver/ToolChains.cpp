@@ -165,7 +165,8 @@ bool needsInstrProfileRuntime(const llvm::opt::ArgList &Args) {
   return Args.hasArg(options::OPT_profile_generate) ||
          Args.hasArg(options::OPT_cs_profile_generate) ||
          Args.hasArg(options::OPT_cs_profile_generate_EQ) ||
-         Args.hasArg(options::OPT_ir_profile_generate);
+         Args.hasArg(options::OPT_ir_profile_generate) ||
+         Args.hasArg(options::OPT_ir_profile_generate_EQ);
 }
 } // namespace swift::driver::toolchains
 
@@ -333,6 +334,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_ir_profile_generate);
+  inputArgs.AddLastArg(arguments, options::OPT_ir_profile_generate_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_ir_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_cs_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_cs_profile_generate_EQ);
