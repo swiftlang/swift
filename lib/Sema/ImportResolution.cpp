@@ -908,8 +908,6 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                                      targetName, importerName);
 
   if (ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
-    // This will catch Swift 6 language mode as well where
-    // it will be reported as an error.
     inFlight.fixItRemove(import.accessLevelRange);
   } else {
     SourceRange attrRange = import.accessLevelRange;
@@ -917,12 +915,17 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
       inFlight.fixItReplace(attrRange, "internal");
     else
       inFlight.fixItInsert(import.importLoc, "internal ");
-
-    // Downgrade to warning only in pre-Swift 6 mode and
-    // when not using the experimental flag.
-    if (!ctx.LangOpts.hasFeature(Feature::AccessLevelOnImport))
-      inFlight.limitBehavior(DiagnosticBehavior::Warning);
   }
+
+  // Report as an error when InternalImportsByDefault is enabled or
+  // the experimental AccessLevelOnImport (but not Swift 6), only in libraries
+  // that are meant to be distributed.
+  auto featureEnabled =
+    ctx.LangOpts.hasFeature(Feature::AccessLevelOnImport) ||
+    ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault);
+  if (!featureEnabled ||
+      SF.getParentModule()->getLibraryLevel() < LibraryLevel::SPI)
+    inFlight.limitBehavior(DiagnosticBehavior::Warning);
 }
 
 void UnboundImport::diagnoseInvalidAttr(DeclAttrKind attrKind,
