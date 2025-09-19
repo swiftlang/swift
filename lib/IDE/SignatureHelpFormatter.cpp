@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/SignatureHelpFormatter.h"
+#include "CodeCompletionStringBuilder.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/IDE/CodeCompletionStringBuilder.h"
 #include "swift/IDE/CommentConversion.h"
 
 using namespace swift;
