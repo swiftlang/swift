@@ -2714,6 +2714,7 @@ ClangImporter::Implementation::Implementation(
       DisableSwiftBridgeAttr(ctx.ClangImporterOpts.DisableSwiftBridgeAttr),
       BridgingHeaderExplicitlyRequested(
           !ctx.ClangImporterOpts.BridgingHeader.empty()),
+      BridgingHeaderIsInternal(ctx.ClangImporterOpts.BridgingHeaderIsInternal),
       DisableOverlayModules(ctx.ClangImporterOpts.DisableOverlayModules),
       EnableClangSPI(ctx.ClangImporterOpts.EnableClangSPI),
       IsReadingBridgingPCH(false),

@@ -353,9 +353,18 @@ def import_bridging_header : Separate<["-"], "import-bridging-header">,
 def import_objc_header : Separate<["-"], "import-objc-header">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   Alias<import_bridging_header>;
+
+def internal_import_bridging_header : Separate<["-"], "internal-import-bridging-header">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Imports an C header file as an internal import">;
+
 def import_pch : Separate<["-"], "import-pch">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Import bridging header PCH file">;
+
+def internal_import_pch : Separate<["-"], "internal-import-pch">,
+  Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
+  HelpText<"Import bridging header PCH file as internal">;
 
 def pch_output_dir: Separate<["-"], "pch-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
