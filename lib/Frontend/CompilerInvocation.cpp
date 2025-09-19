@@ -2129,6 +2129,13 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.BridgingHeaderIsInternal = importAsInternal;
   }
 
+  // Until we have some checking in place, internal bridging headers are a
+  // bit unsafe without library evolution.
+  if (Opts.BridgingHeaderIsInternal && !FrontendOpts.EnableLibraryEvolution) {
+    Diags.diagnose(SourceLoc(),
+                   diag::internal_bridging_header_without_library_evolution);
+  }
+
   Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
 
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);

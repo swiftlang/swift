@@ -609,6 +609,9 @@ ERROR(no_swift_sources_with_embedded,none,
 ERROR(package_cmo_requires_library_evolution, none,
         "Library evolution must be enabled for Package CMO", ())
 
+WARNING(internal_bridging_header_without_library_evolution,none,
+        "using internal bridging headers without library evolution can cause instability", ())
+
 ERROR(experimental_not_supported_in_production,none,
       "experimental feature '%0' cannot be enabled in production compiler",
       (StringRef))
