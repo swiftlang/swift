@@ -893,13 +893,13 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
         addError(CheckStr.data(),
                  "each verified diagnostic may only have one "
                  "{{documentation-file=<#notes#>}} declaration");
-        return 0;
+        continue;
       }
 
       // Trim 'documentation-file='.
       StringRef name = CheckStr.substr(categoryDocFileSpecifier.size());
       Expected.DocumentationFile = {OpenLoc, CloseLoc, name};
-      return 0;
+      continue;
     }
 
     // This wasn't a documentation file specifier, so it must be a fix-it.
@@ -914,7 +914,7 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
       }
 
       Expected.noneMarkerStartLoc = CheckStr.data() - 2;
-      return 0;
+      continue;
     }
 
     if (Expected.noneMarkerStartLoc) {
@@ -928,7 +928,7 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
       addError(CheckStr.data(), Twine("expected fix-it verification within "
                                       "braces; example: '1-2=text' or '") +
                                     fixitExpectationNoneString + Twine("'"));
-      return 0;
+      continue;
     }
 
     // Parse the pieces of the fix-it.
@@ -940,7 +940,7 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
             parseExpectedFixItRange(CheckStr, Expected.LineNo)) {
       FixIt.Range = range.value();
     } else {
-      return 0;
+      continue;
     }
 
     if (!CheckStr.empty() && CheckStr.front() == '=') {
@@ -948,7 +948,7 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
     } else {
       addError(CheckStr.data(),
                "expected '=' after range in fix-it verification");
-      return 0;
+      continue;
     }
 
     // Translate literal "\\n" into '\n', inefficiently.
