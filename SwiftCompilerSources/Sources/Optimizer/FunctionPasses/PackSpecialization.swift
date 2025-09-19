@@ -165,7 +165,12 @@ private struct PackExplodedFunction {
       cloneFunction(from: original, toEmpty: opt, specContext)
 
       let argumentMap = explodePackArguments(from: original, to: opt, specContext)
-      print(argumentMap)
+
+      for bb in opt.blocks {
+        if bb.isReachableExitBlock {
+          insertArgumentPackDeallocations(in: bb, argumentMap: argumentMap, specContext)
+        }
+      }
     }
 
     context.notifyNewFunction(function: function, derivedFrom: original)
@@ -224,6 +229,21 @@ private struct PackExplodedFunction {
     }
 
     return ArgumentMap(map: argumentMap)
+  }
+
+  /// Insert dealloc_pack instructions for the alloc_pack's corresponding to the original function's pack arguments.
+  private func insertArgumentPackDeallocations(
+    in bb: BasicBlock, argumentMap: ArgumentMap, _ context: FunctionPassContext
+  ) {
+    precondition(bb.isReachableExitBlock)
+
+    let terminator = bb.terminator
+
+    let builder = Builder(before: terminator, context)
+
+    for (_, mapping) in argumentMap.map {
+      builder.createDeallocPack(mapping.allocPack)
+    }
   }
 
   private func unrollPackLoops(in opt: Function, specContext: FunctionPassContext) {
