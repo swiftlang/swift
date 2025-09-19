@@ -17,6 +17,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckEmbedded.h"
 #include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTBridging.h"
@@ -389,6 +390,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           return;
         }
       }
+
+      // Embedded Swift places restrictions on dynamic casting.
+      diagnoseDynamicCastInEmbedded(DC, cast);
 
       // now, look for conditional casts to marker protocols.
 

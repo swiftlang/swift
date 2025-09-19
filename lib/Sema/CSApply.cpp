@@ -21,6 +21,7 @@
 #include "MiscDiagnostics.h"
 #include "OpenedExistentials.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckEmbedded.h"
 #include "TypeCheckMacros.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
@@ -924,8 +925,9 @@ namespace {
     /// \returns An OpaqueValueExpr that provides a reference to the value
     /// stored within the expression or its metatype (if the base was a
     /// metatype).
-    Expr *openExistentialReference(Expr *base, ExistentialArchetypeType *archetype,
-                                   ValueDecl *member) {
+    Expr *openExistentialReference(Expr *base,
+                                   ExistentialArchetypeType *archetype,
+                                   ValueDecl *member, SourceLoc memberLoc) {
       assert(archetype && "archetype not already opened?");
 
       // Dig out the base type.
@@ -954,6 +956,11 @@ namespace {
       }
 
       assert(baseTy->isAnyExistentialType() && "Type must be existential");
+
+      // Embedded Swift has limitations on the use of generic members of
+      // existentials. Diagnose them here.
+      diagnoseGenericMemberOfExistentialInEmbedded(
+          dc, memberLoc, baseTy, member);
 
       // If the base was an lvalue but it will only be treated as an
       // rvalue, turn the base into an rvalue now. This results in
@@ -1983,7 +1990,8 @@ namespace {
             (!member->getDeclContext()->getSelfProtocolDecl() &&
              baseIsInstance && member->isInstanceMember())) {
           // Open the existential before performing the member reference.
-          base = openExistentialReference(base, knownOpened->second, member);
+          base = openExistentialReference(base, knownOpened->second, member,
+                                          memberLoc.getBaseNameLoc());
           baseTy = baseOpenedTy;
           selfTy = baseTy;
           openedExistential = true;
@@ -2490,7 +2498,8 @@ namespace {
       auto memberLoc = cs.getCalleeLocator(cs.getConstraintLocator(locator));
       auto knownOpened = solution.OpenedExistentialTypes.find(memberLoc);
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
-        base = openExistentialReference(base, knownOpened->second, subscript);
+        base = openExistentialReference(base, knownOpened->second, subscript,
+                                        args->getLoc());
         baseTy = knownOpened->second;
       }
 
@@ -6551,7 +6560,8 @@ ArgumentList *ExprRewriter::coerceCallArguments(
           cs.getConstraintLocator(argLoc));
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         argExpr = openExistentialReference(
-            argExpr, knownOpened->second, callee.getDecl());
+            argExpr, knownOpened->second, callee.getDecl(),
+            apply ? apply->getLoc() : argExpr->getLoc());
         argType = cs.getType(argExpr);
       }
     }

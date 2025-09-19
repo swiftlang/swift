@@ -19,12 +19,22 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Bridging/ASTGen.h"
 
 using namespace swift;
+
+static DiagnosticBehavior
+defaultEmbeddedLimitationForError(const DeclContext *dc, SourceLoc loc) {
+  if (dc->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return DiagnosticBehavior::Unspecified;
+
+  return DiagnosticBehavior::Warning;
+}
 
 std::optional<DiagnosticBehavior>
 swift::shouldDiagnoseEmbeddedLimitations(const DeclContext *dc, SourceLoc loc,
@@ -33,7 +43,7 @@ swift::shouldDiagnoseEmbeddedLimitations(const DeclContext *dc, SourceLoc loc,
   // as errors. Use "unspecified" so we don't change anything.
   if (dc->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
       wasAlwaysEmbeddedError) {
-    return DiagnosticBehavior::Unspecified;
+    return defaultEmbeddedLimitationForError(dc, loc);
   }
 
   // Check one of the Embedded restriction diagnostics that is ignored by
@@ -66,6 +76,42 @@ swift::shouldDiagnoseEmbeddedLimitations(const DeclContext *dc, SourceLoc loc,
   return DiagnosticBehavior::Unspecified;
 }
 
+/// Determine whether the inner signature is more generic than the outer
+/// signature, ignoring differences that
+static bool isABIMoreGenericThan(GenericSignature innerSig, GenericSignature outerSig) {
+  auto canInnerSig = innerSig.getCanonicalSignature();
+  auto canOuterSig = outerSig.getCanonicalSignature();
+  if (canInnerSig == canOuterSig)
+    return false;
+
+  // The inner signature added generic parameters.
+  if (canOuterSig.getGenericParams().size() !=
+        canInnerSig.getGenericParams().size())
+    return true;
+
+  // Look at the requirements of the inner signature that aren't satisfied
+  // by the outer signature, to see if there are any requirements that aren't
+  // just marker protocols.
+  auto requirements = canInnerSig.requirementsNotSatisfiedBy(canOuterSig);
+  for (const auto &req : requirements) {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+      if (req.getProtocolDecl()->isMarkerProtocol())
+        continue;
+
+      return true;
+
+    case RequirementKind::Superclass:
+    case RequirementKind::Layout:
+    case RequirementKind::SameShape:
+    case RequirementKind::SameType:
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /// Check embedded restrictions in the signature of the given function.
 void swift::checkEmbeddedRestrictionsInSignature(
     const AbstractFunctionDecl *func) {
@@ -80,6 +126,20 @@ void swift::checkEmbeddedRestrictionsInSignature(
       !func->hasPolymorphicEffect(EffectKind::Throws)) {
     diagnoseUntypedThrowsInEmbedded(func, throwsLoc);
   }
+
+  // If we're in a class, one cannot have a non-final generic function.
+  if (auto classDecl = dyn_cast<ClassDecl>(func->getDeclContext())) {
+    if (!classDecl->isSemanticallyFinal() &&
+        ((isa<FuncDecl>(func) && !func->isSemanticallyFinal()) ||
+         (isa<ConstructorDecl>(func) &&
+          cast<ConstructorDecl>(func)->isRequired())) &&
+        isABIMoreGenericThan(func->getGenericSignature(),
+                             classDecl->getGenericSignature())) {
+      func->diagnose(diag::generic_nonfinal_in_embedded_swift, func,
+                     isa<ConstructorDecl>(func))
+        .limitBehavior(defaultEmbeddedLimitationForError(func, func->getLoc()));
+    }
+  }
 }
 
 void swift::diagnoseUntypedThrowsInEmbedded(
@@ -93,4 +153,46 @@ void swift::diagnoseUntypedThrowsInEmbedded(
       throwsLoc, diag::untyped_throws_in_embedded_swift)
     .limitBehavior(*behavior)
     .fixItInsertAfter(throwsLoc, "(<#thrown error type#>)");
+}
+
+void swift::diagnoseGenericMemberOfExistentialInEmbedded(
+    const DeclContext *dc, SourceLoc loc,
+    Type baseType, const ValueDecl *member) {
+  // If we are not supposed to diagnose Embedded Swift limitations, do nothing.
+  auto behavior = shouldDiagnoseEmbeddedLimitations(dc, loc);
+  if (!behavior)
+    return;
+
+  if (isABIMoreGenericThan(
+          member->getInnermostDeclContext()->getGenericSignatureOfContext(),
+          member->getDeclContext()->getGenericSignatureOfContext())) {
+    dc->getASTContext().Diags.diagnose(loc, diag::use_generic_member_of_existential_in_embedded_swift, member,
+        baseType)
+      .limitBehavior(*behavior);
+  }
+}
+
+void swift::diagnoseDynamicCastInEmbedded(
+    const DeclContext *dc, const CheckedCastExpr *cast) {
+  // If we are not supposed to diagnose Embedded Swift limitations, do nothing.
+  auto behavior = shouldDiagnoseEmbeddedLimitations(dc, cast->getLoc());
+  if (!behavior)
+    return;
+
+  // We only care about casts to existential types.
+  Type toType = cast->getCastType()->lookThroughAllOptionalTypes();
+  if (!toType->isAnyExistentialType())
+    return;
+
+  ExistentialLayout layout = toType->getExistentialLayout();
+  for (auto proto : layout.getProtocols()) {
+    if (proto->isMarkerProtocol())
+      continue;
+
+    dc->getASTContext().Diags.diagnose(
+        cast->getLoc(),
+        diag::dynamic_cast_involving_protocol_in_embedded_swift, proto)
+      .limitBehaviorIf(behavior);
+    return;
+  }
 }
