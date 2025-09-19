@@ -7006,6 +7006,15 @@ ERROR(attr_availability_domain_not_usable_from_inline, none,
       "'@usableFromInline' or public",
       (AvailabilityDomain, DeclAttribute, const Decl *))
 
+GROUPED_WARNING(attr_availability_has_no_effect_domain_always_available,
+                AlwaysAvailableDomain, none,
+                "'%0' has no effect because '%1' is always available",
+                (DeclAttribute, AvailabilityDomain))
+GROUPED_WARNING(attr_availability_domain_always_available,
+                AlwaysAvailableDomain, none,
+                "'%0' is always available, use '*' instead",
+                (AvailabilityDomain))
+
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
       (const ValueDecl *, bool, AvailabilityDomain, StringRef))
@@ -7126,6 +7135,12 @@ WARNING(availability_query_useless_enclosing_scope, none,
 
 NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
+
+GROUPED_WARNING(availability_query_useless_always_true,
+                AlwaysAvailableDomain, none,
+                "unnecessary check for '%0'; "
+                "this condition will always be %select{false|true}1",
+                (AvailabilityDomain, unsigned))
 
 ERROR(availability_decl_no_potential, none,
       "%kindonly0 cannot be marked potentially unavailable with '@available'",
