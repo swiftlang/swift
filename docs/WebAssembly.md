@@ -30,8 +30,14 @@ for WebAssembly is built and tested using the following command:
 
 This command will build the Swift compiler for the host platform and then build the Swift standard library
 for WebAssembly targets. Toolchain `lit.py` tests will run on the freshly built stdlib, both for embedded and non-embedded
-builds. The resulting Swift SDK `.artifactbundle` will be placed in the `../swift-sdk-generator/Bundles`
-directory.
+builds.
+
+The resulting Swift SDK `.artifactbundle` will be placed in the `../swift-sdk-generator/Bundles`
+directory. Install it using the following command (assuming you're in the `swift` directory of `update-checkout` clones):
+
+```
+swift sdk install ../swift-sdk-generator/Bundles/swift-DEVELOPMENT-SNAPSHOT_wasm.artifactbundle
+```
 
 ## Building Swift SDK for WebAssembly without building the compiler
 
