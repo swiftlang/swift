@@ -148,7 +148,7 @@ extension BidirectionalCollection {
     by areEquivalent: (C.Element, Element) -> Bool
   ) -> CollectionDifference<Element>
   where C.Element == Self.Element {
-    return _myers(from: other, to: self, using: areEquivalent)
+    _linearSpaceMyers(from: other, to: self, using: areEquivalent)
   }
 }
 
@@ -173,59 +173,416 @@ extension BidirectionalCollection where Element: Equatable {
   public func difference<C: BidirectionalCollection>(
     from other: C
   ) -> CollectionDifference<Element> where C.Element == Self.Element {
-    return difference(from: other, by: ==)
+    difference(from: other, by: ==)
   }
 }
 
 // MARK: Internal implementation
 
-// _V is a rudimentary type made to represent the rows of the triangular matrix
-// type used by the Myer's algorithm.
-//
-// This type is basically an array that only supports indexes in the set
-// `stride(from: -d, through: d, by: 2)` where `d` is the depth of this row in
-// the matrix `d` is always known at allocation-time, and is used to preallocate
-// the structure.
-private struct _V {
-
-  private var a: [Int]
+/// Storage for the two "k-vectors" used by the Myers diffing
+/// algorithm, using a single allocation.
+///
+/// The two k-vectors are stored one after the other in this type's
+/// buffer. For a given size `s`, each k-vector provides space for
+/// offsets in the range `-s...s`, using this layout for the buffer
+/// and offsets when `s == 2`:
+///
+/// ```
+/// ┌─────────────────────────────────────────────────────────────┐
+/// │             0    1    2    3    4    5    6    7    8    9  │
+/// │          ┌────┬────┬────┬────┬────┬────┬────┬────┬────┬────┐│
+/// │ buffer:  │ .. │ .. │ .. │ .. │ .. │ .. │ .. │ .. │ .. │ .. ││
+/// │          └────┴────┴────┴────┴────┴────┴────┴────┴────┴────┘│
+/// |                       ^                        ^            |
+/// |                  forwardOffset           backwardOffset     |
+/// │          ┌────┬────┬────┬────┬────┐                         │
+/// │ forward: │ -2 │ -1 │  0 │  1 │  2 │                         │
+/// │          └────┴────┴────┴────┴────┘                         │
+/// │                                   ┌────┬────┬────┬────┬────┐│
+/// │ backward:                         │ -2 │ -1 │  0 │  1 │  2 ││
+/// │                                   └────┴────┴────┴────┴────┘│
+/// └─────────────────────────────────────────────────────────────┘
+/// ```
+@safe fileprivate struct DoubleKVector: ~Copyable {
+  let buffer: UnsafeMutableBufferPointer<Int>
+  let forwardOffset: Int
+  let backwardOffset: Int
 #if INTERNAL_CHECKS_ENABLED
-  private let isOdd: Bool
+  private let range: Int
 #endif
 
-  init(maxIndex largest: Int) {
+  /// Creates a new double k-vector.
+  ///
+  /// The size of the resulting array is `((2 * size) + 1) * 2`,
+  /// enough space to store two k-vectors ranging from `-size`
+  /// through `size`.
+  init(size: Int) {
+    let range = size * 2 + 1
+    unsafe self.buffer = .allocate(capacity: range * 2)
+    self.forwardOffset = size
+    self.backwardOffset = range + size
+    unsafe buffer.initialize(repeating: 0)
 #if INTERNAL_CHECKS_ENABLED
-    _internalInvariant(largest >= 0)
-    isOdd = largest % 2 == 1
+    self.range = range
 #endif
-    a = [Int](repeating: 0, count: largest + 1)
   }
 
-  // The way negative indexes are implemented is by interleaving them in the empty slots between the valid positive indexes
-  @inline(__always) private static func transform(_ index: Int) -> Int {
-    // -3, -1, 1, 3 -> 3, 1, 0, 2 -> 0...3
-    // -2, 0, 2 -> 2, 0, 1 -> 0...2
-    return (index <= 0 ? -index : index &- 1)
+  deinit {
+    unsafe buffer.deallocate()
+  }
+  
+  @inline(__always) fileprivate func forwardTransform(_ index: Int) -> Int {
+    forwardOffset &+ index
   }
 
-  subscript(index: Int) -> Int {
+  @inline(__always) fileprivate func backwardTransform(_ index: Int) -> Int {
+    backwardOffset &+ index
+  }
+  
+  subscript(forward index: Int) -> Int {
     get {
 #if INTERNAL_CHECKS_ENABLED
-      _internalInvariant(isOdd == (index % 2 != 0))
+      precondition(((-range)...range).contains(index))
 #endif
-      return a[_V.transform(index)]
+      return unsafe buffer[forwardTransform(index)]
     }
     set(newValue) {
 #if INTERNAL_CHECKS_ENABLED
-      _internalInvariant(isOdd == (index % 2 != 0))
+      precondition(((-range)...range).contains(index))
 #endif
-      a[_V.transform(index)] = newValue
+      unsafe buffer[forwardTransform(index)] = newValue
+    }
+  }
+  
+  subscript(backward index: Int) -> Int {
+    get {
+#if INTERNAL_CHECKS_ENABLED
+      precondition(((-range)...range).contains(index))
+#endif
+      return unsafe buffer[backwardTransform(index)]
+    }
+    set(newValue) {
+#if INTERNAL_CHECKS_ENABLED
+      precondition(((-range)...range).contains(index))
+#endif
+      unsafe buffer[backwardTransform(index)] = newValue
     }
   }
 }
 
-@available(SwiftStdlib 5.1, *)
-private func _myers<C,D>(
+/// A two-dimensional region of a Myers diff algorithm edit graph.
+fileprivate struct EditGraphRect: Equatable {
+  var left: Int
+  var top: Int
+  var right: Int
+  var bottom: Int
+  
+  var width: Int {
+    right &- left
+  }
+
+  var height: Int {
+    bottom &- top
+  }
+
+  var size: Int {
+    width &+ height
+  }
+
+  var delta: Int {
+    width &- height
+  }
+  
+  var isEven: Bool {
+    delta.isMultiple(of: 2)
+  }
+  
+  var isOdd: Bool {
+    !delta.isMultiple(of: 2)
+  }
+  
+  var max: Int {
+    (size &+ 1) / 2
+  }
+  
+  /// Shrinks this box so that its bottom right corner is the top left corner of
+  /// the given box.
+  func cropped(toTopLeftOf limit: EditGraphRect) -> EditGraphRect {
+    .init(left: left, top: top, right: limit.left, bottom: limit.top)
+  }
+  
+  /// Shrinks this box so that its top left corner is the bottom right corner of
+  /// the given box.
+  func cropped(toBottomRightOf limit: EditGraphRect) -> EditGraphRect {
+    .init(left: limit.right, top: limit.bottom, right: right, bottom: bottom)
+  }
+
+  /// Shrinks this box from both top and bottom by following diagonal paths
+  /// (equal corresponding elements) in the two collections that are the target
+  /// of diffing.
+  func shrunk<T>(
+    old: UnsafeBufferPointer<T>,
+    new: UnsafeBufferPointer<T>,
+    cmp: (T, T) -> Bool
+  ) -> EditGraphRect {
+    var r = self
+    while r.left < r.right, r.top < r.bottom,
+          unsafe cmp(old[r.left], new[r.top])
+    {
+      r.left &+= 1
+      r.top &+= 1
+    }
+    while r.right > r.left, r.bottom > r.top,
+          unsafe cmp(old[r.right - 1], new[r.bottom - 1])
+    {
+      r.right &-= 1
+      r.bottom &-= 1
+    }
+    return r
+  }
+}
+
+fileprivate struct LinearMyers: ~Copyable {
+  var kVector: DoubleKVector
+  
+  /// Implements a refinement of the Myers diffing algorithm that uses
+  /// linear space for storing the "k vectors" during an iterative divide-
+  /// and-conquer search.
+  mutating func findDifferences<T>(
+    in initial: EditGraphRect,
+    old: UnsafeBufferPointer<T>,
+    new: UnsafeBufferPointer<T>,
+    cmp: (T, T) -> Bool
+  ) -> [CollectionDifference<T>.Change] {
+    var result: [CollectionDifference<T>.Change] = []
+    var stack: [EditGraphRect] = []
+    var current = initial
+    
+    while true {
+      let (edit, snakeBox) = unsafe middleSnake(
+        in: current, old: old, new: new, cmp: cmp)
+      
+      // Append edit if exists
+      if let edit {
+        result.append(edit)
+      }
+      
+      guard let snakeBox else {
+        // Didn't find a new middle snake, so we'll look at the next area on the
+        // stack next (the right side of the last snake)
+        guard let next = stack.popLast() else {
+          // Stack is empty -- all done with diff!
+          return result
+        }
+        current = next
+        continue
+      }
+      
+      let headBox = unsafe current.cropped(toTopLeftOf: snakeBox)
+        .shrunk(old: old, new: new, cmp: cmp)
+      let tailBox = unsafe current.cropped(toBottomRightOf: snakeBox)
+        .shrunk(old: old, new: new, cmp: cmp)
+      
+      // Process the left side of the snake next
+      current = headBox
+      // Save the right side of the snake for later
+      stack.append(tailBox)
+    }
+  }
+  
+  fileprivate mutating func middleSnake<T>(
+    in box: EditGraphRect,
+    old: UnsafeBufferPointer<T>, new: UnsafeBufferPointer<T>,
+    cmp: (T, T) -> Bool
+  ) -> (CollectionDifference<T>.Change?, EditGraphRect?) {
+    guard box.size > 1 else {
+      // One rightward or downward move represents a removal or insertion.
+      if box.size == 0 {
+        return (nil, nil)
+      } else if box.width == 1 {
+        return unsafe (.remove(offset: box.left, element: old[box.left], associatedWith: nil), nil)
+      } else {
+        return unsafe (.insert(offset: box.top, element: new[box.top], associatedWith: nil), nil)
+      }
+    }
+    
+    // Reset for depth == 0
+    kVector[forward: 1] = box.left
+    kVector[backward: 1] = box.bottom
+    
+    for depth in 0...box.max {
+      if box.isOdd {
+        if let result = unsafe forwardSearch(
+          in: box, depth: depth, old: old, new: new, cmp: cmp)
+        {
+          return result
+        }
+        _ = unsafe backwardSearch(in: box, depth: depth, old: old, new: new, cmp: cmp)
+      } else {
+        _ = unsafe forwardSearch(in: box, depth: depth, old: old, new: new, cmp: cmp)
+        if let result = unsafe backwardSearch(
+          in: box, depth: depth, old: old, new: new, cmp: cmp)
+        {
+          return result
+        }
+      }
+    }
+    fatalError("Unreachable")
+  }
+  
+  fileprivate mutating func forwardSearch<T>(
+    in box: EditGraphRect,
+    depth: Int,
+    old: UnsafeBufferPointer<T>,
+    new: UnsafeBufferPointer<T>,
+    cmp: (T, T) -> Bool
+  ) -> (CollectionDifference<T>.Change, EditGraphRect)? {
+    for k in stride(from: depth, through: -depth, by: -2) {
+      // The furthest right and down we search
+      var newRight, newBottom: Int
+      // The top/left of the candidate middle snake
+      let newLeft, newTop: Int
+      
+      // Information about the selected edit, if used
+      let isInsertion: Bool
+      let editIndex: Int
+            
+      // Choose whether this is an insertion or a deletion, then set up
+      // bounds of candidate middle snake.
+      if k == -depth ||
+          (k != depth && kVector[forward: k - 1] < kVector[forward: k + 1])
+      {
+        newRight = kVector[forward: k + 1]
+        newLeft = newRight
+        newBottom = box.top + (newRight - box.left) - k
+        
+        isInsertion = true
+        editIndex = newBottom - 1
+      } else {
+        newLeft = kVector[forward: k - 1]
+        newRight = newLeft + 1
+        newBottom = box.top + (newRight - box.left) - k
+        
+        isInsertion = false
+        editIndex = newLeft
+      }
+      newTop = if depth == 0 || newRight != newLeft {
+        newBottom
+      } else {
+        newBottom - 1
+      }
+      
+      // Follow any diagonal after the movement
+      while newRight < box.right && newBottom < box.bottom,
+            unsafe cmp(old[newRight], new[newBottom])
+      {
+        newRight &+= 1
+        newBottom &+= 1
+      }
+      kVector[forward: k] = newRight
+      
+      // Only check for overlap in _odd-sized_ boxes when moving _forward_
+      guard box.isOdd else { continue }
+      
+      // If `c` is in bounds and there's an overlap, return the identified edit
+      // and the eliminated box.
+      let c = k - box.delta
+      if (c >= -(depth - 1) && c <= depth - 1) && newBottom >= kVector[backward: c] {
+        let edit: CollectionDifference<T>.Change = if isInsertion {
+          unsafe .insert(offset: editIndex, element: new[editIndex], associatedWith: nil)
+        } else {
+          unsafe .remove(offset: editIndex, element: old[editIndex], associatedWith: nil)
+        }
+        return (
+          edit,
+          EditGraphRect(left: newLeft, top: newTop, right: newRight, bottom: newBottom))
+      }
+    }
+    return nil
+  }
+    
+  fileprivate mutating func backwardSearch<T>(
+    in box: EditGraphRect,
+    depth: Int,
+    old: UnsafeBufferPointer<T>,
+    new: UnsafeBufferPointer<T>,
+    cmp: (T, T) -> Bool
+  ) -> (CollectionDifference<T>.Change, EditGraphRect)? {
+    for c in stride(from: depth, through: -depth, by: -2) {
+      let k = c + box.delta
+      // The furthest up and left we search
+      var newLeft, newTop: Int
+      // The bottom/right of the candidate middle snake
+      let newRight, newBottom: Int
+      
+      // Information about the selected edit, if used
+      let isInsertion: Bool
+      let editIndex: Int
+      
+      // Choose whether this is an insertion or a deletion, then set up
+      // bounds of candidate middle snake.
+      if c == -depth ||
+          (c != depth && kVector[backward: c - 1] > kVector[backward: c + 1])
+      {
+        newTop = kVector[backward: c + 1]
+        newBottom = newTop
+        newLeft = box.left + (newTop - box.top) + k
+        
+        isInsertion = false
+        editIndex = newLeft
+      } else {
+        newBottom = kVector[backward: c - 1]
+        newTop = newBottom - 1
+        newLeft = box.left + (newTop - box.top) + k
+
+        isInsertion = true
+        editIndex = newTop
+      }
+      newRight = if depth == 0 || newTop != newBottom {
+        newLeft
+      } else {
+        newLeft + 1
+      }
+      
+      // Follow any diagonal after the movement
+      while newLeft > box.left && newTop > box.top,
+            unsafe cmp(old[newLeft - 1], new[newTop - 1])
+      {
+        newLeft &-= 1
+        newTop &-= 1
+      }
+      kVector[backward: c] = newTop
+      
+      // Only check for overlap in _even-sized_ boxes when moving _backward_
+      guard box.isEven else { continue }
+      
+      // If `k` is in bounds and there's an overlap, return the identified edit
+      // and the eliminated box.
+      if (k >= -depth && k <= depth) && newLeft <= kVector[forward: k] {
+        let edit: CollectionDifference<T>.Change = if isInsertion {
+          unsafe .insert(offset: editIndex, element: new[editIndex], associatedWith: nil)
+        } else {
+          unsafe .remove(offset: editIndex, element: old[editIndex], associatedWith: nil)
+        }
+        return (
+          edit,
+          EditGraphRect(left: newLeft, top: newTop, right: newRight, bottom: newBottom))
+      }
+    }
+    return nil
+  }
+}
+
+extension LinearMyers {
+  fileprivate init?(
+    initialSize size: Int
+  ) {
+    guard size >= 0 else { return nil }
+    self.kVector = DoubleKVector(size: size)
+  }
+}
+
+func _linearSpaceMyers<C,D>(
   from old: C, to new: D,
   using cmp: (C.Element, D.Element) -> Bool
 ) -> CollectionDifference<C.Element>
@@ -234,133 +591,34 @@ private func _myers<C,D>(
     D: BidirectionalCollection,
     C.Element == D.Element
 {
-
-  // Core implementation of the algorithm described at http://www.xmailserver.org/diff2.pdf
-  // Variable names match those used in the paper as closely as possible
-  func _descent(from a: UnsafeBufferPointer<C.Element>, to b: UnsafeBufferPointer<D.Element>) -> [_V] {
-    let n = a.count
-    let m = b.count
-    let max = n + m
-
-    var result = [_V]()
-    var v = _V(maxIndex: 1)
-    v[1] = 0
-
-    var x = 0
-    var y = 0
-    iterator: for d in 0...max {
-      let prev_v = v
-      result.append(v)
-      v = _V(maxIndex: d)
-
-      // The code in this loop is _very_ hot—the loop bounds increases in terms
-      // of the iterator of the outer loop!
-      for k in stride(from: -d, through: d, by: 2) {
-        if k == -d {
-          x = prev_v[k &+ 1]
-        } else {
-          let km = prev_v[k &- 1]
-
-          if k != d {
-            let kp = prev_v[k &+ 1]
-            if km < kp {
-              x = kp
-            } else {
-              x = km &+ 1
-            }
-          } else {
-            x = km &+ 1
-          }
-        }
-        y = x &- k
-
-        while x < n && y < m {
-          if unsafe !cmp(a[x], b[y]) {
-            break;
-          }
-          x &+= 1
-          y &+= 1
-        }
-
-        v[k] = x
-
-        if x >= n && y >= m {
-          break iterator
-        }
-      }
-      if x >= n && y >= m {
-        break
-      }
-    }
-
-    _internalInvariant(x >= n && y >= m)
-
-    return result
-  }
-
-  // Backtrack through the trace generated by the Myers descent to produce the changes that make up the diff
-  func _formChanges(
-    from a: UnsafeBufferPointer<C.Element>,
-    to b: UnsafeBufferPointer<C.Element>,
-    using trace: [_V]
-  ) -> [CollectionDifference<C.Element>.Change] {
-    var changes = [CollectionDifference<C.Element>.Change]()
-    changes.reserveCapacity(trace.count)
-
-    var x = a.count
-    var y = b.count
-    for d in stride(from: trace.count &- 1, to: 0, by: -1) {
-      let v = trace[d]
-      let k = x &- y
-      let prev_k = (k == -d || (k != d && v[k &- 1] < v[k &+ 1])) ? k &+ 1 : k &- 1
-      let prev_x = v[prev_k]
-      let prev_y = prev_x &- prev_k
-
-      while x > prev_x && y > prev_y {
-        // No change at this position.
-        x &-= 1
-        y &-= 1
-      }
-
-      _internalInvariant((x == prev_x && y > prev_y) || (y == prev_y && x > prev_x))
-      if y != prev_y {
-        unsafe changes.append(.insert(offset: prev_y, element: b[prev_y], associatedWith: nil))
-      } else {
-        unsafe changes.append(.remove(offset: prev_x, element: a[prev_x], associatedWith: nil))
-      }
-
-      x = prev_x
-      y = prev_y
-    }
-
-    return changes
-  }
-
   /* Splatting the collections into contiguous storage has two advantages:
    *
    *   1) Subscript access is much faster
    *   2) Subscript index becomes Int, matching the iterator types in the algorithm
    *
-   * Combined, these effects dramatically improves performance when
+   * Combined, these effects dramatically improve performance when
    * collections differ significantly, without unduly degrading runtime when
    * the parameters are very similar.
-   *
-   * In terms of memory use, the linear cost of creating a ContiguousArray (when
-   * necessary) is significantly less than the worst-case n² memory use of the
-   * descent algorithm.
    */
   func _withContiguousStorage<Col: Collection, R>(
     for values: Col,
-    _ body: (UnsafeBufferPointer<Col.Element>) throws -> R
-  ) rethrows -> R {
-    if let result = try values.withContiguousStorageIfAvailable(body) { return result }
+    _ body: (UnsafeBufferPointer<Col.Element>) -> R
+  ) -> R {
+    if let result = values.withContiguousStorageIfAvailable(body) { return result }
     let array = ContiguousArray(values)
-    return try unsafe array.withUnsafeBufferPointer(body)
+    return unsafe array.withUnsafeBufferPointer(body)
   }
 
   return unsafe _withContiguousStorage(for: old) { a in
     return unsafe _withContiguousStorage(for: new) { b in
-      return unsafe CollectionDifference(_formChanges(from: a, to: b, using:_descent(from: a, to: b)))!
+      let box = unsafe EditGraphRect(left: 0, top: 0, right: old.count, bottom: new.count)
+        .shrunk(old: a, new: b, cmp: cmp)
+      
+      guard var myers = LinearMyers(initialSize: box.size) else {
+        return CollectionDifference([])!
+      }
+      let diffs = unsafe myers.findDifferences(in: box, old: a, new: b, cmp: cmp)
+      return CollectionDifference(diffs)!
     }
   }
 }
