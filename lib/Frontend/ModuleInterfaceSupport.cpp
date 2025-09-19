@@ -688,10 +688,13 @@ public:
     if (!printOptions.shouldPrint(nominal))
       return;
 
-    /// is this nominal specifically an 'actor'?
+    /// is this nominal specifically an 'actor' or 'distributed actor'?
     bool actorClass = false;
-    if (auto klass = dyn_cast<ClassDecl>(nominal))
+    bool distributedActorClass = false;
+    if (auto klass = dyn_cast<ClassDecl>(nominal)) {
       actorClass = klass->isActor();
+      distributedActorClass = klass->isDistributedActor();
+    }
 
     SmallPtrSet<ProtocolDecl *, 16> handledProtocols;
 
@@ -727,7 +730,10 @@ public:
         // it is only valid to conform to Actor on an 'actor' decl,
         // not extensions of that 'actor'.
         if (actorClass &&
-            inherited->isSpecificProtocol(KnownProtocolKind::Actor))
+          inherited->isSpecificProtocol(KnownProtocolKind::Actor))
+          return TypeWalker::Action::SkipNode;
+        if (distributedActorClass &&
+          inherited->isSpecificProtocol(KnownProtocolKind::DistributedActor))
           return TypeWalker::Action::SkipNode;
 
         // Do not synthesize an extension to print a conformance to an
