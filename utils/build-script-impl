@@ -149,6 +149,7 @@ KNOWN_SETTINGS=(
     ## Skip Test ...
     skip-test-benchmarks                          ""                "set to skip running Swift Benchmark Suite"
     skip-test-sourcekit                           ""                "set to skip testing SourceKit"
+    skip-test-lldb-unittests                      ""                "set to skip running LLDB unit tests"
 
     ## Extra ... CMake Options
     common-cmake-options                          ""                "CMake options used for all targets, including LLVM/Clang"
@@ -2188,6 +2189,12 @@ for host in "${ALL_HOSTS[@]}"; do
                   )
                 fi
 
+                if [[ "${SKIP_TEST_LLDB_UNITTESTS}" ]]; then
+                    cmake_options+=(
+                        -DLLDB_INCLUDE_TESTS:BOOL=OFF
+                    )
+                fi
+
                 # Add the extra CMake args at the end so they can override
                 # values set earlier.
                 if [ ! -z "${LLDB_EXTRA_CMAKE_ARGS}" ]; then
@@ -2675,9 +2682,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLVM_LIT_FILTER_ARG="${FILTER_SWIFT_OPTION}"
                 fi
 
-                echo "--- Running LLDB unit tests ---"
-                with_pushd ${lldb_build_dir} \
-                    call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
+                if [[ ! "${SKIP_TEST_LLDB_UNITTESTS}" ]]; then
+                    echo "--- Running LLDB unit tests ---"
+                    with_pushd ${lldb_build_dir} \
+                        call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
+                fi
                 echo "--- Running LLDB tests (Swift Config: ClangImporter) ---"
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
