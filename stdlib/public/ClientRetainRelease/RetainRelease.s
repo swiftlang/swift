@@ -112,15 +112,18 @@ _swift_releaseInlined:
 
 // The compare-and-swap goes back to here when it needs to retry.
 Lrelease_retry:
-// Load-exclusive of the current value in the refcount field when using LLSC.
-// stxr does not update x16 like cas does, so this load must be inside the loop.
-  CONDITIONAL USE_LDX_STX, \
-    ldxr x16, [x0]
-
 // Get the slow path mask and see if the refcount field has any of those bits
 // set.
   adrp  x17, _retainRelease_slowpath_mask@PAGE
   ldr   x17, [x17, _retainRelease_slowpath_mask@PAGEOFF]
+
+// Load-exclusive of the current value in the refcount field when using LLSC.
+// stxr does not update x16 like cas does, so this load must be inside the loop.
+// ldxr/stxr are not guaranteed to make forward progress if there are memory
+// accesses between them, so we need to do this after getting the mask above.
+  CONDITIONAL USE_LDX_STX, \
+    ldxr x16, [x0]
+
   tst   x16, x17
 
 // Also check if we're releazing with a refcount of 0. That will initiate
@@ -153,7 +156,7 @@ Lrelease_retry:
   b.ne  Lrelease_retry
 #elif USE_LDX_STX
 // Try to store the updated value.
-  stxr  w16, x17, [x0]
+  stlxr  w16, x17, [x0]
 
 // On failure, retry.
   cbnz  w16, Lrelease_retry
@@ -166,6 +169,8 @@ Lrelease_ret:
   ret
 
 Lslowpath_release:
+  CONDITIONAL USE_LDX_STX, \
+    clrex
   CALL_SLOWPATH _swift_release
 
 
@@ -184,16 +189,20 @@ _swift_retainInlined:
     ldr   x16, [x0]
 
 Lretain_retry:
+// Get the slow path mask and see if the refcount field has any of those bits
+// set.
+  adrp  x17, _retainRelease_slowpath_mask@PAGE
+  ldr   x17, [x17, _retainRelease_slowpath_mask@PAGEOFF]
+
 // Load-exclusive of the current value in the refcount field when using LLSC.
 // stxr does not update x16 like cas does, so this load must be inside the loop.
+// ldxr/stxr are not guaranteed to make forward progress if there are memory
+// accesses between them, so we need to do this after getting the mask above.
   CONDITIONAL USE_LDX_STX, \
     ldxr x16, [x0]
 
-// Get the slow path mask and see if the refcount field has any of those bits
-// set. If it does, go to the slow path.
-  adrp  x17, _retainRelease_slowpath_mask@PAGE
-  ldr   x17, [x17, _retainRelease_slowpath_mask@PAGEOFF]
   tst   x16, x17
+
   b.ne  Lslowpath_retain
 
 // Compute a refcount field with the strong refcount incremented.
@@ -233,6 +242,8 @@ Lretain_ret:
   ret
 
 Lslowpath_retain:
+  CONDITIONAL USE_LDX_STX, \
+    clrex
   CALL_SLOWPATH _swift_retain
 
 #else
