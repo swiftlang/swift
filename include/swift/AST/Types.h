@@ -5410,6 +5410,13 @@ public:
     return hasErrorResult() && getErrorResult().isFormalIndirect();
   }
 
+  bool hasGuaranteedResult() const {
+    if (getNumResults() != 1) {
+      return false;
+    }
+    return getResults()[0].isGuaranteedResult();
+  }
+
   bool hasGuaranteedAddressResult() const {
     if (getNumResults() != 1) {
       return false;
