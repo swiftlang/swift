@@ -347,6 +347,11 @@ void swift::performImportResolutionForClangMacroBuffer(
   SF.ASTStage = SourceFile::ImportsResolved;
 }
 
+static bool isSubmodule(const ModuleDecl* M) {
+  auto clangMod = M->findUnderlyingClangModule();
+  return clangMod && clangMod->Parent;
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: Import handling generally
 //===----------------------------------------------------------------------===//
@@ -395,7 +400,7 @@ void ImportResolver::bindImport(UnboundImport &&I) {
   I.validateOptions(topLevelModule, SF);
 
   auto alreadyImportedTLM = [ID,this](const ModuleDecl *MD) {
-    assert(!MD->findUnderlyingClangModule()->isSubModule());
+    ASSERT(!isSubmodule(MD));
     // Scoped imports don't import all symbols from the module, so a scoped
     // import does not count the module as imported
     if (ID && isScopedImportKind(ID.get()->getImportKind()))
@@ -1611,11 +1616,6 @@ void ImportResolver::findCrossImports(
       llvm::dbgs() << "import " << name << "\n";
     });
   }
-}
-
-static bool isSubmodule(ModuleDecl* M) {
-  auto clangMod = M->findUnderlyingClangModule();
-  return clangMod && clangMod->Parent;
 }
 
 void ImportResolver::addCrossImportableModules(
