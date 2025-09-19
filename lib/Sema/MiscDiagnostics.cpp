@@ -4010,8 +4010,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     if (!(access & RK_Defined))
       continue;
 
-    if (auto *caseStmt =
-            dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {
+    if (isa_and_nonnull<CaseStmt>(var->getRecursiveParentPatternStmt())) {
       // Only diagnose for the parent-most VarDecl.
       if (var->getParentVarDecl())
         continue;

@@ -1020,7 +1020,7 @@ namespace {
                   options);
       SmallVector<OverloadChoice, 4> outerChoices;
       for (auto decl : outerAlternatives) {
-        outerChoices.push_back(OverloadChoice(Type(), decl, functionRefInfo));
+        outerChoices.push_back(OverloadChoice::getDecl(decl, functionRefInfo));
       }
       CS.addValueMemberConstraint(
           baseTy, name, tv, CurDC, functionRefInfo, outerChoices,
@@ -1044,8 +1044,8 @@ namespace {
       auto tv = CS.createTypeVariable(memberLocator,
                                       TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
-      OverloadChoice choice =
-          OverloadChoice(CS.getType(base), decl, functionRefInfo);
+      auto choice =
+          OverloadChoice::getDecl(CS.getType(base), decl, functionRefInfo);
 
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addBindOverloadConstraint(tv, choice, locator, CurDC);
@@ -1162,7 +1162,7 @@ namespace {
       // a known subscript here. This might be cleaner if we split off a new
       // UnresolvedSubscriptExpr from SubscriptExpr.
       if (auto decl = declOrNull) {
-        OverloadChoice choice = OverloadChoice(
+        auto choice = OverloadChoice::getDecl(
             baseTy, decl, FunctionRefInfo::doubleBaseNameApply());
         CS.addBindOverloadConstraint(memberTy, choice, memberLocator,
                                      CurDC);
@@ -1657,8 +1657,8 @@ namespace {
       // resolve it. This records the overload for use later.
       auto tv = CS.createTypeVariable(locator, options);
 
-      OverloadChoice choice =
-          OverloadChoice(Type(), E->getDecl(), E->getFunctionRefInfo());
+      auto choice =
+          OverloadChoice::getDecl(E->getDecl(), E->getFunctionRefInfo());
       CS.addBindOverloadConstraint(tv, choice, locator, CurDC);
       return tv;
     }
@@ -1775,8 +1775,8 @@ namespace {
         if (decls[i]->isInvalid())
           continue;
 
-        OverloadChoice choice =
-            OverloadChoice(Type(), decls[i], expr->getFunctionRefInfo());
+        auto choice =
+            OverloadChoice::getDecl(decls[i], expr->getFunctionRefInfo());
         choices.push_back(choice);
       }
 
@@ -2811,6 +2811,9 @@ namespace {
           // interface type request via `var->getType()` that would
           // attempt to validate `weak` attribute, and produce a
           // diagnostic in the middle of the solver path.
+          //
+          // FIXME: getVarType() is now gone. Is the above still
+          // relevant?
 
           CS.addConstraint(ConstraintKind::OneWayEqual, oneWayVarType,
                            varType, locator);
@@ -4120,7 +4123,7 @@ namespace {
         // logic.
         if (result->isInvalid())
           continue;
-        OverloadChoice choice = OverloadChoice(Type(), result, functionRefInfo);
+        auto choice = OverloadChoice::getDecl(result, functionRefInfo);
         choices.push_back(choice);
       }
 
@@ -5241,7 +5244,8 @@ ConstraintSystem::applyPropertyWrapperToParameter(
                   locator,
                   /*isFavored=*/false,
                   preparedOverload);
-    setType(param->getPropertyWrapperWrappedValueVar(), wrappedValueType);
+    setType(param->getPropertyWrapperWrappedValueVar(), wrappedValueType,
+            preparedOverload);
 
     applyPropertyWrapper(anchor,
                          { wrapperType, PropertyWrapperInitKind::WrappedValue },
