@@ -52,8 +52,8 @@ private func optimizedCallee(at apply: ApplySite, in context: FunctionPassContex
 private struct PackExplodedFunction {
   public let original: Function
   public let function: Function
-  public let resultMap: [Int: [ResultInfo]]
-  public let parameterMap: [Int: [ParameterInfo]]
+  public let resultMap: [(Int, [ResultInfo])]
+  public let parameterMap: [(Int, [ParameterInfo])]
 
   init(at apply: ApplySite, in context: FunctionPassContext) {
 
@@ -61,7 +61,7 @@ private struct PackExplodedFunction {
     self.original = callee
 
     var newParams = [ParameterInfo]()
-    var parameterMap = [Int: [ParameterInfo]]()
+    var parameterMap = [(Int, [ParameterInfo])]()
 
     for arg in callee.parameters {
       if arg.isConcretePack() {
@@ -78,7 +78,7 @@ private struct PackExplodedFunction {
 
         }
 
-        parameterMap[arg.index] = mappedParameterInfos
+        parameterMap.append((arg.index, mappedParameterInfos))
         newParams += mappedParameterInfos
 
       } else {
@@ -90,7 +90,7 @@ private struct PackExplodedFunction {
     self.parameterMap = parameterMap
 
     var newResults = [ResultInfo]()
-    var resultMap = [Int: [ResultInfo]]()
+    var resultMap = [(Int, [ResultInfo])]()
 
     var indirectResultIdx = 0
     for resultInfo in callee.convention.results {
@@ -104,7 +104,7 @@ private struct PackExplodedFunction {
             hasLoweredAddresses: resultInfo.hasLoweredAddresses)
         }
 
-        resultMap[indirectResultIdx] = mappedResultInfos
+        resultMap.append((indirectResultIdx, mappedResultInfos))
         newResults += mappedResultInfos
       } else {
         newResults.append(resultInfo)
@@ -142,12 +142,19 @@ private struct PackExplodedFunction {
 
   }
 
+  private struct ExplodedArgument {
+    public let packIdx: ScalarPackIndexInst
+    // A reference to an indirect function argument that the final value must be written back to, if necessary
+    public let output: FunctionArgument?
+  }
+
   private struct ArgumentMapping {
-    public let args: [(FunctionArgument, ScalarPackIndexInst)]
+    public let allocPack: AllocPackInst
+    public let arguments: [ExplodedArgument]
   }
 
   private struct ArgumentMap {
-    public var map: [AllocPackInst: ArgumentMapping] = [:]
+    public let map: [(Int, ArgumentMapping)]
   }
 
   /// Build the body of the pack-specialized function
@@ -157,49 +164,66 @@ private struct PackExplodedFunction {
       // Callee is a specialized function, so we don't need to specialize it again.
       cloneFunction(from: original, toEmpty: opt, specContext)
 
-      let entryBlock = opt.entryBlock
-
-      let builder = Builder(atBeginOf: entryBlock, specContext)
-
-      // Explode the types of the entry block's arguments, and track the correspondence between exploded arguments and local packs
-
-      var argumentMap = ArgumentMap()
-
-      let explodeArgument = { (idx: Int) in
-        let originalPackArg = entryBlock.arguments[idx]
-        let packType = originalPackArg.type.objectType
-        let astPackType = packType.approximateFormalPackType
-        assert(packType.isPack)
-        let ownership = originalPackArg.ownership
-
-        let localPack = builder.createAllocPack(packType)
-        originalPackArg.uses.replaceAll(with: localPack, specContext)
-        entryBlock.eraseArgument(at: idx, specContext)
-        let mappedArguments = packType.packElements.enumerated().map { (i, type) in
-          let arg = entryBlock.insertFunctionArgument(
-            atPosition: idx + i, type: type, ownership: ownership, specContext)
-
-          let packIdx = builder.createScalarPackIndex(
-            componentIndex: i, indexedPackType: astPackType)
-          _ = builder.createPackElementSet(elementValue: arg, packIndex: packIdx, pack: localPack)
-
-          return (arg, packIdx)
-        }
-        argumentMap.map[localPack] = ArgumentMapping(args: mappedArguments)
-
-      }
-
-      parameterMap.keys.reversed().forEach(explodeArgument)
-      for (key, resultInfos) in resultMap.reversed() {
-        if resultInfos.allSatisfy({ !$0.isSILIndirect }) {
-          // TODO: Do not add direct parameters to replace the indirect ones
-        } else {
-          explodeArgument(key)
-        }
-      }
+      let argumentMap = explodePackArguments(from: original, to: opt, specContext)
+      print(argumentMap)
     }
 
     context.notifyNewFunction(function: function, derivedFrom: original)
+  }
+
+  /// Explode the types of the entry block's pack arguments, and track the correspondence between exploded arguments and local packs
+  private func explodePackArguments(
+    from original: Function, to opt: Function, _ specContext: FunctionPassContext
+  ) -> ArgumentMap {
+
+    let entryBlock = opt.entryBlock
+
+    let builder = Builder(atBeginOf: entryBlock, specContext)
+
+    var argumentMap = [(Int, ArgumentMapping)]()
+
+    let explodePackArgument = { (idx: Int, packElementBecomesArgument: (Int) -> Bool) in
+      let originalPackArg = entryBlock.arguments[idx]
+      let packType = originalPackArg.type.objectType
+      let astPackType = packType.approximateFormalPackType
+
+      let localPack = builder.createAllocPack(packType)
+      originalPackArg.uses.replaceAll(with: localPack, specContext)
+      entryBlock.eraseArgument(at: idx, specContext)
+
+      let ownership = originalPackArg.ownership
+
+      var mappings = [ExplodedArgument]()
+      var insertArgumentPosition = idx
+      for (i, type) in packType.packElements.enumerated() {
+        let packIdx = builder.createScalarPackIndex(
+          componentIndex: i, indexedPackType: astPackType)
+
+        let output: FunctionArgument?
+        if packElementBecomesArgument(i) {
+          let arg = entryBlock.insertFunctionArgument(
+            atPosition: insertArgumentPosition, type: type, ownership: ownership, specContext)
+          insertArgumentPosition += 1
+          _ = builder.createPackElementSet(elementValue: arg, packIndex: packIdx, pack: localPack)
+          output = arg
+        } else {
+          output = nil
+        }
+
+        mappings.append(ExplodedArgument(packIdx: packIdx, output: output))
+      }
+      argumentMap.append((idx, ArgumentMapping(allocPack: localPack, arguments: mappings)))
+    }
+
+    for (key, _) in parameterMap.reversed() {
+      explodePackArgument(key, { _ in true })
+    }
+
+    for (key, resultInfos) in resultMap.reversed() {
+      explodePackArgument(key, { i in resultInfos[i].isSILIndirect })
+    }
+
+    return ArgumentMap(map: argumentMap)
   }
 
   private func unrollPackLoops(in opt: Function, specContext: FunctionPassContext) {
@@ -212,14 +236,13 @@ private struct PackExplodedFunction {
       let header = loop.header
 
       guard loop.hasSingleExitBlock,
-            loop.innerLoops.isEmpty,
-            let exit = loop.exitBlocks.first,
-            let branch = header.instructions.last as? CondBranchInst,
-            let conditionInst = branch.condition.definingInstruction as? BuiltinInst,
-            conditionInst.id == .ICMP_EQ,
-            // conditionInst.name == "cmp_eq_Word", // TODO: Bridge the enum properly
-            let packLengthInst = conditionInst.arguments.compactMap({ $0 as? PackLengthInst }).first,
-            !packLengthInst.packType.containsPackExpansionType
+        loop.innerLoops.isEmpty,
+        let exit = loop.exitBlocks.first,
+        let branch = header.instructions.last as? CondBranchInst,
+        let conditionInst = branch.condition.definingInstruction as? BuiltinInst,
+        conditionInst.id == .ICMP_EQ,
+        let packLengthInst = conditionInst.arguments.compactMap({ $0 as? PackLengthInst }).first,
+        !packLengthInst.packType.containsPackExpansionType
       else {
         continue
       }
@@ -281,7 +304,7 @@ private func explodedPackElementResultConvention(in function: Function, elem: Ty
 {
   // If the pack element type is loadable, then we can return it directly
   if elem.isTrivial(in: function) {
-    return .unowned // TODO: Verify this does the right thing before enabling
+    return .unowned  // TODO: Verify this does the right thing before enabling
   } else if elem.isLoadable(in: function) {
     return .owned
   } else {
@@ -289,8 +312,8 @@ private func explodedPackElementResultConvention(in function: Function, elem: Ty
   }
 }
 
-private extension FunctionArgument {
-  func isConcretePack() -> Bool {
+extension FunctionArgument {
+  fileprivate func isConcretePack() -> Bool {
     if !self.type.isPack {
       return false
     }
@@ -305,8 +328,8 @@ private extension FunctionArgument {
   }
 }
 
-private extension ResultInfo {
-  func isConcretePack() -> Bool {
+extension ResultInfo {
+  fileprivate func isConcretePack() -> Bool {
     switch self.convention {
     case .pack:
       return !self.type.hasTypeParameter
