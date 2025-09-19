@@ -2000,6 +2000,10 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.getLastArg(OPT_solver_disable_splitter))
     Opts.SolverDisableSplitter = true;
 
+  if (Args.hasArg(OPT_solver_enable_prepared_overloads) ||
+      Args.hasArg(OPT_solver_disable_prepared_overloads))
+    Opts.SolverEnablePreparedOverloads = Args.hasArg(OPT_solver_enable_prepared_overloads);
+
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
 
