@@ -54,7 +54,7 @@ func testCurryMemberFull() {
 }
 
 // CURRY_TOPLEVEL:      Begin signatures, 1 items
-// CURRY_TOPLEVEL-NEXT: Signature[Active]: (<param name="" active>Double</param>) -> (String) -> Void
+// CURRY_TOPLEVEL-NEXT: Signature[Active]: (<param active>Double</param>) -> (String) -> Void
 // CURRY_TOPLEVEL-NEXT: End signatures
 
 // CURRY_MEMBER_PARTIAL:      Begin signatures, 8 items

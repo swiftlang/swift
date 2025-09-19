@@ -19,5 +19,5 @@ func testUnlabled() {
 // LABELLED-NEXT: End signatures
 
 // UNLABELLED:      Begin signatures, 1 items
-// UNLABELLED-NEXT: Signature[Active]: qrCode(<param name="" active>String</param>) -> Barcode
+// UNLABELLED-NEXT: Signature[Active]: qrCode(<param active>String</param>) -> Barcode
 // UNLABELLED-NEXT: End signatures

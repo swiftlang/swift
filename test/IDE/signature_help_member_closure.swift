@@ -9,5 +9,5 @@ struct Observable {
 }
 
 // MEMBER_CLOSURE:      Begin signatures, 1 items
-// MEMBER_CLOSURE-NEXT: Signature[Active]: observer(<param name="">String</param>, <param name="" active>Int?</param>, <param name="">[AnyHashable : [Double?]]</param>) async throws -> [Observable?]
+// MEMBER_CLOSURE-NEXT: Signature[Active]: observer(<param>String</param>, <param active>Int?</param>, <param>[AnyHashable : [Double?]]</param>) async throws -> [Observable?]
 // MEMBER_CLOSURE-NEXT: End signatures

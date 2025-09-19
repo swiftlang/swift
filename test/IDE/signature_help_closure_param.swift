@@ -5,5 +5,5 @@ func apply<Value, Result>(value: Value, body: (Value) -> Result) -> Result {
 }
 
 // CLOSURE_PARAM:      Begin signatures, 1 items
-// CLOSURE_PARAM-NEXT: Signature[Active]: body(<param name="" active>Value</param>) -> Result
+// CLOSURE_PARAM-NEXT: Signature[Active]: body(<param active>Value</param>) -> Result
 // CLOSURE_PARAM-NEXT: End signatures

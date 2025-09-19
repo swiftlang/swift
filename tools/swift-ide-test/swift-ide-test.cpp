@@ -1501,7 +1501,10 @@ static void printSignatureHelpResultsImpl(const FormattedSignatureHelp &Result,
                                             Param.Offset - currentPos);
       }
 
-      signatureOS << "<param name=\"" << Param.Name << "\"";
+      signatureOS << "<param";
+      if (!Param.Name.empty()) {
+        signatureOS << " name=\"" << Param.Name << '"';
+      }
       if (Signature.ActiveParam && *Signature.ActiveParam == j) {
         signatureOS << " active";
       }
