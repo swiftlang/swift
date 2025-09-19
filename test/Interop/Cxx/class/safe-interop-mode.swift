@@ -134,6 +134,7 @@ func useUnsafeTuple(x: UnsafeTuple) {
 func useCppSpan(x: SpanOfInt) {
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
   _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+  _ = x.size()
 }
 
 func useCppSpan2(x: SpanOfIntAlias) {
