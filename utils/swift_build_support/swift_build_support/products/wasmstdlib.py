@@ -220,10 +220,11 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_THREADING_PACKAGE:STRING', 'none')
 
     def _wasm_runtime_lookup_failed(self) -> NoReturn:
-            print("wasmstdlib testing: Wasm runtime not found")
-            sys.exit(1)
+        print("wasmstdlib testing: Wasm runtime not found")
+        sys.exit(1)
 
     def infer_wasm_runtime(self, host_target) -> str:
+        '''Return absolute path to the Wasm runtime used'''
         build_root = os.path.dirname(self.build_dir)
         if self.args.test_with_wasm_runtime == 'wasmkit':
             wasmkit_build_path = os.path.join(
@@ -250,7 +251,6 @@ class WasmStdlib(cmake_product.CMakeProduct):
         ]
 
         wasm_runtime_bin_path = self.infer_wasm_runtime(host_target)
-        print(f"wasm_runtime_bin_path is {wasm_runtime_bin_path}")
         if not os.path.exists(wasm_runtime_bin_path) or not self.should_test_executable():
             test_target = "check-swift-only_non_executable-wasi-wasm32-custom"
         else:
