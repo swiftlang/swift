@@ -3,8 +3,8 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %generate-callers(module:SizedByClang) > %t/test.swift
-// RUN: %verify-safe-wrappers %t/test.swift
-// RUN: %dump-safe-wrappers %t/test.swift 2> %t/expansions.out
+// RUN: %verify-safe-wrappers -enable-experimental-feature SafeInteropWrappers %t/test.swift
+// RUN: %dump-safe-wrappers -enable-experimental-feature SafeInteropWrappers %t/test.swift 2> %t/expansions.out
 // RUN: diff %t/expansions.out %t/expansions.expected
 
 //--- expansions.expected
