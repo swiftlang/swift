@@ -2878,33 +2878,22 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Arg *A = Args.getLastArg(OPT_copy_propagation_state_EQ)) {
     specifiedCopyPropagationOption =
         llvm::StringSwitch<std::optional<CopyPropagationOption>>(A->getValue())
-            .Case("true", CopyPropagationOption::On)
+            .Case("always", CopyPropagationOption::Always)
+            .Case("optimizing", CopyPropagationOption::Optimizing)
             .Case("false", CopyPropagationOption::Off)
             .Case("requested-passes-only",
                   CopyPropagationOption::RequestedPassesOnly)
             .Default(std::nullopt);
+
+    // Error if copy propagation has been set via the flag at the same time.
+    if (auto *Flag = Args.getLastArg(OPT_enable_copy_propagation)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
+                       Flag->getAsString(Args),
+                       A->getAsString(Args));
+    }
   }
   if (Args.hasArg(OPT_enable_copy_propagation)) {
-    if (specifiedCopyPropagationOption) {
-      if (*specifiedCopyPropagationOption == CopyPropagationOption::Off) {
-        // Error if copy propagation has been set to ::Off via the meta-var form
-        // and enabled via the flag.
-        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
-                       "enable-copy-propagation",
-                       "enable-copy-propagation=false");
-        return true;
-      } else if (*specifiedCopyPropagationOption ==
-                 CopyPropagationOption::RequestedPassesOnly) {
-        // Error if copy propagation has been set to ::RequestedPassesOnly via
-        // the meta-var form and enabled via the flag.
-        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
-                       "enable-copy-propagation",
-                       "enable-copy-propagation=requested-passes-only");
-        return true;
-      }
-    } else {
-      specifiedCopyPropagationOption = CopyPropagationOption::On;
-    }
+    specifiedCopyPropagationOption = CopyPropagationOption::Always;
   }
   if (specifiedCopyPropagationOption) {
     Opts.CopyPropagation = *specifiedCopyPropagationOption;
@@ -2936,7 +2925,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   // Unless overridden below, enabling copy propagation means enabling lexical
   // lifetimes.
-  if (Opts.CopyPropagation == CopyPropagationOption::On) {
+  if (Opts.CopyPropagation >= CopyPropagationOption::Optimizing) {
     Opts.LexicalLifetimes = LexicalLifetimesOption::On;
     Opts.DestroyHoisting = DestroyHoistingOption::On;
   }
