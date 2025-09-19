@@ -133,7 +133,9 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
     Context.Diags.diagnose(problematicImport->importLoc,
                            diag::decl_import_via_here, D,
                            problematicImport->accessLevel,
-                           problematicImport->module.importedModule);
+                           problematicImport->module.importedModule,
+                           problematicImport->module.importedModule
+                             ->isClangHeaderImportModule());
   }
 
   return (downgradeToWarning == DowngradeToWarning::No);
@@ -213,7 +215,9 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
     ctx.Diags.diagnose(limitImport->importLoc,
                        diag::decl_import_via_here, D,
                        limitImport->accessLevel,
-                       limitImport->module.importedModule);
+                       limitImport->module.importedModule,
+                       limitImport->module.importedModule
+                         ->isClangHeaderImportModule());
   }
 
   return true;
@@ -368,7 +372,9 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
     ctx.Diags.diagnose(import->importLoc,
                        diag::decl_import_via_here, D,
                        import->accessLevel,
-                       import->module.importedModule);
+                       import->module.importedModule,
+                       import->module.importedModule
+                         ->isClangHeaderImportModule());
   }
 
   return true;
@@ -454,7 +460,9 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
     ctx.Diags.diagnose(limitImport->importLoc,
                        diag::decl_import_via_here, ext,
                        limitImport->accessLevel,
-                       limitImport->module.importedModule);
+                       limitImport->module.importedModule,
+                       limitImport->module.importedModule
+                         ->isClangHeaderImportModule());
   }
 
   return true;
