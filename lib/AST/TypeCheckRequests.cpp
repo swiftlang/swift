@@ -1227,6 +1227,11 @@ void InterfaceTypeRequest::cacheResult(Type type) const {
     ASSERT(!type->hasPrimaryArchetype() && "Archetype in interface type");
     ASSERT(decl->getDeclContext()->isLocalContext() || !type->hasLocalArchetype() &&
            "Local archetype in interface type of non-local declaration");
+    // Placeholders are only permitted in closure parameters.
+    if (!(isa<ParamDecl>(decl) &&
+          isa<AbstractClosureExpr>(decl->getDeclContext()))) {
+      ASSERT(!type->hasPlaceholder() && "Placeholder in interface type");
+    }
   }
   decl->TypeAndAccess.setPointer(type);
 }

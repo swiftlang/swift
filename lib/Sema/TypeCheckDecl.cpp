@@ -2121,17 +2121,10 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (decl->preconcurrency())
     options |= TypeResolutionFlags::Preconcurrency;
 
-  // Placeholders are only currently allowed for FuncDecls with bodies, which
-  // we diagnose in ReturnTypePlaceholderReplacer.
-  HandlePlaceholderTypeReprFn placeholderOpener;
-  if (auto *FD = dyn_cast<FuncDecl>(decl)) {
-    if (FD->hasBody() && !FD->isBodySkipped())
-      placeholderOpener = PlaceholderType::get;
-  }
   auto *const dc = decl->getInnermostDeclContext();
   return TypeResolution::forInterface(dc, options,
                                       /*unboundTyOpener*/ nullptr,
-                                      placeholderOpener,
+                                      /*placeholderOpener*/ nullptr,
                                       /*packElementOpener*/ nullptr)
       .resolveType(resultTyRepr);
 }
@@ -2259,6 +2252,7 @@ static Type validateParameterType(ParamDecl *decl) {
 
   TypeResolutionOptions options(std::nullopt);
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
+  HandlePlaceholderTypeReprFn placeholderOpener = nullptr;
   if (isa<AbstractClosureExpr>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::ClosureExpr);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
@@ -2267,8 +2261,9 @@ static Type validateParameterType(ParamDecl *decl) {
       // For now, just return the unbound generic type.
       return unboundTy;
     };
-    // FIXME: Don't let placeholder types escape type resolution.
-    // For now, just return the placeholder type.
+    // FIXME: Don't let placeholder types escape type resolution. For now, just
+    // return the placeholder type, which we open in `inferClosureType`.
+    placeholderOpener = PlaceholderType::get;
   } else if (isa<AbstractFunctionDecl>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::AbstractFunctionDecl);
   } else if (isa<SubscriptDecl>(dc)) {
@@ -2316,14 +2311,6 @@ static Type validateParameterType(ParamDecl *decl) {
                      ? TypeResolverContext::VariadicFunctionInput
                      : TypeResolverContext::FunctionInput);
   options |= TypeResolutionFlags::Direct;
-
-  // We allow placeholders in parameter types to improve recovery since if a
-  // default argument is present we can suggest the inferred type. Avoid doing
-  // this for protocol requirements though since those can't ever have default
-  // arguments anyway.
-  HandlePlaceholderTypeReprFn placeholderOpener;
-  if (!isa<ProtocolDecl>(dc->getParent()))
-    placeholderOpener = PlaceholderType::get;
 
   const auto resolution =
       TypeResolution::forInterface(dc, options, unboundTyOpener,

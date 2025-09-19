@@ -1193,73 +1193,18 @@ static bool checkExpressionMacroDefaultValueRestrictions(ParamDecl *param) {
 #endif
 }
 
-void TypeChecker::notePlaceholderReplacementTypes(Type writtenType,
-                                                  Type inferredType) {
-  assert(writtenType && inferredType &&
-         "Must provide both written and inferred types");
-  assert(writtenType->hasPlaceholder() && "Written type has no placeholder?");
-
-  class PlaceholderNotator
-      : public CanTypeDifferenceVisitor<PlaceholderNotator> {
-  public:
-    bool visitDifferentComponentTypes(CanType t1, CanType t2) {
-      // Never replace anything the user wrote with an error type.
-      if (t2->hasError() || t2->hasUnresolvedType()) {
-        return false;
-      }
-
-      auto *placeholder = t1->getAs<PlaceholderType>();
-      if (!placeholder) {
-        return false;
-      }
-
-      if (auto *origRepr =
-              placeholder->getOriginator().dyn_cast<TypeRepr *>()) {
-        assert(isa<PlaceholderTypeRepr>(origRepr));
-        t1->getASTContext()
-            .Diags
-            .diagnose(origRepr->getLoc(),
-                      diag::replace_placeholder_with_inferred_type, t2)
-            .fixItReplace(origRepr->getSourceRange(), t2.getString());
-      }
-      return false;
-    }
-
-    bool check(Type t1, Type t2) {
-      return !visit(t1->getCanonicalType(), t2->getCanonicalType());
-    };
-  };
-
-  PlaceholderNotator().check(writtenType, inferredType);
-}
-
 /// Check the default arguments that occur within this parameter list.
 static void checkDefaultArguments(ParameterList *params) {
   // Force the default values in case they produce diagnostics.
   for (auto *param : *params) {
-    auto ifacety = param->getInterfaceType();
-    auto *expr = param->getTypeCheckedDefaultExpr();
+    (void)param->getTypeCheckedDefaultExpr();
 
     // Force captures since this can emit diagnostics.
-    (void) param->getDefaultArgumentCaptureInfo();
+    (void)param->getDefaultArgumentCaptureInfo();
 
     // If the default argument has isolation, it must match the
     // isolation of the decl context.
     (void)param->getInitializerIsolation();
-
-    if (!ifacety->hasPlaceholder()) {
-      continue;
-    }
-
-    // Placeholder types are banned for all parameter decls. We try to use the
-    // freshly-checked default expression's contextual type to suggest a
-    // reasonable type to insert.
-    param->diagnose(diag::placeholder_type_not_allowed_in_parameter)
-        .highlight(param->getSourceRange());
-    if (expr && !expr->getType()->hasError()) {
-      TypeChecker::notePlaceholderReplacementTypes(
-          ifacety, expr->getType()->mapTypeOutOfContext());
-    }
   }
 }
 

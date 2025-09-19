@@ -1238,24 +1238,6 @@ bool diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
                                  std::optional<FunctionTypeRepr *> repr,
                                  DeclContext *dc,
                                  std::optional<TypeResolutionStage> stage);
-
-/// Walk the parallel structure of a type with user-provided placeholders and
-/// an inferred type produced by the type checker. Where placeholders can be
-/// found, suggest the corresponding inferred type.
-///
-/// For example,
-///
-/// \code
-///  func foo(_ x: [_] = [0])
-/// \endcode
-///
-/// Has a written type of `(ArraySlice (Placeholder))` and an inferred type of
-/// `(ArraySlice Int)`, so we walk to `Placeholder` and `Int` in each type and
-/// suggest replacing `_` with `Int`.
-///
-/// \param writtenType The interface type usually derived from a user-written
-/// type repr. \param inferredType The type inferred by the type checker.
-void notePlaceholderReplacementTypes(Type writtenType, Type inferredType);
 } // namespace TypeChecker
 
 /// Returns the protocol requirement kind of the given declaration.
