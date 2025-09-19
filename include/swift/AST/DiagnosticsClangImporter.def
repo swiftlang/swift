@@ -299,8 +299,8 @@ ERROR(both_returns_retained_returns_unretained, none,
 ERROR(redundant_conformance_protocol,none,
      "redundant conformance of %0 to protocol '%1'", (Type, StringRef))
 
-ERROR(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
-      "%0 cannot be annotated with either SWIFT_RETURNS_RETAINED or "
+WARNING(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
+      "%0 should not be annotated with SWIFT_TURNS_RETAINED or "
       "SWIFT_RETURNS_UNRETAINED because it is not returning "
       "a SWIFT_SHARED_REFERENCE type",
       (const clang::NamedDecl *))

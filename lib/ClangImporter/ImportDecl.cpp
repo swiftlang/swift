@@ -3620,10 +3620,17 @@ namespace {
       } else {
         if (attrInfo.hasRetainAttr()) {
           if (const auto *functionDecl = dyn_cast<clang::FunctionDecl>(decl)) {
-            if (functionDecl->isTemplateInstantiation()) {
+            // Skip diagnostics for template instantiations and template-dependent
+            // return types. We cannot determine at import time whether T or T* will
+            // be instantiated as a SWIFT_SHARED_REFERENCE type or not, so we avoid
+            // emitting potentially incorrect warnings for these cases.
+            if (functionDecl->isTemplateInstantiation() ||
+                functionDecl->getReturnType()->isInstantiationDependentType() ||
+                functionDecl->getReturnType()->isDependentType()) {
               return;
             }
           }
+
           Impl.diagnose(
               loc,
               diag::

@@ -47,3 +47,8 @@ let _ = DefaultOwnershipInheritance.createDerivedTypeNonDefault() // expected-wa
 let _ = DefaultOwnershipInheritance.createDerivedTypeNonDefaultUnretained()
 let  _ = SourceLocationCaching.FactoryA.make() // expected-warning {{cannot infer the ownership of the returned value, annotate 'make()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
 let  _ = SourceLocationCaching.FactoryB.make() // expected-warning {{cannot infer the ownership of the returned value, annotate 'make()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
+
+let refTemplate = FRTStructRef()
+let templatePtr = refTemplate.ptr()
+let templateGet = refTemplate.get()
+let templateValue = refTemplate.value()  // expected-warning {{cannot infer the ownership of the returned value, annotate 'value()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
