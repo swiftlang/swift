@@ -716,6 +716,11 @@ public struct Builder {
     return notifyNew(initExistential.getAs(InitExistentialMetatypeInst.self))
   }
 
+  public func createScalarPackIndex(componentIndex: Int, indexedPackType: CanonicalType) -> ScalarPackIndexInst {
+    let scalarPackIndex = bridged.createScalarPackIndex(SwiftInt(componentIndex), indexedPackType.bridged)
+    return notifyNew(scalarPackIndex.getAs(ScalarPackIndexInst.self))
+  }
+
   public func createPackElementGet(packIndex: Value, pack: Value, elementType: Type) -> PackElementGetInst {
     let packElementGet = bridged.createPackElementGet(packIndex.bridged, pack.bridged, elementType.bridged)
     return notifyNew(packElementGet.getAs(PackElementGetInst.self))

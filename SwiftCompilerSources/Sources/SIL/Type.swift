@@ -142,7 +142,12 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
 
   public var containsPackExpansionType: Bool {
     precondition(isPack);
-    return bridged.containsPackExpansionType()
+    return bridged.containsPackExpansionType();
+  }
+
+  public var approximateFormalPackType: CanonicalType {
+    precondition(isPack);
+    return CanonicalType(bridged: bridged.getApproximateFormalPackType());
   }
 
   //===--------------------------------------------------------------------===//

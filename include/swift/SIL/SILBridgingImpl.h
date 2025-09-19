@@ -514,8 +514,12 @@ bool BridgedType::isPackElementAddress() const {
 }
 
 bool BridgedType::containsPackExpansionType() const {
-  auto packType = unbridged().getAs<swift::SILPackType>();
+  auto packType = unbridged().castTo<swift::SILPackType>();
   return packType->containsPackExpansionType();
+}
+
+BridgedCanType BridgedType::getApproximateFormalPackType() const {
+  return unbridged().castTo<swift::SILPackType>()->getApproximateFormalPackType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1811,6 +1815,14 @@ BridgedCanType BridgedInstruction::PackLengthInst_getPackType() const {
   return getAs<swift::PackLengthInst>()->getPackType();
 }
 
+SwiftInt BridgedInstruction::ScalarPackIndexInst_getComponentIndex() const {
+  return getAs<swift::ScalarPackIndexInst>()->getComponentIndex();
+}
+
+BridgedCanType BridgedInstruction::AnyPackIndexInst_getIndexedPackType() const {
+  return getAs<swift::AnyPackIndexInst>()->getIndexedPackType();
+}
+
 //===----------------------------------------------------------------------===//
 //                     VarDeclInst and DebugVariableInst
 //===----------------------------------------------------------------------===//
@@ -2759,6 +2771,14 @@ BridgedInstruction BridgedBuilder::createInitExistentialMetatype(BridgedValue me
   return {unbridged().createInitExistentialMetatype(
       regularLoc(), metatype.getSILValue(), existentialType.unbridged(),
       conformances.pcArray.unbridged<swift::ProtocolConformanceRef>())};
+}
+
+BridgedInstruction
+BridgedBuilder::createScalarPackIndex(SwiftInt componentIndex,
+                                      BridgedCanType indexedPackType) const {
+  auto *pt = indexedPackType.unbridged()->castTo<swift::PackType>();
+  return {unbridged().createScalarPackIndex(regularLoc(), componentIndex,
+                                            swift::CanPackType(pt))};
 }
 
 BridgedInstruction
