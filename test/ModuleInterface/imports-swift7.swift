@@ -5,8 +5,31 @@
 // RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -emit-module -o %t/nonResilient.swiftmodule %t/empty.swift
 // RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -emit-module -o %t/resilient.swiftmodule %t/empty.swift -enable-library-evolution
 
-/// Check errors.
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/clientWithError.swift -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -I %t -verify -enable-upcoming-feature InternalImportsByDefault
+/// Warning vs error on public import of a non-LE module from LE.
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) \
+// RUN:     %t/clientWithError.swift -I %t -verify \
+// RUN:     -disable-implicit-concurrency-module-import \
+// RUN:     -disable-implicit-string-processing-module-import \
+// RUN:     -enable-upcoming-feature InternalImportsByDefault \
+// RUN:     -verify-additional-prefix library-level-private-
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) \
+// RUN:     %t/clientWithError.swift -I %t -verify \
+// RUN:     -disable-implicit-concurrency-module-import \
+// RUN:     -disable-implicit-string-processing-module-import \
+// RUN:     -enable-upcoming-feature InternalImportsByDefault \
+// RUN:     -verify-additional-prefix library-level-private- -library-level ipi
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) \
+// RUN:     %t/clientWithError.swift -I %t -verify \
+// RUN:     -disable-implicit-concurrency-module-import \
+// RUN:     -disable-implicit-string-processing-module-import \
+// RUN:     -enable-upcoming-feature InternalImportsByDefault \
+// RUN:     -verify-additional-prefix library-level-public- -library-level spi
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) \
+// RUN:     %t/clientWithError.swift -I %t -verify \
+// RUN:     -disable-implicit-concurrency-module-import \
+// RUN:     -disable-implicit-string-processing-module-import \
+// RUN:     -enable-upcoming-feature InternalImportsByDefault \
+// RUN:     -verify-additional-prefix library-level-public- -library-level api
 
 /// Check Swift 7 imports printed in swiftinterface from 2 source files.
 // RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/main.swift %t/main-other.swift -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -I %S/Inputs/imports-clang-modules/ -I %t -verify -enable-upcoming-feature InternalImportsByDefault
@@ -38,8 +61,11 @@ public import D // expected-warning {{public import of 'D' was not used in publi
 public import NotSoSecret // expected-warning {{'NotSoSecret' inconsistently imported as implementation-only}}
 // expected-warning @-1 {{public import of 'NotSoSecret' was not used in public declarations or inlinable code}}
 @_implementationOnly import NotSoSecret2 // expected-note {{imported as implementation-only here}}
+
 //--- clientWithError.swift
-@_exported public import nonResilient // expected-error {{module 'nonResilient' was not compiled with library evolution support; using it means binary compatibility for 'clientWithError' can't be guaranteed}}
+@_exported public import nonResilient
+// expected-library-level-public-error @-1 {{module 'nonResilient' was not compiled with library evolution support; using it means binary compatibility for 'clientWithError' can't be guaranteed}}
+// expected-library-level-private-warning @-2 {{module 'nonResilient' was not compiled with library evolution support; using it means binary compatibility for 'clientWithError' can't be guaranteed}}
 
 // CHECK-7-NOT: import
 // CHECK-7: {{^}}public import A{{$}}

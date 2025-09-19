@@ -68,22 +68,24 @@ namespace swift {
     Complete,
   };
 
-  /// Access or distribution level of a library.
+  /// Intended distribution level of a module.
+  ///
+  /// Ordered from more private to more public.
   enum class LibraryLevel : uint8_t {
-    /// Application Programming Interface that is publicly distributed so
-    /// public decls are really public and only @_spi decls are SPI.
-    API,
+    /// This isn't a library or the library distribution intent is unknown.
+    Other,
 
-    /// System Programming Interface that has restricted distribution
-    /// all decls in the module are considered to be SPI including public ones.
-    SPI,
-
-    /// Internal Programming Interface that is not distributed and only usable
-    /// from within a project.
+    /// Internal Programming Interface: the module is not distributed and
+    /// only usable from within its project.
     IPI,
 
-    /// The library has some other undefined distribution.
-    Other
+    /// System Programming Interface: the module has restricted distribution,
+    /// all public decls in the module are considered to be SPI.
+    SPI,
+
+    /// Application Programming Interface: the module is distributed publicly,
+    /// public decls are really public and only @_spi decls are SPI.
+    API,
   };
 
   enum class AccessNoteDiagnosticBehavior : uint8_t {
