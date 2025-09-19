@@ -2780,16 +2780,13 @@ namespace {
               diagnoseNonSendableParametersAndResult(toFnType);
               break;
 
+            // @Sendable nonisolated(nonsending) -> nonisolated(nonsending)
+            // doesn't require Sendable checking.
+            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
+              break;
+
             case FunctionTypeIsolation::Kind::Parameter:
               llvm_unreachable("invalid conversion");
-
-            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
-              // Non isolated caller is always async. This can only occur if we
-              // are converting from an `@Sendable` representation to something
-              // else. So we need to just check that we diagnose non sendable
-              // parameters and results.
-              diagnoseNonSendableParametersAndResult(toFnType);
-              break;
             }
             break;
           }
