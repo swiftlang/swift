@@ -181,12 +181,14 @@ internal class _AnySequenceBox<Element> {
   @inlinable
   internal var _underestimatedCount: Int { _abstract() }
 
+#if !$Embedded
   @inlinable
   internal func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
     _abstract()
   }
+#endif
 
   @inlinable
   internal func _filter(
@@ -534,12 +536,16 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   internal override var _underestimatedCount: Int {
     return _base.underestimatedCount
   }
+
+#if !$Embedded
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
     try _base.map(transform)
   }
+#endif
+
   @inlinable
   internal override func _filter(
     _ isIncluded: (Element) throws -> Bool
@@ -627,12 +633,14 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   internal override var _underestimatedCount: Int {
     return _base.underestimatedCount
   }
+#if !$Embedded
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
     try _base.map(transform)
   }
+#endif
   @inlinable
   internal override func _filter(
     _ isIncluded: (Element) throws -> Bool
@@ -822,12 +830,14 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   internal override var _underestimatedCount: Int {
     return _base.underestimatedCount
   }
+#if !$Embedded
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
     try _base.map(transform)
   }
+#endif
   @inlinable
   internal override func _filter(
     _ isIncluded: (Element) throws -> Bool
@@ -1035,12 +1045,14 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   internal override var _underestimatedCount: Int {
     return _base.underestimatedCount
   }
+#if !$Embedded
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
     try _base.map(transform)
   }
+#endif
   @inlinable
   internal override func _filter(
     _ isIncluded: (Element) throws -> Bool
@@ -1322,6 +1334,7 @@ extension AnySequence {
     return _box._underestimatedCount
   }
 
+#if !$Embedded
   @inlinable
   @_alwaysEmitIntoClient
   public func map<T, E>(
@@ -1334,7 +1347,6 @@ extension AnySequence {
     }
   }
 
-#if !$Embedded
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
@@ -1428,6 +1440,7 @@ extension AnyCollection {
     return _box._underestimatedCount
   }
 
+#if !$Embedded
   @inlinable
   @_alwaysEmitIntoClient
   public func map<T, E>(
@@ -1440,7 +1453,6 @@ extension AnyCollection {
     }
   }
 
-#if !$Embedded
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
@@ -1540,6 +1552,7 @@ extension AnyBidirectionalCollection {
     return _box._underestimatedCount
   }
 
+#if !$Embedded
   @inlinable
   @_alwaysEmitIntoClient
   public func map<T, E>(
@@ -1552,7 +1565,6 @@ extension AnyBidirectionalCollection {
     }
   }
 
-#if !$Embedded
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
@@ -1654,6 +1666,7 @@ extension AnyRandomAccessCollection {
     return _box._underestimatedCount
   }
 
+#if !$Embedded
   @inlinable
   @_alwaysEmitIntoClient
   public func map<T, E>(
@@ -1666,7 +1679,6 @@ extension AnyRandomAccessCollection {
     }
   }
 
-#if !$Embedded
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
