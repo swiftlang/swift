@@ -700,7 +700,7 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
       Offs = MatchStart.slice(2, TextStartIdx).rtrim();
     else {
       Offs = MatchStart.slice(1, TextStartIdx).rtrim();
-      if (Offs[0] != '-')
+      if (Offs[0] >= '0' && Offs[0] <= '9')
         AbsoluteLine = true;
     }
 
