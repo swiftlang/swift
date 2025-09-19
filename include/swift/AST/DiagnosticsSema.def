@@ -2707,8 +2707,8 @@ NOTE(decl_import_via_here,none,
 NOTE(decl_import_via_local,none,
      "%kind0 is imported by this file as "
      "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
-     "from %2",
-     (const Decl *, AccessLevel, const ModuleDecl*))
+     "from %select{%2|bridging header}3",
+     (const Decl *, AccessLevel, const ModuleDecl*, bool))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,

@@ -3763,8 +3763,14 @@ ImportDecl *swift::createImportDecl(ASTContext &Ctx,
   auto *ID = ImportDecl::create(Ctx, DC, SourceLoc(),
                                 ImportKind::Module, SourceLoc(),
                                 importPath.get(), ClangN);
-  if (IsExported)
+  if (Ctx.ClangImporterOpts.BridgingHeaderIsInternal) {
+    ID->getAttrs().add(
+        new (Ctx) AccessControlAttr(SourceLoc(), SourceRange(),
+                                    AccessLevel::Internal, /*implicit=*/true));
+    ID->getAttrs().add(new (Ctx) ImplementationOnlyAttr(/*IsImplicit=*/true));
+  } else if (IsExported) {
     ID->getAttrs().add(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+  }
   return ID;
 }
 

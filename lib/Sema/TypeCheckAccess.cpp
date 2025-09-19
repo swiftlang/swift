@@ -454,7 +454,9 @@ static void noteLimitingImport(const Decl *userDecl, ASTContext &ctx,
     if (userDecl)
       userDecl->diagnose(diag::decl_import_via_local, complainDecl,
                          limitImport->accessLevel,
-                         limitImport->module.importedModule);
+                         limitImport->module.importedModule,
+                         limitImport->module.importedModule
+                           ->isClangHeaderImportModule());
 
     if (limitImport->importLoc.isValid())
       ctx.Diags.diagnose(limitImport->importLoc, diag::decl_import_via_here,
