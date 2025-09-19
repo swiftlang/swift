@@ -16,43 +16,70 @@ import SIL
 let packSpecialization = FunctionPass(name: "pack-specialization") {
   (function: Function, context: FunctionPassContext) in
 
-
   for inst in function.instructions {
-    guard let apply = inst as? FullApplySite,
-          // Only support closures which, after generic specialization, are not generic any more.
-          !apply.substitutionMap.replacementTypes.contains(where: { $0.hasArchetype }),
-          let callee = apply.referencedFunction,
-          callee.isDefinition,
-          callee.isSpecialization,
-          callee.argumentTypes.contains(where: { $0.isPack }) else { continue }
+    // TODO: FullApplyInst etc?
+    guard let apply = inst as? ApplySite,
+      // Only support closures which, after generic specialization, are not generic any more.
+      !apply.substitutionMap.replacementTypes.contains(where: { $0.hasArchetype }),
+      let optimized = optimizedCallee(at: apply, in: context)
+    else {
+      continue
+    }
 
-    let f = createSpecializedDeclaration(for: callee, at: apply, in: context)
+    print(optimized)
+    // TODO
+    // specializeCallsite(at: apply, with: optimized, in: context)
   }
 
 }
 
-private func createSpecializedDeclaration(for callee: Function, at apply: FullApplySite, in context: FunctionPassContext) -> Function {
+private func optimizedCallee(at apply: ApplySite, in context: FunctionPassContext)
+  -> PackExplodedFunction?
+{
+  guard let callee = apply.referencedFunction,
+    callee.isDefinition,
+    callee.isSpecialization,
+    callee.argumentTypes.contains(where: { $0.isPack })
+  else {
+    return nil
+  }
 
-    let packArgs: [Int] = callee.arguments.filter { $0.isConcretePack() }.map { $0.index }
-    let specializedName = context.mangle(withExplodedPackArguments: packArgs, from: callee)
-    if let specialized = context.lookupFunction(name: specializedName) {
-      print("Reusing existing specialized definition of ", specializedName)
-      return specialized
-    }
+  let exploded = PackExplodedFunction(at: apply, in: context)
+
+  return exploded
+}
+
+private struct PackExplodedFunction {
+  public let original: Function
+  public let function: Function
+  public let resultMap: [Int: [ResultInfo]]
+  public let parameterMap: [Int: [ParameterInfo]]
+
+  init(at apply: ApplySite, in context: FunctionPassContext) {
+
+    let callee = apply.referencedFunction!
+    self.original = callee
 
     var newParams = [ParameterInfo]()
+    var parameterMap = [Int: [ParameterInfo]]()
 
     for arg in callee.parameters {
       if arg.isConcretePack() {
         let argParameterInfo = apply.parameter(for: apply.argumentOperands[arg.index])!
-        for elem in arg.type.packElements {
+
+        let mappedParameterInfos = arg.type.packElements.map { elem in
+
           // TODO: Determine correct values for options and hasLoweredAddress
-          let param = ParameterInfo(type: elem.canonicalType,
-                                    convention: explodedPackElementArgumentConvention(pack: arg, elem: elem),
-                                    options: argParameterInfo.options,
-                                    hasLoweredAddresses: argParameterInfo.hasLoweredAddresses)
-          newParams.append(param)
+          ParameterInfo(
+            type: elem.canonicalType,
+            convention: explodedPackElementArgumentConvention(pack: arg, elem: elem),
+            options: argParameterInfo.options,
+            hasLoweredAddresses: argParameterInfo.hasLoweredAddresses)
+
         }
+
+        parameterMap[arg.index] = mappedParameterInfos
+        newParams += mappedParameterInfos
 
       } else {
         let param = apply.parameter(for: apply.argumentOperands[arg.index])!
@@ -60,41 +87,158 @@ private func createSpecializedDeclaration(for callee: Function, at apply: FullAp
       }
     }
 
+    self.parameterMap = parameterMap
+
     var newResults = [ResultInfo]()
-    for i in 0..<callee.argumentConventions.firstParameterIndex {
-      let result = callee.argument(at: i)
-      let resultInfo = callee.argumentConventions[result: i]!
+    var resultMap = [Int: [ResultInfo]]()
+
+    var indirectResultIdx = 0
+    for resultInfo in callee.convention.results {
       print(resultInfo)
       if resultInfo.isConcretePack() {
-        for elem in result.type.packElements {
-          let elemResultInfo = ResultInfo(type: elem.canonicalType, convention: explodedPackElementResultConvention(in: callee, elem: elem),
-                                          options: resultInfo.options,
-                                          hasLoweredAddresses: resultInfo.hasLoweredAddresses);
-          newResults.append(elemResultInfo)
+        let mappedResultInfos = resultInfo.type.silType!.packElements.map { elem in
+          ResultInfo(
+            type: elem.canonicalType,
+            convention: explodedPackElementResultConvention(in: callee, elem: elem),
+            options: resultInfo.options,
+            hasLoweredAddresses: resultInfo.hasLoweredAddresses)
         }
+
+        resultMap[indirectResultIdx] = mappedResultInfos
+        newResults += mappedResultInfos
       } else {
         newResults.append(resultInfo)
       }
+
+      if resultInfo.isSILIndirect {
+        indirectResultIdx += 1
+      }
+    }
+    // We should have walked through all the indirect results, and no further.
+    assert(indirectResultIdx == callee.argumentConventions.firstParameterIndex)
+
+    self.resultMap = resultMap
+
+    let packArgIndices: [Int] = callee.arguments.filter { $0.isConcretePack() }.map { $0.index }
+    let specializedName = context.mangle(withExplodedPackArguments: packArgIndices, from: callee)
+    if let existingFunction = context.lookupFunction(name: specializedName) {
+      print("Reusing existing specialized definition of ", specializedName)
+      function = existingFunction
+    } else {
+
+      function = context.createSpecializedFunctionDeclaration(
+        from: callee,
+        withName: specializedName,
+        withParams: newParams,
+        withResults: newResults)
+
+      self.buildOptimizedClosure(apply: apply, context)
     }
 
-    let explodedDeclaration = context.createSpecializedFunctionDeclaration(from: callee,
-                                                         withName: specializedName,
-                                                         withParams: newParams,
-                                                         withResults: newResults)
-
-    print(packArgs, [Int](callee.arguments.filter { $0.isIndirectResult }.map { $0.index }))
+    print(packArgIndices, [Int](callee.arguments.filter { $0.isIndirectResult }.map { $0.index }))
     print("specializing:", callee.name, "\n\tto", specializedName)
     print(newParams)
-    print(explodedDeclaration)
+    print(function)
 
-    return explodedDeclaration
+  }
+
+  private struct ArgumentMapping {
+    public let args: [(FunctionArgument, ScalarPackIndexInst)]
+  }
+
+  private struct ArgumentMap {
+    public var map: [AllocPackInst: ArgumentMapping] = [:]
+  }
+
+  /// Build the body of the pack-specialized function
+  private func buildOptimizedClosure(apply: ApplySite, _ context: FunctionPassContext) {
+
+    context.buildSpecializedFunction(specializedFunction: function) { (opt, specContext) in
+      // Callee is a specialized function, so we don't need to specialize it again.
+      cloneFunction(from: original, toEmpty: opt, specContext)
+
+      let entryBlock = opt.entryBlock
+
+      let builder = Builder(atBeginOf: entryBlock, specContext)
+
+      // Explode the types of the entry block's arguments, and track the correspondence between exploded arguments and local packs
+
+      var argumentMap = ArgumentMap()
+
+      let explodeArgument = { (idx: Int) in
+        let originalPackArg = entryBlock.arguments[idx]
+        let packType = originalPackArg.type.objectType
+        let astPackType = packType.approximateFormalPackType
+        assert(packType.isPack)
+        let ownership = originalPackArg.ownership
+
+        let localPack = builder.createAllocPack(packType)
+        originalPackArg.uses.replaceAll(with: localPack, specContext)
+        entryBlock.eraseArgument(at: idx, specContext)
+        let mappedArguments = packType.packElements.enumerated().map { (i, type) in
+          let arg = entryBlock.insertFunctionArgument(
+            atPosition: idx + i, type: type, ownership: ownership, specContext)
+
+          let packIdx = builder.createScalarPackIndex(
+            componentIndex: i, indexedPackType: astPackType)
+          _ = builder.createPackElementSet(elementValue: arg, packIndex: packIdx, pack: localPack)
+
+          return (arg, packIdx)
+        }
+        argumentMap.map[localPack] = ArgumentMapping(args: mappedArguments)
+
+      }
+
+      parameterMap.keys.reversed().forEach(explodeArgument)
+      for (key, resultInfos) in resultMap.reversed() {
+        if resultInfos.allSatisfy({ !$0.isSILIndirect }) {
+          // TODO: Do not add direct parameters to replace the indirect ones
+        } else {
+          explodeArgument(key)
+        }
+      }
+    }
+
+    context.notifyNewFunction(function: function, derivedFrom: original)
+  }
+
+  private func unrollPackLoops(in opt: Function, specContext: FunctionPassContext) {
+
+    for loop in specContext.loopTree.loops {
+      // Match the specific shape of a dynamic pack loop we can unroll.
+      // Since these loops only get generated in one place, they have a highly
+      // predictable structure.
+      // The loop body itself should be a single basic block, so unrolling is straightforward.
+      let header = loop.header
+
+      guard loop.hasSingleExitBlock,
+            loop.innerLoops.isEmpty,
+            let exit = loop.exitBlocks.first,
+            let branch = header.instructions.last as? CondBranchInst,
+            let conditionInst = branch.condition.definingInstruction as? BuiltinInst,
+            conditionInst.id == .ICMP_EQ,
+            // conditionInst.name == "cmp_eq_Word", // TODO: Bridge the enum properly
+            let packLengthInst = conditionInst.arguments.compactMap({ $0 as? PackLengthInst }).first,
+            !packLengthInst.packType.containsPackExpansionType
+      else {
+        continue
+      }
+
+      var cloner = Cloner(cloneBefore: loop.preheader!.terminator, specContext)
+      defer { cloner.deinitialize() }
+      let iterations = packLengthInst.packType.numPackElements
+    }
+  }
 }
 
-private func explodedPackElementArgumentConvention(pack: FunctionArgument, elem: Type) -> ArgumentConvention {
-  precondition(pack.convention == .packGuaranteed
-                 || pack.convention == .packOwned
-                 || pack.convention == .packInout
-                 || pack.convention == .packOut)
+private func explodedPackElementArgumentConvention(pack: FunctionArgument, elem: Type)
+  -> ArgumentConvention
+{
+  precondition(
+    pack.convention == .packGuaranteed
+      || pack.convention == .packOwned
+      || pack.convention == .packInout
+      || pack.convention == .packOut)
 
   // If the pack element type is loadable, then we can pass it directly in the generated function.
   // TODO: Account for pack.type.isPackElementAddress with packOwned and packGuaranteed packs
@@ -114,28 +258,30 @@ private func explodedPackElementArgumentConvention(pack: FunctionArgument, elem:
       // For trivial output pack elements, we can return the value directly, but that isn't this function's responsibility
       return .indirectOut
     default:
-      fatalError("Precondition violated")
+      preconditionFailure()
     }
   } else {
     switch pack.convention {
     case .packGuaranteed:
       return .indirectInGuaranteed
     case .packOwned:
-      return .indirectIn; // TODO: Not quite right?
+      return .indirectIn  // TODO: Not quite right?
     case .packInout:
       return .indirectInout
     case .packOut:
       return .indirectOut
     default:
-      fatalError("Precondition violated")
+      preconditionFailure()
     }
   }
 }
 
-private func explodedPackElementResultConvention(in function: Function, elem: Type) -> ResultConvention {
+private func explodedPackElementResultConvention(in function: Function, elem: Type)
+  -> ResultConvention
+{
   // If the pack element type is loadable, then we can return it directly
   if elem.isTrivial(in: function) {
-    return .unowned
+    return .unowned // TODO: Verify this does the right thing before enabling
   } else if elem.isLoadable(in: function) {
     return .owned
   } else {
@@ -169,7 +315,3 @@ private extension ResultInfo {
     }
   }
 }
-
-// private extension FullApplySite {
-//   func classifyArgumentsFor
-// }
