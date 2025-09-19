@@ -7,7 +7,7 @@
 // RUN: %generate-callers(module:CommentsClang) > %t/test.swift
 // RUN: %verify-safe-wrappers -enable-experimental-feature SafeInteropWrappers %t/test.swift
 // RUN: %dump-safe-wrappers -enable-experimental-feature SafeInteropWrappers %t/test.swift 2> %t/expansions.out
-// RUN: diff %t/expansions.out %t/expansions.expected
+// RUN: diff --strip-trailing-cr %t/expansions.out %t/expansions.expected
 
 //--- expansions.expected
 @__swiftmacro_So11lineComment15_SwiftifyImportfMp_.swift
