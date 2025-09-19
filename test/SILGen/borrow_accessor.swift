@@ -2,7 +2,9 @@
 
 // REQUIRES: swift_feature_BorrowAndMutateAccessors
 
-public class Klass {}
+public class Klass {
+  var id: Int = 0
+}
 
 func getKlass() -> Klass {
   return Klass()
@@ -87,6 +89,18 @@ public struct Wrapper {
   var nested_get2: Klass {
     borrow {
       return s_get.borrowKlass // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either literals, stored properties or computed properties that have borrow accessors}}
+    }
+  }
+
+  var nested_get3: Int {
+    borrow {
+      return _s.getKlass.id
+    }
+  }
+
+  var nested_get4: Int {
+    borrow {
+      return s_get.borrowKlass.id
     }
   }
 
@@ -460,6 +474,41 @@ func nctest() {
 // CHECK:   [[REG4:%.*]] = apply [[REG3]]([[REG2]]) : $@convention(method) (@guaranteed S) -> @guaranteed Klass 
 // CHECK:   return [[REG4]]                                       
 // CHECK: } 
+
+// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV11nested_get3Sivb : $@convention(method) (@guaranteed Wrapper) -> Int {
+// CHECK: bb0([[REG0:%.*]] : @guaranteed $Wrapper):
+// CHECK:   [[REG2:%.*]] = struct_extract [[REG0]], #Wrapper._s
+// CHECK:   [[REG3:%.*]] = copy_value [[REG2]]
+// CHECK:   [[REG4:%.*]] = begin_borrow [[REG3]]
+// CHECK:   [[REG5:%.*]] = function_ref @$s15borrow_accessor1SV8getKlassAA0D0Cvg : $@convention(method) (@guaranteed S) -> @owned Klass
+// CHECK:   [[REG6:%.*]] = apply [[REG5]]([[REG4]]) : $@convention(method) (@guaranteed S) -> @owned Klass
+// CHECK:   end_borrow [[REG4]]
+// CHECK:   destroy_value [[REG3]]
+// CHECK:   [[REG9:%.*]] = begin_borrow [[REG6]]
+// CHECK:   [[REG10:%.*]] = class_method [[REG9]], #Klass.id!getter : (Klass) -> () -> Int, $@convention(method) (@guaranteed Klass) -> Int
+// CHECK:   [[REG11:%.*]] = apply [[REG10]]([[REG9]]) : $@convention(method) (@guaranteed Klass) -> Int
+// CHECK:   end_borrow [[REG9]]
+// CHECK:   destroy_value [[REG6]]
+// CHECK:   return [[REG11]]
+// CHECK: }
+
+// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV11nested_get4Sivb : $@convention(method) (@guaranteed Wrapper) -> Int {
+// CHECK: bb0([[REG0:%.*]] : @guaranteed $Wrapper):
+// CHECK:   [[REG2:%.*]] = function_ref @$s15borrow_accessor7WrapperV5s_getAA1SVvg : $@convention(method) (@guaranteed Wrapper) -> @owned S
+// CHECK:   [[REG3:%.*]] = apply [[REG2]]([[REG0]]) : $@convention(method) (@guaranteed Wrapper) -> @owned S
+// CHECK:   [[REG4:%.*]] = begin_borrow [[REG3]]
+// CHECK:   [[REG5:%.*]] = function_ref @$s15borrow_accessor1SV0A5KlassAA0C0Cvb : $@convention(method) (@guaranteed S) -> @guaranteed Klass
+// CHECK:   [[REG6:%.*]] = apply [[REG5]]([[REG4]]) : $@convention(method) (@guaranteed S) -> @guaranteed Klass
+// CHECK:   [[REG7:%.*]] = copy_value [[REG6]]
+// CHECK:   end_borrow [[REG4]]
+// CHECK:   destroy_value [[REG3]]
+// CHECK:   [[REG10:%.*]] = begin_borrow [[REG7]]
+// CHECK:   [[REG11:%.*]] = class_method [[REG10]], #Klass.id!getter : (Klass) -> () -> Int, $@convention(method) (@guaranteed Klass) -> Int
+// CHECK:   [[REG12:%.*]] = apply [[REG11]]([[REG10]]) : $@convention(method) (@guaranteed Klass) -> Int
+// CHECK:   end_borrow [[REG10]]
+// CHECK:   destroy_value [[REG7]]
+// CHECK:   return [[REG12]]
+// CHECK: }
 
 // CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV6nestedAA5KlassCvb : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
 // CHECK: bb0([[REG0:%.*]] : @guaranteed $Wrapper):

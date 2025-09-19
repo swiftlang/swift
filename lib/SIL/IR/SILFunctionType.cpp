@@ -1452,9 +1452,11 @@ public:
     ResultConvention convention;
 
     if (isBorrowOrMutateAccessor) {
-      if ((hasSelfWithAddressType && !substResultTL.isTrivial()) ||
-          isFormallyReturnedIndirectly(origType, substType,
-                                       substResultTLForConvention)) {
+      if (substResultTL.isTrivial()) {
+        convention = ResultConvention::Unowned;
+      } else if (hasSelfWithAddressType ||
+                 isFormallyReturnedIndirectly(origType, substType,
+                                              substResultTLForConvention)) {
         assert(Convs.getResult(substResultTLForConvention) ==
                ResultConvention::Guaranteed);
         convention = ResultConvention::GuaranteedAddress;
