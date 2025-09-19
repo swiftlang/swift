@@ -2694,6 +2694,11 @@ void swift::recordRequiredImportAccessLevelForDecl(
   if (definingModule == dc->getParentModule())
     return;
 
+  // Egregious hack: if the declaration is for a C++ namespace, assume it's
+  // accessible.
+  if (isa_and_nonnull<clang::NamespaceDecl>(decl->getClangDecl()))
+    return;
+
   sf->registerRequiredAccessLevelForModule(definingModule, accessLevel);
 
   if (auto attributedImport = sf->getImportAccessLevel(definingModule)) {
