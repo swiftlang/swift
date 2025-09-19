@@ -2666,7 +2666,8 @@ namespace {
 
     /// Some function conversions synthesized by the constraint solver may not
     /// be correct AND the solver doesn't know, so we must emit a diagnostic.
-    void checkFunctionConversion(Expr *funcConv, Type fromType, Type toType) {
+    void checkFunctionConversion(ImplicitConversionExpr *funcConv,
+                                 Type fromType, Type toType) {
       auto diagnoseNonSendableParametersAndResult =
           [&](FunctionType *fnType,
               std::optional<unsigned> warnUntilSwiftMode = std::nullopt) {
@@ -2770,6 +2771,18 @@ namespace {
               // an isolation boundary.
               if (!fromFnType->isAsync())
                 break;
+
+              // Applying `nonisolated(nonsending)` to an interface type
+              // of a declaration.
+              if (auto *declRef =
+                      dyn_cast<DeclRefExpr>(funcConv->getSubExpr())) {
+                auto *decl = declRef->getDecl();
+                if (auto *nonisolatedAttr =
+                        decl->getAttrs().getAttribute<NonisolatedAttr>()) {
+                  if (nonisolatedAttr->isNonSending())
+                    return;
+                }
+              }
 
               // @concurrent -> nonisolated(nonsending)
               // crosses an isolation boundary.
