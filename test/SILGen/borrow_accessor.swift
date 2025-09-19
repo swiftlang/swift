@@ -14,6 +14,8 @@ public struct NC : ~Copyable {}
 
 func use(_ t: borrowing NC) {}
 
+func consume<T : ~Copyable>(_ t: consuming T) {}
+
 public struct S {
   var _k: Klass
 
@@ -44,8 +46,28 @@ public struct Wrapper {
     }
   }
 
+  var s_get: S {
+    get {
+      return _s
+    }
+  }
+
+  var s_read: S {
+    _read {
+      yield _s
+    }
+  }
+
   var k: Klass {
     borrow {
+      return _k
+    }
+  }
+
+  var k_complex: Klass {
+    borrow {
+      consume(self)
+      consume(_k)
       return _k
     }
   }
@@ -56,18 +78,30 @@ public struct Wrapper {
     }
   }
 
-  var nested_get: Klass {
+  var nested_get1: Klass {
     borrow {
       return _s.getKlass // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either literals, stored properties or computed properties that have borrow accessors}} 
     }
   }
   
-  var nested_read: Klass {
+  var nested_get2: Klass {
+    borrow {
+      return s_get.borrowKlass // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either literals, stored properties or computed properties that have borrow accessors}}
+    }
+  }
+
+  var nested_read1: Klass {
     borrow {
       return _s.readKlass // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either literals, stored properties or computed properties that have borrow accessors}} 
     }
   }
   
+  var nested_read2: Klass {
+    borrow {
+      return s_read.readKlass // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either literals, stored properties or computed properties that have borrow accessors}}
+    }
+  }
+
   var owned_value_direct: Klass {
     borrow {
       return getKlass() // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either literals, stored properties or computed properties that have borrow accessors}} 
@@ -352,6 +386,7 @@ public struct NCWrapper: ~Copyable {
       return _nc
     }
   }
+
   var nested1: NC {
     borrow {
       return _s.nc

@@ -5707,15 +5707,20 @@ SILGenFunction::tryEmitProjectedLValue(SILLocation loc, LValue &&src,
                                        TSanKind tsanKind) {
   assert(src.getAccessKind() == SGFAccessKind::BorrowedAddressRead ||
          src.getAccessKind() == SGFAccessKind::BorrowedObjectRead);
+
+  for (auto component = src.begin(); component != src.end(); component++) {
+    if (component->get()->getKind() != PathComponent::BorrowMutateKind &&
+        component->get()->getKind() != PathComponent::StructElementKind &&
+        component->get()->getKind() != PathComponent::TupleElementKind &&
+        component->get()->getKind() != PathComponent::ValueKind) {
+      return std::nullopt;
+    }
+  }
+
   ManagedValue base;
   PathComponent &&component =
       drillToLastComponent(loc, std::move(src), base, tsanKind);
 
-  if (component.getKind() != PathComponent::BorrowMutateKind &&
-      component.getKind() != PathComponent::StructElementKind &&
-      component.getKind() != PathComponent::TupleElementKind) {
-    return std::nullopt;
-  }
   auto value =
       drillIntoComponent(*this, loc, std::move(component), base, tsanKind);
   ASSERT(!value.hasCleanup());
