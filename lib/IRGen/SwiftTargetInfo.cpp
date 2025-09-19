@@ -71,8 +71,10 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
   // half for the kernel.
   target.SwiftRetainIgnoresNegativeValues = true;
 
-  // ARM64 has swiftClientRetainRelease, except for Android.
-  if (!triple.isAndroid())
+  // ARM64 has swiftClientRetainRelease, except for Android and Embedded.
+  if (!triple.isAndroid() &&
+      !IGM.getSwiftModule()->getASTContext().LangOpts.hasFeature(
+          Feature::Embedded))
     target.HasSwiftClientRRLibrary = true;
 
   target.UsableSwiftAsyncContextAddrIntrinsic = true;
