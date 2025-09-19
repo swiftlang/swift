@@ -1,4 +1,4 @@
-// {"kind":"complete","original":"098f0ede","signature":"swift::ide::CodeCompletionStringBuilder::addTypeAnnotation(swift::Type, swift::DeclContext const*, swift::GenericSignature)","signatureAssert":"Assertion failed: (genericFuncType->getGenericSignature()->isEqual(genericSig) && \"if not, just use the GFT's signature instead below\"), function eraseArchetypes"}
+// {"kind":"complete","original":"098f0ede","signature":"swift::constraints::ConstraintSystem::getMemberReferenceTypeFromOpenedType(swift::Type, swift::Type, swift::ValueDecl*, swift::constraints::ConstraintLocator*, bool, bool)","signatureAssert":"Assertion failed: (isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"), function cast"}
 // RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
 enum a<b> {
   c=d#^^#  macro d()
