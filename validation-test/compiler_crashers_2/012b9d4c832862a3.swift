@@ -1,4 +1,4 @@
-// {"signature":"swift::rewriting::RewriteSystem::verifyRewriteRules(swift::rewriting::RewriteSystem::ValidityPolicy) const"}
+// {"kind":"typecheck","signature":"swift::rewriting::RewriteSystem::verifyRewriteRules(swift::rewriting::RewriteSystem::ValidityPolicy) const"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a { associatedtype b : Collection }
 struct c < d : Collection where d.Element : a,
