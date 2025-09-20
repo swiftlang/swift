@@ -117,23 +117,32 @@ bool swift::tripleRequiresRPathForSwiftLibrariesInOS(
     // macOS versions before 10.14.4 don't have Swift in the OS
     // (the linker still uses an rpath-based install name until 10.15).
     // macOS versions before 12.0 don't have _Concurrency in the OS.
-    return triple.isMacOSXVersionLT(12, 0);
+    // macOS versions before 26.0 don't have Span in stdlib.
+    return triple.isMacOSXVersionLT(26, 0);
   }
 
   if (triple.isiOS()) {
     // iOS versions before 12.2 don't have Swift in the OS.
     // iOS versions before 15.0 don't have _Concurrency in the OS.
-    return triple.isOSVersionLT(15, 0);
+    // iOS versions before 26.0 don't have Span in stdlib.
+    return triple.isOSVersionLT(26, 0);
   }
 
   if (triple.isWatchOS()) {
     // watchOS versions before 5.2 don't have Swift in the OS.
     // watchOS versions before 8.0 don't have _Concurrency in the OS.
-    return triple.isOSVersionLT(8, 0);
+    // watchOS versions before 26.0 don't have Span in stdlib.
+    return triple.isOSVersionLT(26, 0);
+  }
+
+  if (triple.isTvOS()) {
+    // tvOS versions before 26.0 don't have Span in stdlib.
+    return triple.isOSVersionLT(26, 0);
   }
 
   if (triple.isXROS()) {
-    return triple.isOSVersionLT(1, 0);
+    // visionOS versions before 26.0 don't have Span in stdlib.
+    return triple.isOSVersionLT(26, 0);
   }
 
   // Other platforms don't have Swift installed as part of the OS by default.
