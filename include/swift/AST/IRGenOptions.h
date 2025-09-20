@@ -602,6 +602,9 @@ public:
   /// Emit a .casid file next to the object file if CAS Backend is used.
   bool EmitCASIDFile = false;
 
+  /// Generate verbose assembly output with comments.
+  bool VerboseAsm = true;
+
   /// Paths to the pass plugins registered via -load-pass-plugin.
   std::vector<std::string> LLVMPassPlugins;
 
@@ -641,22 +644,20 @@ public:
         DisableStandardSubstitutionsInReflectionMangling(false),
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
-        AnnotateCondFailMessage(false),
-        InternalizeAtLink(false), InternalizeSymbols(false),
-        EmitGenericRODatas(true),
+        AnnotateCondFailMessage(false), InternalizeAtLink(false),
+        InternalizeSymbols(false), EmitGenericRODatas(true),
         NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(true),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
-        UseCoroCCX8664(false), UseCoroCCArm64(false),
-        MergeableTraps(false),
+        UseCoroCCX8664(false), UseCoroCCArm64(false), MergeableTraps(false),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
-        CASObjMode(llvm::CASBackendMode::Native) {
+        CASObjMode(llvm::CASBackendMode::Native), VerboseAsm(true) {
     DisableRoundTripDebugTypes = !CONDITIONAL_ASSERT_enabled();
   }
 
