@@ -833,6 +833,7 @@ enum Project {
   Subprocess
   Build
   PackageManager
+  PackageManagerRuntime
   Markdown
   Format
   LMDB
@@ -3535,6 +3536,14 @@ function Build-PackageManager([Hashtable] $Platform) {
       SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
       SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib";
     }
+
+  Build-CMakeProject `
+    -Src "$SrcDir\Sources\Runtime" `
+    -Bin (Get-ProjectBinaryCache $Platform PackageManagerRuntime) `
+    -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
+    -Platform $Platform `
+    -UseBuiltCompilers C,Swift `
+    -SwiftSDK (Get-SwiftSDK -OS $Platform.OS)
 }
 
 function Build-Markdown([Hashtable] $Platform) {
