@@ -1205,7 +1205,10 @@ public:
       StringRef sectionName = "", StringRef name = "");
   llvm::Constant *getAddrOfGlobalString(StringRef utf8,
                                         bool willBeRelativelyAddressed = false,
-                                        bool useOSLogSection = false);
+                                        bool useOSLogSection = false,
+                                        StringRef sectionName = "");
+  llvm::Constant *getAddrOfGlobalString(StringRef utf8,
+                                        const char *sectionName);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *
   getAddrOfGlobalIdentifierString(StringRef utf8,
@@ -1542,6 +1545,15 @@ public:
   const char *getReflectionStringsSectionName();
   const char *getReflectionTypeRefSectionName();
   const char *getMultiPayloadEnumDescriptorSectionName();
+
+  static constexpr const char ObjCClassNameSectionName[] =
+      "__TEXT,__objc_classname,cstring_literals";
+  static constexpr const char ObjCMethodNameSectionName[] =
+      "__TEXT,__objc_methname,cstring_literals";
+  static constexpr const char ObjCMethodTypeSectionName[] =
+      "__TEXT,__objc_methtype,cstring_literals";
+  static constexpr const char ObjCPropertyNameSectionName[] =
+      "__TEXT,__objc_methname,cstring_literals";
 
   /// Returns the special builtin types that should be emitted in the stdlib
   /// module.

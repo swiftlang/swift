@@ -296,9 +296,9 @@ public:
     // Check if the ObjC runtime already has a descriptor for this
     // protocol. If so, use it.
     SmallString<32> buf;
-    auto protocolName
-      = IGM.getAddrOfGlobalString(proto->getObjCRuntimeName(buf));
-    
+    auto protocolName = IGM.getAddrOfGlobalString(
+        proto->getObjCRuntimeName(buf), IRGenModule::ObjCClassNameSectionName);
+
     auto existing = Builder.CreateCall(objc_getProtocol, protocolName);
     auto isNull = Builder.CreateICmpEQ(existing,
                    llvm::ConstantPointerNull::get(IGM.ProtocolDescriptorPtrTy));
@@ -1056,16 +1056,16 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
   case llvm::Triple::MachO:
     switch (Type) {
     case ObjCLabelType::ClassName:
-      GV->setSection("__TEXT,__objc_classname,cstring_literals");
+      GV->setSection(IRGenModule::ObjCClassNameSectionName);
       return;
     case ObjCLabelType::MethodVarName:
-      GV->setSection("__TEXT,__objc_methname,cstring_literals");
+      GV->setSection(IRGenModule::ObjCMethodNameSectionName);
       return;
     case ObjCLabelType::MethodVarType:
-      GV->setSection("__TEXT,__objc_methtype,cstring_literals");
+      GV->setSection(IRGenModule::ObjCMethodTypeSectionName);
       return;
     case ObjCLabelType::PropertyName:
-      GV->setSection("__TEXT,__objc_methname,cstring_literals");
+      GV->setSection(IRGenModule::ObjCPropertyNameSectionName);
       return;
     }
   case llvm::Triple::ELF:
@@ -4241,8 +4241,9 @@ getObjCClassByNameReference(IRGenModule &IGM, ClassDecl *cls) {
   auto kind = TypeReferenceKind::DirectObjCClassName;
   SmallString<64> objcRuntimeNameBuffer;
   auto ref = IGM.getAddrOfGlobalString(
-                                 cls->getObjCRuntimeName(objcRuntimeNameBuffer),
-                                 /*willBeRelativelyAddressed=*/true);
+      cls->getObjCRuntimeName(objcRuntimeNameBuffer),
+      /*willBeRelativelyAddressed=*/true,
+      /*useOSLogSection=*/false, IRGenModule::ObjCClassNameSectionName);
 
   return TypeEntityReference(kind, ref);
 }
@@ -6015,6 +6016,12 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
   return Address(alloca, type, alignment);
 }
 
+llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
+                                                   const char *sectionName) {
+  return getAddrOfGlobalString(data, /*willBeRelativelyAddressed=*/false,
+                               /*useOSLogSection=*/false, sectionName);
+}
+
 /// Get or create a global string constant.
 ///
 /// \returns an i8* with a null terminator; note that embedded nulls
@@ -6023,9 +6030,9 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
 /// FIXME: willBeRelativelyAddressed is only needed to work around an ld64 bug
 /// resolving relative references to coalesceable symbols.
 /// It should be removed when fixed. rdar://problem/22674524
-llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
-                                               bool willBeRelativelyAddressed,
-                                               bool useOSLogSection) {
+llvm::Constant *IRGenModule::getAddrOfGlobalString(
+    StringRef data, bool willBeRelativelyAddressed, bool useOSLogSection,
+    StringRef sectionName) {
   useOSLogSection = useOSLogSection &&
     TargetInfo.OutputObjectFormat == llvm::Triple::MachO;
 
@@ -6053,8 +6060,8 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
     (llvm::Twine(".nul") + llvm::Twine(i)).toVector(name);
   }
 
-  auto sectionName =
-    useOSLogSection ? "__TEXT,__oslogstring,cstring_literals" : "";
+  sectionName =
+      useOSLogSection ? "__TEXT,__oslogstring,cstring_literals" : sectionName;
 
   entry = createStringConstant(data, willBeRelativelyAddressed,
                                sectionName, name);
