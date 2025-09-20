@@ -88,6 +88,10 @@ DiagnosticArgument::DiagnosticArgument(StmtKind SK)
     : Kind(DiagnosticArgumentKind::DescriptiveStmtKind),
       DescriptiveStmtKindVal(SK) {}
 
+DiagnosticArgument::DiagnosticArgument(ExprKind EK)
+    : Kind(DiagnosticArgumentKind::DescriptiveExprKind),
+      DescriptiveExprKindVal(EK) {}
+
 DiagnosticArgument::DiagnosticArgument(const DeclAttribute *attr)
     : Kind(DiagnosticArgumentKind::DeclAttribute), DeclAttributeVal(attr) {}
 
@@ -203,6 +207,11 @@ DescriptiveDeclKind DiagnosticArgument::getAsDescriptiveDeclKind() const {
 StmtKind DiagnosticArgument::getAsDescriptiveStmtKind() const {
   ASSERT(Kind == DiagnosticArgumentKind::DescriptiveStmtKind);
   return DescriptiveStmtKindVal;
+}
+
+ExprKind DiagnosticArgument::getAsDescriptiveExprKind() const {
+  ASSERT(Kind == DiagnosticArgumentKind::DescriptiveExprKind);
+  return DescriptiveExprKindVal;
 }
 
 const DeclAttribute *DiagnosticArgument::getAsDeclAttribute() const {

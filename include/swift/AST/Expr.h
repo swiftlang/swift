@@ -414,6 +414,10 @@ public:
   /// to the user of the compiler in any way.
   static StringRef getKindName(ExprKind K);
 
+  /// Retrieve the descriptive kind name for a given expression. This is
+  /// suitable for use in diagnostics.
+  static StringRef getDescriptiveKindName(ExprKind K);
+
   /// getType - Return the type of this expression.
   Type getType() const { return Ty; }
 

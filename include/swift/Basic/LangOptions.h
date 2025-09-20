@@ -993,6 +993,11 @@ namespace swift {
     /// Should be stored sorted.
     llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
 
+    /// Expressions with source ranges containing these line/column positions
+    /// should emit inferred type remarks. Should be stored sorted.
+    llvm::SmallVector<std::pair<unsigned, unsigned>, 4>
+        InferredTypesRemarksAtPositions;
+
     /// Triggers llvm fatal error if the typechecker tries to typecheck a decl
     /// or an identifier reference with any of the provided prefix names. This
     /// is for testing purposes.
