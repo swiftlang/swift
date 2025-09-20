@@ -418,6 +418,9 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
   llvm_unreachable("Invalid invoker kind"); // silences MSVC C4715
 }
 
+/// Get the source file for the given `SILFunction`.
+SourceFile &getSourceFile(SILFunction *f);
+
 } // end namespace autodiff
 } // end namespace swift
 
