@@ -20,7 +20,7 @@ protocol Fungible {}
 func meta<T>(_ m: T.Type) {}
 func meta2<T>(_ m: T.Type, _ x: Int) {}
 
-func generic<T>(_ x: T) {} // expected-note {{'generic' declared here}}
+func generic<T>(_ x: T) {}
 
 var a, b, c, d : Int
 
@@ -41,9 +41,7 @@ _ = (a < b, c > d)
 _ = a>(b)
 _ = a > (b)
 
-generic<Int>(0)
-// expected-swift5-warning@-1{{cannot explicitly specialize global function 'generic'}}
-// expected-swift6-error@-2 {{cannot explicitly specialize global function 'generic'}}
+generic<Int>(0) // ok, explicit specialization is allowed
 
 A<B>.c()
 A<A<B>>.c()
