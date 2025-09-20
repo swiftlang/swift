@@ -1665,7 +1665,8 @@ uint16_t SILGenFunction::emitBasicProlog(
   emitIndirectResultParameters(*this, resultType, origResultType, DC);
 
   std::optional<AbstractionPattern> origErrorType;
-  if (origClosureType && !origClosureType->isTypeParameterOrOpaqueArchetype()) {
+  if (origClosureType && !origClosureType->isTypeParameterOrOpaqueArchetype() &&
+      !origClosureType->isClangType()) {
     origErrorType = origClosureType->getFunctionThrownErrorType();
     if (origErrorType && !errorType)
       errorType = origErrorType->getEffectiveThrownErrorType();
