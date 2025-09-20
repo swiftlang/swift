@@ -5108,25 +5108,6 @@ public:
   void cacheResult(bool isSkipped) const;
 };
 
-class SemanticDeclAttrsRequest
-    : public SimpleRequest<SemanticDeclAttrsRequest,
-                           DeclAttributes(const Decl *),
-                           RequestFlags::SeparatelyCached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  DeclAttributes evaluate(Evaluator &evaluator, const Decl *) const;
-
-public:
-  // Separate caching.
-  bool isCached() const { return true; }
-  std::optional<DeclAttributes> getCachedResult() const;
-  void cacheResult(DeclAttributes) const;
-};
-
 class UniqueUnderlyingTypeSubstitutionsRequest
     : public SimpleRequest<UniqueUnderlyingTypeSubstitutionsRequest,
                            std::optional<SubstitutionMap>(
