@@ -4549,15 +4549,6 @@ void ClangModuleUnit::getImportedModules(
         // Remove the exported ones now that we're done with them.
         imported.clear();
       }
-      llvm::copy_if(clangModule->Imports, std::back_inserter(imported),
-                    [&](clang::Module *mod) {
-                     return !knownModules.insert(mod).second;
-                    });
-
-      // FIXME: The parent module isn't exactly a private import, but it is
-      // needed for link dependencies.
-      if (clangModule->Parent)
-        imported.push_back(clangModule->Parent);
     }
   }
 
@@ -4575,6 +4566,7 @@ void ClangModuleUnit::getImportedModules(
           auto topLevelWrapper = owner.getWrapperForModule(importTopLevel);
           imports.push_back({ ImportPath::Access(),
                               topLevelWrapper->getParentModule() });
+          continue;
         }
       }
       actualMod = wrapper->getParentModule();
