@@ -552,7 +552,7 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
           get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
 
           # Detect and handle swiftly-managed hosts.
-          if(swift_bin_dir MATCHES ".*/swiftly/bin")
+          if(swift_bin_dir MATCHES ".*/swiftly/bin" OR swift_bin_dir STREQUAL "$ENV{SWIFTLY_BIN_DIR}")
             execute_process(COMMAND swiftly use --print-location
               OUTPUT_VARIABLE swiftly_dir
               ERROR_VARIABLE err)
@@ -626,7 +626,7 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
           get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
 
           # Detect and handle swiftly-managed hosts.
-          if(swift_bin_dir MATCHES ".*/swiftly/bin")
+          if(swift_bin_dir MATCHES ".*/swiftly/bin" OR swift_bin_dir STREQUAL "$ENV{SWIFTLY_BIN_DIR}")
             execute_process(COMMAND swiftly use --print-location
               OUTPUT_VARIABLE swiftly_dir
               ERROR_VARIABLE err)
