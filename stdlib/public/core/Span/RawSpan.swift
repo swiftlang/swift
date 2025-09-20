@@ -62,7 +62,7 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
   /// `pointer` must point to a region of `byteCount` initialized bytes,
-  /// or may be `nil` if `count` is 0.
+  /// or may be `nil` if `byteCount` is 0.
   ///
   /// The region of `byteCount` bytes of memory starting at `pointer`
   /// must remain valid, initialized and immutable
@@ -121,7 +121,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: a `Slice<UnsafeRawBufferPointer>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -142,7 +142,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: an `UnsafeMutableRawBufferPointer` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -163,7 +163,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: a `Slice<UnsafeMutableRawBufferPointer>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -207,7 +207,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: an `UnsafeBufferPointer<T>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -228,7 +228,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: a `Slice<UnsafeBufferPointer<T>>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -249,7 +249,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: an `UnsafeMutableBufferPointer<T>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -270,7 +270,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: a `Slice<UnsafeMutableBufferPointer<T>>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
