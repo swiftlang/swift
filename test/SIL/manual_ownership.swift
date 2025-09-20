@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend %s -emit-sil -verify -enable-experimental-feature ManualOwnership
+// RUN: %target-swift-frontend %s -emit-sil -verify \
+// RUN:   -enable-experimental-feature ManualOwnership \
+// RUN:   -enable-copy-propagation=always
 
 // REQUIRES: swift_feature_ManualOwnership
 
@@ -12,6 +14,7 @@ public struct Pair {
   var x: Int
   var y: Int
 
+  @_manualOwnership
   consuming func midpoint(_ other: borrowing Pair) -> Pair {
     return Pair(x: (x + other.x) / 2, y: (y + other.y) / 2)
   }
@@ -24,7 +27,10 @@ public class Triangle {
 
   var nontrivial = Whatever()
 
+  @_manualOwnership
   consuming func consuming() {}
+
+  @_manualOwnership
   borrowing func borrowing() {}
 }
 
@@ -33,14 +39,8 @@ public class Triangle {
 @_manualOwnership
 public func basic_return1() -> Triangle {
   let x = Triangle()
-  return x // expected-error {{explicit 'copy' required here}}
+  return x
 }
-@_manualOwnership
-public func basic_return1_fixed() -> Triangle {
-  let x = Triangle()
-  return copy x
-}
-
 
 @_manualOwnership
 public func basic_return2(t: Triangle) -> Triangle {
@@ -56,23 +56,38 @@ public func basic_return3() -> Triangle {
   return Triangle()
 }
 
-// FIXME: we need copy propagation in -Onone to eliminate all these copies
 @_manualOwnership
 func reassign_with_lets() -> Triangle {
   let x = Triangle()
-  let y = x // expected-error {{explicit 'copy' required here}}
-  let z = y // expected-error {{explicit 'copy' required here}}
-  return z // expected-error {{explicit 'copy' required here}}
+  let y = x
+  let z = y
+  return z
 }
 
-// FIXME: we need copy propagation in -Onone to eliminate all but the copies for returning
 @_manualOwnership
 func renamed_return(_ cond: Bool, _ a: Triangle) -> Triangle {
-  let b = a // expected-error {{explicit 'copy' required here}}
-  let c = b // expected-error {{explicit 'copy' required here}}
+  let b = a
+  let c = b
   if cond { return b } // expected-error {{explicit 'copy' required here}}
   return c // expected-error {{explicit 'copy' required here}}
 }
+
+@_manualOwnership
+func renamed_return_fix1(_ cond: Bool, _ a: Triangle) -> Triangle {
+  let b = copy a
+  let c = copy b  // FIXME: not needed! Is explicit_copy_value is blocking propagation?
+  if cond { return b }
+  return c
+}
+
+// FIXME: this crashes CopyPropagation!
+//@_manualOwnership
+//func renamed_return_fix2(_ cond: Bool, _ a: Triangle) -> Triangle {
+//  let b = a
+//  let c = b
+//  if cond { return copy b }
+//  return copy c
+//}
 
 /// MARK: method calls
 
@@ -87,7 +102,7 @@ func basic_methods_borrowing(_ t1: Triangle) {
 func basic_methods_consuming(_ t1: Triangle) {
   let t2 = Triangle()
   t1.consuming() // expected-error {{explicit 'copy' required here}}
-  t2.consuming() // expected-error {{explicit 'copy' required here}}
+  t2.consuming()
 }
 @_manualOwnership
 func basic_methods_consuming_fixed(_ t1: Triangle) {
@@ -96,7 +111,7 @@ func basic_methods_consuming_fixed(_ t1: Triangle) {
   t3 = Triangle()
 
   (copy t1).consuming()
-  (copy t2).consuming()
+  (copy t2).consuming()  // FIXME: why is this not propagated?
   (copy t3).consuming()
 }
 
@@ -113,12 +128,12 @@ func basic_function_call(_ t1: Triangle) {
 /// MARK: control-flow
 
 
-// FIXME: var's and assignments are a little busted
+// FIXME: var assignments are somtimes impossible to satisfy with 'copy'
 
 // @_manualOwnership
 // func reassignments_1() {
 //   var t3 = Triangle()
-//   t3 = Triangle()
+//   t3 = copy Triangle()  // FIXME: should not be needed
 //   t3.borrowing()
 // }
 // @_manualOwnership

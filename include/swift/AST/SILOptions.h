@@ -49,10 +49,14 @@ enum class CopyPropagationOption : uint8_t {
   // just -enable-ossa-modules.
   RequestedPassesOnly,
 
-  // Add all relevant copy propagation passes.  If a setting, e.g.
-  // -enable-ossa-modules, requests to add copy propagation to the pipeline, do
-  // so.
-  On
+  // Run copy propagation during optimized builds only.
+  //
+  // If a setting, e.g. -enable-ossa-modules, requests to add copy propagation
+  // to the performance pipeline, do so.
+  Optimizing,
+
+  // Run copy propagation during all builds and whenever requested.
+  Always
 };
 
 enum class DestroyHoistingOption : uint8_t {
@@ -90,11 +94,8 @@ public:
   /// observable end of lexical scope.
   LexicalLifetimesOption LexicalLifetimes = LexicalLifetimesOption::On;
 
-  /// Whether to run SIL copy propagation to shorten object lifetime in whatever
-  /// optimization pipeline is currently used.
-  ///
-  /// When this is 'On' the pipeline has default behavior.
-  CopyPropagationOption CopyPropagation = CopyPropagationOption::On;
+  /// Controls when to run SIL copy propagation, which shortens object lifetimes
+  CopyPropagationOption CopyPropagation = CopyPropagationOption::Optimizing;
 
   /// Whether to run the DestroyAddrHoisting pass.
   ///
