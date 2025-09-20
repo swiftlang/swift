@@ -593,8 +593,13 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
       !clangImporter->importBridgingHeader(bridgingHeaderPath, module)) {
     auto *headerModule = clangImporter->getImportedHeaderModule();
     assert(headerModule && "Didn't load bridging header?");
-    imports.emplace_back(
+    AttributedImport<ImportedModule> import(
         ImportedModule(headerModule), SourceLoc(), ImportFlags::Exported);
+    if (ctx.ClangImporterOpts.BridgingHeaderIsInternal) {
+      import.accessLevel = AccessLevel::Internal;
+    }
+
+    imports.emplace_back(import);
   }
 
   // Implicitly import the underlying Clang half of this module if needed.

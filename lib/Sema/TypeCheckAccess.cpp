@@ -454,12 +454,16 @@ static void noteLimitingImport(const Decl *userDecl, ASTContext &ctx,
     if (userDecl)
       userDecl->diagnose(diag::decl_import_via_local, complainDecl,
                          limitImport->accessLevel,
-                         limitImport->module.importedModule);
+                         limitImport->module.importedModule,
+                         limitImport->module.importedModule
+                           ->isClangHeaderImportModule());
 
     if (limitImport->importLoc.isValid())
       ctx.Diags.diagnose(limitImport->importLoc, diag::decl_import_via_here,
                          complainDecl, limitImport->accessLevel,
-                         limitImport->module.importedModule);
+                         limitImport->module.importedModule,
+                         limitImport->module.importedModule
+                           ->isClangHeaderImportModule());
   } else if (limitImport->importLoc.isValid()) {
     ctx.Diags.diagnose(limitImport->importLoc, diag::module_imported_here,
                        limitImport->module.importedModule,
@@ -2690,6 +2694,11 @@ void swift::recordRequiredImportAccessLevelForDecl(
 
   auto definingModule = decl->getModuleContext();
   if (definingModule == dc->getParentModule())
+    return;
+
+  // Egregious hack: if the declaration is for a C++ namespace, assume it's
+  // accessible.
+  if (isa_and_nonnull<clang::NamespaceDecl>(decl->getClangDecl()))
     return;
 
   sf->registerRequiredAccessLevelForModule(definingModule, accessLevel);

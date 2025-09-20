@@ -32,10 +32,10 @@
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -emit-executable %/s -L=. | %FileCheck %s -check-prefix=L_PATH
 // L_PATH: -L {{"?}}SOURCE_DIR/test/Driver/Inputs
 
-// RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c %/s -disable-bridging-pch -import-objc-header bridging-header.h | %FileCheck %s -check-prefix=OBJC_HEADER1
-// OBJC_HEADER1: -import-objc-header {{"?}}SOURCE_DIR/test/Driver/Inputs{{/|\\\\}}bridging-header.h
+// RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c %/s -disable-bridging-pch -import-bridging-header bridging-header.h | %FileCheck %s -check-prefix=OBJC_HEADER1
+// OBJC_HEADER1: -import-bridging-header {{"?}}SOURCE_DIR/test/Driver/Inputs{{/|\\\\}}bridging-header.h
 
-// RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c %/s -enable-bridging-pch -import-objc-header bridging-header.h | %FileCheck %s -check-prefix=OBJC_HEADER2
+// RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c %/s -enable-bridging-pch -import-bridging-header bridging-header.h | %FileCheck %s -check-prefix=OBJC_HEADER2
 // OBJC_HEADER2: SOURCE_DIR/test/Driver/Inputs{{/|\\\\}}bridging-header.h{{"? .*}}-emit-pch
 
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c %/s -o main.o | %FileCheck %s -check-prefix=OUTPUT_OBJ

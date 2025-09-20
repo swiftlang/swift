@@ -2996,7 +2996,9 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
   // they are recommended over indirect imports.
   if ((!restrictiveImport.has_value() ||
        restrictiveImport->accessLevel < AccessLevel::Public) &&
-     imports.isImportedBy(targetModule, getParentModule()))
+      !(restrictiveImport &&
+        restrictiveImport->module.importedModule->isClangHeaderImportModule()) &&
+      imports.isImportedBy(targetModule, getParentModule()))
     return std::nullopt;
 
   return restrictiveImport;

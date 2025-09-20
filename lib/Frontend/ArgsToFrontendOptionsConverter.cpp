@@ -913,18 +913,40 @@ static inline bool isPCHFilenameExtension(StringRef path) {
 
 void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
-  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
-    // Legacy support for passing PCH file through `-import-objc-header`.
+  bool hadNormalBridgingHeader = false;
+  if (const Arg *A = Args.getLastArgNoClaim(
+          OPT_import_bridging_header,
+          OPT_internal_import_bridging_header)) {
+    // Legacy support for passing PCH file through `-import-bridging-header`.
     if (isPCHFilenameExtension(A->getValue()))
       Opts.ImplicitObjCPCHPath = A->getValue();
     else
       Opts.ImplicitObjCHeaderPath = A->getValue();
-    // If `-import-object-header` is used, it means the module has a direct
+    // If `-import-bridging-header` is used, it means the module has a direct
     // bridging header dependency and it can be serialized into binary module.
     Opts.ModuleHasBridgingHeader |= true;
+
+    Opts.ImportHeaderAsInternal =
+        A->getOption().getID() == OPT_internal_import_bridging_header;
+
+    hadNormalBridgingHeader = true;
   }
-  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_pch))
+  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_pch,
+                                            OPT_internal_import_pch)) {
     Opts.ImplicitObjCPCHPath = A->getValue();
+
+    bool importAsInternal = A->getOption().getID() == OPT_internal_import_pch;
+
+    /// Don't let the bridging-header and precompiled-header options differ in
+    /// whether they are treated as internal or public imports.
+    if (hadNormalBridgingHeader &&
+        importAsInternal != Opts.ImportHeaderAsInternal) {
+      Diags.diagnose(SourceLoc(),
+                     diag::bridging_header_and_pch_internal_mismatch);
+    }
+
+    Opts.ImportHeaderAsInternal = importAsInternal;
+  }
 }
 void ArgsToFrontendOptionsConverter::
 computeImplicitImportModuleNames(OptSpecifier id, bool isTestable) {
