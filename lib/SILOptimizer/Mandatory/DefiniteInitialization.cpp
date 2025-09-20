@@ -1114,8 +1114,7 @@ void LifetimeChecker::injectActorHops() {
 
 void LifetimeChecker::doIt() {
   // With any escapes tallied up, we can work through all the uses, checking
-  // for definitive initialization, promoting loads, rewriting assigns, and
-  // performing other tasks.
+  // for definitive initialization and performing other tasks.
 
   // Note that this should not use a for-each loop, as the Uses list can grow
   // and reallocate as we iterate over it.
@@ -1185,7 +1184,7 @@ void LifetimeChecker::doIt() {
     }
   }
 
-  // If we emitted an error, there is no reason to proceed with load promotion.
+  // If we emitted an error, there is no reason to proceed.
   if (!EmittedErrorLocs.empty()) {
     // Since we failed DI, for now, turn off the move checker on the entire
     // function. With time, we should be able to allow for move checker checks
@@ -2514,8 +2513,8 @@ static void setStaticInitAccess(SILValue memoryAddress) {
 
 /// updateInstructionForInitState - When an instruction being analyzed moves
 /// from being InitOrAssign to some concrete state, update it for that state.
-/// This includes rewriting them from assign instructions into their composite
-/// operations.
+/// This includes marking assign instructions so they will be appropriately
+/// handled during RawSILInstLowering.
 void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
   DIMemoryUse &Use = Uses[UseID];
   SILInstruction *Inst = Use.Inst;
@@ -2564,14 +2563,17 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
     return; \
   }
 #include "swift/AST/ReferenceStorage.def"
-  
-  // If this is an assign, rewrite it based on whether it is an initialization
-  // or not.
-  if (auto *AI = dyn_cast<AssignInst>(Inst)) {
-    // Remove this instruction from our data structures, since we will be
-    // removing it.
+
+  // Helper to remove the instruction from our data structures.
+  auto eraseUseInst = [&] {
     Use.Inst = nullptr;
     llvm::erase_if(NonLoadUses[Inst], [&](unsigned id) { return id == UseID; });
+  };
+
+  // If this is an assign, mark it so that RawSILInstLowering can handle it
+  // appropriately.
+  if (auto *AI = dyn_cast<AssignInst>(Inst)) {
+    eraseUseInst();
 
     if (TheMemory.isClassInitSelf() &&
         Use.Kind == DIUseKind::SelfInit) {
@@ -2605,10 +2607,7 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
   }
 
   if (auto *AI = dyn_cast<AssignOrInitInst>(Inst)) {
-    // Remove this instruction from our data structures, since we will be
-    // removing it.
-    Use.Inst = nullptr;
-    llvm::erase_if(NonLoadUses[Inst], [&](unsigned id) { return id == UseID; });
+    eraseUseInst();
 
     switch (Use.Kind) {
     case DIUseKind::Assign:
@@ -3869,8 +3868,7 @@ static bool checkDefiniteInitialization(SILFunction &Fn) {
 
 namespace {
 
-/// Perform definitive initialization analysis and promote alloc_box uses into
-/// SSA registers for later SSA-based dataflow passes.
+/// Perform definitive initialization analysis.
 class DefiniteInitialization : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
@@ -3878,7 +3876,6 @@ class DefiniteInitialization : public SILFunctionTransform {
     if (getFunction()->wasDeserializedCanonical())
       return;
 
-    // Walk through and promote all of the alloc_box's that we can.
     if (checkDefiniteInitialization(*getFunction())) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }
