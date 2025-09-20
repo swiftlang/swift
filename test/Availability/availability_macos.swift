@@ -2,8 +2,8 @@
 
 // REQUIRES: OS=macosx
 
-struct A {} // expected-note * {{found this candidate}}
-struct B {} // expected-note * {{found this candidate}}
+struct A {} // expected-note * {{found candidate with type '() -> A'}}
+struct B {} // expected-note * {{found candidate with type '() -> B'}}
 
 func ambiguousInFarFuture(_: A) {}
 

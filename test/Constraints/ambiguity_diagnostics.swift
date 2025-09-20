@@ -41,8 +41,8 @@ func test() {
   func __findValue<T: ExpressibleByStringLiteral>(_: String, fallback: T) -> T { fatalError() }
   func __findValue<T: ExpressibleByExtendedGraphemeClusterLiteral>(_: String, fallback: T) -> T { fatalError() }
 
-  func ambiguitySource() -> AnyShapeStyle { fatalError() } // expected-note {{found this candidate}}
-  func ambiguitySource() -> AnyGradient { fatalError() }   // expected-note {{found this candidate}}
+  func ambiguitySource() -> AnyShapeStyle { fatalError() } // expected-note {{found candidate with type '() -> AnyShapeStyle'}}
+  func ambiguitySource() -> AnyGradient { fatalError() }   // expected-note {{found candidate with type '() -> AnyGradient'}}
 
   Text("Test")
     .title(__findValue("someKey", fallback: "<unknown>"))
