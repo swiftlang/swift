@@ -380,12 +380,16 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_module_semantic_info_path);
   auto optRecordOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_save_optimization_record_path);
+  auto silOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_sil_output_path);
+  auto irOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_ir_output_path);
   if (!clangHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !loadedModuleTrace || !TBD ||
       !moduleInterfaceOutput || !privateModuleInterfaceOutput || !packageModuleInterfaceOutput ||
       !moduleSourceInfoOutput || !moduleSummaryOutput || !abiDescriptorOutput ||
-      !moduleSemanticInfoOutput || !optRecordOutput) {
+      !moduleSemanticInfoOutput || !optRecordOutput || !silOutput || !irOutput) {
     return std::nullopt;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -413,6 +417,8 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.ModuleSemanticInfoOutputPath = (*moduleSemanticInfoOutput)[i];
     sop.YAMLOptRecordPath = (*optRecordOutput)[i];
     sop.BitstreamOptRecordPath = (*optRecordOutput)[i];
+    sop.SILOutputPath = (*silOutput)[i];
+    sop.LLVMIROutputPath = (*irOutput)[i];
     result.push_back(sop);
   }
   return result;
@@ -613,6 +619,9 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       file_types::TY_BitstreamOptRecord, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
+  auto SILOutputPath = pathsFromArguments.SILOutputPath;
+  auto LLVMIROutputPath = pathsFromArguments.LLVMIROutputPath;
+
   SupplementaryOutputPaths sop;
   sop.ClangHeaderOutputPath = clangHeaderOutputPath;
   sop.ModuleOutputPath = moduleOutputPath;
@@ -635,6 +644,8 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.ModuleSemanticInfoOutputPath = ModuleSemanticInfoOutputPath;
   sop.YAMLOptRecordPath = YAMLOptRecordPath;
   sop.BitstreamOptRecordPath = bitstreamOptRecordPath;
+  sop.SILOutputPath = SILOutputPath;
+  sop.LLVMIROutputPath = LLVMIROutputPath;
   return sop;
 }
 
@@ -752,7 +763,9 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
                                options::OPT_emit_private_module_interface_path,
                                options::OPT_emit_package_module_interface_path,
                                options::OPT_emit_module_source_info_path,
-                               options::OPT_emit_tbd_path)) {
+                               options::OPT_emit_tbd_path,
+                               options::OPT_sil_output_path,
+                               options::OPT_ir_output_path)) {
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_have_supplementary_outputs,
                    A->getSpelling(), "-supplementary-output-file-map");

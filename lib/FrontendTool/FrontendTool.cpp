@@ -2100,6 +2100,13 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::EmitSIL)
     return writeSIL(*SM, PSPs, Instance, Invocation.getSILOptions());
 
+  // Write extra SIL output if requested
+  if (!PSPs.SupplementaryOutputs.SILOutputPath.empty()) {
+    if (writeSIL(*SM, Instance.getMainModule(), Invocation.getSILOptions(),
+                 PSPs.SupplementaryOutputs.SILOutputPath, Instance.getOutputBackend()))
+      return true;
+  }
+
   assert(Action >= FrontendOptions::ActionType::Immediate &&
          "All actions not requiring IRGen must have been handled!");
   assert(Action != FrontendOptions::ActionType::REPL &&
@@ -2143,6 +2150,17 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   auto IRModule =
       generateIR(IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
                  OutputFilename, MSF, HashGlobal, ParallelOutputFilenames);
+
+  // Write extra LLVM IR output if requested
+  if (IRModule && !PSPs.SupplementaryOutputs.LLVMIROutputPath.empty()) {
+    if (withOutputPath(Instance.getDiags(), Instance.getOutputBackend(),
+                       PSPs.SupplementaryOutputs.LLVMIROutputPath,
+                       [&](raw_ostream &out) -> bool {
+                         IRModule.getModule()->print(out, nullptr);
+                         return false;
+                       }))
+      return true;
+  }
 
   // Cancellation check after IRGen.
   if (Instance.isCancellationRequested())
