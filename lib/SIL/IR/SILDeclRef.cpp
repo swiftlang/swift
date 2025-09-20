@@ -1298,7 +1298,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     }
 
     // Use a given cdecl name for native-to-foreign thunks.
-    if (auto CDeclA = getDecl()->getAttrs().getAttribute<CDeclAttr>())
+    if (getDecl()->getAttrs().hasAttribute<CDeclAttr>())
       if (isNativeToForeignThunk()) {
         // If this is an @implementation @_cdecl, mangle it like the clang
         // function it implements.
@@ -1307,7 +1307,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
           if (!clangMangling.empty())
             return clangMangling;
         }
-        return CDeclA->Name.str();
+        return getDecl()->getCDeclName().str();
       }
 
     if (SKind == ASTMangler::SymbolKind::DistributedThunk) {
