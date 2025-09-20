@@ -991,7 +991,7 @@ public:
       // Disable the expression cleanup of the copy, since the let value
       // initialization has a cleanup that lives for the entire scope of the
       // let declaration.
-      bindValue(value.copyUnmanaged(SGF, loc).forward(SGF), SGF, true, loc);
+      bindValue(value.copy(SGF, loc).forward(SGF), SGF, true, loc);
     }
   }
 
@@ -1298,13 +1298,13 @@ void EnumElementPatternInitialization::emitEnumMatch(
               ManagedValue borrowedVal =
                   SGF.B.createLoadBorrow(loc, mvAccessAddress);
               mv = loadScope.popPreservingValue(
-                  borrowedVal.copyUnmanaged(SGF, loc));
+                  borrowedVal.copy(SGF, loc));
             }
             access.endAccess(SGF);
           } else {
             // If we do not have a loadable value, just do a copy of the
             // boxedValue.
-            mv = boxedValue.copyUnmanaged(SGF, loc);
+            mv = boxedValue.copy(SGF, loc);
           }
         }
 
