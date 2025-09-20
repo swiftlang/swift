@@ -81,11 +81,15 @@ func testFastRuncible<T: Runcible, U: FastRuncible>(_ t: T, u: U)
 //   2. Get the witness table for U.RuncerType.Runcee : Speedy
 //     2a. Get the protocol witness table for U.RuncerType : FastRuncer.
 // CHECK-NEXT: %T.RuncerType.FastRuncer = call swiftcc ptr @swift_getAssociatedConformanceWitness(ptr %U.FastRuncible, ptr %U, ptr [[T3]]
+// CHECK-NEXT: store ptr %T.RuncerType.FastRuncer, ptr %T.RuncerType
+// CHECK-NEXT: store ptr %T.RuncerType.FastRuncer, ptr %T.RuncerType5
 //     1c. Get the type metadata for U.RuncerType.Runcee.
 // CHECK-NEXT: [[T2:%.*]] = call swiftcc %swift.metadata_response @swift_getAssociatedTypeWitness([[INT]] 0, ptr %T.RuncerType.FastRuncer, ptr [[T3]], {{.*}}, ptr getelementptr inbounds (<{{.*}}>, ptr @"$s16associated_types10FastRuncerMp", i32 0, i32 10))
 // CHECK-NEXT: %T.RuncerType.Runcee = extractvalue %swift.metadata_response [[T2]], 0
 //     2b. Get the witness table for U.RuncerType.Runcee : Speedy.
 // CHECK-NEXT: %T.RuncerType.Runcee.Speedy = call swiftcc ptr @swift_getAssociatedConformanceWitness(ptr %T.RuncerType.FastRuncer, ptr [[T3]], ptr %T.RuncerType.Runcee
+// CHECK-NEXT: store ptr %T.RuncerType.Runcee.Speedy, ptr %T.RuncerType.Runcee6, align 8
+// CHECK-NEXT: store ptr %T.RuncerType.Runcee.Speedy, ptr %T.RuncerType.Runcee7, align 8
 //   3. Perform the actual call.
 // CHECK-NEXT: [[T0_GEP:%.*]] = getelementptr inbounds ptr, ptr %T.RuncerType.Runcee.Speedy, i32 1
 // CHECK-NEXT: [[T0:%.*]] = load ptr, ptr [[T0_GEP]]
