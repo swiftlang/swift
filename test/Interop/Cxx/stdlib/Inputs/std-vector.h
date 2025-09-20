@@ -1,8 +1,9 @@
 #ifndef TEST_INTEROP_CXX_STDLIB_INPUTS_STD_VECTOR_H
 #define TEST_INTEROP_CXX_STDLIB_INPUTS_STD_VECTOR_H
 
-#include <vector>
+#include <memory>
 #include <string>
+#include <vector>
 
 using Vector = std::vector<int>;
 using VectorOfString = std::vector<std::string>;
@@ -29,5 +30,22 @@ __attribute__((swift_attr("release:immortal"))) ImmortalRef {
   static ImmortalRef *create(int value) { return new ImmortalRef({value}); }
 };
 using VectorOfImmortalRefPtr = std::vector<ImmortalRef *>;
+
+struct NonCopyable {
+  NonCopyable() = default;
+  NonCopyable(const NonCopyable &other) = delete;
+  NonCopyable(NonCopyable &&other) = default;
+  ~NonCopyable() {}
+};
+
+using VectorOfNonCopyable = std::vector<NonCopyable>;
+using VectorOfPointer = std::vector<NonCopyable *>;
+
+inline std::vector<std::unique_ptr<NonCopyable>>
+getVectorOfNonCopyableUniquePtr() {
+  std::vector<std::unique_ptr<NonCopyable>> vec;
+  vec.emplace_back();
+  return vec;
+}
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_VECTOR_H
