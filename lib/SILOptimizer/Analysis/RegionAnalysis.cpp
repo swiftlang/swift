@@ -2066,8 +2066,7 @@ public:
     auto functionArguments = function->getArguments();
     if (functionArguments.empty()) {
       REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    None.\n");
-      initialEntryBlockPartition = Partition::singleRegion(
-          SILLocation::invalid(), {}, historyFactory.get());
+      initialEntryBlockPartition = Partition::empty(historyFactory.get());
       return;
     }
 
@@ -2105,7 +2104,7 @@ public:
     }
 
     initialEntryBlockPartition = Partition::singleRegion(
-        SILLocation::invalid(), nonSendableJoinedIndices, historyFactory.get());
+        {}, nonSendableJoinedIndices, historyFactory.get());
     for (Element elt : nonSendableSeparateIndices) {
       initialEntryBlockPartition->trackNewElement(elt);
     }
@@ -4305,8 +4304,8 @@ void RegionAnalysisFunctionInfo::runDataflow() {
         REGIONBASEDISOLATION_LOG(
             llvm::dbgs() << "    Pred. bb" << predBlock->getDebugID() << ": ";
             predState.exitPartition.print(llvm::dbgs()));
-        newEntryPartition =
-            Partition::join(newEntryPartition, predState.exitPartition);
+        newEntryPartition = Partition::join(newEntryPartition,
+                                            predState.exitPartition, predBlock);
       }
 
       // Update the entry partition. We need to still try to
