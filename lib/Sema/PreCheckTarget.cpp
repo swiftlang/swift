@@ -558,8 +558,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       }
     }
 
-    DeclName lookupName(context, Name.getBaseName(), lookupLabels);
-    LookupName = DeclNameRef(lookupName);
+    LookupName = Name.withArgumentLabels(context, lookupLabels);
   }
 
   // Perform standard value name lookup.
@@ -577,8 +576,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
   // First, look for a local binding in scope.
   if (Loc.isValid() && !Name.isOperator()) {
-    ASTScope::lookupLocalDecls(DC->getParentSourceFile(),
-                               LookupName.getFullName(), Loc,
+    ASTScope::lookupLocalDecls(DC->getParentSourceFile(), LookupName, Loc,
                                /*stopAfterInnermostBraceStmt=*/false,
                                ResultValues);
     for (auto *localDecl : ResultValues) {
@@ -636,6 +634,108 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
         diagnoseOperatorJuxtaposition(UDRE, DC) ||
         diagnoseNonexistentPowerOperator(Context.Diags, UDRE, DC)) {
       return errorResult();
+    }
+
+    // Is there an incorrect module selector?
+    if (Name.hasModuleSelector()) {
+      auto anyModuleName = DeclNameRef(LookupName.getFullName());
+      auto anyModuleResults = TypeChecker::lookupUnqualified(DC, anyModuleName,
+                                                             Loc,
+                                                             lookupOptions);
+      if (!anyModuleResults.empty()) {
+        Context.Diags.diagnose(UDRE->getNameLoc(), diag::decl_not_in_module,
+                               LookupName.getFullName(),
+                               LookupName.getModuleSelector());
+
+        SourceLoc moduleSelectorLoc = UDRE->getNameLoc().getModuleSelectorLoc();
+
+        enum class CandidateKind {
+          /// A declaration at module scope.
+          TopLevel,
+          /// A member declaration accessed via implicit \c self .
+          MemberViaSelf,
+          /// A member declaration not accessed via implicit \c self (usually a static
+          /// member of an enclosing type).
+          MemberViaContext,
+          /// A local declaration.
+          Local
+        };
+
+        using CandidateModule = std::pair<Identifier, CandidateKind>;
+        SmallSetVector<CandidateModule, 4> candidateModules;
+
+        // Produce a list of *unique* module selector diagnostics so we don't
+        // emit a bunch of duplicates.
+        for (auto result : anyModuleResults) {
+          ValueDecl * decl = result.getValueDecl();
+
+          CandidateKind kind;
+          if (!result.getDeclContext()) {
+            if (decl->getDeclContext()->isLocalContext())
+              kind = CandidateKind::Local;
+            else
+              kind = CandidateKind::TopLevel;
+          } else {
+            if (result.getDeclContext()->isTypeContext())
+              kind = CandidateKind::MemberViaContext;
+            else // found through result.getDeclContext()'s implicit `self`
+              kind = CandidateKind::MemberViaSelf;
+          }
+
+          auto owningModule = decl->getModuleContext();
+          candidateModules.insert({ owningModule->getName(), kind });
+        }
+
+        for (auto pair : candidateModules) {
+          Identifier moduleName = pair.first;
+          switch (pair.second) {
+          case CandidateKind::TopLevel:
+            Context.Diags.diagnose(moduleSelectorLoc,
+                                   diag::note_change_module_selector,
+                                   moduleName)
+                .fixItReplace(moduleSelectorLoc, moduleName.str());
+            break;
+
+          case CandidateKind::MemberViaSelf: {
+            SmallString<64> replacement("self.");
+            if (moduleName != Name.getModuleSelector()) {
+              // The module selector specified the wrong module; replace it.
+              replacement += moduleName.str();
+
+              Context.Diags.diagnose(moduleSelectorLoc,
+                                     diag::note_change_module_selector,
+                                     moduleName)
+                  .fixItReplace(moduleSelectorLoc, replacement);
+            } else {
+              // The module selector specified the right module, but we need to
+              // make the `self.` explicit.
+              Context.Diags.diagnose(moduleSelectorLoc,
+                  diag::note_add_explicit_self_with_module_selector)
+                  .fixItInsert(moduleSelectorLoc, replacement);
+            }
+            break;
+          }
+          case CandidateKind::MemberViaContext:
+            // FIXME: If we had more info here, we could construct a reference
+            //        to the outer type in question.
+            Context.Diags.diagnose(moduleSelectorLoc,
+                                   diag::note_remove_module_selector_outer_type)
+                .fixItRemoveChars(moduleSelectorLoc,
+                                  UDRE->getNameLoc().getBaseNameLoc());
+            break;
+
+          case CandidateKind::Local:
+            Context.Diags.diagnose(moduleSelectorLoc,
+                                   diag::note_remove_module_selector_local_decl)
+                .fixItRemoveChars(moduleSelectorLoc,
+                                  UDRE->getNameLoc().getBaseNameLoc());
+            break;
+          }
+        }
+
+        // FIXME: Can we recover by assuming the first/best result is correct?
+        return new (Context) ErrorExpr(UDRE->getSourceRange());
+      }
     }
 
     // Try ignoring access control.
@@ -2089,8 +2189,9 @@ VarDecl *PreCheckTarget::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
 
   // Do an actual lookup for 'self' in case it shows up in a capture list.
   auto *methodSelf = methodContext->getImplicitSelfDecl();
-  auto *lookupSelf = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
-                                                     Ctx.Id_self, Loc);
+  auto *lookupSelf = ASTScope::lookupSingleLocalDecl(
+                                   DC->getParentSourceFile(),
+                                   DeclNameRef::createSelf(Ctx), Loc);
   if (lookupSelf && lookupSelf != methodSelf) {
     // FIXME: This is the wrong diagnostic for if someone manually declares a
     // variable named 'self' using backticks.

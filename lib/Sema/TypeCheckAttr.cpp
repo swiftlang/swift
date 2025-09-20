@@ -2994,6 +2994,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   if (KitModule) {
     SmallVector<ValueDecl *, 1> decls;
     namelookup::lookupInModule(KitModule, Id_ApplicationDelegate,
+                               /*hasModuleSelector=*/false,
                                decls, NLKind::QualifiedLookup,
                                namelookup::ResolutionKind::TypesOnly,
                                SF, attr->getLocation(),
@@ -3258,10 +3259,11 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
     }
 
     CS.addDisjunctionConstraint(typeEqualityConstraints, locator);
-    CS.addValueMemberConstraint(
-        nominal->getInterfaceType(), DeclNameRef(context.Id_main),
-        Type(mainType), declContext, FunctionRefInfo::singleBaseNameApply(), {},
-        locator);
+    CS.addValueMemberConstraint(nominal->getInterfaceType(),
+                                DeclNameRef(context.Id_main), // OK: Generated
+                                Type(mainType), declContext,
+                                FunctionRefInfo::singleBaseNameApply(), {},
+                                locator);
   }
 
   FuncDecl *mainFunction = nullptr;
@@ -3826,6 +3828,28 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
                                      results);
 }
 
+static void
+diagnoseCandidatesEliminatedByModuleSelector(DeclNameRefWithLoc replacedDeclName,
+                                             DeclAttribute *attr,
+                                             const ValueDecl *replacement,
+                                             DiagnosticEngine &Diags) {
+  if (replacedDeclName.Name.getModuleSelector().empty())
+    return;
+
+  // Look up without the module selector
+  SmallVector<ValueDecl *, 4> results;
+  lookupReplacedDecl(DeclNameRef(replacedDeclName.Name.getFullName()),
+                     attr, replacement, results);
+
+  auto selectorLoc = replacedDeclName.Loc.getModuleSelectorLoc();
+
+  for (auto candidate : results)
+    Diags.diagnose(selectorLoc, diag::note_change_module_selector,
+                   candidate->getModuleContext()->getBaseIdentifier())
+      .fixItReplace(selectorLoc,
+                    candidate->getModuleContext()->getBaseIdentifier().str());
+}
+
 /// Remove any argument labels from the interface type of the given value that
 /// are extraneous from the type system's point of view, producing the
 /// type to compare against for the purposes of dynamic replacement.
@@ -3845,14 +3869,14 @@ static Type getDynamicComparisonType(ValueDecl *value) {
   return interfaceType->removeArgumentLabels(numArgumentLabels);
 }
 
-static FuncDecl *findSimilarAccessor(DeclNameRef replacedVarName,
+static FuncDecl *findSimilarAccessor(DeclNameRefWithLoc replacedVarName,
                                      const AccessorDecl *replacement,
                                      DeclAttribute *attr, ASTContext &ctx,
                                      bool forDynamicReplacement) {
 
   // Retrieve the replaced abstract storage decl.
   SmallVector<ValueDecl *, 4> results;
-  lookupReplacedDecl(replacedVarName, attr, replacement, results);
+  lookupReplacedDecl(replacedVarName.Name, attr, replacement, results);
 
   // Filter out any accessors that won't work.
   if (!results.empty()) {
@@ -3885,15 +3909,19 @@ static FuncDecl *findSimilarAccessor(DeclNameRef replacedVarName,
   if (results.empty()) {
     Diags.diagnose(attr->getLocation(),
                    diag::dynamic_replacement_accessor_not_found,
-                   replacedVarName);
+                   replacedVarName.Name);
     attr->setInvalid();
+
+    diagnoseCandidatesEliminatedByModuleSelector(replacedVarName, attr,
+                                                 replacement, Diags);
+
     return nullptr;
   }
 
   if (results.size() > 1) {
     Diags.diagnose(attr->getLocation(),
                    diag::dynamic_replacement_accessor_ambiguous,
-                   replacedVarName);
+                   replacedVarName.Name);
     for (auto result : results) {
       Diags.diagnose(result,
                      diag::dynamic_replacement_accessor_ambiguous_candidate,
@@ -3935,7 +3963,7 @@ static FuncDecl *findSimilarAccessor(DeclNameRef replacedVarName,
   return origAccessor;
 }
 
-static FuncDecl *findReplacedAccessor(DeclNameRef replacedVarName,
+static FuncDecl *findReplacedAccessor(DeclNameRefWithLoc replacedVarName,
                                       const AccessorDecl *replacement,
                                       DeclAttribute *attr,
                                       ASTContext &ctx) {
@@ -3943,7 +3971,7 @@ static FuncDecl *findReplacedAccessor(DeclNameRef replacedVarName,
                              /*forDynamicReplacement*/ true);
 }
 
-static FuncDecl *findTargetAccessor(DeclNameRef replacedVarName,
+static FuncDecl *findTargetAccessor(DeclNameRefWithLoc replacedVarName,
                                       const AccessorDecl *replacement,
                                       DeclAttribute *attr,
                                       ASTContext &ctx) {
@@ -3952,7 +3980,7 @@ static FuncDecl *findTargetAccessor(DeclNameRef replacedVarName,
 }
 
 static AbstractFunctionDecl *
-findSimilarFunction(DeclNameRef replacedFunctionName,
+findSimilarFunction(DeclNameRefWithLoc replacedFunctionName,
                     const AbstractFunctionDecl *base, DeclAttribute *attr,
                     DiagnosticEngine *Diags, bool forDynamicReplacement) {
 
@@ -3960,7 +3988,7 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
   // Any modification to attr must be guarded by a null check on TC.
   //
   SmallVector<ValueDecl *, 4> lookupResults;
-  lookupReplacedDecl(replacedFunctionName, attr, base, lookupResults);
+  lookupReplacedDecl(replacedFunctionName.Name, attr, base, lookupResults);
 
   SmallVector<AbstractFunctionDecl *, 4> candidates;
   for (auto *result : lookupResults) {
@@ -3981,7 +4009,9 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
                       forDynamicReplacement
                           ? diag::dynamic_replacement_function_not_found
                           : diag::specialize_target_function_not_found,
-                      replacedFunctionName);
+                      replacedFunctionName.Name);
+      diagnoseCandidatesEliminatedByModuleSelector(replacedFunctionName, attr,
+                                                   base, *Diags);
     }
 
     attr->setInvalid();
@@ -4047,7 +4077,7 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
                   forDynamicReplacement
                       ? diag::dynamic_replacement_function_of_type_not_found
                       : diag::specialize_target_function_of_type_not_found,
-                  replacedFunctionName,
+                  replacedFunctionName.Name,
                   base->getInterfaceType()->getCanonicalType());
 
   for (auto *result : matches) {
@@ -4063,7 +4093,7 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
 }
 
 static AbstractFunctionDecl *
-findReplacedFunction(DeclNameRef replacedFunctionName,
+findReplacedFunction(DeclNameRefWithLoc replacedFunctionName,
                      const AbstractFunctionDecl *replacement,
                      DynamicReplacementAttr *attr, DiagnosticEngine *Diags) {
   return findSimilarFunction(replacedFunctionName, replacement, attr, Diags,
@@ -4071,7 +4101,7 @@ findReplacedFunction(DeclNameRef replacedFunctionName,
 }
 
 static AbstractFunctionDecl *
-findTargetFunction(DeclNameRef targetFunctionName,
+findTargetFunction(DeclNameRefWithLoc targetFunctionName,
                    const AbstractFunctionDecl *base,
                    AbstractSpecializeAttr * attr, DiagnosticEngine *diags) {
   return findSimilarFunction(targetFunctionName, base, attr, diags,
@@ -5741,13 +5771,15 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
   }
 
   auto &Ctx = VD->getASTContext();
+  DeclNameRefWithLoc nameWithLoc{attr->getReplacedFunctionName(),
+                                 attr->getReplacedFunctionNameLoc(),
+                                 std::nullopt};
   if (auto *AD = dyn_cast<AccessorDecl>(VD)) {
-    return findReplacedAccessor(attr->getReplacedFunctionName(), AD, attr, Ctx);
+    return findReplacedAccessor(nameWithLoc, AD, attr, Ctx);
   }
 
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    return findReplacedFunction(attr->getReplacedFunctionName(), AFD,
-                                attr, &Ctx.Diags);
+    return findReplacedFunction(nameWithLoc, AFD, attr, &Ctx.Diags);
   }
 
   if (auto *SD = dyn_cast<AbstractStorageDecl>(VD)) {
@@ -5770,8 +5802,10 @@ SpecializeAttrTargetDeclRequest::evaluate(Evaluator &evaluator,
 
   auto &ctx = vd->getASTContext();
 
-  auto targetFunctionName = attr->getTargetFunctionName();
-  if (!targetFunctionName)
+  DeclNameRefWithLoc targetFunctionName{attr->getTargetFunctionName(),
+                                        attr->getTargetFunctionNameLoc(),
+                                        std::nullopt};
+  if (!targetFunctionName.Name)
     return nullptr;
 
   if (auto *ad = dyn_cast<AccessorDecl>(vd)) {
