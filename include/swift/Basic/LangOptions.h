@@ -648,6 +648,9 @@ namespace swift {
     /// Enables dumping macro expansions.
     bool DumpMacroExpansions = false;
 
+    /// Enables dumping imports for each SourceFile.
+    bool DumpSourceFileImports = false;
+
     /// The model of concurrency to be used.
     ConcurrencyModel ActiveConcurrencyModel = ConcurrencyModel::Standard;
 
