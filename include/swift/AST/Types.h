@@ -6996,7 +6996,7 @@ public:
   }
 protected:
   ArchetypeType(TypeKind Kind,
-                const ASTContext &C,
+                const ASTContext *C,
                 RecursiveTypeProperties properties,
                 Type InterfaceType,
                 ArrayRef<ProtocolDecl *> ConformsTo,
@@ -7075,7 +7075,8 @@ public:
   }
 
 private:
-  OpaqueTypeArchetypeType(GenericEnvironment *environment,
+  OpaqueTypeArchetypeType(const ASTContext *ctx,
+                          GenericEnvironment *environment,
                           RecursiveTypeProperties properties,
                           Type interfaceType,
                           ArrayRef<ProtocolDecl*> conformsTo,
@@ -7219,11 +7220,13 @@ public:
   }
   
 private:
-  ExistentialArchetypeType(GenericEnvironment *environment, Type interfaceType,
-                      ArrayRef<ProtocolDecl *> conformsTo,
-                      Type superclass,
-                      LayoutConstraint layout,
-                      RecursiveTypeProperties properties);
+  ExistentialArchetypeType(const ASTContext *ctx,
+                           GenericEnvironment *environment,
+                           Type interfaceType,
+                           ArrayRef<ProtocolDecl *> conformsTo,
+                           Type superclass,
+                           LayoutConstraint layout,
+                           RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(ExistentialArchetypeType, LocalArchetypeType)
 END_CAN_TYPE_WRAPPER(ExistentialArchetypeType, LocalArchetypeType)
@@ -7296,7 +7299,7 @@ public:
   }
   
 private:
-  ElementArchetypeType(const ASTContext &ctx,
+  ElementArchetypeType(const ASTContext *ctx,
                        GenericEnvironment *environment, Type interfaceType,
                        ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
                        LayoutConstraint layout);

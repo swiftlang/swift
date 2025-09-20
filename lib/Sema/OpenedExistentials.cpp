@@ -915,7 +915,7 @@ Type swift::typeEraseOpenedExistentialReference(
 
 Type swift::typeEraseOpenedArchetypesFromEnvironment(
     Type type, GenericEnvironment *env) {
-  assert(env->getKind() == GenericEnvironment::Kind::OpenedExistential);
+  ASSERT(env->getKind() == GenericEnvironment::Kind::Existential);
 
   return typeEraseExistentialSelfReferences(
       type,
