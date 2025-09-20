@@ -90,6 +90,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %WindowsSDKArchitecturesArg% ^
   %TestArg% ^
   -SkipPackaging ^
+  -WindowsSDKLinkage dynamic ^
   -IncludeSBoM ^
   -Summary || (exit /b 1)
 
