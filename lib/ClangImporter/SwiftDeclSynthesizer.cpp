@@ -2947,8 +2947,7 @@ FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
     if (!destroyFuncName.consume_front("destroy:"))
       continue;
 
-    auto decls = getValueDeclsForName(
-        clangType, nominal->getASTContext(), destroyFuncName);
+    auto decls = getValueDeclsForName(nominal, destroyFuncName);
     for (auto decl : decls) {
       auto func = dyn_cast<FuncDecl>(decl);
       if (!func)
