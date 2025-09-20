@@ -212,7 +212,7 @@ extension Unsafe${Mutable}BufferPointer: @unsafe Sequence {
     return (unsafe Iterator(_position: s + n, _end: s + count), n)
   }
 
-  @inlinable
+  @inlinable @_transparent
   @safe
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -780,7 +780,7 @@ extension Unsafe${Mutable}BufferPointer:
     return try unsafe body(&self)
   }
 
-  @inlinable
+  @inlinable @_transparent
   @safe
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
@@ -825,7 +825,7 @@ extension Unsafe${Mutable}BufferPointer {
   /// - `rebased.count == slice.count`
   ///
   /// - Parameter slice: The buffer slice to rebase.
-  @inlinable // unsafe-performance
+  @inlinable @_transparent // unsafe-performance
   public init(rebasing slice: Slice<UnsafeBufferPointer<Element>>) {
     // NOTE: `Slice` does not guarantee that its start/end indices are valid
     // in `base` -- it merely ensures that `startIndex <= endIndex`.
@@ -864,7 +864,7 @@ extension Unsafe${Mutable}BufferPointer {
   /// - `rebased.count == slice.count`
   ///
   /// - Parameter slice: The buffer slice to rebase.
-  @inlinable // unsafe-performance
+  @inlinable @_transparent // unsafe-performance
   public init(rebasing slice: Slice<UnsafeMutableBufferPointer<Element>>) {
     let base = unsafe slice.base.baseAddress?.advanced(by: slice.startIndex)
     let count = unsafe slice.endIndex &- slice.startIndex
@@ -993,7 +993,7 @@ extension UnsafeMutableBufferPointer {
   ///     initialize the buffer's storage.
   /// - Returns: The index one past the last element of the buffer initialized
   ///     by this function.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent 
   public func initialize(
     fromContentsOf source: some Collection<Element>
   ) -> Index {
@@ -1418,7 +1418,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///     method.
   ///   - buffer: The buffer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     _ body: (_ buffer: ${Self}<T>) throws(E) -> Result
