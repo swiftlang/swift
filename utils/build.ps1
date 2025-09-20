@@ -3785,6 +3785,37 @@ function Install-HostToolchain() {
   Copy-Item -Force `
     -Path $SwiftDriver `
     -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swiftc.exe"
+
+  # Copy static dependencies
+  if ($Windows) {
+    foreach ($Build in $WindowsSDKBuilds) {
+      $SDKROOT = Get-SwiftSDK $Build.OS -Identifier "$($Build.OS)Experimental"
+      Copy-Item -Force `
+        -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.lib" `
+        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libcurl.lib" | Out-Null
+      Copy-Item -Force `
+        -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2s.lib" `
+        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libxml2s.lib" | Out-Null
+      Copy-Item -Force `
+        -Path "${BinaryCache}\$($Build.Triple)\zlib\zlibstatic.lib" `
+        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\zlibstatic.lib" | Out-Null
+    }
+  }
+
+  if ($Android) {
+    foreach ($Build in $AndroidSDKBuilds) {
+      $SDKROOT = Get-SwiftSDK $Build.OS -Identifier "$($Build.OS)Experimental"
+      Copy-Item -Force `
+        -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.a" `
+        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libcurl.a" | Out-Null
+      Copy-Item -Force `
+        -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2.a" `
+        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libxml2.a" | Out-Null
+      Copy-Item -Force `
+        -Path "${BinaryCache}\$($Build.Triple)\zlib\libz.a" `
+        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libz.a" | Out-Null
+    }
+  }
 }
 
 function Build-Inspect([Hashtable] $Platform) {
