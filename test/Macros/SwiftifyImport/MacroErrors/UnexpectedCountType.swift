@@ -10,16 +10,14 @@ func myFunc(_ ptr: UnsafePointer<CInt>, _ len: String) {
 // REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend %t/test.swift -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -verify 2> %t/dump.txt
-// RUN: diff %t/myFunc.expected %t/dump.txt
+// RUN: %target-swift-frontend %t/test.swift -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -verify 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace
 
-//--- myFunc.expected
-@__swiftmacro_4main6myFunc15_SwiftifyImportfMp_.swift
-------------------------------
-/// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload
-func myFunc(_ ptr: UnsafeBufferPointer<CInt>) {
-    let len = String(exactly: unsafe ptr.count)!
-    return unsafe myFunc(ptr.baseAddress!, len)
-}
-------------------------------
+// CHECK:@__swiftmacro_4main6myFunc15_SwiftifyImportfMp_.swift
+// CHECK-NEXT:------------------------------
+// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload
+// CHECK-NEXT:func myFunc(_ ptr: UnsafeBufferPointer<CInt>) {
+// CHECK-NEXT:    let len = String(exactly: unsafe ptr.count)!
+// CHECK-NEXT:    return unsafe myFunc(ptr.baseAddress!, len)
+// CHECK-NEXT:}
+// CHECK-NEXT:------------------------------
