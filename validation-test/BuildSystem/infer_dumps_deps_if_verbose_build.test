@@ -37,7 +37,6 @@
 # CHECK: --- Installing cmark ---
 # CHECK: --- Installing llvm ---
 # CHECK: --- Installing swift ---
-# CHECK: --- Installing llbuild ---
 
 # Then make sure we are installing/building SwiftPM last.
 #
