@@ -115,8 +115,11 @@ operator<<(raw_ostream &os, const std::optional<CopyPropagationOption> option) {
     case CopyPropagationOption::RequestedPassesOnly:
       os << "requested-passes-only";
       break;
-    case CopyPropagationOption::On:
-      os << "on";
+    case CopyPropagationOption::Optimizing:
+      os << "optimizing";
+      break;
+    case CopyPropagationOption::Always:
+      os << "always";
       break;
     }
   } else {
@@ -135,24 +138,27 @@ public:
   // parse - Return true on error.
   bool parse(Option &O, StringRef ArgName, StringRef Arg,
              std::optional<CopyPropagationOption> &Value) {
-    if (Arg == "" || Arg == "true" || Arg == "TRUE" || Arg == "True" ||
-        Arg == "1") {
-      Value = CopyPropagationOption::On;
+    if (Arg.compare_insensitive("always")) {
+      Value = CopyPropagationOption::Always;
       return false;
     }
-    if (Arg == "false" || Arg == "FALSE" || Arg == "False" || Arg == "0") {
+    if (Arg.compare_insensitive("optimizing")) {
+      Value = CopyPropagationOption::Optimizing;
+      return false;
+    }
+    if (Arg.compare_insensitive("false") || Arg.compare_insensitive("off") ||
+        Arg == "0") {
       Value = CopyPropagationOption::Off;
       return false;
     }
-    if (Arg == "requested-passes-only" || Arg == "REQUESTED-PASSES-ONLY" ||
-        Arg == "Requested-Passes-Only") {
+    if (Arg.compare_insensitive("requested-passes-only")) {
       Value = CopyPropagationOption::RequestedPassesOnly;
       return false;
     }
 
     return O.error("'" + Arg +
-                   "' is invalid for CopyPropagationOption! Try true, false, "
-                   "or requested-passes-only.");
+                   "' is invalid for CopyPropagationOption!"
+                   " Try always, optimizing, or requested-passes-only.");
   }
 
   void initialize() {}
@@ -907,7 +913,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   // Unless overridden below, enabling copy propagation means enabling lexical
   // lifetimes.
-  if (SILOpts.CopyPropagation == CopyPropagationOption::On)
+  if (SILOpts.CopyPropagation >= CopyPropagationOption::Optimizing)
     SILOpts.LexicalLifetimes = LexicalLifetimesOption::On;
 
   // Unless overridden below, disable copy propagation means disabling lexical

@@ -255,7 +255,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Only issue weak lifetime warnings for users who select object lifetime
   // optimization. The risk of spurious warnings outweighs the benefits.
-  if (P.getOptions().CopyPropagation == CopyPropagationOption::On) {
+  if (P.getOptions().CopyPropagation >= CopyPropagationOption::Optimizing) {
     P.addDiagnoseLifetimeIssues();
   }
 
@@ -278,6 +278,23 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   P.addDiagnoseUnknownConstValues();
   P.addEmbeddedSwiftDiagnostics();
+
+  /// FIXME: Ideally, we'd have this relative order:
+  ///   1. DiagnoseLifetimeIssues
+  ///   2. CopyPropagation
+  ///   3. AddressLowering
+  /// to get the maximum benefits of CopyPropagation + OpaqueValues in -Onone.
+  if (P.getOptions().CopyPropagation == CopyPropagationOption::Always) {
+    // FIXME: ComputeSideEffects helps CopyPropagation simplify across
+    //   call-sites, but PerformanceDiagnostics is sensitive to the # of copies.
+    //   If ManualOwnership is used in the compiler itself, we wouldn't be able
+    //   to bootstrap the compiler on different platforms with same diagnostics.
+#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT
+    P.addComputeSideEffects();
+#endif
+    P.addMandatoryCopyPropagation();
+  }
+
   P.addPerformanceDiagnostics();
 }
 
@@ -655,7 +672,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // Cleanup after SILGen: remove trivial copies to temporaries.
   P.addTempRValueElimination();
   // Cleanup after SILGen: remove unneeded borrows/copies.
-  if (P.getOptions().CopyPropagation == CopyPropagationOption::On) {
+  if (P.getOptions().CopyPropagation >= CopyPropagationOption::Optimizing) {
     P.addComputeSideEffects();
     P.addCopyPropagation();
   }
