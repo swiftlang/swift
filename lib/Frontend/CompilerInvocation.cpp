@@ -1425,6 +1425,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Arg *A = Args.getLastArg(OPT_Rpass_missed_EQ))
     Opts.OptimizationRemarkMissedPattern =
         generateOptimizationRemarkRegex(Diags, Args, A);
+  if (Arg *A = Args.getLastArg(OPT_Rpass_analysis_EQ))
+    Opts.OptimizationRemarkAnalysisPattern =
+        generateOptimizationRemarkRegex(Diags, Args, A);
 
   if (const Arg *A = Args.getLastArg(OPT_access_notes_path))
     Opts.AccessNotesPath = A->getValue();
