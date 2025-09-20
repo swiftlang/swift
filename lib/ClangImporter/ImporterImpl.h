@@ -1278,6 +1278,8 @@ public:
   /// \returns The named module, or null if the module has not been imported.
   ModuleDecl *getNamedModule(StringRef name);
 
+  ImportPath::Builder getSwiftModulePath(const clang::Module *M);
+
   /// Returns the "Foundation" module, if it can be loaded.
   ///
   /// After this has been called, the Foundation module will or won't be loaded
