@@ -761,6 +761,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   // If our inline selection is only always inline, do a quick check if we have
   // an always inline function and bail otherwise.
   if (WhatToInline == InlineSelection::OnlyInlineAlways &&
+      Callee->getInlineStrategy() != HeuristicAlwaysInline &&
       Callee->getInlineStrategy() != AlwaysInline) {
     return nullptr;
   }
@@ -873,7 +874,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     if (!isCallerAndCalleeLayoutConstraintsCompatible(AI) &&
         // TODO: revisit why we can make an exception for inline-always
         // functions. Some tests depend on it.
-        Callee->getInlineStrategy() != AlwaysInline && !Callee->isTransparent())
+        Callee->getInlineStrategy() != HeuristicAlwaysInline && !Callee->isTransparent())
       return nullptr;
   }
 

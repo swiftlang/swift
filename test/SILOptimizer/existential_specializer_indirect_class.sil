@@ -10,7 +10,7 @@ protocol ClassProtocol: AnyObject { func method() }
 
 class C: ClassProtocol { func method() {} }
 
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @test_indirect_class_protocol : $@convention(thin) (@in any ClassProtocol) -> ()
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] @test_indirect_class_protocol : $@convention(thin) (@in any ClassProtocol) -> ()
 sil [noinline] @test_indirect_class_protocol : $@convention(thin) (@in ClassProtocol) -> () {
 // CHECK: bb0(%0 : $*any ClassProtocol):
 bb0(%0 : $*ClassProtocol):

@@ -556,7 +556,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         return {FragileFunctionKind::Transparent};
       }
 
-      if (AFD->getAttrs().hasAttribute<InlinableAttr>()) {
+      if (AFD->hasAttributeWithInlinableSemantics()) {
         return {FragileFunctionKind::Inlinable};
       }
 
@@ -572,7 +572,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
       // @backDeployed, and @inlinable from their storage declarations.
       if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
         auto *storage = accessor->getStorage();
-        if (storage->getAttrs().getAttribute<InlinableAttr>()) {
+        if (storage->hasAttributeWithInlinableSemantics()) {
           return {FragileFunctionKind::Inlinable};
         }
         if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {

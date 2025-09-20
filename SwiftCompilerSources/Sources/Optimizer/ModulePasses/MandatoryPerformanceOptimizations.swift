@@ -302,7 +302,9 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
     return false
   }
 
-  if apply.parentFunction.isGlobalInitOnceFunction && callee.inlineStrategy == .always {
+  if apply.parentFunction.isGlobalInitOnceFunction && (
+      callee.inlineStrategy == .heuristicAlways ||
+      callee.inlineStrategy == .always) {
     // Some arithmetic operations, like integer conversions, are not transparent but `inline(__always)`.
     // Force inlining them in global initializers so that it's possible to statically initialize the global.
     return true
