@@ -2051,7 +2051,7 @@ public struct DefineAnonymousTypesMacro: DeclarationMacro {
 
       results += ["""
 
-      struct \(context.makeUniqueName("name"))<T> where T == Equatable { // expect error: need 'any'
+      struct \(context.makeUniqueName("name"))<T> where T == Equatable { // expected-warning{{must be written 'any Hashable'}}
         #introduceTypeCheckingErrors // make sure we get nested errors
       }
       """]
@@ -2070,7 +2070,7 @@ public struct IntroduceTypeCheckingErrorsMacro: DeclarationMacro {
       """
 
       struct \(context.makeUniqueName("name")) {
-        struct \(context.makeUniqueName("name"))<T> where T == Hashable { // expect error: need 'any'
+        struct \(context.makeUniqueName("name"))<T> where T == Hashable { // expected-warning{{must be written 'any Hashable'}}
         }
       }
       """

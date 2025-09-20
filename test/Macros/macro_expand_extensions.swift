@@ -10,9 +10,6 @@
 // RUN: %FileCheck -check-prefix=CHECK-DUMP %s < %t/expansions-dump.txt
 // RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5 -I %t
 
-// RUN: not %target-swift-frontend -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s -emit-macro-expansion-files no-diagnostics
-// RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS %s
-
 // Ensure that we can serialize this file as a module.
 // RUN: %target-swift-frontend -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %s -I %t -disable-availability-checking -emit-module -o %t/MyModule.swiftmodule -enable-testing
 
@@ -137,8 +134,11 @@ macro UndocumentedNamesInExtension() = #externalMacro(module: "MacroDefinition",
 @UndocumentedNamesInExtension
 struct S<Element> {}
 // expected-note@-2 {{in expansion of macro 'UndocumentedNamesInExtension' on generic struct 'S' here}}
-
-// CHECK-DIAGS: error: declaration name 'requirement()' is not covered by macro 'UndocumentedNamesInExtension'
+/*
+expected-expansion@-3:21 {{
+  expected-error@2:15{{declaration name 'requirement()' is not covered by macro 'UndocumentedNamesInExtension'}}
+}}
+*/
 
 @attached(extension, names: named(requirement))
 macro UndocumentedConformanceInExtension() = #externalMacro(module: "MacroDefinition", type: "AlwaysAddConformance")
@@ -146,8 +146,11 @@ macro UndocumentedConformanceInExtension() = #externalMacro(module: "MacroDefini
 @UndocumentedConformanceInExtension
 struct InvalidConformance<Element> {}
 // expected-note@-2 {{in expansion of macro 'UndocumentedConformanceInExtension' on generic struct 'InvalidConformance' here}}
-
-// CHECK-DIAGS: error: conformance to 'P' is not covered by macro 'UndocumentedConformanceInExtension'
+/*
+expected-expansion@-3:38 {{
+  expected-error@1:1{{conformance to 'P' is not covered by macro 'UndocumentedConformanceInExtension'}}
+}}
+*/
 
 @attached(extension)
 macro UndocumentedCodable() = #externalMacro(module: "MacroDefinition", type: "AlwaysAddCodable")
@@ -155,8 +158,11 @@ macro UndocumentedCodable() = #externalMacro(module: "MacroDefinition", type: "A
 @UndocumentedCodable
 struct TestUndocumentedCodable {}
 // expected-note@-2 {{in expansion of macro 'UndocumentedCodable' on struct 'TestUndocumentedCodable' here}}
-
-// CHECK-DIAGS: error: conformance to 'Codable' (aka 'Decodable & Encodable') is not covered by macro 'UndocumentedCodable'
+/*
+expected-expansion@-3:34 {{
+  expected-error@1:1{{conformance to 'Codable' (aka 'Decodable & Encodable') is not covered by macro 'UndocumentedCodable'}}
+}}
+*/
 
 @attached(extension, conformances: Decodable)
 macro UndocumentedEncodable() = #externalMacro(module: "MacroDefinition", type: "AlwaysAddCodable")
@@ -164,8 +170,11 @@ macro UndocumentedEncodable() = #externalMacro(module: "MacroDefinition", type: 
 @UndocumentedEncodable
 struct TestUndocumentedEncodable {}
 // expected-note@-2 {{in expansion of macro 'UndocumentedEncodable' on struct 'TestUndocumentedEncodable' here}}
-
-// CHECK-DIAGS: error: conformance to 'Codable' (aka 'Decodable & Encodable') is not covered by macro 'UndocumentedEncodable'
+/*
+expected-expansion@-3:36 {{
+  expected-error@1:1{{conformance to 'Codable' (aka 'Decodable & Encodable') is not covered by macro 'UndocumentedEncodable'}}
+}}
+*/
 
 @attached(extension)
 macro BadExtension() = #externalMacro(module: "MacroDefinition", type: "BadExtensionMacro")
@@ -176,7 +185,11 @@ struct HasSomeNestedType {
   @BadExtension // expected-note {{in expansion of macro 'BadExtension' on struct 'SomeNestedType' here}}
   struct SomeNestedType {}
 }
-// CHECK-DIAGS: error: cannot find type 'SomeNestedType' in scope
+/*
+expected-expansion@-2:2 {{
+  expected-error@1:11{{cannot find type 'SomeNestedType' in scope}}
+}}
+*/
 
 #endif
 
