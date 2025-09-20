@@ -3026,7 +3026,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DeclAttrKind::CDecl: {
     if (!AttrName.starts_with("_") &&
 
-        // Backwards support for @cdecl("stringId"). Remove before enabling in
+        // Backwards support for @c("stringId"). Remove before enabling in
         // production so we accept only the identifier format.
         lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
            return Tok.isNot(tok::string_literal);

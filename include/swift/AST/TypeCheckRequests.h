@@ -4948,7 +4948,7 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Check @cdecl functions for compatibility with the foreign language.
+/// Check @c functions for compatibility with the foreign language.
 class TypeCheckCDeclFunctionRequest
     : public SimpleRequest<TypeCheckCDeclFunctionRequest,
                            evaluator::SideEffect(FuncDecl *FD,
@@ -4967,7 +4967,7 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Check @cdecl enums for compatibility with C.
+/// Check @c enums for compatibility with C.
 class TypeCheckCDeclEnumRequest
     : public SimpleRequest<TypeCheckCDeclEnumRequest,
                            evaluator::SideEffect(EnumDecl *ED,

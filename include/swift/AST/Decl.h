@@ -4903,12 +4903,12 @@ public:
     return getAttrs().hasAttribute<IndirectAttr>();
   }
 
-  /// True if the enum is marked with `@cdecl`.
+  /// True if the enum is marked with `@c`.
   bool isCDeclEnum() const {
     return getAttrs().hasAttribute<CDeclAttr>();
   }
 
-  /// True if the enum is marked with `@cdecl` or `@objc`.
+  /// True if the enum is marked with `@c` or `@objc`.
   bool isCCompatibleEnum() const {
     return isCDeclEnum() || isObjC();
   }
@@ -8236,8 +8236,8 @@ public:
   /// instance method.
   bool isObjCInstanceMethod() const;
 
-  /// Get the foreign language targeted by a @cdecl-style attribute, if any.
-  /// Used to abstract away the change in meaning of @cdecl vs @_cdecl while
+  /// Get the foreign language targeted by a @c-style attribute, if any.
+  /// Used to abstract away the change in meaning of @c vs @_cdecl while
   /// formalizing the attribute.
   std::optional<ForeignLanguage> getCDeclKind() const;
 

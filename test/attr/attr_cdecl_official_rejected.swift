@@ -4,9 +4,9 @@
 
 // REQUIRES: swift_feature_CDecl
 
-@cdecl("cdecl_foo") func foo() { } // expected-error {{'@cdecl' requires '-enable-experimental-feature CDecl'}}
+@c("cdecl_foo") func foo() { } // expected-error {{'@c' requires '-enable-experimental-feature CDecl'}}
 
 var computed: Int {
-  @cdecl("get_computed") get { return 0 } // expected-error {{'@cdecl' requires '-enable-experimental-feature CDecl'}}
-  @cdecl("set_computed") set { } // expected-error {{'@cdecl' requires '-enable-experimental-feature CDecl'}}
+  @c("get_computed") get { return 0 } // expected-error {{'@c' requires '-enable-experimental-feature CDecl'}}
+  @c("set_computed") set { } // expected-error {{'@c' requires '-enable-experimental-feature CDecl'}}
 }

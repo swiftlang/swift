@@ -3166,7 +3166,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       if (isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal))
         return failure();
 
-      // @objc enums are not representable in C, @cdecl ones and imported ones
+      // @objc enums are not representable in C, @c ones and imported ones
       // are ok.
       if (!nominal->hasClangNode())
         return failure();
@@ -3209,7 +3209,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     }
   }
 
-  // @cdecl enums are representable in C and Objective-C.
+  // @c enums are representable in C and Objective-C.
   if (nominal->getAttrs().getAttribute<CDeclAttr>()) {
     return { ForeignRepresentableKind::Trivial, nullptr };
   }

@@ -6536,7 +6536,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
         std::move(elementsWithPayload), std::move(elementsWithNoPayload)));
   }
 
-  // Enums imported from Clang or marked with @objc or @cdecl use a
+  // Enums imported from Clang or marked with @objc or @c use a
   // C-compatible layout.
   if (theEnum->hasClangNode() || theEnum->isCCompatibleEnum()) {
     assert(elementsWithPayload.empty() && "C enum with payload?!");

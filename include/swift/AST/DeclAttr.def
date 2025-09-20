@@ -368,11 +368,11 @@ SIMPLE_DECL_ATTR(_show_in_interface, ShowInInterface,
   UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
   62)
 
-DECL_ATTR(_cdecl, CDecl,
+DECL_ATTR(c, CDecl,
   OnFunc | OnAccessor | OnEnum,
   LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   63)
-DECL_ATTR_ALIAS(cdecl, CDecl)
+DECL_ATTR_ALIAS(_cdecl, CDecl)
 
 SIMPLE_DECL_ATTR(usableFromInline, UsableFromInline,
   OnAbstractFunction | OnVar | OnSubscript | OnNominalType | OnTypeAlias,

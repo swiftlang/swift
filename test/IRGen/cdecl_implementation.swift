@@ -10,13 +10,13 @@
 // REQUIRES: swift_feature_CImplementation
 // REQUIRES: swift_feature_CDecl
 
-@implementation @cdecl
+@implementation @c
 public func implFunc(_ param: Int32) {}
 
-@implementation @cdecl
+@implementation @c
 public func implFuncCName(_ param: Int32) {}
 
-@implementation @cdecl(implFuncRenamed_C)
+@implementation @c(implFuncRenamed_C)
 public func implFuncRenamed_Swift(param: Int32) {}
 
 public func fn() {

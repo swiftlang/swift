@@ -170,7 +170,7 @@ void SILFunctionBuilder::addFunctionAttributes(
   for (auto *EA : Attrs.getAttributes<ExposeAttr>()) {
     bool shouldExportDecl = true;
     if (Attrs.hasAttribute<CDeclAttr>()) {
-      // If the function is marked with @cdecl, expose only C compatible
+      // If the function is marked with @c, expose only C compatible
       // thunk function.
       shouldExportDecl = constant.isNativeToForeignThunk();
     }

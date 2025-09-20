@@ -460,7 +460,7 @@ public:
 
     if (isa<EnumDecl>(D) && !D->hasClangNode() &&
         outputLangMode != OutputLanguageMode::Cxx) {
-      // We don't want to add an import for a @cdecl or @objc enum declared
+      // We don't want to add an import for a @c or @objc enum declared
       // in Swift. We either do nothing for special enums like Optional as
       // done in the prologue here, or we forward declare them.
       return false;

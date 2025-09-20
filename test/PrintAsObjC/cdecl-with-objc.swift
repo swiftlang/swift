@@ -1,4 +1,4 @@
-/// Ensure we print @cdecl and @_cdecl only once.
+/// Ensure we print @c and @_cdecl only once.
 
 // RUN: %empty-directory(%t)
 
@@ -18,7 +18,7 @@
 // REQUIRES: swift_feature_CDecl
 // REQUIRES: objc_interop
 
-@cdecl("cFunc")
+@c("cFunc")
 func cFunc() { }
 // CHECK: cFunc
 // CHECK-NOT: cFunc

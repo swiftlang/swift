@@ -655,7 +655,7 @@ clang::QualType ClangTypeConverter::visitEnumType(EnumType *type) {
 
   auto ED = type->getDecl();
   if (!ED->isCCompatibleEnum())
-    // Can't translate something not marked with @objc or @cdecl.
+    // Can't translate something not marked with @objc or @c.
     return clang::QualType();
 
   // @objc enums lower to their raw types.
