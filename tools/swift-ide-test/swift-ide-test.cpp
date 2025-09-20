@@ -3799,9 +3799,14 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       llvm::outs() << ":\n";
 
       scratch.clear();
-      next.importedModule->getImportedModules(
-          scratch, ModuleDecl::ImportFilterKind::Exported);
-      // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
+      if (options::ModulePrintHidden) {
+        next.importedModule->getImportedModules(
+            scratch, ModuleDecl::getImportFilterAll());
+      } else {
+        next.importedModule->getImportedModules(
+            scratch, ModuleDecl::ImportFilterKind::Exported);
+        // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
+      }
       for (auto &import : scratch) {
         llvm::outs() << "\t" << import.importedModule->getName();
         for (auto accessPathPiece : import.accessPath) {

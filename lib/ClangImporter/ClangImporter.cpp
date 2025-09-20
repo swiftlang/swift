@@ -2834,6 +2834,74 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   if (auto mainModule = SwiftContext.MainModule) {
     implicitImportInfo = mainModule->getImplicitImportInfo();
   }
+
+  if (!underlying->isSubModule()) {
+    // Make sure that synthesized Swift code in the clang module wrapper
+    // (e.g. _SwiftifyImport macro expansions) can access the same symbols
+    // as if it were actually in the clang module, by copying the imports.
+    // Because this top-level module wrapper contains all the imported decls
+    // of the clang submodules, we need to add the imports of all the
+    // transitive submodules, since we don't know at this point of the
+    // compilation which submodules will contain relevant macros.
+    // We also need to add (transitive) explicit submodules as imports,
+    // to make sure that they are marked as imported *somewhere* (clang modules
+    // including them don't count) - otherwise their decls won't be found after
+    // non-visible clang decls are filtered out.
+    llvm::SmallVector<const clang::Module *, 32> SubmoduleWorklist;
+    llvm::DenseSet<ImportPath> Imported;
+    SubmoduleWorklist.push_back(underlying);
+    ImportPath::Builder underlyingSwiftModulePath =
+        getSwiftModulePath(underlying);
+    Imported.insert(underlyingSwiftModulePath.get());
+    for (auto UI : implicitImportInfo.AdditionalUnloadedImports)
+      Imported.insert(UI.module.getImportPath());
+    assert(implicitImportInfo.AdditionalImports.empty());
+
+    auto addImplicitImport = [&implicitImportInfo, &Imported,
+                              this](const clang::Module *M,
+                                    bool guaranteedUnique) {
+      ImportPath::Builder builder = getSwiftModulePath(M);
+      if (!guaranteedUnique && Imported.count(builder.get()))
+        return;
+
+      // Don't perform this clone for modules already added to the list
+      ImportPath importedModulePath = builder.copyTo(SwiftContext);
+
+#ifndef NDEBUG
+      const bool performSanityCheck = true;
+#else
+      const bool performSanityCheck = false;
+#endif
+      if (!guaranteedUnique || performSanityCheck) {
+        bool WasInserted = Imported.insert(importedModulePath).second;
+        assert(WasInserted);
+      }
+
+      UnloadedImportedModule importedModule(importedModulePath,
+                                            ImportKind::Module);
+      implicitImportInfo.AdditionalUnloadedImports.push_back(
+          std::move(importedModule));
+    };
+
+    while (!SubmoduleWorklist.empty()) {
+      const clang::Module *CurrModule = SubmoduleWorklist.pop_back_val();
+      if (CurrModule->IsExplicit) {
+        // We don't add imports under the same TLM, and submodules form
+        // a tree, so these don't require deduplication.
+        addImplicitImport(CurrModule, /*guaranteedUnique=*/true);
+      }
+      for (auto *I : CurrModule->Imports) {
+        // `underlying` is the current TLM. Only explicit submodules need to
+        // be imported under the same TLM, which is handled above.
+        if (I->getTopLevelModule() == underlying)
+          continue;
+        addImplicitImport(I, /*guaranteedUnique=*/false);
+      }
+      for (auto *Submodule : CurrModule->submodules())
+        SubmoduleWorklist.push_back(Submodule);
+    }
+  }
+
   ClangModuleUnit *file = nullptr;
   auto wrapper = ModuleDecl::create(name, SwiftContext, implicitImportInfo,
                                     [&](ModuleDecl *wrapper, auto addFile) {
@@ -3742,7 +3810,11 @@ ImportDecl *swift::createImportDecl(ASTContext &Ctx,
   while (TmpMod) {
     // If this is a C++ stdlib module, print its name as `CxxStdlib` instead of
     // `std`. `CxxStdlib` is the only accepted spelling of the C++ stdlib module
-    // name in Swift.
+    // name in Swift. In libc++ versions 17-19 there are multiple TLMs, named
+    // std_vector, std_array etc. We don't support importing those modules, but
+    // when printing the module interface it'd be weird to print "import
+    // CxxStdlib" over and over, so those are still printed as "import
+    // std_vector". This only affects the module interface for CxxStdlib.
     Identifier moduleName = !TmpMod->isSubModule() && TmpMod->Name == "std"
                                 ? Ctx.Id_CxxStdlib
                                 : Ctx.getIdentifier(TmpMod->Name);
@@ -4597,8 +4669,8 @@ void ClangModuleUnit::getImportedModulesForLookup(
     if (owner.SwiftContext.LangOpts.EnableCXXInterop && topLevel &&
         isCxxStdModule(topLevel) && wrapper->clangModule &&
         isCxxStdModule(wrapper->clangModule)) {
-      // The CxxStdlib overlay re-exports the clang module std, which in recent
-      // libc++ versions re-exports top-level modules for different std headers
+      // The CxxStdlib overlay re-exports the clang module std, which in libc++
+      // versions 17-19 re-exports top-level modules for different std headers
       // (std_string, std_vector, etc). The overlay module for each of the std
       // modules is the CxxStdlib module itself. Make sure we return the actual
       // clang modules (std_xyz) as transitive dependencies instead of just
@@ -8663,7 +8735,7 @@ bool importer::isCxxStdModule(const clang::Module *module) {
 bool importer::isCxxStdModule(StringRef moduleName, bool IsSystem) {
   if (moduleName == "std")
     return true;
-  // In recent libc++ versions the module is split into multiple top-level
+  // In libc++ versions 17-19 the module is split into multiple top-level
   // modules (std_vector, std_utility, etc).
   if (IsSystem && moduleName.starts_with("std_")) {
     if (moduleName == "std_errno_h")
@@ -8671,6 +8743,19 @@ bool importer::isCxxStdModule(StringRef moduleName, bool IsSystem) {
     return true;
   }
   return false;
+}
+
+ImportPath::Builder ClangImporter::Implementation::getSwiftModulePath(const clang::Module *M) {
+  ImportPath::Builder builder;
+  while (M) {
+    if (!M->isSubModule() && isCxxStdModule(M))
+      builder.push_back(SwiftContext.Id_CxxStdlib);
+    else
+      builder.push_back(SwiftContext.getIdentifier(M->Name));
+    M = M->Parent;
+  }
+  std::reverse(builder.begin(), builder.end());
+  return builder;
 }
 
 std::optional<clang::QualType>

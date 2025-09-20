@@ -163,6 +163,11 @@ class ImportResolver final : public DeclVisitor<ImportResolver> {
   /// The list of fully bound imports.
   SmallVector<AttributedImport<ImportedModule>, 16> boundImports;
 
+  /// Set of imported top-level clang modules. We normally don't expect
+  /// duplicated imports, but importing multiple submodules of the same clang
+  /// TLM would cause the same TLM to be imported once per submodule.
+  SmallPtrSet<const ModuleDecl*, 16> seenClangTLMs;
+
   /// All imported modules which should be considered when cross-importing.
   /// This is basically the transitive import graph, but with only top-level
   /// modules and without reexports from Objective-C modules.
@@ -189,6 +194,14 @@ class ImportResolver final : public DeclVisitor<ImportResolver> {
 
 public:
   ImportResolver(SourceFile &SF) : SF(SF), ctx(SF.getASTContext()) {
+    addImplicitImports();
+  }
+
+  // FIXME: Remove this ctor once namespace contents are imported to their
+  // corresponding module instead of the __ObjC module
+  ImportResolver(SourceFile &SF, ModuleDecl *explicitUnderlyingClangModule)
+      : SF(SF), ctx(SF.getASTContext()),
+        underlyingClangModule(explicitUnderlyingClangModule) {
     addImplicitImports();
   }
 
@@ -322,24 +335,21 @@ void swift::performImportResolution(SourceFile &SF) {
 }
 
 void swift::performImportResolutionForClangMacroBuffer(
-    SourceFile &SF, ModuleDecl *clangModule
-) {
-  // If we've already performed import resolution, bail.
-  if (SF.ASTStage == SourceFile::ImportsResolved)
-    return;
+    SourceFile &SF, ModuleDecl *explicitOriginModule) {
+  assert(SF.ASTStage == SourceFile::Unprocessed);
 
-  ImportResolver resolver(SF);
-  resolver.addImplicitImport(clangModule);
-
-  // FIXME: This is a hack that we shouldn't need, but be sure that we can
-  // see the Swift standard library.
-  if (auto stdlib = SF.getASTContext().getStdlibModule())
-    resolver.addImplicitImport(stdlib);
-
+  // `getWrapperForModule` has already declared all the implicit clang module
+  // imports we need
+  ImportResolver resolver(SF, explicitOriginModule);
   SF.setImports(resolver.getFinishedImports());
   SF.setImportedUnderlyingModule(resolver.getUnderlyingClangModule());
 
   SF.ASTStage = SourceFile::ImportsResolved;
+}
+
+static bool isSubmodule(const ModuleDecl* M) {
+  auto clangMod = M->findUnderlyingClangModule();
+  return clangMod && clangMod->Parent;
 }
 
 //===----------------------------------------------------------------------===//
@@ -389,14 +399,23 @@ void ImportResolver::bindImport(UnboundImport &&I) {
 
   I.validateOptions(topLevelModule, SF);
 
-  if (topLevelModule && topLevelModule != M) {
-    // If we have distinct submodule and top-level module, add both.
+  auto alreadyImportedTLM = [ID,this](const ModuleDecl *MD) {
+    ASSERT(!isSubmodule(MD));
+    // Scoped imports don't import all symbols from the module, so a scoped
+    // import does not count the module as imported
+    if (ID && isScopedImportKind(ID.get()->getImportKind()))
+      return false;
+    return !seenClangTLMs.insert(MD).second;
+  };
+  if (!M->isNonSwiftModule() || topLevelModule != M || !alreadyImportedTLM(M)) {
     addImport(I, M);
-    addImport(I, topLevelModule.get());
-  }
-  else {
-    // Add only the import itself.
-    addImport(I, M);
+    if (topLevelModule && topLevelModule != M &&
+        !alreadyImportedTLM(topLevelModule.get())) {
+      // If we have distinct submodule and top-level module, add both.
+      // Importing the submodule ensures that it gets loaded, but the decls
+      // are imported to the TLM, so import that for visibility.
+      addImport(I, topLevelModule.get());
+    }
   }
 
   crossImport(M, I);
@@ -592,7 +611,19 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
 }
 
 void ImportResolver::addImplicitImports() {
-  auto implicitImports = SF.getParentModule()->getImplicitImports();
+  // This is a workaround for the fact that namespaces are imported into the
+  // bridging header module. To allow correct lookup, we expose a ctor with an
+  // explicit underlying clang module input, which is the clang module that this
+  // macro expansion actually originates in.
+  const ModuleDecl *moduleToInherit = nullptr;
+  if (underlyingClangModule) {
+    moduleToInherit = underlyingClangModule;
+    boundImports.push_back(
+        AttributedImport(ImportedModule(underlyingClangModule)));
+  } else {
+    moduleToInherit = SF.getParentModule();
+  }
+  auto implicitImports = moduleToInherit->getImplicitImports();
 
   // TODO: Support cross-module imports.
   for (auto &import : implicitImports.imports) {
@@ -1588,11 +1619,6 @@ void ImportResolver::findCrossImports(
       llvm::dbgs() << "import " << name << "\n";
     });
   }
-}
-
-static bool isSubmodule(ModuleDecl* M) {
-  auto clangMod = M->findUnderlyingClangModule();
-  return clangMod && clangMod->Parent;
 }
 
 void ImportResolver::addCrossImportableModules(
