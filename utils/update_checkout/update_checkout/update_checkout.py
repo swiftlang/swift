@@ -121,7 +121,7 @@ def find_rev_by_timestamp(timestamp, repo_name, refspec):
 
 
 def get_branch_for_repo(config, repo_name, scheme_name, scheme_map,
-                        cross_repos_pr):
+                        cross_repos_pr, skip_tags):
     """Infer, fetch, and return a branch corresponding to a given PR, otherwise
     return a branch found in the config for this repository name.
 
@@ -153,13 +153,13 @@ def get_branch_for_repo(config, repo_name, scheme_name, scheme_map,
                           echo=True, allow_non_zero_exit=True)
             shell.run(["git", "fetch", "origin",
                        "pull/{0}/merge:{1}"
-                       .format(pr_id, repo_branch), "--tags"], echo=True)
+                       .format(pr_id, repo_branch)] + (['--tags'] if not skip_tags else []), echo=True)
     return repo_branch, cross_repo
 
 
 def update_single_repository(pool_args):
     source_root, config, repo_name, scheme_name, scheme_map, tag, timestamp, \
-        reset_to_remote, should_clean, should_stash, cross_repos_pr = pool_args
+        reset_to_remote, should_clean, should_stash, cross_repos_pr, skip_tags = pool_args
     repo_path = os.path.join(source_root, repo_name)
     if not os.path.isdir(repo_path) or os.path.islink(repo_path):
         return
@@ -175,7 +175,7 @@ def update_single_repository(pool_args):
                 checkout_target = confirm_tag_in_repo(tag, repo_name)
             elif scheme_name:
                 checkout_target, cross_repo = get_branch_for_repo(
-                    config, repo_name, scheme_name, scheme_map, cross_repos_pr)
+                    config, repo_name, scheme_name, scheme_map, cross_repos_pr, skip_tags)
                 if timestamp:
                     checkout_target = find_rev_by_timestamp(timestamp,
                                                             repo_name,
@@ -228,7 +228,7 @@ def update_single_repository(pool_args):
                     shell.run(['git', 'rev-parse', '--verify', checkout_target])
                 except Exception:
                     shell.run(["git", "fetch", "--recurse-submodules=yes",
-                               "--tags"],
+                               f"{checkout_target}:{checkout_target}"],
                               echo=True, prefix=prefix)
 
                 try:
@@ -246,7 +246,7 @@ def update_single_repository(pool_args):
             # It's important that we checkout, fetch, and rebase, in order.
             # .git/FETCH_HEAD updates the not-for-merge attributes based on
             # which branch was checked out during the fetch.
-            shell.run(["git", "fetch", "--recurse-submodules=yes", "--tags"],
+            shell.run(["git", "fetch", "--recurse-submodules=yes"] + (["--tags"] if not skip_tags else []),
                       echo=True, prefix=prefix)
 
             # If we were asked to reset to the specified branch, do the hard
@@ -395,7 +395,8 @@ def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_p
                    args.reset_to_remote,
                    args.clean,
                    args.stash,
-                   cross_repos_pr]
+                   cross_repos_pr,
+                   args.skip_tags]
         pool_args.append(my_args)
 
     locked_repositories: set[str] = _is_any_repository_locked(pool_args)
@@ -853,7 +854,8 @@ repositories.
             branch_name, cross_repo = get_branch_for_repo(config, 'swift',
                                                           scheme_name,
                                                           scheme_map,
-                                                          cross_repos_pr)
+                                                          cross_repos_pr,
+                                                          skip_tags)
 
             if cross_repo:
                 shell.run(['git', 'checkout', branch_name], echo=True,
