@@ -84,7 +84,7 @@ extension UTF8Span {
     }
 
 
-    /// Advance `codeUnitOffset` to the end of the current scalar, without
+    /// Advance `currentCodeUnitOffset` to the end of the current scalar, without
     /// decoding it.
     ///
     /// Returns the number of `Unicode.Scalar`s skipped over, which can be 0
@@ -103,7 +103,7 @@ extension UTF8Span {
       return 1
     }
 
-    /// Advance `codeUnitOffset` to the end of `n` scalars, without decoding
+    /// Advance `currentCodeUnitOffset` to the end of `n` scalars, without decoding
     /// them.
     ///
     /// Returns the number of `Unicode.Scalar`s skipped over, which can be
@@ -120,7 +120,7 @@ extension UTF8Span {
       return numSkipped
     }
 
-    /// Move `codeUnitOffset` to the start of the previous scalar, without
+    /// Move `currentCodeUnitOffset` to the start of the previous scalar, without
     /// decoding it.
     ///
     /// Returns the number of `Unicode.Scalar`s skipped over, which can be 0
@@ -139,7 +139,7 @@ extension UTF8Span {
       return 1
     }
 
-    /// Move `codeUnitOffset` to the start of the previous `n` scalars,
+    /// Move `currentCodeUnitOffset` to the start of the previous `n` scalars,
     /// without decoding them.
     ///
     /// Returns the number of `Unicode.Scalar`s skipped over, which can be
@@ -299,7 +299,7 @@ extension UTF8Span {
       return result
     }
 
-    /// Advance `codeUnitOffset` to the end of the current `Character`,
+    /// Advance `currentCodeUnitOffset` to the end of the current `Character`,
     /// without constructing it.
     ///
     /// Returns the number of `Character`s skipped over, which can be 0
@@ -316,7 +316,7 @@ extension UTF8Span {
       return 1
     }
 
-    /// Advance `codeUnitOffset` to the end of `n` `Characters`, without
+    /// Advance `currentCodeUnitOffset` to the end of `n` `Characters`, without
     /// constructing them.
     ///
     /// Returns the number of `Character`s skipped over, which can be
@@ -331,7 +331,7 @@ extension UTF8Span {
       return numSkipped
     }
 
-    /// Move `codeUnitOffset` to the start of the previous `Character`,
+    /// Move `currentCodeUnitOffset` to the start of the previous `Character`,
     /// without constructing it.
     ///
     /// Returns the number of `Character`s skipped over, which can be 0
@@ -349,7 +349,7 @@ extension UTF8Span {
 
     }
 
-    /// Move `codeUnitOffset` to the start of the previous `n` `Character`s,
+    /// Move `currentCodeUnitOffset` to the start of the previous `n` `Character`s,
     /// without constructing them.
     ///
     /// Returns the number of `Character`s skipped over, which can be
