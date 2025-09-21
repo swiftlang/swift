@@ -1312,7 +1312,7 @@ void PrintAST::printAttributes(const Decl *D) {
 
   // Force semantic attrs to be computed if appropriate.
   if (shouldPrintAllSemanticDetails(Options))
-    (void)D->getSemanticAttrs();
+    (void)D->getExpandedAttrs();
 
   auto attrs = D->getAttrs();
 

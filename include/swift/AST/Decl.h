@@ -410,9 +410,6 @@ protected:
     /// lldb.
     Hoisted : 1,
 
-    /// Whether the set of semantic attributes has been computed.
-    SemanticAttrsComputed : 1,
-
     /// True if \c ObjCInterfaceAndImplementationRequest has been computed
     /// and did \em not find anything. This is the fast path where we can bail
     /// out without checking other caches or computing anything.
@@ -1048,11 +1045,6 @@ public:
   /// attribute macro expansion.
   DeclAttributes getExpandedAttrs() const;
 
-  /// Returns all semantic attributes attached to this declaration,
-  /// including attributes that are generated as the result of member
-  /// attribute macro expansion.
-  DeclAttributes getSemanticAttrs() const;
-
   /// Register the relationship between \c this and \p attr->abiDecl , assuming
   /// that \p attr is attached to \c this . This is necessary for
   /// \c ABIRoleInfo::ABIRoleInfo() to determine that \c attr->abiDecl
@@ -1264,14 +1256,6 @@ private:
   }
 
 public:
-  bool getSemanticAttrsComputed() const {
-    return Bits.Decl.SemanticAttrsComputed;
-  }
-
-  void setSemanticAttrsComputed(bool Computed) {
-    Bits.Decl.SemanticAttrsComputed = Computed;
-  }
-
   /// \returns the unparsed comment attached to this declaration.
   RawComment getRawComment() const;
 

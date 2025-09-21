@@ -2575,45 +2575,6 @@ void ExpandPeerMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
 }
 
 //----------------------------------------------------------------------------//
-// SemanticDeclAttrsRequest computation.
-//----------------------------------------------------------------------------//
-
-DeclAttributes SemanticDeclAttrsRequest::evaluate(Evaluator &evaluator,
-                                                  const Decl *decl) const {
-  // Expand attributes contributed by attached macros.
-  auto mutableDecl = const_cast<Decl *>(decl);
-  (void)evaluateOrDefault(evaluator, ExpandMemberAttributeMacros{mutableDecl},
-                          {});
-
-  // Trigger requests that cause additional semantic attributes to be added.
-  if (auto vd = dyn_cast<ValueDecl>(mutableDecl)) {
-    (void)getActorIsolation(vd);
-    (void)vd->isDynamic();
-    (void)vd->isFinal();
-  }
-  if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
-    (void)afd->isTransparent();
-  } else if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
-    (void)asd->hasStorage();
-  }
-
-  return decl->getAttrs();
-}
-
-std::optional<DeclAttributes>
-SemanticDeclAttrsRequest::getCachedResult() const {
-  auto decl = std::get<0>(getStorage());
-  if (decl->getSemanticAttrsComputed())
-    return decl->getAttrs();
-  return std::nullopt;
-}
-
-void SemanticDeclAttrsRequest::cacheResult(DeclAttributes attrs) const {
-  auto decl = std::get<0>(getStorage());
-  const_cast<Decl *>(decl)->setSemanticAttrsComputed(true);
-}
-
-//----------------------------------------------------------------------------//
 // UniqueUnderlyingTypeSubstitutionsRequest computation.
 //----------------------------------------------------------------------------//
 
