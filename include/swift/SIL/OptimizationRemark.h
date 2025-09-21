@@ -273,6 +273,20 @@ struct RemarkMissed : public Remark<RemarkMissed> {
                SourceLocPresentationKind locPresentationKind)
       : Remark(id, i, inferenceBehavior, locPresentationKind) {}
 };
+/// Remark to report analysis.
+struct RemarkAnalysis : public Remark<RemarkAnalysis> {
+  RemarkAnalysis(StringRef id, SILInstruction &i)
+      : Remark(id, i, SourceLocInferenceBehavior::None,
+               SourceLocPresentationKind::StartRange) {}
+  RemarkAnalysis(StringRef id, SILInstruction &i,
+               SourceLocInferenceBehavior inferenceBehavior)
+      : Remark(id, i, inferenceBehavior,
+               SourceLocPresentationKind::StartRange) {}
+  RemarkAnalysis(StringRef id, SILInstruction &i,
+               SourceLocInferenceBehavior inferenceBehavior,
+               SourceLocPresentationKind locPresentationKind)
+      : Remark(id, i, inferenceBehavior, locPresentationKind) {}
+};
 
 /// Used to emit the remarks.  Passes reporting remarks should create an
 /// instance of this.
@@ -281,12 +295,15 @@ class Emitter {
   std::string passName;
   bool passedEnabled;
   bool missedEnabled;
+  bool analysisEnabled;
 
   // Making these non-generic allows out-of-line definition.
   void emit(const RemarkPassed &remark);
   void emit(const RemarkMissed &remark);
+  void emit(const RemarkAnalysis &remark);
   static void emitDebug(const RemarkPassed &remark);
   static void emitDebug(const RemarkMissed &remark);
+  static void emitDebug(const RemarkAnalysis &remark);
 
   template <typename RemarkT> bool isEnabled();
 
@@ -345,6 +362,9 @@ template <> inline bool Emitter::isEnabled<RemarkMissed>() {
 }
 template <> inline bool Emitter::isEnabled<RemarkPassed>() {
   return passedEnabled;
+}
+template <> inline bool Emitter::isEnabled<RemarkAnalysis>() {
+  return analysisEnabled;
 }
 } // namespace OptRemark
 } // namespace swift

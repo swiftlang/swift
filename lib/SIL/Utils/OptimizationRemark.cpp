@@ -159,6 +159,12 @@ Emitter::Emitter(StringRef passName, SILFunction &fn)
           isMethodWithForceEmitSemanticAttrNominalType(fn) ||
           (fn.getASTContext().LangOpts.OptimizationRemarkMissedPattern &&
            fn.getASTContext().LangOpts.OptimizationRemarkMissedPattern->match(
+               passName))),
+      analysisEnabled(
+          hasForceEmitSemanticAttr(fn, passName) ||
+          isMethodWithForceEmitSemanticAttrNominalType(fn) ||
+          (fn.getASTContext().LangOpts.OptimizationRemarkAnalysisPattern &&
+           fn.getASTContext().LangOpts.OptimizationRemarkAnalysisPattern->match(
                passName))) {}
 
 static SourceLoc getLocForPresentation(SILLocation loc,
@@ -343,10 +349,15 @@ void Emitter::emit(const RemarkMissed &remark) {
   emitRemark(fn, remark, diag::opt_remark_missed, isEnabled<RemarkMissed>());
 }
 
+void Emitter::emit(const RemarkAnalysis &remark) {
+  emitRemark(fn, remark, diag::opt_remark_analysis, isEnabled<RemarkAnalysis>());
+}
 void Emitter::emitDebug(const RemarkPassed &remark) {
   llvm::dbgs() << remark.getDebugMsg();
 }
-
 void Emitter::emitDebug(const RemarkMissed &remark) {
+  llvm::dbgs() << remark.getDebugMsg();
+}
+void Emitter::emitDebug(const RemarkAnalysis &remark) {
   llvm::dbgs() << remark.getDebugMsg();
 }
