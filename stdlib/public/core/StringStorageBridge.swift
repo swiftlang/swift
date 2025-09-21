@@ -109,13 +109,21 @@ extension _AbstractStringStorage {
     }
   }
   
+  // The caller info isn't useful here anyway because it's never client code,
+  // so this makes sure that _character(at:) doesn't have inlined assertion bits
+  @inline(never)
+  internal func _characterAtIndexOutOfBounds() -> Never {
+    _preconditionFailure("String index is out of bounds")
+  }
+  
   @inline(__always)
   @_effects(readonly)
   internal func _character(at offset: Int) -> UInt16 {
     if _fastPath(isASCII) {
-      _precondition(offset < count && offset >= 0,
-        "String index is out of bounds")
-      return unsafe UInt16((start + offset).pointee)
+      if (_fastPath(offset < count && offset >= 0)) {
+        return unsafe UInt16((start + offset).pointee)
+      }
+      _characterAtIndexOutOfBounds()
     } else {
       return utf16[nativeNonASCIIOffset: offset]
     }
