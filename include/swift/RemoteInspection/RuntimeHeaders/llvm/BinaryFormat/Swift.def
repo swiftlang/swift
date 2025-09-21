@@ -22,6 +22,8 @@ HANDLE_SWIFT_SECTION(fieldmd, "__swift5_fieldmd", "swift5_fieldmd", ".sw5flmd")
 HANDLE_SWIFT_SECTION(assocty, "__swift5_assocty", "swift5_assocty", ".sw5asty")
 HANDLE_SWIFT_SECTION(builtin, "__swift5_builtin", "swift5_builtin", ".sw5bltn")
 HANDLE_SWIFT_SECTION(capture, "__swift5_capture", "swift5_capture", ".sw5cptr")
+HANDLE_SWIFT_SECTION(typemd, "__swift5_types", "swift5_types", ".sw5tymd")
+HANDLE_SWIFT_SECTION(typemd2, "__swift5_types2", "swift5_types2", ".sw5tym2")
 HANDLE_SWIFT_SECTION(typeref, "__swift5_typeref", "swift5_typeref", ".sw5tyrf")
 HANDLE_SWIFT_SECTION(reflstr, "__swift5_reflstr", "swift5_reflstr", ".sw5rfst")
 HANDLE_SWIFT_SECTION(conform, "__swift5_proto", "swift5_protocol_conformances",
