@@ -333,8 +333,8 @@ public:
                                         DeclContext *dc);
 
   /// Whether we can derive the given DistributedActorSystem requirements.
-  static bool canDeriveDistributedActorSystem(NominalTypeDecl *nominal,
-                                              DeclContext *dc);
+  static bool canDeriveDistributedActorSystem(
+      NormalProtocolConformance *conformance);
 
   /// Derive a 'DistributedActor' requirement for an distributed actor.
   ///
