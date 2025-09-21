@@ -6820,7 +6820,7 @@ void RequirementRepr::dump() const {
 }
 
 void GenericParamList::dump() const {
-  print(llvm::errs());
+  print(llvm::errs(), PrintOptions::forDebugging());
   llvm::errs() << '\n';
 }
 
@@ -6829,11 +6829,11 @@ void LayoutConstraint::dump() const {
     llvm::errs() << "(null)\n";
     return;
   }
-  getPointer()->print(llvm::errs());
+  getPointer()->print(llvm::errs(), PrintOptions::forDebugging());
 }
 
 void GenericSignature::dump() const {
-  print(llvm::errs());
+  print(llvm::errs(), PrintOptions::forDebugging());
   llvm::errs() << '\n';
 }
 
@@ -6868,7 +6868,7 @@ void InheritedEntry::dump(llvm::raw_ostream &os) const {
     os << '@' << getDumpString(getExplicitSafety()) << ' ';
   if (isSuppressed())
     os << "~";
-  getType().print(os);
+  getType().print(os, PrintOptions::forDebugging());
 }
 
 void InheritedEntry::dump() const { dump(llvm::errs()); }

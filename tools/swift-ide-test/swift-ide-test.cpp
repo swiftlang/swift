@@ -585,6 +585,11 @@ PreferTypeRepr("prefer-type-repr",
                llvm::cl::cat(Category),
                llvm::cl::init(true));
 
+static llvm::cl::opt<bool> PrintForDebugging(
+    "debug-print",
+    llvm::cl::desc("Print using the debug representation for types"),
+    llvm::cl::cat(Category), llvm::cl::init(true));
+
 static llvm::cl::opt<bool>
 FullyQualifiedTypes("fully-qualified-types",
                     llvm::cl::desc("Print fully qualified types"),
@@ -4735,6 +4740,7 @@ int main(int argc, char *argv[]) {
       return PrintOptions::printDocInterface();
     } else {
       auto PrintOpts = PrintOptions::printEverything();
+      PrintOpts.PrintTypesForDebugging = options::PrintForDebugging;
       PrintOpts.FullyQualifiedTypes = options::FullyQualifiedTypes;
       PrintOpts.FullyQualifiedTypesIfAmbiguous =
         options::FullyQualifiedTypesIfAmbiguous;

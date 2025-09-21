@@ -2055,7 +2055,7 @@ static void dumpGenericSignature(ASTContext &ctx, GenericContext *GC) {
         GC->printContext(llvm::errs());
       }
       llvm::errs() << "Generic signature: ";
-      PrintOptions Opts;
+      PrintOptions Opts = PrintOptions::forDebugging();
       Opts.ProtocolQualifiedDependentMemberTypes = true;
       Opts.PrintInverseRequirements =
           !ctx.TypeCheckerOpts.DebugInverseRequirements;
@@ -3427,7 +3427,7 @@ public:
       PD->dumpRef(llvm::errs());
       llvm::errs() << "\n";
       llvm::errs() << "Requirement signature: ";
-      PrintOptions Opts;
+      PrintOptions Opts = PrintOptions::forDebugging();
       Opts.ProtocolQualifiedDependentMemberTypes = true;
       Opts.PrintInverseRequirements =
           !Ctx.TypeCheckerOpts.DebugInverseRequirements;
