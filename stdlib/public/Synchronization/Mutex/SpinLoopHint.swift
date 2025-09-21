@@ -77,7 +77,7 @@ var _tries: Int {
 
 @inline(__always)
 func _spinLoopHint() {
-#if arch(arm) || arch(arm64) || arch(arm64_32)
+#if (arch(arm) && !ARMV5) || arch(arm64) || arch(arm64_32)
   _wfe()
 #elseif arch(i386) || arch(x86_64)
   _pause()
