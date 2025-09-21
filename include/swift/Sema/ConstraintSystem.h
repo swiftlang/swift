@@ -6223,8 +6223,7 @@ public:
   fixForHole(ConstraintSystem &cs) const;
 
   void print(llvm::raw_ostream &Out, SourceManager *, unsigned indent) const {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
+    PrintOptions PO = PrintOptions::forDebugging();
     Out << "type variable binding " << TypeVar->getString(PO)
         << " := " << Binding.BindingType->getString(PO);
   }

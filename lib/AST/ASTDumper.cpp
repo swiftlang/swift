@@ -3398,13 +3398,11 @@ public:
   /// FIXME: This should use ExprWalker to print children.
 
   void printCommon(Expr *E, const char *C, Label label) {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-
     printHead(C, ExprColor, label);
 
     printFlag(E->isImplicit(), "implicit", ExprModifierColor);
-    printTypeField(GetTypeOfExpr(E), Label::always("type"), PO, TypeColor);
+    printTypeField(GetTypeOfExpr(E), Label::always("type"),
+                   PrintOptions::forDebugging(), TypeColor);
 
     // If we have a source range and an ASTContext, print the source range.
     if (auto Ty = GetTypeOfExpr(E)) {
@@ -4054,10 +4052,8 @@ public:
   void visitForceTryExpr(ForceTryExpr *E, Label label) {
     printCommon(E, "force_try_expr", label);
 
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-    printTypeField(E->getThrownError(), Label::always("thrown_error"), PO,
-                   TypeColor);
+    printTypeField(E->getThrownError(), Label::always("thrown_error"),
+                   PrintOptions::forDebugging(), TypeColor);
 
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
@@ -4066,10 +4062,8 @@ public:
   void visitOptionalTryExpr(OptionalTryExpr *E, Label label) {
     printCommon(E, "optional_try_expr", label);
 
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-    printTypeField(E->getThrownError(), Label::always("thrown_error"), PO,
-                   TypeColor);
+    printTypeField(E->getThrownError(), Label::always("thrown_error"),
+                   PrintOptions::forDebugging(), TypeColor);
 
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
@@ -4553,10 +4547,8 @@ public:
   void visitTypeValueExpr(TypeValueExpr *E, Label label) {
     printCommon(E, "type_value_expr", label);
 
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-    printTypeField(E->getParamType(), Label::always("param_type"), PO,
-                   TypeColor);
+    printTypeField(E->getParamType(), Label::always("param_type"),
+                   PrintOptions::forDebugging(), TypeColor);
 
     printFoot();
   }

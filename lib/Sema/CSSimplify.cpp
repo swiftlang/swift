@@ -13439,12 +13439,9 @@ retry_after_fail:
   // If we have a common result type, bind the expected result type to it.
   if (commonResultType && !commonResultType->is<ErrorType>()) {
     if (isDebugMode()) {
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
       llvm::errs().indent(solverState ? solverState->getCurrentIndent() : 0)
-        << "(common result type for $T" << fnTypeVar->getID() << " is "
-        << commonResultType.getString(PO)
-        << ")\n";
+          << "(common result type for $T" << fnTypeVar->getID() << " is "
+          << commonResultType.getString(PrintOptions::forDebugging()) << ")\n";
     }
 
     // Introduction of a `Bind` constraint here could result in the disconnect
