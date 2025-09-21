@@ -38,6 +38,7 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/TypeTransform.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
@@ -96,42 +97,52 @@ Type FailureDiagnostic::getRawType(ASTNode node) const {
 
 Type FailureDiagnostic::resolveType(Type rawType, bool reconstituteSugar,
                                     bool wantRValue) const {
-  rawType = rawType.transformRec([&](Type type) -> std::optional<Type> {
-    if (auto *typeVar = type->getAs<TypeVariableType>()) {
-      auto resolvedType = S.simplifyType(typeVar);
+  class Transform : public TypeTransform<Transform> {
+    const FailureDiagnostic &FD;
 
-      if (!resolvedType->hasUnresolvedType())
-        return resolvedType;
+  public:
+    explicit Transform(const FailureDiagnostic &FD)
+        : TypeTransform(FD.getASTContext()), FD(FD) {}
 
-      // If type variable was simplified to an unresolved pack expansion
-      // type, let's examine its original pattern type because it could
-      // contain type variables replaceable with their generic parameter
-      // types.
-      if (auto *expansion = resolvedType->getAs<PackExpansionType>()) {
-        auto *locator = typeVar->getImpl().getLocator();
-        auto *openedExpansionTy =
-            locator->castLastElementTo<LocatorPathElt::PackExpansionType>()
-                .getOpenedType();
-        auto patternType = resolveType(openedExpansionTy->getPatternType());
-        return PackExpansionType::get(patternType, expansion->getCountType());
+    std::optional<Type> transform(TypeBase *type, TypePosition position) {
+      if (auto *typeVar = type->getAs<TypeVariableType>()) {
+        auto resolvedType = FD.S.simplifyType(typeVar);
+
+        if (!resolvedType->hasUnresolvedType())
+          return resolvedType;
+
+        // If type variable was simplified to an unresolved pack expansion
+        // type, let's examine its original pattern type because it could
+        // contain type variables replaceable with their generic parameter
+        // types.
+        if (auto *expansion = resolvedType->getAs<PackExpansionType>()) {
+          auto *locator = typeVar->getImpl().getLocator();
+          auto *openedExpansionTy =
+              locator->castLastElementTo<LocatorPathElt::PackExpansionType>()
+                  .getOpenedType();
+          auto patternType =
+              FD.resolveType(openedExpansionTy->getPatternType());
+          return PackExpansionType::get(patternType, expansion->getCountType());
+        }
+
+        Type GP = typeVar->getImpl().getGenericParameter();
+        return resolvedType->is<UnresolvedType>() && GP ? ErrorType::get(GP)
+                                                        : resolvedType;
       }
 
-      Type GP = typeVar->getImpl().getGenericParameter();
-      return resolvedType->is<UnresolvedType>() && GP
-          ? ErrorType::get(GP)
-          : resolvedType;
+      if (type->hasElementArchetype()) {
+        auto *env = FD.getDC()->getGenericEnvironmentOfContext();
+        return env->mapElementTypeIntoPackContext(type);
+      }
+
+      if (type->isPlaceholder())
+        return Type(type->getASTContext().TheUnresolvedType);
+      return std::nullopt;
     }
+    bool shouldUnwrapVanishingTuples() const { return false; }
+  };
 
-    if (type->hasElementArchetype()) {
-      auto *env = getDC()->getGenericEnvironmentOfContext();
-      return env->mapElementTypeIntoPackContext(type);
-    }
-
-    if (type->isPlaceholder())
-      return Type(type->getASTContext().TheUnresolvedType);
-
-    return std::nullopt;
-  });
+  rawType = Transform(*this).doIt(rawType, TypePosition::Invariant);
 
   if (reconstituteSugar)
     rawType = rawType->reconstituteSugar(/*recursive*/ true);
