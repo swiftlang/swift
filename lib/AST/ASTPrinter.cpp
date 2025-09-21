@@ -6198,9 +6198,11 @@ public:
       if (Options.PrintTypesForDebugging || Options.PrintInSILBody)
         Printer << "@error_type ";
       visit(originalType);
-    }
-    else
+    } else if (Options.PrintTypesForDebugging) {
       Printer << "<<error type>>";
+    } else {
+      Printer << "_";
+    }
   }
 
   void visitUnresolvedType(UnresolvedType *T,
