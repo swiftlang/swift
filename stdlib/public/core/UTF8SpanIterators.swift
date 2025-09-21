@@ -23,7 +23,7 @@ extension UTF8Span {
 
   // **TODO**: Examples in below doc
 
-  /// Iterate the `Unicode.Scalar`s  contents of a `UTF8Span`.
+  /// Iterate the `Unicode.Scalar`s contents of a `UTF8Span`.
   @frozen
   public struct UnicodeScalarIterator: ~Escapable {
     public let codeUnits: UTF8Span
@@ -174,7 +174,7 @@ extension UTF8Span {
       self.currentCodeUnitOffset = codeUnits._scalarAlignForwards(i)
     }
 
-    // TODO: for below, verify that there is no path to UB, just garabage-data or guaranteed
+    // TODO: for below, verify that there is no path to UB, just garbage-data or guaranteed
     // trap!
 
     /// Reset this iterator to `codeUnitOffset`, skipping _all_ safety
