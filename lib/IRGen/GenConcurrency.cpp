@@ -1001,3 +1001,37 @@ const LoadableTypeInfo &TypeConverter::getImplicitActorTypeInfo() {
   FirstType = ImplicitActorTI;
   return *ImplicitActorTI;
 }
+
+llvm::Value *irgen::clearImplicitIsolatedActorBits(IRGenFunction &IGF,
+                                                   llvm::Value *value) {
+  // Helper. We conditionally use this and just use a simple helper function
+  // here so we do not expose the internals of clearing implicit isolated actor
+  // bits into the rest of the file. The work here is very straight forward.
+  auto getTBIClearMask = [](IRGenFunction &IGF) -> llvm::Value * {
+    auto *one = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 1);
+    auto *three = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 3);
+    auto *four = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 4);
+    auto *valueToShiftLit = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 3);
+
+    auto *sizeOfWord =
+        llvm::ConstantInt::get(IGF.IGM.IntPtrTy, one->getBitWidth() >> 3);
+
+    // sizeof(Word) - 1
+    auto *sub = IGF.Builder.CreateSub(sizeOfWord, one);
+    // (sizeof(Word) - 1) << 3
+    auto *innerShift = IGF.Builder.CreateShl(sub, three);
+    // ((sizeof(Word) - 1) << 3) + 4
+    auto *innerShiftOffset = IGF.Builder.CreateAdd(innerShift, four);
+    auto *negBits = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, -1);
+    // (valueToShiftLit << innerShiftOffset) ^ -1.
+    return IGF.Builder.CreateXor(
+        IGF.Builder.CreateShl(valueToShiftLit, innerShiftOffset), negBits);
+  };
+
+  auto *cast = IGF.Builder.CreateBitOrPointerCast(value, IGF.IGM.IntPtrTy);
+  auto *bitMask = IGF.getOptions().HasAArch64TBI
+                      ? getTBIClearMask(IGF)
+                      : llvm::ConstantInt::get(IGF.IGM.IntPtrTy, -4);
+  auto *result = IGF.Builder.CreateAnd(cast, bitMask);
+  return IGF.Builder.CreateBitOrPointerCast(result, value->getType());
+}
