@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-sil -verify \
-// RUN:   -enable-experimental-feature ManualOwnership \
-// RUN:   -enable-copy-propagation=always
+// RUN:   -enable-experimental-feature ManualOwnership
 
 // REQUIRES: swift_feature_ManualOwnership
 
