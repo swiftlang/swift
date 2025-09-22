@@ -18,10 +18,29 @@
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "cold-block-info"
 
 using namespace swift;
+
+/// Strategy for handling blocks with zero execution counts in profile data
+enum class ZeroCountStrategy {
+  Conservative,  // Skip inference, let other heuristics decide (safe default)
+  Optimistic,    // Assume zero-count blocks are cold
+  Aggressive     // Assume zero-count blocks are warm
+};
+
+static llvm::cl::opt<ZeroCountStrategy> ZeroCountHandling(
+    "sil-zero-count-strategy", llvm::cl::init(ZeroCountStrategy::Conservative),
+    llvm::cl::desc("Strategy for handling blocks with zero execution counts"),
+    llvm::cl::values(
+        clEnumValN(ZeroCountStrategy::Conservative, "conservative",
+                   "Skip inference for zero-count blocks (default)"),
+        clEnumValN(ZeroCountStrategy::Optimistic, "optimistic",
+                   "Assume zero-count blocks are cold"),
+        clEnumValN(ZeroCountStrategy::Aggressive, "aggressive",
+                   "Assume zero-count blocks are warm")));
 
 bool isColdEnergy(ColdBlockInfo::Energy e);
 
@@ -249,12 +268,37 @@ bool ColdBlockInfo::inferFromEdgeProfile(SILBasicBlock *BB) {
   // Handle the case where the block was instrumented but never executed
   // This aligns with LLVM's handling of zero-count blocks
   if (totalCount.getValue() < 1) {
-    // Conservative approach: we can't infer probabilities without execution data
-    // Skip this block and let other heuristics handle it
     LLVM_DEBUG(llvm::dbgs()
-               << "ColdBlockInfo: skipping inference for " << toString(BB)
-               << " - block has zero execution count (never executed)\n");
-    return false;
+               << "ColdBlockInfo: handling zero execution count for " << toString(BB)
+               << " using strategy: ");
+
+    switch (ZeroCountHandling) {
+    case ZeroCountStrategy::Conservative:
+      // Conservative approach: we can't infer probabilities without execution data
+      // Skip this block and let other heuristics handle it
+      LLVM_DEBUG(llvm::dbgs() << "conservative (skipping inference)\n");
+      return false;
+
+    case ZeroCountStrategy::Optimistic:
+      // Optimistic approach: assume zero-count blocks are cold
+      // Mark all successors as cold since this code path is never executed
+      LLVM_DEBUG(llvm::dbgs() << "optimistic (marking all successors as cold)\n");
+      for (auto const &succ : succs) {
+        set(succ, ColdBlockInfo::State::Cold);
+      }
+      return true;
+
+    case ZeroCountStrategy::Aggressive:
+      // Aggressive approach: assume zero-count blocks are warm
+      // This might be useful when profile data is incomplete or unrepresentative
+      LLVM_DEBUG(llvm::dbgs() << "aggressive (marking all successors as warm)\n");
+      for (auto const &succ : succs) {
+        set(succ, ColdBlockInfo::State::Warm);
+      }
+      return true;
+    }
+
+    llvm_unreachable("Unknown zero count strategy");
   }
 
   // Record temperatures.
