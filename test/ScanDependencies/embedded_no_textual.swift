@@ -1,3 +1,4 @@
+// REQUIRES: swift_feature_Embedded
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
