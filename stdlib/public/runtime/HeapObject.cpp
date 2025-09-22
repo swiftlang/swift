@@ -61,8 +61,20 @@ using namespace swift;
 #error "The runtime must be built with a compiler that supports swiftcall."
 #endif
 
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+// Define a mask used by ClientRetainRelease to determine when it must call into
+// the runtime. The symbol's address is used as the mask, rather than its
+// contents, to eliminate one load instruction when using it. This is imported
+// weakly, which makes its address zero when running against older runtimes.
+// ClientRetainRelease references it using an addend of 0x8000000000000000,
+// whicrh produces the appropriate mask in that case. Since the mask is still
+// unchanged in this version of the runtime, we export this symbol as zero. If a
+// different mask is ever needed, the address of this symbol needs to be set to
+// 0x8000000000000000 less than that value so that it comes out right in
+// ClientRetainRelease.
 asm(".globl __swift_retainRelease_slowpath_mask_v1\n");
 asm(".set __swift_retainRelease_slowpath_mask_v1, 0\n");
+#endif
 
 
 /// Returns true if the pointer passed to a native retain or release is valid.
