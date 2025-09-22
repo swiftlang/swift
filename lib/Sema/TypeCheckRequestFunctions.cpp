@@ -509,6 +509,24 @@ Type GenericTypeParamDeclGetValueTypeRequest::evaluate(
   return inherited.getResolvedType(0, TypeResolutionStage::Structural);
 }
 
+Type GenericTypeParamDeclDefaultTypeRequest::evaluate(
+    Evaluator &evaluator, GenericTypeParamDecl *decl) const {
+  auto defaultTyRepr = decl->getDefaultTypeRepr();
+
+  if (!defaultTyRepr) {
+    return Type();
+  }
+
+  return TypeResolution::forInterface(decl->getDeclContext(),
+                                      std::nullopt,
+                                      // Diagnose unbound generics and
+                                      // placeholders.
+                                      /*unboundTyOpener*/ nullptr,
+                                      /*placeholderHandler*/ nullptr,
+                                      /*packElementOpener*/ nullptr)
+      .resolveType(defaultTyRepr);
+}
+
 // Define request evaluation functions for each of the type checker requests.
 static AbstractRequestFunction *typeCheckerRequestFunctions[] = {
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \

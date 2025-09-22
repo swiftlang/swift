@@ -2204,6 +2204,11 @@ namespace {
         printRec(decl->getValueType(), Label::always("value_type"));
         break;
       }
+
+      if (decl->hasDefaultType()) {
+        printRec(decl->getDefaultType(), Label::always("default_type"));
+      }
+
       printAttributes(decl);
 
       printFoot();

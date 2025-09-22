@@ -90,6 +90,33 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
     }
   }
 
+  // Add defaultable constraints for every generic parameter that has a default
+  // type.
+  //
+  // FIXME: This feels bad. There has to be a better way...
+  SmallVector<GenericTypeParamDecl *> params;
+  decl->forEachGenericContext([&](auto gpList) {
+    for (auto param : *gpList) {
+      if (!param->hasDefaultType()) {
+        continue;
+      }
+
+      auto replacement = llvm::find_if(replacements, [&](auto pair) {
+        auto paramTy = param->getDeclaredInterfaceType()->getCanonicalType();
+        auto replacementTy = pair.first->getCanonicalType();
+
+        return replacementTy->isEqual(paramTy);
+      });
+
+      if (replacement == replacements.end()) {
+        continue;
+      }
+
+      addConstraint(ConstraintKind::Defaultable, replacement->second,
+                    param->getDefaultType(), locator);
+    }
+  });
+
   // Map the generic parameters to their corresponding type variables.
   llvm::SmallVector<Type, 2> arguments;
   for (auto gp : decl->getInnermostGenericParamTypes()) {

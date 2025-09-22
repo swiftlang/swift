@@ -548,6 +548,9 @@ EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 /// Enable borrow/mutate accessors
 EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, false)
 
+/// Allow generics to have a default type, e.g. `<T = Int>`.
+EXPERIMENTAL_FEATURE(DefaultGenerics, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

@@ -540,8 +540,13 @@ static void checkGenericParams(GenericContext *ownerCtx) {
   auto *decl = ownerCtx->getAsDecl();
   auto &ctx = ownerCtx->getASTContext();
   bool hasPack = false;
+  bool hasDefault = false;
+  bool hasSeenNonDefault = false;
 
-  for (auto gp : *genericParams) {
+  for (auto i : indices(genericParams->getParams())) {
+    // Walk backwards which makes it easier to flag non-trailing default types.
+    auto gp = genericParams->getParams()[genericParams->size() - 1 - i];
+
     // Diagnose generic types with a parameter packs if VariadicGenerics
     // is not enabled.
     if (gp->isParameterPack()) {
@@ -580,8 +585,28 @@ static void checkGenericParams(GenericContext *ownerCtx) {
       }
     }
 
+    if (gp->hasDefaultType()) {
+      // Generic parameters with default types _must_ be trailing
+      if (hasSeenNonDefault) {
+        gp->diagnose(diag::default_generic_not_trailing, gp, gp->getDefaultType());
+      }
+
+      // Only allow default types on actual type declarations.
+      if (!isa<GenericTypeDecl>(decl) && !isa<ExtensionDecl>(decl)) {
+        gp->diagnose(diag::default_generic_not_type, gp);
+      }
+
+      hasDefault = true;
+    } else {
+      hasSeenNonDefault = true;
+    }
+
     TypeChecker::checkDeclAttributes(gp);
     checkInheritanceClause(gp);
+  }
+
+  if (hasPack && hasDefault) {
+    decl->diagnose(diag::default_generic_parameter_pack, decl);
   }
 
   // Force resolution of interface types written in requirements here.

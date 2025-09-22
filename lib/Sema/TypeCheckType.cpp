@@ -880,12 +880,25 @@ static bool resolveGenericArguments(ValueDecl *decl,
     args.push_back(substTy);
   }
 
+  // Implicitly add default generic args if there are any.
+  if (!hasParameterPack && args.size() < genericParams->size()) {
+    for (auto i = args.size(); i != genericParams->size(); i += 1) {
+      // If we don't have a default type, then bail out. We'll diagnose this
+      // shortly.
+      if (!genericParams->getParams()[i]->hasDefaultType()) {
+        break;
+      }
+
+      args.push_back(genericParams->getParams()[i]->getDefaultType());
+    }
+  }
+
   // Make sure we have the right number of generic arguments.
   if (!hasParameterPack) {
     // For generic types without type parameter packs, we require
     // the number of declared generic parameters match the number of
     // arguments.
-    if (genericArgs.size() != genericParams->size()) {
+    if (args.size() != genericParams->size()) {
       if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
         diagnoseInvalidGenericArguments(
             loc, decl, genericArgs.size(), genericParams->size(),

@@ -2887,3 +2887,17 @@ void IsCustomAvailabilityDomainPermanentlyEnabled::cacheResult(
   domain->flags.isPermanentlyEnabledComputed = true;
   domain->flags.isPermanentlyEnabled = isPermanentlyEnabled;
 }
+
+//----------------------------------------------------------------------------//
+// GenericTypeParamDeclDefaultTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<Type> GenericTypeParamDeclDefaultTypeRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  return decl->getCachedDefaultType();
+}
+
+void GenericTypeParamDeclDefaultTypeRequest::cacheResult(Type value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setDefaultType(value);
+}

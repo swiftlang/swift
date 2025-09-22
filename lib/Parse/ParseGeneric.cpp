@@ -34,6 +34,7 @@ using namespace swift;
 ///     identifier
 ///     identifier ':' type-identifier
 ///     identifier ':' type-composition
+///     identifier ':' type-identifier '=' type-identifier
 ///
 /// When parsing the generic parameters, this routine establishes a new scope
 /// and adds those parameters to the scope.
@@ -129,6 +130,37 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
         Inherited.push_back({Ty.get()});
     }
 
+    // Parse the '=' followed by a type.
+    TypeLoc DefaultType;
+
+    if (Context.LangOpts.hasFeature(Feature::DefaultGenerics)) {
+      // TODO: Don't allow defaults for values or parameter packs at the moment.
+      if (Tok.is(tok::equal) && !EachLoc.isValid() && !LetLoc.isValid()) {
+        (void)consumeToken();
+        ParserResult<TypeRepr> Ty;
+
+        if (Tok.isAny(tok::identifier, tok::code_complete, tok::kw_protocol,
+                      tok::kw_Any) || Tok.isTilde()) {
+          Ty = parseType();
+        } else if (Tok.is(tok::kw_class)) {
+          diagnose(Tok, diag::unexpected_class_constraint);
+          diagnose(Tok, diag::suggest_anyobject)
+          .fixItReplace(Tok.getLoc(), "AnyObject");
+          consumeToken();
+          Result.setIsParseError();
+        } else {
+          diagnose(Tok, diag::expected_generics_type_restriction, Name);
+          Result.setIsParseError();
+        }
+
+        if (Ty.hasCodeCompletion())
+          return makeParserCodeCompletionStatus();
+
+        if (Ty.isNonNull())
+          DefaultType = Ty.get();
+      }
+    }
+
     auto ParamKind = GenericTypeParamKind::Type;
     SourceLoc SpecifierLoc;
 
@@ -141,7 +173,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     }
 
     auto *Param = GenericTypeParamDecl::createParsed(
-        CurDeclContext, Name, NameLoc, SpecifierLoc,
+        CurDeclContext, Name, NameLoc, SpecifierLoc, DefaultType,
         /*index*/ GenericParams.size(), ParamKind);
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));
