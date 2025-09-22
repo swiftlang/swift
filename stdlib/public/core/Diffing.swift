@@ -388,6 +388,7 @@ fileprivate struct LinearMyers: ~Copyable {
       // Save the right side of the snake for later
       stack.append(tailBox)
     }
+    fatalError("Unreachable")
   }
   
   fileprivate mutating func middleSnake<T>(
