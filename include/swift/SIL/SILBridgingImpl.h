@@ -701,6 +701,21 @@ BridgedStringRef BridgedFunction::getAccessorName() const {
   return accessorKindName(accessorDecl->getAccessorKind());
 }
 
+bool BridgedFunction::isInitializer() const {
+  return getFunction()->getDeclRef().isConstructor();
+}
+
+bool BridgedFunction::isDeinitializer() const {
+  return getFunction()->getDeclRef().isDestructor();
+}
+
+bool BridgedFunction::isImplicit() const {
+  if (auto *funcDecl = getFunction()->getDeclRef().getAbstractFunctionDecl()) {
+    return funcDecl->isImplicit();
+  }
+  return false;
+}
+
 bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(); }
 
 bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->getModule().useLoweredAddresses(); }

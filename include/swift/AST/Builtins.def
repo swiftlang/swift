@@ -240,6 +240,7 @@ BUILTIN_SIL_OPERATION(LoadRaw, "loadRaw", Special)
 BUILTIN_SIL_OPERATION(LoadInvariant, "loadInvariant", Special)
 
 /// Take has type (Builtin.RawPointer) -> T
+/// where T: ~Copyable & ~Escapable
 BUILTIN_SIL_OPERATION(Take, "take", Special)
 
 /// Destroy has type (T.Type, Builtin.RawPointer) -> ()

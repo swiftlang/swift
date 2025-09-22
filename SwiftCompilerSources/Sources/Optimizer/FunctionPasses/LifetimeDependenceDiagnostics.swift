@@ -43,6 +43,9 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
   log("\(function)")
   log("\(function.convention)")
 
+  if skipStdlibFunction(function) {
+    return
+  }
   for argument in function.arguments
       where !argument.type.isEscapable(in: function)
   {
@@ -88,6 +91,22 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
       continue
     }
   }
+}
+
+/// Do not diagnose implicit unsafe pointer methods. They are effectively builtins. Manually overriding lifetimes is
+/// undesirable and impossible because of rules regarding which combination of accessors can be user-defined.
+private func skipStdlibFunction(_ function: Function) -> Bool {
+  if !function.isImplicit {
+    return false
+  }
+  guard let selfType = function.selfArgument?.type else {
+    return false
+  }
+  if selfType.isAnyUnsafePointer || selfType.isAnyUnsafeBufferPointer {
+    log("Skipping implicit unsafe pointer method... They are considered builtins.")
+    return true
+  }
+  return false
 }
 
 /// Analyze a single Lifetime dependence and trigger diagnostics.
@@ -284,6 +303,7 @@ private struct DiagnoseDependence {
         diagnose(sourceLoc, .lifetime_value_outside_thunk, thunkSelect, function.name)
       }
     }
+    diagnoseImplicitFunction()
     reportScope()
     // Identify the use point.
     if let userSourceLoc = operand.instruction.location.sourceLoc {
@@ -321,6 +341,23 @@ private struct DiagnoseDependence {
       } else {
         diagnose(parentLoc, .lifetime_outside_scope_value)
       }
+    }
+  }
+
+  func diagnoseImplicitFunction() {
+    guard let funcLoc = function.location.sourceLoc else {
+      return
+    }
+    if let kindName = {
+         if function.isInitializer {
+           return "init"
+         }
+         if function.isDeinitializer {
+           return "deinit"
+         }
+         return function.accessorKindName
+       }() {
+      diagnose(funcLoc, .implicit_function_note, kindName)
     }
   }
 }
