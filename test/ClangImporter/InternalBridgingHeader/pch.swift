@@ -47,4 +47,6 @@
 // RUN: not %target-swift-frontend -typecheck %s -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -pch-output-dir %t/no-pch -pch-disable-validation -sdk %clang-importer-sdk 2>&1 | %FileCheck %s -check-prefix=NO-VALIDATION
 // NO-VALIDATION: PCH file {{.*}} not found
 
+// UNSUPPORTED: OS=windows-msvc
+
 func getX(point: MyPoint) -> Double { point.x }
