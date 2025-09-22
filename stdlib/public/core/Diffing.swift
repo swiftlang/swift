@@ -348,6 +348,7 @@ fileprivate struct LinearMyers: ~Copyable {
   /// Implements a refinement of the Myers diffing algorithm that uses
   /// linear space for storing the "k vectors" during an iterative divide-
   /// and-conquer search.
+  @available(SwiftStdlib 5.1, *)
   mutating func findDifferences<T>(
     in initial: EditGraphRect,
     old: UnsafeBufferPointer<T>,
@@ -390,6 +391,7 @@ fileprivate struct LinearMyers: ~Copyable {
     }
   }
   
+  @available(SwiftStdlib 5.1, *)
   fileprivate mutating func middleSnake<T>(
     in box: EditGraphRect,
     old: UnsafeBufferPointer<T>, new: UnsafeBufferPointer<T>,
@@ -430,6 +432,7 @@ fileprivate struct LinearMyers: ~Copyable {
     fatalError("Unreachable")
   }
   
+  @available(SwiftStdlib 5.1, *)
   fileprivate mutating func forwardSearch<T>(
     in box: EditGraphRect,
     depth: Int,
@@ -501,6 +504,7 @@ fileprivate struct LinearMyers: ~Copyable {
     return nil
   }
     
+  @available(SwiftStdlib 5.1, *)
   fileprivate mutating func backwardSearch<T>(
     in box: EditGraphRect,
     depth: Int,
@@ -582,6 +586,7 @@ extension LinearMyers {
   }
 }
 
+@available(SwiftStdlib 5.1, *)
 func _linearSpaceMyers<C,D>(
   from old: C, to new: D,
   using cmp: (C.Element, D.Element) -> Bool
