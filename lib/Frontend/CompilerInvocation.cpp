@@ -4144,6 +4144,7 @@ bool CompilerInvocation::parseArgs(
     IRGenOpts.ReflectionMetadata = ReflectionMetadataMode::None;
     IRGenOpts.EnableReflectionNames = false;
     FrontendOpts.DisableBuildingInterface = true;
+    SearchPathOpts.ModuleLoadMode = ModuleLoadingMode::OnlySerialized;
     TypeCheckerOpts.SkipFunctionBodies = FunctionBodySkipping::None;
     SILOpts.SkipFunctionBodies = FunctionBodySkipping::None;
     SILOpts.CMOMode = CrossModuleOptimizationMode::Everything;
