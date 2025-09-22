@@ -2167,8 +2167,11 @@ swift::getDisallowedOriginKind(const Decl *decl,
   // See \c diagnoseValueDeclRefExportability.
   auto importSource = decl->getImportAccessFrom(where.getDeclContext());
   if (importSource.has_value() &&
-      importSource->accessLevel < AccessLevel::Public)
-    return DisallowedOriginKind::NonPublicImport;
+      importSource->accessLevel < AccessLevel::Public) {
+    return importSource->module.importedModule->isClangHeaderImportModule()
+      ? DisallowedOriginKind::InternalBridgingHeaderImport
+      : DisallowedOriginKind::NonPublicImport;
+  }
 
   return DisallowedOriginKind::None;
 }

@@ -277,7 +277,8 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
       D, DC, AccessLevel::Public,
       [&](AttributedImport<ImportedModule> attributedImport) {
         if (where.isExported() && reason != ExportabilityReason::General &&
-            originKind != DisallowedOriginKind::NonPublicImport) {
+            originKind != DisallowedOriginKind::NonPublicImport &&
+            originKind != DisallowedOriginKind::InternalBridgingHeaderImport) {
           // These may be reported twice, for the Type and for the TypeRepr.
           ModuleDecl *importedVia = attributedImport.module.importedModule,
                      *sourceModule = D->getModuleContext();
@@ -294,6 +295,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
     return false;
 
   case DisallowedOriginKind::NonPublicImport:
+  case DisallowedOriginKind::InternalBridgingHeaderImport:
     // With a few exceptions, access levels from imports are diagnosed during
     // access checking and should be skipped here.
     if (!shouldDiagnoseDeclAccess(D, where))

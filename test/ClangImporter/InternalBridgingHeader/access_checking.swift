@@ -20,3 +20,20 @@ public func getX(point: MyPoint) -> Double { point.x } // expected-error{{functi
 
 // Comes from the macros module.
 public func returnsFromMacrosModule() -> okay_t { 0 }
+
+public protocol P {
+  associatedtype A
+}
+
+public struct MyType: P {
+  public typealias A = MyDouble
+  // expected-error@-1{{type alias cannot be declared public because its underlying type uses an internal type}}
+  // expected-note@-2{{type alias 'MyDouble' is imported by this file as 'internal' from bridging header}}
+}
+
+// expected-error@+1{{cannot use struct 'MyPoint' in an extension with public or '@usableFromInline' members; it was imported via the internal bridging header}}
+extension MyPoint: P {
+  public typealias A = MyDouble
+  // expected-error@-1{{type alias cannot be declared public because its underlying type uses an internal type}}
+  // expected-note@-2{{type alias 'MyDouble' is imported by this file as 'internal' from bridging header}}
+}

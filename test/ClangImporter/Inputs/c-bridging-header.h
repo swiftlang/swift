@@ -8,4 +8,5 @@ typedef struct {
   double x, y;
 } MyPoint;
 
+typedef double MyDouble;
 #endif
