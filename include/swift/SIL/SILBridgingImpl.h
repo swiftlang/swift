@@ -1512,6 +1512,14 @@ BridgedArgumentConvention BridgedInstruction::YieldInst_getConvention(BridgedOpe
   return castToArgumentConvention(getAs<swift::YieldInst>()->getArgumentConventionForOperand(*forOperand.op));
 }
 
+BridgedBasicBlock BridgedInstruction::YieldInst_getResumeBB() const {
+  return {getAs<swift::YieldInst>()->getResumeBB()};
+}
+
+BridgedBasicBlock BridgedInstruction::YieldInst_getUnwindBB() const {
+  return {getAs<swift::YieldInst>()->getUnwindBB()};
+}
+
 BridgedBasicBlock BridgedInstruction::BranchInst_getTargetBlock() const {
   return {getAs<swift::BranchInst>()->getDestBB()};
 }

@@ -1884,6 +1884,9 @@ final public class YieldInst : TermInst {
   public func convention(of operand: Operand) -> ArgumentConvention {
     return bridged.YieldInst_getConvention(operand.bridged).convention
   }
+
+  public var resumeBlock: BasicBlock { bridged.YieldInst_getResumeBB().block }
+  public var unwindBlock: BasicBlock { bridged.YieldInst_getUnwindBB().block }
 }
 
 final public class UnwindInst : TermInst {
