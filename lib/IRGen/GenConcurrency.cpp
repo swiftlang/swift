@@ -1001,3 +1001,17 @@ const LoadableTypeInfo &TypeConverter::getImplicitActorTypeInfo() {
   FirstType = ImplicitActorTI;
   return *ImplicitActorTI;
 }
+
+llvm::Value *irgen::clearImplicitIsolatedActorBits(IRGenFunction &IGF,
+                                                   llvm::Value *value) {
+  auto *cast = IGF.Builder.CreateBitOrPointerCast(value, IGF.IGM.IntPtrTy);
+  // When TBI is enabled, we use the bottom two bits of the upper nibble of the
+  // TBI bit, implying a mask of 0xCFFFFFFFFFFFFFFF. If TBI is disabled, then we
+  // mask the bottom two tagged pointer bits.
+  auto *bitMask =
+      IGF.getOptions().HasAArch64TBI
+          ? llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0xCFFFFFFFFFFFFFFFull)
+          : llvm::ConstantInt::get(IGF.IGM.IntPtrTy, -4);
+  auto *result = IGF.Builder.CreateAnd(cast, bitMask);
+  return IGF.Builder.CreateBitOrPointerCast(result, value->getType());
+}

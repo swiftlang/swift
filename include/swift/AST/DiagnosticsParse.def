@@ -614,6 +614,12 @@ ERROR(sil_operand_has_incorrect_moveonlywrapped,none,
 ERROR(sil_operand_not_ref_storage_address,none,
       "%0 operand of '%1' must have address of %2 type",
       (StringRef, StringRef, ReferenceOwnership))
+ERROR(sil_operand_has_wrong_ownership_kind,none,
+      "operand has ownership kind %0 but ownership kind %1 was expected",
+      (StringRef, StringRef))
+ERROR(sil_operand_has_incompatible_ownership_kind,none,
+      "operand has ownership kind %0 but ownership kind compatible with %1 was expected",
+      (StringRef, StringRef))
 ERROR(sil_integer_literal_not_integer_type,none,
       "integer_literal instruction requires a 'Builtin.Int<n>' type", ())
 ERROR(sil_integer_literal_not_well_formed,none,
