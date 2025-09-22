@@ -1422,6 +1422,8 @@ public:
   void visitCopyBlockWithoutEscapingInst(CopyBlockWithoutEscapingInst *i) {
     llvm_unreachable("not valid in canonical SIL");
   }
+  void visitImplicitActorToOpaqueIsolationCastInst(
+      ImplicitActorToOpaqueIsolationCastInst *i);
   void visitStrongRetainInst(StrongRetainInst *i);
   void visitStrongReleaseInst(StrongReleaseInst *i);
   void visitIsUniqueInst(IsUniqueInst *i);
@@ -6150,6 +6152,17 @@ void IRGenSILFunction::visitCopyBlockInst(CopyBlockInst *i) {
   llvm::Value *copied = emitBlockCopyCall(lowered.claimNext());
   Explosion result;
   result.add(copied);
+  setLoweredExplosion(i, result);
+}
+
+void IRGenSILFunction::visitImplicitActorToOpaqueIsolationCastInst(
+    ImplicitActorToOpaqueIsolationCastInst *i) {
+  auto lowered = getLoweredExplosion(i->getOperand());
+  Explosion result;
+  result.add(Builder.CreateBitOrPointerCast(lowered.claimNext(), IGM.IntPtrTy));
+  result.add(Builder.CreateBitOrPointerCast(
+      clearImplicitIsolatedActorBits(*this, lowered.claimNext()),
+      IGM.IntPtrTy));
   setLoweredExplosion(i, result);
 }
 

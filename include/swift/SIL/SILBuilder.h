@@ -2341,6 +2341,12 @@ public:
     return createUncheckedOwnershipConversion(Loc, Operand, Kind);
   }
 
+  ImplicitActorToOpaqueIsolationCastInst *
+  createImplicitActorToOpaqueIsolationCast(SILLocation Loc, SILValue Value) {
+    return insert(new (getModule()) ImplicitActorToOpaqueIsolationCastInst(
+        getSILDebugLocation(Loc), Value));
+  }
+
   FixLifetimeInst *createFixLifetime(SILLocation Loc, SILValue Operand) {
     return insert(new (getModule())
                       FixLifetimeInst(getSILDebugLocation(Loc), Operand));

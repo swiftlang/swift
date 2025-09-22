@@ -2371,6 +2371,16 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         addValueRef(operand));
     break;
   }
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst: {
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    auto operand =
+        cast<ImplicitActorToOpaqueIsolationCastInst>(&SI)->getOperand();
+    SILOneOperandLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), 0 /*attr*/,
+        S.addTypeRef(operand->getType().getRawASTType()),
+        (unsigned)operand->getType().getCategory(), addValueRef(operand));
+    break;
+  }
 
   case SILInstructionKind::BeginUnpairedAccessInst: {
     unsigned abbrCode = SILAbbrCodes[SILTwoOperandsExtraAttributeLayout::Code];
