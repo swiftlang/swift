@@ -643,7 +643,10 @@ private extension MovableInstructions {
 
   /// Hoist and sink scoped instructions.
   mutating func hoistWithSinkScopedInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
-    guard !loop.hasNoExitBlocks else {
+    // Since we don't sink scoped instructions to dead exit blocks, we need to check there's
+    // at least one exit block to which we can sink end instructions. Otherwise we could end up
+    // with partially hoisted scoped instruction that could lead to e.g. value overconsumption.
+    guard !loop.hasNoExitBlocks, loop.exitBlocks.contains(where: { !context.deadEndBlocks.isDeadEnd($0) }) else {
       return false
     }
     
