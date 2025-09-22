@@ -5267,7 +5267,7 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
   return result;
 }
 
-static const llvm::StringMap<std::vector<int>> STLConditionalEscapableParams{
+static const llvm::StringMap<std::vector<int>> STLConditionalParams{
     {"basic_string", {0}},
     {"vector", {0}},
     {"array", {0}},
@@ -5343,10 +5343,10 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
       return CxxEscapability::Escapable;
     auto injectedStlAnnotation =
         recordDecl->isInStdNamespace()
-            ? STLConditionalEscapableParams.find(recordDecl->getName())
-            : STLConditionalEscapableParams.end();
+            ? STLConditionalParams.find(recordDecl->getName())
+            : STLConditionalParams.end();
     bool hasInjectedSTLAnnotation =
-        injectedStlAnnotation != STLConditionalEscapableParams.end();
+        injectedStlAnnotation != STLConditionalParams.end();
     auto conditionalParams = getConditionalEscapableAttrParams(recordDecl);
     if (!conditionalParams.empty() || hasInjectedSTLAnnotation) {
       auto specDecl = cast<clang::ClassTemplateSpecializationDecl>(recordDecl);
@@ -7987,10 +7987,27 @@ getRefParentDecls(const clang::RecordDecl *decl, ASTContext &ctx,
 }
 
 llvm::SmallVector<ValueDecl *, 1>
-importer::getValueDeclsForName(
-    const clang::Decl *decl, ASTContext &ctx, StringRef name) {
+importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
+  // If the name is empty, don't try to find any decls.
+  if (name.empty())
+    return {};
+
+  auto &ctx = decl->getASTContext();
+  auto clangDecl = decl->getClangDecl();
   llvm::SmallVector<ValueDecl *, 1> results;
-  auto *clangMod = decl->getOwningModule();
+
+  if (name.starts_with(".")) {
+    // Look for a member of decl instead of a global.
+    StringRef memberName = name.drop_front(1);
+    if (memberName.empty())
+      return {};
+    auto declName = DeclName(ctx.getIdentifier(memberName));
+    auto allResults = evaluateOrDefault(
+        ctx.evaluator, ClangRecordMemberLookup({decl, declName}), {});
+    return SmallVector<ValueDecl *, 1>(allResults.begin(), allResults.end());
+  }
+
+  auto *clangMod = clangDecl->getOwningModule();
   if (clangMod && clangMod->isSubModule())
     clangMod = clangMod->getTopLevelModule();
   if (clangMod) {
@@ -8299,6 +8316,7 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
                             CxxValueSemanticsDescriptor desc) const {
 
   const auto *type = desc.type;
+  auto *importerImpl = desc.importerImpl;
 
   auto desugared = type->getUnqualifiedDesugaredType();
   const auto *recordType = desugared->getAs<clang::RecordType>();
@@ -8310,7 +8328,7 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
   // When a reference type is copied, the pointer’s value is copied rather than
   // the object’s storage. This means reference types can be imported as
   // copyable to Swift, even when they are non-copyable in C++.
-  if (recordHasReferenceSemantics(recordDecl, desc.importerImpl))
+  if (recordHasReferenceSemantics(recordDecl, importerImpl))
     return CxxValueSemanticsKind::Copyable;
 
   if (recordDecl->isInStdNamespace()) {
@@ -8319,10 +8337,40 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
     if (recordDecl->getIdentifier() &&
         recordDecl->getName() == "_Optional_construct_base")
       return CxxValueSemanticsKind::Copyable;
+
+    auto injectedStlAnnotation =
+        STLConditionalParams.find(recordDecl->getName());
+
+    if (injectedStlAnnotation != STLConditionalParams.end()) {
+      auto specDecl = cast<clang::ClassTemplateSpecializationDecl>(recordDecl);
+      auto &argList = specDecl->getTemplateArgs();
+      for (auto argToCheck : injectedStlAnnotation->second) {
+        auto arg = argList[argToCheck];
+        llvm::SmallVector<clang::TemplateArgument, 1> nonPackArgs;
+        if (arg.getKind() == clang::TemplateArgument::Pack) {
+          auto pack = arg.getPackAsArray();
+          nonPackArgs.assign(pack.begin(), pack.end());
+        } else
+          nonPackArgs.push_back(arg);
+        for (auto nonPackArg : nonPackArgs) {
+
+          auto argValueSemantics = evaluateOrDefault(
+              evaluator,
+              CxxValueSemantics(
+                  {nonPackArg.getAsType()->getUnqualifiedDesugaredType(),
+                   desc.importerImpl}),
+              {});
+          if (argValueSemantics != CxxValueSemanticsKind::Copyable)
+            return argValueSemantics;
+        }
+      }
+
+      return CxxValueSemanticsKind::Copyable;
+    }
   }
 
   const auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
-  if (!cxxRecordDecl) {
+  if (!cxxRecordDecl || !cxxRecordDecl->isCompleteDefinition()) {
     if (hasNonCopyableAttr(recordDecl))
       return CxxValueSemanticsKind::MoveOnly;
     return CxxValueSemanticsKind::Copyable;
@@ -8555,7 +8603,7 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
     return {CustomRefCountingOperationResult::immortal, nullptr, name};
 
   llvm::SmallVector<ValueDecl *, 1> results =
-      getValueDeclsForName(swiftDecl->getClangDecl(), ctx, name);
+      getValueDeclsForName(const_cast<ClassDecl*>(swiftDecl), name);
   if (results.size() == 1)
     return {CustomRefCountingOperationResult::foundOperation, results.front(),
             name};

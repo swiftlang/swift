@@ -12,4 +12,13 @@ inline SetOfCInt initSetOfCInt() { return {1, 5, 3}; }
 inline UnorderedSetOfCInt initUnorderedSetOfCInt() { return {2, 4, 6}; }
 inline MultisetOfCInt initMultisetOfCInt() { return {2, 2, 4, 6}; }
 
+struct NonCopyable {
+  NonCopyable() = default;
+  NonCopyable(const NonCopyable &other) = delete;
+  NonCopyable(NonCopyable &&other) = default;
+  ~NonCopyable() {}
+};
+
+using SetOfNonCopyable = std::set<NonCopyable>;
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SET_H

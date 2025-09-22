@@ -2788,6 +2788,7 @@ namespace {
 
       enum class RetainReleaseOperationKind {
         notAfunction,
+        notAnInstanceFunction,
         invalidReturnType,
         invalidParameters,
         valid
@@ -2801,17 +2802,32 @@ namespace {
         if (!operationFn)
           return RetainReleaseOperationKind::notAfunction;
 
-        if (operationFn->getParameters()->size() != 1)
-          return RetainReleaseOperationKind::invalidParameters;
+        if (operationFn->isStatic())
+          return RetainReleaseOperationKind::notAnInstanceFunction;
 
-        Type paramType =
-            operationFn->getParameters()->get(0)->getInterfaceType();
-        // Unwrap if paramType is an OptionalType
-        if (Type optionalType = paramType->getOptionalObjectType()) {
-          paramType = optionalType;
+        if (operationFn->isInstanceMember()) {
+          if (operationFn->getParameters()->size() != 0)
+            return RetainReleaseOperationKind::invalidParameters;
+        } else {
+          if (operationFn->getParameters()->size() != 1)
+            return RetainReleaseOperationKind::invalidParameters;
         }
 
-        swift::NominalTypeDecl *paramDecl = paramType->getAnyNominal();
+        Type paramType;
+        NominalTypeDecl *paramDecl = nullptr;
+        if (!operationFn->isInstanceMember()) {
+          paramType =
+              operationFn->getParameters()->get(0)->getInterfaceType();
+          // Unwrap if paramType is an OptionalType
+          if (Type optionalType = paramType->getOptionalObjectType()) {
+            paramType = optionalType;
+          }
+
+          paramDecl = paramType->getAnyNominal();
+        } else {
+          paramDecl = cast<NominalTypeDecl>(operationFn->getParent());
+          paramType = paramDecl->getDeclaredInterfaceType();
+        }
 
         // The return type should be void (for release functions), or void
         // or the parameter type (for retain functions).
@@ -2896,6 +2912,12 @@ namespace {
               diag::foreign_reference_types_retain_release_not_a_function_decl,
               false, retainOperation.name);
           break;
+        case RetainReleaseOperationKind::notAnInstanceFunction:
+          Impl.diagnose(
+              loc,
+              diag::foreign_reference_types_retain_release_not_an_instance_function,
+              false, retainOperation.name);
+          break;
         case RetainReleaseOperationKind::invalidReturnType:
           Impl.diagnose(
               loc,
@@ -2959,6 +2981,12 @@ namespace {
           Impl.diagnose(
               loc,
               diag::foreign_reference_types_retain_release_not_a_function_decl,
+              true, releaseOperation.name);
+          break;
+        case RetainReleaseOperationKind::notAnInstanceFunction:
+          Impl.diagnose(
+              loc,
+              diag::foreign_reference_types_retain_release_not_an_instance_function,
               true, releaseOperation.name);
           break;
         case RetainReleaseOperationKind::invalidReturnType:
@@ -3242,26 +3270,12 @@ namespace {
 
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
-      bool isPair = decl->getSpecializedTemplate()->isInStdNamespace() &&
-                    decl->getSpecializedTemplate()->getName() == "pair";
-
-      // Before we go any further, check if we've already got tens of thousands
-      // of specializations. If so, it means we're likely instantiating a very
-      // deep/complex template, or we've run into an infinite loop. In either
-      // case, its not worth the compile time, so bail.
-      // TODO: this could be configurable at some point.
-      size_t specializationLimit = !isPair ? 1000 : 10000;
-      if (size_t(
-              llvm::size(decl->getSpecializedTemplate()->specializations())) >
-          specializationLimit) {
-        // Note: it would be nice to import a dummy unavailable struct,
-        // but we would then need to instantiate the template here,
-        // as we cannot import a struct without a definition. That would
-        // defeat the purpose. Also, we can't make the dummy
-        // struct simply unavailable, as that still makes the
-        // typelias that references it available.
+      // Importing std::conditional substantially increases compile times when
+      // building with libstdc++, i.e. on most Linux distros.
+      if (decl->isInStdNamespace() && decl->getIdentifier() &&
+          (decl->getName() == "conditional" || decl->getName() == "__or_" ||
+           decl->getName() == "_Expr"))
         return nullptr;
-      }
 
       // `decl->getDefinition()` can return nullptr before the call to sema and
       // return its definition afterwards.
