@@ -212,6 +212,20 @@ bb1:
   br bb1
 }
 
+// CHECK-LABEL: sil [ossa] @test_inject_guaranteed : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: inject_guaranteed %4 : $Klass onto %0 : $Klass
+// CHECK: } // end sil function 'test_inject_guaranteed'
+sil [ossa] @test_inject_guaranteed : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = unchecked_bitwise_cast %0 : $Klass to $Builtin.Word
+  %2 = integer_literal $Builtin.Word, -7
+  %3 = builtin "and_Word"(%1 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  %4 = unchecked_bitwise_cast %3 : $Builtin.Word to $Klass
+  %5 = inject_guaranteed %4 : $Klass onto %0 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @test_mark_dependence : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 // CHECK: [[MD1:%.*]] = mark_dependence %1 : $Builtin.NativeObject on %0 : $Builtin.NativeObject
 // CHECK: [[MD2:%.*]] = mark_dependence [nonescaping] [[MD1]] : $Builtin.NativeObject on %0 : $Builtin.NativeObject
@@ -389,4 +403,3 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   %9999 = tuple ()
   return %9999 : $()
 }
-

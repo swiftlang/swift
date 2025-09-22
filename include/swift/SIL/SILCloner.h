@@ -3141,6 +3141,22 @@ void SILCloner<ImplClass>::visitUncheckedOwnershipConversionInst(
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitInjectGuaranteedInst(
+    InjectGuaranteedInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+
+  // Without ownership, just pass through our .none value.
+  if (!getBuilder().hasOwnership()) {
+    return recordFoldedValue(Inst, getOpValue(Inst->getValue()));
+  }
+
+  recordClonedInstruction(Inst, getBuilder().createInjectGuaranteedInst(
+                                    getOpLocation(Inst->getLoc()),
+                                    getOpValue(Inst->getValue()),
+                                    getOpValue(Inst->getGuaranteedBase())));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitMarkDependenceInst(MarkDependenceInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(

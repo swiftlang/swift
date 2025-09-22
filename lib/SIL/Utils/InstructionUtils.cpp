@@ -624,6 +624,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::FunctionExtractIsolationInst:
   case SILInstructionKind::TypeValueInst:
   case SILInstructionKind::IgnoredUseInst:
+  case SILInstructionKind::InjectGuaranteedInst:
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::LoadInst: {

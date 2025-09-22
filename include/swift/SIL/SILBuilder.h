@@ -2352,6 +2352,20 @@ public:
     return createUncheckedOwnershipConversion(Loc, Operand, Kind);
   }
 
+  InjectGuaranteedInst *createInjectGuaranteedInst(SILLocation Loc,
+                                                   SILValue Value,
+                                                   SILValue GuaranteedBase) {
+    return insert(new (getModule()) InjectGuaranteedInst(
+        getSILDebugLocation(Loc), Value, GuaranteedBase));
+  }
+
+  SILValue emitInjectGuaranteed(SILLocation Loc, SILValue Value,
+                                SILValue GuaranteedBase) {
+    if (!hasOwnership())
+      return Value;
+    return createInjectGuaranteedInst(Loc, Value, GuaranteedBase);
+  }
+
   FixLifetimeInst *createFixLifetime(SILLocation Loc, SILValue Operand) {
     return insert(new (getModule())
                       FixLifetimeInst(getSILDebugLocation(Loc), Operand));

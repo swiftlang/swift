@@ -3600,6 +3600,39 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::InjectGuaranteedInst: {
+    SourceLoc UnownedLoc;
+    SourceLoc GuaranteedBaseLoc;
+    SILValue UnownedValue;
+    SILValue GuaranteedBaseValue;
+
+    if (parseTypedValueRef(UnownedValue, UnownedLoc, B) ||
+        parseVerbatim("onto") ||
+        parseTypedValueRef(GuaranteedBaseValue, GuaranteedBaseLoc, B) ||
+        parseSILDebugLocation(InstLoc, B)) {
+      return true;
+    }
+
+    if (!UnownedValue->getOwnershipKind().isCompatibleWith(
+            OwnershipKind::Unowned)) {
+      P.diagnose(UnownedLoc, diag::sil_operand_has_wrong_ownership_kind,
+                 UnownedValue->getOwnershipKind().asString(),
+                 OwnershipKind(OwnershipKind::Unowned).asString());
+      return true;
+    }
+
+    if (GuaranteedBaseValue->getOwnershipKind() != OwnershipKind::Guaranteed) {
+      P.diagnose(GuaranteedBaseLoc, diag::sil_operand_has_wrong_ownership_kind,
+                 GuaranteedBaseValue->getOwnershipKind().asString(),
+                 OwnershipKind(OwnershipKind::Guaranteed).asString());
+      return true;
+    }
+
+    ResultVal = B.createInjectGuaranteedInst(InstLoc, UnownedValue,
+                                             GuaranteedBaseValue);
+    break;
+  }
+
   case SILInstructionKind::MoveValueInst: {
     bool allowsDiagnostics = false;
     auto isLexical = IsNotLexical;

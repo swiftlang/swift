@@ -730,6 +730,16 @@ OperandOwnership OperandOwnershipClassifier::visitTupleAddrConstructorInst(
   return OperandOwnership::TrivialUse;
 }
 
+OperandOwnership OperandOwnershipClassifier::visitInjectGuaranteedInst(
+    InjectGuaranteedInst *igi) {
+  if (getOperandIndex() == InjectGuaranteedInst::Value) {
+    return OperandOwnership::PointerEscape;
+  }
+
+  // We always perform guaranteed forwarding of the base value.
+  return OperandOwnership::GuaranteedForwarding;
+}
+
 //===----------------------------------------------------------------------===//
 //                            Builtin Use Checker
 //===----------------------------------------------------------------------===//

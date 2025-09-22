@@ -2843,6 +2843,24 @@ public:
             "converting ownership does not affect the type");
   }
 
+  void checkInjectGuaranteedInst(InjectGuaranteedInst *igi) {
+    require(
+        F.hasOwnership(),
+        "Inst with qualified ownership in a function that is not qualified");
+    require(igi->getValue()->getType() == igi->getType(),
+            "inject_guaranteed's type should match its none value");
+    require(igi->getValue()->getOwnershipKind().isCompatibleWith(
+                OwnershipKind::Unowned),
+            "inject_guaranteed's value should be compatible with unowned "
+            "ownership");
+    require(igi->getGuaranteedBase()->getOwnershipKind() ==
+                OwnershipKind::Guaranteed,
+            "inject_guaranteed's base value should have guaranteed ownership");
+    require(
+        igi->getOwnershipKind() == OwnershipKind::Guaranteed,
+        "inject_guaranteed's result value should have guaranteed ownership");
+  }
+
   template <class AI>
   void checkAccessEnforcement(AI *AccessInst) {
     if (AccessInst->getModule().getStage() != SILStage::Raw) {

@@ -1422,6 +1422,9 @@ public:
   void visitCopyBlockWithoutEscapingInst(CopyBlockWithoutEscapingInst *i) {
     llvm_unreachable("not valid in canonical SIL");
   }
+  void visitInjectGuaranteedInst(InjectGuaranteedInst *i) {
+    llvm_unreachable("invalid in Lowered SIL");
+  }
   void visitStrongRetainInst(StrongRetainInst *i);
   void visitStrongReleaseInst(StrongReleaseInst *i);
   void visitIsUniqueInst(IsUniqueInst *i);

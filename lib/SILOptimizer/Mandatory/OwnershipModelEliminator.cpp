@@ -195,6 +195,10 @@ struct OwnershipModelEliminatorVisitor
     eraseInstructionAndRAUW(uoci, uoci->getOperand());
     return true;
   }
+  bool visitInjectGuaranteedInst(InjectGuaranteedInst *inst) {
+    eraseInstructionAndRAUW(inst, inst->getValue());
+    return true;
+  }
   bool visitUnmanagedRetainValueInst(UnmanagedRetainValueInst *urvi);
   bool visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *urvi);
   bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *uavi);

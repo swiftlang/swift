@@ -939,6 +939,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
   case SILInstructionKind::IgnoredUseInst:
+  case SILInstructionKind::InjectGuaranteedInst:
     return InlineCost::Free;
 
   // Typed GEPs are free.

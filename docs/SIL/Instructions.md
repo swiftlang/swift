@@ -4555,6 +4555,48 @@ copy.
 The resulting value must meet the usual ownership requirements; for
 example, a trivial type must have '.none' ownership.
 
+NOTE: A guaranteed result value is assumed to be a non-dependent guaranteed
+value like a function argument. To inject a non-Trivial unowned value into a
+dependent guaranteed value's scope, please use `inject_guaranteed`_ instead.
+
+### inject_guaranteed
+
+```
+sil-instruction ::= 'inject_guaranteed' sil-operand 'onto' sil-operand
+
+%2 = inject_guaranteed %0 : $A onto %1 : $B
+// %0 must have unowned or none ownership
+// %1 must have .guaranteed ownership
+// %2 will have type $A
+```
+
+Given a non-Trivial unowned or none value `%0` of type `$A` and a guaranteed
+non-Trivial value `%1`, return a new guaranteed value `%2` of type `$A` that is
+viewed as being part of `%1`'s scope.
+
+The intended usage of this instruction is to enable the compiler to perform
+operations like removing the tagged pointer bits of a class pointer by
+converting the pointer to an integer, masking the bits, converting the masked
+pointer back to its original type and then bind the new value to the original
+value without forcing the new value to have its own end_borrow. E.x.:
+
+```
+bb0(%0 : @guaranteed $Class):
+  %1 = unchecked_value_cast %0 : $Class to $Builtin.Word
+  %2 = integer_literal $Builtin.Word, -7
+  %3 = buildin "and_Word"(%1, %2)
+  // %4 has none ownership
+  %4 = unchecked_value_cast %3 : $Builtin.Word to $Class
+  %5 = inject_guaranteed %4 : $Class onto %0 : $Class
+  // Use %5. %5 does not need an end_borrow since it is considered
+  // to be part of %0's borrow scope.
+```
+
+We are flexible and accept as our value unowned or none since we can get one of
+those two values depending on the specific ossa compatible cast that is used.
+
+Only available in Ownership SSA.
+
 ### ref_to_raw_pointer
 
 ```

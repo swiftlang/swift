@@ -494,3 +494,31 @@ bb0(%0 : @guaranteed $Klass):
   %9999 = tuple ()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @inject_guaranteed_test : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: inject_guaranteed %4 : $Klass onto %0 : $Klass
+// CHECK: } // end sil function 'inject_guaranteed_test'
+sil [ossa] @inject_guaranteed_test : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = unchecked_value_cast %0 : $Klass to $Builtin.Word
+  %2 = integer_literal $Builtin.Word, -7
+  %3 = builtin "and_Word"(%1 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  %4 = unchecked_value_cast %3 : $Builtin.Word to $Klass
+  %5 = inject_guaranteed %4 : $Klass onto %0 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @inject_guaranteed_test2 : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: inject_guaranteed %4 : $Klass onto %0 : $Klass
+// CHECK: } // end sil function 'inject_guaranteed_test2'
+sil [ossa] @inject_guaranteed_test2 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = unchecked_bitwise_cast %0 : $Klass to $Builtin.Word
+  %2 = integer_literal $Builtin.Word, -7
+  %3 = builtin "and_Word"(%1 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  %4 = unchecked_bitwise_cast %3 : $Builtin.Word to $Klass
+  %5 = inject_guaranteed %4 : $Klass onto %0 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}

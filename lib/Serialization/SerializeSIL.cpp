@@ -2356,6 +2356,19 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         addValueRef(operand));
     break;
   }
+  case SILInstructionKind::InjectGuaranteedInst: {
+    unsigned abbrCode = SILAbbrCodes[SILTwoOperandsLayout::Code];
+    auto *i = cast<InjectGuaranteedInst>(&SI);
+    SILTwoOperandsLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), /*attr*/ 0,
+        S.addTypeRef(i->getValue()->getType().getRawASTType()),
+        (unsigned)i->getValue()->getType().getCategory(),
+        addValueRef(i->getValue()),
+        S.addTypeRef(i->getGuaranteedBase()->getType().getRawASTType()),
+        (unsigned)i->getGuaranteedBase()->getType().getCategory(),
+        addValueRef(i->getGuaranteedBase()));
+    break;
+  }
 
   case SILInstructionKind::BeginUnpairedAccessInst: {
     unsigned abbrCode = SILAbbrCodes[SILTwoOperandsExtraAttributeLayout::Code];
