@@ -694,10 +694,11 @@ public:
     if (!printOptions.shouldPrint(nominal))
       return;
 
-    /// is this nominal specifically an 'actor'?
-    bool actorClass = false;
-    if (auto klass = dyn_cast<ClassDecl>(nominal))
-      actorClass = klass->isActor();
+    /// is this nominal specifically an 'actor' or 'distributed actor'?
+    bool anyActorClass = false;
+    if (auto klass = dyn_cast<ClassDecl>(nominal)) {
+      anyActorClass = klass->isAnyActor();
+    }
 
     SmallPtrSet<ProtocolDecl *, 16> handledProtocols;
 
@@ -732,9 +733,11 @@ public:
         // There is a special restriction on the Actor protocol in that
         // it is only valid to conform to Actor on an 'actor' decl,
         // not extensions of that 'actor'.
-        if (actorClass &&
-            inherited->isSpecificProtocol(KnownProtocolKind::Actor))
-          return TypeWalker::Action::SkipNode;
+        if (anyActorClass) {
+          if (inherited->isSpecificProtocol(KnownProtocolKind::Actor) ||
+              inherited->isSpecificProtocol(KnownProtocolKind::DistributedActor))
+            return TypeWalker::Action::SkipNode;
+        }
 
         // Do not synthesize an extension to print a conformance to an
         // invertible protocol, as their conformances are always re-inferred
