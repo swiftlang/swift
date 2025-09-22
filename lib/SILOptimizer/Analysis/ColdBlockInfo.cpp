@@ -246,6 +246,17 @@ bool ColdBlockInfo::inferFromEdgeProfile(SILBasicBlock *BB) {
   TermInst::ConstSuccessorListTy succs = BB->getSuccessors();
   ASSERT(succCount.size() == succs.size());
 
+  // Handle the case where the block was instrumented but never executed
+  // This aligns with LLVM's handling of zero-count blocks
+  if (totalCount.getValue() < 1) {
+    // Conservative approach: we can't infer probabilities without execution data
+    // Skip this block and let other heuristics handle it
+    LLVM_DEBUG(llvm::dbgs()
+               << "ColdBlockInfo: skipping inference for " << toString(BB)
+               << " - block has zero execution count (never executed)\n");
+    return false;
+  }
+
   // Record temperatures.
   for (size_t i = 0; i < succs.size(); i++) {
     double takenProbability =

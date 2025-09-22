@@ -1,0 +1,75 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-inline | %FileCheck %s
+// Test that we handle blocks with zero execution counts gracefully
+// This reproduces the division by zero bug in ColdBlockInfo::inferFromEdgeProfile
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil @test_zero_count_block
+sil @test_zero_count_block : $@convention(thin) () -> () !function_entry_count(100) {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  // Both branches have zero counts - the block was instrumented but never executed
+  // This should not crash with division by zero
+  cond_br %0, bb1, bb2, !true_count(0), !false_count(0)
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_partial_zero_count
+sil @test_partial_zero_count : $@convention(thin) () -> () !function_entry_count(100) {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  // One branch has zero, one has non-zero - should handle gracefully
+  cond_br %0, bb1, bb2, !true_count(0), !false_count(50)
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Function to inline into the test functions
+sil @callee : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 42
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  return %1 : $Int32
+}
+
+// CHECK-LABEL: sil @test_inline_with_zero_count
+sil @test_inline_with_zero_count : $@convention(thin) () -> Int32 !function_entry_count(100) {
+bb0:
+  %0 = function_ref @callee : $@convention(thin) () -> Int32
+  %1 = integer_literal $Builtin.Int1, 0
+  // This block has zero execution count but contains a call
+  // The inliner should not crash when analyzing this
+  cond_br %1, bb1, bb2, !true_count(0), !false_count(100)
+
+bb1:
+  // This path never executes
+  %r1 = apply %0() : $@convention(thin) () -> Int32
+  br bb3(%r1 : $Int32)
+
+bb2:
+  %r2 = apply %0() : $@convention(thin) () -> Int32
+  br bb3(%r2 : $Int32)
+
+bb3(%result : $Int32):
+  return %result : $Int32
+}
