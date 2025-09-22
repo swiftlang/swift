@@ -27,8 +27,7 @@ using namespace swift;
 /// Strategy for handling blocks with zero execution counts in profile data
 enum class ZeroCountStrategy {
   Conservative,  // Skip inference, let other heuristics decide (safe default)
-  Optimistic,    // Assume zero-count blocks are cold
-  Aggressive     // Assume zero-count blocks are warm
+  Optimistic     // Assume zero-count blocks are cold
 };
 
 static llvm::cl::opt<ZeroCountStrategy> ZeroCountHandling(
@@ -38,9 +37,7 @@ static llvm::cl::opt<ZeroCountStrategy> ZeroCountHandling(
         clEnumValN(ZeroCountStrategy::Conservative, "conservative",
                    "Skip inference for zero-count blocks (default)"),
         clEnumValN(ZeroCountStrategy::Optimistic, "optimistic",
-                   "Assume zero-count blocks are cold"),
-        clEnumValN(ZeroCountStrategy::Aggressive, "aggressive",
-                   "Assume zero-count blocks are warm")));
+                   "Assume zero-count blocks are cold")));
 
 bool isColdEnergy(ColdBlockInfo::Energy e);
 
@@ -285,15 +282,6 @@ bool ColdBlockInfo::inferFromEdgeProfile(SILBasicBlock *BB) {
       LLVM_DEBUG(llvm::dbgs() << "optimistic (marking all successors as cold)\n");
       for (auto const &succ : succs) {
         set(succ, ColdBlockInfo::State::Cold);
-      }
-      return true;
-
-    case ZeroCountStrategy::Aggressive:
-      // Aggressive approach: assume zero-count blocks are warm
-      // This might be useful when profile data is incomplete or unrepresentative
-      LLVM_DEBUG(llvm::dbgs() << "aggressive (marking all successors as warm)\n");
-      for (auto const &succ : succs) {
-        set(succ, ColdBlockInfo::State::Warm);
       }
       return true;
     }

@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -performance-inline | %FileCheck %s --check-prefix=CHECK-CONSERVATIVE
 // RUN: %target-sil-opt -enable-sil-verify-all %s -performance-inline -sil-zero-count-strategy=optimistic | %FileCheck %s --check-prefix=CHECK-OPTIMISTIC
-// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-inline -sil-zero-count-strategy=aggressive | %FileCheck %s --check-prefix=CHECK-AGGRESSIVE
 // Test that we handle blocks with zero execution counts gracefully with different strategies
 // This reproduces the division by zero bug in ColdBlockInfo::inferFromEdgeProfile
 
@@ -11,7 +10,6 @@ import Swift
 
 // CHECK-CONSERVATIVE-LABEL: sil @test_zero_count_block
 // CHECK-OPTIMISTIC-LABEL: sil @test_zero_count_block
-// CHECK-AGGRESSIVE-LABEL: sil @test_zero_count_block
 sil @test_zero_count_block : $@convention(thin) () -> () !function_entry_count(100) {
 bb0:
   %0 = integer_literal $Builtin.Int1, 0
@@ -19,7 +17,6 @@ bb0:
   // This should not crash with division by zero, and behavior depends on strategy:
   // - Conservative: skips inference, lets other heuristics decide
   // - Optimistic: marks successors as cold (never executed = cold)
-  // - Aggressive: marks successors as warm (useful for incomplete profile data)
   cond_br %0, bb1, bb2, !true_count(0), !false_count(0)
 
 bb1:
@@ -35,7 +32,6 @@ bb3:
 
 // CHECK-CONSERVATIVE-LABEL: sil @test_partial_zero_count
 // CHECK-OPTIMISTIC-LABEL: sil @test_partial_zero_count
-// CHECK-AGGRESSIVE-LABEL: sil @test_partial_zero_count
 sil @test_partial_zero_count : $@convention(thin) () -> () !function_entry_count(100) {
 bb0:
   %0 = integer_literal $Builtin.Int1, 0
@@ -63,7 +59,6 @@ bb0:
 
 // CHECK-CONSERVATIVE-LABEL: sil @test_inline_with_zero_count
 // CHECK-OPTIMISTIC-LABEL: sil @test_inline_with_zero_count
-// CHECK-AGGRESSIVE-LABEL: sil @test_inline_with_zero_count
 sil @test_inline_with_zero_count : $@convention(thin) () -> Int32 !function_entry_count(100) {
 bb0:
   %0 = function_ref @callee : $@convention(thin) () -> Int32
