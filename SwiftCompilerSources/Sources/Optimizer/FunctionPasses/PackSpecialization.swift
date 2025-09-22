@@ -166,10 +166,8 @@ private struct PackExplodedFunction {
 
       let argumentMap = explodePackArguments(from: original, to: opt, specContext)
 
-      for bb in opt.blocks {
-        if bb.isReachableExitBlock {
-          insertArgumentPackDeallocations(in: bb, argumentMap: argumentMap, specContext)
-        }
+      for bb in opt.blocks where bb.isReachableExitBlock {
+        insertArgumentPackDeallocations(in: bb, argumentMap: argumentMap, specContext)
       }
     }
 
