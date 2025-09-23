@@ -153,3 +153,14 @@ suite.test("deinitialize buffer")
     expectTrue(false)
   }
 }
+
+private func send(_: borrowing some Sendable & ~Copyable & ~Escapable) {}
+
+suite.test("OutputRawSpan Sendability")
+.require(.stdlib_6_2).code {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 1, alignment: 2)
+  defer { buffer.deallocate() }
+
+  let span = OutputRawSpan(buffer: buffer, initializedCount: 0)
+  send(span)
+}
