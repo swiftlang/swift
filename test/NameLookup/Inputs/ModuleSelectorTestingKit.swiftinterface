@@ -40,3 +40,8 @@ public struct available {
 public struct MyBuilder {
   public static func buildBlock()
 }
+
+public protocol ComparableIdentifiable {
+  associatedtype ID: Comparable
+  var id: ID { get }
+}
