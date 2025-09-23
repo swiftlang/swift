@@ -103,7 +103,7 @@ protected:
       std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-      bool skipBuildingInterface, bool isTestableDependencyLookup,
+      bool isCanImportLookup, bool isTestableDependencyLookup,
       bool &isFramework, bool &isSystemModule);
 
   /// Attempts to search the provided directory for a loadable serialized
@@ -125,8 +125,8 @@ protected:
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool SkipBuildingInterface, bool IsFramework,
-      bool isTestableDependencyLookup = false) = 0;
+      bool IsCanImportLookup, bool IsFramework,
+      bool IsTestableDependencyLookup = false) = 0;
 
   std::error_code
   openModuleFile(
@@ -154,7 +154,8 @@ protected:
   virtual bool maybeDiagnoseTargetMismatch(
       SourceLoc sourceLocation,
       StringRef moduleName,
-      const SerializedModuleBaseName &BaseName) {
+      const SerializedModuleBaseName &BaseName,
+      bool isCanImportLookup) {
     return false;
   }
 
@@ -278,13 +279,14 @@ class ImplicitSerializedModuleLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool SkipBuildingInterface, bool IsFramework,
-      bool isTestableDependencyLookup = false) override;
+      bool IsCanImportLookup, bool IsFramework,
+      bool IsTestableDependencyLookup = false) override;
 
   bool maybeDiagnoseTargetMismatch(
       SourceLoc sourceLocation,
       StringRef moduleName,
-      const SerializedModuleBaseName &BaseName) override;
+      const SerializedModuleBaseName &BaseName,
+      bool isCanImportLookup) override;
 
 public:
   virtual ~ImplicitSerializedModuleLoader();
@@ -336,13 +338,8 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool SkipBuildingInterface, bool IsFramework,
+      bool IsCanImportLookup, bool IsFramework,
       bool IsTestableDependencyLookup = false) override;
-
-  bool maybeDiagnoseTargetMismatch(
-      SourceLoc sourceLocation,
-      StringRef moduleName,
-      const SerializedModuleBaseName &BaseName) override;
 
   bool BypassResilience;
 public:

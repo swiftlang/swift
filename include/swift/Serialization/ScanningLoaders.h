@@ -63,7 +63,7 @@ private:
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool SkipBuildingInterface, bool IsFramework,
+      bool IsCanImportLookup, bool IsFramework,
       bool IsTestableDependencyLookup) override;
 
   bool canImportModule(ImportPath::Module named, SourceLoc loc,

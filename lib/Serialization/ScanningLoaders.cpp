@@ -46,7 +46,7 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool IsFramework,
+    bool IsCanImportLookup, bool IsFramework,
     bool isTestableDependencyLookup) {
   using namespace llvm::sys;
 
