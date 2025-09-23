@@ -3767,7 +3767,6 @@ ImportDecl *swift::createImportDecl(ASTContext &Ctx,
     ID->getAttrs().add(
         new (Ctx) AccessControlAttr(SourceLoc(), SourceRange(),
                                     AccessLevel::Internal, /*implicit=*/true));
-    ID->getAttrs().add(new (Ctx) ImplementationOnlyAttr(/*IsImplicit=*/true));
   } else if (IsExported) {
     ID->getAttrs().add(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
   }
