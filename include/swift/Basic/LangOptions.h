@@ -1054,6 +1054,10 @@ namespace swift {
     /// The bridging header PCH file.
     std::string BridgingHeaderPCH;
 
+    /// Whether the bridging header and PCH file are considered to be
+    /// internal imports.
+    bool BridgingHeaderIsInternal = false;
+
     /// When automatically generating a precompiled header from the bridging
     /// header, place it in this directory.
     std::string PrecompiledHeaderOutputDir;
