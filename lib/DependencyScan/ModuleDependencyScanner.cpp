@@ -1456,7 +1456,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
 
   // A scanning task to query a Swift module by-name. If the module already
   // exists in the cache, do nothing and return.
-  auto scanForSwiftDependency = [this, &cache, &lookupResultLock,
+  auto scanForSwiftDependency = [this, &moduleID, &cache, &lookupResultLock,
                                  &swiftOverlayLookupResult](
                                     Identifier moduleIdentifier) {
     auto moduleName = moduleIdentifier.str();
@@ -1466,6 +1466,13 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
           cache.hasDependency(moduleName, ModuleDependencyKind::SwiftBinary))
         return;
     }
+
+    // Avoid Swift overlay lookup for the underlying clang module of a known
+    // Swift module. i.e. When computing set of Swift Overlay dependencies
+    // for module 'A', which depends on a Clang module 'A', ensure we don't
+    // lookup Swift module 'A' itself here.
+    if (moduleName == moduleID.ModuleName)
+      return;
 
     auto moduleDependencies = withDependencyScanningWorker(
         [moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
