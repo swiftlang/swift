@@ -885,3 +885,14 @@ struct Twople<T> {
 func throwTypedValue(_ e: Err) throws(Err) { throw e }
 
 struct Err : Error {}
+
+// CHECK-LABEL: sil{{.*}} [ossa] @copy_expr_generic : {{.*}} {
+// CHECK:       bb0([[E:%[^,]+]] : @guaranteed $T
+// CHECK:         [[E_COPY:%[^,]+]] = explicit_copy_value [[E]]
+// CHECK:         apply {{.*}}<T>([[E_COPY]])
+// CHECK-LABEL: } // end sil function 'copy_expr_generic'
+@_silgen_name("copy_expr_generic")
+func copy_expr_generic<T>(_ t: T)  {
+  eat_generic(copy t)
+}
+func eat_generic<T>(_ t: consuming T) {}

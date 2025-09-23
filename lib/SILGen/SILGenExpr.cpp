@@ -7323,7 +7323,7 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
     return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
   }
 
-  if (subType.isLoadable(SGF.F)) {
+  if (subType.isLoadable(SGF.F) || !SGF.silConv.useLoweredAddresses()) {
     ManagedValue mv =
       SGF.emitRValue(subExpr, SGFContext::AllowImmediatePlusZero)
          .getAsSingleValue(SGF, subExpr);
