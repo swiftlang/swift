@@ -767,6 +767,9 @@ extension Builder {
     if value.type.isTrivial(in: value.parentFunction) {
       return
     }
+    if value.type.isAddress {
+      return
+    }
     if value.parentFunction.hasOwnership {
       createDestroyValue(operand: value)
     } else if value.type.isClass {
