@@ -43,25 +43,17 @@ extension String {
 
 // ObjC interfaces.
 extension _AbstractStringStorage {
+  
   @inline(__always)
   @_effects(releasenone)
   internal func _getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>, _ aRange: _SwiftNSRange
   ) {
-    _precondition(aRange.location >= 0 && aRange.length >= 0,
-                  "Range out of bounds")
-    // Note: `count` is counting UTF-8 code units, while `aRange` is measured in
-    // UTF-16 offsets. This precondition is a necessary, but not sufficient test
-    // for validity. (More precise checks are done in UTF16View._nativeCopy.)
-    _precondition(aRange.location + aRange.length <= Int(count),
-                  "Range out of bounds")
-
     let range = unsafe Range(
       _uncheckedBounds: (aRange.location, aRange.location+aRange.length))
-    let str = asString
-    unsafe str._copyUTF16CodeUnits(
+    unsafe utf16._nativeCopy(
       into: UnsafeMutableBufferPointer(start: buffer, count: range.count),
-      range: range)
+      offsetRange: range)
   }
 
   @inline(__always)
@@ -114,6 +106,26 @@ extension _AbstractStringStorage {
       fallthrough
     default:
       return _cocoaLengthOfBytesInEncodingTrampoline(self, encoding)
+    }
+  }
+  
+  // The caller info isn't useful here anyway because it's never client code,
+  // so this makes sure that _character(at:) doesn't have inlined assertion bits
+  @inline(never)
+  internal func _characterAtIndexOutOfBounds() -> Never {
+    _preconditionFailure("String index is out of bounds")
+  }
+  
+  @inline(__always)
+  @_effects(readonly)
+  internal func _character(at offset: Int) -> UInt16 {
+    if _fastPath(isASCII) {
+      if (_fastPath(offset < count && offset >= 0)) {
+        return unsafe UInt16((start + offset).pointee)
+      }
+      _characterAtIndexOutOfBounds()
+    } else {
+      return utf16[nativeNonASCIIOffset: offset]
     }
   }
 
@@ -176,7 +188,7 @@ extension _AbstractStringStorage {
           start: utf16Ptr,
           count: otherUTF16Length
         )
-        return unsafe asString.utf16.elementsEqual(utf16Buffer) ? 1 : 0
+        return unsafe utf16.elementsEqual(utf16Buffer) ? 1 : 0
       }
 
       /*
@@ -197,7 +209,7 @@ extension __StringStorage {
       if isASCII {
         return count
       }
-      return asString.utf16.count
+      return utf16.count
     }
   }
 
@@ -214,8 +226,7 @@ extension __StringStorage {
   @objc(characterAtIndex:)
   @_effects(readonly)
   final internal func character(at offset: Int) -> UInt16 {
-    let str = asString
-    return str.utf16[str._toUTF16Index(offset)]
+    _character(at: offset)
   }
 
   @objc(getCharacters:range:)
@@ -313,7 +324,7 @@ extension __SharedStringStorage {
       if isASCII {
         return count
       }
-      return asString.utf16.count
+      return utf16.count
     }
   }
 
@@ -330,8 +341,7 @@ extension __SharedStringStorage {
   @objc(characterAtIndex:)
   @_effects(readonly)
   final internal func character(at offset: Int) -> UInt16 {
-    let str = asString
-    return str.utf16[str._toUTF16Index(offset)]
+    _character(at: offset)
   }
 
   @objc(getCharacters:range:)
