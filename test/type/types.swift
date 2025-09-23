@@ -234,3 +234,19 @@ let closureTypeWithTrailingCommas: (
   bar: String,
   quux: String,
 )
+
+let _ = Array<(
+  foo: Int,
+  bar: String,
+)>()
+
+let _ = Dictionary<
+  String,
+  Dictionary<
+    String,
+    Array<(
+      foo: Int,
+      bar: String,
+    )>,
+  >,
+>()
