@@ -356,7 +356,7 @@ def import_objc_header : Separate<["-"], "import-objc-header">,
 
 def internal_import_bridging_header : Separate<["-"], "internal-import-bridging-header">,
   Flags<[FrontendOption, ArgumentIsPath]>,
-  HelpText<"Imports an C header file as an internal import">;
+  HelpText<"Implicitly imports a C header file as an internal import">;
 
 def import_pch : Separate<["-"], "import-pch">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
