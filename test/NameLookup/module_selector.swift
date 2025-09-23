@@ -428,3 +428,15 @@ func concurrencyModuleLookups(
   // expected-error@-1 {{'withTaskCancellationHandler' is not imported through module 'ModuleSelectorTestingKit'}}
   // expected-note@-2 {{did you mean module 'Swift'?}} {{9-33=Swift}}
 }
+
+func dependentTypeLookup<T, U, V, W, X>(_: T, _: U, _: V, _: W, _: X) where
+  T: Identifiable, T: ComparableIdentifiable, T.ID == Int,
+  U: Identifiable, U: ComparableIdentifiable, U.Swift::ID == Int,
+  // expected-error@-1 {{module selector is not allowed on generic member type; associated types with the same name are merged instead of shadowing one another}} {{49-56=}}
+  V: Identifiable, V: ComparableIdentifiable, V.ModuleSelectorTestingKit::ID == Int,
+  // expected-error@-1 {{module selector is not allowed on generic member type; associated types with the same name are merged instead of shadowing one another}} {{49-75=}}
+  W: Identifiable, W: ComparableIdentifiable, W.ctypes::ID == Int,
+  // expected-error@-1 {{module selector is not allowed on generic member type; associated types with the same name are merged instead of shadowing one another}} {{49-57=}}
+  X: Identifiable, X: ComparableIdentifiable, X.NonexistentModule::ID == Int
+  // expected-error@-1 {{module selector is not allowed on generic member type; associated types with the same name are merged instead of shadowing one another}} {{49-68=}}
+{}
