@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift
+// REQUIRES: rdar160135085
 
 struct K<U> {} // expected-note 6{{'U' declared as parameter to type 'K'}}
 protocol Q {}

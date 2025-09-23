@@ -268,9 +268,7 @@ public:
     auto substTy = TypeAliasType::get(
         aliasTy->getDecl(), transform(aliasTy->getParent()), genericArgs,
         transform(aliasTy->getSinglyDesugaredType()));
-    openGenericTypeRequirements(substTy->getDecl(),
-                                substTy->getSubstitutionMap());
-    return substTy;
+    return substTy->getSinglyDesugaredType();
   }
 
   Type transformErrorType(ErrorType *errTy) {
