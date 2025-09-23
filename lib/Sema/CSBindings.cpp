@@ -2174,13 +2174,8 @@ void PotentialBindings::reset() {
   AssociatedCodeCompletionToken = ASTNode();
 }
 
-void PotentialBindings::dump(ConstraintSystem &cs,
-                             TypeVariableType *typeVar,
-                             llvm::raw_ostream &out,
-                             unsigned indent) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
-
+void PotentialBindings::dump(ConstraintSystem &cs, TypeVariableType *typeVar,
+                             llvm::raw_ostream &out, unsigned indent) const {
   out << "Potential bindings for ";
   typeVar->getImpl().print(out);
   out << "\n";
@@ -2202,16 +2197,17 @@ void PotentialBindings::dump(ConstraintSystem &cs,
                [](auto lhs, auto rhs) {
                    return lhs.first->getID() < rhs.first->getID();
                });
-    interleave(adjacentVars,
-               [&](std::pair<TypeVariableType *, Constraint *> pair) {
-                 out << pair.first->getString(PO);
-                 if (pair.first->getImpl().getFixedType(/*record=*/nullptr))
-                   out << " (fixed)";
-                 out << " via ";
-                 pair.second->print(out, &cs.getASTContext().SourceMgr, indent,
-                                    /*skipLocator=*/true);
-               },
-               [&out]() { out << ", "; });
+    interleave(
+        adjacentVars,
+        [&](std::pair<TypeVariableType *, Constraint *> pair) {
+          out << pair.first->getString(PrintOptions::forDebugging());
+          if (pair.first->getImpl().getFixedType(/*record=*/nullptr))
+            out << " (fixed)";
+          out << " via ";
+          pair.second->print(out, &cs.getASTContext().SourceMgr, indent,
+                             /*skipLocator=*/true);
+        },
+        [&out]() { out << ", "; });
     out << "] ";
   }
 }
@@ -2295,8 +2291,7 @@ static std::string getCollectionLiteralAsString(KnownProtocolKind KPK) {
 }
 
 void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
 
   if (auto typeVar = getTypeVariable()) {
     typeVar->getImpl().print(out);
@@ -2991,8 +2986,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
   if (result.isFailure()) {
     if (cs.isDebugMode()) {
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
+      PrintOptions PO = PrintOptions::forDebugging();
 
       llvm::errs().indent(cs.solverState->getCurrentIndent())
           << "(failed to establish binding " << TypeVar->getString(PO)

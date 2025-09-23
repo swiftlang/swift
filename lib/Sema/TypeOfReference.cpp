@@ -3118,8 +3118,7 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
   bindOverloadType(overload, boundType, locator, useDC);
 
   if (isDebugMode()) {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
+    PrintOptions PO = PrintOptions::forDebugging();
 
     auto &log = llvm::errs();
     log.indent(solverState ? solverState->getCurrentIndent() : 2);

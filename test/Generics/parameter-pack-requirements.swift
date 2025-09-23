@@ -117,7 +117,7 @@ protocol PP {
 struct G<each T> {}
 
 // CHECK-LABEL: sameTypeMatch1
-// CHECK-NEXT: <T, each U, each V where T : PP, repeat each U : PP, repeat each V : PP, T.[PP]A == G<repeat (each U).[PP]A>, repeat (each U).[PP]A == (each V).[PP]A>
+// CHECK-NEXT: <T, each U, each V where T : PP, repeat each U : PP, repeat each V : PP, T.[PP]A == G<Pack{repeat (each U).[PP]A}>, repeat (each U).[PP]A == (each V).[PP]A>
 func sameTypeMatch1<T: PP, each U: PP, each V: PP>(t: T, u: repeat each U, v: repeat each V)
   where T.A == G<repeat (each U).A>, T.A == G<repeat (each V).A>,
         (repeat (each U, each V)) : Any {}

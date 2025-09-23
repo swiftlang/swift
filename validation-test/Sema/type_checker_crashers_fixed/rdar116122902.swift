@@ -14,9 +14,9 @@ struct Test {
 
   mutating func test<T>(v: Value<T>) {
     _ = {
-      // FIXME(diagnostics): We need to figure out how to avoid mentioning <<error type>> in the second diagnostic
+      // FIXME(diagnostics): This isn't a useful error message
       self.tuple = (v, 42)
-      // expected-error@-1 {{generic struct 'Value' requires the types 'T' and '<<error type>>' be equivalent}}
+      // expected-error@-1 {{generic struct 'Value' requires the types 'T' and '_' be equivalent}}
       return 0
     }
   }
