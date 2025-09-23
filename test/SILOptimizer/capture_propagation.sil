@@ -803,7 +803,7 @@ struct S {
 }
 
 // CHECK-LABEL: sil [ossa] @testStruct :
-// CHECK:         [[C]] = function_ref @$s17closureWithStruct4main1SVs5Int32VSbTf3npSSi3Si0_n : $@convention(thin) (Str) -> Builtin.Int32
+// CHECK:         [[C:%.*]] = function_ref @$s17closureWithStruct4main1SVs5Int32VSbTf3npSSi3Si0_n : $@convention(thin) (Str) -> Builtin.Int32
 // CHECK:         thin_to_thick_function [[C]] : $@convention(thin) (Str) -> Builtin.Int32 to $@callee_guaranteed (Str) -> Builtin.Int32
 // CHECK:       } // end sil function 'testStruct'
 sil [ossa] @testStruct : $@convention(thin) () -> () {
@@ -843,3 +843,35 @@ bb0(%0 : $Str, %1 : $S):
 }
 
 sil @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+
+struct NonTrivialStruct {
+    var x: AnyObject
+}
+
+sil_global [serialized] @gNonTrivialStruct : $NonTrivialStruct
+
+// CHECK-LABEL: sil [ossa] @test_global_addr :
+// CHECK:         [[C:%.*]] = function_ref @$s19global_addr_closure17gNonTrivialStructTf3pg_n : $@convention(thin) () -> ()
+// CHECK:         thin_to_thick_function %2 : $@convention(thin) () -> () to $@callee_owned () -> ()
+// CHECK:       } // end sil function 'test_global_addr'
+sil [ossa] @test_global_addr : $@convention(thin) () -> () {
+  %3 = global_addr @gNonTrivialStruct : $*NonTrivialStruct
+  %7 = function_ref @global_addr_closure : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %8 = partial_apply %7<NonTrivialStruct>(%3) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  destroy_value %8
+  %r = tuple()
+  return %r
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s19global_addr_closure17gNonTrivialStructTf3pg_n :
+// CHECK:       bb0:
+// CHECK-NEXT:    %0 = global_addr @gNonTrivialStruct : $*NonTrivialStruct
+// CHECK-NEXT:    %1 = tuple ()
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function '$s19global_addr_closure17gNonTrivialStructTf3pg_n'
+sil [ossa] @global_addr_closure : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %r = tuple()
+  return %r : $()
+}
+
