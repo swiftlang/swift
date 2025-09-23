@@ -135,6 +135,12 @@ public:
     }
 
     if (!getActorIsolation(nominal).isMainActor() && destructor->hasBody()) {
+      // In module emission jobs, type checking the body of the destructor may
+      // be skipped which means availability in the body cannot be diagnosed
+      // accurately.
+      if (destructor->isBodySkipped())
+        return;
+
       TypeChecker::checkAvailability(
           destructor->getBodySourceRange(), C.getIsolatedDeinitAvailability(),
           D->getDeclContext(),
