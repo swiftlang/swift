@@ -8,10 +8,10 @@
 @_cdecl("async") // expected-error{{@_cdecl global function cannot be asynchronous}}
 func asynchronous() async { }
 
-@cdecl("async2") // expected-error{{@cdecl global function cannot be asynchronous}}
+@cdecl(async2) // expected-error{{@cdecl global function cannot be asynchronous}}
 func asynchronous2() async { }
 
-@cdecl("asyncParam")
+@cdecl(asyncParam)
 func asynchronousParam(fn: (String) async -> Int) { }
 // expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
 // expected-note @-2 {{'async' function types cannot be represented in C}}
