@@ -213,7 +213,7 @@ func resyncParserB5() {}
 
 for var i = 0; ; {
   #^TOP_LEVEL_STMT_5?check=PLAIN_TOP_LEVEL;check=TOP_LEVEL_STMT_5^#
-// TOP_LEVEL_STMT_5: Decl[LocalVar]/Local: i[#<<error type>>#]{{; name=.+$}}
+// TOP_LEVEL_STMT_5: Decl[LocalVar]/Local: i[#_#]{{; name=.+$}}
 }
 
 func resyncParserB6() {}
@@ -234,7 +234,7 @@ func resyncParserB8() {}
 
 for i in unknown_var {
   #^TOP_LEVEL_STMT_8?check=PLAIN_TOP_LEVEL;check=TOP_LEVEL_STMT_8^#
-// TOP_LEVEL_STMT_8: Decl[LocalVar]/Local: i[#<<error type>>#]{{; name=.+$}}
+// TOP_LEVEL_STMT_8: Decl[LocalVar]/Local: i[#_#]{{; name=.+$}}
 }
 
 func resyncParserB9() {}

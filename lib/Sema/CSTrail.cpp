@@ -577,8 +577,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 void SolverTrail::Change::dump(llvm::raw_ostream &out,
                                ConstraintSystem &cs,
                                unsigned indent) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
 
   out.indent(indent);
 
@@ -887,8 +886,7 @@ void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
   llvm::set_subtract(removedConstraints, intersects);
 
   // Print out Changes.
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
   out.indent(indent);
   out << "(Changes:\n";
   if (!addedTypeVars.empty()) {

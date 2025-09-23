@@ -694,6 +694,13 @@ public:
     return result;
   }
 
+  /// Print options suitable for debug printing.
+  static PrintOptions forDebugging() {
+    PrintOptions result;
+    result.PrintTypesForDebugging = true;
+    return result;
+  }
+
   /// Retrieve the set of options suitable for diagnostics printing.
   static PrintOptions printForDiagnostics(AccessLevel accessFilter,
                                           bool printFullConvention) {

@@ -497,7 +497,7 @@ func testPropertyWrapper() {
 // CHECK27-NEXT:     foo9(1, 2)</Content>
 // CHECK27-NEXT: <Type>Void</Type>
 // CHECK27-NEXT: <Context>swift_ide_test.(file).foo9(_:_:)</Context>
-// CHECK27-NEXT: <Referenced>foo9</Referenced><Type>(Int, Int) -> Int</Type>
+// CHECK27-NEXT: <Referenced>foo9</Referenced><Type>(_ a: Int, _ b: Int) -> Int</Type>
 // CHECK27-NEXT: <ASTNodes>2</ASTNodes>
 // CHECK27-NEXT: <end>
 

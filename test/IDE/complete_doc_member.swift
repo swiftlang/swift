@@ -129,7 +129,7 @@ func testWithNoDot() {
 
 // MEMBER_NO_DOT:      Begin completions, 12 items
 
-// MEMBER_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#<<error type>>#]; name=[:];
+// MEMBER_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#_#]; name=[:];
 // MEMBER_NO_DOT-SAME: briefcomment=subscript on struct S;
 // MEMBER_NO_DOT-SAME: xmlcomment=<Other file="{{.*}}" line="44" column="3"><Name>subscript(_:)</Name><USR>s:15CompleteDocTest2S1VyXeXecip</USR><Declaration>subscript(index: Int) -&gt; &lt;&lt;error type&gt;&gt; { get }</Declaration><CommentParts><Abstract><Para>subscript on struct S</Para></Abstract><Parameters><Parameter><Name>index</Name><Direction isExplicit="0">in</Direction><Discussion><Para>an index into S1</Para></Discussion></Parameter></Parameters></CommentParts></Other>;
 // MEMBER_NO_DOT-SAME: rawcomment=subscript on struct S

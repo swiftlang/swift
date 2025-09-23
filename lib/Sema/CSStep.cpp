@@ -280,13 +280,11 @@ StepResult ComponentStep::take(bool prevFailed) {
     CS.collectDisjunctions(disjunctions);
     std::vector<std::string> overloadDisjunctions;
     for (const auto &disjunction : disjunctions) {
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
-
       auto constraints = disjunction->getNestedConstraints();
       if (constraints[0]->getKind() == ConstraintKind::BindOverload)
         overloadDisjunctions.push_back(
-            constraints[0]->getFirstType()->getString(PO));
+            constraints[0]->getFirstType()->getString(
+                PrintOptions::forDebugging()));
     }
 
     if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
@@ -357,14 +355,11 @@ StepResult ComponentStep::take(bool prevFailed) {
     // we can't solve this system unless we have free type variables
     // allowed in the solution.
     if (CS.isDebugMode()) {
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
-
       auto &log = getDebugLogger();
       log << "(failed due to free variables:";
       for (auto *typeVar : CS.getTypeVariables()) {
         if (!typeVar->getImpl().hasRepresentativeOrFixed()) {
-          log << " " << typeVar->getString(PO);
+          log << " " << typeVar->getString(PrintOptions::forDebugging());
         }
       }
       log << ")\n";

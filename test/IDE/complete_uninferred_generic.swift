@@ -14,5 +14,5 @@ struct S2<T> : P1 {
 _ = S2()#^UNINFERRED^#
 
 // UNINFERRED-DAG: Decl[Subscript]/Super:     [{#(v0): T#}][#Int#]; name=[:]
-// UNINFERRED-DAG: Decl[Subscript]/Super:     [{#(v0): T#}][#<<error type>>#]; name=[:]
+// UNINFERRED-DAG: Decl[Subscript]/Super:     [{#(v0): T#}][#_#]; name=[:]
 // UNINFERRED-DAG: Keyword[self]/CurrNominal: .self[#S2<_>#]; name=self

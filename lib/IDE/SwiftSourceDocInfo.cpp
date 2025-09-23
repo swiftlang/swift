@@ -70,7 +70,8 @@ void XMLEscapingPrinter::printXML(StringRef Text) {
   OS << Text;
 }
 
-void ResolvedRangeInfo::print(llvm::raw_ostream &OS) const {
+void ResolvedRangeInfo::print(llvm::raw_ostream &OS,
+                              const PrintOptions &PO) const {
   OS << "<Kind>";
   switch (Kind) {
   case RangeKind::SingleExpression: OS << "SingleExpression"; break;
@@ -87,7 +88,7 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) const {
 
   if (auto Ty = getType()) {
     OS << "<Type>";
-    Ty->print(OS);
+    Ty->print(OS, PO);
     OS << "</Type>";
     switch(exit()) {
     case ExitState::Positive: OS << "<Exit>true</Exit>"; break;
@@ -147,7 +148,7 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) const {
   for (auto &RD : ReferencedDecls) {
     OS << "<Referenced>" << RD.VD->getBaseName() << "</Referenced>";
     OS << "<Type>";
-    RD.Ty->print(OS);
+    RD.Ty->print(OS, PO);
     OS << "</Type>\n";
   }
 
