@@ -151,13 +151,22 @@ protected:
   /// to list the architectures that \e are present.
   ///
   /// \returns true if an error diagnostic was emitted
-  virtual bool maybeDiagnoseTargetMismatch(
+  virtual bool handlePossibleTargetMismatch(
       SourceLoc sourceLocation,
       StringRef moduleName,
-      const SerializedModuleBaseName &BaseName,
+      const SerializedModuleBaseName &baseName,
       bool isCanImportLookup) {
     return false;
   }
+
+  /// Assuming the \c baseName is a target-specific Swift module path,
+  /// for a missing target variant, collect all adjacent binary module
+  /// files to build a list of discovered modules for incompatible
+  /// architectures.
+  static void identifyArchitectureVariants(
+       ASTContext &Ctx,
+       const SerializedModuleBaseName &baseName,
+       std::vector<std::string> &incompatibleArchModules);
 
   /// Determines if the provided path is a cached artifact for dependency
   /// tracking purposes.
@@ -282,7 +291,7 @@ class ImplicitSerializedModuleLoader : public SerializedModuleLoaderBase {
       bool IsCanImportLookup, bool IsFramework,
       bool IsTestableDependencyLookup = false) override;
 
-  bool maybeDiagnoseTargetMismatch(
+  bool handlePossibleTargetMismatch(
       SourceLoc sourceLocation,
       StringRef moduleName,
       const SerializedModuleBaseName &BaseName,
