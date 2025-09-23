@@ -126,7 +126,12 @@ func test21057425() -> (Int, Int) {
 // rdar://problem/21081340
 func test21081340() {
   func foo() { }
+
+  // FIXME: The double diagnostic here is a little unfortunate but is a result of
+  // the fact that we essentially type-check the pattern twice, once on its own,
+  // and again as part of the initialization.
   let (x: a, y: b): () = foo() // expected-error{{tuple pattern has the wrong length for tuple type '()'}}
+  // expected-error@-1 {{pattern of type '(x: _, y: _)' cannot match '()'}}
 }
 
 // <rdar://problem/22322266> Swift let late initialization in top level control flow statements

@@ -576,6 +576,14 @@ def define_enabled_availability_domain : Separate<["-"], "define-enabled-availab
     HelpText<"Defines a custom availability domain that is available at compile time">,
     MetaVarName<"<domain>">;
 
+def define_always_enabled_availability_domain
+    : Separate<["-"], "define-always-enabled-availability-domain">,
+      Flags<[HelpHidden, FrontendOption, NoInteractiveOption,
+             ModuleInterfaceOptionIgnorable]>,
+      HelpText<"Defines a custom availability domain that is available for all "
+               "deployments">,
+      MetaVarName<"<domain>">;
+
 def define_disabled_availability_domain : Separate<["-"], "define-disabled-availability-domain">,
     Flags<[HelpHidden, FrontendOption, NoInteractiveOption, ModuleInterfaceOptionIgnorable]>,
     HelpText<"Defines a custom availability domain that is unavailable at compile time">,
@@ -882,7 +890,7 @@ def experimental_package_interface_load:
 def experimental_serialize_debug_info:
   Flag<["-"], "experimental-serialize-debug-info">,
   Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Enables seriailzation/deserialization of debug scopes">;
+  HelpText<"Enables serialization/deserialization of debug scopes">;
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
@@ -1163,7 +1171,7 @@ def ExperimentalPackageCMO : Flag<["-"], "experimental-package-cmo">,
 
 def PackageCMO : Flag<["-"], "package-cmo">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable optimization to perform defalut CMO within a package boundary">;
+  HelpText<"Enable optimization to perform default CMO within a package boundary">;
 
 def EnableDefaultCMO : Flag<["-"], "enable-default-cmo">,
   Flags<[HelpHidden, FrontendOption]>,
@@ -1779,6 +1787,19 @@ def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
   HelpText<"Emit a symbol graph to directory <dir>">,
   MetaVarName<"<dir>">;
 
+def symbol_graph_pretty_print: Flag<["-"], "symbol-graph-pretty-print">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden, SupplementaryOutput]>,
+  HelpText<"Pretty-print the output symbol graph JSON">;
+
+def symbol_graph_skip_inherited_docs: Flag<["-"], "symbol-graph-skip-inherited-docs">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden, SupplementaryOutput]>,
+  HelpText<"Skip emitting doc comments for members inherited through classes or "
+           "default implementations">;
+
+def symbol_graph_skip_synthesized_members: Flag<["-"], "symbol-graph-skip-synthesized-members">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden, SupplementaryOutput]>,
+  HelpText<"Skip members inherited through classes or default implementations">;
+
 def symbol_graph_minimum_access_level: Separate<["-"], "symbol-graph-minimum-access-level">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Include symbols with this access level or more when emitting a symbol graph">,
@@ -2107,6 +2128,13 @@ def emit_module_serialize_diagnostics_path:
            "<path>">,
   MetaVarName<"<path>">;
 
+def dependency_scan_serialize_diagnostics_path:
+  Separate<["-"], "dependency-scan-serialize-diagnostics-path">,
+  Flags<[ArgumentIsPath, SupplementaryOutput, NewDriverOnlyOption]>,
+  HelpText<"Emit a serialized diagnostics file for the dependency scanning task to "
+           "<path>">,
+  MetaVarName<"<path>">;
+
 def emit_module_dependencies_path:
   Separate<["-"], "emit-module-dependencies-path">,
   Flags<[ArgumentIsPath, SupplementaryOutput, NewDriverOnlyOption]>,
@@ -2294,7 +2322,7 @@ def load_resolved_plugin:
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Path to resolved plugin configuration and a comma-separated list "
            "of module names where the macro types are declared. Library path "
-           "and exectuable path can be empty if not used">,
+           "and executable path can be empty if not used">,
   MetaVarName<"<library-path>#<executable-path>#<module-names>">;
 
 def resolved_plugin_verification : Flag<["-"], "resolved-plugin-verification">,

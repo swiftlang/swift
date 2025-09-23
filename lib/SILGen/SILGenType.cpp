@@ -1171,6 +1171,8 @@ originalAccessorKindForReplacementKind(AccessorKind kind) {
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Init:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
     return std::nullopt;
   }
 }
@@ -1537,6 +1539,8 @@ public:
     auto initInfo = vd->getPropertyWrapperInitializerInfo();
     if (initInfo.hasInitFromWrappedValue() && !vd->isStatic()) {
       SGM.emitPropertyWrapperBackingInitializer(vd);
+      // Output this unconditionally, SIL optimizer will remove it if not needed
+      SGM.emitPropertyWrappedFieldInitAccessor(vd);
     }
 
     visitAbstractStorageDecl(vd);

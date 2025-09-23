@@ -368,6 +368,7 @@ Entities
   entity-spec ::= entity 'fa'                // runtime discoverable attribute generator
   entity-spec ::= 'fi'                       // non-local variable initializer
   entity-spec ::= 'fP'                       // property wrapper backing initializer
+  entity-spec ::= 'fF'                       // property wrapped field init accessor
   entity-spec ::= 'fW'                       // property wrapper init from projected value
   entity-spec ::= 'fD'                       // deallocating destructor; untyped
   entity-spec ::= 'fZ'                       // isolated deallocating destructor; untyped
@@ -400,6 +401,8 @@ Entities
   ACCESSOR ::= 'p'                           // pseudo accessor referring to the storage itself
   ACCESSOR ::= 'x'                           // modify
   ACCESSOR ::= 'y'                           // read
+  ACCESSOR ::= 'b'                           // borrow
+  ACCESSOR ::= 'z'                           // mutate
 
   ADDRESSOR-KIND ::= 'u'                     // unsafe addressor (no owner)
   ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner), not used anymore
@@ -1373,6 +1376,7 @@ Some kinds need arguments, which precede ``Tf``.
   CONST-PROP ::= 'd' NATURAL-ZERO            // float-as-64-bit-integer
   CONST-PROP ::= 's' ENCODING                // string literal. Consumes one identifier argument.
   CONST-PROP ::= 'k'                         // keypath. Consumes one identifier - the SHA1 of the keypath and two types (root and value).
+  CONST-PROP ::= 'S' CONST-PROP*             // struct with operands. Consumes one type argument - the struct type.
 
   ENCODING ::= 'b'                           // utf8
   ENCODING ::= 'w'                           // utf16

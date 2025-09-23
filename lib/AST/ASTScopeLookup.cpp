@@ -378,10 +378,10 @@ bool CaseLabelItemScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
 }
 
 bool CaseStmtBodyScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  for (auto *var : stmt->getCaseBodyVariablesOrEmptyArray())
+  for (auto *var : stmt->getCaseBodyVariables()) {
     if (consumer.consume({var}))
-        return true;
-
+      return true;
+  }
   return false;
 }
 

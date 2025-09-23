@@ -53,6 +53,9 @@ struct RequirementError {
     RecursiveRequirement,
     /// A not-yet-supported same-element requirement, e.g. each T == Int.
     UnsupportedSameElement,
+    /// A not-yet-supported same-type requirement involving packs and concrete
+    /// types, e.g. (repeat each T) == (Int, repeat each U).
+    UnsupportedPackSameType,
     /// An unexpected value type used in a value generic,
     /// e.g. 'let N: String'.
     InvalidValueGenericType,
@@ -160,6 +163,10 @@ public:
 
   static RequirementError forSameElement(Requirement req, SourceLoc loc) {
     return {Kind::UnsupportedSameElement, req, loc};
+  }
+
+  static RequirementError forPackSameType(Requirement req, SourceLoc loc) {
+    return {Kind::UnsupportedPackSameType, req, loc};
   }
 
   static RequirementError forInvalidValueGenericType(Type subjectType,

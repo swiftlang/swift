@@ -661,6 +661,7 @@ namespace {
       case SILDeclRef::Kind::EnumElement:
       case SILDeclRef::Kind::GlobalAccessor:
       case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+      case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
       case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
       case SILDeclRef::Kind::EntryPoint:
       case SILDeclRef::Kind::AsyncEntryPoint:
@@ -934,6 +935,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
     case ResultConvention::Pack:
+    case ResultConvention::GuaranteedAddress:
+    case ResultConvention::Guaranteed:
       lifetimeExtendsSelf = false;
       break;
     }
@@ -1721,6 +1724,11 @@ void IRGenFunction::emitBlockRelease(llvm::Value *value) {
 
 void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
     ValueDecl *fn, llvm::Value *value, bool needsNullCheck) {
+  if (auto originalDecl = fn->getASTContext()
+                              .getClangModuleLoader()
+                              ->getOriginalForClonedMember(fn))
+    fn = originalDecl;
+
   assert(fn->getClangDecl() && isa<clang::FunctionDecl>(fn->getClangDecl()));
 
   auto clangFn = cast<clang::FunctionDecl>(fn->getClangDecl());

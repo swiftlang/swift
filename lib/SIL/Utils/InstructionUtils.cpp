@@ -439,21 +439,6 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
   return Arg;
 }
 
-bool swift::onlyUsedByAssignByWrapper(PartialApplyInst *PAI) {
-  bool usedByAssignByWrapper = false;
-  for (Operand *Op : PAI->getUses()) {
-    SILInstruction *User = Op->getUser();
-    if (isa<AssignByWrapperInst>(User) && Op->getOperandNumber() >= 2) {
-      usedByAssignByWrapper = true;
-      continue;
-    }
-    if (isa<DestroyValueInst>(User))
-      continue;
-    return false;
-  }
-  return usedByAssignByWrapper;
-}
-
 bool swift::onlyUsedByAssignOrInit(PartialApplyInst *PAI) {
   bool usedByAssignOrInit = false;
   for (Operand *Op : PAI->getUses()) {
@@ -567,7 +552,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
-  case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::BorrowedFromInst:
@@ -612,7 +596,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::AssignInst:
-  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::AssignOrInitInst:
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::EndLifetimeInst:
@@ -642,6 +625,14 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::TypeValueInst:
   case SILInstructionKind::IgnoredUseInst:
     return RuntimeEffect::NoEffect;
+
+  case SILInstructionKind::LoadInst: {
+    if (cast<LoadInst>(inst)->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+      return ifNonTrivial(inst->getOperand(0)->getType(),
+                          RuntimeEffect::RefCounting);
+    }
+    return RuntimeEffect::NoEffect;
+  }
       
   case SILInstructionKind::OpenExistentialMetatypeInst:
   case SILInstructionKind::OpenExistentialBoxInst:

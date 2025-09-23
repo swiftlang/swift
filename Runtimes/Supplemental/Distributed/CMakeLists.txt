@@ -9,13 +9,14 @@ if(POLICY CMP0157 AND CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
   cmake_policy(SET CMP0157 OLD)
 endif()
 
-if($ENV{BUILD_NUMBER})
-  math(EXPR BUILD_NUMBER "$ENV{BUILD_NUMBER} % 65535")
-  set(BUILD_NUMBER ".${BUILD_NUMBER}")
-endif()
+list(APPEND CMAKE_MODULE_PATH
+  "${CMAKE_SOURCE_DIR}/../cmake/modules"
+  "${CMAKE_SOURCE_DIR}/../../cmake/modules")
+
+include(SwiftProjectVersion)
 project(SwiftDistributed
   LANGUAGES C CXX Swift
-  VERSION 6.3.0${BUILD_NUMBER})
+  VERSION ${SWIFT_RUNTIME_VERSION})
 
 if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Distributed must build as a standalone project")
@@ -33,8 +34,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 
 set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake/modules")
 
 set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../../"
@@ -76,6 +75,7 @@ add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-strict-memory-safety>
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-swift-version 5>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NoncopyableGenerics2>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
@@ -87,6 +87,7 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
+  "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 

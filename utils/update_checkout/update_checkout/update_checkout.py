@@ -16,7 +16,7 @@ import re
 import sys
 import traceback
 from multiprocessing import Lock, Pool, cpu_count, freeze_support
-from typing import Optional
+from typing import Optional, Set, List, Any
 
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
@@ -68,8 +68,11 @@ def check_parallel_results(results, op):
         if r is not None:
             if fail_count == 0:
                 print("======%s FAILURES======" % op)
-            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
             fail_count += 1
+            if isinstance(r, str):
+                print(r)
+                continue
+            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
             if r.stderr:
                 print(r.stderr)
     return fail_count
@@ -337,6 +340,30 @@ def get_scheme_map(config, scheme_name):
 
     return None
 
+def _is_any_repository_locked(pool_args: List[Any]) -> Set[str]:
+    """Returns the set of locked repositories.
+
+    A repository is considered to be locked if its .git directory contains a
+    file ending in ".lock".
+
+    Args:
+        pool_args (List[Any]): List of arguments passed to the
+        `update_single_repository` function.
+
+    Returns:
+        Set[str]: The names of the locked repositories if any.
+    """
+
+    repos = [(x[0], x[2]) for x in pool_args]
+    locked_repositories = set()
+    for source_root, repo_name in repos:
+        dot_git_path = os.path.join(source_root, repo_name, ".git")
+        if not os.path.exists(dot_git_path) or not os.path.isdir(dot_git_path):
+            continue
+        for file in os.listdir(dot_git_path):
+            if file.endswith(".lock"):
+                locked_repositories.add(repo_name)
+    return locked_repositories
 
 def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_pr):
     pool_args = []
@@ -371,6 +398,12 @@ def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_p
                    cross_repos_pr]
         pool_args.append(my_args)
 
+    locked_repositories: set[str] = _is_any_repository_locked(pool_args)
+    if len(locked_repositories) > 0:
+        return [
+            f"'{repo_name}' is locked by git. Cannot update it."
+            for repo_name in locked_repositories
+        ]
     return run_parallel(update_single_repository, pool_args, args.n_processes)
 
 

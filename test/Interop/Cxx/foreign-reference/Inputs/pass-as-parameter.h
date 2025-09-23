@@ -14,3 +14,7 @@ inline int extractValueFromRefToPtr(IntBox *&b) { return b->value; }
 inline int extractValueFromRefToConstPtr(IntBox const *&b) { return b->value; }
 inline int extractValueFromConstRefToPtr(IntBox *const &b) { return b->value; }
 inline int extractValueFromConstRefToConstPtr(IntBox const *const &b) { return b->value; }
+
+inline void initializeByPtr(int value, IntBox **b) {
+  *b = IntBox::create(value);
+}

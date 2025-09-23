@@ -254,13 +254,6 @@ ERROR(cannot_apply_lvalue_binop_to_subelement,none,
 ERROR(cannot_apply_lvalue_binop_to_rvalue,none,
       "left side of mutating operator has immutable type %0", (Type))
 
-ERROR(cannot_subscript_base,none,
-      "cannot subscript a value of type %0",
-      (Type))
-
-ERROR(cannot_subscript_ambiguous_base,none,
-      "cannot subscript a value of incorrect or ambiguous type", ())
-
 ERROR(cannot_subscript_nil_literal,none,
       "cannot subscript a nil literal value", ())
 ERROR(conditional_cast_from_nil,none,
@@ -1590,6 +1583,9 @@ ERROR(missing_address_of,none,
 ERROR(missing_address_of_yield,none,
       "yielding mutable value of type %0 requires explicit '&'",
       (Type))
+ERROR(missing_address_of_return,none,
+      "returning mutable value from a mutate accessor requires explicit '&'",
+      ())
 ERROR(extraneous_address_of,none,
       "'&' may only be used to pass an argument to inout parameter",
       ())
@@ -2142,6 +2138,10 @@ ERROR(attr_static_exclusive_only_mutating,none,
 ERROR(attr_static_exclusive_no_setters,none,
       "variable of type %0 must not have a setter", (Type))
 
+// @_manualOwnership
+ERROR(attr_manual_ownership_experimental,none,
+      "'@_manualOwnership' requires '-enable-experimental-feature ManualOwnership'", ())
+
 // @extractConstantsFromMembers
 ERROR(attr_extractConstantsFromMembers_experimental,none,
       "'@extractConstantsFromMembers' requires "
@@ -2174,6 +2174,8 @@ ERROR(expose_only_non_other_attr,none,
 ERROR(expose_inside_unexposed_decl,none,
       "'@_expose' cannot be applied inside of unexposed declaration %0",
       (const ValueDecl *))
+ERROR(expose_redundant_name_provided, none,
+      "'@_expose(!Cxx)' does not accept a name argument", ())
 ERROR(expose_invalid_name_pattern_init,none,
       "invalid declaration name '%0' specified in '@_expose'; "
       "exposed initializer name must start with 'init'", (StringRef))
@@ -2231,9 +2233,6 @@ ERROR(attr_only_at_non_generic_scope, none,
       "attribute %0 cannot be used in a generic context", (DeclAttribute))
 ERROR(attr_only_on_static_properties, none,
       "properties with attribute %0 must be static", (DeclAttribute))
-
-ERROR(weak_unowned_in_embedded_swift, none,
-      "attribute %0 cannot be used in embedded Swift", (ReferenceOwnership))
 
 ERROR(access_control_in_protocol,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
@@ -3419,6 +3418,9 @@ ERROR(invalid_shape_requirement,none,
 ERROR(unsupported_same_element,none,
       "same-element requirements are not yet supported",
       ())
+ERROR(unsupported_pack_same_type,none,
+      "same-type requirements between packs and concrete types are not yet supported",
+      ())
 
 ERROR(requires_generic_params_made_equal,none,
       "same-type requirement makes generic parameters %0 and %1 equivalent",
@@ -3824,7 +3826,8 @@ ERROR(decl_from_hidden_module,none,
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances|"
-      "in a public or '@usableFromInline' conformance}1; "
+      "in a public or '@usableFromInline' conformance|"
+      "in an '@available' attribute here}1; "
       "%select{%2 has been imported as implementation-only|"
       "it is an SPI imported from %2|"
       "it is SPI|"
@@ -3839,7 +3842,8 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformance|"
-      "in a public or '@usableFromInline' conformance}3 "
+      "in a public or '@usableFromInline' conformance|"
+      "<<ERROR>>}3 "
       "because %select{%4 has been imported as implementation-only|"
       "it is an SPI imported from %4|"
       "<<ERROR>>|"
@@ -3853,7 +3857,7 @@ ERROR(conformance_from_implementation_only_module,none,
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances|"
-      "<<ERROR>>}2; "
+      "<<ERROR>>|<<ERROR>>}2; "
       "%select{%3 has been imported as implementation-only|"
       "the conformance is declared as SPI in %3|"
       "the conformance is declared as SPI|"
@@ -4859,10 +4863,6 @@ NOTE(descriptive_generic_type_declared_here,none,
 
 ERROR(placeholder_type_not_allowed,none,
       "type placeholder not allowed here", ())
-ERROR(placeholder_type_not_allowed_in_return_type,none,
-      "type placeholder may not appear in function return type", ())
-ERROR(placeholder_type_not_allowed_in_parameter,none,
-      "type placeholder may not appear in top-level parameter", ())
 ERROR(placeholder_type_not_allowed_in_pattern,none,
       "placeholder type may not appear as type of a variable", ())
 NOTE(replace_placeholder_with_inferred_type,none,
@@ -5552,6 +5552,10 @@ WARNING(no_throw_in_do_with_catch,none,
 
 ERROR(thrown_type_not_error,none,
       "thrown type %0 does not conform to the 'Error' protocol", (Type))
+
+ERROR(typed_throw_in_objc_forbidden,none,
+      "typed 'throws' %kindonly0 cannot be represented in Objective-C",
+      (const AbstractFunctionDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: Concurrency
@@ -6705,6 +6709,8 @@ ERROR(objc_addressor, none,
       "addressors are not allowed to be marked '@objc'", ())
 ERROR(objc_coroutine_accessor, none,
       "'read' and 'modify' accessors are not allowed to be marked '@objc'", ())
+ERROR(objc_borrow_mutate_accessor, none,
+      "borrow and mutate accessors are not allowed to be marked '@objc'", ())
 ERROR(objc_invalid_on_func_variadic,none,
       "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because it has a variadic "
       "parameter", (const AbstractFunctionDecl*, unsigned))
@@ -7849,6 +7855,10 @@ ERROR(atomics_ordering_must_be_constant, none,
 
 #define WHICH_ACCESS_NOTE(reason) "specified by access note for %" #reason
 
+WARNING(access_notes_file_io_error,none,
+        "ignored access notes file at '%0' because it cannot be read: %1",
+        (StringRef, StringRef))
+
 REMARK(attr_added_by_access_note, none,
        "implicitly added '%1' to this %kindonly2, as " WHICH_ACCESS_NOTE(0),
        (StringRef, StringRef, const ValueDecl *))
@@ -8594,6 +8604,30 @@ ERROR(inlinearray_literal_incorrect_count,none,
 
 ERROR(inline_array_type_backwards,none,
       "element count must precede inline array element type", ())
+
+//===----------------------------------------------------------------------===//
+// MARK: Embedded Swift
+//===----------------------------------------------------------------------===//
+
+GROUPED_ERROR(weak_unowned_in_embedded_swift, EmbeddedRestrictions, none,
+              "attribute %0 cannot be used in Embedded Swift",
+              (ReferenceOwnership))
+
+GROUPED_WARNING(untyped_throws_in_embedded_swift, EmbeddedRestrictions,
+                DefaultIgnore,
+                "untyped throws is not available in Embedded Swift; add a thrown error type with '(type)'", ())
+GROUPED_WARNING(generic_nonfinal_in_embedded_swift, EmbeddedRestrictions,
+                DefaultIgnore,
+                "generic %kind0 in a class %select{must be 'final'|cannot be 'required'}1 in Embedded Swift",
+                (const Decl *, bool))
+GROUPED_WARNING(use_generic_member_of_existential_in_embedded_swift,
+                EmbeddedRestrictions, DefaultIgnore,
+                "cannot use generic %kind0 on a value of type %1 in Embedded Swift",
+                (const Decl *, Type))
+GROUPED_WARNING(dynamic_cast_involving_protocol_in_embedded_swift,
+                EmbeddedRestrictions, DefaultIgnore,
+                "cannot perform a dynamic cast to a type involving %kind0 in Embedded Swift",
+                (const Decl *))
 
 //===----------------------------------------------------------------------===//
 // MARK: @abi Attribute

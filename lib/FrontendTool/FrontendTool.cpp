@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1604,8 +1604,12 @@ static bool generateReproducer(CompilerInstance &Instance,
     }
     auto map = llvm::json::parse(mapProxy->getData());
     if (!map) {
-      diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_corrupted,
-                     mapOpts);
+      llvm::handleAllErrors(
+          map.takeError(), [&diags, &mapOpts](const llvm::json::ParseError &E) {
+            diags.diagnose(SourceLoc(),
+                           diag::explicit_swift_module_map_corrupted, mapOpts,
+                           E.message());
+          });
       return true;
     }
     if (auto array = map->getAsArray()) {
@@ -2255,7 +2259,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                            const char *Argv0, void *MainAddr,
                            FrontendObserver *observer) {
   INITIALIZE_LLVM();
-  llvm::setBugReportMsg(SWIFT_CRASH_BUG_REPORT_MESSAGE "\n");
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   std::unique_ptr<CompilerInstance> Instance =

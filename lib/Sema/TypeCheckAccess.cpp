@@ -33,6 +33,7 @@
 #include "swift/Basic/Assertions.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/AST/Type.h"
 
 using namespace swift;
 
@@ -424,12 +425,10 @@ void AccessControlCheckerBase::checkTypeAccess(
 static void highlightOffendingType(InFlightDiagnostic &diag,
                                    const TypeRepr *complainRepr) {
   if (!complainRepr) {
-    diag.flush();
     return;
   }
 
   diag.highlight(complainRepr->getSourceRange());
-  diag.flush();
 
   if (auto *declRefTR = dyn_cast<DeclRefTypeRepr>(complainRepr)) {
     const ValueDecl *VD = declRefTR->getBoundDecl();
@@ -1947,6 +1946,15 @@ bool isFragileClangType(clang::QualType type) {
   // Builtin clang types are compatible with library evolution.
   if (underlyingTypePtr->isBuiltinType())
     return false;
+  if (const auto *ft = dyn_cast<clang::FunctionType>(underlyingTypePtr)) {
+    if (const auto *fpt =
+            dyn_cast<clang::FunctionProtoType>(underlyingTypePtr)) {
+      for (auto paramTy : fpt->getParamTypes())
+        if (isFragileClangType(paramTy))
+          return true;
+    }
+    return isFragileClangType(ft->getReturnType());
+  }
   // Pointers to non-fragile types are non-fragile.
   if (underlyingTypePtr->isPointerType())
     return isFragileClangType(underlyingTypePtr->getPointeeType());
@@ -2116,7 +2124,21 @@ swift::getDisallowedOriginKind(const Decl *decl,
           return DisallowedOriginKind::None;
         }
       }
+
+      // Allow SPI available use in an extension to an SPI available type.
+      // This is a narrow workaround for rdar://159292698 as this should be
+      // handled as part of the `where.isSPI()` above, but that context check
+      // is currently too permissive. It allows SPI use in SPI available which
+      // can break swiftinterfaces. The SPI availability logic likely need to be
+      // separated from normal SPI and treated more like availability.
+      auto ext = dyn_cast_or_null<ExtensionDecl>(where.getDeclContext());
+      if (ext) {
+        auto nominal = ext->getExtendedNominal();
+        if (nominal && nominal->isAvailableAsSPI())
+          return DisallowedOriginKind::None;
+      }
     }
+
     // SPI can only be exported in SPI.
     return where.getDeclContext()->getParentModule() == M ?
       DisallowedOriginKind::SPILocal :
@@ -2251,11 +2273,13 @@ public:
 
   void checkAvailabilityDomains(const Decl *D) {
     D = D->getAbstractSyntaxDeclForAttributes();
+
+    auto where = Where.withReason(ExportabilityReason::AvailableAttribute);
     for (auto attr : D->getSemanticAvailableAttrs()) {
       if (auto *domainDecl = attr.getDomain().getDecl()) {
         diagnoseDeclAvailability(domainDecl,
                                  attr.getParsedAttr()->getDomainLoc(), nullptr,
-                                 Where, std::nullopt);
+                                 where, std::nullopt);
       }
     }
   }
@@ -2547,18 +2571,6 @@ public:
             : ExportabilityReason::ExtensionWithConditionalConformances;
     checkConstrainedExtensionRequirements(ED, reason);
 
-    // Diagnose the exportability of the availability domains referenced by the
-    // @available attributes attached to the extension.
-    if (Where.isExported()) {
-      for (auto availableAttr : ED->getSemanticAvailableAttrs()) {
-        if (auto *domainDecl = availableAttr.getDomain().getDecl()) {
-          TypeChecker::diagnoseDeclRefExportability(
-              availableAttr.getParsedAttr()->getDomainLoc(), domainDecl,
-              Where.withReason(reason));
-        }
-      }
-    }
-
     // If we haven't already visited the extended nominal visit it here.
     // This logic is too wide but prevents false reports of an unused public
     // import. We should instead check for public generic requirements
@@ -2596,7 +2608,7 @@ public:
                     );
     if (refRange.isValid())
       diag.highlight(refRange);
-    diag.flush();
+
     PGD->diagnose(diag::name_declared_here, PGD->getName());
   }
 

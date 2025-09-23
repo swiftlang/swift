@@ -3583,20 +3583,19 @@ ProtocolRequirementsRequest::evaluate(Evaluator &evaluator,
   return PD->getASTContext().AllocateCopy(requirements);
 }
 
-NominalTypeDecl *
-ExtendedNominalRequest::evaluate(Evaluator &evaluator,
-                                 ExtensionDecl *ext,
-                                 bool excludeMacroExpansions) const {
-  auto typeRepr = ext->getExtendedTypeRepr();
+NominalTypeDecl *ExtensionDecl::computeExtendedNominal(
+    bool excludeMacroExpansions) const {
+  auto typeRepr = getExtendedTypeRepr();
   if (!typeRepr) {
     // We must've seen 'extension { ... }' during parsing.
     return nullptr;
   }
 
-  ASTContext &ctx = ext->getASTContext();
+  ASTContext &ctx = getASTContext();
+  auto &evaluator = ctx.evaluator;
   auto options = defaultDirectlyReferencedTypeLookupOptions;
 
-  if (ext->isInSpecializeExtensionContext()) {
+  if (isInSpecializeExtensionContext()) {
     options |= DirectlyReferencedTypeLookupFlags::AllowUsableFromInline;
   }
 
@@ -3605,7 +3604,7 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   }
 
   DirectlyReferencedTypeDecls referenced = directReferencesForTypeRepr(
-      evaluator, ctx, typeRepr, ext->getParent(), options);
+      evaluator, ctx, typeRepr, getParent(), options);
 
   // If there were no results, expand the lookup to include members that are
   // inaccessible due to missing imports. The missing imports will be diagnosed
@@ -3615,7 +3614,7 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
                               /*allowMigration=*/true)) {
     options |= DirectlyReferencedTypeLookupFlags::IgnoreMissingImports;
     referenced = directReferencesForTypeRepr(evaluator, ctx, typeRepr,
-                                             ext->getParent(), options);
+                                             getParent(), options);
   }
 
   // Resolve those type declarations to nominal type declarations.
@@ -3632,6 +3631,13 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
     return nullptr;
 
   return nominalTypes[0];
+}
+
+NominalTypeDecl *
+ExtendedNominalRequest::evaluate(Evaluator &evaluator,
+                                 const ExtensionDecl *ext) const {
+  ASSERT(ext->canNeverBeBound() && "Should have been bound by bindExtensions");
+  return ext->computeExtendedNominal();
 }
 
 /// Whether there are only associated types in the set of declarations.

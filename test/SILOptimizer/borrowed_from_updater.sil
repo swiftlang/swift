@@ -300,3 +300,47 @@ bb2(%5 : @guaranteed $C):
   return %0 : $C
 }
 
+class Klass {}
+
+public struct Wrapper {
+  @_hasStorage var _k: Klass { get set }
+  var k: Klass
+}
+
+public struct GenWrapper<T> {
+  @_hasStorage var _prop: T { get set }
+  public var prop: T
+}
+
+// CHECK-LABEL: sil [ossa] @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
+sil [ossa] @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
+bb0(%0 : @guaranteed $Wrapper):
+  %2 = struct_extract %0, #Wrapper._k
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrow_accessor :
+// CHECK: bb3([[PHI:%.*]] : @guaranteed $Klass):
+// CHECK: [[B:%.*]] = borrowed [[PHI]] : $Klass from (%1 : $Wrapper)
+// CHECK-LABEL: } // end sil function 'test_borrow_accessor'
+sil [ossa] @test_borrow_accessor : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %1 = begin_borrow %0
+  %2 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  br bb3(%3)
+
+bb2:
+  %5 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  br bb3(%5)
+
+bb3(%7 : @guaranteed $Klass):
+  end_borrow %1
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+

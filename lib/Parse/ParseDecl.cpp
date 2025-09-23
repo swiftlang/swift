@@ -877,7 +877,7 @@ bool Parser::parseSpecializeAttribute(
   assert(ClosingBrace == tok::r_paren || ClosingBrace == tok::r_square);
 
   SourceLoc lParenLoc;
-  if (Tok.is(tok::l_paren)) {
+  if (isAtAttributeLParen()) {
     lParenLoc = consumeAttributeLParen();
   } else {
     // SIL parsing is positioned at _specialize when entering this and parses
@@ -2261,7 +2261,7 @@ Parser::parseMacroRoleAttribute(
     break;
   }
 
-  if (!Tok.isFollowingLParen()) {
+  if (!isAtAttributeLParen()) {
     diagnose(Tok, diag::attr_expected_lparen, attrName, false);
     return makeParserError();
   }
@@ -2503,7 +2503,7 @@ static std::optional<Identifier> parseSingleAttrOptionImpl(
   };
   bool isDeclModifier = DeclAttribute::isDeclModifier(DK);
 
-  if (!P.Tok.isFollowingLParen()) {
+  if (!P.isAtAttributeLParen()) {
     if (allowOmitted)
       return Identifier();
 
@@ -2883,7 +2883,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       .Case("public", AccessLevel::Public)
       .Case("open", AccessLevel::Open);
 
-    if (!Tok.isFollowingLParen()) {
+    if (!isAtAttributeLParen()) {
       // Normal access control attribute.
       AttrRange = Loc;
 
@@ -3079,13 +3079,22 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
                  "Cxx");
         ParseSymbolName = false;
       };
+      bool isNegated = false;
+      if (Tok.is(tok::oper_prefix) && Tok.getText() == "!") {
+        isNegated = true;
+        consumeToken(tok::oper_prefix);
+      }
       if (Tok.isNot(tok::identifier)) {
         diagnoseExpectOption();
         return makeParserSuccess();
       }
       if (Tok.getText() == "Cxx") {
-        ExpKind = ExposureKind::Cxx;
+        ExpKind = isNegated ? ExposureKind::NotCxx : ExposureKind::Cxx;
       } else if (Tok.getText() == "wasm") {
+        if (isNegated) {
+          diagnoseExpectOption();
+          return makeParserSuccess();
+        }
         ExpKind = ExposureKind::Wasm;
       } else {
         diagnoseExpectOption();
@@ -3458,7 +3467,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
   case DeclAttrKind::PrivateImport: {
     // Parse the leading '('.
-    if (!Tok.isFollowingLParen()) {
+    if (!isAtAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
       return makeParserSuccess();
@@ -3507,7 +3516,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
   case DeclAttrKind::ObjC: {
     // Unnamed @objc attribute.
-    if (!Tok.isFollowingLParen()) {
+    if (!isAtAttributeLParen()) {
       auto attr = ObjCAttr::createUnnamed(Context, AtLoc, Loc);
       Attributes.add(attr);
       break;
@@ -3575,7 +3584,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DeclAttrKind::DynamicReplacement: {
     // Parse the leading '('.
-    if (!Tok.isFollowingLParen()) {
+    if (!isAtAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
       return makeParserSuccess();
@@ -3626,7 +3635,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DeclAttrKind::TypeEraser: {
     // Parse leading '('
-    if (!Tok.isFollowingLParen()) {
+    if (!isAtAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
       return makeParserSuccess();
@@ -3656,7 +3665,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DeclAttrKind::Specialize:
   case DeclAttrKind::Specialized: {
-    if (!Tok.isFollowingLParen()) {
+    if (!isAtAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
       return makeParserSuccess();
@@ -3885,7 +3894,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
   case DeclAttrKind::RawLayout: {
-    if (!Tok.isFollowingLParen()) {
+    if (!isAtAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
       return makeParserSuccess();
@@ -4155,27 +4164,11 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
   return false;
 }
 
-bool Parser::isCustomAttributeArgument() {
-  BacktrackingScope backtrack(*this);
-  if (skipSingle().hasCodeCompletion())
-    return true;
-
-  // If we have any keyword, identifier, or token that follows a function
-  // type's parameter list, this is a parameter list and not an attribute.
-  // Alternatively, we might have a token that illustrates we're not going to
-  // get anything following the attribute, which means the parentheses describe
-  // what follows the attribute.
-  return !Tok.isAny(
-      tok::arrow, tok::kw_throw, tok::kw_throws, tok::kw_rethrows,
-      tok::r_paren, tok::r_brace, tok::r_square, tok::r_angle) &&
-    !Tok.isContextualKeyword("async") && !Tok.isContextualKeyword("reasync") ;
-}
-
 bool Parser::canParseCustomAttribute() {
   if (!canParseType())
     return false;
 
-  if (Tok.isFollowingLParen() && isCustomAttributeArgument())
+  if (isAtAttributeLParen(/*isCustomAttribute=*/true))
     skipSingle();
 
   return true;
@@ -4187,7 +4180,7 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(SourceLoc atLoc) {
   // Parse a custom attribute.
   auto type = parseType(diag::expected_type, ParseTypeReason::CustomAttribute);
   if (type.hasCodeCompletion() || type.isNull()) {
-    if (Tok.isFollowingLParen() && isCustomAttributeArgument())
+    if (isAtAttributeLParen(/*isCustomAttribute=*/true))
       skipSingle();
 
     return ParserResult<CustomAttr>(ParserStatus(type));
@@ -4199,7 +4192,11 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(SourceLoc atLoc) {
   ParserStatus status;
   ArgumentList *argList = nullptr;
   CustomAttributeInitializer *initContext = nullptr;
-  if (Tok.isFollowingLParen() && isCustomAttributeArgument()) {
+  if (isAtAttributeLParen(/*isCustomAttribute=*/true)) {
+    if (getEndOfPreviousLoc() != Tok.getLoc()) {
+      diagnose(getEndOfPreviousLoc(), diag::attr_extra_whitespace_before_lparen)
+          .warnUntilSwiftVersion(6);
+    }
     // If we have no local context to parse the initial value into, create
     // one for the attribute.
     std::optional<ParseFunctionBody> initParser;
@@ -4207,10 +4204,6 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(SourceLoc atLoc) {
       assert(!initContext);
       initContext = CustomAttributeInitializer::create(CurDeclContext);
       initParser.emplace(*this, initContext);
-    }
-    if (getEndOfPreviousLoc() != Tok.getLoc()) {
-      diagnose(getEndOfPreviousLoc(), diag::attr_extra_whitespace_before_lparen)
-          .warnUntilSwiftVersion(6);
     }
     auto result = parseArgumentList(tok::l_paren, tok::r_paren,
                                     /*isExprBasic*/ true,
@@ -4369,7 +4362,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
     SourceLoc attrLoc = consumeToken();
 
     // @warn_unused_result with no arguments.
-    if (!Tok.isFollowingLParen()) {
+    if (!isAtAttributeLParen()) {
       diagnose(AtLoc, diag::attr_warn_unused_result_removed)
         .fixItRemove(SourceRange(AtLoc, attrLoc));
 
@@ -4453,7 +4446,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
 
   // Recover by eating @foo(...) when foo is not known.
   consumeToken();
-  if (Tok.isFollowingLParen())
+  if (isAtAttributeLParen())
     skipSingle();
 
   return makeParserError();
@@ -4736,15 +4729,8 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
       // Recover by eating @foo(...) when foo is not known.
       consumeToken();
 
-      if (Tok.is(tok::l_paren) && getEndOfPreviousLoc() == Tok.getLoc()) {
-        CancellableBacktrackingScope backtrack(*this);
+      if (isAtAttributeLParen(/*isCustomAttr=*/true))
         skipSingle();
-        // If we found '->', or 'throws' after paren, it's likely a parameter
-        // of function type.
-        if (Tok.isNot(tok::arrow, tok::kw_throws, tok::kw_rethrows,
-                      tok::kw_throw))
-          backtrack.cancelBacktrack();
-      }
 
       return makeParserError();
     }
@@ -4805,7 +4791,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
 
   case TypeAttrKind::Isolated: {
     SourceLoc lpLoc = Tok.getLoc(), kindLoc, rpLoc;
-    if (!consumeIfNotAtStartOfLine(tok::l_paren)) {
+    if (!consumeIfAttributeLParen()) {
       if (!justChecking) {
         diagnose(Tok, diag::attr_isolated_expected_lparen);
         // TODO: should we suggest removing the `@`?
@@ -4853,7 +4839,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   case TypeAttrKind::Opened: {
     // Parse the opened existential ID string in parens
     SourceLoc beginLoc = Tok.getLoc(), idLoc, endLoc;
-    if (!consumeAttributeLParen()) {
+    if (!consumeIfAttributeLParen()) {
       if (!justChecking)
         diagnose(Tok, diag::opened_attribute_expected_lparen);
       return makeParserError();
@@ -5060,7 +5046,7 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
     return std::nullopt;
   };
 
-  if (!Tok.isFollowingLParen()) {
+  if (!isAtAttributeLParen()) {
     diagnose(loc, diag::expected_lparen_after_lifetime_dependence);
     status.setIsParseError();
     return status;
@@ -5768,6 +5754,7 @@ static bool consumeIfParenthesizedNonisolated(Parser &P) {
 }
 
 static void skipAttribute(Parser &P) {
+  P.consumeToken(tok::at_sign);
   // Consider unexpected tokens to be incomplete attributes.
 
   // Parse the attribute name, which can be qualified, have
@@ -5784,12 +5771,8 @@ static void skipAttribute(Parser &P) {
   } while (P.consumeIf(tok::period));
 
   // Skip an argument clause after the attribute name.
-  if (P.consumeIf(tok::l_paren)) {
-    while (P.Tok.isNot(tok::r_brace, tok::eof, tok::pound_endif)) {
-      if (P.consumeIf(tok::r_paren)) break;
-      P.skipSingle();
-    }
-  }
+  if (P.isAtAttributeLParen())
+    P.skipSingle();
 }
 
 bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
@@ -5833,7 +5816,7 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
   // in positions like generic argument lists.
   if (Tok.is(tok::at_sign)) {
     BacktrackingScope backtrack(*this);
-    while (consumeIf(tok::at_sign))
+    while (Tok.is(tok::at_sign))
       skipAttribute(*this);
 
     // If this attribute is the last element in the block,
@@ -7859,6 +7842,11 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
 
   case AccessorKind::Init:
     return forSIL;
+
+  // TODO: Add support for borrow/mutate constraints in protocols
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
+    return false;
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -7892,6 +7880,8 @@ struct Parser::ParsedAccessors {
     if (Modify) return Modify;
     if (Modify2) return Modify2;
     if (MutableAddress) return MutableAddress;
+    if (Mutate)
+      return Mutate;
     return nullptr;
   }
 };
@@ -8073,6 +8063,22 @@ bool Parser::parseAccessorAfterIntroducer(
     diagnose(Tok, diag::accessor_requires_coroutine_accessors,
              getAccessorNameForDiagnostic(Kind, /*article*/ false,
                                           /*underscored*/ false));
+  }
+
+  if (requiresFeatureBorrowAndMutateAccessors(Kind) &&
+      !Context.LangOpts.hasFeature(Feature::BorrowAndMutateAccessors)) {
+    diagnose(Tok, diag::accessor_requires_borrow_and_mutate_accessors,
+             getAccessorNameForDiagnostic(Kind, /*article*/ false,
+                                          /*underscored*/ false));
+  }
+
+  if (Kind == AccessorKind::Borrow || Kind == AccessorKind::Mutate) {
+    if (!Flags.contains(PD_InStruct) && !Flags.contains(PD_InEnum) &&
+        !Flags.contains(PD_InExtension)) {
+      diagnose(Tok, diag::accessor_not_supported_in_decl,
+               getAccessorNameForDiagnostic(Kind, /*article*/ true,
+                                            /*underscored*/ false));
+    }
   }
 
   // There should be no body in the limited syntax; diagnose unexpected
@@ -8523,6 +8529,8 @@ getCorrespondingUnderscoredAccessorKind(AccessorKind kind) {
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Init:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
     return std::nullopt;
   }
 }
@@ -8592,16 +8600,21 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     diagnoseConflictingAccessors(P, Get, Read);
     diagnoseConflictingAccessors(P, Get, Read2);
     diagnoseConflictingAccessors(P, Get, Address);
+    diagnoseConflictingAccessors(P, Get, Borrow);
   } else if (Read) {
     diagnoseConflictingAccessors(P, Read, Read2);
     diagnoseConflictingAccessors(P, Read, Address);
+    diagnoseConflictingAccessors(P, Read, Borrow);
   } else if (Read2) {
     diagnoseConflictingAccessors(P, Read2, Address);
+    diagnoseConflictingAccessors(P, Read2, Borrow);
   } else if (Address) {
+    diagnoseConflictingAccessors(P, Read2, Borrow);
+  } else if (Borrow) {
     // Nothing can go wrong.
 
-  // If there's a writing accessor of any sort, there must also be a
-  // reading accessor.
+    // If there's a writing accessor of any sort, there must also be a
+    // reading accessor.
   } else if (auto mutator = findFirstMutator()) {
     if (!invalid) {
       P.diagnose(mutator->getLoc(),
@@ -8609,7 +8622,8 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
                  // only provided a setter without a getter.
                  (MutableAddress || Modify || Modify2)
                      ? diag::missing_reading_accessor
-                     : diag::missing_getter,
+                 : Mutate ? diag::missing_borrow_accessor
+                          : diag::missing_getter,
                  isa<SubscriptDecl>(storage),
                  getAccessorNameForDiagnostic(mutator, /*article*/ true));
     }
@@ -8623,13 +8637,17 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   }
 
   // '_modify', 'modify' and 'unsafeMutableAddress' are all mutually exclusive.
-  // 'unsafeMutableAddress' and 'set' are mutually exclusive, but 'set' and
-  // 'modify' can appear together.
+  // 'mutate' and 'set' are mutually exclusive
+  // 'unsafeMutableAddress' and 'set'/'mutate' are mutually exclusive
+  // 'modify' and 'set'/'mutate' can appear together.
   if (Set) {
     diagnoseConflictingAccessors(P, Set, MutableAddress);
+    diagnoseConflictingAccessors(P, Set, Mutate);
   } else if (Modify) {
     diagnoseConflictingAccessors(P, Modify, Modify2);
     diagnoseConflictingAccessors(P, Modify, MutableAddress);
+  } else if (Mutate) {
+    diagnoseConflictingAccessors(P, Mutate, MutableAddress);
   }
 
   if (Init) {
@@ -9926,7 +9944,8 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
 
     if (ElementTy.isNull()) {
       // Always set an element type.
-      ElementTy = makeParserResult(ElementTy, ErrorTypeRepr::create(Context));
+      ElementTy = makeParserResult(
+          ElementTy, ErrorTypeRepr::create(Context, getTypeErrorLoc()));
     }
   }
 

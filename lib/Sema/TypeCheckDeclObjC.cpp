@@ -776,7 +776,13 @@ bool swift::isRepresentableInLanguage(
           .limitBehavior(behavior);
       Reason.describe(accessor);
       return false;
-
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
+      diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
+                            diag::objc_borrow_mutate_accessor)
+          .limitBehavior(behavior);
+      Reason.describe(accessor);
+      return false;
     case AccessorKind::Read:
     case AccessorKind::Read2:
     case AccessorKind::Modify:
@@ -835,6 +841,23 @@ bool swift::isRepresentableInLanguage(
                                          FD->getResultTypeSourceRange(),
                                          behavior, Reason);
       Reason.describe(FD);
+      return false;
+    }
+  }
+
+  // Check that @objc functions can't have typed throw.
+  if (AFD->hasThrows()) {
+    Type thrownType = AFD->getThrownInterfaceType();
+    // TODO: only `throws(Error)` is allowed.
+    // Throwing `any MyError` that confronts `Error` is not implemented yet.
+    // Shall we allow `any MyError` in the future, we should check against
+    // `isExistentialType` instead, and other type checks will make sure it
+    // confrons to `Error`.
+    if (thrownType && !thrownType->isErrorExistentialType()) {
+      softenIfAccessNote(AFD, Reason.getAttr(),
+                         AFD->diagnose(diag::typed_throw_in_objc_forbidden, AFD)
+                             .limitBehavior(behavior));
+      Reason.describe(AFD);
       return false;
     }
   }
@@ -1519,6 +1542,8 @@ shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit,
       case AccessorKind::WillSet:
       case AccessorKind::Init:
       case AccessorKind::DistributedGet:
+      case AccessorKind::Borrow:
+      case AccessorKind::Mutate:
         return false;
 
       case AccessorKind::MutableAddress:

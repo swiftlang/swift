@@ -21,7 +21,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -582,8 +581,7 @@ namespace {
     void addGenericParameters() {
       GenericSignature sig = asImpl().getGenericSignature();
       auto metadata =
-        irgen::addGenericParameters(IGM, B,
-                                    asImpl().getGenericSignature(),
+        irgen::addGenericParameters(IGM, B, sig,
                                     /*implicit=*/false);
       assert(metadata.NumParams == metadata.NumParamsEmitted &&
              "We can't use implicit GenericParamDescriptors here");
@@ -6776,7 +6774,8 @@ namespace {
         return;
       }
 
-      // Emit a reference to the superclass.
+      // Emit a reference to the superclass. This should be abstract for now,
+      // but transitively completing the class will complete it.
       auto superclass = IGF.emitAbstractTypeMetadataRef(
                           getSuperclassForMetadata(IGM, Target));
 
@@ -6940,7 +6939,13 @@ namespace {
     }
 
     void addValueWitnessTable() {
-      auto vwtPointer = emitValueWitnessTable(/*relative*/ false).getValue();
+      llvm::Constant* vwtPointer = nullptr;
+      if (auto cd = Target->getClangDecl())
+        if (auto rd = dyn_cast<clang::RecordDecl>(cd))
+          if (rd->isAnonymousStructOrUnion())
+            vwtPointer = llvm::Constant::getNullValue(IGM.WitnessTablePtrTy);
+      if (!vwtPointer)
+        vwtPointer = emitValueWitnessTable(/*relative*/ false).getValue();
       B.addSignedPointer(vwtPointer,
                          IGM.getOptions().PointerAuth.ValueWitnessTable,
                          PointerAuthEntity());

@@ -214,8 +214,10 @@ AccessorDecl *DeclContext::getInnermostPropertyAccessorContext() {
         return nullptr;
 
       auto *storage = accessor->getStorage();
-      if (isa<VarDecl>(storage) && storage->getDeclContext()->isTypeContext())
+      if ((isa<VarDecl>(storage) || isa<SubscriptDecl>(storage)) &&
+          storage->getDeclContext()->isTypeContext()) {
         return accessor;
+      }
     }
   } while ((dc = dc->getParent()));
 

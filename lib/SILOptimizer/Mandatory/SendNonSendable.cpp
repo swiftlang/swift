@@ -673,7 +673,7 @@ struct DiagnosticEvaluator final
         sendingOpToRequireInstMultiMap(sendingOpToRequireInstMultiMap),
         foundVerbatimErrors(foundVerbatimErrors) {}
 
-  void handleLocalUseAfterSend(LocalUseAfterSendError error) const {
+  void handleLocalUseAfterSend(LocalUseAfterSendError &&error) const {
     const auto &partitionOp = *error.op;
     REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
 
@@ -689,7 +689,7 @@ struct DiagnosticEvaluator final
   }
 
   void handleInOutSendingNotInitializedAtExitError(
-      InOutSendingNotInitializedAtExitError error) const {
+      InOutSendingNotInitializedAtExitError &&error) const {
     const PartitionOp &partitionOp = *error.op;
     Operand *sendingOp = error.sendingOp;
 
@@ -700,7 +700,7 @@ struct DiagnosticEvaluator final
                        partitionOp.getSourceInst()));
   }
 
-  void handleUnknownCodePattern(UnknownCodePatternError error) const {
+  void handleUnknownCodePattern(UnknownCodePatternError &&error) const {
     const PartitionOp &op = *error.op;
 
     if (shouldAbortOnUnknownPatternMatchError()) {
@@ -712,10 +712,11 @@ struct DiagnosticEvaluator final
                   diag::regionbasedisolation_unknown_pattern);
   }
 
-  void handleError(PartitionOpError error) {
+  void handleError(PartitionOpError &&error) {
     switch (error.getKind()) {
     case PartitionOpError::LocalUseAfterSend: {
-      return handleLocalUseAfterSend(error.getLocalUseAfterSendError());
+      return handleLocalUseAfterSend(
+          std::move(error).getLocalUseAfterSendError());
     }
     case PartitionOpError::InOutSendingNotDisconnectedAtExit:
     case PartitionOpError::InOutSendingReturned:
@@ -727,14 +728,15 @@ struct DiagnosticEvaluator final
       // appropriate if they want to emit an error here (some will squelch the
       // error).
       REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
-      foundVerbatimErrors.emplace_back(error);
+      foundVerbatimErrors.emplace_back(std::move(error));
       return;
     case PartitionOpError::InOutSendingNotInitializedAtExit: {
       return handleInOutSendingNotInitializedAtExitError(
-          error.getInOutSendingNotInitializedAtExitError());
+          std::move(error).getInOutSendingNotInitializedAtExitError());
     }
     case PartitionOpError::UnknownCodePattern: {
-      return handleUnknownCodePattern(error.getUnknownCodePatternError());
+      return handleUnknownCodePattern(
+          std::move(error).getUnknownCodePatternError());
     }
     }
     llvm_unreachable("Covered switch isn't covered?!");
@@ -2824,10 +2826,11 @@ bool InOutSendingReturnedDiagnosticEmitter::emitOutParamIncomingValueError(
 
   // Loop through the errors to find our InOutReturnedError. We emit one error
   // per return... but we emit for multiple returns separate diagnostics.
-  for (auto err : errors) {
+  while (!errors.empty()) {
+    auto err = errors.pop_back_val();
     if (err.getKind() != PartitionOpError::InOutSendingReturned)
       continue;
-    auto castError = err.getInOutSendingReturnedError();
+    auto castError = std::move(err).getInOutSendingReturnedError();
     if (castError.inoutSendingElement != inoutSendingParamElement)
       continue;
     // Ok, we found an error. Lets emit it and return early.
@@ -3321,8 +3324,8 @@ struct NonSendableIsolationCrossingResultDiagnosticEmitter {
   SILValue representative;
 
   NonSendableIsolationCrossingResultDiagnosticEmitter(
-      RegionAnalysisValueMap &valueMap, Error error)
-      : valueMap(valueMap), error(error),
+      RegionAnalysisValueMap &valueMap, Error &&error)
+      : valueMap(valueMap), error(std::move(error)),
         representative(valueMap.getRepresentative(error.returnValueElement)) {}
 
   SILFunction *getFunction() const {
@@ -3510,7 +3513,8 @@ void SendNonSendableImpl::emitVerbatimErrors() {
     case PartitionOpError::InOutSendingNotInitializedAtExit:
       llvm_unreachable("Handled elsewhere");
     case PartitionOpError::AssignNeverSendableIntoSendingResult: {
-      auto error = erasedError.getAssignNeverSendableIntoSendingResultError();
+      auto error =
+          std::move(erasedError).getAssignNeverSendableIntoSendingResultError();
       REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
       AssignIsolatedIntoSendingResultDiagnosticEmitter emitter(
           error.op->getSourceOp(), error.destValue, error.srcValue,
@@ -3519,7 +3523,8 @@ void SendNonSendableImpl::emitVerbatimErrors() {
       continue;
     }
     case PartitionOpError::InOutSendingNotDisconnectedAtExit: {
-      auto error = erasedError.getInOutSendingNotDisconnectedAtExitError();
+      auto error =
+          std::move(erasedError).getInOutSendingNotDisconnectedAtExitError();
       auto inoutSendingVal =
           info->getValueMap().getRepresentative(error.inoutSendingElement);
       auto isolationRegionInfo = error.isolationInfo;
@@ -3533,7 +3538,7 @@ void SendNonSendableImpl::emitVerbatimErrors() {
       continue;
     }
     case PartitionOpError::InOutSendingReturned: {
-      auto error = erasedError.getInOutSendingReturnedError();
+      auto error = std::move(erasedError).getInOutSendingReturnedError();
       auto inoutSendingVal =
           info->getValueMap().getRepresentative(error.inoutSendingElement);
       auto returnedValue =
@@ -3548,18 +3553,19 @@ void SendNonSendableImpl::emitVerbatimErrors() {
       continue;
     }
     case PartitionOpError::SentNeverSendable: {
-      auto e = erasedError.getSentNeverSendableError();
+      auto e = std::move(erasedError).getSentNeverSendableError();
       REGIONBASEDISOLATION_LOG(e.print(llvm::dbgs(), info->getValueMap()));
       SentNeverSendableDiagnosticInferrer diagnosticInferrer(
-          info->getValueMap(), e);
+          info->getValueMap(), std::move(e));
       diagnosticInferrer.run();
       continue;
     }
     case PartitionOpError::NonSendableIsolationCrossingResult: {
-      auto e = erasedError.getNonSendableIsolationCrossingResultError();
+      auto e =
+          std::move(erasedError).getNonSendableIsolationCrossingResultError();
       REGIONBASEDISOLATION_LOG(e.print(llvm::dbgs(), info->getValueMap()));
       NonSendableIsolationCrossingResultDiagnosticEmitter diagnosticInferrer(
-          info->getValueMap(), e);
+          info->getValueMap(), std::move(e));
       diagnosticInferrer.emit();
       continue;
     }

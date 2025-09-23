@@ -650,7 +650,7 @@ protected:
         caseStmt->getCaseLabelItems(),
         caseStmt->hasUnknownAttr() ? caseStmt->getStartLoc() : SourceLoc(),
         caseStmt->getItemTerminatorLoc(), cloneBraceWith(body, newBody),
-        caseStmt->getCaseBodyVariablesOrEmptyArray(), caseStmt->isImplicit(),
+        caseStmt->getCaseBodyVariables(), caseStmt->isImplicit(),
         caseStmt->getFallthroughStmt());
 
     return std::make_pair(caseVarRef.get(), newCase);
@@ -1000,7 +1000,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
     cs.Options |= ConstraintSystemFlags::ForCodeCompletion;
     cs.solveForCodeCompletion(solutions);
 
-    CompletionContextFinder analyzer(target, func->getDeclContext());
+    CompletionContextFinder analyzer(target);
     if (analyzer.hasCompletion()) {
       filterSolutionsForCodeCompletion(solutions, analyzer);
       for (const auto &solution : solutions) {
@@ -1289,9 +1289,7 @@ bool AnyFunctionRef::bodyHasExplicitReturnStmt() const {
     return false;
   }
 
-  auto &ctx = getAsDeclContext()->getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-                           BraceHasExplicitReturnStmtRequest{body}, false);
+  return body->hasExplicitReturnStmt(getAsDeclContext()->getASTContext());
 }
 
 void AnyFunctionRef::getExplicitReturnStmts(

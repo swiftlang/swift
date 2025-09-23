@@ -215,7 +215,9 @@ enum class DescriptiveDeclKind : uint8_t {
   OpaqueVarType,
   Macro,
   MacroExpansion,
-  Using
+  Using,
+  BorrowAccessor,
+  MutateAccessor,
 };
 
 /// Describes which spelling was used in the source for the 'static' or 'class'
@@ -752,7 +754,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -821,7 +823,10 @@ protected:
     SerializePackageEnabled : 1,
 
     /// Whether this module has enabled strict memory safety checking.
-    StrictMemorySafety : 1
+    StrictMemorySafety : 1,
+
+    /// Whether this module uses deferred code generation in Embedded Swift.
+    DeferredCodeGen : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -2050,6 +2055,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoaderSlow();
 
   friend class ExtendedNominalRequest;
+  friend class BindExtensionsRequest;
   friend class Decl;
 public:
   using Decl::getASTContext;
@@ -2087,13 +2093,14 @@ public:
   Type getExtendedType() const;
 
   /// Retrieve the nominal type declaration that is being extended.
-  /// Will  trip an assertion if the declaration has not already been computed.
+  /// Will trip an assertion if the declaration has not already been computed.
   /// In order to fail fast when type checking work is attempted
   /// before extension binding has taken place.
-
   NominalTypeDecl *getExtendedNominal() const;
 
-  /// Compute the nominal type declaration that is being extended.
+  /// Compute the nominal type declaration that is being extended. The result
+  /// is not cached, this should only be invoked by extension binding itself.
+  /// FIXME: Make this private once lldb has been migrated off it.
   NominalTypeDecl *computeExtendedNominal(
       bool excludeMacroExpansions=false) const;
 
@@ -2917,6 +2924,10 @@ private:
     /// a null pointer.
     unsigned noOpaqueResultType : 1;
 
+    /// Whether the ClangUSRGenerationRequest request was evaluated and produced
+    /// a std::nullopt.
+    unsigned noClangUSR : 1;
+
     /// Whether the "isFinal" bit has been computed yet.
     unsigned isFinalComputed : 1;
 
@@ -2951,6 +2962,7 @@ private:
   friend class OpaqueResultTypeRequest;
   friend class ApplyAccessNoteRequest;
   friend class AvailabilityDomainForDeclRequest;
+  friend class ClangUSRGenerationRequest;
 
   friend class Decl;
   SourceLoc getLocFromSource() const { return NameLoc; }
@@ -3036,13 +3048,6 @@ public:
   /// These are special accessors used by distributed thunks, implementing
   /// `distributed var get { }` accessors.
   bool isDistributedGetAccessor() const;
-
-  /// Is this a 'distributed thunk'?
-  ///
-  /// Distributed thunks are synthesized functions which perform the "is remote?"
-  /// check, before dispatching to a 'system.remoteCall' (if actor was remote).
-  /// They are always 'async' and 'throws'.
-  bool isDistributedThunk() const;
 
   bool hasName() const { return bool(Name); }
   bool isOperator() const { return Name.isOperator(); }
@@ -3283,6 +3288,9 @@ public:
   /// If the declaration is neither `AbstractFunctionDecl` nor
   /// `AbstractStorageDecl`, returns `false`.
   bool isAsync() const;
+
+  /// Returns whether this function represents a defer body.
+  bool isDeferBody() const;
 
 private:
   bool isObjCDynamic() const {
@@ -6249,7 +6257,7 @@ public:
   bool requiresOpaqueRead2Coroutine() const;
 
   /// Does this storage require a 'set' accessor in its opaque-accessors set?
-  bool requiresOpaqueSetter() const { return supportsMutation(); }
+  bool requiresOpaqueSetter() const;
 
   /// Does this storage require a '_modify' accessor in its opaque-accessors
   /// set?
@@ -7092,6 +7100,14 @@ public:
       Identifier argumentName, SourceLoc parameterNameLoc,
       Identifier parameterName, Expr *defaultValue,
       DefaultArgumentInitializer *defaultValueInitContext, DeclContext *dc);
+
+  SourceLoc getLocFromSource() const {
+    // If we have a name loc, use it, otherwise fallback to the start loc for
+    // e.g enum elements without parameter names.
+    if (auto nameLoc = getNameLoc())
+      return nameLoc;
+    return getStartLoc();
+  }
 
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const {
@@ -8315,10 +8331,6 @@ public:
   /// Asserts if not in type context.
   Type getMethodInterfaceType() const;
 
-  /// Tests if this is a function returning a DynamicSelfType, or a
-  /// constructor.
-  bool hasDynamicSelfResult() const;
-
   /// The async function marked as the alternative to this function, if any.
   AbstractFunctionDecl *getAsyncAlternative() const;
 
@@ -8723,6 +8735,13 @@ public:
   /// use the implicit oldValue parameter in its body or does not have
   /// an explicit parameter in its parameter list.
   bool isSimpleDidSet() const;
+
+  bool isBorrowAccessor() const {
+    return getAccessorKind() == AccessorKind::Borrow;
+  }
+  bool isMutateAccessor() const {
+    return getAccessorKind() == AccessorKind::Mutate;
+  }
 
   void setIsTransparent(bool transparent) {
     Bits.AccessorDecl.IsTransparent = transparent;

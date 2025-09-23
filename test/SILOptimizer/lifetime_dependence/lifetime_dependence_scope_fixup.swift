@@ -280,12 +280,12 @@ func testPointeeDependenceOnMutablePointer(p: UnsafePointer<Int64>) {
 // CHECK:   [[VAR:%.*]] = alloc_stack [lexical] [var_decl] $MutableView, var, name "span", type $MutableView
 // CHECK:   apply %{{.*}}(%0, %{{.*}}) : $@convention(method) (UnsafeMutableRawBufferPointer, @thin MutableView.Type) -> @lifetime(borrow 0) @owned MutableView
 // CHECK:   [[ACCESS1:%.*]] = begin_access [modify] [static] [[VAR]] : $*MutableView
-// CHECK:   apply %{{.*}}(%{{.*}}) : $@convention(method) (@inout MutableView) -> @lifetime(borrow 0) @owned MutableView
+// CHECK:   apply %{{.*}}(%{{.*}}) : $@convention(method) (@lifetime(copy 0) @inout MutableView) -> @lifetime(borrow 0) @owned MutableView
 // CHECK:   [[LD1:%.*]] = load %{{.*}} : $*MutableView
 // CHECK:   apply %{{.*}}([[LD1]]) : $@convention(thin) (@guaranteed MutableView) -> ()
 // CHECK:   end_access [[ACCESS1]] : $*MutableView
 // CHECK:   [[ACCESS2:%.*]] = begin_access [modify] [static] [[VAR]] : $*MutableView
-// CHECK:   apply %{{.*}}(%{{.*}}) : $@convention(method) (@inout MutableView) -> @lifetime(borrow 0) @owned MutableView
+// CHECK:   apply %{{.*}}(%{{.*}}) : $@convention(method) (@lifetime(copy 0) @inout MutableView) -> @lifetime(borrow 0) @owned MutableView
 // CHECK:   [[LD2:%.*]] = load %{{.*}} : $*MutableView
 // CHECK:   apply %{{.*}}([[LD2]]) : $@convention(thin) (@guaranteed MutableView) -> ()
 // CHECK:   end_access [[ACCESS2]] : $*MutableView

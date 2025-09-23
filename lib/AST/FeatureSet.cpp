@@ -84,6 +84,7 @@ UNINTERESTING_FEATURE(CodeItemMacros)
 UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
 UNINTERESTING_FEATURE(SymbolLinkageMarkers)
+UNINTERESTING_FEATURE(DeferredCodeGen)
 UNINTERESTING_FEATURE(LazyImmediate)
 UNINTERESTING_FEATURE(MoveOnlyClasses)
 UNINTERESTING_FEATURE(NoImplicitCopy)
@@ -137,6 +138,7 @@ static bool usesFeatureInlineArrayTypeSugar(Decl *D) {
 }
 
 UNINTERESTING_FEATURE(StaticExclusiveOnly)
+UNINTERESTING_FEATURE(ManualOwnership)
 UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
 UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
@@ -353,14 +355,7 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
-
-static bool usesFeatureCustomAvailability(Decl *decl) {
-  for (auto attr : decl->getSemanticAvailableAttrs()) {
-    if (attr.getDomain().isCustom())
-      return true;
-  }
-  return false;
-}
+UNINTERESTING_FEATURE(CustomAvailability)
 
 static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   // Explicit `@concurrent` attribute on the declaration.
@@ -441,6 +436,8 @@ UNINTERESTING_FEATURE(BuiltinInterleave)
 UNINTERESTING_FEATURE(BuiltinVectorsExternC)
 UNINTERESTING_FEATURE(AddressOfProperty2)
 UNINTERESTING_FEATURE(ImmutableWeakCaptures)
+// Ignore borrow and mutate accessors until it is used in the standard library.
+UNINTERESTING_FEATURE(BorrowAndMutateAccessors)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

@@ -3348,24 +3348,9 @@ public:
   }
 };
 
-/// This is a conversion from an expression of UnresolvedType to an arbitrary
-/// other type, and from an arbitrary type to UnresolvedType.  This node does
-/// not appear in valid code, only in code involving diagnostics.
-class UnresolvedTypeConversionExpr : public ImplicitConversionExpr {
-public:
-  UnresolvedTypeConversionExpr(Expr *subExpr, Type type)
-  : ImplicitConversionExpr(ExprKind::UnresolvedTypeConversion, subExpr, type) {}
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UnresolvedTypeConversion;
-  }
-};
-
 /// FunctionConversionExpr - Convert a function to another function type,
 /// which might involve renaming the parameters or handling substitutions
 /// of subtypes (in the return) or supertypes (in the input).
-///
-/// FIXME: This should be a CapturingExpr.
 class FunctionConversionExpr : public ImplicitConversionExpr {
 public:
   FunctionConversionExpr(Expr *subExpr, Type type)

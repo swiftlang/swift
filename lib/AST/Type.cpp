@@ -1342,6 +1342,21 @@ Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   return FunctionType::get(unlabeledParams, result, fnType->getExtInfo());
 }
 
+Type TypeBase::eraseDynamicSelfType() {
+  if (!hasDynamicSelfType())
+    return Type(this);
+
+  return Type(this).transformWithPosition(
+      TypePosition::Covariant,
+      [&](TypeBase *t, TypePosition pos) -> std::optional<Type> {
+        if (isa<DynamicSelfType>(t) &&
+            pos == TypePosition::Covariant) {
+          return cast<DynamicSelfType>(t)->getSelfType();
+        }
+        return std::nullopt;
+      });
+}
+
 Type TypeBase::replaceDynamicSelfType(Type newSelfType) {
   if (!hasDynamicSelfType())
     return Type(this);
@@ -1349,12 +1364,12 @@ Type TypeBase::replaceDynamicSelfType(Type newSelfType) {
   return Type(this).transformWithPosition(
       TypePosition::Covariant,
       [&](TypeBase *t, TypePosition pos) -> std::optional<Type> {
-      if (isa<DynamicSelfType>(t) &&
-          pos == TypePosition::Covariant) {
-        return newSelfType;
-      }
-    return std::nullopt;
-  });
+        if (isa<DynamicSelfType>(t) &&
+            pos == TypePosition::Covariant) {
+          return newSelfType;
+        }
+        return std::nullopt;
+      });
 }
 
 Type TypeBase::withCovariantResultType() {
@@ -1391,37 +1406,6 @@ Type TypeBase::withCovariantResultType() {
   
   return FunctionType::get(fnType->getParams(), resultFnType,
                            fnType->getExtInfo());
-}
-
-Type TypeBase::replaceCovariantResultType(Type newResultType,
-                                          unsigned uncurryLevel) {
-  if (uncurryLevel == 0) {
-    bool isLValue = is<LValueType>();
-
-    auto loadedTy = getWithoutSpecifierType();
-    if (auto objectType = loadedTy->getOptionalObjectType()) {
-      newResultType = OptionalType::get(
-          objectType->replaceCovariantResultType(newResultType, uncurryLevel));
-    }
-
-    return isLValue ? LValueType::get(newResultType) : newResultType;
-  }
-
-  // Determine the input and result types of this function.
-  auto fnType = this->castTo<AnyFunctionType>();
-  auto inputType = fnType->getParams();
-  Type resultType =
-    fnType->getResult()->replaceCovariantResultType(newResultType,
-                                                    uncurryLevel - 1);
-
-  // Produce the resulting function type.
-  if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
-    return GenericFunctionType::get(genericFn->getGenericSignature(),
-                                    inputType, resultType,
-                                    fnType->getExtInfo());
-  }
-  
-  return FunctionType::get(inputType, resultType, fnType->getExtInfo());
 }
 
 /// Whether this parameter accepts an unlabeled trailing closure argument

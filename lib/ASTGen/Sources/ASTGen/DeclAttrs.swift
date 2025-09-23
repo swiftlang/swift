@@ -265,6 +265,7 @@ extension ASTGenVisitor {
         .LexicalLifetimes,
         .LLDBDebuggerFunction,
         .MainType,
+        .ManualOwnership,
         .Marker,
         .MoveOnly,
         .NeverEmitIntoClient,

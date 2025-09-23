@@ -4988,16 +4988,6 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
         return ActorIsolation::forActorInstanceCapture(param);
     }
 
-    // If we have a closure that acts as an isolation inference boundary, then
-    // we return that it is non-isolated.
-    //
-    // NOTE: Since we already checked for global actor isolated things, we
-    // know that all Sendable closures must be nonisolated. That is why it is
-    // safe to rely on this path to handle Sendable closures.
-    if (isIsolationInferenceBoundaryClosure(closure,
-                                            /*canInheritActorContext=*/true))
-      return ActorIsolation::forNonisolated(/*unsafe=*/false);
-
     // A non-Sendable closure gets its isolation from its context.
     auto parentIsolation = getActorIsolationOfContext(
         closure->getParent(), getClosureActorIsolation);
@@ -5028,6 +5018,16 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
         }
       }
     }
+
+    // If we have a closure that acts as an isolation inference boundary, then
+    // we return that it is non-isolated.
+    //
+    // NOTE: Since we already checked for global actor isolated things, we
+    // know that all Sendable closures must be nonisolated. That is why it is
+    // safe to rely on this path to handle Sendable closures.
+    if (isIsolationInferenceBoundaryClosure(closure,
+                                            /*canInheritActorContext=*/true))
+      return ActorIsolation::forNonisolated(/*unsafe=*/false);
 
     return normalIsolation;
   }();
@@ -5212,13 +5212,6 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     if (decl->getASTContext().LangOpts.hasFeature(
             Feature::NonisolatedNonsendingByDefault)) {
       if (auto *value = dyn_cast<ValueDecl>(decl)) {
-        // TODO(distributed): make distributed thunks nonisolated(nonsending) and remove this if
-        if (value->isAsync() && value->isDistributedThunk()) {
-          // don't change isolation of distributed thunks until we make them nonisolated(nonsending),
-          // since the runtime calling them assumes they're just nonisolated right now.
-          return ActorIsolation::forNonisolated(nonisolatedAttr->isUnsafe());
-        }
-
         if (value->isAsync() &&
             value->getModuleContext() == decl->getASTContext().MainModule) {
           return ActorIsolation::forCallerIsolationInheriting();
@@ -6360,6 +6353,14 @@ static bool shouldSelfIsolationOverrideDefault(
 
 static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
                                                     ValueDecl *value) {
+  // Defer bodies share the actor isolation of their enclosing context.
+  if (value->isDeferBody()) {
+    return {
+      getActorIsolationOfContext(value->getDeclContext()),
+      IsolationSource()
+    };
+  }
+
   // If this declaration has actor-isolated "self", it's isolated to that
   // actor.
   if (evaluateOrDefault(evaluator, HasIsolatedSelfRequest{value}, false)) {

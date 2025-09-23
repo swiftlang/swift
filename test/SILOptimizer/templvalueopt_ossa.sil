@@ -685,3 +685,20 @@ bb2:
   %r = tuple ()
   return %r
 }
+
+// CHECK-LABEL: sil [ossa] @dont_propagate_with_access_scope :
+// CHECK:         alloc_stack
+// CHECK:         copy_addr
+// CHECK-LABEL: } // end sil function 'dont_propagate_with_access_scope'
+sil [ossa] @dont_propagate_with_access_scope : $@convention(thin) (@inout Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = alloc_stack $Int
+  %3 = begin_access [modify] [dynamic] %2
+  store %1 to [trivial] %3
+  end_access %3
+  copy_addr %2 to %0
+  dealloc_stack %2
+  %8 = tuple ()
+  return %8
+}
+

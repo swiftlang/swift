@@ -116,6 +116,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("complete.setpopularapi", SourceKitRequest::CodeCompleteSetPopularAPI)
         .Case("typecontextinfo", SourceKitRequest::TypeContextInfo)
         .Case("conformingmethods", SourceKitRequest::ConformingMethodList)
+        .Case("signaturehelp", SourceKitRequest::SignatureHelp)
         .Case("cursor", SourceKitRequest::CursorInfo)
         .Case("related-idents", SourceKitRequest::RelatedIdents)
         .Case("active-regions", SourceKitRequest::ActiveRegions)
@@ -173,6 +174,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                      << "- complete.setpopularapi\n"
                      << "- typecontextinfo\n"
                      << "- conformingmethods\n"
+                     << "- signaturehelp\n"
                      << "- cursor\n"
                      << "- related-idents\n"
                      << "- syntax-map\n"

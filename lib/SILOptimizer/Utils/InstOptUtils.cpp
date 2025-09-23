@@ -774,7 +774,8 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
 }
 
 namespace {
-  class TypeDependentVisitor : public CanTypeVisitor<TypeDependentVisitor, bool> {
+  class TypeDependentVisitor :
+      public CanTypeVisitor_AnyNominal<TypeDependentVisitor, bool> {
   public:
     // If the type isn't actually dependent, we're okay.
     bool visit(CanType type) {
@@ -783,11 +784,8 @@ namespace {
       return CanTypeVisitor::visit(type);
     }
 
-    bool visitStructType(CanStructType type) {
-      return visitStructDecl(type->getDecl());
-    }
-    bool visitBoundGenericStructType(CanBoundGenericStructType type) {
-      return visitStructDecl(type->getDecl());
+    bool visitAnyStructType(CanType type, StructDecl *decl) {
+      return visitStructDecl(decl);
     }
     bool visitStructDecl(StructDecl *decl) {
       auto rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
@@ -806,11 +804,8 @@ namespace {
       return false;
     }
 
-    bool visitEnumType(CanEnumType type) {
-      return visitEnumDecl(type->getDecl());
-    }
-    bool visitBoundGenericEnumType(CanBoundGenericEnumType type) {
-      return visitEnumDecl(type->getDecl());
+    bool visitAnyEnumType(CanType type, EnumDecl *decl) {
+      return visitEnumDecl(decl);
     }
     bool visitEnumDecl(EnumDecl *decl) {
       if (decl->isIndirect())
@@ -835,12 +830,9 @@ namespace {
     }
 
     // A class reference does not depend on the layout of the class.
-    bool visitClassType(CanClassType type) {
+    bool visitAnyClassType(CanType type, ClassDecl *decl) {
       return false;
      }
-    bool visitBoundGenericClassType(CanBoundGenericClassType type) {
-      return false;
-    }
 
     // The same for non-strong references.
     bool visitReferenceStorageType(CanReferenceStorageType type) {

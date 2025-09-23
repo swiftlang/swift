@@ -18,7 +18,13 @@ roots:
     contents:
       - name: module.modulemap
         type: file
-        external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/winsdk.modulemap"
+        external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/winsdk_um.modulemap"
+  - name: "@WindowsSdkDir@/Include/@WindowsSDKVersion@/shared"
+    type: directory
+    contents:
+      - name: module.modulemap
+        type: file
+        external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/winsdk_shared.modulemap"
   - name: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/ucrt"
     type: directory
     contents:
@@ -47,5 +53,6 @@ install(FILES
   ucrt.modulemap
   vcruntime.apinotes
   vcruntime.modulemap
-  winsdk.modulemap
+  winsdk_um.modulemap
+  winsdk_shared.modulemap
   DESTINATION ${CMAKE_INSTALL_DATAROOTDIR})

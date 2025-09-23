@@ -58,6 +58,7 @@ class ExecutorBreadcrumb;
 struct LValueOptions {
   bool IsNonAccessing = false;
   bool TryAddressable = false;
+  bool NeedsBorrow = false;
 
   /// Derive options for accessing the base of an l-value, given that
   /// applying the derived component might touch the memory.
@@ -79,6 +80,12 @@ struct LValueOptions {
   LValueOptions withAddressable(bool addressable) const {
     auto copy = *this;
     copy.TryAddressable = addressable;
+    return copy;
+  }
+
+  LValueOptions withBorrow(bool borrow) const {
+    auto copy = *this;
+    copy.NeedsBorrow = borrow;
     return copy;
   }
 };
@@ -576,9 +583,9 @@ public:
   
   /// Get a stable address which is suitable for forming dependent pointers
   /// if possible.
-  SILValue getLocalVariableAddressableBuffer(VarDecl *decl,
-                                             SILLocation loc,
-                                             ValueOwnership ownership);
+  SILValue getVariableAddressableBuffer(VarDecl *decl,
+                                        SILLocation loc,
+                                        ValueOwnership ownership);
 
   /// The local auxiliary declarations for the parameters of this function that
   /// need to be emitted inside the next brace statement.
@@ -1060,6 +1067,12 @@ public:
   /// with either argument (if property appears in `acesses` list`) or result
   /// value assignment.
   void emitInitAccessor(AccessorDecl *accessor);
+
+  /// Generates code for the init accessor thunk that assigns the result of
+  /// calling a property wrapper's backing storage initializer into the backing
+  /// storage variable
+  void emitPropertyWrappedFieldInitAccessor(SILDeclRef function, Expr *value,
+                                            bool EmitProfilerIncrement);
 
   /// Generates code to emit the given setter reference to the given base value.
   SILValue emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
@@ -2059,6 +2072,19 @@ public:
                                       SmallVectorImpl<ManagedValue> &yields,
                                       bool isOnSelfParameter);
 
+  ManagedValue emitBorrowAccessor(SILLocation loc, SILDeclRef accessor,
+                                  SubstitutionMap substitutions,
+                                  ArgumentSource &&selfValue, bool isSuper,
+                                  bool isDirectUse,
+                                  PreparedArguments &&subscriptIndices,
+                                  bool isOnSelfParameter);
+
+  ManagedValue applyBorrowAccessor(SILLocation loc, ManagedValue fn,
+                                   bool canUnwind, SubstitutionMap subs,
+                                   ArrayRef<ManagedValue> args,
+                                   CanSILFunctionType substFnType,
+                                   ApplyOptions options);
+
   RValue emitApplyConversionFunction(SILLocation loc,
                                      Expr *funcExpr,
                                      Type resultType,
@@ -2205,7 +2231,15 @@ public:
                                    TSanKind tsanKind = TSanKind::None);
   ManagedValue emitBorrowedLValue(SILLocation loc, LValue &&src,
                                   TSanKind tsanKind = TSanKind::None);
+  std::optional<ManagedValue>
+  tryEmitProjectedLValue(SILLocation loc, LValue &&src, TSanKind tsanKind);
   ManagedValue emitConsumedLValue(SILLocation loc, LValue &&src,
+                                  TSanKind tsanKind = TSanKind::None);
+  /// Simply projects the LValue as a ManagedValue, allowing the caller
+  /// to check invariants and make adjustments manually.
+  ///
+  /// When in doubt, reach for emit[Borrowed|Consumed|etc]LValue.
+  ManagedValue emitRawProjectedLValue(SILLocation loc, LValue &&src,
                                   TSanKind tsanKind = TSanKind::None);
   LValue emitOpenExistentialLValue(SILLocation loc,
                                    LValue &&existentialLV,

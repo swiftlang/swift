@@ -303,6 +303,7 @@ bool SILDeclRef::hasUserWrittenCode() const {
   // Non-implicit decls generally have user-written code.
   if (!isImplicit()) {
     switch (kind) {
+    case Kind::PropertyWrappedFieldInitAccessor:
     case Kind::PropertyWrapperBackingInitializer: {
       // Only has user-written code if any of the property wrappers have
       // arguments to apply. Otherwise, it's just a forwarding initializer for
@@ -386,6 +387,7 @@ bool SILDeclRef::hasUserWrittenCode() const {
   case Kind::IVarInitializer:
   case Kind::IVarDestroyer:
   case Kind::PropertyWrapperBackingInitializer:
+  case Kind::PropertyWrappedFieldInitAccessor:
   case Kind::PropertyWrapperInitFromProjectedValue:
   case Kind::EntryPoint:
   case Kind::AsyncEntryPoint:
@@ -521,6 +523,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     return constant.isSerialized() ? Limit::AlwaysEmitIntoClient : Limit::None;
 
   case Kind::PropertyWrapperBackingInitializer:
+  case Kind::PropertyWrappedFieldInitAccessor:
   case Kind::PropertyWrapperInitFromProjectedValue: {
     if (!d->getDeclContext()->isTypeContext()) {
       // If the backing initializer is to be serialized, only use non-ABI public
@@ -801,13 +804,28 @@ AbstractFunctionDecl *SILDeclRef::getAbstractFunctionDecl() const {
   return dyn_cast_or_null<AbstractFunctionDecl>(getDecl());
 }
 
-bool SILDeclRef::isInitAccessor() const {
+AccessorDecl *SILDeclRef::getAccessorDecl() const {
   if (kind != Kind::Func || !hasDecl())
-    return false;
+    return nullptr;
+  return dyn_cast_or_null<AccessorDecl>(getDecl());
+}
 
-  if (auto accessor = dyn_cast<AccessorDecl>(getDecl()))
+bool SILDeclRef::isInitAccessor() const {
+  if (auto *accessor = getAccessorDecl())
     return accessor->getAccessorKind() == AccessorKind::Init;
 
+  return false;
+}
+
+bool SILDeclRef::isMutateAccessor() const {
+  if (auto *accessor = getAccessorDecl())
+    return accessor->getAccessorKind() == AccessorKind::Mutate;
+  return false;
+}
+
+bool SILDeclRef::isBorrowAccessor() const {
+  if (auto *accessor = getAccessorDecl())
+    return accessor->getAccessorKind() == AccessorKind::Borrow;
   return false;
 }
 
@@ -1112,10 +1130,20 @@ bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
   if (decl->isNeverEmittedIntoClient())
     return false;
 
-  // If the declaration is not from the main module, treat its definition as
-  // non-unique.
+  /// @_alwaysEmitIntoClient means that we have a non-unique definition.
+  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    return true;
+
   auto module = decl->getModuleContext();
   auto &ctx = module->getASTContext();
+
+  /// With deferred code generation, declarations are emitted as late as
+  /// possible, so they must have non-unique definitions.
+  if (module->deferredCodeGen())
+    return true;
+
+  // If the declaration is not from the main module, treat its definition as
+  // non-unique.
   return module != ctx.MainModule && ctx.MainModule;
 }
 
@@ -1407,6 +1435,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return mangler.mangleBackingInitializerEntity(cast<VarDecl>(getDecl()),
                                                   SKind);
+
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
+    return mangler.manglePropertyWrappedFieldInitAccessorEntity(
+        cast<VarDecl>(getDecl()), SKind);
 
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return mangler.mangleInitFromProjectedValueEntity(cast<VarDecl>(getDecl()),
@@ -1763,6 +1795,7 @@ Expr *SILDeclRef::getInitializationExpr() const {
     }
     return init;
   }
+  case Kind::PropertyWrappedFieldInitAccessor:
   case Kind::PropertyWrapperBackingInitializer: {
     auto *var = cast<VarDecl>(getDecl());
     auto wrapperInfo = var->getPropertyWrapperInitializerInfo();
@@ -1902,4 +1935,22 @@ bool SILDeclRef::isCalleeAllocatedCoroutine() const {
     return false;
 
   return getASTContext().SILOpts.CoroutineAccessorsUseYieldOnce2;
+}
+
+ActorIsolation SILDeclRef::getActorIsolation() const {
+  // Deallocating destructor is always nonisolated. Isolation of the deinit
+  // applies only to isolated deallocator and destroyer.
+  if (kind == SILDeclRef::Kind::Deallocator) {
+    return ActorIsolation::forNonisolated(false);
+  }
+
+  // Default argument generators use the isolation of the initializer,
+  // not the general isolation of the function.
+  if (isDefaultArgGenerator()) {
+    auto param = getParameterAt(getDecl(), defaultArgIndex);
+    assert(param);
+    return param->getInitializerIsolation();
+  }
+
+  return getActorIsolationOfContext(getInnermostDeclContext());
 }

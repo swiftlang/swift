@@ -328,6 +328,8 @@ static StringRef getDumpString(ReadImplKind kind) {
     return "read_coroutine";
   case ReadImplKind::Read2:
     return "read2_coroutine";
+  case ReadImplKind::Borrow:
+    return "borrow";
   }
   llvm_unreachable("bad kind");
 }
@@ -350,6 +352,8 @@ static StringRef getDumpString(WriteImplKind kind) {
     return "modify_coroutine";
   case WriteImplKind::Modify2:
     return "modify2_coroutine";
+  case WriteImplKind::Mutate:
+    return "mutate";
   }
   llvm_unreachable("bad kind");
 }
@@ -372,6 +376,8 @@ static StringRef getDumpString(ReadWriteImplKind kind) {
     return "stored_with_didset";
   case ReadWriteImplKind::InheritedWithDidSet:
     return "inherited_with_didset";
+  case ReadWriteImplKind::Mutate:
+    return "mutate";
   }
   llvm_unreachable("bad kind");
 }
@@ -3811,12 +3817,6 @@ public:
 
     printFoot();
   }
-  void visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E,
-                                         Label label) {
-    printCommon(E, "unresolvedtype_conversion_expr", label);
-    printRec(E->getSubExpr(), Label::optional("sub_expr"));
-    printFoot();
-  }
   void visitFunctionConversionExpr(FunctionConversionExpr *E, Label label) {
     printCommon(E, "function_conversion_expr", label);
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
@@ -4619,6 +4619,8 @@ public:
 
   void visitErrorTypeRepr(ErrorTypeRepr *T, Label label) {
     printCommon("type_error", label);
+    if (auto *originalExpr = T->getOriginalExpr())
+      printRec(originalExpr, Label::optional("original_expr"));
   }
 
   void visitAttributedTypeRepr(AttributedTypeRepr *T, Label label) {
@@ -5022,6 +5024,7 @@ public:
   TRIVIAL_ATTR_PRINTER(NoLocks, no_locks)
   TRIVIAL_ATTR_PRINTER(NoMetadata, no_metadata)
   TRIVIAL_ATTR_PRINTER(NoObjCBridging, no_objc_bridging)
+  TRIVIAL_ATTR_PRINTER(ManualOwnership, manual_ownership)
   TRIVIAL_ATTR_PRINTER(NoRuntime, no_runtime)
   TRIVIAL_ATTR_PRINTER(NonEphemeral, non_ephemeral)
   TRIVIAL_ATTR_PRINTER(NonEscapable, non_escapable)
@@ -6077,6 +6080,8 @@ namespace {
                             Label::optional("originating_var"), DeclColor);
       } else if (isa<ErrorExpr *>(originator)) {
         printFlag("error_expr");
+      } else if (auto *errTy = originator.dyn_cast<ErrorType *>()) {
+        printRec(errTy, Label::always("error_type"));
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         printRec(DMT, Label::always("dependent_member_type"));
       } else if (isa<TypeRepr *>(originator)) {

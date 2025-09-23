@@ -117,6 +117,11 @@ intptr_t swift_ASTGen_configuredRegions(
 void swift_ASTGen_freeConfiguredRegions(
     BridgedIfConfigClauseRangeInfo *_Nullable regions, intptr_t numRegions);
 
+intptr_t swift_ASTGen_activeInEmbeddedSwift(
+    BridgedASTContext astContext,
+    void *_Nonnull sourceFile,
+    swift::SourceLoc location);
+
 bool swift_ASTGen_validateUnqualifiedLookup(
     void *_Nonnull sourceFile,
     BridgedASTContext astContext,

@@ -213,7 +213,8 @@ struct FilterRule {
 
 enum class DiagnosticSeverityKind {
   Warning,
-  Error
+  Error,
+  Remark
 };
 
 enum class DiagnosticCategory {
@@ -1011,6 +1012,56 @@ public:
   virtual void cancelled() = 0;
 };
 
+struct SignatureHelpResponse {
+  struct Parameter {
+    /// The offset of the parameter text in the signature text.
+    unsigned Offset;
+
+    /// The length of the parameter text in the signature text.
+    unsigned Length;
+
+    /// The documentation comment for the parameter.
+    StringRef DocComment;
+
+    /// The internal parameter name.
+    StringRef Name;
+
+    Parameter() {}
+  };
+
+  struct Signature {
+    /// The text describing the signature.
+    StringRef Text;
+
+    /// The documentation comment for the signature.
+    StringRef Doc;
+
+    /// The index of the active parameter if any.
+    std::optional<unsigned> ActiveParam;
+
+    /// The parameters for the signature.
+    ArrayRef<Parameter> Params;
+  };
+
+  /// The index of the active signature.
+  unsigned ActiveSignature;
+
+  /// The available signatures/overloads.
+  ArrayRef<Signature> Signatures;
+};
+
+class SignatureHelpConsumer {
+  virtual void anchor();
+
+public:
+  virtual ~SignatureHelpConsumer() {}
+
+  virtual void handleResult(const SignatureHelpResponse &Result) = 0;
+  virtual void setReusingASTContext(bool flag) = 0;
+  virtual void failed(StringRef ErrDescription) = 0;
+  virtual void cancelled() = 0;
+};
+
 struct CompilationResult {
   unsigned int ResultStatus;
   llvm::ArrayRef<DiagnosticEntryInfo> Diagnostics;
@@ -1266,6 +1317,12 @@ public:
       SourceKitCancellationToken CancellationToken,
       ConformingMethodListConsumer &Consumer,
       std::optional<VFSOptions> vfsOptions) = 0;
+
+  virtual void getSignatureHelp(StringRef PrimaryFilePath, unsigned Offset,
+                                ArrayRef<const char *> Args,
+                                SourceKitCancellationToken CancellationToken,
+                                SignatureHelpConsumer &Consumer,
+                                std::optional<VFSOptions> vfsOptions) = 0;
 
   virtual void expandMacroSyntactically(llvm::MemoryBuffer *inputBuf,
                                         ArrayRef<const char *> args,

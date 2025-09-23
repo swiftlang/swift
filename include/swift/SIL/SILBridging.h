@@ -60,6 +60,10 @@ class SymbolicValueBumpAllocator;
 class ConstExprEvaluator;
 class SILWitnessTable;
 class SILDefaultWitnessTable;
+class SILLoopInfo;
+class SILLoop;
+class BridgedClonerImpl;
+class BridgedTypeSubstClonerImpl;
 class SILDebugLocation;
 class NominalTypeDecl;
 class VarDecl;
@@ -75,10 +79,24 @@ class SILLocation;
 class BasicBlockSet;
 class NodeSet;
 class OperandSet;
-class ClonerWithFixedLocation;
 class FixedSizeSlabPayload;
 class FixedSizeSlab;
 }
+
+struct BridgedLoop {
+  swift::SILLoop * _Nonnull l;
+  
+  BRIDGED_INLINE SwiftInt getInnerLoopCount() const;
+  BRIDGED_INLINE BridgedLoop getInnerLoop(SwiftInt index) const;
+  
+  BRIDGED_INLINE SwiftInt getBasicBlockCount() const;
+  BRIDGED_INLINE BridgedBasicBlock getBasicBlock(SwiftInt index) const;
+  
+  BRIDGED_INLINE OptionalBridgedBasicBlock getPreheader() const;
+  BRIDGED_INLINE BridgedBasicBlock getHeader() const;
+  
+  BRIDGED_INLINE bool contains(BridgedBasicBlock block) const;
+};
 
 bool swiftModulesInitialized();
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
@@ -89,7 +107,9 @@ enum class BridgedResultConvention {
   Unowned,
   UnownedInnerPointer,
   Autoreleased,
-  Pack
+  Pack,
+  GuaranteedAddress,
+  Guaranteed,
 };
 
 struct BridgedResultInfo {
@@ -443,13 +463,18 @@ struct BridgedFunction {
     NoLocks = 2,
     NoRuntime = 3,
     NoExistentials = 4,
-    NoObjCBridging = 5
+    NoObjCBridging = 5,
+    ManualOwnership = 6,
   };
 
   enum class InlineStrategy {
     InlineDefault,
     NoInline,
     AlwaysInline
+  };
+
+  enum class ABILanguage {
+    Swift, C
   };
 
   enum class ThunkKind {
@@ -513,6 +538,7 @@ struct BridgedFunction {
   BRIDGED_INLINE EffectsKind getEffectAttribute() const;
   BRIDGED_INLINE PerformanceConstraints getPerformanceConstraints() const;
   BRIDGED_INLINE InlineStrategy getInlineStrategy() const;
+  BRIDGED_INLINE ABILanguage getSILFunctionLanguage() const;
   BRIDGED_INLINE SerializedKind getSerializedKind() const;
   BRIDGED_INLINE bool canBeInlinedIntoCaller(SerializedKind) const;
   BRIDGED_INLINE bool hasValidLinkageForFragileRef(SerializedKind) const;
@@ -678,6 +704,7 @@ struct BridgedInstruction {
   bool maySynchronize() const;
   bool mayBeDeinitBarrierNotConsideringSideEffects() const;
   BRIDGED_INLINE bool shouldBeForwarding() const;
+  BRIDGED_INLINE bool isIdenticalTo(BridgedInstruction inst) const;
 
   // =========================================================================//
   //                   Generalized instruction subclasses
@@ -824,6 +851,8 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool BeginAccessInst_isStatic() const;
   BRIDGED_INLINE bool BeginAccessInst_isUnsafe() const;
   BRIDGED_INLINE void BeginAccess_setAccessKind(SwiftInt accessKind) const;
+  BRIDGED_INLINE SwiftInt BeginAccessInst_getEnforcement() const;
+  BRIDGED_INLINE void BeginAccess_setEnforcement(SwiftInt accessKind) const;
   BRIDGED_INLINE bool CopyAddrInst_isTakeOfSrc() const;
   BRIDGED_INLINE bool CopyAddrInst_isInitializationOfDest() const;
   BRIDGED_INLINE void CopyAddrInst_setIsTakeOfSrc(bool isTakeOfSrc) const;
@@ -841,6 +870,8 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool AllocRefInst_isBare() const;
   BRIDGED_INLINE void AllocRefInst_setIsBare() const;
   BRIDGED_INLINE void TermInst_replaceBranchTarget(BridgedBasicBlock from, BridgedBasicBlock to) const;
+  BRIDGED_INLINE BridgedSubstitutionMap KeyPathInst_getSubstitutionMap() const;
+  BRIDGED_INLINE bool KeyPathInst_hasPattern() const;
   BRIDGED_INLINE SwiftInt KeyPathInst_getNumComponents() const;
   BRIDGED_INLINE void KeyPathInst_getReferencedFunctions(SwiftInt componentIdx, KeyPathFunctionResults * _Nonnull results) const;
   BRIDGED_INLINE void GlobalAddrInst_clearToken() const;
@@ -1280,7 +1311,7 @@ struct BridgedBuilder{
                                                                            BridgedArgumentConvention calleeConvention,
                                                                            BridgedSubstitutionMap bridgedSubstitutionMap = BridgedSubstitutionMap(),
                                                                            bool hasUnknownIsolation = true,
-                                                                           bool isOnStack = false) const;                                                                                  
+                                                                           bool isOnStack = false) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBranch(BridgedBasicBlock destBlock,
                                                                      BridgedValueArray arguments) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCondBranch(BridgedValue condition,
@@ -1323,7 +1354,7 @@ struct BridgedBuilder{
                                           BridgedASTType::MetatypeRepresentation representation) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndCOWMutation(BridgedValue instance,
                                                                              bool keepUnique) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndCOWMutationAddr(BridgedValue instance) const;                                                                             
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndCOWMutationAddr(BridgedValue instance) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMarkDependence(
     BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind dependenceKind) const;
 
@@ -1378,18 +1409,6 @@ struct BridgedOperandSet {
   BRIDGED_INLINE bool insert(BridgedOperand operand) const;
   BRIDGED_INLINE void erase(BridgedOperand operand) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction getFunction() const;
-};
-
-struct BridgedCloner {
-  swift::ClonerWithFixedLocation * _Nonnull cloner;
-
-  BridgedCloner(BridgedGlobalVar var, BridgedContext context);
-  BridgedCloner(BridgedInstruction inst, BridgedContext context);
-  void destroy(BridgedContext context);
-  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
-  bool isValueCloned(BridgedValue v) const;
-  void clone(BridgedInstruction inst);
-  void recordFoldedValue(BridgedValue origValue, BridgedValue mappedValue);
 };
 
 struct BridgedContext {
@@ -1470,6 +1489,7 @@ struct BridgedContext {
   BRIDGED_INLINE void eraseInstruction(BridgedInstruction inst, bool salvageDebugInfo) const;
   BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
   static BRIDGED_INLINE void moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
+  static BRIDGED_INLINE void copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
 
     // SSAUpdater
 
@@ -1504,6 +1524,36 @@ struct BridgedContext {
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE Slab allocSlab(Slab afterSlab) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE Slab freeSlab(Slab slab) const;
+};
+
+struct BridgedCloner {
+  swift::BridgedClonerImpl * _Nonnull cloner;
+
+  BridgedCloner(BridgedGlobalVar var, BridgedContext context);
+  BridgedCloner(BridgedInstruction inst, BridgedContext context);
+  BridgedCloner(BridgedFunction emptyFunction, BridgedContext context);
+  void destroy(BridgedContext context);
+  SWIFT_IMPORT_UNSAFE BridgedFunction getCloned() const;
+  SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
+  void cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock,
+                         BridgedValueArray clonedEntryBlockArgs) const;
+  void cloneFunctionBody(BridgedFunction originalFunction) const;
+  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
+  bool isValueCloned(BridgedValue v) const;
+  void recordClonedInstruction(BridgedInstruction origInst, BridgedInstruction clonedInst) const;
+  void recordFoldedValue(BridgedValue orig, BridgedValue mapped) const;
+  BridgedInstruction clone(BridgedInstruction inst) const;
+};
+
+struct BridgedTypeSubstCloner {
+  swift::BridgedTypeSubstClonerImpl * _Nonnull cloner;
+
+  BridgedTypeSubstCloner(BridgedFunction fromFunction, BridgedFunction toFunction,
+                         BridgedSubstitutionMap substitutions, BridgedContext context);
+  void destroy(BridgedContext context);
+  void cloneFunctionBody() const;
+  SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
+  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
 };
 
 struct BridgedVerifier {

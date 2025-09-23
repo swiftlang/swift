@@ -2834,6 +2834,74 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   if (auto mainModule = SwiftContext.MainModule) {
     implicitImportInfo = mainModule->getImplicitImportInfo();
   }
+
+  if (!underlying->isSubModule()) {
+    // Make sure that synthesized Swift code in the clang module wrapper
+    // (e.g. _SwiftifyImport macro expansions) can access the same symbols
+    // as if it were actually in the clang module, by copying the imports.
+    // Because this top-level module wrapper contains all the imported decls
+    // of the clang submodules, we need to add the imports of all the
+    // transitive submodules, since we don't know at this point of the
+    // compilation which submodules will contain relevant macros.
+    // We also need to add (transitive) explicit submodules as imports,
+    // to make sure that they are marked as imported *somewhere* (clang modules
+    // including them don't count) - otherwise their decls won't be found after
+    // non-visible clang decls are filtered out.
+    llvm::SmallVector<const clang::Module *, 32> SubmoduleWorklist;
+    llvm::DenseSet<ImportPath> Imported;
+    SubmoduleWorklist.push_back(underlying);
+    ImportPath::Builder underlyingSwiftModulePath =
+        getSwiftModulePath(underlying);
+    Imported.insert(underlyingSwiftModulePath.get());
+    for (auto UI : implicitImportInfo.AdditionalUnloadedImports)
+      Imported.insert(UI.module.getImportPath());
+    assert(implicitImportInfo.AdditionalImports.empty());
+
+    auto addImplicitImport = [&implicitImportInfo, &Imported,
+                              this](const clang::Module *M,
+                                    bool guaranteedUnique) {
+      ImportPath::Builder builder = getSwiftModulePath(M);
+      if (!guaranteedUnique && Imported.count(builder.get()))
+        return;
+
+      // Don't perform this clone for modules already added to the list
+      ImportPath importedModulePath = builder.copyTo(SwiftContext);
+
+#ifndef NDEBUG
+      const bool performSanityCheck = true;
+#else
+      const bool performSanityCheck = false;
+#endif
+      if (!guaranteedUnique || performSanityCheck) {
+        bool WasInserted = Imported.insert(importedModulePath).second;
+        assert(WasInserted);
+      }
+
+      UnloadedImportedModule importedModule(importedModulePath,
+                                            ImportKind::Module);
+      implicitImportInfo.AdditionalUnloadedImports.push_back(
+          std::move(importedModule));
+    };
+
+    while (!SubmoduleWorklist.empty()) {
+      const clang::Module *CurrModule = SubmoduleWorklist.pop_back_val();
+      if (CurrModule->IsExplicit) {
+        // We don't add imports under the same TLM, and submodules form
+        // a tree, so these don't require deduplication.
+        addImplicitImport(CurrModule, /*guaranteedUnique=*/true);
+      }
+      for (auto *I : CurrModule->Imports) {
+        // `underlying` is the current TLM. Only explicit submodules need to
+        // be imported under the same TLM, which is handled above.
+        if (I->getTopLevelModule() == underlying)
+          continue;
+        addImplicitImport(I, /*guaranteedUnique=*/false);
+      }
+      for (auto *Submodule : CurrModule->submodules())
+        SubmoduleWorklist.push_back(Submodule);
+    }
+  }
+
   ClangModuleUnit *file = nullptr;
   auto wrapper = ModuleDecl::create(name, SwiftContext, implicitImportInfo,
                                     [&](ModuleDecl *wrapper, auto addFile) {
@@ -3559,6 +3627,17 @@ void ClangImporter::lookupTypeDecl(
         if (auto ext = dyn_cast_or_null<ExtensionDecl>(imported)) {
           imported = ext->getExtendedNominal();
         }
+
+        // Look through compatibility aliases since we must have mangled the
+        // underlying type (see ASTMangler::getSpecialManglingContext).
+        if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(imported)) {
+          if (alias->isCompatibilityAlias()) {
+            imported = alias->getUnderlyingType()->getAnyNominal();
+            assert(imported != nullptr &&
+                   "No underlying decl for a compatibility typealias");
+          }
+        }
+
         if (auto *importedType = dyn_cast_or_null<TypeDecl>(imported)) {
           foundViaClang = true;
           receiver(importedType);
@@ -3731,7 +3810,11 @@ ImportDecl *swift::createImportDecl(ASTContext &Ctx,
   while (TmpMod) {
     // If this is a C++ stdlib module, print its name as `CxxStdlib` instead of
     // `std`. `CxxStdlib` is the only accepted spelling of the C++ stdlib module
-    // name in Swift.
+    // name in Swift. In libc++ versions 17-19 there are multiple TLMs, named
+    // std_vector, std_array etc. We don't support importing those modules, but
+    // when printing the module interface it'd be weird to print "import
+    // CxxStdlib" over and over, so those are still printed as "import
+    // std_vector". This only affects the module interface for CxxStdlib.
     Identifier moduleName = !TmpMod->isSubModule() && TmpMod->Name == "std"
                                 ? Ctx.Id_CxxStdlib
                                 : Ctx.getIdentifier(TmpMod->Name);
@@ -4586,8 +4669,8 @@ void ClangModuleUnit::getImportedModulesForLookup(
     if (owner.SwiftContext.LangOpts.EnableCXXInterop && topLevel &&
         isCxxStdModule(topLevel) && wrapper->clangModule &&
         isCxxStdModule(wrapper->clangModule)) {
-      // The CxxStdlib overlay re-exports the clang module std, which in recent
-      // libc++ versions re-exports top-level modules for different std headers
+      // The CxxStdlib overlay re-exports the clang module std, which in libc++
+      // versions 17-19 re-exports top-level modules for different std headers
       // (std_string, std_vector, etc). The overlay module for each of the std
       // modules is the CxxStdlib module itself. Make sure we return the actual
       // clang modules (std_xyz) as transitive dependencies instead of just
@@ -5184,7 +5267,7 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
   return result;
 }
 
-static const llvm::StringMap<std::vector<int>> STLConditionalEscapableParams{
+static const llvm::StringMap<std::vector<int>> STLConditionalParams{
     {"basic_string", {0}},
     {"vector", {0}},
     {"array", {0}},
@@ -5260,10 +5343,10 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
       return CxxEscapability::Escapable;
     auto injectedStlAnnotation =
         recordDecl->isInStdNamespace()
-            ? STLConditionalEscapableParams.find(recordDecl->getName())
-            : STLConditionalEscapableParams.end();
+            ? STLConditionalParams.find(recordDecl->getName())
+            : STLConditionalParams.end();
     bool hasInjectedSTLAnnotation =
-        injectedStlAnnotation != STLConditionalEscapableParams.end();
+        injectedStlAnnotation != STLConditionalParams.end();
     auto conditionalParams = getConditionalEscapableAttrParams(recordDecl);
     if (!conditionalParams.empty() || hasInjectedSTLAnnotation) {
       auto specDecl = cast<clang::ClassTemplateSpecializationDecl>(recordDecl);
@@ -7904,10 +7987,27 @@ getRefParentDecls(const clang::RecordDecl *decl, ASTContext &ctx,
 }
 
 llvm::SmallVector<ValueDecl *, 1>
-importer::getValueDeclsForName(
-    const clang::Decl *decl, ASTContext &ctx, StringRef name) {
+importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
+  // If the name is empty, don't try to find any decls.
+  if (name.empty())
+    return {};
+
+  auto &ctx = decl->getASTContext();
+  auto clangDecl = decl->getClangDecl();
   llvm::SmallVector<ValueDecl *, 1> results;
-  auto *clangMod = decl->getOwningModule();
+
+  if (name.starts_with(".")) {
+    // Look for a member of decl instead of a global.
+    StringRef memberName = name.drop_front(1);
+    if (memberName.empty())
+      return {};
+    auto declName = DeclName(ctx.getIdentifier(memberName));
+    auto allResults = evaluateOrDefault(
+        ctx.evaluator, ClangRecordMemberLookup({decl, declName}), {});
+    return SmallVector<ValueDecl *, 1>(allResults.begin(), allResults.end());
+  }
+
+  auto *clangMod = clangDecl->getOwningModule();
   if (clangMod && clangMod->isSubModule())
     clangMod = clangMod->getTopLevelModule();
   if (clangMod) {
@@ -8083,87 +8183,13 @@ bool importer::isViewType(const clang::CXXRecordDecl *decl) {
   return !hasOwnedValueAttr(decl) && hasPointerInSubobjects(decl);
 }
 
-static bool copyConstructorIsDefaulted(const clang::CXXRecordDecl *decl) {
-  auto ctor = llvm::find_if(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-    return ctor->isCopyConstructor();
-  });
-
-  assert(ctor != decl->ctor_end());
-  return ctor->isDefaulted();
-}
-
-static bool copyAssignOperatorIsDefaulted(const clang::CXXRecordDecl *decl) {
-  auto copyAssignOp = llvm::find_if(decl->decls(), [](clang::Decl *member) {
-    if (auto method = dyn_cast<clang::CXXMethodDecl>(member))
-      return method->isCopyAssignmentOperator();
-    return false;
-  });
-
-  assert(copyAssignOp != decl->decls_end());
-  return cast<clang::CXXMethodDecl>(*copyAssignOp)->isDefaulted();
-}
-
-/// Recursively checks that there are no user-provided copy constructors or
-/// destructors in any fields or base classes.
-/// Does not check C++ records with specific API annotations.
-static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
-  // Probably a class template that has not yet been specialized:
-  if (!decl->getDefinition())
-    return true;
-
-  if ((decl->hasUserDeclaredCopyConstructor() &&
-       !copyConstructorIsDefaulted(decl)) ||
-      (decl->hasUserDeclaredCopyAssignment() &&
-       !copyAssignOperatorIsDefaulted(decl)) ||
-      (decl->hasUserDeclaredDestructor() && decl->getDestructor() &&
-       !decl->getDestructor()->isDefaulted()))
-    return false;
-
-  auto checkType = [](clang::QualType t) {
-    if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
-      if (auto cxxRecord =
-              dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
-        if (hasImportAsRefAttr(cxxRecord) || hasOwnedValueAttr(cxxRecord) ||
-            hasUnsafeAPIAttr(cxxRecord))
-          return true;
-
-        if (!isSufficientlyTrivial(cxxRecord))
-          return false;
-      }
-    }
-
-    return true;
-  };
-
-  for (auto field : decl->fields()) {
-    if (!checkType(field->getType()))
-      return false;
-  }
-
-  for (auto base : decl->bases()) {
-    if (!checkType(base.getType()))
-      return false;
-  }
-
-  return true;
-}
-
-/// Checks if a record provides the required value type lifetime operations
-/// (copy and destroy).
 static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
-  // Hack for a base type of std::optional from the Microsoft standard library.
-  if (decl->isInStdNamespace() && decl->getIdentifier() &&
-      decl->getName() == "_Optional_construct_base")
-    return true;
-
   if (decl->hasSimpleCopyConstructor())
     return true;
 
-  // If we have no way of copying the type we can't import the class
-  // at all because we cannot express the correct semantics as a swift
-  // struct.
   return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
     return ctor->isCopyConstructor() && !ctor->isDeleted() &&
+           !ctor->isIneligibleOrNotSelected() &&
            // FIXME: Support default arguments (rdar://142414553)
            ctor->getNumParams() == 1 &&
            ctor->getAccess() == clang::AccessSpecifier::AS_public;
@@ -8171,12 +8197,10 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
 }
 
 static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
-  // If we have no way of copying the type we can't import the class
-  // at all because we cannot express the correct semantics as a swift
-  // struct.
   if (llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
         return ctor->isMoveConstructor() &&
-               (ctor->isDeleted() || ctor->getAccess() != clang::AS_public);
+               (ctor->isDeleted() || ctor->isIneligibleOrNotSelected() ||
+                ctor->getAccess() != clang::AS_public);
       }))
     return false;
 
@@ -8189,7 +8213,8 @@ static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
 
 static bool hasDestroyTypeOperations(const clang::CXXRecordDecl *decl) {
   if (auto dtor = decl->getDestructor()) {
-    if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
+    if (dtor->isDeleted() || dtor->isIneligibleOrNotSelected() ||
+        dtor->getAccess() != clang::AS_public) {
       return false;
     }
     return true;
@@ -8245,49 +8270,17 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
 
   auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl);
   if (!cxxDecl) {
-    if (hasNonCopyableAttr(decl))
-      return CxxRecordSemanticsKind::MoveOnly;
-
-    return CxxRecordSemanticsKind::Trivial;
+    return CxxRecordSemanticsKind::Value;
   }
 
   if (isSwiftClassType(cxxDecl))
     return CxxRecordSemanticsKind::SwiftClassType;
 
-  if (!hasDestroyTypeOperations(cxxDecl) ||
-      (!hasCopyTypeOperations(cxxDecl) && !hasMoveTypeOperations(cxxDecl))) {
-
-    if (hasConstructorWithUnsupportedDefaultArgs(cxxDecl))
-      return CxxRecordSemanticsKind::UnavailableConstructors;
-
-    return CxxRecordSemanticsKind::MissingLifetimeOperation;
-  }
-
-  if (hasNonCopyableAttr(cxxDecl) && hasMoveTypeOperations(cxxDecl)) {
-    return CxxRecordSemanticsKind::MoveOnly;
-  }
-
-  if (hasOwnedValueAttr(cxxDecl)) {
-    return CxxRecordSemanticsKind::Owned;
-  }
-
   if (hasIteratorAPIAttr(cxxDecl) || isIterator(cxxDecl)) {
     return CxxRecordSemanticsKind::Iterator;
   }
 
-  if (hasCopyTypeOperations(cxxDecl)) {
-    return CxxRecordSemanticsKind::Owned;
-  }
-
-  if (hasMoveTypeOperations(cxxDecl)) {
-    return CxxRecordSemanticsKind::MoveOnly;
-  }
-
-  if (isSufficientlyTrivial(cxxDecl)) {
-    return CxxRecordSemanticsKind::Trivial;
-  }
-
-  llvm_unreachable("Could not classify C++ type.");
+  return CxxRecordSemanticsKind::Value;
 }
 
 ValueDecl *
@@ -8316,6 +8309,105 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
       return results[0];
   }
   return nullptr;
+}
+
+CxxValueSemanticsKind
+CxxValueSemantics::evaluate(Evaluator &evaluator,
+                            CxxValueSemanticsDescriptor desc) const {
+
+  const auto *type = desc.type;
+  auto *importerImpl = desc.importerImpl;
+
+  auto desugared = type->getUnqualifiedDesugaredType();
+  const auto *recordType = desugared->getAs<clang::RecordType>();
+  if (!recordType)
+    return CxxValueSemanticsKind::Copyable;
+
+  auto recordDecl = recordType->getDecl();
+
+  // When a reference type is copied, the pointer’s value is copied rather than
+  // the object’s storage. This means reference types can be imported as
+  // copyable to Swift, even when they are non-copyable in C++.
+  if (recordHasReferenceSemantics(recordDecl, importerImpl))
+    return CxxValueSemanticsKind::Copyable;
+
+  if (recordDecl->isInStdNamespace()) {
+    // Hack for a base type of std::optional from the Microsoft standard
+    // library.
+    if (recordDecl->getIdentifier() &&
+        recordDecl->getName() == "_Optional_construct_base")
+      return CxxValueSemanticsKind::Copyable;
+
+    auto injectedStlAnnotation =
+        STLConditionalParams.find(recordDecl->getName());
+
+    if (injectedStlAnnotation != STLConditionalParams.end()) {
+      auto specDecl = cast<clang::ClassTemplateSpecializationDecl>(recordDecl);
+      auto &argList = specDecl->getTemplateArgs();
+      for (auto argToCheck : injectedStlAnnotation->second) {
+        auto arg = argList[argToCheck];
+        llvm::SmallVector<clang::TemplateArgument, 1> nonPackArgs;
+        if (arg.getKind() == clang::TemplateArgument::Pack) {
+          auto pack = arg.getPackAsArray();
+          nonPackArgs.assign(pack.begin(), pack.end());
+        } else
+          nonPackArgs.push_back(arg);
+        for (auto nonPackArg : nonPackArgs) {
+
+          auto argValueSemantics = evaluateOrDefault(
+              evaluator,
+              CxxValueSemantics(
+                  {nonPackArg.getAsType()->getUnqualifiedDesugaredType(),
+                   desc.importerImpl}),
+              {});
+          if (argValueSemantics != CxxValueSemanticsKind::Copyable)
+            return argValueSemantics;
+        }
+      }
+
+      return CxxValueSemanticsKind::Copyable;
+    }
+  }
+
+  const auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
+  if (!cxxRecordDecl || !cxxRecordDecl->isCompleteDefinition()) {
+    if (hasNonCopyableAttr(recordDecl))
+      return CxxValueSemanticsKind::MoveOnly;
+    return CxxValueSemanticsKind::Copyable;
+  }
+
+  bool isCopyable = hasCopyTypeOperations(cxxRecordDecl);
+  bool isMovable = hasMoveTypeOperations(cxxRecordDecl);
+
+  if (!hasDestroyTypeOperations(cxxRecordDecl) || (!isCopyable && !isMovable)) {
+
+    if (hasConstructorWithUnsupportedDefaultArgs(cxxRecordDecl))
+      return CxxValueSemanticsKind::UnavailableConstructors;
+
+    return CxxValueSemanticsKind::MissingLifetimeOperation;
+  }
+
+  if (hasNonCopyableAttr(cxxRecordDecl) && isMovable)
+    return CxxValueSemanticsKind::MoveOnly;
+
+  if (isCopyable)
+    return CxxValueSemanticsKind::Copyable;
+
+  if (isMovable)
+    return CxxValueSemanticsKind::MoveOnly;
+
+  llvm_unreachable("Could not classify C++ type.");
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           CxxValueSemanticsDescriptor desc) {
+  out << "Checking if '";
+  out << clang::QualType(desc.type, 0).getAsString();
+  out << "' is copyable or movable.";
+}
+
+SourceLoc swift::extractNearestSourceLoc(CxxValueSemanticsDescriptor) {
+  return SourceLoc();
 }
 
 static bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
@@ -8511,7 +8603,7 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
     return {CustomRefCountingOperationResult::immortal, nullptr, name};
 
   llvm::SmallVector<ValueDecl *, 1> results =
-      getValueDeclsForName(swiftDecl->getClangDecl(), ctx, name);
+      getValueDeclsForName(const_cast<ClassDecl*>(swiftDecl), name);
   if (results.size() == 1)
     return {CustomRefCountingOperationResult::foundOperation, results.front(),
             name};
@@ -8691,7 +8783,7 @@ bool importer::isCxxStdModule(const clang::Module *module) {
 bool importer::isCxxStdModule(StringRef moduleName, bool IsSystem) {
   if (moduleName == "std")
     return true;
-  // In recent libc++ versions the module is split into multiple top-level
+  // In libc++ versions 17-19 the module is split into multiple top-level
   // modules (std_vector, std_utility, etc).
   if (IsSystem && moduleName.starts_with("std_")) {
     if (moduleName == "std_errno_h")
@@ -8699,6 +8791,19 @@ bool importer::isCxxStdModule(StringRef moduleName, bool IsSystem) {
     return true;
   }
   return false;
+}
+
+ImportPath::Builder ClangImporter::Implementation::getSwiftModulePath(const clang::Module *M) {
+  ImportPath::Builder builder;
+  while (M) {
+    if (!M->isSubModule() && isCxxStdModule(M))
+      builder.push_back(SwiftContext.Id_CxxStdlib);
+    else
+      builder.push_back(SwiftContext.getIdentifier(M->Name));
+    M = M->Parent;
+  }
+  std::reverse(builder.begin(), builder.end());
+  return builder;
 }
 
 std::optional<clang::QualType>

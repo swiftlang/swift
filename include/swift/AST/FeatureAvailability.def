@@ -82,6 +82,7 @@ FEATURE(ValueGenericType,                               (6, 2))
 FEATURE(InitRawStructMetadata2,                         (6, 2))
 FEATURE(CustomGlobalExecutors,                          (6, 2))
 FEATURE(TaskExecutor,                                   (6, 2))
+FEATURE(TypedCoroAlloc,                                 (6, 2))
 
 FEATURE(Differentiation,                                FUTURE)
 FEATURE(ClearSensitive,                                 FUTURE)

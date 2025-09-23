@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -swift-version 6 -o %t/a.out %s
+// RUN: %target-build-swift -o %t/a.out %s
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test

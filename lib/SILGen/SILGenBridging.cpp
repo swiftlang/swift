@@ -2170,23 +2170,22 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   SmallVector<SILValue, 8> params;
 
   bindParametersForForwarding(fd->getParameters(), params);
-  if (thunk.kind != SILDeclRef::Kind::Allocator)
-    if (auto *selfDecl = fd->getImplicitSelfDecl())
-      bindParameterForForwarding(selfDecl, params);
-
-  // For allocating constructors, 'self' is a metatype, not the 'self' value
-  // formally present in the constructor body.
   Type allocatorSelfType;
-  if (thunk.kind == SILDeclRef::Kind::Allocator) {
-    auto *selfDecl = fd->getImplicitSelfDecl();
-    allocatorSelfType = F.mapTypeIntoContext(
-      fd->getDeclContext()->getSelfInterfaceType());
-
-    auto selfMetatype =
-      CanMetatypeType::get(allocatorSelfType->getCanonicalType());
-    auto selfArg = F.begin()->createFunctionArgument(
-        getLoweredLoadableType(selfMetatype), selfDecl);
+  if (auto *selfDecl = fd->getImplicitSelfDecl()) {
+    // The self declaration sometimes differ in dynamic-self-ness from the
+    // lowered function type, so get the self parameter type from the function
+    // type rather than the declaration.
+    auto selfArgTy = F.getLoweredFunctionType()->getSelfParameter()
+      .getSILStorageType(getModule(), F.getLoweredFunctionType(), getTypeExpansionContext());
+    auto selfArg = F.begin()->createFunctionArgument(F.mapTypeIntoContext(selfArgTy), selfDecl);
     params.push_back(selfArg);
+
+    // For allocating constructors, 'self' is a metatype, not the 'self' value
+    // formally present in the constructor body.
+    if (thunk.kind == SILDeclRef::Kind::Allocator) {
+      allocatorSelfType = F.mapTypeIntoContext(
+        fd->getDeclContext()->getSelfInterfaceType());
+    }
   }
 
   // Set up the throw destination if necessary.

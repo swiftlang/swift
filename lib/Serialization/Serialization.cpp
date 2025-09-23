@@ -533,6 +533,7 @@ static uint8_t getRawReadImplKind(swift::ReadImplKind kind) {
   CASE(Address)
   CASE(Read)
   CASE(Read2)
+  CASE(Borrow)
 #undef CASE
   }
   llvm_unreachable("bad kind");
@@ -551,6 +552,7 @@ static unsigned getRawWriteImplKind(swift::WriteImplKind kind) {
   CASE(MutableAddress)
   CASE(Modify)
   CASE(Modify2)
+  CASE(Mutate)
 #undef CASE
   }
   llvm_unreachable("bad kind");
@@ -569,6 +571,7 @@ static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
   CASE(Modify2)
   CASE(StoredWithDidSet)
   CASE(InheritedWithDidSet)
+  CASE(Mutate)
 #undef CASE
   }
   llvm_unreachable("bad kind");
@@ -864,6 +867,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, ALLOW_NON_RESILIENT_ACCESS);
   BLOCK_RECORD(options_block, SERIALIZE_PACKAGE_ENABLED);
   BLOCK_RECORD(options_block, STRICT_MEMORY_SAFETY);
+  BLOCK_RECORD(options_block, DEFERRED_CODE_GEN);
   BLOCK_RECORD(options_block, CXX_STDLIB_KIND);
   BLOCK_RECORD(options_block, PUBLIC_MODULE_NAME);
   BLOCK_RECORD(options_block, SWIFT_INTERFACE_COMPILER_VERSION);
@@ -1177,6 +1181,11 @@ void Serializer::writeHeader() {
         StrictMemorySafety.emit(ScratchRecord);
       }
 
+      if (M->deferredCodeGen()) {
+        options_block::DeferredCodeGenLayout DeferredCodeGen(Out);
+        DeferredCodeGen.emit(ScratchRecord);
+      }
+
       if (M->hasCxxInteroperability()) {
         options_block::HasCxxInteroperabilityEnabledLayout
             CxxInteroperabilityEnabled(Out);
@@ -1193,10 +1202,12 @@ void Serializer::writeHeader() {
 
         const auto &PathRemapper = Options.DebuggingOptionsPrefixMap;
         const auto &PathObfuscator = Options.PathObfuscator;
+        auto remapPath = [&PathRemapper, &PathObfuscator](StringRef Path) {
+          return PathObfuscator.obfuscate(PathRemapper.remapPath(Path));
+        };
+
         auto sdkPath = M->getASTContext().SearchPathOpts.getSDKPath();
-        SDKPath.emit(
-            ScratchRecord,
-            PathObfuscator.obfuscate(PathRemapper.remapPath(sdkPath)));
+        SDKPath.emit(ScratchRecord, remapPath(sdkPath));
         auto &Opts = Options.ExtraClangOptions;
         for (auto Arg = Opts.begin(), E = Opts.end(); Arg != E; ++Arg) {
           StringRef arg(*Arg);
@@ -1240,7 +1251,7 @@ void Serializer::writeHeader() {
             auto &opt = elem.get<PluginSearchOption::PluginPath>();
             PluginSearchOpt.emit(ScratchRecord,
                                  uint8_t(PluginSearchOptionKind::PluginPath),
-                                 opt.SearchPath);
+                                 remapPath(opt.SearchPath));
             continue;
           }
           case PluginSearchOption::Kind::ExternalPluginPath: {
@@ -1248,7 +1259,7 @@ void Serializer::writeHeader() {
             PluginSearchOpt.emit(
                 ScratchRecord,
                 uint8_t(PluginSearchOptionKind::ExternalPluginPath),
-                opt.SearchPath + "#" + opt.ServerPath);
+                remapPath(opt.SearchPath) + "#" + remapPath(opt.ServerPath));
             continue;
           }
           case PluginSearchOption::Kind::LoadPluginLibrary: {
@@ -1256,12 +1267,12 @@ void Serializer::writeHeader() {
             PluginSearchOpt.emit(
                 ScratchRecord,
                 uint8_t(PluginSearchOptionKind::LoadPluginLibrary),
-                opt.LibraryPath);
+                remapPath(opt.LibraryPath));
             continue;
           }
           case PluginSearchOption::Kind::LoadPluginExecutable: {
             auto &opt = elem.get<PluginSearchOption::LoadPluginExecutable>();
-            std::string optStr = opt.ExecutablePath + "#";
+            std::string optStr = remapPath(opt.ExecutablePath) + "#";
             llvm::interleave(
                 opt.ModuleNames, [&](auto &name) { optStr += name; },
                 [&]() { optStr += ","; });
@@ -1272,8 +1283,8 @@ void Serializer::writeHeader() {
           }
           case PluginSearchOption::Kind::ResolvedPluginConfig: {
             auto &opt = elem.get<PluginSearchOption::ResolvedPluginConfig>();
-            std::string optStr =
-                opt.LibraryPath + "#" + opt.ExecutablePath + "#";
+            std::string optStr = remapPath(opt.LibraryPath) + "#" +
+                                 remapPath(opt.ExecutablePath) + "#";
             llvm::interleave(
                 opt.ModuleNames, [&](auto &name) { optStr += name; },
                 [&]() { optStr += ","; });
@@ -5512,6 +5523,8 @@ static uint8_t getRawStableResultConvention(swift::ResultConvention rc) {
   SIMPLE_CASE(ResultConvention, UnownedInnerPointer)
   SIMPLE_CASE(ResultConvention, Autoreleased)
   SIMPLE_CASE(ResultConvention, Pack)
+  SIMPLE_CASE(ResultConvention, GuaranteedAddress)
+  SIMPLE_CASE(ResultConvention, Guaranteed)
   }
   llvm_unreachable("bad result convention kind");
 }

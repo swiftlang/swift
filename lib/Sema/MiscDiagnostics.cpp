@@ -17,6 +17,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckEmbedded.h"
 #include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTBridging.h"
@@ -390,6 +391,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
       }
 
+      // Embedded Swift places restrictions on dynamic casting.
+      diagnoseDynamicCastInEmbedded(DC, cast);
+
       // now, look for conditional casts to marker protocols.
 
       if (!isa<ConditionalCheckedCastExpr>(cast) && !isa<IsExpr>(cast))
@@ -474,6 +478,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             copyExpr->getLoc(),
             diag::copy_expression_cannot_be_used_with_noncopyable_types);
       }
+
+      /// FIXME: there really is no reason for the restriction on copy not being
+      ///   permitted on fields, other than needing tests to ensure it works.
+      if (Ctx.LangOpts.hasFeature(ManualOwnership))
+        return;
 
       // We only allow for copy_expr to be applied directly to lvalues. We do
       // not allow currently for it to be applied to fields.
@@ -3459,7 +3468,7 @@ public:
 
     // Make sure that we setup our case body variables.
     if (auto *caseStmt = dyn_cast<CaseStmt>(S)) {
-      for (auto *vd : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+      for (auto *vd : caseStmt->getCaseBodyVariables()) {
         VarDecls[vd] |= RK_Defined;
       }
     }
@@ -3859,71 +3868,6 @@ public:
   }
 };
 
-class ReturnTypePlaceholderReplacer : public ASTWalker {
-  FuncDecl *Implementation;
-  BraceStmt *Body;
-  SmallVector<Type, 4> Candidates;
-
-  bool HasInvalidReturn = false;
-
-public:
-  ReturnTypePlaceholderReplacer(FuncDecl *Implementation, BraceStmt *Body)
-      : Implementation(Implementation), Body(Body) {}
-
-  void check() {
-    auto *resultRepr = Implementation->getResultTypeRepr();
-    if (!resultRepr) {
-      return;
-    }
-
-    Implementation->getASTContext()
-        .Diags
-        .diagnose(resultRepr->getLoc(),
-                  diag::placeholder_type_not_allowed_in_return_type)
-        .highlight(resultRepr->getSourceRange());
-
-    Body->walk(*this);
-
-    // If given function has any invalid returns in the body
-    // let's not try to validate the types, since it wouldn't
-    // be accurate.
-    if (HasInvalidReturn)
-      return;
-
-    auto writtenType = Implementation->getResultInterfaceType();
-    llvm::SmallPtrSet<TypeBase *, 8> seenTypes;
-    for (auto candidate : Candidates) {
-      if (!seenTypes.insert(candidate.getPointer()).second) {
-        continue;
-      }
-      TypeChecker::notePlaceholderReplacementTypes(writtenType, candidate);
-    }
-  }
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::ArgumentsAndExpansion;
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *E) override { return Action::Continue(E); }
-
-  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    if (auto *RS = dyn_cast<ReturnStmt>(S)) {
-      if (RS->hasResult()) {
-        auto resultTy = RS->getResult()->getType();
-        HasInvalidReturn |= resultTy.isNull() || resultTy->hasError();
-        Candidates.push_back(resultTy);
-      }
-    }
-
-    return Action::Continue(S);
-  }
-
-  // Don't descend into nested decls.
-  PreWalkAction walkToDeclPre(Decl *D) override {
-    return Action::SkipNode();
-  }
-};
-
 } // end anonymous namespace
 
 SourceLoc swift::getFixItLocForVarToLet(VarDecl *var) {
@@ -4005,14 +3949,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     if (!(access & RK_Defined))
       continue;
 
-    if (auto *caseStmt =
-            dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {
-      // Only diagnose VarDecls from the first CaseLabelItem in CaseStmts, as
-      // the remaining items must match it anyway.
-      auto caseItems = caseStmt->getCaseLabelItems();
-      assert(!caseItems.empty() &&
-             "If we have any case stmt var decls, we should have a case item");
-      if (!caseItems.front().getPattern()->containsVarDecl(var))
+    if (isa_and_nonnull<CaseStmt>(var->getRecursiveParentPatternStmt())) {
+      // Only diagnose for the parent-most VarDecl.
+      if (var->getParentVarDecl())
         continue;
 
       auto *childVar = var->getCorrespondingCaseBodyVariable().get();
@@ -4541,13 +4480,6 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
         OpaqueUnderlyingTypeChecker(AFD, opaqueResultTy, body).check();
       }
     }
-  } else if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-    auto resultIFaceTy = FD->getResultInterfaceType();
-    // If the result has a placeholder, we need to try to use the contextual
-    // type inferred in the body to replace it.
-    if (resultIFaceTy && resultIFaceTy->hasPlaceholder()) {
-      ReturnTypePlaceholderReplacer(FD, body).check();
-    }
   }
 }
 
@@ -5034,6 +4966,8 @@ public:
           case AccessorKind::Modify:
           case AccessorKind::Modify2:
           case AccessorKind::Init:
+          case AccessorKind::Borrow:
+          case AccessorKind::Mutate:
             llvm_unreachable("cannot be @objc");
           }
         } else {
@@ -6382,20 +6316,25 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
         for (const auto &component : KPE->getComponents()) {
           if (component.hasDeclRef())
-            checkDecl(component.getDeclRef().getDecl(), component.getLoc());
+            checkDecl(component.getDeclRef().getDecl(), component.getLoc(),
+                      /*downgradeToWarning=*/true);
         }
       }
 
       return Action::Continue(E);
     }
 
-    void checkDecl(const ValueDecl *decl, SourceLoc loc) {
+    void checkDecl(const ValueDecl *decl, SourceLoc loc,
+                   bool downgradeToWarning = false) {
       // Only diagnose uses of members.
       if (!decl->getDeclContext()->isTypeContext())
         return;
 
       if (!dc->isDeclImported(decl))
-        maybeDiagnoseMissingImportForMember(decl, dc, loc);
+        maybeDiagnoseMissingImportForMember(
+            decl, dc, loc,
+            downgradeToWarning ? DiagnosticBehavior::Warning
+                               : DiagnosticBehavior::Unspecified);
     }
   };
 
@@ -6808,7 +6747,7 @@ TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   // Handle contextual type, result type, and returnsSelf.
   Type contextType = afd->getDeclContext()->getDeclaredInterfaceType();
   Type resultType;
-  bool returnsSelf;
+  bool returnsSelf = false;
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
     resultType = func->getResultInterfaceType();

@@ -216,37 +216,45 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     llvm::PrefixMapper *Mapper, DiagnosticEngine &Diagnostics)
     : workerCompilerInvocation(
           std::make_unique<CompilerInvocation>(ScanCompilerInvocation)),
-      workerASTContext(std::unique_ptr<ASTContext>(
-          ASTContext::get(workerCompilerInvocation->getLangOptions(),
-                          workerCompilerInvocation->getTypeCheckerOptions(),
-                          workerCompilerInvocation->getSILOptions(),
-                          workerCompilerInvocation->getSearchPathOptions(),
-                          workerCompilerInvocation->getClangImporterOptions(),
-                          workerCompilerInvocation->getSymbolGraphOptions(),
-                          workerCompilerInvocation->getCASOptions(),
-                          workerCompilerInvocation->getSerializationOptions(),
-                          ScanASTContext.SourceMgr, Diagnostics))),
-      scanningASTDelegate(std::make_unique<InterfaceSubContextDelegateImpl>(
-          workerASTContext->SourceMgr, &workerASTContext->Diags,
-          workerASTContext->SearchPathOpts, workerASTContext->LangOpts,
-          workerASTContext->ClangImporterOpts, workerASTContext->CASOpts,
-          workerCompilerInvocation->getFrontendOptions(),
-          /* buildModuleCacheDirIfAbsent */ false,
-          getModuleCachePathFromClang(
-              ScanASTContext.getClangModuleLoader()->getClangInstance()),
-          workerCompilerInvocation->getFrontendOptions()
-              .PrebuiltModuleCachePath,
-          workerCompilerInvocation->getFrontendOptions()
-              .BackupModuleInterfaceDir,
-          workerCompilerInvocation->getFrontendOptions().CacheReplayPrefixMap,
-          workerCompilerInvocation->getFrontendOptions()
-              .SerializeModuleInterfaceDependencyHashes,
-          workerCompilerInvocation->getFrontendOptions()
-              .shouldTrackSystemDependencies(),
-          RequireOSSAModules_t(SILOptions))),
       clangScanningTool(*globalScanningService.ClangScanningService,
                         getClangScanningFS(CAS, ScanASTContext)),
       CAS(CAS), ActionCache(ActionCache) {
+  // Instantiate a worker-specific diagnostic engine and copy over
+  // the scanner's diagnostic consumers (expected to be thread-safe).
+  workerDiagnosticEngine = std::make_unique<DiagnosticEngine>(ScanASTContext.SourceMgr);
+  for (auto &scannerDiagConsumer : Diagnostics.getConsumers())
+    workerDiagnosticEngine->addConsumer(*scannerDiagConsumer);
+
+  workerASTContext = std::unique_ptr<ASTContext>(
+      ASTContext::get(workerCompilerInvocation->getLangOptions(),
+                      workerCompilerInvocation->getTypeCheckerOptions(),
+                      workerCompilerInvocation->getSILOptions(),
+                      workerCompilerInvocation->getSearchPathOptions(),
+                      workerCompilerInvocation->getClangImporterOptions(),
+                      workerCompilerInvocation->getSymbolGraphOptions(),
+                      workerCompilerInvocation->getCASOptions(),
+                      workerCompilerInvocation->getSerializationOptions(),
+                      ScanASTContext.SourceMgr, *workerDiagnosticEngine));
+
+  scanningASTDelegate = std::make_unique<InterfaceSubContextDelegateImpl>(
+      workerASTContext->SourceMgr, workerDiagnosticEngine.get(),
+      workerASTContext->SearchPathOpts, workerASTContext->LangOpts,
+      workerASTContext->ClangImporterOpts, workerASTContext->CASOpts,
+      workerCompilerInvocation->getFrontendOptions(),
+      /* buildModuleCacheDirIfAbsent */ false,
+      getModuleCachePathFromClang(
+          ScanASTContext.getClangModuleLoader()->getClangInstance()),
+      workerCompilerInvocation->getFrontendOptions()
+          .PrebuiltModuleCachePath,
+      workerCompilerInvocation->getFrontendOptions()
+          .BackupModuleInterfaceDir,
+      workerCompilerInvocation->getFrontendOptions().CacheReplayPrefixMap,
+      workerCompilerInvocation->getFrontendOptions()
+          .SerializeModuleInterfaceDependencyHashes,
+      workerCompilerInvocation->getFrontendOptions()
+          .shouldTrackSystemDependencies(),
+      RequireOSSAModules_t(SILOptions));
+
   auto loader = std::make_unique<PluginLoader>(
       *workerASTContext, /*DepTracker=*/nullptr,
       workerCompilerInvocation->getFrontendOptions().CacheReplayPrefixMap,
@@ -306,14 +314,13 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
       clangScanningWorkingDirectoryPath, alreadySeenModules,
       lookupModuleOutput);
   if (!clangModuleDependencies) {
-    auto errorStr = toString(clangModuleDependencies.takeError());
-    // We ignore the "module 'foo' not found" error, the Swift dependency
-    // scanner will report such an error only if all of the module loaders
-    // fail as well.
-    if (errorStr.find("fatal error: module '" + moduleName.str().str() +
-                      "' not found") == std::string::npos)
-      workerASTContext->Diags.diagnose(
-          SourceLoc(), diag::clang_dependency_scan_error, errorStr);
+    llvm::handleAllErrors(clangModuleDependencies.takeError(), [this, &moduleName](
+                                                  const llvm::StringError &E) {
+          auto &message = E.getMessage();
+          if (message.find("fatal error: module '" + moduleName.str().str() +
+                            "' not found") == std::string::npos)
+            workerDiagnosticEngine->diagnose(SourceLoc(), diag::clang_dependency_scan_error, message);
+      });
     return std::nullopt;
   }
 
@@ -347,7 +354,7 @@ ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
   auto clangModuleDependencies = scanHeaderDependencies();
   if (!clangModuleDependencies) {
     auto errorStr = toString(clangModuleDependencies.takeError());
-    workerASTContext->Diags.diagnose(
+    workerDiagnosticEngine->diagnose(
         SourceLoc(), diag::clang_header_dependency_scan_error, errorStr);
     return std::nullopt;
   }
@@ -553,23 +560,6 @@ ModuleDependencyScanner::ModuleDependencyScanner(
     Workers.emplace_front(std::make_unique<ModuleDependencyScanningWorker>(
         ScanningService, ScanCompilerInvocation, SILOptions, ScanASTContext,
         DependencyTracker, CAS, ActionCache, PrefixMapper.get(), Diagnostics));
-}
-
-/// Find all of the imported Clang modules starting with the given module name.
-static void findAllImportedClangModules(StringRef moduleName,
-                                        const ModuleDependenciesCache &cache,
-                                        llvm::StringSet<> &allModules) {
-  if (!allModules.insert(moduleName).second)
-    return;
-
-  auto moduleID =
-      ModuleDependencyID{moduleName.str(), ModuleDependencyKind::Clang};
-  auto optionalDependencies = cache.findDependency(moduleID);
-  if (!optionalDependencies.has_value())
-    return;
-
-  for (const auto &dep : cache.getAllClangDependencies(moduleID))
-    findAllImportedClangModules(dep.ModuleName, cache, allModules);
 }
 
 static std::set<ModuleDependencyID>
@@ -1459,11 +1449,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
     ModuleDependencyIDSetVector &swiftOverlayDependencies) {
   PrettyStackTraceStringAction trace(
       "Resolving Swift Overlay dependencies of module", moduleID.ModuleName);
-  llvm::StringSet<> allClangDependencies;
-
-  // Find all of the discovered Clang modules that this module depends on.
-  for (const auto &dep : cache.getAllClangDependencies(moduleID))
-    findAllImportedClangModules(dep.ModuleName, cache, allClangDependencies);
+  auto visibleClangDependencies = cache.getVisibleClangModules(moduleID);
 
   llvm::StringMap<SwiftModuleScannerQueryResult> swiftOverlayLookupResult;
   std::mutex lookupResultLock;
@@ -1494,7 +1480,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
   };
 
   // Enque asynchronous lookup tasks
-  for (const auto &clangDep : allClangDependencies)
+  for (const auto &clangDep : visibleClangDependencies)
     ScanningThreadPool.async(scanForSwiftDependency,
                              getModuleImportIdentifier(clangDep.getKey().str()));
   ScanningThreadPool.wait();
@@ -1523,7 +1509,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
             lookupResult.incompatibleCandidates, cache, std::nullopt);
     }
   };
-  for (const auto &clangDep : allClangDependencies)
+  for (const auto &clangDep : visibleClangDependencies)
     recordResult(clangDep.getKey().str());
 
   // C++ Interop requires additional handling
@@ -1556,7 +1542,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
     lookupCxxStdLibOverlay = false;
 
   if (lookupCxxStdLibOverlay) {
-    for (const auto &clangDepNameEntry : allClangDependencies) {
+    for (const auto &clangDepNameEntry : visibleClangDependencies) {
       auto clangDepName = clangDepNameEntry.getKey().str();
 
       // If this Clang module is a part of the C++ stdlib, and we haven't

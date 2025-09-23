@@ -1488,16 +1488,6 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
         return std::nullopt;
       }
 
-      if (Options.contains(
-            ConstraintSystemFlags::AllowUnresolvedTypeVariables)) {
-        dumpSolutions(solution);
-        auto ambiguousSolutions = std::move(solution).takeAmbiguousSolutions();
-        std::vector<Solution> result(
-            std::make_move_iterator(ambiguousSolutions.begin()),
-            std::make_move_iterator(ambiguousSolutions.end()));
-        return std::move(result);
-      }
-
       LLVM_FALLTHROUGH;
 
     case SolutionResult::UndiagnosedError:

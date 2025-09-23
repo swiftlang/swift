@@ -18,12 +18,15 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
+#include "TypeCheckEmbedded.h"
 #include "TypeCheckMacros.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -467,6 +470,7 @@ public:
   void visitUnsafeNonEscapableResultAttr(UnsafeNonEscapableResultAttr *attr);
 
   void visitStaticExclusiveOnlyAttr(StaticExclusiveOnlyAttr *attr);
+  void visitManualOwnershipAttr(ManualOwnershipAttr *attr);
   void visitWeakLinkedAttr(WeakLinkedAttr *attr);
   void visitSILGenNameAttr(SILGenNameAttr *attr);
   void visitLifetimeAttr(LifetimeAttr *attr);
@@ -2462,6 +2466,14 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
       diagnose(attr->getLocation(), diag::expose_wasm_not_at_top_level_func);
     break;
   }
+  case ExposureKind::NotCxx:
+    for (const auto *attr : D->getAttrs().getAttributes<ExposeAttr>())
+      if (attr->getExposureKind() == ExposureKind::Cxx)
+        diagnose(attr->getLocation(), diag::expose_only_non_other_attr,
+                 "@_expose(Cxx)");
+    if (!attr->Name.empty())
+      diagnose(attr->getLocation(), diag::expose_redundant_name_provided);
+    break;
   case ExposureKind::Cxx: {
     auto *VD = cast<ValueDecl>(D);
     // Expose cannot be mixed with '@_cdecl' declarations.
@@ -5491,12 +5503,14 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   }
 
   // Embedded Swift prohibits weak/unowned but allows unowned(unsafe).
-  if (ctx.LangOpts.hasFeature(Feature::Embedded)) {
+  if (auto behavior = shouldDiagnoseEmbeddedLimitations(
+          dc, attr->getLocation(),
+          /*wasAlwaysEmbeddedError=*/true)) {
     if (ownershipKind == ReferenceOwnership::Weak ||
         ownershipKind == ReferenceOwnership::Unowned) {
       Diags.diagnose(attr->getLocation(), diag::weak_unowned_in_embedded_swift,
-               ownershipKind);
-      attr->setInvalid();
+               ownershipKind)
+        .limitBehavior(*behavior);
     }
   }
 
@@ -5984,6 +5998,10 @@ static DescriptiveDeclKind getAccessorDescriptiveDeclKind(AccessorKind kind) {
     return DescriptiveDeclKind::MutableAddressor;
   case AccessorKind::Init:
     return DescriptiveDeclKind::InitAccessor;
+  case AccessorKind::Borrow:
+    return DescriptiveDeclKind::BorrowAccessor;
+  case AccessorKind::Mutate:
+    return DescriptiveDeclKind::MutateAccessor;
   }
 }
 
@@ -8339,6 +8357,13 @@ void AttributeChecker::visitStaticExclusiveOnlyAttr(
   if (structDecl->canBeCopyable() != TypeDecl::CanBeInvertible::Never) {
     diagnoseAndRemoveAttr(attr, diag::attr_static_exclusive_only_noncopyable);
   }
+}
+
+void AttributeChecker::visitManualOwnershipAttr(ManualOwnershipAttr *attr) {
+  if (Ctx.LangOpts.hasFeature(Feature::ManualOwnership))
+    return;
+
+  diagnoseAndRemoveAttr(attr, diag::attr_manual_ownership_experimental);
 }
 
 void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {

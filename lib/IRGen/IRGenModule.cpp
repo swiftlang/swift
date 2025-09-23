@@ -902,6 +902,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability TypedCoroAllocAvailability(ASTContext &context) {
+    auto featureAvailability = context.getTypedCoroAllocAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability ConcurrencyDiscardingTaskGroupAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getConcurrencyDiscardingTaskGroupAvailability();
@@ -2296,6 +2304,22 @@ IRGenModule *IRGenerator::getGenModule(SILFunction *f) {
 
   if (auto *dc = f->getDeclContext())
     return getGenModule(dc);
+
+  return getPrimaryIGM();
+}
+
+IRGenModule *IRGenerator::getGenModule(SILGlobalVariable *v) {
+  if (GenModules.size() == 1) {
+    return getPrimaryIGM();
+  }
+
+  auto found = DefaultIGMForGlobalVariable.find(v);
+  if (found != DefaultIGMForGlobalVariable.end())
+    return found->second;
+
+  if (auto decl = v->getDecl()) {
+    return getGenModule(decl->getDeclContext());
+  }
 
   return getPrimaryIGM();
 }

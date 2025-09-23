@@ -670,7 +670,7 @@ void filterSolutionsForCodeCompletion(
 /// \returns `true` if target was applicable and it was possible to infer
 /// types for code completion, `false` otherwise.
 bool typeCheckForCodeCompletion(
-    constraints::SyntacticElementTarget &target, bool needsPrecheck,
+    constraints::SyntacticElementTarget &target,
     llvm::function_ref<void(const constraints::Solution &)> callback);
 
 /// Check the key-path expression.
@@ -1238,24 +1238,6 @@ bool diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
                                  std::optional<FunctionTypeRepr *> repr,
                                  DeclContext *dc,
                                  std::optional<TypeResolutionStage> stage);
-
-/// Walk the parallel structure of a type with user-provided placeholders and
-/// an inferred type produced by the type checker. Where placeholders can be
-/// found, suggest the corresponding inferred type.
-///
-/// For example,
-///
-/// \code
-///  func foo(_ x: [_] = [0])
-/// \endcode
-///
-/// Has a written type of `(ArraySlice (Placeholder))` and an inferred type of
-/// `(ArraySlice Int)`, so we walk to `Placeholder` and `Int` in each type and
-/// suggest replacing `_` with `Int`.
-///
-/// \param writtenType The interface type usually derived from a user-written
-/// type repr. \param inferredType The type inferred by the type checker.
-void notePlaceholderReplacementTypes(Type writtenType, Type inferredType);
 } // namespace TypeChecker
 
 /// Returns the protocol requirement kind of the given declaration.
@@ -1416,26 +1398,9 @@ bool checkFallthroughStmt(FallthroughStmt *stmt);
 void checkUnknownAttrRestrictions(
     ASTContext &ctx, CaseStmt *caseBlock, bool &limitExhaustivityChecks);
 
-/// Bind all of the pattern variables that occur within a case statement and
-/// all of its case items to their "parent" pattern variables, forming chains
-/// of variables with the same name.
-///
-/// Given a case such as:
-/// \code
-/// case .a(let x), .b(let x), .c(let x):
-/// \endcode
-///
-/// Each case item contains a (different) pattern variable named.
-/// "x". This function will set the "parent" variable of the
-/// second and third "x" variables to the "x" variable immediately
-/// to its left. A fourth "x" will be the body case variable,
-/// whose parent will be set to the "x" within the final case
-/// item.
-///
-/// Each of the "x" variables must eventually have the same type, and agree on
-/// let vs. var. This function does not perform any of that validation, leaving
-/// it to later stages.
-void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
+/// Diagnoses any mutability mismatches for any same-named variables bound by
+/// given CaseStmt.
+void diagnoseCaseVarMutabilityMismatch(DeclContext *dc, CaseStmt *stmt);
 
 /// If \p attr was added by an access note, wraps the error in
 /// \c diag::wrap_invalid_attr_added_by_access_note and limits it as an access
@@ -1531,8 +1496,9 @@ void diagnoseUnnecessaryPublicImports(SourceFile &SF);
 /// delayed, the diagnostic will instead be emitted after type checking the
 /// entire file and will include an appropriate fix-it. Returns true if a
 /// diagnostic was emitted (and not delayed).
-bool maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
-                                         const DeclContext *dc, SourceLoc loc);
+bool maybeDiagnoseMissingImportForMember(
+    const ValueDecl *decl, const DeclContext *dc, SourceLoc loc,
+    DiagnosticBehavior limit = DiagnosticBehavior::Unspecified);
 
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.

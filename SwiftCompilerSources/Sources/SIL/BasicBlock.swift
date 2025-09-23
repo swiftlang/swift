@@ -153,6 +153,14 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
         return false
     }
   }
+  
+  public func isCriticalEdge(edgeIndex: Int) -> Bool {
+    if terminator.successors.count <= 1 {
+      return false
+    } else {
+      return !terminator.successors[edgeIndex].hasSinglePredecessor
+    }
+  }
 }
 
 /// The list of instructions in a BasicBlock.

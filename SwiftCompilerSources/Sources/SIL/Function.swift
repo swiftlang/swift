@@ -293,6 +293,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case noRuntime
     case noExistentials
     case noObjCRuntime
+    case manualOwnership
   }
 
   public var performanceConstraints: PerformanceConstraints {
@@ -303,6 +304,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       case .NoRuntime: return .noRuntime
       case .NoExistentials: return .noExistentials
       case .NoObjCBridging: return .noObjCRuntime
+      case .ManualOwnership: return .manualOwnership
       default: fatalError("unknown performance constraint")
     }
   }
@@ -322,6 +324,20 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       case .InlineDefault: return .automatic
       case .NoInline: return .never
       case .AlwaysInline: return .always
+      default:
+        fatalError()
+    }
+  }
+
+  public enum ABILanguage {
+    case C
+    case Swift
+  }
+
+  public var abi: ABILanguage {
+    switch bridged.getSILFunctionLanguage() {
+      case .C:     return .C
+      case .Swift: return .Swift
       default:
         fatalError()
     }

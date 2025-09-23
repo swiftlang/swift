@@ -1626,6 +1626,10 @@ public:
   AvailabilityDomain getTargetAvailabilityDomain() const;
 };
 
+inline SourceLoc extractNearestSourceLoc(const ASTContext *ctx) {
+  return SourceLoc();
+}
+
 } // end namespace swift
 
 #endif

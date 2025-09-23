@@ -19,6 +19,7 @@
 #include "NonisolatedNonsendingByDefaultMigration.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckEmbedded.h"
 #include "TypeCheckInvertible.h"
 #include "TypeCheckProtocol.h"
 #include "TypeChecker.h"
@@ -827,6 +828,130 @@ namespace {
   };
 }
 
+/// Returns true on error.
+static bool resolveGenericArguments(ValueDecl *decl,
+                                    const GenericContext *genCtx,
+                                    const TypeResolution &resolution,
+                                    SILTypeResolutionContext *silContext,
+                                    DeclRefTypeRepr *repr,
+                                    SmallVectorImpl<Type> &args) {
+  auto options = resolution.getOptions();
+  auto &ctx = decl->getASTContext();
+
+  auto genericParams = genCtx->getGenericParams();
+  auto hasParameterPack = llvm::any_of(*genericParams, [](auto *paramDecl) {
+    return paramDecl->isParameterPack();
+  });
+  auto hasValueParam = llvm::any_of(*genericParams, [](auto *paramDecl) {
+    return paramDecl->isValue();
+  });
+
+  // If the type declares at least one parameter pack, allow pack expansions
+  // anywhere in the argument list. We'll use the PackMatcher to ensure that
+  // everything lines up. Otherwise, don't allow pack expansions to appear
+  // at all.
+  auto argOptions = options.withoutContext().withContext(
+      hasParameterPack
+      ? TypeResolverContext::VariadicGenericArgument
+      : TypeResolverContext::ScalarGenericArgument);
+  if (hasValueParam)
+    argOptions = argOptions.withContext(TypeResolverContext::ValueGenericArgument);
+  auto genericResolution = resolution.withOptions(argOptions);
+
+  // In SIL mode, Optional<T> interprets T as a SIL type.
+  if (options.contains(TypeResolutionFlags::SILType)) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(genCtx)) {
+      if (nominal->isOptionalDecl()) {
+        genericResolution = resolution;
+      }
+    }
+  }
+
+  auto genericArgs = repr->getGenericArgs();
+  auto loc = repr->getNameLoc().getBaseNameLoc();
+
+  // Resolve the types of the generic arguments.
+  for (auto tyR : genericArgs) {
+    // Propagate failure.
+    Type substTy = genericResolution.resolveType(tyR, silContext);
+    if (!substTy || substTy->hasError())
+      return true;
+
+    args.push_back(substTy);
+  }
+
+  // Make sure we have the right number of generic arguments.
+  if (!hasParameterPack) {
+    // For generic types without type parameter packs, we require
+    // the number of declared generic parameters match the number of
+    // arguments.
+    if (genericArgs.size() != genericParams->size()) {
+      if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+        diagnoseInvalidGenericArguments(
+            loc, decl, genericArgs.size(), genericParams->size(),
+            /*hasParameterPack=*/false, repr->getAngleBrackets());
+      }
+      return true;
+    }
+
+    return false;
+  }
+
+  // For generic types with type parameter packs, we only require
+  // that the number of arguments is enough to saturate the number of
+  // regular generic parameters. The parameter pack will absorb
+  // zero or arguments.
+  SmallVector<Type, 2> params;
+  for (auto paramDecl : genericParams->getParams()) {
+    auto paramType = paramDecl->getDeclaredInterfaceType();
+    params.push_back(paramDecl->isParameterPack()
+                     ? PackExpansionType::get(paramType, paramType)
+                     : paramType);
+  }
+
+  PackMatcher matcher(params, args, ctx);
+  if (matcher.match() || matcher.pairs.size() != params.size()) {
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      diagnoseInvalidGenericArguments(
+          loc, decl, genericArgs.size(), genericParams->size(),
+          /*hasParameterPack=*/true, repr->getAngleBrackets());
+    }
+    return true;
+  }
+
+  args.clear();
+  for (unsigned i : indices(params)) {
+    auto found = std::find_if(matcher.pairs.begin(),
+                              matcher.pairs.end(),
+                              [&](const MatchedPair &pair) -> bool {
+                                return pair.lhsIdx == i;
+                              });
+    assert(found != matcher.pairs.end());
+
+    auto arg = found->rhs;
+
+    // PackMatcher will always produce a PackExpansionType as the
+    // arg for a pack parameter, if necessary by wrapping a PackType
+    // in one.  (It's a weird representation.)  Look for that pattern
+    // and unwrap the pack.  Otherwise, we must have matched with a
+    // single component which happened to be an expansion; wrap that
+    // in a PackType.  In either case, we always want arg to end up
+    // a PackType.
+    if (auto *expansionType = arg->getAs<PackExpansionType>()) {
+      auto pattern = expansionType->getPatternType();
+      if (auto pack = pattern->getAs<PackType>()) {
+        arg = pack;
+      } else {
+        arg = PackType::get(ctx, {expansionType});
+      }
+    }
+
+    args.push_back(arg);
+  }
+
+  return false;
+}
+
 /// Apply generic arguments to the given type.
 ///
 /// If the type is itself not generic, this does nothing.
@@ -1005,112 +1130,10 @@ static Type applyGenericArguments(Type type,
   auto *unboundType = type->castTo<UnboundGenericType>();
   auto *decl = unboundType->getDecl();
 
-  auto genericParams = decl->getGenericParams();
-  auto hasParameterPack = llvm::any_of(*genericParams, [](auto *paramDecl) {
-    return paramDecl->isParameterPack();
-  });
-  auto hasValueParam = llvm::any_of(*genericParams, [](auto *paramDecl) {
-    return paramDecl->isValue();
-  });
-
-  // If the type declares at least one parameter pack, allow pack expansions
-  // anywhere in the argument list. We'll use the PackMatcher to ensure that
-  // everything lines up. Otherwise, don't allow pack expansions to appear
-  // at all.
-  auto argOptions = options.withoutContext().withContext(
-      hasParameterPack
-      ? TypeResolverContext::VariadicGenericArgument
-      : TypeResolverContext::ScalarGenericArgument);
-  if (hasValueParam)
-    argOptions = argOptions.withContext(TypeResolverContext::ValueGenericArgument);
-  auto genericResolution = resolution.withOptions(argOptions);
-
-  // In SIL mode, Optional<T> interprets T as a SIL type.
-  if (options.contains(TypeResolutionFlags::SILType)) {
-    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-      if (nominal->isOptionalDecl()) {
-        genericResolution = resolution;
-      }
-    }
-  }
-
   // Resolve the types of the generic arguments.
   SmallVector<Type, 2> args;
-  for (auto tyR : genericArgs) {
-    // Propagate failure.
-    Type substTy = genericResolution.resolveType(tyR, silContext);
-    if (!substTy || substTy->hasError())
-      return ErrorType::get(ctx);
-
-    args.push_back(substTy);
-  }
-
-  // Make sure we have the right number of generic arguments.
-  if (!hasParameterPack) {
-    // For generic types without type parameter packs, we require
-    // the number of declared generic parameters match the number of
-    // arguments.
-    if (genericArgs.size() != genericParams->size()) {
-      if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-        diagnoseInvalidGenericArguments(
-            loc, decl, genericArgs.size(), genericParams->size(),
-            /*hasParameterPack=*/false, repr->getAngleBrackets());
-      }
-      return ErrorType::get(ctx);
-    }
-  } else {
-    // For generic types with type parameter packs, we only require
-    // that the number of arguments is enough to saturate the number of
-    // regular generic parameters. The parameter pack will absorb
-    // zero or arguments.
-    SmallVector<Type, 2> params;
-    for (auto paramDecl : genericParams->getParams()) {
-      auto paramType = paramDecl->getDeclaredInterfaceType();
-      params.push_back(paramDecl->isParameterPack()
-                       ? PackExpansionType::get(paramType, paramType)
-                       : paramType);
-    }
-
-    PackMatcher matcher(params, args, ctx);
-    if (matcher.match() || matcher.pairs.size() != params.size()) {
-      if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-        diagnoseInvalidGenericArguments(
-            loc, decl, genericArgs.size(), genericParams->size(),
-            /*hasParameterPack=*/true, repr->getAngleBrackets());
-      }
-      return ErrorType::get(ctx);
-    }
-
-    args.clear();
-    for (unsigned i : indices(params)) {
-      auto found = std::find_if(matcher.pairs.begin(),
-                                matcher.pairs.end(),
-                                [&](const MatchedPair &pair) -> bool {
-                                  return pair.lhsIdx == i;
-                                });
-      assert(found != matcher.pairs.end());
-
-      auto arg = found->rhs;
-
-      // PackMatcher will always produce a PackExpansionType as the
-      // arg for a pack parameter, if necessary by wrapping a PackType
-      // in one.  (It's a weird representation.)  Look for that pattern
-      // and unwrap the pack.  Otherwise, we must have matched with a
-      // single component which happened to be an expansion; wrap that
-      // in a PackType.  In either case, we always want arg to end up
-      // a PackType.
-      if (auto *expansionType = arg->getAs<PackExpansionType>()) {
-        auto pattern = expansionType->getPatternType();
-        if (auto pack = pattern->getAs<PackType>()) {
-          arg = pack;
-        } else {
-          arg = PackType::get(ctx, {expansionType});
-        }
-      }
-
-      args.push_back(arg);
-    }
-  }
+  if (resolveGenericArguments(decl, decl, resolution, silContext, repr, args))
+    return ErrorType::get(ctx);
 
   // Construct the substituted type.
   const auto result = resolution.applyUnboundGenericArguments(
@@ -1130,6 +1153,7 @@ static Type applyGenericArguments(Type type,
   if (auto clangDecl = decl->getClangDecl()) {
     if (auto classTemplateDecl =
             dyn_cast<clang::ClassTemplateDecl>(clangDecl)) {
+      // FIXME: Why does this resolve the types twice?
       SmallVector<Type, 2> typesOfGenericArgs;
       for (auto typeRepr : genericArgs) {
         typesOfGenericArgs.push_back(resolution.resolveType(typeRepr));
@@ -2766,7 +2790,6 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   switch (repr->getKind()) {
   case TypeReprKind::Error:
-    cast<ErrorTypeRepr>(repr)->dischargeDiagnostic(getASTContext());
     return ErrorType::get(getASTContext());
 
   case TypeReprKind::Attributed:
@@ -3172,6 +3195,7 @@ TypeAttrKind TypeAttrSet::getRepresentative(TypeAttrKind kind) {
   case TypeAttrKind::InoutAliasable:
   case TypeAttrKind::Owned:
   case TypeAttrKind::Guaranteed:
+  case TypeAttrKind::GuaranteedAddress:
   case TypeAttrKind::PackOwned:
   case TypeAttrKind::PackGuaranteed:
   case TypeAttrKind::PackInout:
@@ -3995,25 +4019,12 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
   return elements;
 }
 
+/// Implement the special @_opaqueReturnTypeOf attribute syntax in
+/// module interface files.
 NeverNullType
 TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
                                       unsigned ordinal,
                                       TypeResolutionOptions options) {
-  // The type representation should be an unqualified identifier. We don't
-  // really use the identifier for anything, but we do resolve any generic
-  // arguments to instantiate the possibly-generic opaque type.
-  SmallVector<Type, 4> TypeArgsBuf;
-  if (auto *unqualIdentRepr = dyn_cast<UnqualifiedIdentTypeRepr>(repr)) {
-    for (auto argRepr : unqualIdentRepr->getGenericArgs()) {
-      auto argTy = resolveType(argRepr, options);
-      // If we cannot resolve the generic parameter, propagate the error out.
-      if (argTy->hasError()) {
-        return ErrorType::get(getASTContext());
-      }
-      TypeArgsBuf.push_back(argTy);
-    }
-  }
-
   // Use type reconstruction to summon the opaque type decl.
   Demangler demangle;
   auto definingDeclNode = demangle.demangleSymbol(mangledName);
@@ -4027,14 +4038,98 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
   auto opaqueNode =
     builder.getNodeFactory().createNode(Node::Kind::OpaqueReturnTypeOf);
   opaqueNode->addChild(definingDeclNode, builder.getNodeFactory());
-  
-  auto TypeArgs = ArrayRef<Type>(TypeArgsBuf);
-  auto ty = builder.resolveOpaqueType(opaqueNode, TypeArgs, ordinal);
-  if (!ty || ty->hasError()) {
+  auto *opaqueDecl = builder.resolveOpaqueTypeDecl(opaqueNode);
+
+  auto *ownerDecl = opaqueDecl->getNamingDecl();
+  if (!ownerDecl) {
     diagnose(repr->getLoc(), diag::no_opaque_return_type_of);
     return ErrorType::get(getASTContext());
   }
-  return ty;
+
+  auto genericSig = ownerDecl->getInnermostDeclContext()
+    ->getGenericSignatureOfContext();
+
+  SubstitutionMap subs;
+  if (genericSig) {
+    SmallVector<Type, 2> args;
+
+    // The type representation should either be a single identifier, or a
+    // series of member references. We don't use the identifiers for
+    // anything, but we do resolve the generic arguments at each level
+    // to instantiate the possibly-generic opaque type.
+    if (isa<UnqualifiedIdentTypeRepr>(repr) &&
+        !genericSig->hasParameterPack()) {
+      // When there are no parameter packs and we just have a single
+      // unqualified identifier, we fall back to the legacy behavior,
+      // which collects the generic arguments for all levels of nesting
+      // in a flat list.
+      //
+      // This matches the old behavior of the ASTPrinter.
+      auto *unqualIdentRepr = cast<UnqualifiedIdentTypeRepr>(repr);
+
+      for (auto argRepr : unqualIdentRepr->getGenericArgs()) {
+        auto argTy = resolveType(argRepr, options);
+        // If we cannot resolve the generic parameter, propagate the error out.
+        if (argTy->hasError()) {
+          return ErrorType::get(getASTContext());
+        }
+        args.push_back(argTy);
+      }
+
+      if (args.size() != genericSig.getGenericParams().size()) {
+        diagnose(repr->getLoc(), diag::no_opaque_return_type_of);
+        return ErrorType::get(getASTContext());
+      }
+    } else {
+      // Correct handling of nested types. We interpret a qualified
+      // TypeRepr with a generic argument list at each level, like
+      // __<OuterArgs, ...>.__<InnerArgs, ...>.
+      SmallVector<SmallVector<Type, 2>, 2> nestedArgs;
+
+      auto *dc = ownerDecl->getInnermostDeclContext();
+      while (!dc->isModuleScopeContext()) {
+        if (dc->isInnermostContextGeneric()) {
+          if (repr == nullptr || !isa<DeclRefTypeRepr>(repr)) {
+            diagnose(repr->getLoc(), diag::no_opaque_return_type_of);
+            return ErrorType::get(getASTContext());
+          }
+
+          auto *identRepr = cast<DeclRefTypeRepr>(repr);
+          nestedArgs.emplace_back();
+
+          auto *decl = dyn_cast<ValueDecl>(dc->getAsDecl());
+          if (decl == nullptr)
+            decl = dc->getSelfNominalTypeDecl();
+          ASSERT(decl);
+
+          resolveGenericArguments(decl,
+                                  decl->getAsGenericContext(),
+                                  resolution,
+                                  silContext,
+                                  identRepr,
+                                  nestedArgs.back());
+          repr = identRepr->getBase();
+        }
+
+        dc = dc->getParent();
+      }
+
+      for (auto &subArgs : llvm::reverse(nestedArgs)) {
+        args.append(subArgs.begin(), subArgs.end());
+      }
+    }
+
+    subs = SubstitutionMap::get(genericSig, args,
+                                LookUpConformanceInModule());
+  }
+
+  if (ordinal >= opaqueDecl->getOpaqueGenericParams().size()) {
+    diagnose(repr->getLoc(), diag::no_opaque_return_type_of);
+    return ErrorType::get(getASTContext());
+  }
+
+  Type interfaceType = opaqueDecl->getOpaqueGenericParams()[ordinal];
+  return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
 }
 
 NeverNullType TypeResolver::resolveASTFunctionType(
@@ -4335,6 +4430,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
             thrownTy);
       }
     }
+  } else if (repr->getThrowsLoc().isValid()) {
+    diagnoseUntypedThrowsInEmbedded(getDeclContext(), repr->getThrowsLoc());
   }
 
   bool hasSendingResult =
@@ -4904,6 +5001,8 @@ bool TypeResolver::resolveSingleSILResult(
         ERROR(ErrorUnowned, Unowned)
         NORMAL(Out, Indirect)
         NORMAL(Owned, Owned)
+        NORMAL(Guaranteed, Guaranteed)
+        NORMAL(GuaranteedAddress, GuaranteedAddress)
         NORMAL(UnownedInnerPointer, UnownedInnerPointer)
         NORMAL(Autoreleased, Autoreleased)
         NORMAL(PackOut, Pack)
@@ -6900,7 +6999,7 @@ Type ExplicitCaughtTypeRequest::evaluate(
 
     return TypeResolution::forInterface(func, options,
                                         /*unboundTyOpener*/ nullptr,
-                                        PlaceholderType::get,
+                                        /*placeholderOpener*/ nullptr,
                                         /*packElementOpener*/ nullptr)
         .resolveType(thrownTypeRepr);
   }
@@ -6912,12 +7011,13 @@ Type ExplicitCaughtTypeRequest::evaluate(
       return TypeResolution::resolveContextualType(
                thrownTypeRepr, closure,
                TypeResolutionOptions(TypeResolverContext::None),
-               /*unboundTyOpener*/ nullptr, PlaceholderType::get,
+               /*unboundTyOpener*/ nullptr, /*placeholderOpener*/ nullptr,
                /*packElementOpener*/ nullptr);
     }
 
     // Explicit 'throws' implies that this throws 'any Error'.
     if (closure->getThrowsLoc().isValid()) {
+      diagnoseUntypedThrowsInEmbedded(closure, closure->getThrowsLoc());
       return ctx.getErrorExistentialType();
     }
 
@@ -6937,13 +7037,15 @@ Type ExplicitCaughtTypeRequest::evaluate(
 
     // If there is no explicitly-specified thrown error type, it's 'any Error'.
     if (!typeRepr) {
+      diagnoseUntypedThrowsInEmbedded(doCatch->getDeclContext(),
+                                      doCatch->getThrowsLoc());
       return ctx.getErrorExistentialType();
     }
 
     return TypeResolution::resolveContextualType(
         typeRepr, doCatch->getDeclContext(),
         TypeResolutionOptions(TypeResolverContext::None),
-        /*unboundTyOpener*/ nullptr, PlaceholderType::get,
+        /*unboundTyOpener*/ nullptr, /*placeholderOpener*/ nullptr,
         /*packElementOpener*/ nullptr);
   }
 

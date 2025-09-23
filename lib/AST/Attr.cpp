@@ -805,6 +805,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector modifiers;
   bool libraryLevelAPI =
       D && D->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API;
+  auto *SF = D ? D->getDeclContext()->getParentSourceFile() : nullptr;
 
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
     // Don't skip implicit custom attributes. Custom attributes like global
@@ -848,6 +849,16 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
       auto semanticAttr = D->getSemanticAvailableAttr(availableAttr);
       if (!semanticAttr)
         continue;
+
+      // In the public interfaces of -library-level=api modules, skip @available
+      // attributes that refer to domains imported from @_spiOnly modules.
+      if (Options.printPublicInterface() && libraryLevelAPI) {
+        if (auto *domainDecl = semanticAttr->getDomain().getDecl()) {
+          if (SF->getRestrictedImportKind(domainDecl->getModuleContext()) ==
+              RestrictedImportKind::SPIOnly)
+            continue;
+        }
+      }
 
       if (isShortAvailable(*semanticAttr)) {
         if (semanticAttr->isSwiftLanguageModeSpecific())
@@ -1249,6 +1260,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     case ExposureKind::Cxx:
       Printer << "(Cxx";
       break;
+    case ExposureKind::NotCxx:
+      Printer << "(!Cxx";
+      break;
     }
     if (!cast<ExposeAttr>(this)->Name.empty())
       Printer << ", \"" << cast<ExposeAttr>(this)->Name << "\"";
@@ -1439,14 +1453,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DeclAttrKind::Custom: {
-    Printer.callPrintNamePre(PrintNameContext::Attribute);
-    Printer << "@";
     auto *attr = cast<CustomAttr>(this);
-    if (auto type = attr->getType())
-      type.print(Printer, Options);
-    else
-      attr->getTypeRepr()->print(Printer, Options);
-    Printer.printNamePost(PrintNameContext::Attribute);
+    attr->printCustomAttr(Printer, Options);
     break;
   }
 

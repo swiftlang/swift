@@ -282,12 +282,12 @@ def no_parallel_scan : Flag<["-"], "no-parallel-scan">,
    HelpText<"Perform dependency scanning in a single-threaded fashion.">;
 
 def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
-  HelpText<"Run SIL copy propagation with lexical lifetimes to shorten object "
+  HelpText<"Always run SIL copy propagation with lexical lifetimes to shorten object "
            "lifetimes while preserving variable lifetimes.">;
 def copy_propagation_state_EQ :
   Joined<["-"], "enable-copy-propagation=">,
   HelpText<"Whether to enable copy propagation">,
-  MetaVarName<"true|requested-passes-only|false">;
+  MetaVarName<"always|optimizing|requested-passes-only|false">;
 
 def disable_infer_public_concurrent_value : Flag<["-"], "disable-infer-public-sendable">,
     HelpText<"Disable inference of Sendable conformances for public structs and enums">;
@@ -318,6 +318,12 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
     Joined<["-"], "formal-cxx-interoperability-mode=">,
     HelpText<"What version of C++ interoperability a textual interface was originally generated with">,
     MetaVarName<"<cxx-interop-version>|off">;
+  def enable_assembly_vision_all
+      : Flag<["-"], "enable-assembly-vision-all">,
+        HelpText<"Enable assembly vision for all functions">;
+  def disable_assembly_vision_all
+      : Flag<["-"], "disable-assembly-vision-all">,
+        HelpText<"Disable assembly vision for all functions">;
 }
 
 // Flags that are saved into module interfaces
@@ -426,6 +432,9 @@ def dump_macro_expansions : Flag<["-"], "dump-macro-expansions">,
   HelpText<"Dumps the results of each macro expansion">;
 def emit_macro_expansion_files : Separate<["-"], "emit-macro-expansion-files">,
   HelpText<"Specify when to emit macro expansion file: 'none', 'debug', or 'diagnostics'">;
+
+def dump_source_file_imports : Flag<["-"], "dump-source-file-imports">,
+  HelpText<"Dumps the list of imports for each source file">;
 
 def analyze_request_evaluator : Flag<["-"], "analyze-request-evaluator">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
@@ -876,6 +885,12 @@ def solver_scope_threshold_EQ : Joined<["-"], "solver-scope-threshold=">,
 
 def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">,
   HelpText<"Expression type checking trail change limit">;
+
+def solver_disable_prepared_overloads : Flag<["-"], "solver-disable-prepared-overloads">,
+  HelpText<"Disable experimental prepared overloads optimization">;
+
+def solver_enable_prepared_overloads : Flag<["-"], "solver-enable-prepared-overloads">,
+  HelpText<"Enable experimental prepared overloads optimization">;
 
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;

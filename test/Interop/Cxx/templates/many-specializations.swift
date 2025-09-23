@@ -5,4 +5,4 @@
 // CHECK-NEXT: struct TemplateStruct<T> {
 // CHECK-NEXT: }
 
-// CHECK-NOT: typealias
+// CHECK: typealias T1000

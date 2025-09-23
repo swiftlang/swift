@@ -1988,7 +1988,7 @@ SwiftDeclCollector::addConformancesToTypeDecl(SDKNodeDeclType *Root,
   } else {
     // Avoid adding the same conformance twice.
     SmallPtrSet<ProtocolConformance*, 4> Seen;
-    for (auto &Conf: NTD->getAllConformances()) {
+    for (auto &Conf: NTD->getAllConformances(/*sorted=*/true)) {
       if (!Ctx.shouldIgnore(Conf->getProtocol()) && !Seen.count(Conf))
         Root->addConformance(constructConformanceNode(Conf));
       Seen.insert(Conf);

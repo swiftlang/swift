@@ -5569,6 +5569,17 @@ bool ConstraintSystem::repairFailures(
     return true;
   };
 
+  // Propagate a hole from one type to another. This is useful for contextual
+  // types since type resolution forms a top-level ErrorType for types with
+  // nested errors, e.g `S<@error_type>` becomes `@error_type`. As such, when
+  // matching `S<$T0> == $T1` where `$T1` is a hole from a contextual type, we
+  // want to eagerly turn `$T0` into a hole since it's likely that `$T1` would
+  // have provided the contextual info for it.
+  auto tryPropagateHole = [&](Type from, Type to) {
+    if (from->isPlaceholder() && to->hasTypeVariable())
+      recordTypeVariablesAsHoles(to);
+  };
+
   if (path.empty()) {
     if (!anchor)
       return false;
@@ -6342,6 +6353,13 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ClosureResult: {
+    // If either type is a placeholder, consider this fixed, eagerly propagating
+    // a hole from the contextual type.
+    if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
+      tryPropagateHole(rhs, lhs);
+      return true;
+    }
+
     if (repairByInsertingExplicitCall(lhs, rhs))
       break;
 
@@ -6361,9 +6379,12 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::ContextualType: {
-    // If either type is a placeholder, consider this fixed
-    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+    // If either type is a placeholder, consider this fixed, eagerly propagating
+    // a hole from the contextual type.
+    if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
+      tryPropagateHole(rhs, lhs);
       return true;
+    }
 
     // If either side is not yet resolved, it's too early for this fix.
     if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
@@ -6662,12 +6683,6 @@ bool ConstraintSystem::repairFailures(
     if (rhs->isExistentialType())
       break;
 
-    // If the types didn't line up, let's allow right-hand side
-    // of the conversion (or pattern match) to have holes. This
-    // helps when conversion if between a type and a tuple e.g.
-    // `Int` vs. `(_, _)`.
-    recordAnyTypeVarAsPotentialHole(rhs);
-
     conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;
@@ -6761,9 +6776,6 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::TernaryBranch:
   case ConstraintLocator::SingleValueStmtResult: {
-    recordAnyTypeVarAsPotentialHole(lhs);
-    recordAnyTypeVarAsPotentialHole(rhs);
-
     if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
       return true;
 
@@ -6831,8 +6843,6 @@ bool ConstraintSystem::repairFailures(
       return true;
 
     if (isMemberMatch) {
-      recordAnyTypeVarAsPotentialHole(lhs);
-      recordAnyTypeVarAsPotentialHole(rhs);
       conversionsOrFixes.push_back(AllowAssociatedValueMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
       break;
@@ -7002,6 +7012,13 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::CoercionOperand: {
+    // If either type is a placeholder, consider this fixed, eagerly propagating
+    // a hole from the contextual type.
+    if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
+      tryPropagateHole(rhs, lhs);
+      return true;
+    }
+
     auto *coercion = castToExpr<CoerceExpr>(anchor);
 
     // Coercion from T.Type to T.Protocol.
@@ -10474,8 +10491,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         auto choice =
             instanceTy->isAnyObject()
                 ? candidate
-                : OverloadChoice(instanceTy, decl,
-                                 FunctionRefInfo::singleBaseNameApply());
+                : OverloadChoice::getDecl(instanceTy, decl,
+                                          FunctionRefInfo::singleBaseNameApply());
 
         const bool invalidMethodRef = isa<FuncDecl>(decl) && !hasInstanceMethods;
         const bool invalidMemberRef = !isa<FuncDecl>(decl) && !hasInstanceMembers;
@@ -10710,7 +10727,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       }
     }
 
-    return OverloadChoice(baseTy, cand, functionRefInfo);
+    return OverloadChoice::getDecl(baseTy, cand, functionRefInfo);
   };
 
   // Add all results from this lookup.
@@ -11849,7 +11866,8 @@ ConstraintSystem::simplifyValueWitnessConstraint(
   if (!witness)
     return fail();
 
-  auto choice = OverloadChoice(resolvedBaseType, witness.getDecl(), functionRefInfo);
+  auto choice = OverloadChoice::getDecl(
+      resolvedBaseType, witness.getDecl(), functionRefInfo);
   addBindOverloadConstraint(memberType, choice, getConstraintLocator(locator),
                             useDC);
   return SolutionKind::Solved;
@@ -12954,8 +12972,29 @@ ConstraintSystem::simplifyKeyPathConstraint(
       auto paramFnTy = FunctionType::get(paramParam, fnTy->getResult(),
                                          fnTy->getExtInfo());
 
+      // Form a key path type as well to make sure that root and value
+      // types satisfy all of its requirements.
+      // Note that `KeyPath` types used to have no requirements but now
+      // they do require `Root` and `Value` to be `Copyable` and `Escapable`.
+      {
+        auto keyPathTy =
+            openUnboundGenericType(
+                getASTContext().getKeyPathDecl(),
+                /*parent=*/Type(),
+                locator.withPathElement(LocatorPathElt::KeyPathType()),
+                /*isTypeResolution=*/false)
+                ->castTo<BoundGenericType>();
+        addConstraint(ConstraintKind::Bind, keyPathTy->getGenericArgs()[0],
+                      rootTy,
+                      locator.withPathElement(LocatorPathElt::KeyPathRoot()));
+        addConstraint(ConstraintKind::Bind, keyPathTy->getGenericArgs()[1],
+                      valueTy,
+                      locator.withPathElement(LocatorPathElt::KeyPathValue()));
+      }
+
       return !matchTypes(kpFnTy, paramFnTy, ConstraintKind::Conversion,
-                         subflags, locator).isFailure();
+                         subflags, locator)
+                  .isFailure();
     }
 
     assert(contextualRootTy && contextualValueTy);
@@ -14072,8 +14111,8 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   SmallVector<OverloadChoice, 4> choices;
   for (auto candidate : candidates) {
     if (candidate->isInvalid()) continue;
-    choices.push_back(OverloadChoice(type2, candidate,
-                                     FunctionRefInfo::singleBaseNameApply()));
+    choices.push_back(OverloadChoice::getDecl(type2, candidate,
+                                              FunctionRefInfo::singleBaseNameApply()));
   }
 
   if (choices.empty()) {
@@ -16522,7 +16561,6 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_DictionaryValue:
   case CTP_CoerceOperand:
   case CTP_SubscriptAssignSource:
-  case CTP_ForEachStmt:
   case CTP_WrappedProperty:
   case CTP_ComposedPropertyWrapper:
   case CTP_ExprPattern:
@@ -16698,22 +16736,23 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     }
 
     // FIXME: Transitional hack.
-    bool enablePreparedOverloads = false;
+    bool enablePreparedOverloads = getASTContext().TypeCheckerOpts.SolverEnablePreparedOverloads;
 
     auto *preparedOverload = constraint.getPreparedOverload();
     if (!preparedOverload) {
       if (enablePreparedOverloads &&
           constraint.getOverloadChoice().canBePrepared()) {
-        preparedOverload = prepareOverload(constraint.getLocator(),
-                                           constraint.getOverloadChoice(),
-                                           constraint.getDeclContext());
+        preparedOverload = prepareOverload(constraint.getOverloadChoice(),
+                                           constraint.getDeclContext(),
+                                           constraint.getLocator());
         const_cast<Constraint &>(constraint).setPreparedOverload(preparedOverload);
       }
     }
 
-    resolveOverload(constraint.getLocator(), constraint.getFirstType(),
-                    constraint.getOverloadChoice(),
+    resolveOverload(constraint.getOverloadChoice(),
                     constraint.getDeclContext(),
+                    constraint.getLocator(),
+                    constraint.getFirstType(),
                     preparedOverload);
     return SolutionKind::Solved;
   }

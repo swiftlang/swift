@@ -1621,6 +1621,7 @@ namespace  {
     UNINTERESTING_ATTR(NoRuntime)
     UNINTERESTING_ATTR(NoExistentials)
     UNINTERESTING_ATTR(NoObjCBridging)
+    UNINTERESTING_ATTR(ManualOwnership)
     UNINTERESTING_ATTR(Inlinable)
     UNINTERESTING_ATTR(Effects)
     UNINTERESTING_ATTR(Expose)
@@ -2368,6 +2369,8 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
     case AccessorKind::Read2:
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
       break;
 
     case AccessorKind::WillSet:

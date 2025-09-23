@@ -403,6 +403,11 @@ public struct AccessPath : CustomStringConvertible, Hashable {
   public func isEqualOrContains(_ other: AccessPath) -> Bool {
     return getProjection(to: other) != nil
   }
+  
+  /// Returns true if this access contains `other` access and is not equal.
+  public func contains(_ other: AccessPath) -> Bool {
+    return !(getProjection(to: other)?.isEmpty ?? true)
+  }
 
   public var materializableProjectionPath: SmallProjectionPath? {
     if projectionPath.isMaterializable {

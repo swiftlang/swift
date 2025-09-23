@@ -1344,15 +1344,15 @@ public:
   Type removeArgumentLabels(unsigned numArgumentLabels);
 
   /// Replace DynamicSelfType anywhere it appears in covariant position with
+  /// its underlying Self type.
+  Type eraseDynamicSelfType();
+
+  /// Replace DynamicSelfType anywhere it appears in covariant position with
   /// the given type.
   Type replaceDynamicSelfType(Type newSelfType);
 
   /// Hack to deal with ConstructorDecl interface types.
   Type withCovariantResultType();
-
-  /// Deprecated in favor of the above.
-  Type replaceCovariantResultType(Type newResultType,
-                                  unsigned uncurryLevel);
 
   /// Returns a new function type exactly like this one but with the self
   /// parameter replaced. Only makes sense for function members of types.
@@ -4776,7 +4776,7 @@ enum class ResultConvention : uint8_t {
   /// The validity of the return value is dependent on the 'self' parameter,
   /// so it may be invalidated if that parameter is released.
   UnownedInnerPointer,
-  
+
   /// This value has been (or may have been) returned autoreleased.
   /// The caller should make an effort to reclaim the autorelease.
   /// The type must be a class or class existential type, and this
@@ -4788,6 +4788,14 @@ enum class ResultConvention : uint8_t {
   /// depending on the pact type).  The callee is responsible for
   /// leaving an initialized object in each element of the pack.
   Pack,
+
+  /// The caller is responsible for using the returned address within a valid
+  /// scope. This is valid only for borrow and mutate accessors.
+  GuaranteedAddress,
+
+  /// The caller is responsible for using the returned value within a valid
+  /// scope. This is valid only for borrow accessors.
+  Guaranteed,
 };
 
 // Does this result require indirect storage for the purpose of reabstraction?
@@ -4942,6 +4950,14 @@ public:
   /// Is this a pack result?  Pack results are always indirect.
   bool isPack() const {
     return getConvention() == ResultConvention::Pack;
+  }
+
+  bool isGuaranteedAddressResult() const {
+    return getConvention() == ResultConvention::GuaranteedAddress;
+  }
+
+  bool isGuaranteedResult() const {
+    return getConvention() == ResultConvention::Guaranteed;
   }
 
   /// Transform this SILResultInfo by applying the user-provided
@@ -5382,6 +5398,13 @@ public:
   }
   bool hasIndirectErrorResult() const {
     return hasErrorResult() && getErrorResult().isFormalIndirect();
+  }
+
+  bool hasGuaranteedAddressResult() const {
+    if (getNumResults() != 1) {
+      return false;
+    }
+    return getResults()[0].isGuaranteedAddressResult();
   }
 
   struct IndirectFormalResultFilter {
@@ -7734,8 +7757,8 @@ class PlaceholderType : public TypeBase {
   // NOTE: If you add a new Type-based originator, you'll need to update the
   // recursive property logic in PlaceholderType::get.
   using Originator =
-      llvm::PointerUnion<TypeVariableType *, DependentMemberType *, VarDecl *,
-                         ErrorExpr *, TypeRepr *>;
+      llvm::PointerUnion<TypeVariableType *, DependentMemberType *, ErrorType *,
+                         VarDecl *, ErrorExpr *, TypeRepr *>;
 
   Originator O;
 

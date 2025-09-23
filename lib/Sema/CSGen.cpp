@@ -1020,7 +1020,7 @@ namespace {
                   options);
       SmallVector<OverloadChoice, 4> outerChoices;
       for (auto decl : outerAlternatives) {
-        outerChoices.push_back(OverloadChoice(Type(), decl, functionRefInfo));
+        outerChoices.push_back(OverloadChoice::getDecl(decl, functionRefInfo));
       }
       CS.addValueMemberConstraint(
           baseTy, name, tv, CurDC, functionRefInfo, outerChoices,
@@ -1044,8 +1044,8 @@ namespace {
       auto tv = CS.createTypeVariable(memberLocator,
                                       TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
-      OverloadChoice choice =
-          OverloadChoice(CS.getType(base), decl, functionRefInfo);
+      auto choice =
+          OverloadChoice::getDecl(CS.getType(base), decl, functionRefInfo);
 
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addBindOverloadConstraint(tv, choice, locator, CurDC);
@@ -1162,7 +1162,7 @@ namespace {
       // a known subscript here. This might be cleaner if we split off a new
       // UnresolvedSubscriptExpr from SubscriptExpr.
       if (auto decl = declOrNull) {
-        OverloadChoice choice = OverloadChoice(
+        auto choice = OverloadChoice::getDecl(
             baseTy, decl, FunctionRefInfo::doubleBaseNameApply());
         CS.addBindOverloadConstraint(memberTy, choice, memberLocator,
                                      CurDC);
@@ -1657,8 +1657,8 @@ namespace {
       // resolve it. This records the overload for use later.
       auto tv = CS.createTypeVariable(locator, options);
 
-      OverloadChoice choice =
-          OverloadChoice(Type(), E->getDecl(), E->getFunctionRefInfo());
+      auto choice =
+          OverloadChoice::getDecl(E->getDecl(), E->getFunctionRefInfo());
       CS.addBindOverloadConstraint(tv, choice, locator, CurDC);
       return tv;
     }
@@ -1712,12 +1712,12 @@ namespace {
       const auto result = TypeResolution::resolveContextualType(
           repr, CS.DC, options, genericOpener, placeholderHandler,
           packElementOpener, requirementOpener);
+      // If we have an error, record a fix and produce a hole for the type.
       if (result->hasError()) {
         CS.recordFix(
             IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(locator)));
 
-        return CS.createTypeVariable(CS.getConstraintLocator(repr),
-                                     TVO_CanBindToHole);
+        return PlaceholderType::get(CS.getASTContext(), repr);
       }
       // Diagnose top-level usages of placeholder types.
       if (auto *ty = dyn_cast<PlaceholderTypeRepr>(repr->getWithoutParens())) {
@@ -1775,8 +1775,8 @@ namespace {
         if (decls[i]->isInvalid())
           continue;
 
-        OverloadChoice choice =
-            OverloadChoice(Type(), decls[i], expr->getFunctionRefInfo());
+        auto choice =
+            OverloadChoice::getDecl(decls[i], expr->getFunctionRefInfo());
         choices.push_back(choice);
       }
 
@@ -1957,6 +1957,8 @@ namespace {
     void addSpecializationConstraint(ConstraintLocator *locator, Type boundType,
                                      SourceLoc lAngleLoc,
                                      ArrayRef<TypeRepr *> specializationArgs) {
+      auto &ctx = CS.getASTContext();
+
       // Resolve each type.
       SmallVector<Type, 2> specializationArgTypes;
       auto options =
@@ -1971,6 +1973,7 @@ namespace {
           options |= TypeResolutionFlags::AllowPackReferences;
           elementEnv = OuterExpansions.back();
         }
+        auto alreadyInvalid = specializationArg->isInvalid();
         auto result = TypeResolution::resolveContextualType(
             specializationArg, CurDC, options,
             // Introduce type variables for unbound generics.
@@ -1980,17 +1983,20 @@ namespace {
             OpenGenericTypeRequirements(CS, locator,
                                         /*preparedOverload*/ nullptr));
         if (result->hasError()) {
-          auto &ctxt = CS.getASTContext();
-          result = PlaceholderType::get(ctxt, specializationArg);
-          ctxt.Diags.diagnose(lAngleLoc,
-                              diag::while_parsing_as_left_angle_bracket);
+          if (!alreadyInvalid) {
+            ctx.Diags.diagnose(lAngleLoc,
+                               diag::while_parsing_as_left_angle_bracket);
+          }
+          CS.recordFix(IgnoreInvalidASTNode::create(
+              CS, CS.getConstraintLocator(argLocator)));
+          result = PlaceholderType::get(ctx, specializationArg);
         }
         specializationArgTypes.push_back(result);
       }
 
       auto constraint = Constraint::create(
           CS, ConstraintKind::ExplicitGenericArguments, boundType,
-          PackType::get(CS.getASTContext(), specializationArgTypes), locator);
+          PackType::get(ctx, specializationArgTypes), locator);
       CS.addUnsolvedConstraint(constraint);
       CS.activateConstraint(constraint);
     }
@@ -2536,8 +2542,11 @@ namespace {
       Type thrownErrorTy = [&] {
         // Explicitly-specified thrown type.
         if (closure->getExplicitThrownTypeRepr()) {
-          if (Type explicitType = closure->getExplicitThrownType())
-            return explicitType;
+          if (Type explicitType = closure->getExplicitThrownType()) {
+            // The thrown type may have errors, open as placeholders if needed.
+            return CS.replaceInferableTypesWithTypeVars(explicitType,
+                                                        thrownErrorLocator);
+          }
         }
 
         // Explicitly-specified 'throws' without a type is untyped throws.
@@ -2802,6 +2811,9 @@ namespace {
           // interface type request via `var->getType()` that would
           // attempt to validate `weak` attribute, and produce a
           // diagnostic in the middle of the solver path.
+          //
+          // FIXME: getVarType() is now gone. Is the above still
+          // relevant?
 
           CS.addConstraint(ConstraintKind::OneWayEqual, oneWayVarType,
                            varType, locator);
@@ -3839,6 +3851,7 @@ namespace {
 
         switch (auto kind = component.getKind()) {
         case KeyPathExpr::Component::Kind::Invalid:
+          CS.recordFix(IgnoreInvalidASTNode::create(CS, memberLocator));
           break;
         case KeyPathExpr::Component::Kind::CodeCompletion:
           // We don't know what the code completion might resolve to, so we are
@@ -4110,7 +4123,7 @@ namespace {
         // logic.
         if (result->isInvalid())
           continue;
-        OverloadChoice choice = OverloadChoice(Type(), result, functionRefInfo);
+        auto choice = OverloadChoice::getDecl(result, functionRefInfo);
         choices.push_back(choice);
       }
 
@@ -4896,28 +4909,39 @@ bool ConstraintSystem::generateConstraints(
             getConstraintLocator(expr, LocatorPathElt::ContextualType(ctp));
       }
 
-      auto getLocator = [&](Type ty) -> ConstraintLocator * {
-        // If we have a placeholder originating from a PlaceholderTypeRepr,
-        // tack that on to the locator.
-        if (auto *placeholderTy = ty->getAs<PlaceholderType>())
-          if (auto *typeRepr = placeholderTy->getOriginator()
-                                          .dyn_cast<TypeRepr *>())
-            return getConstraintLocator(
-                convertTypeLocator,
-                LocatorPathElt::PlaceholderType(typeRepr));
-        return convertTypeLocator;
-      };
+      // If the contextual type has an error, we can't apply the solution.
+      // Record a fix for an invalid AST node.
+      if (convertType->hasError())
+        recordFix(IgnoreInvalidASTNode::create(*this, convertTypeLocator));
 
-      // Substitute type variables in for placeholder types.
-      convertType = convertType.transformRec([&](Type type) -> std::optional<Type> {
-        if (type->is<PlaceholderType>()) {
-          return Type(createTypeVariable(getLocator(type),
-                                         TVO_CanBindToNoEscape |
-                                             TVO_PrefersSubtypeBinding |
-                                             TVO_CanBindToHole));
-        }
-        return std::nullopt;
-      });
+      // Substitute type variables in for placeholder and error types.
+      convertType =
+          convertType.transformRec([&](Type type) -> std::optional<Type> {
+            auto *tyPtr = type.getPointer();
+            // Open a type variable for a placeholder type repr. Note we don't
+            // do this for arbitrary placeholders since they may be existing
+            // holes when e.g generating the constraints for a ReturnStmt in a
+            // closure.
+            if (auto *placeholderTy = dyn_cast<PlaceholderType>(tyPtr)) {
+              auto originator = placeholderTy->getOriginator();
+              auto *typeRepr = originator.dyn_cast<TypeRepr *>();
+              if (!isa_and_nonnull<PlaceholderTypeRepr>(typeRepr))
+                return std::nullopt;
+
+              auto *loc = getConstraintLocator(
+                  convertTypeLocator,
+                  LocatorPathElt::PlaceholderType(typeRepr));
+              return createTypeVariable(loc, TVO_CanBindToNoEscape |
+                                                 TVO_PrefersSubtypeBinding |
+                                                 TVO_CanBindToHole);
+            }
+            // For ErrorTypes we want to eagerly produce a hole since we know
+            // this is where the issue is.
+            if (auto *errTy = dyn_cast<ErrorType>(tyPtr)) {
+              return PlaceholderType::get(getASTContext(), errTy);
+            }
+            return std::nullopt;
+          });
 
       addContextualConversionConstraint(expr, convertType, ctp,
                                         convertTypeLocator);
@@ -5220,7 +5244,8 @@ ConstraintSystem::applyPropertyWrapperToParameter(
                   locator,
                   /*isFavored=*/false,
                   preparedOverload);
-    setType(param->getPropertyWrapperWrappedValueVar(), wrappedValueType);
+    setType(param->getPropertyWrapperWrappedValueVar(), wrappedValueType,
+            preparedOverload);
 
     applyPropertyWrapper(anchor,
                          { wrapperType, PropertyWrapperInitKind::WrappedValue },

@@ -208,21 +208,27 @@ namespace {
       return Action::Continue(P);
     }
 
-    // Only walk into an expression insofar as it doesn't open a new scope -
-    // that is, don't walk into a closure body.
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (isa<ClosureExpr>(E)) {
+      // Only walk into an expression insofar as it doesn't open a new scope -
+      // that is, don't walk into a closure body, TapExpr, or
+      // SingleValueStmtExpr. Also don't walk into key paths since any nested
+      // VarDecls are invalid there, and after being diagnosed by key path
+      // resolution the ASTWalker won't visit them.
+      if (isa<ClosureExpr>(E) || isa<TapExpr>(E) ||
+          isa<SingleValueStmtExpr>(E) || isa<KeyPathExpr>(E)) {
         return Action::SkipNode(E);
       }
       return Action::Continue(E);
     }
 
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      // ErrorTypeReprs can contain invalid expressions.
+      return Action::Continue();
+    }
+
     // Don't walk into anything else.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       return Action::SkipNode(S);
-    }
-    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      return Action::SkipNode();
     }
     PreWalkAction walkToParameterListPre(ParameterList *PL) override {
       return Action::SkipNode();

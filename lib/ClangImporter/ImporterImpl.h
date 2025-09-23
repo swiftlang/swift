@@ -1278,6 +1278,8 @@ public:
   /// \returns The named module, or null if the module has not been imported.
   ModuleDecl *getNamedModule(StringRef name);
 
+  ImportPath::Builder getSwiftModulePath(const clang::Module *M);
+
   /// Returns the "Foundation" module, if it can be loaded.
   ///
   /// After this has been called, the Foundation module will or won't be loaded
@@ -2200,7 +2202,7 @@ ImportedType findOptionSetEnum(clang::QualType type,
 ///
 /// The name we're looking for is the Swift name.
 llvm::SmallVector<ValueDecl *, 1>
-getValueDeclsForName(const clang::Decl *decl, ASTContext &ctx, StringRef name);
+getValueDeclsForName(NominalTypeDecl* decl, StringRef name);
 
 } // end namespace importer
 } // end namespace swift

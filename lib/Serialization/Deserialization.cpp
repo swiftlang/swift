@@ -255,9 +255,7 @@ ModularizationError::diagnose(const ModuleFile *MF,
     llvm_unreachable("Unhandled ModularizationError::Kind in switch.");
   };
 
-  auto inFlight = diagnoseError(errorKind);
-  inFlight.limitBehavior(limit);
-  inFlight.flush();
+  diagnoseError(errorKind).limitBehavior(limit);
 
   // We could pass along the `path` information through notes.
   // However, for a top-level decl a path would just duplicate the
@@ -1726,7 +1724,7 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
   }
   default:
     // Not a generic signature; no way to recover.
-    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
+    return diagnoseFatal(llvm::make_error<InvalidRecordKindError>(recordID));
   }
 
   // If we've already deserialized this generic signature, start over to return
@@ -3199,6 +3197,7 @@ getActualReadImplKind(unsigned rawKind) {
   CASE(Address)
   CASE(Read)
   CASE(Read2)
+  CASE(Borrow)
 #undef CASE
   }
   return std::nullopt;
@@ -3218,6 +3217,7 @@ getActualWriteImplKind(unsigned rawKind) {
   CASE(MutableAddress)
   CASE(Modify)
   CASE(Modify2)
+  CASE(Mutate)
 #undef CASE
   }
   return std::nullopt;
@@ -3237,6 +3237,7 @@ getActualReadWriteImplKind(unsigned rawKind) {
   CASE(Modify2)
   CASE(StoredWithDidSet)
   CASE(InheritedWithDidSet)
+  CASE(Mutate)
 #undef CASE
   }
   return std::nullopt;
@@ -7073,6 +7074,8 @@ getActualResultConvention(uint8_t raw) {
   CASE(UnownedInnerPointer)
   CASE(Autoreleased)
   CASE(Pack)
+  CASE(GuaranteedAddress)
+  CASE(Guaranteed)
 #undef CASE
   }
   return std::nullopt;

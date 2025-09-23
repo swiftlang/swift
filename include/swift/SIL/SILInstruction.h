@@ -2674,7 +2674,7 @@ protected:
       : Base(kind, DebugLoc, baseArgs...), SubstCalleeType(substCalleeType),
         SpecializationInfo(specializationInfo), NumCallArguments(args.size()),
         NumTypeDependentOperands(typeDependentOperands.size()),
-        Substitutions(subs) {
+        Substitutions(subs.getCanonical()) {
     assert(!!subs == !!callee->getType().castTo<SILFunctionType>()
         ->getInvocationGenericSignature());
 
@@ -3147,6 +3147,14 @@ class ApplyInst final
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
          std::optional<ApplyIsolationCrossing> isolationCrossing);
+
+public:
+  bool hasGuaranteedResult() const {
+    return getSubstCalleeConv().hasGuaranteedResult();
+  }
+  bool hasGuaranteedAddressResult() const {
+    return getSubstCalleeConv().hasGuaranteedAddressResult();
+  }
 };
 
 /// PartialApplyInst - Represents the creation of a closure object by partial
@@ -4885,6 +4893,7 @@ class EndBorrowInst
 };
 
 /// Different kinds of access.
+/// This enum must stay in sync with `BeginAccessInst.AccessKind` in SwiftCompilerSources.
 enum class SILAccessKind : uint8_t {
   /// An access which takes uninitialized memory and initializes it.
   Init,
@@ -4907,6 +4916,7 @@ enum { NumSILAccessKindBits = 2 };
 StringRef getSILAccessKindName(SILAccessKind kind);
 
 /// Different kinds of exclusivity enforcement for accesses.
+/// This enum must stay in sync with `BeginAccessInst.Enforcement` in SwiftCompilerSources.
 enum class SILAccessEnforcement : uint8_t {
   /// The access's enforcement has not yet been determined.
   Unknown,
@@ -5228,52 +5238,7 @@ public:
   }
 };
 
-/// AssignByWrapperInst - Represents an abstract assignment via a wrapper,
-/// which may either be an initialization or a store sequence.  This is only
-/// valid in Raw SIL.
-class AssignByWrapperInst
-    : public AssignInstBase<SILInstructionKind::AssignByWrapperInst, 4> {
-  friend SILBuilder;
-  USE_SHARED_UINT8;
-
-public:
-  enum Mode {
-    /// The mode is not decided yet (by DefiniteInitialization).
-    Unknown,
-    
-    /// The initializer is called with Src as argument. The result is stored to
-    /// Dest.
-    Initialization,
-    
-    // Like ``Initialization``, except that the destination is "assigned" rather
-    // than "initialized". This means that the existing value in the destination
-    // is destroyed before the new value is stored.
-    Assign,
-    
-    /// The setter is called with Src as argument. The Dest is not used in this
-    /// case.
-    AssignWrappedValue
-  };
-
-private:
-  AssignByWrapperInst(SILDebugLocation DebugLoc,
-                      SILValue Src, SILValue Dest, SILValue Initializer,
-                      SILValue Setter, Mode mode);
-
-public:
-  SILValue getInitializer() { return Operands[2].get(); }
-  SILValue getSetter() { return  Operands[3].get(); }
-
-  Mode getMode() const {
-    return Mode(sharedUInt8().AssignByWrapperInst.mode);
-  }
-
-  void setMode(Mode mode) {
-    sharedUInt8().AssignByWrapperInst.mode = uint8_t(mode);
-  }
-};
-
-/// AssignOrInitInst - Represents an abstract assignment via a init accessor
+/// AssignOrInitInst - Represents an abstract assignment via an init accessor
 /// or a setter, which may either be an initialization or a store sequence.
 /// This is only valid in Raw SIL.
 ///
@@ -5310,16 +5275,23 @@ public:
   };
 
 private:
-  AssignOrInitInst(SILDebugLocation DebugLoc, VarDecl *P, SILValue Self,
+  AssignOrInitInst(SILDebugLocation DebugLoc, VarDecl *P, SILValue SelfOrLocal,
                    SILValue Src, SILValue Initializer, SILValue Setter,
                    Mode mode);
 
 public:
   VarDecl *getProperty() const { return Property; }
-  SILValue getSelf() const { return Operands[0].get(); }
   SILValue getSrc() const { return Operands[1].get(); }
   SILValue getInitializer() const { return Operands[2].get(); }
-  SILValue getSetter() { return  Operands[3].get(); }
+  SILValue getSetter() { return Operands[3].get(); }
+
+  // Init accessors currently don't support local contexts.
+  // The `PropertyWrappedFieldInitAccessor` thunk must work for both local
+  // and nominal contexts. For locals, we work around this by storing the
+  // projected local address directly in the original `Self` operand.
+  // Callers of this method conditionally handle its result based on
+  // the current DeclContext
+  SILValue getSelfOrLocalOperand() const { return Operands[0].get(); }
 
   Mode getMode() const {
     return Mode(sharedUInt8().AssignOrInitInst.mode);
@@ -5341,7 +5313,8 @@ public:
 
   unsigned getNumInitializedProperties() const;
 
-  ArrayRef<VarDecl *> getInitializedProperties() const;
+  void forEachInitializedProperty(
+      llvm::function_ref<void(VarDecl *)> callback) const;
   ArrayRef<VarDecl *> getAccessedProperties() const;
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
@@ -5349,6 +5322,7 @@ public:
 
   StringRef getPropertyName() const;
   AccessorDecl *getReferencedInitAccessor() const;
+  DeclContext *getDeclContextOrNull() const;
 };
 
 /// Indicates that a memory location is uninitialized at this point and needs to
@@ -5983,7 +5957,7 @@ private:
             Kind kind, SubstitutionMap subs)
       : UnaryInstructionWithTypeDependentOperandsBase(
             debugLoc, operand, typeDependentOperands, outputType),
-        kind(kind), substitutions(subs) {}
+        kind(kind), substitutions(subs.getCanonical()) {}
 
   static ThunkInst *create(SILDebugLocation debugLoc, SILValue operand,
                            SILModule &mod, SILFunction *func, Kind kind,
@@ -8650,7 +8624,7 @@ class InitBlockStorageHeaderInst
                              SILValue InvokeFunction, SILType BlockType,
                              SubstitutionMap Subs)
       : InstructionBase(DebugLoc, BlockType),
-        Substitutions(Subs),
+        Substitutions(Subs.getCanonical()),
         Operands(this, BlockStorage, InvokeFunction) {
   }
   

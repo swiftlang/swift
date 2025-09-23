@@ -92,5 +92,5 @@ do {
 
   let c: Class
   test(c)
-  // expected-complete-warning@-1:8 {{implicit capture of 'c' requires that 'Class' conforms to 'Sendable'; this is an error in the Swift 6 language mode}}
+  // expected-complete-warning@-1:8 {{implicit capture of 'c' requires that 'Class' conforms to 'Sendable'}}
 }

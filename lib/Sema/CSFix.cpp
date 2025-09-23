@@ -1796,7 +1796,10 @@ bool IgnoreAssignmentDestinationType::diagnoseForAmbiguity(
   if (!overload)
     return false;
 
-  auto memberName = overload->choice.getName().getBaseName();
+  auto declName = overload->choice.getName();
+  if (!declName)
+    return false;
+
   auto destType = solution.getType(assignment->getDest());
 
   auto &DE = cs.getASTContext().Diags;
@@ -1804,7 +1807,7 @@ bool IgnoreAssignmentDestinationType::diagnoseForAmbiguity(
   // for cases like this instead of using "contextual" one.
   DE.diagnose(assignment->getSrc()->getLoc(),
               diag::no_candidates_match_result_type,
-              memberName.userFacingName(),
+              declName.getBaseName().userFacingName(),
               solution.simplifyType(destType)->getRValueType());
 
   for (auto &entry : commonFixes) {

@@ -1,10 +1,10 @@
 // RUN: %target-swift-frontend -parse -verify %s
 
 func test1() {
-  @s // expected-error {{expected statement}}
-  return
+  @s
+  return // expected-error {{expected declaration}}
 }
 func test2() {
-  @unknown // expected-error {{expected statement}}
-  return
+  @unknown // expected-error {{unknown attribute 'unknown'}}
+  return // expected-error {{expected declaration}}
 }

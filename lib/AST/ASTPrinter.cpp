@@ -20,6 +20,8 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityConstraint.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Comment.h"
@@ -189,6 +191,38 @@ static bool shouldPrintAllSemanticDetails(const PrintOptions &options) {
   return false;
 }
 
+static bool shouldSkipDeclInPublicInterface(const Decl *D) {
+  // @_spi should be skipped in the public interface.
+  if (D->isSPI())
+    return true;
+
+  // Decls that are unavailable at runtime in an availability domain that has
+  // been @_spiOnly imported should be hidden from the public interface of
+  // a -library-level=api module.
+  auto &ctx = D->getDeclContext()->getASTContext();
+  if (ctx.LangOpts.LibraryLevel != LibraryLevel::API)
+    return false;
+
+  auto *SF = D->getDeclContext()->getParentSourceFile();
+  if (!SF)
+    return false;
+
+  auto constraints = getAvailabilityConstraintsForDecl(
+      D, AvailabilityContext::forDeploymentTarget(ctx));
+  llvm::SmallVector<AvailabilityDomain, 4> unavailableDomains;
+  getRuntimeUnavailableDomains(constraints, unavailableDomains, ctx);
+
+  for (auto domain : unavailableDomains) {
+    if (auto *domainDecl = domain.getDecl()) {
+      if (SF->getRestrictedImportKind(domainDecl->getModuleContext()) ==
+          RestrictedImportKind::SPIOnly)
+        return true;
+    }
+  }
+
+  return false;
+}
+
 /// Get the non-recursive printing options that should be applied when
 /// printing the type of a value decl.
 static NonRecursivePrintOptions getNonRecursiveOptions(const ValueDecl *D) {
@@ -293,8 +327,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
       if (D->getAttrs().hasAttribute<ImplementationOnlyAttr>())
         return false;
 
-      // Skip SPI decls if `PrintSPIs`.
-      if (options.printPublicInterface() && D->isSPI())
+      if (options.printPublicInterface() && shouldSkipDeclInPublicInterface(D))
         return false;
 
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -410,8 +443,6 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.CurrentPrintabilityChecker =
       std::make_shared<ShouldPrintForModuleInterface>();
 
-  // FIXME: We don't really need 'public' on everything; we could just change
-  // the default to 'public' and mark the 'internal' things.
   result.PrintAccess = true;
 
   result.ExcludeAttrList = {
@@ -1072,6 +1103,8 @@ public:
   void printRequirement(const InverseRequirement &inverse,
                         bool forInherited);
 
+  void printArgumentList(ArgumentList *args, bool forSubscript = false);
+
 private:
   bool shouldPrint(const Decl *D, bool Notify = false);
   bool shouldPrintPattern(const Pattern *P);
@@ -1107,8 +1140,8 @@ private:
   void printFunctionParameters(AbstractFunctionDecl *AFD);
 
   void printArgument(const Argument &arg);
-  
-  void printArgumentList(ArgumentList *args, bool forSubscript = false);
+
+  void printAvailabilitySpec(AvailabilitySpec *spec);
 
   void printStmtCondition(StmtCondition stmt);
 
@@ -2634,6 +2667,8 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       }
       AddAccessorToPrint(AccessorKind::Read2);
       break;
+    case ReadImplKind::Borrow:
+      AddAccessorToPrint(AccessorKind::Borrow);
     }
     switch (impl.getWriteImpl()) {
     case WriteImplKind::Immutable:
@@ -2667,6 +2702,9 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
         AddAccessorToPrint(AccessorKind::Modify);
       }
       AddAccessorToPrint(AccessorKind::Modify2);
+      break;
+    case WriteImplKind::Mutate:
+      AddAccessorToPrint(AccessorKind::Mutate);
       break;
     }
   }
@@ -4219,6 +4257,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::Modify2:
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
+  case AccessorKind::Borrow:
     recordDeclLoc(decl,
       [&]{
         Printer << getAccessorLabel(decl->getAccessorKind());
@@ -4227,6 +4266,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::Set:
   case AccessorKind::WillSet:
   case AccessorKind::Init:
+  case AccessorKind::Mutate:
     recordDeclLoc(decl,
       [&]{
         Printer << getAccessorLabel(decl->getAccessorKind());
@@ -4808,6 +4848,19 @@ void PrintAST::visitMacroExpansionDecl(MacroExpansionDecl *decl) {
     isFirst = false;
   }
   Printer << ')';
+}
+
+void CustomAttr::printCustomAttr(ASTPrinter &Printer, const PrintOptions &Options) const {
+  Printer.callPrintNamePre(PrintNameContext::Attribute);
+  Printer << "@";
+  if (auto type = getType())
+    type.print(Printer, Options);
+  else
+    getTypeRepr()->print(Printer, Options);
+  Printer.printNamePost(PrintNameContext::Attribute);
+  if (hasArgs() && Options.PrintExprs) {
+    PrintAST(Printer, Options).printArgumentList(argList);
+  }
 }
 
 void PrintAST::visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
@@ -5505,9 +5558,6 @@ void PrintAST::visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *e
 void PrintAST::visitProtocolMetatypeToObjectExpr(ProtocolMetatypeToObjectExpr *expr) {
 }
 
-void PrintAST::visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *expr) {
-}
-
 void PrintAST::visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *expr) {
 }
 
@@ -5666,19 +5716,58 @@ void PrintAST::visitRepeatWhileStmt(RepeatWhileStmt *stmt) {
   visit(stmt->getCond());
 }
 
+void PrintAST::printAvailabilitySpec(AvailabilitySpec *spec) {
+  auto domainOrIdentifier = spec->getDomainOrIdentifier();
+  if (auto domain = domainOrIdentifier.getAsDomain()) {
+    Printer << domain->getNameForAttributePrinting();
+  } else {
+    Printer << domainOrIdentifier.getAsIdentifier().value();
+  }
+
+  if (!spec->getRawVersion().empty())
+    Printer << " " << spec->getRawVersion().getAsString();
+}
+
 void PrintAST::printStmtCondition(StmtCondition condition) {
   interleave(
       condition,
       [&](StmtConditionElement &elt) {
-        if (auto pattern = elt.getPatternOrNull()) {
-          printPattern(pattern);
-          auto initializer = elt.getInitializer();
-          if (initializer) {
+        switch (elt.getKind()) {
+        case StmtConditionElement::ConditionKind::CK_Boolean:
+          visit(elt.getBoolean());
+          break;
+
+        case StmtConditionElement::ConditionKind::CK_PatternBinding:
+          printPattern(elt.getPattern());
+          if (auto initializer = elt.getInitializer()) {
             Printer << " = ";
             visit(initializer);
           }
-        } else if (auto boolean = elt.getBooleanOrNull()) {
-          visit(boolean);
+          break;
+
+        case StmtConditionElement::ConditionKind::CK_Availability:
+          if (auto availability = elt.getAvailability()) {
+            Printer << (availability->isUnavailability()
+                            ? tok::pound_unavailable
+                            : tok::pound_available)
+                    << "(";
+
+            interleave(
+                availability->getQueries(),
+                [&](AvailabilitySpec *spec) { printAvailabilitySpec(spec); },
+                [&] { Printer << ", "; });
+
+            Printer << ")";
+          }
+          break;
+
+        case StmtConditionElement::ConditionKind::CK_HasSymbol:
+          if (auto hasSymbolInfo = elt.getHasSymbolInfo()) {
+            Printer << tok::pound__hasSymbol << "(";
+            visit(hasSymbolInfo->getSymbolExpr());
+            Printer << ")";
+          }
+          break;
         }
       },
       [&] { Printer << ", "; });
@@ -6146,6 +6235,8 @@ public:
         Printer << VD->getName();
       } else if (isa<ErrorExpr *>(originator)) {
         Printer << "error_expr";
+      } else if (auto *errTy = originator.dyn_cast<ErrorType *>()) {
+        visit(errTy);
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         visit(DMT);
       } else if (isa<TypeRepr *>(originator)) {
@@ -7441,10 +7532,37 @@ public:
       Printer << ") __";
 
       if (genericSig) {
-        printGenericArgs(decl->getASTContext(),
-                         genericSig.getGenericParams(),
-                         T->getSubstitutions().getReplacementTypes());
+        auto &ctx = decl->getASTContext();
+        auto params = genericSig.getGenericParams();
+        auto args = T->getSubstitutions().getReplacementTypes();
+
+        // Use the new "nested" syntax if there is at least one parameter pack,
+        // because that case didn't round trip at all before anyway. Otherwise,
+        // use the old "flat" syntax, even when the owner declaration is in a
+        // nested generic context, because we want the generated swiftinterface
+        // to continue to work on old compilers.
+        if (genericSig->hasParameterPack()) {
+          bool first = true;
+
+          while (!params.empty()) {
+            if (!first) { Printer << ".__"; }
+            first = false;
+
+            unsigned end = 1;
+            unsigned depth = params.front()->getDepth();
+            while (end < params.size() && params[end]->getDepth() == depth) {
+              ++end;
+            }
+
+            printGenericArgs(ctx, params.take_front(end), args.take_front(end));
+            params = params.slice(end);
+            args = args.slice(end);
+          }
+        } else {
+          printGenericArgs(ctx, params, args);
+        }
       }
+
       return;
     }
     case PrintOptions::OpaqueReturnTypePrintingMode::Description: {
@@ -7812,6 +7930,10 @@ static StringRef getStringForResultConvention(ResultConvention conv) {
   case ResultConvention::UnownedInnerPointer: return "@unowned_inner_pointer ";
   case ResultConvention::Autoreleased: return "@autoreleased ";
   case ResultConvention::Pack: return "@pack_out ";
+  case ResultConvention::GuaranteedAddress:
+    return "@guaranteed_addr ";
+  case ResultConvention::Guaranteed:
+    return "@guaranteed ";
   }
   llvm_unreachable("bad result convention");
 }

@@ -784,6 +784,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.AllowNonResilientAccess = 0;
   Bits.ModuleDecl.SerializePackageEnabled = 0;
   Bits.ModuleDecl.StrictMemorySafety = 0;
+  Bits.ModuleDecl.DeferredCodeGen = 0;
 
   // Populate the module's files.
   SmallVector<FileUnit *, 2> files;
@@ -820,6 +821,16 @@ ImplicitImportList ModuleDecl::getImplicitImports() const {
   auto *mutableThis = const_cast<ModuleDecl *>(this);
   return evaluateOrDefault(evaluator, ModuleImplicitImportsRequest{mutableThis},
                            {});
+}
+
+const AccessNotesFile *ModuleDecl::getAccessNotes() const {
+  // Only the main module has access notes.
+  if (!isMainModule())
+    return nullptr;
+
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator, LoadAccessNotesRequest{&ctx},
+                           nullptr);
 }
 
 SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
@@ -1031,6 +1042,20 @@ void ModuleDecl::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   FORWARD(lookupImportedSPIGroups, (importedModule, spiGroups));
+}
+
+bool ModuleDecl::isModuleImportedPreconcurrency(
+    const ModuleDecl *importedModule) const {
+  for (const FileUnit *file : getFiles()) {
+    if (file->isModuleImportedPreconcurrency(importedModule))
+      return true;
+
+    if (auto *synth = file->getSynthesizedFile()) {
+      if (synth->isModuleImportedPreconcurrency(importedModule))
+        return true;
+    }
+  }
+  return false;
 }
 
 void ModuleDecl::lookupAvailabilityDomains(
@@ -2664,6 +2689,11 @@ void
 SourceFile::setImports(ArrayRef<AttributedImport<ImportedModule>> imports) {
   assert(!Imports && "Already computed imports");
   Imports = getASTContext().AllocateCopy(imports);
+  if (getASTContext().LangOpts.DumpSourceFileImports) {
+    llvm::errs() << "imports for " << getFilename() << ":\n";
+    for (auto Import : imports)
+      llvm::errs() << "\t" << Import.module.importedModule->getName() << "\n";
+  }
 }
 
 std::optional<AttributedImport<ImportedModule>>
@@ -2878,6 +2908,7 @@ bool SourceFile::hasTestableOrPrivateImport(
       });
 }
 
+// FIXME: This should probably be requestified.
 RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *module) const {
   auto &imports = getASTContext().getImportCache();
   RestrictedImportKind importKind = RestrictedImportKind::MissingImport;
@@ -3036,6 +3067,20 @@ void SourceFile::lookupImportedSPIGroups(
       spiGroups.insert(import.spiGroups.begin(), import.spiGroups.end());
     }
   }
+}
+
+bool SourceFile::isModuleImportedPreconcurrency(
+    const ModuleDecl *importedModule) const {
+  auto &imports = getASTContext().getImportCache();
+  for (auto &import : *Imports) {
+    if (import.options.contains(ImportFlags::Preconcurrency) &&
+        (importedModule == import.module.importedModule ||
+         imports.isImportedByViaSwiftOnly(importedModule,
+                                          import.module.importedModule))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool shouldImplicitImportAsSPI(ArrayRef<Identifier> spiGroups) {

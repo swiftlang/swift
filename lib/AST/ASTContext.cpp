@@ -2380,16 +2380,35 @@ void ASTContext::addLoadedModule(ModuleDecl *M) {
   // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
   // and a source file has 'import Foo', a module called Bar (real name)
   // will be loaded and added to the map.
-  getImpl().LoadedModules[M->getRealName()] = M;
+
+  auto RealName = M->getRealName();
+  auto ABIName = M->getABIName();
+
+  auto &LoadedModules = getImpl().LoadedModules;
+  auto &NameToModules = getImpl().NameToModules;
+
+  // If a module with the same name has been loaded before, remove it from the
+  // list of modules that share the same name.
+  if (auto *current = LoadedModules.lookup(RealName)) {
+    auto isCurrentModule = [&](ModuleDecl *module) {
+      return module == current;
+    };
+    llvm::erase_if(NameToModules[RealName], isCurrentModule);
+
+    if (RealName != ABIName)
+      llvm::erase_if(NameToModules[ABIName], isCurrentModule);
+  }
+
+  LoadedModules[RealName] = M;
 
   // Add the module to the mapping from module name to list of modules that
   // share that name.
-  getImpl().NameToModules[M->getRealName()].push_back(M);
+  NameToModules[RealName].push_back(M);
 
   // If the ABI name differs from the real name, also add the module to the list
   // that share that ABI name.
-  if (M->getRealName() != M->getABIName())
-    getImpl().NameToModules[M->getABIName()].push_back(M);
+  if (RealName != ABIName)
+    NameToModules[ABIName].push_back(M);
 }
 
 void ASTContext::removeLoadedModule(Identifier RealName) {
@@ -3675,6 +3694,9 @@ Type PlaceholderType::get(ASTContext &ctx, Originator originator) {
     if (auto *depTy = originator.dyn_cast<DependentMemberType *>())
       return depTy->getRecursiveProperties();
 
+    if (auto *errTy = originator.dyn_cast<ErrorType *>())
+      return errTy->getRecursiveProperties();
+
     return RecursiveTypeProperties();
   }();
   auto arena = getArena(originatorProps);
@@ -4664,6 +4686,8 @@ isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 // For now, generic function types cannot be dependent (in fact,
 // they erase dependence) or contain type variables, and they're
 // always materializable.
+// FIXME: This doesn't seem great, we should consider changing it to be opt-out
+// rather than opt-in.
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result, Type globalActor,
@@ -4672,34 +4696,25 @@ getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
-  for (auto param : params) {
-    if (param.getPlainType()->getRecursiveProperties().hasError())
-      properties |= RecursiveTypeProperties::HasError;
-    if (param.getPlainType()->getRecursiveProperties().isUnsafe())
-      properties |= RecursiveTypeProperties::IsUnsafe;
-  }
+  using Prop = RecursiveTypeProperties::Property;
+  auto mask = (unsigned)Prop::HasError | Prop::IsUnsafe | Prop::HasPlaceholder;
+
+  auto unionBits = [&](Type ty) {
+    if (!ty)
+      return;
+    auto bits = ty->getRecursiveProperties().getBits();
+    properties |= Prop(bits & mask);
+  };
+
+  for (auto param : params)
+    unionBits(param.getPlainType());
 
   if (result->getRecursiveProperties().hasDynamicSelf())
     properties |= RecursiveTypeProperties::HasDynamicSelf;
-  if (result->getRecursiveProperties().hasError())
-    properties |= RecursiveTypeProperties::HasError;
-  if (result->getRecursiveProperties().isUnsafe())
-    properties |= RecursiveTypeProperties::IsUnsafe;
-  
-  if (globalActor) {
-    if (globalActor->getRecursiveProperties().hasError())
-      properties |= RecursiveTypeProperties::HasError;
-    if (globalActor->getRecursiveProperties().isUnsafe())
-      properties |= RecursiveTypeProperties::IsUnsafe;
-  }
 
-  if (thrownError) {
-    if (thrownError->getRecursiveProperties().hasError())
-      properties |= RecursiveTypeProperties::HasError;
-    if (thrownError->getRecursiveProperties().isUnsafe())
-      properties |= RecursiveTypeProperties::IsUnsafe;
-  }
-
+  unionBits(result);
+  unionBits(globalActor);
+  unionBits(thrownError);
   return properties;
 }
 

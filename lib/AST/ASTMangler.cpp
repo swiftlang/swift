@@ -161,6 +161,10 @@ static StringRef getCodeForAccessorKind(AccessorKind kind) {
     return "x";
   case AccessorKind::Read2:
     return "y";
+  case AccessorKind::Borrow:
+    return "b";
+  case AccessorKind::Mutate:
+    return "z";
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -249,6 +253,16 @@ std::string ASTMangler::mangleBackingInitializerEntity(const VarDecl *var,
   llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
   beginMangling();
   appendBackingInitializerEntity(var);
+  appendSymbolKind(SKind);
+  return finalize();
+}
+
+std::string
+ASTMangler::manglePropertyWrappedFieldInitAccessorEntity(const VarDecl *var,
+                                                         SymbolKind SKind) {
+  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
+  beginMangling();
+  appendPropertyWrappedFieldInitAccessorEntity(var);
   appendSymbolKind(SKind);
   return finalize();
 }
@@ -2268,6 +2282,10 @@ static char getResultConvention(ResultConvention conv) {
     case ResultConvention::UnownedInnerPointer: return 'u';
     case ResultConvention::Autoreleased: return 'a';
     case ResultConvention::Pack: return 'k';
+    case ResultConvention::GuaranteedAddress:
+      return 'g';
+    case ResultConvention::Guaranteed:
+      return 'G';
   }
   llvm_unreachable("bad result convention");
 }
@@ -2533,6 +2551,14 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
   if (auto file = dyn_cast<FileUnit>(decl->getDeclContext())) {
     if (file->getKind() == FileUnitKind::ClangModule ||
         file->getKind() == FileUnitKind::DWARFModule) {
+
+      // Use ClangImporterContext for compatibility aliases to avoid conflicting
+      // with the mangled name of the actual declaration.
+      if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(decl)) {
+        if (aliasDecl->isCompatibilityAlias())
+          return ASTMangler::ClangImporterContext;
+      }
+
       if (decl->getClangDecl())
         return ASTMangler::ObjCContext;
       return ASTMangler::ClangImporterContext;
@@ -2560,6 +2586,8 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
         hasNameForLinkage = !clangDecl->getDeclName().isEmpty();
       if (hasNameForLinkage) {
         auto *clangDC = clangDecl->getDeclContext();
+        while (isa<clang::LinkageSpecDecl>(clangDC))
+          clangDC = clangDC->getParent();
         // In C, "nested" structs, unions, enums, etc. will become siblings:
         //   struct Foo { struct Bar { }; }; -> struct Foo { }; struct Bar { };
         // Whereas in C++, nested records will actually be nested. So if this is
@@ -3126,6 +3154,13 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
   // Always use Clang names for imported Clang declarations, unless they don't
   // have one.
   auto tryAppendClangName = [this, decl]() -> bool {
+    // We use the Swift name rather than the Clang name for compatibility
+    // aliases since they are ClangImporterContext entities.
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(decl)) {
+      if (aliasDecl->isCompatibilityAlias())
+        return false;
+    }
+
     auto *nominal = dyn_cast<NominalTypeDecl>(decl);
     auto namedDecl = getClangDeclForMangling(decl);
     if (!namedDecl) {
@@ -4104,6 +4139,14 @@ void ASTMangler::appendBackingInitializerEntity(const VarDecl *var) {
   BaseEntitySignature base(var);
   appendEntity(var, base, "vp", var->isStatic());
   appendOperator("fP");
+}
+
+void ASTMangler::appendPropertyWrappedFieldInitAccessorEntity(
+    const VarDecl *var) {
+  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
+  BaseEntitySignature base(var);
+  appendEntity(var, base, "vp", var->isStatic());
+  appendOperator("fF");
 }
 
 void ASTMangler::appendInitFromProjectedValueEntity(const VarDecl *var) {

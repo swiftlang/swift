@@ -834,3 +834,10 @@ func testUndefinedTypeInPattern(_ x: Int) {
     }
   }
 }
+
+func testUndefinedInClosureVar() {
+  // Make sure we don't produce "unable to infer closure type without a type annotation"
+  _ = {
+    var x: Undefined // expected-error {{cannot find type 'Undefined' in scope}}
+  }
+}

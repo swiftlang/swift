@@ -976,6 +976,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setIsConcurrencyChecked();
     if (loadedModuleFile->strictMemorySafety())
       M.setStrictMemorySafety();
+    if (loadedModuleFile->deferredCodeGen())
+      M.setDeferredCodeGen();
     if (loadedModuleFile->hasCxxInteroperability()) {
       M.setHasCxxInteroperability();
       M.setCXXStdlibKind(loadedModuleFile->getCXXStdlibKind());
@@ -1911,6 +1913,14 @@ void SerializedASTFile::lookupImportedSPIGroups(
       spiGroups.insert(dep.spiGroups.begin(), dep.spiGroups.end());
     }
   }
+}
+
+bool SerializedASTFile::isModuleImportedPreconcurrency(
+    const ModuleDecl *importedModule) const {
+  // This method should only be queried during `-merge-modules` jobs, which are
+  // deprecated, and thus no effort has been made to answer this query correctly
+  // (@preconcurrency is not encoded on imports in serialized modules).
+  return false;
 }
 
 std::optional<CommentInfo>

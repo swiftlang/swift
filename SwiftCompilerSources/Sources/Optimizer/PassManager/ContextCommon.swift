@@ -45,10 +45,6 @@ extension Context {
   func canMakeStaticObjectReadOnly(objectType: Type) -> Bool {
     bridgedPassContext.canMakeStaticObjectReadOnly(objectType.bridged)
   }
-
-  func notifyNewFunction(function: Function, derivedFrom: Function) {
-    bridgedPassContext.addFunctionToPassManagerWorklist(function.bridged, derivedFrom.bridged)
-  }
 }
 
 extension MutatingContext {
@@ -150,5 +146,20 @@ extension MutatingContext {
   /// on the body (i.e. SIL instructions) of another function than the currently optimized one.
   func notifyDependency(onBodyOf otherFunction: Function) {
     bridgedPassContext.notifyDependencyOnBodyOf(otherFunction.bridged)
+  }
+}
+
+extension Instruction {
+  var arraySemanticsCallKind: ArrayCallKind {
+    return BridgedPassContext.getArraySemanticsCallKind(self.bridged)
+  }
+
+  func canHoistArraySemanticsCall(to toInst: Instruction, _ context: FunctionPassContext) -> Bool {
+    return context.bridgedPassContext.canHoistArraySemanticsCall(self.bridged, toInst.bridged)
+  }
+
+  func hoistArraySemanticsCall(before toInst: Instruction, _ context: some MutatingContext) {
+    context.bridgedPassContext.hoistArraySemanticsCall(self.bridged, toInst.bridged) // Internally updates dom tree.
+    context.notifyInstructionsChanged()
   }
 }

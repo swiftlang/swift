@@ -309,10 +309,13 @@ static bool isViableElement(ASTNode element,
       // Skip if we're doing completion for a SingleValueStmtExpr, and have a
       // brace that doesn't involve a single expression, and doesn't have a
       // code completion token, as it won't contribute to the type of the
-      // SingleValueStmtExpr.
+      // SingleValueStmtExpr. We also need to skip if the body has a ReturnStmt,
+      // which isn't something that's currently allowed, but is necessary to
+      // correctly infer the contextual type without leaving it unbound.
       if (isForSingleValueStmtCompletion &&
           !SingleValueStmtExpr::hasResult(braceStmt) &&
-          !cs.containsIDEInspectionTarget(braceStmt)) {
+          !cs.containsIDEInspectionTarget(braceStmt) &&
+          !braceStmt->hasExplicitReturnStmt(cs.getASTContext())) {
         return false;
       }
     }
@@ -738,23 +741,6 @@ private:
                   LocatorPathElt::ContextualType(context.purpose)});
     cs.addConstraint(ConstraintKind::Equal, context.getType(), patternType,
                      loc);
-
-    // For any pattern variable that has a parent variable (i.e., another
-    // pattern variable with the same name in the same case), require that
-    // the types be equivalent.
-    pattern->forEachNode([&](Pattern *pattern) {
-      auto namedPattern = dyn_cast<NamedPattern>(pattern);
-      if (!namedPattern)
-        return;
-
-      auto var = namedPattern->getDecl();
-      if (auto parentVar = var->getParentVarDecl()) {
-        cs.addConstraint(
-            ConstraintKind::Equal, cs.getType(parentVar), cs.getType(var),
-            cs.getConstraintLocator(
-                locator, LocatorPathElt::PatternMatch(namedPattern)));
-      }
-    });
   }
 
   void visitPatternBinding(PatternBindingDecl *patternBinding,
@@ -844,12 +830,6 @@ private:
     auto contextualPattern =
         ContextualPattern::forPatternBindingDecl(patternBinding, index);
     Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-
-    // Fail early if pattern couldn't be type-checked.
-    if (!patternType || patternType->hasError()) {
-      hadError = true;
-      return;
-    }
 
     auto target = getTargetForPattern(patternBinding, index, patternType);
     if (!target) {
@@ -1401,7 +1381,7 @@ private:
       pattern->forEachVariable([&](VarDecl *var) { recordVar(var); });
     }
 
-    for (auto bodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+    for (auto bodyVar : caseStmt->getCaseBodyVariables()) {
       if (!bodyVar->hasName())
         continue;
 
@@ -2028,9 +2008,9 @@ private:
       }
     }
 
-    bindSwitchCasePatternVars(context.getAsDeclContext(), caseStmt);
+    diagnoseCaseVarMutabilityMismatch(context.getAsDeclContext(), caseStmt);
 
-    for (auto *expected : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+    for (auto *expected : caseStmt->getCaseBodyVariables()) {
       assert(expected->hasName());
       auto prev = expected->getParentVarDecl();
       auto type = solution.getResolvedType(prev)->mapTypeOutOfContext();

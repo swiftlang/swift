@@ -324,6 +324,12 @@ EXPERIMENTAL_FEATURE(KeyPathWithMethodMembers, false)
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
 
+// Whether to emit an Embedded Swift module with "deferred" code generation,
+// meaning that the only code that will be emitted into the object file is
+// code that was marked as "never emit into client". For everything else,
+// Swift still store the SIL and emit it into the client only when used.
+EXPERIMENTAL_FEATURE(DeferredCodeGen, true)
+
 // Whether to compile scripts lazily in immediate mode
 EXPERIMENTAL_FEATURE(LazyImmediate, false)
 
@@ -441,6 +447,9 @@ EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
+/// Enable the `@_manualOwnership` attribute.
+EXPERIMENTAL_FEATURE(ManualOwnership, false)
+
 /// Enable the @extractConstantsFromMembers attribute.
 EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
 
@@ -535,6 +544,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 
 /// Allow macro based aliases to be imported into Swift
 EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
+
+/// Enable borrow/mutate accessors
+EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

@@ -13,15 +13,16 @@
 #include "PrimitiveTypeMapping.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include <optional>
 
 using namespace swift;
 
 /// Find the implementation of the named type in the named module if loaded.
-static TypeDecl *findTypeInModuleByName(ASTContext &ctx,
-                                        Identifier moduleName,
+static TypeDecl *findTypeInModuleByName(ASTContext &ctx, Identifier moduleName,
                                         Identifier typeName) {
   auto module = ctx.getLoadedModule(moduleName);
   if (!module)
@@ -69,18 +70,15 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
 
   // Map stdlib types.
 #define MAP(SWIFT_NAME, CLANG_REPR, NEEDS_NULLABILITY)                         \
-  addMappedType(ctx.StdlibModuleName,                                          \
-                ctx.getIdentifier(#SWIFT_NAME),                                \
+  addMappedType(ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME),          \
                 {CLANG_REPR, std::optional<StringRef>(CLANG_REPR),             \
                  std::optional<StringRef>(CLANG_REPR), NEEDS_NULLABILITY})
 #define MAP_C(SWIFT_NAME, OBJC_REPR, C_REPR, NEEDS_NULLABILITY)                \
-  addMappedType(ctx.StdlibModuleName,                                          \
-                ctx.getIdentifier(#SWIFT_NAME),                                \
+  addMappedType(ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME),          \
                 {OBJC_REPR, std::optional<StringRef>(C_REPR),                  \
                  std::optional<StringRef>(C_REPR), NEEDS_NULLABILITY})
 #define MAP_CXX(SWIFT_NAME, OBJC_REPR, C_REPR, CXX_REPR, NEEDS_NULLABILITY)    \
-  addMappedType(ctx.StdlibModuleName,                                          \
-                ctx.getIdentifier(#SWIFT_NAME),                                \
+  addMappedType(ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME),          \
                 {OBJC_REPR, std::optional<StringRef>(C_REPR),                  \
                  std::optional<StringRef>(CXX_REPR), NEEDS_NULLABILITY})
 
@@ -140,10 +138,10 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
                 {"BOOL", std::nullopt, std::nullopt, false});
   addMappedType(ctx.Id_ObjectiveC, ctx.getIdentifier("Selector"),
                 {"SEL", std::nullopt, std::nullopt, true});
-  addMappedType(ctx.Id_ObjectiveC,
-                ctx.getIdentifier(swift::getSwiftName(
-                                      KnownFoundationEntity::NSZone)),
-                {"struct _NSZone *", std::nullopt, std::nullopt, true});
+  addMappedType(
+      ctx.Id_ObjectiveC,
+      ctx.getIdentifier(swift::getSwiftName(KnownFoundationEntity::NSZone)),
+      {"struct _NSZone *", std::nullopt, std::nullopt, true});
 
   addMappedType(ctx.Id_Darwin, ctx.getIdentifier("DarwinBoolean"),
                 {"Boolean", std::nullopt, std::nullopt, false});
@@ -157,17 +155,33 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   // Use typedefs we set up for SIMD vector types.
 #define MAP_SIMD_TYPE(BASENAME, _, __)                                         \
   StringRef simd2##BASENAME = "swift_" #BASENAME "2";                          \
-  addMappedType(ctx.Id_simd, ctx.getIdentifier(#BASENAME "2"),                 \
-      {simd2##BASENAME, simd2##BASENAME, simd2##BASENAME, false},              \
-      /*applyToUnderlying*/false);                                             \
+  addMappedType(                                                               \
+      ctx.Id_simd, ctx.getIdentifier(#BASENAME "2"),                           \
+      {simd2##BASENAME, simd2##BASENAME, simd2##BASENAME, false, true},        \
+      /*applyToUnderlying*/ false);                                            \
+  addMappedType(                                                               \
+      ctx.Id_simd, ctx.getIdentifier("simd_" #BASENAME "2"),                   \
+      {simd2##BASENAME, simd2##BASENAME, simd2##BASENAME, false, true},        \
+      /*applyToUnderlying*/ false);                                            \
   StringRef simd3##BASENAME = "swift_" #BASENAME "3";                          \
-  addMappedType(ctx.Id_simd, ctx.getIdentifier(#BASENAME "3"),                 \
-      {simd3##BASENAME, simd3##BASENAME, simd3##BASENAME, false},              \
-      /*applyToUnderlying*/false);                                             \
+  addMappedType(                                                               \
+      ctx.Id_simd, ctx.getIdentifier(#BASENAME "3"),                           \
+      {simd3##BASENAME, simd3##BASENAME, simd3##BASENAME, false, true},        \
+      /*applyToUnderlying*/ false);                                            \
+  addMappedType(                                                               \
+      ctx.Id_simd, ctx.getIdentifier("simd_" #BASENAME "3"),                   \
+      {simd3##BASENAME, simd3##BASENAME, simd3##BASENAME, false, true},        \
+      /*applyToUnderlying*/ false);                                            \
   StringRef simd4##BASENAME = "swift_" #BASENAME "4";                          \
-  addMappedType(ctx.Id_simd, ctx.getIdentifier(#BASENAME "4"),                 \
-      {simd4##BASENAME, simd4##BASENAME, simd4##BASENAME, false},              \
-      /*applyToUnderlying*/false);
+  addMappedType(                                                               \
+      ctx.Id_simd, ctx.getIdentifier(#BASENAME "4"),                           \
+      {simd4##BASENAME, simd4##BASENAME, simd4##BASENAME, false, true},        \
+      /*applyToUnderlying*/ false);                                            \
+  addMappedType(                                                               \
+      ctx.Id_simd, ctx.getIdentifier("simd_" #BASENAME "4"),                   \
+      {simd4##BASENAME, simd4##BASENAME, simd4##BASENAME, false, true},        \
+      /*applyToUnderlying*/ false);
+
 #include "swift/ClangImporter/SIMDMappedTypes.def"
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
                 "must add or remove special name mappings if max number of "
@@ -192,7 +206,8 @@ PrimitiveTypeMapping::getMappedTypeInfoOrNull(const TypeDecl *typeDecl) {
 std::optional<PrimitiveTypeMapping::ClangTypeInfo>
 PrimitiveTypeMapping::getKnownObjCTypeInfo(const TypeDecl *typeDecl) {
   if (auto *typeInfo = getMappedTypeInfoOrNull(typeDecl))
-    return ClangTypeInfo{typeInfo->objcName, typeInfo->canBeNullable};
+    return ClangTypeInfo{typeInfo->objcName, typeInfo->canBeNullable,
+                         typeInfo->simd};
   return std::nullopt;
 }
 
@@ -200,7 +215,8 @@ std::optional<PrimitiveTypeMapping::ClangTypeInfo>
 PrimitiveTypeMapping::getKnownCTypeInfo(const TypeDecl *typeDecl) {
   if (auto *typeInfo = getMappedTypeInfoOrNull(typeDecl)) {
     if (typeInfo->cName)
-      return ClangTypeInfo{*typeInfo->cName, typeInfo->canBeNullable};
+      return ClangTypeInfo{*typeInfo->cName, typeInfo->canBeNullable,
+                           typeInfo->simd};
   }
   return std::nullopt;
 }
@@ -209,7 +225,25 @@ std::optional<PrimitiveTypeMapping::ClangTypeInfo>
 PrimitiveTypeMapping::getKnownCxxTypeInfo(const TypeDecl *typeDecl) {
   if (auto *typeInfo = getMappedTypeInfoOrNull(typeDecl)) {
     if (typeInfo->cxxName)
-      return ClangTypeInfo{*typeInfo->cxxName, typeInfo->canBeNullable};
+      return ClangTypeInfo{*typeInfo->cxxName, typeInfo->canBeNullable,
+                           typeInfo->simd};
   }
   return std::nullopt;
+}
+
+std::optional<PrimitiveTypeMapping::ClangTypeInfo>
+PrimitiveTypeMapping::getKnownSIMDTypeInfo(Type t, ASTContext &ctx) {
+  auto vecTy = t->getAs<BuiltinVectorType>();
+  if (!vecTy)
+    return std::nullopt;
+
+  auto elemTy = vecTy->getElementType();
+  auto numElems = vecTy->getNumElements();
+
+  std::string elemTyName = elemTy.getString();
+  // While the element type starts with an upper case, vector types start with
+  // lower case.
+  elemTyName[0] = std::tolower(elemTyName[0]);
+  Identifier swiftName = ctx.getIdentifier("swift_" + elemTyName + std::to_string(numElems));
+  return ClangTypeInfo{swiftName.str(), false, true};
 }

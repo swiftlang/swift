@@ -87,6 +87,11 @@ public struct AThing : ~Copyable {
   init(somethings: UnsafeMutableRawBufferPointer)
 }
 
+@_addressableForDependencies
+public struct InlineInt {
+  var i: Int
+}
+
 sil @getContainer : $@convention(thin) (@inout AThing) -> @lifetime(borrow address_for_deps 0) @out Container
 sil @getMutableView : $@convention(thin) (@in_guaranteed Container) -> @lifetime(copy 0) @out Optional<MutableView>
 sil @modAThing : $@convention(thin) (@inout AThing) -> ()
@@ -137,6 +142,10 @@ sil @getHolder : $@convention(thin) () -> @owned Holder
 sil @getAddressableObj : $@convention(method) (@guaranteed Holder) -> @owned AddressableForDepsObj
 
 sil @getAddressableObj_NE : $@convention(thin) (@in_guaranteed AddressableForDepsObj) -> @owned NE
+
+sil @globalAddress : $@convention(thin) () -> Builtin.RawPointer
+sil @addressInt : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address_for_deps 0) @owned Span<Int>
+sil @useSpan : $@convention(thin) (@guaranteed Span<Int>) -> ()
 
 // NCContainer.wrapper._read:
 //   var wrapper: Wrapper {
@@ -913,4 +922,51 @@ bb2:
   end_borrow %2
   dealloc_box [dead_end] %1
   unreachable
+}
+
+// Test trivial alloc_stack extension when used by an addressable dependency.
+//
+// CHECK-LABEL: sil hidden [noinline] [ossa] @testTempTrivialStackCopy : $@convention(thin) () -> () {
+// CHECK:   [[STK:%[0-9]+]] = alloc_stack $InlineInt
+// CHECK:   [[MD:%[0-9]+]] = mark_dependence [unresolved] %{{.*}} on [[STK]]
+// CHECK:   [[VAR:%[0-9]+]] = move_value [var_decl] [[MD]]
+// CHECK: bb3:                                              // Preds: bb2 bb1
+// CHECK:   [[BORROW:%[0-9]+]] = begin_borrow [[VAR]]
+// CHECK:   apply %{{.*}}([[BORROW]]) : $@convention(thin) (@guaranteed Span<Int>) -> ()
+// CHECK:   destroy_value [[VAR]]
+// CHECK:   dealloc_stack [[STK]]
+// CHECK-LABEL: } // end sil function 'testTempTrivialStackCopy'
+sil hidden [noinline] [ossa] @testTempTrivialStackCopy : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @globalAddress : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*InlineInt
+  %3 = begin_access [read] [dynamic] %2
+  %4 = load [trivial] %3
+  end_access %3
+  %6 = alloc_stack $InlineInt
+  store %4 to [trivial] %6
+
+  %8 = function_ref @addressInt : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address_for_deps 0) @owned Span<Int>
+  %9 = apply %8(%6) : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address_for_deps 0) @owned Span<Int>
+  %10 = mark_dependence [unresolved] %9 on %6
+  %11 = move_value [var_decl] %10
+  cond_br undef, bb1, bb2
+
+bb1:
+  dealloc_stack %6
+  br bb3
+bb2:
+  dealloc_stack %6
+  br bb3
+
+bb3:
+  %13 = begin_borrow %11
+
+  %14 = function_ref @useSpan : $@convention(thin) (@guaranteed Span<Int>) -> ()
+  %15 = apply %14(%13) : $@convention(thin) (@guaranteed Span<Int>) -> ()
+  end_borrow %13
+  destroy_value %11
+  %18 = tuple ()
+  return %18
 }

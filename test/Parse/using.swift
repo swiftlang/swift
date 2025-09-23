@@ -68,6 +68,5 @@ struct S {
 
 do {
   @objc using @MainActor
-  // expected-error@-1 {{expected expression}}
-  // expected-error@-2 {{declaration is only valid at file scope}}
+  // expected-error@-1 {{declaration is only valid at file scope}}
 }

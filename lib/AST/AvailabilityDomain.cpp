@@ -27,14 +27,16 @@ using namespace swift;
 CustomAvailabilityDomain::Kind
 getCustomDomainKind(clang::FeatureAvailKind featureAvailKind) {
   switch (featureAvailKind) {
-  case clang::FeatureAvailKind::None:
-    llvm_unreachable("unexpected kind");
   case clang::FeatureAvailKind::Available:
     return CustomAvailabilityDomain::Kind::Enabled;
   case clang::FeatureAvailKind::Unavailable:
     return CustomAvailabilityDomain::Kind::Disabled;
   case clang::FeatureAvailKind::Dynamic:
     return CustomAvailabilityDomain::Kind::Dynamic;
+  case clang::FeatureAvailKind::AlwaysAvailable:
+    return CustomAvailabilityDomain::Kind::AlwaysEnabled;
+  default:
+    llvm::report_fatal_error("unexpected kind");
   }
 }
 
@@ -52,8 +54,16 @@ customDomainForClangDecl(ValueDecl *decl) {
   if (featureInfo.first.empty())
     return nullptr;
 
-  if (featureInfo.second.Kind == clang::FeatureAvailKind::None)
+  // Check that the domain has a supported availability kind.
+  switch (featureInfo.second.Kind) {
+  case clang::FeatureAvailKind::Available:
+  case clang::FeatureAvailKind::Unavailable:
+  case clang::FeatureAvailKind::Dynamic:
+  case clang::FeatureAvailKind::AlwaysAvailable:
+    break;
+  default:
     return nullptr;
+  }
 
   auto &ctx = decl->getASTContext();
   FuncDecl *predicate = nullptr;
@@ -174,7 +184,8 @@ bool AvailabilityDomain::supportsQueries() const {
   }
 }
 
-bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
+bool AvailabilityDomain::isActive(const ASTContext &ctx,
+                                  bool forTargetVariant) const {
   switch (getKind()) {
   case Kind::Universal:
   case Kind::SwiftLanguage:
@@ -182,7 +193,7 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   case Kind::Embedded:
     return true;
   case Kind::Platform:
-    return isPlatformActive(getPlatformKind(), ctx.LangOpts);
+    return isPlatformActive(getPlatformKind(), ctx.LangOpts, forTargetVariant);
   case Kind::Custom:
     // For now, custom domains are always active but it's conceivable that in
     // the future someone might want to define a domain but leave it inactive.
@@ -190,11 +201,12 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   }
 }
 
-bool AvailabilityDomain::isActivePlatform(const ASTContext &ctx) const {
+bool AvailabilityDomain::isActivePlatform(const ASTContext &ctx,
+                                          bool forTargetVariant) const {
   if (!isPlatform())
     return false;
 
-  return isActive(ctx);
+  return isActive(ctx, forTargetVariant);
 }
 
 static std::optional<llvm::VersionTuple>
@@ -217,8 +229,23 @@ getDeploymentVersion(const AvailabilityDomain &domain, const ASTContext &ctx) {
 
 std::optional<AvailabilityRange>
 AvailabilityDomain::getDeploymentRange(const ASTContext &ctx) const {
-  if (auto version = getDeploymentVersion(*this, ctx))
-    return AvailabilityRange{*version};
+  if (isVersioned()) {
+    if (auto version = getDeploymentVersion(*this, ctx))
+      return AvailabilityRange{*version};
+
+    return std::nullopt;
+  }
+
+  if (auto customDomain = getCustomDomain()) {
+    switch (customDomain->getKind()) {
+    case CustomAvailabilityDomain::Kind::AlwaysEnabled:
+      return AvailabilityRange::alwaysAvailable();
+    case CustomAvailabilityDomain::Kind::Enabled:
+    case CustomAvailabilityDomain::Kind::Disabled:
+    case CustomAvailabilityDomain::Kind::Dynamic:
+      return std::nullopt;
+    }
+  }
   return std::nullopt;
 }
 

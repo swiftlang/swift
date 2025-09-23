@@ -31,6 +31,18 @@ Type eraseArchetypes(Type type, GenericSignature genericSig);
 
 bool hasInterestingDefaultValue(const ParamDecl *param);
 
+/// Modes for printing arguments with default values in
+/// \c CodeCompletionStringBuilder::addCallArgumentPatterns
+enum class DefaultArgumentOutputMode {
+  /// Don't output any argument that has a default value.
+  None,
+  /// Output arguments with interesting default values only.
+  /// \sa hasInterestingDefaultValue
+  Interesting,
+  /// Output all arguments with default values (even non-interesting ones).
+  All
+};
+
 class CodeCompletionStringBuilder {
   friend CodeCompletionStringPrinter;
 
@@ -39,11 +51,17 @@ class CodeCompletionStringBuilder {
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
 
   bool AnnotateResults;
+  bool UnderscoreEmptyArgumentLabel;
+  bool FullParameterFlags;
 
 public:
   CodeCompletionStringBuilder(llvm::BumpPtrAllocator &Allocator,
-                              bool AnnotateResults)
-      : Allocator(Allocator), AnnotateResults(AnnotateResults) {}
+                              bool AnnotateResults = false,
+                              bool UnderscoreEmptyArgumentLabel = false,
+                              bool FullParameterFlags = false)
+      : Allocator(Allocator), AnnotateResults(AnnotateResults),
+        UnderscoreEmptyArgumentLabel(UnderscoreEmptyArgumentLabel),
+        FullParameterFlags(FullParameterFlags) {}
 
 private:
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
@@ -316,7 +334,8 @@ public:
   void addCallArgument(Identifier Name, Identifier LocalName, Type Ty,
                        Type ContextTy, bool IsVarArg, bool IsInOut, bool IsIUO,
                        bool IsAutoClosure, bool IsLabeledTrailingClosure,
-                       bool IsForOperator, bool HasDefault);
+                       bool IsForOperator, bool HasDefault,
+                       StringRef DefaultValue = {});
 
   void addCallArgument(Identifier Name, Type Ty, Type ContextTy = Type(),
                        bool IsForOperator = false) {
@@ -383,7 +402,9 @@ public:
                                ArrayRef<const ParamDecl *> declParams,
                                const DeclContext *DC,
                                GenericSignature genericSig,
-                               bool includeDefaultArgs = true);
+                               DefaultArgumentOutputMode defaultArgsMode =
+                                   DefaultArgumentOutputMode::Interesting,
+                               bool includeDefaultValues = false);
 
   /// Build argument patterns for calling. Returns \c true if any content was
   /// added to \p Builder. If \p Params is non-nullptr, \F
@@ -391,7 +412,9 @@ public:
                                const ParameterList *Params,
                                const DeclContext *DC,
                                GenericSignature genericSig,
-                               bool includeDefaultArgs = true);
+                               DefaultArgumentOutputMode defaultArgsMode =
+                                   DefaultArgumentOutputMode::Interesting,
+                               bool includeDefaultValues = false);
 
   void addTypeAnnotation(Type T, const DeclContext *DC,
                          GenericSignature genericSig = GenericSignature());
@@ -408,6 +431,8 @@ public:
   CodeCompletionString *createCompletionString() {
     return CodeCompletionString::create(Allocator, Chunks);
   }
+
+  ArrayRef<CodeCompletionString::Chunk> getChunks() { return Chunks; }
 };
 
 } // end namespace ide

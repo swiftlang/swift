@@ -107,9 +107,6 @@ public:
   /// The path to which we should store indexing data, if any.
   std::string IndexStorePath;
 
-  /// The path to load access notes from.
-  std::string AccessNotesPath;
-
   /// The path to look in when loading a module interface file, to see if a
   /// binary module has already been built for use by the compiler.
   std::string PrebuiltModuleCachePath;
@@ -615,6 +612,8 @@ public:
   struct CustomAvailabilityDomains {
     /// Domains defined with `-define-enabled-availability-domain=`.
     llvm::SmallVector<std::string> EnabledDomains;
+    /// Domains defined with `-define-always-enabled-availability-domain=`.
+    llvm::SmallVector<std::string> AlwaysEnabledDomains;
     /// Domains defined with `-define-disabled-availability-domain=`.
     llvm::SmallVector<std::string> DisabledDomains;
     /// Domains defined with `-define-dynamic-availability-domain=`.
