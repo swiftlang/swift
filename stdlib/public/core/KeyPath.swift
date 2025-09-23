@@ -1280,11 +1280,11 @@ internal struct ComputedArgumentSize {
     }
 
     set {
-#if _pointerBitWidth(_64)
-      let reduced: UInt = newValue == 16 ? 1 : 0
-#elseif _pointerBitWidth(_32)
-      let reduced: UInt
+      var reduced: UInt = 0
 
+#if _pointerBitWidth(_64)
+      reduced = newValue == 16 ? 1 : 0
+#elseif _pointerBitWidth(_32)
       switch newValue {
       case 8:
         reduced = 1
