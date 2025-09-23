@@ -14,6 +14,7 @@ struct Int {
 }
 
 open class B {
+  @_borrowed
   open var i: Int { read set }
 }
 

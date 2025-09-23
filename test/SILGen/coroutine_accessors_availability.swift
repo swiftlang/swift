@@ -129,9 +129,9 @@ public func getOld() -> StructOld {
 public func readOldInlinableOld(_ n: StructOld) -> Int {
 // CHECK-LABEL: sil {{.*}}@readOldInlinableOld : {{.*}} {
 // Could be inlined into code that's running before CoroutineAccessors is
-// available--must use read.
-                  // function_ref StructOld.i.read
-// CHECK:         function_ref @$s7Library9StructOldV1iSivr
+// available--must use get.
+                  // function_ref StructOld.i.getter
+// CHECK:         function_ref @$s7Library9StructOldV1iSivg
 // CHECK-LABEL: } // end sil function 'readOldInlinableOld'
   return n.i
 }
@@ -282,9 +282,12 @@ public protocol ProtocolNew {
 }
 
 // CHECK-LABEL: sil_default_witness_table ProtocolOld {
+//                getter:
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    method #ProtocolOld.i!read2
+//                setter:
 // CHECK-NEXT:    no_default
+//                modify:
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    method #ProtocolOld.i!modify2
 // CHECK-NEXT:  }
@@ -341,8 +344,8 @@ func readOldOld() {
 // This module could be back-deployed to before CoroutineAccessors were
 // available, and nothing ensures the function is available only after the
 // feature is available--must use read.
-                  // function_ref StructOld.i.read
-// CHECK-OLD:     function_ref @$s7Library9StructOldV1iSivr
+                  // function_ref StructOld.i.getter
+// CHECK-OLD:     function_ref @$s7Library9StructOldV1iSivg
 // This module cannot be back-deployed (the deployment target is
 // available, and nothing ensures the function is available only after the
 // feature is available--must use read.
@@ -433,7 +436,7 @@ public class DerivedOldFromBaseClassOld : BaseClassOld {
 
 // CHECK-LABEL: sil_vtable [serialized] DerivedOldFromBaseClassOld {
 // CHECK-NEXT:    #BaseClassOld.init!allocator
-// CHECK-NEXT:    #BaseClassOld.i!read
+// CHECK-NEXT:    #BaseClassOld.i!getter
 // CHECK-NEXT:    #BaseClassOld.i!read2
 // CHECK-NEXT:    #BaseClassOld.i!setter
 // CHECK-NEXT:    #BaseClassOld.i!modify

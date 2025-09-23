@@ -864,9 +864,8 @@ void diagnoseEffectfulGetterOnBorrowingRead(
 
 } // end anonymous namespace
 
-OpaqueReadOwnership
-DirectOpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
-                                           AbstractStorageDecl *storage) const {
+static OpaqueReadOwnership
+computeOpaqueReadOwnership(AbstractStorageDecl *storage) {
   if (auto *accessorDecl = storage->getAccessor(AccessorKind::Read)) {
     auto lifetimeDependencies = accessorDecl->getLifetimeDependencies();
     if (lifetimeDependencies.has_value() && !lifetimeDependencies->empty()) {
@@ -879,13 +878,10 @@ DirectOpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  if (storage->getAccessor(AccessorKind::Read2))
-    return OpaqueReadOwnership::Borrowed;
+  using DiagKind = DirectOpaqueReadOwnershipRequestDiagKind;
 
   if (storage->getAccessor(AccessorKind::Borrow))
     return OpaqueReadOwnership::Borrowed;
-
-  using DiagKind = DirectOpaqueReadOwnershipRequestDiagKind;
 
   if (storage->getAttrs().hasAttribute<BorrowedAttr>()) {
     diagnoseEffectfulGetterOnBorrowingRead(storage, DiagKind::BorrowedAttr);
@@ -900,6 +896,26 @@ DirectOpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   }
 
   return OpaqueReadOwnership::Owned;
+}
+
+OpaqueReadOwnership
+DirectOpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
+                                           AbstractStorageDecl *storage) const {
+  auto computed = computeOpaqueReadOwnership(storage);
+
+  if (!storage->getAccessor(AccessorKind::Read2))
+    return computed;
+
+  if (!storage->requiresAccessorsForABICompatibilityWithPreCoroutineAccessors())
+    return OpaqueReadOwnership::Borrowed;
+
+  switch (computed) {
+  case OpaqueReadOwnership::Owned:
+  case OpaqueReadOwnership::OwnedOrBorrowed:
+    return OpaqueReadOwnership::OwnedOrBorrowed;
+  case OpaqueReadOwnership::Borrowed:
+    return OpaqueReadOwnership::Borrowed;
+  }
 }
 
 /// Insert the specified decl into the DeclContext's member list.  If the hint
@@ -2680,31 +2696,24 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
-/// When the CoroutineAccessors feature is available, the coroutine accessor
-/// _could_ be required.  That non-underscored accessor would be preferred to
-/// its underscored counterpart accessor.
-///
-/// The underscored accessor could, however, still be required for ABI
-/// stability.
-static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
-    AbstractStorageDecl const *storage, AccessorKind kind,
-    AccessorDecl const *decl, AbstractStorageDecl const *derived) {
+/// When the CoroutineAccessors feature is available, different accessors may be
+/// required (e.g. read2 and modify2).  The accessors which were previously
+/// required, however, may still be required for ABI compatibility.
+static bool requiresAccessorsForABICompatibilityWithPreCoroutineAccessorsImpl(
+    AbstractStorageDecl const *storage, AbstractStorageDecl const *derived) {
   auto &ctx = storage->getASTContext();
-  assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
-  assert(kind == AccessorKind::Modify2 || kind == AccessorKind::Read2);
-
-  // If any overridden decl requires the underscored version, then this decl
-  // does too.  Otherwise dispatch to the underscored version on a value
-  // statically the super but dynamically this subtype would not dispatch to an
-  // override of the underscored version but rather (incorrectly) the
-  // supertype's implementation.
+  // If any overridden storage requires accessors for ABI compatibility, then
+  // this storage does too.
+  //
+  // Otherwise dispatch to one of those required-by-some-overridden-storage
+  // accessor on an instance of a type that's statically the supertype but
+  // dynamically this subtype would not dispatch to an override provided by this
+  // subtype but rather (incorrectly) that supertype's implementation.
   if (storage == derived) {
     auto *current = storage;
     while ((current = current->getOverriddenDecl())) {
-      auto *currentDecl = cast_or_null<AccessorDecl>(
-          decl ? decl->getOverriddenDecl() : nullptr);
-      if (requiresCorrespondingUnderscoredCoroutineAccessorImpl(
-              current, kind, currentDecl, derived)) {
+      if (requiresAccessorsForABICompatibilityWithPreCoroutineAccessorsImpl(
+              current, derived)) {
         return true;
       }
     }
@@ -2719,12 +2728,6 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
   if (!isExported(storage))
     return false;
 
-  // The non-underscored accessor is not present, the underscored accessor
-  // won't be either.
-  auto *accessor = decl ? decl : storage->getOpaqueAccessor(kind);
-  if (!accessor)
-    return false;
-
   // Availability checks are only relevant on targets which support versioned
   // availability.  Otherwise, since we're building with library evolution,
   // conservatively assume that the binary must keep ABI compatibility with its
@@ -2734,7 +2737,7 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
 
   AvailabilityContext accessorAvailability = [&] {
     if (storage->getModuleContext()->isMainModule()) {
-      return AvailabilityContext::forDeclSignature(accessor);
+      return AvailabilityContext::forDeclSignature(storage);
     }
     // Calculate the availability of the imported declaration ourselves starting
     // from always available and constraining by walking the enclosing decl
@@ -2758,15 +2761,19 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
           featureAvailability))
     return false;
 
-  // The underscored accessor is required for ABI stability.
+  // ABI stability requires that accessors provieded before CoroutineAccessors
+  // was enabled be provided still.
+  //
+  // In the case of modify2, that will always mean that modify is required.
+  //
+  // In the case of read2, that could mean read OR get is required.
   return true;
 }
 
-bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
-    AccessorKind kind, AccessorDecl const *decl) const {
-  return requiresCorrespondingUnderscoredCoroutineAccessorImpl(
-      this, kind, decl,
-      /*derived=*/this);
+bool AbstractStorageDecl::
+    requiresAccessorsForABICompatibilityWithPreCoroutineAccessors() const {
+  return requiresAccessorsForABICompatibilityWithPreCoroutineAccessorsImpl(
+      this, /*derived=*/this);
 }
 
 bool RequiresOpaqueModifyCoroutineRequest::evaluate(
@@ -2779,9 +2786,10 @@ bool RequiresOpaqueModifyCoroutineRequest::evaluate(
   if (!hasCoroutineAccessorsFeature && !isUnderscored)
     return false;
 
-  if (hasCoroutineAccessorsFeature && isUnderscored) {
-    return storage->requiresCorrespondingUnderscoredCoroutineAccessor(
-        AccessorKind::Modify2);
+  if (hasCoroutineAccessorsFeature && isUnderscored &&
+      !storage
+           ->requiresAccessorsForABICompatibilityWithPreCoroutineAccessors()) {
+    return false;
   }
 
   // Only for mutable storage.

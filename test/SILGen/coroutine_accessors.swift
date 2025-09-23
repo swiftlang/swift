@@ -22,6 +22,21 @@ public var o: any AnyObject
 public var _i: Int = 0
 
 public var irm: Int {
+// CHECK-LABEL: sil{{.*}} [ossa] @$s19coroutine_accessors1SV3irmSivg :
+// CHECK-SAME:      $@convention(method)
+// CHECK-SAME:      (@guaranteed S)
+// CHECK-SAME:      ->
+// CHECK-SAME:      Int
+// CHECK-SAME:  {
+// CHECK:       bb0(
+// CHECK:           [[SELF:%[^,]+]] :
+// CHECK:       ):
+// CHECK:         [[READER2:%[^,]+]] = function_ref @$s19coroutine_accessors1SV3irmSivy
+// CHECK:         ([[VALUE:%[^,]+]], [[TOKEN:%[^,]+]], [[ALLOCATION:%[^,]+]]) = begin_apply [[READER2]]([[SELF]])
+// CHECK:         end_apply [[TOKEN]]
+// CHECK:         dealloc_stack [[ALLOCATION]] : $*Builtin.SILToken
+// CHECK:         return [[VALUE]]
+// CHECK-LABEL: } // end sil function '$s19coroutine_accessors1SV3irmSivg'
 // CHECK-LABEL: sil [ossa] @$s19coroutine_accessors1SV3irmSivy :
 // CHECK-SAME:      $@yield_once_2
 // CHECK-SAME:      @convention(method)
@@ -44,26 +59,6 @@ public var irm: Int {
   modify {
     yield &_i
   }
-// CHECK-LABEL: sil{{.*}} [ossa] @$s19coroutine_accessors1SV3irmSivr :
-// CHECK-SAME:      $@yield_once
-// CHECK-SAME:      @convention(method)
-// CHECK-SAME:      (@guaranteed S)
-// CHECK-SAME:      ->
-// CHECK-SAME:      @yields Int
-// CHECK-SAME:  {
-// CHECK:       bb0(
-// CHECK:           [[SELF:%[^,]+]] :
-// CHECK:       ):
-// CHECK:         [[READER2:%[^,]+]] = function_ref @$s19coroutine_accessors1SV3irmSivy
-// CHECK:         ([[VALUE_ADDRESS:%[^,]+]], [[TOKEN:%[^,]+]], [[ALLOCATION:%[^,]+]]) = begin_apply [[READER2]]([[SELF]])
-// CHECK:         end_apply [[TOKEN]]
-// CHECK:         yield [[VALUE_ADDRESS]] : $Int, resume bb1, unwind bb2
-// CHECK:       bb1:
-// CHECK:         dealloc_stack [[ALLOCATION]] : $*Builtin.SILToken
-// CHECK:       bb2:
-// CHECK:         dealloc_stack [[ALLOCATION]] : $*Builtin.SILToken
-// CHECK:         unwind
-// CHECK-LABEL: } // end sil function '$s19coroutine_accessors1SV3irmSivr'
 
 // CHECK-LABEL: sil {{.*}}[ossa] @$s19coroutine_accessors1SV3irmSivs :
 // CHECK-SAME:      $@convention(method)

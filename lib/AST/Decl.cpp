@@ -3250,14 +3250,10 @@ static AccessStrategy getOpaqueReadAccessStrategy(
     ResilienceExpansion expansion,
     std::optional<std::pair<SourceRange, const DeclContext *>> location,
     bool useOldABI) {
-  if (useOldABI) {
-    assert(storage->requiresOpaqueRead2Coroutine());
-    assert(storage->requiresOpaqueReadCoroutine());
-    return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
-  }
   if (storage->requiresOpaqueRead2Coroutine() &&
       mayReferenceUseCoroutineAccessorOnStorage(module, expansion, location,
-                                                storage))
+                                                storage) &&
+      !useOldABI)
     return AccessStrategy::getAccessor(AccessorKind::Read2, dispatch);
   if (storage->requiresOpaqueReadCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
@@ -3276,14 +3272,10 @@ static AccessStrategy getOpaqueReadWriteAccessStrategy(
     ResilienceExpansion expansion,
     std::optional<std::pair<SourceRange, const DeclContext *>> location,
     bool useOldABI) {
-  if (useOldABI) {
-    assert(storage->requiresOpaqueModify2Coroutine());
-    assert(storage->requiresOpaqueModifyCoroutine());
-    return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
-  }
   if (storage->requiresOpaqueModify2Coroutine() &&
       mayReferenceUseCoroutineAccessorOnStorage(module, expansion, location,
-                                                storage))
+                                                storage) &&
+      !useOldABI)
     return AccessStrategy::getAccessor(AccessorKind::Modify2, dispatch);
   if (storage->requiresOpaqueModifyCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
@@ -3446,15 +3438,17 @@ bool AbstractStorageDecl::requiresOpaqueGetter() const {
 
 bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
   ASTContext &ctx = getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
-    return requiresCorrespondingUnderscoredCoroutineAccessor(
-        AccessorKind::Read2);
+  if (ctx.LangOpts.hasFeature(Feature::CoroutineAccessors) &&
+      !requiresAccessorsForABICompatibilityWithPreCoroutineAccessors()) {
+    return false;
+  }
 
   // If a borrow accessor is present, we don't need a read coroutine.
   if (getAccessor(AccessorKind::Borrow)) {
     return false;
   }
-  return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
+
+  return getOpaqueReadOwnership() == OpaqueReadOwnership::Borrowed;
 }
 
 bool AbstractStorageDecl::requiresOpaqueRead2Coroutine() const {
@@ -11361,8 +11355,8 @@ bool AccessorDecl::isRequirementWithSynthesizedDefaultImplementation() const {
   if (!requiresNewWitnessTableEntry()) {
     return false;
   }
-  return getStorage()->requiresCorrespondingUnderscoredCoroutineAccessor(
-      getAccessorKind(), this);
+  return getStorage()
+      ->requiresAccessorsForABICompatibilityWithPreCoroutineAccessors();
 }
 
 bool AccessorDecl::doesAccessorHaveBody() const {
