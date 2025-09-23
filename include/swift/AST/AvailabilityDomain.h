@@ -289,6 +289,12 @@ public:
     return getRemappedDomain(ctx, unused);
   }
 
+  /// Returns true for a domain that is permanently always available, and
+  /// therefore availability constraints in the domain are effectively the same
+  /// as constraints in the `*` domain. This is used to diagnose unnecessary
+  /// `@available` attributes and `if #available` statements.
+  bool isPermanentlyAlwaysEnabled() const;
+
   bool operator==(const AvailabilityDomain &other) const {
     return storage.getOpaqueValue() == other.storage.getOpaqueValue();
   }
@@ -330,7 +336,7 @@ struct StableAvailabilityDomainComparator {
 /// Represents an availability domain that has been defined in a module.
 class CustomAvailabilityDomain : public llvm::FoldingSetNode {
 public:
-  enum class Kind {
+  enum class Kind : uint8_t {
     /// A domain that is known to be enabled at compile time.
     Enabled,
     /// A domain that is known to be enabled at compile time and is also assumed
@@ -344,10 +350,20 @@ public:
 
 private:
   Identifier name;
-  Kind kind;
   ModuleDecl *mod;
   ValueDecl *decl;
   FuncDecl *predicateFunc;
+  Kind kind;
+
+  struct {
+    /// Whether the "isPermanentlyEnabled" bit has been computed yet.
+    unsigned isPermanentlyEnabledComputed : 1;
+    /// Whether the domain is permanently enabled, which makes constraints in
+    /// the domain equivalent to those in the `*` domain.
+    unsigned isPermanentlyEnabled : 1;
+  } flags = {};
+
+  friend class IsCustomAvailabilityDomainPermanentlyEnabled;
 
   CustomAvailabilityDomain(Identifier name, Kind kind, ModuleDecl *mod,
                            ValueDecl *decl, FuncDecl *predicateFunc);
@@ -374,6 +390,11 @@ public:
 
   void Profile(llvm::FoldingSetNodeID &ID) const { Profile(ID, name, mod); }
 };
+
+inline void simple_display(llvm::raw_ostream &os,
+                           const CustomAvailabilityDomain *domain) {
+  os << domain->getName();
+}
 
 /// Represents either a resolved availability domain or an identifier written
 /// in source that has not yet been resolved to a domain.

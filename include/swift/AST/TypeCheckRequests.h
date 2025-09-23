@@ -5505,7 +5505,6 @@ public:
 private:
   friend SimpleRequest;
 
-  // Evaluation.
   std::optional<AvailabilityDomain> evaluate(Evaluator &evaluator,
                                              ValueDecl *decl) const;
 
@@ -5513,6 +5512,30 @@ public:
   bool isCached() const { return true; }
   std::optional<std::optional<AvailabilityDomain>> getCachedResult() const;
   void cacheResult(std::optional<AvailabilityDomain> domain) const;
+};
+
+class IsCustomAvailabilityDomainPermanentlyEnabled
+    : public SimpleRequest<IsCustomAvailabilityDomainPermanentlyEnabled,
+                           bool(const CustomAvailabilityDomain *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator,
+                const CustomAvailabilityDomain *customDomain) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<bool> getCachedResult() const;
+  void cacheResult(bool isPermanentlyEnabled) const;
+
+  SourceLoc getNearestLoc() const {
+    auto *domain = std::get<0>(getStorage());
+    return extractNearestSourceLoc(domain->getDecl());
+  }
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

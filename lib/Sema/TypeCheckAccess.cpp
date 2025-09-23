@@ -2281,12 +2281,45 @@ public:
   void checkAvailabilityDomains(const Decl *D) {
     D = D->getAbstractSyntaxDeclForAttributes();
 
+    auto &ctx = D->getASTContext();
     auto where = Where.withReason(ExportabilityReason::AvailableAttribute);
     for (auto attr : D->getSemanticAvailableAttrs()) {
-      if (auto *domainDecl = attr.getDomain().getDecl()) {
+      auto domain = attr.getDomain();
+      if (auto *domainDecl = domain.getDecl()) {
         diagnoseDeclAvailability(domainDecl,
                                  attr.getParsedAttr()->getDomainLoc(), nullptr,
                                  where, std::nullopt);
+
+        if (!attr.isVersionSpecific()) {
+          // Check whether the availability domain is permanently enabled. If it
+          // is, suggest modifying or removing the attribute.
+          if (domain.isPermanentlyAlwaysEnabled()) {
+            auto parsedAttr = attr.getParsedAttr();
+            switch (parsedAttr->getKind()) {
+            case AvailableAttr::Kind::Default:
+              // This introduction constraint has no effect since it will never
+              // restrict use of the declaration. Provide a fix-it remove the
+              // attribute.
+              diagnoseAndRemoveAttr(
+                  D, attr.getParsedAttr(),
+                  diag::attr_availability_has_no_effect_domain_always_available,
+                  parsedAttr, domain);
+              break;
+            case AvailableAttr::Kind::Deprecated:
+            case AvailableAttr::Kind::NoAsync:
+            case AvailableAttr::Kind::Unavailable:
+              // Any other kind of constraint always constrains use of the
+              // declaration, so provide a fix-it to specify `*` instead of the
+              // custom domain.
+              ctx.Diags
+                  .diagnose(parsedAttr->getDomainLoc(),
+                            diag::attr_availability_domain_always_available,
+                            domain)
+                  .fixItReplace(parsedAttr->getDomainLoc(), "*");
+              break;
+            }
+          }
+        }
       }
     }
   }
