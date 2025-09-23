@@ -8,50 +8,50 @@ Diagnostics in the `EmbeddedRestrictions` group describe those language features
 
 * `weak` and `unowned` references, because Embedded Swift uses a simplified reference-counting model that cannot support them. For example:
 
-    class Node {
-      weak var parent: Node?    // error: attribute 'weak' cannot be used in Embedded Swift
-    }
+      class Node {
+        weak var parent: Node?    // error: attribute 'weak' cannot be used in Embedded Swift
+      }
 
 * Dynamic casts to a type involving a protocol are not supported, because Embedded Swift does not include runtime metadata about protocol conformances. For example:
 
-    protocol P: AnyObject { }
-    func casting(object: AnyObject) {
-      if let p = object as? P { // error: cannot perform a dynamic cast to a type involving protocol 'P' in Embedded Swift
-        // ...
+      protocol P: AnyObject { }
+      func casting(object: AnyObject) {
+        if let p = object as? P { // error: cannot perform a dynamic cast to a type involving protocol 'P' in Embedded Swift
+          // ...
+        }
       }
-    }
 
 * Non-final generic methods in a class, which are prohibited because they cannot be specialized for every possible call site. For example:
 
-    class MyGenericClass<T> {
-      func f<U>(value: U) { } // warning: generic instance method 'f(value:)' in a class must be 'final' in Embedded Swift
+      class MyGenericClass<T> {
+        func f<U>(value: U) { } // warning: generic instance method 'f(value:)' in a class must be 'final' in Embedded Swift
 
-      func g() { } // okay, not generic relative to the class itself
+        func g() { } // okay, not generic relative to the class itself
 
-      class func h() where T: P { } // warning: generic class method 'h()' in a class must be 'final' in Embedded Swift
-    }
+        class func h() where T: P { } // warning: generic class method 'h()' in a class must be 'final' in Embedded Swift
+      }
 
 * Generic methods used on values of protocol type, which are prohibited because they cannot be specialized for every possible call site. For example:
 
-    protocol P: AnyObject {
-      func doNothing()
-      func doSomething<T>(on value: T)
-    }
+      protocol P: AnyObject {
+        func doNothing()
+        func doSomething<T>(on value: T)
+      }
 
-    func testGenerics<Value: P>(value: value, i: Int) {
-      value.doNothing()        // okay
-      value.doSomething(on: i) // okay, always specialized
-    }
+      func testGenerics<Value: P>(value: value, i: Int) {
+        value.doNothing()        // okay
+        value.doSomething(on: i) // okay, always specialized
+      }
 
-    func testValuesOfProtocolType(value: any P, i: Int) {
-      value.doNothing()        // okay
-      value.doSomething(on: i) // warning: cannot use generic instance method 'doSomething(on:)' on a value of type 'any P' in Embedded Swift
-    }
+      func testValuesOfProtocolType(value: any P, i: Int) {
+        value.doNothing()        // okay
+        value.doSomething(on: i) // warning: cannot use generic instance method 'doSomething(on:)' on a value of type 'any P' in Embedded Swift
+      }
 
 * Use of untyped throws, which depends on `any Error` and is not available in Embedded Swift. Use typed throws instead:
 
-    func mayFail() throws { } // error: untyped throws is not available in Embedded Swift; add a thrown error type with '(type)'
-    func mayFail() throws(MyError) // okay
+      func mayFail() throws { } // error: untyped throws is not available in Embedded Swift; add a thrown error type with '(type)'
+      func mayFail() throws(MyError) // okay
 
 ## See Also
 
