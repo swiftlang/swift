@@ -726,6 +726,7 @@ public struct Builder {
     return notifyNew(packElementGet.getAs(PackElementGetInst.self))
   }
 
+  @discardableResult
   public func createPackElementSet(elementValue: Value, packIndex: Value, pack: Value) -> PackElementSetInst {
     let packElementSet = bridged.createPackElementSet(elementValue.bridged, packIndex.bridged, pack.bridged)
     return notifyNew(packElementSet.getAs(PackElementSetInst.self))
