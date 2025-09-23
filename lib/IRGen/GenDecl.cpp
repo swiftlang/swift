@@ -297,7 +297,7 @@ public:
     // protocol. If so, use it.
     SmallString<32> buf;
     auto protocolName = IGM.getAddrOfGlobalString(
-        proto->getObjCRuntimeName(buf), IRGenModule::ObjCClassNameSectionName);
+        proto->getObjCRuntimeName(buf), CStringSectionType::ObjCClassName);
 
     auto existing = Builder.CreateCall(objc_getProtocol, protocolName);
     auto isNull = Builder.CreateICmpEQ(existing,
@@ -4240,10 +4240,10 @@ static TypeEntityReference
 getObjCClassByNameReference(IRGenModule &IGM, ClassDecl *cls) {
   auto kind = TypeReferenceKind::DirectObjCClassName;
   SmallString<64> objcRuntimeNameBuffer;
-  auto ref = IGM.getAddrOfGlobalString(
-      cls->getObjCRuntimeName(objcRuntimeNameBuffer),
-      /*willBeRelativelyAddressed=*/true,
-      /*useOSLogSection=*/false, IRGenModule::ObjCClassNameSectionName);
+  auto ref =
+      IGM.getAddrOfGlobalString(cls->getObjCRuntimeName(objcRuntimeNameBuffer),
+                                CStringSectionType::ObjCClassName,
+                                /*willBeRelativelyAddressed=*/true);
 
   return TypeEntityReference(kind, ref);
 }
@@ -4800,9 +4800,9 @@ void IRGenModule::emitAccessibleFunction(StringRef sectionName,
 
   // -- Field: Name (record name)
   {
-    llvm::Constant *name =
-        getAddrOfGlobalString(func.getFunctionName(),
-                              /*willBeRelativelyAddressed=*/true);
+    llvm::Constant *name = getAddrOfGlobalString(
+        func.getFunctionName(), CStringSectionType::Default,
+        /*willBeRelativelyAddressed=*/true);
     fields.addRelativeAddress(name);
   }
 
@@ -6016,12 +6016,6 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
   return Address(alloca, type, alignment);
 }
 
-llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
-                                                   const char *sectionName) {
-  return getAddrOfGlobalString(data, /*willBeRelativelyAddressed=*/false,
-                               /*useOSLogSection=*/false, sectionName);
-}
-
 /// Get or create a global string constant.
 ///
 /// \returns an i8* with a null terminator; note that embedded nulls
@@ -6030,15 +6024,35 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
 /// FIXME: willBeRelativelyAddressed is only needed to work around an ld64 bug
 /// resolving relative references to coalesceable symbols.
 /// It should be removed when fixed. rdar://problem/22674524
-llvm::Constant *IRGenModule::getAddrOfGlobalString(
-    StringRef data, bool willBeRelativelyAddressed, bool useOSLogSection,
-    StringRef sectionName) {
-  useOSLogSection = useOSLogSection &&
-    TargetInfo.OutputObjectFormat == llvm::Triple::MachO;
+llvm::Constant *
+IRGenModule::getAddrOfGlobalString(StringRef data, CStringSectionType type,
+                                   bool willBeRelativelyAddressed) {
+  if (TargetInfo.OutputObjectFormat != llvm::Triple::MachO)
+    type = CStringSectionType::Default;
+  StringRef sectionName;
+  switch (type) {
+  case CStringSectionType::Default:
+    sectionName = "";
+    break;
+  case CStringSectionType::ObjCClassName:
+    sectionName = ObjCClassNameSectionName;
+    break;
+  case CStringSectionType::ObjCMethodName:
+    sectionName = ObjCMethodNameSectionName;
+    break;
+  case CStringSectionType::ObjCMethodType:
+    sectionName = ObjCMethodTypeSectionName;
+    break;
+  case CStringSectionType::ObjCPropertyName:
+    sectionName = ObjCPropertyNameSectionName;
+    break;
+  case CStringSectionType::OSLogString:
+    sectionName = OSLogStringSectionName;
+    break;
+  }
 
   // Check whether this string already exists.
-  auto &entry = useOSLogSection ? GlobalOSLogStrings[data] :
-    GlobalStrings[data];
+  auto &entry = GlobalStrings[type][data];
 
   if (entry.second) {
     // FIXME: Clear unnamed_addr if the global will be relative referenced
@@ -6060,9 +6074,6 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(
     (llvm::Twine(".nul") + llvm::Twine(i)).toVector(name);
   }
 
-  sectionName =
-      useOSLogSection ? "__TEXT,__oslogstring,cstring_literals" : sectionName;
-
   entry = createStringConstant(data, willBeRelativelyAddressed,
                                sectionName, name);
   return entry.second;
@@ -6074,9 +6085,11 @@ IRGenModule::getAddrOfGlobalIdentifierString(StringRef data,
   if (Lexer::identifierMustAlwaysBeEscaped(data)) {
     llvm::SmallString<256> name;
     Mangle::Mangler::appendRawIdentifierForRuntime(data, name);
-    return getAddrOfGlobalString(name, willBeRelativelyAddressed);
+    return getAddrOfGlobalString(name, CStringSectionType::Default,
+                                 willBeRelativelyAddressed);
   }
-  return getAddrOfGlobalString(data, willBeRelativelyAddressed);
+  return getAddrOfGlobalString(data, CStringSectionType::Default,
+                               willBeRelativelyAddressed);
 }
 
 /// Get or create a global UTF-16 string constant.

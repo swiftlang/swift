@@ -669,6 +669,15 @@ public:
                                            llvm::Constant *address);
 };
 
+enum class CStringSectionType {
+  Default,
+  ObjCClassName,
+  ObjCMethodName,
+  ObjCMethodType,
+  ObjCPropertyName,
+  OSLogString,
+};
+
 /// IRGenModule - Primary class for emitting IR for global declarations.
 /// 
 class IRGenModule {
@@ -1203,12 +1212,10 @@ public:
   std::pair<llvm::GlobalVariable *, llvm::Constant *> createStringConstant(
       StringRef Str, bool willBeRelativelyAddressed = false,
       StringRef sectionName = "", StringRef name = "");
-  llvm::Constant *getAddrOfGlobalString(StringRef utf8,
-                                        bool willBeRelativelyAddressed = false,
-                                        bool useOSLogSection = false,
-                                        StringRef sectionName = "");
-  llvm::Constant *getAddrOfGlobalString(StringRef utf8,
-                                        const char *sectionName);
+  llvm::Constant *getAddrOfGlobalString(
+      StringRef utf8,
+      CStringSectionType sectionType = CStringSectionType::Default,
+      bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *
   getAddrOfGlobalIdentifierString(StringRef utf8,
@@ -1332,10 +1339,10 @@ private:
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
-  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
-    GlobalStrings;
-  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
-    GlobalOSLogStrings;
+  llvm::DenseMap<
+      CStringSectionType,
+      llvm::StringMap<std::pair<llvm::GlobalVariable *, llvm::Constant *>>>
+      GlobalStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
     StringsForTypeRef;
@@ -1554,6 +1561,8 @@ public:
       "__TEXT,__objc_methtype,cstring_literals";
   static constexpr const char ObjCPropertyNameSectionName[] =
       "__TEXT,__objc_methname,cstring_literals";
+  static constexpr const char OSLogStringSectionName[] =
+      "__TEXT,__oslogstring,cstring_literals";
 
   /// Returns the special builtin types that should be emitted in the stdlib
   /// module.

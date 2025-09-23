@@ -1403,7 +1403,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     IGF.IGM.getClangASTContext().getObjCEncodingForType(clangTy, encoding);
 
     auto globalString = IGF.IGM.getAddrOfGlobalString(
-        encoding, IRGenModule::ObjCMethodTypeSectionName);
+        encoding, CStringSectionType::ObjCMethodType);
     out.add(globalString);
     return;
   }
