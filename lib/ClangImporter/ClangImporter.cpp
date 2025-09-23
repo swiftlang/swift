@@ -6368,7 +6368,7 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
     auto out = new (rawMemory) TypeAliasDecl(
         typeDecl->getLoc(), typeDecl->getLoc(), typeDecl->getName(),
         typeDecl->getLoc(), nullptr, newContext);
-    out->setUnderlyingType(typeDecl->getInterfaceType());
+    out->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
     out->setAccess(access);
     inheritance.setUnavailableIfNecessary(decl, out);
     return out;
