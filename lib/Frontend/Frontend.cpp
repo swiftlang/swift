@@ -197,7 +197,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.DocOutputPath = outs.ModuleDocOutputPath;
   serializationOpts.SourceInfoOutputPath = outs.ModuleSourceInfoOutputPath;
   serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
-  if (opts.ModuleHasBridgingHeader && !outs.ModuleOutputPath.empty())
+  if (opts.ModuleHasBridgingHeader && !outs.ModuleOutputPath.empty() &&
+      !opts.ImportHeaderAsInternal)
     serializationOpts.SerializeBridgingHeader = true;
   // For batch mode, emit empty header path as placeholder.
   if (serializationOpts.SerializeBridgingHeader &&

@@ -481,6 +481,7 @@ public:
   const bool ImportForwardDeclarations;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
+  const bool BridgingHeaderIsInternal;
   const bool DisableOverlayModules;
   const bool EnableClangSPI;
 

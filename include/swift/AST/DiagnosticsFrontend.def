@@ -609,6 +609,9 @@ ERROR(no_swift_sources_with_embedded,none,
 ERROR(package_cmo_requires_library_evolution, none,
         "Library evolution must be enabled for Package CMO", ())
 
+WARNING(internal_bridging_header_without_library_evolution,none,
+        "using internal bridging headers without library evolution can cause instability", ())
+
 ERROR(experimental_not_supported_in_production,none,
       "experimental feature '%0' cannot be enabled in production compiler",
       (StringRef))
@@ -636,6 +639,8 @@ NOTE(dependency_scan_unexpected_variant_module_map_note, none,
 NOTE(dependency_scan_unexpected_variant_extra_arg_note, none,
      "%select{first|second}0 module command-line has extra argument: '%1'", (bool, StringRef))
 
+ERROR(bridging_header_and_pch_internal_mismatch,none,
+      "bridging header and precompiled header options mismatch on internal vs. public import", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
