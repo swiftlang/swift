@@ -13,7 +13,7 @@
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-concurrency -enable-experimental-feature CoroutineAccessors -enable-experimental-feature DefaultIsolationPerFile -enable-experimental-feature ParserASTGen)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-concurrency -enable-experimental-feature CoroutineAccessors -enable-experimental-feature DefaultIsolationPerFile -enable-experimental-feature DefaultGenerics -enable-experimental-feature ParserASTGen)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
@@ -370,4 +370,3 @@ struct Vec<Element, A = SystemAllocator> {}
 enum DefaultGenericEnum<T = Int> {}
 class DefaultGenericClass<T, U: Proto1, V: Proto2 = SystemAllocator> {}
 typealias DefaultGenericTypealias<T = Int> = Vec<T>
-func defaultGenericFunc<T = String>() {}
