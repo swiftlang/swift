@@ -2317,8 +2317,8 @@ bool ExplicitSwiftModuleLoader::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool isTestableDependencyLookup,
-    bool &IsFramework, bool &IsSystemModule) {
+    std::string *cacheKey, bool skipBuildingInterface,
+    bool isTestableDependencyLookup, bool &IsFramework, bool &IsSystemModule) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
   //
@@ -2680,6 +2680,7 @@ bool ExplicitCASModuleLoader::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
+    std::string *CacheKey,
     bool skipBuildingInterface, bool isTestableDependencyLookup,
     bool &IsFramework, bool &IsSystemModule) {
   // Find a module with an actual, physical name on disk, in case
@@ -2701,6 +2702,8 @@ bool ExplicitCASModuleLoader::findModule(
   // Set IsFramework bit according to the moduleInfo
   IsFramework = moduleInfo.isFramework;
   IsSystemModule = moduleInfo.isSystem;
+  if (CacheKey && moduleInfo.moduleCacheKey)
+    *CacheKey = *moduleInfo.moduleCacheKey;
 
   // Fallback check for module cache key passed on command-line as module path.
   std::string moduleCASID = moduleInfo.moduleCacheKey

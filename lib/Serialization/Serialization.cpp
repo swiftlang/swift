@@ -1493,8 +1493,13 @@ void Serializer::writeInputBlock() {
     SmallString<64> importPath;
     {
       llvm::raw_svector_ostream s(importPath);
-      if (import.importedModule && !import.importedModule->isNonSwiftModule())
-        s << import.importedModule->getModuleLoadedFilename();
+      if (import.importedModule && !import.importedModule->isNonSwiftModule()) {
+        StringRef cacheKey = import.importedModule->getCacheKey();
+        if (cacheKey.empty())
+          s << import.importedModule->getModuleLoadedFilename();
+        else
+          s << cacheKey;
+      }
       s << '\0';
       flattenImportPath(import, s);
     }
