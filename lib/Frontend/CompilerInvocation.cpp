@@ -1011,6 +1011,9 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
   else if (Args.hasArg(OPT_strict_memory_safety_migrate))
     Opts.enableFeature(Feature::StrictMemorySafety, /*forMigration=*/true);
 
+  if (Args.hasArg(OPT_enable_library_evolution, OPT_enable_resilience))
+    Opts.enableFeature(Feature::LibraryEvolution);
+
   return HadError;
 }
 
@@ -1802,7 +1805,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       HadError = true;
     }
 
-    if (FrontendOpts.EnableLibraryEvolution) {
+    if (Opts.hasFeature(Feature::LibraryEvolution)) {
       Diags.diagnose(SourceLoc(), diag::evolution_with_embedded);
       HadError = true;
     }
@@ -2138,7 +2141,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
 
   // Until we have some checking in place, internal bridging headers are a
   // bit unsafe without library evolution.
-  if (Opts.BridgingHeaderIsInternal && !FrontendOpts.EnableLibraryEvolution) {
+  if (Opts.BridgingHeaderIsInternal &&
+      !LangOpts.hasFeature(Feature::LibraryEvolution)) {
     Diags.diagnose(SourceLoc(),
                    diag::internal_bridging_header_without_library_evolution);
   }
@@ -3064,7 +3068,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
           FrontendOptions::ActionType::TypecheckModuleFromInterface)
         Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
                        "-package-cmo", "-allow-non-resilient-access");
-    } else if (!FEOpts.EnableLibraryEvolution) {
+    } else if (!LangOpts.hasFeature(Feature::LibraryEvolution)) {
       Diags.diagnose(SourceLoc(), diag::package_cmo_requires_library_evolution);
     } else {
       Opts.EnableSerializePackage = true;
