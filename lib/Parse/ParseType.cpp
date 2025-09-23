@@ -1967,7 +1967,7 @@ bool Parser::canParseTypeTupleBody() {
           skipSingle();
         }
       }
-    } while (consumeIf(tok::comma));
+    } while (consumeIf(tok::comma) && Tok.isNot(tok::r_paren));
   }
   
   return consumeIf(tok::r_paren);
