@@ -308,6 +308,8 @@ UPCOMING_FEATURE(ImmutableWeakCaptures, 481, 7)
 /// safety.
 MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(StrictMemorySafety, 458, "Strict memory safety")
 
+OPTIONAL_LANGUAGE_FEATURE(LibraryEvolution, 0, "Library evolution")
+
 // Experimental features
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)

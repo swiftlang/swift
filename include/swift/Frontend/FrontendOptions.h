@@ -298,11 +298,6 @@ public:
   /// \see ModuleDecl::isImplicitDynamicEnabled
   bool EnableImplicitDynamic = false;
 
-  /// Enables the "fully resilient" resilience strategy.
-  ///
-  /// \see ResilienceStrategy::Resilient
-  bool EnableLibraryEvolution = false;
-
   /// If set, this module is part of a mixed Objective-C/Swift framework, and
   /// the Objective-C half should implicitly be visible to the Swift sources.
   bool ImportUnderlyingModule = false;
