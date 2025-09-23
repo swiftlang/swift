@@ -850,6 +850,7 @@ enum Project {
   Subprocess
   Build
   PackageManager
+  PackageManagerRuntime
   Markdown
   Format
   LMDB
@@ -3605,6 +3606,31 @@ function Build-PackageManager([Hashtable] $Platform) {
     }
 }
 
+function Build-PackageManagerRuntime([Hashtable] $Platform) {
+  $SrcDir = if (Test-Path -Path "$SourceCache\swift-package-manager" -PathType Container) {
+    "$SourceCache\swift-package-manager"
+  } else {
+    "$SourceCache\swiftpm"
+  }
+
+  $SwiftSDK = if ($Platform.DefaultSDK -match "Experimental") {
+    Get-SwiftSDK -OS $Platform.OS -Identifier "$($Platform.OS)Experimental"
+  } else {
+    Get-SwiftSDK -OS $Platform.OS
+  }
+  Build-CMakeProject `
+    -Src $SrcDir\Sources\Runtimes `
+    -Bin (Get-ProjectBinaryCache $Platform PackageManagerRuntime) `
+    -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
+    -Platform $Platform `
+    -UseBuiltCompilers C,CXX,Swift `
+    -SwiftSDK $SwiftSDK `
+    -UseGNUDriver `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+    }
+}
+
 function Build-Markdown([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\swift-markdown `
@@ -4166,6 +4192,8 @@ if (-not $SkipBuild) {
     }
 
     Write-PlatformInfoPlist Windows
+
+    Invoke-BuildStep Build-PackageManagerRuntime $HostPlatform
   }
 
   if ($Android) {
