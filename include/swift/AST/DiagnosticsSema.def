@@ -2702,13 +2702,13 @@ NOTE(module_imported_here,none,
 NOTE(decl_import_via_here,none,
      "%kind0 imported as "
      "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
-     "from %2 here",
-     (const Decl *, AccessLevel, const ModuleDecl*))
+     "from %select{%2 here|bridging header}3",
+     (const Decl *, AccessLevel, const ModuleDecl*, bool))
 NOTE(decl_import_via_local,none,
      "%kind0 is imported by this file as "
      "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
-     "from %2",
-     (const Decl *, AccessLevel, const ModuleDecl*))
+     "from %select{%2|bridging header}3",
+     (const Decl *, AccessLevel, const ModuleDecl*, bool))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -3834,6 +3834,7 @@ ERROR(decl_from_hidden_module,none,
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
       "C++ types from imported module %2 do not support library evolution|"
+      "it was imported via the internal bridging header|"
       "%2 was not imported publicly}3",
       (const Decl *, unsigned, Identifier, unsigned))
 ERROR(typealias_desugars_to_type_from_hidden_module,none,
@@ -3850,6 +3851,7 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "%4 was imported for SPI only|"
       "%4 was not imported by this file|"
       "C++ types from imported module %4 do not support library evolution|"
+      "it was imported via the internal bridging header|"
       "%4 was not imported publicly}5",
       (const TypeAliasDecl *, StringRef, StringRef, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
@@ -3864,6 +3866,7 @@ ERROR(conformance_from_implementation_only_module,none,
       "%3 was imported for SPI only|"
       "%3 was not imported by this file|"
       "C++ types from imported module %3 do not support library evolution|"
+      "it was imported via the internal bridging header|"
       "%3 was not imported publicly}4",
       (Type, Identifier, unsigned, Identifier, unsigned))
 NOTE(assoc_conformance_from_implementation_only_module,none,
@@ -7317,6 +7320,7 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
       "C++ APIs from imported module %2 do not support library evolution|"
+      "it was imported via the internal bridging header|"
       "%2 was not imported publicly}3",
       (const ValueDecl *, unsigned, Identifier, unsigned))
 
@@ -7328,6 +7332,7 @@ ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
       "%4 was imported for SPI only|"
       "%4 was not imported by this file|"
       "C++ types from imported module %4 do not support library evolution|"
+      "it was imported via the internal bridging header|"
       "%4 was not imported publicly}5",
       (const TypeAliasDecl *, StringRef, StringRef, unsigned, Identifier, unsigned))
 

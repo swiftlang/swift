@@ -144,7 +144,8 @@ static void validateLegacyUnsupportedArgs(DiagnosticEngine &diags,
 
 static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
                                        const ArgList &args) {
-  if (!args.hasArgNoClaim(options::OPT_import_objc_header))
+  if (!args.hasArgNoClaim(options::OPT_import_bridging_header,
+                          options::OPT_internal_import_bridging_header))
     return;
 
   if (args.hasArgNoClaim(options::OPT_import_underlying_module))
@@ -1521,7 +1522,9 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     if (Args.hasFlag(options::OPT_enable_bridging_pch,
                      options::OPT_disable_bridging_pch,
                      true)) {
-      if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
+      if (Arg *A = Args.getLastArg(
+              options::OPT_import_bridging_header,
+              options::OPT_internal_import_bridging_header)) {
         StringRef Value = A->getValue();
         auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
         if (Ty == file_types::TY_ClangHeader) {

@@ -2714,6 +2714,7 @@ ClangImporter::Implementation::Implementation(
       DisableSwiftBridgeAttr(ctx.ClangImporterOpts.DisableSwiftBridgeAttr),
       BridgingHeaderExplicitlyRequested(
           !ctx.ClangImporterOpts.BridgingHeader.empty()),
+      BridgingHeaderIsInternal(ctx.ClangImporterOpts.BridgingHeaderIsInternal),
       DisableOverlayModules(ctx.ClangImporterOpts.DisableOverlayModules),
       EnableClangSPI(ctx.ClangImporterOpts.EnableClangSPI),
       IsReadingBridgingPCH(false),
@@ -3834,8 +3835,13 @@ ImportDecl *swift::createImportDecl(ASTContext &Ctx,
   auto *ID = ImportDecl::create(Ctx, DC, SourceLoc(),
                                 ImportKind::Module, SourceLoc(),
                                 importPath.get(), ClangN);
-  if (IsExported)
+  if (Ctx.ClangImporterOpts.BridgingHeaderIsInternal) {
+    ID->getAttrs().add(
+        new (Ctx) AccessControlAttr(SourceLoc(), SourceRange(),
+                                    AccessLevel::Internal, /*implicit=*/true));
+  } else if (IsExported) {
     ID->getAttrs().add(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+  }
   return ID;
 }
 
