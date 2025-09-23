@@ -108,6 +108,14 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
     bridged.moveAllInstructionsToEnd(otherBlock.bridged)
   }
 
+  public func erase(instruction: Instruction, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    if instruction is TermInst {
+      context.notifyBranchesChanged()
+    }
+    bridged.erase(instruction.bridged)
+  }
+
   //===----------------------------------------------------------------------===//
   //                        predecessors and successors
   //===----------------------------------------------------------------------===//
