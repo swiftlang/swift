@@ -103,8 +103,8 @@ protected:
       std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-      bool isCanImportLookup, bool isTestableDependencyLookup,
-      bool &isFramework, bool &isSystemModule);
+      std::string *CacheKey, bool isCanImportLookup,
+      bool isTestableDependencyLookup, bool &isFramework, bool &isSystemModule);
 
   /// Attempts to search the provided directory for a loadable serialized
   /// .swiftmodule with the provided `ModuleFilename`. Subclasses must
