@@ -710,8 +710,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     Invocation.setTargetTriple(options.Target);
   if (!options.ResourceDir.empty())
     Invocation.setRuntimeResourcePath(options.ResourceDir);
-  Invocation.getFrontendOptions().EnableLibraryEvolution
-    = options.EnableLibraryEvolution;
+  if (options.EnableLibraryEvolution)
+    Invocation.getLangOptions().enableFeature(Feature::LibraryEvolution);
   Invocation.getFrontendOptions().StrictImplicitModuleContext
     = options.StrictImplicitModuleContext;
 

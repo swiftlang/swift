@@ -140,7 +140,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   Invocation.getLangOptions().EnableObjCInterop = Target.isOSDarwin();
   Invocation.getLangOptions().DebuggerSupport = true;
 
-  Invocation.getFrontendOptions().EnableLibraryEvolution = true;
+  Invocation.getLangOptions().enableFeature(Feature::LibraryEvolution);
 
   std::string ModuleCachePath = "";
   if (auto *A = ParsedArgs.getLastArg(OPT_module_cache_path)) {
