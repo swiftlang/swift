@@ -1,4 +1,4 @@
-/// Include module for use from both C and Objective-C @cdecl variants.
+/// Include module for use from both C and Objective-C @c variants.
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t --leading-lines
@@ -53,11 +53,11 @@ import Foundation
 // CHECK: extern "C" {
 // CHECK: #endif
 
-@cdecl("get_int_alias")
+@c("get_int_alias")
 public func getIntAlias() -> IntFromCFramework { 42 }
 // CHECK: SWIFT_EXTERN IntFromCFramework get_int_alias(void) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
-@cdecl("imports_cgpoint")
+@c("imports_cgpoint")
 public func importsCGPoint(pt: CGPoint) {  }
 // CHECK: SWIFT_EXTERN void imports_cgpoint(CGPoint pt) SWIFT_NOEXCEPT;
 
