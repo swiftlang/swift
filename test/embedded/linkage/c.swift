@@ -29,7 +29,7 @@ package func f2() { }
 internal func f3() { }
 
 // CHECK: define hidden void @lib_publicCDeclFunc4
-@c("lib_publicCDeclFunc4")
+@c(lib_publicCDeclFunc4)
 internal func f4() { }
 
 // CHECK-NOT: lib_publicCDeclFunc5
@@ -37,7 +37,7 @@ internal func f4() { }
 private func f5() { }
 
 // CHECK-NOT: lib_publicCDeclFunc6
-@c("lib_publicCDeclFunc6")
+@c(lib_publicCDeclFunc6)
 private func f6() { }
 
 // ---------------------------------------------------------------------------
