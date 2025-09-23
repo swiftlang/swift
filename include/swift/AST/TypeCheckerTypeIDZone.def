@@ -660,3 +660,7 @@ SWIFT_REQUEST(TypeChecker, ModuleHasTypeCheckerPerformanceHacksEnabledRequest,
 SWIFT_REQUEST(TypeChecker, AvailabilityDomainForDeclRequest,
               std::optional<AvailabilityDomain>(ValueDecl *),
               Cached | SplitCached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, IsCustomAvailabilityDomainPermanentlyEnabled,
+              bool(const CustomAvailabilityDomain *),
+              SeparatelyCached, NoLocationInfo)

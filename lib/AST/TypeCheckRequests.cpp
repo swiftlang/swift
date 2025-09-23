@@ -2867,3 +2867,23 @@ void AvailabilityDomainForDeclRequest::cacheResult(
 
   decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(domain));
 }
+
+//----------------------------------------------------------------------------//
+// IsCustomAvailabilityDomainPermanentlyEnabled computation.
+//----------------------------------------------------------------------------//
+std::optional<bool>
+IsCustomAvailabilityDomainPermanentlyEnabled::getCachedResult() const {
+  auto *domain = std::get<0>(getStorage());
+
+  if (domain->flags.isPermanentlyEnabledComputed)
+    return domain->flags.isPermanentlyEnabled;
+  return std::nullopt;
+}
+
+void IsCustomAvailabilityDomainPermanentlyEnabled::cacheResult(
+    bool isPermanentlyEnabled) const {
+  auto *domain = const_cast<CustomAvailabilityDomain *>(std::get<0>(getStorage()));
+
+  domain->flags.isPermanentlyEnabledComputed = true;
+  domain->flags.isPermanentlyEnabled = isPermanentlyEnabled;
+}

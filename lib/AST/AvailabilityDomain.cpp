@@ -357,6 +357,45 @@ AvailabilityDomain::getRemappedDomain(const ASTContext &ctx,
   return *this;
 }
 
+bool IsCustomAvailabilityDomainPermanentlyEnabled::evaluate(
+    Evaluator &evaluator, const CustomAvailabilityDomain *customDomain) const {
+  switch (customDomain->getKind()) {
+  case CustomAvailabilityDomain::Kind::Enabled:
+  case CustomAvailabilityDomain::Kind::Disabled:
+  case CustomAvailabilityDomain::Kind::Dynamic:
+    return false;
+
+  case CustomAvailabilityDomain::Kind::AlwaysEnabled:
+    break;
+  }
+
+  auto *domainDecl = customDomain->getDecl();
+  if (!domainDecl)
+    return false;
+
+  if (auto deprecatedAttr = domainDecl->getDeprecatedAttr()) {
+    if (deprecatedAttr->getDomain().isUniversal())
+      return true;
+  }
+
+  if (auto unavailableAttr = domainDecl->getUnavailableAttr()) {
+    if (unavailableAttr->getDomain().isUniversal())
+      return true;
+  }
+
+  return false;
+}
+
+bool AvailabilityDomain::isPermanentlyAlwaysEnabled() const {
+  if (auto *customDomain = getCustomDomain()) {
+    if (auto *domainDecl = customDomain->getDecl())
+      return evaluateOrDefault(
+          domainDecl->getASTContext().evaluator,
+          IsCustomAvailabilityDomainPermanentlyEnabled{customDomain}, false);
+  }
+  return false;
+}
+
 void AvailabilityDomain::print(llvm::raw_ostream &os) const {
   os << getNameForAttributePrinting();
 }
@@ -408,8 +447,8 @@ CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name, Kind kind,
                                                    ModuleDecl *mod,
                                                    ValueDecl *decl,
                                                    FuncDecl *predicateFunc)
-    : name(name), kind(kind), mod(mod), decl(decl),
-      predicateFunc(predicateFunc) {
+    : name(name), mod(mod), decl(decl), predicateFunc(predicateFunc),
+      kind(kind) {
   ASSERT(!name.empty());
   ASSERT(mod);
   if (predicateFunc)
