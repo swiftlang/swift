@@ -190,7 +190,7 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
 
   /// Pops \p numBits from the path.
   private func pop(numBits: Int) -> SmallProjectionPath {
-    return Self(bytes: bytes &>> numBits)
+    return Self(bytes: bytes >> numBits)
   }
 
   /// Pops and returns the first path component included the resulting path
@@ -214,7 +214,7 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
           // Ignore zero indices
           return self
         }
-        if k == .indexedElement {
+        if k == .indexedElement && index &+ i >= 0 {
           // "Merge" two constant successive indexed elements
           return pop(numBits: numBits).push(.indexedElement, index: index + i)
         }
@@ -691,7 +691,8 @@ extension SmallProjectionPath {
     overlapping()
     predicates()
     path2path()
-  
+    indexedElements()
+
     func basicPushPop() {
       let p1 = SmallProjectionPath(.structField, index: 3)
                         .push(.classField, index: 12345678)
@@ -963,6 +964,24 @@ extension SmallProjectionPath {
       } else {
         assert(result == nil)
       }
+    }
+
+    func indexedElements() {
+      let p1 = SmallProjectionPath(.indexedElement, index: 1)
+      let (k1, i1, s1) = p1.pop()
+      assert(k1 == .indexedElement && i1 == 1 && s1.isEmpty)
+
+      let p2 = SmallProjectionPath(.indexedElement, index: -1)
+      let (k2, _, s2) = p2.pop()
+      assert(k2 == .anything && s2.isEmpty)
+
+      let p3 = SmallProjectionPath(.indexedElement, index: 0xfffffffffffff)
+      let (k3, i3, s3) = p3.pop()
+      assert(k3 == .indexedElement && i3 == 0xfffffffffffff && s3.isEmpty)
+
+      let p4 = p3.push(.indexedElement, index: Int.max)
+      let (k4, _, s4) = p4.pop()
+      assert(k4 == .anyIndexedElement && s4.isEmpty)
     }
   }
 }
