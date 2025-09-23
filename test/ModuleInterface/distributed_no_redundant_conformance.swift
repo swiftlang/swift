@@ -13,6 +13,7 @@ public actor Example {}
 
 // CHECK-NOT: extension TestResilient.Example : _Concurrency.Actor {}
 
+@available(SwiftStdlib 5.7, *)
 public distributed actor DistributedExample {
   public typealias ActorSystem = LocalTestingDistributedActorSystem
   distributed func example() {}
