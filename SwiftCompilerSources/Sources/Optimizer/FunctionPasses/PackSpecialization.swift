@@ -144,8 +144,8 @@ private struct PackExplodedFunction {
 
   private struct ExplodedArgument {
     public let packIdx: ScalarPackIndexInst
-    // A reference to an indirect function argument that the final value must be written back to, if necessary
-    public let output: FunctionArgument?
+    // A reference to the stack location holding the argument's value, if the argument/return value is direct
+    public let allocStack: AllocStackInst?
   }
 
   private struct ArgumentMapping {
@@ -154,7 +154,7 @@ private struct PackExplodedFunction {
   }
 
   private struct ArgumentMap {
-    public let map: [(Int, ArgumentMapping)]
+    public let map: [Int: ArgumentMapping]
   }
 
   /// Build the body of the pack-specialized function
@@ -166,6 +166,50 @@ private struct PackExplodedFunction {
 
       let argumentMap = explodePackArguments(from: original, to: opt, specContext)
 
+      // Build a block that extracts the necessary direct return values and returns them, if necessary.
+      // This is only necessary if any pack result elements were mapped to direct results, and the
+      // function contains at least one return statement.
+      if resultMap.contains(where: { (_, resultInfos) in
+        resultInfos.contains(where: { !$0.isSILIndirect })
+      }) {
+        if let originalReturnStatement = original.blocks.lazy.first(where: {
+          $0.terminator is ReturnInst
+        })?.terminator as? ReturnInst {
+          let originalReturnType = originalReturnStatement.returnedValue.type
+
+          let originalReturnTupleElements: [Type]
+          if originalReturnType.isTuple {
+            originalReturnTupleElements = [Type](originalReturnType.tupleElements)
+          } else {
+            originalReturnTupleElements = [originalReturnType]
+          }
+          let returnShimBB = addReturnShimBlock(
+            in: opt, argumentMap: argumentMap, originalReturnTypes: originalReturnTupleElements,
+            specContext)
+
+          // Now modify all existing return blocks to instead branch to this return shim block
+          for bb in opt.blocks where (bb.terminator is ReturnInst) && bb != returnShimBB {
+            let returnInst = bb.terminator as! ReturnInst
+            let returnedValue = returnInst.returnedValue
+            bb.erase(instruction: returnInst, specContext)
+
+            let builder = Builder(atEndOf: bb, location: opt.location, specContext)
+
+            let forwardedValues: [any Value]
+            if !returnedValue.type.isTuple {
+              forwardedValues = [returnedValue]
+            } else if let tupleInst = returnedValue.definingInstruction as? TupleInst {
+              forwardedValues = [any Value](tupleInst.operands.values)
+            } else {
+              forwardedValues = returnedValue.type.tupleElements.indices.map { i in
+                builder.createTupleExtract(tuple: returnedValue, elementIndex: i)
+              }
+            }
+
+            builder.createBranch(to: returnShimBB, arguments: forwardedValues)
+          }
+        }
+      }
       for bb in opt.blocks where bb.isReachableExitBlock {
         insertArgumentPackDeallocations(in: bb, argumentMap: argumentMap, specContext)
       }
@@ -180,50 +224,82 @@ private struct PackExplodedFunction {
   ) -> ArgumentMap {
 
     let entryBlock = opt.entryBlock
-
     let builder = Builder(atBeginOf: entryBlock, specContext)
 
-    var argumentMap = [(Int, ArgumentMapping)]()
+    let prepareExplosion = { idx in
 
-    let explodePackArgument = { (idx: Int, packElementBecomesArgument: (Int) -> Bool) in
       let originalPackArg = entryBlock.arguments[idx]
       let packType = originalPackArg.type.objectType
-      let astPackType = packType.approximateFormalPackType
 
       let localPack = builder.createAllocPack(packType)
       originalPackArg.uses.replaceAll(with: localPack, specContext)
+
       entryBlock.eraseArgument(at: idx, specContext)
 
-      let ownership = originalPackArg.ownership
+      return (localPack, packType, originalPackArg.ownership)
+    }
+
+    var argumentMap = [Int: ArgumentMapping]()
+
+    // Explode parameters
+    for (idx, parameterInfos) in parameterMap.reversed() {
+
+      let (localPack, packType, ownership) = prepareExplosion(idx)
+
+      var mappings = [ExplodedArgument]()
+      for (i, type) in packType.packElements.enumerated() {
+        let packIdx = builder.createScalarPackIndex(
+          componentIndex: i, indexedPackType: packType.approximateFormalPackType)
+        let argument = entryBlock.insertFunctionArgument(
+          atPosition: idx + i, type: type, ownership: ownership, specContext)
+
+        let allocStack: AllocStackInst?
+        if parameterInfos[i].isSILIndirect {
+          builder.createPackElementSet(elementValue: argument, packIndex: packIdx, pack: localPack)
+          allocStack = nil
+        } else {
+          let alloc = builder.createAllocStack(type)
+          builder.createStore(source: argument, destination: alloc, ownership: .unqualified)
+          builder.createPackElementSet(elementValue: alloc, packIndex: packIdx, pack: localPack)
+          allocStack = alloc
+        }
+
+        mappings.append(ExplodedArgument(packIdx: packIdx, allocStack: allocStack))
+
+      }
+      argumentMap[idx] = ArgumentMapping(allocPack: localPack, arguments: mappings)
+    }
+
+    // Explode results
+    for (idx, resultInfos) in resultMap.reversed() {
+
+      let (localPack, packType, ownership) = prepareExplosion(idx)
 
       var mappings = [ExplodedArgument]()
       var insertArgumentPosition = idx
       for (i, type) in packType.packElements.enumerated() {
         let packIdx = builder.createScalarPackIndex(
-          componentIndex: i, indexedPackType: astPackType)
+          componentIndex: i, indexedPackType: packType.approximateFormalPackType)
 
-        let output: FunctionArgument?
-        if packElementBecomesArgument(i) {
-          let arg = entryBlock.insertFunctionArgument(
+        let allocStack: AllocStackInst?
+        if resultInfos[i].isSILIndirect {
+          let argument = entryBlock.insertFunctionArgument(
             atPosition: insertArgumentPosition, type: type, ownership: ownership, specContext)
+          builder.createPackElementSet(elementValue: argument, packIndex: packIdx, pack: localPack)
+          allocStack = nil
           insertArgumentPosition += 1
-          _ = builder.createPackElementSet(elementValue: arg, packIndex: packIdx, pack: localPack)
-          output = arg
         } else {
-          output = nil
+          // TODO: This is an indirect result, so we rely on the existing code to initialize it?
+          let alloc = builder.createAllocStack(type)
+          builder.createPackElementSet(elementValue: alloc, packIndex: packIdx, pack: localPack)
+          allocStack = alloc
         }
 
-        mappings.append(ExplodedArgument(packIdx: packIdx, output: output))
+        mappings.append(ExplodedArgument(packIdx: packIdx, allocStack: allocStack))
+
       }
-      argumentMap.append((idx, ArgumentMapping(allocPack: localPack, arguments: mappings)))
-    }
+      argumentMap[idx] = ArgumentMapping(allocPack: localPack, arguments: mappings)
 
-    for (key, _) in parameterMap.reversed() {
-      explodePackArgument(key, { _ in true })
-    }
-
-    for (key, resultInfos) in resultMap.reversed() {
-      explodePackArgument(key, { i in resultInfos[i].isSILIndirect })
     }
 
     return ArgumentMap(map: argumentMap)
@@ -233,42 +309,81 @@ private struct PackExplodedFunction {
   private func insertArgumentPackDeallocations(
     in bb: BasicBlock, argumentMap: ArgumentMap, _ context: FunctionPassContext
   ) {
-    precondition(bb.isReachableExitBlock)
 
     let terminator = bb.terminator
 
     let builder = Builder(before: terminator, context)
 
-    for (_, mapping) in argumentMap.map {
-      builder.createDeallocPack(mapping.allocPack)
+    let createDeallocations = { (idx: Int) in
+      let mapped = argumentMap.map[idx]!
+      for argument in mapped.arguments.reversed() {
+        if let allocStack = argument.allocStack {
+          // TODO: We take from the stack allocations when preparing the return block, so we don't need to destroy their addresses?
+          builder.createDestroyAddr(address: allocStack)
+          builder.createDeallocStack(allocStack)
+        }
+      }
+      builder.createDeallocPack(argumentMap.map[idx]!.allocPack)
+    }
+
+    // Emit dealloc_packs in the opposite order to the alloc_packs
+    for (key, _) in resultMap {
+      createDeallocations(key)
+    }
+    for (key, _) in parameterMap {
+      createDeallocations(key)
     }
   }
 
-  private func unrollPackLoops(in opt: Function, specContext: FunctionPassContext) {
+  private func addReturnShimBlock(
+    in opt: Function, argumentMap: ArgumentMap, originalReturnTypes: [Type],
+    _ context: FunctionPassContext
+  ) -> BasicBlock {
+    let bb = opt.appendNewBlock(context)
+    let builder = Builder(atEndOf: bb, location: opt.location, context)
 
-    for loop in specContext.loopTree.loops {
-      // Match the specific shape of a dynamic pack loop we can unroll.
-      // Since these loops only get generated in one place, they have a highly
-      // predictable structure.
-      // The loop body itself should be a single basic block, so unrolling is straightforward.
-      let header = loop.header
-
-      guard loop.hasSingleExitBlock,
-        loop.innerLoops.isEmpty,
-        let exit = loop.exitBlocks.first,
-        let branch = header.instructions.last as? CondBranchInst,
-        let conditionInst = branch.condition.definingInstruction as? BuiltinInst,
-        conditionInst.id == .ICMP_EQ,
-        let packLengthInst = conditionInst.arguments.compactMap({ $0 as? PackLengthInst }).first,
-        !packLengthInst.packType.containsPackExpansionType
-      else {
-        continue
-      }
-
-      var cloner = Cloner(cloneBefore: loop.preheader!.terminator, specContext)
-      defer { cloner.deinitialize() }
-      let iterations = packLengthInst.packType.numPackElements
+    let returnBlockArguments = originalReturnTypes.map {
+      bb.addArgument(type: $0, ownership: .unowned, context)
     }
+
+    var returnValues = [any Value]()
+
+    // Thread together the original and exploded direct return values
+    var resultMapIdx = 0
+    var originalReturnTypesIdx = 0
+    for (i, originalResult) in self.original.convention.results.enumerated()
+    where originalResult.isConcretePack() || !originalResult.isSILIndirect {
+
+      if !resultMap.indices.contains(resultMapIdx) || resultMap[resultMapIdx].0 != i {
+        returnValues.append(returnBlockArguments[originalReturnTypesIdx])
+        originalReturnTypesIdx += 1
+
+      } else {
+
+        let (originalPackArgumentIdx, _) = resultMap[resultMapIdx]
+
+        let argumentMapping = argumentMap.map[originalPackArgumentIdx]!
+        for argument in argumentMapping.arguments
+        where argument.allocStack != nil {
+          returnValues.append(
+            builder.createLoad(fromAddress: argument.allocStack!, ownership: .unqualified))
+        }
+
+        resultMapIdx += 1
+      }
+    }
+
+    // Return the single value directly, rather than constructing a single-element tuple for it.
+    if returnValues.count == 1 {
+      builder.createReturn(of: returnValues[0])
+    } else {
+      let tupleType = context.getTupleType(elements: returnValues.map { $0.type }).loweredType(
+        in: opt)
+      let tuple = builder.createTuple(type: tupleType, elements: returnValues)
+      builder.createReturn(of: tuple)
+    }
+
+    return bb
   }
 }
 
