@@ -99,6 +99,11 @@ struct MyBrokenStruct {
   // expected-note@+1 2{{in expansion of macro 'myPropertyWrapper' on property 'birthDate' here}}
   @myPropertyWrapper
   var birthDate: Date? {
+    /*
+    expected-expansion@-2:25{{
+      expected-error@1:1{{variable already has a getter}}
+    }}
+    */
     // CHECK-DIAGS: variable already has a getter
     // CHECK-DIAGS: in expansion of macro
     // CHECK-DIAGS: previous definition of getter here
@@ -153,6 +158,12 @@ struct HasStoredTests {
   // expected-error@-1{{expansion of macro 'MakeComputedSneakily()' produced an unexpected getter}}
   // expected-note@-2 2{{in expansion of macro}}
   // expected-note@-3 2{{'z' declared here}}
+  /*
+     expected-expansion@-5:36{{
+       expected-error@3:9{{cannot find '_z' in scope; did you mean 'z'?}}
+       expected-error@6:9{{cannot find '_z' in scope; did you mean 'z'?}}
+     }}
+  */
 #endif
 }
 
