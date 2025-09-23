@@ -189,6 +189,7 @@ param
   [ValidateRange(1, 36)]
   [int] $AndroidAPILevel = 28,
   [string[]] $AndroidSDKVersions = @("Android", "AndroidExperimental"),
+  [string] $AndroidSDKVersionDefault = "Android",
   [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
 
   # Windows SDK Options
@@ -196,6 +197,7 @@ param
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
   [string] $WinSDKVersion = "",
   [string[]] $WindowsSDKVersions = @("Windows", "WindowsExperimental"),
+  [string] $WindowsSDKVersionDefault = "Windows",
   [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
 
   # Incremental Build Support
@@ -291,6 +293,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin64a";
     Cache = @{};
+    DefaultSDK = $WindowsSDKVersionDefault;
   };
 
   WindowsX64 = @{
@@ -304,6 +307,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin64";
     Cache = @{};
+    DefaultSDK = $WindowsSDKVersionDefault;
   };
 
   WindowsX86  = @{
@@ -317,6 +321,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin32";
     Cache = @{};
+    DefaultSDK = $WindowsSDKVersionDefault;
   };
 
   AndroidARMv7 = @{
@@ -330,6 +335,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin32a";
     Cache = @{};
+    DefaultSDK = $AndroidSDKVersionDefault;
   };
 
   AndroidARM64 = @{
@@ -343,6 +349,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin64a";
     Cache = @{};
+    DefaultSDK = $AndroidSDKVersionDefault;
   };
 
   AndroidX86 = @{
@@ -356,6 +363,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin32";
     Cache = @{};
+    DefaultSDK = $AndroidSDKVersionDefault;
   };
 
   AndroidX64 = @{
@@ -369,6 +377,7 @@ $KnownPlatforms = @{
     };
     BinaryDir = "bin64";
     Cache = @{};
+    DefaultSDK = $AndroidSDKVersionDefault;
   };
 }
 
@@ -3105,36 +3114,47 @@ function Build-XCTest([Hashtable] $Platform) {
     -InstallTo "$([IO.Path]::Combine((Get-PlatformRoot $Platform.OS), "Developer", "Library", "XCTest-$ProductVersion", "usr"))" `
     -Platform $Platform `
     -UseBuiltCompilers Swift `
-    -SwiftSDK (Get-SwiftSDK $Platform.OS) `
+    -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
       ENABLE_TESTING = "NO";
-      dispatch_DIR = $(Get-ProjectCMakeModules $Platform Dispatch);
-      Foundation_DIR = $(Get-ProjectCMakeModules $Platform DynamicFoundation);
       XCTest_INSTALL_NESTED_SUBDIR = "YES";
     }
 }
 
 function Test-XCTest {
   Invoke-IsolatingEnvVars {
-    $env:Path = "$(Get-ProjectBinaryCache $BuildPlatform XCTest);$(Get-ProjectBinaryCache $BuildPlatform DynamicFoundation)\bin;$(Get-ProjectBinaryCache $BuildPlatform Dispatch);$(Get-ProjectBinaryCache $BuildPlatform Runtime)\bin;${env:Path};$UnixToolsBinDir"
+    $SwiftRuntime = if ($BuildPlatform.DefaultSDK -match "Experimental") {
+      [IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", "$ProductVersion.experimental");
+    } else {
+      [IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", "$ProductVersion");
+    }
 
-    $RuntimeBinaryCache = Get-ProjectBinaryCache $BuildPlatform Runtime
-    $SwiftRuntimeDirectory = "${RuntimeBinaryCache}\lib\swift"
+    $DispatchBinaryCache = if ($BuildPlatform.DefaultSDK -match "Experimental") {
+      Get-ProjectBinaryCache $BuildPlatform ExperimentalDynamicDispatch
+    } else {
+      Get-ProjectBinaryCache $BuildPlatform Dispatch
+    }
+
+    $FoundationBinaryCache = if ($BuildPlatform.DefaultSDK -match "Experimental") {
+      Get-ProjectBinaryCache $BuildPlatform ExperimentalDynamicFoundation
+    } else {
+      Get-ProjectBinaryCache $BuildPlatform DynamicFoundation
+    }
+
+    $env:Path = "$(Get-ProjectBinaryCache $BuildPlatform XCTest);${FoundationBinaryCache}\bin;${DispatchBinaryCache};${SwiftRuntime}\usr\bin;${env:Path};$UnixToolsBinDir"
+    $env:SDKROOT = Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK
 
     Build-CMakeProject `
       -Src $SourceCache\swift-corelibs-xctest `
       -Bin (Get-ProjectBinaryCache $BuildPlatform XCTest) `
       -Platform $BuildPlatform `
       -UseBuiltCompilers C,CXX,Swift `
-      -SwiftSDK $null `
+      -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
       -BuildTargets default,check-xctest `
       -Defines @{
-        CMAKE_Swift_FLAGS = @("-resource-dir", $SwiftRuntimeDirectory, "-vfsoverlay", "${RuntimeBinaryCache}\stdlib\windows-vfs-overlay.yaml");
         ENABLE_TESTING = "YES";
-        dispatch_DIR = $(Get-ProjectCMakeModules $BuildPlatform Dispatch);
-        Foundation_DIR = $(Get-ProjectCMakeModules $BuildPlatform DynamicFoundation);
         LLVM_DIR = "$(Get-ProjectBinaryCache $BuildPlatform LLVM)\lib\cmake\llvm";
         XCTEST_PATH_TO_FOUNDATION_BUILD = $(Get-ProjectBinaryCache $BuildPlatform DynamicFoundation);
         XCTEST_PATH_TO_LIBDISPATCH_BUILD = $(Get-ProjectBinaryCache $BuildPlatform Dispatch);
@@ -3150,12 +3170,10 @@ function Build-Testing([Hashtable] $Platform) {
     -InstallTo "$([IO.Path]::Combine((Get-PlatformRoot $Platform.OS), "Developer", "Library", "Testing-$ProductVersion", "usr"))" `
     -Platform $Platform `
     -UseBuiltCompilers CXX,Swift `
-    -SwiftSDK (Get-SwiftSDK $Platform.OS) `
+    -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
-      dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
-      Foundation_DIR = (Get-ProjectCMakeModules $Platform DynamicFoundation);
       SwiftTesting_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapTestingMacros)\TestingMacros.dll";
       SwiftTesting_INSTALL_NESTED_SUBDIR = "YES";
     }
@@ -3216,8 +3234,6 @@ function Build-SDK([Hashtable] $Platform) {
   Invoke-BuildStep Build-Dispatch $Platform
   Invoke-BuildStep Build-Foundation $Platform
   Invoke-BuildStep Build-CompilerRuntime $Platform
-  Invoke-BuildStep Build-XCTest $Platform
-  Invoke-BuildStep Build-Testing $Platform
 }
 
 function Build-ExperimentalSDK([Hashtable] $Platform) {
@@ -4144,6 +4160,11 @@ if (-not $SkipBuild) {
       }
     }
 
+    foreach ($Build in $WindowsSDKBuilds) {
+      Invoke-BuildStep Build-XCTest $Build
+      Invoke-BuildStep Build-Testing $Build
+    }
+
     Write-PlatformInfoPlist Windows
   }
 
@@ -4195,6 +4216,11 @@ if (-not $SkipBuild) {
           Write-SDKSettings Android -Identifier AndroidExperimental
         }
       }
+    }
+
+    foreach ($Build in $AndroidSDKBuilds) {
+      Invoke-BuildStep Build-XCTest $Build
+      Invoke-BuildStep Build-Testing $Build
     }
 
     Write-PlatformInfoPlist Android
