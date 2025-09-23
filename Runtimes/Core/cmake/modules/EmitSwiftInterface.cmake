@@ -31,6 +31,11 @@ function(emit_swift_interface target)
     target_compile_options(${target} PRIVATE
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftmodule>")
   endif()
+
+  # Swift source info file.
+  target_compile_options(${target} PRIVATE
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-source-info-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftCore_MODULE_TRIPLE}.swiftsourceinfo>")
+
   add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftCore_MODULE_TRIPLE}.swiftmodule"
     DEPENDS ${target})
   target_sources(${target}
