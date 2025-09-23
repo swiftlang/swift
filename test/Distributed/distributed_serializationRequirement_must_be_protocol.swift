@@ -54,7 +54,7 @@ final class System: DistributedActorSystem {
     fatalError()
   }
 
-  // expected-note@+1 {{candidate has non-matching type '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout System.InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res' (aka '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout ClassInvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res') [with ResultHandler = <<error type>>]}}
+  // expected-note@+1 {{candidate has non-matching type '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout System.InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res' (aka '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout ClassInvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res') [with ResultHandler = _]}}
   func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,

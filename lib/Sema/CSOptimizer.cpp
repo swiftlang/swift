@@ -1738,13 +1738,11 @@ static void determineBestChoicesInContext(
         });
 
     if (cs.isDebugMode()) {
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
 
       llvm::errs().indent(cs.solverState->getCurrentIndent())
           << "<<< Disjunction "
           << disjunction->getNestedConstraints()[0]->getFirstType()->getString(
-                 PO)
+                 PrintOptions::forDebugging())
           << " with score " << bestScore << "\n";
     }
 
@@ -1774,8 +1772,7 @@ static void determineBestChoicesInContext(
   }
 
   if (cs.isDebugMode() && bestOverallScore > 0) {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
+    PrintOptions PO = PrintOptions::forDebugging();
 
     auto getLogger = [&](unsigned extraIndent = 0) -> llvm::raw_ostream & {
       return llvm::errs().indent(cs.solverState->getCurrentIndent() +
