@@ -2034,30 +2034,6 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
             namedMember = def;
         addEntryToLookupTable(table, namedMember, nameImporter);
       }
-      if (auto linkageSpecDecl =
-              dyn_cast<clang::LinkageSpecDecl>(canonicalMember)) {
-        std::function<void(clang::DeclContext *)> addDeclsFromContext =
-            [&](clang::DeclContext *declContext) {
-              for (auto nestedDecl : declContext->decls()) {
-                if (auto namedMember = dyn_cast<clang::NamedDecl>(nestedDecl))
-                  addEntryToLookupTable(table, namedMember, nameImporter);
-                else if (auto nestedLinkageSpecDecl =
-                             dyn_cast<clang::LinkageSpecDecl>(nestedDecl))
-                  addDeclsFromContext(nestedLinkageSpecDecl);
-              }
-            };
-
-        // HACK: libc++ redeclares lgamma_r in one of its headers, and that
-        // declaration hijacks lgamma_r from math.h where it is originally
-        // defined. This causes deserialization issues when loading the Darwin
-        // overlay on Apple platforms, because Swift cannot find lgamma_r in
-        // module _math.
-        bool shouldSkip = canonicalMember->getOwningModule() &&
-                          canonicalMember->getOwningModule()->Name ==
-                              "std_private_random_binomial_distribution";
-        if (!shouldSkip)
-          addDeclsFromContext(linkageSpecDecl);
-      }
     }
   }
   if (auto usingDecl = dyn_cast<clang::UsingDecl>(named)) {
