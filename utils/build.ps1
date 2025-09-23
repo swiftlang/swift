@@ -3195,6 +3195,7 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
           ENABLE_SWIFT = "YES";
         }
     }
+
     Record-OperationTime $Platform "Build-ExperimentalStaticDispatch" {
       Build-CMakeProject `
         -Src $SourceCache\swift-corelibs-libdispatch `
