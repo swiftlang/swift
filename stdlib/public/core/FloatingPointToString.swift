@@ -124,10 +124,24 @@
 //
 // ================================================================
 
-// Float16 is not currently supported on Intel macOS.
-// (This will change once there's a fully-stable Float16
-// ABI on that platform.)
-#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
+#if (os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64)
+
+// Float16 is not currently supported on Intel x86_64 macOS,
+// (including macCatalyst on x86_64) but this symbol somehow got
+// exported there.
+// This preserves the export.
+@available(SwiftStdlib 5.3, *)
+@_silgen_name("swift_float16ToString")
+public func _float16ToStringImpl(
+  _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  _ bufferLength: UInt,
+  _ value: Float,
+  _ debug: Bool
+) -> UInt64 {
+    fatalError()
+}
+
+#else
 
 // Support Legacy ABI on top of new implementation
 @available(SwiftStdlib 5.3, *)
