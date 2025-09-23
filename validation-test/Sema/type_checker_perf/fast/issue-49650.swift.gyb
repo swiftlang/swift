@@ -1,0 +1,11 @@
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// REQUIRES: asserts, no_asan
+
+// https://github.com/swiftlang/swift/issues/49650
+
+func f<T: Numeric>(t: T) -> T{
+  return t * t - t * t
+%for i in range(0, N):
+  + t * t - t * t
+%end
+}
