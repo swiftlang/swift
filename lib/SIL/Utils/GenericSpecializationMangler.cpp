@@ -63,8 +63,10 @@ std::string SpecializationMangler::finalize() {
   StringRef FuncName = Function ? Function->getName() : StringRef(FunctionName);
   NodePointer FuncTopLevel = nullptr;
   if (FuncName.starts_with(MANGLING_PREFIX_STR)) {
+    // Demangling can fail, i.e. FuncTopLevel == nullptr, if the user provides
+    // a custom not-demangable `@_silgen_name` (but still containing the "$s"
+    // mangling prefix).
     FuncTopLevel = D.demangleSymbol(FuncName);
-    assert(FuncTopLevel);
   }
   else if (FuncName.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) {
     FuncTopLevel = D.demangleSymbol(FuncName);
