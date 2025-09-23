@@ -1,0 +1,19 @@
+// RUN: %scale-test --invert-result --begin 1 --end 6 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// REQUIRES: asserts, no_asan
+
+// https://github.com/swiftlang/swift/issues/58051
+
+struct Date {}
+
+struct S {
+  var x: Date?
+}
+
+extension S {
+  var y: Date? {
+    x
+%for i in range(0, N):
+      ?? x
+%end
+  }
+}

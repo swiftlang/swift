@@ -1,0 +1,11 @@
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// REQUIRES: asserts, no_asan
+
+// https://github.com/swiftlang/swift/issues/54695
+
+func slow() {
+  var eq3 = 1.0 - 1/3.0
+%for i in range(0, N):
+          + 1/5.0 - 1/7.0
+%end
+}

@@ -1,0 +1,11 @@
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// REQUIRES: asserts, no_asan
+
+// https://github.com/swiftlang/swift/issues/50046
+
+func slow(x: UInt64) {
+	let _: UInt64 = ((x >> (6 * 1)) & 0xFF) << (8 * 0)
+%for i in range(0, N):
+                  | ((x >> (6 * 3)) & 0xFF) << (8 * 1)
+%end
+}

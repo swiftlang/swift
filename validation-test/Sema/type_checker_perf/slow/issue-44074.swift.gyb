@@ -1,0 +1,11 @@
+// RUN: %scale-test --invert-result --begin 1 --end 5 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// REQUIRES: asserts, no_asan
+
+func slow() {
+  let a = [1]
+  let x = [
+%for i in range(0, N):
+    a.lazy.map({$0 + 1}),
+%end
+  ]
+}
