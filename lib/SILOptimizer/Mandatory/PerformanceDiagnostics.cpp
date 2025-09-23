@@ -376,12 +376,15 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
 
   if (perfConstr == PerformanceConstraints::ManualOwnership) {
-    if (impact == RuntimeEffect::RefCounting) {
+    if (impact & RuntimeEffect::RefCounting) {
       bool shouldDiagnose = false;
       switch (inst->getKind()) {
+      case SILInstructionKind::DestroyAddrInst:
+      case SILInstructionKind::DestroyValueInst:
+        break; // These modify reference counts, but aren't copies.
       case SILInstructionKind::ExplicitCopyAddrInst:
       case SILInstructionKind::ExplicitCopyValueInst:
-        break;
+        break; // Explicitly acknowledged copies are OK.
       case SILInstructionKind::LoadInst: {
         // FIXME: we don't have an `explicit_load` and transparent functions can
         //   end up bringing in a `load [copy]`. A better approach is needed to
