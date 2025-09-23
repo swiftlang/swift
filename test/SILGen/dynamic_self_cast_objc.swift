@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -Xllvm -sil-print-types -disable-objc-interop -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -module-name=dynamic_self_cast -emit-silgen %s | %FileCheck %s
+
+// REQUIRES: objc_interop
 
 public class SelfCasts {
   // CHECK-LABEL: sil [ossa] @$s17dynamic_self_cast9SelfCastsC02toD0yACXDACFZ : $@convention(method) (@guaranteed SelfCasts, @thick SelfCasts.Type) -> @owned SelfCasts {
@@ -31,7 +33,7 @@ public class SelfCasts {
   }
 
   // CHECK-LABEL: sil [ossa] @$s17dynamic_self_cast9SelfCastsC016classGenericFromD0xyRlzClFZ : $@convention(method) <T where T : AnyObject> (@thick SelfCasts.Type) -> @owned T
-  // CHECK: unconditional_checked_cast {{.*}} : $SelfCasts to T
+  // CHECK: unconditional_checked_cast_addr @dynamic_self SelfCasts in {{.*}} : $*SelfCasts to T in {{.*}} : $*T
   // CHECK: }
   public static func classGenericFromSelf<T : AnyObject>() -> T {
     let s = Self()
@@ -68,7 +70,7 @@ public class SelfCasts {
   }
 
   // CHECK-LABEL: sil [ossa] @$s17dynamic_self_cast9SelfCastsC016classGenericFromD11ConditionalxSgyRlzClFZ : $@convention(method) <T where T : AnyObject> (@thick SelfCasts.Type) -> @owned Optional<T> {
-  // CHECK: checked_cast_br @dynamic_self SelfCasts in {{.*}} : $SelfCasts to T
+  // CHECK: checked_cast_addr_br take_always @dynamic_self SelfCasts in {{.*}} : $*SelfCasts to T in {{.*}} : $*T
   // CHECK: }
   public static func classGenericFromSelfConditional<T : AnyObject>() -> T? {
     let s = Self()
@@ -77,3 +79,4 @@ public class SelfCasts {
 
   public required init() {}
 }
+
