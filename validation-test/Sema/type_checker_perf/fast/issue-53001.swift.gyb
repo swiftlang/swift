@@ -1,0 +1,14 @@
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// REQUIRES: asserts, no_asan
+
+// https://github.com/swiftlang/swift/issues/53001
+
+func slow() {
+  let bit: UInt32 = 0
+  let offset: UInt32 = 0
+
+  let result = bit
+%for i in range(0, N):
+             | (bit << offset)
+%end
+}

@@ -1,0 +1,11 @@
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// REQUIRES: asserts, no_asan
+
+// https://github.com/swiftlang/swift/issues/48588
+
+func toUInt32(_ a: [UInt8]) -> UInt32 {
+    return (UInt32(a[0]) << 24)
+%for i in range(0, N):
+        + (UInt32(a[1]) << 16)
+%end
+}

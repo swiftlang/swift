@@ -1,0 +1,12 @@
+// RUN: %scale-test --begin 1 --end 6 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// REQUIRES: asserts, no_asan
+
+// https://github.com/swiftlang/swift/issues/47896
+
+func slow() {
+    let _ = MemoryLayout<OpaquePointer>.size
+%for n in range(0, N):
+           + MemoryLayout<Int32>.size + MemoryLayout<UnsafePointer<UInt8>>.size
+%end
+}
+
