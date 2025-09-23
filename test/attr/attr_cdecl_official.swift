@@ -12,6 +12,10 @@
 // expected-error @-1 {{expected ')' in 'c' attribute}}
 // expected-error @-2 {{expected declaration}}
 
+@c("old string syntax") func stringSyntax() {}
+// expected-error @-1 {{expected C identifier in 'c' attribute}}
+// expected-error @-2 {{expected declaration}}
+
 @c() func emptyParen() {}
 // expected-error @-1 {{expected C identifier in 'c' attribute}}
 // expected-error @-2 {{expected declaration}}
