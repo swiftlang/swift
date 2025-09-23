@@ -190,6 +190,11 @@
   __attribute__((swift_attr("~Copyable"))) \
   __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(destroy:_destroy))))
 
+/// Specifies that a C++ `class` or `struct` should be imported as a copyable
+/// Swift value if all of the specified template arguments are copyable.
+#define SWIFT_COPYABLE_IF(...) \
+  __attribute__((swift_attr("copyable_if:" _CXX_INTEROP_CONCAT(__VA_ARGS__))))
+
 /// Specifies that a specific class or struct should be imported
 /// as a non-escapable Swift value type.
 #define SWIFT_NONESCAPABLE \
@@ -283,6 +288,7 @@
 #define SWIFT_UNCHECKED_SENDABLE
 #define SWIFT_NONCOPYABLE
 #define SWIDT_NONCOPYABLE_WITH_DESTROY(_destroy)
+#define SWIFT_COPYABLE_IF(...)
 #define SWIFT_NONESCAPABLE
 #define SWIFT_ESCAPABLE
 #define SWIFT_ESCAPABLE_IF(...)
