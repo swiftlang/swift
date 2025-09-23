@@ -2202,7 +2202,7 @@ ImportedType findOptionSetEnum(clang::QualType type,
 ///
 /// The name we're looking for is the Swift name.
 llvm::SmallVector<ValueDecl *, 1>
-getValueDeclsForName(const clang::Decl *decl, ASTContext &ctx, StringRef name);
+getValueDeclsForName(NominalTypeDecl* decl, StringRef name);
 
 } // end namespace importer
 } // end namespace swift
