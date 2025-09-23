@@ -615,7 +615,7 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   SwiftToClangInteropContext interopContext(*M, irGenOpts);
   writePrologue(os, M->getASTContext(), computeMacroGuard(M));
 
-  // C content (@cdecl)
+  // C content (@c)
   std::string moduleContentsScratch;
   if (M->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
     SmallPtrSet<ImportModuleTy, 8> imports;

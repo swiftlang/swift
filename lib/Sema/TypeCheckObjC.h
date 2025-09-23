@@ -41,7 +41,7 @@ class ObjCReason {
 public:
   // The kind of reason.
   enum Kind {
-    /// Has the '@cdecl' attribute.
+    /// Has the '@c' attribute.
     ExplicitlyCDecl,
     /// Has the '@_cdecl' attribute.
     ExplicitlyUnderscoreCDecl,
