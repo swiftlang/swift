@@ -2345,7 +2345,11 @@ public:
 
   /// Retrieve the substitution map applied to the declaration's underlying
   /// to produce the described type.
-  SubstitutionMap getSubstitutionMap() const;
+  ///
+  /// \param wantContextualType If \c true, the substitution map will bind
+  /// outer local generic parameters to archetypes. Otherwise they will be left
+  /// unchanged.
+  SubstitutionMap getSubstitutionMap(bool wantContextualType = false) const;
 
   /// Get the direct generic arguments, which correspond to the generic
   /// arguments that are directly applied to the typealias declaration
