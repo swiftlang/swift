@@ -3,9 +3,9 @@
 @propertyWrapper struct a<b{
          wrappedValue: b
        }
-        @propertyWrapper struct c<b{
+        @propertyWrapper struct e<b{
          wrappedValue: b
        }
            {
-               @c @a var value = if true
-                 let : c<a<Bool>> = _value
+               @e @a var value = if true
+                 let : e<a<Bool>> = _value
