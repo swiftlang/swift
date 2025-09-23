@@ -1146,6 +1146,10 @@ ERROR(no_module_type,none,
       "no type named %0 in module %1", (DeclNameRef, Identifier))
 ERROR(ambiguous_module_type,none,
       "ambiguous type name %0 in module %1", (DeclNameRef, Identifier))
+ERROR(module_selector_dependent_member_type_not_allowed,none,
+      "module selector is not allowed on generic member type; associated types "
+      "with the same name are merged instead of shadowing one another",
+      ())
 ERROR(use_nonmatching_operator,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
       (DeclNameRef, unsigned))

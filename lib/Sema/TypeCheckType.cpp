@@ -193,10 +193,20 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
 Type TypeResolution::resolveDependentMemberType(
     Type baseTy, DeclContext *DC, SourceRange baseRange,
     QualifiedIdentTypeRepr *repr) const {
-  // FIXME(ModQual): If module selector is present, check that it matches the
-  // protocol's module.
   Identifier refIdentifier = repr->getNameRef().getBaseIdentifier();
   ASTContext &ctx = DC->getASTContext();
+
+  if (repr->getNameRef().hasModuleSelector()) {
+    if (!this->getOptions().contains(TypeResolutionFlags::SilenceErrors)) {
+      ctx.Diags.diagnose(repr->getNameLoc().getModuleSelectorLoc(),
+                         diag::module_selector_dependent_member_type_not_allowed)
+          .fixItRemoveChars(repr->getNameLoc().getModuleSelectorLoc(),
+                            repr->getNameLoc().getBaseNameLoc());
+      // If we can check if `refIdentifier` is a protocol ext's concrete type:
+      // FIXME: Conditionally emit fix-it replacing base type with protocol
+    }
+    return ErrorType::get(baseTy);
+  }
 
   switch (stage) {
   case TypeResolutionStage::Structural:

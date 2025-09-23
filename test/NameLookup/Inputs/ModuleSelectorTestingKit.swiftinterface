@@ -41,5 +41,10 @@ public struct MyBuilder {
   public static func buildBlock()
 }
 
+public protocol ComparableIdentifiable {
+  associatedtype ID: Comparable
+  var id: ID { get }
+}
+
 @freestanding(expression) public macro ExprMacro() -> String = #file
 @attached(peer) public macro PeerMacro() = #externalMacro(module: "Fnord", type: "PeerMacro")
