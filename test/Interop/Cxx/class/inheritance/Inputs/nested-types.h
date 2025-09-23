@@ -20,3 +20,5 @@ struct Base {
 };
 
 struct Derived : Base {};
+struct Derived1 : Base {};
+struct Derived2 : Derived1 {};
