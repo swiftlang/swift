@@ -853,6 +853,7 @@ enum Project {
   Subprocess
   Build
   PackageManager
+  PackageManagerRuntime
   Markdown
   Format
   LMDB
@@ -3582,6 +3583,27 @@ function Build-PackageManager([Hashtable] $Platform) {
       SwiftSyntax_DIR = (Get-ProjectCMakeModules $Platform Compilers);
       SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
       SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib";
+      SwiftPM_ENABLE_RUNTIME = "NO";
+    }
+}
+
+function Build-PackageManagerRuntime([Hashtable] $Platform) {
+  $SrcDir = if (Test-Path -Path "$SourceCache\swift-package-manager" -PathType Container) {
+    "$SourceCache\swift-package-manager"
+  } else {
+    "$SourceCache\swiftpm"
+  }
+
+  Build-CMakeProject `
+    -Src $SrcDir\Sources\Runtimes `
+    -Bin (Get-ProjectBinaryCache $Platform PackageManagerRuntime) `
+    -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
+    -Platform $Platform `
+    -UseBuiltCompilers C,CXX,Swift `
+    -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
+    -UseGNUDriver `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
     }
 }
 
@@ -4116,6 +4138,8 @@ if (-not $SkipBuild) {
     }
 
     Write-PlatformInfoPlist Windows
+
+    Invoke-BuildStep Build-PackageManagerRuntime $HostPlatform
 
     # Copy static dependencies
     foreach ($Build in $WindowsSDKBuilds) {
