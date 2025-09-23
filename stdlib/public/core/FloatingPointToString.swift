@@ -138,21 +138,25 @@ public func _float16ToStringImpl(
   _ value: Float16,
   _ debug: Bool
 ) -> UInt64 {
-  // Code below works with raw memory.
-  var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
-    _unchecked: textBuffer,
-    count: Int(bufferLength))
-  let textRange = _Float16ToASCII(value: value, buffer: &buffer)
-  let textLength = textRange.upperBound - textRange.lowerBound
+  if #available(SwiftStdlib 6.2, *) {
+    // Code below works with raw memory.
+    var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
+      _unchecked: textBuffer,
+      count: Int(bufferLength))
+    let textRange = _Float16ToASCII(value: value, buffer: &buffer)
+    let textLength = textRange.upperBound - textRange.lowerBound
 
-  // Move the text to the start of the buffer
-  if textRange.lowerBound != 0 {
-    unsafe _memmove(
-      dest: textBuffer,
-      src: textBuffer + textRange.lowerBound,
-      size: UInt(truncatingIfNeeded: textLength))
+    // Move the text to the start of the buffer
+    if textRange.lowerBound != 0 {
+      unsafe _memmove(
+        dest: textBuffer,
+        src: textBuffer + textRange.lowerBound,
+        size: UInt(truncatingIfNeeded: textLength))
+    }
+    return UInt64(truncatingIfNeeded: textLength)
+  } else {
+    fatalError()
   }
-  return UInt64(truncatingIfNeeded: textLength)
 }
 
 // Convert a Float16 to an optimal ASCII representation.
