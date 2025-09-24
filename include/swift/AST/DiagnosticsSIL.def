@@ -435,6 +435,12 @@ NOTE(performance_called_from,none,
       "called from here", ())
 ERROR(manualownership_copy,none,
       "explicit 'copy' required here", ())
+ERROR(manualownership_copy_happened,none,
+      "accessing %0 produces a copy of it; write 'copy' to acknowledge", (Identifier))
+ERROR(manualownership_copy_demanded,none,
+      "ownership of %0 is demanded and cannot not be consumed; write 'copy' to satisfy", (Identifier))
+ERROR(manualownership_copy_captured,none,
+      "ownership of %0 is demanded by a closure; write 'copy' in its capture list to satisfy", (Identifier))
 
 // 'transparent' diagnostics
 ERROR(circular_transparent,none,

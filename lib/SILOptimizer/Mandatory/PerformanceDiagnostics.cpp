@@ -20,6 +20,7 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -376,12 +377,16 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
 
   if (perfConstr == PerformanceConstraints::ManualOwnership) {
-    if (impact == RuntimeEffect::RefCounting) {
+    if (impact & RuntimeEffect::RefCounting) {
       bool shouldDiagnose = false;
       switch (inst->getKind()) {
+      case SILInstructionKind::PartialApplyInst:
+      case SILInstructionKind::DestroyAddrInst:
+      case SILInstructionKind::DestroyValueInst:
+        break; // These modify reference counts, but aren't copies.
       case SILInstructionKind::ExplicitCopyAddrInst:
       case SILInstructionKind::ExplicitCopyValueInst:
-        break;
+        break; // Explicitly acknowledged copies are OK.
       case SILInstructionKind::LoadInst: {
         // FIXME: we don't have an `explicit_load` and transparent functions can
         //   end up bringing in a `load [copy]`. A better approach is needed to
@@ -418,19 +423,40 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
         break;
       }
       if (shouldDiagnose) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "function " << inst->getFunction()->getName()
+                   << "\n has unexpected copying instruction: " << *inst);
+
+        // Try to come up with a useful diagnostic.
+        if (auto svi = dyn_cast<SingleValueInstruction>(inst)) {
+          if (auto name = VariableNameInferrer::inferName(svi)) {
+            // Simplistic check for whether this is a closure capture.
+            for (auto user : svi->getUsers()) {
+              if (isa<PartialApplyInst>(user)) {
+                LLVM_DEBUG(llvm::dbgs() << "captured by "<< *user);
+                diagnose(loc, diag::manualownership_copy_captured, *name);
+                return false;
+              }
+            }
+
+            // There's no hope of borrowing access if there's a consuming use.
+            for (auto op : svi->getUses()) {
+              if (op->getOperandOwnership() == OperandOwnership::ForwardingConsume) {
+                LLVM_DEBUG(llvm::dbgs() << "demanded by "<< *(op->getUser()));
+                diagnose(loc, diag::manualownership_copy_demanded, *name);
+                return false;
+              }
+            }
+
+            diagnose(loc, diag::manualownership_copy_happened, *name);
+            return false;
+          }
+        }
+
+        // Back-up diagnostic, when all-else fails.
         diagnose(loc, diag::manualownership_copy);
-        llvm::dbgs() << "function " << inst->getFunction()->getName();
-        llvm::dbgs() << "\n has unexpected copying instruction: ";
-        inst->dump();
         return false; // Don't bail-out early; diagnose more issues in the func.
       }
-    } else if (impact == RuntimeEffect::ExclusivityChecking) {
-      // TODO: diagnose only the nested exclusivity; perhaps as a warning
-      //   since we don't yet have reference bindings?
-
-      // diagnose(loc, diag::performance_arc);
-      // inst->dump();
-      // return true;
     }
     return false;
   }
