@@ -669,10 +669,8 @@ class SILCombine : public SILFunctionTransform {
   void run() override {
     bool enableCopyPropagation =
         getOptions().CopyPropagation >= CopyPropagationOption::Optimizing;
-    if (getOptions().EnableOSSAModules) {
-      enableCopyPropagation =
-          getOptions().CopyPropagation != CopyPropagationOption::Off;
-    }
+    enableCopyPropagation =
+        getOptions().CopyPropagation != CopyPropagationOption::Off;
 
     SILCombiner Combiner(this, getOptions().RemoveRuntimeAsserts,
                          enableCopyPropagation);

@@ -343,7 +343,7 @@ std::optional<std::string> SerializedModuleLoaderBase::invalidModuleReason(seria
 
 llvm::ErrorOr<std::vector<ScannerImportStatementInfo>>
 SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
-    Twine modulePath, bool isFramework, bool isRequiredOSSAModules,
+    Twine modulePath, bool isFramework,
     StringRef SDKName, const llvm::Triple &target, StringRef packageName,
     llvm::vfs::FileSystem *fileSystem, PathObfuscator &recoverer) {
   auto moduleBuf = fileSystem->getBufferForFile(modulePath);
@@ -355,7 +355,7 @@ SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
-      isRequiredOSSAModules, SDKName, target, recoverer, loadedModuleFile);
+      SDKName, target, recoverer, loadedModuleFile);
 
   if (loadedModuleFile->getModulePackageName() != packageName)
     return importedModuleNames;
@@ -953,7 +953,6 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       moduleInterfacePath, moduleInterfaceSourcePath,
       std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
       std::move(moduleSourceInfoInputBuffer), isFramework,
-      isRequiredOSSAModules(),
       Ctx.LangOpts.SDKName, Ctx.LangOpts.Target,
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFileCore);
   SerializedASTFile *fileUnit = nullptr;
@@ -1113,10 +1112,6 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   return fileUnit;
 }
 
-bool SerializedModuleLoaderBase::isRequiredOSSAModules() const {
-  return Ctx.SILOpts.EnableOSSAModules;
-}
-
 void swift::serialization::diagnoseSerializedASTLoadFailure(
     ASTContext &Ctx, SourceLoc diagLoc,
     const serialization::ValidationInfo &loadInfo,
@@ -1155,12 +1150,9 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
                        moduleBufferID);
     break;
   case serialization::Status::NotInOSSA:
-    if (Ctx.SerializationOpts.ExplicitModuleBuild ||
-        Ctx.SILOpts.EnableOSSAModules) {
-      Ctx.Diags.diagnose(diagLoc,
-                         diag::serialization_non_ossa_module_incompatible,
-                         ModuleName);
-    }
+    Ctx.Diags.diagnose(diagLoc,
+                       diag::serialization_non_ossa_module_incompatible,
+                       ModuleName);
     break;
   case serialization::Status::RevisionIncompatible:
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_incompatible_revision,
@@ -1498,7 +1490,7 @@ std::unique_ptr<llvm::MemoryBuffer> swift::extractEmbeddedBridgingHeaderContent(
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(file), nullptr, nullptr, false,
-      Context.SILOpts.EnableOSSAModules, Context.LangOpts.SDKName,
+      Context.LangOpts.SDKName,
       Context.LangOpts.Target,
       Context.SearchPathOpts.DeserializedPathRecoverer,
       loadedModuleFile);
@@ -1553,7 +1545,7 @@ bool SerializedModuleLoaderBase::canImportModule(
 
   if (moduleInputBuffer) {
     auto metaData = serialization::validateSerializedAST(
-        moduleInputBuffer->getBuffer(), Ctx.SILOpts.EnableOSSAModules,
+        moduleInputBuffer->getBuffer(),
         Ctx.LangOpts.SDKName);
 
     // If we only found binary module, make sure that is valid.
