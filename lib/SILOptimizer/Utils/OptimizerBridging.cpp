@@ -61,9 +61,9 @@ void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
     return;
   }
 
-  getSwiftPassInvocation()->beginVerifyFunction(f);
+  SILFunction *prevFunction = getSwiftPassInvocation()->beginVerifyFunction(f);
   BridgedVerifier::runSwiftFunctionVerification(f, getSwiftPassInvocation());
-  getSwiftPassInvocation()->endVerifyFunction();
+  getSwiftPassInvocation()->endVerifyFunction(prevFunction);
 }
 
 void SILPassManager::runSwiftModuleVerification() {

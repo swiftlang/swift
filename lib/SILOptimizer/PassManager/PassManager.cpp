@@ -1532,21 +1532,23 @@ void SwiftPassInvocation::verifyEverythingIsCleared() {
   SILContext::verifyEverythingIsCleared();
 }
 
-void SwiftPassInvocation::beginVerifyFunction(SILFunction *function) {
-  if (transform) {
+SILFunction *SwiftPassInvocation::beginVerifyFunction(SILFunction *function) {
+  SILFunction *prevFunction = this->function;
+  if (transform && this->function) {
     ASSERT(this->function == function);
   } else {
     ASSERT(!this->function);
     this->function = function;
   }
+  return prevFunction;
 }
 
-void SwiftPassInvocation::endVerifyFunction() {
+void SwiftPassInvocation::endVerifyFunction(SILFunction *prevFunction) {
   ASSERT(function);
   if (!transform) {
     verifyEverythingIsCleared();
-    function = nullptr;
   }
+  function = prevFunction;
 }
 
 irgen::IRGenModule *SwiftPassInvocation::getIRGenModule() {
