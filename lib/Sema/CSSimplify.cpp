@@ -13394,8 +13394,12 @@ retry_after_fail:
             choiceType = objectType;
         }
 
+        // FIXME: The !getSelfProtocolDecl() check is load-bearing, because
+        // this optimization interacts poorly with existential opening
+        // somehow. It should all be removed.
         if (auto *choiceFnType = choiceType->getAs<FunctionType>()) {
-          if (isa<ConstructorDecl>(choice.getDecl())) {
+          if (isa<ConstructorDecl>(choice.getDecl()) &&
+              !choice.getDecl()->getDeclContext()->getSelfProtocolDecl()) {
             auto choiceResultType = choice.getBaseType()
                                         ->getRValueType()
                                         ->getMetatypeInstanceType();
