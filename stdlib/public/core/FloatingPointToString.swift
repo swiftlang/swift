@@ -442,7 +442,7 @@ internal func _Float16ToASCII(
 // Support Legacy ABI on top of new implementation
 @_silgen_name("swift_float32ToString")
 @usableFromInline
-private func _float32ToStringImpl(
+internal func _float32ToStringImpl(
   _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Float32,
@@ -695,7 +695,7 @@ internal func _Float32ToASCII(
 // Support Legacy ABI on top of new implementation
 @_silgen_name("swift_float64ToString")
 @usableFromInline
-private func _float64ToStringImpl(
+internal func _float64ToStringImpl(
   _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Float64,
@@ -1203,7 +1203,7 @@ internal func _Float64ToASCII(
 // Support Legacy ABI on top of new implementation
 @_silgen_name("swift_float80ToString")
 @usableFromInline
-private func _float80ToStringImpl(
+internal func _float80ToStringImpl(
   _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Float80,
