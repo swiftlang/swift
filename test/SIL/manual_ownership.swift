@@ -252,35 +252,52 @@ return (copy ref_result)[2]
 
 /// MARK: closures
 
-// FIXME: (1) Closure capture lists need to support the short-hand [copy t] and produce explicit copies.
-//            We also need a better error message for when this is missed for closure captures.
-//        (2) Escaping closures need to be recursively checked by the PerformanceDiagnostics.
-//            We might just need to widen the propagation of [manual_ownership]?
-//        (3) Autoclosures have no ability to annotate captures. Is that OK?
-
 @_manualOwnership
 func closure_basic(_ t: Triangle) -> () -> Triangle {
-  return { return t } // expected-error {{ownership of 't' is demanded by a closure}}
+  return { // expected-error {{ownership of 't' is demanded by a closure}}
+    return t // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+  }
 }
 @_manualOwnership
+func closure_basic_almost_fixed_1(_ t: Triangle) -> () -> Triangle {
+  // FIXME: Closure capture lists need to support the short-hand [copy t] that makes the
+  //        closure capture parameter @owned, rather than @guaranteed. Only can work for Copyable types!
+  return { [x = copy t] in
+    return x // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
+  }
+}
+
+@_manualOwnership
+func closure_basic_almost_fixed_2(_ t: Triangle) -> () -> Triangle {
+  return { // expected-error {{ownership of 't' is demanded by a closure}}
+    return copy t
+  }
+}
+
+@_manualOwnership
 func closure_basic_fixed(_ t: Triangle) -> () -> Triangle {
-  return { [t = copy t] in return t }
+  return { [x = copy t] in
+    return copy x
+  }
 }
 
 @_manualOwnership
 func closure_copies_in_body(_ t: Triangle) -> () -> Triangle {
-  return { [t = copy t] in
-    eat(t) // FIXME: missing required copies
-    eat(t)
-    return t }
+  return { [x = copy t] in
+    eat(x) // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
+    use(x)
+    eat(x) // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
+    return x // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
+    }
 }
 
 @_manualOwnership
 func closure_copies_in_body_noescape(_ t: Triangle) -> Triangle {
-  let f = { [t = copy t] in
-    eat(t)  // FIXME: missing required copies
-    eat(t)
-    return t
+  let f = { [x = copy t] in
+    eat(x)  // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
+    use(x)
+    eat(x) // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
+    return x // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
   }
   return f()
 }
@@ -296,7 +313,32 @@ func try_to_assert(_ n: Int, _ names: [String]) {
 
 @_manualOwnership
 func copy_in_autoclosure(_ t: Triangle) {
-  simple_assert(consumingFunc(t)) // FIXME: missing required copies
+  simple_assert(consumingFunc(t)) // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+}
+@_manualOwnership
+func copy_in_autoclosure_fixed(_ t: Triangle) {
+  simple_assert(consumingFunc(copy t))
+}
+
+@_manualOwnership
+func nested_closures(_ t: Triangle) -> () -> (() -> Triangle) {
+  return { // expected-error {{ownership of 't' is demanded by a closure}}
+    { eat(t) }() // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+    return { // expected-error {{ownership of 't' is demanded by a closure}}
+      simple_assert(consumingFunc(t)) // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+      return t // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+    }
+  }
+}
+@_manualOwnership
+func nested_closures_fixed(_ t: Triangle) -> () -> (() -> Triangle) {
+  return { [a = copy t] in
+    { eat(copy a) }()
+    return { [b = copy a] in
+      simple_assert(consumingFunc(copy b))
+      return copy b
+    }
+  }
 }
 
 /// MARK: generics
