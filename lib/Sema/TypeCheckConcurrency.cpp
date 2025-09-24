@@ -2666,7 +2666,8 @@ namespace {
 
     /// Some function conversions synthesized by the constraint solver may not
     /// be correct AND the solver doesn't know, so we must emit a diagnostic.
-    void checkFunctionConversion(Expr *funcConv, Type fromType, Type toType) {
+    void checkFunctionConversion(ImplicitConversionExpr *funcConv,
+                                 Type fromType, Type toType) {
       auto diagnoseNonSendableParametersAndResult =
           [&](FunctionType *fnType,
               std::optional<unsigned> warnUntilSwiftMode = std::nullopt) {
@@ -2771,6 +2772,18 @@ namespace {
               if (!fromFnType->isAsync())
                 break;
 
+              // Applying `nonisolated(nonsending)` to an interface type
+              // of a declaration.
+              if (auto *declRef =
+                      dyn_cast<DeclRefExpr>(funcConv->getSubExpr())) {
+                auto *decl = declRef->getDecl();
+                if (auto *nonisolatedAttr =
+                        decl->getAttrs().getAttribute<NonisolatedAttr>()) {
+                  if (nonisolatedAttr->isNonSending())
+                    return;
+                }
+              }
+
               // @concurrent -> nonisolated(nonsending)
               // crosses an isolation boundary.
               LLVM_FALLTHROUGH;
@@ -2780,16 +2793,13 @@ namespace {
               diagnoseNonSendableParametersAndResult(toFnType);
               break;
 
+            // @Sendable nonisolated(nonsending) -> nonisolated(nonsending)
+            // doesn't require Sendable checking.
+            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
+              break;
+
             case FunctionTypeIsolation::Kind::Parameter:
               llvm_unreachable("invalid conversion");
-
-            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
-              // Non isolated caller is always async. This can only occur if we
-              // are converting from an `@Sendable` representation to something
-              // else. So we need to just check that we diagnose non sendable
-              // parameters and results.
-              diagnoseNonSendableParametersAndResult(toFnType);
-              break;
             }
             break;
           }
@@ -3460,19 +3470,6 @@ namespace {
         }
       }
 
-      // The constraint solver may not have chosen legal casts.
-      if (auto funcConv = dyn_cast<FunctionConversionExpr>(expr)) {
-        checkFunctionConversion(funcConv,
-                                funcConv->getSubExpr()->getType(),
-                                funcConv->getType());
-      }
-
-      if (auto *isolationErasure = dyn_cast<ActorIsolationErasureExpr>(expr)) {
-        checkFunctionConversion(isolationErasure,
-                                isolationErasure->getSubExpr()->getType(),
-                                isolationErasure->getType());
-      }
-
       if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(expr)) {
         checkDefaultArgument(defaultArg);
       }
@@ -3562,6 +3559,19 @@ namespace {
             }
           }
         }
+      }
+
+      // The constraint solver may not have chosen legal casts.
+      if (auto funcConv = dyn_cast<FunctionConversionExpr>(expr)) {
+        checkFunctionConversion(funcConv,
+                                funcConv->getSubExpr()->getType(),
+                                funcConv->getType());
+      }
+
+      if (auto *isolationErasure = dyn_cast<ActorIsolationErasureExpr>(expr)) {
+        checkFunctionConversion(isolationErasure,
+                                isolationErasure->getSubExpr()->getType(),
+                                isolationErasure->getType());
       }
 
       return Action::Continue(expr);
