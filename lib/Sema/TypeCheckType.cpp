@@ -5922,7 +5922,7 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
     if (auto *packIdent =
             dyn_cast<UnqualifiedIdentTypeRepr>(repr->getPackType())) {
       if (auto *packIdentBinding = packIdent->getBoundDecl()) {
-        if (packIdentBinding->getLoc().isValid()) {
+        if (packIdentBinding->getLoc(/*SerializedOK=*/false).isValid()) {
           diag.fixItInsert(packIdentBinding->getLoc(), "each ");
           addEachFixitApplied = true;
         }
