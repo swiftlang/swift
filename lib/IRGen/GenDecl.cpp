@@ -6052,7 +6052,7 @@ IRGenModule::getAddrOfGlobalString(StringRef data, CStringSectionType type,
   }
 
   // Check whether this string already exists.
-  auto &entry = GlobalStrings[type][data];
+  auto &entry = GlobalStrings[sectionName][data];
 
   if (entry.second) {
     // FIXME: Clear unnamed_addr if the global will be relative referenced

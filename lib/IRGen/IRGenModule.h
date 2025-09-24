@@ -1339,8 +1339,8 @@ private:
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
-  llvm::DenseMap<
-      CStringSectionType,
+  // Maps sectionName -> string data -> constant
+  llvm::StringMap<
       llvm::StringMap<std::pair<llvm::GlobalVariable *, llvm::Constant *>>>
       GlobalStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
