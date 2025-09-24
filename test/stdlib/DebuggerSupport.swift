@@ -108,6 +108,28 @@ if #available(SwiftStdlib 6.1, *) {
   }
 }
 
+func _expectStringForPrintObject<T>(_ pointer: UnsafePointer<T>, output: String) {
+    let mangledTypeName = _mangledTypeName(T.self)
+    let printed = _DebuggerSupport.stringForPrintObject(UnsafeRawPointer(pointer), mangledTypeName: mangledTypeName!)
+    expectEqual(printed, output)
+}
+
+StringForPrintObjectTests.test("PointerWithMangledTypeName") {
+  var num = 33
+  _expectStringForPrintObject(&num, output: "33\n")
+
+  var val1 = StructWithMembers()
+  _expectStringForPrintObject(&val1, output: "▿ StructWithMembers\n  - a : 1\n  - b : \"Hello World\"\n")
+  var val2 = StructWithMembersAndDescription()
+  _expectStringForPrintObject(&val2, output: "Hello World\n")
+
+  let obj = ClassWithMembers()
+  let pointer = unsafeBitCast(obj, to: UnsafeRawPointer.self)
+  let mangledTypeName = _mangledTypeName(ClassWithMembers.self)
+  let printed = _DebuggerSupport.stringForPrintObject(pointer, mangledTypeName: mangledTypeName!)
+  expectTrue(printed.hasPrefix("<main.ClassWithMembers: 0x"))
+}
+
 class RefCountedObj {
   var patatino : Int
   init(_ p : Int) {
