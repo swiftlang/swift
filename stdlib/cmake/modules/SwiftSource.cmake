@@ -1079,7 +1079,7 @@ function(_compile_swift_files
   # 6. *.O.sib
   # 7. *.sibgen
   #
-  # Only 1,2,4,3 are built by default. 5,6,7 are utility targets for use by
+  # Only 1,2,3,4 are built by default. 5,6,7 are utility targets for use by
   # engineers and thus even though the targets are generated, the targets are
   # not built by default.
   #
