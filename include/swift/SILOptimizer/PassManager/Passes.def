@@ -163,8 +163,6 @@ MODULE_PASS(MandatoryAllocBoxToStack, "mandatory-allocbox-to-stack",
      "Mandatory stack promotion of box objects")
 MODULE_PASS(AsyncDemotion, "async-demotion",
      "Convert async functions to be synchronous")
-MODULE_PASS(RunUnitTests, "run-unit-tests",
-     "Runs the compiler internal unit tests")
 MODULE_PASS(FunctionUsesDumper, "dump-function-uses",
      "Dump the results of FunctionUses")
 MODULE_PASS(MandatoryPerformanceOptimizations, "mandatory-performance-optimizations",
