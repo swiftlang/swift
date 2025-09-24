@@ -262,3 +262,16 @@ suite.test("InlineArray initialization throws")
     expectEqual(I.count, 0)
   }
 }
+
+private func send(_: borrowing some Sendable & ~Copyable & ~Escapable) {}
+
+private struct NCSendable: ~Copyable, Sendable {}
+
+suite.test("OutputSpan Sendability")
+.require(.stdlib_6_2).code {
+  let buffer = UnsafeMutableBufferPointer<NCSendable>.allocate(capacity: 1)
+  defer { buffer.deallocate() }
+
+  let span = OutputSpan(buffer: buffer, initializedCount: 0)
+  send(span)
+}
