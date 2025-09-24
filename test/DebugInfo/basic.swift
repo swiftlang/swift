@@ -6,7 +6,9 @@
 // RUN:   | %FileCheck %s --check-prefix NDEBUG
 // NDEBUG: source_filename
 // NDEBUG-NOT: !dbg
-// NDEBUG-NOT: DICompileUnit
+// NDEBUG-NOT: DIModule
+// NDEBUG-NOT: DISubroutineType
+// NDEBUG-NOT: DILocalVariable
 // --------------------------------------------------------------------
 // Verify that we don't emit any debug info with -gnone.
 // RUN: %target-swift-frontend %s -emit-ir -gnone -o - \
