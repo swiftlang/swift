@@ -586,6 +586,45 @@ bb6:
   return %12 : $()
 }
 
+// CHECK-LABEL: sil @dont_sink_store_with_nonmaterializable_load_projection
+// CHECK:       alloc_stack
+// CHECK-NOT:   store
+// CHECK: bb1(%8 : $Builtin.Int64, %9 : $Builtin.Int64):
+// CHECK:       store
+// CHECK:       [[INDEXADDR:%.*]] = index_addr
+// CHECK:       load [[INDEXADDR]]
+// CHECK: bb3:
+// CHECK-NOT:   store
+// CHECK:       dealloc_stack
+// CHECK: } // end sil function 'dont_sink_store_with_nonmaterializable_load_projection'
+sil @dont_sink_store_with_nonmaterializable_load_projection : $@convention(method) (InlineArray<3, Int>) -> () {
+bb0(%0 : $InlineArray<3, Int>):
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = struct_extract %0, #InlineArray._storage
+  %5 = alloc_stack $Builtin.FixedArray<3, Int>
+  %6 = vector_base_addr %5
+  br bb1(%1, %1)
+
+bb1(%8 : $Builtin.Int64, %9 : $Builtin.Int64):
+  %10 = builtin "sadd_with_overflow_Int64"(%8, %2, %3) : $(Builtin.Int64, Builtin.Int1)
+  %11 = tuple_extract %10, 0
+  store %4 to %5
+  %13 = builtin "truncOrBitCast_Int64_Word"(%9) : $Builtin.Word
+  %14 = index_addr [stack_protection] %6, %13
+  %15 = load %14
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%1, %1)
+
+bb3:
+  dealloc_stack %5
+  %18 = tuple ()
+  return %18
+}
+
 // CHECK-LABEL: sil @hoist_loads_and_stores_multiple_exits
 // CHECK:   [[V1:%[0-9]+]] = load %0
 // CHECK:   br bb1([[V1]] : $Int32)
