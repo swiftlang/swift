@@ -382,3 +382,49 @@ func copy_generic_fixed<T>(_ t: T)  {
   borrow_generic(t)
   consume_generic(copy t)
 }
+
+@_manualOwnership
+func benchCaptureProp<S : Sequence>(
+  _ s: S, _ f: (S.Element, S.Element) -> S.Element) -> S.Element {
+
+  var it = s.makeIterator() // expected-error {{explicit 'copy' required here}}
+  let initial = it.next()!
+  return
+    IteratorSequence(it) // expected-error {{explicit 'copy' required here}}
+           .reduce(initial, f)
+}
+@_manualOwnership
+func benchCaptureProp_fixed<S : Sequence>(
+  _ s: S, _ f: (S.Element, S.Element) -> S.Element) -> S.Element {
+
+  var it = (copy s).makeIterator()
+  let initial = it.next()!
+  return
+    IteratorSequence(copy it)
+           .reduce(initial, f)
+}
+
+extension FixedWidthInteger {
+    @_manualOwnership
+    func leftRotate(_ distance: Int) -> Self {
+        return (self << distance) | (self >> (Self.bitWidth - distance))
+    }
+
+    @_manualOwnership
+    mutating func rotatedLeft(_ distance: Int) {
+        // FIXME: this doesn't appear to be solvable
+        self = (copy self).leftRotate(distance) // expected-error {{explicit 'copy' required here}}
+    }
+}
+
+struct CollectionOf32BitLittleEndianIntegers<BaseCollection: Collection> where BaseCollection.Element == UInt8 {
+    var baseCollection: BaseCollection
+
+    @_manualOwnership
+    init(_ baseCollection: BaseCollection) {
+        precondition(baseCollection.count % 4 == 0)
+        self.baseCollection = baseCollection // expected-error {{explicit 'copy' required here}}
+    } // expected-error {{explicit 'copy' required here}}
+
+    // FIXME: the above initializer shouldn't have any diagnostics
+}
