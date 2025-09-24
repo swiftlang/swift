@@ -7282,8 +7282,7 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
 
     // If we're relying on ManualOwnership for explicit-copies enforcement,
     // avoid doing address-based emission for loadable types.
-    if (subType.isLoadableOrOpaque(SGF.F) &&
-        SGF.F.getPerfConstraints() == PerformanceConstraints::ManualOwnership) {
+    if (subType.isLoadableOrOpaque(SGF.F) && SGF.B.hasManualOwnershipAttr()) {
       // Interpret this 'load' as a borrow + copy instead.
       LValue lv =
         SGF.emitLValue(li->getSubExpr(), SGFAccessKind::BorrowedObjectRead);
