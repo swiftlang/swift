@@ -61,7 +61,7 @@ do {
 
   let _: KeyPath<K, Bool> = \.[NonSendable()] // ok
   let _: KeyPath<K, Bool> & Sendable = \.[NonSendable()] // expected-warning {{type 'KeyPath<K, Bool>' does not conform to the 'Sendable' protocol}}
-  let _: KeyPath<K, Int> & Sendable = \.[42, NonSendable(data: [-1, 0, 1])] // expected-warning {{type 'ReferenceWritableKeyPath<K, Int>' does not conform to the 'Sendable' protocol}}
+  let _: KeyPath<K, Int> & Sendable = \.[42, NonSendable(data: [-1, 0, 1])] // expected-warning {{type 'KeyPath<K, Int>' does not conform to the 'Sendable' protocol}}
   let _: KeyPath<K, Int> & Sendable = \.[42, -1] // Ok
 
   test(nonSendableKP) // expected-warning {{type 'KeyPath<K, Bool>' does not conform to the 'Sendable' protocol}}
@@ -106,7 +106,7 @@ do {
   // expected-warning@-1 {{converting non-Sendable function value to '@Sendable (V) -> Int' may introduce data races}}
 
   let _: KeyPath<V, Int> & Sendable = \.[42, CondSendable(NonSendable(data: [1, 2, 3]))]
-  // expected-warning@-1 {{type 'ReferenceWritableKeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
+  // expected-warning@-1 {{type 'KeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
   let _: KeyPath<V, Int> & Sendable = \.[42, CondSendable(42)] // Ok
 
   struct Root {
@@ -114,14 +114,14 @@ do {
   }
 
   testSendableKP(v: v, \.[42, CondSendable(NonSendable(data: [1, 2, 3]))])
-  // expected-warning@-1 {{type 'ReferenceWritableKeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
+  // expected-warning@-1 {{type 'KeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
   testSendableFn(v: v, \.[42, CondSendable(NonSendable(data: [1, 2, 3]))])
   // expected-warning@-1 {{converting non-Sendable function value to '@Sendable (V) -> Int' may introduce data races}}
   testSendableKP(v: v, \.[42, CondSendable(42)]) // Ok
 
   let nonSendable = NonSendable()
   testSendableKP(v: v, \.[42, CondSendable(nonSendable)])
-  // expected-warning@-1 {{type 'ReferenceWritableKeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
+  // expected-warning@-1 {{type 'KeyPath<V, Int>' does not conform to the 'Sendable' protocol}}
 
   testSendableFn(v: v, \.[42, CondSendable(nonSendable)])
   // expected-warning@-1 {{converting non-Sendable function value to '@Sendable (V) -> Int' may introduce data races}}
@@ -276,4 +276,15 @@ do {
     _ = s[bar: NonSendable()]
     // expected-warning@-1 {{type 'KeyPath<Foo, Int>' does not conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
   }
+}
+
+public final class TestSetterRef {
+  public internal(set) var v: Int = 0 // expected-note {{setter for property 'v' is not '@usableFromInline' or public}}
+
+  public func test1(_ kp: KeyPath<TestSetterRef, Int> = \.v) {} // Ok
+  public func test2(_ kp: KeyPath<TestSetterRef, Int> = \TestSetterRef.v) {} // Ok
+  public func test3(_ kp: KeyPath<TestSetterRef, Int> & Sendable = \.v) {} // Ok
+
+  public func test_err(_ kp: WritableKeyPath<TestSetterRef, Int> = \.v) {}
+  // expected-warning@-1 {{setter for property 'v' is internal and should not be referenced from a default argument value}}
 }
