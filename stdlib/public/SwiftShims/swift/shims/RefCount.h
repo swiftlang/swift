@@ -1010,6 +1010,7 @@ class RefCounts {
   // First slow path of doDecrement, where the object may need to be deinited.
   // Side table is handled in the second slow path, doDecrementSideTable().
   template <PerformDeinit performDeinit>
+  SWIFT_REFCOUNT_CC
   bool doDecrementSlow(RefCountBits oldbits, uint32_t dec) {
     RefCountBits newbits;
     

@@ -80,30 +80,12 @@ _retainRelease_slowpath_mask:
 .endmacro
 
 .macro CALL_SLOWPATH func
-// Push a stack frame.
-  CONDITIONAL PTRAUTH, \
-    pacibsp
-  stp   fp, lr, [sp, #-16]!
-  mov   fp, sp
-
-  SAVE_REGS
-
 // x0 points to the refcount field. Adjust it back to point to the object
 // itself.
   sub   x0, x0, #8
 
-// Call the slow path.
-  bl \func
-
-  LOAD_REGS
-
-// Pop the stack frame and return.
-  mov   sp, fp
-  ldp   fp, lr, [sp], #16
-  CONDITIONAL PTRAUTH, \
-    retab
-  CONDITIONAL !PTRAUTH, \
-    ret
+// Tail call the slow path.
+  b \func
 .endmacro
 
 
