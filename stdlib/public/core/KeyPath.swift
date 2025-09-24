@@ -24,6 +24,11 @@ internal func _abstract(
 #endif
 }
 
+@_alignment(16)
+struct _SixteenAligned {
+  let x: UInt8
+}
+
 // MARK: Type-erased abstract base classes
 
 // NOTE: older runtimes had Swift.AnyKeyPath as the ObjC name.
@@ -179,7 +184,7 @@ public class AnyKeyPath: _AppendKeyPath {
       // above. The result of this tail element should just be the 16 byte
       // pointer aligned requirement and no extra bytes allocated.
       0._builtinWordValue,
-      SIMD16<Int8>.self,
+      _SixteenAligned.self,
 
       (bytesWithoutHeader/4)._builtinWordValue,
       Int32.self
