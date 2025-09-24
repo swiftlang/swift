@@ -39,16 +39,16 @@ public struct NonCopyable: ~Copyable { }
 // 'MF' constant as a separator that precedes each field descriptor.
 
 // NEW: @"$s4test8CC_TestsCMF" =
-// NEW-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOyxG.3"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOyxG.{{[0-9]+}}"
 // NEW-SAME: @"symbolic _____yq_G 4test21ConditionallyCopyableOAARi_zrlE"
-// NEW-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOyAA03NonC0VG.4"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOyAA03NonC0VG.{{[0-9]+}}"
 // NEW-SAME: @"symbolic _____ySSG 4test21ConditionallyCopyableOAARi_zrlE"
 
 // OLD: @"$s4test8CC_TestsCMF" =
-// OLD-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOyxG.3"
-// OLD-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOyq_G.4"
-// OLD-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOyAA03NonC0VG.5"
-// OLD-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOySSG.6"
+// OLD-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOyxG.{{[0-9]+}}"
+// OLD-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOyq_G.{{[0-9]+}}"
+// OLD-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOyAA03NonC0VG.{{[0-9]+}}"
+// OLD-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOySSG.{{[0-9]+}}"
 public class CC_Tests<NCG: ~Copyable, T> {
   var ccNCG: ConditionallyCopyable<NCG> = .none
   var ccT: ConditionallyCopyable<T> = .none
@@ -62,16 +62,16 @@ public class CC_Tests<NCG: ~Copyable, T> {
 /// fields until a future runtime says they're safe to reflect.
 
 // NEW: @"$s4test8NC_TestsCMF" =
-// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyxG.5"
-// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyq_G.6"
-// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyAA03NonC0VG.7"
-// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOySSG.8"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyxG.{{[0-9]+}}"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyq_G.{{[0-9]+}}"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyAA03NonC0VG.{{[0-9]+}}"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOySSG.{{[0-9]+}}"
 
 // OLD: @"$s4test8NC_TestsCMF" =
-// OLD-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyxG.7"
-// OLD-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyq_G.8"
-// OLD-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyAA03NonC0VG.9"
-// OLD-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOySSG.10"
+// OLD-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyxG.{{[0-9]+}}"
+// OLD-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyq_G.{{[0-9]+}}"
+// OLD-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOyAA03NonC0VG.{{[0-9]+}}"
+// OLD-SAME: @"get_type_metadata Ri_zr0_l4test13NeverCopyableOySSG.{{[0-9]+}}"
 public class NC_Tests<NCG: ~Copyable, T> {
   var ncNCG: NeverCopyable<NCG> = .none
   var ncT: NeverCopyable<T> = .none
@@ -83,7 +83,7 @@ public class NC_Tests<NCG: ~Copyable, T> {
 // NEW: @"$s4test17StdlibTypes_TestsCMF" =
 // NEW-SAME: @"symbolic xSg"
 // NEW-SAME: @"symbolic q_Sg"
-// NEW-SAME: @"get_type_metadata Ri_zr0_l4test11NonCopyableVSg.9"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test11NonCopyableVSg.{{[0-9]+}}"
 // NEW-SAME: @"symbolic SSSg"
 // NEW-SAME: @"symbolic SPyxG"
 // NEW-SAME: @"symbolic SPyq_G"
@@ -93,7 +93,7 @@ public class NC_Tests<NCG: ~Copyable, T> {
 // OLD: @"$s4test17StdlibTypes_TestsCMF" =
 // OLD-SAME: @"symbolic xSg"
 // OLD-SAME: @"symbolic q_Sg"
-// OLD-SAME: @"get_type_metadata Ri_zr0_l4test11NonCopyableVSg.11"
+// OLD-SAME: @"get_type_metadata Ri_zr0_l4test11NonCopyableVSg.{{[0-9]+}}"
 // OLD-SAME: @"symbolic SSSg"
 // OLD-SAME: @"symbolic SPyxG"
 // OLD-SAME: @"symbolic SPyq_G"
@@ -115,13 +115,13 @@ public class StdlibTypes_Tests<NCG: ~Copyable, T> {
 // NEW: @"$s4test19PlainlyStored_TestsCMF" =
 // NEW-SAME: @"symbolic x"
 // NEW-SAME: @"symbolic q_"
-// NEW-SAME: @"get_type_metadata Ri_zr0_l4test11NonCopyableV.10"
+// NEW-SAME: @"get_type_metadata Ri_zr0_l4test11NonCopyableV.{{[0-9]+}}"
 // NEW-SAME: @"symbolic SS"
 
 // OLD: @"$s4test19PlainlyStored_TestsCMF" =
 // OLD-SAME: @"symbolic x"
 // OLD-SAME: @"symbolic q_"
-// OLD-SAME: @"get_type_metadata Ri_zr0_l4test11NonCopyableV.12"
+// OLD-SAME: @"get_type_metadata Ri_zr0_l4test11NonCopyableV.{{[0-9]+}}"
 // OLD-SAME: @"symbolic SS"
 public class PlainlyStored_Tests<NCG: ~Copyable, T> {
   var ncg: NCG
