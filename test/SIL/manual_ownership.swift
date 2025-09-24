@@ -64,6 +64,26 @@ public func basic_return3() -> Triangle {
 }
 
 @_manualOwnership
+func return_borrowed(_ t: borrowing Triangle) -> Triangle {
+  return t // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+}
+@_manualOwnership
+func return_borrowed_fixed(_ t: borrowing Triangle) -> Triangle {
+  return copy t
+}
+
+// FIXME: copy propagation isn't able to simplify this. No copy should be required.
+@_manualOwnership
+func return_consumingParam(_ t: consuming Triangle) -> Triangle { // expected-error {{accessing 't' produces a copy of it}}
+  return t
+}
+
+@_manualOwnership
+func return_owned(_ t: __owned Triangle) -> Triangle {
+  return t
+}
+
+@_manualOwnership
 func reassign_with_lets() -> Triangle {
   let x = Triangle()
   let y = x

@@ -26,3 +26,49 @@ class TriangleClass {
 func basic_access_of_loadable(_ t: TriangleClass) -> ShapeClass {
   return copy t.shape
 }
+
+// CHECK-LABEL: sil {{.*}} [manual_ownership] [ossa] @return_borrowed
+// CHECK:       bb0(%0 : @guaranteed $TriangleClass):
+// CHECK-NEXT:     debug_value %0
+// CHECK-NEXT:     [[IMPL_COPY:%.*]] = copy_value %0
+// CHECK-NEXT:     return [[IMPL_COPY]]
+// CHECK-NEXT:  } // end sil function 'return_borrowed'
+@_manualOwnership
+@_silgen_name("return_borrowed")
+func return_borrowed(_ t: borrowing TriangleClass) -> TriangleClass {
+  return t
+}
+
+// CHECK-LABEL: sil {{.*}} [manual_ownership] [ossa] @return_consumingParam
+// CHECK:       bb0(%0 : @_eagerMove @owned $TriangleClass):
+// CHECK-NEXT:     alloc_box ${ var TriangleClass }, var, name "t"
+// CHECK-NEXT:     begin_borrow [var_decl]
+// CHECK-NEXT:     [[ADDR:%.*]] = project_box {{.*}}, 0
+// CHECK-NEXT:     store %0 to [init] [[ADDR]]
+// CHECK-NEXT:     [[ACCESS:%.*]] = begin_access [read] [unknown] [[ADDR]]
+// CHECK-NEXT:     [[IMPL_COPY:%.*]] = load [copy] [[ACCESS]]
+// CHECK-NEXT:     end_access [[ACCESS]]
+// CHECK-NEXT:     end_borrow
+// CHECK-NEXT:     destroy_value
+// CHECK-NEXT:     return [[IMPL_COPY]]
+// CHECK-NEXT:  } // end sil function 'return_consumingParam'
+@_manualOwnership
+@_silgen_name("return_consumingParam")
+func return_consumingParam(_ t: consuming TriangleClass) -> TriangleClass {
+  return t
+}
+
+// CHECK-LABEL: sil {{.*}} [manual_ownership] [ossa] @return_owned
+// CHECK:       bb0(%0 : @owned $TriangleClass):
+// CHECK-NEXT:     debug_value %0
+// CHECK-NEXT:     [[BORROW:%.*]] = begin_borrow %0
+// CHECK-NEXT:     [[IMPL_COPY:%.*]] = copy_value [[BORROW]]
+// CHECK-NEXT:     end_borrow [[BORROW]]
+// CHECK-NEXT:     destroy_value %0
+// CHECK-NEXT:     return [[IMPL_COPY]]
+// CHECK-NEXT:  } // end sil function 'return_owned'
+@_manualOwnership
+@_silgen_name("return_owned")
+func return_owned(_ t: __owned TriangleClass) -> TriangleClass {
+  return t
+}
