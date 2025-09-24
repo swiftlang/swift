@@ -728,15 +728,6 @@ extension String.Index {
   }
 }
 
-// Breadcrumb-aware acceleration
-extension _StringGuts {
-  @inline(__always)
-  fileprivate func _useBreadcrumbs(forEncodedOffset offset: Int) -> Bool {
-    return offset == count && hasOneCrumb ||
-      offset >= _StringBreadcrumbs.breadcrumbStride && hasBreadcrumbs
-  }
-}
-
 extension String.UTF16View {
   
 #if SWIFT_STDLIB_ENABLE_VECTOR_TYPES
@@ -864,16 +855,14 @@ extension String.UTF16View {
     if idx == startIndex { return 0 }
 
     let idx = _utf16AlignNativeIndex(idx)
-
-    guard _guts._useBreadcrumbs(forEncodedOffset: idx._encodedOffset) else {
-      return _utf16Distance(from: startIndex, to: idx)
-    }
     
     // Simple and common: endIndex aka `length`.
     if idx == endIndex {
-      let result = _guts.getUTF16CountFromBreadcrumbs()
-      _internalInvariant(result == _utf16Distance(from: startIndex, to: idx))
-      return result
+      return _guts.getUTF16Count()
+    }
+
+    guard _guts._useBreadcrumbs(forEncodedOffset: idx._encodedOffset) else {
+      return _utf16Distance(from: startIndex, to: idx)
     }
 
     let breadcrumbs = unsafe _guts.loadUnmanagedBreadcrumbs()
@@ -908,17 +897,21 @@ extension String.UTF16View {
         _encodedOffset: offset
       )._scalarAligned._encodingIndependent
     }
-
-    guard _guts._useBreadcrumbs(forEncodedOffset: offset) else {
-      return _index(startIndex, offsetBy: offset)._knownUTF8
+    
+    let useCrumbs = _guts._useBreadcrumbs(forEncodedOffset: offset)
+    
+    if _guts.hasOneCrumb || useCrumbs {
+      // Simple and common: endIndex aka `length`.
+      let utf16Count = _guts.getUTF16Count()
+      if offset == utf16Count {
+        _internalInvariant(endIndex == _index(
+          startIndex, offsetBy: offset)._knownUTF8)
+        return endIndex
+      }
     }
 
-    // Simple and common: endIndex aka `length`.
-    let utf16Count = _guts.getUTF16CountFromBreadcrumbs()
-    if offset == utf16Count {
-      _internalInvariant(endIndex == _index(
-        startIndex, offsetBy: offset)._knownUTF8)
-      return endIndex
+    guard useCrumbs else {
+      return _index(startIndex, offsetBy: offset)._knownUTF8
     }
 
     let breadcrumbs = unsafe _guts.loadUnmanagedBreadcrumbs()

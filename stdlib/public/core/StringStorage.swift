@@ -873,15 +873,31 @@ extension _StringGuts {
     return unsafe createAndLoadBreadcrumbs_time_here_is_String_to_NSString_bridging_overhead(mutPtr)
   }
   
+  @inline(__always)
+  internal func _useBreadcrumbs(forEncodedOffset offset: Int) -> Bool {
+    return offset >= _StringBreadcrumbs.breadcrumbStride && hasBreadcrumbs
+  }
+  
   @_effects(releasenone)
-  internal func getUTF16CountFromBreadcrumbs() -> Int {
-    guard hasOneCrumb else {
-      return unsafe loadUnmanagedBreadcrumbs()._withUnsafeGuaranteedRef {
-        $0.utf16Length
+  internal func getUTF16Count() -> Int {
+    if hasOneCrumb {
+      _internalInvariant(hasNativeStorage)
+      return _object.withNativeStorage { $0._oneCrumb }
+    } else {
+      let result:Int
+      if _useBreadcrumbs(forEncodedOffset: endIndex._encodedOffset) {
+        result = unsafe loadUnmanagedBreadcrumbs()._withUnsafeGuaranteedRef {
+          $0.utf16Length
+        }
+        _internalInvariant(result == String.UTF16View(self)._utf16Distance(
+          from: startIndex, to: endIndex))
+      } else {
+        result = String.UTF16View(self)._utf16Distance(
+          from: startIndex, to: endIndex
+        )
       }
+      return result
     }
-    _internalInvariant(hasNativeStorage)
-    return _object.withNativeStorage { $0._oneCrumb }
   }
 }
 
