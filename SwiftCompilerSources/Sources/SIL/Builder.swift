@@ -190,11 +190,21 @@ public struct Builder {
     }
   }
 
-  public func createIntegerLiteral(_ value: Int, type: Type) -> IntegerLiteralInst {
-    let literal = bridged.createIntegerLiteral(type.bridged, value)
+  private func createIntegerLiteral(_ value: Int, type: Type, treatAsSigned: Bool) -> IntegerLiteralInst {
+    let literal = bridged.createIntegerLiteral(type.bridged, value, treatAsSigned)
     return notifyNew(literal.getAs(IntegerLiteralInst.self))
   }
-    
+
+  public func createIntegerLiteral(_ value: Int, type: Type) -> IntegerLiteralInst {
+    createIntegerLiteral(value, type: type, treatAsSigned: true)
+  }
+
+  /// Creates a `Builtin.Int1` integer literal instruction with the given value.
+  public func createBoolLiteral(_ value: Bool) -> IntegerLiteralInst {
+    let boolType = notificationHandler.getBuiltinIntegerType(1).type
+    return createIntegerLiteral(value ? 1 : 0, type: boolType, treatAsSigned: false)
+  }
+
   public func createAllocRef(_ type: Type, isObjC: Bool = false, canAllocOnStack: Bool = false, isBare: Bool = false,
                              tailAllocatedTypes: TypeArray, tailAllocatedCounts: [Value]) -> AllocRefInst {
     return tailAllocatedCounts.withBridgedValues { countsRef in
