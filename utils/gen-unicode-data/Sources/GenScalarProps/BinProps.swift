@@ -78,6 +78,7 @@ internal struct BinProps: OptionSet {
   static var isWhitespace                : Self { Self(1 &<< 45) }
   static var isXIDContinue               : Self { Self(1 &<< 46) }
   static var isXIDStart                  : Self { Self(1 &<< 47) }
+  static var isNFDQuickCheck             : Self { Self(1 &<< 48) }
 }
 
 extension BinProps: Hashable {}
@@ -117,6 +118,7 @@ let binPropMappings: [String: BinProps] = [
   "Logical_Order_Exception": .isLogicalOrderException,
   "Lowercase": .isLowercase,
   "Math": .isMath,
+  "NFD_QC": .isNFDQuickCheck,
   "Noncharacter_Code_Point": .isNoncharacterCodePoint,
   "Other_Alphabetic": .isAlphabetic,
   "Other_Default_Ignorable_Code_Point": .isDefaultIgnorableCodePoint,
@@ -139,6 +141,10 @@ let binPropMappings: [String: BinProps] = [
   "White_Space": .isWhitespace,
   "XID_Continue": .isXIDContinue,
   "XID_Start": .isXIDStart
+]
+
+let invertedBinProps: BinProps = [
+  .isNFDQuickCheck,
 ]
 
 func getBinaryProperties(
@@ -238,6 +244,10 @@ func generateBinaryProps(for platform: String, into result: inout String) {
   getBinaryProperties(from: normalization, into: &binProps)
   getBinaryProperties(from: emoji, into: &binProps)
   getBinaryProperties(from: propList, into: &binProps)
+  
+  for key in binProps.keys {
+    binProps[key]!.formSymmetricDifference(invertedBinProps)
+  }
   
   // This loop inserts the ranges of scalars who have no binary properties to
   // fill in the holes for binary search.
