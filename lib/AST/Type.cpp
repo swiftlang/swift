@@ -2155,7 +2155,8 @@ GenericSignature TypeAliasType::getGenericSignature() const {
   return typealias->getGenericSignature();
 }
 
-SubstitutionMap TypeAliasType::getSubstitutionMap() const {
+SubstitutionMap
+TypeAliasType::getSubstitutionMap(bool wantContextualType) const {
   auto genericSig = typealias->getGenericSignature();
   if (!genericSig)
     return SubstitutionMap();
@@ -2164,8 +2165,14 @@ SubstitutionMap TypeAliasType::getSubstitutionMap() const {
   DeclContext *dc = typealias->getDeclContext();
 
   if (dc->isLocalContext()) {
-    if (auto parentSig = dc->getGenericSignatureOfContext())
-      parentSubMap = parentSig->getIdentitySubstitutionMap();
+    if (auto parentSig = dc->getGenericSignatureOfContext()) {
+      if (wantContextualType) {
+        parentSubMap =
+            parentSig.getGenericEnvironment()->getForwardingSubstitutionMap();
+      } else {
+        parentSubMap = parentSig->getIdentitySubstitutionMap();
+      }
+    }
   } else if (auto parent = getParent()) {
     parentSubMap = parent->getContextSubstitutionMap(dc);
   }

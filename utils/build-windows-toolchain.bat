@@ -72,7 +72,7 @@ if not "%SKIP_PACKAGING%"=="1" set "SkipPackagingArg= "
 
 :: Build the -WindowsSDKArchitectures argument, if any, otherwise build all the SDKs.
 set "WindowsSDKArchitecturesArg= "
-if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArchitecturesArg=-WindowsSDKArchitectures %WINDOWS_SDKS%"
+if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArchitecturesArg=-Windows -WindowsSDKArchitectures %WINDOWS_SDKS%"
 
 :: Build the -HostArchName argument, if any.
 set "HostArchNameArg="
