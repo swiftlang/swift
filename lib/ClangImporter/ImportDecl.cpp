@@ -3271,7 +3271,7 @@ namespace {
       // building with libstdc++, i.e. on most Linux distros.
       if (decl->isInStdNamespace() && decl->getIdentifier() &&
           (decl->getName() == "conditional" || decl->getName() == "__or_" ||
-           decl->getName() == "_Expr"))
+            decl->getName() == "_Expr" || decl->getName() == "__val_expr"))
         return nullptr;
 
       // `decl->getDefinition()` can return nullptr before the call to sema and
