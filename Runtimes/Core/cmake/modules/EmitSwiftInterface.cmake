@@ -26,17 +26,11 @@ function(emit_swift_interface target)
     file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule")
   endif()
   target_compile_options(${target} PRIVATE
-    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftCore_MODULE_TRIPLE}.swiftmodule>")
-  if(SwiftCore_VARIANT_MODULE_TRIPLE)
-    target_compile_options(${target} PRIVATE
-      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftmodule>")
-  endif()
-
-  # Swift source info file.
-  target_compile_options(${target} PRIVATE
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftCore_MODULE_TRIPLE}.swiftmodule>"
     "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-source-info-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftCore_MODULE_TRIPLE}.swiftsourceinfo>")
   if(SwiftCore_VARIANT_MODULE_TRIPLE)
     target_compile_options(${target} PRIVATE
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftmodule>"
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-source-info-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftsourceinfo>")
   endif()
 
