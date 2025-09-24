@@ -172,9 +172,8 @@ public func basic_loop_trivial_values_fixed(_ t: Triangle, _ xs: [Triangle]) {
 // FIXME: the only reason for so many copies below is because
 // `Triangle.nontrivial` only exposes get/set rather than read/modify by default
 //
-// We should figure out when the coroutine accessors are generated, and ensure
-// that when it is available, it is used without copying the result, rather than
-// calling the get/set
+// There's complexity in auto-generating a read accessor for classes, but if it's provided
+// we could then allow someone to elide the copy with a `borrow x` expression.
 
 @_manualOwnership
 public func basic_loop_nontrivial_values(_ t: Triangle, _ xs: [Triangle]) {
@@ -185,14 +184,35 @@ public func basic_loop_nontrivial_values(_ t: Triangle, _ xs: [Triangle]) {
   t.nontrivial.a = p // expected-error {{accessing 't.nontrivial' produces a copy of it}}
 }
 
-// FIXME: there should be no copies required in the below, other than what's already written.
 @_manualOwnership
 public func basic_loop_nontrivial_values_fixed(_ t: Triangle, _ xs: [Triangle]) {
-  var p: Pair = (copy t.nontrivial).a  // expected-error {{accessing 't.nontrivial' produces a copy of it}}
+  var p: Pair = (copy t.nontrivial).a
   for x in copy xs {
-    p = p.midpoint((copy x.nontrivial).a) // expected-error {{accessing 'x.nontrivial' produces a copy of it}}
+    p = p.midpoint((copy x.nontrivial).a)
   }
-  (copy t.nontrivial).a = p // expected-error {{accessing 't.nontrivial' produces a copy of it}}
+  (copy t.nontrivial).a = p
+}
+
+@_manualOwnership
+public func basic_loop_nontrivial_values_reduced_copies(_ t: Triangle, _ xs: [Triangle]) {
+  // FIXME: confusing variable names are chosen
+  let nt = t.nontrivial // expected-error {{accessing 'nt' produces a copy of it}}
+  var p: Pair = nt.a
+  for x in copy xs {
+    let xnt = x.nontrivial // expected-error {{accessing 'xnt' produces a copy of it}}
+    p = p.midpoint(xnt.a)
+  }
+  nt.a = p
+}
+@_manualOwnership
+public func basic_loop_nontrivial_values_reduced_copies_fixed(_ t: Triangle, _ xs: [Triangle]) {
+  let nt = copy t.nontrivial
+  var p: Pair = nt.a
+  for x in copy xs {
+    let xnt = copy x.nontrivial
+    p = p.midpoint(xnt.a)
+  }
+  nt.a = p
 }
 
 
