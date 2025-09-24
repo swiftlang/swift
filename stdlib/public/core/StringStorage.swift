@@ -874,8 +874,12 @@ extension _StringGuts {
   }
   
   @_effects(releasenone)
-  internal func loadOneCrumb() -> Int {
-    _internalInvariant(hasOneCrumb)
+  internal func getUTF16CountFromBreadcrumbs() -> Int {
+    guard hasOneCrumb else {
+      return unsafe loadUnmanagedBreadcrumbs()._withUnsafeGuaranteedRef {
+        $0.utf16Length
+      }
+    }
     _internalInvariant(hasNativeStorage)
     return _object.withNativeStorage { $0._oneCrumb }
   }

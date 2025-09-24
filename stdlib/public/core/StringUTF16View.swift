@@ -869,20 +869,14 @@ extension String.UTF16View {
       return _utf16Distance(from: startIndex, to: idx)
     }
     
-    // Some strings have a single breadcrumb for the most common case
-    if idx == endIndex && _guts.hasOneCrumb {
-      let result = _guts.loadOneCrumb()
+    // Simple and common: endIndex aka `length`.
+    if idx == endIndex {
+      let result = _guts.getUTF16CountFromBreadcrumbs()
       _internalInvariant(result == _utf16Distance(from: startIndex, to: idx))
       return result
     }
 
     let breadcrumbs = unsafe _guts.loadUnmanagedBreadcrumbs()
-
-    // Simple and common: endIndex aka `length`.
-    if idx == endIndex {
-      return unsafe breadcrumbs._withUnsafeGuaranteedRef { $0.utf16Length }
-    }
-
     return unsafe breadcrumbs._withUnsafeGuaranteedRef { crumbs in
       // Otherwise, find the nearest lower-bound breadcrumb and count from there
       // FIXME: Starting from the upper-bound crumb when that is closer would
@@ -920,18 +914,12 @@ extension String.UTF16View {
     }
 
     // Simple and common: endIndex aka `length`.
-    let utf16Count: Int
-    if _guts.hasOneCrumb {
-      utf16Count = _guts.loadOneCrumb()
-      if offset == utf16Count {
-        _internalInvariant(endIndex == _index(
-          startIndex, offsetBy: offset)._knownUTF8)
-      }
-    } else {
-      let breadcrumbs = unsafe _guts.loadUnmanagedBreadcrumbs()
-      utf16Count = unsafe breadcrumbs._withUnsafeGuaranteedRef { $0.utf16Length }
+    let utf16Count = _guts.getUTF16CountFromBreadcrumbs()
+    if offset == utf16Count {
+      _internalInvariant(endIndex == _index(
+        startIndex, offsetBy: offset)._knownUTF8)
+      return endIndex
     }
-    if offset == utf16Count { return endIndex }
 
     let breadcrumbs = unsafe _guts.loadUnmanagedBreadcrumbs()
     // Otherwise, find the nearest lower-bound breadcrumb and advance that
