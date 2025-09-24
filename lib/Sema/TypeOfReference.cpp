@@ -261,16 +261,30 @@ public:
   }
 
   Type transformTypeAliasType(TypeAliasType *aliasTy) {
+    auto *TAD = aliasTy->getDecl();
+
+    // For a non-generic typealias, we can simply recurse into the underlying
+    // type. The constraint system doesn't properly handle opened types in
+    // the underlying type of a typealias (e.g TypeWalker won't visit them),
+    // so we don't preserve the sugar.
+    if (!TAD->getGenericSignature())
+      return transform(aliasTy->getSinglyDesugaredType());
+
+    // Otherwise we have a generic typealias, or typealias in a generic context,
+    // and need to open any requirements introduced. Then we need to
+    // re-substitute any opened types into the underlying type. Like the
+    // non-generic codepath we also don't want to preserve sugar.
     SmallVector<Type, 4> genericArgs;
     for (auto arg : aliasTy->getDirectGenericArgs())
       genericArgs.push_back(transform(arg));
 
-    auto substTy = TypeAliasType::get(
-        aliasTy->getDecl(), transform(aliasTy->getParent()), genericArgs,
-        transform(aliasTy->getSinglyDesugaredType()));
-    openGenericTypeRequirements(substTy->getDecl(),
-                                substTy->getSubstitutionMap());
-    return substTy;
+    auto parentTy = transform(aliasTy->getParent());
+    auto subMap = TypeAliasType::get(TAD, parentTy, genericArgs,
+                                     aliasTy->getSinglyDesugaredType())
+                      ->getSubstitutionMap(/*wantContextualType*/ true);
+
+    openGenericTypeRequirements(TAD, subMap);
+    return transform(TAD->getUnderlyingType().subst(subMap));
   }
 
   Type transformErrorType(ErrorType *errTy) {
