@@ -129,7 +129,10 @@
 // Float16 is not currently supported on Intel x86_64 macOS,
 // (including macCatalyst on x86_64) but this symbol somehow got
 // exported there.
-// This preserves the export.
+// This preserves that export.
+
+// Note: Other platforms that don't support Float16 should
+// NOT export this.
 @available(SwiftStdlib 5.3, *)
 @_silgen_name("swift_float16ToString")
 public func _float16ToStringImpl(
@@ -439,7 +442,7 @@ internal func _Float16ToASCII(
 // Support Legacy ABI on top of new implementation
 @_silgen_name("swift_float32ToString")
 @usableFromInline
-func _float32ToStringImpl(
+private func _float32ToStringImpl(
   _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Float32,
@@ -692,7 +695,7 @@ internal func _Float32ToASCII(
 // Support Legacy ABI on top of new implementation
 @_silgen_name("swift_float64ToString")
 @usableFromInline
-func _float64ToStringImpl(
+private func _float64ToStringImpl(
   _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Float64,
@@ -1200,7 +1203,7 @@ internal func _Float64ToASCII(
 // Support Legacy ABI on top of new implementation
 @_silgen_name("swift_float80ToString")
 @usableFromInline
-func _float80ToStringImpl(
+private func _float80ToStringImpl(
   _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Float80,
