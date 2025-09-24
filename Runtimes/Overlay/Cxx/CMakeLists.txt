@@ -31,7 +31,6 @@ target_compile_options(swiftCxx PRIVATE
   # This module should not pull in the C++ standard library, so we disable it
   # explicitly.  For functionality that depends on the C++ stdlib, use C++
   # stdlib overlay (`swiftstd` module).
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-swift-version 5>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -nostdinc++>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AllowUnsafeAttribute>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BuiltinModule>"
