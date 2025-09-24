@@ -1001,8 +1001,20 @@ private extension LoadInst {
   }
   
   func overlaps(accessPath: AccessPath) -> Bool {
-    // Don't use `AccessPath.mayOverlap`. We only want definite overlap.
-    return accessPath.isEqualOrContains(self.operand.value.accessPath) || self.operand.value.accessPath.isEqualOrContains(accessPath)
+    if let path = accessPath.getProjection(to: self.operand.value.accessPath),
+       // If the accessPath is wider than load, it needs to be materializable.
+       // Otherwise we won't be able to project it.
+       path.isMaterializable {
+      // The load is narrower than the access path.
+      return true
+    }
+    
+    if self.operand.value.accessPath.isEqualOrContains(accessPath) {
+      // The load is wider than the access path.
+      return true
+    }
+    
+    return false
   }
 }
 
