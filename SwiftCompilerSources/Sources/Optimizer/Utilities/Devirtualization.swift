@@ -288,7 +288,7 @@ private func devirtualize(builtinDestroyArray: BuiltinInst, _ context: some Muta
   let preheaderBuilder = Builder(atEndOf: preheaderBlock, location: builtinDestroyArray.location, context)
   let zero = preheaderBuilder.createIntegerLiteral(0, type: indexType)
   let one = preheaderBuilder.createIntegerLiteral(1, type: indexType)
-  let falseValue = preheaderBuilder.createIntegerLiteral(0, type: boolType)
+  let falseValue = preheaderBuilder.createBoolLiteral(false);
   let baseAddress = preheaderBuilder.createPointerToAddress(pointer: basePointer,
                                                             addressType: elementType.addressType,
                                                             isStrict: true, isInvariant: false)
