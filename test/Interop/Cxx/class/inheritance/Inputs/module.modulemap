@@ -16,8 +16,8 @@ module ReferenceToDerived {
   requires cplusplus
 }
 
-module SubTypes {
-  header "sub-types.h"
+module NestedTypes {
+  header "nested-types.h"
 }
 
 module Subscripts {

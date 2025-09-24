@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=SubTypes -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=NestedTypes -I %S/Inputs -source-filename=x -cxx-interoperability-mode=default | %FileCheck %s
 
 // CHECK:      struct Base {
 // CHECK-NEXT:   init()
@@ -39,11 +39,29 @@
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 
-// CHECK-NEXT: struct Derived {
+// CHECK:      struct Derived {
 // CHECK-NEXT:   init()
-// CHECK-NEXT:   typealias EnumClass = Base.EnumClass.Type
-// CHECK-NEXT:   typealias Enum = Base.Enum.Type
-// CHECK-NEXT:   typealias Struct = Base.Struct.Type
-// CHECK-NEXT:   typealias Parent = Base.Parent.Type
-// CHECK-NEXT:   typealias Union = Base.Union.Type
+// CHECK-NEXT:   typealias EnumClass = Base.EnumClass
+// CHECK-NEXT:   typealias Enum = Base.Enum
+// CHECK-NEXT:   typealias Struct = Base.Struct
+// CHECK-NEXT:   typealias Parent = Base.Parent
+// CHECK-NEXT:   typealias Union = Base.Union
+// CHECK-NEXT: }
+
+// CHECK:      struct Derived1 {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   typealias EnumClass = Base.EnumClass
+// CHECK-NEXT:   typealias Enum = Base.Enum
+// CHECK-NEXT:   typealias Struct = Base.Struct
+// CHECK-NEXT:   typealias Parent = Base.Parent
+// CHECK-NEXT:   typealias Union = Base.Union
+// CHECK-NEXT: }
+
+// CHECK:      struct Derived2 {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   typealias EnumClass = Base.EnumClass
+// CHECK-NEXT:   typealias Enum = Base.Enum
+// CHECK-NEXT:   typealias Struct = Base.Struct
+// CHECK-NEXT:   typealias Parent = Base.Parent
+// CHECK-NEXT:   typealias Union = Base.Union
 // CHECK-NEXT: }
