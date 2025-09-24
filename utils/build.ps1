@@ -4073,7 +4073,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts"
   $KnownPlatforms.Values | Where-Object {
     switch ($_.OS) {
-      Windows { $true }
+      Windows { $Windows }
       Android { $Android }
       default { $false }
     }
