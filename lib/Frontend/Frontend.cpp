@@ -281,8 +281,6 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.SerializeDebugInfoSIL = true;
   }
 
-  serializationOpts.IsOSSA = true;
-
   serializationOpts.SkipNonExportableDecls =
       getLangOptions().SkipNonExportableDecls;
 

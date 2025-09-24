@@ -313,8 +313,6 @@ std::optional<std::string> SerializedModuleLoaderBase::invalidModuleReason(seria
     return "compiled with a different version of the compiler";
   case Status::ChannelIncompatible:
     return "compiled for a different distribution channel";
-  case Status::NotInOSSA:
-    return "module was not built with OSSA";
   case Status::MissingDependency:
     return "missing dependency";
   case Status::MissingUnderlyingModule:
@@ -1149,11 +1147,6 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_too_old, ModuleName,
                        moduleBufferID);
     break;
-  case serialization::Status::NotInOSSA:
-    Ctx.Diags.diagnose(diagLoc,
-                       diag::serialization_non_ossa_module_incompatible,
-                       ModuleName);
-    break;
   case serialization::Status::RevisionIncompatible:
     Ctx.Diags.diagnose(diagLoc, diag::serialization_module_incompatible_revision,
                        loadInfo.problematicRevision, ModuleName, moduleBufferID);
@@ -1248,7 +1241,6 @@ void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
   case serialization::Status::Valid:
   case serialization::Status::FormatTooNew:
   case serialization::Status::FormatTooOld:
-  case serialization::Status::NotInOSSA:
   case serialization::Status::RevisionIncompatible:
   case serialization::Status::ChannelIncompatible:
   case serialization::Status::Malformed:

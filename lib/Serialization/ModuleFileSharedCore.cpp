@@ -483,12 +483,6 @@ static ValidationInfo validateControlBlock(
       }
       break;
     }
-    case control_block::IS_OSSA: {
-      auto isModuleInOSSA = scratch[0];
-      if (!isModuleInOSSA)
-        result.status = Status::NotInOSSA;
-      break;
-    }
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.
@@ -592,7 +586,6 @@ std::string serialization::StatusToString(Status S) {
   case Status::FormatTooNew: return "FormatTooNew";
   case Status::RevisionIncompatible: return "RevisionIncompatible";
   case Status::ChannelIncompatible: return "ChannelIncompatible";
-  case Status::NotInOSSA: return "NotInOSSA";
   case Status::MissingDependency: return "MissingDependency";
   case Status::MissingUnderlyingModule: return "MissingUnderlyingModule";
   case Status::CircularDependency: return "CircularDependency";

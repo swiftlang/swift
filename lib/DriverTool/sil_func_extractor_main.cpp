@@ -361,7 +361,6 @@ int sil_func_extractor_main(ArrayRef<const char *> argv, void *MainAddr) {
     serializationOpts.OutputPath = OutputFile;
     serializationOpts.SerializeAllSIL = true;
     serializationOpts.IsSIB = true;
-    serializationOpts.IsOSSA = true;
 
     symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
 

@@ -1081,7 +1081,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     serializationOpts.OutputPath = OutputFile;
     serializationOpts.SerializeAllSIL = options.EmitSIB;
     serializationOpts.IsSIB = options.EmitSIB;
-    serializationOpts.IsOSSA = true;
 
     symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
 

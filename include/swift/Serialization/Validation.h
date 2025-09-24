@@ -51,9 +51,6 @@ enum class Status {
   /// The distribution channel doesn't match.
   ChannelIncompatible,
 
-  /// The module is required to be in OSSA, but is not.
-  NotInOSSA,
-
   /// The module file depends on another module that can't be loaded.
   MissingDependency,
 
