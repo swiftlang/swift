@@ -2949,6 +2949,17 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                        A->getAsString(Args));
     }
   }
+  // Have ManualOwnership imply MandatoryCopyPropagation.
+  // Once that pass becomes enabled by default, we don't need this.
+  if (LangOpts.hasFeature(ManualOwnership)) {
+    specifiedCopyPropagationOption = CopyPropagationOption::Always;
+
+    if (auto *Flag = Args.getLastArg(OPT_copy_propagation_state_EQ)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_combination,
+                       Flag->getAsString(Args),
+                       "-enable-experimental-feature ManualOwnership");
+    }
+  }
   if (Args.hasArg(OPT_enable_copy_propagation)) {
     specifiedCopyPropagationOption = CopyPropagationOption::Always;
   }
