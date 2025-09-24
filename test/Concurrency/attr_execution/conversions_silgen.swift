@@ -620,4 +620,26 @@ func testSendableClosureNonisolatedNonSendingInference() {
   // CHECK: hop_to_executor [[EXECUTOR]]
   // CHECK: // end sil function '$s21attr_execution_silgen49testSendableClosureNonisolatedNonSendingInferenceyyFySiYaYbYCcfU_'
   let _: nonisolated(nonsending) @Sendable (Int) async -> Void = { _ in }
+
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen49testSendableClosureNonisolatedNonSendingInferenceyyFyS2SYaKYCcYaYbYCcfU0_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed String) -> (@owned String, @error any Error)) -> @error any Error
+  // CHECK: bb0([[EXECUTOR:%.*]] : @guaranteed $Optional<any Actor>, %1 : @guaranteed $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed String) -> (@owned String, @error any Error)):
+  // CHECK: hop_to_executor [[EXECUTOR]]
+  // CHECK: // end sil function '$s21attr_execution_silgen49testSendableClosureNonisolatedNonSendingInferenceyyFyS2SYaKYCcYaYbYCcfU0_'
+  let _: nonisolated(nonsending) @Sendable (
+    nonisolated(nonsending) @escaping (String) async throws -> String
+  ) async throws -> Void = { _ in }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s21attr_execution_silgen014testSendableToE35ConversionWithNonisilatedNonsendingyyF : $@convention(thin) () -> ()
+// CHECK: [[TEST_REF:%.*]] = function_ref @$s21attr_execution_silgen014testSendableToE35ConversionWithNonisilatedNonsendingyyF0D0L_7closureyS2SYaKYCc_tYaYbKF : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed String) -> (@owned String, @error any Error)) -> @error any Error
+// CHECK: // end sil function '$s21attr_execution_silgen014testSendableToE35ConversionWithNonisilatedNonsendingyyF'
+func testSendableToSendableConversionWithNonisilatedNonsending() {
+  @Sendable nonisolated(nonsending) func test(
+    closure: nonisolated(nonsending) @escaping (String) async throws -> String
+  ) async throws {
+  }
+
+  let _: nonisolated(nonsending) @Sendable (
+    nonisolated(nonsending) @escaping (String) async throws -> String
+  ) async throws -> Void = test
 }
