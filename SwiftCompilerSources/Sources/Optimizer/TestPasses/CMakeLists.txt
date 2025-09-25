@@ -15,7 +15,6 @@ swift_compiler_sources(Optimizer
   MemBehaviorDumper.swift
   SILPrinter.swift
   RangeDumper.swift
-  RunUnitTests.swift
   UpdateBorrowedFrom.swift
   TestInstructionIteration.swift
 )
