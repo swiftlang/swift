@@ -142,6 +142,7 @@ public func registerTests() {
   // Register each test.
   registerTests(
     parseTestSpecificationTest,
+    smallProjectionPathTest,
     getAccessBaseTest,
     borrowIntroducersTest,
     enclosingValuesTest,
