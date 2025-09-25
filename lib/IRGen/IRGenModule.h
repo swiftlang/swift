@@ -674,8 +674,11 @@ enum class CStringSectionType {
   ObjCClassName,
   ObjCMethodName,
   ObjCMethodType,
-  ObjCPropertyName,
   OSLogString,
+  // Place all new section types above this line
+  NumTypes,
+  // Place all alias below this line
+  ObjCPropertyName = ObjCMethodName,
 };
 
 /// IRGenModule - Primary class for emitting IR for global declarations.
@@ -1340,8 +1343,9 @@ private:
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
   // Maps sectionName -> string data -> constant
-  llvm::StringMap<
-      llvm::StringMap<std::pair<llvm::GlobalVariable *, llvm::Constant *>>>
+  std::array<
+      llvm::StringMap<std::pair<llvm::GlobalVariable *, llvm::Constant *>>,
+      static_cast<size_t>(CStringSectionType::NumTypes)>
       GlobalStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
@@ -1559,8 +1563,6 @@ public:
       "__TEXT,__objc_methname,cstring_literals";
   static constexpr const char ObjCMethodTypeSectionName[] =
       "__TEXT,__objc_methtype,cstring_literals";
-  static constexpr const char ObjCPropertyNameSectionName[] =
-      "__TEXT,__objc_methname,cstring_literals";
   static constexpr const char OSLogStringSectionName[] =
       "__TEXT,__oslogstring,cstring_literals";
 

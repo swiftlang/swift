@@ -1065,7 +1065,7 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
       GV->setSection(IRGenModule::ObjCMethodTypeSectionName);
       return;
     case ObjCLabelType::PropertyName:
-      GV->setSection(IRGenModule::ObjCPropertyNameSectionName);
+      GV->setSection(IRGenModule::ObjCMethodNameSectionName);
       return;
     }
   case llvm::Triple::ELF:
@@ -6043,16 +6043,15 @@ IRGenModule::getAddrOfGlobalString(StringRef data, CStringSectionType type,
   case CStringSectionType::ObjCMethodType:
     sectionName = ObjCMethodTypeSectionName;
     break;
-  case CStringSectionType::ObjCPropertyName:
-    sectionName = ObjCPropertyNameSectionName;
-    break;
   case CStringSectionType::OSLogString:
     sectionName = OSLogStringSectionName;
     break;
+  case CStringSectionType::NumTypes:
+    llvm_unreachable("invalid type");
   }
 
   // Check whether this string already exists.
-  auto &entry = GlobalStrings[sectionName][data];
+  auto &entry = GlobalStrings[static_cast<size_t>(type)][data];
 
   if (entry.second) {
     // FIXME: Clear unnamed_addr if the global will be relative referenced
