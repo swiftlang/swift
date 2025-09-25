@@ -495,6 +495,8 @@ extension ResultConvention {
     case .unownedInnerPointer: return .UnownedInnerPointer
     case .autoreleased: return .Autoreleased
     case .pack: return .Pack
+    case .guaranteed: return .Guaranteed
+    case .guaranteedAddress: return .GuaranteedAddress
     }
   }
 }
