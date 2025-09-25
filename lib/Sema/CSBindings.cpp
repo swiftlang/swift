@@ -721,6 +721,7 @@ bool BindingSet::finalize(bool transitive) {
       if (isValid && !capability)
         return false;
 
+      bool isContextualTypeReadOnly = false;
       // If the key path is sufficiently resolved we can add inferred binding
       // to the set.
       SmallSetVector<PotentialBinding, 4> updatedBindings;
@@ -740,19 +741,30 @@ bool BindingSet::finalize(bool transitive) {
           }
 
           updatedBindings.insert(binding.withType(fnType));
+          isContextualTypeReadOnly = true;
+        } else if (!(bindingTy->isWritableKeyPath() ||
+                     bindingTy->isReferenceWritableKeyPath())) {
+          isContextualTypeReadOnly = true;
         }
       }
 
       // Note that even though key path literal maybe be invalid it's
       // still the best course of action to use contextual function type
       // bindings because they allow to propagate type information from
-      // the key path into the context, so key path bindings are addded
+      // the key path into the context, so key path bindings are added
       // only if there is absolutely no other choice.
       if (updatedBindings.empty()) {
         auto rootTy = CS.getKeyPathRootType(keyPath);
 
         // A valid key path literal.
         if (capability) {
+          // Capability inference always results in a maximum mutability
+          // but if context is read-only it can be downgraded to avoid
+          // conversions.
+          if (isContextualTypeReadOnly)
+            capability =
+                std::make_pair(KeyPathMutability::ReadOnly, capability->second);
+
           // Note that the binding is formed using root & value
           // type variables produced during constraint generation
           // because at this point root is already known (otherwise
