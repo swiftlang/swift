@@ -132,6 +132,17 @@ static HeapObject *_swift_tryRetain_(HeapObject *object)
   return _ ## name ## _ args; \
 } while(0)
 
+// SWIFT_REFCOUNT_CC functions make the call to the "might be swizzled" path
+// through an adapter marked noinline and with the refcount CC. This allows the
+// fast path to avoid pushing a stack frame. Without this adapter, clang emits
+// code that pushes a stack frame right away, then does the fast path or slow
+// path.
+#define CALL_IMPL_SWIFT_REFCOUNT_CC(name, args) do { \
+  if (SWIFT_UNLIKELY(_swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly.load(std::memory_order_relaxed))) \
+    return _ ## name ## _adapter args; \
+  return _ ## name ## _ args; \
+} while(0)
+
 #define CALL_IMPL_CHECK(name, args) do { \
   void *fptr; \
   memcpy(&fptr, (void *)&_ ## name, sizeof(fptr)); \
@@ -437,7 +448,8 @@ HeapObject *swift::swift_allocEmptyBox() {
 }
 
 // Forward-declare this, but define it after swift_release.
-extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED void
+extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED SWIFT_REFCOUNT_CC
+void
 _swift_release_dealloc(HeapObject *object);
 
 SWIFT_ALWAYS_INLINE
@@ -452,11 +464,16 @@ static HeapObject *_swift_retain_(HeapObject *object) {
   return object;
 }
 
+SWIFT_REFCOUNT_CC SWIFT_NOINLINE
+static HeapObject *_swift_retain_adapter(HeapObject *object) {
+  return _swift_retain(object);
+}
+
 HeapObject *swift::swift_retain(HeapObject *object) {
 #ifdef SWIFT_THREADING_NONE
   return swift_nonatomic_retain(object);
 #else
-  CALL_IMPL(swift_retain, (object));
+  CALL_IMPL_SWIFT_REFCOUNT_CC(swift_retain, (object));
 #endif
 }
 
@@ -499,11 +516,16 @@ static void _swift_release_(HeapObject *object) {
     object->refCounts.decrementAndMaybeDeinit(1);
 }
 
+SWIFT_REFCOUNT_CC SWIFT_NOINLINE
+static void _swift_release_adapter(HeapObject *object) {
+  _swift_release(object);
+}
+
 void swift::swift_release(HeapObject *object) {
 #ifdef SWIFT_THREADING_NONE
   swift_nonatomic_release(object);
 #else
-  CALL_IMPL(swift_release, (object));
+  CALL_IMPL_SWIFT_REFCOUNT_CC(swift_release, (object));
 #endif
 }
 
