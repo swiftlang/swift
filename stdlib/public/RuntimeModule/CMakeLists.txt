@@ -62,6 +62,8 @@ set(RUNTIME_SOURCES
   Mangling.swift
   MemoryReader.swift
   OSReleaseScanner.swift
+  PeCoff.swift
+  PeImageCache.swift
   ProcMapsScanner.swift
   Registers.swift
   Runtime.swift
