@@ -101,17 +101,17 @@ private func specializeCallsite(
             newArguments.append(
               builder.createLoad(
                 fromAddress: indirectParameterAddress,
-                ownership: loadOwnership(for: indirectParameterAddress, default: .trivial)))
+                ownership: loadOwnership(for: indirectParameterAddress, normal: .trivial)))
           case .directGuaranteed:
             newArguments.append(
               builder.createLoad(
                 fromAddress: indirectParameterAddress,
-                ownership: loadOwnership(for: indirectParameterAddress, default: .take)))
+                ownership: loadOwnership(for: indirectParameterAddress, normal: .take)))
           case .directOwned:
             newArguments.append(
               builder.createLoad(
                 fromAddress: indirectParameterAddress,
-                ownership: loadOwnership(for: indirectParameterAddress, default: .take)))
+                ownership: loadOwnership(for: indirectParameterAddress, normal: .take)))
           case .indirectIn, .indirectInCXX, .indirectInGuaranteed, .indirectInout,
             .indirectInoutAliasable:
             newArguments.append(indirectParameterAddress)
@@ -139,10 +139,10 @@ private func specializeCallsite(
     let outputResultAddress = builder.createPackElementGet(
       packIndex: packIdx, pack: originalPackArgument,
       elementType: originalPackArgument.type.packElements[elementIdx])
-    // TODO: Analyse whether contents of outputResultAddress is live? It shouldn't be.
     builder.createStore(
       source: value, destination: outputResultAddress,
-      ownership: initialStoreOwnership(for: value))
+      // The callee is responsible for initializing return pack elements, so preserve this expectation
+      ownership: storeOwnership(for: value, normal: .initialize))
   }
 
   // Map the exploded direct results of the optimized function back to the corresponding indirect pack results of the original function.
@@ -454,7 +454,7 @@ private struct PackExplodedFunction {
           allocStack = nil
         } else {
           let alloc = builder.createAllocStack(type)
-          let ownership = initialStoreOwnership(for: argument)
+          let ownership = storeOwnership(for: argument, normal: .initialize)
           builder.createStore(
             source: argument, destination: alloc,
             ownership: ownership)
@@ -567,7 +567,7 @@ private struct PackExplodedFunction {
           returnValues.append(
             builder.createLoad(
               fromAddress: allocStack,
-              ownership: loadOwnership(for: allocStack, default: .take))
+              ownership: loadOwnership(for: allocStack, normal: .take))
           )
         }
 
@@ -647,7 +647,7 @@ private func explodedPackElementResultConvention(in function: Function, elem: Ty
   }
 }
 
-private func initialStoreOwnership(for value: any Value) -> StoreInst.StoreOwnership {
+private func storeOwnership(for value: any Value, normal: StoreInst.StoreOwnership) -> StoreInst.StoreOwnership {
   let function = value.parentFunction
   if !function.hasOwnership {
     return .unqualified
@@ -656,11 +656,11 @@ private func initialStoreOwnership(for value: any Value) -> StoreInst.StoreOwner
   if value.type.isTrivial(in: function) {
     return .trivial
   } else {
-    return .initialize
+    return normal
   }
 }
 
-private func loadOwnership(for value: any Value, default: LoadInst.LoadOwnership)
+private func loadOwnership(for value: any Value, normal: LoadInst.LoadOwnership)
   -> LoadInst.LoadOwnership
 {
   let function = value.parentFunction
