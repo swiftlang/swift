@@ -182,7 +182,8 @@ namespace swift {
 }
 
 // FIXME: HACK: copied from HeapObject.cpp
-extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED void
+extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED SWIFT_REFCOUNT_CC
+void
 _swift_release_dealloc(swift::HeapObject *object);
 
 namespace swift {
@@ -714,6 +715,7 @@ class RefCounts {
   // Out-of-line slow paths.
 
   SWIFT_NOINLINE
+  SWIFT_REFCOUNT_CC
   HeapObject *incrementSlow(RefCountBits oldbits, uint32_t inc);
 
   SWIFT_NOINLINE
