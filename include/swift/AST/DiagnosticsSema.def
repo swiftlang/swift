@@ -2141,6 +2141,8 @@ ERROR(attr_static_exclusive_no_setters,none,
 // @_manualOwnership
 ERROR(attr_manual_ownership_experimental,none,
       "'@_manualOwnership' requires '-enable-experimental-feature ManualOwnership'", ())
+ERROR(attr_manual_ownership_noimplicitcopy,none,
+      "'@_noImplicitCopy' cannot be used with ManualOwnership", ())
 
 // @extractConstantsFromMembers
 ERROR(attr_extractConstantsFromMembers_experimental,none,

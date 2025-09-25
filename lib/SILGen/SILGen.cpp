@@ -1360,6 +1360,24 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
   // Set our actor isolation.
   F->setActorIsolation(constant.getActorIsolation());
 
+  // Closures automatically infer [manual_ownership] based on outermost func.
+  //
+  // We need to add this constraint _prior_ to emitting the closure's body,
+  // because the output from SILGen slightly differs because of this constraint
+  // when it comes to the CopyExpr and SILMoveOnlyWrappedType usage.
+  //
+  // If ManualOwnership ends up subsuming those prior mechanisms for an
+  // explicit-copy mode, we can move this somewhere else, like postEmitFunction.
+  if (auto *ace = constant.getAbstractClosureExpr()) {
+    if (auto *dc = ace->getOutermostFunctionContext()) {
+      if (auto *decl = dc->getAsDecl()) {
+        if (decl->getAttrs().hasAttribute<ManualOwnershipAttr>()) {
+          F->setPerfConstraints(PerformanceConstraints::ManualOwnership);
+        }
+      }
+    }
+  }
+
   LLVM_DEBUG(llvm::dbgs() << "lowering ";
              F->printName(llvm::dbgs());
              llvm::dbgs() << " : ";

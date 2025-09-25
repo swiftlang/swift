@@ -383,6 +383,7 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
       case SILInstructionKind::PartialApplyInst:
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::DestroyValueInst:
+      case SILInstructionKind::StoreInst:
         break; // These modify reference counts, but aren't copies.
       case SILInstructionKind::ExplicitCopyAddrInst:
       case SILInstructionKind::ExplicitCopyValueInst:
@@ -441,7 +442,11 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
 
             // There's no hope of borrowing access if there's a consuming use.
             for (auto op : svi->getUses()) {
-              if (op->getOperandOwnership() == OperandOwnership::ForwardingConsume) {
+              auto useKind = op->getOperandOwnership();
+
+              // Only some DestroyingConsume's, like 'store', are interesting.
+              if (useKind == OperandOwnership::ForwardingConsume
+                  || isa<StoreInst>(op->getUser())) {
                 LLVM_DEBUG(llvm::dbgs() << "demanded by "<< *(op->getUser()));
                 diagnose(loc, diag::manualownership_copy_demanded, *name);
                 return false;
