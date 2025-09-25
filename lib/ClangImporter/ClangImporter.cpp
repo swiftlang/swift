@@ -5298,16 +5298,66 @@ static const llvm::StringMap<std::vector<int>> STLConditionalParams{
     {"unordered_multimap", {0, 1}},
 };
 
+template <typename Kind>
+static std::optional<Kind> checkConditionalParams(
+    clang::RecordDecl *recordDecl, const std::vector<int> &STLParams,
+    std::set<StringRef> &conditionalParams,
+    std::function<std::optional<Kind>(clang::TemplateArgument &, StringRef)>
+        &checkArg) {
+  auto specDecl = cast<clang::ClassTemplateSpecializationDecl>(recordDecl);
+  SmallVector<std::pair<unsigned, StringRef>, 4> argumentsToCheck;
+  bool hasInjectedSTLAnnotation = !STLParams.empty();
+  while (specDecl) {
+    auto templateDecl = specDecl->getSpecializedTemplate();
+    if (hasInjectedSTLAnnotation) {
+      auto params = templateDecl->getTemplateParameters();
+      for (auto idx : STLParams)
+        argumentsToCheck.push_back(
+            std::make_pair(idx, params->getParam(idx)->getName()));
+    } else {
+      for (auto [idx, param] :
+           llvm::enumerate(*templateDecl->getTemplateParameters())) {
+        if (conditionalParams.erase(param->getName()))
+          argumentsToCheck.push_back(std::make_pair(idx, param->getName()));
+      }
+    }
+    auto &argList = specDecl->getTemplateArgs();
+    for (auto argToCheck : argumentsToCheck) {
+      auto arg = argList[argToCheck.first];
+      llvm::SmallVector<clang::TemplateArgument, 1> nonPackArgs;
+      if (arg.getKind() == clang::TemplateArgument::Pack) {
+        auto pack = arg.getPackAsArray();
+        nonPackArgs.assign(pack.begin(), pack.end());
+      } else
+        nonPackArgs.push_back(arg);
+      for (auto nonPackArg : nonPackArgs) {
+        auto result = checkArg(nonPackArg, argToCheck.second);
+        if (result.has_value())
+          return result.value();
+      }
+    }
+    if (hasInjectedSTLAnnotation)
+      break;
+    clang::DeclContext *dc = specDecl;
+    specDecl = nullptr;
+    while ((dc = dc->getParent())) {
+      specDecl = dyn_cast<clang::ClassTemplateSpecializationDecl>(dc);
+      if (specDecl)
+        break;
+    }
+  }
+  return std::nullopt;
+}
+
 static std::set<StringRef>
-getConditionalEscapableAttrParams(const clang::RecordDecl *decl) {
+getConditionalAttrParams(const clang::RecordDecl *decl, StringRef attrName) {
   std::set<StringRef> result;
   if (!decl->hasAttrs())
     return result;
   for (auto attr : decl->getAttrs()) {
-    if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-      if (swiftAttr->getAttribute().starts_with("escapable_if:")) {
-        StringRef params = swiftAttr->getAttribute().drop_front(
-            StringRef("escapable_if:").size());
+    if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+      StringRef params = swiftAttr->getAttribute();
+      if (params.consume_front(attrName)) {
         auto commaPos = params.find(',');
         StringRef nextParam = params.take_front(commaPos);
         while (!nextParam.empty() && commaPos != StringRef::npos) {
@@ -5317,8 +5367,19 @@ getConditionalEscapableAttrParams(const clang::RecordDecl *decl) {
           nextParam = params.take_front(commaPos);
         }
       }
+    }
   }
   return result;
+}
+
+static std::set<StringRef>
+getConditionalEscapableAttrParams(const clang::RecordDecl *decl) {
+  return getConditionalAttrParams(decl, "escapable_if:");
+}
+
+static std::set<StringRef>
+getConditionalCopyableAttrParams(const clang::RecordDecl *decl) {
+  return getConditionalAttrParams(decl, "copyable_if:");
 }
 
 CxxEscapability
@@ -5346,60 +5407,33 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
         recordDecl->isInStdNamespace()
             ? STLConditionalParams.find(recordDecl->getName())
             : STLConditionalParams.end();
-    bool hasInjectedSTLAnnotation =
-        injectedStlAnnotation != STLConditionalParams.end();
+    auto STLParams = injectedStlAnnotation != STLConditionalParams.end()
+                         ? injectedStlAnnotation->second
+                         : std::vector<int>();
     auto conditionalParams = getConditionalEscapableAttrParams(recordDecl);
-    if (!conditionalParams.empty() || hasInjectedSTLAnnotation) {
-      auto specDecl = cast<clang::ClassTemplateSpecializationDecl>(recordDecl);
-      SmallVector<std::pair<unsigned, StringRef>, 4> argumentsToCheck;
-      HeaderLoc loc{recordDecl->getLocation()};
-      while (specDecl) {
-        auto templateDecl = specDecl->getSpecializedTemplate();
-        if (hasInjectedSTLAnnotation) {
-          auto params = templateDecl->getTemplateParameters();
-          for (auto idx : injectedStlAnnotation->second)
-            argumentsToCheck.push_back(
-                std::make_pair(idx, params->getParam(idx)->getName()));
-        } else {
-          for (auto [idx, param] :
-               llvm::enumerate(*templateDecl->getTemplateParameters())) {
-            if (conditionalParams.erase(param->getName()))
-              argumentsToCheck.push_back(std::make_pair(idx, param->getName()));
-          }
-        }
-        auto &argList = specDecl->getTemplateArgs();
-        for (auto argToCheck : argumentsToCheck) {
-          auto arg = argList[argToCheck.first];
-          llvm::SmallVector<clang::TemplateArgument, 1> nonPackArgs;
-          if (arg.getKind() == clang::TemplateArgument::Pack) {
-            auto pack = arg.getPackAsArray();
-            nonPackArgs.assign(pack.begin(), pack.end());
-          } else
-            nonPackArgs.push_back(arg);
-          for (auto nonPackArg : nonPackArgs) {
-            if (nonPackArg.getKind() != clang::TemplateArgument::Type &&
-                desc.impl) {
-              desc.impl->diagnose(loc, diag::type_template_parameter_expected,
-                                  argToCheck.second);
-              return CxxEscapability::Unknown;
-            }
 
-            auto argEscapability = evaluateEscapability(
-                nonPackArg.getAsType()->getUnqualifiedDesugaredType());
-            if (argEscapability == CxxEscapability::NonEscapable)
-              return CxxEscapability::NonEscapable;
-          }
+    if (!STLParams.empty() || !conditionalParams.empty()) {
+      HeaderLoc loc{recordDecl->getLocation()};
+      std::function checkArgEscapability =
+          [&](clang::TemplateArgument &arg,
+              StringRef argToCheck) -> std::optional<CxxEscapability> {
+        if (arg.getKind() != clang::TemplateArgument::Type && desc.impl) {
+          desc.impl->diagnose(loc, diag::type_template_parameter_expected,
+                              argToCheck);
+          return CxxEscapability::Unknown;
         }
-        if (hasInjectedSTLAnnotation)
-          break;
-        clang::DeclContext *dc = specDecl;
-        specDecl = nullptr;
-        while ((dc = dc->getParent())) {
-          specDecl = dyn_cast<clang::ClassTemplateSpecializationDecl>(dc);
-          if (specDecl)
-            break;
-        }
-      }
+
+        auto argEscapability = evaluateEscapability(
+            arg.getAsType()->getUnqualifiedDesugaredType());
+        if (argEscapability == CxxEscapability::NonEscapable)
+          return CxxEscapability::NonEscapable;
+        return std::nullopt;
+      };
+
+      auto result = checkConditionalParams<CxxEscapability>(
+          recordDecl, STLParams, conditionalParams, checkArgEscapability);
+      if (result.has_value())
+        return result.value();
 
       if (desc.impl)
         for (auto name : conditionalParams)
@@ -8338,36 +8372,48 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
     if (recordDecl->getIdentifier() &&
         recordDecl->getName() == "_Optional_construct_base")
       return CxxValueSemanticsKind::Copyable;
+  }
 
-    auto injectedStlAnnotation =
-        STLConditionalParams.find(recordDecl->getName());
+  auto injectedStlAnnotation =
+      recordDecl->isInStdNamespace()
+          ? STLConditionalParams.find(recordDecl->getName())
+          : STLConditionalParams.end();
+  auto STLParams = injectedStlAnnotation != STLConditionalParams.end()
+                       ? injectedStlAnnotation->second
+                       : std::vector<int>();
+  auto conditionalParams = getConditionalCopyableAttrParams(recordDecl);
 
-    if (injectedStlAnnotation != STLConditionalParams.end()) {
-      auto specDecl = cast<clang::ClassTemplateSpecializationDecl>(recordDecl);
-      auto &argList = specDecl->getTemplateArgs();
-      for (auto argToCheck : injectedStlAnnotation->second) {
-        auto arg = argList[argToCheck];
-        llvm::SmallVector<clang::TemplateArgument, 1> nonPackArgs;
-        if (arg.getKind() == clang::TemplateArgument::Pack) {
-          auto pack = arg.getPackAsArray();
-          nonPackArgs.assign(pack.begin(), pack.end());
-        } else
-          nonPackArgs.push_back(arg);
-        for (auto nonPackArg : nonPackArgs) {
-
-          auto argValueSemantics = evaluateOrDefault(
-              evaluator,
-              CxxValueSemantics(
-                  {nonPackArg.getAsType()->getUnqualifiedDesugaredType(),
-                   desc.importerImpl}),
-              {});
-          if (argValueSemantics != CxxValueSemanticsKind::Copyable)
-            return argValueSemantics;
-        }
+  if (!STLParams.empty() || !conditionalParams.empty()) {
+    HeaderLoc loc{recordDecl->getLocation()};
+    std::function checkArgValueSemantics =
+        [&](clang::TemplateArgument &arg,
+            StringRef argToCheck) -> std::optional<CxxValueSemanticsKind> {
+      if (arg.getKind() != clang::TemplateArgument::Type && importerImpl) {
+        importerImpl->diagnose(loc, diag::type_template_parameter_expected,
+                               argToCheck);
+        return CxxValueSemanticsKind::Unknown;
       }
 
-      return CxxValueSemanticsKind::Copyable;
-    }
+      auto argValueSemantics = evaluateOrDefault(
+          evaluator,
+          CxxValueSemantics(
+              {arg.getAsType()->getUnqualifiedDesugaredType(), importerImpl}),
+          {});
+      if (argValueSemantics != CxxValueSemanticsKind::Copyable)
+        return argValueSemantics;
+      return std::nullopt;
+    };
+
+    auto result = checkConditionalParams<CxxValueSemanticsKind>(
+        recordDecl, STLParams, conditionalParams, checkArgValueSemantics);
+    if (result.has_value())
+      return result.value();
+
+    if (importerImpl)
+      for (auto name : conditionalParams)
+        importerImpl->diagnose(loc, diag::unknown_template_parameter, name);
+
+    return CxxValueSemanticsKind::Copyable;
   }
 
   const auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
