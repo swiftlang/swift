@@ -1,7 +1,7 @@
 
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging -Xcc -std=c++20 -I %t/Inputs  %t/test.swift -strict-memory-safety -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1
+// RUN: %target-swift-frontend -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging -Xcc -iapinotes-modules -Xcc %swift_src_root/stdlib/public/Cxx/std -Xcc -std=c++20 -I %t/Inputs  %t/test.swift -strict-memory-safety -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_LifetimeDependence
@@ -134,6 +134,7 @@ func useUnsafeTuple(x: UnsafeTuple) {
 func useCppSpan(x: SpanOfInt) {
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
   _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+  _ = x.size()
 }
 
 func useCppSpan2(x: SpanOfIntAlias) {
