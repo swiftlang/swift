@@ -139,6 +139,10 @@ inline BridgedArgumentConvention castToArgumentConvention(swift::SILArgumentConv
   return static_cast<BridgedArgumentConvention>(convention.Value);
 }
 
+inline swift::SILArgumentConvention unbridge(BridgedArgumentConvention convention) {
+  return swift::SILArgumentConvention(static_cast<swift::SILArgumentConvention::ConventionType>(convention));
+}
+
 BridgedParameterInfo::BridgedParameterInfo(swift::SILParameterInfo parameterInfo):
   type(parameterInfo.getInterfaceType()),
   convention(getArgumentConvention(parameterInfo.getConvention())),
@@ -772,6 +776,12 @@ BridgedStringRef BridgedFunction::getAccessorName() const {
 }
 
 bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(); }
+
+BridgedValue::Ownership BridgedFunction::getValueOwnership(BridgedType type, BridgedArgumentConvention convention) const {
+  auto silConvention = unbridge(convention);
+  swift::ValueOwnershipKind ownership(*getFunction(), type.unbridged(), silConvention);
+  return bridge(ownership);
+}
 
 bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->getModule().useLoweredAddresses(); }
 
