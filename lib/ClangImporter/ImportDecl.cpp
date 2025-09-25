@@ -2747,6 +2747,7 @@ namespace {
 
       enum class RetainReleaseOperationKind {
         notAfunction,
+        notAnInstanceFunction,
         invalidReturnType,
         invalidParameters,
         valid
@@ -2760,17 +2761,32 @@ namespace {
         if (!operationFn)
           return RetainReleaseOperationKind::notAfunction;
 
-        if (operationFn->getParameters()->size() != 1)
-          return RetainReleaseOperationKind::invalidParameters;
+        if (operationFn->isStatic())
+          return RetainReleaseOperationKind::notAnInstanceFunction;
 
-        Type paramType =
-            operationFn->getParameters()->get(0)->getInterfaceType();
-        // Unwrap if paramType is an OptionalType
-        if (Type optionalType = paramType->getOptionalObjectType()) {
-          paramType = optionalType;
+        if (operationFn->isInstanceMember()) {
+          if (operationFn->getParameters()->size() != 0)
+            return RetainReleaseOperationKind::invalidParameters;
+        } else {
+          if (operationFn->getParameters()->size() != 1)
+            return RetainReleaseOperationKind::invalidParameters;
         }
 
-        swift::NominalTypeDecl *paramDecl = paramType->getAnyNominal();
+        Type paramType;
+        NominalTypeDecl *paramDecl = nullptr;
+        if (!operationFn->isInstanceMember()) {
+          paramType =
+              operationFn->getParameters()->get(0)->getInterfaceType();
+          // Unwrap if paramType is an OptionalType
+          if (Type optionalType = paramType->getOptionalObjectType()) {
+            paramType = optionalType;
+          }
+
+          paramDecl = paramType->getAnyNominal();
+        } else {
+          paramDecl = cast<NominalTypeDecl>(operationFn->getParent());
+          paramType = paramDecl->getDeclaredInterfaceType();
+        }
 
         // The return type should be void (for release functions), or void
         // or the parameter type (for retain functions).
@@ -2855,6 +2871,12 @@ namespace {
               diag::foreign_reference_types_retain_release_not_a_function_decl,
               false, retainOperation.name);
           break;
+        case RetainReleaseOperationKind::notAnInstanceFunction:
+          Impl.diagnose(
+              loc,
+              diag::foreign_reference_types_retain_release_not_an_instance_function,
+              false, retainOperation.name);
+          break;
         case RetainReleaseOperationKind::invalidReturnType:
           Impl.diagnose(
               loc,
@@ -2918,6 +2940,12 @@ namespace {
           Impl.diagnose(
               loc,
               diag::foreign_reference_types_retain_release_not_a_function_decl,
+              true, releaseOperation.name);
+          break;
+        case RetainReleaseOperationKind::notAnInstanceFunction:
+          Impl.diagnose(
+              loc,
+              diag::foreign_reference_types_retain_release_not_an_instance_function,
               true, releaseOperation.name);
           break;
         case RetainReleaseOperationKind::invalidReturnType:
