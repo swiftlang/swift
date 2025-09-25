@@ -576,6 +576,7 @@ SourceLoc extractNearestSourceLoc(EscapabilityLookupDescriptor desc);
 // the object’s storage. This means reference types can be imported as
 // copyable to Swift, even when they are non-copyable in C++.
 enum class CxxValueSemanticsKind {
+  Unknown,
   Copyable,
   MoveOnly,
   // A record that is either not copyable/movable or not destructible.
