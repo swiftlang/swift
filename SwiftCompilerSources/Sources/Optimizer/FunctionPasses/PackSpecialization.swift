@@ -27,10 +27,7 @@ let packSpecialization = FunctionPass(name: "pack-specialization") {
       continue
     }
 
-    // TODO
     specializeCallsite(at: apply, with: optimized, context)
-    print(apply.parentFunction.name)
-    print(apply.parentBlock)
   }
 
 }
@@ -42,6 +39,7 @@ private func specializeCallsite(
 
   // Populate the arguments list with the appropriate set of indirect results and parameters
   var newArguments = [any Value]()
+  var parameterBorrows = [LoadBorrowInst]()
 
   var packArgumentIndices = [Int: [ScalarPackIndexInst]]()
   for (idx, argument) in apply.arguments.enumerated() {
@@ -103,10 +101,9 @@ private func specializeCallsite(
                 fromAddress: indirectParameterAddress,
                 ownership: loadOwnership(for: indirectParameterAddress, normal: .trivial)))
           case .directGuaranteed:
-            newArguments.append(
-              builder.createLoad(
-                fromAddress: indirectParameterAddress,
-                ownership: loadOwnership(for: indirectParameterAddress, normal: .take)))
+            let borrow = builder.createLoadBorrow(fromAddress: indirectParameterAddress)
+            newArguments.append(borrow)
+            parameterBorrows.append(borrow)
           case .directOwned:
             newArguments.append(
               builder.createLoad(
@@ -132,6 +129,11 @@ private func specializeCallsite(
   let optimizedFunctionRef = builder.createFunctionRef(optimized.function)
   let optimizedApply = builder.createApply(
     function: optimizedFunctionRef, SubstitutionMap(), arguments: newArguments)
+
+  // Release any borrows of @guaranteed parameters
+  for borrow in parameterBorrows {
+    builder.createEndBorrow(of: borrow)
+  }
 
   let writeBackPackElement = { (value: any Value, argumentIdx: Int, elementIdx: Int) in
     let originalPackArgument = apply.arguments[argumentIdx]
@@ -188,8 +190,6 @@ private func specializeCallsite(
       // We only need to handle direct and pack results, since indirect results are handled above
       if !resultInfo.isSILIndirect {
         // Direct results of the original function are mapped to direct results of the optimized function.
-        print("direct original result;", optimizedApply.ownership)
-        fflush(stdout)
         substitutedResultTupleElements.append(destructuredTupleElements.next()!)
         optimizedDirectResultIdx += 1
 
@@ -200,8 +200,6 @@ private func specializeCallsite(
 
         for (packElementIdx, mappedDirectResult) in mappedResults.enumerated()
         where !mappedDirectResult.isSILIndirect {
-          print("pack original result", optimizedApply.ownership)
-          fflush(stdout)
           writeBackPackElement(
             destructuredTupleElements.next()!,
             originalResultIdx, packElementIdx
@@ -320,7 +318,6 @@ private struct PackExplodedFunction {
     let packArgIndices: [Int] = callee.arguments.filter { $0.isConcretePack() }.map { $0.index }
     let specializedName = context.mangle(withExplodedPackArguments: packArgIndices, from: callee)
     if let existingFunction = context.lookupFunction(name: specializedName) {
-      // print("Reusing existing specialized definition of ", specializedName)
       function = existingFunction
     } else {
 
@@ -332,12 +329,6 @@ private struct PackExplodedFunction {
 
       self.buildOptimizedClosure(apply: apply, context)
     }
-
-    // print(packArgIndices, [Int](callee.arguments.filter { $0.isIndirectResult }.map { $0.index }))
-    // print("specializing:", callee.name, "\n\tto", specializedName)
-    // print(newParams)
-    // print(function)
-
   }
 
   private struct ExplodedArgument {
@@ -431,7 +422,7 @@ private struct PackExplodedFunction {
 
       entryBlock.eraseArgument(at: idx, specContext)
 
-      return (localPack, packType, originalPackArg.ownership)
+      return (localPack, packType)
     }
 
     var argumentMap = [Int: ArgumentMapping]()
@@ -439,24 +430,35 @@ private struct PackExplodedFunction {
     // Explode parameters
     for (idx, parameterInfos) in parameterMap.reversed() {
 
-      let (localPack, packType, ownership) = prepareExplosion(idx)
+      let (localPack, packType) = prepareExplosion(idx)
 
       var mappings = [ExplodedArgument]()
-      for (i, type) in packType.packElements.enumerated() {
+      for (i, (type, parameterInfo)) in zip(packType.packElements, parameterInfos).enumerated() {
         let packIdx = builder.createScalarPackIndex(
           componentIndex: i, indexedPackType: self.packASTTypes[idx]!)
         let argument = entryBlock.insertFunctionArgument(
-          atPosition: idx + i, type: type, ownership: ownership, specContext)
+          atPosition: idx + i, type: type,
+          ownership: opt.getValueOwnership(type: type, convention: parameterInfo.convention),
+          specContext)
 
         let allocStack: AllocStackInst?
-        if parameterInfos[i].isSILIndirect {
+        if parameterInfo.isSILIndirect {
           builder.createPackElementSet(elementValue: argument, packIndex: packIdx, pack: localPack)
           allocStack = nil
         } else {
           let alloc = builder.createAllocStack(type)
+          // We need to copy @guaranteed arguments if we put them on the stack, since we don't own them.
+          // TODO: Can this copy be elided?
+          let ownedValue: any Value
+          if parameterInfo.convention == .directGuaranteed {
+            ownedValue = builder.createCopyValue(operand: argument)
+          } else {
+            ownedValue = argument
+          }
+
           let ownership = storeOwnership(for: argument, normal: .initialize)
           builder.createStore(
-            source: argument, destination: alloc,
+            source: ownedValue, destination: alloc,
             ownership: ownership)
           builder.createPackElementSet(elementValue: alloc, packIndex: packIdx, pack: localPack)
           allocStack = alloc
@@ -471,18 +473,21 @@ private struct PackExplodedFunction {
     // Explode results
     for (idx, resultInfos) in resultMap.reversed() {
 
-      let (localPack, packType, ownership) = prepareExplosion(idx)
+      let (localPack, packType) = prepareExplosion(idx)
 
       var mappings = [ExplodedArgument]()
       var insertArgumentPosition = idx
-      for (i, type) in packType.packElements.enumerated() {
+      for (i, (type, resultInfo)) in zip(packType.packElements, resultInfos).enumerated() {
         let packIdx = builder.createScalarPackIndex(
           componentIndex: i, indexedPackType: self.packASTTypes[idx]!)
 
         let allocStack: AllocStackInst?
-        if resultInfos[i].isSILIndirect {
+        if resultInfo.isSILIndirect {
           let argument = entryBlock.insertFunctionArgument(
-            atPosition: insertArgumentPosition, type: type, ownership: ownership, specContext)
+            atPosition: insertArgumentPosition, type: type,
+            ownership: opt.getValueOwnership(
+              type: type, convention: ArgumentConvention(result: resultInfo.convention)),
+            specContext)
           builder.createPackElementSet(elementValue: argument, packIndex: packIdx, pack: localPack)
           allocStack = nil
           insertArgumentPosition += 1
@@ -647,7 +652,9 @@ private func explodedPackElementResultConvention(in function: Function, elem: Ty
   }
 }
 
-private func storeOwnership(for value: any Value, normal: StoreInst.StoreOwnership) -> StoreInst.StoreOwnership {
+private func storeOwnership(for value: any Value, normal: StoreInst.StoreOwnership)
+  -> StoreInst.StoreOwnership
+{
   let function = value.parentFunction
   if !function.hasOwnership {
     return .unqualified
