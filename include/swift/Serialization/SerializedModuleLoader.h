@@ -583,9 +583,9 @@ bool extractCompilerFlagsFromInterface(
 llvm::VersionTuple extractUserModuleVersionFromInterface(StringRef moduleInterfacePath);
 
 /// Extract embedded bridging header from binary module.
-std::string
+std::unique_ptr<llvm::MemoryBuffer>
 extractEmbeddedBridgingHeaderContent(std::unique_ptr<llvm::MemoryBuffer> file,
-                                     ASTContext &Context);
+                                     StringRef headerPath, ASTContext &Context);
 } // end namespace swift
 
 #endif

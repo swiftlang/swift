@@ -675,9 +675,9 @@ public:
   }
 
   /// Get embedded bridging header.
-  std::string getEmbeddedHeader() const {
+  StringRef getEmbeddedHeader() const {
     // Don't include the '\0' in the end.
-    return importedHeaderInfo.contents.drop_back().str();
+    return importedHeaderInfo.contents.drop_back();
   }
 
   /// If the module-defining `.swiftinterface` file is an SDK-relative path,

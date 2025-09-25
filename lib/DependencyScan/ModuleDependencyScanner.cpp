@@ -1364,12 +1364,8 @@ void ModuleDependencyScanner::resolveHeaderDependenciesForModule(
     if (!moduleBuf)
       return nullptr;
 
-    auto content = extractEmbeddedBridgingHeaderContent(std::move(*moduleBuf),
-                                                        ScanASTContext);
-    if (content.empty())
-      return nullptr;
-
-    return llvm::MemoryBuffer::getMemBufferCopy(content, header);
+    return extractEmbeddedBridgingHeaderContent(std::move(*moduleBuf), header,
+                                                ScanASTContext);
   };
 
   if (isBinaryModuleWithHeaderInput) {
@@ -1643,28 +1639,24 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
                 allModules.end(), action);
 }
 
+static void appendHeaderContent(llvm::raw_ostream &OS,
+                                llvm::MemoryBufferRef buffer,
+                                ModuleDependencyID fromModule) {
+  // Use preprocessor directives to add some clues for where the content is
+  // coming from.
+  OS << "# 1 \"<module-" << fromModule.ModuleName << ">/"
+     << llvm::sys::path::filename(buffer.getBufferIdentifier()) << "\" 1\n";
+  OS << buffer.getBuffer();
+}
+
 llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
     const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
     ModuleDependencyIDSetVector &allModules) {
   if (rootModuleID.Kind != ModuleDependencyKind::SwiftSource)
     return llvm::Error::success();
 
-  bool hasBridgingHeader = false;
-  llvm::vfs::OnDiskOutputBackend outputBackend;
-
-  SmallString<256> outputPath(
-      ScanCompilerInvocation.getFrontendOptions().ScannerOutputDir);
-
-  if (outputPath.empty())
-    outputPath = "/<compiler-generated>";
-
-  llvm::sys::path::append(
-      outputPath, ScanCompilerInvocation.getFrontendOptions().ModuleName + "-" +
-                      ScanCompilerInvocation.getModuleScanningHash() +
-                      "-ChainedBridgingHeader.h");
-
-  llvm::SmallString<256> sourceBuf;
-  llvm::raw_svector_ostream outOS(sourceBuf);
+  llvm::SmallString<256> chainedHeaderBuffer;
+  llvm::raw_svector_ostream outOS(chainedHeaderBuffer);
 
   // Iterate through all the modules and collect all the bridging header
   // and chain them into a single file. The allModules list is in the order of
@@ -1672,16 +1664,14 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
   // buffer.
   auto FS = ScanASTContext.SourceMgr.getFileSystem();
   for (const auto &moduleID : allModules) {
-    if (moduleID.Kind != ModuleDependencyKind::SwiftSource &&
-        moduleID.Kind != ModuleDependencyKind::SwiftBinary)
+    if (moduleID.Kind != ModuleDependencyKind::SwiftBinary)
       continue;
 
     auto moduleDependencyInfo = cache.findKnownDependency(moduleID);
     if (auto *binaryMod = moduleDependencyInfo.getAsSwiftBinaryModule()) {
       if (!binaryMod->headerImport.empty()) {
-        hasBridgingHeader = true;
-        if (FS->exists(binaryMod->headerImport)) {
-          outOS << "#include \"" << binaryMod->headerImport << "\"\n";
+        if (auto buffer= FS->getBufferForFile(binaryMod->headerImport)) {
+          appendHeaderContent(outOS, (*buffer)->getMemBufferRef(), moduleID);
         } else {
           // Extract the embedded bridging header
           auto moduleBuf = FS->getBufferForFile(binaryMod->compiledModulePath);
@@ -1689,39 +1679,76 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
             return llvm::errorCodeToError(moduleBuf.getError());
 
           auto content = extractEmbeddedBridgingHeaderContent(
-              std::move(*moduleBuf), ScanASTContext);
-          if (content.empty())
+              std::move(*moduleBuf), /*headerPath=*/"", ScanASTContext);
+          if (!content)
             return llvm::createStringError("can't load embedded header from " +
                                            binaryMod->compiledModulePath);
 
-          outOS << content << "\n";
+          outOS << content->getBuffer() << "\n";
         }
-      }
-    } else if (auto *srcMod = moduleDependencyInfo.getAsSwiftSourceModule()) {
-      if (srcMod->textualModuleDetails.bridgingHeaderFile) {
-        hasBridgingHeader = true;
-        outOS << "#include \""
-              << *srcMod->textualModuleDetails.bridgingHeaderFile << "\"\n";
       }
     }
   }
 
-  if (!hasBridgingHeader)
-    return llvm::Error::success();
+  // Handle bridging header in main module.
+  auto mainModuleDeps = cache.findKnownDependency(rootModuleID);
+  auto *mainModule = mainModuleDeps.getAsSwiftSourceModule();
+  assert(mainModule && "expect main module to be a swift source module");
+  std::unique_ptr<llvm::MemoryBuffer> sourceBuffer;
+  bool needChainedHeader = !chainedHeaderBuffer.empty();
+  if (!needChainedHeader) {
+    // There is no bridging header chained from dependencies.
+    // If main module also has no bridging header, ther is nothing to scan.
+    if (!mainModule->textualModuleDetails.bridgingHeaderFile)
+      return llvm::Error::success();
 
-  if (ScanCompilerInvocation.getFrontendOptions().WriteScannerOutput) {
-    auto outFile = outputBackend.createFile(outputPath);
-    if (!outFile)
-      return outFile.takeError();
-    *outFile << sourceBuf;
-    if (auto err = outFile->keep())
-      return err;
+    // Otherwise, there is no chaining needed. Just use the bridging header from
+    // main module.
+    if (auto headerBuffer = FS->getBufferForFile(
+            *mainModule->textualModuleDetails.bridgingHeaderFile))
+      sourceBuffer = std::move(*headerBuffer);
+    else
+      return llvm::errorCodeToError(headerBuffer.getError());
+  } else {
+    // There are bridging header needed to be chained. Append the bridging
+    // header from main module if needed and create use a new source buffer.
+    if (mainModule->textualModuleDetails.bridgingHeaderFile) {
+      auto srcBuf = FS->getBufferForFile(
+          *mainModule->textualModuleDetails.bridgingHeaderFile);
+      if (!srcBuf)
+        return llvm::errorCodeToError(srcBuf.getError());
+      appendHeaderContent(outOS, (*srcBuf)->getMemBufferRef(), rootModuleID);
+    }
+
+    SmallString<256> outputPath(
+        ScanCompilerInvocation.getFrontendOptions().ScannerOutputDir);
+
+    if (outputPath.empty())
+      outputPath = "/<compiler-generated>";
+
+    // Use the hash of the file content to differentiate the chained header.
+    auto fileHash =
+        llvm::toString(llvm::APInt(64, llvm::hash_value(chainedHeaderBuffer)),
+                       36, /*Signed=*/false);
+    llvm::sys::path::append(
+        outputPath, ScanCompilerInvocation.getFrontendOptions().ModuleName +
+                        "-" + fileHash + "-ChainedBridgingHeader.h");
+
+    if (ScanCompilerInvocation.getFrontendOptions().WriteScannerOutput) {
+      llvm::vfs::OnDiskOutputBackend outputBackend;
+      auto outFile = outputBackend.createFile(outputPath);
+      if (!outFile)
+        return outFile.takeError();
+      *outFile << chainedHeaderBuffer;
+      if (auto err = outFile->keep())
+        return err;
+    }
+
+    sourceBuffer =
+        llvm::MemoryBuffer::getMemBufferCopy(chainedHeaderBuffer, outputPath);
   }
 
-  auto sourceBuffer =
-      llvm::MemoryBuffer::getMemBufferCopy(sourceBuf, outputPath);
   // Scan and update the main module dependency.
-  auto mainModuleDeps = cache.findKnownDependency(rootModuleID);
   ModuleDependencyIDSetVector headerClangModuleDependencies;
   std::optional<std::string> includeTreeID;
   auto err = withDependencyScanningWorker(
@@ -1740,7 +1767,8 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
 
         if (!headerScanResult)
           return llvm::createStringError(
-              "failed to scan generated bridging header " + outputPath);
+              "failed to scan generated bridging header " +
+              sourceBuffer->getBufferIdentifier());
 
         // Record module dependencies for each new module we found.
         cache.recordClangDependencies(
@@ -1781,9 +1809,25 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
         }
         mainModuleDeps.updateBridgingHeaderCommandLine(
             bridgingHeaderCommandLine);
+        if (needChainedHeader) {
+          // As only the chained bridging header is scanned, the dependency will
+          // not include the original bridging header passed by user. Fixup the
+          // headerFileInputs to include original bridging header and not
+          // include the generated header so build system can correctly computes
+          // the dependencies.
+          auto generated =
+              llvm::find(headerFileInputs, sourceBuffer->getBufferIdentifier());
+          if (generated != headerFileInputs.end()) {
+            if (mainModule->textualModuleDetails.bridgingHeaderFile)
+              *generated = *mainModule->textualModuleDetails.bridgingHeaderFile;
+            else
+              headerFileInputs.erase(generated);
+          }
+        }
         mainModuleDeps.setHeaderSourceFiles(headerFileInputs);
-        mainModuleDeps.setChainedBridgingHeaderBuffer(
-            outputPath, sourceBuffer->getBuffer());
+        if (needChainedHeader)
+          mainModuleDeps.setChainedBridgingHeaderBuffer(
+              sourceBuffer->getBufferIdentifier(), sourceBuffer->getBuffer());
         // Update the set of visible Clang modules
         mainModuleDeps.addVisibleClangModules(headerScanResult->VisibleModules);
 
