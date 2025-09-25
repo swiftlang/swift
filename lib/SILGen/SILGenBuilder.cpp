@@ -537,6 +537,10 @@ static ManagedValue createInputFunctionArgument(
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
     }
+
+    // ManualOwnership checks everything for implicit copies already.
+    if (B.hasManualOwnershipAttr())
+      isNoImplicitCopy = false;
   }
   if (isNoImplicitCopy)
     arg->setNoImplicitCopy(isNoImplicitCopy);

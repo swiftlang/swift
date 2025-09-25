@@ -497,6 +497,11 @@ void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
     return;
   }
 
+  // Don't allow it to be combined with ManualOwnership.
+  if (D->getASTContext().LangOpts.hasFeature(Feature::ManualOwnership)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_manual_ownership_noimplicitcopy);
+  }
+
   if (auto *funcDecl = dyn_cast<FuncDecl>(D)) {
     if (visitOwnershipAttr(attr))
       return;

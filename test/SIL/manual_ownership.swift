@@ -64,6 +64,26 @@ public func basic_return3() -> Triangle {
 }
 
 @_manualOwnership
+func return_borrowed(_ t: borrowing Triangle) -> Triangle {
+  return t // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+}
+@_manualOwnership
+func return_borrowed_fixed(_ t: borrowing Triangle) -> Triangle {
+  return copy t
+}
+
+// FIXME: copy propagation isn't able to simplify this. No copy should be required.
+@_manualOwnership
+func return_consumingParam(_ t: consuming Triangle) -> Triangle { // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+  return t
+}
+
+@_manualOwnership
+func return_owned(_ t: __owned Triangle) -> Triangle {
+  return t
+}
+
+@_manualOwnership
 func reassign_with_lets() -> Triangle {
   let x = Triangle()
   let y = x
@@ -136,13 +156,32 @@ func basic_function_call(_ t1: Triangle) {
 
 /// MARK: control-flow
 
+@_manualOwnership
+func check_vars(_ t: Triangle, _ b: Bool) -> Triangle {
+  var x = Triangle()
+  if b { x = t } // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+  return x // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
+}
+@_manualOwnership
+func check_vars_fixed(_ t: Triangle, _ b: Bool) -> Triangle {
+  var x = Triangle()
+  if b { x = copy t }
+  return copy x
+}
 
-// FIXME: var assignments are somtimes impossible to satisfy with 'copy'
+// FIXME: var's still have some issues.
+// (1) MandatoryRedundantLoadElimination introduces a 'copy_value' in place of a 'load [copy]'
 
+// @_manualOwnership
+// func reassignments_0() -> Triangle {
+//   var t3 = Triangle()
+//   t3 = Triangle()
+//   return t3
+// }
 // @_manualOwnership
 // func reassignments_1() {
 //   var t3 = Triangle()
-//   t3 = copy Triangle()  // FIXME: should not be needed
+//   t3 = Triangle()
 //   t3.borrowing()
 // }
 // @_manualOwnership
@@ -172,9 +211,8 @@ public func basic_loop_trivial_values_fixed(_ t: Triangle, _ xs: [Triangle]) {
 // FIXME: the only reason for so many copies below is because
 // `Triangle.nontrivial` only exposes get/set rather than read/modify by default
 //
-// We should figure out when the coroutine accessors are generated, and ensure
-// that when it is available, it is used without copying the result, rather than
-// calling the get/set
+// There's complexity in auto-generating a read accessor for classes, but if it's provided
+// we could then allow someone to elide the copy with a `borrow x` expression.
 
 @_manualOwnership
 public func basic_loop_nontrivial_values(_ t: Triangle, _ xs: [Triangle]) {
@@ -185,14 +223,35 @@ public func basic_loop_nontrivial_values(_ t: Triangle, _ xs: [Triangle]) {
   t.nontrivial.a = p // expected-error {{accessing 't.nontrivial' produces a copy of it}}
 }
 
-// FIXME: there should be no copies required in the below, other than what's already written.
 @_manualOwnership
 public func basic_loop_nontrivial_values_fixed(_ t: Triangle, _ xs: [Triangle]) {
-  var p: Pair = (copy t.nontrivial).a  // expected-error {{accessing 't.nontrivial' produces a copy of it}}
+  var p: Pair = (copy t.nontrivial).a
   for x in copy xs {
-    p = p.midpoint((copy x.nontrivial).a) // expected-error {{accessing 'x.nontrivial' produces a copy of it}}
+    p = p.midpoint((copy x.nontrivial).a)
   }
-  (copy t.nontrivial).a = p // expected-error {{accessing 't.nontrivial' produces a copy of it}}
+  (copy t.nontrivial).a = p
+}
+
+@_manualOwnership
+public func basic_loop_nontrivial_values_reduced_copies(_ t: Triangle, _ xs: [Triangle]) {
+  // FIXME: confusing variable names are chosen
+  let nt = t.nontrivial // expected-error {{accessing 'nt' produces a copy of it}}
+  var p: Pair = nt.a
+  for x in copy xs {
+    let xnt = x.nontrivial // expected-error {{accessing 'xnt' produces a copy of it}}
+    p = p.midpoint(xnt.a)
+  }
+  nt.a = p
+}
+@_manualOwnership
+public func basic_loop_nontrivial_values_reduced_copies_fixed(_ t: Triangle, _ xs: [Triangle]) {
+  let nt = copy t.nontrivial
+  var p: Pair = nt.a
+  for x in copy xs {
+    let xnt = copy x.nontrivial
+    p = p.midpoint(xnt.a)
+  }
+  nt.a = p
 }
 
 
@@ -212,35 +271,52 @@ return (copy ref_result)[2]
 
 /// MARK: closures
 
-// FIXME: (1) Closure capture lists need to support the short-hand [copy t] and produce explicit copies.
-//            We also need a better error message for when this is missed for closure captures.
-//        (2) Escaping closures need to be recursively checked by the PerformanceDiagnostics.
-//            We might just need to widen the propagation of [manual_ownership]?
-//        (3) Autoclosures have no ability to annotate captures. Is that OK?
-
 @_manualOwnership
 func closure_basic(_ t: Triangle) -> () -> Triangle {
-  return { return t } // expected-error {{ownership of 't' is demanded by a closure}}
+  return { // expected-error {{ownership of 't' is demanded by a closure}}
+    return t // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+  }
 }
 @_manualOwnership
+func closure_basic_almost_fixed_1(_ t: Triangle) -> () -> Triangle {
+  // FIXME: Closure capture lists need to support the short-hand [copy t] that makes the
+  //        closure capture parameter @owned, rather than @guaranteed. Only can work for Copyable types!
+  return { [x = copy t] in
+    return x // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
+  }
+}
+
+@_manualOwnership
+func closure_basic_almost_fixed_2(_ t: Triangle) -> () -> Triangle {
+  return { // expected-error {{ownership of 't' is demanded by a closure}}
+    return copy t
+  }
+}
+
+@_manualOwnership
 func closure_basic_fixed(_ t: Triangle) -> () -> Triangle {
-  return { [t = copy t] in return t }
+  return { [x = copy t] in
+    return copy x
+  }
 }
 
 @_manualOwnership
 func closure_copies_in_body(_ t: Triangle) -> () -> Triangle {
-  return { [t = copy t] in
-    eat(t) // FIXME: missing required copies
-    eat(t)
-    return t }
+  return { [x = copy t] in
+    eat(x) // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
+    use(x)
+    eat(x) // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
+    return x // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
+    }
 }
 
 @_manualOwnership
 func closure_copies_in_body_noescape(_ t: Triangle) -> Triangle {
-  let f = { [t = copy t] in
-    eat(t)  // FIXME: missing required copies
-    eat(t)
-    return t
+  let f = { [x = copy t] in
+    eat(x)  // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
+    use(x)
+    eat(x) // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
+    return x // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
   }
   return f()
 }
@@ -256,7 +332,32 @@ func try_to_assert(_ n: Int, _ names: [String]) {
 
 @_manualOwnership
 func copy_in_autoclosure(_ t: Triangle) {
-  simple_assert(consumingFunc(t)) // FIXME: missing required copies
+  simple_assert(consumingFunc(t)) // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+}
+@_manualOwnership
+func copy_in_autoclosure_fixed(_ t: Triangle) {
+  simple_assert(consumingFunc(copy t))
+}
+
+@_manualOwnership
+func nested_closures(_ t: Triangle) -> () -> (() -> Triangle) {
+  return { // expected-error {{ownership of 't' is demanded by a closure}}
+    { eat(t) }() // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+    return { // expected-error {{ownership of 't' is demanded by a closure}}
+      simple_assert(consumingFunc(t)) // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+      return t // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+    }
+  }
+}
+@_manualOwnership
+func nested_closures_fixed(_ t: Triangle) -> () -> (() -> Triangle) {
+  return { [a = copy t] in
+    { eat(copy a) }()
+    return { [b = copy a] in
+      simple_assert(consumingFunc(copy b))
+      return copy b
+    }
+  }
 }
 
 /// MARK: generics
@@ -299,4 +400,50 @@ func copy_generic_fixed<T>(_ t: T)  {
   consume_generic(copy t)
   borrow_generic(t)
   consume_generic(copy t)
+}
+
+@_manualOwnership
+func benchCaptureProp<S : Sequence>(
+  _ s: S, _ f: (S.Element, S.Element) -> S.Element) -> S.Element {
+
+  var it = s.makeIterator() // expected-error {{explicit 'copy' required here}}
+  let initial = it.next()!
+  return
+    IteratorSequence(it) // expected-error {{explicit 'copy' required here}}
+           .reduce(initial, f)
+}
+@_manualOwnership
+func benchCaptureProp_fixed<S : Sequence>(
+  _ s: S, _ f: (S.Element, S.Element) -> S.Element) -> S.Element {
+
+  var it = (copy s).makeIterator()
+  let initial = it.next()!
+  return
+    IteratorSequence(copy it)
+           .reduce(initial, f)
+}
+
+extension FixedWidthInteger {
+    @_manualOwnership
+    func leftRotate(_ distance: Int) -> Self {
+        return (self << distance) | (self >> (Self.bitWidth - distance))
+    }
+
+    @_manualOwnership
+    mutating func rotatedLeft(_ distance: Int) {
+        // FIXME: this doesn't appear to be solvable
+        self = (copy self).leftRotate(distance) // expected-error {{explicit 'copy' required here}}
+    }
+}
+
+struct CollectionOf32BitLittleEndianIntegers<BaseCollection: Collection> where BaseCollection.Element == UInt8 {
+    var baseCollection: BaseCollection
+
+    @_manualOwnership
+    init(_ baseCollection: BaseCollection) {
+        precondition(baseCollection.count % 4 == 0)
+        self.baseCollection = baseCollection // expected-error {{explicit 'copy' required here}}
+    } // expected-error {{explicit 'copy' required here}}
+
+    // FIXME: the above initializer shouldn't have any diagnostics
 }
