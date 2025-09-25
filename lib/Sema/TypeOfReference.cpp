@@ -2392,13 +2392,13 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
 
     if (auto *existential = paramTy->getAs<ExistentialType>()) {
       paramTy = existential->getSuperclass();
-      assert(isKnownKeyPathType(paramTy));
+      assert(paramTy->isKnownKeyPathType());
     }
 
     auto keyPathTy = paramTy->castTo<BoundGenericType>();
 
     auto *keyPathDecl = keyPathTy->getAnyNominal();
-    assert(isKnownKeyPathType(keyPathTy) &&
+    assert(keyPathTy->isKnownKeyPathType() &&
            "parameter is supposed to be a keypath");
 
     auto *keyPathLoc = getConstraintLocator(

@@ -56,7 +56,7 @@ struct BaseStruct<T> {
 
   var unavailableGetter: T {
     @available(*, unavailable)
-    get { fatalError() } // expected-note 69 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
+    get { fatalError() } // expected-note 73 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
     set { }
   }
 
@@ -68,7 +68,7 @@ struct BaseStruct<T> {
 
   var unavailableGetterAndSetter: T {
     @available(*, unavailable)
-    get { fatalError() } // expected-note 68 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    get { fatalError() } // expected-note 71 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
     @available(*, unavailable)
     set { fatalError() } // expected-note 33 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
   }
@@ -114,11 +114,6 @@ struct SubscriptHelper {
 
 @discardableResult func takesInOut<T>(_ t: inout T) -> T {
   return t
-}
-
-func takesKeyPath<T, U>(_ t: T, _ keyPath: KeyPath<T, U>) -> () { }
-func takesWritableKeyPath<T, U>(_ t: inout T, _ keyPath: WritableKeyPath<T, U>) -> () {
-  // expected-note@-1 2 {{in call to function 'takesWritableKeyPath'}}
 }
 
 func testDiscardedRValueLoads_Struct() {
@@ -548,12 +543,43 @@ func testDiscardedApplyOfFuncWithInOutParam_Class() {
 func testKeyPathArguments_Struct() {
   var x = BaseStruct<StructValue>()
 
+  func takesKeyPath<T, U>(_ t: T, _ keyPath: KeyPath<T, U>) -> () { }
+
   takesKeyPath(x, \.available)
   takesKeyPath(x, \.unavailableGetter) // expected-error {{getter for 'unavailableGetter' is unavailable}}
   takesKeyPath(x, \.unavailableSetter)
   takesKeyPath(x, \.unavailableGetterAndSetter) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
   takesKeyPath(x, \.deprecatedGetter) // expected-warning {{getter for 'deprecatedGetter' is deprecated: reading not recommended}}
   takesKeyPath(x, \.deprecatedSetter)
+
+  func takesAnyKeyPath(_ keyPath: AnyKeyPath) -> () { }
+
+  takesAnyKeyPath(\BaseStruct<StructValue>.available)
+  takesAnyKeyPath(\BaseStruct<StructValue>.unavailableGetter) // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  takesAnyKeyPath(\BaseStruct<StructValue>.unavailableSetter)
+  takesAnyKeyPath(\BaseStruct<StructValue>.unavailableGetterAndSetter) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  takesAnyKeyPath(\BaseStruct<StructValue>.deprecatedGetter) // expected-warning {{getter for 'deprecatedGetter' is deprecated: reading not recommended}}
+  takesAnyKeyPath(\BaseStruct<StructValue>.deprecatedSetter)
+
+  func takesPartialKeyPath<T>(_ t: T, _ keyPath: PartialKeyPath<T>) -> () { }
+  takesPartialKeyPath(x, \.available)
+  takesPartialKeyPath(x, \.unavailableGetter) // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  takesPartialKeyPath(x, \.unavailableSetter)
+  takesPartialKeyPath(x, \.unavailableGetterAndSetter) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  takesPartialKeyPath(x, \.deprecatedGetter) // expected-warning {{getter for 'deprecatedGetter' is deprecated: reading not recommended}}
+  takesPartialKeyPath(x, \.deprecatedSetter)
+
+  func takesSendableKeyPath<T, U>(_ t: T, _ keyPath: KeyPath<T, U> & Sendable) -> () { }
+
+  takesSendableKeyPath(x, \.available)
+  takesSendableKeyPath(x, \.unavailableGetter) // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  takesSendableKeyPath(x, \.unavailableSetter)
+  takesSendableKeyPath(x, \.unavailableGetterAndSetter) // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+  takesSendableKeyPath(x, \.deprecatedGetter) // expected-warning {{getter for 'deprecatedGetter' is deprecated: reading not recommended}}
+  takesSendableKeyPath(x, \.deprecatedSetter)
+
+  func takesWritableKeyPath<T, U>(_ t: inout T, _ keyPath: WritableKeyPath<T, U>) -> () { }
+  // expected-note@-1 2 {{in call to function 'takesWritableKeyPath'}}
 
   takesWritableKeyPath(&x, \.available)
   takesWritableKeyPath(&x, \.unavailableGetter) // expected-error {{getter for 'unavailableGetter' is unavailable}}
@@ -566,6 +592,14 @@ func testKeyPathArguments_Struct() {
   // expected-error@-1 {{generic parameter 'U' could not be inferred}}
   takesWritableKeyPath(&x, \.deprecatedGetter) // expected-warning {{getter for 'deprecatedGetter' is deprecated: reading not recommended}}
   takesWritableKeyPath(&x, \.deprecatedSetter) // expected-warning {{setter for 'deprecatedSetter' is deprecated: writing not recommended}}
+
+  func takesUnifiedTypes<T>(_: T, _: T) { }
+
+  takesUnifiedTypes(\BaseStruct<StructValue>.available, \BaseStruct<StructValue>.available)
+  takesUnifiedTypes(\BaseStruct<StructValue>.available, \BaseStruct<StructValue>.unavailableGetter) // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  takesUnifiedTypes(\BaseStruct<StructValue>.available, \BaseStruct<StructValue>.unavailableSetter)
+  takesUnifiedTypes(\BaseStruct<StructValue>.available, \BaseStruct<StructValue>.deprecatedSetter) // expected-warning {{setter for 'deprecatedSetter' is deprecated: writing not recommended}}
+  takesUnifiedTypes(\BaseStruct<StructValue>.unavailableSetter, \BaseStruct<StructValue>.deprecatedSetter)
 }
 
 var global = BaseStruct<StructValue>()

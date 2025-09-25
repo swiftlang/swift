@@ -5598,7 +5598,7 @@ bool ConstraintSystem::repairFailures(
     // fix-up here unless last component has already a invalid type or
     // instance fix recorded.
     if (isExpr<KeyPathExpr>(anchor)) {
-      if (isKnownKeyPathType(lhs) && isKnownKeyPathType(rhs)) {
+      if (lhs->isKnownKeyPathType() && rhs->isKnownKeyPathType()) {
         // If we have a conversion happening here, we should let fix happen in
         // simplifyRestrictedConstraint.
         if (hasAnyRestriction())
