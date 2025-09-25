@@ -3247,98 +3247,106 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
   Invoke-IsolatingEnvVars {
     $env:Path = "$(Get-CMarkBinaryCache $Platform)\src;$(Get-PinnedToolchainRuntime);${env:Path}"
 
+    Record-OperationTime $Platform "Build-ExperimentalDynamicDispatch" {
+      Build-CMakeProject `
+        -Src $SourceCache\swift-corelibs-libdispatch `
+        -Bin (Get-ProjectBinaryCache $Platform ExperimentalDynamicDispatch) `
+        -InstallTo "${SDKROOT}\usr" `
+        -Platform $Platform `
+        -UseBuiltCompilers C,CXX,Swift `
+        -SwiftSDK "${SDKROOT}" `
+        -Defines @{
+          BUILD_SHARED_LIBS = "YES";
+          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+          CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+          ENABLE_SWIFT = "YES";
+        }
+    }
+
+    Record-OperationTime $Platform "Build-ExperimentalStaticDispatch" {
+      Build-CMakeProject `
+        -Src $SourceCache\swift-corelibs-libdispatch `
+        -Bin (Get-ProjectBinaryCache $Platform ExperimentalStaticDispatch) `
+        -InstallTo "${SDKROOT}\usr" `
+        -Platform $Platform `
+        -UseBuiltCompilers C,CXX,Swift `
+        -SwiftSDK "${SDKROOT}" `
+        -Defines @{
+          BUILD_SHARED_LIBS = "NO";
+          CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
+          CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+          ENABLE_SWIFT = "YES";
+        }
+    }
+  }
+
+  Record-OperationTime $Platform "Build-ExperimentalDynamicFoundation" {
     Build-CMakeProject `
-      -Src $SourceCache\swift-corelibs-libdispatch `
-      -Bin (Get-ProjectBinaryCache $Platform ExperimentalDynamicDispatch) `
+      -Src $SourceCache\swift-corelibs-foundation `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalDynamicFoundation) `
       -InstallTo "${SDKROOT}\usr" `
       -Platform $Platform `
-      -UseBuiltCompilers C,CXX,Swift `
+      -UseBuiltCompilers ASM,C,CXX,Swift `
       -SwiftSDK "${SDKROOT}" `
       -Defines @{
         BUILD_SHARED_LIBS = "YES";
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        ENABLE_TESTING = "NO";
 
-        ENABLE_SWIFT = "YES";
-      }
-
-    Build-CMakeProject `
-      -Src $SourceCache\swift-corelibs-libdispatch `
-      -Bin (Get-ProjectBinaryCache $Platform ExperimentalStaticDispatch) `
-      -InstallTo "${SDKROOT}\usr" `
-      -Platform $Platform `
-      -UseBuiltCompilers C,CXX,Swift `
-      -SwiftSDK "${SDKROOT}" `
-      -Defines @{
-        BUILD_SHARED_LIBS = "NO";
-        CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
-        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-
-        ENABLE_SWIFT = "YES";
+        FOUNDATION_BUILD_TOOLS = "NO";
+        CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
+        LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
+        ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+        ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+          "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
+        } else {
+          "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
+        };
+        dispatch_DIR = $(Get-ProjectCMakeModules $Platform ExperimentalDynamicDispatch);
+        SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
+        _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
+        _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
+        _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
+        SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
       }
   }
 
-  Build-CMakeProject `
-    -Src $SourceCache\swift-corelibs-foundation `
-    -Bin (Get-ProjectBinaryCache $Platform ExperimentalDynamicFoundation) `
-    -InstallTo "${SDKROOT}\usr" `
-    -Platform $Platform `
-    -UseBuiltCompilers ASM,C,CXX,Swift `
-    -SwiftSDK "${SDKROOT}" `
-    -Defines @{
-      BUILD_SHARED_LIBS = "YES";
-      CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-      CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
-      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-      ENABLE_TESTING = "NO";
+  Record-OperationTime $Platform "Build-ExperimentalStaticFoundation" {
+    Build-CMakeProject `
+      -Src $SourceCache\swift-corelibs-foundation `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalStaticFoundation) `
+      -InstallTo "${SDKROOT}\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers ASM,C,CXX,Swift `
+      -SwiftSDK ${SDKROOT} `
+      -Defines @{
+        BUILD_SHARED_LIBS = "NO";
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
+        CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        ENABLE_TESTING = "NO";
 
-      FOUNDATION_BUILD_TOOLS = "NO";
-      CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
-      LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
-      ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
-      ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
-      } else {
-        "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
-      };
-      dispatch_DIR = $(Get-ProjectCMakeModules $Platform ExperimentalDynamicDispatch);
-      SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
-      _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
-      _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
-      _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
-      SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
-    }
-
-  Build-CMakeProject `
-    -Src $SourceCache\swift-corelibs-foundation `
-    -Bin (Get-ProjectBinaryCache $Platform ExperimentalStaticFoundation) `
-    -InstallTo "${SDKROOT}\usr" `
-    -Platform $Platform `
-    -UseBuiltCompilers ASM,C,CXX,Swift `
-    -SwiftSDK ${SDKROOT} `
-    -Defines @{
-      BUILD_SHARED_LIBS = "NO";
-      CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-      CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
-      CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
-      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-      ENABLE_TESTING = "NO";
-
-      FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
-      CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
-      LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
-      ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
-      ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
-      } else {
-        "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
-      };
-      dispatch_DIR = $(Get-ProjectCMakeModules $Platform ExperimentalStaticDispatch);
-      SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
-      _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
-      _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
-      _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
-      SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
+        FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
+        CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
+        LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
+        ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+        ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+          "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
+        } else {
+          "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
+        };
+        dispatch_DIR = $(Get-ProjectCMakeModules $Platform ExperimentalStaticDispatch);
+        SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
+        _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
+        _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
+        _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
+        SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
+      }
     }
 }
 
