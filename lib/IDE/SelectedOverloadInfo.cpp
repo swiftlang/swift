@@ -79,7 +79,7 @@ swift::ide::getSelectedOverloadInfo(const Solution &S,
         fnType->getParams()[0].getPlainType()->castTo<BoundGenericType>();
 
     auto *keyPathDecl = keyPathTy->getAnyNominal();
-    assert(isKnownKeyPathType(keyPathTy) &&
+    assert(keyPathTy->isKnownKeyPathType() &&
            "parameter is supposed to be a keypath");
 
     auto KeyPathDynamicLocator = CS.getConstraintLocator(
