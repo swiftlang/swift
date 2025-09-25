@@ -3108,6 +3108,12 @@ function Build-FoundationMacros([Hashtable] $Platform) {
 }
 
 function Build-XCTest([Hashtable] $Platform) {
+  $SwiftFlags = if ($Platform.OS -eq [OS]::Windows) {
+    @();
+  } else {
+    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\lib\swift");
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-xctest `
     -Bin (Get-ProjectBinaryCache $Platform XCTest) `
@@ -3118,6 +3124,7 @@ function Build-XCTest([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
+      CMAKE_Swift_FLAGS = $SwiftFlags;
       ENABLE_TESTING = "NO";
       XCTest_INSTALL_NESTED_SUBDIR = "YES";
     }
