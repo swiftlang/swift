@@ -105,6 +105,12 @@ GROUPED_WARNING(clang_ignored_sendable_attr, ClangDeclarationImport, none,
         "cannot be added to it",
         (Type))
 
+GROUPED_WARNING(warn_clang_ignored_bounds_on_self, ClangDeclarationImport, none,
+                "bounds attribute '%0' ignored on parameter mapped to 'self'",
+                (StringRef))
+NOTE(note_swift_name_instance_method, none,
+     "swift_name maps free function to instance method here", ())
+
 WARNING(implicit_bridging_header_imported_from_module,none,
         "implicit import of bridging header '%0' via module %1 "
         "is deprecated and will be removed in a later version of Swift",
