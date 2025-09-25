@@ -483,6 +483,7 @@ public:
   void visitAddressableSelfAttr(AddressableSelfAttr *attr);
   void visitAddressableForDependenciesAttr(AddressableForDependenciesAttr *attr);
   void visitUnsafeAttr(UnsafeAttr *attr);
+  void visitUnsafeSelfDependentResultAttr(UnsafeSelfDependentResultAttr *attr);
 };
 
 } // end anonymous namespace
@@ -8459,6 +8460,18 @@ void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
       .highlight(safeAttr->getRange())
       .warnInSwiftInterface(D->getDeclContext());
   }
+}
+
+void AttributeChecker::visitUnsafeSelfDependentResultAttr(
+    UnsafeSelfDependentResultAttr *attr) {
+  // TODO: Introduce a new experimental feature and check for presence
+  auto *accessor = dyn_cast<AccessorDecl>(D);
+  if (accessor &&
+      (accessor->isBorrowAccessor() || accessor->isMutateAccessor())) {
+    return;
+  }
+  Ctx.Diags.diagnose(attr->getLocation(),
+                     diag::unsafe_self_dependent_result_attr_on_invalid_decl);
 }
 
 namespace {

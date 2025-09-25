@@ -738,17 +738,18 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     }
   } else if (F.getConventions().hasGuaranteedResult() ||
              F.getConventions().hasGuaranteedAddressResult()) {
-    // If the return expression is a literal, emit as a regular return
-    // expression/
+    auto *afd = cast<AbstractFunctionDecl>(FunctionDC->getAsDecl());
     if (isa<LiteralExpr>(ret)) {
+      // If the return expression is a literal, emit as a regular return
+      // expression.
       auto RV = emitRValue(ret);
       std::move(RV).forwardAll(*this, directResults);
     } else {
-      // If the return expression is not a projection, diagnose as error.
       FormalEvaluationScope scope(*this);
       auto storageRefResult =
           StorageRefResult::findStorageReferenceExprForBorrow(ret);
       auto lvExpr = storageRefResult.getTransitiveRoot();
+      // If the return expression is not an lvalue, diagnose.
       if (!lvExpr) {
         diagnose(getASTContext(), ret->getStartLoc(),
                  diag::invalid_borrow_accessor_return);
@@ -756,17 +757,7 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                  diag::borrow_accessor_not_a_projection_note);
         return;
       }
-      // If the return expression is not a projection of self, diagnose as
-      // error.
-      auto *baseExpr = lookThroughProjections(storageRefResult.getStorageRef());
-      if (!baseExpr->isSelfExprOf(
-              cast<AbstractFunctionDecl>(FunctionDC->getAsDecl()))) {
-        diagnose(getASTContext(), ret->getStartLoc(),
-                 diag::invalid_borrow_accessor_return);
-        diagnose(getASTContext(), ret->getStartLoc(),
-                 diag::borrow_accessor_not_a_projection_note);
-        return;
-      }
+
       // Emit return value at +0.
       LValueOptions options;
       auto lvalue = emitLValue(ret,
@@ -776,34 +767,71 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                                F.getConventions().hasGuaranteedResult()
                                    ? options.forGuaranteedReturn(true)
                                    : options.forGuaranteedAddressReturn(true));
-      auto result =
-          tryEmitProjectedLValue(ret, std::move(lvalue), TSanKind::None);
-      if (!result) {
-        diagnose(getASTContext(), ret->getStartLoc(),
-                 diag::invalid_borrow_accessor_return);
-        diagnose(getASTContext(), ret->getStartLoc(),
-                 diag::borrow_accessor_not_a_projection_note);
-        return;
-      }
-      // For now diagnose multiple return statements in borrow/mutate accessors.
-      // We need additional support for this.
-      // 1. Address phis are banned in SIL.
-      // 2. borrowed from is not inserted in SILGenCleanup.
-      if (!ReturnDest.getBlock()->getPredecessorBlocks().empty()) {
-        diagnose(getASTContext(), ret->getStartLoc(),
-                 diag::invalid_multiple_return_borrow_accessor);
-        return;
-      }
 
-      auto resultValue = result->getValue();
-      SILType selfType = F.getSelfArgument()->getType();
-      if (selfType.isMoveOnly() && F.getConventions().hasGuaranteedResult()) {
-        // If we are returning the result of borrow accessor, strip the
-        // unnecessary copy_value + mark_unresolved_non_copyable_value
-        // instructions.
-        resultValue = lookThroughMoveOnlyCheckerPattern(resultValue);
+      if (afd->getAttrs().hasAttribute<UnsafeSelfDependentResultAttr>()) {
+        // If the accessor is annotated with @_unsafeSelfDependentResultAttr,
+        // disable diagnosing the return expression.
+        // This is needed to implement borrow accessors for Unsafe*Pointer based
+        // Container types where the compiler cannot analyze the safety of
+        // return expressions based on pointer arithmetic and unsafe addressors.
+        // Example:
+        // public struct Container<Element: ~Copyable>: ~Copyable {
+        //   var _storage: UnsafeMutableBufferPointer<Element>
+        //   var _count: Int
+        //
+        //   public subscript(index: Int) -> Element {
+        //     @_unsafeSelfDependentResult
+        //     borrow {
+        //       precondition(index >= 0 && index < _count, "Index out of
+        //       bounds") return
+        //       _storage.baseAddress.unsafelyUnwrapped.advanced(by:
+        //       index).pointee
+        //     }
+        //   }
+        // }
+        auto resultValue = emitBorrowedLValue(ret, std::move(lvalue));
+        directResults.push_back(resultValue.getValue());
+      } else {
+        // If the return expression is not a transitive projection of self,
+        // diagnose.
+        auto *baseExpr =
+            lookThroughProjections(storageRefResult.getStorageRef());
+        if (!baseExpr->isSelfExprOf(afd)) {
+          diagnose(getASTContext(), ret->getStartLoc(),
+                   diag::invalid_borrow_accessor_return);
+          diagnose(getASTContext(), ret->getStartLoc(),
+                   diag::borrow_accessor_not_a_projection_note);
+          return;
+        }
+        auto result =
+            tryEmitProjectedLValue(ret, std::move(lvalue), TSanKind::None);
+        if (!result) {
+          diagnose(getASTContext(), ret->getStartLoc(),
+                   diag::invalid_borrow_accessor_return);
+          diagnose(getASTContext(), ret->getStartLoc(),
+                   diag::borrow_accessor_not_a_projection_note);
+          return;
+        }
+        // For now diagnose multiple return statements in borrow/mutate
+        // accessors. We need additional support for this.
+        // 1. Address phis are banned in SIL.
+        // 2. borrowed from is not inserted in SILGenCleanup.
+        if (!ReturnDest.getBlock()->getPredecessorBlocks().empty()) {
+          diagnose(getASTContext(), ret->getStartLoc(),
+                   diag::invalid_multiple_return_borrow_accessor);
+          return;
+        }
+
+        auto resultValue = result->getValue();
+        SILType selfType = F.getSelfArgument()->getType();
+        if (selfType.isMoveOnly() && F.getConventions().hasGuaranteedResult()) {
+          // If we are returning the result of borrow accessor, strip the
+          // unnecessary copy_value + mark_unresolved_non_copyable_value
+          // instructions.
+          resultValue = lookThroughMoveOnlyCheckerPattern(resultValue);
+        }
+        directResults.push_back(resultValue);
       }
-      directResults.push_back(resultValue);
     }
   } else {
     // SILValue return.

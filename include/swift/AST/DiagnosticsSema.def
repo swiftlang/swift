@@ -8929,5 +8929,8 @@ ERROR(attr_inline_always_requires_inlinable,none,
 ERROR(attr_inline_always_no_usable_from_inline,none,
       "cannot use '@inline(always)' together with '@usableFromInline'", ())
 
+ERROR(unsafe_self_dependent_result_attr_on_invalid_decl,none,
+      "invalid use of @_unsafeSelfDependentResult", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
