@@ -6,6 +6,8 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
+include(SwiftUtils)
+
 # Following function are needed as a workaround until it's possible to compile
 # swift code with cmake's builtin swift support.
 
@@ -121,10 +123,19 @@ function(add_swift_compiler_modules_library name)
     list(APPEND swift_compile_options "-Xfrontend" "-cxx-interop-use-opaque-pointer-for-moveonly")
   endif()
 
-  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  is_build_type_with_debuginfo("${CMAKE_BUILD_TYPE}" debug)
+  if (debug)
     list(APPEND swift_compile_options "-g")
-  else()
-    list(APPEND swift_compile_options "-O" "-cross-module-optimization")
+  endif()
+
+  is_build_type_optimized("${CMAKE_BUILD_TYPE}" optimized)
+  if (optimized)
+    if("${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
+      list(APPEND swift_compile_options "-Osize")
+    else()
+      list(APPEND swift_compile_options "-O")
+    endif()
+    list(APPEND swift_compile_options "-cross-module-optimization")
   endif()
 
   if(LLVM_ENABLE_ASSERTIONS)
