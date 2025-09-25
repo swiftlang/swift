@@ -1309,6 +1309,15 @@ bool TypeBase::isCxxString() {
          ctx.Id_basic_string.is(clangDecl->getName());
 }
 
+bool TypeBase::isKnownKeyPathType() {
+  return isKeyPath() || isWritableKeyPath() || isReferenceWritableKeyPath() ||
+         isPartialKeyPath() || isAnyKeyPath();
+}
+
+bool TypeBase::isKnownImmutableKeyPathType() {
+  return isKeyPath() || isPartialKeyPath() || isAnyKeyPath();
+}
+
 bool TypeBase::isKnownStdlibCollectionType() {
   if (isArray() || isDictionary() || isSet()) {
     return true;

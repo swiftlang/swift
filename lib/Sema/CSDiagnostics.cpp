@@ -2262,7 +2262,7 @@ bool AssignmentFailure::diagnoseAsError() {
 
       auto type = getType(immutableExpr);
 
-      if (isKnownKeyPathType(type))
+      if (type->isKnownKeyPathType())
         message += " is read-only";
       else if (VD->isCaptureList())
         message += " is an immutable capture";
@@ -7487,7 +7487,7 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 
   // Unresolved key path argument requires a tailored diagnostic
   // that doesn't mention a fallback type - `KeyPath<_, _>`.
-  if (argType->isKeyPath() && !isKnownKeyPathType(paramType)) {
+  if (argType->isKeyPath() && !paramType->isKnownKeyPathType()) {
     auto keyPathTy = argType->castTo<BoundGenericType>();
     auto rootTy = keyPathTy->getGenericArgs()[0];
     if (rootTy->is<UnresolvedType>()) {
@@ -7852,7 +7852,7 @@ bool ArgumentMismatchFailure::diagnoseKeyPathAsFunctionResultMismatch() const {
   auto argType = getFromType();
   auto paramType = getToType();
 
-  if (!isKnownKeyPathType(argType))
+  if (!argType->isKnownKeyPathType())
     return false;
 
   auto kpType = argType->castTo<BoundGenericType>();

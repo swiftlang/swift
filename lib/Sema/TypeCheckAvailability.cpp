@@ -29,6 +29,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -2232,9 +2233,6 @@ class ExprAvailabilityWalker : public BaseDiagnosticWalker {
     /// The context does not involve a key path access.
     None,
 
-    /// The context is an expression that is coerced to a read-only key path.
-    ReadOnlyCoercion,
-
     /// The context is a key path application (`x[keyPath: \.member]`).
     Application,
   };
@@ -2360,15 +2358,6 @@ public:
                                           FCE->getType(),
                                           FCE->getLoc(),
                                           Where.getDeclContext());
-    }
-    if (auto DTBE = dyn_cast<DerivedToBaseExpr>(E)) {
-      if (auto ty = DTBE->getType()) {
-        if (ty->isKeyPath()) {
-          walkInKeyPathAccessContext(DTBE->getSubExpr(),
-                                     KeyPathAccessContext::ReadOnlyCoercion);
-          return Action::SkipChildren(E);
-        }
-      }
     }
     if (auto KP = dyn_cast<KeyPathExpr>(E)) {
       maybeDiagKeyPath(KP);
@@ -2586,19 +2575,49 @@ private:
 
   StorageAccessKind getStorageAccessKindForKeyPath(KeyPathExpr *KP) const {
     switch (KeyPathAccess) {
-    case KeyPathAccessContext::None:
-      // Use the key path's type to determine the access kind.
-      if (!KP->isObjC())
-        if (auto keyPathType = KP->getKeyPathType())
-          if (keyPathType->isKeyPath())
+    case KeyPathAccessContext::None: {
+      // Obj-C key paths are always considered mutable.
+      if (KP->isObjC())
+        return StorageAccessKind::GetSet;
+
+      // Check whether key path type indicates immutability, in which case only
+      // the getter will be used.
+      if (auto keyPathType = KP->getKeyPathType())
+        if (keyPathType->isKnownImmutableKeyPathType())
+          return StorageAccessKind::Get;
+
+      // Check if there's a conversion expression containing this one directly
+      // above it in the stack. If so, and that conversion is to an immutable
+      // key path type, then we should infer that use of the key path only
+      // implies use of the getter.
+      ArrayRef<const Expr *> exprs = ExprStack;
+      // Must be called while visiting the given key path expression.
+      ASSERT(exprs.back() == KP);
+
+      for (auto *expr : llvm::reverse(exprs.drop_back())) {
+        // Only traverse through conversions on the stack.
+        if (!isa<ImplicitConversionExpr>(expr) &&
+            !isa<OpenExistentialExpr>(expr))
+          break;
+
+        if (auto ty = expr->getType()) {
+          if (ty->isKnownImmutableKeyPathType())
             return StorageAccessKind::Get;
 
-      return StorageAccessKind::GetSet;
+          if (auto existential = dyn_cast<ExistentialType>(ty)) {
+            if (auto superclass =
+                    existential->getExistentialLayout().getSuperclass()) {
+              if (superclass->isKnownImmutableKeyPathType())
+                return StorageAccessKind::Get;
+            }
+          }
+        }
+      }
 
-    case KeyPathAccessContext::ReadOnlyCoercion:
-      // The type of this key path is being coerced to the type KeyPath<_, _> so
-      // ignore the actual key path type.
-      return StorageAccessKind::Get;
+      // We failed to prove that the key path is only used immutably,
+      // so diagnose both get and set access.
+      return StorageAccessKind::GetSet;
+    }
 
     case KeyPathAccessContext::Application:
       // The key path is being applied directly to a base so treat it as if it

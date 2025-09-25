@@ -4363,12 +4363,6 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
                                    fnInterfaceType, fnType, callee);
 }
 
-bool constraints::isKnownKeyPathType(Type type) {
-  return type->isKeyPath() || type->isWritableKeyPath() ||
-         type->isReferenceWritableKeyPath() || type->isPartialKeyPath() ||
-         type->isAnyKeyPath();
-}
-
 bool constraints::isTypeErasedKeyPathType(Type type) {
   assert(type);
 
