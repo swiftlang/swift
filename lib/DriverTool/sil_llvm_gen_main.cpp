@@ -167,6 +167,7 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
   IRGenOptions &Opts = Invocation.getIRGenOptions();
   Opts.OutputKind = options.OutputKind;
   Opts.DisableLegacyTypeInfo = options.DisableLegacyTypeInfo;
+  Invocation.computeAArch64TBIOptions();
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
