@@ -388,6 +388,11 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
       case SILInstructionKind::ExplicitCopyAddrInst:
       case SILInstructionKind::ExplicitCopyValueInst:
         break; // Explicitly acknowledged copies are OK.
+      case SILInstructionKind::CopyAddrInst: {
+        if (!cast<CopyAddrInst>(inst)->isTakeOfSrc())
+          shouldDiagnose = true; // If it isn't a [take], it's a copy.
+        break;
+      }
       case SILInstructionKind::LoadInst: {
         // FIXME: we don't have an `explicit_load` and transparent functions can
         //   end up bringing in a `load [copy]`. A better approach is needed to

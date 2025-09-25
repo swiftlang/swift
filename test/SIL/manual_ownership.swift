@@ -72,7 +72,7 @@ func return_borrowed_fixed(_ t: borrowing Triangle) -> Triangle {
   return copy t
 }
 
-// FIXME: copy propagation isn't able to simplify this. No copy should be required.
+// FIXME: copy propagation isn't able to simplify this. No copy should be required. (rdar://161359163)
 @_manualOwnership
 func return_consumingParam(_ t: consuming Triangle) -> Triangle { // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
   return t
@@ -95,7 +95,7 @@ func reassign_with_lets() -> Triangle {
 func renamed_return(_ cond: Bool, _ a: Triangle) -> Triangle {
   let b = a
   let c = b
-  // FIXME: we say 'c' instead of 'b', because of the propagation.
+  // FIXME: we say 'c' instead of 'b', because of the propagation. (rdar://161360537)
   if cond { return b } // expected-error {{ownership of 'c' is demanded}}
   return c // expected-error {{ownership of 'c' is demanded}}
 }
@@ -103,12 +103,12 @@ func renamed_return(_ cond: Bool, _ a: Triangle) -> Triangle {
 @_manualOwnership
 func renamed_return_fix1(_ cond: Bool, _ a: Triangle) -> Triangle {
   let b = copy a
-  let c = copy b  // FIXME: not needed! Is explicit_copy_value is blocking propagation?
+  let c = copy b  // FIXME: not needed! Is explicit_copy_value is blocking propagation? (rdar://161359163)
   if cond { return b }
   return c
 }
 
-// FIXME: this crashes CopyPropagation!
+// FIXME: this crashes CopyPropagation! (rdar://161360764)
 //@_manualOwnership
 //func renamed_return_fix2(_ cond: Bool, _ a: Triangle) -> Triangle {
 //  let b = a
@@ -169,8 +169,8 @@ func check_vars_fixed(_ t: Triangle, _ b: Bool) -> Triangle {
   return copy x
 }
 
-// FIXME: var's still have some issues.
-// (1) MandatoryRedundantLoadElimination introduces a 'copy_value' in place of a 'load [copy]'
+// FIXME: var's still have some issues
+// (1) MandatoryRedundantLoadElimination introduces a 'copy_value' in place of a 'load [copy]' (rdar://161359163)
 
 // @_manualOwnership
 // func reassignments_0() -> Triangle {
@@ -234,7 +234,7 @@ public func basic_loop_nontrivial_values_fixed(_ t: Triangle, _ xs: [Triangle]) 
 
 @_manualOwnership
 public func basic_loop_nontrivial_values_reduced_copies(_ t: Triangle, _ xs: [Triangle]) {
-  // FIXME: confusing variable names are chosen
+  // FIXME: confusing variable names are chosen (rdar://161360537)
   let nt = t.nontrivial // expected-error {{accessing 'nt' produces a copy of it}}
   var p: Pair = nt.a
   for x in copy xs {
@@ -379,7 +379,7 @@ func reassign_with_lets<T>(_ t: T) -> T {
   return copy z
 }
 
-// FIXME: there's copy propagation has no effect on address-only types.
+// FIXME: copy propagation has no effect on address-only types, so this is quite verbose.
 @_manualOwnership
 func reassign_with_lets_fixed<T>(_ t: T) -> T {
   let x = copy t
@@ -431,8 +431,7 @@ extension FixedWidthInteger {
 
     @_manualOwnership
     mutating func rotatedLeft(_ distance: Int) {
-        // FIXME: this doesn't appear to be solvable
-        self = (copy self).leftRotate(distance) // expected-error {{explicit 'copy' required here}}
+        self = (copy self).leftRotate(distance)
     }
 }
 
