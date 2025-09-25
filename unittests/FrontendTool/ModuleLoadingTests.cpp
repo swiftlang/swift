@@ -131,7 +131,7 @@ protected:
         SerializedModuleBaseName(tempDir, SerializedModuleBaseName("Library")),
         /*ModuleInterfacePath=*/nullptr, /*ModuleInterfaceSourcePath=*/nullptr,
         &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer,
-        /*skipBuildingInterface*/ false, /*IsFramework*/false);
+        /*isCanImportLookup*/ false, /*IsFramework*/false);
     ASSERT_FALSE(error);
     ASSERT_FALSE(diags.hadAnyError());
 

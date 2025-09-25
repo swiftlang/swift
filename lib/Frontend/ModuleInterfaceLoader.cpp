@@ -1336,8 +1336,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool IsFramework,
-    bool isTestableImport) {
+    bool IsCanImportLookup, bool IsFramework,
+    bool IsTestableImport) {
 
   // If running in OnlySerialized mode, ModuleInterfaceLoader
   // should not have been constructed at all.
@@ -1361,11 +1361,9 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   if (ModuleInterfaceSourcePath)
     ModuleInterfaceSourcePath->assign(InPath->begin(), InPath->end());
 
-  // If we've been told to skip building interfaces, we are done here and do
-  // not need to have the module actually built. For example, if we are
-  // currently answering a `canImport` query, it is enough to have found
-  // the interface.
-  if (skipBuildingInterface) {
+  // If we are currently answering a `canImport` query, it is enough to have
+  // found the interface.
+  if (IsCanImportLookup) {
     if (ModuleInterfacePath)
       ModuleInterfacePath->assign(InPath->begin(), InPath->end());
     return std::error_code();
@@ -2317,7 +2315,7 @@ bool ExplicitSwiftModuleLoader::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool isTestableDependencyLookup,
+    bool IsCanImportLookup, bool isTestableDependencyLookup,
     bool &IsFramework, bool &IsSystemModule) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
@@ -2396,7 +2394,7 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool IsFramework,
+    bool IsCanImportLookup, bool IsFramework,
     bool IsTestableDependencyLookup) {
   llvm_unreachable("Not supported in the Explicit Swift Module Loader.");
   return std::make_error_code(std::errc::not_supported);
@@ -2674,7 +2672,7 @@ bool ExplicitCASModuleLoader::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool isTestableDependencyLookup,
+    bool IsCanImportLookup, bool IsTestableDependencyLookup,
     bool &IsFramework, bool &IsSystemModule) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
@@ -2763,7 +2761,7 @@ std::error_code ExplicitCASModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool IsFramework,
+    bool IsCanImportLookup, bool IsFramework,
     bool IsTestableDependencyLookup) {
   llvm_unreachable("Not supported in the Explicit Swift Module Loader.");
   return std::make_error_code(std::errc::not_supported);
