@@ -1059,13 +1059,11 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
       GV->setSection(IRGenModule::ObjCClassNameSectionName);
       return;
     case ObjCLabelType::MethodVarName:
+    case ObjCLabelType::PropertyName:
       GV->setSection(IRGenModule::ObjCMethodNameSectionName);
       return;
     case ObjCLabelType::MethodVarType:
       GV->setSection(IRGenModule::ObjCMethodTypeSectionName);
-      return;
-    case ObjCLabelType::PropertyName:
-      GV->setSection(IRGenModule::ObjCMethodNameSectionName);
       return;
     }
   case llvm::Triple::ELF:
