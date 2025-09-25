@@ -18,6 +18,8 @@ func foo(_ p: inout MutableSpan<CInt>, a: A, aa: inout A, s: IntSpan, cs: ConstI
   aa.refSelf(&p)
   aa.namespaced(&p)
   b.decapseman(&p)
+  baz.bar(&aa, &p)
+  baz.this(&aa, &p)
 
   let _: IntSpan = unsafe s.spanSelf()
   let _: MutableSpan<CInt> = unsafe s.spanSelf()
@@ -62,6 +64,8 @@ ConstIntSpan constSpanSelf(ConstIntSpan p __lifetimebound) __attribute__((swift_
 namespace baz {
   void namespaced(A *a, IntSpan p __noescape) __attribute__((swift_name("A.namespaced(self:_:)")));
   struct B {};
+  void renamed(A &a, IntSpan p __noescape) __attribute__((swift_name("baz.bar(_:_:)")));
+  void that(A &a, IntSpan p __noescape) __attribute__((swift_name("this(_:_:)")));
 }
 
 void decapseman(baz::B *b, IntSpan p __noescape) __attribute__((swift_name("baz.B.decapseman(self:_:)")));
@@ -169,7 +173,7 @@ public mutating func refSelf(_ p: inout MutableSpan<CInt>) {
 @available(swift, obsoleted: 3, renamed: "A.refSelf(self:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func refSelf(_ a: inout A, _ p: inout MutableSpan<CInt>) {
     return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
-      return unsafe refSelf(a, IntSpan(_pPtr))
+      return unsafe refSelf(&a, IntSpan(_pPtr))
     }
 }
 ------------------------------
@@ -210,6 +214,46 @@ public mutating func decapseman(_ p: inout MutableSpan<CInt>)  {
 public func decapseman(_ b: UnsafeMutablePointer<baz.B>!, _ p: inout MutableSpan<CInt>) {
     return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
       return unsafe decapseman(b, IntSpan(_pPtr))
+    }
+}
+------------------------------
+@__swiftmacro_So3bazO8InstanceE3bar15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+public static func bar(_ a: inout A, _ p: inout MutableSpan<CInt>) {
+    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
+      return unsafe bar(&a, IntSpan(_pPtr))
+    }
+}
+------------------------------
+@__swiftmacro_So3bazO7renamed15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@available(swift, obsoleted: 3, renamed: "baz.bar(_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+  public static func renamed(_ a: inout A, _ p: inout MutableSpan<CInt>) {
+    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
+      return unsafe renamed(&a, IntSpan(_pPtr))
+    }
+}
+------------------------------
+@__swiftmacro_So3bazO4this15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+public static func this(_ a: inout A, _ p: inout MutableSpan<CInt>) {
+    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
+      return unsafe this(&a, IntSpan(_pPtr))
+    }
+}
+------------------------------
+@__swiftmacro_So3bazO4that15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@available(swift, obsoleted: 3, renamed: "this(_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+  public static func that(_ a: inout A, _ p: inout MutableSpan<CInt>) {
+    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
+      return unsafe that(&a, IntSpan(_pPtr))
     }
 }
 ------------------------------
