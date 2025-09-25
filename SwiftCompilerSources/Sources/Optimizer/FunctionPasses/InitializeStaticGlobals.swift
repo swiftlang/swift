@@ -233,17 +233,15 @@ private indirect enum GlobalInitValue {
   }
 
   private mutating func setEnumCase(to value: InitValue, at path: SmallProjectionPath, index: Int, type: Type) -> Bool {
-    switch value {
+    if path.isEmpty, case .enumCaseWithoutPayload(let iea) = value {
 
-    case .enumCaseWithoutPayload(let iea):
       guard case .undefined = self else {
         // The enum was set twice.
         return false
       }
       assert(index == iea.caseIndex)
       self = .enumCase(caseIndex: index)
-
-    case .value:
+    } else {
       guard let payloadType = type.getEnumCases(in: value.parentFunction)!.getPayloadType(ofCaseIndex: index) else {
         return false
       }
