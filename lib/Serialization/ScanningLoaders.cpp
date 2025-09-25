@@ -46,7 +46,7 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool IsFramework,
+    bool IsCanImportLookup, bool IsFramework,
     bool isTestableDependencyLookup) {
   using namespace llvm::sys;
 
@@ -105,6 +105,21 @@ bool SwiftModuleScanner::canImportModule(
 
   return SerializedModuleLoaderBase::canImportModule(
       path, loc, versionInfo, isTestableDependencyLookup);
+}
+
+bool SwiftModuleScanner::handlePossibleTargetMismatch(
+    SourceLoc sourceLocation, StringRef moduleName,
+    const SerializedModuleBaseName &absoluteBaseName,
+    bool isCanImportLookup) {
+  std::vector<std::string> foundIncompatibleArchModules;
+  identifyArchitectureVariants(Ctx, absoluteBaseName,
+                               foundIncompatibleArchModules);
+
+  for (const auto &modulePath : foundIncompatibleArchModules)
+    incompatibleCandidates.push_back({modulePath,
+                                      "invalid architecture"});
+
+  return false;
 }
 
 static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,

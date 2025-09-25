@@ -152,7 +152,7 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                  bool skipBuildingInterface, bool isTestableDependencyLookup,
+                  bool isCanImportLookup, bool isTestableDependencyLookup,
                   bool &isFramework, bool &isSystemModule) override;
 
   std::error_code findModuleFilesInDirectory(
@@ -162,7 +162,7 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool SkipBuildingInterface, bool IsFramework,
+      bool isCanImportLookup, bool IsFramework,
       bool IsTestableDependencyLookup = false) override;
 
   bool canImportModule(ImportPath::Module named, SourceLoc loc,
@@ -201,7 +201,7 @@ class ExplicitCASModuleLoader : public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                  bool skipBuildingInterface, bool isTestableDependencyLookup,
+                  bool isCanImportLookup, bool isTestableDependencyLookup,
                   bool &isFramework, bool &isSystemModule) override;
 
   std::error_code findModuleFilesInDirectory(
@@ -211,7 +211,7 @@ class ExplicitCASModuleLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool SkipBuildingInterface, bool IsFramework,
+      bool IsCanImportLookup, bool IsFramework,
       bool IsTestableDependencyLookup = false) override;
 
   bool canImportModule(ImportPath::Module named, SourceLoc loc,
@@ -561,7 +561,7 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-      bool SkipBuildingInterface, bool IsFramework,
+      bool IsCanImportLookup, bool IsFramework,
       bool IsTestableDependencyLookup = false) override;
 
   bool isCached(StringRef DepPath) override;

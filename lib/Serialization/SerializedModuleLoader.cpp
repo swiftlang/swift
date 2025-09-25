@@ -550,7 +550,7 @@ std::error_code ImplicitSerializedModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool IsFramework, bool IsTestableDependencyLookup) {
+    bool IsCanImportLookup, bool IsFramework, bool IsTestableDependencyLookup) {
   if (LoadMode == ModuleLoadingMode::OnlyInterface ||
       Ctx.IgnoreAdjacentModules)
     return std::make_error_code(std::errc::not_supported);
@@ -577,46 +577,60 @@ std::error_code ImplicitSerializedModuleLoader::findModuleFilesInDirectory(
   return std::error_code();
 }
 
-bool ImplicitSerializedModuleLoader::maybeDiagnoseTargetMismatch(
-    SourceLoc sourceLocation, StringRef moduleName,
-    const SerializedModuleBaseName &absoluteBaseName) {
+void SerializedModuleLoaderBase::identifyArchitectureVariants(
+    ASTContext &Ctx, const SerializedModuleBaseName &absoluteBaseName,
+    std::vector<std::string> &incompatibleArchModules) {
   llvm::vfs::FileSystem &fs = *Ctx.SourceMgr.getFileSystem();
-
-  // Get the last component of the base name, which is the target-specific one.
-  auto target = llvm::sys::path::filename(absoluteBaseName.baseName);
 
   // Strip off the last component to get the .swiftmodule folder.
   auto dir = absoluteBaseName.baseName;
   llvm::sys::path::remove_filename(dir);
 
   std::error_code errorCode;
-  std::string foundArchs;
   for (llvm::vfs::directory_iterator directoryIterator =
            fs.dir_begin(dir, errorCode), endIterator;
        directoryIterator != endIterator;
        directoryIterator.increment(errorCode)) {
     if (errorCode)
-      return false;
+      continue;
     StringRef filePath = directoryIterator->path();
     StringRef extension = llvm::sys::path::extension(filePath);
     if (file_types::lookupTypeForExtension(extension) ==
           file_types::TY_SwiftModuleFile) {
-      if (!foundArchs.empty())
-        foundArchs += ", ";
-      foundArchs += llvm::sys::path::stem(filePath).str();
+      incompatibleArchModules.push_back(filePath.str());
     }
   }
+}
 
-  if (foundArchs.empty()) {
-    // Maybe this swiftmodule directory only contains swiftinterfaces, or
-    // maybe something else is going on. Regardless, we shouldn't emit a
-    // possibly incorrect diagnostic.
+bool ImplicitSerializedModuleLoader::handlePossibleTargetMismatch(
+    SourceLoc sourceLocation, StringRef moduleName,
+    const SerializedModuleBaseName &absoluteBaseName,
+    bool isCanImportLookup) {
+  std::string foundArchs;
+  std::vector<std::string> foundIncompatibleArchModules;
+  identifyArchitectureVariants(Ctx, absoluteBaseName,
+                               foundIncompatibleArchModules);
+
+  // Maybe this swiftmodule directory only contains swiftinterfaces, or
+  // maybe something else is going on. Regardless, we shouldn't emit a
+  // possibly incorrect diagnostic.
+  if (foundIncompatibleArchModules.empty())
     return false;
+
+  // Generate combined list of discovered architectures
+  // for the diagnostic
+  for (const auto &modulePath : foundIncompatibleArchModules) {
+    if (!foundArchs.empty())
+      foundArchs += ", ";
+    foundArchs += llvm::sys::path::stem(modulePath).str();
   }
 
-  Ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_target, moduleName,
-                     target, foundArchs, dir);
-  return true;
+  Ctx.Diags
+      .diagnose(sourceLocation, diag::sema_no_import_target, moduleName,
+                llvm::sys::path::filename(absoluteBaseName.baseName),
+                foundArchs, absoluteBaseName.baseName)
+      .limitBehaviorIf(isCanImportLookup, DiagnosticBehavior::Warning);
+  return !isCanImportLookup;
 }
 
 SerializedModuleBaseName::SerializedModuleBaseName(
@@ -720,7 +734,7 @@ bool SerializedModuleLoaderBase::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-    bool skipBuildingInterface, bool isTestableDependencyLookup,
+    bool isCanImportLookup, bool isTestableDependencyLookup,
     bool &isFramework, bool &isSystemModule) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
@@ -766,7 +780,7 @@ bool SerializedModuleLoaderBase::findModule(
       auto result = findModuleFilesInDirectory(
           moduleID, absoluteBaseName, moduleInterfacePath,
           moduleInterfaceSourcePath, moduleBuffer, moduleDocBuffer,
-          moduleSourceInfoBuffer, skipBuildingInterface, IsFramework,
+          moduleSourceInfoBuffer, isCanImportLookup, IsFramework,
           isTestableDependencyLookup);
       if (!result)
         return SearchResult::Found;
@@ -779,8 +793,8 @@ bool SerializedModuleLoaderBase::findModule(
     // We can only get here if all targetFileNamePairs failed with
     // 'std::errc::no_such_file_or_directory'.
     if (firstAbsoluteBaseName &&
-        maybeDiagnoseTargetMismatch(moduleID.Loc, moduleName,
-                                    *firstAbsoluteBaseName))
+        handlePossibleTargetMismatch(moduleID.Loc, moduleName,
+                                     *firstAbsoluteBaseName, isCanImportLookup))
       return SearchResult::Error;
 
     return SearchResult::NotFound;
@@ -838,7 +852,7 @@ bool SerializedModuleLoaderBase::findModule(
       auto result = findModuleFilesInDirectory(
           moduleID, absoluteBaseName, moduleInterfacePath,
           moduleInterfaceSourcePath, moduleBuffer, moduleDocBuffer,
-          moduleSourceInfoBuffer, skipBuildingInterface, isFramework,
+          moduleSourceInfoBuffer, isCanImportLookup, isFramework,
           isTestableDependencyLookup);
       if (!result)
         return true;
@@ -1512,7 +1526,7 @@ bool SerializedModuleLoaderBase::canImportModule(
       mID, /*moduleInterfacePath=*/nullptr, &moduleInterfaceSourcePath,
       &moduleInputBuffer,
       /*moduleDocBuffer=*/nullptr, /*moduleSourceInfoBuffer=*/nullptr,
-      /*skipBuildingInterface=*/true, isTestableDependencyLookup,
+      /*isCanImportLookup=*/true, isTestableDependencyLookup,
       isFramework, isSystemModule);
   // If we cannot find the module, don't continue.
   if (!found)
@@ -1607,7 +1621,7 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   if (!findModule(moduleID, &moduleInterfacePath, &moduleInterfaceSourcePath,
                   &moduleInputBuffer, &moduleDocInputBuffer,
                   &moduleSourceInfoInputBuffer,
-                  /*skipBuildingInterface=*/false,
+                  /*isCanImportLookup=*/false,
                   /*isTestableDependencyLookup=*/false,
                   isFramework,
                   isSystemModule)) {
@@ -1747,19 +1761,13 @@ std::error_code MemoryBufferSerializedModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool skipBuildingInterface, bool IsFramework,
+    bool isCanImportLookup, bool IsFramework,
     bool isTestableDependencyLookup) {
   // This is a soft error instead of an llvm_unreachable because this API is
   // primarily used by LLDB which makes it more likely that unwitting changes to
   // the Swift compiler accidentally break the contract.
   assert(false && "not supported");
   return std::make_error_code(std::errc::not_supported);
-}
-
-bool MemoryBufferSerializedModuleLoader::maybeDiagnoseTargetMismatch(
-    SourceLoc sourceLocation, StringRef moduleName,
-    const SerializedModuleBaseName &absoluteBaseName) {
-  return false;
 }
 
 void SerializedModuleLoaderBase::verifyAllModules() {
