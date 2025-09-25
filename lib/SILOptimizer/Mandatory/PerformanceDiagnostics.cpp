@@ -460,7 +460,7 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
         for (auto user : copied->getUsers()) {
           if (isa<PartialApplyInst>(user)) {
             LLVM_DEBUG(llvm::dbgs() << "captured by "<< *user);
-            diagnose(loc, diag::manualownership_copy_captured, *name);
+            diagnose(loc, diag::manualownership_copy_captured, name->get());
             return false;
           }
         }
