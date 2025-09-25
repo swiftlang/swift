@@ -1301,8 +1301,7 @@ void Serializer::writeHeader() {
 }
 
 static void flattenImportPath(const ImportedModule &import,
-                              SmallVectorImpl<char> &out) {
-  llvm::raw_svector_ostream outStream(out);
+                              llvm::raw_svector_ostream &outStream) {
   // This will write the module 'real name', which can be different
   // from the 'name' in case module aliasing was used (see `-module-alias`)
   import.importedModule->getReverseFullModuleName().printForward(
@@ -1492,7 +1491,18 @@ void Serializer::writeInputBlock() {
     }
 
     SmallString<64> importPath;
-    flattenImportPath(import, importPath);
+    {
+      llvm::raw_svector_ostream s(importPath);
+      if (import.importedModule && !import.importedModule->isNonSwiftModule()) {
+        StringRef cacheKey = import.importedModule->getCacheKey();
+        if (cacheKey.empty())
+          s << import.importedModule->getModuleLoadedFilename();
+        else
+          s << cacheKey;
+      }
+      s << '\0';
+      flattenImportPath(import, s);
+    }
 
     serialization::ImportControl stableImportControl;
     // The order of checks here is important, since a module can be imported
