@@ -1867,39 +1867,13 @@ final class ElfImage<SomeElfTraits: ElfTraits>
   func inlineCallSites(
     at address: Traits.Address
   ) -> ArraySlice<CallSiteInfo> {
-    guard let callSiteInfo = dwarfReader?.inlineCallSites else {
+    guard let dwarfReader else {
       return [][0..<0]
     }
 
-    var min = 0
-    var max = callSiteInfo.count
-
-    while min < max {
-      let mid = min + (max - min) / 2
-      let callSite = callSiteInfo[mid]
-
-      if callSite.lowPC <= address && callSite.highPC > address {
-        var first = mid, last = mid
-        while first > 0
-                && callSiteInfo[first - 1].lowPC <= address
-                && callSiteInfo[first - 1].highPC > address {
-          first -= 1
-        }
-        while last < callSiteInfo.count - 1
-                && callSiteInfo[last + 1].lowPC <= address
-                && callSiteInfo[last + 1].highPC > address {
-          last += 1
-        }
-
-        return callSiteInfo[first...last]
-      } else if callSite.highPC <= address {
-        min = mid + 1
-      } else if callSite.lowPC > address {
-        max = mid
-      }
-    }
-
-    return []
+    return dwarfReader.lookupInlineCallSites(
+      at: DwarfReader<ElfImage>.Address(address)
+    )
   }
 
   typealias SourceLocation = SymbolicatedBacktrace.SourceLocation
@@ -1907,33 +1881,12 @@ final class ElfImage<SomeElfTraits: ElfTraits>
   func sourceLocation(
     for address: Traits.Address
   ) throws -> SourceLocation? {
-    var result: SourceLocation? = nil
-    var prevState: DwarfLineNumberState? = nil
-    guard let dwarfReader = dwarfReader else {
+    guard let dwarfReader else {
       return nil
     }
-    for ndx in 0..<dwarfReader.lineNumberInfo.count {
-      var info = dwarfReader.lineNumberInfo[ndx]
-      try info.executeProgram { (state, done) in
-        if let oldState = prevState,
-           address >= oldState.address && address < state.address {
-          result = SourceLocation(
-            path: oldState.path,
-            line: oldState.line,
-            column: oldState.column
-          )
-          done = true
-        }
-
-        if state.endSequence {
-          prevState = nil
-        } else {
-          prevState = state
-        }
-      }
-    }
-
-    return result
+    return try dwarfReader.sourceLocation(
+      for: DwarfReader<ElfImage>.Address(address)
+    )
   }
 }
 

@@ -553,6 +553,83 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
       frames.append(Frame(captured: frame, symbol: nil))
     }
+    #elseif os(Windows)
+    let cache = PeImageCache.threadLocal
+
+    for frame in backtrace.frames {
+      let address = frame.adjustedProgramCounter
+      if let imageNdx = theImages.indexOfImage(at: address) {
+        let name = theImages[imageNdx].name ?? "<unknown>"
+        var symbol: Symbol = Symbol(imageIndex: imageNdx,
+                                    imageName: name,
+                                    rawName: "<unknown>",
+                                    offset: 0,
+                                    sourceLocation: nil)
+
+        func lookupSymbol(
+          image: PeCoffImage?,
+          at imageNdx: Int,
+          named name: String,
+          address: ImageSource.Address
+        ) -> Symbol? {
+          guard let image else {
+            return nil
+          }
+          guard let theSymbol = image.lookupSymbol(address: address) else {
+            return nil
+          }
+
+          var location: SourceLocation?
+
+          if options.contains(.showSourceLocations)
+               || options.contains(.showInlineFrames) {
+            location = try? image.sourceLocation(for: address)
+          } else {
+            location = nil
+          }
+
+          if options.contains(.showInlineFrames) {
+            for inline in image.inlineCallSites(at: address) {
+              let fakeSymbol = Symbol(imageIndex: imageNdx,
+                                      imageName: name,
+                                      rawName: inline.rawName ?? "<unknown>",
+                                      offset: 0,
+                                      sourceLocation: location)
+              frames.append(Frame(captured: frame,
+                                  symbol: fakeSymbol,
+                                  inlined: true))
+
+              location = SourceLocation(path: inline.filename,
+                                        line: inline.line,
+                                        column: inline.column)
+            }
+          }
+
+          return Symbol(imageIndex: imageNdx,
+                        imageName: name,
+                        rawName: theSymbol.name,
+                        offset: theSymbol.offset,
+                        sourceLocation: location)
+        }
+
+        if let image = cache.lookup(path: theImages[imageNdx].path) {
+          let relativeAddress = ImageSource.Address(
+            address - theImages[imageNdx].baseAddress
+          ) + image.baseAddress
+          if let theSymbol = lookupSymbol(image: image,
+                                          at: imageNdx,
+                                          named: name,
+                                          address: relativeAddress) {
+            symbol = theSymbol
+          }
+        }
+
+        frames.append(Frame(captured: frame, symbol: symbol))
+        continue
+      }
+
+      frames.append(Frame(captured: frame, symbol: nil))
+    }
     #else
     frames = backtrace.frames.map{ Frame(captured: $0, symbol: nil) }
     #endif

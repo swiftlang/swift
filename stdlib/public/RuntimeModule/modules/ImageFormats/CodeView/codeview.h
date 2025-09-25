@@ -20,6 +20,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+// ###FIXME: Need to define this without windows.h
+
 #ifdef __cplusplus
 namespace swift {
 namespace runtime {
