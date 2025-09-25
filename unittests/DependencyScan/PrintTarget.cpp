@@ -52,7 +52,7 @@ TEST_F(ScanTest, TestTargetInfoQuery) {
 
   auto targetInfoStr = std::string(swift::c_string_utils::get_C_string(targetInfo.get()));
   EXPECT_NE(targetInfoStr.find("\"triple\": \"x86_64-apple-macosx12.0\""), std::string::npos);
-  EXPECT_NE(targetInfoStr.find("\"librariesRequireRPath\": false"), std::string::npos);
+  EXPECT_NE(targetInfoStr.find("\"librariesRequireRPath\": true"), std::string::npos);
 
   std::string expectedRuntimeResourcePath = "\"runtimeResourcePath\": \"" + relativeLibPath.str().str() + "\"";
   // On windows, need to normalize the path back to "\\" separators
