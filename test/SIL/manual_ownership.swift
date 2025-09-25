@@ -387,7 +387,7 @@ func nested_closures_fixed(_ t: Triangle) -> () -> (() -> Triangle) {
 
 @_manualOwnership
 func return_generic<T>(_ t: T) -> T {
-  return t // expected-error {{explicit 'copy' required here}}
+  return t // expected-error {{accessing 't' produces a copy}}
 }
 @_manualOwnership
 func return_generic_fixed<T>(_ t: T) -> T {
@@ -396,9 +396,9 @@ func return_generic_fixed<T>(_ t: T) -> T {
 
 @_manualOwnership
 func reassign_with_lets<T>(_ t: T) -> T {
-  let x = t // expected-error {{explicit 'copy' required here}}
-  let y = x // expected-error {{explicit 'copy' required here}}
-  let z = y // expected-error {{explicit 'copy' required here}}
+  let x = t // expected-error {{accessing 't' produces a copy}}
+  let y = x // expected-error {{accessing 'x' produces a copy}}
+  let z = y // expected-error {{accessing 'y' produces a copy}}
   return copy z
 }
 
@@ -413,9 +413,9 @@ func reassign_with_lets_fixed<T>(_ t: T) -> T {
 
 @_manualOwnership
 func copy_generic<T>(_ t: T)  {
-  consume_generic(t) // expected-error {{explicit 'copy' required here}}
+  consume_generic(t) // expected-error {{accessing 't' produces a copy}}
   borrow_generic(t)
-  consume_generic(t) // expected-error {{explicit 'copy' required here}}
+  consume_generic(t) // expected-error {{accessing 't' produces a copy}}
 }
 
 @_manualOwnership
@@ -429,10 +429,10 @@ func copy_generic_fixed<T>(_ t: T)  {
 func benchCaptureProp<S : Sequence>(
   _ s: S, _ f: (S.Element, S.Element) -> S.Element) -> S.Element {
 
-  var it = s.makeIterator() // expected-error {{explicit 'copy' required here}}
+  var it = s.makeIterator() // expected-error {{accessing 's' produces a copy}}
   let initial = it.next()!
   return
-    IteratorSequence(it) // expected-error {{explicit 'copy' required here}}
+    IteratorSequence(it) // expected-error {{accessing 'it' produces a copy}}
            .reduce(initial, f)
 }
 @_manualOwnership
@@ -464,8 +464,8 @@ struct CollectionOf32BitLittleEndianIntegers<BaseCollection: Collection> where B
     @_manualOwnership
     init(_ baseCollection: BaseCollection) {
         precondition(baseCollection.count % 4 == 0)
-        self.baseCollection = baseCollection // expected-error {{explicit 'copy' required here}}
-    } // expected-error {{explicit 'copy' required here}}
+        self.baseCollection = baseCollection // expected-error {{accessing 'baseCollection' produces a copy}}
+    } // expected-error {{accessing 'self' produces a copy of it}}
 
     // FIXME: the above initializer shouldn't have any diagnostics
 }
