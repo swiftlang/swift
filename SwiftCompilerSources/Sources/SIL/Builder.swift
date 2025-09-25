@@ -190,19 +190,38 @@ public struct Builder {
     }
   }
 
-  private func createIntegerLiteral(_ value: Int, type: Type, treatAsSigned: Bool) -> IntegerLiteralInst {
-    let literal = bridged.createIntegerLiteral(type.bridged, value, treatAsSigned)
+  /// Creates a integer literal instruction with the given integer value and
+  /// type. If an extension is necessary, the value is extended in accordance
+  /// with the signedness of `Value`.
+  public func createIntegerLiteral<Value: FixedWidthInteger>(
+    _ value: Value,
+    type: Type
+  ) -> IntegerLiteralInst {
+    precondition(
+      Value.bitWidth <= Int.bitWidth,
+      "Cannot fit \(Value.bitWidth)-bit integer into \(Int.bitWidth)-bit 'Swift.Int'"
+    )
+    // Extend the value based on its signedness to the bit width of `Int` and
+    // reinterpret it as an `Int`.
+    let extendedValue: Int =
+      if Value.isSigned {
+        Int(value)
+      } else {
+        // NB: This initializer is effectively a generic equivalent
+        // of `Int(bitPattern:)`
+        Int(truncatingIfNeeded: value)
+      }
+
+    let literal = bridged.createIntegerLiteral(type.bridged, extendedValue, Value.isSigned)
     return notifyNew(literal.getAs(IntegerLiteralInst.self))
   }
 
-  public func createIntegerLiteral(_ value: Int, type: Type) -> IntegerLiteralInst {
-    createIntegerLiteral(value, type: type, treatAsSigned: true)
-  }
-
-  /// Creates a `Builtin.Int1` integer literal instruction with the given value.
+  /// Creates a `Builtin.Int1` integer literal instruction with a value
+  /// corresponding to the given Boolean.
   public func createBoolLiteral(_ value: Bool) -> IntegerLiteralInst {
     let boolType = notificationHandler.getBuiltinIntegerType(1).type
-    return createIntegerLiteral(value ? 1 : 0, type: boolType, treatAsSigned: false)
+    let integerValue: UInt = value ? 1 : 0
+    return createIntegerLiteral(integerValue, type: boolType)
   }
 
   public func createAllocRef(_ type: Type, isObjC: Bool = false, canAllocOnStack: Bool = false, isBare: Bool = false,
