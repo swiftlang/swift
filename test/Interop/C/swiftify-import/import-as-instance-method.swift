@@ -3,9 +3,9 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift -dump-macro-expansions 2> %t/out.txt
+// RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift -dump-macro-expansions -I %bridging-path 2> %t/out.txt
 // RUN: diff --strip-trailing-cr %t/out.txt %t/out.expected
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -verify -verify-additional-file %t/Inputs/instance.h %t/test.swift -DVERIFY
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -verify -verify-additional-file %t/Inputs/instance.h %t/test.swift -I %bridging-path -DVERIFY
 
 //--- test.swift
 import Instance
@@ -30,14 +30,7 @@ func foo(_ p: inout MutableSpan<CInt>, a: A, aa: inout A, c: C, b: B, bb: inout 
 //--- Inputs/instance.h
 #include <ptrcheck.h>
 #include <lifetimebound.h>
-
-#define SWIFT_IMMORTAL_REFERENCE                    \
-  __attribute__((swift_attr("import_reference")))   \
-  __attribute__((swift_attr("retain:immortal")))    \
-  __attribute__((swift_attr("release:immortal")))
-
-#define SWIFT_NONESCAPABLE \
-  __attribute__((swift_attr("~Escapable")))
+#include <swift/bridging>
 
 struct A {};
 struct SWIFT_NONESCAPABLE B {};
