@@ -385,50 +385,17 @@ extension ImageMap {
              ) {
             // We read the debug directory data successfully; scan it.
             //
-            // We are looking for either IMAGE_DEBUG_TYPE_REPRO with a payload,
-            // or IMAGE_DEBUG_TYPE_CODEVIEW with the signature RSDS, which
-            // contains a GUID.
+            // We are looking for IMAGE_DEBUG_TYPE_CODEVIEW with the signature
+            // RSDS, which contains a GUID.
             //d
             // We also keep track of FPO data for 32-bit x86.
-            //
-            // Prefer IMAGE_DEBUG_TYPE_REPRO as that's the best kind of hash.
-            var gotUUID = false
             for entry in buffer {
               if entry.SizeOfData == 0 {
                 continue
               }
 
-              // IMAGE_DEBUG_TYPE_REPRO with a payload
-              if entry.Type == IMAGE_DEBUG_TYPE_REPRO && !gotUUID {
-                var dwHashLen = DWORD(0)
-                bRet = withUnsafeMutablePointer(to: &dwHashLen) { ptr in
-                  ReadProcessMemory(hProcess,
-                                    moduleInfo.lpBaseOfDll + Int(entry.AddressOfRawData),
-                                    ptr, SIZE_T(MemoryLayout<DWORD>.size),
-                                    &cbRead)
-                }
-
-                if bRet {
-                  var uuid = Array<UInt8>(repeating: 0, count: Int(dwHashLen))
-
-                  bRet = uuid.withUnsafeMutableBufferPointer { buffer in
-                    ReadProcessMemory(hProcess,
-                                      moduleInfo.lpBaseOfDll + Int(entry.AddressOfRawData) + 4,
-                                      buffer.baseAddress, SIZE_T(buffer.count),
-                                      &cbRead)
-                  }
-
-                  if bRet {
-                    theUUID = uuid
-
-                    // Do not set gotUUID here; we want IMAGE_DEBUG_TYPE_CODEVIEW
-                    // to take precedence.
-                  }
-                }
-              }
-
               // IMAGE_DEBUG_TYPE_CODEVIEW
-              if entry.Type == IMAGE_DEBUG_TYPE_CODEVIEW && !gotUUID {
+              if entry.Type == IMAGE_DEBUG_TYPE_CODEVIEW {
                 var pdbInfo = CV_PDB70_INFO()
                 bRet = withUnsafeMutablePointer(to: &pdbInfo) { ptr in
                   ReadProcessMemory(hProcess,
@@ -444,8 +411,6 @@ extension ImageMap {
                   withUnsafeBytes(of: pdbInfo.dwAge) {
                     theUUID!.append(contentsOf: $0)
                   }
-
-                  gotUUID = true
                 }
               }
 

@@ -58,6 +58,8 @@ set(RUNTIME_SOURCES
   LimitSequence.swift
   MemoryReader.swift
   OSReleaseScanner.swift
+  PeCoff.swift
+  PeImageCache.swift
   ProcMapsScanner.swift
   Registers.swift
   Runtime.swift
