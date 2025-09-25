@@ -6525,10 +6525,6 @@ public:
   }
 };
 
-/// Determine whether given type is a known one
-/// for a key path `{Any, Partial, Writable, ReferenceWritable}KeyPath`.
-bool isKnownKeyPathType(Type type);
-
 /// Determine whether the given type is a PartialKeyPath and
 /// AnyKeyPath or existential type thererof, for example,
 /// `PartialKeyPath<...> & Sendable`.

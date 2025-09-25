@@ -2689,7 +2689,7 @@ namespace {
       Type keyPathTy = paramType;
       if (auto *existential = keyPathTy->getAs<ExistentialType>()) {
         keyPathTy = existential->getSuperclass();
-        assert(isKnownKeyPathType(keyPathTy));
+        assert(keyPathTy->isKnownKeyPathType());
       }
 
       SmallVector<Component, 2> components;

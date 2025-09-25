@@ -1103,6 +1103,12 @@ public:
   /// Check if this is a std.string type from C++.
   bool isCxxString();
 
+  /// Check if this type is known to represent key paths.
+  bool isKnownKeyPathType();
+
+  /// Check if this type is known to represent immutable key paths.
+  bool isKnownImmutableKeyPathType();
+
   /// Check if this is either an Array, Set or Dictionary collection type defined
   /// at the top level of the Swift module
   bool isKnownStdlibCollectionType();
