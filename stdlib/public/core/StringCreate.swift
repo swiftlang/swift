@@ -302,6 +302,8 @@ extension String {
   }
 
   @inline(never) // slow path
+  @_specialize(
+    where Input == UnsafeBufferPointer<UInt16>, Encoding == Unicode.UTF16)
   private static func _slowFromCodeUnits<
     Input: Collection,
     Encoding: Unicode.Encoding
@@ -354,7 +356,11 @@ extension String {
   ) -> (String, repairsMade: Bool)?
   where Input.Element == Encoding.CodeUnit {
     guard _fastPath(encoding == Unicode.ASCII.self) else {
-      return _slowFromCodeUnits(input, encoding: encoding, repair: repair)
+      let result = input.withContiguousStorageIfAvailable {
+        return unsafe _slowFromCodeUnits($0, encoding: encoding, repair: repair)
+      }
+      return result ?? _slowFromCodeUnits(
+        input, encoding: encoding, repair: repair)
     }
 
     // Helper to simplify early returns
