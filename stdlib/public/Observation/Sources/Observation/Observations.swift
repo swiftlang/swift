@@ -36,9 +36,9 @@ func withIsolatedTaskCancellationHandler<T: Sendable>(
   return try await operation()
 }
 
-/// An asychronous sequence generated from a closure that tracks the transactional changes of `@Observable` types.
+/// An asynchronous sequence generated from a closure that tracks the transactional changes of `@Observable` types.
 ///
-/// `Observations` conforms to `AsyncSequence`, providing a intutive and safe mechanism to track changes to
+/// `Observations` conforms to `AsyncSequence`, providing an intuitive and safe mechanism to track changes to
 /// types that are marked as `@Observable` by using Swift Concurrency to indicate transactional boundaries
 /// starting from the willSet of the first mutation to the next suspension point of the safe access.
 @available(SwiftStdlib 6.2, *)
@@ -76,7 +76,7 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
     }
     
     // the cancellation of awaiting on willSet only ferries in resuming early
-    // it is the responsability of the caller to check if the task is actually
+    // it is the responsibility of the caller to check if the task is actually
     // cancelled after awaiting the willSet to act accordingly.
     static func cancel(_ state: _ManagedCriticalState<State>, id: Int) {
       state.withCriticalRegion { state in
@@ -96,7 +96,7 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
     static func emitWillChange(_ state: _ManagedCriticalState<State>) {
       let continuations = state.withCriticalRegion { state in
         // if there are no continuations present then we have to set the state as dirty
-        // else if this is uncondiitonally set the state might produce duplicate events
+        // else if this is unconditionally set the state might produce duplicate events
         // one for the dirty and one for the continuation.
         if state.continuations.count == 0 {
           state.dirty = true
@@ -155,7 +155,7 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
   let state: _ManagedCriticalState<State>
   let emit: Emit
   
-  // internal funnel method for initialziation
+  // internal funnel method for initialization
   internal init(emit: Emit) {
     self.emit = emit
     self.state = _ManagedCriticalState(State())
@@ -191,7 +191,7 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
   public struct Iterator: AsyncIteratorProtocol {
     // the state ivar serves two purposes:
     // 1) to store a critical region of state of the mutations
-    // 2) to idenitify the termination of _this_ sequence
+    // 2) to identify the termination of _this_ sequence
     var state: _ManagedCriticalState<State>?
     let emit: Emit
     var started = false
@@ -263,13 +263,13 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
           await withIsolatedTaskCancellationHandler(operation: {
             await State.willChange(isolation: iterationIsolation, state: state, id: id)
           }, onCancel: {
-            // ensure to clean out our continuation uon cancellation
+            // ensure to clean out our continuation upon cancellation
             State.cancel(state, id: id)
           }, isolation: iterationIsolation)
           return try await trackEmission(isolation: iterationIsolation, state: state, id: id)
         }
       } catch {
-        // the user threw a failure in the closure so propigate that outwards and terminate the sequence
+        // the user threw a failure in the closure so propagate that outwards and terminate the sequence
         return try terminate(throwing: error, id: id)
       }
     }
