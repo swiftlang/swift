@@ -53,8 +53,8 @@
 /// This example shows how to use this macro to let Swift know that
 /// a non-copyable reference counted C++ class can be imported as a reference counted type in Swift:
 ///  ```c++
-///    class SWIFT_SHARED_REFERENCE(retainSharedObject, releaseSharedObject)
-///    SharedObject : NonCopyable, IntrusiveReferenceCounted<SharedObject> {
+///    class SWIFT_SHARED_REFERENCE(retainSharedObject, releaseSharedObject) SWIFT_NONCOPYABLE
+///    SharedObject : IntrusiveReferenceCounted<SharedObject> {
 ///    public:
 ///      static SharedObject* create();
 ///      void doSomething();
@@ -84,8 +84,8 @@
 /// This example shows how to use this macro to let Swift know that
 /// a non-copyable singleton C++ class can be imported as a reference type in Swift:
 ///  ```c++
-///    class SWIFT_IMMORTAL_REFERENCE
-///    LoggerSingleton : NonCopyable {
+///    class SWIFT_IMMORTAL_REFERENCE SWIFT_NONCOPYABLE
+///    LoggerSingleton {
 ///    public:
 ///      static LoggerSingleton &getInstance();
 ///      void log(int x);
