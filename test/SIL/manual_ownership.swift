@@ -72,10 +72,14 @@ func return_borrowed_fixed(_ t: borrowing Triangle) -> Triangle {
   return copy t
 }
 
-// FIXME: copy propagation isn't able to simplify this. No copy should be required. (rdar://161359163)
+// FIXME: there's no workaround to this; it acts like a var so it's the same class of problem (rdar://161359163)
 @_manualOwnership
-func return_consumingParam(_ t: consuming Triangle) -> Triangle { // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
-  return t
+func return_consumingParam(_ t: consuming Triangle) -> Triangle {
+  return t // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+}
+@_manualOwnership
+func return_consumingParam_no_workaround(_ t: consuming Triangle) -> Triangle {
+  return copy t
 }
 
 @_manualOwnership
@@ -172,24 +176,43 @@ func check_vars_fixed(_ t: Triangle, _ b: Bool) -> Triangle {
 // FIXME: var's still have some issues
 // (1) MandatoryRedundantLoadElimination introduces a 'copy_value' in place of a 'load [copy]' (rdar://161359163)
 
-// @_manualOwnership
-// func reassignments_0() -> Triangle {
-//   var t3 = Triangle()
-//   t3 = Triangle()
-//   return t3
-// }
-// @_manualOwnership
-// func reassignments_1() {
-//   var t3 = Triangle()
-//   t3 = Triangle()
-//   t3.borrowing()
-// }
-// @_manualOwnership
-// func ressignments_2() {
-//   var t3 = Triangle()
-//   t3 = Triangle()
-//   t3.consuming()
-// }
+@_manualOwnership
+func reassignments_0() -> Triangle {
+  var t3 = Triangle()
+  t3 = Triangle()
+  return t3 // expected-error {{ownership of 't3' is demanded}}
+}
+@_manualOwnership
+func reassignments_0_fixed_1() -> Triangle {
+  var t3 = Triangle()
+  t3 = Triangle()
+  return copy t3
+}
+@_manualOwnership
+func reassignments_0_fixed_2() -> Triangle {
+  var t3 = Triangle()
+  t3 = Triangle()
+  return consume t3
+}
+
+@_manualOwnership
+func reassignments_1() {
+  var t3 = Triangle()
+  t3 = Triangle()
+  t3.borrowing() // expected-error {{accessing 't3' produces a copy of it}}
+}
+@_manualOwnership
+func reassignments_1_fixed_1() {
+  var t3 = Triangle()
+  t3 = Triangle()
+  (copy t3).borrowing()
+}
+@_manualOwnership
+func reassignments_1_fixed_2() {
+  var t3 = Triangle()
+  t3 = Triangle()
+  (consume t3).borrowing()
+}
 
 @_manualOwnership
 public func basic_loop_trivial_values(_ t: Triangle, _ xs: [Triangle]) {
