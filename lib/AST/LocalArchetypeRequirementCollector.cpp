@@ -135,14 +135,14 @@ GenericSignature swift::buildGenericSignatureWithCapturedEnvironments(
     case GenericEnvironment::Kind::Opaque:
       break;
 
-    case GenericEnvironment::Kind::OpenedExistential: {
+    case GenericEnvironment::Kind::Existential: {
       auto existentialTy = genericEnv->maybeApplyOuterContextSubstitutions(
           genericEnv->getOpenedExistentialType())
               ->mapTypeOutOfContext();
       collector.addOpenedExistential(existentialTy);
       continue;
     }
-    case GenericEnvironment::Kind::OpenedElement: {
+    case GenericEnvironment::Kind::Element: {
       collector.addOpenedElement(
           genericEnv->getOpenedElementShapeClass());
       continue;
