@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-silgen -verify \
+// RUN: %target-swift-frontend %s -emit-silgen -verify -sil-verify-all \
 // RUN:   -enable-experimental-feature ManualOwnership -o %t.silgen
 
 // RUN: %FileCheck %s --input-file %t.silgen
@@ -15,9 +15,7 @@ class TriangleClass {
 // CHECK-NEXT:    debug_value %0
 // CHECK-NEXT:    [[M:%.*]] = class_method %0, #TriangleClass.shape!getter
 // CHECK-NEXT:    [[SHAPE:%.*]] = apply [[M]](%0)
-// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[SHAPE]]
-// CHECK-NEXT:    [[COPY:%.*]] = explicit_copy_value [[B]]
-// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    [[COPY:%.*]] = explicit_copy_value [[SHAPE]]
 // CHECK-NEXT:    destroy_value [[SHAPE]]
 // CHECK-NEXT:    return [[COPY]]
 // CHECK-NEXT:  } // end sil function 'basic_access_of_loadable'
@@ -25,6 +23,30 @@ class TriangleClass {
 @_silgen_name("basic_access_of_loadable")
 func basic_access_of_loadable(_ t: TriangleClass) -> ShapeClass {
   return copy t.shape
+}
+
+// CHECK-LABEL: sil {{.*}} @var_assign
+// CHECK:          alloc_box ${ var TriangleClass }, var, name "x"
+// CHECK-NEXT:     begin_borrow [lexical] [var_decl]
+// CHECK-NEXT:     [[VAR:%.*]] = project_box {{.*}}, 0
+// CHECK:         bb1:
+// CHECK-NEXT:      [[T_COPY:%.*]] = explicit_copy_value %0
+// CHECK-NEXT:      [[ADDR1:%.*]] = begin_access [modify] [unknown] [[VAR]]
+// CHECK-NEXT:      assign [[T_COPY]] to [[ADDR1]]
+// CHECK-NEXT:      end_access [[ADDR1]]
+// CHECK:         bb3:
+// CHECK-NEXT:      [[ADDR2:%.*]] = begin_access [read] [unknown] [[VAR]]
+// CHECK-NEXT:      [[LOAD:%.*]] = load [copy] [[ADDR2]]
+// CHECK-NEXT:      [[X_COPY:%.*]] = explicit_copy_value [[LOAD]]
+// CHECK-NEXT:      end_access [[ADDR2]]
+// CHECK:           return [[X_COPY]]
+// CHECK-NEXT:    } // end sil function 'var_assign'
+@_manualOwnership
+@_silgen_name("var_assign")
+func var_assign(_ t: TriangleClass, _ b: Bool) -> TriangleClass {
+  var x = TriangleClass()
+  if b { x = copy t }
+  return copy x
 }
 
 // CHECK-LABEL: sil {{.*}} [manual_ownership] [ossa] @return_borrowed

@@ -7283,10 +7283,17 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
     // If we're relying on ManualOwnership for explicit-copies enforcement,
     // avoid doing address-based emission for loadable types.
     if (subType.isLoadableOrOpaque(SGF.F) && SGF.B.hasManualOwnershipAttr()) {
-      // Interpret this 'load' as a borrow + copy instead.
+      // Do a read on the lvalue. If we get back an address, do a load before
+      // emitting the explicit copy.
       LValue lv =
         SGF.emitLValue(li->getSubExpr(), SGFAccessKind::BorrowedObjectRead);
-      auto value = SGF.emitBorrowedLValue(li, std::move(lv));
+      auto value = SGF.emitRawProjectedLValue(E, std::move(lv));
+      if (value.getType().isAddress()) {
+        // We don't have 'load [explicit_copy]' so do this instead:
+        //   %x = load [copy] %value
+        //   %y = explicit_copy_value %x
+        value = SGF.emitManagedLoadCopy(E, value.getUnmanagedValue());
+      }
       ManagedValue copy = SGF.B.createExplicitCopyValue(E, value);
       return RValue(SGF, {copy}, subType.getASTType());
     }

@@ -74,7 +74,7 @@ func return_borrowed_fixed(_ t: borrowing Triangle) -> Triangle {
 
 // FIXME: copy propagation isn't able to simplify this. No copy should be required.
 @_manualOwnership
-func return_consumingParam(_ t: consuming Triangle) -> Triangle { // expected-error {{accessing 't' produces a copy of it}}
+func return_consumingParam(_ t: consuming Triangle) -> Triangle { // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
   return t
 }
 
@@ -156,13 +156,32 @@ func basic_function_call(_ t1: Triangle) {
 
 /// MARK: control-flow
 
+@_manualOwnership
+func check_vars(_ t: Triangle, _ b: Bool) -> Triangle {
+  var x = Triangle()
+  if b { x = t } // expected-error {{ownership of 't' is demanded and cannot not be consumed}}
+  return x // expected-error {{ownership of 'x' is demanded and cannot not be consumed}}
+}
+@_manualOwnership
+func check_vars_fixed(_ t: Triangle, _ b: Bool) -> Triangle {
+  var x = Triangle()
+  if b { x = copy t }
+  return copy x
+}
 
-// FIXME: var assignments are somtimes impossible to satisfy with 'copy'
+// FIXME: var's still have some issues.
+// (1) MandatoryRedundantLoadElimination introduces a 'copy_value' in place of a 'load [copy]'
 
+// @_manualOwnership
+// func reassignments_0() -> Triangle {
+//   var t3 = Triangle()
+//   t3 = Triangle()
+//   return t3
+// }
 // @_manualOwnership
 // func reassignments_1() {
 //   var t3 = Triangle()
-//   t3 = copy Triangle()  // FIXME: should not be needed
+//   t3 = Triangle()
 //   t3.borrowing()
 // }
 // @_manualOwnership
