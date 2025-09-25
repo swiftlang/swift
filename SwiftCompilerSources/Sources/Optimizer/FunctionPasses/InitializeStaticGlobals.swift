@@ -80,8 +80,11 @@ private indirect enum GlobalInitValue {
   // For example, a struct or vector which is initialized by storing its elements.
   case aggregate([GlobalInitValue])
 
-  // An enum with a payload which is not a SIL "constant".
-  case enumCase(caseIndex: Int, payload: GlobalInitValue)
+  // An enum case without a payload of an address-only enum.
+  case enumCase(caseIndex: Int)
+
+  // An enum case which is not a SIL "constant", e.g. because it's address-only
+  case enumCaseWithPayload(caseIndex: Int, payload: GlobalInitValue)
 
   init?(of globalInitFunction: Function, _ context: FunctionPassContext) {
     self = .undefined
@@ -133,10 +136,26 @@ private indirect enum GlobalInitValue {
     self = builder.initValue
   }
 
+  enum InitValue {
+    // The common case
+    case value(Value)
+
+    // For payload-less cases of address-only enums. Such cases are initialized purely with an `inject_enum_addr`,
+    // and we don't have a `Value` which represents the resulting enum(-case).
+    case enumCaseWithoutPayload(InjectEnumAddrInst)
+
+    var parentFunction: Function {
+      switch self {
+        case .value(let value):  return value.parentFunction
+        case .enumCaseWithoutPayload(let iea): return iea.parentFunction
+      }
+    }
+  }
+
   // Sets an element in the constant tree.
   // Returns true if this was successful. One reason for being not successful is if a certain
   // element is set twice, i.e. does not have a single defined value.
-  mutating func setElement(to value: Value, at path: SmallProjectionPath, type: Type) -> Bool {
+  mutating func setElement(to value: InitValue, at path: SmallProjectionPath, type: Type) -> Bool {
     let (kind, index, subPath) = path.pop()
     switch kind {
     case .root:
@@ -144,8 +163,16 @@ private indirect enum GlobalInitValue {
         // The element was set twice.
         return false
       }
-      self = .constant(value)
+      switch value {
+      case .value(let value):
+        self = .constant(value)
+      case .enumCaseWithoutPayload:
+        fatalError("should have been handled in the .enumCase of the SmallProjectionPath below")
+      }
       return true
+
+    case .enumCase:
+      return setEnumCase(to: value, at: subPath, index: index, type: type)
 
     case .structField:
       guard let structFields = type.getNominalFields(in: value.parentFunction) else {
@@ -186,7 +213,7 @@ private indirect enum GlobalInitValue {
   }
 
   private mutating func setField(
-    to value: Value, at path: SmallProjectionPath,
+    to value: InitValue, at path: SmallProjectionPath,
     index: Int, type: Type, numFields: Int
   ) -> Bool {
     if case .undefined = self {
@@ -203,6 +230,43 @@ private indirect enum GlobalInitValue {
       return true
     }
     return false
+  }
+
+  private mutating func setEnumCase(to value: InitValue, at path: SmallProjectionPath, index: Int, type: Type) -> Bool {
+    switch value {
+
+    case .enumCaseWithoutPayload(let iea):
+      guard case .undefined = self else {
+        // The enum was set twice.
+        return false
+      }
+      assert(index == iea.caseIndex)
+      self = .enumCase(caseIndex: index)
+
+    case .value:
+      guard let payloadType = type.getEnumCases(in: value.parentFunction)!.getPayloadType(ofCaseIndex: index) else {
+        return false
+      }
+      switch self {
+      case .undefined:
+        // It's the first time we set the payload or a sub-field of it.
+        var payload = GlobalInitValue.undefined
+        if !payload.setElement(to: value, at: path, type: payloadType) {
+          return false
+        }
+        self = .enumCaseWithPayload(caseIndex: index, payload: payload)
+      case .enumCaseWithPayload(let existingIndex, var payload) where index == existingIndex:
+        // Some sub-field of the enum-payload was already set.
+        self = .undefined // avoid copy-on-write
+        if !payload.setElement(to: value, at: path, type: payloadType) {
+          return false
+        }
+        self = .enumCaseWithPayload(caseIndex: index, payload: payload)
+      default:
+        return false
+      }
+    }
+    return true
   }
 
   /// Creates SIL for this global init value in the initializer of the `global`.
@@ -248,8 +312,11 @@ private indirect enum GlobalInitValue {
       }
       return builder.createVector(type: type, arguments: elementValues)
 
-    case .enumCase(let caseIndex, let payload):
-      let payloadType = type.getEnumCases(in: function)!.first(where: { $0.index == caseIndex })!.payload!
+    case .enumCase(let caseIndex):
+      return builder.createEnum(caseIndex: caseIndex, payload: nil, enumType: type)
+
+    case .enumCaseWithPayload(let caseIndex, let payload):
+      let payloadType = type.getEnumCases(in: function)!.getPayloadType(ofCaseIndex: caseIndex)!
       let payloadValue = payload.materializeRecursively(type: payloadType, &cloner, builder, function)
       return builder.createEnum(caseIndex: caseIndex, payload: payloadValue, enumType: type)
     }
@@ -272,7 +339,7 @@ private indirect enum GlobalInitValue {
     _ context: FunctionPassContext
   ) {
     switch self {
-    case .undefined:
+    case .undefined, .enumCase:
       break
     case .constant(let value):
       if value.containsLoad(context) {
@@ -281,7 +348,7 @@ private indirect enum GlobalInitValue {
           self = .aggregate((value as! Instruction).operands.lazy.map { .constant($0.value) })
           resolveLoadsRecursively(from: &stackValues, &resolvedAllocStacks, context)
         case let ei as EnumInst:
-          self = .enumCase(caseIndex: ei.caseIndex, payload: .constant(ei.payload!))
+          self = .enumCaseWithPayload(caseIndex: ei.caseIndex, payload: .constant(ei.payload!))
           resolveLoadsRecursively(from: &stackValues, &resolvedAllocStacks, context)
         case let li as LoadInst:
           guard let allocStack = li.address as? AllocStackInst,
@@ -306,10 +373,9 @@ private indirect enum GlobalInitValue {
         newFields[i].resolveLoadsRecursively(from: &stackValues, &resolvedAllocStacks, context)
       }
       self = .aggregate(newFields)
-    case .enumCase(let caseIndex, let payload):
-      var newPayload = payload
-      newPayload.resolveLoadsRecursively(from: &stackValues, &resolvedAllocStacks, context)
-      self = .enumCase(caseIndex: caseIndex, payload: newPayload)
+    case .enumCaseWithPayload(let caseIndex, var payload):
+      payload.resolveLoadsRecursively(from: &stackValues, &resolvedAllocStacks, context)
+      self = .enumCaseWithPayload(caseIndex: caseIndex, payload: payload)
     }
   }
 
@@ -321,7 +387,9 @@ private indirect enum GlobalInitValue {
       return value.isValidGlobalInitValue(context)
     case .aggregate(let fields):
       return fields.allSatisfy { $0.isValid(context) }
-    case .enumCase(_, let payload):
+    case .enumCase:
+      return true
+    case .enumCaseWithPayload(_, let payload):
       return payload.isValid(context)
     }
   }
@@ -361,7 +429,7 @@ private struct InitValueBuilder: AddressDefUseWalker {
       let accessPath = store.destination.lookThroughRawLayoutAddress.constantAccessPath
       switch accessPath.base {
       case .global, .stack:
-        if !initValue.setElement(to: store.source, at: accessPath.projectionPath, type: originalAddress.type) {
+        if !initValue.setElement(to: .value(store.source), at: accessPath.projectionPath, type: originalAddress.type) {
           return .abortWalk
         }
         return .continueWalk
@@ -376,13 +444,35 @@ private struct InitValueBuilder: AddressDefUseWalker {
           return .abortWalk
         }
         // The `nonConstAccessPath` now contains a single `.anyIndexedElement`.
-        if !initValue.setElement(to: store.source, at: nonConstAccessPath.projectionPath, type: originalAddress.type) {
+        if !initValue.setElement(to: .value(store.source), at: nonConstAccessPath.projectionPath, type: originalAddress.type) {
           return .abortWalk
         }
         return .continueWalk
       default:
         fatalError("could not compute access path")
       }
+    case let injectEnum as InjectEnumAddrInst:
+      if injectEnum.element.hasAssociatedValues {
+        if !injectEnum.operand.value.type.isLoadable(in: injectEnum.parentFunction) {
+          // TODO: we don't support non-loadable enum cases with payload yet, because IRGen support is missing.
+          //       e.g. `var global: Atomic<Int>? = Atomic<Int>(0)`
+          // FixedTypeInfo (= used for non-loadable types) is missing the ability to pack a payload into an enum.
+          return .abortWalk
+        }
+        return .continueWalk
+      }
+      let accessPath = injectEnum.enum.getAccessPath(fromInitialPath: SmallProjectionPath(.enumCase,
+                                                                                          index: injectEnum.caseIndex))
+      switch accessPath.base {
+      case .global, .stack:
+        if !initValue.setElement(to: .enumCaseWithoutPayload(injectEnum), at: accessPath.projectionPath, type: originalAddress.type) {
+          return .abortWalk
+        }
+        return .continueWalk
+      default:
+        return .abortWalk
+      }
+
     case is LoadInst, is DeallocStackInst:
       return .continueWalk
     case let bi as BuiltinInst:
@@ -477,6 +567,8 @@ private extension Function {
         return false
       case let store as StoreInst:
         return !store.destination.lookThroughRawLayoutAddress.isAddressOfStack(orGlobal: global)
+      case let injectEnum as InjectEnumAddrInst:
+        return !injectEnum.enum.isAddressOfStack(orGlobal: global)
       case let bi as BuiltinInst where bi.id == .PrepareInitialization:
         return false
       default:
@@ -531,5 +623,11 @@ private extension Value {
       return builtin.arguments[0]
     }
     return self
+  }
+}
+
+private extension EnumCases {
+  func getPayloadType(ofCaseIndex caseIndex: Int) -> Type? {
+    return first(where: { $0.index == caseIndex })!.payload
   }
 }

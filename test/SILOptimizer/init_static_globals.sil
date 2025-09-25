@@ -168,6 +168,21 @@ sil_global [let] @graw2: $Raw
 // CHECK-LABEL: sil_global [let] @grawArray : $RawArray{{$}}
 sil_global [let] @grawArray: $RawArray
 
+// CHECK-LABEL: sil_global [let] @gIndirectNone : $Optional<TwoFields> = {
+// CHECK-NEXT:    %initval = enum $Optional<TwoFields>, #Optional.none!enumelt
+// CHECK-NEXT:  }
+sil_global [let] @gIndirectNone: $Optional<TwoFields>
+
+// CHECK-LABEL: sil_global [let] @gIndirectSome : $Optional<TwoFields> = {
+// CHECK-NEXT:    %0 = integer_literal $Builtin.Int32, 11
+// CHECK-NEXT:    %1 = struct $Int32 (%0)
+// CHECK-NEXT:    %2 = integer_literal $Builtin.Int32, 10
+// CHECK-NEXT:    %3 = struct $Int32 (%2)
+// CHECK-NEXT:    %4 = struct $TwoFields (%1, %3)
+// CHECK-NEXT:    %initval = enum $Optional<TwoFields>, #Optional.some!enumelt, %4
+// CHECK-NEXT:  }
+sil_global [let] @gIndirectSome: $Optional<TwoFields>
+
 sil @unknownfunc : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil [global_init_once_fn] [ossa] @globalinit_trivialglobal_func :
@@ -577,5 +592,31 @@ bb0(%0 : $Builtin.RawPointer):
   store %4 to [trivial] %6
   %21 = tuple ()
   return %21
+}
+
+sil [global_init_once_fn] [ossa] @globalinit_indirect_none: $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @gIndirectNone
+  %2 = global_addr @gIndirectNone : $*Optional<TwoFields>
+  inject_enum_addr %2, #Optional.none!enumelt
+  %21 = tuple ()
+  return %21
+}
+
+sil [global_init_once_fn] [ossa] @globalinit_indirect_some : $@convention(c) () -> () {
+bb0:
+  alloc_global @gIndirectSome
+  %1 = global_addr @gIndirectSome : $*Optional<TwoFields>
+  %2 = init_enum_data_addr %1, #Optional.some!enumelt
+  %3 = integer_literal $Builtin.Int32, 10
+  %4 = struct $Int32 (%3)
+  %5 = struct_element_addr %2, #TwoFields.b
+  store %4 to [trivial] %5
+  %7 = integer_literal $Builtin.Int32, 11
+  %8 = struct $Int32 (%7)
+  %9 = struct_element_addr %2, #TwoFields.a
+  store %8 to [trivial] %9
+  %10 = tuple ()
+  return %10 : $()
 }
 
