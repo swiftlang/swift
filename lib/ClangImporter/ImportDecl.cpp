@@ -9552,8 +9552,10 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
         isa<clang::CXXMethodDecl>(ClangDecl) &&
         !isa<clang::CXXConstructorDecl>(ClangDecl) &&
         cast<clang::CXXMethodDecl>(ClangDecl)->isInstance();
+    size_t swiftNumParams = MappedDecl->getParameters()->size() -
+                            (ClangDecl->isVariadic() ? 1 : 0);
     ASSERT((MappedDecl->isImportAsInstanceMember() == isClangInstanceMethod) ==
-           (ClangDecl->getNumParams() == MappedDecl->getParameters()->size()));
+           (ClangDecl->getNumParams() == swiftNumParams));
 
     size_t selfParamIndex = MappedDecl->isImportAsInstanceMember()
                                 ? MappedDecl->getSelfIndex()
