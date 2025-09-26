@@ -656,17 +656,22 @@ namespace {
               return false;
             });
 
-        if (copyConstructor->getTrailingRequiresClause()) {
+        bool hasRequiresClause =
+            copyConstructor->getTrailingRequiresClause() != nullptr;
+
+        if (hasRequiresClause || hasCopyableIfAttr) {
           ctx.Diags.diagnose(copyConstructorLoc, diag::maybe_missing_annotation,
-                             recordDecl, "'requires' clause");
-        } else if (hasCopyableIfAttr) {
-          ctx.Diags.diagnose(copyConstructorLoc, diag::maybe_missing_annotation,
-                             recordDecl, "'SWIFT_COPYABLE_IF' annotation");
+                             recordDecl);
+          ctx.Diags.diagnose(copyConstructorLoc, diag::maybe_missing_parameter,
+                             hasCopyableIfAttr, recordDecl);
         } else {
           ctx.Diags.diagnose(copyConstructorLoc, diag::use_requires_expression);
           ctx.Diags.diagnose(copyConstructorLoc, diag::annotate_copyable_if);
         }
-        ctx.Diags.diagnose(copyConstructorLoc, diag::annotate_non_copyable);
+
+        if (!copyConstructor->isUserProvided()) {
+          ctx.Diags.diagnose(copyConstructorLoc, diag::annotate_non_copyable);
+        }
       }
 
       auto callee = cast<llvm::Function>(clangFnAddr->stripPointerCasts());

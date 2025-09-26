@@ -81,7 +81,7 @@ ERROR(unable_to_load_pass_plugin,none,
       "unable to load plugin '%0': '%1'", (StringRef, StringRef))
 
 ERROR(failed_emit_copy, none,
-      "failed to copy %0; did you want to import %0 as ~Copyable?",
+      "failed to copy %0; did you mean to import %0 as ~Copyable?",
       (const clang::NamedDecl *))
 
 NOTE(use_requires_expression, none,
@@ -101,8 +101,16 @@ NOTE(annotate_non_copyable, none,
      ())
 
 NOTE(maybe_missing_annotation, none,
-     "maybe one of the types that %0 depends on needs a %1",
-     (const clang::NamedDecl *, StringRef))
+     "one of the types that %0 depends on may need a 'requires' clause (since "
+     "C++20) in the copy constructor, a 'SWIFT_COPYABLE_IF' annotation or a "
+     "'SWIFT_NONCOPYABLE' annotation'",
+     (const clang::NamedDecl *))
+
+NOTE(maybe_missing_parameter, none,
+     "the %select{'requires' clause on the copy constructor "
+     "of|'SWIFT_COPYABLE_IF' annotation on}0 %1 may be missing a "
+     "%select{constraint|parameter}0",
+     (bool, const clang::NamedDecl *))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

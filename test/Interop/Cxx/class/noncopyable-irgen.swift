@@ -28,17 +28,16 @@ struct OwnsT {
     OwnsT(const OwnsT &other) : element(other.element) {} 
     // expected-error@-1 *{{call to deleted constructor of 'NonCopyable'}}
     // expected-note@-2 *{{in instantiation of member function 'OwnsT<NonCopyable>::OwnsT' requested here}}
-    // expected-TEST1-error@-3 {{failed to copy 'OwnsT<NonCopyable>'; did you want to import 'OwnsT<NonCopyable>' as ~Copyable?}}
+    // expected-TEST1-error@-3 {{failed to copy 'OwnsT<NonCopyable>'; did you mean to import 'OwnsT<NonCopyable>' as ~Copyable?}}
     // expected-TEST1-note@-4 {{use 'requires' (since C++20) to specify the constraints under which the copy constructor is available}}
     // expected-TEST1-note@-5 {{annotate a type with 'SWIFT_COPYABLE_IF(<T>)' in C++ to specify that the type is Copyable if <T> is Copyable}}
-    // expected-TEST1-note@-6 {{annotate a type with 'SWIFT_NONCOPYABLE' in C++ to import it as ~Copyable}}
     OwnsT(OwnsT&& other) {}
 };
 
 using OwnsNonCopyable = OwnsT<NonCopyable>;
 
 template <typename T> struct Derived : OwnsT<T> {
-    // expected-TEST2-error@-1 {{failed to copy 'Derived<NonCopyable>'; did you want to import 'Derived<NonCopyable>' as ~Copyable?}}
+    // expected-TEST2-error@-1 {{failed to copy 'Derived<NonCopyable>'; did you mean to import 'Derived<NonCopyable>' as ~Copyable?}}
     // expected-TEST2-note@-2 {{use 'requires' (since C++20) to specify the constraints under which the copy constructor is available}}
     // expected-TEST2-note@-3 {{annotate a type with 'SWIFT_COPYABLE_IF(<T>)' in C++ to specify that the type is Copyable if <T> is Copyable}}
     // expected-TEST2-note@-4 {{annotate a type with 'SWIFT_NONCOPYABLE' in C++ to import it as ~Copyable}}
@@ -50,9 +49,9 @@ template <typename T> struct SWIFT_COPYABLE_IF(T) Annotated {
     T element;
     Annotated() : element() {}
     Annotated(const Annotated &other) : element(other.element) {}
-    // expected-TEST3-error@-1 {{failed to copy 'Annotated<OwnsT<NonCopyable>>'; did you want to import 'Annotated<OwnsT<NonCopyable>>' as ~Copyable?}}
-    // expected-TEST3-note@-2 {{maybe one of the types that 'Annotated<OwnsT<NonCopyable>>' depends on needs a 'SWIFT_COPYABLE_IF' annotation}}
-    // expected-TEST3-note@-3 {{annotate a type with 'SWIFT_NONCOPYABLE' in C++ to import it as ~Copyable}}
+    // expected-TEST3-error@-1 {{failed to copy 'Annotated<OwnsT<NonCopyable>>'; did you mean to import 'Annotated<OwnsT<NonCopyable>>' as ~Copyable?}}
+    // expected-TEST3-note@-2 {{one of the types that 'Annotated<OwnsT<NonCopyable>>' depends on may need a 'requires' clause (since C++20) in the copy constructor, a 'SWIFT_COPYABLE_IF' annotation or a 'SWIFT_NONCOPYABLE' annotation'}}
+    // expected-TEST3-note@-3 {{the 'SWIFT_COPYABLE_IF' annotation on 'Annotated<OwnsT<NonCopyable>>' may be missing a parameter}}
 
     Annotated(Annotated &&) = default;
 };
@@ -64,9 +63,9 @@ template <typename T> struct Requires {
     T element;
     Requires() : element() {}
     Requires(const Requires &other) requires std::is_copy_constructible_v<T> : element(other.element) {}
-    // expected-TEST4-error@-1 {{failed to copy 'Requires<OwnsT<NonCopyable>>'; did you want to import 'Requires<OwnsT<NonCopyable>>' as ~Copyable?}}
-    // expected-TEST4-note@-2 {{maybe one of the types that 'Requires<OwnsT<NonCopyable>>' depends on needs a 'requires' clause}}
-    // expected-TEST4-note@-3 {{annotate a type with 'SWIFT_NONCOPYABLE' in C++ to import it as ~Copyable}}
+    // expected-TEST4-error@-1 {{failed to copy 'Requires<OwnsT<NonCopyable>>'; did you mean to import 'Requires<OwnsT<NonCopyable>>' as ~Copyable?}}
+    // expected-TEST4-note@-2 {{one of the types that 'Requires<OwnsT<NonCopyable>>' depends on may need a 'requires' clause (since C++20) in the copy constructor, a 'SWIFT_COPYABLE_IF' annotation or a 'SWIFT_NONCOPYABLE' annotation'}}
+    // expected-TEST4-note@-3 {{the 'requires' clause on the copy constructor of 'Requires<OwnsT<NonCopyable>>' may be missing a constraint}}
 
     Requires(Requires &&) = default;
 };
