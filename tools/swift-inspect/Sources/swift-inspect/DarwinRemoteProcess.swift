@@ -87,15 +87,28 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     return task_peek(task.value, address, mach_vm_size_t(size))
   }
 
-  func getAddr(symbolName: String) -> swift_addr_t {
+  func getAddr(symbolName: String) -> swift_addr_t? {
     // FIXME: use `__USER_LABEL_PREFIX__` instead of the hardcoded `_`.
     let fullName = "_\(symbolName)"
     var symbol = CSSymbolOwnerGetSymbolWithMangledName(swiftCore, fullName)
     if CSIsNull(symbol) {
       symbol = CSSymbolOwnerGetSymbolWithMangledName(swiftConcurrency, fullName)
     }
+    if CSIsNull(symbol) {
+      return nil
+    }
     let range = CSSymbolGetRange(symbol)
     return swift_addr_t(range.location)
+  }
+
+  private func readGlobalVariable<T>(named name: String) -> T? {
+    guard let globalPointer = getAddr(symbolName: name) else {
+      return nil
+    }
+    guard let readPointer = read(address: globalPointer, size: MemoryLayout<T>.size) else {
+      return nil
+    }
+    return readPointer.load(as: T.self)
   }
 
   static var Free: FreeFunction? { return nil }
@@ -125,7 +138,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
         let buffer = UnsafeBufferPointer(start: $0, count: Int(length))
         return String(decoding: buffer, as: UTF8.self)
       }
-      return process.getAddr(symbolName: name)
+      return process.getAddr(symbolName: name) ?? 0
     }
   }
 
@@ -221,6 +234,21 @@ internal final class DarwinRemoteProcess: RemoteProcess {
             callback(swift_addr_t(range.address), UInt64(range.size))
           }
         })
+      }
+    }
+  }
+
+  internal func iteratePotentialMetadataPages(_ body: (swift_addr_t, UInt64) -> Void) {
+    if let initialPoolPointer: UInt = readGlobalVariable(named: "_swift_debug_allocationPoolPointer"),
+       let initialPoolSize: UInt = readGlobalVariable(named: "_swift_debug_allocationPoolSize") {
+      body(swift_reflection_ptr_t(initialPoolPointer), UInt64(initialPoolSize));
+    }
+
+    if let pageSize: UInt = readGlobalVariable(named: "_swift_debug_metadataAllocatorPageSize") {
+      iterateHeap { address, size in
+        if size == pageSize {
+          body(address, size)
+        }
       }
     }
   }

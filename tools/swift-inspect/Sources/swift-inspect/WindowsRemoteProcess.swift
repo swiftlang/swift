@@ -397,6 +397,10 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     }
   }
 
+  internal func iteratePotentialMetadataPages(_ body: (swift_addr_t, UInt64) -> Void) {
+    fatalError("metadata page iteration is not supported on Windows")
+  }
+
   private func allocateDllPathRemote() -> UnsafeMutableRawPointer? {
     URL(fileURLWithPath: ProcessInfo.processInfo.arguments[0])
       .deletingLastPathComponent()

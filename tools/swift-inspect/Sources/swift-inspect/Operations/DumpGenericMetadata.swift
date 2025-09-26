@@ -116,36 +116,17 @@ internal struct DumpGenericMetadata: ParsableCommand {
   @Flag(help: "Show allocations in mangled form")
   var mangled: Bool = false
 
+  @Flag(help: "Scan for data that looks like Swift type metadata.")
+  var scanSearch: Bool = false
+
   func run() throws {
     disableStdErrBuffer()
     var metadataSummary = [String: MetadataSummary]()
     var allProcesses = [ProcessMetadata]()
     try inspect(options: options) { process in
-      let allocations: [swift_metadata_allocation_t] =
-          try process.context.allocations.sorted()
-
-      let stacks: [swift_reflection_ptr_t:[swift_reflection_ptr_t]] =
-          backtraceOptions.style == nil
-          ? [swift_reflection_ptr_t:[swift_reflection_ptr_t]]()
-          : try process.context.allocationStacks
-
-      let generics: [Metadata] = allocations.compactMap { allocation -> Metadata? in
-        let pointer = swift_reflection_allocationMetadataPointer(process.context, allocation)
-        if pointer == 0 { return nil }
-        let allocation = allocations.last(where: { pointer >= $0.ptr && pointer < $0.ptr + swift_reflection_ptr_t($0.size) })
-        let garbage = (allocation == nil && swift_reflection_ownsAddressStrict(process.context, UInt(pointer)) == 0)
-        var currentBacktrace: String?
-        if let style = backtraceOptions.style, let allocation, let stack = stacks[allocation.ptr] {
-          currentBacktrace = backtrace(stack, style: style, process.symbolicate)
-        }
-
-        return Metadata(ptr: pointer,
-                        allocation: allocation,
-                        name: process.context.name(type: pointer, mangled: mangled) ?? "<unknown>",
-                        isArrayOfClass: process.context.isArrayOfClass(pointer),
-                        garbage: garbage,
-                        backtrace: currentBacktrace)
-      } // generics
+      let generics = scanSearch
+          ? try metadataFromScanning(process: process)
+          : try metadataFromAllocations(process: process)
 
       // Update summary
       generics.forEach { metadata in
@@ -180,6 +161,57 @@ internal struct DumpGenericMetadata: ParsableCommand {
     } else if metadataOptions.summary {
       try dumpTextSummary(of: metadataSummary)
     }
+  }
+
+  private func metadataFromAllocations(process: any RemoteProcess) throws -> [Metadata] {
+    let allocations: [swift_metadata_allocation_t] =
+        try process.context.allocations.sorted()
+
+    let stacks: [swift_reflection_ptr_t:[swift_reflection_ptr_t]] =
+        backtraceOptions.style == nil
+        ? [swift_reflection_ptr_t:[swift_reflection_ptr_t]]()
+        : try process.context.allocationStacks
+
+    return allocations.compactMap { allocation -> Metadata? in
+      let pointer = swift_reflection_allocationMetadataPointer(process.context, allocation)
+      if pointer == 0 { return nil }
+      let allocation = allocations.last(where: { pointer >= $0.ptr && pointer < $0.ptr + swift_reflection_ptr_t($0.size) })
+      let garbage = (allocation == nil && swift_reflection_ownsAddressStrict(process.context, UInt(pointer)) == 0)
+      var currentBacktrace: String?
+      if let style = backtraceOptions.style, let allocation, let stack = stacks[allocation.ptr] {
+        currentBacktrace = backtrace(stack, style: style, process.symbolicate)
+      }
+
+      return Metadata(ptr: pointer,
+                      allocation: allocation,
+                      name: process.context.name(type: pointer, mangled: mangled) ?? "<unknown>",
+                      isArrayOfClass: process.context.isArrayOfClass(pointer),
+                      garbage: garbage,
+                      backtrace: currentBacktrace)
+    }
+  }
+
+  private func metadataFromScanning(process: any RemoteProcess) throws -> [Metadata] {
+    var metadata: [Metadata] = []
+
+    func scanMemory(address: swift_reflection_ptr_t, size: UInt64) {
+      for candidate in stride(from: address, to: address + swift_reflection_ptr_t(size), by: MemoryLayout<UInt>.size) {
+        guard let name = process.context.name(type: candidate, mangled: mangled) else {
+          continue
+        }
+        let m = Metadata(ptr: candidate,
+                         allocation: nil,
+                         name: name,
+                         isArrayOfClass: process.context.isArrayOfClass(candidate),
+                         garbage: false,
+                         backtrace: nil)
+        metadata.append(m)
+      }
+    }
+
+    process.iteratePotentialMetadataPages(scanMemory)
+
+    return metadata
   }
 
   private func dumpText(process: any RemoteProcess, generics: [Metadata]) throws {

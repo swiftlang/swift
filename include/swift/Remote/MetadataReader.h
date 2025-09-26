@@ -3215,6 +3215,23 @@ private:
     if (!descriptor)
       return BuiltType();
 
+    // Make sure the kinds match, to catch bad data from not reading an actual
+    // metadata.
+    auto metadataKind = metadata.getLocalBuffer()->getKind();
+    auto descriptorKind = descriptor.getLocalBuffer()->getKind();
+    if (metadataKind == MetadataKind::Class &&
+        descriptorKind != ContextDescriptorKind::Class)
+      return BuiltType();
+    if (metadataKind == MetadataKind::Struct &&
+        descriptorKind != ContextDescriptorKind::Struct)
+      return BuiltType();
+    if (metadataKind == MetadataKind::Enum &&
+        descriptorKind != ContextDescriptorKind::Enum)
+      return BuiltType();
+    if (metadataKind == MetadataKind::Optional &&
+        descriptorKind != ContextDescriptorKind::Enum)
+      return BuiltType();
+
     // From that, attempt to resolve a nominal type.
     BuiltTypeDecl typeDecl = buildNominalTypeDecl(descriptor);
     if (!typeDecl)
