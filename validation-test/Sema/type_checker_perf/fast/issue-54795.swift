@@ -2,6 +2,7 @@
 // Succeeds in 60ms with 5572 scopes
 
 // REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 
 // https://github.com/swiftlang/swift/issues/54795
 
