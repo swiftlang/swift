@@ -3191,7 +3191,6 @@ function Build-SDK([Hashtable] $Platform) {
   Invoke-BuildStep Build-Runtime $Platform
   Invoke-BuildStep Build-Dispatch $Platform
   Invoke-BuildStep Build-Foundation $Platform
-  Invoke-BuildStep Build-CompilerRuntime $Platform
 }
 
 function Build-ExperimentalSDK([Hashtable] $Platform) {
