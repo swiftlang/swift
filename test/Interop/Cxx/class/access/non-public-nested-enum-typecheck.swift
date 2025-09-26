@@ -52,12 +52,20 @@ func switches() {
     default: return   // this is OK
   }
   switch b.makeEnum() {
-    case .Bar: return // somehow this is OK
-    case .Foo: return // somehow this is OK
+    case Base.Enum.Bar: return // expected-error {{'Enum' is inaccessible due to 'private' protection level}}
+    case Base.Enum.Foo: return // expected-error {{'Enum' is inaccessible due to 'private' protection level}}
+  }
+  switch b.makeEnum() {
+    case .Bar: return // OK as long as the user does not refer to Enum itself
+    case .Foo: return // (NOTE: arguably this should not be allowed)
   }
   switch d.makeEnum() {
-    case .Bar: return // somehow this is OK
-    case .Foo: return // somehow this is OK
+    case Derived.Enum.Bar: return // expected-error {{'Enum' is inaccessible due to 'private' protection level}}
+    case Derived.Enum.Foo: return // expected-error {{'Enum' is inaccessible due to 'private' protection level}}
+  }
+  switch d.makeEnum() {
+    case .Bar: return // OK as long as the user does not refer to Enum itself
+    case .Foo: return // (NOTE: arguably this should not be allowed)
   }
 }
 
@@ -91,6 +99,7 @@ extension Derived {
   private static func inside(e: Enum) {
     let b = Base()
     let _: Enum = Enum.Bar
+    let _: Derived.Enum = Derived.Enum.Bar
     let _: Enum = b.makeEnum()
 
     // It would be nice to make these work but they do not
