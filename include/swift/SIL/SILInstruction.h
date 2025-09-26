@@ -8787,6 +8787,35 @@ public:
   }
 };
 
+class InjectGuaranteedInst
+    : public InstructionBase<SILInstructionKind::InjectGuaranteedInst,
+                             OwnershipForwardingSingleValueInstruction> {
+  friend SILBuilder;
+
+  FixedOperandList<2> operands;
+
+  InjectGuaranteedInst(SILDebugLocation loc, SILValue value,
+                       SILValue guaranteedBase)
+      : InstructionBase(loc, value->getType(), OwnershipKind::Guaranteed),
+        operands{this, value, guaranteedBase} {}
+
+public:
+  enum { Value, GuaranteedBase };
+
+  /// Must be either unowned or none.
+  SILValue getValue() const { return operands[Value].get(); }
+  SILValue getGuaranteedBase() const { return operands[GuaranteedBase].get(); }
+
+  void setValue(SILValue newNoneValue) { operands[Value].set(newNoneValue); }
+
+  void setGuaranteedBase(SILValue newGuaranteedBase) {
+    operands[GuaranteedBase].set(newGuaranteedBase);
+  }
+
+  ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
+};
+
 enum class MarkDependenceKind {
   Unresolved, Escaping, NonEscaping
 };
@@ -11653,6 +11682,7 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::FunctionExtractIsolationInst:
   case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::BorrowedFromInst:
+  case SILInstructionKind::InjectGuaranteedInst:
     return true;
   default:
     return false;

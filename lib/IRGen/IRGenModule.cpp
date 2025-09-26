@@ -784,6 +784,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                                          PtrTy,
                                          PtrTy,
                                      });
+  SwiftImplicitActorType =
+      createStructType(*this, "swift.implicit_isolated_actor_type",
+                       {
+                           RefCountedPtrTy, // ref counted pointer
+                           Int8PtrTy,       // witness table pointer
+                       });
 }
 
 IRGenModule::~IRGenModule() {

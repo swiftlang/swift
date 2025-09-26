@@ -2160,6 +2160,11 @@ public:
           << "@" << UOCI->getConversionOwnershipKind();
   }
 
+  void visitInjectGuaranteedInst(InjectGuaranteedInst *UOCI) {
+    *this << getIDAndType(UOCI->getValue()) << " onto "
+          << getIDAndType(UOCI->getGuaranteedBase());
+  }
+
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
     *this << getIDAndType(CI->getOperand()) << " to ";
     if (CI->withoutActuallyEscaping())

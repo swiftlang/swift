@@ -2762,6 +2762,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createDestructureStruct(Loc, Operand);
     break;
   }
+  case SILInstructionKind::InjectGuaranteedInst: {
+    assert(RecordKind == SIL_TWO_OPERANDS);
+    auto Ty = MF->getType(TyID);
+    auto Ty2 = MF->getType(TyID2);
+    ResultInst = Builder.createInjectGuaranteedInst(
+        Loc,
+        getLocalValue(Builder.maybeGetFunction(), ValID,
+                      getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
+        getLocalValue(Builder.maybeGetFunction(), ValID2,
+                      getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)));
+    break;
+  }
   case SILInstructionKind::UncheckedOwnershipConversionInst: {
     auto Ty = MF->getType(TyID);
     auto ResultKind = decodeValueOwnership(Attr);
