@@ -13,6 +13,7 @@ list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_SOURCE_DIR}/../cmake/modules"
   "${CMAKE_SOURCE_DIR}/../../cmake/modules")
 
+include(LanguageVersions)
 include(SwiftProjectVersion)
 project(SwiftObservation
   LANGUAGES Swift CXX
@@ -22,9 +23,6 @@ if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Observation must build as a standalone project")
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED YES)
-set(CMAKE_CXX_EXTENSIONS NO)
 set(CMAKE_POSITION_INDEPENDENT_CODE YES)
 
 set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
