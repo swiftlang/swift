@@ -149,7 +149,7 @@ public func implementationDetailsUser() {
 
 public struct ClientStruct {
 #if !SKIP_ERRORS
-  public var a: SPIOnlyStruct // expected-error {{cannot use struct 'SPIOnlyStruct' here; 'SPIOnlyImportedLib' was imported for SPI only}}
+  public var a: SPIOnlyStruct // expected-error {{cannot use struct 'SPIOnlyStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'SPIOnlyImportedLib' was imported for SPI only}}
   // expected-error@+1 {{cannot use property 'wrappedValue' here; 'SPIOnlyImportedLib' was imported for SPI only}}
   @SPIOnlyPropertyWrapper(42) public var aWrapped: Any // expected-error {{cannot use generic struct 'SPIOnlyPropertyWrapper' as property wrapper here; 'SPIOnlyImportedLib' was imported for SPI only}}
 #endif

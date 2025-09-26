@@ -2376,7 +2376,8 @@ public:
     if (seenVars.count(theVar))
       return;
 
-    checkType(theVar->getValueInterfaceType(), /*typeRepr*/nullptr, theVar);
+    checkType(theVar->getValueInterfaceType(), /*typeRepr*/nullptr, theVar,
+              ExportabilityReason::PublicVarDecl);
 
     for (auto attr : theVar->getAttachedPropertyWrappers()) {
       checkType(attr->getType(), attr->getTypeRepr(), theVar,
@@ -2398,7 +2399,8 @@ public:
     });
 
     checkType(TP->hasType() ? TP->getType() : Type(),
-              TP->getTypeRepr(), anyVar ? (Decl *)anyVar : (Decl *)PBD);
+              TP->getTypeRepr(), anyVar ? (Decl *)anyVar : (Decl *)PBD,
+              ExportabilityReason::PublicVarDecl);
 
     // Check the property wrapper types.
     if (anyVar) {
