@@ -49,43 +49,55 @@ static StringRef copyAndClearString(llvm::BumpPtrAllocator &Allocator,
   return Ref;
 }
 
-CodeCompletionString *SignatureHelpFormatter::createSignatureString(
-    ValueDecl *FD, AnyFunctionType *AFT, const DeclContext *DC,
-    GenericSignature GenericSig, bool IsSubscript, bool IsMember,
-    bool IsImplicitlyCurried, bool IsSecondApply) {
+CodeCompletionString *
+SignatureHelpFormatter::createSignatureString(const ide::Signature &Signature,
+                                              const DeclContext *DC) {
+  ValueDecl *FD = Signature.FuncD;
+  AnyFunctionType *AFT = Signature.FuncTy;
+
+  GenericSignature GenericSig;
+  if (FD) {
+    if (auto *GC = FD->getAsGenericContext())
+      GenericSig = GC->getGenericSignature();
+  }
+
   CodeCompletionStringBuilder StringBuilder(
       Allocator, /*AnnotateResults=*/false,
-      /*UnderscoreEmptyArgumentLabel=*/!IsSubscript,
+      /*UnderscoreEmptyArgumentLabel=*/!Signature.IsSubscript,
       /*FullParameterFlags=*/true);
 
   DeclBaseName BaseName;
 
-  if (!IsSecondApply && FD) {
+  if (!Signature.IsSecondApply && FD) {
     BaseName = FD->getBaseName();
-  } else if (IsSubscript) {
+  } else if (Signature.IsSubscript) {
     BaseName = DeclBaseName::createSubscript();
   }
 
   if (!BaseName.empty())
-    StringBuilder.addValueBaseName(BaseName, IsMember);
+    StringBuilder.addValueBaseName(BaseName,
+                                   /*IsMember=*/bool(Signature.BaseType));
 
   StringBuilder.addLeftParen();
 
   const ParamDecl *ParamScratch;
   StringBuilder.addCallArgumentPatterns(
       AFT->getParams(),
-      getParameterArray(FD, IsImplicitlyCurried, ParamScratch), DC, GenericSig,
-      DefaultArgumentOutputMode::All, /*includeDefaultValues=*/true);
+      getParameterArray(FD, Signature.IsImplicitlyCurried, ParamScratch), DC,
+      GenericSig, DefaultArgumentOutputMode::All,
+      /*includeDefaultValues=*/true);
 
   StringBuilder.addRightParen();
 
-  if (!IsImplicitlyCurried) {
-    // For a second apply, we don't pass the declaration to avoid adding
-    // incorrect rethrows and reasync which are only usable in a single apply.
-    StringBuilder.addEffectsSpecifiers(
-        AFT,
-        /*AFD=*/IsSecondApply ? nullptr
-                              : dyn_cast_or_null<AbstractFunctionDecl>(FD));
+  if (!Signature.IsImplicitlyCurried) {
+    if (Signature.IsSecondApply) {
+      // For a second apply, we don't pass the declaration to avoid adding
+      // incorrect rethrows and reasync which are only usable in a single apply.
+      StringBuilder.addEffectsSpecifiers(AFT, /*AFD=*/nullptr);
+    } else {
+      StringBuilder.addEffectsSpecifiers(
+          AFT, dyn_cast_or_null<AbstractFunctionDecl>(FD));
+    }
   }
 
   if (FD && FD->isImplicitlyUnwrappedOptional()) {
@@ -104,19 +116,9 @@ SignatureHelpFormatter::formatSignature(const DeclContext *DC,
   auto *FD = Signature.FuncD;
   auto *AFT = Signature.FuncTy;
 
-  bool IsConstructor = false;
-  GenericSignature genericSig;
-  if (FD) {
-    IsConstructor = isa<ConstructorDecl>(FD);
+  bool IsConstructor = isa_and_nonnull<ConstructorDecl>(FD);
 
-    if (auto *GC = FD->getAsGenericContext())
-      genericSig = GC->getGenericSignature();
-  }
-
-  auto *SignatureString = createSignatureString(
-      FD, AFT, DC, genericSig, Signature.IsSubscript,
-      /*IsMember=*/bool(Signature.BaseType), Signature.IsImplicitlyCurried,
-      Signature.IsSecondApply);
+  auto *SignatureString = createSignatureString(Signature, DC);
 
   llvm::SmallString<512> SS;
   llvm::raw_svector_ostream OS(SS);

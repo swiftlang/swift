@@ -20,10 +20,7 @@
 
 namespace swift {
 
-class ValueDecl;
-class AnyFunctionType;
 class DeclContext;
-class GenericSignature;
 
 namespace ide {
 
@@ -78,11 +75,8 @@ private:
   FormattedSignatureHelp::Signature
   formatSignature(const DeclContext *DC, const ide::Signature &Signature);
 
-  CodeCompletionString *
-  createSignatureString(ValueDecl *FD, AnyFunctionType *AFT,
-                        const DeclContext *DC, GenericSignature GenericSig,
-                        bool IsSubscript, bool IsMember,
-                        bool IsImplicitlyCurried, bool IsSecondApply);
+  CodeCompletionString *createSignatureString(const ide::Signature &Signature,
+                                              const DeclContext *DC);
 };
 
 } // namespace ide
