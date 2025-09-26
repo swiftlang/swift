@@ -8412,10 +8412,22 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   // If this is a stored property, and not a backing property in a case where
   // we only want to see the declared properties, it can be memberwise
   // initialized.
-  if (hasStorage() && preferDeclaredProperties &&
-      isBackingStorageForDeclaredProperty(this))
-    return false;
-
+  if (hasStorage()) {
+    if (isBackingStorageForDeclaredProperty(this)) {
+      if (preferDeclaredProperties)
+        return false;
+    } else if (getASTContext().LangOpts.hasFeature(Feature::ExcludePrivateFromMemberwiseInit)) {
+      // Private variables with initial values are never memberwise initialized.
+      if (getFormalAccess() == AccessLevel::Private) {
+        if (hasInitialValue())
+          return false;
+        if (auto *PBD = getParentPatternBinding()) {
+          if (PBD->isDefaultInitializable())
+            return false;
+        }
+      }
+    }
+  }
   // If this is a computed property with `init` accessor, it's
   // memberwise initializable when it could be used to initialize
   // other stored properties.
