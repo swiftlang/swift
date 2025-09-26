@@ -3651,7 +3651,7 @@ function Test-SourceKitLSP {
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\lib",
     # swift-markdown
-    "-Xswiftc", "-I$SourceCache\swift-markdown\Sources\CAtomic\inclde",
+    "-Xswiftc", "-I$SourceCache\swift-markdown\Sources\CAtomic\include",
     "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform Markdown)\lib\CAtomic.lib",
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Markdown)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform Markdown)\lib",
