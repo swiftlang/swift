@@ -359,6 +359,11 @@ struct BridgedValue {
   bool findPointerEscape() const;
 };
 
+BRIDGED_INLINE BridgedValue::Ownership
+BridgedValueOwnership_init(BridgedFunction f, BridgedType type,
+                           BridgedArgumentConvention convention);
+
+
 struct OptionalBridgedValue {
   OptionalSwiftObject obj;
 
@@ -530,7 +535,6 @@ struct BridgedFunction {
   BRIDGED_INLINE bool isAccessor() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getAccessorName() const;
   BRIDGED_INLINE bool hasOwnership() const;
-  BRIDGED_INLINE BridgedValue::Ownership getValueOwnership(BridgedType type, BridgedArgumentConvention convention) const;
   BRIDGED_INLINE bool hasLoweredAddresses() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getLoweredFunctionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getLoweredFunctionTypeInContext() const;

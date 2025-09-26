@@ -580,6 +580,14 @@ BridgedFunction BridgedValue::PlaceholderValue_getParentFunction() const {
   return {llvm::cast<swift::PlaceholderValue>(getSILValue())->getParent()};
 }
 
+BridgedValue::Ownership
+BridgedValueOwnership_init(BridgedFunction f, BridgedType type,
+                           BridgedArgumentConvention convention) {
+  swift::ValueOwnershipKind ownership(*f.getFunction(), type.unbridged(),
+                                      unbridge(convention));
+  return bridge(ownership);
+}
+
 //===----------------------------------------------------------------------===//
 //                                BridgedOperand
 //===----------------------------------------------------------------------===//
@@ -772,12 +780,6 @@ BridgedStringRef BridgedFunction::getAccessorName() const {
 }
 
 bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(); }
-
-BridgedValue::Ownership BridgedFunction::getValueOwnership(BridgedType type, BridgedArgumentConvention convention) const {
-  auto silConvention = unbridge(convention);
-  swift::ValueOwnershipKind ownership(*getFunction(), type.unbridged(), silConvention);
-  return bridge(ownership);
-}
 
 bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->getModule().useLoweredAddresses(); }
 

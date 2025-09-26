@@ -2998,7 +2998,8 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isBuiltinVector() const;
   BRIDGED_INLINE bool isBuiltinFixedArray() const;
   BRIDGED_INLINE bool isBox() const;
-  BRIDGED_INLINE bool isPack() const;
+  BRIDGED_INLINE bool isASTPack() const;
+  BRIDGED_INLINE bool isSILPack() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getBuiltinVectorElementType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArrayElementType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArraySizeType() const;

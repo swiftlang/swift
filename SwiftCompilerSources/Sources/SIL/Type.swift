@@ -136,17 +136,17 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
   }
 
   public var isPackElementAddress: Bool {
-    precondition(isPack);
+    precondition(isSILPack);
     return bridged.isPackElementAddress();
   }
 
   public var containsPackExpansionType: Bool {
-    precondition(isPack);
+    precondition(isSILPack);
     return bridged.containsPackExpansionType();
   }
 
   public var approximateFormalPackType: CanonicalType {
-    precondition(isPack);
+    precondition(isSILPack);
     return CanonicalType(bridged: bridged.getApproximateFormalPackType());
   }
 
@@ -199,7 +199,7 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
   }
 
   public var packElements: PackElementArray {
-    precondition(isPack)
+    precondition(isSILPack)
     return PackElementArray(type: self)
   }
 

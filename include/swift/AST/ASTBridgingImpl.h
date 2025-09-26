@@ -525,7 +525,11 @@ bool BridgedASTType::isBox() const {
   return unbridged()->is<swift::SILBoxType>();
 }
 
-bool BridgedASTType::isPack() const {
+bool BridgedASTType::isASTPack() const {
+  return unbridged()->is<swift::PackType>();
+}
+
+bool BridgedASTType::isSILPack() const {
   return unbridged()->is<swift::SILPackType>();
 }
 
