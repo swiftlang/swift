@@ -12,7 +12,7 @@
 // RUN: cp %S/Inputs/CHeader.h %t/Dependencies/
 // RUN: cp %S/Inputs/module.modulemap %t/Dependencies/
 
-// RUN: split-file %s %t/Files
+// RUN: split-file %s %t/Files --leading-lines
 
 // Compile the Swift dependencies into that same location.
 // RUN: %target-swift-frontend -parse-as-library -emit-module %t/Dependencies/SwiftDependency.swift -enable-experimental-feature Embedded -o %t/Dependencies/SwiftDependency.swiftmodule
@@ -21,6 +21,9 @@
 // against the dependencies.
 // RUN: %target-swift-frontend -parse-as-library -emit-module %t/Files/Library.swift -enable-experimental-feature Embedded -I %t/Dependencies/ -o %t/Modules/Library.swiftmodule
 
+// Building the library with invalid uses trigger errors.
+// RUN: %target-swift-frontend -parse-as-library -typecheck -verify %t/Files/Library.swift -enable-experimental-feature Embedded -I %t/Dependencies/ -o %t/Modules/Library.swiftmodule -DBAD_IOI_USAGE
+
 // Remove the dependencies so there is no way we can find them later.
 // RUN: rm -rf %t/Dependencies
 
@@ -28,19 +31,12 @@
 // @_neverEmitIntoClient hides the body of test().
 // RUN: %target-swift-frontend -emit-ir -parse-as-library %t/Files/Application.swift -enable-experimental-feature Embedded -I %t/Modules -o %t/Application.ir
 
-// Build the application against the library, but intentionally trigger
-// deserialization of some serialized SIL that refers to an implementation-only
-// dependency. Right now, these fail spectacularly. Over time, we want them to
-// become compile-time errors or start working.
-// RUN: not --crash %target-swift-frontend -emit-ir -parse-as-library %t/Files/Application.swift -enable-experimental-feature Embedded -I %t/Modules -o %t/Application.ir -DBAD_C_USAGE
-// RUN: not --crash %target-swift-frontend -emit-ir -parse-as-library %t/Files/Application.swift -enable-experimental-feature Embedded -I %t/Modules -o %t/Application.ir -DBAD_SWIFT_USAGE
-
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 //--- Library.swift
-@_implementationOnly import CDependency
-@_implementationOnly import SwiftDependency
+@_implementationOnly import CDependency // expected-warning {{using '@_implementationOnly' without enabling library evolution for 'Library' may lead to instability during execution}}
+@_implementationOnly import SwiftDependency // expected-warning {{using '@_implementationOnly' without enabling library evolution for 'Library' may lead to instability during execution}}
 
 @_neverEmitIntoClient
 public func test() {
@@ -48,13 +44,17 @@ public func test() {
   A().doSomething()
 }
 
+#if BAD_IOI_USAGE
 public func badCLibraryUsage() {
-  _ = getPoint(3.14159, 2.71828)
+  _ = getPoint(3.14159, 2.71828) // expected-error {{global function 'getPoint' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'CDependency' was imported implementation-only}}
 }
 
 public func badSwiftLibraryUsage() {
-  A().doSomething()
+  A().doSomething() // expected-error {{struct 'A' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'SwiftDependency' was imported implementation-only}}
+  // expected-error @-1 {{initializer 'init()' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'SwiftDependency' was imported implementation-only}}
+  // expected-error @-2 {{instance method 'doSomething()' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'SwiftDependency' was imported implementation-only}}
 }
+#endif
 
 //--- Application.swift
 
@@ -62,12 +62,4 @@ import Library
 
 public func useTest() {
   test()
-
-#if BAD_C_USAGE
-  badCLibraryUsage()
-#endif
-
-#if BAD_SWIFT_USAGE
-  badSwiftLibraryUsage()
-#endif
 }

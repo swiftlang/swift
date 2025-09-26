@@ -478,6 +478,11 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
   case FragileFunctionKind::PropertyInitializer:
   case FragileFunctionKind::BackDeploy:
     return ResilienceExpansion::Minimal;
+
+  /// Embedded functions are treated as fragile for diagnostics only.
+  /// For code gen they are treated as normal and optimized later.
+  case FragileFunctionKind::EmbeddedAlwaysEmitIntoClient:
+
   case FragileFunctionKind::None:
     return ResilienceExpansion::Maximal;
   }
@@ -541,6 +546,23 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
       if (AFD->getDeclContext()->isLocalContext())
         continue;
 
+      // Delay checking the implicit conditions after explicit declarations.
+      auto checkEmbeddedAlwaysEmitIntoClient = [&](const ValueDecl *VD) {
+        if (!VD->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+          return FragileFunctionKind::None;
+
+        bool funcIsNEIC = VD->isNeverEmittedIntoClient();
+        bool storageIsNEIC = false;
+        if (auto accessor = dyn_cast<AccessorDecl>(VD))
+          storageIsNEIC = accessor->getStorage()->isNeverEmittedIntoClient();
+
+        // Accessors are implicitly EmbeddedAlwaysEmitIntoClient if neither the
+        // accessor or starage is marked @_neverEmitIntoClient.
+        if (!funcIsNEIC && !storageIsNEIC)
+            return FragileFunctionKind::EmbeddedAlwaysEmitIntoClient;
+        return FragileFunctionKind::None;
+      };
+
       auto funcAccess =
         AFD->getFormalAccessScope(/*useDC=*/nullptr,
                                   /*treatUsableFromInlineAsPublic=*/true);
@@ -548,7 +570,8 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
       // If the function is not externally visible, we will not be serializing
       // its body.
       if (!funcAccess.isPublic()) {
-        return {FragileFunctionKind::None};
+        // For non-public decls, only check embedded mode correctness.
+        return {checkEmbeddedAlwaysEmitIntoClient(AFD)};
       }
 
       // If the function is public, @_transparent implies @inlinable.
@@ -582,6 +605,10 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
           return {FragileFunctionKind::BackDeploy};
         }
       }
+
+      auto implicitKind = checkEmbeddedAlwaysEmitIntoClient(AFD);
+      if (implicitKind != FragileFunctionKind::None)
+        return {implicitKind};
     }
   }
 
