@@ -2324,8 +2324,9 @@ class LowerType
     if (auto N = dyn_cast<NominalTypeRef>(TR)) {
       Demangler Dem;
       auto Node = N->getDemangling(Dem);
-      if (Node->getKind() == Node::Kind::Type && Node->getNumChildren() == 1) {
-	auto Alias = Node->getChild(0);
+      if (Node && Node->getKind() == Node::Kind::Type &&
+          Node->getNumChildren() == 1) {
+        auto Alias = Node->getChild(0);
 	if (Alias->getKind() == Node::Kind::TypeAlias && Alias->getNumChildren() == 2) {
 	  auto Module = Alias->getChild(0);
 	  auto Name = Alias->getChild(1);
