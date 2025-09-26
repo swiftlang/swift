@@ -22,6 +22,7 @@
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/PlatformKindUtils.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
@@ -334,7 +335,8 @@ struct StableAvailabilityDomainComparator {
 };
 
 /// Represents an availability domain that has been defined in a module.
-class CustomAvailabilityDomain : public llvm::FoldingSetNode {
+class alignas(1 << CustomAvailabilityDomainAlignInBits) CustomAvailabilityDomain
+    : public llvm::FoldingSetNode {
 public:
   enum class Kind : uint8_t {
     /// A domain that is known to be enabled at compile time.
