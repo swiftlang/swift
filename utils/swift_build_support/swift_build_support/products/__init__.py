@@ -42,6 +42,7 @@ from .swiftinspect import SwiftInspect
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
 from .system import System
+from .systemtests import SystemTests
 from .tsan_libdispatch import TSanLibDispatch
 from .wasisysroot import WASILibc, WasmLLVMRuntimeLibs
 from .wasmkit import WasmKit

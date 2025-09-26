@@ -120,7 +120,7 @@ Skip building the MSI installers and packaging. Useful for development builds.
 
 .PARAMETER Test
 An array of names of projects to run tests for. Use '*' to run all tests.
-Available tests: lld, lldb, swift, dispatch, foundation, xctest, swift-format, sourcekit-lsp
+Available tests: lld, lldb, swift, dispatch, system, foundation, xctest, swift-format, sourcekit-lsp
 
 .PARAMETER IncludeDS2
 Include the ds2 remote debug server in the SDK.
@@ -210,6 +210,7 @@ param
   [switch] $IncludeNoAsserts = $false,
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
+  [string] $SystemTestConfiguration = "debug",
 
   [switch] $Summary,
   [switch] $ToBatch
@@ -252,7 +253,7 @@ if ($Test.Length -eq 1) { $Test = $Test[0].Split(",") }
 
 if ($Test -contains "*") {
   # Explicitly don't include llbuild yet since tests are known to fail on Windows
-  $Test = @("lld", "lldb", "swift", "dispatch", "foundation", "xctest", "swift-format", "sourcekit-lsp")
+  $Test = @("lld", "lldb", "swift", "dispatch", "system", "foundation", "xctest", "swift-format", "sourcekit-lsp")
 }
 
 if ($UseHostToolchain -is [string]) {
@@ -4221,6 +4222,7 @@ if (-not $IsCrossCompiling) {
   # functions hardcode their platform needs.
   if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch $BuildPlatform }
   if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation $BuildPlatform }
+  if ($Test -contains "system") { Invoke-BuildStep Test-System $BuildPlatform }
   if ($Test -contains "xctest") { Invoke-BuildStep Test-XCTest $BuildPlatform }
   if ($Test -contains "testing") { Invoke-BuildStep Test-Testing $BuildPlatform }
   if ($Test -contains "llbuild") { Invoke-BuildStep Test-LLBuild $BuildPlatform }

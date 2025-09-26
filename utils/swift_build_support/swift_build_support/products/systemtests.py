@@ -12,6 +12,7 @@
 
 import os
 
+from . import product
 from . import system
 from . import swift
 from . import swiftpm
@@ -20,7 +21,7 @@ from . import xctest
 from .. import shell
 
 
-class SwiftSystemTests(product.Product):
+class SystemTests(product.Product):
     @classmethod
     def is_build_script_impl_product(cls):
         return False
