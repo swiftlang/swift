@@ -3056,6 +3056,12 @@ function Build-FoundationMacros([Hashtable] $Platform) {
 }
 
 function Build-XCTest([Hashtable] $Platform) {
+  $SwiftFlags = if ($Platform.OS -eq [OS]::Windows) {
+    @();
+  } else {
+    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\lib\swift");
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-xctest `
     -Bin (Get-ProjectBinaryCache $Platform XCTest) `
@@ -3066,6 +3072,7 @@ function Build-XCTest([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
+      CMAKE_Swift_FLAGS = $SwiftFlags;
       ENABLE_TESTING = "NO";
       XCTest_INSTALL_NESTED_SUBDIR = "YES";
     }
@@ -3112,6 +3119,12 @@ function Test-XCTest {
 }
 
 function Build-Testing([Hashtable] $Platform) {
+  $SwiftFlags = if ($Platform.OS -eq [OS]::Windows) {
+    @();
+  } else {
+    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\lib\swift");
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-testing `
     -Bin (Get-ProjectBinaryCache $Platform Testing) `
@@ -3122,6 +3135,7 @@ function Build-Testing([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
+      CMAKE_Swift_FLAGS = $SwiftFlags;
       SwiftTesting_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapTestingMacros)\TestingMacros.dll";
       SwiftTesting_INSTALL_NESTED_SUBDIR = "YES";
     }
@@ -3856,7 +3870,7 @@ function Build-Inspect([Hashtable] $Platform) {
     $InstallPath = "$(Get-PlatformRoot $Platform.OS)\Developer\Library\$(Get-ModuleTriple $Platform)"
   }
 
-  $SDKROOT = Get-SwiftSDK $Platform.OS
+  $SDKROOT = Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK
 
   Build-CMakeProject `
     -Src $SourceCache\swift\tools\swift-inspect `
