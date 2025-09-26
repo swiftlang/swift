@@ -71,7 +71,7 @@
 ///    object.doSomething()
 ///    // The Swift compiler will release object here.
 ///  ```
-#define SWIFT_SHARED_REFERENCE(_retain, _release)                                \
+#define SWIFT_SHARED_REFERENCE(_retain, _release)                          \
   __attribute__((swift_attr("import_reference")))                          \
   __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(retain:_retain))))      \
   __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(release:_release))))
@@ -98,18 +98,18 @@
 ///    let logger = LoggerSingleton.getInstance()
 ///    logger.log(123)
 ///  ```
-#define SWIFT_IMMORTAL_REFERENCE                                                \
-  __attribute__((swift_attr("import_reference")))                         \
-  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(retain:immortal))))    \
-  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(release:immortal))))
+#define SWIFT_IMMORTAL_REFERENCE                     \
+  __attribute__((swift_attr("import_reference")))    \
+  __attribute__((swift_attr("retain:immortal"))))    \
+  __attribute__((swift_attr("release:immortal"))))
 
 /// Specifies that a `class` or `struct` is a reference type whose lifetime
 /// is not managed automatically. The programmer must validate that any reference
 /// to such object is valid themselves. This annotation lets Swift import such a type as a reference type in Swift.
-#define SWIFT_UNSAFE_REFERENCE                                                  \
-  __attribute__((swift_attr("import_reference")))                         \
-  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(retain:immortal))))    \
-  __attribute__((swift_attr(_CXX_INTEROP_STRINGIFY(release:immortal))))   \
+#define SWIFT_UNSAFE_REFERENCE                       \
+  __attribute__((swift_attr("import_reference")))    \
+  __attribute__((swift_attr("retain:immortal"))))    \
+  __attribute__((swift_attr("release:immortal"))))   \
   __attribute__((swift_attr("unsafe")))
 
 /// Specifies a name that will be used in Swift for this declaration instead of its original name.
