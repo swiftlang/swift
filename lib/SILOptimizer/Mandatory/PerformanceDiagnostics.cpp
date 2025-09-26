@@ -388,6 +388,11 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
       case SILInstructionKind::ExplicitCopyAddrInst:
       case SILInstructionKind::ExplicitCopyValueInst:
         break; // Explicitly acknowledged copies are OK.
+      case SILInstructionKind::CopyAddrInst: {
+        if (!cast<CopyAddrInst>(inst)->isTakeOfSrc())
+          shouldDiagnose = true; // If it isn't a [take], it's a copy.
+        break;
+      }
       case SILInstructionKind::LoadInst: {
         // FIXME: we don't have an `explicit_load` and transparent functions can
         //   end up bringing in a `load [copy]`. A better approach is needed to
@@ -429,38 +434,53 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
                    << "\n has unexpected copying instruction: " << *inst);
 
         // Try to come up with a useful diagnostic.
+
+        // First, identify what is being copied.
+        SILValue copied;
         if (auto svi = dyn_cast<SingleValueInstruction>(inst)) {
-          if (auto name = VariableNameInferrer::inferName(svi)) {
-            // Simplistic check for whether this is a closure capture.
-            for (auto user : svi->getUsers()) {
-              if (isa<PartialApplyInst>(user)) {
-                LLVM_DEBUG(llvm::dbgs() << "captured by "<< *user);
-                diagnose(loc, diag::manualownership_copy_captured, *name);
-                return false;
-              }
-            }
+          copied = svi;
+        } else if (auto cai = dyn_cast<CopyAddrInst>(inst)) {
+          copied = cai->getSrc();
+        }
 
-            // There's no hope of borrowing access if there's a consuming use.
-            for (auto op : svi->getUses()) {
-              auto useKind = op->getOperandOwnership();
+        // Find a name for that copied thing.
+        std::optional<Identifier> name;
+        if (copied)
+          name = VariableNameInferrer::inferName(copied);
 
-              // Only some DestroyingConsume's, like 'store', are interesting.
-              if (useKind == OperandOwnership::ForwardingConsume
-                  || isa<StoreInst>(op->getUser())) {
-                LLVM_DEBUG(llvm::dbgs() << "demanded by "<< *(op->getUser()));
-                diagnose(loc, diag::manualownership_copy_demanded, *name);
-                return false;
-              }
-            }
+        if (!name) {
+          // Emit a rudimentary diagnostic.
+          diagnose(loc, diag::manualownership_copy);
+          return false;
+        }
 
-            diagnose(loc, diag::manualownership_copy_happened, *name);
+        // Try to tailor the diagnostic based on usages.
+
+        // Simplistic check for whether this is a closure capture.
+        for (auto user : copied->getUsers()) {
+          if (isa<PartialApplyInst>(user)) {
+            LLVM_DEBUG(llvm::dbgs() << "captured by "<< *user);
+            diagnose(loc, diag::manualownership_copy_captured, name->get());
             return false;
           }
         }
 
-        // Back-up diagnostic, when all-else fails.
-        diagnose(loc, diag::manualownership_copy);
-        return false; // Don't bail-out early; diagnose more issues in the func.
+        // There's no hope of borrowing access if there's a consuming use.
+        for (auto op : copied->getUses()) {
+          auto useKind = op->getOperandOwnership();
+
+          // Only some DestroyingConsume's, like 'store', are interesting.
+          if (useKind == OperandOwnership::ForwardingConsume
+              || isa<StoreInst>(op->getUser())) {
+            LLVM_DEBUG(llvm::dbgs() << "demanded by "<< *(op->getUser()));
+            diagnose(loc, diag::manualownership_copy_demanded, *name);
+            return false;
+          }
+        }
+
+        // Catch-all diagnostic for when we at least have the name.
+        diagnose(loc, diag::manualownership_copy_happened, *name);
+        return false;
       }
     }
     return false;
