@@ -52,6 +52,7 @@
 #endif
 
 #if defined(SWIFT_USE_STD_RANDOM_DEVICE)
+#include <cstring>
 #include <random>
 #endif
 
@@ -83,7 +84,7 @@ void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
   }
 }
 
-#elseif defined(__APPLE__)
+#elif defined(__APPLE__)
 
 SWIFT_RUNTIME_STDLIB_API
 void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
