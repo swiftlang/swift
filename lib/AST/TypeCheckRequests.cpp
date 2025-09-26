@@ -687,6 +687,9 @@ void swift::simple_display(llvm::raw_ostream &out,
   case FragileFunctionKind::BackDeploy:
     out << "backDeploy";
     return;
+  case FragileFunctionKind::EmbeddedAlwaysEmitIntoClient:
+    out << "embeddedAlwaysEmitIntoClient";
+    return;
   case FragileFunctionKind::None:
     out << "none";
     return;
