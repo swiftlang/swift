@@ -1998,6 +1998,8 @@ function Build-Sanitizers([Hashtable] $Platform) {
 }
 
 function Build-Brotli([Hashtable] $Platform) {
+  $ArchName = $Platform.Architecture.LLVMName
+
   Build-CMakeProject `
     -Src $SourceCache\brotli `
     -Bin "$(Get-ProjectBinaryCache $Platform brotli)" `
@@ -2008,6 +2010,8 @@ function Build-Brotli([Hashtable] $Platform) {
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
       CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+      INSTALL_BIN_DIR = "$LibraryRoot\brotli\usr\bin\$($Platform.OS.ToString())\$ArchName";
+      INSTALL_LIB_DIR = "$LibraryRoot\brotli\usr\lib\$($Platform.OS.ToString())\$ArchName";
     }
 }
 
@@ -2190,8 +2194,8 @@ function Build-CURL([Hashtable] $Platform) {
       ZLIB_ROOT = "$LibraryRoot\zlib-1.3.1\usr";
       ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3.1\usr\lib\$($Platform.OS.ToString())\$ArchName\zlibstatic.lib";
       BROTLI_INCLUDE_DIR = "$LibraryRoot\brotli\usr\include";
-      BROTLIDEC_LIBRARY = "$LibraryRoot\brotli\usr\lib\brotlidec.lib";
-      BROTLICOMMON_LIBRARY = "$LibraryRoot\brotli\usr\lib\brotlicommon.lib";
+      BROTLIDEC_LIBRARY = "$LibraryRoot\brotli\usr\lib\$($Platform.OS.ToString())\$ArchName\brotlidec.lib";
+      BROTLICOMMON_LIBRARY = "$LibraryRoot\brotli\usr\lib\$($Platform.OS.ToString())\$ArchName\brotlicommon.lib";
     })
 }
 
@@ -2424,14 +2428,14 @@ function Build-Foundation {
       };
       ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.3.1\usr\include";
       BROTLIDEC_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-         "$LibraryRoot\brotli\usr\lib\brotlidec.lib"
+         "$LibraryRoot\brotli\usr\lib\$($Platform.OS.ToString())\$($Platform.Architecture.LLVMName)\brotlidec.lib"
       } else {
-        "$LibraryRoot\brotli\usr\lib64\brotlidec.a"
+        "$LibraryRoot\brotli\usr\lib64\$($Platform.OS.ToString())\$($Platform.Architecture.LLVMName)\brotlidec.a"
       };
       BROTLICOMMON_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$LibraryRoot\brotli\usr\lib\brotlicommon.lib"
+        "$LibraryRoot\brotli\usr\lib\$($Platform.OS.ToString())\$($Platform.Architecture.LLVMName)\brotlicommon.lib"
       } else {
-        "$LibraryRoot\brotli\usr\lib64\brotlicommon.a"
+        "$LibraryRoot\brotli\usr\lib64\$($Platform.OS.ToString())\$($Platform.Architecture.LLVMName)\brotlicommon.a"
       };
       BROTLI_INCLUDE_DIR = "$LibraryRoot\brotli\usr\include";
       dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
@@ -2456,7 +2460,7 @@ function Test-Foundation {
     $env:LIBXML_LIBRARY_PATH="$LibraryRoot/libxml2-2.11.5/usr/lib/windows/$($BuildPlatform.Architecture.LLVMName)"
     $env:LIBXML_INCLUDE_PATH="$LibraryRoot/libxml2-2.11.5/usr/include/libxml2"
     $env:ZLIB_LIBRARY_PATH="$LibraryRoot/zlib-1.3.1/usr/lib/windows/$($BuildPlatform.Architecture.LLVMName)"
-    $env:BROTLI_LIBRARY_PATH="$LibraryRoot/brotli/usr/lib"
+    $env:BROTLI_LIBRARY_PATH="$LibraryRoot/brotli/usr/lib/windows/$($BuildPlatform.Architecture.LLVMName)"
     $env:CURL_LIBRARY_PATH="$LibraryRoot/curl-8.9.1/usr/lib/windows/$($BuildPlatform.Architecture.LLVMName)"
     $env:CURL_INCLUDE_PATH="$LibraryRoot/curl-8.9.1/usr/include"
     Build-SPMProject `
