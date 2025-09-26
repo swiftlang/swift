@@ -45,10 +45,18 @@ BridgedGenericParamList BridgedGenericParamList_createParsed(
 BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     SourceLoc specifierLoc, Identifier name, SourceLoc nameLoc,
-    BridgedNullableTypeRepr bridgedInheritedType, size_t index,
+    BridgedNullableTypeRepr bridgedInheritedType,
+    BridgedNullableTypeRepr bridgedDefaultType, size_t index,
     swift::GenericTypeParamKind paramKind) {
+  TypeLoc defaultType;
+
+  if (auto *defaultTypeRepr = bridgedDefaultType.unbridged()) {
+    defaultType = TypeLoc(defaultTypeRepr);
+  }
+
   auto *decl = GenericTypeParamDecl::createParsed(
-      cDeclContext.unbridged(), name, nameLoc, specifierLoc, index, paramKind);
+      cDeclContext.unbridged(), name, nameLoc, specifierLoc, defaultType,
+      index, paramKind);
 
   if (auto *inheritedType = bridgedInheritedType.unbridged()) {
     auto entry = InheritedEntry(inheritedType);

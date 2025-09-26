@@ -5386,6 +5386,27 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Compute the default type of a generic type param.
+class GenericTypeParamDeclDefaultTypeRequest
+    : public SimpleRequest<GenericTypeParamDeclDefaultTypeRequest,
+                           Type(GenericTypeParamDecl *decl),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, GenericTypeParamDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+  std::optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
 class CustomDerivativesRequest
     : public SimpleRequest<CustomDerivativesRequest,
                            evaluator::SideEffect(SourceFile *),

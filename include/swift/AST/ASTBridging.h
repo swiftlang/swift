@@ -2893,12 +2893,13 @@ BridgedGenericParamList BridgedGenericParamList_createParsed(
 
 SWIFT_NAME(
     "BridgedGenericTypeParamDecl.createParsed(_:declContext:specifierLoc:"
-    "name:nameLoc:inheritedType:index:paramKind:)")
+    "name:nameLoc:inheritedType:defaultType:index:paramKind:)")
 BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     swift::SourceLoc specifierLoc, swift::Identifier name,
     swift::SourceLoc nameLoc, BridgedNullableTypeRepr opaqueInheritedType,
-    size_t index, swift::GenericTypeParamKind paramKind);
+    BridgedNullableTypeRepr defaultType, size_t index,
+    swift::GenericTypeParamKind paramKind);
 
 SWIFT_NAME(
     "BridgedTrailingWhereClause.createParsed(_:whereKeywordLoc:requirements:)")

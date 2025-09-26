@@ -85,6 +85,10 @@ GenericParamList::clone(DeclContext *dc) const {
         GenericTypeParamDeclGetValueTypeRequest{newParam},
         param->getValueType());
 
+    ctx.evaluator.cacheOutput(
+        GenericTypeParamDeclDefaultTypeRequest{newParam},
+        param->getDefaultType());
+
     params.push_back(newParam);
   }
 

@@ -3,21 +3,24 @@
 // RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-concurrency -enable-experimental-feature ParserASTGen \
 // RUN:    -enable-experimental-feature CoroutineAccessors \
 // RUN:    -enable-experimental-feature DefaultIsolationPerFile \
+// RUN:    -enable-experimental-feature DefaultGenerics \
 // RUN:    | %sanitize-address > %t/astgen.ast
 // RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-concurrency \
 // RUN:    -enable-experimental-feature CoroutineAccessors \
 // RUN:    -enable-experimental-feature DefaultIsolationPerFile \
+// RUN:    -enable-experimental-feature DefaultGenerics \
 // RUN:    | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-concurrency -enable-experimental-feature CoroutineAccessors -enable-experimental-feature DefaultIsolationPerFile -enable-experimental-feature ParserASTGen)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-concurrency -enable-experimental-feature CoroutineAccessors -enable-experimental-feature DefaultIsolationPerFile -enable-experimental-feature DefaultGenerics -enable-experimental-feature ParserASTGen)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_CoroutineAccessors
 // REQUIRES: swift_feature_DefaultIsolationPerFile
+// REQUIRES: swift_feature_DefaultGenerics
 
 // rdar://116686158
 // UNSUPPORTED: asan
@@ -361,3 +364,9 @@ func testBuilder() {
 }
 
 struct ExpansionRequirementTest<each T> where repeat each T: Comparable {}
+
+struct SystemAllocator: Proto1, Proto2 {}
+struct Vec<Element, A = SystemAllocator> {}
+enum DefaultGenericEnum<T = Int> {}
+class DefaultGenericClass<T, U: Proto1, V: Proto2 = SystemAllocator> {}
+typealias DefaultGenericTypealias<T = Int> = Vec<T>

@@ -34,6 +34,7 @@ using namespace swift;
 ///     identifier
 ///     identifier ':' type-identifier
 ///     identifier ':' type-composition
+///     identifier ':' type-identifier '=' type-identifier
 ///
 /// When parsing the generic parameters, this routine establishes a new scope
 /// and adds those parameters to the scope.
@@ -140,8 +141,22 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
       SpecifierLoc = LetLoc;
     }
 
+    // Parse the '=' followed by a type.
+    ParserResult<TypeRepr> DefaultType;
+
+    if (Context.LangOpts.hasFeature(Feature::DefaultGenerics)) {
+      // TODO: Don't allow defaults for values or parameter packs at the moment.
+      if (Tok.is(tok::equal) && ParamKind == GenericTypeParamKind::Type) {
+        consumeToken(tok::equal);
+        DefaultType = parseType(diag::expected_type);
+        Result |= DefaultType;
+        if (DefaultType.isNull())
+          return Result;
+      }
+    }
+
     auto *Param = GenericTypeParamDecl::createParsed(
-        CurDeclContext, Name, NameLoc, SpecifierLoc,
+        CurDeclContext, Name, NameLoc, SpecifierLoc, DefaultType.getPtrOrNull(),
         /*index*/ GenericParams.size(), ParamKind);
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));

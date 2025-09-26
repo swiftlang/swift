@@ -2022,6 +2022,11 @@ void PrintAST::printSingleDepthOfGenericSignature(
               printType(param->getValueType());
             }
 
+            if (GP->hasDefaultType()) {
+              Printer << " = ";
+              printType(GP->getDefaultType());
+            }
+
             Printer.printStructurePost(PrintStructureKind::GenericParameter,
                                        GP);
           } else {
@@ -3645,6 +3650,11 @@ void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
   });
 
   printInherited(decl);
+
+  if (decl->hasDefaultType()) {
+    Printer << " = ";
+    decl->getDefaultType().print(Printer, Options);
+  }
 }
 
 void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
@@ -8372,6 +8382,17 @@ void GenericParamList::print(ASTPrinter &Printer,
             loc.getTypeRepr()->print(Printer, PO);
           } else {
             loc.getType()->print(Printer, PO);
+          }
+
+          if (P->hasDefaultType()) {
+            Printer << " = ";
+
+            auto loc = P->getDefaultTypeRepr();
+            if (loc && willUseTypeReprPrinting(loc, nullptr, PO)) {
+              loc->print(Printer, PO);
+            } else {
+              P->getDefaultType()->print(Printer, PO);
+            }
           }
         }
       },

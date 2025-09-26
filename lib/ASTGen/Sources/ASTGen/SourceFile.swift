@@ -86,6 +86,7 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.OldOwnershipOperatorSpellings, to: .oldOwnershipOperatorSpellings)
     mapFeature(.KeyPathWithMethodMembers, to: .keypathWithMethodMembers)
     mapFeature(.DefaultIsolationPerFile, to: .defaultIsolationPerFile)
+    mapFeature(.DefaultGenerics, to: .defaultGenerics)
   }
 }
 

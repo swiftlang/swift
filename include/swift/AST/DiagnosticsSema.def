@@ -8927,5 +8927,19 @@ ERROR(invalid_redecl_of_file_isolation,none,
 NOTE(invalid_redecl_of_file_isolation_prev,none,
      "default isolation was previously declared here", ())
 
+//===----------------------------------------------------------------------===//
+// MARK: Default generics
+//===----------------------------------------------------------------------===//
+
+ERROR(default_generic_not_trailing,none,
+      "generic parameter %0 with default type %1 must be trailing",
+      (const GenericTypeParamDecl *, Type))
+ERROR(default_generic_not_type,none,
+      "generic parameter %0 can only have a default type on type declarations",
+      (const GenericTypeParamDecl *))
+ERROR(default_generic_parameter_pack,none,
+      "declaration %0 cannot have both parameter packs and generic parameters with default types",
+      (const Decl *))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

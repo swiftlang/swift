@@ -4442,7 +4442,8 @@ public:
         S.addDeclBaseNameRef(genericParam->getName()),
         genericParam->isImplicit(),
         genericParam->isOpaqueType(),
-        S.addTypeRef(genericParam->getDeclaredInterfaceType()->getCanonicalType()));
+        S.addTypeRef(genericParam->getDeclaredInterfaceType()->getCanonicalType()),
+        S.addTypeRef(genericParam->getDefaultType()));
   }
 
   void visitAssociatedTypeDecl(const AssociatedTypeDecl *assocType) {

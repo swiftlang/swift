@@ -432,6 +432,22 @@ static bool usesFeatureDefaultIsolationPerFile(Decl *D) {
   return isa<UsingDecl>(D);
 }
 
+static bool usesFeatureDefaultGenerics(Decl *decl) {
+  auto genericContext = decl->getAsGenericContext();
+
+  if (!genericContext || !genericContext->getGenericParams()) {
+    return false;
+  }
+
+  for (auto arg : *genericContext->getGenericParams()) {
+    if (arg->hasDefaultType()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 UNINTERESTING_FEATURE(BuiltinSelect)
 UNINTERESTING_FEATURE(BuiltinInterleave)
 UNINTERESTING_FEATURE(BuiltinVectorsExternC)

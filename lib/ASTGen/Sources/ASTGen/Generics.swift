@@ -57,6 +57,7 @@ extension ASTGenVisitor {
       name: name,
       nameLoc: nameLoc,
       inheritedType: self.generate(type: node.inheritedType),
+      defaultType: self.generate(type: node.initializer?.value),
       index: genericParameterIndex,
       paramKind: paramKind
     )

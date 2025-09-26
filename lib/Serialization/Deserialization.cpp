@@ -3619,9 +3619,11 @@ public:
     bool isImplicit;
     bool isOpaqueType;
     TypeID interfaceTypeID;
+    TypeID defaultTypeID;
 
     decls_block::GenericTypeParamDeclLayout::readRecord(
-        scratch, nameID, isImplicit, isOpaqueType, interfaceTypeID);
+        scratch, nameID, isImplicit, isOpaqueType, interfaceTypeID,
+        defaultTypeID);
 
     auto interfaceTy = MF.getTypeChecked(interfaceTypeID);
     if (!interfaceTy)
@@ -3647,6 +3649,15 @@ public:
       ctx.evaluator.cacheOutput(
         GenericTypeParamDeclGetValueTypeRequest{genericParam},
         paramTy->getValueType());
+    }
+
+    // If this generic parameter had a default type, inform the evaluator that
+    // this value is already computed.
+    auto defaultTy = MF.getTypeChecked(defaultTypeID);
+    if (defaultTy) {
+      ctx.evaluator.cacheOutput(
+        GenericTypeParamDeclDefaultTypeRequest{genericParam},
+        std::move(defaultTy.get()));
     }
 
     return genericParam;
