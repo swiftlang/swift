@@ -96,17 +96,19 @@ struct SILLLVMGenOptions {
   llvm::cl::opt<bool>
     PerformWMO = llvm::cl::opt<bool>("wmo", llvm::cl::desc("Enable whole-module optimizations"));
 
-  llvm::cl::opt<IRGenOutputKind>
-    OutputKind = llvm::cl::opt<IRGenOutputKind>(
+  llvm::cl::opt<IRGenOutputKind> OutputKind = llvm::cl::opt<IRGenOutputKind>(
       "output-kind", llvm::cl::desc("Type of output to produce"),
-      llvm::cl::values(clEnumValN(IRGenOutputKind::LLVMAssemblyAfterOptimization,
-                                  "llvm-as", "Emit llvm assembly"),
-                       clEnumValN(IRGenOutputKind::LLVMBitcode, "llvm-bc",
-                                  "Emit llvm bitcode"),
-                       clEnumValN(IRGenOutputKind::NativeAssembly, "as",
-                                  "Emit native assembly"),
-                       clEnumValN(IRGenOutputKind::ObjectFile, "object",
-                                  "Emit an object file")),
+      llvm::cl::values(
+          clEnumValN(IRGenOutputKind::LLVMAssemblyBeforeOptimization, "llvm-as",
+                     "Emit llvm assembly before optimization"),
+          clEnumValN(IRGenOutputKind::LLVMAssemblyAfterOptimization,
+                     "llvm-as-opt", "Emit llvm assembly after optimization"),
+          clEnumValN(IRGenOutputKind::LLVMBitcode, "llvm-bc",
+                     "Emit llvm bitcode"),
+          clEnumValN(IRGenOutputKind::NativeAssembly, "as",
+                     "Emit native assembly"),
+          clEnumValN(IRGenOutputKind::ObjectFile, "object",
+                     "Emit an object file")),
       llvm::cl::init(IRGenOutputKind::ObjectFile));
 
   llvm::cl::opt<bool>
@@ -216,16 +218,26 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
       return IRGenDescriptor::forWholeModule(
           mod, Opts, TBDOpts, SILOpts, SILTypes,
           /*SILMod*/ nullptr, moduleName, PSPs);
-    } else {
-      return IRGenDescriptor::forFile(
-          mod->getFiles()[0], Opts, TBDOpts, SILOpts, SILTypes,
-          /*SILMod*/ nullptr, moduleName, PSPs, /*discriminator*/ "");
     }
+
+    return IRGenDescriptor::forFile(
+        mod->getFiles()[0], Opts, TBDOpts, SILOpts, SILTypes,
+        /*SILMod*/ nullptr, moduleName, PSPs, /*discriminator*/ "");
   };
 
   auto &eval = CI.getASTContext().evaluator;
   auto desc = getDescriptor();
   desc.out = &outFile->getOS();
+
+  if (options.OutputKind == IRGenOutputKind::LLVMAssemblyBeforeOptimization) {
+    auto generatedMod = evaluateOrFatal(eval, IRGenRequest{desc});
+    if (!generatedMod)
+      return 1;
+
+    generatedMod.getModule()->print(*outFile, nullptr);
+    return 0;
+  }
+
   auto generatedMod = evaluateOrFatal(eval, OptimizedIRRequest{desc});
   if (!generatedMod)
     return 1;
