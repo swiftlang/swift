@@ -208,10 +208,10 @@ func usePrivateEnum(a: inout Leaky.AliasToPrivateEnum) -> Leaky.AliasToPrivateEn
     // Constructing and reading PrivateEnum
     //
 
-    // TODO: nested enum members are not being imported (#54905)
-    // let _ = Leaky.privateEnumMember
-    let rv0 = Leaky.AliasToPrivateEnum(rawValue: 0)!
-    let _ = Leaky.PrivateEnum(rawValue: 0)!
+    let _ = Leaky.privateEnumMember // FIXME: nested enum members are not being imported (#54905)
+    // expected-error@-1 {{type 'Leaky' has no member 'privateEnumMember'}}
+    let rv0 = Leaky.AliasToPrivateEnum(rawValue: 0)
+    let _ = Leaky.PrivateEnum(rawValue: 0)
     // expected-error@-1 {{'PrivateEnum' is inaccessible due to 'private' protection level}}
 
     let _ = rv0.rawValue
@@ -276,16 +276,15 @@ func usePrivateEnumClass(a: inout Leaky.AliasToPrivateEnumClass) -> Leaky.AliasT
     // Constructing and reading PrivateEnumClass
     //
 
-    // NOTE: private enum class members are not accessible even if we can access
-    // instances of the private enum class via
+    // NOTE: private enum class members are accessible if we can access
+    // their parent enum class decl
 
     let _ = Leaky.AliasToPrivateEnumClass.privateEnumClassMember
-    // expected-error@-1 {{'privateEnumClassMember' is inaccessible due to 'private' protection level}}
     let _ = Leaky.PrivateEnumClass.privateEnumClassMember
     // expected-error@-1 {{'PrivateEnumClass' is inaccessible due to 'private' protection level}}
     let _: Leaky.AliasToPrivateEnum = .privateEnumClassMember
     // expected-error@-1 {{type 'Leaky.AliasToPrivateEnum' (aka 'Leaky.PrivateEnum') has no member 'privateEnumClassMember'}}
-    // TODO: ^this is not really the right error message
+    // FIXME: ^this should be accessible
 
     let rv0 = Leaky.AliasToPrivateEnumClass(rawValue: 0)!
     let _ = Leaky.PrivateEnumClass(rawValue: 0)!
@@ -298,7 +297,6 @@ func usePrivateEnumClass(a: inout Leaky.AliasToPrivateEnumClass) -> Leaky.AliasT
 
     switch rv0 {
     case .privateEnumClassMember:
-    // expected-error@-1 {{'privateEnumClassMember' is inaccessible due to 'private' protection level}}
       doSomething()
     default:
       doSomething()

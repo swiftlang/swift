@@ -1,7 +1,7 @@
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck -verify -I %t/Inputs -cxx-interoperability-mode=default -module-name main %t/base.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %t/Inputs -cxx-interoperability-mode=default -module-name main %t/derived.swift
+// RUN: %target-swift-frontend -typecheck -verify -I %t/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main %t/base.swift
+// RUN: %target-swift-frontend -typecheck -verify -I %t/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers -module-name main %t/derived.swift
 
 // REQUIRES: swift_feature_ImportNonPublicCxxMembers
 
