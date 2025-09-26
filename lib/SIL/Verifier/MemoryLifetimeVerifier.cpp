@@ -749,8 +749,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         requireNoStoreBorrowLocation(IEAI->getOperand(), &I);
         break;
       }
-      case SILInstructionKind::InitExistentialAddrInst:
-      case SILInstructionKind::InitEnumDataAddrInst: {
+      case SILInstructionKind::InitExistentialAddrInst: {
         SILValue addr = I.getOperand(0);
         requireBitsClear(bits & nonTrivialLocations, addr, &I);
         requireNoStoreBorrowLocation(addr, &I);
