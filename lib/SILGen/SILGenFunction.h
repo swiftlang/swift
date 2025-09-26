@@ -2273,6 +2273,9 @@ public:
 
   void emitReturnExpr(SILLocation loc, Expr *ret);
 
+  bool emitGuaranteedReturn(SILLocation loc, Expr *ret,
+                            SmallVectorImpl<SILValue> &directResults);
+
   void emitYield(SILLocation loc, MutableArrayRef<ArgumentSource> yieldValues,
                  ArrayRef<AbstractionPattern> origTypes,
                  JumpDest unwindDest);
