@@ -1759,6 +1759,12 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getFinishAsyncLet(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _async(_thin),
+                            _parameters(_rawPointer, _rawPointer),
+                            _void);
+}
+
 static ValueDecl *getEndAsyncLet(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_rawPointer),
@@ -3391,6 +3397,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
     return getStartAsyncLet(Context, Id);
+
+  case BuiltinValueKind::FinishAsyncLet:
+    return getFinishAsyncLet(Context, Id);
 
   case BuiltinValueKind::EndAsyncLetLifetime:
     return getEndAsyncLet(Context, Id);

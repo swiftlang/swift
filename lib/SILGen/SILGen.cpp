@@ -393,10 +393,6 @@ FuncDecl *SILGenModule::getAsyncLetGetThrowing() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_get_throwing");
 }
 
-FuncDecl *SILGenModule::getFinishAsyncLet() {
-  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_finish");
-}
-
 FuncDecl *SILGenModule::getTaskFutureGet() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_taskFutureGet");
 }

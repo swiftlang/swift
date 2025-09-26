@@ -205,6 +205,8 @@ static bool isSuspensionPoint(SILInstruction *inst) {
   }
   if (isa<AwaitAsyncContinuationInst>(inst))
     return true;
+  if (isBuiltinInst(inst, BuiltinValueKind::FinishAsyncLet))
+    return true;
 
   return false;
 }

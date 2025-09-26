@@ -203,6 +203,16 @@ bool StackNesting::solve() {
   return isNested;
 }
 
+/// Create a dealloc for a particular allocation.
+///
+/// This is expected to work for all allocations that don't have
+/// properly-nested deallocations. It's fine to have a kind of allocation
+/// that you can't do this for, as long as as it's always explicitly
+/// deallocated on all paths. This pass doesn't change any allocations
+/// or deallocations that are properly nested already.
+///
+/// Allocations that don't support creating deallocations here:
+///   builtin "startAsyncLetWithLocalBuffer"
 static SILInstruction *createDealloc(SILInstruction *Alloc,
                                      SILInstruction *InsertionPoint,
                                      SILLocation Location) {
@@ -228,8 +238,9 @@ static SILInstruction *createDealloc(SILInstruction *Alloc,
       return B.createDeallocPack(Location, cast<AllocPackInst>(Alloc));
     case SILInstructionKind::BuiltinInst: {
       auto *bi = cast<BuiltinInst>(Alloc);
-      assert(bi->getBuiltinKind() == BuiltinValueKind::StackAlloc ||
-             bi->getBuiltinKind() == BuiltinValueKind::UnprotectedStackAlloc);
+      auto bk = *bi->getBuiltinKind();
+      assert(bk == BuiltinValueKind::StackAlloc ||
+             bk == BuiltinValueKind::UnprotectedStackAlloc);
       auto &context = Alloc->getFunction()->getModule().getASTContext();
       auto identifier =
           context.getIdentifier(getBuiltinName(BuiltinValueKind::StackDealloc));
