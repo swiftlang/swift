@@ -434,13 +434,13 @@ ERROR(wrong_linkage_for_serialized_function,none,
 NOTE(performance_called_from,none,
       "called from here", ())
 ERROR(manualownership_copy,none,
-      "explicit 'copy' required here", ())
+      "explicit 'copy' required here; please report this vague diagnostic as a bug", ())
 ERROR(manualownership_copy_happened,none,
-      "accessing %0 produces a copy of it; write 'copy' to acknowledge", (Identifier))
+      "accessing %0 may produce a copy; write 'copy' to acknowledge or 'consume' to elide", (Identifier))
 ERROR(manualownership_copy_demanded,none,
-      "ownership of %0 is demanded and cannot not be consumed; write 'copy' to satisfy", (Identifier))
+      "independent copy of %0 is required here; write 'copy' to acknowledge or 'consume' to elide", (Identifier))
 ERROR(manualownership_copy_captured,none,
-      "ownership of %0 is demanded by a closure; write 'copy' in its capture list to satisfy", (Identifier))
+      "closure capture of '%0' requires independent copy of it; write [%0 = copy %0] in the closure's capture list to acknowledge", (StringRef))
 
 // 'transparent' diagnostics
 ERROR(circular_transparent,none,
