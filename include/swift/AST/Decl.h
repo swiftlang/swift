@@ -4857,6 +4857,16 @@ public:
     return getAttrs().hasAttribute<IndirectAttr>();
   }
 
+  /// True if the enum is marked with `@cdecl`.
+  bool isCDeclEnum() const {
+    return getAttrs().hasAttribute<CDeclAttr>();
+  }
+
+  /// True if the enum is marked with `@cdecl` or `@objc`.
+  bool isCCompatibleEnum() const {
+    return isCDeclEnum() || isObjC();
+  }
+
   /// True if the enum can be exhaustively switched within \p useDC.
   ///
   /// Note that this property is \e not necessarily true for all children of
@@ -8171,6 +8181,11 @@ public:
   /// Determine whether the given method would produce an Objective-C
   /// instance method.
   bool isObjCInstanceMethod() const;
+
+  /// Get the foreign language targeted by a @cdecl-style attribute, if any.
+  /// Used to abstract away the change in meaning of @cdecl vs @_cdecl while
+  /// formalizing the attribute.
+  std::optional<ForeignLanguage> getCDeclKind() const;
 
   /// Determine whether the name of an argument is an API name by default
   /// depending on the function context.
