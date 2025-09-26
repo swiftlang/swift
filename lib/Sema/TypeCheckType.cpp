@@ -4039,13 +4039,12 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
     builder.getNodeFactory().createNode(Node::Kind::OpaqueReturnTypeOf);
   opaqueNode->addChild(definingDeclNode, builder.getNodeFactory());
   auto *opaqueDecl = builder.resolveOpaqueTypeDecl(opaqueNode);
-
-  auto *ownerDecl = opaqueDecl->getNamingDecl();
-  if (!ownerDecl) {
+  if (!opaqueDecl) {
     diagnose(repr->getLoc(), diag::no_opaque_return_type_of);
     return ErrorType::get(getASTContext());
   }
 
+  auto *ownerDecl = opaqueDecl->getNamingDecl();
   auto genericSig = ownerDecl->getInnermostDeclContext()
     ->getGenericSignatureOfContext();
 
