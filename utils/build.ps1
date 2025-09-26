@@ -2010,8 +2010,8 @@ function Build-Brotli([Hashtable] $Platform) {
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
       CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
-      INSTALL_BIN_DIR = "$LibraryRoot\brotli\usr\bin\$($Platform.OS.ToString())\$ArchName";
-      INSTALL_LIB_DIR = "$LibraryRoot\brotli\usr\lib\$($Platform.OS.ToString())\$ArchName";
+      CMAKE_INSTALL_BINDIR = "$LibraryRoot\brotli\usr\bin\$($Platform.OS.ToString())\$ArchName";
+      CMAKE_INSTALL_LIBDIR = "$LibraryRoot\brotli\usr\lib\$($Platform.OS.ToString())\$ArchName";
     }
 }
 
