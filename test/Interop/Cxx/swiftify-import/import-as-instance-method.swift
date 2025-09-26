@@ -10,6 +10,7 @@
 // RUN: diff -u --strip-trailing-cr %t/out.txt %t/out.expected
 
 //--- test.swift
+import CxxStdlib
 import Instance
 
 func foo(_ p: inout MutableSpan<CInt>, a: A, aa: inout A, s: IntSpan, cs: ConstIntSpan, asp: AliasingSpan, b: inout baz.B) {
