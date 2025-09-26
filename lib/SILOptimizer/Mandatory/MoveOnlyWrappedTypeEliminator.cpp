@@ -208,6 +208,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(AddressToPointer)
   NO_UPDATE_NEEDED(AllocBox)
   NO_UPDATE_NEEDED(AllocStack)
+  NO_UPDATE_NEEDED(AutoreleaseValue)
   NO_UPDATE_NEEDED(BeginAccess)
   NO_UPDATE_NEEDED(Branch)
   NO_UPDATE_NEEDED(BridgeObjectToRef)
