@@ -25,7 +25,7 @@ import Swift
 
 /// A Dispatch-based main executor.
 @available(StdlibDeploymentTarget 6.3, *)
-class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
+class DispatchMainExecutor: ThreadDonationExecutor, SchedulingExecutor,
                             @unchecked Sendable {
   var threaded = false
 
@@ -38,10 +38,6 @@ class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
 
     threaded = true
     _dispatchMain()
-  }
-
-  public func stop() {
-    fatalError("DispatchMainExecutor cannot be stopped")
   }
 
   var asScheduling: (any SchedulingExecutor)? {

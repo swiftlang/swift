@@ -536,25 +536,23 @@ extension SerialExecutor where Self: Equatable {
 
 }
 
+/// An executor that can take over a thread.
+@available(StdlibDeploymentTarget 6.2, *)
+public protocol ThreadDonationExecutor: Executor {
+  /// Donate the calling thread to this executor.
+  ///
+  /// This method will synchronously block the calling thread.
+  func run() throws
+}
+
 /// An executor that is backed by some kind of run loop.
 ///
 /// The idea here is that some executors may work by running a loop
 /// that processes events of some sort; we want a way to enter that loop,
 /// and we would also like a way to trigger the loop to exit.
 @available(StdlibDeploymentTarget 6.3, *)
-public protocol RunLoopExecutor: Executor {
-  /// Run the executor's run loop.
-  ///
-  /// This method will synchronously block the calling thread.  Nested calls to
-  /// `run()` may be permitted, however it is not permitted to call `run()` on a
-  /// single executor instance from more than one thread.
-  func run() throws
-
+public protocol RunLoopExecutor: SerialExecutor, ThreadDonationExecutor {
   /// Run the executor's run loop until a condition is satisfied.
-  ///
-  /// Not every `RunLoopExecutor` will support this method; you must not call
-  /// it unless you *know* that it is supported.  The default implementation
-  /// generates a fatal error.
   ///
   /// Parameters:
   ///
@@ -572,20 +570,17 @@ public protocol RunLoopExecutor: Executor {
   func stop()
 }
 
+
+/// The main executor protocol only includes the `run` method; some main
+/// executors may not support `runUntil` or `stop`.
 @available(StdlibDeploymentTarget 6.3, *)
-extension RunLoopExecutor {
-
-  public func runUntil(_ condition: () -> Bool) throws {
-    fatalError("run(until condition:) not supported on this executor")
-  }
-
-}
-
-
-/// The main executor must conform to these two protocols; we have to
-/// make this a protocol for compatibility with Embedded Swift.
-@available(StdlibDeploymentTarget 6.3, *)
-public protocol MainExecutor: RunLoopExecutor, SerialExecutor {
+public protocol MainExecutor: SerialExecutor, ThreadDonationExecutor {
+  /// Run the executor's run loop.
+  ///
+  /// This method will synchronously block the calling thread.  Nested calls to
+  /// `run()` may be permitted, however it is not permitted to call `run()` on a
+  /// single executor instance from more than one thread.
+  func run() throws
 }
 
 
@@ -602,6 +597,22 @@ public protocol ExecutorFactory {
   /// Constructs and returns the default or global executor, which is the
   /// default place in which we run tasks.
   static var defaultExecutor: any TaskExecutor { get }
+}
+
+// Provide default implementations so you can override just one of the two
+@available(StdlibDeploymentTarget 6.3, *)
+public extension ExecutorFactory {
+  #if os(WASI) || !$Embedded
+  @available(StdlibDeploymentTarget 6.3, *)
+  static var mainExecutor: any MainExecutor {
+    return DefaultExecutorFactory.mainExecutor
+  }
+  #endif
+
+  @available(StdlibDeploymentTarget 6.3, *)
+  static var defaultExecutor: any TaskExecutor {
+    return DefaultExecutorFactory.defaultExecutor
+  }
 }
 
 @available(StdlibDeploymentTarget 6.3, *)

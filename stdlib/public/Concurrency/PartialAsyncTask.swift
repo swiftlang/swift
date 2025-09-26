@@ -322,6 +322,9 @@ public struct ExecutorJob: Sendable, ~Copyable {
   /// referenced from the private data area are cleared up prior to running the
   /// job.
   ///
+  /// The size and alignment of the private data buffer are both twice the
+  /// machine word size (i.e. `2 * sizeof(void *)`, or `2 * MemoryLayout<UInt>`).
+  ///
   /// Parameters:
   ///
   /// - body: The closure to execute.
@@ -337,28 +340,27 @@ public struct ExecutorJob: Sendable, ~Copyable {
 
   /// Kinds of schedulable jobs
   @available(StdlibDeploymentTarget 6.3, *)
-  @frozen
-  public struct Kind: Sendable, RawRepresentable {
-    public typealias RawValue = UInt8
+  struct Kind: Sendable, RawRepresentable {
+    typealias RawValue = UInt8
 
     /// The raw job kind value.
-    public var rawValue: RawValue
+    var rawValue: RawValue
 
     /// Creates a new instance with the specified raw value.
-    public init?(rawValue: Self.RawValue) {
+    init?(rawValue: Self.RawValue) {
       self.rawValue = rawValue
     }
 
     /// A task.
-    public static let task = Kind(rawValue: RawValue(0))!
+    static let task = Kind(rawValue: RawValue(0))!
 
     // Job kinds >= 192 are private to the implementation.
-    public static let firstReserved = Kind(rawValue: RawValue(192))!
+    static let firstReserved = Kind(rawValue: RawValue(192))!
   }
 
   /// What kind of job this is.
   @available(StdlibDeploymentTarget 6.3, *)
-  public var kind: Kind {
+  var kind: Kind {
     return Kind(rawValue: _jobGetKind(self.context))!
   }
 
