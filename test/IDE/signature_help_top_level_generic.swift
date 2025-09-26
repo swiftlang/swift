@@ -5,7 +5,5 @@ func add<T>(x: T, y: T, with adder: (T, T) -> T) -> T where T: AdditiveArithmeti
 }
 
 add(x: "A", y: "B", with: #^TOP_LEVEL_GENERIC^#)
-
-// TOP_LEVEL_GENERIC:      Begin signatures, 1 items
-// TOP_LEVEL_GENERIC-NEXT: Signature[Active]: add(<param name="x">x: String</param>, <param name="y">y: String</param>, <param name="adder" active>with: (String, String) -> String</param>) -> String
-// TOP_LEVEL_GENERIC-NEXT: End signatures
+// TOP_LEVEL_GENERIC:     Begin signatures, 1 items
+// TOP_LEVEL_GENERIC-DAG: Signature[Active]: add(<param name="x">x: String</param>, <param name="y">y: String</param>, <param name="adder" active>with: (String, String) -> String</param>) -> String

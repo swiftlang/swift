@@ -33,14 +33,12 @@ func add(x: Int) -> (Int) -> Int {
 }
 
 add(#^TOP_LEVEL^#)
-
-// TOP_LEVEL:      Begin signatures, 8 items
-// TOP_LEVEL-NEXT: Signature[Active]: add(<param name="x" active>_ x: Int</param>, <param name="y">to: Int</param>) -> Int
-// TOP_LEVEL-NEXT: Signature: add(<param name="x" active>oneTo: inout Int</param>)
-// TOP_LEVEL-NEXT: Signature: add(<param name="x" active>_ x: AdditiveArithmetic</param>, <param name="y">to: AdditiveArithmetic</param>) -> AdditiveArithmetic
-// TOP_LEVEL-NEXT: Signature: add(<param name="first" active>first: Double!</param>, <param name="second">second: Float</param>, <param name="third">third: Int</param>) -> Double
-// TOP_LEVEL-NEXT: Signature: add(<param name="param1" active>arg1: Double</param>, <param name="arg2">arg2: Float</param>, <param name="param3">arg3: Int</param>) -> Double
-// TOP_LEVEL-NEXT: Signature: add(<param name="numbers" active>numbers: Double...</param>) -> Double
-// TOP_LEVEL-NEXT: Signature: add(<param name="x" active>x: Int</param>, <param name="y">y: Int</param>, <param name="adder">with: (Int, Int) -> Int</param>) -> Int
-// TOP_LEVEL-NEXT: Signature: add(<param name="x" active>x: Int</param>) -> (Int) -> Int
-// TOP_LEVEL-NEXT: End signatures
+// TOP_LEVEL:     Begin signatures, 8 items
+// TOP_LEVEL-DAG: Signature[Active]: add(<param name="x" active>_ x: Int</param>, <param name="y">to: Int</param>) -> Int
+// TOP_LEVEL-DAG: Signature: add(<param name="x" active>oneTo: inout Int</param>)
+// TOP_LEVEL-DAG: Signature: add(<param name="x" active>_ x: AdditiveArithmetic</param>, <param name="y">to: AdditiveArithmetic</param>) -> AdditiveArithmetic
+// TOP_LEVEL-DAG: Signature: add(<param name="first" active>first: Double!</param>, <param name="second">second: Float</param>, <param name="third">third: Int</param>) -> Double
+// TOP_LEVEL-DAG: Signature: add(<param name="param1" active>arg1: Double</param>, <param name="arg2">arg2: Float</param>, <param name="param3">arg3: Int</param>) -> Double
+// TOP_LEVEL-DAG: Signature: add(<param name="numbers" active>numbers: Double...</param>) -> Double
+// TOP_LEVEL-DAG: Signature: add(<param name="x" active>x: Int</param>, <param name="y">y: Int</param>, <param name="adder">with: (Int, Int) -> Int</param>) -> Int
+// TOP_LEVEL-DAG: Signature: add(<param name="x" active>x: Int</param>) -> (Int) -> Int

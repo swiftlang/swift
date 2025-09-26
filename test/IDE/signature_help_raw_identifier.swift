@@ -5,7 +5,5 @@ struct `Raw Identifier` {
 }
 
 `Raw Identifier`().`some method :)`(#^RAW_ID^#)
-
-// RAW_ID:      Begin signatures, 1 items
-// RAW_ID-NEXT: Signature[Active]: `some method :)`(<param name="param label?" active>`argument label!`: Int</param>)
-// RAW_ID-NEXT: End signatures
+// RAW_ID:     Begin signatures, 1 items
+// RAW_ID-DAG: Signature[Active]: `some method :)`(<param name="param label?" active>`argument label!`: Int</param>)

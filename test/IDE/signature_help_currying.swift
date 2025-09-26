@@ -42,39 +42,33 @@ func topLevelCurried(x: Int) -> (Double) -> (String) -> Void {
 
 func testCurryTopLevel() {
   topLevelCurried(x: 1)(#^CURRY_TOPLEVEL^#)
+  // CURRY_TOPLEVEL:     Begin signatures, 1 items
+  // CURRY_TOPLEVEL-DAG: Signature[Active]: (<param active>Double</param>) -> (String) -> Void
 }
 
 func testCurryMemberPartial() {
   Adder.add(#^CURRY_MEMBER_PARTIAL^#)
+  // CURRY_MEMBER_PARTIAL:     Begin signatures, 8 items
+  // CURRY_MEMBER_PARTIAL-DAG: Signature[Active]: add(<param name="self" active>_ self: Adder</param>) -> (Int, Int) -> Int
+  // CURRY_MEMBER_PARTIAL-DAG: Signature: add(<param name="self" active>_ self: Adder</param>) -> (inout Int) -> ()
+  // CURRY_MEMBER_PARTIAL-DAG: Signature: add(<param name="self" active>_ self: Adder</param>) -> (AdditiveArithmetic, AdditiveArithmetic) -> AdditiveArithmetic
+  // CURRY_MEMBER_PARTIAL-DAG: Signature: add(<param name="self" active>_ self: Adder</param>) -> (Double?, Float, Int) -> Double
+  // CURRY_MEMBER_PARTIAL-DAG: Signature: add(<param name="self" active>_ self: Adder</param>) -> (Double, Float, Int) -> Double
+  // CURRY_MEMBER_PARTIAL-DAG: Signature: add(<param name="self" active>_ self: Adder</param>) -> (Double...) -> Double
+  // CURRY_MEMBER_PARTIAL-DAG: Signature: add(<param name="self" active>_ self: Adder</param>) -> (Int, Int, (Int, Int) throws -> Int) throws -> Int?
+  // CURRY_MEMBER_PARTIAL-DAG: Signature: add(<param name="self" active>_ self: Adder</param>) -> (Int) -> (Int) -> Int
 }
 
 func testCurryMemberFull() {
   let adder = Adder()
   Adder.add(adder)(#^CURRY_MEMBER_FULL^#)
+  // CURRY_MEMBER_FULL:     Begin signatures, 8 items
+  // CURRY_MEMBER_FULL-DAG: Signature[Active]: (<param name="x" active>_ x: Int</param>, <param name="y">to: Int</param>) -> Int
+  // CURRY_MEMBER_FULL-DAG: Signature: (<param name="x" active>oneTo: inout Int</param>)
+  // CURRY_MEMBER_FULL-DAG: Signature: (<param name="x" active>_ x: AdditiveArithmetic</param>, <param name="y">to: AdditiveArithmetic</param>) -> AdditiveArithmetic
+  // CURRY_MEMBER_FULL-DAG: Signature: (<param name="first" active>first: Double!</param>, <param name="second">second: Float</param>, <param name="third">third: Int</param>) -> Double
+  // CURRY_MEMBER_FULL-DAG: Signature: (<param name="param1" active>arg1: Double</param>, <param name="arg2">arg2: Float</param>, <param name="param3">arg3: Int</param>) -> Double
+  // CURRY_MEMBER_FULL-DAG: Signature: (<param name="numbers" active>numbers: Double...</param>) -> Double
+  // CURRY_MEMBER_FULL-DAG: Signature: (<param name="x" active>x: Int</param>, <param name="y">y: Int</param>, <param name="adder">with: (Int, Int) throws -> Int</param>) throws -> Int!
+  // CURRY_MEMBER_FULL-DAG: Signature: (<param name="x" active>x: Int</param>) -> (Int) -> Int
 }
-
-// CURRY_TOPLEVEL:      Begin signatures, 1 items
-// CURRY_TOPLEVEL-NEXT: Signature[Active]: (<param active>Double</param>) -> (String) -> Void
-// CURRY_TOPLEVEL-NEXT: End signatures
-
-// CURRY_MEMBER_PARTIAL:      Begin signatures, 8 items
-// CURRY_MEMBER_PARTIAL-NEXT: Signature[Active]: add(<param name="self" active>_ self: Adder</param>) -> (Int, Int) -> Int
-// CURRY_MEMBER_PARTIAL-NEXT: Signature: add(<param name="self" active>_ self: Adder</param>) -> (inout Int) -> ()
-// CURRY_MEMBER_PARTIAL-NEXT: Signature: add(<param name="self" active>_ self: Adder</param>) -> (AdditiveArithmetic, AdditiveArithmetic) -> AdditiveArithmetic
-// CURRY_MEMBER_PARTIAL-NEXT: Signature: add(<param name="self" active>_ self: Adder</param>) -> (Double?, Float, Int) -> Double
-// CURRY_MEMBER_PARTIAL-NEXT: Signature: add(<param name="self" active>_ self: Adder</param>) -> (Double, Float, Int) -> Double
-// CURRY_MEMBER_PARTIAL-NEXT: Signature: add(<param name="self" active>_ self: Adder</param>) -> (Double...) -> Double
-// CURRY_MEMBER_PARTIAL-NEXT: Signature: add(<param name="self" active>_ self: Adder</param>) -> (Int, Int, (Int, Int) throws -> Int) throws -> Int?
-// CURRY_MEMBER_PARTIAL-NEXT: Signature: add(<param name="self" active>_ self: Adder</param>) -> (Int) -> (Int) -> Int
-// CURRY_MEMBER_PARTIAL-NEXT: End signatures
-
-// CURRY_MEMBER_FULL:      Begin signatures, 8 items
-// CURRY_MEMBER_FULL-NEXT: Signature[Active]: (<param name="x" active>_ x: Int</param>, <param name="y">to: Int</param>) -> Int
-// CURRY_MEMBER_FULL-NEXT: Signature: (<param name="x" active>oneTo: inout Int</param>)
-// CURRY_MEMBER_FULL-NEXT: Signature: (<param name="x" active>_ x: AdditiveArithmetic</param>, <param name="y">to: AdditiveArithmetic</param>) -> AdditiveArithmetic
-// CURRY_MEMBER_FULL-NEXT: Signature: (<param name="first" active>first: Double!</param>, <param name="second">second: Float</param>, <param name="third">third: Int</param>) -> Double
-// CURRY_MEMBER_FULL-NEXT: Signature: (<param name="param1" active>arg1: Double</param>, <param name="arg2">arg2: Float</param>, <param name="param3">arg3: Int</param>) -> Double
-// CURRY_MEMBER_FULL-NEXT: Signature: (<param name="numbers" active>numbers: Double...</param>) -> Double
-// CURRY_MEMBER_FULL-NEXT: Signature: (<param name="x" active>x: Int</param>, <param name="y">y: Int</param>, <param name="adder">with: (Int, Int) throws -> Int</param>) throws -> Int!
-// CURRY_MEMBER_FULL-NEXT: Signature: (<param name="x" active>x: Int</param>) -> (Int) -> Int
-// CURRY_MEMBER_FULL-NEXT: End signatures

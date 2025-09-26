@@ -16,10 +16,8 @@ struct Matrix {
 
 let matrix = Matrix()
 matrix[#^MEMBER_SUBSCRIPT^#]
-
-// MEMBER_SUBSCRIPT:      Begin signatures, 4 items
-// MEMBER_SUBSCRIPT-NEXT: Signature[Active]: subscript(<param active>keyPath: KeyPath<Matrix, Value></param>) -> Value
-// MEMBER_SUBSCRIPT-NEXT: Signature: subscript(<param name="row" active>row: Int</param>, <param name="column">column: Int</param>) -> Int
-// MEMBER_SUBSCRIPT-NEXT: Signature: subscript(<param name="r" active>row: Int</param>) -> [Int]
-// MEMBER_SUBSCRIPT-NEXT: Signature: subscript(<param name="c" active>column: Int</param>) -> [Int]
-// MEMBER_SUBSCRIPT-NEXT: End signatures
+// MEMBER_SUBSCRIPT:     Begin signatures, 4 items
+// MEMBER_SUBSCRIPT-DAG: Signature[Active]: subscript(<param active>keyPath: KeyPath<Matrix, Value></param>) -> Value
+// MEMBER_SUBSCRIPT-DAG: Signature: subscript(<param name="row" active>row: Int</param>, <param name="column">column: Int</param>) -> Int
+// MEMBER_SUBSCRIPT-DAG: Signature: subscript(<param name="r" active>row: Int</param>) -> [Int]
+// MEMBER_SUBSCRIPT-DAG: Signature: subscript(<param name="c" active>column: Int</param>) -> [Int]

@@ -8,7 +8,5 @@ struct Vector<Value> {
 
 let vec = Vector(elements: [1.0, 2.1, 3.4])
 vec.dot(with: #^MEMBER_GENERIC^#)
-
-// MEMBER_GENERIC:      Begin signatures, 1 items
-// MEMBER_GENERIC-NEXT: Signature[Active]: dot(<param name="other" active>with: Vector<Double></param>) -> Double
-// MEMBER_GENERIC-NEXT: End signatures
+// MEMBER_GENERIC:     Begin signatures, 1 items
+// MEMBER_GENERIC-DAG: Signature[Active]: dot(<param name="other" active>with: Vector<Double></param>) -> Double

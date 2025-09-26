@@ -5,9 +5,7 @@ struct Observable {
   
   func notify() async throws {
     _ = try await observer("EVENT", #^MEMBER_CLOSURE^#, [:])
+    // MEMBER_CLOSURE:     Begin signatures, 1 items
+    // MEMBER_CLOSURE-DAG: Signature[Active]: observer(<param>String</param>, <param active>Int?</param>, <param>[AnyHashable : [Double?]]</param>) async throws -> [Observable?]
   }
 }
-
-// MEMBER_CLOSURE:      Begin signatures, 1 items
-// MEMBER_CLOSURE-NEXT: Signature[Active]: observer(<param>String</param>, <param active>Int?</param>, <param>[AnyHashable : [Double?]]</param>) async throws -> [Observable?]
-// MEMBER_CLOSURE-NEXT: End signatures

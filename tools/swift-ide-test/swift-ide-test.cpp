@@ -1489,37 +1489,32 @@ static void printSignatureHelpResultsImpl(const FormattedSignatureHelp &Result,
     }
 
     StringRef signatureText = Signature.Text;
-    std::string formattedSignature;
-    llvm::raw_string_ostream signatureOS(formattedSignature);
 
     unsigned currentPos = 0;
     for (unsigned j = 0; j < Signature.Params.size(); ++j) {
       const auto &Param = Signature.Params[j];
 
       if (Param.Offset > currentPos) {
-        signatureOS << signatureText.substr(currentPos,
-                                            Param.Offset - currentPos);
+        OS << signatureText.substr(currentPos, Param.Offset - currentPos);
       }
 
-      signatureOS << "<param";
+      OS << "<param";
       if (!Param.Name.empty()) {
-        signatureOS << " name=\"" << Param.Name << '"';
+        OS << " name=\"" << Param.Name << '"';
       }
       if (Signature.ActiveParam && *Signature.ActiveParam == j) {
-        signatureOS << " active";
+        OS << " active";
       }
-      signatureOS << ">";
-      signatureOS << signatureText.substr(Param.Offset, Param.Length);
-      signatureOS << "</param>";
+      OS << ">";
+      OS << signatureText.substr(Param.Offset, Param.Length);
+      OS << "</param>";
 
       currentPos = Param.Offset + Param.Length;
     }
 
     if (currentPos < signatureText.size()) {
-      signatureOS << signatureText.substr(currentPos);
+      OS << signatureText.substr(currentPos);
     }
-
-    OS << formattedSignature;
 
     if (!Signature.DocComment.empty()) {
       OS << "; Documentation=";

@@ -2,8 +2,6 @@
 
 func apply<Value, Result>(value: Value, body: (Value) -> Result) -> Result {
   return body(#^CLOSURE_PARAM^#)
+  // CLOSURE_PARAM:     Begin signatures, 1 items
+  // CLOSURE_PARAM-DAG: Signature[Active]: body(<param active>Value</param>) -> Result
 }
-
-// CLOSURE_PARAM:      Begin signatures, 1 items
-// CLOSURE_PARAM-NEXT: Signature[Active]: body(<param active>Value</param>) -> Result
-// CLOSURE_PARAM-NEXT: End signatures

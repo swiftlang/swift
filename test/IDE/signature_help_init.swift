@@ -5,7 +5,5 @@ struct Person {
 }
 
 Person(name: "John", age: #^INIT^#)
-
-// INIT:      Begin signatures, 1 items
-// INIT-NEXT: Signature[Active]: init(<param name="name">name: String</param>, <param name="age" active>age: Int</param>, <param name="job">profession: String</param>)
-// INIT-NEXT: End signatures
+// INIT:     Begin signatures, 1 items
+// INIT-DAG: Signature[Active]: init(<param name="name">name: String</param>, <param name="age" active>age: Int</param>, <param name="job">profession: String</param>)

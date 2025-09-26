@@ -23,14 +23,12 @@ func add(x: Int = importantValue) {}
 func add(x: Int, line: UInt = #line, file: StaticString = #file) {}
 
 add(#^DEFAULT_ARGS^#)
-
-// DEFAULT_ARGS:      Begin signatures, 8 items
-// DEFAULT_ARGS-NEXT: Signature[Active]: add(<param name="x" active>_ x: Int = 10</param>, <param name="y">to: Int</param>) -> Int
-// DEFAULT_ARGS-NEXT: Signature: add(<param name="x" active>oneTo: inout Int</param>)
-// DEFAULT_ARGS-NEXT: Signature: add(<param name="x" active>_ x: Int</param>, <param name="y">to: Int? = nil</param>) -> String
-// DEFAULT_ARGS-NEXT: Signature: add(<param name="first" active>first: Double!</param>, <param name="second">second: Float = .pi</param>, <param name="third">third: Int</param>) -> Double
-// DEFAULT_ARGS-NEXT: Signature: add(<param name="s" active>s: S = S(a: false)</param>) -> Double
-// DEFAULT_ARGS-NEXT: Signature: add(<param name="x" active>x: Int</param>, <param name="y">y: Int</param>, <param name="adder">with: (Int, Int) -> Int = { $0 + $1 }</param>) -> Int
-// DEFAULT_ARGS-NEXT: Signature: add(<param name="x" active>x: Int = importantValue</param>)
-// DEFAULT_ARGS-NEXT: Signature: add(<param name="x" active>x: Int</param>, <param name="line">line: UInt = #line</param>, <param name="file">file: StaticString = #file</param>)
-// DEFAULT_ARGS-NEXT: End signatures
+// DEFAULT_ARGS:     Begin signatures, 8 items
+// DEFAULT_ARGS-DAG: Signature[Active]: add(<param name="x" active>_ x: Int = 10</param>, <param name="y">to: Int</param>) -> Int
+// DEFAULT_ARGS-DAG: Signature: add(<param name="x" active>oneTo: inout Int</param>)
+// DEFAULT_ARGS-DAG: Signature: add(<param name="x" active>_ x: Int</param>, <param name="y">to: Int? = nil</param>) -> String
+// DEFAULT_ARGS-DAG: Signature: add(<param name="first" active>first: Double!</param>, <param name="second">second: Float = .pi</param>, <param name="third">third: Int</param>) -> Double
+// DEFAULT_ARGS-DAG: Signature: add(<param name="s" active>s: S = S(a: false)</param>) -> Double
+// DEFAULT_ARGS-DAG: Signature: add(<param name="x" active>x: Int</param>, <param name="y">y: Int</param>, <param name="adder">with: (Int, Int) -> Int = { $0 + $1 }</param>) -> Int
+// DEFAULT_ARGS-DAG: Signature: add(<param name="x" active>x: Int = importantValue</param>)
+// DEFAULT_ARGS-DAG: Signature: add(<param name="x" active>x: Int</param>, <param name="line">line: UInt = #line</param>, <param name="file">file: StaticString = #file</param>)

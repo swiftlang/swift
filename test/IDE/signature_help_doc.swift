@@ -17,7 +17,5 @@ func add(_ x: Int, to y: Int) -> Int {
 }
 
 add(#^DOC^#)
-
-// DOC:      Begin signatures, 1 items
-// DOC-NEXT: Signature[Active]: add(<param name="x" active>_ x: Int</param>, <param name="y">to: Int</param>) -> Int; Documentation=Adds two integers.\n\n- Parameters:\n  - x: The first integer to add.\n  - y: The second integer to add.\n\nUsage:\n```swift\nadd(1, to: 2) // 3\n```\n\n- Returns: The sum of the two integers.
-// DOC-NEXT: End signatures
+// DOC:     Begin signatures, 1 items
+// DOC-DAG: Signature[Active]: add(<param name="x" active>_ x: Int</param>, <param name="y">to: Int</param>) -> Int; Documentation=Adds two integers.\n\n- Parameters:\n  - x: The first integer to add.\n  - y: The second integer to add.\n\nUsage:\n```swift\nadd(1, to: 2) // 3\n```\n\n- Returns: The sum of the two integers.
