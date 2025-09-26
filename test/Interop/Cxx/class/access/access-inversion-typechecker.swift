@@ -282,9 +282,7 @@ func usePrivateEnumClass(a: inout Leaky.AliasToPrivateEnumClass) -> Leaky.AliasT
     let _ = Leaky.AliasToPrivateEnumClass.privateEnumClassMember
     let _ = Leaky.PrivateEnumClass.privateEnumClassMember
     // expected-error@-1 {{'PrivateEnumClass' is inaccessible due to 'private' protection level}}
-    let _: Leaky.AliasToPrivateEnum = .privateEnumClassMember
-    // expected-error@-1 {{type 'Leaky.AliasToPrivateEnum' (aka 'Leaky.PrivateEnum') has no member 'privateEnumClassMember'}}
-    // FIXME: ^this should be accessible
+    let _: Leaky.AliasToPrivateEnumClass = .privateEnumClassMember
 
     let rv0 = Leaky.AliasToPrivateEnumClass(rawValue: 0)!
     let _ = Leaky.PrivateEnumClass(rawValue: 0)!
