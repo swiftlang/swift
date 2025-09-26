@@ -8,7 +8,7 @@ import CompilerPluginSupport
 
 let package = Package(
 	name: "SwiftifyImport",
-	platforms: [.macOS(.v11)],
+	platforms: [.macOS(.v11), .iOS(.v15), .tvOS(.v15), .watchOS(.v8)],
 	products: [
 		.library(
 			name: "SwiftifyImport",
