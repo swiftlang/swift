@@ -3316,6 +3316,14 @@ public:
       break;
     }
     }
+
+    // If we're passing the continuation directly, add those implicit
+    // arguments.
+    if (getCallee().shouldPassContinuationDirectly()) {
+      asyncExplosion.add(getResumeFunctionPointer());
+      asyncExplosion.add(getAsyncContext());
+    }
+
     super::setArgs(asyncExplosion, false, witnessMetadata);
 
     auto layout = getAsyncContextLayout();

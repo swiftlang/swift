@@ -3911,11 +3911,6 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     }
   }
 
-  if (calleeFP.shouldPassContinuationDirectly()) {
-    llArgs.add(emission->getResumeFunctionPointer());
-    llArgs.add(emission->getAsyncContext());
-  }
-
   // Add all those arguments.
   emission->setArgs(llArgs, false, &witnessMetadata);
 
