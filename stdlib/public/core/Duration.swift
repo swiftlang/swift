@@ -251,7 +251,7 @@ extension Duration {
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
   
-  /// Construct a `Duration` given a number of seconds nanoseconds as a
+  /// Construct a `Duration` given a number of nanoseconds as a
   /// `Double` by converting the value into the closest attosecond scale value.
   ///
   ///       let d: Duration = .nanoseconds(382.9)
