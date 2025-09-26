@@ -22,207 +22,259 @@ let packSpecialization = FunctionPass(name: "pack-specialization") {
     guard let apply = inst as? ApplyInst,
       // Only support closures which, after generic specialization, are not generic any more.
       !apply.substitutionMap.replacementTypes.contains(where: { $0.hasArchetype }),
-      let optimized = optimizedCallee(at: apply, in: context)
+      let specialized = specializeCallee(apply: apply, context: context)
     else {
       continue
     }
 
-    specializeCallsite(at: apply, with: optimized, context)
+    let callSiteSpecializer = CallSiteSpecializer(
+      apply: apply, specialized: specialized, context: context)
+    callSiteSpecializer.specialize()
   }
 
 }
 
-private func specializeCallsite(
-  at apply: ApplyInst, with optimized: PackExplodedFunction, _ context: FunctionPassContext
-) {
-  let builder = Builder(before: apply, context)
+private class CallSiteSpecializer {
+  let apply: ApplyInst
+  let builder: Builder
+  let specialized: PackExplodedFunction
+  let context: FunctionPassContext
+  let packArgumentIndices: [Int: [ScalarPackIndexInst]]
 
-  // Populate the arguments list with the appropriate set of indirect results and parameters
-  var newArguments = [any Value]()
-  var parameterBorrows = [LoadBorrowInst]()
+  init(apply: ApplyInst, specialized: PackExplodedFunction, context: FunctionPassContext) {
+    self.apply = apply
+    self.builder = Builder(before: apply, context)
+    self.specialized = specialized
+    self.context = context
 
-  var packArgumentIndices = [Int: [ScalarPackIndexInst]]()
-  for (idx, argument) in apply.arguments.enumerated() {
-    if argument.type.isPack {
-      var indices = [ScalarPackIndexInst]()
-      let packType = optimized.packASTTypes[idx]!
-      for elementIdx in argument.type.packElements.indices {
-        indices.append(
-          builder.createScalarPackIndex(componentIndex: elementIdx, indexedPackType: packType))
-      }
-      packArgumentIndices[idx] = indices
-    }
-  }
-
-  var resultIdx = 0
-  var parameterIdx = 0
-  for (originalArgumentIdx, originalArgument) in apply.arguments.enumerated() {
-    if let originalPack = originalArgument as? AllocPackInst {
-      // This code assumes the pack elements are all addresses
-      assert(originalPack.type.isPackElementAddress)
-
-      let packIndices = packArgumentIndices[originalArgumentIdx]!
-      if resultIdx < optimized.resultMap.count {
-        let (mappedResultIdx, resultInfos) = optimized.resultMap[resultIdx]
-        assert(mappedResultIdx == originalArgumentIdx)
-
-        for (packElementIdx, (resultInfo, packIdx)) in zip(resultInfos, packIndices).enumerated()
-        where resultInfo.isSILIndirect {
-          let indirectResultAddress = builder.createPackElementGet(
-            packIndex: packIdx, pack: originalPack,
-            elementType: originalPack.type.packElements[packElementIdx])
-          newArguments.append(indirectResultAddress)
+    // Create scalar pack indices for each pack argument's elements
+    var packArgumentIndices = [Int: [ScalarPackIndexInst]]()
+    for (idx, argument) in apply.arguments.enumerated() {
+      if argument.type.isPack {
+        var indices = [ScalarPackIndexInst]()
+        let packType = specialized.packASTTypes[idx]!
+        for elementIdx in argument.type.packElements.indices {
+          indices.append(
+            builder.createScalarPackIndex(componentIndex: elementIdx, indexedPackType: packType))
         }
-        resultIdx += 1
-      } else {
-        assert(
-          parameterIdx < optimized.parameterMap.count,
-          "Application takes more parameter pack arguments than were exploded.")
-
-        let (mappedParameterIdx, parameterInfos) = optimized.parameterMap[parameterIdx]
-        assert(mappedParameterIdx == originalArgumentIdx)
-
-        for (packElementIdx, (parameterInfo, packIdx)) in zip(parameterInfos, packIndices)
-          .enumerated()
-        {
-          let indirectParameterAddress = builder.createPackElementGet(
-            packIndex: packIdx, pack: originalPack,
-            elementType: originalPack.type.packElements[packElementIdx])
-
-          assert(
-            parameterInfo.convention != .packOut && parameterInfo.convention != .packInout
-              && parameterInfo.convention != .packOwned
-              && parameterInfo.convention != .packGuaranteed
-              && parameterInfo.convention != .indirectOut)
-          switch parameterInfo.convention {
-          case .directUnowned:
-            newArguments.append(
-              builder.createLoad(
-                fromAddress: indirectParameterAddress,
-                ownership: loadOwnership(for: indirectParameterAddress, normal: .trivial)))
-          case .directGuaranteed:
-            let borrow = builder.createLoadBorrow(fromAddress: indirectParameterAddress)
-            newArguments.append(borrow)
-            parameterBorrows.append(borrow)
-          case .directOwned:
-            newArguments.append(
-              builder.createLoad(
-                fromAddress: indirectParameterAddress,
-                ownership: loadOwnership(for: indirectParameterAddress, normal: .take)))
-          case .indirectIn, .indirectInCXX, .indirectInGuaranteed, .indirectInout,
-            .indirectInoutAliasable:
-            newArguments.append(indirectParameterAddress)
-          default:
-            assert(false, "Unsupported exploded parameter pack element convention.")
-          }
-        }
-
-        parameterIdx += 1
+        packArgumentIndices[idx] = indices
       }
-
-    } else {
-      newArguments.append(originalArgument)
     }
+
+    self.packArgumentIndices = packArgumentIndices
   }
 
-  // Emit a call to the optimized function
-  let optimizedFunctionRef = builder.createFunctionRef(optimized.function)
-  let optimizedApply = builder.createApply(
-    function: optimizedFunctionRef, SubstitutionMap(), arguments: newArguments)
-
-  // Release any borrows of @guaranteed parameters
-  for borrow in parameterBorrows {
-    builder.createEndBorrow(of: borrow)
-  }
-
-  let writeBackPackElement = { (value: any Value, argumentIdx: Int, elementIdx: Int) in
-    let originalPackArgument = apply.arguments[argumentIdx]
-    let packIdx = packArgumentIndices[argumentIdx]![elementIdx]
+  private func writeBackPackElement(value: any Value, argumentIndex: Int, elementIndex: Int) {
+    let originalPackArgument = apply.arguments[argumentIndex]
+    let packIndex = packArgumentIndices[argumentIndex]![elementIndex]
     let outputResultAddress = builder.createPackElementGet(
-      packIndex: packIdx, pack: originalPackArgument,
-      elementType: originalPackArgument.type.packElements[elementIdx])
+      packIndex: packIndex, pack: originalPackArgument,
+      elementType: originalPackArgument.type.packElements[elementIndex])
     builder.createStore(
       source: value, destination: outputResultAddress,
-      // The callee is responsible for initializing return pack elements, so preserve this expectation
+      // The callee is responsible for initializing return pack elements
       ownership: storeOwnership(for: value, normal: .initialize))
   }
 
-  // Map the exploded direct results of the optimized function back to the corresponding indirect pack results of the original function.
-  if !optimizedApply.type.isTuple {
-    // Handle the single return value case
-    if !apply.type.isTuple {
-      // Both return a single value directly: just replace it
-      apply.uses.replaceAll(with: optimizedApply, context)
-    } else {
-      // The original should have no more arguments than the optimized function (which has 1), and
-      // in this case it also doesn't have exactly 1. It must have none.
+  // Collect values to pass as indirect result arguments to the new function from
+  // the original call site.
+  private func collectNewResultArguments() -> [any Value] {
+    var resultIterator = specialized.resultMap.makeIterator()
+    var newResults = [any Value]()
+
+    for (index, argument) in apply.arguments[
+      0..<apply.referencedFunction!.argumentConventions.firstParameterIndex
+    ].enumerated() {
+      // Do not modify non-packs, or packs that contain
+      if !argument.type.shouldExplode {
+        newResults.append(argument)
+        continue
+      }
+
       assert(
-        apply.type.isVoid,
-        "Pack specialization has fewer direct return values than original function.")
-      // Write back the single pack element
-      outerLoop: for (packArgumentIdx, mappedResultInfos) in optimized.resultMap {
-        for (packElementIdx, resultInfo) in mappedResultInfos.enumerated() {
-          if !resultInfo.isSILIndirect {
-            writeBackPackElement(optimizedApply, packArgumentIdx, packElementIdx)
-            break outerLoop
+        argument.type.isPackElementAddress, "This code assumes the pack elements are all addresses")
+
+      let packIndices = packArgumentIndices[index]!
+      let (mappedResultIdx, resultInfos) = resultIterator.next()!
+      assert(mappedResultIdx == index)
+
+      for (packElementIdx, (resultInfo, packIdx)) in zip(resultInfos, packIndices).enumerated()
+      where resultInfo.isSILIndirect {
+        let indirectResultAddress = builder.createPackElementGet(
+          packIndex: packIdx, pack: argument,
+          elementType: argument.type.packElements[packElementIdx])
+        newResults.append(indirectResultAddress)
+      }
+
+    }
+    return newResults
+  }
+
+  // Collect values to pass as parameters to the new function from the original
+  // call site. Also collect any borrows of parameters that need to be released
+  // after the call.
+  private func collectNewParameterArguments() -> ([any Value], [LoadBorrowInst]) {
+
+    var parameterIterator = specialized.parameterMap.makeIterator()
+    var newParameters = [any Value]()
+    var parameterBorrows = [LoadBorrowInst]()
+    for (index, argument) in apply.arguments[
+      apply.referencedFunction!.argumentConventions.firstParameterIndex...
+    ].enumerated() {
+
+      if !argument.type.shouldExplode {
+        newParameters.append(argument)
+        continue
+      }
+
+      assert(
+        argument.type.isPackElementAddress, "This code assumes the pack elements are all addresses")
+
+      let packIndices = packArgumentIndices[index]!
+      let (mappedParameterIdx, parameterInfos) = parameterIterator.next()!
+      assert(mappedParameterIdx == index)
+
+      for (packElementIdx, (parameterInfo, packIdx)) in zip(parameterInfos, packIndices)
+        .enumerated()
+      {
+        let indirectParameterAddress = builder.createPackElementGet(
+          packIndex: packIdx, pack: argument,
+          elementType: argument.type.packElements[packElementIdx])
+
+        assert(
+          parameterInfo.convention != .packOut && parameterInfo.convention != .packInout
+            && parameterInfo.convention != .packOwned
+            && parameterInfo.convention != .packGuaranteed
+            && parameterInfo.convention != .indirectOut)
+
+        switch parameterInfo.convention {
+        case .directUnowned:
+          newParameters.append(
+            builder.createLoad(
+              fromAddress: indirectParameterAddress,
+              ownership: loadOwnership(for: indirectParameterAddress, normal: .trivial)))
+        case .directGuaranteed:
+          let borrow = builder.createLoadBorrow(fromAddress: indirectParameterAddress)
+          newParameters.append(borrow)
+          parameterBorrows.append(borrow)
+        case .directOwned:
+          newParameters.append(
+            builder.createLoad(
+              fromAddress: indirectParameterAddress,
+              ownership: loadOwnership(for: indirectParameterAddress, normal: .take)))
+        case .indirectIn, .indirectInCXX, .indirectInGuaranteed, .indirectInout,
+          .indirectInoutAliasable:
+          newParameters.append(indirectParameterAddress)
+        case .packOut, .packInout, .packOwned, .packGuaranteed, .indirectOut:
+          assert(false, "Unsupported exploded parameter pack element convention.")
+        }
+      }
+
+    }
+
+    return (newParameters, parameterBorrows)
+  }
+
+  private func createSpecializedApply(newArguments: [any Value]) -> ApplyInst {
+    // Emit a call to the specialized function
+    let specializedFunctionRef = builder.createFunctionRef(specialized.specialized)
+    let specializedApply = builder.createApply(
+      function: specializedFunctionRef, SubstitutionMap(), arguments: newArguments)
+    return specializedApply
+  }
+
+  /// Map the direct results of the specialized function back to the corresponding
+  /// indirect pack or direct results of the original function.
+  private func substituteNewDirectResults(specializedApply: ApplyInst) {
+    if !specializedApply.type.isTuple {
+      // Handle the single return value case
+      if !apply.type.isTuple {
+        // Both return a single value directly: just replace it
+        apply.uses.replaceAll(with: specializedApply, context)
+      } else {
+        // The original should have no more arguments than the specialized function (which has 1), and
+        // in this case it also doesn't have exactly 1. It must have none.
+        assert(
+          apply.type.isVoid,
+          "Pack specialization has fewer direct return values than original function.")
+        // Write back the single pack element
+        outerLoop: for (packArgumentIdx, mappedResultInfos) in specialized.resultMap {
+          for (packElementIdx, resultInfo) in mappedResultInfos.enumerated() {
+            if !resultInfo.isSILIndirect {
+              writeBackPackElement(
+                value: specializedApply, argumentIndex: packArgumentIdx,
+                elementIndex: packElementIdx)
+              break outerLoop
+            }
           }
         }
       }
-    }
 
-  } else if optimizedApply.type.tupleElements.isEmpty {
-    // Handle both return types being void. To ensure it is safe to erase the original apply,
-    // substitute all uses, even though there's no reason why there should be any.
-    assert(apply.type.isVoid)
-    apply.uses.replaceAll(with: optimizedApply, context)
+    } else if specializedApply.type.tupleElements.isEmpty {
+      // Handle both return types being void. To ensure it is safe to erase the original apply,
+      // substitute all uses, even though there's no reason why there should be any.
+      assert(apply.type.isVoid)
+      apply.uses.replaceAll(with: specializedApply, context)
 
-  } else {
-    // Handle a tuple with multiple elements. Since there could be many uses of the original apply's
-    // result tuple, we construct a new one with the corresponding values from optimizedApply.
+    } else {
+      // Handle a tuple with multiple elements. Since there could be many uses of the original apply's
+      // result tuple, we construct a new one with the corresponding values from specializedApply.
 
-    var substitutedResultTupleElements = [any Value]()
-    var resultMapIterator = optimized.resultMap.makeIterator()
-    var optimizedDirectResultIdx = 0
+      var substitutedResultTupleElements = [any Value]()
+      var resultMapIterator = specialized.resultMap.makeIterator()
 
-    let destructuredTuple = builder.createDestructureTuple(tuple: optimizedApply)
-    var destructuredTupleElements = destructuredTuple.results.makeIterator()
-    for (originalResultIdx, resultInfo) in apply.functionConvention.results.enumerated() {
-      // We only need to handle direct and pack results, since indirect results are handled above
-      if !resultInfo.isSILIndirect {
-        // Direct results of the original function are mapped to direct results of the optimized function.
-        substitutedResultTupleElements.append(destructuredTupleElements.next()!)
-        optimizedDirectResultIdx += 1
+      let destructuredTuple = builder.createDestructureTuple(tuple: specializedApply)
+      var destructuredTupleElements = destructuredTuple.results.makeIterator()
+      for (originalResultIdx, resultInfo) in apply.functionConvention.results.enumerated() {
+        // We only need to handle direct and pack results, since indirect results are handled above
+        if !resultInfo.isSILIndirect {
+          // Direct results of the original function are mapped to direct results of the specialized function.
+          substitutedResultTupleElements.append(destructuredTupleElements.next()!)
 
-      } else if resultInfo.isConcretePack() {
-        // Some elements of pack results may get mapped to direct results of the optimized function.
-        let (mappedOriginalResultIdx, mappedResults) = resultMapIterator.next()!
-        assert(originalResultIdx == mappedOriginalResultIdx)
+        } else if resultInfo.type.shouldExplode {
+          // Some elements of pack results may get mapped to direct results of the specialized function.
+          let (mappedOriginalResultIdx, mappedResults) = resultMapIterator.next()!
+          assert(originalResultIdx == mappedOriginalResultIdx)
 
-        for (packElementIdx, mappedDirectResult) in mappedResults.enumerated()
-        where !mappedDirectResult.isSILIndirect {
-          writeBackPackElement(
-            destructuredTupleElements.next()!,
-            originalResultIdx, packElementIdx
-          )
-          optimizedDirectResultIdx += 1
+          for (packElementIdx, mappedDirectResult) in mappedResults.enumerated()
+          where !mappedDirectResult.isSILIndirect {
+            writeBackPackElement(
+              value: destructuredTupleElements.next()!, argumentIndex: originalResultIdx,
+              elementIndex: packElementIdx)
+          }
         }
       }
-    }
 
-    // If exactly one direct result was mapped, don't generate a tuple
-    if substitutedResultTupleElements.count == 1 {
-      apply.uses.replaceAll(with: substitutedResultTupleElements[0], context)
-    } else {
-      let substitutedResultTuple = builder.createTuple(
-        type: apply.type, elements: substitutedResultTupleElements)
-      apply.uses.replaceAll(with: substitutedResultTuple, context)
+      // If exactly one direct result was mapped, don't generate a tuple
+      if substitutedResultTupleElements.count == 1 {
+        apply.uses.replaceAll(with: substitutedResultTupleElements[0], context)
+      } else {
+        let substitutedResultTuple = builder.createTuple(
+          type: apply.type, elements: substitutedResultTupleElements)
+        apply.uses.replaceAll(with: substitutedResultTuple, context)
+      }
     }
   }
 
-  apply.parentBlock.erase(instruction: apply, context)
+  func specialize() {
+    // Populate the arguments list with the appropriate set of indirect results and parameters
+    let newResults = collectNewResultArguments()
+    let (newParameters, parameterBorrows) = collectNewParameterArguments()
+
+    let specializedApply = createSpecializedApply(newArguments: newResults + newParameters)
+
+    // Release any borrows that were created to pass parameters
+    for borrow in parameterBorrows {
+      builder.createEndBorrow(of: borrow)
+    }
+
+    substituteNewDirectResults(specializedApply: specializedApply)
+
+    context.erase(instruction: apply)
+  }
 }
 
-private func optimizedCallee(at apply: ApplySite, in context: FunctionPassContext)
+private func specializeCallee(apply: ApplySite, context: FunctionPassContext)
   -> PackExplodedFunction?
 {
   // Only perform pack specialization when the callee has pack arguments
@@ -234,19 +286,30 @@ private func optimizedCallee(at apply: ApplySite, in context: FunctionPassContex
     return nil
   }
 
-  let exploded = PackExplodedFunction(at: apply, in: context)
+  let exploded = PackExplodedFunction(at: apply, context)
 
   return exploded
 }
 
+/// A description of the mapping from an original function with pack arguments,
+/// to a new one where those arguments have been exploded into separate
+/// parameters and results.
 private struct PackExplodedFunction {
   public let original: Function
-  public let function: Function
+  public let specialized: Function
+  /// Each element stores the set of results of the new function corresponding
+  /// to the pack argument of the original at the given index, in ascending
+  /// order.
   public let resultMap: [(Int, [ResultInfo])]
+  /// Each element stores the set of parameters of the new function
+  /// corresponding to the pack argument of the original at the given
+  /// index, in ascending order.
   public let parameterMap: [(Int, [ParameterInfo])]
+  // Maps indices of pack arguments of the original function to its
+  // `approximateFormalPackType` (a Canonical AST PackType).
   public let packASTTypes: [Int: CanonicalType]
 
-  init(at apply: ApplySite, in context: FunctionPassContext) {
+  init(at apply: ApplySite, _ context: FunctionPassContext) {
 
     let callee = apply.referencedFunction!
     self.original = callee
@@ -261,7 +324,7 @@ private struct PackExplodedFunction {
     var parameterMap = [(Int, [ParameterInfo])]()
 
     for arg in callee.parameters {
-      if arg.isConcretePack() {
+      if arg.type.shouldExplode {
         let argParameterInfo = apply.parameter(for: apply.argumentOperands[arg.index])!
 
         let mappedParameterInfos = arg.type.packElements.map { elem in
@@ -291,8 +354,9 @@ private struct PackExplodedFunction {
 
     var indirectResultIdx = 0
     for resultInfo in callee.convention.results {
-      if resultInfo.isConcretePack() {
+      if resultInfo.type.shouldExplode {
         let mappedResultInfos = resultInfo.type.silType!.packElements.map { elem in
+          // TODO: Determine correct values for options and hasLoweredAddress
           ResultInfo(
             type: elem.canonicalType,
             convention: explodedPackElementResultConvention(in: callee, elem: elem),
@@ -315,19 +379,19 @@ private struct PackExplodedFunction {
 
     self.resultMap = resultMap
 
-    let packArgIndices: [Int] = callee.arguments.filter { $0.isConcretePack() }.map { $0.index }
+    let packArgIndices: [Int] = callee.arguments.filter { $0.type.shouldExplode }.map { $0.index }
     let specializedName = context.mangle(withExplodedPackArguments: packArgIndices, from: callee)
     if let existingFunction = context.lookupFunction(name: specializedName) {
-      function = existingFunction
+      specialized = existingFunction
     } else {
 
-      function = context.createSpecializedFunctionDeclaration(
+      specialized = context.createSpecializedFunctionDeclaration(
         from: callee,
         withName: specializedName,
         withParams: newParams,
         withResults: newResults)
 
-      self.buildOptimizedClosure(apply: apply, context)
+      self.buildSpecializedFunction(apply: apply, context)
     }
   }
 
@@ -347,13 +411,14 @@ private struct PackExplodedFunction {
   }
 
   /// Build the body of the pack-specialized function
-  private func buildOptimizedClosure(apply: ApplySite, _ context: FunctionPassContext) {
+  private func buildSpecializedFunction(apply: ApplySite, _ context: FunctionPassContext) {
 
-    context.buildSpecializedFunction(specializedFunction: function) { (opt, specContext) in
+    context.buildSpecializedFunction(specializedFunction: specialized) {
+      (specialized, specContext) in
       // Callee is a specialized function, so we don't need to specialize it again.
-      cloneFunction(from: original, toEmpty: opt, specContext)
+      cloneFunction(from: original, toEmpty: specialized, specContext)
 
-      let argumentMap = explodePackArguments(from: original, to: opt, specContext)
+      let argumentMap = explodePackArguments(from: original, to: specialized, specContext)
 
       // Build a block that extracts the necessary direct return values and returns them, if necessary.
       // This is only necessary if any pack result elements were mapped to direct results, and the
@@ -373,44 +438,51 @@ private struct PackExplodedFunction {
             originalReturnTupleElements = [originalReturnType]
           }
           let returnShimBB = addReturnShimBlock(
-            in: opt, argumentMap: argumentMap, originalReturnTypes: originalReturnTupleElements,
+            in: specialized, argumentMap: argumentMap,
+            originalReturnTypes: originalReturnTupleElements,
             specContext)
 
           // Now modify all existing return blocks to instead branch to this return shim block
-          for bb in opt.blocks where (bb.terminator is ReturnInst) && bb != returnShimBB {
-            let returnInst = bb.terminator as! ReturnInst
-            let returnedValue = returnInst.returnedValue
-            bb.erase(instruction: returnInst, specContext)
-
-            let builder = Builder(atEndOf: bb, location: opt.location, specContext)
-
-            let forwardedValues: [any Value]
-            if !returnedValue.type.isTuple {
-              forwardedValues = [returnedValue]
-            } else {
-              forwardedValues = [any Value](
-                builder.createDestructureTuple(tuple: returnedValue).results)
-            }
-
-            builder.createBranch(to: returnShimBB, arguments: forwardedValues)
+          for bb in specialized.blocks where (bb.terminator is ReturnInst) && bb != returnShimBB {
+            redirect(returnBB: bb, to: returnShimBB, specContext)
           }
         }
       }
-      for bb in opt.blocks where bb.isReachableExitBlock {
+      for bb in specialized.blocks where bb.isReachableExitBlock {
         insertArgumentPackDeallocations(in: bb, argumentMap: argumentMap, specContext)
       }
     }
 
-    context.notifyNewFunction(function: function, derivedFrom: original)
+    context.notifyNewFunction(function: specialized, derivedFrom: original)
+  }
+
+  private func redirect(
+    returnBB bb: BasicBlock, to returnShimBB: BasicBlock, _ specContext: FunctionPassContext
+  ) {
+    let returnInst = bb.terminator as! ReturnInst
+    let returnedValue = returnInst.returnedValue
+    let builder = Builder(before: returnInst, specContext)
+
+    specContext.erase(instruction: returnInst)
+
+    let forwardedValues: [any Value]
+    if !returnedValue.type.isTuple {
+      forwardedValues = [returnedValue]
+    } else {
+      forwardedValues = [any Value](
+        builder.createDestructureTuple(tuple: returnedValue).results)
+    }
+
+    builder.createBranch(to: returnShimBB, arguments: forwardedValues)
   }
 
   /// Explode the types of the entry block's pack arguments, and track the correspondence between exploded arguments and local packs
   private func explodePackArguments(
-    from original: Function, to opt: Function, _ specContext: FunctionPassContext
+    from original: Function, to specialized: Function, _ context: FunctionPassContext
   ) -> ArgumentMap {
 
-    let entryBlock = opt.entryBlock
-    let builder = Builder(atBeginOf: entryBlock, specContext)
+    let entryBlock = specialized.entryBlock
+    let builder = Builder(atBeginOf: entryBlock, context)
 
     let prepareExplosion = { idx in
 
@@ -418,9 +490,9 @@ private struct PackExplodedFunction {
       let packType = originalPackArg.type.objectType
 
       let localPack = builder.createAllocPack(packType)
-      originalPackArg.uses.replaceAll(with: localPack, specContext)
+      originalPackArg.uses.replaceAll(with: localPack, context)
 
-      entryBlock.eraseArgument(at: idx, specContext)
+      entryBlock.eraseArgument(at: idx, context)
 
       return (localPack, packType)
     }
@@ -438,8 +510,9 @@ private struct PackExplodedFunction {
           componentIndex: i, indexedPackType: self.packASTTypes[idx]!)
         let argument = entryBlock.insertFunctionArgument(
           atPosition: idx + i, type: type,
-          ownership: opt.getValueOwnership(type: type, convention: parameterInfo.convention),
-          specContext)
+          ownership: specialized.getValueOwnership(
+            type: type, convention: parameterInfo.convention),
+          context)
 
         let allocStack: AllocStackInst?
         if parameterInfo.isSILIndirect {
@@ -485,9 +558,9 @@ private struct PackExplodedFunction {
         if resultInfo.isSILIndirect {
           let argument = entryBlock.insertFunctionArgument(
             atPosition: insertArgumentPosition, type: type,
-            ownership: opt.getValueOwnership(
+            ownership: specialized.getValueOwnership(
               type: type, convention: ArgumentConvention(result: resultInfo.convention)),
-            specContext)
+            context)
           builder.createPackElementSet(elementValue: argument, packIndex: packIdx, pack: localPack)
           allocStack = nil
           insertArgumentPosition += 1
@@ -539,11 +612,11 @@ private struct PackExplodedFunction {
   }
 
   private func addReturnShimBlock(
-    in opt: Function, argumentMap: ArgumentMap, originalReturnTypes: [Type],
+    in specialized: Function, argumentMap: ArgumentMap, originalReturnTypes: [Type],
     _ context: FunctionPassContext
   ) -> BasicBlock {
-    let bb = opt.appendNewBlock(context)
-    let builder = Builder(atEndOf: bb, location: opt.location, context)
+    let bb = specialized.appendNewBlock(context)
+    let builder = Builder(atEndOf: bb, location: specialized.location, context)
 
     let returnBlockArguments = originalReturnTypes.map {
       bb.addArgument(type: $0, ownership: .unowned, context)
@@ -555,7 +628,7 @@ private struct PackExplodedFunction {
     var resultMapIdx = 0
     var originalReturnTypesIdx = 0
     for (i, originalResult) in self.original.convention.results.enumerated()
-    where originalResult.isConcretePack() || !originalResult.isSILIndirect {
+    where originalResult.type.shouldExplode || !originalResult.isSILIndirect {
 
       if !resultMap.indices.contains(resultMapIdx) || resultMap[resultMapIdx].0 != i {
         returnValues.append(returnBlockArguments[originalReturnTypesIdx])
@@ -585,7 +658,7 @@ private struct PackExplodedFunction {
       builder.createReturn(of: returnValues[0])
     } else {
       let tupleType = context.getTupleType(elements: returnValues.map { $0.type }).loweredType(
-        in: opt)
+        in: specialized)
       let tuple = builder.createTuple(type: tupleType, elements: returnValues)
       builder.createReturn(of: tuple)
     }
@@ -682,29 +755,9 @@ private func loadOwnership(for value: any Value, normal: LoadInst.LoadOwnership)
   }
 }
 
-extension FunctionArgument {
-  fileprivate func isConcretePack() -> Bool {
-    if !self.type.isPack {
-      return false
-    }
-
-    switch self.convention {
-    case .packGuaranteed, .packOut, .packInout, .packOwned:
-      // TODO: Probably just check containsPackExpansionType
-      return !(self.type.containsPackExpansionType || self.type.hasTypeParameter)
-    default:
-      return false
-    }
-  }
-}
-
-extension ResultInfo {
-  fileprivate func isConcretePack() -> Bool {
-    switch self.convention {
-    case .pack:
-      return !self.type.hasTypeParameter
-    default:
-      return false
-    }
+extension TypeProperties {
+  /// A pack argument can explode if it contains no pack expansion types
+  fileprivate var shouldExplode: Bool {
+    return isPack && !containsPackExpansionType
   }
 }
