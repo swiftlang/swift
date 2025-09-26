@@ -73,7 +73,7 @@ void decapseman(baz::B *b, IntSpan p __noescape) __attribute__((swift_name("baz.
 //--- Inputs/module.modulemap
 module Instance {
   header "instance.h"
-  export std.span
+  export *
 }
 
 //--- out.expected
