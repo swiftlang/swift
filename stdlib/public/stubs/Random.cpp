@@ -65,7 +65,7 @@ using namespace swift;
 
 #if defined(SWIFT_USE_STD_RANDOM_DEVICE)
 SWIFT_RUNTIME_STDLIB_API
-void swift_stdlib_random_fallback(void *buf, __swift_size_t nbytes) {
+void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
   auto buffer = reinterpret_cast<char *>(buf); // for arithmetic
   std::random_device rd;
 
