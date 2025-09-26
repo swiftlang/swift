@@ -170,11 +170,11 @@ protocol N { associatedtype D }
 infix operator ++ : AdditionPrecedence
 infix operator -- : AdditionPrecedence
 
-func ++ <T: N> (lhs: T, rhs: T) -> T.D { fatalError() } // expected-note {{found this candidate}}
-func ++ <T: N> (lhs: T, rhs: T) -> T { fatalError() } // expected-note {{found this candidate}}
+func ++ <T: N> (lhs: T, rhs: T) -> T.D { fatalError() } // expected-note {{found candidate with type '<T where T : N> (T, T) -> T.D'}}
+func ++ <T: N> (lhs: T, rhs: T) -> T { fatalError() } // expected-note {{found candidate with type '<T where T : N> (T, T) -> T'}}
 
-func -- <T: N> (lhs: T, rhs: T) -> T { fatalError() } // expected-note {{found this candidate}}
-func -- <T: N> (lhs: T, rhs: T) -> T.D { fatalError() } // expected-note {{found this candidate}}
+func -- <T: N> (lhs: T, rhs: T) -> T { fatalError() } // expected-note {{found candidate with type '<T where T : N> (T, T) -> T'}}
+func -- <T: N> (lhs: T, rhs: T) -> T.D { fatalError() } // expected-note {{found candidate with type '<T where T : N> (T, T) -> T.D'}}
 
 do {
   struct MyInt16: N { typealias D = MyInt32 }
