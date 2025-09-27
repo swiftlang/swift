@@ -62,18 +62,18 @@ struct CRTPDerived : CRTPBase<CRTPDerived> {
 struct VirtualRetainRelease {
   int value;
   mutable int refCount = 1;
+  mutable bool calledBase = false;
   VirtualRetainRelease(int value) : value(value) {}
 
-  virtual void doRetainVirtual() const { refCount++; }
-  virtual void doReleaseVirtual() const { refCount--; }
+  virtual void doRetainVirtual() const { refCount++; calledBase = true; }
+  virtual void doReleaseVirtual() const { refCount--; calledBase = true; }
   virtual ~VirtualRetainRelease() = default;
 } SWIFT_SHARED_REFERENCE(.doRetainVirtual, .doReleaseVirtual);
 
 struct DerivedVirtualRetainRelease : VirtualRetainRelease {
   DerivedVirtualRetainRelease(int value) : VirtualRetainRelease(value) {}
 
-  mutable bool calledDerived = false;
-  void doRetainVirtual() const override { refCount++; calledDerived = true; }
+  void doRetainVirtual() const override { refCount++; }
   void doReleaseVirtual() const override { refCount--; }
 };
 
