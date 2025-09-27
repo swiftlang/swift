@@ -39,15 +39,23 @@
 # /usr/lib/swift and changes them to use @rpath.
 
 import argparse
+import os
 import re
 import subprocess
 import sys
 
 
+def file_path(string):
+    if os.path.isfile(string):
+        return string
+    else:
+        raise argparse.ArgumentTypeError(f"{string} is not a valid path")
+
+
 def main(arguments):
     parser = argparse.ArgumentParser(
         description='Change absolute install names to use @rpath')
-    parser.add_argument('bin', help='the binary')
+    parser.add_argument('bin', type=file_path, help='the binary')
 
     args = parser.parse_args(arguments)
     rpathize(args.bin)
@@ -60,12 +68,12 @@ def rpathize(filename):
         # `dyldinfo` has been replaced with `dyld_info`, so we try it first
         # before falling back to `dyldinfo`
         dylibsOutput = subprocess.check_output(
-            ['xcrun', 'dyld_info', '-dependents', filename],
+            ['/usr/bin/xcrun', 'dyld_info', '-dependents', filename],
             universal_newlines=True)
     except subprocess.CalledProcessError:
         sys.stderr.write("falling back to 'xcrun dyldinfo' ...\n")
         dylibsOutput = subprocess.check_output(
-            ['xcrun', 'dyldinfo', '-dylibs', filename],
+            ['/usr/bin/xcrun', 'dyldinfo', '-dylibs', filename],
             universal_newlines=True)
 
     # The output from dyldinfo -dylibs is a line of header followed by one
@@ -74,7 +82,7 @@ def rpathize(filename):
         r"(^|.*\s)(?P<path>/usr/lib/swift/(?P<filename>.*\.dylib))\s*$")
 
     # Build a command to invoke install_name_tool.
-    command = ['install_name_tool']
+    command = ['/usr/bin/xcrun', 'install_name_tool']
     for line in dylibsOutput.splitlines():
         match = dylib_regex.match(line)
         if match:
@@ -85,7 +93,7 @@ def rpathize(filename):
 
     # Don't run the command if we didn't find any dylibs to change:
     # it's invalid to invoke install_name_tool without any operations.
-    if len(command) == 1:
+    if len(command) == 2:
         return
 
     # The last argument is the filename to operate on.
