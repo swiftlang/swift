@@ -835,8 +835,8 @@ let strInterpolation = "This is a \(stringStr + "ing") interpolation"
 
 // RUN: %sourcekitd-test -req=cursor -pos=227:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK94 %s
 // CHECK94: source.lang.swift.ref.struct
-// CHECK94-NEXT: String
-// CHECK94-NEXT: s:SS
+// CHECK94: String
+// CHECK94: s:SS
 // CHECK94-NEXT: source.lang.swift
 // CHECK94-NEXT: String.Type
 // CHECK94-NEXT: $sSSmD
@@ -851,8 +851,8 @@ let strInterpolation = "This is a \(stringStr + "ing") interpolation"
 
 // RUN: %sourcekitd-test -req=cursor -pos=23:23 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK96 %s
 // CHECK96: source.lang.swift.ref.struct
-// CHECK96-NEXT: String
-// CHECK96-NEXT: s:SS
+// CHECK96: String
+// CHECK96: s:SS
 // CHECK96-NEXT: source.lang.swift
 // CHECK96-NEXT: String.Type
 // CHECK96-NEXT: $sSSmD
@@ -863,8 +863,8 @@ let strInterpolation = "This is a \(stringStr + "ing") interpolation"
 
 // RUN: %sourcekitd-test -req=cursor -pos=233:19 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK97 %s
 // CHECK97: source.lang.swift.ref.struct
-// CHECK97-NEXT: Int
-// CHECK97-NEXT: s:Si
+// CHECK97: Int
+// CHECK97: s:Si
 // CHECK97-NEXT: source.lang.swift
 // CHECK97-NEXT: Int.Type
 // CHECK97-NEXT: $sSimD
@@ -882,7 +882,7 @@ let strInterpolation = "This is a \(stringStr + "ing") interpolation"
 // CHECK98-NEXT: cursor_info
 
 // RUN: %sourcekitd-test -req=cursor -pos=244:51 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK99 %s
-// CHECK99: source.lang.swift.ref.struct ()
+  // CHECK99: source.lang.swift.ref.struct ({{.*}})
 // CHECK99-NEXT: String
 // CHECK99-NEXT: s:SS
 // CHECK99-NEXT: source.lang.swift
@@ -893,7 +893,7 @@ let strInterpolation = "This is a \(stringStr + "ing") interpolation"
 // CHECK99-NEXT: SYSTEM
 
 // RUN: %sourcekitd-test -req=cursor -pos=244:61 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK100 %s
-// CHECK100: source.lang.swift.ref.function.constructor ()
+  // CHECK100: source.lang.swift.ref.function.constructor ({{.*}})
 // CHECK100-NEXT: init(stringInterpolation:)
 // CHECK100-NEXT: s:SS19stringInterpolationSSs013DefaultStringB0V_tcfc
 // CHECK100-NEXT: source.lang.swift

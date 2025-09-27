@@ -3,7 +3,7 @@ func test() {
   Swift.min(1, 2)
 }
 
-// CHECK: source.lang.swift.ref.function.free ()
+// CHECK: source.lang.swift.ref.function.free ({{.*}})
 // CHECK-NEXT: min(_:_:)
 // CHECK-NEXT: s:s3minyxx_xtSLRzlF
 // CHECK-NEXT: source.lang.swift
