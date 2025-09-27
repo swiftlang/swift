@@ -18,10 +18,27 @@
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/Support/CommandLine.h"
+#include <optional>
 
 #define DEBUG_TYPE "cold-block-info"
 
 using namespace swift;
+
+/// Strategy for handling blocks with zero execution counts in profile data
+enum class ZeroCountStrategy {
+  Conservative,  // Skip inference, let other heuristics decide (safe default)
+  Optimistic     // Assume zero-count blocks are cold
+};
+
+static llvm::cl::opt<ZeroCountStrategy> ZeroCountHandling(
+    "sil-zero-count-strategy", llvm::cl::init(ZeroCountStrategy::Conservative),
+    llvm::cl::desc("Strategy for handling blocks with zero execution counts"),
+    llvm::cl::values(
+        clEnumValN(ZeroCountStrategy::Conservative, "conservative",
+                   "Skip inference for zero-count blocks (default)"),
+        clEnumValN(ZeroCountStrategy::Optimistic, "optimistic",
+                   "Assume zero-count blocks are cold")));
 
 bool isColdEnergy(ColdBlockInfo::Energy e);
 
@@ -225,26 +242,87 @@ bool ColdBlockInfo::inferFromEdgeProfile(SILBasicBlock *BB) {
   if (BB->getNumSuccessors() != 2)
     return false;
 
-  // Check the successor edges for profile data.
+  // First pass: collect all counters and check for evidence of profiling
+  bool hasAnyNonZeroCount = false;
+  bool hasAnyMissingData = false;
+  SmallVector<std::optional<ProfileCounter>, 2> counters;
+
   for (auto const &succ : BB->getSuccessors()) {
     auto counter = succ.getCount();
 
-    // Can't make an inference if there's profile data missing for a successor.
-    // FIXME: there are techniques to determine a missing count;
-    //        see the SamplePGO paper by Diego Novillo.
-    if (!counter)
-      return false;
+    if (!counter.hasValue()) {
+      hasAnyMissingData = true;
+      counters.push_back(std::nullopt);
+    } else {
+      counters.push_back(counter);
+      if (counter.getValue() > 0) {
+        hasAnyNonZeroCount = true;
+      }
+    }
+  }
 
-    succCount.push_back(counter);
+  // Apply the optimistic strategy for missing data:
+  // If we have evidence of profiling (at least one non-zero count),
+  // treat missing data as zero. Otherwise, bail out conservatively.
+  // This prevents marking unprofiled code as entirely cold while enabling
+  // optimizations when profile data is partial.
+  if (hasAnyMissingData && !hasAnyNonZeroCount) {
+    // No evidence of profiling - be conservative
+    LLVM_DEBUG(llvm::dbgs() << "ColdBlockInfo: no evidence of profiling for "
+                            << toString(BB) << " (conservative approach)\n");
+    return false;
+  }
 
-    auto didSaturate = totalCount.add_saturating(counter);
+  // Second pass: build the count vector, treating missing as zero if optimistic
+  for (size_t i = 0; i < counters.size(); i++) {
+    ProfileCounter count;
+    if (counters[i].has_value()) {
+      count = counters[i].value();
+    } else {
+      // We're being optimistic - treat missing as zero
+      count = ProfileCounter(0);
+      LLVM_DEBUG(llvm::dbgs()
+        << "ColdBlockInfo: treating missing profile data as zero for "
+        << toString(BB->getSuccessors()[i])
+        << " (optimistic strategy - found non-zero counts on other edges)\n");
+    }
 
+    succCount.push_back(count);
+    auto didSaturate = totalCount.add_saturating(count);
     ASSERT(!didSaturate && "should rescale the profile data first");
     (void)didSaturate;
   }
 
   TermInst::ConstSuccessorListTy succs = BB->getSuccessors();
   ASSERT(succCount.size() == succs.size());
+
+  // Handle the case where all successors have zero execution counts
+  // This can happen when: 1) the block was instrumented but never executed,
+  // or 2) our optimistic strategy treated missing data as zero
+  if (totalCount.getValue() < 1) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "ColdBlockInfo: handling zero execution count for " << toString(BB)
+               << " using strategy: ");
+
+    switch (ZeroCountHandling) {
+    case ZeroCountStrategy::Conservative:
+      // Conservative approach: we can't infer probabilities without execution data
+      // Skip this block and let other heuristics handle it
+      LLVM_DEBUG(llvm::dbgs() << "conservative (skipping inference)\n");
+      return false;
+
+    case ZeroCountStrategy::Optimistic:
+      // Optimistic approach: assume zero-count blocks are cold
+      // Mark all successors as cold since this code path is never executed
+      LLVM_DEBUG(llvm::dbgs() << "optimistic (marking all successors as cold)\n");
+      for (auto const &succ : succs) {
+        set(succ, ColdBlockInfo::State::Cold);
+      }
+      return true;
+    }
+
+    llvm_unreachable("Unknown zero count strategy");
+  }
 
   // Record temperatures.
   for (size_t i = 0; i < succs.size(); i++) {
