@@ -773,13 +773,6 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       jobFlags.task_setIsGroupChildTask(true);
       break;
 
-    case TaskOptionRecordKind::AsyncLet:
-      asyncLet = cast<AsyncLetTaskOptionRecord>(option)->getAsyncLet();
-      assert(asyncLet && "Missing async let storage");
-      jobFlags.task_setIsAsyncLetTask(true);
-      jobFlags.task_setIsChildTask(true);
-      break;
-
     case TaskOptionRecordKind::AsyncLetWithBuffer: {
       auto *aletRecord = cast<AsyncLetWithBufferTaskOptionRecord>(option);
       asyncLet = aletRecord->getAsyncLet();
