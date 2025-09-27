@@ -209,7 +209,9 @@ extension __StringStorage {
       if isASCII {
         return count
       }
-      return utf16.count
+      // Using _nativeGetOffset skips checking for foreign string nature
+      let utf16View = utf16
+      return utf16View._nativeGetOffset(for: utf16View.endIndex)
     }
   }
 
@@ -324,7 +326,9 @@ extension __SharedStringStorage {
       if isASCII {
         return count
       }
-      return utf16.count
+      // Using _nativeGetOffset skips checking for foreign string nature
+      let utf16View = utf16
+      return utf16View._nativeGetOffset(for: utf16View.endIndex)
     }
   }
 
