@@ -248,10 +248,37 @@ public struct Builder {
     return notifyNew(allocStack.getAs(AllocStackInst.self))
   }
 
+  public func createAllocPack(_ packType: Type) -> AllocPackInst {
+    let allocPack = bridged.createAllocPack(packType.bridged)
+    return notifyNew(allocPack.getAs(AllocPackInst.self))
+  }
+
+  public func createAllocPackMetadata() -> AllocPackMetadataInst {
+    let allocPackMetadata = bridged.createAllocPackMetadata()
+    return notifyNew(allocPackMetadata.getAs(AllocPackMetadataInst.self))
+  }
+
+  public func createAllocPackMetadata(_ packType: Type) -> AllocPackMetadataInst {
+    let allocPackMetadata = bridged.createAllocPackMetadata(packType.bridged)
+    return notifyNew(allocPackMetadata.getAs(AllocPackMetadataInst.self))
+  }
+
   @discardableResult
   public func createDeallocStack(_ operand: Value) -> DeallocStackInst {
     let dr = bridged.createDeallocStack(operand.bridged)
     return notifyNew(dr.getAs(DeallocStackInst.self))
+  }
+
+  @discardableResult
+  public func createDeallocPack(_ operand: Value) -> DeallocPackInst {
+    let dr = bridged.createDeallocPack(operand.bridged)
+    return notifyNew(dr.getAs(DeallocPackInst.self))
+  }
+
+  @discardableResult
+  public func createDeallocPackMetadata(_ operand: Value) -> DeallocPackMetadataInst {
+    let dr = bridged.createDeallocPackMetadata(operand.bridged)
+    return notifyNew(dr.getAs(DeallocPackMetadataInst.self))
   }
 
   @discardableResult
@@ -706,6 +733,22 @@ public struct Builder {
                                                    BridgedConformanceArray(pcArray: $0))
     }
     return notifyNew(initExistential.getAs(InitExistentialMetatypeInst.self))
+  }
+
+  public func createScalarPackIndex(componentIndex: Int, indexedPackType: CanonicalType) -> ScalarPackIndexInst {
+    let scalarPackIndex = bridged.createScalarPackIndex(SwiftInt(componentIndex), indexedPackType.bridged)
+    return notifyNew(scalarPackIndex.getAs(ScalarPackIndexInst.self))
+  }
+
+  public func createPackElementGet(packIndex: Value, pack: Value, elementType: Type) -> PackElementGetInst {
+    let packElementGet = bridged.createPackElementGet(packIndex.bridged, pack.bridged, elementType.bridged)
+    return notifyNew(packElementGet.getAs(PackElementGetInst.self))
+  }
+
+  @discardableResult
+  public func createPackElementSet(elementValue: Value, packIndex: Value, pack: Value) -> PackElementSetInst {
+    let packElementSet = bridged.createPackElementSet(elementValue.bridged, packIndex.bridged, pack.bridged)
+    return notifyNew(packElementSet.getAs(PackElementSetInst.self))
   }
 
   public func createMetatype(

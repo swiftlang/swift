@@ -146,6 +146,7 @@ extension TypeProperties {
   public var isExistentialMetatype: Bool { rawType.bridged.isExistentialMetatypeType() }
   public var isDynamicSelf: Bool { rawType.bridged.isDynamicSelf()}
   public var isBox: Bool { rawType.bridged.isBox() }
+  public var isPack: Bool { rawType.bridged.isPack() }
 
   /// True if this is the type which represents an integer literal used in a type position.
   /// For example `N` in `struct T<let N: Int> {}`
@@ -242,6 +243,9 @@ extension TypeProperties {
   public func checkConformance(to protocol: ProtocolDecl) -> Conformance {
     return Conformance(bridged: rawType.bridged.checkConformance(`protocol`.bridged))
   }
+
+  public var containsPackExpansionType: Bool { rawType.bridged.containsPackExpansionType() }
+  public var numPackElements: Int { rawType.bridged.getNumPackElements() }
 }
 
 public struct TypeArray : RandomAccessCollection, CustomReflectable {
