@@ -13,6 +13,7 @@ list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_SOURCE_DIR}/../cmake/modules"
   "${CMAKE_SOURCE_DIR}/../../cmake/modules")
 
+include(LanguageVersions)
 include(SwiftProjectVersion)
 project(SwiftObservation
   LANGUAGES Swift CXX
@@ -22,9 +23,6 @@ if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Observation must build as a standalone project")
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED YES)
-set(CMAKE_CXX_EXTENSIONS NO)
 set(CMAKE_POSITION_INDEPENDENT_CODE YES)
 
 set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
@@ -66,7 +64,6 @@ option(${PROJECT_NAME}_ENABLE_PRESPECIALIZATION "Enable generic metadata prespec
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-swift-version 5>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
