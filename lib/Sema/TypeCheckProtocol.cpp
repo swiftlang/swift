@@ -4498,7 +4498,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
         SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
 
-        if (protoForcesAccess && ctor && ctor->isSynthesized()) {
+        if (protoForcesAccess && ctor && ctor->isMemberwiseInitializer()) {
           diags.diagnose(diagLoc, diag::implicit_init_witness_not_accessible_proto,
                          ctor, requiredAccess,
                          protoAccessScope.accessLevelForDiagnostics(),
