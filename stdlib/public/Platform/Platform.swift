@@ -74,9 +74,9 @@ public func snprintf(ptr: UnsafeMutablePointer<Int8>, _ len: Int, _ format: Unsa
 #endif
 
 #elseif os(OpenBSD)
-public var stdin: UnsafeMutablePointer<FILE> { return _swift_stdlib_stdin() }
-public var stdout: UnsafeMutablePointer<FILE> { return _swift_stdlib_stdout() }
-public var stderr: UnsafeMutablePointer<FILE> { return _swift_stdlib_stderr() }
+public var stdin: OpaquePointer { return OpaquePointer(_swift_stdlib_stdin()) }
+public var stdout: OpaquePointer { return OpaquePointer(_swift_stdlib_stdout()) }
+public var stderr: OpaquePointer { return OpaquePointer(_swift_stdlib_stderr()) }
 #elseif os(Windows)
 public var stdin: UnsafeMutablePointer<FILE> {
   return unsafe __acrt_iob_func(0)
