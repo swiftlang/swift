@@ -1,4 +1,5 @@
 target_sources(swiftSILOptimizer PRIVATE
+  AutoDiffClosureSpecializationBridging.cpp
   BasicBlockOptUtils.cpp
   CFGOptUtils.cpp
   CanonicalizeInstruction.cpp
