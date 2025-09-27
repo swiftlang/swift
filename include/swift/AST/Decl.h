@@ -3094,6 +3094,10 @@ public:
   /// \c \@usableFromInline, \c \@inlinalbe, and \c \@_alwaysEmitIntoClient
   bool isUsableFromInline() const;
 
+  // Returns \c true if this value decl is marked with an attribute that implies
+  // \c \@inlinable semantics: either \c \@inlinable or \c \@inline(always)
+  bool hasAttributeWithInlinableSemantics() const;
+
   /// Returns \c true if this declaration is *not* intended to be used directly
   /// by application developers despite the visibility.
   bool shouldHideFromEditor() const;

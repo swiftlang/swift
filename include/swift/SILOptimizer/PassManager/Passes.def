@@ -363,6 +363,8 @@ LEGACY_PASS(LowerAggregateInstrs, "lower-aggregate-instrs",
      "Lower Aggregate SIL Instructions to Multiple Scalar Operations")
 LEGACY_PASS(MandatoryInlining, "mandatory-inlining",
      "Mandatory Inlining of Transparent Functions")
+LEGACY_PASS(InlineAlwaysInlining, "inline-always-inlining",
+     "Inlining of '@inline(always)' Functions")
 LEGACY_PASS(Mem2Reg, "mem2reg",
      "Memory to SSA Value Conversion to Remove Stack Allocation")
 LEGACY_PASS(MoveCondFailToPreds, "move-cond-fail-to-preds",

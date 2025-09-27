@@ -4930,6 +4930,25 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   return resultLoc;
 }
 
+bool ValueDecl::hasAttributeWithInlinableSemantics() const {
+  if (getAttrs().hasAttribute<InlinableAttr>())
+    return true;
+
+  // @inline(always) implies @inlinable on "public" (open, public, package)
+  // declarations.
+  AccessScope access =
+        getFormalAccessScope(nullptr, /*treatUsableFromInlineAsPublic*/false);
+  if (!access.isPublicOrPackage())
+    return false;
+
+  if (auto *inlineAttr = getAttrs().getAttribute<InlineAttr>()) {
+    if (inlineAttr && inlineAttr->getKind() == InlineKind::Always)
+      return true;
+  }
+
+  return false;
+}
+
 /// Returns true if \p VD needs to be treated as publicly-accessible
 /// at the SIL, LLVM, and machine levels due to being @usableFromInline.
 bool ValueDecl::isUsableFromInline() const {
@@ -4942,14 +4961,14 @@ bool ValueDecl::isUsableFromInline() const {
 
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
       getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
-      getAttrs().hasAttribute<InlinableAttr>())
+      hasAttributeWithInlinableSemantics())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
     auto *storage = accessor->getStorage();
     if (storage->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
         storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
-        storage->getAttrs().hasAttribute<InlinableAttr>())
+        storage->hasAttributeWithInlinableSemantics())
       return true;
   }
 
@@ -4957,7 +4976,7 @@ bool ValueDecl::isUsableFromInline() const {
     if (auto *namingDecl = opaqueType->getNamingDecl()) {
       if (namingDecl->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
           namingDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
-          namingDecl->getAttrs().hasAttribute<InlinableAttr>())
+          namingDecl->hasAttributeWithInlinableSemantics())
         return true;
     }
   }
@@ -5576,7 +5595,7 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
   // Inherit the @usableFromInline attribute.
   if (source->getAttrs().hasAttribute<UsableFromInlineAttr>() &&
       !getAttrs().hasAttribute<UsableFromInlineAttr>() &&
-      !getAttrs().hasAttribute<InlinableAttr>() &&
+      !hasAttributeWithInlinableSemantics() &&
       DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::UsableFromInline,
                                               this)) {
     auto &ctx = getASTContext();
@@ -10712,7 +10731,7 @@ bool AbstractFunctionDecl::isValidKeyPathComponent() const {
 
 bool AbstractFunctionDecl::isResilient() const {
   // Check for attributes that makes functions non-resilient.
-  if (getAttrs().hasAttribute<InlinableAttr>() &&
+  if (hasAttributeWithInlinableSemantics() &&
       getAttrs().hasAttribute<UsableFromInlineAttr>())
     return false;
 

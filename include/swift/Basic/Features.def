@@ -550,6 +550,9 @@ EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 /// Enable borrow/mutate accessors
 EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, false)
 
+/// Allow use of @inline(always) attribute
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(InlineAlways, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

@@ -190,6 +190,7 @@ static_assert((int)BridgedFunction::PerformanceConstraints::ManualOwnership == (
 
 static_assert((int)BridgedFunction::InlineStrategy::InlineDefault == (int)swift::InlineDefault);
 static_assert((int)BridgedFunction::InlineStrategy::NoInline == (int)swift::NoInline);
+static_assert((int)BridgedFunction::InlineStrategy::HeuristicAlwaysInline == (int)swift::HeuristicAlwaysInline);
 static_assert((int)BridgedFunction::InlineStrategy::AlwaysInline == (int)swift::AlwaysInline);
 
 static_assert((int)BridgedFunction::ABILanguage::Swift == (int)swift::SILFunctionLanguage::Swift);

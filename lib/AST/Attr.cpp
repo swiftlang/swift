@@ -1138,7 +1138,18 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       // Don't print into SIL. Necessary bits have already been generated.
       return false;
     } else {
-      Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
+      auto attrName = getAttrName();
+      if (getKind() == DeclAttrKind::Inline &&
+          cast<InlineAttr>(this)->getKind() == InlineKind::Always &&
+          Options.SuppressInlineAlways) {
+        attrName = "inline(__always)";
+        Printer.printSimpleAttr(attrName, /*needAt=*/true);
+        Printer << ' ';
+        // Add @inlinable
+        Printer.printSimpleAttr("inlinable", /*needAt=*/true);
+      } else {
+        Printer.printSimpleAttr(attrName, /*needAt=*/true);
+      }
     }
     return true;
 
@@ -1859,8 +1870,10 @@ StringRef DeclAttribute::getAttrName() const {
     switch (cast<InlineAttr>(this)->getKind()) {
     case InlineKind::Never:
       return "inline(never)";
-    case InlineKind::Always:
+    case InlineKind::AlwaysUnderscored:
       return "inline(__always)";
+    case InlineKind::Always:
+      return "inline(always)";
     }
     llvm_unreachable("Invalid inline kind");
   }

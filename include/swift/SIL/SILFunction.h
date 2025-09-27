@@ -52,7 +52,7 @@ class AbstractionPattern;
 
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
-enum Inline_t { InlineDefault, NoInline, AlwaysInline };
+enum Inline_t { InlineDefault, NoInline, HeuristicAlwaysInline, AlwaysInline };
 enum IsThunk_t {
   IsNotThunk,
   IsThunk,

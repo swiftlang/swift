@@ -221,7 +221,7 @@ func loadBorrow() {
 // Tests LogicalPathComponent's writeback for opaque value types
 // ---
 // Dictionary.subscript.getter
-// CHECK-LABEL: sil [always_inline] [ossa] @$sSD20opaque_values_silgenEyq_Sgq_cig : $@convention(method) <Key, Value where Key : Hashable> (@in_guaranteed Value, @guaranteed Dictionary<Key, Value>) -> @out Optional<Value> {
+// CHECK-LABEL: sil [heuristic_always_inline] [ossa] @$sSD20opaque_values_silgenEyq_Sgq_cig : $@convention(method) <Key, Value where Key : Hashable> (@in_guaranteed Value, @guaranteed Dictionary<Key, Value>) -> @out Optional<Value> {
 // HECK: bb0([[ARG0:%.*]] : $Value, [[ARG1:%.*]] : $*Dictionary<Key, Value>):
 // HECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[ARG1]] : $*Dictionary<Key, Value>
 // HECK:   [[OPTIONAL_ALLOC:%.*]] = alloc_stack $Optional<Value>

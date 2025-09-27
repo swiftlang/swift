@@ -472,7 +472,7 @@ bb0(%0 : $S2):
 
 /// Verify that an aggregate argument containing a single non-trivial live leaf
 /// is not exploded.
-// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @owned_struct_1_callee : $@convention(thin) (@owned S5, @owned S5) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32) {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [heuristic_always_inline] @owned_struct_1_callee : $@convention(thin) (@owned S5, @owned S5) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32) {
 // CHECK: bb0({{%.*}} : $S5, [[INPUT:%.*]] : $S5):
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s21owned_struct_1_calleeTfq4dg_n : $@convention(thin) (@guaranteed S5) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32)
 // CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[INPUT]])
@@ -536,7 +536,7 @@ bb0(%0 : $S5):
 
 /// Verify that argument explosion that increases argument count before and
 /// after dead argument elimination behaves properly.
-// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @owned_struct_2_callee : $@convention(thin) (Builtin.Int256, Builtin.Int256, @owned S4Triple, Builtin.Int128, Builtin.Int128) -> (Builtin.Int256, Builtin.Int256, Builtin.Int128, Builtin.Int128) {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [heuristic_always_inline] @owned_struct_2_callee : $@convention(thin) (Builtin.Int256, Builtin.Int256, @owned S4Triple, Builtin.Int128, Builtin.Int128) -> (Builtin.Int256, Builtin.Int256, Builtin.Int128, Builtin.Int128) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int256, [[IN2:%.*]] : $Builtin.Int256, [[TRIPLE:%.*]] : $S4Triple, [[IN4:%.*]] : $Builtin.Int128, [[IN5:%.*]] : $Builtin.Int128):
 // CHECK: [[FN:%.*]] = function_ref @$s21owned_struct_2_calleeTfq4ndgXdn_n : $@convention(thin) (Builtin.Int256, @guaranteed S4, @guaranteed S4, Builtin.Int128) -> (Builtin.Int256, Builtin.Int256, Builtin.Int128, Builtin.Int128)
 // CHECK: [[TRIPLEF3:%.*]] = struct_extract [[TRIPLE]] : $S4Triple, #S4Triple.f3
@@ -597,7 +597,7 @@ bb0(%0 : $Builtin.Int256, %1 : $S4Triple, %2 : $Builtin.Int128):
 }
 
 /// Verify that pointer arguments are ignored for now.
-// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @ignore_ptrs_callee : $@convention(thin) (@in S4Pair, S4Pair, S4Pair) -> (S4, S4) {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [heuristic_always_inline] @ignore_ptrs_callee : $@convention(thin) (@in S4Pair, S4Pair, S4Pair) -> (S4, S4) {
 // CHECK: bb0([[POINTER:%.*]] : $*S4Pair, [[PAIR1:%.*]] : $S4Pair, [[PAIR2:%.*]] : $S4Pair):
 // CHECK: [[FN:%.*]] = function_ref @$s18ignore_ptrs_calleeTfq4nxx_n : $@convention(thin) (@in S4Pair, S4, S4) -> (S4, S4)
 // CHECK: [[VALUE1:%.*]] = struct_extract [[PAIR1]] : $S4Pair, #S4Pair.f1
@@ -712,7 +712,7 @@ bb0(%0 : $FakeStaticString, %1 : $FakeString, %2 : $FakeStaticString):
 /// Verify that in the face of an exploded argument the ordering of arguments is
 /// based on ordering of fields in the original argument rather than ordering of
 /// usage in the function being specialized.
-// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @check_out_of_order_uses_callee : $@convention(thin) (S4Triple) -> () {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [heuristic_always_inline] @check_out_of_order_uses_callee : $@convention(thin) (S4Triple) -> () {
 // CHECK: bb0([[TRIPLE:%.*]] : $S4Triple):
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s30check_out_of_order_uses_calleeTfq4x_n : $@convention(thin) (S4, S4) -> ()
 // CHECK: [[INPUT1F2:%.*]] = struct_extract [[TRIPLE]] : $S4Triple, #S4Triple.f2
@@ -770,7 +770,7 @@ bb0(%0 : $S4Triple):
 }
 
 // Make sure that we do not SROA classes.
-// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @class_callee_1 : $@convention(thin) (@owned C1, Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [heuristic_always_inline] @class_callee_1 : $@convention(thin) (@owned C1, Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0([[IN1:%.*]] : $C1, [[IN2:%.*]] : $Builtin.Int32):
 // CHECK: [[FN:%.*]] = function_ref @$s14class_callee_1Tfq4gn_n : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
 // CHECK: apply [[FN]]([[IN1]], [[IN2]]) : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
@@ -809,7 +809,7 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
   return %1 : $Builtin.Int32
 }
 
-// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @class_caller_1 : $@convention(thin) (@owned C1, Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [heuristic_always_inline] @class_caller_1 : $@convention(thin) (@owned C1, Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0([[IN1:%.*]] : $C1, [[IN2:%.*]] : $Builtin.Int32):
 // CHECK: [[FN:%.*]] = function_ref @$s14class_callee_1Tfq4gn_n : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
 // CHECK: apply [[FN]]([[IN1]], [[IN2]]) : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
@@ -892,7 +892,7 @@ only(%tet : $S4Fourtytet):
   return %result : $S4
 }
 
-// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @more_than_32_type_sized_callee : $@convention(thin) (S4Fourtytet) -> S4 {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [heuristic_always_inline] @more_than_32_type_sized_callee : $@convention(thin) (S4Fourtytet) -> S4 {
 // CHECK-LABEL: } // end sil function 'more_than_32_type_sized_callee'
 sil [serialized] @more_than_32_type_sized_callee : $@convention(thin) (S4Fourtytet) -> S4 {
 bb0(%tet : $S4Fourtytet):

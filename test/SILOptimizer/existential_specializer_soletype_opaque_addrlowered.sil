@@ -16,7 +16,7 @@ public struct S : P {
 
 // Verify that the opened existential type used in thunk building is properly
 // address lowered even though it has an OpaqueValueTypeLowering.
-// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @$s6test2_6storePyyAA1P_p_AaC_pztF : {{.*}} {
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [heuristic_always_inline] @$s6test2_6storePyyAA1P_p_AaC_pztF : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[IN_ADDR:%[^,]+]] : $*any P, [[OUT_ADDR:%[^,]+]] : $*any P):
 // CHECK:         [[OPENED_IN_ADDR:%[^,]+]] = open_existential_addr mutable_access [[IN_ADDR]] : $*any P to $*@opened([[UUID:".*"]], any P) Self 
 // CHECK:         [[OPENED_OUT_ADDR:%[^,]+]] = alloc_stack $@opened([[UUID]], any P) Self 

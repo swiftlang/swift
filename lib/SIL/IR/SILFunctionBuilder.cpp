@@ -337,6 +337,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   Inline_t inlineStrategy = InlineDefault;
   if (constant.isNoinline())
     inlineStrategy = NoInline;
+  else if (constant.isUnderscoredAlwaysInline())
+    inlineStrategy = HeuristicAlwaysInline;
   else if (constant.isAlwaysInline())
     inlineStrategy = AlwaysInline;
 

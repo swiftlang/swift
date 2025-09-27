@@ -341,7 +341,7 @@ sil [transparent] [thunk] @pullback_f_specialized : $@convention(thin) (@in_guar
 // thunk for @escaping @callee_guaranteed (@in_guaranteed Float) -> (@out Float)
 sil [transparent] [reabstraction_thunk] @$sS2fIegnr_S2fIegyd_TR : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float) -> Float
 
-sil private [signature_optimized_thunk] [always_inline] @pullback_h : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Float) -> Float {
+sil private [signature_optimized_thunk] [heuristic_always_inline] @pullback_h : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Float) -> Float {
 bb0(%0 : $Float, %1 : $@callee_guaranteed (Float) -> Float):
   %2 = apply %1(%0) : $@callee_guaranteed (Float) -> Float
   strong_release %1 : $@callee_guaranteed (Float) -> Float
@@ -362,7 +362,7 @@ bb0(%0 : $Float):
   //=========== Test specialized function signature and body ===========//
   specify_test "autodiff_closure_specialize_specialized_function_signature_and_body"
   // TRUNNER-LABEL: Generated specialized function: $s10pullback_h073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbackti1_j5FZSf_J6SfcfU_S2fTf1nc_n
-  // CHECK:         sil private [signature_optimized_thunk] [always_inline] @$s10pullback_h073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbackti1_j5FZSf_J6SfcfU_S2fTf1nc_n : $@convention(thin) (Float, Float, Float) -> Float {
+  // CHECK:         sil private [signature_optimized_thunk] [heuristic_always_inline] @$s10pullback_h073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbackti1_j5FZSf_J6SfcfU_S2fTf1nc_n : $@convention(thin) (Float, Float, Float) -> Float {
   // CHECK:         bb0(%0 : $Float, %1 : $Float, %2 : $Float):
   // CHECK:           %[[#E1:]] = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
   // CHECK:           %[[#E2:]] = partial_apply [callee_guaranteed] %[[#E1]](%1, %2) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
@@ -432,7 +432,7 @@ sil [transparent] [thunk] @pullback_y_specialized : $@convention(thin) (@in_guar
 
 sil [transparent] [reabstraction_thunk] @reabstraction_thunk : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float) -> Float
 
-sil private [signature_optimized_thunk] [always_inline] @pullback_z : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Float) -> Float {
+sil private [signature_optimized_thunk] [heuristic_always_inline] @pullback_z : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Float) -> Float {
 bb0(%0 : $Float, %1 : $@callee_guaranteed (Float) -> Float):
   %2 = apply %1(%0) : $@callee_guaranteed (Float) -> Float
   strong_release %1 : $@callee_guaranteed (Float) -> Float
@@ -452,7 +452,7 @@ bb0(%0 : $Float):
   //=========== Test specialized function signature and body ===========//
   specify_test "autodiff_closure_specialize_specialized_function_signature_and_body"
   // TRUNNER-LABEL: Generated specialized function: $s10pullback_z0A14_y_specializedTf1nc_n
-  // CHECK:         sil private [signature_optimized_thunk] [always_inline] @$s10pullback_z0A14_y_specializedTf1nc_n : $@convention(thin) (Float) -> Float {
+  // CHECK:         sil private [signature_optimized_thunk] [heuristic_always_inline] @$s10pullback_z0A14_y_specializedTf1nc_n : $@convention(thin) (Float) -> Float {
   // CHECK:         bb0(%0 : $Float):
   // CHECK:           %[[#F1:]] = function_ref @pullback_y_specialized : $@convention(thin) (@in_guaranteed Float) -> @out Float
   // CHECK:           %[[#F2:]] = thin_to_thick_function %[[#F1]] : $@convention(thin) (@in_guaranteed Float) -> @out Float to $@callee_guaranteed (@in_guaranteed Float) -> @out Float
