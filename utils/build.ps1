@@ -3013,6 +3013,7 @@ function Test-Foundation {
     -Src $SourceCache\swift-foundation `
     -Bin "$ScratchPath" `
     -Platform $BuildPlatform `
+    -Configuration $FoundationTestConfiguration `
     --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
     --test-product swift-foundationPackageTests
 
@@ -3028,6 +3029,7 @@ function Test-Foundation {
       -Src $SourceCache\swift-corelibs-foundation `
       -Bin "$ScratchPath" `
       -Platform $BuildPlatform `
+      -Configuration $FoundationTestConfiguration `
       --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
       --test-product swift-corelibs-foundationPackageTests
   }
