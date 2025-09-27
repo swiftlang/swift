@@ -634,6 +634,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
+  llvm::FoldingSet<DeclNameRef::SelectiveDeclNameRef> SelectiveNameRefs;
   llvm::DenseMap<UUID, GenericEnvironment *> OpenedElementEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
@@ -839,6 +840,9 @@ ASTContext::ASTContext(
   // Initialize all of the known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Id_##Name = getIdentifier(IdStr);
 #include "swift/AST/KnownIdentifiers.def"
+  
+  StdlibOverlayNames[0] = Id_Concurrency;
+  StdlibOverlayNames[1] = Id_StringProcessing;
 
   // Record the initial set of search paths.
   for (const auto &path : SearchPathOpts.getImportSearchPaths())
@@ -6197,6 +6201,44 @@ DeclName::DeclName(ASTContext &C, DeclBaseName baseName,
   for (auto P : *paramList)
     names.push_back(P->getArgumentName());
   initialize(C, baseName, names);
+}
+
+// Only allow allocation of SelectiveDeclNameRefs using the allocator in
+// ASTContext.
+void *DeclNameRef::SelectiveDeclNameRef::
+operator new(size_t Bytes, const ASTContext &C, unsigned Alignment) {
+  return C.Allocate(Bytes, Alignment);
+}
+
+void DeclNameRef::SelectiveDeclNameRef::Profile(llvm::FoldingSetNodeID &id,
+                                                Identifier moduleSelector,
+                                                DeclName fullName) {
+  assert(!moduleSelector.empty() &&
+         "Looking up SelectiveDeclNameRef with empty module?");
+  id.AddPointer(moduleSelector.getAsOpaquePointer());
+  id.AddPointer(fullName.getOpaqueValue());
+}
+
+void DeclNameRef::initialize(ASTContext &C, Identifier moduleSelector,
+                             DeclName fullName) {
+  if (moduleSelector.empty()) {
+    storage = fullName;
+    return;
+  }
+
+  llvm::FoldingSetNodeID id;
+  SelectiveDeclNameRef::Profile(id, moduleSelector, fullName);
+
+  void *insert = nullptr;
+  if (SelectiveDeclNameRef *selectiveRef
+        = C.getImpl().SelectiveNameRefs.FindNodeOrInsertPos(id, insert)) {
+    storage = selectiveRef;
+    return;
+  }
+
+  auto selectiveRef = new (C) SelectiveDeclNameRef(moduleSelector, fullName);
+  storage = selectiveRef;
+  C.getImpl().SelectiveNameRefs.InsertNode(selectiveRef, insert);
 }
 
 /// Find the implementation of the named type in the given module.

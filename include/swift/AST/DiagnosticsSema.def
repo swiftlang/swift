@@ -1144,6 +1144,10 @@ ERROR(no_module_type,none,
       "no type named %0 in module %1", (DeclNameRef, Identifier))
 ERROR(ambiguous_module_type,none,
       "ambiguous type name %0 in module %1", (DeclNameRef, Identifier))
+ERROR(module_selector_dependent_member_type_not_allowed,none,
+      "module selector is not allowed on generic member type; associated types "
+      "with the same name are merged instead of shadowing one another",
+      ())
 ERROR(use_nonmatching_operator,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
       (DeclNameRef, unsigned))
@@ -1189,6 +1193,18 @@ ERROR(cannot_find_type_in_cast_expression,none,
       "type-casting operator expects a type on its right-hand side (got: %kind0)", (const ValueDecl *))
 ERROR(cannot_find_type_in_scope_did_you_mean,none,
       "cannot find type %0 in scope; did you mean to use '%1'?", (DeclNameRef, StringRef))
+ERROR(type_not_in_module,none,
+      "type %0 is not imported through module %1", (DeclName, Identifier))
+ERROR(decl_not_in_module,none,
+      "declaration %0 is not imported through module %1", (DeclName, Identifier))
+NOTE(note_change_module_selector,none,
+     "did you mean module %0?", (Identifier))
+NOTE(note_remove_module_selector_local_decl,none,
+     "did you mean the local declaration?", ())
+NOTE(note_remove_module_selector_outer_type,none,
+     "did you mean an outer type member?", ())
+NOTE(note_add_explicit_self_with_module_selector,none,
+     "did you mean the member of 'self'?", ())
 NOTE(note_typo_candidate_implicit_member,none,
      "did you mean the implicitly-synthesized %kindbase0?", (const ValueDecl *))
 NOTE(note_remapped_type,none,

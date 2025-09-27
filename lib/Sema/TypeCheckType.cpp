@@ -193,10 +193,20 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
 Type TypeResolution::resolveDependentMemberType(
     Type baseTy, DeclContext *DC, SourceRange baseRange,
     QualifiedIdentTypeRepr *repr) const {
-  // FIXME(ModQual): Reject qualified names immediately; they cannot be
-  // dependent member types.
   Identifier refIdentifier = repr->getNameRef().getBaseIdentifier();
   ASTContext &ctx = DC->getASTContext();
+
+  if (repr->getNameRef().hasModuleSelector()) {
+    if (!this->getOptions().contains(TypeResolutionFlags::SilenceErrors)) {
+      ctx.Diags.diagnose(repr->getNameLoc().getModuleSelectorLoc(),
+                         diag::module_selector_dependent_member_type_not_allowed)
+          .fixItRemoveChars(repr->getNameLoc().getModuleSelectorLoc(),
+                            repr->getNameLoc().getBaseNameLoc());
+      // If we can check if `refIdentifier` is a protocol ext's concrete type:
+      // FIXME: Conditionally emit fix-it replacing base type with protocol
+    }
+    return ErrorType::get(baseTy);
+  }
 
   switch (stage) {
   case TypeResolutionStage::Structural:
@@ -1524,6 +1534,34 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
       return ErrorType::get(ctx);
     }
 
+    // Is there an incorrect module selector?
+    if (repr->getNameRef().hasModuleSelector()) {
+      auto anyModuleName = DeclNameRef(repr->getNameRef().getFullName());
+      auto anyModuleResults =
+      TypeChecker::lookupUnqualifiedType(dc, anyModuleName,
+                                         repr->getLoc(), lookupOptions);
+      if (!anyModuleResults.empty()) {
+        diags.diagnose(repr->getNameLoc(), diag::type_not_in_module,
+                       repr->getNameRef().getFullName(),
+                       repr->getNameRef().getModuleSelector());
+
+        SourceLoc moduleSelectorLoc = repr->getNameLoc().getModuleSelectorLoc();
+
+        for (auto result : anyModuleResults) {
+          TypeDecl * decl = static_cast<TypeDecl*>(result.getValueDecl());
+          Identifier moduleName =
+              decl->getModuleContext()->getNameForModuleSelector();
+
+          diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
+                         moduleName)
+              .fixItReplace(moduleSelectorLoc, moduleName.str());
+        }
+
+        // FIXME: Can we recover by assuming the first/best result is correct?
+        return ErrorType::get(ctx);
+      }
+    }
+
     // Try ignoring access control.
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
@@ -1613,6 +1651,33 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
     }
 
     return ErrorType::get(ctx);
+  }
+
+  // Is there an incorrect module selector?
+  if (repr->getNameRef().hasModuleSelector()) {
+    auto anyModuleName = DeclNameRef(repr->getNameRef().getFullName());
+    auto anyModuleResults = TypeChecker::lookupMemberType(
+        dc, parentType, anyModuleName, repr->getLoc(), lookupOptions);
+    if (anyModuleResults) {
+      diags.diagnose(repr->getNameLoc(), diag::type_not_in_module,
+                     repr->getNameRef().getFullName(),
+                     repr->getNameRef().getModuleSelector());
+
+      SourceLoc moduleSelectorLoc = repr->getNameLoc().getModuleSelectorLoc();
+
+      for (auto result : anyModuleResults) {
+        TypeDecl * decl = result.Member;
+        Identifier moduleName =
+            decl->getModuleContext()->getNameForModuleSelector();
+
+        diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
+                       moduleName)
+            .fixItReplace(moduleSelectorLoc, moduleName.str());
+      }
+
+      // FIXME: Can we recover by assuming the first/best result is correct?
+      return ErrorType::get(ctx);
+    }
   }
 
   // Try ignoring access control.
