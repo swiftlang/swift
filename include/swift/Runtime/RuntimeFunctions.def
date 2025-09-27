@@ -220,6 +220,22 @@ FUNCTION(NativeStrongRelease, Swift, swift_release, C_CC, AlwaysAvailable,
          EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating),
          UNKNOWN_MEMEFFECTS)
 
+// void *swift_retain(void *ptr);
+FUNCTION(NativeStrongRetainInlined, Swift, swift_retainInlined, SwiftRR_CC, AlwaysAvailable,
+         RETURNS(RefCountedPtrTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind, FirstParamReturned, WillReturn),
+         EFFECT(RuntimeEffect::RefCounting),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_release(void *ptr);
+FUNCTION(NativeStrongReleaseInlined, Swift, swift_releaseInlined, SwiftRR_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
 // void *swift_retain_n(void *ptr, int32_t n);
 FUNCTION(NativeStrongRetainN, Swift, swift_retain_n, C_CC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),

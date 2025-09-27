@@ -61,6 +61,22 @@ using namespace swift;
 #error "The runtime must be built with a compiler that supports swiftcall."
 #endif
 
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+// Define a mask used by ClientRetainRelease to determine when it must call into
+// the runtime. The symbol's address is used as the mask, rather than its
+// contents, to eliminate one load instruction when using it. This is imported
+// weakly, which makes its address zero when running against older runtimes.
+// ClientRetainRelease references it using an addend of 0x8000000000000000,
+// whicrh produces the appropriate mask in that case. Since the mask is still
+// unchanged in this version of the runtime, we export this symbol as zero. If a
+// different mask is ever needed, the address of this symbol needs to be set to
+// 0x8000000000000000 less than that value so that it comes out right in
+// ClientRetainRelease.
+asm(".globl __swift_retainRelease_slowpath_mask_v1\n");
+asm(".set __swift_retainRelease_slowpath_mask_v1, 0\n");
+#endif
+
+
 /// Returns true if the pointer passed to a native retain or release is valid.
 /// If false, the operation should immediately return.
 SWIFT_ALWAYS_INLINE
@@ -113,6 +129,17 @@ static HeapObject *_swift_tryRetain_(HeapObject *object)
 #define CALL_IMPL(name, args) do { \
   if (SWIFT_UNLIKELY(_swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly.load(std::memory_order_relaxed))) \
     return _ ## name args; \
+  return _ ## name ## _ args; \
+} while(0)
+
+// SWIFT_REFCOUNT_CC functions make the call to the "might be swizzled" path
+// through an adapter marked noinline and with the refcount CC. This allows the
+// fast path to avoid pushing a stack frame. Without this adapter, clang emits
+// code that pushes a stack frame right away, then does the fast path or slow
+// path.
+#define CALL_IMPL_SWIFT_REFCOUNT_CC(name, args) do { \
+  if (SWIFT_UNLIKELY(_swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly.load(std::memory_order_relaxed))) \
+    return _ ## name ## _adapter args; \
   return _ ## name ## _ args; \
 } while(0)
 
@@ -421,7 +448,8 @@ HeapObject *swift::swift_allocEmptyBox() {
 }
 
 // Forward-declare this, but define it after swift_release.
-extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED void
+extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED SWIFT_REFCOUNT_CC
+void
 _swift_release_dealloc(HeapObject *object);
 
 SWIFT_ALWAYS_INLINE
@@ -436,11 +464,16 @@ static HeapObject *_swift_retain_(HeapObject *object) {
   return object;
 }
 
+SWIFT_REFCOUNT_CC SWIFT_NOINLINE
+static HeapObject *_swift_retain_adapter(HeapObject *object) {
+  return _swift_retain(object);
+}
+
 HeapObject *swift::swift_retain(HeapObject *object) {
 #ifdef SWIFT_THREADING_NONE
   return swift_nonatomic_retain(object);
 #else
-  CALL_IMPL(swift_retain, (object));
+  CALL_IMPL_SWIFT_REFCOUNT_CC(swift_retain, (object));
 #endif
 }
 
@@ -483,11 +516,16 @@ static void _swift_release_(HeapObject *object) {
     object->refCounts.decrementAndMaybeDeinit(1);
 }
 
+SWIFT_REFCOUNT_CC SWIFT_NOINLINE
+static void _swift_release_adapter(HeapObject *object) {
+  _swift_release(object);
+}
+
 void swift::swift_release(HeapObject *object) {
 #ifdef SWIFT_THREADING_NONE
   swift_nonatomic_release(object);
 #else
-  CALL_IMPL(swift_release, (object));
+  CALL_IMPL_SWIFT_REFCOUNT_CC(swift_release, (object));
 #endif
 }
 
