@@ -259,6 +259,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   }
   ELIMINATE_POTENTIAL_IDENTITY_CAST(Upcast)
   ELIMINATE_POTENTIAL_IDENTITY_CAST(UncheckedAddrCast)
+  ELIMINATE_POTENTIAL_IDENTITY_CAST(UncheckedRefCast)
   ELIMINATE_POTENTIAL_IDENTITY_CAST(UnconditionalCheckedCast)
 #undef ELIMINATE_POTENTIAL_IDENTITY_CAST
   // We handle apply sites by just inserting a convert_function that converts

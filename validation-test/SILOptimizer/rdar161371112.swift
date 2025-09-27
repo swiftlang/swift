@@ -39,3 +39,18 @@ extension Foo {
         }
     }
 }
+
+extension NSString {
+    var utf16Span: Span<UInt16>? {
+        @_lifetime(borrow self)
+        borrowing get { // expected-error{{'self' is borrowed and cannot be consumed}}
+            guard let ptr = CFStringGetCharactersPtr(self) else { // expected-note{{consumed here}}
+                return nil
+            }
+            let length = self.length
+            let buffer = UnsafeBufferPointer(start: ptr, count: length)
+            let span = unsafe Span<UInt16>(_unsafeElements: buffer)
+            return _overrideLifetime(span, borrowing: self)
+        }
+    }
+}
