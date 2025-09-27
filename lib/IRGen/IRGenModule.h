@@ -669,6 +669,18 @@ public:
                                            llvm::Constant *address);
 };
 
+enum class CStringSectionType {
+  Default,
+  ObjCClassName,
+  ObjCMethodName,
+  ObjCMethodType,
+  OSLogString,
+  // Place all new section types above this line
+  NumTypes,
+  // Place all alias below this line
+  ObjCPropertyName = ObjCMethodName,
+};
+
 /// IRGenModule - Primary class for emitting IR for global declarations.
 /// 
 class IRGenModule {
@@ -1203,9 +1215,10 @@ public:
   std::pair<llvm::GlobalVariable *, llvm::Constant *> createStringConstant(
       StringRef Str, bool willBeRelativelyAddressed = false,
       StringRef sectionName = "", StringRef name = "");
-  llvm::Constant *getAddrOfGlobalString(StringRef utf8,
-                                        bool willBeRelativelyAddressed = false,
-                                        bool useOSLogSection = false);
+  llvm::Constant *getAddrOfGlobalString(
+      StringRef utf8,
+      CStringSectionType sectionType = CStringSectionType::Default,
+      bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *
   getAddrOfGlobalIdentifierString(StringRef utf8,
@@ -1329,10 +1342,11 @@ private:
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
-  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
-    GlobalStrings;
-  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
-    GlobalOSLogStrings;
+  // Maps sectionName -> string data -> constant
+  std::array<
+      llvm::StringMap<std::pair<llvm::GlobalVariable *, llvm::Constant *>>,
+      static_cast<size_t>(CStringSectionType::NumTypes)>
+      GlobalStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
     StringsForTypeRef;
@@ -1542,6 +1556,15 @@ public:
   const char *getReflectionStringsSectionName();
   const char *getReflectionTypeRefSectionName();
   const char *getMultiPayloadEnumDescriptorSectionName();
+
+  static constexpr const char ObjCClassNameSectionName[] =
+      "__TEXT,__objc_classname,cstring_literals";
+  static constexpr const char ObjCMethodNameSectionName[] =
+      "__TEXT,__objc_methname,cstring_literals";
+  static constexpr const char ObjCMethodTypeSectionName[] =
+      "__TEXT,__objc_methtype,cstring_literals";
+  static constexpr const char OSLogStringSectionName[] =
+      "__TEXT,__oslogstring,cstring_literals";
 
   /// Returns the special builtin types that should be emitted in the stdlib
   /// module.
