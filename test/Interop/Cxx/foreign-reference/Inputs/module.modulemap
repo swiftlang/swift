@@ -87,3 +87,8 @@ module LoggingFrts {
     header "logging-frts.h"
     requires cplusplus
 }
+
+module FRTReferenceReturns {
+  header "frt-reference-returns.h"
+  requires cplusplus
+}
