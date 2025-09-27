@@ -2003,6 +2003,28 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   }
   llvm::sort(Opts.DebugConstraintSolverOnLines);
 
+  for (const Arg *A : Args.filtered(OPT_inferred_types_at)) {
+    StringRef value = A->getValue();
+    auto colonPos = value.find(':');
+    if (colonPos == StringRef::npos) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+      continue;
+    }
+
+    unsigned line, column;
+    if (value.substr(0, colonPos).getAsInteger(/*radix*/ 10, line) ||
+        value.substr(colonPos + 1).getAsInteger(/*radix*/ 10, column)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.InferredTypesRemarksAtPositions.push_back({line, column});
+    }
+  }
+  llvm::sort(Opts.InferredTypesRemarksAtPositions);
+
   for (auto A : Args.getAllArgValues(OPT_debug_forbid_typecheck_prefix)) {
     Opts.DebugForbidTypecheckPrefixes.push_back(A);
   }

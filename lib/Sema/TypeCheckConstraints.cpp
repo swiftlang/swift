@@ -506,6 +506,32 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
     return errorResult();
   }
 
+  // Emit inferred type remarks if requested.
+  if (constraints::shouldEmitInferredTypesRemarksForTarget(Context,
+                                                           *resultTarget)) {
+    if (auto *expr = resultTarget->getAsExpr()) {
+      class InferredTypeRemarkWalker : public ASTWalker {
+        ASTContext &Context;
+
+      public:
+        InferredTypeRemarkWalker(ASTContext &ctx) : Context(ctx) {}
+
+        PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+          if (auto type = E->getType()) {
+            auto diag = Context.Diags.diagnose(E->getStartLoc(),
+                                               diag::remark_inferred_type,
+                                               E->getKind(), type);
+            diag.highlight(E->getSourceRange());
+          }
+          return Action::Continue(E);
+        }
+      };
+
+      InferredTypeRemarkWalker walker(Context);
+      expr->walk(walker);
+    }
+  }
+
   // Unless the client has disabled them, perform syntactic checks on the
   // expression now.
   if (!cs.shouldSuppressDiagnostics()) {

@@ -8924,5 +8924,12 @@ ERROR(invalid_redecl_of_file_isolation,none,
 NOTE(invalid_redecl_of_file_isolation_prev,none,
      "default isolation was previously declared here", ())
 
+//===----------------------------------------------------------------------===//
+// MARK: Tooling remarks
+//===----------------------------------------------------------------------===//
+
+REMARK(remark_inferred_type,none,
+       "%0 was inferred to be of type %1", (ExprKind, Type))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

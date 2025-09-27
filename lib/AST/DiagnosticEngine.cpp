@@ -1091,6 +1091,11 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << Stmt::getDescriptiveKindName(Arg.getAsDescriptiveStmtKind());
     break;
 
+  case DiagnosticArgumentKind::DescriptiveExprKind:
+    assert(Modifier.empty() && "Improper modifier for ExprKind argument");
+    Out << Expr::getDescriptiveKindName(Arg.getAsDescriptiveExprKind());
+    break;
+
   case DiagnosticArgumentKind::DeclAttribute: {
     auto *const attr = Arg.getAsDeclAttribute();
     const auto printAttrName = [&] {
