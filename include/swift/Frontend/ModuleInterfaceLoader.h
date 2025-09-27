@@ -478,25 +478,6 @@ public:
   ModuleInterfaceLoaderOptions() = default;
 };
 
-/// Strongly typed enum that represents if we require all SILModules to have
-/// OSSA modules emitted. This is implemented by incorporating this bit into the
-/// module cache hash.
-struct RequireOSSAModules_t {
-  enum ValueTy {
-    No = 0,
-    Yes = 1,
-  };
-
-  ValueTy value;
-
-  RequireOSSAModules_t(const SILOptions &opts)
-      : value(opts.EnableOSSAModules ? RequireOSSAModules_t::Yes
-                                     : RequireOSSAModules_t::No) {}
-
-  operator ValueTy() const { return value; }
-  explicit operator bool() const { return bool(value); }
-};
-
 class ModuleInterfaceCheckerImpl: public ModuleInterfaceChecker {
   friend class ModuleInterfaceLoader;
   ASTContext &Ctx;
@@ -504,23 +485,20 @@ class ModuleInterfaceCheckerImpl: public ModuleInterfaceChecker {
   std::string PrebuiltCacheDir;
   std::string BackupInterfaceDir;
   ModuleInterfaceLoaderOptions Opts;
-  RequireOSSAModules_t RequiresOSSAModules;
 
 public:
   explicit ModuleInterfaceCheckerImpl(ASTContext &Ctx, StringRef cacheDir,
                                 StringRef prebuiltCacheDir,
                                 StringRef BackupInterfaceDir,
-                                ModuleInterfaceLoaderOptions opts,
-                                RequireOSSAModules_t requiresOSSAModules)
+                                ModuleInterfaceLoaderOptions opts)
       : Ctx(Ctx), CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
         BackupInterfaceDir(BackupInterfaceDir),
-        Opts(opts), RequiresOSSAModules(requiresOSSAModules) {}
+        Opts(opts) {}
   explicit ModuleInterfaceCheckerImpl(ASTContext &Ctx, StringRef cacheDir,
                                 StringRef prebuiltCacheDir,
-                                ModuleInterfaceLoaderOptions opts,
-                                RequireOSSAModules_t requiresOSSAModules):
+                                ModuleInterfaceLoaderOptions opts):
     ModuleInterfaceCheckerImpl(Ctx, cacheDir, prebuiltCacheDir, StringRef(),
-                               opts, requiresOSSAModules) {}
+                               opts) {}
   std::vector<std::string>
   getCompiledModuleCandidatesForInterface(StringRef moduleName,
                                           StringRef interfacePath) override;
@@ -596,7 +574,6 @@ public:
       ArrayRef<std::pair<std::string, std::string>> replayPrefixMap,
       bool SerializeDependencyHashes, bool TrackSystemDependencies,
       ModuleInterfaceLoaderOptions Opts,
-      RequireOSSAModules_t RequireOSSAModules,
       bool silenceInterfaceDiagnostics);
 
   /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
@@ -666,8 +643,7 @@ private:
                                      const LangOptions &LangOpts,
                                      const ClangImporterOptions &clangImporterOpts,
                                      const CASOptions &casOpts,
-                                     bool suppressRemarks,
-                                     RequireOSSAModules_t requireOSSAModules);
+                                     bool suppressRemarks);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
                                            DiagnosticEngine &subInstanceDiags,
                                            SwiftInterfaceInfo &interfaceInfo,
@@ -684,7 +660,7 @@ public:
       StringRef backupModuleInterfaceDir,
       ArrayRef<std::pair<std::string, std::string>> replayPrefixMap,
       bool serializeDependencyHashes,
-      bool trackSystemDependencies, RequireOSSAModules_t requireOSSAModules);
+      bool trackSystemDependencies);
 
   template<typename ...ArgTypes>
   static InFlightDiagnostic diagnose(StringRef interfacePath,

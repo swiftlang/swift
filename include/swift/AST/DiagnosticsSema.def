@@ -958,9 +958,6 @@ ERROR(serialization_target_too_new_repl,none,
       "deployment target of %0 %3: %4",
       (StringRef, llvm::VersionTuple, Identifier, llvm::VersionTuple,
        StringRef))
-ERROR(serialization_non_ossa_module_incompatible, Fatal,
-      "cannot import non-OSSA module into an OSSA module",
-      (Identifier))
 
 ERROR(serialization_fatal,Fatal,
       "fatal error encountered while reading from module '%0'; "

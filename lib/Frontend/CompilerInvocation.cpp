@@ -3047,7 +3047,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
         enablePackMetadataStackPromotionFlag.value();
 
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
-  Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);
   Opts.EnableRecompilationToOSSAModule |=
       Args.hasArg(OPT_enable_recompilation_to_ossa_module);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
@@ -4190,8 +4189,6 @@ bool CompilerInvocation::parseArgs(
     SILOpts.CMOMode = CrossModuleOptimizationMode::Everything;
     SILOpts.EmbeddedSwift = true;
     SILOpts.UseAggressiveReg2MemForCodeSize = true;
-    // OSSA modules are required for deinit de-virtualization.
-    SILOpts.EnableOSSAModules = true;
     // -g is promoted to -gdwarf-types in embedded Swift
     if (IRGenOpts.DebugInfoLevel == IRGenDebugInfoLevel::ASTTypes) {
       IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::DwarfTypes;
@@ -4244,7 +4241,6 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
   serialization::ValidationInfo info =
       serialization::validateSerializedAST(
         data,
-        getSILOptions().EnableOSSAModules,
         LangOpts.SDKName,
         &extendedInfo);
 
@@ -4282,7 +4278,6 @@ CompilerInvocation::setUpInputForSILTool(
 
   auto result = serialization::validateSerializedAST(
       fileBufOrErr.get()->getBuffer(),
-      getSILOptions().EnableOSSAModules,
       LangOpts.SDKName,
       &extendedInfo);
   bool hasSerializedAST = result.status == serialization::Status::Valid;
