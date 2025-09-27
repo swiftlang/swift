@@ -1139,3 +1139,7 @@ Added: _$ss7UnicodeO27_RandomAccessWordRecognizerVN
 // Obsolete/broken SPIs removed in 6.3
 Removed: _$sSS17_nearestWordIndex9atOrBelowSS0C0VAD_tF
 Removed: _$sSS10_wordIndex6beforeSS0B0VAD_tF
+
+// Internal info exposed for swift-inspect.
+Added: __swift_debug_allocationPoolSize
+Added: __swift_debug_metadataAllocatorPageSize
