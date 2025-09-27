@@ -790,26 +790,8 @@ void SwiftLangSupport::editorOpenInterface(
                                                       SynthesizedExtensions,
                                                       InterestedUSR);
   if (!IFaceGenRef) {
-      // Retry to generate a module interface with C++ interop enabled,
-      // if the first attempt failed.
-      bool retryWithCxxEnabled = true;
-      for (const auto &arg: Args) {
-          if (StringRef(arg).starts_with("-cxx-interoperability-mode=") ||
-              StringRef(arg).starts_with("-enable-experimental-cxx-interop")) {
-              retryWithCxxEnabled = false;
-              break;
-          }
-      }
-      if (retryWithCxxEnabled) {
-          std::vector<const char *> AdjustedArgs(Args.begin(), Args.end());
-          AdjustedArgs.push_back("-cxx-interoperability-mode=default");
-          return editorOpenInterface(Consumer, Name, ModuleName, Group, AdjustedArgs,
-                                     SynthesizedExtensions, InterestedUSR);
-      }
-      else {
-          Consumer.handleRequestError(ErrMsg.c_str());
-          return;
-      }
+    Consumer.handleRequestError(ErrMsg.c_str());
+    return;
   }
 
   IFaceGenRef->reportEditorInfo(Consumer);
