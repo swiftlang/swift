@@ -45,13 +45,12 @@ enum class CopyPropagationOption : uint8_t {
   // Do not add any copy propagation passes.
   Off = 0,
 
-  // Only add the copy propagation passes requested by other flags, currently
-  // just -enable-ossa-modules.
+  // Only add the copy propagation passes requested by other flags.
   RequestedPassesOnly,
 
   // Run copy propagation during optimized builds only.
   //
-  // If a setting, e.g. -enable-ossa-modules, requests to add copy propagation
+  // If a setting, requests to add copy propagation
   // to the performance pipeline, do so.
   Optimizing,
 
@@ -188,11 +187,6 @@ public:
   /// Whether to stop the optimization pipeline right before we lower ownership
   /// and go from OSSA to non-ownership SIL.
   bool StopOptimizationBeforeLoweringOwnership = false;
-
-  /// Do we always serialize SIL in OSSA form?
-  ///
-  /// If this is disabled we do not serialize in OSSA form when optimizing.
-  bool EnableOSSAModules = true;
 
   /// Allow recompilation of a non-OSSA module to an OSSA module when imported
   /// from another OSSA module.

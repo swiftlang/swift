@@ -252,8 +252,8 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
       workerCompilerInvocation->getFrontendOptions()
           .SerializeModuleInterfaceDependencyHashes,
       workerCompilerInvocation->getFrontendOptions()
-          .shouldTrackSystemDependencies(),
-      RequireOSSAModules_t(SILOptions));
+          .shouldTrackSystemDependencies()
+      );
 
   auto loader = std::make_unique<PluginLoader>(
       *workerASTContext, /*DepTracker=*/nullptr,

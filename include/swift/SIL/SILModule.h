@@ -394,10 +394,6 @@ private:
   bool parsedAsSerializedSIL;
 
   /// Set if we have registered a deserialization notification handler for
-  /// lowering ownership in non transparent functions.
-  /// This gets set in NonTransparent OwnershipModelEliminator pass.
-  bool regDeserializationNotificationHandlerForNonTransparentFuncOME;
-  /// Set if we have registered a deserialization notification handler for
   /// lowering ownership in transparent functions.
   /// This gets set in OwnershipModelEliminator pass.
   bool regDeserializationNotificationHandlerForAllFuncOME;
@@ -449,14 +445,8 @@ public:
     deserializationNotificationHandlers.erase(handler);
   }
 
-  bool hasRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME() {
-    return regDeserializationNotificationHandlerForNonTransparentFuncOME;
-  }
   bool hasRegisteredDeserializationNotificationHandlerForAllFuncOME() {
     return regDeserializationNotificationHandlerForAllFuncOME;
-  }
-  void setRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME() {
-    regDeserializationNotificationHandlerForNonTransparentFuncOME = true;
   }
   void setRegisteredDeserializationNotificationHandlerForAllFuncOME() {
     regDeserializationNotificationHandlerForAllFuncOME = true;

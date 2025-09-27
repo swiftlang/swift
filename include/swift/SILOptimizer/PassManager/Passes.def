@@ -377,9 +377,6 @@ LEGACY_PASS(ModulePrinter, "module-printer",
      "Print the module")
 LEGACY_PASS(NestedSemanticFunctionCheck, "nested-semantic-function-check",
      "Diagnose improperly nested '@_semantics' functions")
-LEGACY_PASS(NonTransparentFunctionOwnershipModelEliminator,
-     "non-transparent-func-ownership-model-eliminator",
-     "Eliminate Ownership Annotations from non-transparent SIL Functions")
 LEGACY_PASS(RCIdentityDumper, "rc-id-dumper",
      "Print Reference Count Identities")
 LEGACY_PASS(AlwaysInlineInliner, "always-inline",

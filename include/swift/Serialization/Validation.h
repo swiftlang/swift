@@ -51,9 +51,6 @@ enum class Status {
   /// The distribution channel doesn't match.
   ChannelIncompatible,
 
-  /// The module is required to be in OSSA, but is not.
-  NotInOSSA,
-
   /// The module file depends on another module that can't be loaded.
   MissingDependency,
 
@@ -297,8 +294,6 @@ struct SearchPath {
 ///
 /// \param data A buffer containing the serialized AST. Result information
 /// refers directly into this buffer.
-/// \param requiresOSSAModules If true, necessitates the module to be
-/// compiled with -enable-ossa-modules.
 /// \param requiredSDK If not empty, only accept modules built with
 /// a compatible SDK. The StringRef represents the canonical SDK name.
 /// \param target The target triple of the current compilation for
@@ -309,7 +304,7 @@ struct SearchPath {
 /// \param[out] dependencies If present, will be populated with list of
 /// input files the module depends on, if present in INPUT_BLOCK.
 ValidationInfo validateSerializedAST(
-    StringRef data, bool requiresOSSAModules,
+    StringRef data,
     StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =

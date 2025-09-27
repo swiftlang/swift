@@ -871,17 +871,6 @@ static bool stripOwnership(SILFunction &func) {
   return madeChange;
 }
 
-static void prepareNonTransparentSILFunctionForOptimization(ModuleDecl *,
-                                                            SILFunction *f) {
-  if (!f->hasOwnership() || f->isTransparent())
-    return;
-
-  LLVM_DEBUG(llvm::dbgs() << "After deserialization, stripping ownership in:"
-                          << f->getName() << "\n");
-
-  stripOwnership(*f);
-}
-
 static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *f) {
   if (!f->hasOwnership())
     return;
@@ -895,11 +884,7 @@ static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *f) {
 namespace {
 
 struct OwnershipModelEliminator : SILFunctionTransform {
-  bool skipTransparent;
-  bool skipStdlibModule;
-
-  OwnershipModelEliminator(bool skipTransparent, bool skipStdlibModule)
-      : skipTransparent(skipTransparent), skipStdlibModule(skipStdlibModule) {}
+  OwnershipModelEliminator() {}
 
   void run() override {
     if (DumpBefore.size()) {
@@ -909,18 +894,7 @@ struct OwnershipModelEliminator : SILFunctionTransform {
     auto *f = getFunction();
     auto &mod = getFunction()->getModule();
 
-    // If we are supposed to skip the stdlib module and we are in the stdlib
-    // module bail.
-    if (skipStdlibModule && mod.isStdlibModule()) {
-      return;
-    }
-
     if (!f->hasOwnership())
-      return;
-
-    // If we were asked to not strip ownership from transparent functions in
-    // /our/ module, return.
-    if (skipTransparent && f->isTransparent())
       return;
 
     // Verify here to make sure ownership is correct before we strip.
@@ -950,25 +924,14 @@ struct OwnershipModelEliminator : SILFunctionTransform {
       invalidateAnalysis(InvalidKind);
     }
 
-    // If we were asked to strip transparent, we are at the beginning of the
-    // performance pipeline. In such a case, we register a handler so that all
-    // future things we deserialize have ownership stripped.
+    // Register a handler so that all future things we deserialize have ownership stripped.
     using NotificationHandlerTy =
         FunctionBodyDeserializationNotificationHandler;
     std::unique_ptr<DeserializationNotificationHandler> ptr;
-    if (skipTransparent) {
-      if (!mod.hasRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME()) {
-        ptr.reset(new NotificationHandlerTy(
-            prepareNonTransparentSILFunctionForOptimization));
-        mod.registerDeserializationNotificationHandler(std::move(ptr));
-        mod.setRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME();
-      }
-    } else {
-      if (!mod.hasRegisteredDeserializationNotificationHandlerForAllFuncOME()) {
-        ptr.reset(new NotificationHandlerTy(prepareSILFunctionForOptimization));
-        mod.registerDeserializationNotificationHandler(std::move(ptr));
-        mod.setRegisteredDeserializationNotificationHandlerForAllFuncOME();
-      }
+    if (!mod.hasRegisteredDeserializationNotificationHandlerForAllFuncOME()) {
+      ptr.reset(new NotificationHandlerTy(prepareSILFunctionForOptimization));
+      mod.registerDeserializationNotificationHandler(std::move(ptr));
+      mod.setRegisteredDeserializationNotificationHandlerForAllFuncOME();
     }
   }
 };
@@ -976,11 +939,5 @@ struct OwnershipModelEliminator : SILFunctionTransform {
 } // end anonymous namespace
 
 SILTransform *swift::createOwnershipModelEliminator() {
-  return new OwnershipModelEliminator(false /*skip transparent*/,
-                                      false /*ignore stdlib*/);
-}
-
-SILTransform *swift::createNonTransparentFunctionOwnershipModelEliminator() {
-  return new OwnershipModelEliminator(true /*skip transparent*/,
-                                      false /*ignore stdlib*/);
+  return new OwnershipModelEliminator();
 }
