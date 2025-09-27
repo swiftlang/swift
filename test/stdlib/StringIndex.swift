@@ -1243,7 +1243,11 @@ if #available(SwiftStdlib 6.1, *) {
 suite.test("String index debugDescription backdeployment") {
   // Note: no availability check
   let str = "i\u{308}"
-  expectEqual(str.startIndex.debugDescription, "0[any]")
+  // Result can be `any` or `unknown` depending on inlining behavior
+  expectTrue(
+    str.startIndex.debugDescription == "0[any]" ||
+    str.startIndex.debugDescription == "0[unknown]"
+  )
   expectEqual(str.endIndex.debugDescription, "3[utf8]")
 }
 
