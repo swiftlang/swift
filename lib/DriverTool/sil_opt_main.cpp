@@ -316,12 +316,6 @@ struct SILOptOptions {
   EnableMoveInoutStackProtection = llvm::cl::opt<bool>("enable-move-inout-stack-protector",
                     llvm::cl::desc("Enable the stack protector by moving values to temporaries."));
 
-  llvm::cl::opt<bool> EnableOSSAModules = llvm::cl::opt<bool>(
-      "enable-ossa-modules", llvm::cl::init(true),
-      llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
-                     "this is disabled we do not serialize in OSSA "
-                     "form when optimizing."));
-
   cl::opt<EnforceExclusivityMode>
     EnforceExclusivity = cl::opt<EnforceExclusivityMode>(
     "enforce-exclusivity", cl::desc("Enforce law of exclusivity "
@@ -902,7 +896,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EnableThrowsPrediction = options.EnableThrowsPrediction;
   SILOpts.EnableNoReturnCold = options.EnableNoReturnCold;
   SILOpts.IgnoreAlwaysInline = options.IgnoreAlwaysInline;
-  SILOpts.EnableOSSAModules = options.EnableOSSAModules;
   SILOpts.EnableSILOpaqueValues = options.EnableSILOpaqueValues;
   SILOpts.OSSACompleteLifetimes = options.EnableOSSACompleteLifetimes;
   SILOpts.OSSAVerifyComplete = options.EnableOSSAVerifyComplete;
@@ -1088,7 +1081,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     serializationOpts.OutputPath = OutputFile;
     serializationOpts.SerializeAllSIL = options.EmitSIB;
     serializationOpts.IsSIB = options.EmitSIB;
-    serializationOpts.IsOSSA = SILOpts.EnableOSSAModules;
 
     symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
 

@@ -840,7 +840,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, TARGET);
   BLOCK_RECORD(control_block, SDK_NAME);
   BLOCK_RECORD(control_block, REVISION);
-  BLOCK_RECORD(control_block, IS_OSSA);
   BLOCK_RECORD(control_block, ALLOWABLE_CLIENT_NAME);
   BLOCK_RECORD(control_block, CHANNEL);
   BLOCK_RECORD(control_block, SDK_VERSION);
@@ -1016,7 +1015,6 @@ void Serializer::writeHeader() {
     control_block::SDKVersionLayout SDKVersion(Out);
     control_block::RevisionLayout Revision(Out);
     control_block::ChannelLayout Channel(Out);
-    control_block::IsOSSALayout IsOSSA(Out);
     control_block::AllowableClientLayout Allowable(Out);
 
     // Write module 'real name', which can be different from 'name'
@@ -1072,8 +1070,6 @@ void Serializer::writeHeader() {
     Revision.emit(ScratchRecord, revision);
 
     Channel.emit(ScratchRecord, version::getCurrentCompilerChannel());
-
-    IsOSSA.emit(ScratchRecord, Options.IsOSSA);
 
     {
       llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);

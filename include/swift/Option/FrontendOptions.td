@@ -1320,8 +1320,7 @@ def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
 
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
   def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
-    HelpText<"Always serialize SIL in ossa form. If this flag is not passed in, "
-            "when optimizing ownership will be lowered before serializing SIL">;
+    HelpText<"Obsolete. This option is ignored">;
 }
 
 def enable_recompilation_to_ossa_module : Flag<["-"], "enable-recompilation-to-ossa-module">,

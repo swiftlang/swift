@@ -96,7 +96,7 @@ set(SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS
   "-strict-memory-safety"
 )
 
-add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IMPORTS_NON_OSSA 
+add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${SWIFT_SYNCHRONIZATION_SOURCES}
 
   GYB_SOURCES

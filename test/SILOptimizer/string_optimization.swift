@@ -1,5 +1,4 @@
 // RUN: %target-build-swift -O %s -module-name=test -Xfrontend -sil-verify-all -emit-sil | %FileCheck %s
-// RUN: %target-build-swift -O %s -module-name=test -Xfrontend -sil-verify-all -emit-sil -Xfrontend -enable-ossa-modules | %FileCheck %s
 
 // RUN: %empty-directory(%t) 
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out

@@ -281,8 +281,6 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.SerializeDebugInfoSIL = true;
   }
 
-  serializationOpts.IsOSSA = getSILOptions().EnableOSSAModules;
-
   serializationOpts.SkipNonExportableDecls =
       getLangOptions().SkipNonExportableDecls;
 
@@ -792,8 +790,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     Context->addModuleInterfaceChecker(
         std::make_unique<ModuleInterfaceCheckerImpl>(
             *Context, ModuleCachePathFromInvocation, FEOpts.PrebuiltModuleCachePath,
-            FEOpts.BackupModuleInterfaceDir, LoaderOpts,
-            RequireOSSAModules_t(Invocation.getSILOptions())));
+            FEOpts.BackupModuleInterfaceDir, LoaderOpts));
 
     if (MLM != ModuleLoadingMode::OnlySerialized) {
       // We only need ModuleInterfaceLoader for implicit modules.
@@ -867,8 +864,7 @@ bool CompilerInstance::setUpModuleLoaders() {
   Context->addModuleInterfaceChecker(
       std::make_unique<ModuleInterfaceCheckerImpl>(
           *Context, ModuleCachePath, FEOpts.PrebuiltModuleCachePath,
-          FEOpts.BackupModuleInterfaceDir, LoaderOpts,
-          RequireOSSAModules_t(Invocation.getSILOptions())));
+          FEOpts.BackupModuleInterfaceDir, LoaderOpts));
 
   // Install an explicit module loader if it was created earlier.
   if (ESML) {
@@ -910,8 +906,7 @@ bool CompilerInstance::setUpModuleLoaders() {
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
         FEOpts.CacheReplayPrefixMap,
         FEOpts.SerializeModuleInterfaceDependencyHashes,
-        FEOpts.shouldTrackSystemDependencies(),
-        RequireOSSAModules_t(Invocation.getSILOptions()));
+        FEOpts.shouldTrackSystemDependencies());
   }
 
   return false;

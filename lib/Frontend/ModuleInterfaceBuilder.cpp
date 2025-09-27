@@ -310,7 +310,6 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
       return std::make_error_code(std::errc::not_supported);
     SerializationOpts.Dependencies = Deps;
   }
-  SerializationOpts.IsOSSA = SILOpts.EnableOSSAModules;
 
   SILMod->setSerializeSILAction([&]() {
     // We don't want to serialize module docs in the cache -- they

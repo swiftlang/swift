@@ -391,7 +391,7 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
       Invocation.getOutputFilename(), ABIPath, FEOpts.CacheReplayPrefixMap,
       FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.shouldTrackSystemDependencies(), LoaderOpts,
-      RequireOSSAModules_t(Invocation.getSILOptions()), IgnoreAdjacentModules);
+      IgnoreAdjacentModules);
 }
 
 static bool compileLLVMIR(CompilerInstance &Instance) {
@@ -1754,7 +1754,6 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
   serializationOpts.OutputPath = moduleOutputPath;
   serializationOpts.SerializeAllSIL = true;
   serializationOpts.IsSIB = true;
-  serializationOpts.IsOSSA = Context.SILOpts.EnableOSSAModules;
 
   symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
 
