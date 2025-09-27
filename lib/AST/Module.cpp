@@ -2456,6 +2456,12 @@ ModuleDecl::getDeclaringModuleAndBystander() {
   if (!hasUnderscoredNaming())
     return *(declaringModuleAndBystander = {nullptr, Identifier()});
 
+  // If this is one of the stdlib overlays, indicate as much.
+  auto &ctx = getASTContext();
+  if (llvm::is_contained(ctx.StdlibOverlayNames, getRealName()))
+    return *(declaringModuleAndBystander = { ctx.getStdlibModule(),
+                                             Identifier() });
+
   // Search the transitive set of imported @_exported modules to see if any have
   // this module as their overlay.
   SmallPtrSet<ModuleDecl *, 16> seen;
@@ -2535,7 +2541,8 @@ bool ModuleDecl::getRequiredBystandersIfCrossImportOverlay(
   auto *clangModule = declaring->getUnderlyingModuleIfOverlay();
   auto current = std::make_pair(this, Identifier());
   while ((current = current.first->getDeclaringModuleAndBystander()).first) {
-    bystanderNames.push_back(current.second);
+    if (!current.second.empty())
+      bystanderNames.push_back(current.second);
     if (current.first == declaring || current.first == clangModule)
       return true;
   }

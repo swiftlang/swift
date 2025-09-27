@@ -408,7 +408,7 @@ struct GlobalType {}
 
 @_Concurrency.MainActor
 extension GlobalType {
-  @_Concurrency.MainActor static func ==(
+  @Swift.MainActor static func ==(
     lhs: GlobalType,
     rhs: GlobalType
   ) -> Bool { true }

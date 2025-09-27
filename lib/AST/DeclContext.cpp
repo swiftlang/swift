@@ -449,6 +449,16 @@ DeclContext *DeclContext::getModuleScopeContext() const {
 
 void DeclContext::getSeparatelyImportedOverlays(
     ModuleDecl *declaring, SmallVectorImpl<ModuleDecl *> &overlays) const {
+  if (declaring->isStdlibModule()) {
+    auto &ctx = getASTContext();
+    for (auto overlayName: ctx.StdlibOverlayNames) {
+      if (auto module = ctx.getLoadedModule(overlayName))
+        overlays.push_back(module);
+    }
+    overlays.push_back(declaring);
+    return;
+  }
+
   if (auto SF = getOutermostParentSourceFile())
     SF->getSeparatelyImportedOverlays(declaring, overlays);
 }
