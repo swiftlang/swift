@@ -188,17 +188,19 @@ param
   [string] $AndroidNDKVersion = "r27c",
   [ValidateRange(1, 36)]
   [int] $AndroidAPILevel = 28,
+  [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
+  [string[]] $AndroidSDKLinkModes = @("dynamic", "static"),
   [string[]] $AndroidSDKVersions = @("Android", "AndroidExperimental"),
   [string] $AndroidSDKVersionDefault = "Android",
-  [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
 
   # Windows SDK Options
   [switch] $Windows = $true,
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
   [string] $WinSDKVersion = "",
+  [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
+  [string[]] $WindowsSDKLinkModes = @("dynamic", "static"),
   [string[]] $WindowsSDKVersions = @("Windows", "WindowsExperimental"),
   [string] $WindowsSDKVersionDefault = "Windows",
-  [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
 
   # Incremental Build Support
   [switch] $Clean,
@@ -294,6 +296,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin64a";
     Cache = @{};
     DefaultSDK = $WindowsSDKVersionDefault;
+    LinkModes = $WindowsSDKLinkModes;
   };
 
   WindowsX64 = @{
@@ -308,6 +311,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin64";
     Cache = @{};
     DefaultSDK = $WindowsSDKVersionDefault;
+    LinkModes = $WindowsSDKLinkModes;
   };
 
   WindowsX86  = @{
@@ -322,6 +326,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin32";
     Cache = @{};
     DefaultSDK = $WindowsSDKVersionDefault;
+    LinkModes = $WindowsSDKLinkModes;
   };
 
   AndroidARMv7 = @{
@@ -336,6 +341,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin32a";
     Cache = @{};
     DefaultSDK = $AndroidSDKVersionDefault;
+    LinkModes = $AndroidSDKLinkModes;
   };
 
   AndroidARM64 = @{
@@ -350,6 +356,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin64a";
     Cache = @{};
     DefaultSDK = $AndroidSDKVersionDefault;
+    LinkModes = $AndroidSDKLinkModes;
   };
 
   AndroidX86 = @{
@@ -364,6 +371,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin32";
     Cache = @{};
     DefaultSDK = $AndroidSDKVersionDefault;
+    LinkModes = $AndroidSDKLinkModes;
   };
 
   AndroidX64 = @{
@@ -378,6 +386,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin64";
     Cache = @{};
     DefaultSDK = $AndroidSDKVersionDefault;
+    LinkModes = $AndroidSDKLinkModes;
   };
 }
 
@@ -3173,7 +3182,7 @@ function Install-SDK([Hashtable[]] $Platforms, [OS] $OS = $Platforms[0].OS, [str
   foreach ($Platform in $Platforms) {
     foreach ($ResourceType in ("swift", "swift_static")) {
       $PlatformResources = "$(Get-SwiftSDK -OS $OS -Identifier $Identifier)\usr\lib\$ResourceType\$($OS.ToString().ToLowerInvariant())"
-      Get-ChildItem -Recurse "$PlatformResources\$($Platform.Architecture.LLVMName)" | ForEach-Object {
+      Get-ChildItem -ErrorAction SilentlyContinue -Recurse "$PlatformResources\$($Platform.Architecture.LLVMName)" | ForEach-Object {
         if (".swiftmodule", ".swiftdoc", ".swiftinterface" -contains $_.Extension) {
           Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not in a thick module layout"
           Copy-File $_.FullName "$PlatformResources\$($_.BaseName).swiftmodule\$(Get-ModuleTriple $Platform)$($_.Extension)"
@@ -3196,14 +3205,16 @@ function Build-SDK([Hashtable] $Platform) {
 function Build-ExperimentalSDK([Hashtable] $Platform) {
   Invoke-BuildStep Build-CDispatch $Platform
 
-  Invoke-BuildStep Build-ExperimentalRuntime $Platform
-  Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
+  if ($Platform.LinkModes.Contains("dynamic")) {
+    Invoke-BuildStep Build-ExperimentalRuntime $Platform
+  }
+  if ($Platform.LinkModes.Contains("static")) {
+    Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
+  }
 
   $SDKROOT = Get-SwiftSDK -OS $Platform.OS -Identifier "$($Platform.OS)Experimental"
 
-  Invoke-IsolatingEnvVars {
-    $env:Path = "$(Get-CMarkBinaryCache $Platform)\src;$(Get-PinnedToolchainRuntime);${env:Path}"
-
+  if ($Platform.LinkModes.Contains("dynamic")) {
     Record-OperationTime $Platform "Build-ExperimentalDynamicDispatch" {
       Build-CMakeProject `
         -Src $SourceCache\swift-corelibs-libdispatch `
@@ -3221,6 +3232,41 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
         }
     }
 
+    Record-OperationTime $Platform "Build-ExperimentalDynamicFoundation" {
+      Build-CMakeProject `
+        -Src $SourceCache\swift-corelibs-foundation `
+        -Bin (Get-ProjectBinaryCache $Platform ExperimentalDynamicFoundation) `
+        -InstallTo "${SDKROOT}\usr" `
+        -Platform $Platform `
+        -UseBuiltCompilers ASM,C,CXX,Swift `
+        -SwiftSDK "${SDKROOT}" `
+        -Defines @{
+          BUILD_SHARED_LIBS = "YES";
+          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+          CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
+          CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+          ENABLE_TESTING = "NO";
+
+          FOUNDATION_BUILD_TOOLS = "NO";
+          CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
+          LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
+          ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+          ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+            "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
+          } else {
+            "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
+          };
+          dispatch_DIR = $(Get-ProjectCMakeModules $Platform ExperimentalDynamicDispatch);
+          SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
+          _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
+          _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
+          _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
+          SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
+        }
+    }
+  }
+
+  if ($Platform.LinkModes.Contains("static")) {
     Record-OperationTime $Platform "Build-ExperimentalStaticDispatch" {
       Build-CMakeProject `
         -Src $SourceCache\swift-corelibs-libdispatch `
@@ -3237,72 +3283,39 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
           ENABLE_SWIFT = "YES";
         }
     }
-  }
 
-  Record-OperationTime $Platform "Build-ExperimentalDynamicFoundation" {
-    Build-CMakeProject `
-      -Src $SourceCache\swift-corelibs-foundation `
-      -Bin (Get-ProjectBinaryCache $Platform ExperimentalDynamicFoundation) `
-      -InstallTo "${SDKROOT}\usr" `
-      -Platform $Platform `
-      -UseBuiltCompilers ASM,C,CXX,Swift `
-      -SwiftSDK "${SDKROOT}" `
-      -Defines @{
-        BUILD_SHARED_LIBS = "YES";
-        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
-        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-        ENABLE_TESTING = "NO";
+    Record-OperationTime $Platform "Build-ExperimentalStaticFoundation" {
+      Build-CMakeProject `
+        -Src $SourceCache\swift-corelibs-foundation `
+        -Bin (Get-ProjectBinaryCache $Platform ExperimentalStaticFoundation) `
+        -InstallTo "${SDKROOT}\usr" `
+        -Platform $Platform `
+        -UseBuiltCompilers ASM,C,CXX,Swift `
+        -SwiftSDK ${SDKROOT} `
+        -Defines @{
+          BUILD_SHARED_LIBS = "NO";
+          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+          CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
+          CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
+          CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+          ENABLE_TESTING = "NO";
 
-        FOUNDATION_BUILD_TOOLS = "NO";
-        CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
-        LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
-        ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
-        ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-          "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
-        } else {
-          "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
-        };
-        dispatch_DIR = $(Get-ProjectCMakeModules $Platform ExperimentalDynamicDispatch);
-        SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
-        _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
-        _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
-        _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
-        SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
-      }
-  }
-
-  Record-OperationTime $Platform "Build-ExperimentalStaticFoundation" {
-    Build-CMakeProject `
-      -Src $SourceCache\swift-corelibs-foundation `
-      -Bin (Get-ProjectBinaryCache $Platform ExperimentalStaticFoundation) `
-      -InstallTo "${SDKROOT}\usr" `
-      -Platform $Platform `
-      -UseBuiltCompilers ASM,C,CXX,Swift `
-      -SwiftSDK ${SDKROOT} `
-      -Defines @{
-        BUILD_SHARED_LIBS = "NO";
-        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
-        CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
-        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-        ENABLE_TESTING = "NO";
-
-        FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
-        CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
-        LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
-        ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
-        ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-          "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
-        } else {
-          "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
-        };
-        dispatch_DIR = $(Get-ProjectCMakeModules $Platform ExperimentalStaticDispatch);
-        SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
-        _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
-        _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
-        _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
-        SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
+          FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
+          CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
+          LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
+          ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+          ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+            "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
+          } else {
+            "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
+          };
+          dispatch_DIR = $(Get-ProjectCMakeModules $Platform ExperimentalStaticDispatch);
+          SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
+          _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
+          _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
+          _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
+          SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
+        }
       }
     }
 }
@@ -3818,37 +3831,6 @@ function Install-HostToolchain() {
   Copy-Item -Force `
     -Path $SwiftDriver `
     -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swiftc.exe"
-
-  # Copy static dependencies
-  if ($Windows) {
-    foreach ($Build in $WindowsSDKBuilds) {
-      $SDKROOT = Get-SwiftSDK -OS $Build.OS -Identifier "$($Build.OS)Experimental"
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.lib" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libcurl.lib" | Out-Null
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2s.lib" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libxml2s.lib" | Out-Null
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\zlib\zlibstatic.lib" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\zlibstatic.lib" | Out-Null
-    }
-  }
-
-  if ($Android) {
-    foreach ($Build in $AndroidSDKBuilds) {
-      $SDKROOT = Get-SwiftSDK -OS $Build.OS -Identifier "$($Build.OS)Experimental"
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.a" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libcurl.a" | Out-Null
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2.a" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libxml2.a" | Out-Null
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\zlib\libz.a" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libz.a" | Out-Null
-    }
-  }
 }
 
 function Build-Inspect([Hashtable] $Platform) {
@@ -4131,6 +4113,22 @@ if (-not $SkipBuild) {
     }
 
     Write-PlatformInfoPlist Windows
+
+    # Copy static dependencies
+    foreach ($Build in $WindowsSDKBuilds) {
+      if (-not $Build.LinkModes.Contains("static")) { continue }
+
+      $SDKROOT = Get-SwiftSDK -OS $Build.OS -Identifier "$($Build.OS)Experimental"
+      Copy-Item -Force `
+        -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.lib" `
+        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libcurl.lib" | Out-Null
+      Copy-Item -Force `
+        -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2s.lib" `
+        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libxml2s.lib" | Out-Null
+      Copy-Item -Force `
+        -Path "${BinaryCache}\$($Build.Triple)\zlib\zlibstatic.lib" `
+        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\zlibstatic.lib" | Out-Null
+    }
   }
 
   if ($Android) {
@@ -4193,6 +4191,22 @@ if (-not $SkipBuild) {
     # Android swift-inspect only supports 64-bit platforms.
     $AndroidSDKBuilds | Where-Object { @("arm64-v8a", "x86_64") -contains $_.Architecture.ABI } | ForEach-Object {
       Invoke-BuildStep Build-Inspect $_
+    }
+
+    # Copy static dependencies
+    foreach ($Build in $AndroidSDKBuilds) {
+      if (-not $Build.LinkModes.Contains("static")) { continue }
+
+      $SDKROOT = Get-SwiftSDK -OS $Build.OS -Identifier "$($Build.OS)Experimental"
+      Copy-Item -Force `
+        -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.a" `
+        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libcurl.a" | Out-Null
+      Copy-Item -Force `
+        -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2.a" `
+        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libxml2.a" | Out-Null
+      Copy-Item -Force `
+        -Path "${BinaryCache}\$($Build.Triple)\zlib\libz.a" `
+        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libz.a" | Out-Null
     }
   }
 
