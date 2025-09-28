@@ -679,9 +679,6 @@ namespace swift {
     bool RestrictNonProductionExperimentalFeatures = false;
 #endif
 
-    /// Set to true if we support AArch64TBI.
-    bool HasAArch64TBI = false;
-
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
     }
