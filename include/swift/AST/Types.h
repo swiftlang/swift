@@ -7759,16 +7759,16 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorUnionType, Type)
 
-/// PlaceholderType - This represents a placeholder type for a type variable
-/// or dependent member type that cannot be resolved to a concrete type
-/// because the expression is ambiguous. This type is only used by the
-/// constraint solver and transformed into UnresolvedType to be used in AST.
+/// PlaceholderType - In the AST, this represents the type of a placeholder `_`.
+/// In the constraint system, this is opened into a type variable, and uses of
+/// PlaceholderType are instead used to represent holes where types cannot be
+/// inferred.
 class PlaceholderType : public TypeBase {
   // NOTE: If you add a new Type-based originator, you'll need to update the
   // recursive property logic in PlaceholderType::get.
   using Originator =
       llvm::PointerUnion<TypeVariableType *, DependentMemberType *, ErrorType *,
-                         VarDecl *, ErrorExpr *, TypeRepr *>;
+                         VarDecl *, ErrorExpr *, TypeRepr *, Pattern *>;
 
   Originator O;
 

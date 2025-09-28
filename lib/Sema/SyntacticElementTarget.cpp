@@ -141,7 +141,7 @@ SyntacticElementTarget::forInitialization(Expr *initializer, DeclContext *dc,
   // Determine the contextual type for the initialization.
   TypeLoc contextualType;
   if (!(isa<OptionalSomePattern>(pattern) && !pattern->isImplicit()) &&
-      patternType && !patternType->is<UnresolvedType>()) {
+      patternType && !patternType->is<PlaceholderType>()) {
     contextualType = TypeLoc::withoutLoc(patternType);
 
     // Only provide a TypeLoc if it makes sense to allow diagnostics.

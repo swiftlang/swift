@@ -6078,6 +6078,8 @@ namespace {
         printRec(DMT, Label::always("dependent_member_type"));
       } else if (isa<TypeRepr *>(originator)) {
         printFlag("type_repr");
+      } else if (isa<Pattern *>(originator)) {
+        printFlag("pattern");
       } else {
         assert(false && "unknown originator");
       }
