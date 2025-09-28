@@ -36,17 +36,6 @@ SyntacticElementTarget::SyntacticElementTarget(
   assert((!contextualInfo.getType() || contextualPurpose != CTP_Unused) &&
          "Purpose for conversion type was not specified");
 
-  // Take a look at the conversion type to check to make sure it is sensible.
-  if (auto type = contextualInfo.getType()) {
-    // If we're asked to convert to an UnresolvedType, then ignore the request.
-    // This happens when CSDiags nukes a type.
-    if (type->is<UnresolvedType>() ||
-        (type->is<MetatypeType>() && type->hasUnresolvedType())) {
-      contextualInfo.typeLoc = TypeLoc();
-      contextualPurpose = CTP_Unused;
-    }
-  }
-
   kind = Kind::expression;
   expression.expression = expr;
   expression.dc = dc;
