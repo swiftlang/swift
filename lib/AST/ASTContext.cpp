@@ -3605,13 +3605,9 @@ static Type replacingTypeVariablesAndPlaceholders(Type ty) {
     if (!ty->hasTypeVariableOrPlaceholder())
       return ty;
 
-    // Match the logic in `Solution::simplifyType` and use UnresolvedType.
-    // FIXME: Ideally we'd get rid of UnresolvedType and just use a fresh
-    // PlaceholderType, but we don't currently support placeholders with no
-    // originators.
     auto *typePtr = ty.getPointer();
     if (isa<TypeVariableType>(typePtr) || isa<PlaceholderType>(typePtr))
-      return ctx.TheUnresolvedType;
+      return ErrorType::get(ctx);
 
     return std::nullopt;
   });
@@ -3620,7 +3616,14 @@ static Type replacingTypeVariablesAndPlaceholders(Type ty) {
 Type ErrorType::get(Type originalType) {
   // The original type is only used for printing/debugging, and we don't support
   // solver-allocated ErrorTypes. As such, fold any type variables and
-  // placeholders into UnresolvedTypes, which print as placeholders.
+  // placeholders into bare ErrorTypes, which print as placeholders.
+  //
+  // FIXME: If the originalType is itself an ErrorType we ought to be flattening
+  // it, but that's currently load-bearing as it avoids crashing for recursive
+  // generic signatures such as in `0120-rdar34184392.swift`. To fix this we
+  // ought to change the evaluator to ensure the outer step of a request cycle
+  // returns the same default value as the inner step such that we don't end up
+  // with conflicting generic signatures on encountering a cycle.
   originalType = replacingTypeVariablesAndPlaceholders(originalType);
 
   ASSERT(originalType);
