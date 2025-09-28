@@ -377,7 +377,7 @@ void CompilerInvocation::computeAArch64TBIOptions() {
   auto &LLVMArgs = getFrontendOptions().LLVMArgs;
   auto aarch64_use_tbi =
       std::find(LLVMArgs.begin(), LLVMArgs.end(), "-aarch64-use-tbi");
-  LangOpts.HasAArch64TBI = aarch64_use_tbi != LLVMArgs.end();
+  IRGenOpts.HasAArch64TBI = aarch64_use_tbi != LLVMArgs.end();
 }
 
 void CompilerInvocation::computeCXXStdlibOptions() {
