@@ -80,6 +80,7 @@ add_library(swiftCore
   FlatMap.swift
   Flatten.swift
   FloatingPoint.swift
+  FloatingPointToString.swift
   Hashable.swift
   AnyHashable.swift # ORDER DEPENDENCY
   Hasher.swift
