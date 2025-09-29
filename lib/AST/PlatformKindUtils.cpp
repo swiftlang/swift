@@ -118,6 +118,7 @@ swift::basePlatformForExtensionPlatform(PlatformKind Platform) {
   case PlatformKind::FreeBSD:
   case PlatformKind::OpenBSD:
   case PlatformKind::Windows:
+  case PlatformKind::Android:
   case PlatformKind::none:
     return std::nullopt;
   }
@@ -164,6 +165,8 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
       return Target.isOSFreeBSD();
     case PlatformKind::Windows:
       return Target.isOSWindows();
+    case PlatformKind::Android:
+      return Target.isAndroid();
     case PlatformKind::none:
       llvm_unreachable("handled above");
   }
@@ -291,6 +294,8 @@ swift::tripleOSTypeForPlatform(PlatformKind platform) {
     return llvm::Triple::OpenBSD;
   case PlatformKind::Windows:
     return llvm::Triple::Win32;
+  case PlatformKind::Android:
+    return llvm::Triple::Linux;
   case PlatformKind::none:
     return std::nullopt;
   }
@@ -326,6 +331,7 @@ bool swift::isPlatformSPI(PlatformKind Platform) {
   case PlatformKind::OpenBSD:
   case PlatformKind::FreeBSD:
   case PlatformKind::Windows:
+  case PlatformKind::Android:
   case PlatformKind::none:
     return false;
   }
