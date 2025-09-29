@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -cxx-interoperability-mode=default -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t/Inputs %t/test.swift
-// RUN: %target-swift-frontend -cxx-interoperability-mode=default -Xcc -std=c++20 -verify-additional-prefix cpp20- -D CPP20 -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t/Inputs %t/test.swift
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -Xcc -std=c++20 -verify-additional-prefix cpp20- -D CPP20 -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h
 
 //--- Inputs/module.modulemap
 module Test {
@@ -68,6 +68,18 @@ MyPair<int, NonCopyableRequires> p7();
 
 #endif
 
+template<typename T>
+struct SWIFT_COPYABLE_IF(T) SWIFT_NONCOPYABLE DoubleAnnotation {};
+
+using DoubleAnnotationInt = DoubleAnnotation<int>;
+
+struct SWIFT_NONCOPYABLE NonCopyableNonMovable { // expected-note {{record 'NonCopyableNonMovable' is not automatically available: it must have a copy/move constructor and a destructor; does this type have reference semantics?}}
+    NonCopyableNonMovable() {}
+    NonCopyableNonMovable(const NonCopyableNonMovable& other) {}
+    NonCopyableNonMovable(NonCopyableNonMovable&& other) = delete;
+};
+
+
 //--- test.swift
 import Test
 import CxxStdlib
@@ -107,3 +119,13 @@ func useOfRequires() {
     takeCopyable(p7()) // expected-cpp20-error {{global function 'takeCopyable' requires that 'MyPair<CInt, RequiresCopyableT<NonCopyable>>' conform to 'Copyable'}}
 }
 #endif
+
+func doubleAnnotation() {
+    let s = DoubleAnnotationInt()
+    takeCopyable(s) // expected-error {{global function 'takeCopyable' requires that 'DoubleAnnotationInt' (aka 'DoubleAnnotation<CInt>') conform to 'Copyable'}}
+}
+
+func missingLifetimeOperation() {
+    let s = NonCopyableNonMovable() // expected-error {{cannot find 'NonCopyableNonMovable' in scope}}
+    takeCopyable(s)
+}
