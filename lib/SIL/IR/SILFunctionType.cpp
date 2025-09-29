@@ -2955,8 +2955,10 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
 
   // Make a new 'self' parameter.
   if (!declContext->isLocalContext()) {
-    auto selfInterfaceType =
-        MetatypeType::get(declContext->getSelfInterfaceType());
+    auto selfInterfaceType = MetatypeType::get(
+        (genericSig)
+            ? declContext->getSelfInterfaceType()->getReducedType(genericSig)
+            : declContext->getSelfTypeInContext());
     AbstractionPattern origSelfType(genericSig,
                                     selfInterfaceType->getCanonicalType());
     auto loweredSelfType = TC.getLoweredType(
