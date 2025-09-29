@@ -2568,6 +2568,10 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
     deprecatedAsUnavailableMessage = "";
     break;
 
+  case PlatformKind::Android:
+    deprecatedAsUnavailableMessage = "";
+    break;
+
   case PlatformKind::none:
     break;
   }
@@ -2615,6 +2619,9 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
 
   case PlatformKind::Windows:
     return name == "windows";
+
+  case PlatformKind::Android:
+    return name == "android";
 
   case PlatformKind::none:
     return false;
@@ -2692,6 +2699,10 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   case PlatformKind::Windows:
     // No deprecation filter on Windows
     return false;
+
+  case PlatformKind::Android:
+    // The minimum Android API level supported by Swift is 21
+    return major <= 20;
   }
 
   llvm_unreachable("Unexpected platform");
