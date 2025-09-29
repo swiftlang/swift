@@ -3067,10 +3067,22 @@ static void emitDelayedArguments(SILGenFunction &SGF,
     }
   }
 
+  bool shouldFurtherDelayDefaultArgs = true;
+  //  for (auto &arg: delayedArgs) {
+  //    if (arg.isSimpleInOut()) {
+  //      shouldDeferDefaultArgs = true;
+  //      break;
+  //    }
+  //  }
+  //  if (defaultArgIsolation)
+  //    shouldDeferDefaultArgs = true;
+
   SmallVector<std::tuple<
-      /*delayedArgIt*/decltype(delayedArgs)::iterator,
-      /*siteArgsIt*/decltype(args)::iterator,
-      /*index*/size_t>, 2> isolatedArgs;
+                  /*delayedArgIt*/ decltype(delayedArgs)::iterator,
+                  /*siteArgsIt*/ decltype(args)::iterator,
+                  /*index*/ size_t>,
+              2>
+      furtherDelayedDefaultArgs;
 
   SmallVector<std::pair<SILValue, SILLocation>, 4> emittedInoutArgs;
   auto delayedNext = delayedArgs.begin();
@@ -3103,8 +3115,8 @@ static void emitDelayedArguments(SILGenFunction &SGF,
       assert(delayedNext != delayedArgs.end());
       auto &delayedArg = *delayedNext;
 
-      if (defaultArgIsolation && delayedArg.isDefaultArg()) {
-        isolatedArgs.push_back(std::make_tuple(delayedNext, argsIt, i));
+      if (shouldFurtherDelayDefaultArgs && delayedArg.isDefaultArg()) {
+        furtherDelayedDefaultArgs.push_back(std::make_tuple(delayedNext, argsIt, i));
         ++i;
         if (++delayedNext == delayedArgs.end()) {
           goto done;
@@ -3133,8 +3145,10 @@ static void emitDelayedArguments(SILGenFunction &SGF,
 
 done:
 
-  if (defaultArgIsolation) {
-    assert(!isolatedArgs.empty());
+  // TODO: fix
+  if (defaultArgIsolation ||
+      (shouldFurtherDelayDefaultArgs && !furtherDelayedDefaultArgs.empty())) {
+    assert(!furtherDelayedDefaultArgs.empty());
 
     // Only hop to the default arg isolation if the callee is async.
     // If we're in a synchronous function, the isolation has to match,
@@ -3147,8 +3161,8 @@ done:
     // do end up here for default argument generators and stored property
     // initializers. An alternative (and better) approach is to formally model
     // those generator functions as isolated.
-    if (SGF.F.isAsync()) {
-      auto &firstArg = *std::get<0>(isolatedArgs[0]);
+    if (defaultArgIsolation && SGF.F.isAsync()) { // TODO: fix
+      auto &firstArg = *std::get<0>(furtherDelayedDefaultArgs[0]);
       auto loc = firstArg.getDefaultArgLoc();
 
       SILValue executor;
@@ -3176,7 +3190,7 @@ done:
       SGF.emitHopToTargetExecutor(loc, executor);
     }
 
-    // The index saved in isolatedArgs is the index where we're
+    // The index saved in deferredDefaultArgs is the index where we're
     // supposed to fill in the argument in siteArgs. It should point
     // to a single null element, which we will replace with zero or
     // more actual argument values. This replacement can invalidate
@@ -3188,11 +3202,11 @@ done:
     size_t indexAdjustment = 0;
     auto indexAdjustmentSite = args.begin();
 
-    for (auto &isolatedArg : isolatedArgs) {
-      auto &delayedArg = *std::get<0>(isolatedArg);
-      auto site = std::get<1>(isolatedArg);
+    for (auto &deferreDefaultArg : furtherDelayedDefaultArgs) {
+      auto &delayedArg = *std::get<0>(deferreDefaultArg);
+      auto site = std::get<1>(deferreDefaultArg);
       auto &siteArgs = *site;
-      size_t argIndex = std::get<2>(isolatedArg);
+      size_t argIndex = std::get<2>(deferreDefaultArg);
 
       // Apply the current index adjustment if we haven't changed
       // sites.
