@@ -7,6 +7,7 @@ target_sources(swiftAST PRIVATE
   DiagnosticsBridging.cpp
   ExprBridging.cpp
   GenericsBridging.cpp
+  LangOptionsBridging.cpp
   MiscBridging.cpp
   PatternBridging.cpp
   PluginBridging.cpp

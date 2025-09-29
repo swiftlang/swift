@@ -1542,6 +1542,9 @@ def target_legacy_spelling : Joined<["--"], "target=">,
 def print_target_info : Flag<["-"], "print-target-info">,
     Flags<[FrontendOption]>,
     HelpText<"Print target information for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
+def print_static_build_config : Flag<["-"], "print-static-build-config">,
+    Flags<[FrontendOption]>,
+    HelpText<"Print static build configuration that can be used to evaluate #ifs in Swift source code">;
 
 def print_supported_features : Flag<["-"], "print-supported-features">,
     Flags<[FrontendOption]>,

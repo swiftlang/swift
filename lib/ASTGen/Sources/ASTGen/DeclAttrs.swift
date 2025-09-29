@@ -31,7 +31,7 @@ extension ASTGenVisitor {
 
     // Comments.
     COMMENT: if
-      self.ctx.langOptsAttachCommentsToDecls,
+      self.ctx.langOpts.attachCommentsToDecls,
       let firstTok = node.firstToken(viewMode: .sourceAccurate)
     {
       var pos = firstTok.position
@@ -2228,7 +2228,7 @@ extension ASTGenVisitor {
   }
 
   func generateUnavailableInEmbeddedAttr(attribute node: AttributeSyntax) -> BridgedAvailableAttr? {
-    if ctx.langOptsHasFeature(.Embedded) {
+    if ctx.langOpts.hasFeature(.Embedded) {
       return BridgedAvailableAttr.createUnavailableInEmbedded(
         self.ctx,
         atLoc: self.generateSourceLoc(node.atSign),

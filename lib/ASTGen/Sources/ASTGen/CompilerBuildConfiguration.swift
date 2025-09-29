@@ -30,21 +30,21 @@ struct CompilerBuildConfiguration: BuildConfiguration {
   func isCustomConditionSet(name: String) throws -> Bool {
     var name = name
     return name.withBridgedString { nameRef in
-      ctx.langOptsCustomConditionSet(nameRef)
+      ctx.langOpts.customConditionSet(nameRef)
     }
   }
   
   func hasFeature(name: String) throws -> Bool {
     var name = name
     return name.withBridgedString { nameRef in
-      ctx.langOptsHasFeatureNamed(nameRef)
+      ctx.langOpts.hasFeatureNamed(nameRef)
     }
   }
   
   func hasAttribute(name: String) throws -> Bool {
     var name = name
     return name.withBridgedString { nameRef in
-      ctx.langOptsHasAttributeNamed(nameRef)
+      ctx.langOpts.hasAttributeNamed(nameRef)
     }
   }
   
@@ -89,21 +89,21 @@ struct CompilerBuildConfiguration: BuildConfiguration {
   func isActiveTargetOS(name: String) throws -> Bool {
     var name = name
     return name.withBridgedString { nameRef in
-      ctx.langOptsIsActiveTargetOS(nameRef)
+      ctx.langOpts.isActiveTargetOS(nameRef)
     }
   }
   
   func isActiveTargetArchitecture(name: String) throws -> Bool {
     var name = name
     return name.withBridgedString { nameRef in
-      ctx.langOptsIsActiveTargetArchitecture(nameRef)
+      ctx.langOpts.isActiveTargetArchitecture(nameRef)
     }
   }
   
   func isActiveTargetEnvironment(name: String) throws -> Bool {
     var name = name
     return name.withBridgedString { nameRef in
-      ctx.langOptsIsActiveTargetEnvironment(nameRef)
+      ctx.langOpts.isActiveTargetEnvironment(nameRef)
     }
   }
   
@@ -117,31 +117,31 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     }
 
     return name.withBridgedString { nameRef in
-      ctx.langOptsIsActiveTargetRuntime(nameRef)
+      ctx.langOpts.isActiveTargetRuntime(nameRef)
     }
   }
   
   func isActiveTargetPointerAuthentication(name: String) throws -> Bool {
     var name = name
     return name.withBridgedString { nameRef in
-      ctx.langOptsIsActiveTargetPtrAuth(nameRef)
+      ctx.langOpts.isActiveTargetPtrAuth(nameRef)
     }
   }
   
   var targetPointerBitWidth: Int {
-    Int(ctx.langOptsTargetPointerBitWidth)
+    Int(ctx.langOpts.targetPointerBitWidth)
   }
 
   var targetAtomicBitWidths: [Int] {
     var bitWidthsBuf: UnsafeMutablePointer<SwiftInt>? = nil
-    let count = ctx.langOptsGetTargetAtomicBitWidths(&bitWidthsBuf)
+    let count = ctx.langOpts.getTargetAtomicBitWidths(&bitWidthsBuf)
     let bitWidths = Array(UnsafeMutableBufferPointer(start: bitWidthsBuf, count: count))
     deallocateIntBuffer(bitWidthsBuf);
     return bitWidths
   }
 
   var endianness: Endianness {
-    switch ctx.langOptsTargetEndianness {
+    switch ctx.langOpts.targetEndianness {
     case .EndianBig: return .big
     case .EndianLittle: return .little
     }
@@ -149,7 +149,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
 
   var languageVersion: VersionTuple { 
     var componentsBuf: UnsafeMutablePointer<SwiftInt>? = nil
-    let count = ctx.langOptsGetLanguageVersion(&componentsBuf)
+    let count = ctx.langOpts.getLanguageVersion(&componentsBuf)
     let version = VersionTuple(
       components: Array(UnsafeMutableBufferPointer(start: componentsBuf, count: count))
     )
@@ -159,7 +159,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
 
   var compilerVersion: VersionTuple { 
     var componentsBuf: UnsafeMutablePointer<SwiftInt>? = nil
-    let count = ctx.langOptsGetCompilerVersion(&componentsBuf)
+    let count = ctx.langOpts.getCompilerVersion(&componentsBuf)
     let version = VersionTuple(
       components: Array(UnsafeMutableBufferPointer(start: componentsBuf, count: count))
     )
