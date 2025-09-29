@@ -305,7 +305,9 @@ private extension PartialApplyInst {
     var nonConstArgs = [Operand]()
     var hasKeypath = false
     for argOp in argumentOperands {
-      switch argOp.value.isConstant() {
+      // In non-OSSA we don't know where to insert the compensating release for a propagated keypath.
+      // Therefore bail if a keypath has multiple uses.
+      switch argOp.value.isConstant(requireSingleUse: !parentFunction.hasOwnership && !isOnStack) {
       case .constant:
         constArgs.append(argOp)
       case .constantWithKeypath:
@@ -357,16 +359,19 @@ private enum ConstantKind {
 }
 
 private extension Value {
-  func isConstant() -> ConstantKind {
+  func isConstant(requireSingleUse: Bool) -> ConstantKind {
     // All instructions handled here must also be handled in
     // `FunctionSignatureSpecializationMangler::mangleConstantProp`.
+    let result: ConstantKind
     switch self {
     case let si as StructInst:
-      return si.operands.reduce(.constant, { $0.merge(with: $1.value.isConstant()) })
+      result = si.operands.reduce(.constant, {
+        $0.merge(with: $1.value.isConstant(requireSingleUse: requireSingleUse))
+      })
     case is ThinToThickFunctionInst, is ConvertFunctionInst, is UpcastInst, is OpenExistentialRefInst:
-      return (self as! UnaryInstruction).operand.value.isConstant()
+      result = (self as! UnaryInstruction).operand.value.isConstant(requireSingleUse: requireSingleUse)
     case is StringLiteralInst, is IntegerLiteralInst, is FloatLiteralInst, is FunctionRefInst, is GlobalAddrInst:
-      return .constant
+      result = .constant
     case let keyPath as KeyPathInst:
       guard keyPath.operands.isEmpty,
             keyPath.hasPattern,
@@ -374,9 +379,13 @@ private extension Value {
       else {
         return .notConstant
       }
-      return .constantWithKeypath
+      result = .constantWithKeypath
     default:
       return .notConstant
     }
+    if requireSingleUse, result == .constantWithKeypath, !uses.ignoreDebugUses.isSingleUse {
+      return .notConstant
+    }
+    return result
   }
 }
