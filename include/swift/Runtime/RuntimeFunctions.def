@@ -221,7 +221,7 @@ FUNCTION(NativeStrongRelease, Swift, swift_release, C_CC, AlwaysAvailable,
          UNKNOWN_MEMEFFECTS)
 
 // void *swift_retain(void *ptr);
-FUNCTION(NativeStrongRetainInlined, Swift, swift_retainInlined, SwiftRR_CC, AlwaysAvailable,
+FUNCTION(NativeStrongRetainClient, Swift, swift_retainClient, SwiftRR_CC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, FirstParamReturned, WillReturn),
@@ -229,7 +229,7 @@ FUNCTION(NativeStrongRetainInlined, Swift, swift_retainInlined, SwiftRR_CC, Alwa
          UNKNOWN_MEMEFFECTS)
 
 // void swift_release(void *ptr);
-FUNCTION(NativeStrongReleaseInlined, Swift, swift_releaseInlined, SwiftRR_CC, AlwaysAvailable,
+FUNCTION(NativeStrongReleaseClient, Swift, swift_releaseClient, SwiftRR_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind),

@@ -999,7 +999,7 @@ void IRGenFunction::emitNativeStrongRetain(llvm::Value *value,
   // Emit the call.
   FunctionPointer function;
   if (atomicity == Atomicity::Atomic && IGM.TargetInfo.HasSwiftClientRRLibrary)
-    function = IGM.getNativeStrongRetainInlinedFunctionPointer();
+    function = IGM.getNativeStrongRetainClientFunctionPointer();
   else if (atomicity == Atomicity::Atomic)
     function = IGM.getNativeStrongRetainFunctionPointer();
   else
@@ -1262,7 +1262,7 @@ void IRGenFunction::emitNativeStrongRelease(llvm::Value *value,
     return;
   llvm::Constant *function;
   if (atomicity == Atomicity::Atomic && IGM.TargetInfo.HasSwiftClientRRLibrary)
-    function = IGM.getNativeStrongReleaseInlinedFn();
+    function = IGM.getNativeStrongReleaseClientFn();
   else if (atomicity == Atomicity::Atomic)
     function = IGM.getNativeStrongReleaseFn();
   else
