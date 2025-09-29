@@ -341,6 +341,8 @@ bool ColdBlockInfo::inferFromEdgeProfile(SILBasicBlock *BB) {
   // Reference: Diego Novillo. "SamplePGO - The Power of Profile Guided
   //            Optimizations without the Usability Burden."
   //            LLVM-HPC 2014. DOI: 10.1109/LLVM-HPC.2014.8
+  //            Paper: https://research.google/pubs/samplepgo-the-power-of-profile-guided-optimizations-without-the-usability-burden/
+  //            PDF: https://storage.googleapis.com/gweb-research2023-media/pubtools/pdf/45290.pdf
 
   // Handle the case where all successors have zero execution counts
   // This can happen when: 1) the block was instrumented but never executed,
