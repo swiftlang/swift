@@ -66,6 +66,10 @@ let constantCapturePropagation = FunctionPass(name: "constant-capture-propagatio
       continue
     }
 
+    if !context.continueWithNextSubpassRun(for: partialApply) {
+      return
+    }
+
     optimizeClosureWithDeadCaptures(of: partialApply, context)
 
     if partialApply.isDeleted {
