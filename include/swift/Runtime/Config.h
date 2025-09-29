@@ -248,7 +248,15 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 // so changing this value is not sufficient.
 #define SWIFT_DEFAULT_LLVM_CC llvm::CallingConv::C
 
+// Define the calling convention for refcounting functions for targets where it
+// differs from the standard calling convention. Currently this is only used for
+// swift_retain, swift_release, and some internal helper functions that they
+// call.
+#if defined(__aarch64__)
+#define SWIFT_REFCOUNT_CC SWIFT_CC_PreserveMost
+#else
 #define SWIFT_REFCOUNT_CC
+#endif
 
 /// Should we use absolute function pointers instead of relative ones?
 /// WebAssembly target uses it by default.
