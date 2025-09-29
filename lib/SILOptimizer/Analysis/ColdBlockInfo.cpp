@@ -238,11 +238,18 @@ bool ColdBlockInfo::inferFromEdgeProfile(SILBasicBlock *BB) {
   SmallVector<ProfileCounter, 2> succCount;
 
   // Current analysis only accurately handles blocks with 2 successors,
-  // especially since we only have two temperatures.
+  // especially since we only have two temperatures (cold/warm).
+  // TODO: With propagation algorithm, this limitation can be removed to support
+  // multi-way branches (switch statements) and arbitrary successor counts.
   if (BB->getNumSuccessors() != 2)
     return false;
 
   // First pass: collect all counters and check for evidence of profiling
+  // Note: std::optional<ProfileCounter> is used to distinguish between:
+  //   - std::nullopt: missing profile data (profiler didn't record this edge)
+  //   - ProfileCounter(0): definitely zero executions (profiler recorded 0)
+  // This distinction is crucial for both the current optimistic strategy and
+  // future propagation algorithms, which need to know where data is missing.
   bool hasAnyNonZeroCount = false;
   bool hasAnyMissingData = false;
   SmallVector<std::optional<ProfileCounter>, 2> counters;
@@ -295,6 +302,45 @@ bool ColdBlockInfo::inferFromEdgeProfile(SILBasicBlock *BB) {
 
   TermInst::ConstSuccessorListTy succs = BB->getSuccessors();
   ASSERT(succCount.size() == succs.size());
+
+  // TODO: Implement full SamplePGO profile count propagation algorithm
+  //
+  // The current implementation handles missing profile data with a simple
+  // optimistic strategy (treat missing as zero when evidence of profiling exists).
+  // The SamplePGO paper by Diego Novillo describes more sophisticated techniques
+  // for inferring missing counts through iterative propagation across the CFG:
+  //
+  // 1. Equivalence Classes: Compute sets of blocks guaranteed to execute the
+  //    same number of times using dominance, post-dominance, and loop nesting:
+  //      - B1 dominates B2
+  //      - B2 post-dominates B1
+  //      - B1 and B2 in same loop nest
+  //    All blocks in same class get same weight.
+  //
+  // 2. Iterative Propagation: Use flow conservation to infer unknown weights:
+  //      Weight(Block) = Sum(Incoming Edges) = Sum(Outgoing Edges)
+  //    Algorithm:
+  //      - If all edges known → compute block weight
+  //      - If block known and one edge unknown → compute that edge
+  //      - Iterate until convergence or max iterations
+  //
+  // 3. Multi-Successor Support: Extend beyond 2-successor limitation to handle
+  //    switch statements, multi-way branches, and complex control flow.
+  //
+  // Future implementation should:
+  //   - Add propagateProfileWeights() method as a third pass after this collection
+  //   - Use the existing 'counters' vector as input (already distinguishes missing)
+  //   - Maintain backward compatibility with ZeroCountStrategy flag
+  //   - Support incremental adoption (propagation as optional enhancement)
+  //   - Add new command-line flag: -sil-profile-propagation=[none|basic|full]
+  //
+  // The paper reports achieving up to 98% of instrumentation-based PGO performance
+  // gains with this approach, making it highly valuable for handling incomplete
+  // sampling profiles in real-world scenarios.
+  //
+  // Reference: Diego Novillo. "SamplePGO - The Power of Profile Guided
+  //            Optimizations without the Usability Burden."
+  //            LLVM-HPC 2014. DOI: 10.1109/LLVM-HPC.2014.8
 
   // Handle the case where all successors have zero execution counts
   // This can happen when: 1) the block was instrumented but never executed,
