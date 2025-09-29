@@ -13,7 +13,7 @@ let arr = [_](repeating: "hi", count: 3)
 func foo(_ arr: [_] = [0]) {} // expected-error {{type placeholder not allowed here}}
 
 let foo = _.foo // expected-error {{type placeholder not allowed here}}
-let zero: _ = .zero // expected-error {{cannot infer contextual base in reference to member 'zero'}}
+let zero: _ = .zero // expected-error {{reference to member 'zero' cannot be resolved without a contextual type}}
 
 struct S<T> {
     var x: T

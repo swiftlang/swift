@@ -905,10 +905,6 @@ typeCheckPatternBindingStmtConditionElement(StmtConditionElement &elt,
   // provide type information.
   auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
   Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-  if (patternType->hasError()) {
-    typeCheckPatternFailed();
-    return true;
-  }
 
   // If the pattern didn't get a type, it's because we ran into some
   // unknown types along the way. We'll need to check the initializer.
