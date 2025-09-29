@@ -6034,6 +6034,15 @@ ERROR(incorrect_optional_any,none,
 GROUPED_ERROR(existential_requires_any,ExistentialAny,none,
               "use of %select{protocol |}2%0 as a type must be written %1",
               (Type, Type, bool))
+GROUPED_ERROR(existential_requires_any_or_some,ExistentialAny,none,
+              "use of %select{protocol |}2%0 as type must be written %1 or 'some %2'",
+              (Type, Type, StringRef, bool))
+NOTE(suggest_any_fixit,none,
+    "use %0 to create an existential type",
+    (Type))
+NOTE(suggest_some_fixit,none,
+    "use 'some %0' to create an opaque type",
+    (StringRef))
 GROUPED_ERROR(inverse_requires_any,ExistentialAny,none,
               "constraint that suppresses conformance requires 'any'", ())
 

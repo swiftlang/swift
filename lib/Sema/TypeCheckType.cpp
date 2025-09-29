@@ -6800,9 +6800,17 @@ private:
                                       diag::inverse_requires_any));
     } else {
       diag.emplace(Ctx.Diags.diagnose(T->getNameLoc(),
-                                      diag::existential_requires_any, type,
+                                      diag::existential_requires_any_or_some, type,
                                       ExistentialType::get(type),
+                                      type->getAnyGeneric()->getNameStr(),
                                       /*isAlias=*/isa<TypeAliasDecl>(decl)));
+      Ctx.Diags.diagnose(T->getNameLoc(),
+                         diag::suggest_any_fixit, 
+                         ExistentialType::get(type));
+
+      Ctx.Diags.diagnose(T->getNameLoc(),
+                         diag::suggest_some_fixit,
+                         type->getAnyGeneric()->getNameStr());
     }
 
     // If `ExistentialAny` is enabled in migration mode, warn unconditionally.
