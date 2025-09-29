@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -I %swift_src_root/lib/ClangImporter/SwiftBridging -Xfrontend -disable-availability-checking)
 
+// REQUIRES: executable_test
+
 // Temporarily disable when running with an older runtime (rdar://128681137)
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
@@ -61,7 +63,7 @@ LifetimeMethodsTestSuite.test("virtual retain/release") {
 LifetimeMethodsTestSuite.test("overridden virtual retain/release") {
   let a = DerivedVirtualRetainRelease(456)
   expectEqual(a.value, 456)
-  expectTrue(a.calledDerived)
+  expectFalse(a.calledBase) // in optimized builds, we might not call retain/release at all
   expectTrue(a.refCount > 0)
   expectTrue(a.refCount < 10) // optimizations would affect the exact number
 }
