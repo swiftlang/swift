@@ -96,23 +96,23 @@ extension MutatingContext {
   func inlineFunction(apply: FullApplySite, mandatoryInline: Bool) {
     // This is only a best-effort attempt to notify the new cloned instructions as changed.
     // TODO: get a list of cloned instructions from the `inlineFunction`
-    let instAfterInling: Instruction?
+    let instAfterInlining: Instruction?
     switch apply {
     case is ApplyInst:
-      instAfterInling = apply.next
+      instAfterInlining = apply.next
     case let beginApply as BeginApplyInst:
       let next = beginApply.next!
-      instAfterInling = (next is EndApplyInst ? nil : next)
+      instAfterInlining = (next is EndApplyInst ? nil : next)
     case is TryApplyInst:
-      instAfterInling = apply.parentBlock.next?.instructions.first
+      instAfterInlining = apply.parentBlock.next?.instructions.first
     default:
-      instAfterInling = nil
+      instAfterInlining = nil
     }
 
     bridgedPassContext.inlineFunction(apply.bridged, mandatoryInline)
 
-    if let instAfterInling = instAfterInling {
-      notifyNewInstructions(from: apply, to: instAfterInling)
+    if let instAfterInlining = instAfterInlining {
+      notifyNewInstructions(from: apply, to: instAfterInlining)
     }
   }
 
