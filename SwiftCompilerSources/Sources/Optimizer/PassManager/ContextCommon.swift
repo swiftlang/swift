@@ -113,7 +113,8 @@ extension MutatingContext {
     bridgedPassContext.inlineFunction(apply.bridged, mandatoryInline)
 
     if let instBeforeInlining = instBeforeInlining?.next,
-       let instAfterInlining = instAfterInlining {
+       let instAfterInlining = instAfterInlining,
+       !instAfterInlining.isDeleted {
       notifyNewInstructions(from: instBeforeInlining, to: instAfterInlining)
     }
   }

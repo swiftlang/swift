@@ -10,8 +10,6 @@
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_LifetimeDependence
 
-// XFAIL: *
-
 struct NoEscapeNoCopy: ~Escapable, ~Copyable {}
 
 protocol Foo {
