@@ -824,6 +824,46 @@ bb0:
   return %12 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @testNonConstStruct1 :
+// CHECK:         [[S:%.*]] = struct $S
+// CHECK:         partial_apply [callee_guaranteed] {{%[0-9]+}}([[S]])
+// CHECK:       } // end sil function 'testNonConstStruct1'
+sil [ossa] @testNonConstStruct1 : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = struct $Bool (%2)
+  %4 = struct $S (%0, %3)
+  %5 = function_ref @closureWithStruct : $@convention(thin) (Str, S) -> Builtin.Int32
+  %6 = partial_apply [callee_guaranteed] %5(%4) : $@convention(thin) (Str, S) -> Builtin.Int32
+  %7 = convert_escape_to_noescape %6 to $@noescape @callee_guaranteed (Str) -> Builtin.Int32
+  %8 = function_ref @useIntClosure : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Builtin.Int32) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Builtin.Int32) -> ()
+  destroy_value %7
+  destroy_value %6
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testNonConstStruct2 :
+// CHECK:         [[S:%.*]] = struct $S
+// CHECK:         partial_apply [callee_guaranteed] {{%[0-9]+}}([[S]])
+// CHECK:       } // end sil function 'testNonConstStruct2'
+sil [ossa] @testNonConstStruct2 : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = integer_literal $Builtin.Int32, 3
+  %2 = struct $Int32 (%1)
+  %4 = struct $S (%2, %0)
+  %5 = function_ref @closureWithStruct : $@convention(thin) (Str, S) -> Builtin.Int32
+  %6 = partial_apply [callee_guaranteed] %5(%4) : $@convention(thin) (Str, S) -> Builtin.Int32
+  %7 = convert_escape_to_noescape %6 to $@noescape @callee_guaranteed (Str) -> Builtin.Int32
+  %8 = function_ref @useIntClosure : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Builtin.Int32) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@noescape @callee_guaranteed (Str) -> Builtin.Int32) -> ()
+  destroy_value %7
+  destroy_value %6
+  %12 = tuple ()
+  return %12 : $()
+}
+
 // CHECK-LABEL: sil shared [ossa] @$s17closureWithStruct4main1SVs5Int32VSbTf3npSSi3Si0_n : $@convention(thin) (Str) -> Builtin.Int32 {
 // CHECK:       bb0(%0 : $Str):
 // CHECK:         %1 = integer_literal $Builtin.Int32, 3
