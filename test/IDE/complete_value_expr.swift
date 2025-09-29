@@ -913,10 +913,10 @@ func testChainedCalls2() {
 
 func testChainedCalls3() {
   // doBaz() takes a Double.  Check that we can recover.
-  SomeBuilder(42).doFoo().doBaz(SomeBuilder(24))#^CHAINED_CALLS_3?xfail=FIXME^#
+  SomeBuilder(42).doFoo().doBaz(SomeBuilder(24))#^CHAINED_CALLS_3^#
 // CHAINED_CALLS_3-DAG: Decl[InstanceMethod]/CurrNominal: .doFoo()[#SomeBuilder#]{{; name=.+$}}
 // CHAINED_CALLS_3-DAG: Decl[InstanceMethod]/CurrNominal: .doBar()[#SomeBuilder#]{{; name=.+$}}
-// CHAINED_CALLS_3-DAG: Decl[InstanceMethod]/CurrNominal: .doBaz({#z: Double#})[#SomeBuilder#]{{; name=.+$}}
+// CHAINED_CALLS_3-DAG: Decl[InstanceMethod]/CurrNominal: .doBaz({#(z): Double#})[#SomeBuilder#]{{; name=.+$}}
 // CHAINED_CALLS_3-DAG: Keyword[self]/CurrNominal: .self[#SomeBuilder#]; name=self
 }
 
