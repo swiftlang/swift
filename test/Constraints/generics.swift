@@ -472,7 +472,9 @@ do {
 }
 
 class testStdlibType {
-  let _: Array // expected-error {{reference to generic type 'Array' requires arguments in <...>}} {{15-15=<Any>}}
+  let _: Array
+  // expected-error@-1 {{reference to generic type 'Array' requires arguments in <...>}} {{15-15=<Any>}}
+  // expected-error@-2 {{property declaration does not bind any variables}}
 }
 
 // rdar://problem/32697033

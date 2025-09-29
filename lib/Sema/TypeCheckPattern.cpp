@@ -866,7 +866,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     // If we're type checking this pattern in a context that can provide type
     // information, then the lack of type information is not an error.
     if (options & TypeResolutionFlags::AllowUnspecifiedTypes)
-      return Context.TheUnresolvedType;
+      return PlaceholderType::get(Context, P);
 
     Context.Diags.diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
     if (auto named = dyn_cast<NamedPattern>(P)) {
@@ -946,7 +946,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
       return ErrorType::get(Context);
     }
 
-    return Context.TheUnresolvedType;
+    return PlaceholderType::get(Context, P);
   }
   llvm_unreachable("bad pattern kind!");
 }
@@ -1736,41 +1736,18 @@ Pattern *TypeChecker::coercePatternToType(
 /// contextual type.
 void TypeChecker::coerceParameterListToType(ParameterList *P,
                                             AnyFunctionType *FN) {
-
-  // Local function to check if the given type is valid e.g. doesn't have
-  // errors, type variables or unresolved types related to it.
-  auto isValidType = [](Type type) -> bool {
-    return !(type->hasError() || type->hasUnresolvedType());
-  };
-
-  // Local function to check whether type of given parameter
-  // should be coerced to a given contextual type or not.
-  auto shouldOverwriteParam = [&](ParamDecl *param) -> bool {
-    return !isValidType(param->getTypeInContext());
-  };
-
-  auto handleParameter = [&](ParamDecl *param, Type ty, bool forceMutable) {
-    if (forceMutable)
-      param->setSpecifier(ParamDecl::Specifier::InOut);
-
-    // If contextual type is invalid and we have a valid argument type
-    // trying to coerce argument to contextual type would mean erasing
-    // valuable diagnostic information.
-    if (isValidType(ty) || shouldOverwriteParam(param)) {
-      param->setInterfaceType(ty->mapTypeOutOfContext());
-    }
-  };
-
   // Coerce each parameter to the respective type.
   ArrayRef<AnyFunctionType::Param> params = FN->getParams();
   for (unsigned i = 0, e = P->size(); i != e; ++i) {
     auto &param = P->get(i);
     assert(param->getArgumentName().empty() &&
            "Closures cannot have API names");
-    
-    handleParameter(param,
-                    params[i].getParameterType(),
-                    params[i].isInOut());
     assert(!param->isDefaultArgument() && "Closures cannot have default args");
+
+    if (params[i].isInOut())
+      param->setSpecifier(ParamDecl::Specifier::InOut);
+
+    param->setInterfaceType(
+        params[i].getParameterType()->mapTypeOutOfContext());
   }
 }

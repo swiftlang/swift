@@ -451,12 +451,6 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
   auto contextualPattern =
       ContextualPattern::forPatternBindingDecl(binding, entryNumber);
   Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-  if (patternType->hasError()) {
-    swift::setBoundVarsTypeError(pattern, Context);
-    binding->setInvalid();
-    pattern->setType(ErrorType::get(Context));
-    return &pbe;
-  }
 
   llvm::SmallVector<VarDecl *, 2> vars;
   binding->getPattern(entryNumber)->collectVariables(vars);
@@ -516,9 +510,7 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
 
   // If the pattern contains some form of unresolved type, we'll need to
   // check the initializer.
-  if (patternType->hasUnresolvedType() ||
-      patternType->hasPlaceholder() ||
-      patternType->hasUnboundGenericType()) {
+  if (patternType->hasPlaceholder() || patternType->hasUnboundGenericType()) {
     if (TypeChecker::typeCheckPatternBinding(binding, entryNumber,
                                              patternType)) {
       binding->setInvalid();

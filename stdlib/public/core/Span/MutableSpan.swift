@@ -280,7 +280,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableSpan where Element: ~Copyable {
 
-  /// Accesses the element at the specified position in the `Span`.
+  /// Accesses the element at the specified position in the `MutableSpan`.
   ///
   /// - Parameter position: The offset of the element to access. `position`
   ///     must be greater or equal to zero, and less than `count`.
@@ -299,7 +299,7 @@ extension MutableSpan where Element: ~Copyable {
     }
   }
 
-  /// Accesses the element at the specified position in the `Span`.
+  /// Accesses the element at the specified position in the `MutableSpan`.
   ///
   /// This subscript does not validate `position`; this is an unsafe operation.
   ///

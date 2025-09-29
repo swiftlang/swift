@@ -753,8 +753,10 @@ Pattern *resolvePattern(Pattern *P, DeclContext *dc, bool isStmtCondition);
 ///
 /// \returns the type of the pattern, which may be an error type if an
 /// unrecoverable error occurred. If the options permit it, the type may
-/// involve \c UnresolvedType (for patterns with no type information) and
+/// involve \c PlaceholderType (for patterns with no type information) and
 /// unbound generic types.
+/// TODO: We ought to expose hooks that let callers open the
+/// PlaceholderTypes directly, similar to type resolution.
 Type typeCheckPattern(ContextualPattern pattern);
 
 /// Attempt to simplify an ExprPattern into a BoolPattern or
