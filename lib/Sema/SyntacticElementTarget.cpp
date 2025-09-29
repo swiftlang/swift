@@ -36,17 +36,6 @@ SyntacticElementTarget::SyntacticElementTarget(
   assert((!contextualInfo.getType() || contextualPurpose != CTP_Unused) &&
          "Purpose for conversion type was not specified");
 
-  // Take a look at the conversion type to check to make sure it is sensible.
-  if (auto type = contextualInfo.getType()) {
-    // If we're asked to convert to an UnresolvedType, then ignore the request.
-    // This happens when CSDiags nukes a type.
-    if (type->is<UnresolvedType>() ||
-        (type->is<MetatypeType>() && type->hasUnresolvedType())) {
-      contextualInfo.typeLoc = TypeLoc();
-      contextualPurpose = CTP_Unused;
-    }
-  }
-
   kind = Kind::expression;
   expression.expression = expr;
   expression.dc = dc;
@@ -141,7 +130,7 @@ SyntacticElementTarget::forInitialization(Expr *initializer, DeclContext *dc,
   // Determine the contextual type for the initialization.
   TypeLoc contextualType;
   if (!(isa<OptionalSomePattern>(pattern) && !pattern->isImplicit()) &&
-      patternType && !patternType->is<UnresolvedType>()) {
+      patternType && !patternType->is<PlaceholderType>()) {
     contextualType = TypeLoc::withoutLoc(patternType);
 
     // Only provide a TypeLoc if it makes sense to allow diagnostics.

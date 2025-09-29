@@ -6235,6 +6235,8 @@ public:
         visit(DMT);
       } else if (isa<TypeRepr *>(originator)) {
         Printer << "type_repr";
+      } else if (isa<Pattern *>(originator)) {
+        Printer << "pattern";
       } else {
         assert(false && "unknown originator");
       }
