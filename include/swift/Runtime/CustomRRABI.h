@@ -59,8 +59,8 @@ namespace swift {
 template <typename Ret, typename Param>
 Param returnTypeHelper(Ret (*)(Param)) {}
 
-template <typename Ret, typename Param>
-Param returnTypeHelper(SWIFT_REFCOUNT_CC Ret (*)(Param)) {}
+// template <typename Ret, typename Param>
+// Param returnTypeHelper(SWIFT_REFCOUNT_CC Ret (*)(Param)) {}
 
 #if defined(__LP64__) || defined(_LP64)
 #define REGISTER_SUBSTITUTION_PREFIX ""
