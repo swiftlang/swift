@@ -3713,6 +3713,37 @@ void AttributeChecker::visitInlineAttr(InlineAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::attr_inline_always_no_usable_from_inline);
     return;
   }
+  // Check that @inline(always) is only used on statically dispatched methods
+  // (final, static, and methods in extensions mostly).
+  bool isAccessorDecl = false;
+  if (auto *accessorDecl = dyn_cast<AccessorDecl>(D)) {
+    VD = accessorDecl->getStorage();
+    isAccessorDecl = true;
+  }
+
+  auto dc = dyn_cast<ClassDecl>(VD->getDeclContext());
+  if (!dc)
+   return;
+  // In a `class` context.
+
+  if (dc->isActor())
+    return;
+
+  if (auto *vd = dyn_cast<VarDecl>(VD)) {
+    if (vd->isFinal())
+      return;
+    if (isAccessorDecl) {
+      diagnoseAndRemoveAttr(attr, diag::attr_inline_always_on_accessor);
+    } else {
+      diagnoseAndRemoveAttr(attr, diag::attr_inline_always_requires_final_method,
+                            vd->getName(), true/*isVar*/);
+    }
+  } else if (auto *afd = dyn_cast<AbstractFunctionDecl>(VD)) {
+    if (afd->isFinal())
+      return;
+    diagnoseAndRemoveAttr(attr, diag::attr_inline_always_requires_final_method,
+                              afd->getName(), false/*isVar*/);
+  }
 }
 
 void AttributeChecker::visitInlinableAttr(InlinableAttr *attr) {
