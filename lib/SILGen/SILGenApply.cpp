@@ -7306,12 +7306,16 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
     return base.isLValue() || base.isPlusZeroRValueOrTrivial()
       || !SGF.silConv.useLoweredAddresses();
 
-  case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Indirect_In_Guaranteed: {
+    if (accessor.isBorrowAccessor()) {
+      return false;
+    }
     // We can pass the memory we already have at +0. The memory referred to
     // by the base should be already immutable unless it was lowered as an
     // lvalue.
     return base.isLValue()
       || !SGF.silConv.useLoweredAddresses();
+  }
 
   // If the accessor wants the value directly, we definitely have to
   // load.

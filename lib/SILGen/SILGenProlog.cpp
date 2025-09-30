@@ -728,13 +728,15 @@ private:
                                         : AbstractionPattern(substType));
 
       // A parameter can be directly marked as addressable, or its
-      // addressability can be implied by a scoped dependency.
-      bool isAddressable = false;
-      
-      isAddressable = pd->isAddressable()
-        || (ScopedDependencies.contains(pd)
-            && SGF.getTypeProperties(origType, substType)
-                  .isAddressableForDependencies());
+      // addressability can be implied by a scoped dependency or a borrow
+      // dependency.
+      bool isAddressable =
+          pd->isAddressable() ||
+          (ScopedDependencies.contains(pd) &&
+           SGF.getTypeProperties(origType, substType)
+               .isAddressableForDependencies()) ||
+          SGF.getFunction().getConventions().hasGuaranteedAddressResult() ||
+          SGF.getFunction().getConventions().hasGuaranteedResult();
       paramValue = argEmitter.handleParam(origType, substType, pd,
                                           isAddressable);
     }
