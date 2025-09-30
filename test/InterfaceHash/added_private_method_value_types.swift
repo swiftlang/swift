@@ -6,7 +6,7 @@
 // RUN: cp %t/a.swift %t/x.swift
 // RUN: %target-swift-frontend -typecheck -primary-file %t/x.swift -emit-reference-dependencies-path %t/x.swiftdeps -module-name main
 // RUN: %{python} %S/../Inputs/process_fine_grained_swiftdeps_with_fingerprints.py %swift-dependency-tool %t/x.swiftdeps > %t/a-processed.swiftdeps
-// RUN: cp %t/b.swift %t/x.swiftt
+// RUN: cp %t/b.swift %t/x.swift
 // RUN: %target-swift-frontend -typecheck -primary-file %t/x.swift -emit-reference-dependencies-path %t/x.swiftdeps -module-name main
 // RUN: %{python} %S/../Inputs/process_fine_grained_swiftdeps_with_fingerprints.py %swift-dependency-tool %t/x.swiftdeps > %t/b-processed.swiftdeps
 
