@@ -693,6 +693,12 @@ private extension MovableInstructions {
     accessPath: AccessPath,
     context: FunctionPassContext
   ) -> Bool {
+
+    // If the memory is not initialized at all exits, it would be wrong to insert stores at exit blocks.
+    guard memoryIsInitializedAtAllExits(of: loop, accessPath: accessPath, context) else {
+      return false
+    }
+
     // Initially load the value in the loop pre header.
     let builder = Builder(before: loop.preheader!.terminator, context)
     var firstStore: StoreInst?
@@ -830,6 +836,40 @@ private extension MovableInstructions {
     }
     
     return changed
+  }
+
+  func memoryIsInitializedAtAllExits(of loop: Loop, accessPath: AccessPath, _ context: FunctionPassContext) -> Bool {
+
+    // Perform a simple dataflow analysis which checks if there is a path from a `load [take]`
+    // (= the only kind of instruction which can de-initialize the memory) to a loop exit without
+    // a `store` in between.
+
+    var stores = InstructionSet(context)
+    defer { stores.deinitialize() }
+    for case let store as StoreInst in loadsAndStores where store.storesTo(accessPath) {
+      stores.insert(store)
+    }
+
+    var exitInsts = InstructionSet(context)
+    defer { exitInsts.deinitialize() }
+    exitInsts.insert(contentsOf: loop.exitBlocks.lazy.map { $0.instructions.first! })
+
+    var worklist = InstructionWorklist(context)
+    defer { worklist.deinitialize() }
+    for case let load as LoadInst in loadsAndStores where load.loadOwnership == .take && load.loadsFrom(accessPath) {
+      worklist.pushIfNotVisited(load)
+    }
+
+    while let inst = worklist.pop() {
+      if stores.contains(inst) {
+        continue
+      }
+      if exitInsts.contains(inst) {
+        return false
+      }
+      worklist.pushSuccessors(of: inst)
+    }
+    return true
   }
 }
 
