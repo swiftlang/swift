@@ -63,6 +63,7 @@
 #endif
 
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/SwiftDtoa.h"
 #include "swift/Basic/Lazy.h"
 
 #include "swift/Threading/Thread.h"
@@ -171,6 +172,46 @@ static locale_t getCLocale() {
 }
 #endif
 #endif // SWIFT_STDLIB_HAS_LOCALE
+
+#if SWIFT_DTOA_PASS_FLOAT16_AS_FLOAT
+using _CFloat16Argument = float;
+#else
+using _CFloat16Argument = _Float16;
+#endif
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+__swift_ssize_t swift_float16ToString(char *Buffer, size_t BufferLength,
+                                      _CFloat16Argument Value, bool Debug) {
+#if SWIFT_DTOA_PASS_FLOAT16_AS_FLOAT
+  __fp16 v = Value;
+  return swift_dtoa_optimal_binary16_p(&v, Buffer, BufferLength);
+#else
+  return swift_dtoa_optimal_binary16_p(&Value, Buffer, BufferLength);
+#endif
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+uint64_t swift_float32ToString(char *Buffer, size_t BufferLength,
+                               float Value, bool Debug) {
+  return swift_dtoa_optimal_float(Value, Buffer, BufferLength);
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+uint64_t swift_float64ToString(char *Buffer, size_t BufferLength,
+                               double Value, bool Debug) {
+  return swift_dtoa_optimal_double(Value, Buffer, BufferLength);
+}
+
+// We only support float80 on platforms that use that exact format for 'long double'
+// This should match the conditionals in Runtime.swift
+#if !defined(_WIN32) && !defined(__ANDROID__) && (defined(__i386__) || defined(__i686__) || defined(__x86_64__))
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
+                               long double Value, bool Debug) {
+  // SwiftDtoa.cpp automatically enables float80 on platforms that use it for 'long double'
+  return swift_dtoa_optimal_float80_p(&Value, Buffer, BufferLength);
+}
+#endif
 
 #if SWIFT_STDLIB_HAS_STDIN
 
