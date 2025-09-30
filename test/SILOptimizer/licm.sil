@@ -2032,3 +2032,59 @@ bb3:
   return %r
 }
 
+// CHECK-LABEL: sil [ossa] @load_copy_followed_by_take :
+// CHECK:       bb1([[V:%.*]] : @owned $S):
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[V]]
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK-NEXT:      = move_value [[V]]
+// CHECK-LABEL: } // end sil function 'load_copy_followed_by_take'
+sil [ossa] @load_copy_followed_by_take : $@convention(thin) (@inout S) -> () {
+bb0(%0 : $*S):
+  br bb1
+
+bb1:
+  %4 = load [copy] %0
+  destroy_value %4
+  %6 = load [take] %0
+  %7 = move_value %6
+  store %7 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @projected_load_copy_followed_by_take :
+// CHECK:       bb1([[V:%.*]] : @owned $S):
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT:    [[SE:%.*]] = struct_extract [[B]]
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[SE]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK-NEXT:    ({{%[0-9]+}}, [[S:%.*]]) = destructure_struct [[V]]
+// CHECK-NEXT:      = struct $S (%1 : $Int, [[S]] : $String)
+// CHECK-LABEL: } // end sil function 'projected_load_copy_followed_by_take'
+sil [ossa] @projected_load_copy_followed_by_take : $@convention(thin) (@inout S, Int) -> () {
+bb0(%0 : $*S, %1 : $Int):
+  br bb1
+
+bb1:
+  %43 = struct_element_addr %0, #S.s
+  %4 = load [copy] %43
+  destroy_value %4
+  %48 = load [take] %43
+  %49 = struct $S (%1, %48)
+  store %49 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}

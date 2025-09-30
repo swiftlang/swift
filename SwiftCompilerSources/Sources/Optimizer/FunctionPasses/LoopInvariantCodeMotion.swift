@@ -798,7 +798,13 @@ private extension MovableInstructions {
       let rootVal = currentVal ?? ssaUpdater.getValue(inMiddleOf: block)
       
       if loadInst.operand.value.accessPath == accessPath {
-        loadInst.replace(with: rootVal, context)
+        if loadInst.loadOwnership == .copy {
+          let builder = Builder(before: loadInst, context)
+          let copy = builder.createCopyValue(operand: rootVal)
+          loadInst.replace(with: copy, context)
+        } else {
+          loadInst.replace(with: rootVal, context)
+        }
         changed = true
         continue
       }
@@ -808,7 +814,11 @@ private extension MovableInstructions {
       }
     
       let builder = Builder(before: loadInst, context)
-      let projection = rootVal.createProjection(path: projectionPath, builder: builder)
+      let projection = if loadInst.loadOwnership == .copy {
+        rootVal.createProjectionAndCopy(path: projectionPath, builder: builder)
+      } else {
+        rootVal.createProjection(path: projectionPath, builder: builder)
+      }
       loadInst.replace(with: projection, context)
       
       changed = true
