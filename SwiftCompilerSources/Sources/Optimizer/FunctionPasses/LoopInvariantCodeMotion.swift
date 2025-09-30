@@ -693,6 +693,12 @@ private extension MovableInstructions {
     accessPath: AccessPath,
     context: FunctionPassContext
   ) -> Bool {
+
+    // If the memory is not initialized at all exits, it would be wrong to insert stores at exit blocks.
+    guard memoryIsInitializedAtAllExits(of: loop, accessPath: accessPath, context) else {
+      return false
+    }
+
     // Initially load the value in the loop pre header.
     let builder = Builder(before: loop.preheader!.terminator, context)
     var firstStore: StoreInst?
@@ -721,7 +727,18 @@ private extension MovableInstructions {
     guard let firstStore else {
       return false
     }
-    
+
+    // We currently don't support split `load [take]`, i.e. `load [take]` which does _not_ load all
+    // non-trivial fields of the initial value.
+    for case let load as LoadInst in loadsAndStores {
+      if load.loadOwnership == .take,
+         let path = accessPath.getProjection(to: load.address.accessPath),
+         !firstStore.destination.type.isProjectingEntireNonTrivialMembers(path: path, in: load.parentFunction)
+      {
+        return false
+      }
+    }
+
     var ssaUpdater = SSAUpdater(
       function: firstStore.parentFunction,
       type: firstStore.destination.type.objectType,
@@ -792,7 +809,13 @@ private extension MovableInstructions {
       let rootVal = currentVal ?? ssaUpdater.getValue(inMiddleOf: block)
       
       if loadInst.operand.value.accessPath == accessPath {
-        loadInst.replace(with: rootVal, context)
+        if loadInst.loadOwnership == .copy {
+          let builder = Builder(before: loadInst, context)
+          let copy = builder.createCopyValue(operand: rootVal)
+          loadInst.replace(with: copy, context)
+        } else {
+          loadInst.replace(with: rootVal, context)
+        }
         changed = true
         continue
       }
@@ -802,7 +825,11 @@ private extension MovableInstructions {
       }
     
       let builder = Builder(before: loadInst, context)
-      let projection = rootVal.createProjection(path: projectionPath, builder: builder)
+      let projection = if loadInst.loadOwnership == .copy {
+        rootVal.createProjectionAndCopy(path: projectionPath, builder: builder)
+      } else {
+        rootVal.createProjection(path: projectionPath, builder: builder)
+      }
       loadInst.replace(with: projection, context)
       
       changed = true
@@ -830,6 +857,69 @@ private extension MovableInstructions {
     }
     
     return changed
+  }
+
+  func memoryIsInitializedAtAllExits(of loop: Loop, accessPath: AccessPath, _ context: FunctionPassContext) -> Bool {
+
+    // Perform a simple dataflow analysis which checks if there is a path from a `load [take]`
+    // (= the only kind of instruction which can de-initialize the memory) to a loop exit without
+    // a `store` in between.
+
+    var stores = InstructionSet(context)
+    defer { stores.deinitialize() }
+    for case let store as StoreInst in loadsAndStores where store.storesTo(accessPath) {
+      stores.insert(store)
+    }
+
+    var exitInsts = InstructionSet(context)
+    defer { exitInsts.deinitialize() }
+    exitInsts.insert(contentsOf: loop.exitBlocks.lazy.map { $0.instructions.first! })
+
+    var worklist = InstructionWorklist(context)
+    defer { worklist.deinitialize() }
+    for case let load as LoadInst in loadsAndStores where load.loadOwnership == .take && load.loadsFrom(accessPath) {
+      worklist.pushIfNotVisited(load)
+    }
+
+    while let inst = worklist.pop() {
+      if stores.contains(inst) {
+        continue
+      }
+      if exitInsts.contains(inst) {
+        return false
+      }
+      worklist.pushSuccessors(of: inst)
+    }
+    return true
+  }
+}
+
+private extension Type {
+  func isProjectingEntireNonTrivialMembers(path: SmallProjectionPath, in function: Function) -> Bool {
+    let (kind, index, subPath) = path.pop()
+    switch kind {
+    case .root:
+      return true
+    case .structField:
+      guard let fields = getNominalFields(in: function) else {
+        return false
+      }
+      for (fieldIdx, fieldType) in fields.enumerated() {
+        if fieldIdx != index && !fieldType.isTrivial(in: function) {
+          return false
+        }
+      }
+      return fields[index].isProjectingEntireNonTrivialMembers(path: subPath, in: function)
+    case .tupleField:
+      for (elementIdx, elementType) in tupleElements.enumerated() {
+        if elementIdx != index && !elementType.isTrivial(in: function) {
+          return false
+        }
+      }
+      return tupleElements[index].isProjectingEntireNonTrivialMembers(path: subPath, in: function)
+    default:
+      fatalError("path is not materializable")
+    }
   }
 }
 
