@@ -1,3 +1,4 @@
+// REQUIRES: swift84597
 // RUN: not %target-swift-frontend %s -typecheck -I %S/Inputs -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
 
 import StdVector
