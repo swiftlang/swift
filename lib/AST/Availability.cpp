@@ -479,8 +479,9 @@ AvailabilityContext ASTContext::getSwift50Availability() {
 }
 
 AvailabilityContext ASTContext::getOpaqueTypeAvailability() {
-  return getSwift51Availability();
+    return AvailabilityContext::alwaysAvailable();
 }
+
 
 AvailabilityContext ASTContext::getObjCClassStubsAvailability() {
   return getSwift51Availability();
