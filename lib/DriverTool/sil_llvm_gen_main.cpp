@@ -393,6 +393,13 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
     return 1;
   }
 
+  CI.performSema();
+
+  // If parsing produced an error, don't run any passes.
+  bool HadError = CI.getASTContext().hadError();
+  if (HadError)
+    exit(-1);
+
   llvm::vfs::OnDiskOutputBackend Backend;
   auto outFile = Backend.createFile(options.OutputFilename);
   if (!outFile) {
