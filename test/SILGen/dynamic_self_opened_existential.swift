@@ -19,8 +19,7 @@ func f(_ p: any P & C) {
   p.v.g1()
   p.v.g2()
 
-  // FIXME
-  // p[].g1()
-  // p[].g2()
+  p[].g1()
+  p[].g2()
 }
 
