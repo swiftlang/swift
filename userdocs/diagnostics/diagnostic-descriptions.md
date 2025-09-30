@@ -39,3 +39,4 @@ presented specially within your IDE of choice. See below for the full list of th
 - <doc:opaque-type-inference>
 - <doc:mutable-global-variable>
 - <doc:existential-member-access-limitations>
+- <doc:performance-hints>
