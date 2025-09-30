@@ -64,11 +64,11 @@ inline RT_Kind classifyInstruction(const llvm::Instruction &I) {
     .Case("__swift_" #TextualName, RT_ ## Name)
 #include "LLVMSwift.def"
 
-    // Identify "Inlined" versions of reference counting entry points.
+    // Identify "Client" versions of reference counting entry points.
 #define SWIFT_FUNC(Name, MemBehavior, TextualName) \
-    .Case("swift_" #TextualName "Inlined", RT_ ## Name)
+    .Case("swift_" #TextualName "Client", RT_ ## Name)
 #define SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(Name, MemBehavior, TextualName) \
-    .Case("__swift_" #TextualName "Inlined", RT_ ## Name)
+    .Case("__swift_" #TextualName "Client", RT_ ## Name)
 #include "LLVMSwift.def"
 
     // Support non-atomic versions of reference counting entry points.
