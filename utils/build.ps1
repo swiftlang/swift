@@ -3064,7 +3064,7 @@ function Build-XCTest([Hashtable] $Platform) {
   $SwiftFlags = if ($Platform.OS -eq [OS]::Windows) {
     @();
   } else {
-    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\lib\swift");
+    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\include");
   }
 
   Build-CMakeProject `
@@ -3127,7 +3127,7 @@ function Build-Testing([Hashtable] $Platform) {
   $SwiftFlags = if ($Platform.OS -eq [OS]::Windows) {
     @();
   } else {
-    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\lib\swift");
+    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\include");
   }
 
   Build-CMakeProject `
