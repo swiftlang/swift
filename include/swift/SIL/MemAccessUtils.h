@@ -1811,9 +1811,11 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
       return asImpl().visitUnidentified(sourceAddr);
 
     if (isGuaranteedAddressReturn(sourceAddr)) {
-      return asImpl().visitAccessProjection(
-          cast<ApplyInst>(sourceAddr),
-          &cast<ApplyInst>(sourceAddr)->getSelfArgumentOperand());
+      auto *selfOp = &cast<ApplyInst>(sourceAddr)->getSelfArgumentOperand();
+      if (selfOp->get()->getType().isObject()) {
+        return asImpl().visitUnidentified(sourceAddr);
+      }
+      return asImpl().visitAccessProjection(cast<ApplyInst>(sourceAddr), selfOp);
     }
 
     // Don't currently allow any other calls to return an accessed address.
