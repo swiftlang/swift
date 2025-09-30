@@ -1809,7 +1809,6 @@ namespace {
       result = adjustTypeForDeclReference(result, resultTySelf,
                                           resultType(adjustedRefTySelf),
                                           locator);
-      closeExistentials(result, locator);
 
       // If the property is of dynamic 'Self' type, wrap an implicit
       // conversion around the resulting expression, with the destination
@@ -1820,6 +1819,8 @@ namespace {
         result = cs.cacheType(new (ctx) CovariantReturnConversionExpr(
             result, resultTy));
       }
+
+      closeExistentials(result, locator);
 
       // If we need to load, do so now.
       if (loadImmediately) {
