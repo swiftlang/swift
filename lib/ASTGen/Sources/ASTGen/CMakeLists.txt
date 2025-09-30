@@ -20,7 +20,6 @@ add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
   Regex.swift
   SourceFile.swift
   StableHasher.swift
-  StaticBuildConfiguration+ASTContext.swift
   Stmts.swift
   TypeAttrs.swift
   Types.swift
@@ -38,4 +37,5 @@ add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
     _CompilerSwiftParser
     _CompilerSwiftParserDiagnostics
     _CompilerSwiftDiagnostics
+    swiftBasicSwift
 )

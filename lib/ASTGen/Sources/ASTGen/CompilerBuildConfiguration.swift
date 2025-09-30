@@ -10,11 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
+import BasicBridging
 import ASTBridging
+import swiftBasicSwift
 import SwiftDiagnostics
 @_spi(Compiler) import SwiftIfConfig
 @_spi(ExperimentalLanguageFeatures) import SwiftParser
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+
+extension BridgedASTContext {
+  /// Retrieve the (cached) static build configuration for this ASTContext.
+  public var staticBuildConfiguration: StaticBuildConfiguration {
+    staticBuildConfigurationPtr.assumingMemoryBound(
+      to: StaticBuildConfiguration.self
+    ).pointee
+  }
+}
 
 /// A build configuration that uses the compiler's ASTContext to answer
 /// queries.

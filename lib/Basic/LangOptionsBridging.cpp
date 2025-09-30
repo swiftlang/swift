@@ -37,11 +37,6 @@ bool BridgedLangOptions_hasFeatureNamed(BridgedLangOptions cLangOpts,
   return cLangOpts.unbridged().hasFeature(cName.unbridged());
 }
 
-bool BridgedLangOptions_hasAttributeNamed(BridgedLangOptions cLangOpts,
-                                          BridgedStringRef cName) {
-  return hasAttribute(cLangOpts.unbridged(), cName.unbridged());
-}
-
 bool BridgedLangOptions_isActiveTargetOS(BridgedLangOptions cLangOpts,
                                          BridgedStringRef cName) {
   return cLangOpts.unbridged().checkPlatformCondition(
@@ -121,6 +116,90 @@ SwiftInt BridgedLangOptions_getTargetAtomicBitWidths(
                       cElements);
 }
 
+namespace {
+
+/// Describe behaviors that should prevent an attribute from being shown.
+///
+/// This is DeclAttrBehaviors, but with irrelevent values set to zero.
+enum DeclAttrBehaviorsNotShown : uint64_t {
+  /// Whether this attribute is only valid when concurrency is enabled.
+  ConcurrencyOnly = 0,
+
+  /// True if multiple instances of this attribute are allowed on a single
+  /// declaration.
+  AllowMultipleAttributes = 0,
+
+  /// True if this is a decl modifier - i.e., that it should not be spelled
+  /// with an @.
+  DeclModifier = 1ull << 2,
+
+  /// True if this is a long attribute that should be printed on its own line.
+  ///
+  /// Currently has no effect on DeclModifier attributes.
+  LongAttribute = 0,
+
+  /// True if this shouldn't be serialized.
+  NotSerialized = 0,
+
+  /// True if this attribute is only valid when parsing a .sil file.
+  SILOnly = 1ull << 5,
+
+  /// The attribute should be reported by parser as unknown.
+  RejectByParser = 1ull << 6,
+
+  /// Whether client code cannot use the attribute. Hides it in code completion.
+  UserInaccessible = 1ull << 7,
+
+  /// Whether adding this attribute can break API
+  APIBreakingToAdd = 0,
+
+  /// Whether removing this attribute can break API
+  APIBreakingToRemove = 0,
+
+  /// Whether adding this attribute can break ABI
+  ABIBreakingToAdd = 0,
+
+  /// Whether removing this attribute can break ABI
+  ABIBreakingToRemove = 0,
+
+  /// The opposite of APIBreakingToAdd
+  APIStableToAdd = 0,
+
+  /// The opposite of APIBreakingToRemove
+  APIStableToRemove = 0,
+
+  /// The opposite of ABIBreakingToAdd
+  ABIStableToAdd = 0,
+
+  /// The opposite of ABIBreakingToRemove
+  ABIStableToRemove = 0,
+
+  /// Attribute should not be used in an \c \@abi attribute. Use for
+  /// attributes which cannot affect mangled names, even indirectly, and
+  /// which either don't affect ABI or where ABI-only declarations get their
+  /// behavior from their API counterpart.
+  ForbiddenInABIAttr = 0,
+
+  /// Attribute can be used without restrictions in an \c \@abi attribute.
+  /// Use for attributes which affect mangled names but otherwise don't alter
+  /// the ABI, or ones where the \c ABIDeclChecker manually implements
+  /// special checking logic (e.g. because several different attributes
+  /// contribute to the same aspect of ABI in some complicated way).
+  UnconstrainedInABIAttr = 0,
+
+  /// Attribute can be used in an \c \@abi attribute, but must match
+  /// equivalent on API decl. Use for attributes which affect both mangled
+  /// names and other parts of the ABI such that the declaration can only be
+  /// valid if they match.
+  EquivalentInABIAttr = 0,
+
+  /// Use for attributes which are \em only valid on declarations that cannot
+  /// have an \c @abi attribute, such as \c ImportDecl .
+  UnreachableInABIAttr = 0,
+};
+
+}
+
 void BridgedLangOptions_enumerateBuildConfigurationEntries(
     BridgedLangOptions cLangOpts,
     void * _Nonnull callbackContext,
@@ -143,13 +222,13 @@ void BridgedLangOptions_enumerateBuildConfigurationEntries(
 
   // Enumerate attributes that are available.
 #define DECL_ATTR(SPELLING, CLASS, REQUIREMENTS, BEHAVIORS, CODE)              \
-  if (hasAttribute(langOpts, #SPELLING))                                       \
+  if ((BEHAVIORS) == 0) \
     callback(cLangOpts, callbackContext, BCKAttribute, StringRef(#SPELLING));
 #include "swift/AST/DeclAttr.def"
 
+#define SIL_TYPE_ATTR(X, C)
 #define TYPE_ATTR(SPELLING, CLASS)                                             \
-  if (hasAttribute(langOpts, #SPELLING))                                       \
-    callback(cLangOpts, callbackContext, BCKAttribute, StringRef(#SPELLING));
+  callback(cLangOpts, callbackContext, BCKAttribute, StringRef(#SPELLING));
 #include "swift/AST/TypeAttr.def"
 
   // Deal with all of the target platform/architecture information.

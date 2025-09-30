@@ -13,7 +13,9 @@
 #include "swift/AST/ASTBridging.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/AST/AvailabilitySpec.h"
+#include "swift/Bridging/BasicSwift.h"
 
 using namespace swift;
 
@@ -42,6 +44,10 @@ BridgedLangOptions BridgedASTContext_langOpts(BridgedASTContext cContext) {
 
 unsigned BridgedASTContext::getMajorLanguageVersion() const {
   return unbridged().LangOpts.EffectiveLanguageVersion[0];
+}
+
+BridgedDiagnosticEngine BridgedASTContext::getDiags() const {
+  return &unbridged().Diags;
 }
 
 bool BridgedASTContext_canImport(BridgedASTContext cContext,
@@ -81,4 +87,23 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
 
 BridgedAvailabilityMacroMap BridgedASTContext::getAvailabilityMacroMap() const {
   return &unbridged().getAvailabilityMacroMap();
+}
+
+bool BridgedLangOptions_hasAttributeNamed(BridgedLangOptions cLangOpts,
+                                          BridgedStringRef cName) {
+  return hasAttribute(cLangOpts.unbridged(), cName.unbridged());
+}
+
+void *BridgedASTContext_staticBuildConfiguration(BridgedASTContext cContext) {
+  ASTContext &ctx = cContext.unbridged();
+  void *staticBuildConfiguration = ctx.getGlobalCache().StaticBuildConfiguration;
+  if (!staticBuildConfiguration) {
+    staticBuildConfiguration =
+        swift_Basic_createStaticBuildConfiguration(ctx.LangOpts);
+    ctx.addCleanup([staticBuildConfiguration] {
+      swift_Basic_freeStaticBuildConfiguration(staticBuildConfiguration);
+    });
+  }
+
+  return staticBuildConfiguration;
 }

@@ -126,21 +126,6 @@ extension BridgedLabeledStmtInfo: /*@retroactive*/ Swift.ExpressibleByNilLiteral
   }
 }
 
-extension String {
-  init(bridged: BridgedStringRef) {
-    self.init(
-      decoding: UnsafeBufferPointer(start: bridged.data, count: bridged.count),
-      as: UTF8.self
-    )
-  }
-
-  public mutating func withBridgedString<R>(_ body: (BridgedStringRef) throws -> R) rethrows -> R {
-    try withUTF8 { buffer in
-      try body(BridgedStringRef(data: buffer.baseAddress, count: buffer.count))
-    }
-  }
-}
-
 extension SyntaxText {
   var bridged: BridgedStringRef {
     BridgedStringRef(data: self.baseAddress, count: self.count)

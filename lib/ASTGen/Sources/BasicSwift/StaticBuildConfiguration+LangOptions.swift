@@ -131,3 +131,19 @@ public func printStaticBuildConfiguration(
 
   return result ?? BridgedStringRef()
 }
+
+@_cdecl("swift_Basic_createStaticBuildConfiguration")
+public func createStaticBuildConfiguration(
+  cLangOpts: BridgedLangOptions
+) -> UnsafeMutableRawPointer {
+  let storage = UnsafeMutablePointer<StaticBuildConfiguration>.allocate(capacity: 1)
+  storage.initialize(to: StaticBuildConfiguration(langOptions: cLangOpts))
+  return UnsafeMutableRawPointer(storage)
+}
+
+/// Free the given static build configuration.
+@_cdecl("swift_Basic_freeStaticBuildConfiguration")
+public func freeStaticBuildConfiguration(pointer: UnsafeMutableRawPointer) {
+  pointer.assumingMemoryBound(to: StaticBuildConfiguration.self)
+    .deinitialize(count: 1).deallocate()
+}
