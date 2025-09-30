@@ -9792,6 +9792,7 @@ void ClangImporter::Implementation::importAttributes(
                     PlatformKind::watchOSApplicationExtension)
               .Case("xros_app_extension",
                     PlatformKind::visionOSApplicationExtension)
+              .Case("android", PlatformKind::Android)
               .Default(std::nullopt);
       if (!platformK)
         continue;
