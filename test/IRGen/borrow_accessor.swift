@@ -317,7 +317,8 @@ func test() {
 // CHECK:   [[REG2:%.*]] = getelementptr inbounds i32, ptr %"GenWrapper<T>", i64 8
 // CHECK:   [[REG3:%.*]] = load i32, ptr [[REG2]], align 8
 // CHECK:   [[REG4:%.*]] = getelementptr inbounds i8, ptr [[REG0]], i32 [[REG3]]
-// CHECK:   ret ptr [[REG4]]
+// CHECK:   [[REG5:%.*]] = load ptr, ptr [[REG4]], align 8
+// CHECK:   ret ptr [[REG5]]
 // CHECK: }
 
 // CHECK: define hidden swiftcc ptr @"$s15borrow_accessor10GenWrapperVyxSicib"(i64 [[REG0:%.*]], ptr %"GenWrapper<T>", ptr noalias swiftself [[REG1:%.*]]) #0 {

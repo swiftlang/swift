@@ -1387,18 +1387,15 @@ class DestructureResults {
   TypeExpansionContext context;
   bool hasSendingResult;
   bool isBorrowOrMutateAccessor;
-  bool hasSelfWithAddressType;
 
 public:
   DestructureResults(TypeExpansionContext context, TypeConverter &TC,
                      const Conventions &conventions,
                      SmallVectorImpl<SILResultInfo> &results,
-                     bool hasSendingResult, bool isBorrowOrMutateAccessor,
-                     bool hasSelfWithAddressType)
+                     bool hasSendingResult, bool isBorrowOrMutateAccessor)
       : TC(TC), Convs(conventions), Results(results), context(context),
         hasSendingResult(hasSendingResult),
-        isBorrowOrMutateAccessor(isBorrowOrMutateAccessor),
-        hasSelfWithAddressType(hasSelfWithAddressType) {}
+        isBorrowOrMutateAccessor(isBorrowOrMutateAccessor) {}
 
   void destructure(AbstractionPattern origType, CanType substType) {
     // Recur into tuples.
@@ -1454,8 +1451,7 @@ public:
     if (isBorrowOrMutateAccessor) {
       if (substResultTL.isTrivial()) {
         convention = ResultConvention::Unowned;
-      } else if (hasSelfWithAddressType ||
-                 isFormallyReturnedIndirectly(origType, substType,
+      } else if (isFormallyReturnedIndirectly(origType, substType,
                                               substResultTLForConvention)) {
         assert(Convs.getResult(substResultTLForConvention) ==
                ResultConvention::Guaranteed);
@@ -2728,16 +2724,12 @@ static CanSILFunctionType getSILFunctionType(
                                 coroutineOrigYieldType, coroutineSubstYieldType,
                                 yields, coroutineKind);
 
-  bool hasSelfWithAddressType =
-      extInfoBuilder.hasSelfParam() &&
-      inputs.back().getSILStorageInterfaceType().isAddress();
-
   // Destructure the result tuple type.
   SmallVector<SILResultInfo, 8> results;
   {
-    DestructureResults destructurer(
-        expansionContext, TC, conventions, results, hasSendingResult,
-        isBorrowOrMutateAccessor(constant), hasSelfWithAddressType);
+    DestructureResults destructurer(expansionContext, TC, conventions, results,
+                                    hasSendingResult,
+                                    isBorrowOrMutateAccessor(constant));
     destructurer.destructure(origResultType, substFormalResultType);
   }
 

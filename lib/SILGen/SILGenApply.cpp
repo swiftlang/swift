@@ -5471,20 +5471,28 @@ ManagedValue SILGenFunction::applyBorrowAccessor(
                ExecutorBreadcrumb());
   assert(rawResults.size() == 1);
   auto rawResult = rawResults[0];
-  if (!rawResult->getType().isMoveOnly()) {
-    return ManagedValue::forForwardedRValue(*this, rawResult);
+
+  if (fn.getFunction()->getConventions().hasGuaranteedResult()) {
+    auto selfArg = args.back().getValue();
+    if (isa<LoadBorrowInst>(selfArg)) {
+      rawResult = emitUncheckedGuaranteedConversion(rawResult);
+    }
   }
-  if (rawResult->getType().isAddress()) {
-    auto result = B.createMarkUnresolvedNonCopyableValueInst(
-        loc, rawResult,
+  if (rawResult->getType().isMoveOnly()) {
+    if (rawResult->getType().isAddress()) {
+      auto result = B.createMarkUnresolvedNonCopyableValueInst(
+          loc, rawResult,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+      return ManagedValue::forRValueWithoutOwnership(result);
+    }
+    auto result = emitManagedCopy(loc, rawResult);
+    result = B.createMarkUnresolvedNonCopyableValueInst(
+        loc, result,
         MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
-    return ManagedValue::forRValueWithoutOwnership(result);
+    return emitManagedBeginBorrow(loc, result.getValue());
   }
-  auto result = emitManagedCopy(loc, rawResult);
-  result = B.createMarkUnresolvedNonCopyableValueInst(
-      loc, result,
-      MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
-  return emitManagedBeginBorrow(loc, result.getValue());
+
+  return ManagedValue::forForwardedRValue(*this, rawResult);
 }
 
 RValue CallEmission::applyFirstLevelCallee(SGFContext C) {
