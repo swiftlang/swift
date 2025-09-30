@@ -6,7 +6,7 @@
 // will be able to have this behavior, however new apps will not. We use the
 // overrides to test the logic for legacy code remains functional.
 //
-// RUN: %env-SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=1 %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/a.out 2>&1 | %FileCheck %s --dump-input=always
+// RUN: env %env-SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=1 %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/a.out 2>&1 | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
