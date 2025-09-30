@@ -125,20 +125,32 @@ extension Value {
     return true
   }
 
+  /// Project out a sub-field of this value according to `path`.
+  /// If this is an "owned" value the result is an "owned" value which forwards the original value.
+  /// This only works if _all_ non-trivial fields are projected. Otherwise some non-trivial results of
+  /// `destructure_struct` or `destructure_tuple` will be leaked.
   func createProjection(path: SmallProjectionPath, builder: Builder) -> Value {
     let (kind, index, subPath) = path.pop()
+    let result: Value
     switch kind {
     case .root:
       return self
     case .structField:
-      let structExtract = builder.createStructExtract(struct: self, fieldIndex: index)
-      return structExtract.createProjection(path: subPath, builder: builder)
+      if ownership == .owned {
+        result = builder.createDestructureStruct(struct: self).results[index]
+      } else {
+        result = builder.createStructExtract(struct: self, fieldIndex: index)
+      }
     case .tupleField:
-      let tupleExtract = builder.createTupleExtract(tuple: self, elementIndex: index)
-      return tupleExtract.createProjection(path: subPath, builder: builder)
+      if ownership == .owned {
+        result = builder.createDestructureTuple(tuple: self).results[index]
+      } else {
+        result = builder.createTupleExtract(tuple: self, elementIndex: index)
+      }
     default:
       fatalError("path is not materializable")
     }
+    return result.createProjection(path: subPath, builder: builder)
   }
 
   func createAddressProjection(path: SmallProjectionPath, builder: Builder) -> Value {

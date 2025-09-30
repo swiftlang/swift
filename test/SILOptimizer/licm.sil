@@ -2005,3 +2005,30 @@ bb3:
   return %r
 }
 
+// CHECK-LABEL: sil [ossa] @projected_load_take :
+// CHECK:       bb1([[V:%.*]] : @owned $(S, Int)):
+// CHECK-NEXT:    ([[E:%.*]], {{%[0-9]+}}) = destructure_tuple [[V]]
+// CHECK-NEXT:    ({{%[0-9]+}}, [[S:%.*]]) = destructure_struct [[E]]
+// CHECK-NEXT:    = struct $S (%1 : $Int, [[S]] : $String)
+// CHECK-LABEL: } // end sil function 'projected_load_take'
+sil [ossa] @projected_load_take : $@convention(thin) (@inout (S, Int), Int) -> () {
+bb0(%0 : $*(S, Int), %1 : $Int):
+  br bb1
+
+bb1:
+  %2 = tuple_element_addr %0, 0
+  %3 = struct_element_addr %2, #S.s
+  %4 = load [take] %3
+  %5 = struct $S (%1, %4)
+  %6 = tuple (%5, %1)
+  store %6 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
