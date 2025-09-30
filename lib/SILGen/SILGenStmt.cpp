@@ -773,7 +773,9 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                                F.getConventions().hasGuaranteedResult()
                                    ? SGFAccessKind::BorrowedObjectRead
                                    : SGFAccessKind::BorrowedAddressRead,
-                               options.forGuaranteedReturn(true));
+                               F.getConventions().hasGuaranteedResult()
+                                   ? options.forGuaranteedReturn(true)
+                                   : options.forGuaranteedAddressReturn(true));
       auto result =
           tryEmitProjectedLValue(ret, std::move(lvalue), TSanKind::None);
       if (!result) {

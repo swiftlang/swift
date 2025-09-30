@@ -3064,7 +3064,8 @@ public:
         forGuaranteedReturn(forGuaranteedReturn),
         forGuaranteedAddressReturn(forGuaranteedAddressReturn) {}
 
-  static bool isNonCopyableBaseBorrow(SILGenFunction &SGF, Expr *e) {
+  static bool isNonCopyableBaseBorrow(SILGenFunction &SGF, Expr *e,
+                                      LValueOptions options) {
     if (auto *m = dyn_cast<MemberRefExpr>(e)) {
       // If our m is a pure noncopyable type or our base is, we need to perform
       // a noncopyable base borrow.
@@ -3072,13 +3073,22 @@ public:
       // DISCUSSION: We can have a noncopyable member_ref_expr with a copyable
       // base if the noncopyable member_ref_expr is from a computed method. In
       // such a case, we want to ensure that we wrap things the right way.
-      return m->getType()->isNoncopyable() ||
-          m->getBase()->getType()->isNoncopyable();
+      if (m->getType()->isNoncopyable() ||
+          m->getBase()->getType()->isNoncopyable()) {
+        return true;
+      }
+
+      if (options.ForGuaranteedAddressReturn || options.ForGuaranteedReturn) {
+        return true;
+      }
     }
 
     if (auto *le = dyn_cast<LoadExpr>(e)) {
       // Noncopyable type is obviously noncopyable.
       if (le->getType()->isNoncopyable()) {
+        return true;
+      }
+      if (options.ForGuaranteedAddressReturn || options.ForGuaranteedReturn) {
         return true;
       }
       // Otherwise, check if the thing we're loading from is a noncopyable
@@ -3090,6 +3100,9 @@ public:
     if (auto *de = dyn_cast<DeclRefExpr>(e)) {
       // Noncopyable type is obviously noncopyable.
       if (de->getType()->isNoncopyable()) {
+        return true;
+      }
+      if (options.ForGuaranteedAddressReturn || options.ForGuaranteedReturn) {
         return true;
       }
       // If the decl ref refers to a parameter with an explicit ownership
@@ -3115,7 +3128,7 @@ public:
   /// define a visitor stub, defer back to SILGenLValue's visitRec as it is
   /// most-likely a non-lvalue root expression.
   LValue visitExpr(Expr *e, SGFAccessKind accessKind, LValueOptions options) {
-    assert(!isNonCopyableBaseBorrow(SGF, e)
+    assert(!isNonCopyableBaseBorrow(SGF, e, options)
             && "unexpected recursion in SILGenLValue::visitRec!");
 
     return SGL.visitRec(e, accessKind, options, Orig);
@@ -3172,8 +3185,7 @@ public:
     ManagedValue mv =
         SGF.emitRValueAsSingleValue(e, SGFContext::AllowImmediatePlusZero);
 
-    if (forGuaranteedReturn && mv.getValue()->getType().isMoveOnly() &&
-        !mv.getValue()->getType().isAddress()) {
+    if (forGuaranteedReturn && mv.getValue()->getType().isMoveOnly()) {
       // SILGen eagerly generates copy_value +
       // mark_unresolved_non_copyable_value for ~Copyable base values. The
       // generated mark_unresolved_non_copyable_value instructions drive
@@ -3286,11 +3298,14 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
   // a `borrow x` operator, the operator is used on the base here), we want to
   // apply the lvalue within a formal access to the original value instead of
   // an actual loaded copy.
-  if (SILGenBorrowedBaseVisitor::isNonCopyableBaseBorrow(SGF, e) ||
-      options.ForGuaranteedReturn) {
+  if (SILGenBorrowedBaseVisitor::isNonCopyableBaseBorrow(SGF, e, options)) {
     SILGenBorrowedBaseVisitor visitor(*this, SGF, orig,
-                                      options.ForGuaranteedReturn);
+                                      options.ForGuaranteedReturn,
+                                      options.ForGuaranteedAddressReturn);
     auto accessKind = SGFAccessKind::BorrowedObjectRead;
+    if (options.ForGuaranteedAddressReturn) {
+      accessKind = SGFAccessKind::BorrowedAddressRead;
+    }
     assert(!e->getType()->is<LValueType>()
         && "maybe need SGFAccessKind::BorrowedAddressRead ?");
     return visitor.visit(e, accessKind, options);
