@@ -68,26 +68,26 @@ struct EmbeddedBuildConfiguration: BuildConfiguration {
     self.configuration = .init(ctx: ctx, sourceBuffer: sourceBuffer)
   }
 
-  func isCustomConditionSet(name: String) throws -> Bool {
+  func isCustomConditionSet(name: String) -> Bool {
     // $Embedded is set when building Embedded Swift
     if name == "$Embedded" {
       return true
     }
 
-    return try configuration.isCustomConditionSet(name: name)
+    return configuration.isCustomConditionSet(name: name)
   }
 
-  func hasFeature(name: String) throws -> Bool {
+  func hasFeature(name: String) -> Bool {
     // The "Embedded" feature is set when building Embedded Swift.
     if name == "Embedded" {
       return true
     }
 
-    return try configuration.hasFeature(name: name)
+    return configuration.hasFeature(name: name)
   }
 
-  func hasAttribute(name: String) throws -> Bool {
-    return try configuration.hasAttribute(name: name)
+  func hasAttribute(name: String) -> Bool {
+    return configuration.hasAttribute(name: name)
   }
 
   func canImport(
@@ -100,24 +100,24 @@ struct EmbeddedBuildConfiguration: BuildConfiguration {
     return false
   }
 
-  func isActiveTargetOS(name: String) throws -> Bool {
-    return try configuration.isActiveTargetOS(name: name)
+  func isActiveTargetOS(name: String) -> Bool {
+    return configuration.isActiveTargetOS(name: name)
   }
 
-  func isActiveTargetArchitecture(name: String) throws -> Bool {
-    return try configuration.isActiveTargetArchitecture(name: name)
+  func isActiveTargetArchitecture(name: String) -> Bool {
+    return configuration.isActiveTargetArchitecture(name: name)
   }
 
-  func isActiveTargetEnvironment(name: String) throws -> Bool {
-    return try configuration.isActiveTargetEnvironment(name: name)
+  func isActiveTargetEnvironment(name: String) -> Bool {
+    return configuration.isActiveTargetEnvironment(name: name)
   }
 
   func isActiveTargetRuntime(name: String) throws -> Bool {
     return try configuration.isActiveTargetRuntime(name: name)
   }
 
-  func isActiveTargetPointerAuthentication(name: String) throws -> Bool {
-    return try configuration.isActiveTargetPointerAuthentication(name: name)
+  func isActiveTargetPointerAuthentication(name: String) -> Bool {
+    return configuration.isActiveTargetPointerAuthentication(name: name)
   }
 
   var targetPointerBitWidth: Int {

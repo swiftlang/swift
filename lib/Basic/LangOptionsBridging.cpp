@@ -22,51 +22,6 @@ bool BridgedLangOptions_hasFeature(BridgedLangOptions cLangOpts,
 }
 
 
-bool BridgedLangOptions_customConditionSet(BridgedLangOptions cLangOpts,
-                                           BridgedStringRef cName) {
-  const LangOptions &langOpts = cLangOpts.unbridged();
-  auto name = cName.unbridged();
-  if (name.starts_with("$") && langOpts.hasFeature(name.drop_front()))
-    return true;
-
-  return langOpts.isCustomConditionalCompilationFlagSet(name);
-}
-
-bool BridgedLangOptions_hasFeatureNamed(BridgedLangOptions cLangOpts,
-                                        BridgedStringRef cName) {
-  return cLangOpts.unbridged().hasFeature(cName.unbridged());
-}
-
-bool BridgedLangOptions_isActiveTargetOS(BridgedLangOptions cLangOpts,
-                                         BridgedStringRef cName) {
-  return cLangOpts.unbridged().checkPlatformCondition(
-      PlatformConditionKind::OS, cName.unbridged());
-}
-
-bool BridgedLangOptions_isActiveTargetArchitecture(
-    BridgedLangOptions cLangOpts, BridgedStringRef cName) {
-  return cLangOpts.unbridged().checkPlatformCondition(
-      PlatformConditionKind::Arch, cName.unbridged());
-}
-
-bool BridgedLangOptions_isActiveTargetEnvironment(
-    BridgedLangOptions cLangOpts, BridgedStringRef cName) {
-  return cLangOpts.unbridged().checkPlatformCondition(
-      PlatformConditionKind::TargetEnvironment, cName.unbridged());
-}
-
-bool BridgedLangOptions_isActiveTargetRuntime(BridgedLangOptions cLangOpts,
-                                              BridgedStringRef cName) {
-  return cLangOpts.unbridged().checkPlatformCondition(
-      PlatformConditionKind::Runtime, cName.unbridged());
-}
-
-bool BridgedLangOptions_isActiveTargetPtrAuth(BridgedLangOptions cLangOpts,
-                                              BridgedStringRef cName) {
-  return cLangOpts.unbridged().checkPlatformCondition(
-      PlatformConditionKind::PtrAuth, cName.unbridged());
-}
-
 unsigned BridgedLangOptions::getTargetPointerBitWidth() const {
   return unbridged().Target.isArch64Bit()   ? 64
          : unbridged().Target.isArch32Bit() ? 32

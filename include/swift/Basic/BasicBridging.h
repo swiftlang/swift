@@ -505,34 +505,6 @@ SWIFT_NAME("BridgedLangOptions.hasFeature(self:_:)")
 bool BridgedLangOptions_hasFeature(BridgedLangOptions cLangOpts,
                                    BridgedFeature feature);
 
-SWIFT_NAME("BridgedLangOptions.customConditionSet(self:_:)")
-bool BridgedLangOptions_customConditionSet(BridgedLangOptions cLangOpts,
-                                           BridgedStringRef cName);
-
-SWIFT_NAME("BridgedLangOptions.hasFeatureNamed(self:_:)")
-bool BridgedLangOptions_hasFeatureNamed(BridgedLangOptions cLangOpts,
-                                        BridgedStringRef cName);
-
-SWIFT_NAME("BridgedLangOptions.isActiveTargetOS(self:_:)")
-bool BridgedLangOptions_isActiveTargetOS(BridgedLangOptions cLangOpts,
-                                         BridgedStringRef cName);
-
-SWIFT_NAME("BridgedLangOptions.isActiveTargetArchitecture(self:_:)")
-bool BridgedLangOptions_isActiveTargetArchitecture(BridgedLangOptions cLangOpts,
-                                                   BridgedStringRef cName);
-
-SWIFT_NAME("BridgedLangOptions.isActiveTargetEnvironment(self:_:)")
-bool BridgedLangOptions_isActiveTargetEnvironment(BridgedLangOptions cLangOpts,
-                                                  BridgedStringRef cName);
-
-SWIFT_NAME("BridgedLangOptions.isActiveTargetRuntime(self:_:)")
-bool BridgedLangOptions_isActiveTargetRuntime(BridgedLangOptions cLangOpts,
-                                              BridgedStringRef cName);
-
-SWIFT_NAME("BridgedLangOptions.isActiveTargetPtrAuth(self:_:)")
-bool BridgedLangOptions_isActiveTargetPtrAuth(BridgedLangOptions cLangOpts,
-                                              BridgedStringRef cName);
-
 SWIFT_NAME("BridgedLangOptions.getTargetAtomicBitWidths(self:_:)")
 SwiftInt BridgedLangOptions_getTargetAtomicBitWidths(BridgedLangOptions cLangOpts,
                                                      SwiftInt* _Nullable * _Nonnull cComponents);

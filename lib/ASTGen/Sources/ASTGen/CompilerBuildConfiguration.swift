@@ -31,32 +31,25 @@ extension BridgedASTContext {
 /// queries.
 struct CompilerBuildConfiguration: BuildConfiguration {
   let ctx: BridgedASTContext
+  let staticBuildConfiguration: StaticBuildConfiguration
   let sourceBuffer: UnsafeBufferPointer<UInt8>
 
   init(ctx: BridgedASTContext, sourceBuffer: UnsafeBufferPointer<UInt8>) {
     self.ctx = ctx
+    self.staticBuildConfiguration = ctx.staticBuildConfiguration
     self.sourceBuffer = sourceBuffer
   }
 
-  func isCustomConditionSet(name: String) throws -> Bool {
-    var name = name
-    return name.withBridgedString { nameRef in
-      ctx.langOpts.customConditionSet(nameRef)
-    }
+  func isCustomConditionSet(name: String) -> Bool {
+    staticBuildConfiguration.isCustomConditionSet(name: name)
   }
   
-  func hasFeature(name: String) throws -> Bool {
-    var name = name
-    return name.withBridgedString { nameRef in
-      ctx.langOpts.hasFeatureNamed(nameRef)
-    }
+  func hasFeature(name: String) -> Bool {
+    staticBuildConfiguration.hasFeature(name: name)
   }
   
-  func hasAttribute(name: String) throws -> Bool {
-    var name = name
-    return name.withBridgedString { nameRef in
-      ctx.langOpts.hasAttributeNamed(nameRef)
-    }
+  func hasAttribute(name: String) -> Bool {
+    staticBuildConfiguration.hasAttribute(name: name)
   }
   
   func canImport(
@@ -97,85 +90,50 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     }
   }
   
-  func isActiveTargetOS(name: String) throws -> Bool {
-    var name = name
-    return name.withBridgedString { nameRef in
-      ctx.langOpts.isActiveTargetOS(nameRef)
-    }
+  func isActiveTargetOS(name: String) -> Bool {
+    staticBuildConfiguration.isActiveTargetOS(name: name)
   }
   
-  func isActiveTargetArchitecture(name: String) throws -> Bool {
-    var name = name
-    return name.withBridgedString { nameRef in
-      ctx.langOpts.isActiveTargetArchitecture(nameRef)
-    }
+  func isActiveTargetArchitecture(name: String) -> Bool {
+    staticBuildConfiguration.isActiveTargetArchitecture(name: name)
   }
   
-  func isActiveTargetEnvironment(name: String) throws -> Bool {
-    var name = name
-    return name.withBridgedString { nameRef in
-      ctx.langOpts.isActiveTargetEnvironment(nameRef)
-    }
+  func isActiveTargetEnvironment(name: String) -> Bool {
+    staticBuildConfiguration.isActiveTargetEnvironment(name: name)
   }
   
   func isActiveTargetRuntime(name: String) throws -> Bool {
-    var name = name
-
     // Complain if the provided runtime isn't one of the known values.
     switch name {
     case "_Native", "_ObjC", "_multithreaded": break
     default: throw IfConfigError.unexpectedRuntimeCondition
     }
 
-    return name.withBridgedString { nameRef in
-      ctx.langOpts.isActiveTargetRuntime(nameRef)
-    }
+    return staticBuildConfiguration.isActiveTargetRuntime(name: name)
   }
-  
-  func isActiveTargetPointerAuthentication(name: String) throws -> Bool {
-    var name = name
-    return name.withBridgedString { nameRef in
-      ctx.langOpts.isActiveTargetPtrAuth(nameRef)
-    }
+
+  func isActiveTargetPointerAuthentication(name: String) -> Bool {
+    staticBuildConfiguration.isActiveTargetPointerAuthentication(name: name)
   }
   
   var targetPointerBitWidth: Int {
-    Int(ctx.langOpts.targetPointerBitWidth)
+    staticBuildConfiguration.targetPointerBitWidth
   }
 
   var targetAtomicBitWidths: [Int] {
-    var bitWidthsBuf: UnsafeMutablePointer<SwiftInt>? = nil
-    let count = ctx.langOpts.getTargetAtomicBitWidths(&bitWidthsBuf)
-    let bitWidths = Array(UnsafeMutableBufferPointer(start: bitWidthsBuf, count: count))
-    deallocateIntBuffer(bitWidthsBuf);
-    return bitWidths
+    staticBuildConfiguration.targetAtomicBitWidths
   }
 
   var endianness: Endianness {
-    switch ctx.langOpts.targetEndianness {
-    case .EndianBig: return .big
-    case .EndianLittle: return .little
-    }
+    staticBuildConfiguration.endianness
   }
 
-  var languageVersion: VersionTuple { 
-    var componentsBuf: UnsafeMutablePointer<SwiftInt>? = nil
-    let count = ctx.langOpts.getLanguageVersion(&componentsBuf)
-    let version = VersionTuple(
-      components: Array(UnsafeMutableBufferPointer(start: componentsBuf, count: count))
-    )
-    deallocateIntBuffer(componentsBuf);
-    return version
+  var languageVersion: VersionTuple {
+    staticBuildConfiguration.languageVersion
   }
 
-  var compilerVersion: VersionTuple { 
-    var componentsBuf: UnsafeMutablePointer<SwiftInt>? = nil
-    let count = ctx.langOpts.getCompilerVersion(&componentsBuf)
-    let version = VersionTuple(
-      components: Array(UnsafeMutableBufferPointer(start: componentsBuf, count: count))
-    )
-    deallocateIntBuffer(componentsBuf);
-    return version
+  var compilerVersion: VersionTuple {
+    staticBuildConfiguration.compilerVersion
   }
 }
 

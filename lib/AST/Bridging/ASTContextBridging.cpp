@@ -89,11 +89,6 @@ BridgedAvailabilityMacroMap BridgedASTContext::getAvailabilityMacroMap() const {
   return &unbridged().getAvailabilityMacroMap();
 }
 
-bool BridgedLangOptions_hasAttributeNamed(BridgedLangOptions cLangOpts,
-                                          BridgedStringRef cName) {
-  return hasAttribute(cLangOpts.unbridged(), cName.unbridged());
-}
-
 void *BridgedASTContext_staticBuildConfiguration(BridgedASTContext cContext) {
   ASTContext &ctx = cContext.unbridged();
   void *staticBuildConfiguration = ctx.getGlobalCache().StaticBuildConfiguration;
