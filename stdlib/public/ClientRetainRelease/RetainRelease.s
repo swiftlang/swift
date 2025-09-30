@@ -40,6 +40,7 @@ _retainRelease_slowpath_mask:
 
 
 .text
+.align 2
 
 // Macro for conditionally emitting instructions. When `condition` is true, the
 // rest of the line is emitted. When false, nothing is emitted. More readable
