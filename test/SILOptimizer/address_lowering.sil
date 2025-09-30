@@ -107,6 +107,8 @@ sil [ossa] @takeGuaranteedObject : $@convention(thin) (@guaranteed AnyObject) ->
 sil [ossa] @takeIndirectClass : $@convention(thin) (@in_guaranteed C) -> ()
 sil [ossa] @takeTuple : $@convention(thin) <τ_0_0> (@in_guaranteed (τ_0_0, C)) -> ()
 
+sil [ossa] @eraseToAny : $@convention(thin) <T> (@in_guaranteed T) -> @out Any
+sil [ossa] @produceInt : $@convention(thin) () -> Int
 
 sil [ossa] @takeIn : $@convention(thin) <T> (@in T) -> ()
 sil [ossa] @takeInGuaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
@@ -2553,6 +2555,32 @@ bb0:
   destroy_value %second_in : $T
   %retval = tuple ()
   return %retval : $()
+}
+
+// Verify that ignored_use of an address-only type gets lowered correctly.
+// CHECK-LABEL: sil [ossa] @test_ignored_use : $@convention(thin) () -> () {
+// CHECK:          [[RETVAL_ADDR:%[^,]+]] = alloc_stack $Any
+// CHECK:          [[MAKE_INT:%[^,]+]] = function_ref @produceInt : $@convention(thin) () -> Builtin.Int64
+// CHECK:          [[INT:%[^,]+]] = apply [[MAKE_INT]]()
+// CHECK:          [[ERASE_FN:%[^,]+]] = function_ref @eraseToAny : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out Any
+// CHECK:          [[ARG_ADDR:%[^,]+]] = alloc_stack $Builtin.Int64
+// CHECK:          store [[INT]] to [trivial] [[ARG_ADDR]] : $*Builtin.Int64
+// CHECK:          = apply [[ERASE_FN]]<Builtin.Int64>([[RETVAL_ADDR]], [[ARG_ADDR]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out Any
+// CHECK:          dealloc_stack [[ARG_ADDR]] : $*Builtin.Int64
+// CHECK:          ignored_use [[RETVAL_ADDR]] : $*Any
+// CHECK:          destroy_addr [[RETVAL_ADDR]] : $*Any
+// CHECK:          dealloc_stack [[RETVAL_ADDR]] : $*Any
+// CHECK:       } // end sil function 'test_ignored_use'
+sil [ossa] @test_ignored_use : $@convention(thin) () -> () {
+bb0:
+  %1 = function_ref @produceInt : $@convention(thin) () -> Int
+  %2 = apply %1() : $@convention(thin) () -> Int
+  %3 = function_ref @eraseToAny : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out Any
+  %4 = apply %3<Int>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out Any
+  ignored_use %4
+  destroy_value %4
+  %5 = tuple ()
+  return %5
 }
 
 // CHECK-LABEL: sil [ossa] @test_mark_unresolved_non_copyable_value_1_consumable_and_assignable : {{.*}} {
