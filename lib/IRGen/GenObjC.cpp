@@ -838,26 +838,37 @@ Callee irgen::getObjCDirectMethodCallee(CalleeInfo &&info, const FunctionPointer
   return Callee(std::move(info), fn, selfValue, nullptr);
 }
 
-/// Call [self allocWithZone: nil].
 llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
                                             llvm::Value *self,
                                             SILType selfType) {
-  // Get an appropriately-cast function pointer.
-  auto fn = IGF.IGM.getObjCAllocWithZoneFn();
-  auto fnType = IGF.IGM.getObjCAllocWithZoneFnType();
+    // Ensure self is a class pointer
+    if (self->getType() != IGF.IGM.ObjCClassPtrTy) {
+        self = IGF.Builder.CreateBitCast(self, IGF.IGM.ObjCClassPtrTy);
+    }
 
-  if (self->getType() != IGF.IGM.ObjCClassPtrTy) {
-    fnType = llvm::FunctionType::get(self->getType(), self->getType(), false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
-  }
+    // Get objc_msgSend function
+    llvm::Constant *msgSend = IGF.IGM.getObjCMsgSendFn();
 
-  auto call = IGF.Builder.CreateCall(fnType, fn, self);
+    // Function type: id objc_msgSend(Class, SEL, void*)
+    auto retTy = IGF.getTypeInfo(selfType).getStorageType();
+    llvm::Type *argTys[] = { IGF.IGM.ObjCClassPtrTy, IGF.IGM.Int8PtrTy, IGF.IGM.Int8PtrTy };
+    auto fnTy = llvm::FunctionType::get(retTy, argTys, false);
+    msgSend = llvm::ConstantExpr::getBitCast(msgSend, fnTy->getPointerTo());
 
-  // Cast the returned pointer to the right type.
-  auto &classTI = IGF.getTypeInfo(selfType);
-  llvm::Type *destType = classTI.getStorageType();
-  return IGF.Builder.CreateBitCast(call, destType);
+    // Prepare arguments
+    llvm::Value *args[] = {
+        self,
+        IGF.emitObjCSelectorRefLoad("allocWithZone:"),
+        llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy)
+    };
+
+    // Call objc_msgSend
+    auto call = IGF.Builder.CreateCall(fnTy, msgSend, args);
+
+    // Cast result to correct type
+    return IGF.Builder.CreateBitCast(call, retTy);
 }
+
 
 static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
                                                            ObjCMethod method,
