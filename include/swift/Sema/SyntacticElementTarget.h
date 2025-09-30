@@ -262,8 +262,9 @@ public:
                     unsigned patternBindingIndex, bool bindPatternVarsOneWay);
 
   /// Form an expression target for a ReturnStmt.
-  static SyntacticElementTarget
-  forReturn(ReturnStmt *returnStmt, Type contextTy, DeclContext *dc);
+  static SyntacticElementTarget forReturn(ReturnStmt *returnStmt,
+                                          Expr *returnExpr, Type contextTy,
+                                          DeclContext *dc);
 
   /// Form a target for the preamble of a for-in loop, excluding its where
   /// clause and body.

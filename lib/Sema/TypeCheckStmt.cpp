@@ -1112,8 +1112,26 @@ public:
       return RS;
     }
 
+    auto *accessor = TheFunc->getAccessorDecl();
+    auto *exprToCheck = RS->getResult();
+    InOutExpr *inout = nullptr;
+
+    if (accessor && accessor->isMutateAccessor()) {
+      // Check that the returned expression is a &.
+      if ((inout = dyn_cast<InOutExpr>(exprToCheck))) {
+        ResultTy = InOutType::get(ResultTy);
+      } else {
+        getASTContext()
+            .Diags
+            .diagnose(exprToCheck->getLoc(), diag::missing_address_of_return)
+            .highlight(exprToCheck->getSourceRange());
+        inout = new (getASTContext()) InOutExpr(
+            exprToCheck->getStartLoc(), exprToCheck, Type(), /*implicit*/ true);
+      }
+    }
     using namespace constraints;
-    auto target = SyntacticElementTarget::forReturn(RS, ResultTy, DC);
+    auto target =
+        SyntacticElementTarget::forReturn(RS, exprToCheck, ResultTy, DC);
     auto resultTarget = TypeChecker::typeCheckTarget(target);
     if (resultTarget) {
       RS->setResult(resultTarget->getAsExpr());

@@ -2571,11 +2571,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
 
-      auto *accessor = dyn_cast<AccessorDecl>(AFD);
-      if (accessor && accessor->isMutateAccessor()) {
-        infoBuilder = infoBuilder.withHasInOutResult();
-      }
-
       auto info = infoBuilder.build();
 
       if (sig && !hasSelf) {
@@ -2595,7 +2590,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         selfInfoBuilder =
             selfInfoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
-
+      auto *accessor = dyn_cast<AccessorDecl>(AFD);
+      if (accessor && accessor->isMutateAccessor()) {
+        selfInfoBuilder = selfInfoBuilder.withHasInOutResult();
+      }
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       auto selfInfo = selfInfoBuilder.build();
       if (sig) {
