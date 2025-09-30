@@ -1386,7 +1386,7 @@ class DestructureResults {
   SmallVectorImpl<SILResultInfo> &Results;
   TypeExpansionContext context;
   bool hasSendingResult;
-  bool isBorrowOrMutateAccessor;
+  bool isBorrowAccessor;
 
 public:
   DestructureResults(TypeExpansionContext context, TypeConverter &TC,
@@ -1395,13 +1395,13 @@ public:
                      bool hasSendingResult, bool isBorrowOrMutateAccessor)
       : TC(TC), Convs(conventions), Results(results), context(context),
         hasSendingResult(hasSendingResult),
-        isBorrowOrMutateAccessor(isBorrowOrMutateAccessor) {}
+        isBorrowAccessor(isBorrowOrMutateAccessor) {}
 
   void destructure(AbstractionPattern origType, CanType substType) {
     // Recur into tuples.
     // Do not explode tuples for borrow and mutate accessors since we cannot
     // explode and reconstruct addresses.
-    if (origType.isTuple() && !isBorrowOrMutateAccessor) {
+    if (origType.isTuple() && !isBorrowAccessor) {
       origType.forEachTupleElement(substType,
                                    [&](TupleElementGenerator &elt) {
         // If the original element type is not a pack expansion, just
@@ -1411,7 +1411,7 @@ public:
           return;
         }
 
-        if (isBorrowOrMutateAccessor) {
+        if (isBorrowAccessor) {
           llvm_unreachable(
               "Returning packs from borrow/mutate accessor is not implemented");
         }
@@ -1448,7 +1448,7 @@ public:
     // Determine the result convention.
     ResultConvention convention;
 
-    if (isBorrowOrMutateAccessor) {
+    if (isBorrowAccessor) {
       if (substResultTL.isTrivial()) {
         convention = ResultConvention::Unowned;
       } else if (isFormallyReturnedIndirectly(origType, substType,
@@ -2368,17 +2368,6 @@ getAsCoroutineAccessor(std::optional<SILDeclRef> constant) {
   return accessor;
 }
 
-static bool isBorrowOrMutateAccessor(std::optional<SILDeclRef> constant) {
-  if (!constant || !constant->hasDecl())
-    return false;
-
-  auto accessor = dyn_cast<AccessorDecl>(constant->getDecl());
-  if (!accessor)
-    return false;
-
-  return accessor->isBorrowAccessor() || accessor->isMutateAccessor();
-}
-
 static void destructureYieldsForReadAccessor(TypeConverter &TC,
                                          TypeExpansionContext expansion,
                                          AbstractionPattern origType,
@@ -2729,7 +2718,7 @@ static CanSILFunctionType getSILFunctionType(
   {
     DestructureResults destructurer(expansionContext, TC, conventions, results,
                                     hasSendingResult,
-                                    isBorrowOrMutateAccessor(constant));
+                                    constant->isBorrowAccessor());
     destructurer.destructure(origResultType, substFormalResultType);
   }
 
