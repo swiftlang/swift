@@ -189,6 +189,7 @@ param
   [ValidateRange(1, 36)]
   [int] $AndroidAPILevel = 28,
   [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
+  [ValidateSet("dynamic", "static")]
   [string[]] $AndroidSDKLinkModes = @("dynamic", "static"),
   [string[]] $AndroidSDKVersions = @("Android", "AndroidExperimental"),
   [string] $AndroidSDKVersionDefault = "Android",
@@ -198,6 +199,7 @@ param
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
   [string] $WinSDKVersion = "",
   [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
+  [ValidateSet("dynamic", "static")]
   [string[]] $WindowsSDKLinkModes = @("dynamic", "static"),
   [string[]] $WindowsSDKVersions = @("Windows", "WindowsExperimental"),
   [string] $WindowsSDKVersionDefault = "Windows",
