@@ -1456,6 +1456,16 @@ DestructureTupleExpr::create(ASTContext &ctx,
                                          srcExpr, dstExpr, ty);
 }
 
+FunctionConversionExpr::FunctionConversionExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::FunctionConversion, subExpr, type) {
+  while (auto *PE = dyn_cast<ParenExpr>(subExpr))
+    subExpr = PE->getSubExpr();
+  if (auto *CLE = dyn_cast<CaptureListExpr>(subExpr))
+    subExpr = CLE->getClosureBody();
+  if (auto *CE = dyn_cast<ClosureExpr>(subExpr))
+    CE->setConvertedTo(this);
+}
+
 SourceRange TupleExpr::getSourceRange() const {
   auto start = LParenLoc;
   if (start.isInvalid()) {
