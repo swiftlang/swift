@@ -219,6 +219,37 @@ static std::optional<bool> toOptionalBool(llvm::cl::boolOrDefault defaultable) {
   llvm_unreachable("Bad case for llvm::cl::boolOrDefault!");
 }
 
+namespace {
+class LLVMOptionFilter {
+  /// Options with -Xllvm removed. We let through -Xllvm options so that LLVM's
+  /// processing can find it.
+  SmallVector<const char *, 32> filteredOptions;
+
+  /// Options with the -Xllvm prefix. We have that here so we can process them
+  /// separately.
+  SmallVector<const char *, 32> llvmOptions;
+
+public:
+  LLVMOptionFilter(ArrayRef<const char *> argv) {
+    for (unsigned i = 0; i < argv.size(); ++i) {
+      // Not a -Xllvm option... just let it through.
+      if (StringRef(argv[i]) != "-Xllvm") {
+        filteredOptions.push_back(argv[i]);
+        continue;
+      }
+
+      assert(i + 1 < argv.size() && "-Xllvm without a corresponding option");
+      ++i;
+      filteredOptions.push_back(argv[i]);
+      llvmOptions.push_back(argv[i]);
+    }
+  }
+
+  ArrayRef<const char *> getFilteredOptions() const { return filteredOptions; }
+  ArrayRef<const char *> getLLVMOptions() const { return llvmOptions; }
+};
+} // namespace
+
 int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
   INITIALIZE_LLVM();
 
@@ -226,15 +257,20 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   SILLLVMGenOptions options;
-
-  llvm::cl::ParseCommandLineOptions(argv.size(), argv.data(), "Swift LLVM IR Generator\n");
-
-  if (options.PrintStats)
-    llvm::EnableStatistics();
+  LLVMOptionFilter filteredOptions(argv);
 
   CompilerInvocation Invocation;
 
   Invocation.setMainExecutablePath(llvm::sys::fs::getMainExecutable(argv[0], MainAddr));
+  copy(filteredOptions.getLLVMOptions(),
+       std::back_inserter(Invocation.getFrontendOptions().LLVMArgs));
+
+  llvm::cl::ParseCommandLineOptions(filteredOptions.getFilteredOptions().size(),
+                                    filteredOptions.getFilteredOptions().data(),
+                                    "Swift LLVM IR Generator\n");
+
+  if (options.PrintStats)
+    llvm::EnableStatistics();
 
   // Give the context the list of search paths to use for modules.
   std::vector<SearchPathOptions::SearchPath> ImportPaths;
