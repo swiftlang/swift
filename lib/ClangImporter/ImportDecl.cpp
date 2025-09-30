@@ -1497,6 +1497,24 @@ namespace {
         // bridging, i.e. if the imported typealias should name a bridged type
         // or the original C type.
         clang::QualType ClangType = Decl->getUnderlyingType();
+
+        // Prevent import of typedefs to forward-declared explicit template
+        // specializations, which would trigger assertion in Clang.
+        if (auto *templateSpec = dyn_cast<clang::TemplateSpecializationType>(
+                importer::desugarIfElaborated(ClangType).getTypePtr())) {
+          if (auto *recordType =
+                  templateSpec->desugar()->getAs<clang::RecordType>()) {
+            if (auto *spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(
+                    recordType->getDecl())) {
+              if (spec->getSpecializationKind() ==
+                      clang::TSK_ExplicitSpecialization &&
+                  !spec->isCompleteDefinition()) {
+                return nullptr;
+              }
+            }
+          }
+        }
+
         SwiftType = Impl.importTypeIgnoreIUO(
             ClangType, ImportTypeKind::Typedef,
             ImportDiagnosticAdder(Impl, Decl, Decl->getLocation()),
