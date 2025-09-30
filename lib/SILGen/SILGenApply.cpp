@@ -6188,13 +6188,12 @@ RValue SILGenFunction::emitApply(
                                  B.getDefaultAtomicity());
         hasAlreadyLifetimeExtendedSelf = true;
       }
-      LLVM_FALLTHROUGH;
-
-    case ResultConvention::Unowned:
-      // Unretained. Retain the value.
       result = resultTL.emitCopyValue(B, loc, result);
       break;
 
+    case ResultConvention::Unowned:
+      // Handled in OwnershipModelEliminator.
+      break;
     case ResultConvention::GuaranteedAddress:
     case ResultConvention::Guaranteed:
       llvm_unreachable("borrow accessor is not yet implemented");

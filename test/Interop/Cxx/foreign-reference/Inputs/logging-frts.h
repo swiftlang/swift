@@ -7,12 +7,14 @@ class SharedFRT {
 public:
   SharedFRT() : _refCount(1) { logMsg("Ctor"); }
 
+protected:
+  virtual ~SharedFRT() { logMsg("Dtor"); }
+
 private:
   void logMsg(const char *s) const {
     printf("RefCount: %d, message: %s\n", _refCount, s);
   }
 
-  ~SharedFRT() { logMsg("Dtor"); }
   SharedFRT(const SharedFRT &) = delete;
   SharedFRT &operator=(const SharedFRT &) = delete;
   SharedFRT(SharedFRT &&) = delete;
@@ -62,3 +64,24 @@ inline LargeStructWithRefCountedField getStruct() {
 inline LargeStructWithRefCountedFieldNested getNestedStruct() {
   return {0, {0, 0, 0, 0, new SharedFRT()}};
 }
+
+template <class T>
+struct Ref {
+  T *_Nonnull ptr() const { return ref; }
+  T *ref;
+};
+
+class Payload final : public SharedFRT {
+public:
+  static Ref<Payload> create(int value) {
+    Ref<Payload> ref;
+    ref.ref = new Payload(value);
+    return ref;
+  }
+
+  int value() const { return m_value; }
+
+private:
+  explicit Payload(int value) : m_value(value) {}
+  int m_value;
+};
