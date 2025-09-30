@@ -3,7 +3,6 @@
 // RUN: %target-swift-frontend -emit-sil -I %S/Inputs/ -I %swift_src_root/lib/ClangImporter/SwiftBridging %s -verify -DERRORS -verify-additional-prefix conly-
 // RUN: %target-swift-frontend -emit-sil -I %S/Inputs/ -I %swift_src_root/lib/ClangImporter/SwiftBridging %s -verify -DERRORS -DCPLUSPLUS -verify-additional-prefix cplusplus- -cxx-interoperability-mode=default
 
-// XFAIL: OS=windows-msvc
 import NoncopyableStructs
 
 #if CPLUSPLUS

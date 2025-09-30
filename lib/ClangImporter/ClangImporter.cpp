@@ -8232,17 +8232,15 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
 }
 
 static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
-  if (llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-        return ctor->isMoveConstructor() &&
-               (ctor->isDeleted() || ctor->isIneligibleOrNotSelected() ||
-                ctor->getAccess() != clang::AS_public);
-      }))
-    return false;
+  if (decl->hasSimpleMoveConstructor())
+    return true;
 
   return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-    return ctor->isMoveConstructor() &&
+    return ctor->isMoveConstructor() && !ctor->isDeleted() &&
+           !ctor->isIneligibleOrNotSelected() &&
            // FIXME: Support default arguments (rdar://142414553)
-           ctor->getNumParams() == 1;
+           ctor->getNumParams() == 1 &&
+           ctor->getAccess() == clang::AS_public;
   });
 }
 
@@ -8374,46 +8372,48 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
       return CxxValueSemanticsKind::Copyable;
   }
 
-  auto injectedStlAnnotation =
-      recordDecl->isInStdNamespace()
-          ? STLConditionalParams.find(recordDecl->getName())
-          : STLConditionalParams.end();
-  auto STLParams = injectedStlAnnotation != STLConditionalParams.end()
-                       ? injectedStlAnnotation->second
-                       : std::vector<int>();
-  auto conditionalParams = getConditionalCopyableAttrParams(recordDecl);
+  if (!hasNonCopyableAttr(recordDecl)) {
+    auto injectedStlAnnotation =
+        recordDecl->isInStdNamespace()
+            ? STLConditionalParams.find(recordDecl->getName())
+            : STLConditionalParams.end();
+    auto STLParams = injectedStlAnnotation != STLConditionalParams.end()
+                         ? injectedStlAnnotation->second
+                         : std::vector<int>();
+    auto conditionalParams = getConditionalCopyableAttrParams(recordDecl);
 
-  if (!STLParams.empty() || !conditionalParams.empty()) {
-    HeaderLoc loc{recordDecl->getLocation()};
-    std::function checkArgValueSemantics =
-        [&](clang::TemplateArgument &arg,
-            StringRef argToCheck) -> std::optional<CxxValueSemanticsKind> {
-      if (arg.getKind() != clang::TemplateArgument::Type && importerImpl) {
-        importerImpl->diagnose(loc, diag::type_template_parameter_expected,
-                               argToCheck);
-        return CxxValueSemanticsKind::Unknown;
-      }
+    if (!STLParams.empty() || !conditionalParams.empty()) {
+      HeaderLoc loc{recordDecl->getLocation()};
+      std::function checkArgValueSemantics =
+          [&](clang::TemplateArgument &arg,
+              StringRef argToCheck) -> std::optional<CxxValueSemanticsKind> {
+        if (arg.getKind() != clang::TemplateArgument::Type && importerImpl) {
+          importerImpl->diagnose(loc, diag::type_template_parameter_expected,
+                                 argToCheck);
+          return CxxValueSemanticsKind::Unknown;
+        }
 
-      auto argValueSemantics = evaluateOrDefault(
-          evaluator,
-          CxxValueSemantics(
-              {arg.getAsType()->getUnqualifiedDesugaredType(), importerImpl}),
-          {});
-      if (argValueSemantics != CxxValueSemanticsKind::Copyable)
-        return argValueSemantics;
-      return std::nullopt;
-    };
+        auto argValueSemantics = evaluateOrDefault(
+            evaluator,
+            CxxValueSemantics(
+                {arg.getAsType()->getUnqualifiedDesugaredType(), importerImpl}),
+            {});
+        if (argValueSemantics != CxxValueSemanticsKind::Copyable)
+          return argValueSemantics;
+        return std::nullopt;
+      };
 
-    auto result = checkConditionalParams<CxxValueSemanticsKind>(
-        recordDecl, STLParams, conditionalParams, checkArgValueSemantics);
-    if (result.has_value())
-      return result.value();
+      auto result = checkConditionalParams<CxxValueSemanticsKind>(
+          recordDecl, STLParams, conditionalParams, checkArgValueSemantics);
+      if (result.has_value())
+        return result.value();
 
-    if (importerImpl)
-      for (auto name : conditionalParams)
-        importerImpl->diagnose(loc, diag::unknown_template_parameter, name);
+      if (importerImpl)
+        for (auto name : conditionalParams)
+          importerImpl->diagnose(loc, diag::unknown_template_parameter, name);
 
-    return CxxValueSemanticsKind::Copyable;
+      return CxxValueSemanticsKind::Copyable;
+    }
   }
 
   const auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
@@ -8423,7 +8423,8 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
     return CxxValueSemanticsKind::Copyable;
   }
 
-  bool isCopyable = hasCopyTypeOperations(cxxRecordDecl);
+  bool isCopyable = !hasNonCopyableAttr(cxxRecordDecl) && 
+                    hasCopyTypeOperations(cxxRecordDecl);
   bool isMovable = hasMoveTypeOperations(cxxRecordDecl);
 
   if (!hasDestroyTypeOperations(cxxRecordDecl) || (!isCopyable && !isMovable)) {
