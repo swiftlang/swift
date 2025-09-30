@@ -27,6 +27,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
@@ -556,7 +557,8 @@ namespace {
         if (ctor->isCopyConstructor() &&
             // FIXME: Support default arguments (rdar://142414553)
             ctor->getNumParams() == 1 &&
-            ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
+            ctor->getAccess() == clang::AS_public && !ctor->isDeleted() &&
+            !ctor->isIneligibleOrNotSelected())
           return ctor;
       }
       return nullptr;
@@ -570,7 +572,8 @@ namespace {
         if (ctor->isMoveConstructor() &&
             // FIXME: Support default arguments (rdar://142414553)
             ctor->getNumParams() == 1 &&
-            ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
+            ctor->getAccess() == clang::AS_public && !ctor->isDeleted() &&
+            !ctor->isIneligibleOrNotSelected())
           return ctor;
       }
       return nullptr;
@@ -623,8 +626,54 @@ namespace {
       auto fnType = createCXXCopyConstructorFunctionType(IGF, T);
       auto globalDecl =
           clang::GlobalDecl(copyConstructor, clang::Ctor_Complete);
+
+      auto &ctx = IGF.IGM.Context;
+      auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+      
+      auto &diagEngine = importer->getClangSema().getDiagnostics();
+      clang::DiagnosticErrorTrap trap(diagEngine);
       auto clangFnAddr =
           IGF.IGM.getAddrOfClangGlobalDecl(globalDecl, NotForDefinition);
+
+      if (trap.hasErrorOccurred()) {
+        SourceLoc copyConstructorLoc =
+            importer->importSourceLocation(copyConstructor->getLocation());
+        auto *recordDecl = copyConstructor->getParent();
+        ctx.Diags.diagnose(copyConstructorLoc, diag::failed_emit_copy,
+                           recordDecl);
+
+        bool hasCopyableIfAttr =
+            recordDecl->hasAttrs() &&
+            llvm::any_of(recordDecl->getAttrs(), [&](clang::Attr *attr) {
+              if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+                StringRef attrStr = swiftAttr->getAttribute();
+                assert(!attrStr.starts_with("~Copyable") &&
+                       "Trying to emit copy of a type annotated with "
+                       "'SWIFT_NONCOPYABLE'?");
+                if (attrStr.starts_with("copyable_if:"))
+                  return true;
+              }
+              return false;
+            });
+
+        bool hasRequiresClause =
+            copyConstructor->getTrailingRequiresClause() != nullptr;
+
+        if (hasRequiresClause || hasCopyableIfAttr) {
+          ctx.Diags.diagnose(copyConstructorLoc, diag::maybe_missing_annotation,
+                             recordDecl);
+          ctx.Diags.diagnose(copyConstructorLoc, diag::maybe_missing_parameter,
+                             hasCopyableIfAttr, recordDecl);
+        } else {
+          ctx.Diags.diagnose(copyConstructorLoc, diag::use_requires_expression);
+          ctx.Diags.diagnose(copyConstructorLoc, diag::annotate_copyable_if);
+        }
+
+        if (!copyConstructor->isUserProvided()) {
+          ctx.Diags.diagnose(copyConstructorLoc, diag::annotate_non_copyable);
+        }
+      }
+
       auto callee = cast<llvm::Function>(clangFnAddr->stripPointerCasts());
       Signature signature = IGF.IGM.getSignature(fnType, copyConstructor);
       std::string name = "__swift_cxx_copy_ctor" + callee->getName().str();
