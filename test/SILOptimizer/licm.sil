@@ -23,6 +23,12 @@ struct S {
   var s: String
 }
 
+struct S2 {
+  var i: Int
+  var s1: String
+  var s2: String
+}
+
 struct Pair  {
   var t: (a: Int, b: Int)
 }
@@ -2088,3 +2094,60 @@ bb3:
   %r = tuple ()
   return %r
 }
+
+// Just check that LICM doesn't produce invalid SIL.
+// CHECK-LABEL: sil [ossa] @partial_load_take_is_not_supported :
+// CHECK-LABEL: } // end sil function 'partial_load_take_is_not_supported'
+sil [ossa] @partial_load_take_is_not_supported : $@convention(thin) (@inout S2, Int) -> () {
+bb0(%0 : $*S2, %1 : $Int):
+  br bb1
+
+bb1:
+  %4 = struct_element_addr %0, #S2.s1
+  %5 = load [take] %4
+  %6 = struct_element_addr %0, #S2.s2
+  %7 = load [take] %6
+  %8 = struct $S2 (%1, %5, %7)
+  store %8 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @partial_load_copy :
+// CHECK:       bb1([[V:%.*]] : @owned $S2):
+// CHECK:          [[B1:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT:     [[SE1:%.*]] = struct_extract [[B1]] : $S2, #S2.s1
+// CHECK-NEXT:       = copy_value [[SE1]]
+// CHECK:          [[B2:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT:     [[SE2:%.*]] = struct_extract [[B2]] : $S2, #S2.s2
+// CHECK-NEXT:       = copy_value [[SE2]]
+// CHECK-LABEL: } // end sil function 'partial_load_copy'
+sil [ossa] @partial_load_copy : $@convention(thin) (@inout S2, Int) -> () {
+bb0(%0 : $*S2, %1 : $Int):
+  br bb1
+
+bb1:
+  %4 = struct_element_addr %0, #S2.s1
+  %5 = load [copy] %4
+  %6 = struct_element_addr %0, #S2.s2
+  %7 = load [copy] %6
+  %8 = struct $S2 (%1, %5, %7)
+  %9 = load [take] %0
+  destroy_value %9
+  store %8 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
