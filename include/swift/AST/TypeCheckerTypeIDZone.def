@@ -664,3 +664,7 @@ SWIFT_REQUEST(TypeChecker, AvailabilityDomainForDeclRequest,
 SWIFT_REQUEST(TypeChecker, IsCustomAvailabilityDomainPermanentlyEnabled,
               bool(const CustomAvailabilityDomain *),
               SeparatelyCached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, SourceFileImportResolutionRequest,
+              bool (SourceFile *),
+              Cached, NoLocationInfo)

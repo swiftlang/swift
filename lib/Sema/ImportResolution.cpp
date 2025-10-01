@@ -302,36 +302,8 @@ void swift::performImportResolution(ModuleDecl *M) {
 ///
 /// Import resolution operates on a parsed but otherwise unvalidated AST.
 void swift::performImportResolution(SourceFile &SF) {
-  // If we've already performed import resolution, bail.
-  if (SF.ASTStage == SourceFile::ImportsResolved)
-    return;
-
-  FrontendStatsTracer tracer(SF.getASTContext().Stats,
-                             "Import resolution");
-
-  // If we're silencing parsing warnings, then also silence import warnings.
-  // This is necessary for secondary files as they can be parsed and have their
-  // imports resolved multiple times.
-  auto &diags = SF.getASTContext().Diags;
-  auto didSuppressWarnings = diags.getSuppressWarnings();
-  auto shouldSuppress = SF.getParsingOptions().contains(
-      SourceFile::ParsingFlags::SuppressWarnings);
-  diags.setSuppressWarnings(didSuppressWarnings || shouldSuppress);
-  SWIFT_DEFER { diags.setSuppressWarnings(didSuppressWarnings); };
-
-  ImportResolver resolver(SF);
-
-  // Resolve each import declaration.
-  for (auto D : SF.getTopLevelDecls())
-    resolver.visit(D);
-  for (auto D : SF.getHoistedDecls())
-    resolver.visit(D);
-
-  SF.setImports(resolver.getFinishedImports());
-  SF.setImportedUnderlyingModule(resolver.getUnderlyingClangModule());
-
-  SF.ASTStage = SourceFile::ImportsResolved;
-  verify(SF);
+  evaluateOrFatal(SF.getASTContext().evaluator,
+                  SourceFileImportResolutionRequest(&SF));
 }
 
 void swift::performImportResolutionForClangMacroBuffer(
@@ -1687,4 +1659,38 @@ LLVM_ATTRIBUTE_USED static void dumpCrossImportOverlays(ModuleDecl* M) {
 
   for (auto secondary : secondaries)
     llvm::dbgs() << "  " << secondary << "\n";
+}
+
+bool SourceFileImportResolutionRequest::evaluate(Evaluator &evaluator,
+                                                 SourceFile *SF) const {
+  // Assert that we haven't already performed import resolution.
+  assert(SF->ASTStage == SourceFile::Unprocessed);
+
+  FrontendStatsTracer tracer(SF->getASTContext().Stats, "Import resolution");
+
+  // If we're silencing parsing warnings, then also silence import warnings.
+  // This is necessary for secondary files as they can be parsed and have their
+  // imports resolved multiple times.
+  auto &diags = SF->getASTContext().Diags;
+  auto didSuppressWarnings = diags.getSuppressWarnings();
+  auto shouldSuppress = SF->getParsingOptions().contains(
+      SourceFile::ParsingFlags::SuppressWarnings);
+  diags.setSuppressWarnings(didSuppressWarnings || shouldSuppress);
+  SWIFT_DEFER { diags.setSuppressWarnings(didSuppressWarnings); };
+
+  ImportResolver resolver(*SF);
+
+  // Resolve each import declaration.
+  for (auto D : SF->getTopLevelDecls())
+    resolver.visit(D);
+  for (auto D : SF->getHoistedDecls())
+    resolver.visit(D);
+
+  SF->setImports(resolver.getFinishedImports());
+  SF->setImportedUnderlyingModule(resolver.getUnderlyingClangModule());
+
+  SF->ASTStage = SourceFile::ImportsResolved;
+  verify(*SF);
+
+  return true;
 }

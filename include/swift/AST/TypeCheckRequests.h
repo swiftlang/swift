@@ -5538,6 +5538,22 @@ public:
   }
 };
 
+class SourceFileImportResolutionRequest
+    : public SimpleRequest<SourceFileImportResolutionRequest,
+                           bool(SourceFile *), RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Defined in libSwiftSema
+  bool evaluate(Evaluator &evaluator, SourceFile *SF) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
