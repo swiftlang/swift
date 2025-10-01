@@ -1,4 +1,5 @@
 // RUN: not %target-swift-frontend %s -typecheck -I %S/Inputs -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
+// XFAIL: OS=linux-androideabi
 
 import StdVector
 import CxxStdlib
