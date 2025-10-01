@@ -6,10 +6,9 @@
 // RUN: %target-swift-frontend -ir-profile-generate=%t.dir -emit-ir %s | %FileCheck %s
 
 // Ensure Passes: PGOInstrumentationGenPass and InstrProfilingLoweringPass are invoked.
-// RUN: %target-swift-frontend -ir-profile-generate -emit-ir %s -Xllvm -debug-pass=Structure -Xllvm --time-passes -o /dev/null 2>&1 | %FileCheck -check-prefix=CHECK-PGOGENPASS-INVOKED-INSTR-GEN --check-prefix=CHECK-INSTRPROF %s
-// CHECK-PGOGENPASS-INVOKED-INSTR-GEN: PGOInstrumentationGen
-// CHECK-INSTRPROF: InstrProfilingLoweringPass
-
+// RUN: %target-swift-frontend -ir-profile-generate -emit-ir %s -Xllvm -debug-pass=Structure -Xllvm --time-passes -o /dev/null 2>&1 | %FileCheck -check-prefix=CHECK-PASSES %s
+// CHECK-PASSES-DAG: PGOInstrumentationGen
+// CHECK-PASSES-DAG: InstrProfilingLoweringPass
 
 sil_stage canonical
 
