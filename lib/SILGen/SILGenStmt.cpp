@@ -1564,23 +1564,29 @@ void StmtEmitter::visitFailStmt(FailStmt *S) {
 
 /// Return a basic block suitable to be the destination block of a
 /// try_apply instruction.  The block is implicitly emitted and filled in.
+///
+/// \param errorAddrOrType Either the address of the indirect error result where
+/// the result will be stored, or the type of the expected Owned error value.
+///
+/// \param suppressErrorPath Should the error path be emitted as unreachable?
 SILBasicBlock *
 SILGenFunction::getTryApplyErrorDest(SILLocation loc,
                                      CanSILFunctionType fnTy,
                                      ExecutorBreadcrumb prevExecutor,
-                                     SILResultInfo errorResult,
-                                     SILValue indirectErrorAddr,
+                                     TaggedUnion<SILValue, SILType> errorAddrOrType,
                                      bool suppressErrorPath) {
   // For now, don't try to re-use destination blocks for multiple
   // failure sites.
   SILBasicBlock *destBB = createBasicBlock(FunctionSection::Postmatter);
 
   SILValue errorValue;
-  if (errorResult.getConvention() == ResultConvention::Owned) {
-    errorValue = destBB->createPhiArgument(getSILType(errorResult, fnTy),
-                                           OwnershipKind::Owned);
+  if (auto ownedErrorTy = errorAddrOrType.dyn_cast<SILType>()) {
+    errorValue = destBB->createPhiArgument(*ownedErrorTy,
+                                               OwnershipKind::Owned);
   } else {
-    errorValue = indirectErrorAddr;
+    auto errorAddr = errorAddrOrType.get<SILValue>();
+    assert(errorAddr->getType().isAddress());
+    errorValue = errorAddr;
   }
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
@@ -1653,9 +1659,6 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
       } else {
         // Call the _willThrowTyped entrypoint, which handles
         // arbitrary error types.
-        SILValue tmpBuffer;
-        SILValue error;
-
         FuncDecl *entrypoint = ctx.getWillThrowTyped();
         auto genericSig = entrypoint->getGenericSignature();
         SubstitutionMap subMap = SubstitutionMap::get(
@@ -1668,18 +1671,15 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
           // Materialize the error so we can pass the address down to the
           // swift_willThrowTyped.
           exnMV = exnMV.materialize(*this, loc);
-          error = exnMV.getValue();
-          exn = exnMV.forward(*this);
-        } else {
-          // Claim the exception value.
-          exn = exnMV.forward(*this);
-          error = exn;
         }
 
         emitApplyOfLibraryIntrinsic(
             loc, entrypoint, subMap,
-            { ManagedValue::forForwardedRValue(*this, error) },
+            { exnMV },
             SGFContext());
+
+        // Claim the exception value.
+        exn = exnMV.forward(*this);
       }
     } else {
       // Claim the exception value.
