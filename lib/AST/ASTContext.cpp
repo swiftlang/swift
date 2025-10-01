@@ -5856,7 +5856,7 @@ ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
   case TypeKind::GenericTypeParam:
   case TypeKind::TypeVariable:
   case TypeKind::DependentMember:
-  case TypeKind::Unresolved:
+  case TypeKind::Error:
   case TypeKind::Placeholder:
   case TypeKind::PrimaryArchetype:
   case TypeKind::PackArchetype:

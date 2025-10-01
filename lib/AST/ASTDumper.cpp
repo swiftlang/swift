@@ -6062,8 +6062,6 @@ namespace {
       printFoot();
     }
 
-    TRIVIAL_TYPE_PRINTER(Unresolved, unresolved)
-
     void visitPlaceholderType(PlaceholderType *T, Label label) {
       printCommon("placeholder_type", label);
       auto originator = T->getOriginator();

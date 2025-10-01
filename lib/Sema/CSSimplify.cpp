@@ -7424,7 +7424,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 #include "swift/AST/TypeNodes.def"
 
     case TypeKind::Error:
-    case TypeKind::Unresolved:
       return getTypeMatchFailure(locator);
 
     case TypeKind::BuiltinFixedArray: {
@@ -8453,7 +8452,6 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::BuiltinTuple:
     llvm_unreachable("BuiltinTupleType in constraint");
     
-  case TypeKind::Unresolved:
   case TypeKind::Error:
   case TypeKind::Placeholder:
     return SolutionKind::Error;

@@ -237,7 +237,6 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   // Nothing else is statically just a class reference.
   case TypeKind::SILBlockStorage:
   case TypeKind::Error:
-  case TypeKind::Unresolved:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinIntegerLiteral:
   case TypeKind::BuiltinFloat:
@@ -761,7 +760,6 @@ bool TypeBase::hasTypeRepr() const {
   return !Type(const_cast<TypeBase *>(this)).findIf([](Type subTy) -> bool {
     switch (subTy->getKind()) {
     case TypeKind::Error:
-    case TypeKind::Unresolved:
     case TypeKind::TypeVariable:
       return true;
 
@@ -1768,7 +1766,6 @@ CanType TypeBase::computeCanonicalType() {
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Error:
-  case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
   case TypeKind::BuiltinTuple:
@@ -2318,10 +2315,9 @@ bool TypeBase::mayBeCallable(DeclContext *dc) {
     return true;
 
   // Unresolved types that could potentially be callable.
-  if (isPlaceholder() || is<UnresolvedType>() ||
-      isTypeParameter() || isTypeVariableOrMember()) {
+  if (isPlaceholder() || isTypeParameter() || isTypeVariableOrMember())
     return true;
-  }
+
   // Callable nominal types.
   if (isCallAsFunctionType(dc) || hasDynamicCallableAttribute())
     return true;
@@ -4568,7 +4564,6 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::SILFunction:
   case TypeKind::SILBlockStorage:
   case TypeKind::Error:
-  case TypeKind::Unresolved:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinIntegerLiteral:
   case TypeKind::BuiltinFloat:

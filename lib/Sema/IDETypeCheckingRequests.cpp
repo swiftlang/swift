@@ -143,7 +143,7 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   // For check on specializable archetype see comment on
   // ContainsSpecializableArchetype.
   if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType() ||
-      BaseTy->hasUnresolvedType() || BaseTy->hasError() ||
+      BaseTy->hasError() ||
       ContainsSpecializableArchetype::check(DC, BaseTy))
     return true;
 
@@ -181,7 +181,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
   // We can't leak type variables into another constraint system.
   // We can't do anything if the base type has unbound generic parameters.
   if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType()||
-      BaseTy->hasUnresolvedType() || BaseTy->hasError())
+      BaseTy->hasError())
     return true;
 
   if (isa<TypeAliasDecl>(VD) && BaseTy->is<ProtocolType>()) {

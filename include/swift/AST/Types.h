@@ -141,61 +141,58 @@ public:
     /// This type expression contains a GenericTypeParamType.
     HasTypeParameter     = 0x04,
 
-    /// This type expression contains an UnresolvedType.
-    HasUnresolvedType    = 0x08,
-
     /// Whether this type expression contains an unbound generic type.
-    HasUnboundGeneric    = 0x10,
+    HasUnboundGeneric    = 0x08,
 
     /// This type expression contains an LValueType other than as a
     /// function input, and can be loaded to convert to an rvalue.
-    IsLValue             = 0x20,
+    IsLValue             = 0x10,
 
     /// This type expression contains an opened existential ArchetypeType.
-    HasOpenedExistential = 0x40,
+    HasOpenedExistential = 0x20,
 
     /// This type expression contains a DynamicSelf type.
-    HasDynamicSelf       = 0x80,
+    HasDynamicSelf       = 0x40,
 
     /// This type contains an Error type.
-    HasError             = 0x100,
+    HasError             = 0x80,
 
     /// This type contains an Error type without an underlying original type.
-    HasBareError         = 0x200,
+    HasBareError         = 0x100,
 
     /// This type contains a DependentMemberType.
-    HasDependentMember   = 0x400,
+    HasDependentMember   = 0x200,
 
     /// This type contains an OpaqueTypeArchetype.
-    HasOpaqueArchetype   = 0x800,
+    HasOpaqueArchetype   = 0x400,
 
     /// This type contains a type placeholder.
-    HasPlaceholder       = 0x1000,
+    HasPlaceholder       = 0x800,
 
     /// This type contains a generic type parameter that is declared as a
     /// parameter pack.
-    HasParameterPack = 0x2000,
+    HasParameterPack = 0x1000,
 
     /// This type contains a parameterized existential type \c any P<T>.
-    HasParameterizedExistential = 0x4000,
+    HasParameterizedExistential = 0x2000,
 
     /// This type contains an ElementArchetypeType.
-    HasElementArchetype = 0x8000,
+    HasElementArchetype = 0x4000,
 
     /// Whether the type is allocated in the constraint solver arena. This can
     /// differ from \c HasTypeVariable for types such as placeholders, which do
     /// not have type variables, but we still want to allocate in the solver if
     /// they have a type variable originator.
-    SolverAllocated = 0x10000,
+    SolverAllocated = 0x8000,
 
     /// Contains a PackType.
-    HasPack = 0x20000,
+    HasPack = 0x10000,
 
     /// Contains a PackArchetypeType. Also implies HasPrimaryArchetype.
-    HasPackArchetype = 0x40000,
+    HasPackArchetype = 0x20000,
 
     /// Whether this type contains an unsafe type.
-    IsUnsafe = 0x080000,
+    IsUnsafe = 0x040000,
 
     Last_Property = IsUnsafe
   };
@@ -227,9 +224,6 @@ public:
   
   /// Does a type with these properties have a type parameter somewhere in it?
   bool hasTypeParameter() const { return Bits & HasTypeParameter; }
-
-  /// Does a type with these properties have an unresolved type somewhere in it?
-  bool hasUnresolvedType() const { return Bits & HasUnresolvedType; }
 
   /// Is a type with these properties an lvalue?
   bool isLValue() const { return Bits & IsLValue; }
@@ -755,11 +749,6 @@ public:
   /// Determine where this type is a type variable or a dependent
   /// member root in a type variable.
   bool isTypeVariableOrMember();
-
-  /// Determine whether this type involves a UnresolvedType.
-  bool hasUnresolvedType() const {
-    return getRecursiveProperties().hasUnresolvedType();
-  }
 
   /// Determine whether this type involves a \c PlaceholderType.
   bool hasPlaceholder() const {
@@ -1712,25 +1701,6 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorType, Type)
-
-/// UnresolvedType - This represents a type variable that cannot be resolved to
-/// a concrete type because the expression is ambiguous.  This is produced when
-/// parsing expressions and producing diagnostics.  Any instance of this should
-/// cause the entire expression to be ambiguously typed.
-class UnresolvedType : public TypeBase {
-  friend class ASTContext;
-  // The Unresolved type is always canonical.
-  UnresolvedType(ASTContext &C)
-    : TypeBase(TypeKind::Unresolved, &C,
-       RecursiveTypeProperties(RecursiveTypeProperties::HasUnresolvedType)) { }
-public:
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Unresolved;
-  }
-};
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnresolvedType, Type)
-
   
 /// BuiltinType - An abstract class for all the builtin types.
 class BuiltinType : public TypeBase {

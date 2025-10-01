@@ -1157,7 +1157,7 @@ void ConstraintSystem::shrink(Expr *expr) {
     ///
     /// \param collection The type of the collection container.
     ///
-    /// \returns Null type, ErrorType or UnresolvedType on failure,
+    /// \returns Null type or ErrorType on failure,
     /// properly constructed type otherwise.
     Type extractElementType(Type collection) {
       auto &ctx = CS.getASTContext();

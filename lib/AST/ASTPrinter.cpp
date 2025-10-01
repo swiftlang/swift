@@ -6204,14 +6204,6 @@ public:
     }
   }
 
-  void visitUnresolvedType(UnresolvedType *T,
-                           NonRecursivePrintOptions nrOptions) {
-    if (Options.PrintTypesForDebugging)
-      Printer << "<<unresolvedtype>>";
-    else
-      Printer << "_";
-  }
-
   void visitErrorUnionType(ErrorUnionType *T,
                            NonRecursivePrintOptions nrOptions) {
     Printer << "error_union(";

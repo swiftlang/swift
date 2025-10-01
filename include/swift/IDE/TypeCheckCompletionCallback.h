@@ -92,7 +92,7 @@ struct WithSolutionSpecificVarTypesRAII {
       } else {
         RestoreVarTypes[var] = Type();
       }
-      if (!ty->hasArchetype() && !ty->hasUnresolvedType()) {
+      if (!ty->hasArchetype()) {
         setInterfaceType(const_cast<VarDecl *>(var), ty);
       } else {
         setInterfaceType(const_cast<VarDecl *>(var), ErrorType::get(ty));

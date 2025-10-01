@@ -1417,7 +1417,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       llvm_unreachable("Cannot mangle module type yet");
 
     case TypeKind::Error:
-    case TypeKind::Unresolved:
     case TypeKind::Placeholder:
       appendOperator("Xe");
       return;
