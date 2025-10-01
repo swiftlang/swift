@@ -3,6 +3,8 @@
 // RUN: %target-swift-frontend -I %t -emit-ir %s -verify | %FileCheck %s
 
 // REQUIRES: swift_feature_Lifetimes
+// REQUIRES: swift_feature_AddressableTypes
+// REQUIRES: swift_feature_AddressableParameters
 
 import lifetime_dependence_ref
 
