@@ -407,7 +407,7 @@ TypeSubstituter::transformOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *opaqu
 
   // If we return an opaque archetype unchanged, recurse into its substitutions
   // as a special case.
-  if (known->getCanonicalType() == opaque->getCanonicalType())
+  if (known.getPointer() == opaque)
     return std::nullopt; // Recursively process the substitutions of the
                          // opaque type archetype.
   return known;
