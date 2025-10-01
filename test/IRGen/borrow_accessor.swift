@@ -262,57 +262,57 @@ func test() {
 }
 
 // IRGen explodes the struct parameter and returns the specified field
-// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor7WrapperV1kAA5KlassCvb"(ptr [[REG0:%.*]], ptr [[REG1:%.*]]) #0 {
+// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor7WrapperV1kAA5KlassCvb"(ptr [[REG0:%.*]], ptr [[REG1:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   ret ptr [[REG0]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor7WrapperV7nested1AA5KlassCvb"(ptr [[REG0:%.*]], ptr [[REG1:%.*]]) #0 {
+// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor7WrapperV7nested1AA5KlassCvb"(ptr [[REG0:%.*]], ptr [[REG1:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[REG2:%.*]] = call swiftcc ptr @"$s15borrow_accessor1SV1kAA5KlassCvb"(ptr [[REG1]])
 // CHECK:   ret ptr [[REG2]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor7WrapperV7nested2AA5KlassCvb"(ptr [[REG0:%.*]], ptr [[REG1:%.*]]) #0 {
+// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor7WrapperV7nested2AA5KlassCvb"(ptr [[REG0:%.*]], ptr [[REG1:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[REG2:%.*]] = call swiftcc ptr @"$s15borrow_accessor7WrapperV1kAA5KlassCvb"(ptr [[REG0]], ptr [[REG1]])
 // CHECK:   ret ptr [[REG2]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor7WrapperVyAA5KlassCSicib"(i64 [[REG0:%.*]], ptr [[REG1:%.*]], ptr [[REG2:%.*]]) #0 {
+// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor7WrapperVyAA5KlassCSicib"(i64 [[REG0:%.*]], ptr [[REG1:%.*]], ptr [[REG2:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   ret ptr [[REG1]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor7WrapperV16nested_subscriptAA5KlassCvb"(ptr [[REG0:%.*]], ptr [[REG1:%.*]]) #0 {
+// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor7WrapperV16nested_subscriptAA5KlassCvb"(ptr [[REG0:%.*]], ptr [[REG1:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[REG2:%.*]] = call swiftcc ptr @"$s15borrow_accessor7WrapperVyAA5KlassCSicib"(i64 0, ptr [[REG0]], ptr [[REG1]])
 // CHECK:   ret ptr [[REG2]]
 // CHECK: }
 
-// CHECK: define swiftcc ptr @"$s15borrow_accessor10GenWrapperV4propxvb"(ptr %"GenWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) #0 {
+// CHECK: define swiftcc ptr @"$s15borrow_accessor10GenWrapperV4propxvb"(ptr %"GenWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   ret ptr [[REG0]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor10GenWrapperV7nested1xvb"(ptr %"GenWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) #0 {
+// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor10GenWrapperV7nested1xvb"(ptr %"GenWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[REG2:%.*]] = getelementptr inbounds i32, ptr %"GenWrapper<T>", i64 7
 // CHECK:   [[REG3:%.*]] = load i32, ptr [[REG2]], align 8
 // CHECK:   [[REG4:%.*]] = getelementptr inbounds i8, ptr [[REG0]], i32 [[REG3]]
-// CHECK:   [[REG5:%.*]] = call swiftcc %swift.metadata_response @"$s15borrow_accessor13SimpleWrapperVMa"(i64 0, ptr %T) #17
+// CHECK:   [[REG5:%.*]] = call swiftcc %swift.metadata_response @"$s15borrow_accessor13SimpleWrapperVMa"(i64 0, ptr %T)
 // CHECK:   [[REG6:%.*]] = extractvalue %swift.metadata_response [[REG5]], 0
 // CHECK:   [[REG7:%.*]] = call swiftcc ptr @"$s15borrow_accessor13SimpleWrapperV4propxvb"(ptr [[REG6]], ptr noalias swiftself [[REG4]])
 // CHECK:   ret ptr [[REG7]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor10GenWrapperV7nested2xvb"(ptr %"GenWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) #0 {
+// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor10GenWrapperV7nested2xvb"(ptr %"GenWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[REG2:%.*]] = call swiftcc ptr @"$s15borrow_accessor10GenWrapperV4propxvb"(ptr %"GenWrapper<T>", ptr noalias swiftself [[REG0]])
 // CHECK:   ret ptr [[REG2]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor10GenWrapperV1kAA5KlassCvb"(ptr %"GenWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) #0 {
+// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor10GenWrapperV1kAA5KlassCvb"(ptr %"GenWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[REG2:%.*]] = getelementptr inbounds i32, ptr %"GenWrapper<T>", i64 8
 // CHECK:   [[REG3:%.*]] = load i32, ptr [[REG2]], align 8
@@ -321,73 +321,73 @@ func test() {
 // CHECK:   ret ptr [[REG5]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor10GenWrapperVyxSicib"(i64 [[REG0:%.*]], ptr %"GenWrapper<T>", ptr noalias swiftself [[REG1:%.*]]) #0 {
+// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor10GenWrapperVyxSicib"(i64 [[REG0:%.*]], ptr %"GenWrapper<T>", ptr noalias swiftself [[REG1:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   ret ptr [[REG1]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor10GenWrapperV16nested_subscriptxvb"(ptr %"GenWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) #0 {
+// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor10GenWrapperV16nested_subscriptxvb"(ptr %"GenWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[REG2:%.*]] = call swiftcc ptr @"$s15borrow_accessor10GenWrapperVyxSicib"(i64 0, ptr %"GenWrapper<T>", ptr noalias swiftself [[REG0]])
 // CHECK:   ret ptr [[REG2]]
 // CHECK: }
 
-// CHECK: define swiftcc ptr @"$s15borrow_accessor12GenNCWrapperVAARi_zrlE4propxvb"(ptr %"GenNCWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) #0 {
+// CHECK: define swiftcc ptr @"$s15borrow_accessor12GenNCWrapperVAARi_zrlE4propxvb"(ptr %"GenNCWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   ret ptr [[REG0]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor12GenNCWrapperVAARi_zrlE7nested1xvb"(ptr %"GenNCWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) #0 {
+// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor12GenNCWrapperVAARi_zrlE7nested1xvb"(ptr %"GenNCWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[REG2:%.*]] = getelementptr inbounds i32, ptr %"GenNCWrapper<T>", i64 7
 // CHECK:   [[REG3:%.*]] = load i32, ptr [[REG2]], align 8
 // CHECK:   [[REG4:%.*]] = getelementptr inbounds i8, ptr [[REG0]], i32 [[REG3]]
-// CHECK:   [[REG5:%.*]] = call swiftcc %swift.metadata_response @"$s15borrow_accessor15SimpleNCWrapperVMa"(i64 0, ptr %T) #17
+// CHECK:   [[REG5:%.*]] = call swiftcc %swift.metadata_response @"$s15borrow_accessor15SimpleNCWrapperVMa"(i64 0, ptr %T)
 // CHECK:   [[REG6:%.*]] = extractvalue %swift.metadata_response [[REG5]], 0
 // CHECK:   [[REG7:%.*]] = call swiftcc ptr @"$s15borrow_accessor15SimpleNCWrapperVAARi_zrlE4propxvb"(ptr [[REG6]], ptr noalias swiftself [[REG4]])
 // CHECK:   ret ptr [[REG7]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor12GenNCWrapperVAARi_zrlE7nested2xvb"(ptr %"GenNCWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) #0 {
+// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor12GenNCWrapperVAARi_zrlE7nested2xvb"(ptr %"GenNCWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[REG2:%.*]] = call swiftcc ptr @"$s15borrow_accessor12GenNCWrapperVAARi_zrlE4propxvb"(ptr %"GenNCWrapper<T>", ptr noalias swiftself [[REG0]])
 // CHECK:   ret ptr [[REG2]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor12GenNCWrapperVAARi_zrlEyxSicib"(i64 [[REG0:%.*]], ptr %"GenNCWrapper<T>", ptr noalias swiftself [[REG1:%.*]]) #0 {
+// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor12GenNCWrapperVAARi_zrlEyxSicib"(i64 [[REG0:%.*]], ptr %"GenNCWrapper<T>", ptr noalias swiftself [[REG1:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   ret ptr [[REG1]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor12GenNCWrapperVAARi_zrlE16nested_subscriptxvb"(ptr %"GenNCWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) #0 {
+// CHECK: define hidden swiftcc ptr @"$s15borrow_accessor12GenNCWrapperVAARi_zrlE16nested_subscriptxvb"(ptr %"GenNCWrapper<T>", ptr noalias swiftself [[REG0:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[REG2:%.*]] = call swiftcc ptr @"$s15borrow_accessor12GenNCWrapperVAARi_zrlEyxSicib"(i64 0, ptr %"GenNCWrapper<T>", ptr noalias swiftself [[REG0]])
 // CHECK:   ret ptr [[REG2]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc i64 @"$s15borrow_accessor9NCWrapperV2ncAA2NCVvb"(i64 [[REG0:%.*]], i64 [[REG1:%.*]]) #0 {
+// CHECK: define hidden swiftcc i64 @"$s15borrow_accessor9NCWrapperV2ncAA2NCVvb"(i64 [[REG0:%.*]], i64 [[REG1:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   ret i64 [[REG0]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc i64 @"$s15borrow_accessor9NCWrapperV7nested1AA2NCVvb"(i64 [[REG0:%.*]], i64 [[REG1:%.*]]) #0 {
+// CHECK: define hidden swiftcc i64 @"$s15borrow_accessor9NCWrapperV7nested1AA2NCVvb"(i64 [[REG0:%.*]], i64 [[REG1:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[REG2:%.*]] = call swiftcc i64 @"$s15borrow_accessor3NCSV2ncAA2NCVvb"(i64 [[REG1]])
 // CHECK:   ret i64 [[REG2]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc i64 @"$s15borrow_accessor9NCWrapperV7nested2AA2NCVvb"(i64 [[REG0:%.*]], i64 [[REG1:%.*]]) #0 {
+// CHECK: define hidden swiftcc i64 @"$s15borrow_accessor9NCWrapperV7nested2AA2NCVvb"(i64 [[REG0:%.*]], i64 [[REG1:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[REG2:%.*]] = call swiftcc i64 @"$s15borrow_accessor9NCWrapperV2ncAA2NCVvb"(i64 [[REG0]], i64 [[REG1]])
 // CHECK:   ret i64 [[REG2]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc i64 @"$s15borrow_accessor9NCWrapperVyAA2NCVSicib"(i64 [[REG0]], i64 [[REG1]], i64 [[REG2]]) #0 {
+// CHECK: define hidden swiftcc i64 @"$s15borrow_accessor9NCWrapperVyAA2NCVSicib"(i64 [[REG0]], i64 [[REG1]], i64 [[REG2]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   ret i64 [[REG1]]
 // CHECK: }
 
-// CHECK: define hidden swiftcc i64 @"$s15borrow_accessor9NCWrapperV16nested_subscriptAA2NCVvb"(i64 [[REG0:%.*]], i64 [[REG1:%.*]]) #0 {
+// CHECK: define hidden swiftcc i64 @"$s15borrow_accessor9NCWrapperV16nested_subscriptAA2NCVvb"(i64 [[REG0:%.*]], i64 [[REG1:%.*]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[REG2:%.*]] = call swiftcc i64 @"$s15borrow_accessor9NCWrapperVyAA2NCVSicib"(i64 0, i64 [[REG0]], i64 [[REG1]])
 // CHECK:   ret i64 [[REG2]]

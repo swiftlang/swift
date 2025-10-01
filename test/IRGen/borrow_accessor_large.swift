@@ -137,7 +137,7 @@ func nctest() {
 // CHECK: }
 
 // IRGen result type is PtrTy because we are returning a class reference 
-// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0A5KlassAA0F0Cvb"(ptr noalias nocapture swiftself dereferenceable(208) [[REG0]]) #0 {
+// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0A5KlassAA0F0Cvb"(ptr noalias nocapture swiftself dereferenceable(208) [[REG0]]) {{.*}} {
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:   %._k = getelementptr inbounds %T21borrow_accessor_large11LargeStructV, ptr [[REG0]], i32 0, i32 0
 // CHECK-IRGEN:   [[REG1:%.*]] = load ptr, ptr %._k, align 8
@@ -151,7 +151,7 @@ func nctest() {
 // CHECK:   return [[REG3]]
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc i64 @"$s21borrow_accessor_large11LargeStructV0a5SmallE0AA0fE0Vvb"(ptr noalias nocapture swiftself dereferenceable(208) [[REG0]]) #0 {
+// CHECK-IRGEN: define hidden swiftcc i64 @"$s21borrow_accessor_large11LargeStructV0a5SmallE0AA0fE0Vvb"(ptr noalias nocapture swiftself dereferenceable(208) [[REG0]]) {{.*}} {
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:   %._smallStruct = getelementptr inbounds %T21borrow_accessor_large11LargeStructV, ptr [[REG0]], i32 0, i32 4
 // CHECK-IRGEN:   %._smallStruct.id = getelementptr inbounds %T21borrow_accessor_large11SmallStructV, ptr %._smallStruct, i32 0, i32 0
@@ -169,7 +169,7 @@ func nctest() {
 // CHECK:   return [[REG5]]
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc void @"$s21borrow_accessor_large11LargeStructV0C10PropBorrowAA0dF0Vvb"(ptr noalias nocapture sret(%T21borrow_accessor_large9LargePropV) [[REG0]], ptr noalias nocapture swiftself dereferenceable(208) [[REG1]]) #0 {
+// CHECK-IRGEN: define hidden swiftcc void @"$s21borrow_accessor_large11LargeStructV0C10PropBorrowAA0dF0Vvb"(ptr noalias nocapture sret(%T21borrow_accessor_large9LargePropV) [[REG0]], ptr noalias nocapture swiftself dereferenceable(208) [[REG1]]) {{.*}} {
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:   %._largeProp = getelementptr inbounds %T21borrow_accessor_large11LargeStructV, ptr [[REG1]], i32 0, i32 3
 // CHECK-IRGEN:   call void @llvm.memcpy.p0.p0.i64(ptr align 8 [[REG0]], ptr align 8 %._largeProp, i64 64, i1 false)
@@ -184,7 +184,7 @@ func nctest() {
 // CHECK:   return [[REG3]]
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc void @"$s21borrow_accessor_large11LargeStructV0C11TupleBorrowAA5KlassC_A7Ftvb"(ptr noalias nocapture sret(<{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>) [[REG0]], ptr noalias nocapture swiftself dereferenceable(208) [[REG1]]) #0 {
+// CHECK-IRGEN: define hidden swiftcc void @"$s21borrow_accessor_large11LargeStructV0C11TupleBorrowAA5KlassC_A7Ftvb"(ptr noalias nocapture sret(<{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>) [[REG0]], ptr noalias nocapture swiftself dereferenceable(208) [[REG1]]) {{.*}} {
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:   %._largeTuple = getelementptr inbounds %T21borrow_accessor_large11LargeStructV, ptr [[REG1]], i32 0, i32 2
 // CHECK-IRGEN:   %._largeTuple.elt = getelementptr inbounds <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr %._largeTuple, i32 0, i32 0
@@ -229,7 +229,7 @@ func nctest() {
 // CHECK:   return [[REG3]]
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc i64 @"$s21borrow_accessor_large13NCLargeStructV0A2NCAA0F0Vvb"(ptr noalias nocapture swiftself dereferenceable(72) [[REG0]]) #0 {
+// CHECK-IRGEN: define hidden swiftcc i64 @"$s21borrow_accessor_large13NCLargeStructV0A2NCAA0F0Vvb"(ptr noalias nocapture swiftself dereferenceable(72) [[REG0]]) {{.*}} {
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:   %._k = getelementptr inbounds %T21borrow_accessor_large13NCLargeStructV, ptr [[REG0]], i32 0, i32 0
 // CHECK-IRGEN:   %._k.id = getelementptr inbounds %T21borrow_accessor_large2NCV, ptr %._k, i32 0, i32 0
@@ -247,7 +247,7 @@ func nctest() {
 // CHECK:   return [[REG5]]
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc void @"$s21borrow_accessor_large13NCLargeStructV0C10PropBorrowAA11LargeNCPropVvb"(ptr noalias nocapture sret(%T21borrow_accessor_large11LargeNCPropV) [[REG0]], ptr noalias nocapture swiftself dereferenceable(72) [[REG1]]) #0 {
+// CHECK-IRGEN: define hidden swiftcc void @"$s21borrow_accessor_large13NCLargeStructV0C10PropBorrowAA11LargeNCPropVvb"(ptr noalias nocapture sret(%T21borrow_accessor_large11LargeNCPropV) [[REG0]], ptr noalias nocapture swiftself dereferenceable(72) [[REG1]]) {{.*}} {
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:   %._largeProp = getelementptr inbounds %T21borrow_accessor_large13NCLargeStructV, ptr [[REG1]], i32 0, i32 1
 // CHECK-IRGEN:   call void @llvm.memcpy.p0.p0.i64(ptr align 8 [[REG0]], ptr align 8 %._largeProp, i64 64, i1 false)
