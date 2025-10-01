@@ -100,7 +100,7 @@ Type FailureDiagnostic::resolveType(Type rawType, bool reconstituteSugar,
     if (auto *typeVar = type->getAs<TypeVariableType>()) {
       auto resolvedType = S.simplifyType(typeVar);
 
-      if (!resolvedType->hasUnresolvedType())
+      if (!resolvedType->hasError())
         return resolvedType;
 
       // If type variable was simplified to an unresolved pack expansion
@@ -117,7 +117,7 @@ Type FailureDiagnostic::resolveType(Type rawType, bool reconstituteSugar,
       }
 
       Type GP = typeVar->getImpl().getGenericParameter();
-      return resolvedType->is<UnresolvedType>() && GP
+      return resolvedType->is<ErrorType>() && GP
           ? ErrorType::get(GP)
           : resolvedType;
     }
@@ -128,7 +128,7 @@ Type FailureDiagnostic::resolveType(Type rawType, bool reconstituteSugar,
     }
 
     if (type->isPlaceholder())
-      return Type(type->getASTContext().TheUnresolvedType);
+      return ErrorType::get(type->getASTContext());
 
     return std::nullopt;
   });
@@ -183,7 +183,7 @@ StringRef FailureDiagnostic::getEditorPlaceholder(
     llvm::SmallVectorImpl<char> &scratch) const {
   llvm::raw_svector_ostream OS(scratch);
   OS << "<#";
-  if (!ty || ty->is<UnresolvedType>()) {
+  if (!ty || ty->isBareErrorType()) {
     OS << description;
   } else {
     OS << "T##";
@@ -5681,7 +5681,7 @@ bool MissingArgumentsFailure::diagnoseMissingResultBuilderElement() const {
   auto fixIt = getEditorPlaceholder("result", paramType, scratch);
   auto fixItLoc = call->getStartLoc();
 
-  if (paramType->is<UnresolvedType>()) {
+  if (paramType->isBareErrorType()) {
     emitDiagnostic(diag::result_builder_missing_element,
                    resultBuilder->getName())
         .fixItInsertAfter(fixItLoc, fixIt);
@@ -5804,7 +5804,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
   auto argType = solution.simplifyType(solution.getType(unaryArg));
   auto paramType = fnType->getParams()[1].getPlainType();
 
-  if (isExpr<ClosureExpr>(unaryArg) && argType->is<UnresolvedType>()) {
+  if (isExpr<ClosureExpr>(unaryArg) && argType->is<ErrorType>()) {
     auto unwrappedParamTy = paramType->lookThroughAllOptionalTypes();
     if (unwrappedParamTy->is<FunctionType>() || unwrappedParamTy->isAny())
       return true;
@@ -5958,7 +5958,7 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
     };
 
     auto isValidType = [](Type resultType) -> bool {
-      return resultType && !resultType->hasUnresolvedType() &&
+      return resultType && !resultType->hasError() &&
              !resultType->hasTypeVariable();
     };
 
@@ -6619,7 +6619,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     // statement it has to be diagnosed as pattern match if there are
     // holes present in the contextual type.
     if (purpose == ContextualTypePurpose::CTP_ForEachSequence &&
-        contextualType->hasUnresolvedType()) {
+        contextualType->hasError()) {
       auto diagnostic = emitDiagnostic(
           (contextualType->is<TupleType>() && !eltType->is<TupleType>())
               ? diag::cannot_match_expr_tuple_pattern_with_nontuple_value
@@ -7490,7 +7490,7 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (argType->isKeyPath() && !paramType->isKnownKeyPathType()) {
     auto keyPathTy = argType->castTo<BoundGenericType>();
     auto rootTy = keyPathTy->getGenericArgs()[0];
-    if (rootTy->is<UnresolvedType>()) {
+    if (rootTy->isBareErrorType()) {
       emitDiagnostic(diag::cannot_convert_unresolved_key_path_argument_value,
                      paramType);
       return true;
@@ -7627,7 +7627,7 @@ bool ArgumentMismatchFailure::diagnosePatternMatchingMismatch() const {
   auto rhsType = getType(rhsExpr);
 
   auto diagnostic =
-      lhsType->is<UnresolvedType>()
+      lhsType->isBareErrorType()
           ? emitDiagnostic(
                 diag::cannot_match_unresolved_expr_pattern_with_value, rhsType)
           : emitDiagnostic(diag::cannot_match_expr_pattern_with_value, lhsType,
@@ -8286,7 +8286,7 @@ bool UnableToInferClosureParameterType::diagnoseAsError() {
       if (parentExpr) {
         // Missing or invalid member reference in call.
         if (auto *AE = dyn_cast<ApplyExpr>(parentExpr)) {
-          if (getType(AE->getFn())->is<UnresolvedType>())
+          if (getType(AE->getFn())->is<ErrorType>())
             return false;
         }
 
