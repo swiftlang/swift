@@ -90,9 +90,21 @@ _retainRelease_slowpath_mask:
 .endmacro
 
 
-// A note on register usage:
-// We use a calling convention that preserves all registers except x0, x1, x16,
-// and x17. The fast path can only use those for its scratch registers.
+// NOTE: we're using the preserve_most calling convention, so x9-15 are off
+// limits, in addition to the usual x19 and up. Any calls to functions that use
+// the standard calling convention need to save/restore x9-x15.
+
+.private_extern _swift_bridgeObjectReleaseClient
+#if SWIFT_OBJC_INTEROP
+_swift_bridgeObjectReleaseClient:
+  lsr   x1, x0, #62
+  cbnz  x1, LbridgeObjectReleaseObjC
+  and   x0, x0, 0xffffffffffffff8
+
+.alt_entry _swift_releaseClient
+#else
+.set _swift_bridgeObjectReleaseClient, _swift_releaseClient
+#endif
 
 .private_extern _swift_releaseClient
 _swift_releaseClient:
@@ -171,6 +183,46 @@ Lslowpath_release:
     clrex
   CALL_SLOWPATH _swift_release
 
+LbridgeObjectReleaseObjC:
+  CONDITIONAL PTRAUTH, \
+    pacibsp
+  stp   x0, x9, [sp, #-0x50]!
+  stp   x10, x11, [sp, #0x10]
+  stp   x12, x13, [sp, #0x20]
+  stp   x14, x15, [sp, #0x30]
+  stp   fp, lr, [sp, #0x40];
+  add   fp, sp, #0x40
+
+  // Clear the spare bits from the pointer, but leave the tagged pointer bit.
+  // This will produce a corrupt tagged pointer if the value is actually a
+  // tagged pointer. But objc_retain is guaranteed to do nothing on tagged
+  // pointers, so that does no harm.
+  and   x0, x0, #0x8fffffffffffffff
+  and   x0, x0, #0xfffffffffffffff8
+  bl    _objc_release
+
+  ldp   fp, lr, [sp, #0x40]
+  ldp   x14, x15, [sp, #0x30]
+  ldp   x12, x13, [sp, #0x20]
+  ldp   x10, x11, [sp, #0x10]
+  ldp   x0, x9, [sp], #0x50
+  CONDITIONAL PTRAUTH, \
+    retab
+  CONDITIONAL !PTRAUTH, \
+    ret
+
+
+.private_extern _swift_bridgeObjectRetainClient
+#if SWIFT_OBJC_INTEROP
+_swift_bridgeObjectRetainClient:
+  lsr   x1, x0, #62
+  cbnz  x1, LbridgeObjectRetainObjC
+  and   x0, x0, 0xffffffffffffff8
+
+.alt_entry _swift_retainClient
+#else
+.set _swift_bridgeObjectRetainClient, _swift_retainClient
+#endif
 
 .private_extern _swift_retainClient
 _swift_retainClient:
@@ -243,6 +295,34 @@ Lslowpath_retain:
   CONDITIONAL USE_LDX_STX, \
     clrex
   CALL_SLOWPATH _swift_retain
+
+LbridgeObjectRetainObjC:
+  CONDITIONAL PTRAUTH, \
+    pacibsp
+  stp   x0, x9, [sp, #-0x50]!
+  stp   x10, x11, [sp, #0x10]
+  stp   x12, x13, [sp, #0x20]
+  stp   x14, x15, [sp, #0x30]
+  stp   fp, lr, [sp, #0x40];
+  add   fp, sp, #0x40
+
+  // Clear the spare bits from the pointer, but leave the tagged pointer bit.
+  // This will produce a corrupt tagged pointer if the value is actually a
+  // tagged pointer. But objc_retain is guaranteed to do nothing on tagged
+  // pointers, so that does no harm.
+  and   x0, x0, #0x8fffffffffffffff
+  and   x0, x0, #0xfffffffffffffff8
+  bl    _objc_retain
+
+  ldp   fp, lr, [sp, #0x40]
+  ldp   x14, x15, [sp, #0x30]
+  ldp   x12, x13, [sp, #0x20]
+  ldp   x10, x11, [sp, #0x10]
+  ldp   x0, x9, [sp], #0x50
+  CONDITIONAL PTRAUTH, \
+    retab
+  CONDITIONAL !PTRAUTH, \
+    ret
 
 #else
 
