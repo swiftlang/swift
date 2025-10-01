@@ -36,7 +36,8 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
                             '--config', self.additional_config_path,
                             '--source-root', self.source_root,
                             '--clone',
-                            '--scheme', 'extra'])
+                            '--scheme', 'extra',
+                            '--verbose'])
 
         # Test that we're actually checking out the 'extra' scheme based on the output
         self.assertIn(b"git checkout refs/heads/main", output)
