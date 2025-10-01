@@ -1341,6 +1341,20 @@ getSymbolSourcesToEmit(const IRGenDescriptor &desc) {
 /// All this is done in a single thread.
 GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
                                        IRGenDescriptor desc) const {
+  auto *parentMod = desc.getParentModule();
+  auto &ctx = parentMod->getASTContext();
+
+  // Resolve imports for all the source files.
+  for (auto *file : parentMod->getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(file))
+      performImportResolution(*SF);
+  }
+
+  bindExtensions(*parentMod);
+
+  if (ctx.hadError())
+    return GeneratedModule::null();
+
   const auto &Opts = desc.Opts;
   const auto &PSPs = desc.PSPs;
   auto *M = desc.getParentModule();
@@ -1917,17 +1931,6 @@ GeneratedModule OptimizedIRRequest::evaluate(Evaluator &evaluator,
                                              IRGenDescriptor desc) const {
   auto *parentMod = desc.getParentModule();
   auto &ctx = parentMod->getASTContext();
-
-  // Resolve imports for all the source files.
-  for (auto *file : parentMod->getFiles()) {
-    if (auto *SF = dyn_cast<SourceFile>(file))
-      performImportResolution(*SF);
-  }
-
-  bindExtensions(*parentMod);
-
-  if (ctx.hadError())
-    return GeneratedModule::null();
 
   auto irMod = evaluateOrFatal(ctx.evaluator, IRGenRequest{desc});
   if (!irMod)
