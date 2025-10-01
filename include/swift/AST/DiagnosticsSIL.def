@@ -448,6 +448,10 @@ ERROR(circular_transparent,none,
 NOTE(note_while_inlining,none,
      "while inlining here", ())
 
+// '@inline(always)' diagnostics
+ERROR(circular_inlineAlways,none,
+      "inlining '@inline(always)' functions forms circular loop", ())
+
 // Pre-specializations
 ERROR(cannot_prespecialize,none,
       "Cannot pre-specialize %0", (StringRef))

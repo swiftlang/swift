@@ -1493,7 +1493,7 @@ bb0(%0 : $*Builtin.Int64, %1 : $*TestDynamic):
 }
 
 // Dictionary.subscript.modify
-sil [serialized] [always_inline] @$sSD_7defaultq_x_q_yXKtciM : $@yield_once @convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0, @noescape @callee_guaranteed () -> @out τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> @yields @inout τ_0_1
+sil [serialized] [heuristic_always_inline] @$sSD_7defaultq_x_q_yXKtciM : $@yield_once @convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0, @noescape @callee_guaranteed () -> @out τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> @yields @inout τ_0_1
 
 // -----------------------------------------------------------------------------
 // testBeginApplyOfClosure: DiagnoseStaticExclusivity must consider

@@ -160,7 +160,7 @@ bb0(%0 : $S1):
   return %1 : $()
 }
 
-sil hidden [thunk] [always_inline] @$S4main2S2C8mayThrowyyKF : $@convention(method) (@guaranteed S2) -> @error any Error {
+sil hidden [thunk] [heuristic_always_inline] @$S4main2S2C8mayThrowyyKF : $@convention(method) (@guaranteed S2) -> @error any Error {
 bb0(%0 : $S2):
   %1 = tuple ()
   return %1 : $()

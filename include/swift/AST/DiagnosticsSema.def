@@ -8924,5 +8924,16 @@ ERROR(invalid_redecl_of_file_isolation,none,
 NOTE(invalid_redecl_of_file_isolation_prev,none,
      "default isolation was previously declared here", ())
 
+//===----------------------------------------------------------------------===//
+// MARK: `@inline(always)` attribute
+//===----------------------------------------------------------------------===//
+ERROR(attr_inline_always_experimental,none,
+      "'@inline(always)' is an experimental feature", ())
+ERROR(attr_inline_always_requires_inlinable,none,
+      "'@inline(always)' on public or package declarations must be used "
+      "together with '@inlinable'", ())
+ERROR(attr_inline_always_no_usable_from_inline,none,
+      "cannot use '@inline(always)' together with '@usableFromInline'", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
