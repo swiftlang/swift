@@ -55,8 +55,6 @@ ManagedValue ManagedValue::forForwardedRValue(SILGenFunction &SGF,
 /// Emit a copy of this value with independent ownership.
 ManagedValue ManagedValue::copy(SILGenFunction &SGF, SILLocation loc) const {
   auto &lowering = SGF.getTypeLowering(getType());
-  if (lowering.isTrivial())
-    return *this;
 
   if (getType().isObject()) {
     return SGF.B.createCopyValue(loc, *this, lowering);
@@ -121,18 +119,6 @@ void ManagedValue::copyInto(SILGenFunction &SGF, SILLocation loc,
                             Initialization *dest) {
   dest->copyOrInitValueInto(SGF, loc, *this, /*isInit*/ false);
   dest->finishInitialization(SGF);
-}
-
-/// This is the same operation as 'copy', but works on +0 values that don't
-/// have cleanups.  It returns a +1 value with one.
-ManagedValue ManagedValue::copyUnmanaged(SILGenFunction &SGF, SILLocation loc) {
-  if (getType().isObject()) {
-    return SGF.B.createCopyValue(loc, *this);
-  }
-
-  SILValue result = SGF.emitTemporaryAllocation(loc, getType());
-  SGF.B.createCopyAddr(loc, getValue(), result, IsNotTake, IsInitialization);
-  return SGF.emitManagedRValueWithCleanup(result);
 }
 
 /// This is the same operation as 'copy', but works on +0 values that don't

@@ -272,14 +272,14 @@ static ManagedValue convertOwnershipConventionGivenParamInfo(
   if (isOwned && valueType.isMoveOnlyWrapped() &&
       valueType.removingMoveOnlyWrapper().isTrivial(SGF.F)) {
     if (value.getOwnershipKind() == OwnershipKind::Guaranteed) {
-      value = value.copyUnmanaged(SGF, loc);
+      value = value.copy(SGF, loc);
       return SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(loc, value);
     }
   }
 
   if (param.isConsumedInCaller() &&
       value.getOwnershipKind() == OwnershipKind::Guaranteed) {
-    return value.copyUnmanaged(SGF, loc);
+    return value.copy(SGF, loc);
   }
 
   // If we are emitting arguments for a coroutine, we need to borrow owned
@@ -5982,18 +5982,13 @@ RValue SILGenFunction::emitApply(
     case ParameterConvention::Direct_Owned:
       // If the callee will consume the 'self' parameter, let's retain it so we
       // can keep it alive.
-      lifetimeExtendedSelf =
-          B.emitCopyValueOperation(loc, lifetimeExtendedSelf);
+      lifetimeExtendedSelf = selfMV.copy(*this, loc).forward(*this);
       break;
     case ParameterConvention::Direct_Guaranteed:
     case ParameterConvention::Direct_Unowned:
       // We'll manually manage the argument's lifetime after the
       // call. Disable its cleanup, forcing a copy if it was emitted +0.
-      if (selfMV.hasCleanup()) {
-        selfMV.forwardCleanup(*this);
-      } else {
-        lifetimeExtendedSelf = selfMV.copyUnmanaged(*this, loc).forward(*this);
-      }
+      lifetimeExtendedSelf = selfMV.ensurePlusOne(*this, loc).forward(*this);
       break;
 
     case ParameterConvention::Indirect_In_Guaranteed:
@@ -7361,7 +7356,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
 
   // We need to produce the value at +1 if it's going to be consumed.
   if (selfParam.isConsumedInCaller() && !base.hasCleanup()) {
-    base = base.copyUnmanaged(SGF, loc);
+    base = base.copy(SGF, loc);
   }
   // If the parameter is indirect, we'll need to drop the value into
   // temporary memory. Make a copy scoped to the current formal access that
