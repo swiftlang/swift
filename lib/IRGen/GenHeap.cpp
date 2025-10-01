@@ -1360,20 +1360,26 @@ void IRGenFunction::emitUnknownStrongRelease(llvm::Value *value,
 
 void IRGenFunction::emitBridgeStrongRetain(llvm::Value *value,
                                            Atomicity atomicity) {
-  emitUnaryRefCountCall(*this,
-                        (atomicity == Atomicity::Atomic)
-                            ? IGM.getBridgeObjectStrongRetainFn()
-                            : IGM.getNonAtomicBridgeObjectStrongRetainFn(),
-                        value);
+  llvm::Constant *function;
+  if (atomicity == Atomicity::Atomic && IGM.TargetInfo.HasSwiftClientRRLibrary)
+    function = IGM.getBridgeObjectStrongRetainClientFn();
+  else if (atomicity == Atomicity::Atomic)
+    function = IGM.getBridgeObjectStrongRetainFn();
+  else
+    function = IGM.getNonAtomicBridgeObjectStrongRetainFn();
+  emitUnaryRefCountCall(*this, function, value);
 }
 
 void IRGenFunction::emitBridgeStrongRelease(llvm::Value *value,
                                             Atomicity atomicity) {
-  emitUnaryRefCountCall(*this,
-                        (atomicity == Atomicity::Atomic)
-                            ? IGM.getBridgeObjectStrongReleaseFn()
-                            : IGM.getNonAtomicBridgeObjectStrongReleaseFn(),
-                        value);
+  llvm::Constant *function;
+  if (atomicity == Atomicity::Atomic && IGM.TargetInfo.HasSwiftClientRRLibrary)
+    function = IGM.getBridgeObjectStrongReleaseClientFn();
+  else if (atomicity == Atomicity::Atomic)
+    function = IGM.getBridgeObjectStrongReleaseFn();
+  else
+    function = IGM.getNonAtomicBridgeObjectStrongReleaseFn();
+  emitUnaryRefCountCall(*this, function, value);
 }
 
 void IRGenFunction::emitErrorStrongRetain(llvm::Value *value) {

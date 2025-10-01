@@ -436,6 +436,24 @@ FUNCTION(BridgeObjectStrongRelease, Swift, swift_bridgeObjectRelease,
          EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating),
          UNKNOWN_MEMEFFECTS)
 
+// void *swift_bridgeObjectRetainClient(void *ptr);
+FUNCTION(BridgeObjectStrongRetainClient, Swift, swift_bridgeObjectRetainClient,
+         SwiftRR_CC, AlwaysAvailable,
+         RETURNS(BridgeObjectPtrTy),
+         ARGS(BridgeObjectPtrTy),
+         ATTRS(NoUnwind, FirstParamReturned),
+         EFFECT(RuntimeEffect::RefCounting),
+         UNKNOWN_MEMEFFECTS)
+
+// void *swift_bridgeObjectReleaseClient(void *ptr);
+FUNCTION(BridgeObjectStrongReleaseClient, Swift, swift_bridgeObjectReleaseClient,
+         SwiftRR_CC, AlwaysAvailable,
+         RETURNS(BridgeObjectPtrTy),
+         ARGS(BridgeObjectPtrTy),
+         ATTRS(NoUnwind, FirstParamReturned),
+         EFFECT(RuntimeEffect::RefCounting),
+         UNKNOWN_MEMEFFECTS)
+
 // void *swift_nonatomic_bridgeObjectRetain(void *ptr);
 FUNCTION(NonAtomicBridgeObjectStrongRetain, Swift, swift_nonatomic_bridgeObjectRetain,
          C_CC, AlwaysAvailable,
