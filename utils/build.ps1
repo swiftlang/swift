@@ -3249,7 +3249,7 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
           ENABLE_TESTING = "NO";
 
-          FOUNDATION_BUILD_TOOLS = "NO";
+          FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
           CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
           LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
           ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
