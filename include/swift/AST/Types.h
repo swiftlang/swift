@@ -160,39 +160,42 @@ public:
     /// This type contains an Error type.
     HasError             = 0x100,
 
+    /// This type contains an Error type without an underlying original type.
+    HasBareError         = 0x200,
+
     /// This type contains a DependentMemberType.
-    HasDependentMember   = 0x200,
+    HasDependentMember   = 0x400,
 
     /// This type contains an OpaqueTypeArchetype.
-    HasOpaqueArchetype   = 0x400,
+    HasOpaqueArchetype   = 0x800,
 
     /// This type contains a type placeholder.
-    HasPlaceholder       = 0x800,
+    HasPlaceholder       = 0x1000,
 
     /// This type contains a generic type parameter that is declared as a
     /// parameter pack.
-    HasParameterPack = 0x1000,
+    HasParameterPack = 0x2000,
 
     /// This type contains a parameterized existential type \c any P<T>.
-    HasParameterizedExistential = 0x2000,
+    HasParameterizedExistential = 0x4000,
 
     /// This type contains an ElementArchetypeType.
-    HasElementArchetype = 0x4000,
+    HasElementArchetype = 0x8000,
 
     /// Whether the type is allocated in the constraint solver arena. This can
     /// differ from \c HasTypeVariable for types such as placeholders, which do
     /// not have type variables, but we still want to allocate in the solver if
     /// they have a type variable originator.
-    SolverAllocated = 0x8000,
+    SolverAllocated = 0x10000,
 
     /// Contains a PackType.
-    HasPack = 0x10000,
+    HasPack = 0x20000,
 
     /// Contains a PackArchetypeType. Also implies HasPrimaryArchetype.
-    HasPackArchetype = 0x20000,
+    HasPackArchetype = 0x40000,
 
     /// Whether this type contains an unsafe type.
-    IsUnsafe = 0x040000,
+    IsUnsafe = 0x080000,
 
     Last_Property = IsUnsafe
   };
@@ -233,6 +236,9 @@ public:
 
   /// Does this type contain an error?
   bool hasError() const { return Bits & HasError; }
+
+  /// Does this type contain an error without an original type?
+  bool hasBareError() const { return Bits & HasBareError; }
 
   /// Does this type contain a dependent member type, possibly with a
   /// non-type parameter base, such as a type variable or concrete type?
@@ -949,6 +955,16 @@ public:
     return getRecursiveProperties().hasError();
   }
 
+  /// Determine whether this type contains an error type without an
+  /// underlying original type, i.e prints as `_`.
+  bool hasBareError() const {
+    return getRecursiveProperties().hasBareError();
+  }
+
+  /// Whether this is a top-level ErrorType without an underlying original
+  /// type, i.e prints as `_`.
+  bool isBareErrorType() const;
+
   /// Does this type contain a dependent member type, possibly with a
   /// non-type parameter base, such as a type variable or concrete type?
   bool hasDependentMember() const {
@@ -1654,11 +1670,18 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalOrBoundGenericNominalType, AnyGenericType)
 /// have to emit further diagnostics to abort compilation.
 class ErrorType final : public TypeBase {
   friend class ASTContext;
+
+  static RecursiveTypeProperties getProperties(Type originalType) {
+    RecursiveTypeProperties props = RecursiveTypeProperties::HasError;
+    if (!originalType || originalType->hasBareError())
+      props |= RecursiveTypeProperties::HasBareError;
+
+    return props;
+  }
+
   // The Error type is always canonical.
-  ErrorType(ASTContext &C, Type originalType,
-            RecursiveTypeProperties properties)
-      : TypeBase(TypeKind::Error, &C, properties) {
-    assert(properties.hasError());
+  ErrorType(ASTContext &C, Type originalType)
+      : TypeBase(TypeKind::Error, &C, getProperties(originalType)) {
     if (originalType) {
       Bits.ErrorType.HasOriginalType = true;
       *reinterpret_cast<Type *>(this + 1) = originalType;
@@ -8122,6 +8145,17 @@ inline ASTContext &TypeBase::getASTContext() const {
 
   // If not, canonicalize it to get the Context.
   return *const_cast<ASTContext*>(getCanonicalType()->Context);
+}
+
+inline bool TypeBase::isBareErrorType() const {
+  auto *errTy = dyn_cast<ErrorType>(this);
+  if (!errTy)
+    return false;
+
+  // FIXME: We shouldn't need to check for a recursive bare error type, we can
+  // remove this once we flatten them.
+  auto originalTy = errTy->getOriginalType();
+  return !originalTy || originalTy->isBareErrorType();
 }
 
 // TODO: This will become redundant once InOutType is removed.
