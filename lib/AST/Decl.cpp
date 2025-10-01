@@ -574,7 +574,7 @@ Type Decl::getResolvedCustomAttrType(CustomAttr *attr) const {
 
   auto dc = getDeclContext();
   auto *nominal = evaluateOrDefault(
-      getASTContext().evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+      getASTContext().evaluator, CustomAttrNominalRequest{attr, this}, nullptr);
   if (!nominal)
     return Type();
 
@@ -8708,10 +8708,9 @@ VarDecl::getAttachedPropertyWrapperTypeInfo(unsigned i) const {
       return PropertyWrapperTypeInfo();
 
     auto attr = attrs[i];
-    auto dc = getDeclContext();
     ASTContext &ctx = getASTContext();
     nominal = evaluateOrDefault(
-        ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+        ctx.evaluator, CustomAttrNominalRequest{attr, this}, nullptr);
   }
 
   if (!nominal)
