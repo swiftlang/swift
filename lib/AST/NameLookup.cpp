@@ -4014,6 +4014,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
     });
     if (!macros.empty() && !hasPropWrapper)
       return nullptr;
+
+    ASSERT(macros.empty() && "now preferring property wrapper");
   }
   if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front()))
     return nominals.front();
