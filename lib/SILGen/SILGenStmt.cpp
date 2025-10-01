@@ -1749,8 +1749,8 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
       B.createDestroyAddr(loc, exn);
   }
 
-  // Branch to the cleanup destination.
-  Cleanups.emitCleanupsForBranch(ThrowDest, loc, args, IsForUnwind);
+  // Emit clean-ups needed prior to entering throw block.
+  Cleanups.emitCleanupsBeforeBranch(ThrowDest, IsForUnwind);
   
   if (indirectErrorAddr && !exn->getType().isAddress()) {
     // Forward the error value into the return slot now. This has to happen
