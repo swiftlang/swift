@@ -5706,7 +5706,8 @@ std::optional<ManagedValue>
 SILGenFunction::tryEmitProjectedLValue(SILLocation loc, LValue &&src,
                                        TSanKind tsanKind) {
   assert(src.getAccessKind() == SGFAccessKind::BorrowedAddressRead ||
-         src.getAccessKind() == SGFAccessKind::BorrowedObjectRead);
+         src.getAccessKind() == SGFAccessKind::BorrowedObjectRead ||
+         src.getAccessKind() == SGFAccessKind::Write);
 
   for (auto component = src.begin(); component != src.end(); component++) {
     if (component->get()->getKind() != PathComponent::BorrowMutateKind &&
