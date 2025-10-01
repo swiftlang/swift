@@ -1718,18 +1718,23 @@ void PreCheckTarget::transformForExpression(SingleValueStmtExpr *SVE) {
 
   auto sveLoc = SVE->getLoc();
 
-  auto *varDecl = new(astCtx) VarDecl(false, VarDecl::Introducer::Var, sveLoc,
-                                   astCtx.getIdentifier("$forExpressionResult"), declCtx);
+  auto *varDecl = new (astCtx)
+      VarDecl(false, VarDecl::Introducer::Var, sveLoc,
+              astCtx.getIdentifier("$forExpressionResult"), declCtx);
 
   auto namedPattern = NamedPattern::createImplicit(astCtx, varDecl);
 
-  auto *initFunc = new(astCtx) UnresolvedMemberExpr(sveLoc, DeclNameLoc(), DeclNameRef(DeclBaseName::createConstructor()), true);
+  auto *initFunc = new (astCtx) UnresolvedMemberExpr(
+      sveLoc, DeclNameLoc(), DeclNameRef(DeclBaseName::createConstructor()),
+      true);
   auto *callExpr = CallExpr::createImplicitEmpty(astCtx, initFunc);
-  auto *initExpr = new(astCtx) UnresolvedMemberChainResultExpr(callExpr, initFunc);
+  auto *initExpr =
+      new (astCtx) UnresolvedMemberChainResultExpr(callExpr, initFunc);
 
-  auto *bindingDecl = PatternBindingDecl::createImplicit(astCtx, StaticSpellingKind::None, namedPattern, initExpr, declCtx);
+  auto *bindingDecl = PatternBindingDecl::createImplicit(
+      astCtx, StaticSpellingKind::None, namedPattern, initExpr, declCtx);
 
-  SVE->setForExpressionPreamble({ varDecl, bindingDecl });
+  SVE->setForExpressionPreamble({varDecl, bindingDecl});
 
   // For-expressions always have a single branch.
   SmallVector<Stmt *, 1> scratch;
@@ -1741,14 +1746,15 @@ void PreCheckTarget::transformForExpression(SingleValueStmtExpr *SVE) {
     auto &result = BS->getElements().back();
     if (auto stmt = result.dyn_cast<Stmt *>()) {
       if (auto *then = dyn_cast<ThenStmt>(stmt)) {
-        auto *declRefExpr = new(astCtx) DeclRefExpr(varDecl, DeclNameLoc(), true);
-        auto *dotExpr = new(astCtx) UnresolvedDotExpr(declRefExpr,
-                                                      SourceLoc(),
-                                                      DeclNameRef(DeclBaseName(astCtx.Id_append)),
-                                                      DeclNameLoc(),
-                                                      true);
-        auto *argumentList = ArgumentList::createImplicit(astCtx, { Argument::unlabeled(then->getResult()) });
-        auto *callExpr = CallExpr::createImplicit(astCtx, dotExpr, argumentList);
+        auto *declRefExpr =
+            new (astCtx) DeclRefExpr(varDecl, DeclNameLoc(), true);
+        auto *dotExpr = new (astCtx) UnresolvedDotExpr(
+            declRefExpr, SourceLoc(),
+            DeclNameRef(DeclBaseName(astCtx.Id_append)), DeclNameLoc(), true);
+        auto *argumentList = ArgumentList::createImplicit(
+            astCtx, {Argument::unlabeled(then->getResult())});
+        auto *callExpr =
+            CallExpr::createImplicit(astCtx, dotExpr, argumentList);
         then->setResult(callExpr);
       }
     }

@@ -2522,7 +2522,8 @@ RValue RValueEmitter::visitSingleValueStmtExpr(SingleValueStmtExpr *E,
     SGF.visit(binding);
     SGF.emitStmt(E->getStmt());
 
-    return SGF.emitRValueForDecl(E, ConcreteDeclRef(decl), E->getType(), AccessSemantics::Ordinary);
+    return SGF.emitRValueForDecl(E, ConcreteDeclRef(decl), E->getType(),
+                                 AccessSemantics::Ordinary);
   }
 
   auto emitStmt = [&]() {

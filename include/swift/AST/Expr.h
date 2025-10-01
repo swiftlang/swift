@@ -6506,9 +6506,7 @@ struct ForCollectionInit {
 /// An expression that may wrap a statement which produces a single value.
 class SingleValueStmtExpr : public Expr {
 public:
-  enum class Kind {
-    If, Switch, Do, DoCatch, For
-  };
+  enum class Kind { If, Switch, Do, DoCatch, For };
 
 private:
   Stmt *S;

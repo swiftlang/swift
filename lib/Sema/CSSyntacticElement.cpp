@@ -1496,24 +1496,26 @@ bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
   setType(E, resultType);
 
   if (E->getStmtKind() == SingleValueStmtExpr::Kind::For) {
-    auto *rrcProtocol = ctx.getProtocol(KnownProtocolKind::RangeReplaceableCollection);
+    auto *rrcProtocol =
+        ctx.getProtocol(KnownProtocolKind::RangeReplaceableCollection);
     auto *sequenceProtocol = ctx.getProtocol(KnownProtocolKind::Sequence);
 
-    addConstraint(ConstraintKind::ConformsTo,
-                  resultType,
-                  rrcProtocol->getDeclaredInterfaceType(),
-                  loc);
+    addConstraint(ConstraintKind::ConformsTo, resultType,
+                  rrcProtocol->getDeclaredInterfaceType(), loc);
     Type elementTypeVar = createTypeVariable(loc, /*options*/ 0);
-    Type elementType = DependentMemberType::get(resultType, sequenceProtocol->getAssociatedType(ctx.Id_Element));
+    Type elementType = DependentMemberType::get(
+        resultType, sequenceProtocol->getAssociatedType(ctx.Id_Element));
 
     addConstraint(ConstraintKind::Bind, elementTypeVar, elementType, loc);
-    addConstraint(ConstraintKind::Defaultable, resultType, ArraySliceType::get(elementTypeVar), loc);
+    addConstraint(ConstraintKind::Defaultable, resultType,
+                  ArraySliceType::get(elementTypeVar), loc);
 
     auto *binding = E->getForExpressionPreamble()->ForAccumulatorBinding;
 
     auto *initializer = binding->getInit(0);
-    auto target = SyntacticElementTarget::forInitialization(initializer, Type(), binding, 0, false);
-    setTargetFor({ binding, 0 }, target);
+    auto target = SyntacticElementTarget::forInitialization(initializer, Type(),
+                                                            binding, 0, false);
+    setTargetFor({binding, 0}, target);
 
     if (generateConstraints(target)) {
       return true;
@@ -1552,15 +1554,15 @@ bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
 
   if (E->getStmtKind() != SingleValueStmtExpr::Kind::For) {
     if (branches.empty()) {
-      // If we only have statement branches, the expression is typed as Void. This
-      // should only be the case for 'if' and 'switch' statements that must be
-      // expressions that have branches that all end in a throw, and we'll warn
-      // that we've inferred Void.
+      // If we only have statement branches, the expression is typed as Void.
+      // This should only be the case for 'if' and 'switch' statements that must
+      // be expressions that have branches that all end in a throw, and we'll
+      // warn that we've inferred Void.
       addConstraint(ConstraintKind::Bind, resultType, ctx.getVoidType(), loc);
     } else {
       // Otherwise, we join the result types for each of the branches.
       join = TypeJoinExpr::forBranchesOfSingleValueStmtExpr(
-                                                            ctx, resultType, E, AllocationArena::ConstraintSolver);
+          ctx, resultType, E, AllocationArena::ConstraintSolver);
     }
   }
 
@@ -1605,8 +1607,8 @@ bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
             *this, ConstraintKind::Bind, resultType, closureResultTy, loc);
         bindToClosure->setFavored();
 
-        auto *bindToVoid = Constraint::create(*this, ConstraintKind::Bind,
-                                              resultType, ctx.getVoidType(), loc);
+        auto *bindToVoid = Constraint::create(
+            *this, ConstraintKind::Bind, resultType, ctx.getVoidType(), loc);
 
         addDisjunctionConstraint({bindToClosure, bindToVoid}, loc);
       }
@@ -2701,7 +2703,7 @@ bool ConstraintSystem::applySolutionToSingleValueStmt(
 
   if (SVE->getStmtKind() == SingleValueStmtExpr::Kind::For) {
     auto *binding = SVE->getForExpressionPreamble()->ForAccumulatorBinding;
-    auto target = getTargetFor({ binding, 0 }).value();
+    auto target = getTargetFor({binding, 0}).value();
 
     auto newTarget = rewriter.rewriteTarget(target);
     if (!newTarget) {
