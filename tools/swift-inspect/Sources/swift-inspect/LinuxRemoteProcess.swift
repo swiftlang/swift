@@ -124,7 +124,7 @@
       self.context = context
     }
 
-    func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?) {
+    func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?, offset: Int?) {
       let moduleName: String?
       let symbolName: String?
       if let symbol = self.symbolCache.symbol(for: address) {
@@ -148,7 +148,7 @@
         moduleBaseName = moduleName
       }
 
-      return (moduleBaseName, symbolName)
+      return (moduleBaseName, symbolName, nil)
     }
 
     internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {

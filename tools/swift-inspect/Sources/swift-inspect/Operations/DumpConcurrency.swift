@@ -266,11 +266,12 @@ fileprivate class ConcurrencyDumper {
   }
 
   func symbolicateBacktracePointer(ptr: swift_reflection_ptr_t) -> String {
-    guard let name = process.symbolicate(swift_addr_t(ptr)).symbol else {
+    let info = process.symbolicate(swift_addr_t(ptr))
+    guard let name = info.symbol else {
       return "<\(hex: ptr)>"
     }
 
-    return remove(from: name, upTo: " resume partial function for ")
+    return remove(from: name, upTo: " resume partial function for ") + (info.offset.map { " + 0x\(String($0, radix: 16))" } ?? "") + " in \(info.module ?? "<unknown>")"
   }
 
   func decodeTaskFlags(_ info: TaskInfo) -> String {
@@ -356,7 +357,6 @@ fileprivate class ConcurrencyDumper {
       }
 
       let runJobSymbol = process.symbolicate(swift_addr_t(task.runJob))
-      let runJobLibrary = runJobSymbol.module ?? "<unknown>"
 
       let symbolicatedBacktrace = task.asyncBacktrace.map(symbolicateBacktracePointer)
 
@@ -385,7 +385,7 @@ fileprivate class ConcurrencyDumper {
         }
       }
 
-      output("resume function: \(symbolicateBacktracePointer(ptr: task.runJob)) in \(runJobLibrary)")
+      output("resume function: \(symbolicateBacktracePointer(ptr: task.runJob))")
       output("task allocator: \(task.allocatorTotalSize) bytes in \(task.allocatorTotalChunks) chunks")
 
       if task.childTasks.count > 0 {

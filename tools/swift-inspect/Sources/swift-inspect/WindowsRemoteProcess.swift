@@ -191,29 +191,36 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     self.release()
   }
 
-  func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?) {
+  func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?, offset: Int?) {
+    // ModBase in the SYMBOL_INFOW returned from SymFromAddrW is always zero, so use SymGetModuleBase64
+    let modBase = SymGetModuleBase64(self.process, DWORD64(address))
+    if modBase == 0 {
+      return (nil, nil, nil)
+    }
+  
     let kMaxSymbolNameLength: Int = 1024
 
-    let byteCount = MemoryLayout<SYMBOL_INFO>.size + kMaxSymbolNameLength + 1
+    let byteCount = MemoryLayout<SYMBOL_INFOW>.size + kMaxSymbolNameLength + 1
 
     let buffer: UnsafeMutableRawPointer =
       UnsafeMutableRawPointer.allocate(byteCount: byteCount, alignment: 1)
     defer { buffer.deallocate() }
 
-    let pSymbolInfo: UnsafeMutablePointer<SYMBOL_INFO> =
-      buffer.bindMemory(to: SYMBOL_INFO.self, capacity: 1)
-    pSymbolInfo.pointee.SizeOfStruct = ULONG(MemoryLayout<SYMBOL_INFO>.size)
+    let pSymbolInfo: UnsafeMutablePointer<SYMBOL_INFOW> =
+      buffer.bindMemory(to: SYMBOL_INFOW.self, capacity: 1)
+    pSymbolInfo.pointee.SizeOfStruct = ULONG(MemoryLayout<SYMBOL_INFOW>.size)
     pSymbolInfo.pointee.MaxNameLen = ULONG(kMaxSymbolNameLength)
 
-    guard SymFromAddr(self.process, DWORD64(address), nil, pSymbolInfo) else {
-      return (nil, nil)
+    var displacement: DWORD64 = 0
+    guard SymFromAddrW(self.process, DWORD64(address), &displacement, pSymbolInfo) else {
+      return (nil, nil, nil)
     }
 
     let symbol: String = withUnsafePointer(to: &pSymbolInfo.pointee.Name) {
-      String(cString: $0)
+      String(utf16CodeUnits: $0, count: Int(pSymbolInfo.pointee.NameLen))
     }
 
-    var context: (DWORD64, String?) = (pSymbolInfo.pointee.ModBase, nil)
+    var context: (DWORD64, String?) = (modBase, nil)
     _ = withUnsafeMutablePointer(to: &context) {
       SymEnumerateModules64(self.process, { (ModuleName, BaseOfDll, UserContext) -> WindowsBool in
         if let pContext = UserContext?.bindMemory(to: (DWORD64, String?).self, capacity: 1) {
@@ -226,7 +233,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
       }, $0)
     }
 
-    return (context.1, symbol)
+    return (context.1, symbol, Int(displacement))
   }
 
   internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
