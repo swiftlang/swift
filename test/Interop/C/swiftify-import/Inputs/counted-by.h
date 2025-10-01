@@ -49,9 +49,9 @@ void lOr(int len, int * __counted_by(len || len) p);
 
 void floatCastToInt(float meters, int * __counted_by((int) meters) p);
 
-void pointerCastToInt(int *square, int * __counted_by((int) square) p);
+void pointerCastToInt(int *square, int * __counted_by((long) square) p);
 
-void nanAsInt(int * __counted_by((int) (0 / 0)) p);
+void nanAsInt(int * __counted_by((int) (0.0 / 0.0)) p);
 
 void unsignedLiteral(int * __counted_by(2u) p);
 
