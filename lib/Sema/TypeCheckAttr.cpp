@@ -172,7 +172,6 @@ public:
   IGNORED_ATTR(HasStorage)
   IGNORED_ATTR(HasMissingDesignatedInitializers)
   IGNORED_ATTR(InheritsConvenienceInitializers)
-  IGNORED_ATTR(Inline)
   IGNORED_ATTR(ObjCBridged)
   IGNORED_ATTR(ObjCNonLazyRealization)
   IGNORED_ATTR(ObjCRuntimeName)
@@ -406,6 +405,7 @@ public:
   void visitFixedLayoutAttr(FixedLayoutAttr *attr);
   void visitUsableFromInlineAttr(UsableFromInlineAttr *attr);
   void visitInlinableAttr(InlinableAttr *attr);
+  void visitInlineAttr(InlineAttr *attr);
   void visitOptimizeAttr(OptimizeAttr *attr);
   void visitExclusivityAttr(ExclusivityAttr *attr);
 
@@ -3693,6 +3693,24 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
     if (Ctx.isSwiftVersionAtLeast(4,2))
       diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline,
                             VD);
+    return;
+  }
+}
+
+void AttributeChecker::visitInlineAttr(InlineAttr *attr) {
+  if (attr->getKind() == InlineKind::Always &&
+      !Ctx.LangOpts.hasFeature(Feature::InlineAlways)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_inline_always_experimental);
+    return;
+  }
+
+  if (attr->getKind() != InlineKind::Always)
+    return;
+
+  // Can't have @inline(always) on @usableFromInline.
+  auto *VD = cast<ValueDecl>(D);
+  if (VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_inline_always_no_usable_from_inline);
     return;
   }
 }

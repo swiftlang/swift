@@ -316,6 +316,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public enum InlineStrategy {
     case automatic
     case never
+    case heuristicAlways
     case always
   }
 
@@ -323,6 +324,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     switch bridged.getInlineStrategy() {
       case .InlineDefault: return .automatic
       case .NoInline: return .never
+      case .HeuristicAlwaysInline: return .heuristicAlways
       case .AlwaysInline: return .always
       default:
         fatalError()

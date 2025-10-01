@@ -2993,6 +2993,7 @@ static void addLLVMFunctionAttributes(SILFunction *f, Signature &signature) {
     attrs = attrs.addFnAttribute(signature.getType()->getContext(),
                                  llvm::Attribute::NoInline);
     break;
+  case HeuristicAlwaysInline:
   case AlwaysInline:
     // FIXME: We do not currently transfer AlwaysInline since doing so results
     // in test failures, which must be investigated first.

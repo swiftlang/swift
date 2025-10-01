@@ -381,7 +381,7 @@ void ExistentialTransform::populateThunkBody() {
   SILModule &M = F->getModule();
 
   F->setThunk(IsSignatureOptimizedThunk);
-  F->setInlineStrategy(AlwaysInline);
+  F->setInlineStrategy(HeuristicAlwaysInline);
 
   /// Remove original body of F.
   for (auto It = F->begin(), End = F->end(); It != End;) {

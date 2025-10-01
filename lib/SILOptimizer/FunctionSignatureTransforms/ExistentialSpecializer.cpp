@@ -247,8 +247,9 @@ bool ExistentialSpecializer::canSpecializeCalleeFunction(FullApplySite &Apply) {
   if (Callee->getLoweredFunctionType()->hasErrorResult()) 
     return false;
 
-  /// Do not optimize always_inlinable functions.
-  if (Callee->getInlineStrategy() == Inline_t::AlwaysInline)
+  /// Do not optimize heuristic_always_inlinable functions.
+  if (Callee->getInlineStrategy() == Inline_t::HeuristicAlwaysInline ||
+      Callee->getInlineStrategy() == Inline_t::AlwaysInline)
     return false;
 
   /// Ignore externally linked functions with public_external or higher
