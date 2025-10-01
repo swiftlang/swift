@@ -210,6 +210,10 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.PrintTargetInfo = true;
   }
 
+  if (Args.hasArg(OPT_print_static_build_config)) {
+    Opts.PrintBuildConfig = true;
+  }
+
   if (Args.hasArg(OPT_print_supported_features)) {
     Opts.PrintSupportedFeatures = true;
   }

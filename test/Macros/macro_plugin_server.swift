@@ -71,9 +71,9 @@
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
 // CHECK-NEXT: ->(plugin:[[#PID1]]) {"loadPluginLibrary":{"libraryPath":"{{.*}}EvilMacros.{{dylib|so|dll}}","moduleName":"EvilMacros"}}
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
-// CHECK-NEXT: ->(plugin:[[#PID1]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"stringify","typeName":"StringifyMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{{{.+}}},"source":"#stringify(a + b)"}}}
+// CHECK-NEXT: ->(plugin:[[#PID1]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"stringify","typeName":"StringifyMacro"},"macroRole":"expression","staticBuildConfiguration"{{.*}},"syntax":{"kind":"expression","location":{{{.+}}},"source":"#stringify(a + b)"}}}
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"expandMacroResult":{"diagnostics":[],"expandedSource":"(a + b, \"a + b\")"}}
-// CHECK-NEXT: ->(plugin:[[#PID1]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"EvilMacros","name":"evil","typeName":"CrashingMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{{{.+}}},"source":"#evil(42)"}}}
+// CHECK-NEXT: ->(plugin:[[#PID1]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"EvilMacros","name":"evil","typeName":"CrashingMacro"},"macroRole":"expression","staticBuildConfiguration"{{.*}},"syntax":{"kind":"expression","location":{{{.+}}},"source":"#evil(42)"}}}
 // ^ This crashes the plugin server.
 
 // CHECK: ->(plugin:[[#PID2:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION]]}}}
@@ -82,12 +82,12 @@
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
 // CHECK-NEXT: ->(plugin:[[#PID2]]) {"loadPluginLibrary":{"libraryPath":"{{.*}}EvilMacros.{{dylib|so|dll}}","moduleName":"EvilMacros"}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
-// CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"stringify","typeName":"StringifyMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{{{.+}}},"source":"#stringify(b + a)"}}}
+// CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"stringify","typeName":"StringifyMacro"},"macroRole":"expression","staticBuildConfiguration"{{.*}},"syntax":{"kind":"expression","location":{{{.+}}},"source":"#stringify(b + a)"}}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"expandMacroResult":{"diagnostics":[],"expandedSource":"(b + a, \"b + a\")"}}
 
-// CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"missing","typeName":"TypeDoesNotExist"},"macroRole":"expression","syntax":{"kind":"expression","location":{{({.+})}},"source":"#missing()"}}}
+// CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"missing","typeName":"TypeDoesNotExist"},"macroRole":"expression","staticBuildConfiguration"{{.*}},"syntax":{"kind":"expression","location":{{({.+})}},"source":"#missing()"}}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"expandMacroResult":{"diagnostics":[{"fixIts":[],"highlights":[{{{.*}}}],"message":"type 'MacroDefinition.TypeDoesNotExist' could not be found in library plugin '{{.*}}MacroDefinition.{{dylib|so|dll}}'","notes":[],"position":{{{.*}}},"severity":"error"}]}}
-// CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"notMacro","typeName":"NotMacroStruct"},"macroRole":"expression","syntax":{"kind":"expression","location":{{({.+})}},"source":"#notMacro()"}}}
+// CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"MacroDefinition","name":"notMacro","typeName":"NotMacroStruct"},"macroRole":"expression","staticBuildConfiguration"{{.*}},"syntax":{"kind":"expression","location":{{({.+})}},"source":"#notMacro()"}}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"expandMacroResult":{"diagnostics":[{"fixIts":[],"highlights":[{{{.*}}}],"message":"type 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '{{.*}}MacroDefinition.{{dylib|so|dll}}'","notes":[],"position":{{{.*}}},"severity":"error"}]}}
 
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")

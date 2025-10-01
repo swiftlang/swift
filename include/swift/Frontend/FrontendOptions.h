@@ -326,6 +326,10 @@ public:
   /// exit.
   bool PrintTargetInfo = false;
 
+  /// Indicates that the frontend should print the static build configuration
+  /// information as JSON.
+  bool PrintBuildConfig = false;
+
   /// Indicates that the frontend should print the supported features and then
   /// exit.
   bool PrintSupportedFeatures = false;

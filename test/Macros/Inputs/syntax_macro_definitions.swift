@@ -2980,3 +2980,21 @@ public struct BigEndianAccessorMacro: AccessorMacro {
         ]
     }
 }
+
+public struct CustomConditionCheckMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    guard let firstElement = node.arguments.first,
+          let stringLiteral = firstElement.expression
+      .as(StringLiteralExprSyntax.self),
+          stringLiteral.segments.count == 1,
+          case let .stringSegment(conditionName)? = stringLiteral.segments.first else {
+      throw CustomError.message("macro requires a string literal containing the name of a custom condition")
+    }
+
+    let isSet = try context.buildConfiguration?.isCustomConditionSet(name: conditionName.content.text) ?? false
+    return "\(literal: isSet)"
+  }
+}

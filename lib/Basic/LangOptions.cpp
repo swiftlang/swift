@@ -252,6 +252,9 @@ LangOptions::getPlatformConditionValue(PlatformConditionKind Kind) const {
 
 bool LangOptions::
 checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
+  // Note: BridgedASTContext_enumerateBuildConfigurationEntries has a redundant
+  // copy of these special cases.
+
   // Check a special case that "macOS" is an alias of "OSX".
   if (Kind == PlatformConditionKind::OS && Value == "macOS")
     return checkPlatformCondition(Kind, "OSX");
