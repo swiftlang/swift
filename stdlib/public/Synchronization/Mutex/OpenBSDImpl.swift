@@ -39,7 +39,7 @@ public struct _MutexHandle: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _tryLock() -> Bool {
-    pthread_mutex_trylock(value._address) != 0
+    pthread_mutex_trylock(value._address) == 0
   }
 
   @available(SwiftStdlib 6.0, *)
