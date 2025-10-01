@@ -657,7 +657,7 @@ namespace {
             });
 
         bool hasRequiresClause =
-            copyConstructor->getTrailingRequiresClause() != nullptr;
+            !copyConstructor->getTrailingRequiresClause().isNull();
 
         if (hasRequiresClause || hasCopyableIfAttr) {
           ctx.Diags.diagnose(copyConstructorLoc, diag::maybe_missing_annotation,
