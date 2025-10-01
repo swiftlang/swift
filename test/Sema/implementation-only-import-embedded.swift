@@ -12,6 +12,7 @@
 
 // RUN: %target-swift-frontend -typecheck -verify %s -I %t \
 // RUN:   -swift-version 5 -target arm64-apple-macosx15.0 \
+// RUN:   -define-availability "availMacro:macOS 26.0, iOS 26.0" \
 // RUN:   -enable-experimental-feature Embedded
 
 // REQUIRES: swift_feature_Embedded
@@ -73,6 +74,8 @@ public func implicitlyInlinablePublic(arg: StructFromDirect = StructFromDirect()
   implicitlyInlinablePublic()
   implicitlyInlinablePrivate()
   explicitNonInliable()
+
+  if #available(availMacro, *) { }
 }
 
 private func implicitlyInlinablePrivate(arg: StructFromDirect = StructFromDirect()) {
