@@ -2572,6 +2572,11 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
 
+      auto *accessor = dyn_cast<AccessorDecl>(AFD);
+      if (accessor && accessor->isMutateAccessor()) {
+        infoBuilder = infoBuilder.withHasInOutResult();
+      }
+
       auto info = infoBuilder.build();
 
       if (sig && !hasSelf) {
