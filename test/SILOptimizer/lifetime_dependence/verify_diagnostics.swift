@@ -208,6 +208,19 @@ func testClosureCapture1(_ a: HasMethods) {
    */
 }
 
+public struct InlineInt: BitwiseCopyable {
+  var val: UInt64
+
+  var span: RawSpan {
+    @_addressableSelf
+    @_lifetime(borrow self) borrowing get {
+      let buf = UnsafeRawBufferPointer(start: UnsafeRawPointer(Builtin.addressOfBorrow(val)), count: 1)
+      let span = RawSpan(_unsafeBytes: buf)
+      return unsafe _overrideLifetime(span, borrowing: val)
+    }
+  }
+}
+
 // =============================================================================
 // Indirect ~Escapable results
 // =============================================================================
@@ -381,4 +394,18 @@ func returnTempBorrow() -> Borrow<Int> {
   let span = Borrow(3) // expected-error{{lifetime-dependent variable 'span' escapes its scope}}
   // expected-note@-1{{it depends on the lifetime of this parent value}}
   return span // expected-note{{this use causes the lifetime-dependent value to escape}}
+}
+
+// Test dependence on the temporary stack address of a trivial value. computeAddressableRange must extend the lifetime
+// of 'inline' into the unreachable.
+//
+// This test requires InlineInt to be a trivial value defined in this module so that inline.span generates:
+//
+//     %temp = alloc_stack
+//     store %arg to [trivial] temp
+//     apply %get_span(%temp)
+//
+// If we use InlineArray instead, we get a store_borrow, which is a completely different situatio.
+func test(inline: InlineInt) {
+  inline.span.withUnsafeBytes { _ = $0 }
 }

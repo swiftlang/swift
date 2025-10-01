@@ -558,10 +558,27 @@ extension LifetimeDependence.Scope {
         }
       }
       guard isAddressable, !deallocInsts.isEmpty else {
+        // Valid on all paths to function exit.
         return nil
       }
       var range = InstructionRange(begin: initializingStore, context)
       range.insert(contentsOf: deallocInsts)
+
+      // Insert unreachable paths with no dealloc_stack.
+      var forwardUnreachableWalk = BasicBlockWorklist(context)
+      defer { forwardUnreachableWalk.deinitialize() }
+
+      for exitBlock in range.exitBlocks {
+        forwardUnreachableWalk.pushIfNotVisited(exitBlock)
+      }
+      while let b = forwardUnreachableWalk.pop() {
+        if let unreachableInst = b.terminator as? UnreachableInst {
+          range.insert(unreachableInst)
+        }
+        for succBlock in b.successors {
+          forwardUnreachableWalk.pushIfNotVisited(succBlock)
+        }
+      }
       return range
     }
   }
