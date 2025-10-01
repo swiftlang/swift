@@ -23,6 +23,7 @@
 #include "swift/FrontendTool/FrontendTool.h"
 #include "Dependencies.h"
 #include "TBD.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTDumper.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AvailabilityScope.h"
@@ -38,6 +39,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
@@ -50,6 +52,7 @@
 #include "swift/Basic/TargetInfo.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/ConstExtract/ConstExtract.h"
 #include "swift/DependencyScan/ScanDependencies.h"
 #include "swift/Frontend/CachedDiagnostics.h"
@@ -2254,6 +2257,14 @@ public:
   };
 };
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+extern "C" BridgedStringRef
+swift_ASTGen_printStaticBuildConfiguration(BridgedLangOptions cLangOpts);
+#pragma clang diagnostic pop
+#endif
+
 int swift::performFrontend(ArrayRef<const char *> Args,
                            const char *Argv0, void *MainAddr,
                            FrontendObserver *observer) {
@@ -2381,6 +2392,16 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   if (Invocation.getFrontendOptions().PrintTargetInfo) {
     swift::targetinfo::printTargetInfo(Invocation, llvm::outs());
+    return finishDiagProcessing(0, /*verifierEnabled*/ false);
+  }
+
+  if (Invocation.getFrontendOptions().PrintBuildConfig) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    auto resultText =
+        swift_ASTGen_printStaticBuildConfiguration(Invocation.getLangOptions());
+    llvm::outs() << resultText.unbridged();
+    swift_ASTGen_freeBridgedString(resultText);
+#endif
     return finishDiagProcessing(0, /*verifierEnabled*/ false);
   }
 

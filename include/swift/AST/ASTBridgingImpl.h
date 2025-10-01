@@ -67,6 +67,17 @@ swift::DeclNameLoc BridgedDeclNameLoc::unbridged() const {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedLangOptions
+//===----------------------------------------------------------------------===//
+
+BridgedLangOptions::BridgedLangOptions(const swift::LangOptions &langOpts)
+  : LangOpts(&langOpts) { }
+
+const swift::LangOptions &BridgedLangOptions::unbridged() const {
+  return *LangOpts;
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: BridgedASTContext
 //===----------------------------------------------------------------------===//
 
