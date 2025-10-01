@@ -2060,8 +2060,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       return TupleType::getEmpty(ctx);
 
     case AccessorKind::Mutate:
-      // TODO: Temporary result representation for mutate accessors.
-      return InOutType::get(storage->getValueInterfaceType());
+      return storage->getValueInterfaceType();
 
     // Addressor result types can get complicated because of the owner.
     case AccessorKind::Address:
