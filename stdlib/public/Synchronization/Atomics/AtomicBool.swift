@@ -77,7 +77,7 @@ extension Atomic where Value == Bool {
   ///
   /// - Parameter operand: A boolean value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
-  /// - Returns: A tuple with the old value before the operation a the new value
+  /// - Returns: A tuple with the old value before the operation and the new value
   ///   after the operation.
   @available(SwiftStdlib 6.0, *)
   @discardableResult
@@ -135,7 +135,7 @@ extension Atomic where Value == Bool {
   ///
   /// - Parameter operand: A boolean value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
-  /// - Returns: A tuple with the old value before the operation a the new value
+  /// - Returns: A tuple with the old value before the operation and the new value
   ///   after the operation.
   @available(SwiftStdlib 6.0, *)
   @discardableResult
@@ -193,7 +193,7 @@ extension Atomic where Value == Bool {
   ///
   /// - Parameter operand: A boolean value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
-  /// - Returns: A tuple with the old value before the operation a the new value
+  /// - Returns: A tuple with the old value before the operation and the new value
   ///   after the operation.
   @available(SwiftStdlib 6.0, *)
   @discardableResult
