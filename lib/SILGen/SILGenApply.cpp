@@ -4164,10 +4164,10 @@ private:
                                             loweredSubstArgType,
                                             param.getSILStorageInterfaceType());
         case SILFunctionLanguage::C:
-          return Conversion::getBridging(Conversion::BridgeToObjC,
-             arg.getSubstRValueType(),
-             origParamType.getType(),
-             param.getSILStorageInterfaceType());
+          return Conversion::getBridging(
+              Conversion::BridgeToObjC, arg.getSubstRValueType(),
+              origParamType.getType(), param.getSILStorageInterfaceType(),
+              origParamType);
         }
         llvm_unreachable("bad language");
       }();
