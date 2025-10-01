@@ -63,6 +63,11 @@ func bad2(_: borrowing BadDestroyNonCopyableType2) { }
 
 #endif
 
+#if CPLUSPLUS
+// expected-cplusplus-warning@+1{{'ExtraDestroy' is deprecated: destroy operation 'extraDestroy' is not allowed on types with a non-trivial destructor}}
+func extra(_: borrowing ExtraDestroy) { }
+#endif
+
 // CHECK-SIL: sil shared @$sSo21NonCopyableWithDeinitVfD : $@convention(method) (@owned NonCopyableWithDeinit) -> () {
 // CHECK-SIL: bb0([[SELF:%[0-9]+]] : $NonCopyableWithDeinit):
 // CHECK-SIL: [[SELF_ALLOC:%[0-9]+]] = alloc_stack $NonCopyableWithDeinit
