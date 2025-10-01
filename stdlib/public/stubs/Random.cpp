@@ -72,12 +72,15 @@ void swift_stdlib_random(void *buf, __swift_size_t nbytes) {
 
   // We must assign each generated value to a temporary local integer because we
   // do not know if the buffer is well-aligned or not.
-  for (size_t i = 0; i < nbytes; i += sizeof(std::random_device::result_type)) {
-    auto value = rd();
-    std::memcpy(buffer + i, &value, sizeof(value));
+  constexpr size_t byteCountPerWord = sizeof(std::random_device::result_type);
+  if (nbytes >= byteCountPerWord) {
+    for (size_t i = 0; i < nbytes; i += byteCountPerWord) {
+      auto value = rd();
+      std::memcpy(buffer + i, &value, byteCountPerWord);
+    }
   }
 
-  auto trailingCount = (nbytes % sizeof(std::random_device::result_type));
+  auto trailingCount = (nbytes % byteCountPerWord);
   if (trailingCount > 0) {
     auto value = rd();
     std::memcpy(buffer + (nbytes - trailingCount), &value, trailingCount);
