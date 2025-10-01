@@ -7810,43 +7810,8 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   if (auto var = dyn_cast<VarDecl>(D)) {
     // stored properties have limitations as to when they can be nonisolated.
     auto type = var->getTypeInContext();
-    if (var->hasStorage()) {
-      {
-        // A stored property can be 'nonisolated' if it is a 'Sendable' member
-        // of a 'Sendable' value type.
-        bool canBeNonisolated = false;
-        if (auto nominal = dc->getSelfStructDecl()) {
-          if (nominal->getDeclaredTypeInContext()->isSendableType() &&
-              !var->isStatic() && type->isSendableType()) {
-            canBeNonisolated = true;
-          }
-        }
-
-          // Additionally, a stored property of a non-'Sendable' type can be
-          // explicitly marked 'nonisolated'.
-          if (auto parentDecl = dc->getDeclaredTypeInContext())
-            if (!parentDecl->isSendableType()) {
-              canBeNonisolated = true;
-            }
-
-        // Otherwise, this stored property has to be qualified as 'unsafe'.
-        if (var->supportsMutation() && !attr->isUnsafe() && !canBeNonisolated) {
-          diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
-              .fixItInsertAfter(attr->getRange().End, "(unsafe)");
-          var->diagnose(diag::nonisolated_mutable_storage_note, var);
-          return;
-        }
-
-        // 'nonisolated' without '(unsafe)' is not allowed on non-Sendable
-        // variables, unless they are a member of a non-'Sendable' type.
-        if (!attr->isUnsafe() && !type->hasError() && !canBeNonisolated) {
-          bool diagnosed = diagnoseIfAnyNonSendableTypes(
-              type, SendableCheckContext(dc), Type(), SourceLoc(),
-              attr->getLocation(), diag::nonisolated_non_sendable);
-          if (diagnosed)
-            return;
-        }
-      }
+    if (var->hasStorage() || var->hasAttachedPropertyWrapper() ||
+        var->getAttrs().hasAttribute<LazyAttr>()) {
 
       if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
         // 'nonisolated' can not be applied to stored properties inside
@@ -7862,6 +7827,61 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
           diagnoseAndRemoveAttr(attr,
                                 diag::nonisolated_distributed_actor_storage);
           return;
+        }
+      }
+
+      {
+        // A stored property can be 'nonisolated' if it is a 'Sendable' member
+        // of a 'Sendable' value type.
+        // The above rule does not apply to lazy properties and properties with
+        // property wrappers, because backing storage is a stored
+        // 'var' that is part of the internal state of the actor which could
+        // only be accessed in actor's isolation context.
+        bool canBeNonisolated = false;
+        if (auto nominal = dc->getSelfStructDecl()) {
+          if (var->hasStorage() &&
+              nominal->getDeclaredTypeInContext()->isSendableType() &&
+              !var->isStatic() && type->isSendableType()) {
+            canBeNonisolated = true;
+          }
+        }
+
+        // Additionally, a stored property of a non-'Sendable' type can be
+        // explicitly marked 'nonisolated'.
+        if (auto parentDecl = dc->getDeclaredTypeInContext())
+          if (!parentDecl->isSendableType()) {
+            canBeNonisolated = true;
+          }
+
+        // Otherwise, this stored property has to be qualified as 'unsafe'.
+        if (var->supportsMutation() && !attr->isUnsafe() && !canBeNonisolated) {
+          if (var->hasAttachedPropertyWrapper()) {
+            diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
+              .warnUntilSwiftVersionIf(attr->isImplicit(), 6)
+              .fixItInsertAfter(attr->getRange().End, "(unsafe)");
+            return;
+          } else if (var->getAttrs().hasAttribute<LazyAttr>()) {
+            diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
+              .warnUntilSwiftVersion(6)
+              .fixItInsertAfter(attr->getRange().End, "(unsafe)");
+            return;
+          } else {
+            diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
+              .fixItInsertAfter(attr->getRange().End, "(unsafe)");
+            if (var->hasStorage())
+              var->diagnose(diag::nonisolated_mutable_storage_note, var);
+            return;
+          }
+        }
+
+        // 'nonisolated' without '(unsafe)' is not allowed on non-Sendable
+        // variables, unless they are a member of a non-'Sendable' type.
+        if (!attr->isUnsafe() && !type->hasError() && !canBeNonisolated) {
+          bool diagnosed = diagnoseIfAnyNonSendableTypes(
+              type, SendableCheckContext(dc), Type(), SourceLoc(),
+              attr->getLocation(), diag::nonisolated_non_sendable);
+          if (diagnosed)
+            return;
         }
       }
 
@@ -7898,22 +7918,6 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
               .fixItRemove(attr->getRange());
         }
       }
-    }
-
-    // Using 'nonisolated' with lazy properties and wrapped properties is
-    // unsupported, because backing storage is a stored 'var' that is part
-    // of the internal state of the actor which could only be accessed in
-    // actor's isolation context.
-    if (var->hasAttachedPropertyWrapper()) {
-      diagnoseAndRemoveAttr(attr, diag::nonisolated_wrapped_property)
-        .warnUntilSwiftVersionIf(attr->isImplicit(), 6);
-      return;
-    }
-
-    if (var->getAttrs().hasAttribute<LazyAttr>()) {
-      diagnose(attr->getLocation(), diag::nonisolated_lazy)
-        .warnUntilSwiftVersion(6);
-      return;
     }
 
     // nonisolated can not be applied to local properties unless qualified as
