@@ -1809,7 +1809,6 @@ namespace {
       result = adjustTypeForDeclReference(result, resultTySelf,
                                           resultType(adjustedRefTySelf),
                                           locator);
-      closeExistentials(result, locator);
 
       // If the property is of dynamic 'Self' type, wrap an implicit
       // conversion around the resulting expression, with the destination
@@ -1820,6 +1819,8 @@ namespace {
         result = cs.cacheType(new (ctx) CovariantReturnConversionExpr(
             result, resultTy));
       }
+
+      closeExistentials(result, locator);
 
       // If we need to load, do so now.
       if (loadImmediately) {
@@ -2509,8 +2510,27 @@ namespace {
       // Coerce the index argument.
       auto openedFullFnType = simplifyType(selected.adjustedOpenedFullType)
                                   ->castTo<FunctionType>();
+
+      auto openedFullFnTypeSelf = openedFullFnType;
+
+      // Now, deal with DynamicSelfType.
+      if (selected.adjustedOpenedFullType->hasDynamicSelfType()) {
+        openedFullFnTypeSelf = simplifyType(
+            selected.adjustedOpenedFullType->eraseDynamicSelfType())
+                  ->castTo<FunctionType>();
+        auto replacementTy = getDynamicSelfReplacementType(
+            baseTy, subscript, memberLoc);
+        openedFullFnType = simplifyType(
+              selected.adjustedOpenedFullType
+                  ->replaceDynamicSelfType(replacementTy))
+                  ->castTo<FunctionType>();
+      }
+
       auto fullSubscriptTy = openedFullFnType->getResult()
                                   ->castTo<FunctionType>();
+      auto fullSubscriptTySelf = openedFullFnTypeSelf->getResult()
+                                  ->castTo<FunctionType>();
+
       auto appliedWrappers =
           solution.getAppliedPropertyWrappers(memberLoc->getAnchor());
       args = coerceCallArguments(
@@ -2564,37 +2584,27 @@ namespace {
       if (!base)
         return nullptr;
 
-      bool hasDynamicSelf = fullSubscriptTy->hasDynamicSelfType();
-
       // Form the subscript expression.
       auto subscriptExpr = SubscriptExpr::create(
           ctx, base, args, subscriptRef, isImplicit, semantics);
       subscriptExpr->setIsSuper(isSuper);
 
-      if (!hasDynamicSelf) {
-        cs.setType(subscriptExpr, fullSubscriptTy->getResult());
-      } else {
-        cs.setType(subscriptExpr,
-                   fullSubscriptTy->getResult()
-                      ->replaceDynamicSelfType(containerTy));
-      }
+      cs.setType(subscriptExpr, fullSubscriptTySelf->getResult());
 
       Expr *result = subscriptExpr;
-      closeExistentials(result, locator);
 
       // If the element is of dynamic 'Self' type, wrap an implicit conversion
       // around the resulting expression, with the destination type having
       // 'Self' swapped for the appropriate replacement type -- usually the
       // base object type.
-      if (hasDynamicSelf) {
-        const auto conversionTy = simplifyType(
-            selected.adjustedOpenedType->castTo<FunctionType>()->getResult());
-
-        if (!containerTy->isEqual(conversionTy)) {
-          result = cs.cacheType(
-              new (ctx) CovariantReturnConversionExpr(result, conversionTy));
-        }
+      if (!fullSubscriptTy->getResult()->isEqual(
+            fullSubscriptTySelf->getResult())) {
+        result = cs.cacheType(
+            new (ctx) CovariantReturnConversionExpr(
+                result, fullSubscriptTy->getResult()));
       }
+
+      closeExistentials(result, locator);
 
       return result;
     }
