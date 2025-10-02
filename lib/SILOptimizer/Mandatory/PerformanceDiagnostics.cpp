@@ -208,7 +208,7 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
             if (auto *fri = dyn_cast<FunctionRefInst>(bi->getArguments()[1])) {
               if (visitCallee(bi, fri->getReferencedFunction(), perfConstr, parentLoc))
                 return true;
-            } else {
+            } else if (perfConstr != PerformanceConstraints::ManualOwnership) {
               LocWithParent loc(inst.getLoc().getSourceLoc(), parentLoc);
               diagnose(loc, diag::performance_unknown_callees);
               return true;
@@ -250,6 +250,12 @@ bool PerformanceDiagnostics::checkClosureValue(SILValue closure,
                                             SILInstruction *callInst,
                                             PerformanceConstraints perfConstr,
                                             LocWithParent *parentLoc) {
+  // Closures within a function are pre-annotated with [manual_ownership]
+  // within SILGen, if they're visible to users for annotation at all.
+  // So no recursive closure checking is needed here.
+  if (perfConstr == PerformanceConstraints::ManualOwnership)
+    return false;
+
   // Walk through the definition of the closure until we find the "underlying"
   // function_ref instruction.
   while (!isa<FunctionRefInst>(closure)) {
