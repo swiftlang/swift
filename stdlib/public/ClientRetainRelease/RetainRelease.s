@@ -97,8 +97,8 @@ _retainRelease_slowpath_mask:
 .private_extern _swift_bridgeObjectReleaseClient
 #if SWIFT_OBJC_INTEROP
 _swift_bridgeObjectReleaseClient:
-  lsr   x1, x0, #62
-  cbnz  x1, LbridgeObjectReleaseObjC
+  tbnz  x0, #63, LbridgeObjectReleaseObjCRet
+  tbnz  x0, #62, LbridgeObjectReleaseObjC
   and   x0, x0, 0xffffffffffffff8
 
 .alt_entry _swift_releaseClient
@@ -193,12 +193,8 @@ LbridgeObjectReleaseObjC:
   stp   fp, lr, [sp, #0x40];
   add   fp, sp, #0x40
 
-  // Clear the spare bits from the pointer, but leave the tagged pointer bit.
-  // This will produce a corrupt tagged pointer if the value is actually a
-  // tagged pointer. But objc_retain is guaranteed to do nothing on tagged
-  // pointers, so that does no harm.
-  and   x0, x0, #0x8fffffffffffffff
-  and   x0, x0, #0xfffffffffffffff8
+  // Clear the unused bits from the pointer
+  and   x0, x0, #0x0ffffffffffffff8
   bl    _objc_release
 
   ldp   fp, lr, [sp, #0x40]
@@ -206,6 +202,7 @@ LbridgeObjectReleaseObjC:
   ldp   x12, x13, [sp, #0x20]
   ldp   x10, x11, [sp, #0x10]
   ldp   x0, x9, [sp], #0x50
+LbridgeObjectReleaseObjCRet:
   CONDITIONAL PTRAUTH, \
     retab
   CONDITIONAL !PTRAUTH, \
@@ -215,8 +212,8 @@ LbridgeObjectReleaseObjC:
 .private_extern _swift_bridgeObjectRetainClient
 #if SWIFT_OBJC_INTEROP
 _swift_bridgeObjectRetainClient:
-  lsr   x1, x0, #62
-  cbnz  x1, LbridgeObjectRetainObjC
+  tbnz  x0, #63, LbridgeObjectRetainObjCRet
+  tbnz  x0, #62, LbridgeObjectRetainObjC
   and   x0, x0, 0xffffffffffffff8
 
 .alt_entry _swift_retainClient
@@ -306,12 +303,8 @@ LbridgeObjectRetainObjC:
   stp   fp, lr, [sp, #0x40];
   add   fp, sp, #0x40
 
-  // Clear the spare bits from the pointer, but leave the tagged pointer bit.
-  // This will produce a corrupt tagged pointer if the value is actually a
-  // tagged pointer. But objc_retain is guaranteed to do nothing on tagged
-  // pointers, so that does no harm.
-  and   x0, x0, #0x8fffffffffffffff
-  and   x0, x0, #0xfffffffffffffff8
+  // Clear the unused bits from the pointer
+  and   x0, x0, #0x0ffffffffffffff8
   bl    _objc_retain
 
   ldp   fp, lr, [sp, #0x40]
@@ -319,6 +312,7 @@ LbridgeObjectRetainObjC:
   ldp   x12, x13, [sp, #0x20]
   ldp   x10, x11, [sp, #0x10]
   ldp   x0, x9, [sp], #0x50
+LbridgeObjectRetainObjCRet:
   CONDITIONAL PTRAUTH, \
     retab
   CONDITIONAL !PTRAUTH, \
