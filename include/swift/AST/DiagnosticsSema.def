@@ -8946,6 +8946,30 @@ GROUPED_WARNING(perf_hint_closure_returns_array,ReturnTypeImplicitCopy,DefaultIg
                 "Performance: closure returns a%select{ dictionary|n array}0, leading to implicit copies. "
                 "Consider using an 'inout' parameter instead.", (bool))
 
+GROUPED_WARNING(perf_hint_param_has_existential,PerformanceHints,DefaultIgnore,
+                "Performance: %0 expects existential any, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
+                (const ParamDecl*))
+GROUPED_WARNING(perf_hint_func_returns_existential,PerformanceHints,DefaultIgnore,
+                "Performance: %0 returns existential any, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
+                (const FuncDecl*))
+GROUPED_WARNING(perf_hint_closure_returns_existential,PerformanceHints,DefaultIgnore,
+                "Performance: closure returns existential any, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.", ())
+GROUPED_WARNING(perf_hint_var_uses_existential,PerformanceHints,DefaultIgnore,
+                "Performance: %0 uses existential any, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
+                (const VarDecl *))
+GROUPED_WARNING(perf_hint_pat_uses_existential,PerformanceHints,DefaultIgnore,
+                "Performance: Ignored value uses existential any, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
+                ())
+GROUPED_WARNING(perf_hint_typealias_uses_existential,PerformanceHints,DefaultIgnore,
+                "Performance: %0 aliases existential any type, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
+                (const TypeAliasDecl *))
+
 ERROR(unsafe_self_dependent_result_attr_on_invalid_decl,none,
       "invalid use of @_unsafeSelfDependentResult", ())
 
