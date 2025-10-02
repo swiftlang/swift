@@ -366,7 +366,7 @@ void ImportResolver::visitImportDecl(ImportDecl *ID) {
   if (front == "std" || front.starts_with("std_")) {
     SmallString<64> modulePathStr;
     path.getString(modulePathStr);
-    auto diagKind = (ctx.LangOpts.DebuggerSupport || true) ? diag::sema_no_import_repl
+    auto diagKind = ctx.LangOpts.DebuggerSupport ? diag::sema_no_import_repl
                                                  : diag::sema_no_import;
     const SourceLoc importLoc = ID->getLoc();
     const ImportPath sourcePath = ID->getImportPath();
