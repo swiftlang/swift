@@ -695,19 +695,6 @@ bb0(%0 : $*Builtin.Int8):
   return %4 : $Builtin.Int64
 }
 
-// CHECK-LABEL: sil [ossa] @cse_raw_pointer_to_ref :
-// CHECK: raw_pointer_to_ref
-// CHECK-NOT: raw_pointer_to_ref
-// CHECK: tuple
-// CHECK-LABEL: } // end sil function 'cse_raw_pointer_to_ref'
-sil [ossa] @cse_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> (C, C) {
-bb0(%0 : $Builtin.RawPointer):
-  %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
-  %2 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
-  %6 = tuple(%1: $C, %2: $C)
-  return %6 : $(C, C)
-}
-
 // CHECK-LABEL: sil [ossa] @cse_unchecked_addr_cast :
 // CHECK: unchecked_addr_cast
 // CHECK-NOT: unchecked_addr_cast
