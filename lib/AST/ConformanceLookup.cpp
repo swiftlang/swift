@@ -480,6 +480,14 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
                                  ProtocolDecl *protocol) {
   if (auto kp = protocol->getKnownProtocolKind()) {
     switch (*kp) {
+    case KnownProtocolKind::Actor: {
+      if (builtinType->getBuiltinTypeKind() !=
+          BuiltinTypeKind::BuiltinImplicitActor)
+        break;
+      return ProtocolConformanceRef(type->getASTContext().getBuiltinConformance(
+          type, protocol, BuiltinConformanceKind::Synthesized));
+    }
+
     case KnownProtocolKind::Sendable:
     case KnownProtocolKind::SendableMetatype:
     case KnownProtocolKind::Copyable:
