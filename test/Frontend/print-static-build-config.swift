@@ -4,7 +4,7 @@
 // CHECK: "attributes":
 // CHECK-SAME: "escaping"
 
-// CHECK-SAME: "customConditions":["SOMETHING"]
+// CHECK-SAME: "customConditions":[{{.*"SOMETHING"[^]]*\]}}
 
 // CHECK-SAME: "features":
 // CHECK-SAME: "AttachedMacros"
