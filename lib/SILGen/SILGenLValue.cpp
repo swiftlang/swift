@@ -3584,7 +3584,8 @@ void LValue::addNonMemberVarComponent(
 
       std::optional<SILAccessEnforcement> enforcement;
       if (!Storage->isLet()) {
-        if (Options.IsNonAccessing) {
+        if (Options.IsNonAccessing || Options.ForGuaranteedReturn ||
+            Options.ForGuaranteedAddressReturn) {
           enforcement = std::nullopt;
         } else if (Storage->getDeclContext()->isLocalContext()) {
           enforcement = SGF.getUnknownEnforcement(Storage);
