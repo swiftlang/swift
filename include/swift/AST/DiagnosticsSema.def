@@ -8935,5 +8935,16 @@ ERROR(attr_inline_always_on_accessor,none,
       "'@inline(always)' on class variable accessors whose variable declaration"
       " is not final are not allowed", ())
 
+//===----------------------------------------------------------------------===//
+// MARK: Swift Performance hints
+//===----------------------------------------------------------------------===//
+
+GROUPED_WARNING(perf_hint_function_returns_array,ReturnTypeImplicitCopy,DefaultIgnore,
+                "Performance: %0 returns a%select{ dictionary|n array}1, leading to implicit copies. "
+                "Consider using an 'inout' parameter instead.", (const FuncDecl *, bool))
+GROUPED_WARNING(perf_hint_closure_returns_array,ReturnTypeImplicitCopy,DefaultIgnore,
+                "Performance: closure returns a%select{ dictionary|n array}0, leading to implicit copies. "
+                "Consider using an 'inout' parameter instead.", (bool))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
