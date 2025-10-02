@@ -2415,10 +2415,6 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
   ModuleDecl *MD = nullptr;
   ASTContext &ctx = getNameImporter().getContext();
 
-  // `CxxStdlib` is the only accepted spelling of the C++ stdlib module name.
-  if (path.front().Item.is("std") ||
-      path.front().Item.str().starts_with("std_"))
-    return nullptr;
   if (path.front().Item == ctx.Id_CxxStdlib) {
     ImportPath::Builder adjustedPath(ctx.getIdentifier("std"), importLoc);
     adjustedPath.append(path.getSubmodulePath());
@@ -8891,7 +8887,7 @@ bool importer::isCxxStdModule(StringRef moduleName, bool IsSystem) {
 ImportPath::Builder ClangImporter::Implementation::getSwiftModulePath(const clang::Module *M) {
   ImportPath::Builder builder;
   while (M) {
-    if (!M->isSubModule() && isCxxStdModule(M))
+    if (!M->isSubModule() && M->Name == "std")
       builder.push_back(SwiftContext.Id_CxxStdlib);
     else
       builder.push_back(SwiftContext.getIdentifier(M->Name));

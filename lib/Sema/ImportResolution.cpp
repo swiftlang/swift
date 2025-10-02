@@ -359,6 +359,26 @@ static bool isSubmodule(const ModuleDecl* M) {
 void ImportResolver::visitImportDecl(ImportDecl *ID) {
   assert(unboundImports.empty());
 
+  // `CxxStdlib` is the only accepted spelling of the C++ stdlib module name.
+  ImportPath::Builder builder;
+  const ImportPath path = ID->getRealImportPath(builder);
+  const llvm::StringRef front = path.front().Item.str();
+  if (front == "std" || front.starts_with("std_")) {
+    SmallString<64> modulePathStr;
+    path.getString(modulePathStr);
+    auto diagKind = ctx.LangOpts.DebuggerSupport ? diag::sema_no_import_repl
+                                                 : diag::sema_no_import;
+    const SourceLoc importLoc = ID->getLoc();
+    const ImportPath sourcePath = ID->getImportPath();
+    const llvm::StringRef sourceFront = sourcePath.front().Item.str();
+    ctx.Diags.diagnose(importLoc, diagKind, modulePathStr);
+    ctx.Diags.diagnose(importLoc, diag::did_you_mean_cxxstdlib)
+        .fixItReplaceChars(importLoc, importLoc.getAdvancedLoc(sourceFront.size()), "CxxStdlib");
+    if (front != sourceFront)
+      ctx.Diags.diagnose(importLoc, diag::sema_module_aliased, sourceFront, front);
+    return;
+  }
+
   unboundImports.emplace_back(ID);
   bindPendingImports();
 }
@@ -513,13 +533,15 @@ UnboundImport::getTopLevelModule(ModuleDecl *M, SourceFile &SF) {
 // MARK: Implicit imports
 //===----------------------------------------------------------------------===//
 
-static void tryStdlibFixit(ASTContext &ctx,
-                           StringRef moduleName,
-                           SourceLoc loc) {
-  if (moduleName.starts_with("std")) {
-    ctx.Diags.diagnose(loc, diag::did_you_mean_cxxstdlib)
-      .fixItReplaceChars(loc, loc.getAdvancedLoc(3), "CxxStdlib");
+ImportPath::Module getRealModulePath(ImportPath::Builder &builder, ImportPath::Module path, ASTContext &ctx) {
+  for (size_t i = 0; i < path.size(); i++) {
+    if (i == 0) {
+      builder.push_back(ctx.getRealModuleName(path[i].Item));
+    } else {
+      builder.push_back(path[i]);
+    }
   }
+  return builder.get().getModulePath(false);
 }
 
 static void diagnoseNoSuchModule(ModuleDecl *importingModule,
@@ -534,13 +556,20 @@ static void diagnoseNoSuchModule(ModuleDecl *importingModule,
                        importingModule->getName());
   } else {
     SmallString<64> modulePathStr;
-    modulePath.getString(modulePathStr);
+    ImportPath::Builder builder;
+    ImportPath::Module realModulePath = getRealModulePath(builder, modulePath, ctx);
+    realModulePath.getString(modulePathStr);
 
     auto diagKind = diag::sema_no_import;
     if (nonfatalInREPL && ctx.LangOpts.DebuggerSupport)
       diagKind = diag::sema_no_import_repl;
     ctx.Diags.diagnose(importLoc, diagKind, modulePathStr);
-    tryStdlibFixit(ctx, modulePathStr, importLoc);
+
+    const llvm::StringRef sourceFront = modulePath.front().Item.str();
+    const llvm::StringRef realFront = realModulePath.front().Item.str();
+    if (realFront != sourceFront)
+      ctx.Diags.diagnose(importLoc, diag::sema_module_aliased, sourceFront,
+                         realFront);
   }
 
   if (ctx.SearchPathOpts.getSDKPath().empty() &&
