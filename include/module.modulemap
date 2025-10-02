@@ -26,3 +26,8 @@ module OptimizerBridging {
   header "swift/SILOptimizer/OptimizerBridging.h"
   export *
 }
+
+module AutoDiffClosureSpecializationBridging {
+  header "swift/SILOptimizer/AutoDiffClosureSpecializationBridging.h"
+  export *
+}
