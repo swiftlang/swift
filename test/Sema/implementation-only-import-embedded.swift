@@ -150,6 +150,39 @@ internal func explicitNonInliableInternal(arg: StructFromDirect = StructFromDire
   explicitNonInliable()
 }
 
+struct Accessors {
+  public var var1: Int {
+    get {
+      globalFunctionFromDirect() // expected-error {{global function 'globalFunctionFromDirect()' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
+      return 0
+    }
+  }
+
+  @_alwaysEmitIntoClient
+  public var var2: Int {
+    get {
+      globalFunctionFromDirect() // expected-error {{global function 'globalFunctionFromDirect()' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
+      return 0
+    }
+  }
+
+  @_neverEmitIntoClient
+  public var var3: Int {
+    get {
+      globalFunctionFromDirect()
+      return 0
+    }
+  }
+
+  public var var4: Int {
+    @_neverEmitIntoClient
+    get {
+      globalFunctionFromDirect()
+      return 0
+    }
+  }
+}
+
 public func legalAccessToIndirect(arg: StructFromIndirect = StructFromIndirect()) {
   _ = StructFromIndirect()
 

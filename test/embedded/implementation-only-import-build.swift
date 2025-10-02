@@ -57,3 +57,12 @@ public func legalAccessToIndirect() {
   }
   nested()
 }
+
+extension Array {
+  @_alwaysEmitIntoClient
+  public var myMutableSpan: Int {
+    get {
+      return 0
+    }
+  }
+}
