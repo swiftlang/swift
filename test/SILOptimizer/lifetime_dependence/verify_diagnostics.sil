@@ -381,3 +381,42 @@ bb2(%error : @owned $any Error):
   destroy_value [dead_end] %md
   unreachable
 }
+
+// Test dependence on the temporary stack address of a trivial value. computeAddressableRange must extend the lifetime
+// of %tempAddr into the unreachable.
+//
+// Note that the computed instruction range is marked Invalid because it does not have a single dominating
+// block. Nonetheless, the range still include all blocks in which the stack allocation is live, which is all we care
+// about.
+sil hidden [ossa] @testTempAddressNondominatedUnreachable : $@convention(thin) (@in_guaranteed InlineInt) -> () {
+bb0(%0 : $*InlineInt):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb5
+
+bb2:
+  %loadArg = load [trivial] %0
+  %tempAddr = alloc_stack $InlineInt
+  store %loadArg to [trivial] %tempAddr
+
+  %f1 = function_ref @getInlineSpan : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address 0) @owned RawSpan
+  %call = apply %f1(%tempAddr) : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address 0) @owned RawSpan
+  %md = mark_dependence [unresolved] %call on %tempAddr
+
+  %f2 = function_ref @useRawSpan : $@convention(thin) (@guaranteed RawSpan) -> @error any Error
+  try_apply %f2(%md) : $@convention(thin) (@guaranteed RawSpan) -> @error any Error, normal bb3, error bb4
+
+bb3(%void : $()):
+  destroy_value %md
+  dealloc_stack %tempAddr
+  %99 = tuple ()
+  return %99
+
+bb4(%error : @owned $any Error):
+  destroy_value [dead_end] %md
+  br bb5
+
+bb5:
+  unreachable
+}
