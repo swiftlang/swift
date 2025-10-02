@@ -3592,14 +3592,7 @@ IRGenFunction::emitTypeMetadataRefForLayout(SILType ty,
 
 llvm::Value *IRGenFunction::emitValueGenericRef(CanType type) {
   if (auto integer = type->getAs<IntegerType>()) {
-    auto value = integer->getValue();
-
-    if (integer->isNegative()) {
-      value = value.sextOrTrunc(IGM.SizeTy->getBitWidth());
-    } else {
-      value = value.zextOrTrunc(IGM.SizeTy->getBitWidth());
-    }
-
+    auto value = integer->getValue().sextOrTrunc(IGM.SizeTy->getBitWidth());
     return llvm::ConstantInt::get(IGM.SizeTy, value);
   }
 
