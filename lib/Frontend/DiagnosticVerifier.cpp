@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/DiagnosticVerifier.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/SourceManager.h"
@@ -1264,6 +1265,10 @@ void DiagnosticVerifier::printRemainingDiagnostics() const {
 /// file.
 void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
                                           const DiagnosticInfo &Info) {
+  // Ignore "fatal error encountered while in -verify mode" errors,
+  // because there's no reason to verify them.
+  if (Info.ID == diag::verify_encountered_fatal.ID)
+    return;
   SmallVector<CapturedFixItInfo, 2> fixIts;
   for (const auto &fixIt : Info.FixIts) {
     fixIts.emplace_back(SM, fixIt);
