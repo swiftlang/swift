@@ -46,12 +46,12 @@ func functionIntroducedOnAndroid30() { }
 
 if #available(iOS 17.3, *) {
   functionIntroducedOnAndroid30() // expected-error{{'functionIntroducedOnAndroid30()' is only available in Android 30 or newer}}
-  // expected-note @-1{{add 'if #available' version check}}
+  // expected-note @-1{{add 'if #available' version check}}{{3-34=if #available(Android 30, *) {\n      functionIntroducedOnAndroid30()\n  \} else {\n      // Fallback on earlier versions\n  \}}}
 }
 
 if #available(Android 28, *) {
   functionIntroducedOnAndroid30() // expected-error{{'functionIntroducedOnAndroid30()' is only available in Android 30 or newer}}
-  // expected-note @-1{{add 'if #available' version check}}
+  // expected-note @-1{{add 'if #available' version check}}{{3-34=if #available(Android 30, *) {\n      functionIntroducedOnAndroid30()\n  \} else {\n      // Fallback on earlier versions\n  \}}}
 }
 
 if #available(Android 30, *) {
