@@ -82,6 +82,8 @@ GROUP(WeakMutability, "weak-mutability")
 GROUP(PerformanceHints, "performance-hints")
 GROUP(ReturnTypeImplicitCopy, "return-type-implicit-copy")
 GROUP_LINK(PerformanceHints, ReturnTypeImplicitCopy)
+GROUP(ExistentialType, "existential-type")
+GROUP_LINK(PerformanceHints, ExistentialType)
 
 #define UNDEFINE_DIAGNOSTIC_GROUPS_MACROS
 #include "swift/AST/DefineDiagnosticGroupsMacros.h"
