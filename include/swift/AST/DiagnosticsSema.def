@@ -8928,6 +8928,12 @@ ERROR(attr_inline_always_requires_inlinable,none,
       "together with '@inlinable'", ())
 ERROR(attr_inline_always_no_usable_from_inline,none,
       "cannot use '@inline(always)' together with '@usableFromInline'", ())
+ERROR(attr_inline_always_requires_final_method,none,
+      "'@inline(always)' on class %select{methods|vars}1 requires %0 to be "
+      "marked 'final'", (DeclName, bool))
+ERROR(attr_inline_always_on_accessor,none,
+      "'@inline(always)' on class variable accessors whose variable declaration"
+      " is not final are not allowed", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

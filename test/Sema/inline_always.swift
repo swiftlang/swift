@@ -70,3 +70,63 @@ public var x: Int {
        return 1
    }
 }
+
+class C {
+  static func staticMethodInA() {} // okay
+
+  @inline(always)
+  final func myMethod() {} // okay
+
+  @inline(always) // expected-error {{'@inline(always)' on class methods requires 'myMethod2()' to be marked 'final'}}
+  func myMethod2() {}
+
+  @inline(always)
+  final var myVarFinal : Int { // okay
+    return 0
+  }
+
+  @inline(always) // expected-error {{'@inline(always)' on class vars requires 'myVar' to be marked 'final'}}
+  var myVar : Int {
+    return 0
+  }
+
+  @inline(always)
+  final var myVar2Final: Int { // okay
+    get {
+      return 1
+    }
+  }
+
+  @inline(always) // expected-error {{'@inline(always)' on class vars requires 'myVar2' to be marked 'final'}}
+  var myVar2: Int {
+    get {
+      return 1
+    }
+  }
+
+  final var myVar3Final : Int { // okay
+    @inline(always)
+    get {
+      return 1
+    }
+  }
+
+
+  var myVar3: Int {
+    @inline(always) // expected-error {{'@inline(always)' on class variable accessors whose variable declaration is not final are not allowed}}
+    get {
+      return 1
+    }
+  }
+
+  @inline(always)
+  static func myMethod3() {} // okay
+}
+
+extension C {
+  @inline(always)
+  final func myMethod10() {} // okay
+
+  @inline(always)
+  func myMethod11() {} // okay
+}
