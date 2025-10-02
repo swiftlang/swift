@@ -11,6 +11,11 @@ extension X {
   public var propXinB: Bool { return true }
   package var propXinB_package: Bool { return true }
 
+  public func shadowedByMemberOnXinB() { }
+  public static func shadowedByStaticMemberOnXinB() { }
+
+  public static var max: Int { return Int.min }
+
   public static func >>>(a: Self, b: Self) -> Self { b }
 
   public struct NestedInB {}
