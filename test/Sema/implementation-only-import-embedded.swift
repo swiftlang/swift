@@ -148,6 +148,8 @@ internal func explicitNonInliableInternal(arg: StructFromDirect = StructFromDire
   implicitlyInlinablePublic()
   implicitlyInlinablePrivate()
   explicitNonInliable()
+
+  struct NestedStruct {}
 }
 
 struct Accessors {

@@ -2946,7 +2946,8 @@ public:
 
     // We don't allow nested types inside inlinable contexts.
     auto kind = DC->getFragileFunctionKind();
-    if (kind.kind != FragileFunctionKind::None) {
+    if (kind.kind != FragileFunctionKind::None &&
+        kind.kind != FragileFunctionKind::EmbeddedAlwaysEmitIntoClient) {
       NTD->diagnose(diag::local_type_in_inlinable_function, NTD->getName(),
                     kind.getSelector());
     }
