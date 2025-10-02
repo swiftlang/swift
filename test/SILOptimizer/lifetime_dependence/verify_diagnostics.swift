@@ -405,7 +405,7 @@ func returnTempBorrow() -> Borrow<Int> {
 //     store %arg to [trivial] temp
 //     apply %get_span(%temp)
 //
-// If we use InlineArray instead, we get a store_borrow, which is a completely different situatio.
+// If we use InlineArray instead, we get a store_borrow, which is a completely different situation.
 func test(inline: InlineInt) {
   inline.span.withUnsafeBytes { _ = $0 }
 }
