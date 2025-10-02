@@ -1159,5 +1159,117 @@ if #available(SwiftStdlib 5.9, *) {
   }
 }
 
+@_alignment(8)
+struct EightAligned {
+  let x = 0
+}
+
+extension EightAligned: Equatable {}
+extension EightAligned: Hashable {}
+
+@_alignment(16)
+struct SixteenAligned {
+  let x = 0
+}
+
+extension SixteenAligned: Equatable {}
+extension SixteenAligned: Hashable {}
+
+struct OveralignedForEight {
+  subscript(getter getter: EightAligned) -> Int {
+    128
+  }
+
+  subscript(setter setter: EightAligned) -> Int {
+    get {
+      128
+    }
+
+    set {
+      fatalError()
+    }
+  }
+}
+
+struct OveralignedForSixteen {
+  subscript(getter getter: SixteenAligned) -> Int {
+    128
+  }
+
+  subscript(setter setter: SixteenAligned) -> Int {
+    get {
+      128
+    }
+
+    set {
+      fatalError()
+    }
+  }
+}
+
+struct SimpleEight {
+  let oa = OveralignedForEight()
+}
+
+struct SimpleSixteen {
+  let oa = OveralignedForSixteen()
+}
+
+#if _pointerBitWidth(_32)
+if #available(SwiftStdlib 6.3, *) {
+  keyPath.test("eight byte overaligned arguments") {
+    let oa = OveralignedForEight()
+    let kp = \OveralignedForEight.[getter: EightAligned()]
+
+    let value = oa[keyPath: kp]
+    expectEqual(value, 128)
+
+    // Test that appends where the argument is no longer overaligned work
+    let simple = SimpleEight()
+    let kp11 = \SimpleEight.oa
+    let kp12 = \OveralignedForEight.[getter: EightAligned()]
+    let kp1 = kp11.appending(path: kp12)
+
+    let value1 = simple[keyPath: kp1]
+    expectEqual(value1, 128)
+
+    // Test that appends where the argument is still overaligned works
+    let kp21 = \SimpleEight.oa
+    let kp22 = \OveralignedForEight.[setter: EightAligned()]
+    let kp2 = kp21.appending(path: kp22)
+
+    let value2 = simple[keyPath: kp2]
+    expectEqual(value2, 128)
+  }
+}
+#endif
+
+if #available(SwiftStdlib 6.3, *) {
+  keyPath.test("sixteen byte overaligned arguments") {
+    let oa = OveralignedForSixteen()
+    let kp = \OveralignedForSixteen.[getter: SixteenAligned()]
+
+    let value = oa[keyPath: kp]
+    expectEqual(value, 128)
+
+    // Test that appends where the argument is no longer overaligned work
+    let simple = SimpleSixteen()
+    let kp11 = \SimpleSixteen.oa
+    let kp12 = \OveralignedForSixteen.[getter: SixteenAligned()]
+    let kp1 = kp11.appending(path: kp12)
+
+    let value1 = simple[keyPath: kp1]
+    expectEqual(value1, 128)
+
+    // Test that appends where the argument is still overaligned works
+    let kp21 = \SimpleSixteen.oa
+    let kp22 = \OveralignedForSixteen.[setter: SixteenAligned()]
+    let kp2 = kp21.appending(path: kp22)
+
+    let value2 = simple[keyPath: kp2]
+    expectEqual(value2, 128)
+  }
+}
+
 runAllTests()
 
