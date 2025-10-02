@@ -2286,15 +2286,16 @@ namespace {
 namespace {
 
 /// A physical component which involves calling borrow accessors.
-class BorrowAccessorComponent
+class BorrowMutateAccessorComponent
     : public AccessorBasedComponent<PhysicalPathComponent> {
 public:
-  BorrowAccessorComponent(AbstractStorageDecl *decl, SILDeclRef accessor,
-                          bool isSuper, bool isDirectAccessorUse,
-                          SubstitutionMap substitutions, CanType baseFormalType,
-                          LValueTypeData typeData,
-                          ArgumentList *argListForDiagnostics,
-                          PreparedArguments &&indices, bool isOnSelfParameter)
+  BorrowMutateAccessorComponent(AbstractStorageDecl *decl, SILDeclRef accessor,
+                                bool isSuper, bool isDirectAccessorUse,
+                                SubstitutionMap substitutions,
+                                CanType baseFormalType, LValueTypeData typeData,
+                                ArgumentList *argListForDiagnostics,
+                                PreparedArguments &&indices,
+                                bool isOnSelfParameter)
       : AccessorBasedComponent(BorrowMutateKind, decl, accessor, isSuper,
                                isDirectAccessorUse, substitutions,
                                baseFormalType, typeData, argListForDiagnostics,
@@ -2311,14 +2312,14 @@ public:
     ManagedValue result;
 
     auto args = std::move(*this).prepareAccessorArgs(SGF, loc, base, Accessor);
-    auto value = SGF.emitBorrowAccessor(
+    auto value = SGF.emitBorrowMutateAccessor(
         loc, Accessor, Substitutions, std::move(args.base), IsSuper,
         IsDirectAccessorUse, std::move(args.Indices), IsOnSelfParameter);
     return value;
   }
 
   void dump(raw_ostream &OS, unsigned indent) const override {
-    printBase(OS, indent, "BorrowAccessorComponent");
+    printBase(OS, indent, "BorrowMutateAccessorComponent");
   }
 };
 } // namespace
@@ -3427,16 +3428,15 @@ namespace {
                                       AccessKind, FormalRValueType);
         return asImpl().emitUsingInitAccessor(accessor, isDirect, typeData);
       }
-      case AccessorKind::Borrow: {
+      case AccessorKind::Borrow:
+      case AccessorKind::Mutate: {
         auto typeData = getPhysicalStorageTypeData(
             SGF.getTypeExpansionContext(), SGF.SGM, AccessKind, Storage, Subs,
             FormalRValueType);
-        return asImpl().emitUsingBorrowAccessor(accessor, isDirect, typeData);
+        return asImpl().emitUsingBorrowMutateAccessor(accessor, isDirect,
+                                                      typeData);
       }
-      case AccessorKind::Mutate:
-        llvm_unreachable("mutate accessor is not yet implemented");
       }
-
       llvm_unreachable("bad kind");
     }
   };
@@ -3526,9 +3526,9 @@ void LValue::addNonMemberVarComponent(
           PreparedArguments(), /*isOnSelfParameter*/ false);
     }
 
-    void emitUsingBorrowAccessor(SILDeclRef accessor, bool isDirect,
-                                 LValueTypeData typeData) {
-      llvm_unreachable("borrow accessor is not implemented");
+    void emitUsingBorrowMutateAccessor(SILDeclRef accessor, bool isDirect,
+                                       LValueTypeData typeData) {
+      llvm_unreachable("borrow/mutate accessor is not implemented");
     }
 
     void emitUsingGetterSetter(SILDeclRef accessor,
@@ -4211,10 +4211,10 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
         ArgListForDiagnostics, std::move(Indices), IsOnSelfParameter);
   }
 
-  void emitUsingBorrowAccessor(SILDeclRef accessor, bool isDirect,
-                               LValueTypeData typeData) {
+  void emitUsingBorrowMutateAccessor(SILDeclRef accessor, bool isDirect,
+                                     LValueTypeData typeData) {
     assert(!ActorIso);
-    LV.add<BorrowAccessorComponent>(
+    LV.add<BorrowMutateAccessorComponent>(
         Storage, accessor, IsSuper, isDirect, Subs, BaseFormalType, typeData,
         ArgListForDiagnostics, std::move(Indices), IsOnSelfParameter);
   }
