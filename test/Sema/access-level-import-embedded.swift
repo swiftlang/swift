@@ -3,18 +3,19 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/indirects.swiftmodule \
 // RUN:   %S/Inputs/implementation-only-imports/indirects.swift \
-// RUN:   -swift-version 5 -target arm64-apple-macosx15.0 \
+// RUN:   -swift-version 5 -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded
 // RUN: %target-swift-frontend -emit-module -o %t/directs.swiftmodule -I %t \
 // RUN:   %S/Inputs/implementation-only-imports/directs.swift \
-// RUN:   -swift-version 5 -target arm64-apple-macosx15.0 \
+// RUN:   -swift-version 5 -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded
 
 // RUN: %target-swift-frontend -typecheck -verify %s -I %t \
-// RUN:   -swift-version 5 -target arm64-apple-macosx15.0 \
+// RUN:   -swift-version 5 -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded
 
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: embedded_stdlib_cross_compiling
 
 @_implementationOnly internal import directs
 // expected-warning @-1 {{using '@_implementationOnly' without enabling library evolution for 'main' may lead to instability during execution}}
