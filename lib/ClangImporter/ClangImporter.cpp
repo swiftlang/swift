@@ -2852,6 +2852,12 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
     auto addImplicitImport = [&implicitImportInfo, &Imported,
                               this](const clang::Module *M,
                                     bool guaranteedUnique) {
+      const bool cannotBeImported = llvm::any_of(M->Requirements, [](auto &Req) {
+        return !Req.RequiredState && Req.FeatureName == "swift";
+      });
+      if (cannotBeImported) {
+        return;
+      }
       ImportPath::Builder builder = getSwiftModulePath(M);
       if (!guaranteedUnique && Imported.count(builder.get()))
         return;
