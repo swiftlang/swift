@@ -144,6 +144,14 @@ func basic_methods_consuming_fixed(_ t1: Triangle) {
   (copy t2).consuming()  // FIXME: why is this not propagated?
 }
 
+open class OpenClass {
+  open func classMethod() {}
+}
+@_manualOwnership
+func callOpenMethod(_ c: OpenClass) {
+  return c.classMethod()
+}
+
 @_manualOwnership
 @discardableResult
 func consumingFunc(_ t0: consuming Triangle) -> Bool { return false }
