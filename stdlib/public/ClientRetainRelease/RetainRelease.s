@@ -14,7 +14,7 @@
 #define USE_LDX_STX !USE_CAS
 
 // Use ptrauth instructions where needed.
-#if __ARM_FEATURE_PAUTH
+#if __has_feature(ptrauth_calls)
 #define PTRAUTH 1
 #else
 #define PTRAUTH 0
@@ -97,8 +97,10 @@ _retainRelease_slowpath_mask:
 .private_extern _swift_bridgeObjectReleaseClient
 #if SWIFT_OBJC_INTEROP
 _swift_bridgeObjectReleaseClient:
-  tbnz  x0, #63, LbridgeObjectReleaseObjCRet
-  tbnz  x0, #62, LbridgeObjectReleaseObjC
+  tbz  x0, #63, LbridgeObjectReleaseNotTagged
+  ret
+LbridgeObjectReleaseNotTagged:
+  tbnz  x0, #62, _bridgeObjectReleaseClientObjC
   and   x0, x0, 0xffffffffffffff8
 
 .alt_entry _swift_releaseClient
@@ -183,7 +185,7 @@ Lslowpath_release:
     clrex
   CALL_SLOWPATH _swift_release
 
-LbridgeObjectReleaseObjC:
+_bridgeObjectReleaseClientObjC:
   CONDITIONAL PTRAUTH, \
     pacibsp
   stp   x0, x9, [sp, #-0x50]!
@@ -212,8 +214,10 @@ LbridgeObjectReleaseObjCRet:
 .private_extern _swift_bridgeObjectRetainClient
 #if SWIFT_OBJC_INTEROP
 _swift_bridgeObjectRetainClient:
-  tbnz  x0, #63, LbridgeObjectRetainObjCRet
-  tbnz  x0, #62, LbridgeObjectRetainObjC
+  tbz  x0, #63, LbridgeObjectRetainNotTagged
+  ret
+LbridgeObjectRetainNotTagged:
+  tbnz  x0, #62, _swift_bridgeObjectRetainClientObjC
   and   x0, x0, 0xffffffffffffff8
 
 .alt_entry _swift_retainClient
@@ -293,7 +297,7 @@ Lslowpath_retain:
     clrex
   CALL_SLOWPATH _swift_retain
 
-LbridgeObjectRetainObjC:
+_swift_bridgeObjectRetainClientObjC:
   CONDITIONAL PTRAUTH, \
     pacibsp
   stp   x0, x9, [sp, #-0x50]!
