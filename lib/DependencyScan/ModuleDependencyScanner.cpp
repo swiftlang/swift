@@ -471,6 +471,11 @@ SwiftDependencyTracker::SwiftDependencyTracker(
   // Add blocklist file.
   for (auto &File: CI.getFrontendOptions().BlocklistConfigFilePaths)
     addCommonFile(File);
+
+  // Add access notes.
+  StringRef AccessNotePath = CI.getLangOptions().AccessNotesPath;
+  if (!AccessNotePath.empty())
+    addCommonFile(AccessNotePath);
 }
 
 void SwiftDependencyTracker::startTracking(bool includeCommonDeps) {
