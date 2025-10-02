@@ -1770,6 +1770,8 @@ public:
                                   CanType fromCollection,
                                   CanType toCollection,
                                   ManagedValue mv,
+                                  ManagedValue keyConversion,
+                                  ManagedValue valueConversion,
                                   SGFContext C);
 
   //===--------------------------------------------------------------------===//
