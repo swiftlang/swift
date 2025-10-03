@@ -817,7 +817,7 @@ class RefCounts {
   // can be directly returned from swift_retain. This makes the call to
   // incrementSlow() a tail call.
   SWIFT_ALWAYS_INLINE
-  HeapObject *increment(uint32_t inc = 1) {
+  HeapObject *increment(HeapObject *returning, uint32_t inc = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     
     // Constant propagation will remove this in swift_retain, it should only
@@ -837,7 +837,7 @@ class RefCounts {
       }
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
-    return getHeapObject();
+    return returning;
   }
 
   SWIFT_ALWAYS_INLINE
@@ -1382,7 +1382,7 @@ class HeapObjectSideTableEntry {
   // STRONG
   
   void incrementStrong(uint32_t inc) {
-    refCounts.increment(inc);
+    refCounts.increment(nullptr, inc);
   }
 
   template <PerformDeinit performDeinit>
