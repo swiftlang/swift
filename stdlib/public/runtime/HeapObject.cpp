@@ -137,11 +137,14 @@ static HeapObject *_swift_tryRetain_(HeapObject *object)
 // fast path to avoid pushing a stack frame. Without this adapter, clang emits
 // code that pushes a stack frame right away, then does the fast path or slow
 // path.
-#define CALL_IMPL_SWIFT_REFCOUNT_CC(name, args) do { \
-  if (SWIFT_UNLIKELY(_swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly.load(std::memory_order_relaxed))) \
-    return _ ## name ## _adapter args; \
-  return _ ## name ## _ args; \
-} while(0)
+#define CALL_IMPL_SWIFT_REFCOUNT_CC(name, args)                                          \
+  do {                                                                                   \
+    if (SWIFT_UNLIKELY(                                                                  \
+            _swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly \
+                .load(std::memory_order_relaxed)))                                       \
+      SWIFT_MUSTTAIL return _##name##_adapter args;                                      \
+    return _##name##_ args;                                                              \
+  } while (0)
 
 #define CALL_IMPL_CHECK(name, args) do { \
   void *fptr; \
@@ -452,22 +455,36 @@ extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED SWIFT_REFCOUNT_CC
 void
 _swift_release_dealloc(HeapObject *object);
 
-SWIFT_ALWAYS_INLINE
-static HeapObject *_swift_retain_(HeapObject *object) {
+SWIFT_ALWAYS_INLINE static HeapObject *_swift_retain_(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_retain);
   if (isValidPointerForNativeRetain(object)) {
+    // swift_bridgeObjectRetain might call us with a pointer that has spare bits
+    // set, and expects us to return that unmasked value. Mask off those bits
+    // for the actual increment operation.
+    HeapObject *masked = (HeapObject *)((uintptr_t)object &
+                                        ~heap_object_abi::SwiftSpareBitsMask);
+
     // Return the result of increment() to make the eventual call to
     // incrementSlow a tail call, which avoids pushing a stack frame on the fast
     // path on ARM64.
-    return object->refCounts.increment(1);
+    return masked->refCounts.increment(object, 1);
   }
   return object;
 }
 
-SWIFT_REFCOUNT_CC SWIFT_NOINLINE
-static HeapObject *_swift_retain_adapter(HeapObject *object) {
-  return _swift_retain(object);
+SWIFT_REFCOUNT_CC
+static HeapObject *_swift_retain_adapterImpl(HeapObject *object) {
+  HeapObject *masked =
+      (HeapObject *)((uintptr_t)object & ~heap_object_abi::SwiftSpareBitsMask);
+  _swift_retain(masked);
+  return object;
 }
+
+// This strange construct prevents the compiler from creating an unnecessary
+// stack frame in swift_retain. A direct tail call to _swift_retain_adapterImpl
+// somehow causes clang to emit a stack frame.
+static HeapObject *(*SWIFT_REFCOUNT_CC volatile _swift_retain_adapter)(
+    HeapObject *object) = _swift_retain_adapterImpl;
 
 HeapObject *swift::swift_retain(HeapObject *object) {
 #ifdef SWIFT_THREADING_NONE
@@ -490,7 +507,7 @@ SWIFT_ALWAYS_INLINE
 static HeapObject *_swift_retain_n_(HeapObject *object, uint32_t n) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_retain_n);
   if (isValidPointerForNativeRetain(object))
-    object->refCounts.increment(n);
+    return object->refCounts.increment(object, n);
   return object;
 }
 

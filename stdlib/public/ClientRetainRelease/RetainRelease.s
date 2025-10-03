@@ -81,10 +81,6 @@ _retainRelease_slowpath_mask:
 .endmacro
 
 .macro CALL_SLOWPATH func
-// x0 points to the refcount field. Adjust it back to point to the object
-// itself.
-  sub   x0, x0, #8
-
 // Tail call the slow path.
   b \func
 .endmacro
@@ -101,7 +97,7 @@ _swift_bridgeObjectReleaseClient:
   ret
 LbridgeObjectReleaseNotTagged:
   tbnz  x0, #62, _bridgeObjectReleaseClientObjC
-  and   x0, x0, 0xffffffffffffff8
+  and   x0, x0, 0x0ffffffffffffff8
 
 .alt_entry _swift_releaseClient
 #else
@@ -116,11 +112,11 @@ _swift_releaseClient:
 
 // We'll operate on the address of the refcount field, which is 8 bytes into
 // the object.
-  add   x0, x0, #8
+  add   x1, x0, #8
 
 // Load the current value in the refcount field when using CAS.
   CONDITIONAL USE_CAS, \
-    ldr x16, [x0]
+    ldr x16, [x1]
 
 // The compare-and-swap goes back to here when it needs to retry.
 Lrelease_retry:
@@ -134,7 +130,7 @@ Lrelease_retry:
 // ldxr/stxr are not guaranteed to make forward progress if there are memory
 // accesses between them, so we need to do this after getting the mask above.
   CONDITIONAL USE_LDX_STX, \
-    ldxr x16, [x0]
+    ldxr x16, [x1]
 
   tst   x16, x17
 
@@ -155,20 +151,20 @@ Lrelease_retry:
 
 #if USE_CAS
 // Save a copy of the old value so we can determine if the CAS succeeded.
-  mov   x1, x16
+  mov   x2, x16
 
 // Compare and swap the new value into the refcount field. Perform the operation
 // with release memory ordering so that dealloc on another thread will see all
 // stores performed on this thread prior to calling release.
-  casl  x16, x17, [x0]
+  casl  x16, x17, [x1]
 
 // The previous value of the refcount field is now in x16. We succeeded if that
 // value is the same as the old value we had before. If we failed, retry.
-  cmp   x1, x16
+  cmp   x2, x16
   b.ne  Lrelease_retry
 #elif USE_LDX_STX
 // Try to store the updated value.
-  stlxr  w16, x17, [x0]
+  stlxr  w16, x17, [x1]
 
 // On failure, retry.
   cbnz  w16, Lrelease_retry
@@ -218,7 +214,6 @@ _swift_bridgeObjectRetainClient:
   ret
 LbridgeObjectRetainNotTagged:
   tbnz  x0, #62, _swift_bridgeObjectRetainClientObjC
-  and   x0, x0, 0xffffffffffffff8
 
 .alt_entry _swift_retainClient
 #else
@@ -231,13 +226,17 @@ _swift_retainClient:
   cmp   x0, #0
   b.le  Lretain_ret
 
+// Mask off spare bits that may have come in from bridgeObjectRetain. Keep the
+// original value in x0 since we have to return it.
+  and   x1, x0, 0xffffffffffffff8
+
 // We'll operate on the address of the refcount field, which is 8 bytes into
 // the object.
-  add   x0, x0, #8
+  add   x1, x1, #8
 
 // Load the current value of the refcount field when using CAS.
   CONDITIONAL USE_CAS, \
-    ldr   x16, [x0]
+    ldr   x16, [x1]
 
 Lretain_retry:
 // Get the slow path mask and see if the refcount field has any of those bits
@@ -250,7 +249,7 @@ Lretain_retry:
 // ldxr/stxr are not guaranteed to make forward progress if there are memory
 // accesses between them, so we need to do this after getting the mask above.
   CONDITIONAL USE_LDX_STX, \
-    ldxr x16, [x0]
+    ldxr x16, [x1]
 
   tst   x16, x17
 
@@ -263,20 +262,20 @@ Lretain_retry:
 
 #if USE_CAS
 // Save the old value so we can check if the CAS succeeded.
-  mov   x1, x16
+  mov   x2, x16
 
 // Compare and swap the new value into the refcount field. Retain can use
 // relaxed memory ordering.
-  cas   x16, x17, [x0]
+  cas   x16, x17, [x1]
 
 // The previous value of the refcount field is now in x16. We succeeded if that
 // value is the same as the old value we had before. If we failed, retry.
-  cmp   x1, x16
+  cmp   x2, x16
   b.ne  Lretain_retry
 
 #elif USE_LDX_STX
 // Try to store the updated value.
-  stxr  w16, x17, [x0]
+  stxr  w16, x17, [x1]
 
 // On failure, retry.
   cbnz  w16, Lretain_retry
@@ -284,10 +283,8 @@ Lretain_retry:
 #error Either USE_CAS or USE_LDX_STX must be set.
 #endif
 
-// If we succeeded, return. Retain returns the object pointer being retained.
-// Readjust x0 to point to the object again instead of the refcount field of the
-// object.
-  sub   x0, x0, #8
+// If we succeeded, return. Retain returns the object pointer being retained,
+// which is still in x0 at this point.
 
 Lretain_ret:
   ret
