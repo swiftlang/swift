@@ -1,8 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | grep 'check-prefix' > %t/prefix-option
-// RUN: %target-run %t/a.out | %FileCheck -check-prefix=CHECK `cat %t/prefix-option` %s
+// RUN: %target-run %t/a.out | %FileCheck --check-prefixes=CHECK,CHECK-51,DONT-CHECK %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
