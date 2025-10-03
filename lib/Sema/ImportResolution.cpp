@@ -623,8 +623,7 @@ void ImportResolver::addImplicitImports() {
   const ModuleDecl *moduleToInherit = nullptr;
   if (underlyingClangModule) {
     moduleToInherit = underlyingClangModule;
-    boundImports.push_back(
-        AttributedImport(ImportedModule(underlyingClangModule)));
+    boundImports.emplace_back(ImportedModule(underlyingClangModule));
   } else {
     moduleToInherit = SF.getParentModule();
   }
