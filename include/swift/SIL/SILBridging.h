@@ -1247,7 +1247,6 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDeallocStack(BridgedValue operand) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDeallocStackRef(BridgedValue operand) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDeallocPack(BridgedValue operand) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDeallocPackMetadata(BridgedValue operand) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createAddressToPointer(BridgedValue address,
                                                                                BridgedType pointerTy,
                                                                                bool needsStackProtection) const;

@@ -2385,10 +2385,6 @@ BridgedInstruction BridgedBuilder::createDeallocPack(BridgedValue operand) const
   return {unbridged().createDeallocPack(regularLoc(), operand.getSILValue())};
 }
 
-BridgedInstruction BridgedBuilder::createDeallocPackMetadata(BridgedValue operand) const {
-  return {unbridged().createDeallocPackMetadata(regularLoc(), operand.getSILValue())};
-}
-
 BridgedInstruction BridgedBuilder::createAddressToPointer(BridgedValue address, BridgedType pointerTy,
                                                           bool needsStackProtection) const {
   return {unbridged().createAddressToPointer(regularLoc(), address.getSILValue(), pointerTy.unbridged(),

@@ -257,12 +257,6 @@ public struct Builder {
   }
 
   @discardableResult
-  public func createDeallocPackMetadata(_ operand: Value) -> DeallocPackMetadataInst {
-    let dr = bridged.createDeallocPackMetadata(operand.bridged)
-    return notifyNew(dr.getAs(DeallocPackMetadataInst.self))
-  }
-
-  @discardableResult
   public func createDeallocStackRef(_ operand: Value) -> DeallocStackRefInst {
     let dr = bridged.createDeallocStackRef(operand.bridged)
     return notifyNew(dr.getAs(DeallocStackRefInst.self))
