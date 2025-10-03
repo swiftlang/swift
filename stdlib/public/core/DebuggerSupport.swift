@@ -214,18 +214,18 @@ public enum _DebuggerSupport {
   
     print(String(repeating: " ", count: indent), terminator: "", to: &target)
 
-    // do not expand classes with no custom Mirror
-    // yes, a type can lie and say it's a class when it's not since we only
-    // check the displayStyle - but then the type would have a custom Mirror
-    // anyway, so there's that...
-    let isNonClass = mirror.displayStyle != .`class`
+    // Do not expand types that conform to Custom(Debug)StringConvertible,
+    // unless the type also conform to CustomReflectable.
+    let isCustomStringConvertible = false
     let isCustomReflectable: Bool
     if let value = value {
       isCustomReflectable = value is CustomReflectable
+      isCustomStringConvertible =
+        value is CustomStringConvertible || value is CustomDebugStringConvertible
     } else {
       isCustomReflectable = true
     }
-    let willExpand = isNonClass || isCustomReflectable
+    let willExpand = isCustomReflectable || !isCustomStringConvertible
 
     let count = mirror.children.count
     let bullet = isRoot && (count == 0 || !willExpand) ? ""
