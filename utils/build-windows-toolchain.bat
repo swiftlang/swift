@@ -80,12 +80,15 @@ if not "%HOST_ARCH_NAME%"=="" set "HostArchNameArg=-HostArchName %HOST_ARCH_NAME
 
 call :CloneRepositories || (exit /b 1)
 
+set SCCACHE_DIRECT=true
+
 :: We only have write access to BuildRoot, so use that as the image root.
 powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %HostArchNameArg% ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
   -ImageRoot %BuildRoot% ^
+  -EnableCaching ^
   %SkipPackagingArg% ^
   %WindowsSDKArchitecturesArg% ^
   %TestArg% ^
