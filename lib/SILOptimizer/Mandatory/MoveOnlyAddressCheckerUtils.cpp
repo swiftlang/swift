@@ -2421,6 +2421,12 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
           return true;
         }
 
+        if (operand->isBorrowAccessorResult()) {
+          moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
+              markedValue);
+          return true;
+        }
+
         // Finally try to emit either a global or class field error...
         if (!moveChecker.diagnosticEmitter
                  .emitGlobalOrClassFieldLoadedAndConsumed(markedValue)) {

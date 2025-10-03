@@ -631,7 +631,6 @@ class ArgumentInitHelper {
   std::optional<FunctionInputGenerator> FormalParamTypes;
 
   SmallPtrSet<ParamDecl *, 2> ScopedDependencies;
-  SmallPtrSet<ParamDecl *, 2> AddressableParams;
 
 public:
   ArgumentInitHelper(SILGenFunction &SGF,
@@ -729,16 +728,15 @@ private:
                                         : AbstractionPattern(substType));
 
       // A parameter can be directly marked as addressable, or its
-      // addressability can be implied by a scoped dependency.
-      bool isAddressable = false;
-      
-      isAddressable = pd->isAddressable()
-        || (ScopedDependencies.contains(pd)
-            && SGF.getTypeProperties(origType, substType)
-                  .isAddressableForDependencies());
-      if (isAddressable) {
-        AddressableParams.insert(pd);
-      }
+      // addressability can be implied by a scoped dependency or a borrow
+      // dependency.
+      bool isAddressable =
+          pd->isAddressable() ||
+          (ScopedDependencies.contains(pd) &&
+           SGF.getTypeProperties(origType, substType)
+               .isAddressableForDependencies()) ||
+          SGF.getFunction().getConventions().hasGuaranteedAddressResult() ||
+          SGF.getFunction().getConventions().hasGuaranteedResult();
       paramValue = argEmitter.handleParam(origType, substType, pd,
                                           isAddressable);
     }

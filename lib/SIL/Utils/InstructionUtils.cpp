@@ -48,6 +48,22 @@ SILValue swift::lookThroughOwnershipInsts(SILValue v) {
   }
 }
 
+SILValue swift::lookThroughMoveOnlyCheckerPattern(SILValue value) {
+  auto *bbi = dyn_cast<BeginBorrowInst>(value);
+  if (!bbi) {
+    return value;
+  }
+  auto *muncvi = cast<MarkUnresolvedNonCopyableValueInst>(bbi->getOperand());
+  if (!muncvi) {
+    return value;
+  }
+  auto *cvi = cast<CopyValueInst>(muncvi->getOperand());
+  if (!cvi) {
+    return value;
+  }
+  return cvi->getOperand();
+}
+
 bool swift::visitNonOwnershipUses(SILValue value,
                                   function_ref<bool(Operand *)> visitor) {
   // All ownership insts have a single operand, so a recursive walk is

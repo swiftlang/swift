@@ -2,7 +2,9 @@
 
 // REQUIRES: swift_feature_BorrowAndMutateAccessors
 
-public class Klass {}
+public class Klass {
+  var id: Int = 0
+}
 
 func getKlass() -> Klass {
   return Klass()
@@ -13,6 +15,8 @@ func use(_ t: Klass) {}
 public struct NC : ~Copyable {}
 
 func use(_ t: borrowing NC) {}
+
+func consume<T : ~Copyable>(_ t: consuming T) {}
 
 public struct S {
   var _k: Klass
@@ -44,8 +48,28 @@ public struct Wrapper {
     }
   }
 
+  var s_get: S {
+    get {
+      return _s
+    }
+  }
+
+  var s_read: S {
+    _read {
+      yield _s
+    }
+  }
+
   var k: Klass {
     borrow {
+      return _k
+    }
+  }
+
+  var k_complex: Klass {
+    borrow {
+      consume(self)
+      consume(_k)
       return _k
     }
   }
@@ -56,18 +80,42 @@ public struct Wrapper {
     }
   }
 
-  var nested_get: Klass {
+  var nested_get1: Klass {
     borrow {
       return _s.getKlass // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either literals, stored properties or computed properties that have borrow accessors}} 
     }
   }
   
-  var nested_read: Klass {
+  var nested_get2: Klass {
+    borrow {
+      return s_get.borrowKlass // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either literals, stored properties or computed properties that have borrow accessors}}
+    }
+  }
+
+  var nested_get3: Int {
+    borrow {
+      return _s.getKlass.id
+    }
+  }
+
+  var nested_get4: Int {
+    borrow {
+      return s_get.borrowKlass.id
+    }
+  }
+
+  var nested_read1: Klass {
     borrow {
       return _s.readKlass // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either literals, stored properties or computed properties that have borrow accessors}} 
     }
   }
   
+  var nested_read2: Klass {
+    borrow {
+      return s_read.readKlass // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either literals, stored properties or computed properties that have borrow accessors}}
+    }
+  }
+
   var owned_value_direct: Klass {
     borrow {
       return getKlass() // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either literals, stored properties or computed properties that have borrow accessors}} 
@@ -104,7 +152,7 @@ public struct Wrapper {
       if Int.random(in: 1..<100) == 0 {
         return _k
       } 
-      return _k
+      return _k // expected-error{{multiple return statements in borrow accessors are not yet supported}} 
     }
   }
 
@@ -156,6 +204,7 @@ public struct GenWrapper<T> {
   var _prop: T
   var _w: SimpleWrapper<T>
   var _klass: Klass
+  var _s: S
 
   public var prop: T {
     borrow {
@@ -182,6 +231,12 @@ public struct GenWrapper<T> {
     }
   }
   
+  var s: S {
+    borrow {
+      return _s
+    }
+  }
+
   var nested: T {
     borrow {
       return prop
@@ -191,6 +246,18 @@ public struct GenWrapper<T> {
   var klass: Klass {
     borrow {
       return _klass
+    }
+  }
+
+  var nested_klass1: Klass {
+    borrow {
+      return _s.borrowKlass
+    }
+  }
+
+  var nested_klass2: Klass {
+    borrow {
+      return s.borrowKlass
     }
   }
 
@@ -263,6 +330,8 @@ public struct SimpleNCWrapper<T : ~Copyable> : ~Copyable {
 public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
   var _prop: T
   var _w: SimpleNCWrapper<T>
+  var _nc: NC
+  var _ncw: NCWrapper
 
   public var prop: T {
     borrow {
@@ -273,6 +342,30 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
   var nested_prop: T {
     borrow {
       return _w.borrow_prop
+    }
+  }
+
+  var nc: NC {
+    borrow {
+      return _nc
+    }
+  }
+
+  var ncw: NCWrapper {
+    borrow {
+      return _ncw
+    }
+  }
+
+  var nested_nc1: NC {
+    borrow {
+      return _ncw.nc
+    }
+  }
+
+  var nested_nc2: NC {
+    borrow {
+      return ncw.nc
     }
   }
 
@@ -333,6 +426,56 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
   }
 }
 
+public struct NCS: ~Copyable {
+  var _nc: NC
+
+  var nc: NC {
+    borrow {
+      return _nc
+    }
+  }
+}
+
+public struct NCWrapper: ~Copyable {
+  var _nc: NC
+  var _s: NCS
+
+  var nc: NC {
+    borrow {
+      return _nc
+    }
+  }
+
+  var nested1: NC {
+    borrow {
+      return _s.nc
+    }
+  }
+
+  var nested2: NC {
+    borrow {
+      return nc
+    }
+  }
+
+  subscript(index: Int) -> NC {
+    borrow {
+      return _nc
+    }
+  }
+
+  var nested_subscript: NC {
+    borrow {
+      return self[0]
+    }
+  }
+
+  var literal: Int {
+    borrow {
+      return 0
+    }
+  }
+}
 
 func test() {
   let w1 = Wrapper(_k: Klass(), _s: S(_k: Klass()))
@@ -344,7 +487,7 @@ func test() {
   use(w1.nested_borrow)
   use(w1.nested)
 
-  let w2 = GenWrapper(_prop: Klass(), _w: SimpleWrapper(_prop: Klass()), _klass: Klass())
+  let w2 = GenWrapper(_prop: Klass(), _w: SimpleWrapper(_prop: Klass()), _klass: Klass(), _s: S(_k: Klass()))
   use(w2.prop)
   var k2 = w2.prop
   use(k2)
@@ -355,7 +498,7 @@ func test() {
 }
 
 func nctest() {
-  let w1 = GenNCWrapper(_prop: NC(), _w: SimpleNCWrapper(_prop: NC()))
+  let w1 = GenNCWrapper(_prop: NC(), _w: SimpleNCWrapper(_prop: NC()), _nc: NC(), _ncw: NCWrapper(_nc: NC(), _s: NCS(_nc: NC())))
   use(w1.prop)
   var k2 = w1.prop // MoveOnlyChecker diagnoses the copy
   use(k2)
@@ -376,6 +519,41 @@ func nctest() {
 // CHECK:   [[REG4:%.*]] = apply [[REG3]]([[REG2]]) : $@convention(method) (@guaranteed S) -> @guaranteed Klass 
 // CHECK:   return [[REG4]]                                       
 // CHECK: } 
+
+// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV11nested_get3Sivb : $@convention(method) (@guaranteed Wrapper) -> Int {
+// CHECK: bb0([[REG0:%.*]] : @guaranteed $Wrapper):
+// CHECK:   [[REG2:%.*]] = struct_extract [[REG0]], #Wrapper._s
+// CHECK:   [[REG3:%.*]] = copy_value [[REG2]]
+// CHECK:   [[REG4:%.*]] = begin_borrow [[REG3]]
+// CHECK:   [[REG5:%.*]] = function_ref @$s15borrow_accessor1SV8getKlassAA0D0Cvg : $@convention(method) (@guaranteed S) -> @owned Klass
+// CHECK:   [[REG6:%.*]] = apply [[REG5]]([[REG4]]) : $@convention(method) (@guaranteed S) -> @owned Klass
+// CHECK:   end_borrow [[REG4]]
+// CHECK:   destroy_value [[REG3]]
+// CHECK:   [[REG9:%.*]] = begin_borrow [[REG6]]
+// CHECK:   [[REG10:%.*]] = class_method [[REG9]], #Klass.id!getter : (Klass) -> () -> Int, $@convention(method) (@guaranteed Klass) -> Int
+// CHECK:   [[REG11:%.*]] = apply [[REG10]]([[REG9]]) : $@convention(method) (@guaranteed Klass) -> Int
+// CHECK:   end_borrow [[REG9]]
+// CHECK:   destroy_value [[REG6]]
+// CHECK:   return [[REG11]]
+// CHECK: }
+
+// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV11nested_get4Sivb : $@convention(method) (@guaranteed Wrapper) -> Int {
+// CHECK: bb0([[REG0:%.*]] : @guaranteed $Wrapper):
+// CHECK:   [[REG2:%.*]] = function_ref @$s15borrow_accessor7WrapperV5s_getAA1SVvg : $@convention(method) (@guaranteed Wrapper) -> @owned S
+// CHECK:   [[REG3:%.*]] = apply [[REG2]]([[REG0]]) : $@convention(method) (@guaranteed Wrapper) -> @owned S
+// CHECK:   [[REG4:%.*]] = begin_borrow [[REG3]]
+// CHECK:   [[REG5:%.*]] = function_ref @$s15borrow_accessor1SV0A5KlassAA0C0Cvb : $@convention(method) (@guaranteed S) -> @guaranteed Klass
+// CHECK:   [[REG6:%.*]] = apply [[REG5]]([[REG4]]) : $@convention(method) (@guaranteed S) -> @guaranteed Klass
+// CHECK:   [[REG7:%.*]] = copy_value [[REG6]]
+// CHECK:   end_borrow [[REG4]]
+// CHECK:   destroy_value [[REG3]]
+// CHECK:   [[REG10:%.*]] = begin_borrow [[REG7]]
+// CHECK:   [[REG11:%.*]] = class_method [[REG10]], #Klass.id!getter : (Klass) -> () -> Int, $@convention(method) (@guaranteed Klass) -> Int
+// CHECK:   [[REG12:%.*]] = apply [[REG11]]([[REG10]]) : $@convention(method) (@guaranteed Klass) -> Int
+// CHECK:   end_borrow [[REG10]]
+// CHECK:   destroy_value [[REG7]]
+// CHECK:   return [[REG12]]
+// CHECK: }
 
 // CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV6nestedAA5KlassCvb : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
 // CHECK: bb0([[REG0:%.*]] : @guaranteed $Wrapper):
@@ -401,18 +579,18 @@ func nctest() {
 // CHECK:   return [[REG7]]                                       
 // CHECK: } 
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV8if_klassAA5KlassCvb : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
-// CHECK: bb0([[REG0:%.*]] : @guaranteed $Wrapper):
-// CHECK:   cond_br {{.*}}, bb1, bb2                           
-// CHECK: bb1:                                              
-// CHECK:   [[EX1:%.*]] = struct_extract [[REG0]], #Wrapper._k            
-// CHECK:   br bb3([[EX1]])                                     
-// CHECK: bb2:                                              
-// CHECK:   [[EX2:%.*]] = struct_extract [[REG0]], #Wrapper._k            
-// CHECK:   br bb3([[EX2]])                                     
-// CHECK: bb3([[PHI:%.*]] : @guaranteed $Klass):                    
-// CHECK:   return [[PHI]]                                     
-// CHECK: } 
+// TODO-CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV8if_klassAA5KlassCvb : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
+// TODO-CHECK: bb0([[REG0:%.*]] : @guaranteed $Wrapper):
+// TODO-CHECK:   cond_br {{.*}}, bb1, bb2
+// TODO-CHECK: bb1:
+// TODO-CHECK:   [[EX1:%.*]] = struct_extract [[REG0]], #Wrapper._k
+// TODO-CHECK:   br bb3([[EX1]])
+// TODO-CHECK: bb2:
+// TODO-CHECK:   [[EX2:%.*]] = struct_extract [[REG0]], #Wrapper._k
+// TODO-CHECK:   br bb3([[EX2]])
+// TODO-CHECK: bb3([[PHI:%.*]] : @guaranteed $Klass):
+// TODO-CHECK:   return [[PHI]]
+// TODO-CHECK: }
 
 // CHECK: sil [ossa] @$s15borrow_accessor10GenWrapperV4propxvb : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_addr T {
 // CHECK: bb0([[REG0:%.*]] : $*GenWrapper<T>):
@@ -435,6 +613,29 @@ func nctest() {
 // CHECK:   return [[REG3]]                                       
 // CHECK: } 
 
+// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV13nested_klass1AA5KlassCvb : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed Klass {
+// CHECK: bb0([[REG0:%.*]] : $*GenWrapper<T>):
+// CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
+// CHECK:   [[REG2:%.*]] = struct_element_addr [[REG0]], #GenWrapper._s
+// CHECK:   [[REG3:%.*]] = load_borrow [[REG2]]
+// CHECK:   [[REG4:%.*]] = function_ref @$s15borrow_accessor1SV0A5KlassAA0C0Cvb : $@convention(method) (@guaranteed S) -> @guaranteed Klass
+// CHECK:   [[REG5:%.*]] = apply [[REG4]]([[REG3]]) : $@convention(method) (@guaranteed S) -> @guaranteed Klass
+// CHECK:   [[REG6:%.*]] = unchecked_ownership_conversion [[REG5]], @guaranteed to @unowned
+// CHECK:   [[REG7:%.*]] = unchecked_ownership_conversion [[REG6]], @unowned to @guaranteed
+// CHECK:   end_borrow [[REG3]]
+// CHECK:   return [[REG7]]
+// CHECK: }
+
+// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV13nested_klass2AA5KlassCvb : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed Klass {
+// CHECK: bb0([[REG0:%.*]] : $*GenWrapper<T>):
+// CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
+// CHECK:   [[REG2:%.*]] = function_ref @$s15borrow_accessor10GenWrapperV1sAA1SVvb : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed S
+// CHECK:   [[REG3:%.*]] = apply [[REG2]]<T>([[REG0]]) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed S
+// CHECK:   [[REG4:%.*]] = function_ref @$s15borrow_accessor1SV0A5KlassAA0C0Cvb : $@convention(method) (@guaranteed S) -> @guaranteed Klass
+// CHECK:   [[REG5:%.*]] = apply [[REG4]]([[REG3]]) : $@convention(method) (@guaranteed S) -> @guaranteed Klass
+// CHECK:   return [[REG5]]
+// CHECK: }
+
 // CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperVyxSicib : $@convention(method) <T> (Int, @in_guaranteed GenWrapper<T>) -> @guaranteed_addr T {
 // CHECK: bb0([[REG0:%.*]] : $Int, [[REG1:%.*]] : $*GenWrapper<T>):
 // CHECK:   [[REG4:%.*]] = struct_element_addr [[REG1]], #GenWrapper._prop  
@@ -451,3 +652,105 @@ func nctest() {
 // CHECK:   [[REG7:%.*]] = apply [[REG6]]<T>([[REG5]], [[REG0]]) : $@convention(method) <τ_0_0> (Int, @in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0 
 // CHECK:   return [[REG7]]                                       
 // CHECK: } 
+
+// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE10nested_nc1AA2NCVvb : $@convention(method) <T where T : ~Copyable> (@in_guaranteed GenNCWrapper<T>) -> @guaranteed NC {
+// CHECK: bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
+// CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
+// CHECK:   [[REG2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG0]]
+// CHECK:   [[REG3:%.*]] = struct_element_addr [[REG2]], #GenNCWrapper._ncw
+// CHECK:   [[REG4:%.*]] = load_borrow [[REG3]]
+// CHECK:   [[REG5:%.*]] = function_ref @$s15borrow_accessor9NCWrapperV2ncAA2NCVvb : $@convention(method) (@guaranteed NCWrapper) -> @guaranteed NC
+// CHECK:   [[REG6:%.*]] = apply [[REG5]]([[REG4]]) : $@convention(method) (@guaranteed NCWrapper) -> @guaranteed NC
+// CHECK:   [[REG7:%.*]] = unchecked_ownership_conversion [[REG6]], @guaranteed to @unowned
+// CHECK:   [[REG8:%.*]] = unchecked_ownership_conversion [[REG7]], @unowned to @guaranteed
+// CHECK:   [[REG9:%.*]] = copy_value [[REG8]]
+// CHECK:   [[REG10:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG9]]
+// CHECK:   [[REG11:%.*]] = begin_borrow [[REG10]]
+// CHECK:   end_borrow [[REG4]]
+// CHECK:   end_borrow [[REG11]]
+// CHECK:   destroy_value [[REG10]]
+// CHECK:   return [[REG8]]
+// CHECK: }
+
+// CHECK-LABEL: sil hidden [ossa] @$s15borrow_accessor9NCWrapperV2ncAA2NCVvb : $@convention(method) (@guaranteed NCWrapper) -> @guaranteed NC {
+// CHECK: bb0([[REG0]] : @guaranteed $NCWrapper):
+// CHECK:   [[REG1:%.*]] =  copy_value [[REG0]]
+// CHECK:   [[REG2:%.*]] =  mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG1]]
+// CHECK:   [[REG4:%.*]] =  begin_borrow [[REG2]]
+// CHECK:   [[REG5:%.*]] =  struct_extract [[REG0]], #NCWrapper._nc
+// CHECK:   end_borrow [[REG4]]
+// CHECK:   destroy_value [[REG2]]
+// CHECK:   return [[REG5]]
+// CHECK: }
+
+// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE10nested_nc2AA2NCVvb : $@convention(method) <T where T : ~Copyable> (@in_guaranteed GenNCWrapper<T>) -> @guaranteed NC {
+// CHECK: bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
+// CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
+// CHECK:   [[REG2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG0]]
+// CHECK:   [[REG3:%.*]] = function_ref @$s15borrow_accessor12GenNCWrapperVAARi_zrlE3ncwAA0D0Vvb : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed GenNCWrapper<τ_0_0>) -> @guaranteed NCWrapper
+// CHECK:   [[REG4:%.*]] = apply [[REG3]]<T>([[REG2]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed GenNCWrapper<τ_0_0>) -> @guaranteed NCWrapper
+// CHECK:   [[REG5:%.*]] = copy_value [[REG4]]
+// CHECK:   [[REG6:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG5]]
+// CHECK:   [[REG7:%.*]] = begin_borrow [[REG6]]
+// CHECK:   [[REG8:%.*]] = function_ref @$s15borrow_accessor9NCWrapperV2ncAA2NCVvb : $@convention(method) (@guaranteed NCWrapper) -> @guaranteed NC
+// CHECK:   [[REG9:%.*]] = apply [[REG8]]([[REG4]]) : $@convention(method) (@guaranteed NCWrapper) -> @guaranteed NC
+// CHECK:   [[REG10:%.*]] = copy_value [[REG9]]
+// CHECK:   [[REG11:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG10]]
+// CHECK:   [[REG12:%.*]] = begin_borrow [[REG11]]
+// CHECK:   end_borrow [[REG12]]
+// CHECK:   destroy_value [[REG11]]
+// CHECK:   end_borrow [[REG7]]
+// CHECK:   destroy_value [[REG6]]
+// CHECK:   return [[REG9]]
+// CHECK: }
+
+// CHECK-LABEL: sil hidden [ossa] @$s15borrow_accessor9NCWrapperV7nested1AA2NCVvb : $@convention(method) (@guaranteed NCWrapper) -> @guaranteed NC {
+// CHECK: bb0([[REG0]] : @guaranteed $NCWrapper):
+// CHECK:   [[REG1:%.*]] =  copy_value [[REG0]]
+// CHECK:   [[REG2:%.*]] =  mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG1]]
+// CHECK:   [[REG4:%.*]] =  begin_borrow [[REG2]]
+// CHECK:   [[REG5:%.*]] =  struct_extract [[REG0]], #NCWrapper._s
+// CHECK:   [[REG6:%.*]] =  function_ref @$s15borrow_accessor3NCSV2ncAA2NCVvb : $@convention(method) (@guaranteed NCS) -> @guaranteed NC
+// CHECK:   [[REG7:%.*]] =  apply [[REG6]]([[REG5]]) : $@convention(method) (@guaranteed NCS) -> @guaranteed NC
+// CHECK:   [[REG8:%.*]] =  copy_value [[REG7]]
+// CHECK:   [[REG9:%.*]] =  mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG8]]
+// CHECK:   [[REG10:%.*]] =  begin_borrow [[REG9]]
+// CHECK:   end_borrow [[REG10]]
+// CHECK:   destroy_value [[REG9]]
+// CHECK:   end_borrow [[REG4]]
+// CHECK:   destroy_value [[REG2]]
+// CHECK:   return [[REG7]]
+// CHECK-LABEL: }
+
+// CHECK-LABEL: sil hidden [ossa] @$s15borrow_accessor9NCWrapperVyAA2NCVSicib : $@convention(method) (Int, @guaranteed NCWrapper) -> @guaranteed NC {
+// CHECK: bb0([[REG0]] : $Int, [[REG1]] : @guaranteed $NCWrapper):
+// CHECK:   [[REG3:%.*]] =  copy_value [[REG1]]
+// CHECK:   [[REG4:%.*]] =  mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG3]]
+// CHECK:   [[REG6:%.*]] =  begin_borrow [[REG4]]
+// CHECK:   [[REG7:%.*]] =  struct_extract [[REG1]], #NCWrapper._nc
+// CHECK:   end_borrow [[REG6]]
+// CHECK:   destroy_value [[REG4]]
+// CHECK:   return [[REG7]]
+// CHECK: }
+
+// CHECK-LABEL: sil hidden [ossa] @$s15borrow_accessor9NCWrapperV16nested_subscriptAA2NCVvb : $@convention(method) (@guaranteed NCWrapper) -> @guaranteed NC {
+// CHECK: bb0([[REG0]] : @guaranteed $NCWrapper):
+// CHECK:   [[REG1:%.*]] =  copy_value [[REG0]]
+// CHECK:   [[REG2:%.*]] =  mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG1]]
+// CHECK:   [[REG4:%.*]] =  begin_borrow [[REG2]]
+// CHECK:   [[REG5:%.*]] =  integer_literal $Builtin.IntLiteral, 0
+// CHECK:   [[REG6:%.*]] =  metatype $@thin Int.Type
+// CHECK:   [[REG7:%.*]] =  function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK:   [[REG8:%.*]] =  apply [[REG7]]([[REG5]], [[REG6]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK:   [[REG9:%.*]] =  function_ref @$s15borrow_accessor9NCWrapperVyAA2NCVSicib : $@convention(method) (Int, @guaranteed NCWrapper) -> @guaranteed NC
+// CHECK:   [[REG10:%.*]] =  apply [[REG9]]([[REG8]], [[REG0]]) : $@convention(method) (Int, @guaranteed NCWrapper) -> @guaranteed NC
+// CHECK:   [[REG11:%.*]] =  copy_value [[REG10]]
+// CHECK:   [[REG12:%.*]] =  mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG11]]
+// CHECK:   [[REG13:%.*]] =  begin_borrow [[REG12]]
+// CHECK:   end_borrow [[REG13]]
+// CHECK:   destroy_value [[REG12]]
+// CHECK:   end_borrow [[REG4]]
+// CHECK:   destroy_value [[REG2]]
+// CHECK:   return [[REG10]]
+// CHECK: }
+

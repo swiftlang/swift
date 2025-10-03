@@ -5442,6 +5442,17 @@ ManagedValue CallEmission::applyBorrowAccessor() {
       origFormalType.getLifetimeDependencies(), calleeTypeInfo.foreign,
       uncurriedArgs, uncurriedLoc);
 
+  auto selfArgMV = uncurriedArgs.back();
+
+  // Strip the unnecessary copy_value + mark_unresolved_non_copyable_value +
+  // begin_borrow instructions added for move-only self argument.
+  if (selfArgMV.getValue()->getType().isMoveOnly() &&
+      selfArgMV.getValue()->getType().isObject()) {
+    uncurriedArgs[uncurriedArgs.size() - 1] =
+        ManagedValue::forBorrowedObjectRValue(
+            lookThroughMoveOnlyCheckerPattern(selfArgMV.getValue()));
+  }
+
   auto value = SGF.applyBorrowAccessor(uncurriedLoc.value(), fnValue, canUnwind,
                                        callee.getSubstitutions(), uncurriedArgs,
                                        calleeTypeInfo.substFnType, options);
@@ -5459,13 +5470,29 @@ ManagedValue SILGenFunction::applyBorrowAccessor(
                /*indirect results*/ {}, /*indirect errors*/ {}, rawResults,
                ExecutorBreadcrumb());
   assert(rawResults.size() == 1);
-  auto result = rawResults[0];
-  if (result->getType().isMoveOnly()) {
+  auto rawResult = rawResults[0];
+
+  if (fn.getFunction()->getConventions().hasGuaranteedResult()) {
+    auto selfArg = args.back().getValue();
+    if (isa<LoadBorrowInst>(selfArg)) {
+      rawResult = emitUncheckedGuaranteedConversion(rawResult);
+    }
+  }
+  if (rawResult->getType().isMoveOnly()) {
+    if (rawResult->getType().isAddress()) {
+      auto result = B.createMarkUnresolvedNonCopyableValueInst(
+          loc, rawResult,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+      return ManagedValue::forRValueWithoutOwnership(result);
+    }
+    auto result = emitManagedCopy(loc, rawResult);
     result = B.createMarkUnresolvedNonCopyableValueInst(
         loc, result,
         MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+    return emitManagedBeginBorrow(loc, result.getValue());
   }
-  return ManagedValue::forForwardedRValue(*this, result);
+
+  return ManagedValue::forForwardedRValue(*this, rawResult);
 }
 
 RValue CallEmission::applyFirstLevelCallee(SGFContext C) {
@@ -7287,12 +7314,16 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
     return base.isLValue() || base.isPlusZeroRValueOrTrivial()
       || !SGF.silConv.useLoweredAddresses();
 
-  case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Indirect_In_Guaranteed: {
+    if (accessor.isBorrowAccessor()) {
+      return false;
+    }
     // We can pass the memory we already have at +0. The memory referred to
     // by the base should be already immutable unless it was lowered as an
     // lvalue.
     return base.isLValue()
       || !SGF.silConv.useLoweredAddresses();
+  }
 
   // If the accessor wants the value directly, we definitely have to
   // load.
