@@ -1083,7 +1083,7 @@ extension UnsafeMutableRawPointer {
     as type: T.Type, to value: consuming T
   ) -> UnsafeMutablePointer<T> {
     Builtin.bindMemory(_rawValue, (1)._builtinWordValue, type)
-    Builtin.initialize(consume value, _rawValue)
+    unsafe Builtin.initialize(_overrideLifetime(consume value, borrowing: ()), _rawValue)
     return unsafe UnsafeMutablePointer(_rawValue)
   }
 
