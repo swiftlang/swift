@@ -212,7 +212,7 @@ void swift::rewriting::applyInverses(
       continue;
     }
 
-    auto state = inverses.getOrInsertDefault(representativeSubject);
+    auto &state = inverses[representativeSubject];
 
     // Check if this inverse has already been seen.
     auto inverseKind = inverse.getKind();

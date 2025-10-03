@@ -282,7 +282,7 @@ private:
 
   /// Access the tail allocated buffer of additional element arguments.
   MutableArrayRef<Element> getAdditionalElementArgs() {
-    return {getTrailingObjects<Element>(), numAdditionalElements};
+    return getTrailingObjects(numAdditionalElements);
   }
 
   Node(Kind kind, Node *parent)

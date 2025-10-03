@@ -1915,7 +1915,7 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
 
   // CASFileSystemRootID.
   std::string RootID = clangModuleDep.CASFileSystemRootID
-                           ? clangModuleDep.CASFileSystemRootID->toString()
+                           ? clangModuleDep.CASFileSystemRootID.value()
                            : "";
 
   std::string IncludeTree =

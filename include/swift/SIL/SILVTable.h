@@ -173,15 +173,13 @@ public:
   }
 
   /// Return all of the method entries.
-  ArrayRef<Entry> getEntries() const {
-    return {getTrailingObjects<SILVTableEntry>(), NumEntries};
-  }
+  ArrayRef<Entry> getEntries() const { return getTrailingObjects(NumEntries); }
 
   /// Return all of the method entries mutably.
   /// If you do modify entries, make sure to invoke `updateVTableCache` to update the
   /// SILModule's cache entry.
   MutableArrayRef<Entry> getMutableEntries() {
-    return {getTrailingObjects<SILVTableEntry>(), NumEntries};
+    return getTrailingObjects(NumEntries);
   }
                           
   void updateVTableCache(const Entry &entry);

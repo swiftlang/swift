@@ -171,7 +171,7 @@ public:
     : OpenedType(openedType), ThrownErrorType(thrownErrorType),
       Count(changes.size()) {
     std::uninitialized_copy(changes.begin(), changes.end(),
-                            getTrailingObjects<Change>());
+                            getTrailingObjects());
   }
 
   Type getOpenedType() const {
@@ -182,9 +182,7 @@ public:
     return ThrownErrorType;
   }
 
-  ArrayRef<Change> getChanges() const {
-    return ArrayRef<Change>(getTrailingObjects<Change>(), Count);
-  }
+  ArrayRef<Change> getChanges() const { return getTrailingObjects(Count); }
 };
 
 struct PreparedOverloadBuilder {

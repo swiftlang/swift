@@ -2345,8 +2345,7 @@ public:
   /// Retrieve the parent of this type as written, e.g., the part that was
   /// written before ".", if provided.
   Type getParent() const {
-    return Bits.TypeAliasType.HasParent ? *getTrailingObjects<Type>()
-                                        : Type();
+    return Bits.TypeAliasType.HasParent ? *getTrailingObjects() : Type();
   }
 
   /// Retrieve the substitution map applied to the declaration's underlying
@@ -2361,10 +2360,9 @@ public:
   /// arguments that are directly applied to the typealias declaration
   /// this type references.
   ArrayRef<Type> getDirectGenericArgs() const {
-    return ArrayRef<Type>(
-        getTrailingObjects<Type>() +
-        (Bits.TypeAliasType.HasParent ? 1 : 0),
-        Bits.TypeAliasType.GenericArgCount);
+    return ArrayRef<Type>(getTrailingObjects() +
+                              (Bits.TypeAliasType.HasParent ? 1 : 0),
+                          Bits.TypeAliasType.GenericArgCount);
   }
 
   SmallVector<Type, 2> getExpandedGenericArgs();
@@ -2755,16 +2753,16 @@ public:
 
   /// getElements - Return the elements of this tuple.
   ArrayRef<TupleTypeElt> getElements() const {
-    return {getTrailingObjects<TupleTypeElt>(), getNumElements()};
+    return getTrailingObjects(getNumElements());
   }
 
   const TupleTypeElt &getElement(unsigned i) const {
-    return getTrailingObjects<TupleTypeElt>()[i];
+    return getTrailingObjects()[i];
   }
 
   /// getElementType - Return the type of the specified element.
   Type getElementType(unsigned ElementNo) const {
-    return getTrailingObjects<TupleTypeElt>()[ElementNo].getType();
+    return getTrailingObjects()[ElementNo].getType();
   }
 
   TupleEltTypeArrayRef getElementTypes() const {
@@ -2794,7 +2792,7 @@ private:
       : TypeBase(TypeKind::Tuple, CanCtx, properties) {
     Bits.TupleType.Count = elements.size();
     std::uninitialized_copy(elements.begin(), elements.end(),
-                            getTrailingObjects<TupleTypeElt>());
+                            getTrailingObjects());
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
@@ -6231,7 +6229,7 @@ private:
       : TypeBase(TypeKind::SILPack, &ctx, properties) {
     Bits.SILPackType.Count = elements.size();
     Bits.SILPackType.ElementIsAddress = info.ElementIsAddress;
-    memcpy(getTrailingObjects<CanType>(), elements.data(),
+    memcpy(getTrailingObjects(), elements.data(),
            elements.size() * sizeof(CanType));
   }
 
@@ -6253,13 +6251,13 @@ public:
 
   /// Retrieves the type of the elements in the pack.
   ArrayRef<CanType> getElementTypes() const {
-    return {getTrailingObjects<CanType>(), getNumElements()};
+    return getTrailingObjects(getNumElements());
   }
 
   /// Returns the type of the element at the given \p index.
   /// This is a lowered SIL type.
   CanType getElementType(unsigned index) const {
-    return getTrailingObjects<CanType>()[index];
+    return getTrailingObjects()[index];
   }
 
   SILType getSILElementType(unsigned index) const; // in SILType.h
@@ -6554,7 +6552,8 @@ public:
   /// a protocol composition type; you also have to look at
   /// hasExplicitAnyObject().
   ArrayRef<Type> getMembers() const {
-    return {getTrailingObjects<Type>(), static_cast<size_t>(Bits.ProtocolCompositionType.Count)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.ProtocolCompositionType.Count));
   }
 
   InvertibleProtocolSet getInverses() const { return Inverses; }
@@ -6602,7 +6601,7 @@ private:
     Bits.ProtocolCompositionType.HasExplicitAnyObject = hasExplicitAnyObject;
     Bits.ProtocolCompositionType.Count = members.size();
     std::uninitialized_copy(members.begin(), members.end(),
-                            getTrailingObjects<Type>());
+                            getTrailingObjects());
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
@@ -6651,8 +6650,8 @@ public:
   }
 
   ArrayRef<Type> getArgs() const {
-    return {getTrailingObjects<Type>(),
-            static_cast<size_t>(Bits.ParameterizedProtocolType.ArgCount)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.ParameterizedProtocolType.ArgCount));
   }
 
   bool requiresClass() const {
@@ -7733,8 +7732,7 @@ class ErrorUnionType final
                  RecursiveTypeProperties properties) 
         : TypeBase(TypeKind::ErrorUnion, /*Context=*/ctx, properties) {
     Bits.ErrorUnionType.NumTerms = terms.size();
-    std::uninitialized_copy(terms.begin(), terms.end(),
-                            getTrailingObjects<Type>());
+    std::uninitialized_copy(terms.begin(), terms.end(), getTrailingObjects());
   }
 
 public:
@@ -7742,7 +7740,8 @@ public:
   static Type get(const ASTContext &ctx, ArrayRef<Type> terms);
 
   ArrayRef<Type> getTerms() const {
-    return { getTrailingObjects<Type>(), static_cast<size_t>(Bits.ErrorUnionType.NumTerms) };
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.ErrorUnionType.NumTerms));
   };
 
   // Support for FoldingSet.
@@ -7834,12 +7833,12 @@ public:
 
   /// Retrieves the type of the elements in the pack.
   ArrayRef<Type> getElementTypes() const {
-    return {getTrailingObjects<Type>(), getNumElements()};
+    return getTrailingObjects(getNumElements());
   }
 
   /// Returns the type of the element at the given \p index.
   Type getElementType(unsigned index) const {
-    return getTrailingObjects<Type>()[index];
+    return getTrailingObjects()[index];
   }
 
   bool containsPackExpansionType() const;
@@ -7865,7 +7864,7 @@ private:
      : TypeBase(TypeKind::Pack, CanCtx, properties) {
      Bits.PackType.Count = elements.size();
      std::uninitialized_copy(elements.begin(), elements.end(),
-                             getTrailingObjects<Type>());
+                             getTrailingObjects());
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(PackType, Type)
@@ -8353,11 +8352,11 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
   if (auto ty = dyn_cast<BoundGenericStructType>(this))
-    return ty->getTrailingObjects<Type>();
+    return ty->getTrailingObjects();
   if (auto ty = dyn_cast<BoundGenericEnumType>(this))
-    return ty->getTrailingObjects<Type>();
+    return ty->getTrailingObjects();
   if (auto ty = dyn_cast<BoundGenericClassType>(this))
-    return ty->getTrailingObjects<Type>();
+    return ty->getTrailingObjects();
   llvm_unreachable("Unhandled BoundGenericType!");
 }
 

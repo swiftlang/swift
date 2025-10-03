@@ -399,6 +399,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
       case clang::TargetInfo::PNaClABIBuiltinVaList:
       case clang::TargetInfo::SystemZBuiltinVaList:
       case clang::TargetInfo::X86_64ABIBuiltinVaList:
+      case clang::TargetInfo::XtensaABIBuiltinVaList:
         return std::make_pair(Type(), "");
     }
     break;
@@ -3300,7 +3301,7 @@ namespace {
             decl->getLocation(),
             const_cast<clang::ClassTemplateSpecializationDecl *>(decl),
             clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
-            /*Complain*/ false);
+            /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
         // If the template can't be instantiated, bail.
         if (notInstantiated)
           return nullptr;
@@ -4273,14 +4274,14 @@ namespace {
             for (auto param : attr->params()) {
               // FIXME: Swift assumes no escaping to globals. We should diagnose
               // this.
-              if (param == clang::LifetimeCaptureByAttr::GLOBAL ||
-                  param == clang::LifetimeCaptureByAttr::UNKNOWN ||
-                  param == clang::LifetimeCaptureByAttr::INVALID)
+              if (param == clang::LifetimeCaptureByAttr::Global ||
+                  param == clang::LifetimeCaptureByAttr::Unknown ||
+                  param == clang::LifetimeCaptureByAttr::Invalid)
                 continue;
 
               paramHasAnnotation[idx] = true;
               if (isa<clang::CXXMethodDecl>(decl) &&
-                  param == clang::LifetimeCaptureByAttr::THIS) {
+                  param == clang::LifetimeCaptureByAttr::This) {
                 auto [it, inserted] = inheritedArgDependences.try_emplace(
                     result->getSelfIndex(), SmallBitVector(dependencyVecSize));
                 it->second[idx] = true;

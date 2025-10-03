@@ -39,13 +39,9 @@ struct Term::Storage final
     return Size;
   }
 
-  MutableArrayRef<Symbol> getElements() {
-    return {getTrailingObjects<Symbol>(), Size};
-  }
+  MutableArrayRef<Symbol> getElements() { return getTrailingObjects(Size); }
 
-  ArrayRef<Symbol> getElements() const {
-    return {getTrailingObjects<Symbol>(), Size};
-  }
+  ArrayRef<Symbol> getElements() const { return getTrailingObjects(Size); }
 
   void Profile(llvm::FoldingSetNodeID &id) const;
 };
