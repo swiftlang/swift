@@ -41,6 +41,8 @@ from .swiftfoundationtests import SwiftFoundationTests
 from .swiftinspect import SwiftInspect
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
+from .system import System
+from .systemtests import SystemTests
 from .tsan_libdispatch import TSanLibDispatch
 from .wasisysroot import WASILibc, WasmLLVMRuntimeLibs
 from .wasmkit import WasmKit
@@ -74,6 +76,8 @@ __all__ = [
     'SwiftDriver',
     'SwiftTesting',
     'SwiftTestingMacros',
+    'System',
+    'SystemTests',
     'EarlySwiftDriver',
     'XCTest',
     'SwiftSyntax',

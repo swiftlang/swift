@@ -91,6 +91,12 @@ def _apply_default_arguments(args):
     if args.lldb_build_with_xcode is None:
         args.lldb_build_with_xcode = '0'
 
+    if args.system_build_variant is None:
+        args.system_build_variant = args.build_variant
+
+    if args.system_tests_build_variant is None:
+        args.system_tests_build_variant = args.build_variant
+
     if args.foundation_build_variant is None:
         args.foundation_build_variant = args.build_variant
 
@@ -221,6 +227,7 @@ def _apply_default_arguments(args):
         args.test_cmark = False
         args.test_swiftpm = False
         args.test_foundation = False
+        args.test_system = False
         args.test_swift_driver = False
         args.test_swiftsyntax = False
         args.test_indexstoredb = False
@@ -887,6 +894,9 @@ def create_argument_parser():
     option('--foundation', toggle_true('build_foundation'),
            help='build foundation')
 
+    option('--system', toggle_true('build_system'),
+           help='build system')
+
     option('--libdispatch', toggle_true('build_libdispatch'),
            help='build libdispatch')
 
@@ -1013,6 +1023,16 @@ def create_argument_parser():
            choices=['Debug', 'Release'],
            default=None,
            help='build the Foundation tests in a certain variant '
+                '(Debug builds much faster)')
+
+    option('--debug-system', store('system_build_variant'),
+           const='Debug',
+           help='build the Debug variant of System')
+
+    option('--system-tests-build-type', store('system_tests_build_variant'),
+           choices=['Debug', 'Release'],
+           default=None,
+           help='build the System tests in a certain variant '
                 '(Debug builds much faster)')
 
     option('--debug-libdispatch', store('libdispatch_build_variant'),
@@ -1398,6 +1418,8 @@ def create_argument_parser():
            help='skip cleaning up libdispatch')
     option('--skip-clean-foundation', toggle_false('clean_foundation'),
            help='skip cleaning up foundation')
+    option('--skip-clean-system', toggle_false('clean_system'),
+           help='skip cleaning up system')
     option('--skip-clean-xctest', toggle_false('clean_xctest'),
            help='skip cleaning up xctest')
     option('--skip-clean-llbuild', toggle_false('clean_llbuild'),
@@ -1418,6 +1440,8 @@ def create_argument_parser():
            help='skip testing swiftpm')
     option('--skip-test-foundation', toggle_false('test_foundation'),
            help='skip testing Foundation')
+    option('--skip-test-system', toggle_false('test_system'),
+           help='skip testing System')
     option('--skip-test-swift-driver', toggle_false('test_swift_driver'),
            help='skip testing Swift driver')
     option('--skip-test-swiftsyntax', toggle_false('test_swiftsyntax'),
