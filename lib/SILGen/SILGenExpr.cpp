@@ -1798,7 +1798,19 @@ ManagedValue RValueEmitter::emitConversionClosure(CollectionUpcastConversionExpr
   auto *BS = BraceStmt::createImplicit(Context, ArrayRef(bodyNode));
   closure->setBody(BS);
 
-  //closure->setExplicitResultType();
+  auto closureParam = AnyFunctionType::Param(pair.OrigValue->getType());
+  auto extInfo = FunctionType::ExtInfo()
+    .withNoEscape()
+    .withSendable()
+    .withoutIsolation();
+  auto *fnTy = FunctionType::get(ArrayRef(closureParam), pair.Conversion->getType(), extInfo);
+  closure->setType(fnTy);
+
+  closure->setCaptureInfo(CaptureInfo::empty());
+
+  auto discriminator = Context.getNextDiscriminator(declContext);
+  closure->setDiscriminator(discriminator++);
+  Context.setMaxAssignedDiscriminator(declContext, discriminator);
 
   RValue result = visitAbstractClosureExpr(closure, C);
   return std::move(result).getScalarValue();
