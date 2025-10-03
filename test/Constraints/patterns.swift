@@ -392,10 +392,10 @@ func test_50875() -> String {
     func h() -> Double {
       return 3.0
     }
-    func h() -> Int? { //expected-note{{found this candidate}}
+    func h() -> Int? { //expected-note{{found candidate with type '() -> Int?'}}
       return 2
     }
-    func h() -> Float? { //expected-note{{found this candidate}}
+    func h() -> Float? { //expected-note{{found candidate with type '() -> Float?'}}
       return nil
     }
 

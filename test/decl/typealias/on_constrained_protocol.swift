@@ -46,10 +46,10 @@ func useDoubleOverloadedSameTypealias() -> DoubleOverloadedSameTypealias.Content
 
 protocol MarkerProtocol {}
 protocol ProtocolWithAssoctype {
-  associatedtype MyAssocType // expected-note {{found this candidate}} (from useAssocTypeInExtension) expected-note {{found candidate with type 'Self.MyAssocType'}} (from useAssocTypeOutsideExtension)
+  associatedtype MyAssocType // expected-note {{found candidate 'MyAssocType'}} (from useAssocTypeInExtension) expected-note {{found candidate with type 'Self.MyAssocType'}} (from useAssocTypeOutsideExtension)
 }
 extension ProtocolWithAssoctype where Self: MarkerProtocol {
-  typealias MyAssocType = Int // expected-note {{found this candidate}} (from useAssocTypeInExtension) expected-note {{found candidate with type 'Int'}} (from useAssocTypeOutsideExtension)
+  typealias MyAssocType = Int // expected-note {{found candidate 'MyAssocType'}} (from useAssocTypeInExtension) expected-note {{found candidate with type 'Int'}} (from useAssocTypeOutsideExtension)
   func useAssocTypeInExtension() -> MyAssocType {} // expected-error {{'MyAssocType' is ambiguous for type lookup in this context}}
 }
 func useAssocTypeOutsideExtension() -> ProtocolWithAssoctype.MyAssocType {} // expected-error {{ambiguous type name 'MyAssocType' in 'ProtocolWithAssoctype'}}

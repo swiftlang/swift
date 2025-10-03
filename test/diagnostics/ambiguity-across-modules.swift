@@ -26,23 +26,19 @@ func foo() {
   publicAmbiguity()
 // CHECK: error: ambiguous use of 'publicAmbiguity()'
 // CHECK:  publicAmbiguity()
-// CHECK: note: found this candidate in module 'A'
+// CHECK: note: found candidate with type '() -> ()' in module 'A'
 // CHECK: public func publicAmbiguity() {}
-// CHECK: note: found this candidate in module 'B'
+// CHECK: note: found candidate with type '() -> ()' in module 'B'
 // CHECK: public func publicAmbiguity() {}
 
   packageAmbiguity()
 // CHECK: error: ambiguous use of 'packageAmbiguity()'
 // CHECK-NEXT:  packageAmbiguity()
-// CHECK: note: found this candidate in module 'A'
 // CHECK: package func packageAmbiguity() {}
-// CHECK: note: found this candidate in module 'B'
 // CHECK: package func packageAmbiguity() {}
 
   internalAmbiguity()
 // CHECK: error: ambiguous use of 'internalAmbiguity()'
 // CHECK-NEXT:  internalAmbiguity()
-// CHECK: note: found this candidate in module 'A'
 // CHECK: internal func internalAmbiguity() {}
-// CHECK: note: found this candidate in module 'B'
 }
