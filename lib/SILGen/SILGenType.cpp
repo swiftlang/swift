@@ -863,8 +863,13 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // setting on the theory that forcing inlining off should only
   // effect the user's function, not otherwise invisible thunks.
   Inline_t InlineStrategy = InlineDefault;
-  if (witnessRef.isAlwaysInline())
-    InlineStrategy = AlwaysInline;
+  if (witnessRef.isUnderscoredAlwaysInline())
+    InlineStrategy = HeuristicAlwaysInline;
+  // We don't guarantee @inline(always) will inline devirtualized thunks. But we
+  // want to make an best-effort attempt to inline.
+  else if (witnessRef.isAlwaysInline())
+    InlineStrategy = HeuristicAlwaysInline;
+
 
   SILFunction *f = M.lookUpFunction(nameBuffer);
   if (allowDuplicateThunk && f)

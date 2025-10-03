@@ -1136,7 +1136,8 @@ namespace {
       ids = StoredSingleEntry::forSerializedDecl(
                                  astWriter.getDeclID(decl).getRawValue());
     } else if (auto *macro = mappedEntry.dyn_cast<clang::MacroInfo *>()) {
-      ids = StoredSingleEntry::forSerializedMacro(astWriter.getMacroID(macro));
+      ids = StoredSingleEntry::forSerializedMacro(
+          astWriter.getMacroRef(macro, /*Name=*/nullptr));
     } else {
       auto *moduleMacro = cast<clang::ModuleMacro *>(mappedEntry);
       StoredSingleEntry::SerializationID nameID =

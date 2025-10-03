@@ -129,10 +129,10 @@
     "default-branch-scheme": "main",
     "branch-schemes": {
         "main": {
-            "aliases": ["swift/main", "main", "stable/20240723"],
+            "aliases": ["swift/main", "main", "stable/21.x"],
             "repos": {
-                "llvm-project": "stable/20240723",
-                "swift-llvm-bindings": "stable/20240723",
+                "llvm-project": "stable/21.x",
+                "swift-llvm-bindings": "stable/21.x",
                 "swift": "main",
                 "cmark": "gfm",
                 "llbuild": "main",
@@ -557,7 +557,7 @@
             }
         },
         "rebranch": {
-            "aliases": ["rebranch", "stable/21.x", "llvm.org/main"],
+            "aliases": ["rebranch", "llvm.org/main"],
             "repos": {
                 "llvm-project": "stable/21.x",
                 "swift-llvm-bindings": "stable/21.x",

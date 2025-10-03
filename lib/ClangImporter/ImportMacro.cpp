@@ -423,7 +423,7 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
   V->setAccess(swift::AccessLevel::Public);
   V->setInterfaceType(Ty.getType());
   V->getAttrs().add(new (Ctx) TransparentAttr(/*Implicit*/true));
-  V->getAttrs().add(new (Ctx) InlineAttr(InlineKind::Always));
+  V->getAttrs().add(new (Ctx) InlineAttr(InlineKind::AlwaysUnderscored));
 
   /* Accessor */
   swift::AccessorDecl *G = nullptr;
@@ -621,7 +621,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       clang::LookupResult R(S, {{tok.getIdentifierInfo()}, {}},
                             clang::Sema::LookupAnyName);
       if (S.LookupName(R, S.TUScope))
-        if (R.getResultKind() == clang::LookupResult::LookupResultKind::Found)
+        if (R.getResultKind() == clang::LookupResultKind::Found)
           if (const auto *VD = dyn_cast<clang::ValueDecl>(R.getFoundDecl()))
             return importDeclAlias(impl, DC, VD, name);
     }

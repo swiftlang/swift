@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import ASTBridging
+import swiftBasicSwift
 import SwiftDiagnostics
 @_spi(Compiler) import SwiftParser
 @_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax

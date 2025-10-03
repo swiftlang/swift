@@ -23,6 +23,12 @@ struct S {
   var s: String
 }
 
+struct S2 {
+  var i: Int
+  var s1: String
+  var s2: String
+}
+
 struct Pair  {
   var t: (a: Int, b: Int)
 }
@@ -1927,3 +1933,221 @@ bb3:
   %13 = tuple ()
   return %13
 }
+
+// Just check that LICM doesn't produce invalid SIL.
+// CHECK-LABEL: sil [ossa] @uninitialized_at_entry_and_exit :
+// CHECK-LABEL: } // end sil function 'uninitialized_at_entry_and_exit'
+sil [ossa] @uninitialized_at_entry_and_exit : $@convention(thin) (@owned S) -> @out S {
+bb0(%0 : $*S, %1 : @owned $S):
+  br bb1
+
+bb1:
+  %5 = copy_value %1
+  store %5 to [init] %0
+  %7 = load [take] %0
+  destroy_value %7
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  store %1 to [init] %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @uninitialized_at_entry :
+// CHECK:       bb1:
+// CHECK-NEXT:    [[C:%.*]] = copy_value %1
+// CHECK-NEXT:    cond_br
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK:       bb3:
+// CHECK-NEXT:    store [[C]] to [init] %0
+// CHECK-LABEL: } // end sil function 'uninitialized_at_entry'
+sil [ossa] @uninitialized_at_entry : $@convention(thin) (@owned S) -> @out S {
+bb0(%0 : $*S, %1 : @owned $S):
+  br bb1
+
+bb1:
+  %5 = copy_value %1
+  store %5 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  %7 = load [take] %0
+  destroy_value %7
+  br bb1
+
+bb3:
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// Just check that LICM doesn't produce invalid SIL.
+// CHECK-LABEL: sil [ossa] @uninitialized_at_exit :
+// CHECK-LABEL: } // end sil function 'uninitialized_at_exit'
+sil [ossa] @uninitialized_at_exit : $@convention(thin) (@in S) -> () {
+bb0(%0 : $*S):
+  br bb1
+
+bb1:
+  %4 = load [take] %0
+  %5 = move_value %4
+  store %5 to [init] %0
+  %6 = load [take] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  %8 = move_value %6
+  store %8 to [init] %0
+  br bb1
+
+bb3:
+  destroy_value %6
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @projected_load_take :
+// CHECK:       bb1([[V:%.*]] : @owned $(S, Int)):
+// CHECK-NEXT:    ([[E:%.*]], {{%[0-9]+}}) = destructure_tuple [[V]]
+// CHECK-NEXT:    ({{%[0-9]+}}, [[S:%.*]]) = destructure_struct [[E]]
+// CHECK-NEXT:    = struct $S (%1 : $Int, [[S]] : $String)
+// CHECK-LABEL: } // end sil function 'projected_load_take'
+sil [ossa] @projected_load_take : $@convention(thin) (@inout (S, Int), Int) -> () {
+bb0(%0 : $*(S, Int), %1 : $Int):
+  br bb1
+
+bb1:
+  %2 = tuple_element_addr %0, 0
+  %3 = struct_element_addr %2, #S.s
+  %4 = load [take] %3
+  %5 = struct $S (%1, %4)
+  %6 = tuple (%5, %1)
+  store %6 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @load_copy_followed_by_take :
+// CHECK:       bb1([[V:%.*]] : @owned $S):
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[V]]
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK-NEXT:      = move_value [[V]]
+// CHECK-LABEL: } // end sil function 'load_copy_followed_by_take'
+sil [ossa] @load_copy_followed_by_take : $@convention(thin) (@inout S) -> () {
+bb0(%0 : $*S):
+  br bb1
+
+bb1:
+  %4 = load [copy] %0
+  destroy_value %4
+  %6 = load [take] %0
+  %7 = move_value %6
+  store %7 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @projected_load_copy_followed_by_take :
+// CHECK:       bb1([[V:%.*]] : @owned $S):
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT:    [[SE:%.*]] = struct_extract [[B]]
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[SE]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK-NEXT:    ({{%[0-9]+}}, [[S:%.*]]) = destructure_struct [[V]]
+// CHECK-NEXT:      = struct $S (%1 : $Int, [[S]] : $String)
+// CHECK-LABEL: } // end sil function 'projected_load_copy_followed_by_take'
+sil [ossa] @projected_load_copy_followed_by_take : $@convention(thin) (@inout S, Int) -> () {
+bb0(%0 : $*S, %1 : $Int):
+  br bb1
+
+bb1:
+  %43 = struct_element_addr %0, #S.s
+  %4 = load [copy] %43
+  destroy_value %4
+  %48 = load [take] %43
+  %49 = struct $S (%1, %48)
+  store %49 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// Just check that LICM doesn't produce invalid SIL.
+// CHECK-LABEL: sil [ossa] @partial_load_take_is_not_supported :
+// CHECK-LABEL: } // end sil function 'partial_load_take_is_not_supported'
+sil [ossa] @partial_load_take_is_not_supported : $@convention(thin) (@inout S2, Int) -> () {
+bb0(%0 : $*S2, %1 : $Int):
+  br bb1
+
+bb1:
+  %4 = struct_element_addr %0, #S2.s1
+  %5 = load [take] %4
+  %6 = struct_element_addr %0, #S2.s2
+  %7 = load [take] %6
+  %8 = struct $S2 (%1, %5, %7)
+  store %8 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @partial_load_copy :
+// CHECK:       bb1([[V:%.*]] : @owned $S2):
+// CHECK:          [[B1:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT:     [[SE1:%.*]] = struct_extract [[B1]] : $S2, #S2.s1
+// CHECK-NEXT:       = copy_value [[SE1]]
+// CHECK:          [[B2:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT:     [[SE2:%.*]] = struct_extract [[B2]] : $S2, #S2.s2
+// CHECK-NEXT:       = copy_value [[SE2]]
+// CHECK-LABEL: } // end sil function 'partial_load_copy'
+sil [ossa] @partial_load_copy : $@convention(thin) (@inout S2, Int) -> () {
+bb0(%0 : $*S2, %1 : $Int):
+  br bb1
+
+bb1:
+  %4 = struct_element_addr %0, #S2.s1
+  %5 = load [copy] %4
+  %6 = struct_element_addr %0, #S2.s2
+  %7 = load [copy] %6
+  %8 = struct $S2 (%1, %5, %7)
+  %9 = load [take] %0
+  destroy_value %9
+  store %8 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+

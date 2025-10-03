@@ -87,25 +87,20 @@ public:
   }
 
   ArrayRef<ImportedModule> getTopLevelImports() const {
-    return {getTrailingObjects<ImportedModule>(),
-            NumTopLevelImports};
+    return getTrailingObjects(NumTopLevelImports);
   }
 
   ArrayRef<ImportedModule> getTransitiveImports() const {
-    return {getTrailingObjects<ImportedModule>() +
-              NumTopLevelImports,
-            NumTransitiveImports};
+    return {getTrailingObjects() + NumTopLevelImports, NumTransitiveImports};
   }
 
   ArrayRef<ImportedModule> getTransitiveSwiftOnlyImports() const {
-    return {getTrailingObjects<ImportedModule>() +
-              NumTopLevelImports + NumTransitiveImports,
+    return {getTrailingObjects() + NumTopLevelImports + NumTransitiveImports,
             NumTransitiveSwiftOnlyImports};
   }
 
   ArrayRef<ImportedModule> getAllImports() const {
-      return {getTrailingObjects<ImportedModule>(),
-              NumTopLevelImports + NumTransitiveImports};
+    return getTrailingObjects(NumTopLevelImports + NumTransitiveImports);
   }
 
   SWIFT_DEBUG_DUMP;

@@ -189,6 +189,7 @@ param
   [ValidateRange(1, 36)]
   [int] $AndroidAPILevel = 28,
   [string[]] $AndroidSDKArchitectures = @("aarch64", "armv7", "i686", "x86_64"),
+  [ValidateSet("dynamic", "static")]
   [string[]] $AndroidSDKLinkModes = @("dynamic", "static"),
   [string[]] $AndroidSDKVersions = @("Android", "AndroidExperimental"),
   [string] $AndroidSDKVersionDefault = "Android",
@@ -198,6 +199,7 @@ param
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
   [string] $WinSDKVersion = "",
   [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
+  [ValidateSet("dynamic", "static")]
   [string[]] $WindowsSDKLinkModes = @("dynamic", "static"),
   [string[]] $WindowsSDKVersions = @("Windows", "WindowsExperimental"),
   [string] $WindowsSDKVersionDefault = "Windows",
@@ -2039,7 +2041,7 @@ function Build-BuildTools([Hashtable] $Platform) {
     -Platform $Platform `
     -UseMSVCCompilers $(if ($UseHostToolchain) { @("ASM_MASM", "C", "CXX") } else { @("") }) `
     -UsePinnedCompilers $(if ($UseHostToolchain) { @("") } else { @("ASM", "C", "CXX") }) `
-    -BuildTargets llvm-tblgen,clang-tblgen,clang-pseudo-gen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
+    -BuildTargets llvm-tblgen,clang-tblgen,clang-tidy-confusable-chars-gen,lldb-tblgen,llvm-config,swift-def-to-strings-converter,swift-serialize-diagnostics,swift-compatibility-symbols `
     -Defines @{
       CMAKE_CROSSCOMPILING = "NO";
       CLANG_ENABLE_LIBXML2 = "NO";
@@ -3064,7 +3066,7 @@ function Build-XCTest([Hashtable] $Platform) {
   $SwiftFlags = if ($Platform.OS -eq [OS]::Windows) {
     @();
   } else {
-    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\lib\swift");
+    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\include");
   }
 
   Build-CMakeProject `
@@ -3127,7 +3129,7 @@ function Build-Testing([Hashtable] $Platform) {
   $SwiftFlags = if ($Platform.OS -eq [OS]::Windows) {
     @();
   } else {
-    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\lib\swift");
+    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\include");
   }
 
   Build-CMakeProject `
@@ -3247,7 +3249,7 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
           ENABLE_TESTING = "NO";
 
-          FOUNDATION_BUILD_TOOLS = "NO";
+          FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
           CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
           LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
           ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
@@ -3900,6 +3902,7 @@ function Build-Installer([Hashtable] $Platform) {
   $Properties = @{
     BundleFlavor = "offline";
     ImageRoot = "$(Get-InstallDir $Platform)\";
+    IncludeLegacySDK = if ($HostPlatform.DefaultSDK -match "Experimental") { "False" } else { "True" };
     INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     SWIFT_DOCC_BUILD = "$(Get-ProjectBinaryCache $HostPlatform DocC)\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";

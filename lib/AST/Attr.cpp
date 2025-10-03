@@ -1138,7 +1138,18 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       // Don't print into SIL. Necessary bits have already been generated.
       return false;
     } else {
-      Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
+      auto attrName = getAttrName();
+      if (getKind() == DeclAttrKind::Inline &&
+          cast<InlineAttr>(this)->getKind() == InlineKind::Always &&
+          Options.SuppressInlineAlways) {
+        attrName = "inline(__always)";
+        Printer.printSimpleAttr(attrName, /*needAt=*/true);
+        Printer << ' ';
+        // Add @inlinable
+        Printer.printSimpleAttr("inlinable", /*needAt=*/true);
+      } else {
+        Printer.printSimpleAttr(attrName, /*needAt=*/true);
+      }
     }
     return true;
 
@@ -1859,8 +1870,10 @@ StringRef DeclAttribute::getAttrName() const {
     switch (cast<InlineAttr>(this)->getKind()) {
     case InlineKind::Never:
       return "inline(never)";
-    case InlineKind::Always:
+    case InlineKind::AlwaysUnderscored:
       return "inline(__always)";
+    case InlineKind::Always:
+      return "inline(always)";
     }
     llvm_unreachable("Invalid inline kind");
   }
@@ -2724,7 +2737,7 @@ SPIAccessControlAttr::SPIAccessControlAttr(SourceLoc atLoc, SourceRange range,
                     /*Implicit=*/false),
       numSPIGroups(spiGroups.size()) {
   std::uninitialized_copy(spiGroups.begin(), spiGroups.end(),
-                          getTrailingObjects<Identifier>());
+                          getTrailingObjects());
 }
 
 SPIAccessControlAttr *
@@ -2762,8 +2775,7 @@ DifferentiableAttr::DifferentiableAttr(bool implicit, SourceLoc atLoc,
   assert((diffKind != DifferentiabilityKind::Normal &&
           diffKind != DifferentiabilityKind::Forward) &&
          "'Normal' and 'Forward' are not supported");
-  std::copy(params.begin(), params.end(),
-            getTrailingObjects<ParsedAutoDiffParameter>());
+  std::copy(params.begin(), params.end(), getTrailingObjects());
 }
 
 DifferentiableAttr::DifferentiableAttr(Decl *original, bool implicit,
@@ -2865,8 +2877,7 @@ DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
     : DeclAttribute(DeclAttrKind::Derivative, atLoc, baseRange, implicit),
       BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
       NumParsedParameters(params.size()) {
-  std::copy(params.begin(), params.end(),
-            getTrailingObjects<ParsedAutoDiffParameter>());
+  std::copy(params.begin(), params.end(), getTrailingObjects());
 }
 
 DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
@@ -2932,8 +2943,7 @@ TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
     : DeclAttribute(DeclAttrKind::Transpose, atLoc, baseRange, implicit),
       BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
       NumParsedParameters(params.size()) {
-  std::uninitialized_copy(params.begin(), params.end(),
-                          getTrailingObjects<ParsedAutoDiffParameter>());
+  std::uninitialized_copy(params.begin(), params.end(), getTrailingObjects());
 }
 
 TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
@@ -2971,9 +2981,9 @@ StorageRestrictionsAttr::StorageRestrictionsAttr(
     : DeclAttribute(DeclAttrKind::StorageRestrictions, AtLoc, Range, Implicit),
       NumInitializes(initializes.size()), NumAccesses(accesses.size()) {
   std::uninitialized_copy(initializes.begin(), initializes.end(),
-                          getTrailingObjects<Identifier>());
+                          getTrailingObjects());
   std::uninitialized_copy(accesses.begin(), accesses.end(),
-                          getTrailingObjects<Identifier>() + NumInitializes);
+                          getTrailingObjects() + NumInitializes);
 }
 
 StorageRestrictionsAttr *
@@ -3233,7 +3243,7 @@ AllowFeatureSuppressionAttr::AllowFeatureSuppressionAttr(
   Bits.AllowFeatureSuppressionAttr.Inverted = inverted;
   Bits.AllowFeatureSuppressionAttr.NumFeatures = features.size();
   std::uninitialized_copy(features.begin(), features.end(),
-                          getTrailingObjects<Identifier>());
+                          getTrailingObjects());
 }
 
 AllowFeatureSuppressionAttr *AllowFeatureSuppressionAttr::create(

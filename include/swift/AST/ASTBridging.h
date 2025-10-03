@@ -58,6 +58,7 @@ class IfConfigClauseRangeInfo;
 class GenericSignature;
 class GenericSignatureImpl;
 struct LabeledStmtInfo;
+class LangOptions;
 class LayoutConstraint;
 class LayoutConstraintInfo;
 struct LifetimeDescriptor;
@@ -82,6 +83,7 @@ enum class RequirementReprKind : unsigned;
 struct BridgedASTType;
 class BridgedCanType;
 class BridgedASTContext;
+class BridgedLangOptions;
 struct BridgedSubstitutionMap;
 struct BridgedGenericSignature;
 struct BridgedConformance;
@@ -192,14 +194,10 @@ BridgedDeclNameLoc_createParsed(BridgedASTContext cContext,
                                 swift::SourceLoc moduleSelectorLoc,
                                 swift::SourceLoc baseNameLoc);
 
+
 //===----------------------------------------------------------------------===//
 // MARK: ASTContext
 //===----------------------------------------------------------------------===//
-
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedEndianness : size_t {
-  EndianLittle,
-  EndianBig,
-};
 
 class BridgedASTContext {
   swift::ASTContext * _Nonnull Ctx;
@@ -218,16 +216,10 @@ public:
   unsigned getMajorLanguageVersion() const;
 
   SWIFT_COMPUTED_PROPERTY
-  unsigned getLangOptsTargetPointerBitWidth() const;
-
-  SWIFT_COMPUTED_PROPERTY
-  bool getLangOptsAttachCommentsToDecls() const;
-
-  SWIFT_COMPUTED_PROPERTY
-  BridgedEndianness getLangOptsTargetEndianness() const;
-
-  SWIFT_COMPUTED_PROPERTY
   BridgedAvailabilityMacroMap getAvailabilityMacroMap() const;
+
+  SWIFT_COMPUTED_PROPERTY
+  BridgedDiagnosticEngine getDiags() const;
 };
 
 #define IDENTIFIER_WITH_NAME(Name, _)                                          \
@@ -259,56 +251,12 @@ SWIFT_NAME("BridgedASTContext.getDollarIdentifier(self:_:)")
 swift::Identifier
 BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext, size_t idx);
 
-SWIFT_NAME("BridgedASTContext.langOptsHasFeature(self:_:)")
-bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
-                                          BridgedFeature feature);
+SWIFT_NAME("getter:BridgedASTContext.langOpts(self:)")
+BridgedLangOptions BridgedASTContext_langOpts(BridgedASTContext cContext);
 
-SWIFT_NAME("BridgedASTContext.langOptsCustomConditionSet(self:_:)")
-bool BridgedASTContext_langOptsCustomConditionSet(BridgedASTContext cContext,
-                                                  BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsHasFeatureNamed(self:_:)")
-bool BridgedASTContext_langOptsHasFeatureNamed(BridgedASTContext cContext,
-                                               BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsHasAttributeNamed(self:_:)")
-bool BridgedASTContext_langOptsHasAttributeNamed(BridgedASTContext cContext,
-                                                 BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetOS(self:_:)")
-bool BridgedASTContext_langOptsIsActiveTargetOS(BridgedASTContext cContext,
-                                                BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetArchitecture(self:_:)")
-bool BridgedASTContext_langOptsIsActiveTargetArchitecture(BridgedASTContext cContext,
-                                                          BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetEnvironment(self:_:)")
-bool BridgedASTContext_langOptsIsActiveTargetEnvironment(BridgedASTContext cContext,
-                                                         BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetRuntime(self:_:)")
-bool BridgedASTContext_langOptsIsActiveTargetRuntime(BridgedASTContext cContext,
-                                                     BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetPtrAuth(self:_:)")
-bool BridgedASTContext_langOptsIsActiveTargetPtrAuth(BridgedASTContext cContext,
-                                                     BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsGetTargetAtomicBitWidths(self:_:)")
-SwiftInt BridgedASTContext_langOptsGetTargetAtomicBitWidths(BridgedASTContext cContext,
-                                                      SwiftInt* _Nullable * _Nonnull cComponents);
-
-SWIFT_NAME("BridgedASTContext.langOptsGetLanguageVersion(self:_:)")
-SwiftInt BridgedASTContext_langOptsGetLanguageVersion(BridgedASTContext cContext,
-                                                      SwiftInt* _Nullable * _Nonnull cComponents);
-
-SWIFT_NAME("BridgedASTContext.langOptsGetCompilerVersion(self:_:)")
-SwiftInt BridgedASTContext_langOptsGetCompilerVersion(BridgedASTContext cContext,
-                                                      SwiftInt* _Nullable * _Nonnull cComponents);
-
-/* Deallocate an array of Swift int values that was allocated in C++. */
-void deallocateIntBuffer(SwiftInt * _Nullable cComponents);
+SWIFT_NAME("BridgedLangOptions.hasAttributeNamed(self:_:)")
+bool BridgedLangOptions_hasAttributeNamed(BridgedLangOptions cLangOpts,
+                                          BridgedStringRef cName);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedCanImportVersion : size_t {
   CanImportUnversioned,
@@ -323,6 +271,9 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
                                  BridgedCanImportVersion versionKind,
                                  const SwiftInt *_Nullable versionComponents,
                                  SwiftInt numVersionComponents);
+
+SWIFT_NAME("getter:BridgedASTContext.staticBuildConfigurationPtr(self:)")
+void * _Nonnull BridgedASTContext_staticBuildConfiguration(BridgedASTContext cContext);
 
 //===----------------------------------------------------------------------===//
 // MARK: AST nodes

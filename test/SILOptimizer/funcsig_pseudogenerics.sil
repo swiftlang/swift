@@ -12,7 +12,7 @@ import Swift
 import Foundation
 import objc_generics
 
-// CHECK: sil [signature_optimized_thunk] [always_inline] @non_pseudo_method :
+// CHECK: sil [signature_optimized_thunk] [heuristic_always_inline] @non_pseudo_method :
 sil @non_pseudo_method : $@convention(thin) <T: AnyObject> (Int64) -> () {
 entry(%0 : $Int64):
   return undef : $()

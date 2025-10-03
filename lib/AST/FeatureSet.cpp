@@ -440,6 +440,13 @@ UNINTERESTING_FEATURE(ImmutableWeakCaptures)
 // Ignore borrow and mutate accessors until it is used in the standard library.
 UNINTERESTING_FEATURE(BorrowAndMutateAccessors)
 
+static bool usesFeatureInlineAlways(Decl *decl) {
+  if (auto *inlineAttr = decl->getAttrs().getAttribute<InlineAttr>()) {
+    return inlineAttr->getKind() == InlineKind::Always;
+  }
+  return false;
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------

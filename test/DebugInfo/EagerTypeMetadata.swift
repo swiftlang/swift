@@ -13,6 +13,6 @@ public class C<T>
 }
 // CHECK: !DIDerivedType(tag: DW_TAG_typedef, name: "T",
 // CHECK-SAME:           baseType: ![[PTRTY:[0-9]+]]
-// CHECK: ![[PTRTY]] = !DIDerivedType(tag: DW_TAG_pointer_type, name: "$sBpD", baseType: null, size: {{64|32}}, flags: DIFlagArtificial | DIFlagObjectPointer)
+// CHECK: ![[PTRTY]] = !DIDerivedType(tag: DW_TAG_pointer_type, name: "$sBpD", baseType: null, size: {{64|32}})
 // CHECK: ![[LOC]] = !DILocation(line: 0,
 

@@ -67,7 +67,7 @@
 // RUN: %target-codesign %t/%target-library-name(ResilientImplLib)
 
 // Run and verify output
-// RUN: %env-SWIFT_DUMP_ACCESSIBLE_FUNCTIONS=true %target-run %t/a.out                                                   \
+// RUN: env %env-SWIFT_DUMP_ACCESSIBLE_FUNCTIONS=true %target-run %t/a.out                                                   \
 // RUN:     %t/%target-library-name(FakeDistributedActorSystems)               \
 // RUN:     %t/%target-library-name(ResilientAPILib)                           \
 // RUN:     %t/%target-library-name(ResilientImplLib)                          \

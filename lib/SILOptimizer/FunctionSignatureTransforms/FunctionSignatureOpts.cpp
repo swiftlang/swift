@@ -129,7 +129,8 @@ static bool canSpecializeFunction(SILFunction *F,
   // It is OK to specialize always inline functions if they are
   // used by partial_apply instructions.
   assert(!OptForPartialApply || FuncInfo);
-  if (F->getInlineStrategy() == Inline_t::AlwaysInline &&
+  if ((F->getInlineStrategy() == Inline_t::HeuristicAlwaysInline ||
+       F->getInlineStrategy() == Inline_t::AlwaysInline) &&
       (!OptForPartialApply || !FuncInfo->getMinPartialAppliedArgs()))
     return false;
 
@@ -590,7 +591,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // optimized. If we inline the thunk, we will get the benefit of calling
   // the signature optimized function without additional setup on the
   // caller side.
-  F->setInlineStrategy(AlwaysInline);
+  F->setInlineStrategy(HeuristicAlwaysInline);
   SILBasicBlock *ThunkBody = F->createBasicBlock();
   for (auto &ArgDesc : TransformDescriptor.ArgumentDescList) {
     auto *NewArg =

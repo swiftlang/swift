@@ -1065,13 +1065,13 @@ bool SILDeclRef::isNoinline() const {
   return false;
 }
 
-/// True if the function has the @inline(__always) attribute.
+/// True if the function has the @inline(always) attribute.
 bool SILDeclRef::isAlwaysInline() const {
   swift::Decl *decl = nullptr;
   if (hasDecl()) {
     decl = getDecl();
   } else if (auto *ce = getAbstractClosureExpr()) {
-    // Closures within @inline(__always) functions should be always inlined, too.
+    // Closures within @inline(always) functions should be always inlined, too.
     // Note that this is different from @inline(never), because closures inside
     // @inline(never) _can_ be inlined within the inline-never function.
     decl = ce->getParent()->getInnermostDeclarationDeclContext();
@@ -1092,6 +1092,39 @@ bool SILDeclRef::isAlwaysInline() const {
     auto *storage = accessorDecl->getStorage();
     if (auto *attr = storage->getAttrs().getAttribute<InlineAttr>())
       if (attr->getKind() == InlineKind::Always)
+        return true;
+  }
+
+  return false;
+}
+
+/// True if the function has the @inline(__always) attribute.
+bool SILDeclRef::isUnderscoredAlwaysInline() const {
+  swift::Decl *decl = nullptr;
+  if (hasDecl()) {
+    decl = getDecl();
+  } else if (auto *ce = getAbstractClosureExpr()) {
+    // Closures within @inline(__always) functions should be always inlined, too.
+    // Note that this is different from @inline(never), because closures inside
+    // @inline(never) _can_ be inlined within the inline-never function.
+    decl = ce->getParent()->getInnermostDeclarationDeclContext();
+    if (!decl)
+      return false;
+  } else {
+    return false;
+  }
+
+  ASSERT(ABIRoleInfo(decl).providesAPI()
+            && "should not get inline attr from ABI-only decl");
+
+  if (auto attr = decl->getAttrs().getAttribute<InlineAttr>())
+    if (attr->getKind() == InlineKind::AlwaysUnderscored)
+      return true;
+
+  if (auto *accessorDecl = dyn_cast<AccessorDecl>(decl)) {
+    auto *storage = accessorDecl->getStorage();
+    if (auto *attr = storage->getAttrs().getAttribute<InlineAttr>())
+      if (attr->getKind() == InlineKind::AlwaysUnderscored)
         return true;
   }
 

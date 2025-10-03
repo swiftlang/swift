@@ -55,7 +55,7 @@
 #include "swift/Markup/Markup.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "llvm/ADT/RewriteBuffer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
@@ -2273,7 +2273,7 @@ static int doDumpImporterLookupTables(const CompilerInvocation &InitInvok,
 class StructureAnnotator : public ide::SyntaxModelWalker {
   SourceManager &SM;
   unsigned BufferID;
-  clang::RewriteBuffer RewriteBuf;
+  llvm::RewriteBuffer RewriteBuf;
   std::vector<SyntaxStructureNode> NodeStack;
   CharSourceRange LastPoppedNodeRange;
 

@@ -3365,6 +3365,11 @@ protected:
     yield->setOperand(use->getOperandNumber(), addr);
   }
 
+  void visitIgnoredUseInst(IgnoredUseInst *ignored) {
+    SILValue addr = addrMat.materializeAddress(use->get());
+    ignored->setOperand(addr);
+  }
+
   void visitValueMetatypeInst(ValueMetatypeInst *vmi) {
     SILValue opAddr = addrMat.materializeAddress(use->get());
     vmi->setOperand(opAddr);

@@ -504,7 +504,8 @@ private extension ApplySite {
     {
       if self is FullApplySite,
          // If the function is inlined later, there is no point in specializing it.
-         !callee.shouldOptimize || callee.inlineStrategy == .always
+         !callee.shouldOptimize || callee.inlineStrategy == .heuristicAlways ||
+         callee.inlineStrategy == .always
       {
         return nil
       }

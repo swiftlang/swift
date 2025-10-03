@@ -1758,6 +1758,9 @@ static bool isExistentialMemberAccessWithExplicitBaseExpression(
 Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     Type type, Type baseObjTy, ValueDecl *value,
     ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup) {
+  if (isa<MacroDecl>(value) || type->is<ErrorType>())
+    return ErrorType::get(getASTContext());
+
   auto *outerDC = value->getDeclContext();
 
   // Cope with dynamic 'Self'.

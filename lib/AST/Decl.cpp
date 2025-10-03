@@ -1731,8 +1731,7 @@ ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
   assert(Bits.ImportDecl.NumPathElements == Path.size() && "Truncation error");
   Bits.ImportDecl.ImportKind = static_cast<unsigned>(K);
   assert(getImportKind() == K && "not enough bits for ImportKind");
-  std::uninitialized_copy(Path.begin(), Path.end(),
-                          getTrailingObjects<ImportPath::Element>());
+  std::uninitialized_copy(Path.begin(), Path.end(), getTrailingObjects());
 }
 
 ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
@@ -2334,7 +2333,7 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                                           PatternList.size(), Parent);
   // Set up the patterns.
   std::uninitialized_copy(PatternList.begin(), PatternList.end(),
-                          PBD->getTrailingObjects<PatternBindingEntry>());
+                          PBD->getTrailingObjects());
 
   for (auto idx : range(PBD->getNumPatternEntries())) {
     auto *initContext = PBD->getInitContext(idx);
@@ -4930,6 +4929,25 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   return resultLoc;
 }
 
+bool ValueDecl::hasAttributeWithInlinableSemantics() const {
+  if (getAttrs().hasAttribute<InlinableAttr>())
+    return true;
+
+  // @inline(always) implies @inlinable on "public" (open, public, package)
+  // declarations.
+  AccessScope access =
+        getFormalAccessScope(nullptr, /*treatUsableFromInlineAsPublic*/false);
+  if (!access.isPublicOrPackage())
+    return false;
+
+  if (auto *inlineAttr = getAttrs().getAttribute<InlineAttr>()) {
+    if (inlineAttr && inlineAttr->getKind() == InlineKind::Always)
+      return true;
+  }
+
+  return false;
+}
+
 /// Returns true if \p VD needs to be treated as publicly-accessible
 /// at the SIL, LLVM, and machine levels due to being @usableFromInline.
 bool ValueDecl::isUsableFromInline() const {
@@ -4942,14 +4960,14 @@ bool ValueDecl::isUsableFromInline() const {
 
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
       getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
-      getAttrs().hasAttribute<InlinableAttr>())
+      hasAttributeWithInlinableSemantics())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
     auto *storage = accessor->getStorage();
     if (storage->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
         storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
-        storage->getAttrs().hasAttribute<InlinableAttr>())
+        storage->hasAttributeWithInlinableSemantics())
       return true;
   }
 
@@ -4957,7 +4975,7 @@ bool ValueDecl::isUsableFromInline() const {
     if (auto *namingDecl = opaqueType->getNamingDecl()) {
       if (namingDecl->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
           namingDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
-          namingDecl->getAttrs().hasAttribute<InlinableAttr>())
+          namingDecl->hasAttributeWithInlinableSemantics())
         return true;
     }
   }
@@ -5576,7 +5594,7 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
   // Inherit the @usableFromInline attribute.
   if (source->getAttrs().hasAttribute<UsableFromInlineAttr>() &&
       !getAttrs().hasAttribute<UsableFromInlineAttr>() &&
-      !getAttrs().hasAttribute<InlinableAttr>() &&
+      !hasAttributeWithInlinableSemantics() &&
       DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::UsableFromInline,
                                               this)) {
     auto &ctx = getASTContext();
@@ -10712,7 +10730,7 @@ bool AbstractFunctionDecl::isValidKeyPathComponent() const {
 
 bool AbstractFunctionDecl::isResilient() const {
   // Check for attributes that makes functions non-resilient.
-  if (getAttrs().hasAttribute<InlinableAttr>() &&
+  if (hasAttributeWithInlinableSemantics() &&
       getAttrs().hasAttribute<UsableFromInlineAttr>())
     return false;
 
@@ -10761,9 +10779,8 @@ OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
   assert(OpaqueReturnTypeReprs.empty() ||
          OpaqueReturnTypeReprs.size() ==
             OpaqueInterfaceGenericSignature.getInnermostGenericParams().size());
-  std::uninitialized_copy(
-      OpaqueReturnTypeReprs.begin(), OpaqueReturnTypeReprs.end(),
-      getTrailingObjects<TypeRepr *>());
+  std::uninitialized_copy(OpaqueReturnTypeReprs.begin(),
+                          OpaqueReturnTypeReprs.end(), getTrailingObjects());
 }
 
 OpaqueTypeDecl *OpaqueTypeDecl::get(

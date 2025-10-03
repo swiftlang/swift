@@ -1777,8 +1777,8 @@ public:
   ///          path will include 'Foo'. This return value is always owned by \c ImportDecl
   ///          (which is owned by the AST context), so it can be persisted.
   ImportPath getImportPath() const {
-    return ImportPath({ getTrailingObjects<ImportPath::Element>(),
-                        static_cast<size_t>(Bits.ImportDecl.NumPathElements) });
+    return ImportPath(getTrailingObjects(
+        static_cast<size_t>(Bits.ImportDecl.NumPathElements)));
   }
 
   /// Retrieves the import path, replacing any module aliases with real names.
@@ -2824,7 +2824,7 @@ public:
 private:
   MutableArrayRef<PatternBindingEntry> getMutablePatternList() {
     // Pattern entries are tail allocated.
-    return {getTrailingObjects<PatternBindingEntry>(), getNumPatternEntries()};
+    return getTrailingObjects(getNumPatternEntries());
   }
 };
   
@@ -3093,6 +3093,10 @@ public:
   /// Returns \c true if this value decl is inlinable with attributes
   /// \c \@usableFromInline, \c \@inlinalbe, and \c \@_alwaysEmitIntoClient
   bool isUsableFromInline() const;
+
+  // Returns \c true if this value decl is marked with an attribute that implies
+  // \c \@inlinable semantics: either \c \@inlinable or \c \@inline(always)
+  bool hasAttributeWithInlinableSemantics() const;
 
   /// Returns \c true if this declaration is *not* intended to be used directly
   /// by application developers despite the visibility.
@@ -3676,10 +3680,7 @@ public:
   /// Retrieve the buffer containing the opaque return type
   /// representations that correspond to the opaque generic parameters.
   ArrayRef<TypeRepr *> getOpaqueReturnTypeReprs() const {
-    return {
-      getTrailingObjects<TypeRepr *>(),
-      getNumOpaqueReturnTypeReprs()
-    };
+    return getTrailingObjects(getNumOpaqueReturnTypeReprs());
   }
 
   /// Should the underlying type be visible to clients outside of the module?
@@ -3745,13 +3746,12 @@ public:
           Substitutions(substitutions) {
       assert(!availabilityQueries.empty());
       std::uninitialized_copy(availabilityQueries.begin(),
-                              availabilityQueries.end(),
-                              getTrailingObjects<AvailabilityQuery>());
+                              availabilityQueries.end(), getTrailingObjects());
     }
 
   public:
     ArrayRef<AvailabilityQuery> getAvailabilityQueries() const {
-      return {getTrailingObjects<AvailabilityQuery>(), NumAvailabilityQueries};
+      return getTrailingObjects(NumAvailabilityQueries);
     }
 
     SubstitutionMap getSubstitutions() const { return Substitutions; }
@@ -5945,7 +5945,7 @@ private:
     inline AccessorDecl *getAccessor(AccessorKind kind) const;
 
     ArrayRef<AccessorDecl *> getAllAccessors() const {
-      return { getTrailingObjects<AccessorDecl*>(), NumAccessors };
+      return getTrailingObjects(NumAccessors);
     }
 
     void addOpaqueAccessor(AccessorDecl *accessor);
@@ -5954,7 +5954,7 @@ private:
 
   private:
     MutableArrayRef<AccessorDecl *> getAccessorsBuffer() {
-      return { getTrailingObjects<AccessorDecl*>(), NumAccessors };
+      return getTrailingObjects(NumAccessors);
     }
 
     bool registerAccessor(AccessorDecl *accessor, AccessorIndex index);
@@ -8807,7 +8807,7 @@ class EnumCaseDecl final : public Decl,
   {
     Bits.EnumCaseDecl.NumElements = Elements.size();
     std::uninitialized_copy(Elements.begin(), Elements.end(),
-                            getTrailingObjects<EnumElementDecl *>());
+                            getTrailingObjects());
   }
   SourceLoc getLocFromSource() const { return CaseLoc; }
 
@@ -8818,8 +8818,8 @@ public:
   
   /// Get the list of elements declared in this case.
   ArrayRef<EnumElementDecl *> getElements() const {
-    return {getTrailingObjects<EnumElementDecl *>(),
-            static_cast<size_t>(Bits.EnumCaseDecl.NumElements)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.EnumCaseDecl.NumElements));
   }
   SourceRange getSourceRange() const;
 

@@ -79,5 +79,9 @@ GROUP(UnknownWarningGroup, "unknown-warning-group")
 GROUP(CompilationCaching, "compilation-caching")
 GROUP(WeakMutability, "weak-mutability")
 
+GROUP(PerformanceHints, "performance-hints")
+GROUP(ReturnTypeImplicitCopy, "return-type-implicit-copy")
+GROUP_LINK(PerformanceHints, ReturnTypeImplicitCopy)
+
 #define UNDEFINE_DIAGNOSTIC_GROUPS_MACROS
 #include "swift/AST/DefineDiagnosticGroupsMacros.h"

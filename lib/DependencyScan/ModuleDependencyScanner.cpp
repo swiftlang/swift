@@ -471,6 +471,11 @@ SwiftDependencyTracker::SwiftDependencyTracker(
   // Add blocklist file.
   for (auto &File: CI.getFrontendOptions().BlocklistConfigFilePaths)
     addCommonFile(File);
+
+  // Add access notes.
+  StringRef AccessNotePath = CI.getLangOptions().AccessNotesPath;
+  if (!AccessNotePath.empty())
+    addCommonFile(AccessNotePath);
 }
 
 void SwiftDependencyTracker::startTracking(bool includeCommonDeps) {
@@ -1915,7 +1920,7 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
 
   // CASFileSystemRootID.
   std::string RootID = clangModuleDep.CASFileSystemRootID
-                           ? clangModuleDep.CASFileSystemRootID->toString()
+                           ? clangModuleDep.CASFileSystemRootID.value()
                            : "";
 
   std::string IncludeTree =

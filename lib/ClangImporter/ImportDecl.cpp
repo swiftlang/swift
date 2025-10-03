@@ -399,6 +399,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
       case clang::TargetInfo::PNaClABIBuiltinVaList:
       case clang::TargetInfo::SystemZBuiltinVaList:
       case clang::TargetInfo::X86_64ABIBuiltinVaList:
+      case clang::TargetInfo::XtensaABIBuiltinVaList:
         return std::make_pair(Type(), "");
     }
     break;
@@ -1497,6 +1498,24 @@ namespace {
         // bridging, i.e. if the imported typealias should name a bridged type
         // or the original C type.
         clang::QualType ClangType = Decl->getUnderlyingType();
+
+        // Prevent import of typedefs to forward-declared explicit template
+        // specializations, which would trigger assertion in Clang.
+        if (auto *templateSpec = dyn_cast<clang::TemplateSpecializationType>(
+                importer::desugarIfElaborated(ClangType).getTypePtr())) {
+          if (auto *recordType =
+                  templateSpec->desugar()->getAs<clang::RecordType>()) {
+            if (auto *spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(
+                    recordType->getDecl())) {
+              if (spec->getSpecializationKind() ==
+                      clang::TSK_ExplicitSpecialization &&
+                  !spec->isCompleteDefinition()) {
+                return nullptr;
+              }
+            }
+          }
+        }
+
         SwiftType = Impl.importTypeIgnoreIUO(
             ClangType, ImportTypeKind::Typedef,
             ImportDiagnosticAdder(Impl, Decl, Decl->getLocation()),
@@ -3282,7 +3301,7 @@ namespace {
             decl->getLocation(),
             const_cast<clang::ClassTemplateSpecializationDecl *>(decl),
             clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
-            /*Complain*/ false);
+            /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
         // If the template can't be instantiated, bail.
         if (notInstantiated)
           return nullptr;
@@ -4255,14 +4274,14 @@ namespace {
             for (auto param : attr->params()) {
               // FIXME: Swift assumes no escaping to globals. We should diagnose
               // this.
-              if (param == clang::LifetimeCaptureByAttr::GLOBAL ||
-                  param == clang::LifetimeCaptureByAttr::UNKNOWN ||
-                  param == clang::LifetimeCaptureByAttr::INVALID)
+              if (param == clang::LifetimeCaptureByAttr::Global ||
+                  param == clang::LifetimeCaptureByAttr::Unknown ||
+                  param == clang::LifetimeCaptureByAttr::Invalid)
                 continue;
 
               paramHasAnnotation[idx] = true;
               if (isa<clang::CXXMethodDecl>(decl) &&
-                  param == clang::LifetimeCaptureByAttr::THIS) {
+                  param == clang::LifetimeCaptureByAttr::This) {
                 auto [it, inserted] = inheritedArgDependences.try_emplace(
                     result->getSelfIndex(), SmallBitVector(dependencyVecSize));
                 it->second[idx] = true;

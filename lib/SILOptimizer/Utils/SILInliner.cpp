@@ -376,7 +376,8 @@ protected:
 
   SILLocation remapLocation(SILLocation InLoc) {
     // For performance inlining return the original location.
-    if (IKind == InlineKind::PerformanceInline)
+    if (IKind == InlineKind::PerformanceInline ||
+        IKind == InlineKind::InlineAlwaysInline)
       return InLoc;
     // Inlined location wraps the call site that is being inlined, regardless of
     // the input location.

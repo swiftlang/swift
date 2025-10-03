@@ -24,7 +24,7 @@ bb0(%value : @owned $T):
   return %retval : $UnownedBox<T>
 }
 
-sil [always_inline] [ossa] @unowned_copy_value : $@convention(thin) <T where T : AnyObject> (@owned T) -> @out UnownedBox<T> {
+sil [heuristic_always_inline] [ossa] @unowned_copy_value : $@convention(thin) <T where T : AnyObject> (@owned T) -> @out UnownedBox<T> {
 bb0(%owned_value : @owned $T):
   %unowned_value = unowned_copy_value %owned_value : $T
   destroy_value %owned_value : $T
