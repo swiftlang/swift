@@ -37,7 +37,7 @@ markUsed(z) // expected-error {{cannot find 'z' in scope}}
 
 markUsed(a)
 markUsed(b)
-markUsed(c) // expected-error {{cannot find 'c' in scope}}
+markUsed(c) // expected-error {{'c' is inaccessible due to 'private' protection level}}
 
 Foo.x()
 Foo.y() // expected-error {{'y' is inaccessible due to 'internal' protection level}}
@@ -64,7 +64,7 @@ _ = PrivateInit() // expected-error {{'PrivateInit' initializer is inaccessible 
 // TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' initializer is inaccessible due to 'private' protection level
 
 var s = StructWithPrivateSetter()
-// expected-note@-1 3{{did you mean 's'?}}
+// expected-note@-1 2{{did you mean 's'?}}
 s.x = 42 // expected-error {{cannot assign to property: 'x' setter is inaccessible}}
 
 class Sub : Base {
