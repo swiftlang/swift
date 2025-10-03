@@ -41,7 +41,7 @@ def Availability(bits):
 
 if Self == 'Float16':
     SelfDocComment = '''\
-/// A half-precision (16b), floating-point value type.
+/// A half-precision (16-bit), floating-point value type.
 ///
 /// On macOS, `Float16` is only available when targeting Apple silicon.
 /// On other supported platforms, `Float16` is available for all
@@ -50,11 +50,11 @@ if Self == 'Float16':
 /// arithmetic will be emulated by the swift compiler and runtime.'''
 elif Self == 'Float':
     SelfDocComment = '''\
-/// A single-precision, floating-point value type.'''
+/// A single-precision (32-bit), floating-point value type.'''
 
 elif Self == 'Double':
     SelfDocComment = '''\
-/// A double-precision, floating-point value type.'''
+/// A double-precision (64-bit), floating-point value type.'''
 
 elif Self == 'Float80':
     SelfDocComment = '''\
