@@ -729,6 +729,16 @@ private:
     if (!DC)
       return TheCU;
 
+    auto createContext = [&](NominalTypeDecl &NTD) {
+      GenericContextScope scope(
+          IGM, NTD.getGenericSignature().getCanonicalSignature());
+
+      auto Ty = NTD.getDeclaredInterfaceType();
+      // Create a Forward-declared type.
+      auto DbgTy = DebugTypeInfo::getForwardDecl(Ty);
+      return getOrCreateType(DbgTy);
+    };
+
     if (isa<FuncDecl>(DC))
       if (auto *Decl = IGM.getSILModule().lookUpFunction(SILDeclRef(
               cast<AbstractFunctionDecl>(DC), SILDeclRef::Kind::Func)))
@@ -742,7 +752,6 @@ private:
 
     // We don't model these in DWARF.
     case DeclContextKind::Initializer:
-    case DeclContextKind::ExtensionDecl:
     case DeclContextKind::SubscriptDecl:
     case DeclContextKind::EnumElementDecl:
     case DeclContextKind::TopLevelCodeDecl:
@@ -761,16 +770,17 @@ private:
       return getOrCreateContext(DC->getParent());
     case DeclContextKind::MacroDecl:
       return getOrCreateContext(DC->getParent());
+    case DeclContextKind::ExtensionDecl: {
+      auto *ED = cast<ExtensionDecl>(DC);
+      if (auto *NTD = ED->getExtendedNominal())
+        return createContext(*NTD);
+      return getOrCreateContext(DC->getParent());
+    }
     case DeclContextKind::GenericTypeDecl: {
-      // The generic signature of this nominal type has no relation to the current
-      // function's generic signature.
+      // The generic signature of this nominal type has no relation to the
+      // current function's generic signature.
       auto *NTD = cast<NominalTypeDecl>(DC);
-      GenericContextScope scope(IGM, NTD->getGenericSignature().getCanonicalSignature());
-
-      auto Ty = NTD->getDeclaredInterfaceType();
-      // Create a Forward-declared type.
-      auto DbgTy = DebugTypeInfo::getForwardDecl(Ty);
-      return getOrCreateType(DbgTy);
+      return createContext(*NTD);
     }
     }
     return TheCU;
