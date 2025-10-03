@@ -70,9 +70,9 @@ if "%TestArg:~-1%"=="," (set TestArg=%TestArg:~0,-1%) else (set TestArg= )
 set "PackagingArg=-SkipPackaging"
 if not "%INCLUDE_PACKAGING%"=="" set "PackagingArg=-Stage %PackageRoot%"
 
-:: Build the -WindowsSDKArchitectures argument, if any, otherwise build all the SDKs.
-set "WindowsSDKArchitecturesArg= "
-if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArchitecturesArg=-Windows -WindowsSDKArchitectures %WINDOWS_SDKS% -WindowsSDKLinkModes dynamic"
+:: Build the arguments related to Windows SDK builds
+set "WindowsSDKArgs=-Windows -WindowsSDKLinkModes dynamic"
+if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArgs=-Windows -WindowsSDKArchitectures %WINDOWS_SDKS% -WindowsSDKLinkModes dynamic"
 
 :: Build the -HostArchName argument, if any.
 set "HostArchNameArg="
@@ -86,8 +86,8 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
   -ImageRoot %BuildRoot% ^
+  %WindowsSDKArgs% ^
   %PackagingArg% ^
-  %WindowsSDKArchitecturesArg% ^
   %TestArg% ^
   -IncludeSBoM ^
   -Summary || (exit /b 1)
