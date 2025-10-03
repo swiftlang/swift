@@ -619,6 +619,7 @@ enum Project {
   SourceKitLSP
   SymbolKit
   DocC
+  brotli
 
   LLVM
   Runtime
@@ -1996,6 +1997,23 @@ function Build-Sanitizers([Hashtable] $Platform) {
     })
 }
 
+function Build-Brotli([Hashtable] $Platform) {
+  $ArchName = $Platform.Architecture.LLVMName
+
+  Build-CMakeProject `
+    -Src $SourceCache\brotli `
+    -Bin "$(Get-ProjectBinaryCache $Platform brotli)" `
+    -InstallTo "$LibraryRoot\brotli\usr\$($Platform.OS.ToString())\$ArchName" `
+    -Platform $Platform `
+    -UseMSVCCompilers C `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      CMAKE_POSITION_INDEPENDENT_CODE = "YES";
+      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+    }
+}
+
+
 function Build-ZLib([Hashtable] $Platform) {
   $ArchName = $Platform.Architecture.LLVMName
 
@@ -2095,7 +2113,7 @@ function Build-CURL([Hashtable] $Platform) {
       CURL_CA_BUNDLE = "none";
       CURL_CA_FALLBACK = "NO";
       CURL_CA_PATH = "none";
-      CURL_BROTLI = "NO";
+      CURL_BROTLI = "YES";
       CURL_DISABLE_ALTSVC = "NO";
       CURL_DISABLE_AWS = "YES";
       CURL_DISABLE_BASIC_AUTH = "NO";
@@ -2173,6 +2191,7 @@ function Build-CURL([Hashtable] $Platform) {
       USE_WIN32_LDAP = "NO";
       ZLIB_ROOT = "$LibraryRoot\zlib-1.3.1\usr";
       ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3.1\usr\lib\$($Platform.OS.ToString())\$ArchName\zlibstatic.lib";
+      BROTLI_DIR = "$LibraryRoot\brotli\usr\$($Platform.OS.ToString())\$ArchName";
     })
 }
 
@@ -2404,6 +2423,7 @@ function Build-Foundation {
         "$LibraryRoot\zlib-1.3.1\usr\lib\$($Platform.OS.ToString())\$($Platform.Architecture.LLVMName)\libz.a"
       };
       ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.3.1\usr\include";
+      BROTLI_DIR = "$LibraryRoot\brotli\usr\$($Platform.OS.ToString())\$ArchName";
       dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
       SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
       _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
@@ -2426,6 +2446,7 @@ function Test-Foundation {
     $env:LIBXML_LIBRARY_PATH="$LibraryRoot/libxml2-2.11.5/usr/lib/windows/$($BuildPlatform.Architecture.LLVMName)"
     $env:LIBXML_INCLUDE_PATH="$LibraryRoot/libxml2-2.11.5/usr/include/libxml2"
     $env:ZLIB_LIBRARY_PATH="$LibraryRoot/zlib-1.3.1/usr/lib/windows/$($BuildPlatform.Architecture.LLVMName)"
+    $env:BROTLI_LIBRARY_PATH="$LibraryRoot/brotli/usr/windows/$($BuildPlatform.Architecture.LLVMName)/lib"
     $env:CURL_LIBRARY_PATH="$LibraryRoot/curl-8.9.1/usr/lib/windows/$($BuildPlatform.Architecture.LLVMName)"
     $env:CURL_INCLUDE_PATH="$LibraryRoot/curl-8.9.1/usr/include"
     Build-SPMProject `
@@ -2566,6 +2587,7 @@ function Build-SDK([Hashtable] $Platform, [switch] $IncludeMacros = $false) {
 
   # Third Party Dependencies
   Invoke-BuildStep Build-ZLib $Platform
+  Invoke-BuildStep Build-Brotli $Platform
   Invoke-BuildStep Build-XML2 $Platform
   Invoke-BuildStep Build-CURL $Platform
   Invoke-BuildStep Build-LLVM $Platform
