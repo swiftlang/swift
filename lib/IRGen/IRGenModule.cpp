@@ -2419,7 +2419,7 @@ bool swift::writeEmptyOutputFilesFor(
     auto *clangImporter = static_cast<ClangImporter *>(
       Context.getClangModuleLoader());
     llvmModule->setTargetTriple(
-      clangImporter->getTargetInfo().getTargetOpts().Triple);
+        llvm::Triple(clangImporter->getTargetInfo().getTargetOpts().Triple));
 
     // Add LLVM module flags.
     auto &clangASTContext = clangImporter->getClangASTContext();

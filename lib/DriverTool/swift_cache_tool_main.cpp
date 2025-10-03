@@ -65,12 +65,13 @@ enum ID {
 #undef OPTION
 };
 
-#define PREFIX(NAME, VALUE)                                                    \
-  constexpr llvm::StringLiteral NAME##_init[] = VALUE;                         \
-  constexpr llvm::ArrayRef<llvm::StringLiteral> NAME(                          \
-      NAME##_init, std::size(NAME##_init) - 1);
+#define OPTTABLE_STR_TABLE_CODE
 #include "SwiftCacheToolOptions.inc"
-#undef PREFIX
+#undef OPTTABLE_STR_TABLE_CODE
+
+#define OPTTABLE_PREFIXES_TABLE_CODE
+#include "SwiftCacheToolOptions.inc"
+#undef OPTTABLE_PREFIXES_TABLE_CODE
 
 static const OptTable::Info InfoTable[] = {
 #define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
@@ -80,7 +81,8 @@ static const OptTable::Info InfoTable[] = {
 
 class CacheToolOptTable : public llvm::opt::GenericOptTable {
 public:
-  CacheToolOptTable() : GenericOptTable(InfoTable) {}
+  CacheToolOptTable()
+      : GenericOptTable(OptionStrTable, OptionPrefixesTable, InfoTable) {}
 };
 
 class SwiftCacheToolInvocation {

@@ -398,7 +398,7 @@ OutOfLoop:
   // there) move the release to the top of the block.
   // TODO: This is where we'd plug in some global algorithms someday.
   if (&*BBI != &Release) {
-    Release.moveBefore(&*BBI);
+    Release.moveBefore(BBI);
     return true;
   }
 
@@ -520,7 +520,7 @@ OutOfLoop:
   // If we were able to move the retain down, move it now.
   // TODO: This is where we'd plug in some global algorithms someday.
   if (MadeProgress) {
-    Retain.moveBefore(&*BBI);
+    Retain.moveBefore(BBI);
     return true;
   }
 

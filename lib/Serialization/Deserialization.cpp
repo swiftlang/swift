@@ -8492,7 +8492,8 @@ public:
     bool isRegularKeywordAttribute = readBool();
 
     clang::AttributeCommonInfo info(
-        name, scopeName, {rangeStart, rangeEnd}, scopeLoc, parsedKind,
+        name, clang::AttributeScopeInfo(scopeName, scopeLoc),
+        {rangeStart, rangeEnd}, parsedKind,
         {syntax, spellingListIndex, /*IsAlignas=*/false,
          isRegularKeywordAttribute});
 
@@ -8520,6 +8521,9 @@ public:
   // these types into Swift.
   clang::TypeCoupledDeclRefInfo readTypeCoupledDeclRefInfo() {
     llvm_unreachable("TypeCoupledDeclRefInfo shouldn't be reached from swift");
+  }
+  clang::SpirvOperand readHLSLSpirvOperand() {
+    llvm_unreachable("SpirvOperand shouldn't be reached from swift");
   }
 };
 
@@ -8773,7 +8777,7 @@ class LazyConformanceLoaderInfo final
 
   LazyConformanceLoaderInfo(ArrayRef<uint64_t> ids)
     : NumConformances(ids.size()) {
-    auto buffer = getTrailingObjects<ProtocolConformanceID>();
+    auto *buffer = getTrailingObjects();
     for (unsigned i = 0, e = ids.size(); i != e; ++i)
       buffer[i] = ProtocolConformanceID(ids[i]);
   }
@@ -8791,8 +8795,7 @@ public:
 
   ArrayRef<ProtocolConformanceID> claim() {
     // TODO: free the memory here (if it's not used in multiple places?)
-    return llvm::ArrayRef(getTrailingObjects<ProtocolConformanceID>(),
-                          NumConformances);
+    return getTrailingObjects(NumConformances);
   }
 };
 } // end anonymous namespace

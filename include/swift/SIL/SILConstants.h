@@ -737,7 +737,7 @@ public:
                                  SymbolicValueAllocator &allocator);
 
   ArrayRef<SymbolicClosureArgument> getCaptures() const {
-    return {getTrailingObjects<SymbolicClosureArgument>(), numCaptures};
+    return getTrailingObjects(numCaptures);
   }
 
   // This is used by the llvm::TrailingObjects base class.

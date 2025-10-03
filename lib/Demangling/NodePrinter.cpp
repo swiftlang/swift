@@ -2371,14 +2371,28 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << "merged ";
     }
     return nullptr;
-  case Node::Kind::TypeSymbolicReference:
+  case Node::Kind::TypeSymbolicReference: {
     Printer << "type symbolic reference 0x";
-    Printer.writeHex(Node->getIndex());
+    if (Node->hasRemoteAddress()) {
+      auto ra = Node->getRemoteAddress();
+      Printer.writeHex(ra.first);
+      Printer << " (" << ra.second << ")";
+    } else if (Node->hasIndex()) {
+      Printer.writeHex(Node->getIndex());
+    }
     return nullptr;
-  case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
+  }
+  case Node::Kind::OpaqueTypeDescriptorSymbolicReference: {
     Printer << "opaque type symbolic reference 0x";
-    Printer.writeHex(Node->getIndex());
+    if (Node->hasRemoteAddress()) {
+      auto ra = Node->getRemoteAddress();
+      Printer.writeHex(ra.first);
+      Printer << " (" << ra.second << ")";
+    } else if (Node->hasIndex()) {
+      Printer.writeHex(Node->getIndex());
+    }
     return nullptr;
+  }
   case Node::Kind::DistributedThunk:
     if (!Options.ShortenThunk) {
       Printer << "distributed thunk ";

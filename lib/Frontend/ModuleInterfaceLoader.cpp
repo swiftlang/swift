@@ -2058,6 +2058,17 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
     GenericArgs.push_back("-enable-experimental-feature");
     GenericArgs.push_back("Embedded");
   }
+
+  if (langOpts.DebuggerSupport) {
+    if (clangImporterOpts.DirectClangCC1ModuleBuild) {
+      subClangImporterOpts.ExtraArgs.push_back("-dwarf-ext-refs");
+      subClangImporterOpts.ExtraArgs.push_back("-fmodule-format=obj");
+        subClangImporterOpts.ExtraArgs.push_back("-debug-info-kind=standalone");
+    } else {
+      subClangImporterOpts.ExtraArgs.push_back("-gmodules");
+      subClangImporterOpts.ExtraArgs.push_back("-g");
+    }
+  }
 }
 
 /// Calculate an output filename in \p genericSubInvocation's cache path that

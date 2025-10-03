@@ -383,12 +383,12 @@ protected:
     // Define bits for use in AccessStorageAnalysis. Each identified storage
     // object is mapped to one instance of this subclass.
     SWIFT_INLINE_BITFIELD_FULL(StorageAccessInfo, AccessRepresentation,
-                               64 - NumAccessRepresentationBits,
+                               64 - NumberOfAccessRepresentationBits,
                                accessKind : NumSILAccessKindBits,
                                noNestedConflict : 1,
-                               storageIndex : 64 - (NumAccessRepresentationBits
-                                                    + NumSILAccessKindBits
-                                                    + 1));
+                               storageIndex : 64 -
+                                   (NumberOfAccessRepresentationBits +
+                                    NumSILAccessKindBits + 1));
 
     // Define bits for use in the AccessEnforcementOpts pass. Each begin_access
     // in the function is mapped to one instance of this subclass.  Reserve a
@@ -398,13 +398,11 @@ protected:
     //
     // `AccessRepresentation` refers to the AccessRepresentationBitfield defined
     // above, setting aside enough bits for common data.
-    SWIFT_INLINE_BITFIELD_FULL(AccessEnforcementOptsInfo,
-                               AccessRepresentation,
-                               64 - NumAccessRepresentationBits,
-                               seenNestedConflict : 1,
-                               seenIdenticalStorage : 1,
-                               beginAccessIndex :
-                                 62 - NumAccessRepresentationBits);
+    SWIFT_INLINE_BITFIELD_FULL(AccessEnforcementOptsInfo, AccessRepresentation,
+                               64 - NumberOfAccessRepresentationBits,
+                               seenNestedConflict : 1, seenIdenticalStorage : 1,
+                               beginAccessIndex : 62 -
+                                   NumberOfAccessRepresentationBits);
 
     // Define data flow bits for use in the AccessEnforcementDom pass. Each
     // begin_access in the function is mapped to one instance of this subclass.

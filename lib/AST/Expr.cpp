@@ -2915,7 +2915,7 @@ TypeJoinExpr::TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
   Bits.TypeJoinExpr.NumElements = elements.size();
   // Copy elements.
   std::uninitialized_copy(elements.begin(), elements.end(),
-                          getTrailingObjects<Expr *>());
+                          getTrailingObjects());
 }
 
 TypeJoinExpr *TypeJoinExpr::createImpl(

@@ -29,6 +29,7 @@
 #include "llvm/Object/ELFTypes.h"
 #include "llvm/Object/MachOUniversal.h"
 #include "llvm/Object/RelocationResolver.h"
+#include "llvm/Object/Wasm.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/StringSaver.h"
 
@@ -266,6 +267,38 @@ void Image::scanCOFF(const llvm::object::COFFObjectFile *O) {
   Segments.push_back({HeaderAddress, O->getData()});
 }
 
+void Image::scanWasm(const llvm::object::WasmObjectFile *O) {
+  HeaderAddress = 0;
+
+  auto resolver = getRelocationResolver(*O);
+  auto resolverSupports = resolver.first;
+  auto resolve = resolver.second;
+
+  if (!resolverSupports || !resolve)
+    return;
+
+  for (auto SectionRef : O->sections()) {
+    auto Section = O->getWasmSection(SectionRef);
+    for (auto &r : Section.Relocations) {
+      auto sym = O->symbol_begin();
+      for (unsigned i = 0; sym != O->symbol_end() && i < r.Index; ++i)
+        ++sym;
+      if (sym == O->symbol_end())
+        continue;
+      auto &wsym = O->getWasmSymbol(*sym);
+      if (!resolverSupports(r.Type)) {
+        llvm::errs() << "Unsupported +" << r.Offset << " " << wsym.Info.Name
+                     << " +" << r.Addend << "\n";
+        continue;
+      }
+      uint64_t offset = resolve(r.Type, r.Offset, 0, 0, r.Addend);
+      DynamicRelocations.insert({r.Offset, {wsym.Info.Name, offset}});
+    }
+  }
+
+  Segments.push_back({HeaderAddress, O->getData()});
+}
+
 bool Image::isMachOWithPtrAuth() const {
   auto macho = dyn_cast<llvm::object::MachOObjectFile>(O);
   if (!macho)
@@ -286,6 +319,8 @@ Image::Image(const llvm::object::ObjectFile *O) : O(O) {
     scanELF(elf);
   } else if (auto coff = dyn_cast<llvm::object::COFFObjectFile>(O)) {
     scanCOFF(coff);
+  } else if (auto wasm = dyn_cast<llvm::object::WasmObjectFile>(O)) {
+    scanWasm(wasm);
   } else {
     fputs("unsupported image format\n", stderr);
     abort();

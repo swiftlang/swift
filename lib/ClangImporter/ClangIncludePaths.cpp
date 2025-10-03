@@ -127,9 +127,13 @@ std::pair<clang::driver::Driver,
 ClangImporter::createClangDriver(
     const LangOptions &LangOpts, const ClangImporterOptions &ClangImporterOpts,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs) {
+
+  auto diagVFS = vfs ? vfs : llvm::vfs::getRealFileSystem();
+
+  clang::DiagnosticOptions diagOpts;
   auto *silentDiagConsumer = new clang::DiagnosticConsumer();
   auto clangDiags = clang::CompilerInstance::createDiagnostics(
-      new clang::DiagnosticOptions(), silentDiagConsumer);
+      *diagVFS, diagOpts, silentDiagConsumer);
   clang::driver::Driver clangDriver(ClangImporterOpts.clangPath,
                                     LangOpts.Target.str(), *clangDiags,
                                     "clang LLVM compiler", vfs);

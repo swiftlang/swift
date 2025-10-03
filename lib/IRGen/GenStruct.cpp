@@ -657,7 +657,7 @@ namespace {
             });
 
         bool hasRequiresClause =
-            copyConstructor->getTrailingRequiresClause() != nullptr;
+            !copyConstructor->getTrailingRequiresClause().isNull();
 
         if (hasRequiresClause || hasCopyableIfAttr) {
           ctx.Diags.diagnose(copyConstructorLoc, diag::maybe_missing_annotation,
@@ -1468,7 +1468,7 @@ private:
         // Collect all of the following bitfields.
         unsigned bitStart =
           layout.getFieldOffset(clangField->getFieldIndex());
-        unsigned bitEnd = bitStart + clangField->getBitWidthValue(ClangContext);
+        unsigned bitEnd = bitStart + clangField->getBitWidthValue();
 
         while (cfi != cfe && (*cfi)->isBitField()) {
           clangField = *cfi++;
@@ -1484,7 +1484,7 @@ private:
             bitStart = nextStart;
           }
 
-          bitEnd = nextStart + clangField->getBitWidthValue(ClangContext);
+          bitEnd = nextStart + clangField->getBitWidthValue();
         }
 
         addOpaqueBitField(bitStart, bitEnd);
