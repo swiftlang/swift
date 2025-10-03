@@ -926,9 +926,7 @@ static bool eliminateSwitchDispatchOnUnavailableElements(
   SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4> NewCaseBBs;
   for (unsigned i : range(SWI.getNumCases())) {
     auto CaseBB = SWI.getCase(i);
-    auto availableAtr = CaseBB.first->getUnavailableAttr();
-
-    if (availableAtr && availableAtr->isUnconditionallyUnavailable()) {
+    if (!CaseBB.first->isAvailableDuringLowering()) {
       // Mark the basic block as potentially unreachable.
       SILBasicBlock *UnreachableBlock = CaseBB.second;
       if (!State->PossiblyUnreachableBlocks.contains(UnreachableBlock)) {
