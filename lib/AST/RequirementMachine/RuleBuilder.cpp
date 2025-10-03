@@ -106,19 +106,10 @@ void RuleBuilder::initWithProtocolSignatureRequirements(
     addPermanentProtocolRules(proto);
 
     auto reqs = proto->getRequirementSignature();
-
-    // If completion failed, we'll have a totally empty requirement signature,
-    // but to maintain invariants around what constitutes a valid rewrite term
-    // between getTypeForTerm() and isValidTypeParameter(), we need to add rules
-    // for inherited protocols.
-    if (reqs.getErrors().contains(GenericSignatureErrorFlags::CompletionFailed)) {
-      for (auto *inheritedProto : proto->getAllInheritedProtocols()) {
-        Requirement req(RequirementKind::Conformance,
-                        proto->getSelfInterfaceType(),
-                        inheritedProto->getDeclaredInterfaceType());
-
-        addRequirement(req.getCanonical(), proto);
-      }
+    auto errors = reqs.getErrors();
+    if (errors.contains(GenericSignatureErrorFlags::CompletionFailed) ||
+        errors.contains(GenericSignatureErrorFlags::CircularReference)) {
+      Failed = 1;
     }
 
     for (auto req : reqs.getRequirements())
@@ -494,6 +485,9 @@ void RuleBuilder::collectRulesFromReferencedProtocols() {
       // We've already seen this protocol component.
       continue;
     }
+
+    if (machine->isFailed())
+      Failed = 1;
 
     // We grab the machine's local rules, not *all* of its rules, to avoid
     // duplicates in case multiple machines share a dependency on a downstream

@@ -1400,33 +1400,13 @@ RequirementSignature RequirementSignature::getPlaceholderRequirementSignature(
     const ProtocolDecl *proto, GenericSignatureErrors errors) {
   auto &ctx = proto->getASTContext();
 
-  SmallVector<ProtocolDecl *, 2> inheritedProtos;
-  for (auto *inheritedProto : proto->getInheritedProtocols()) {
-    inheritedProtos.push_back(inheritedProto);
-  }
-
+  // Pretend the protocol inherits from Copyable and Escapable.
+  SmallVector<Requirement, 2> requirements;
   for (auto ip : InvertibleProtocolSet::allKnown()) {
     auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
-    inheritedProtos.push_back(otherProto);
-  }
-
-  ProtocolType::canonicalizeProtocols(inheritedProtos);
-
-  SmallVector<Requirement, 2> requirements;
-
-  for (auto *inheritedProto : inheritedProtos) {
     requirements.emplace_back(RequirementKind::Conformance,
                               proto->getSelfInterfaceType(),
-                              inheritedProto->getDeclaredInterfaceType());
-  }
-
-  for (auto *assocTypeDecl : proto->getAssociatedTypeMembers()) {
-    for (auto ip : InvertibleProtocolSet::allKnown()) {
-      auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
-      requirements.emplace_back(RequirementKind::Conformance,
-                                assocTypeDecl->getDeclaredInterfaceType(),
-                                otherProto->getDeclaredInterfaceType());
-    }
+                              otherProto->getDeclaredInterfaceType());
   }
 
   // Maintain invariants.
