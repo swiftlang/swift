@@ -55,6 +55,20 @@ extension Context {
     }
   }
 
+  public func getTupleType(elements: [AST.`Type`]) -> AST.`Type` {
+    let bridgedElements = elements.map { $0.bridged }
+    return bridgedElements.withBridgedArrayRef {
+      AST.`Type`(bridged: _bridged.getTupleType($0))
+    }
+  }
+
+  public func getTupleTypeWithLabels(elements: [AST.`Type`], labels: [swift.Identifier]) -> AST.`Type` {
+    assert(elements.count == labels.count)
+    return elements.withBridgedArrayRef{
+      eltArr in labels.withBridgedArrayRef{labelsArr in
+      AST.`Type`(bridged: _bridged.getTupleTypeWithLabels(eltArr, labelsArr))}}
+  }
+
   public var swiftArrayDecl: NominalTypeDecl {
     _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self)
   }

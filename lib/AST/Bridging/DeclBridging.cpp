@@ -90,6 +90,25 @@ BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(BridgedASTContext cContext,
 #define ABSTRACT_DECL(Id, Parent) DECL(Id, Parent)
 #include "swift/AST/DeclNodes.def"
 
+// Define `.asValueDecl` on each BridgedXXXDecl type that's also a
+// ValueDecl.
+#define DECL(Id, Parent)
+#define VALUE_DECL(Id, Parent)                                                 \
+  BridgedValueDecl Bridged##Id##Decl_asValueDecl(Bridged##Id##Decl decl) {     \
+    return static_cast<ValueDecl *>(decl.unbridged());                         \
+  }
+#include "swift/AST/DeclNodes.def"
+
+// Define `.asNominalTypeDecl` on each BridgedXXXDecl type that's also a
+// NominalTypeDecl.
+#define DECL(Id, Parent)
+#define NOMINAL_TYPE_DECL(Id, Parent)                                          \
+  BridgedNominalTypeDecl Bridged##Id##Decl_asNominalTypeDecl(                  \
+      Bridged##Id##Decl decl) {                                                \
+    return static_cast<NominalTypeDecl *>(decl.unbridged());                   \
+  }
+#include "swift/AST/DeclNodes.def"
+
 // Define `.asDeclContext` on each BridgedXXXDecl type that's also a
 // DeclContext.
 #define DECL(Id, Parent)
@@ -98,6 +117,17 @@ BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(BridgedASTContext cContext,
     return static_cast<DeclContext *>(decl.unbridged());                       \
   }
 #define ABSTRACT_CONTEXT_DECL(Id, Parent) CONTEXT_DECL(Id, Parent)
+#include "swift/AST/DeclNodes.def"
+
+// Define `.asGenericContext` on each BridgedXXXDecl type that's also a
+// GenericContext.
+#define DECL(Id, Parent)
+#define GENERIC_DECL(Id, Parent)                                               \
+  BridgedGenericContext Bridged##Id##Decl_asGenericContext(                    \
+      Bridged##Id##Decl decl) {                                                \
+    return static_cast<GenericContext *>(decl.unbridged());                    \
+  }
+#define ITERABLE_GENERIC_DECL(Id, Parent) GENERIC_DECL(Id, Parent)
 #include "swift/AST/DeclNodes.def"
 
 static StaticSpellingKind unbridged(BridgedStaticSpelling kind) {
@@ -115,6 +145,10 @@ void BridgedDecl_forEachDeclToHoist(BridgedDecl cDecl,
     BridgedDecl bridged(D);
     closure(&bridged);
   });
+}
+
+void BridgedValueDecl_setAccessPublic(BridgedValueDecl decl) {
+  decl.unbridged()->setAccess(AccessLevel::Public);
 }
 
 BridgedAccessorDecl BridgedAccessorDecl_createParsed(
@@ -334,7 +368,7 @@ convertToInheritedEntries(ASTContext &ctx, BridgedArrayRef cInheritedTypes) {
       [](auto &e) { return InheritedEntry(e.unbridged()); });
 }
 
-BridgedNominalTypeDecl BridgedEnumDecl_createParsed(
+BridgedEnumDecl BridgedEnumDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     SourceLoc enumKeywordLoc, swift::Identifier name, SourceLoc nameLoc,
     BridgedNullableGenericParamList genericParamList,
@@ -343,12 +377,25 @@ BridgedNominalTypeDecl BridgedEnumDecl_createParsed(
     SourceRange braceRange) {
   ASTContext &context = cContext.unbridged();
 
-  NominalTypeDecl *decl = new (context)
+  auto *decl = new (context)
       EnumDecl(enumKeywordLoc, name, nameLoc,
                convertToInheritedEntries(context, cInheritedTypes),
                genericParamList.unbridged(), cDeclContext.unbridged());
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
   decl->setBraces(braceRange);
+
+  return decl;
+}
+
+BridgedEnumDecl
+BridgedEnumDecl_create(BridgedASTContext cContext,
+                       BridgedDeclContext cDeclContext, BridgedStringRef name,
+                       BridgedNullableGenericParamList genericParamList) {
+  ASTContext &context = cContext.unbridged();
+
+  auto *decl = new (context) EnumDecl(
+      SourceLoc{}, context.getIdentifier(name.unbridged()), SourceLoc{}, {},
+      genericParamList.unbridged(), cDeclContext.unbridged());
 
   return decl;
 }
@@ -383,6 +430,21 @@ BridgedEnumElementDecl BridgedEnumElementDecl_createParsed(
       EnumElementDecl(nameLoc, declName, parameterList, equalsLoc,
                       cast_or_null<LiteralExpr>(rawValue.unbridged()),
                       cDeclContext.unbridged());
+}
+
+BridgedEnumElementDecl BridgedEnumElementDecl_create(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedStringRef name, BridgedParameterList parameterList) {
+  ASTContext &context = cContext.unbridged();
+  return new (context) EnumElementDecl(
+      /*IdentifierLoc*/ SourceLoc(),
+      DeclName(context.getIdentifier(name.unbridged())),
+      parameterList.unbridged(), SourceLoc(), /*RawValueExpr*/ nullptr,
+      cDeclContext.unbridged());
+}
+
+void BridgedEnumElementDecl_setImplicit(BridgedEnumElementDecl self) {
+  return self.unbridged()->setImplicit();
 }
 
 BridgedNominalTypeDecl BridgedStructDecl_createParsed(
@@ -668,6 +730,12 @@ BridgedParameterList BridgedParameterList_createParsed(
   return ParameterList::create(context, leftParenLoc,
                                cParameters.unbridged<ParamDecl *>(),
                                rightParenLoc);
+}
+
+BridgedParameterList BridgedParameterList_create(BridgedASTContext cContext,
+                                                 BridgedArrayRef cParameters) {
+  return ParameterList::create(cContext.unbridged(),
+                               cParameters.unbridged<ParamDecl *>());
 }
 
 size_t BridgedParameterList_size(BridgedParameterList cParameterList) {
