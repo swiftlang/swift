@@ -95,7 +95,7 @@ extension MainActor {
   /// executor of the MainActor.
   ///
   /// If that is the case, the operation is invoked with an `isolated` version
-  /// of the actor, / allowing synchronous access to actor local state without
+  /// of the actor, allowing synchronous access to actor local state without
   /// hopping through asynchronous boundaries.
   ///
   /// If the current context is not running on the actor's serial executor, or
@@ -107,9 +107,9 @@ extension MainActor {
   /// will hop task execution to the target actor if necessary.
   ///
   /// - Note: This check is performed against the MainActor's serial executor,
-  ///   meaning that / if another actor uses the same serial executor--by using
+  ///   meaning that if another actor uses the same serial executor--by using
   ///   ``MainActor/sharedUnownedExecutor`` as its own
-  ///   ``Actor/unownedExecutor``--this check will succeed , as from a concurrency
+  ///   ``Actor/unownedExecutor``--this check will succeed, as from a concurrency
   ///   safety perspective, the serial executor guarantees mutual exclusion of
   ///   those two actors.
   ///
