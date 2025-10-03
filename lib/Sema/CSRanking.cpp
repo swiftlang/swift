@@ -1224,6 +1224,39 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       }
     }
 
+    // Tie-breaker: prefer the overload whose single function-typed parameter
+    // is non-throwing when the candidates differ only by `throws` on that
+    // parameter. This addresses ambiguities like Task.init(name:priority:operation:)
+    // where both throwing and non-throwing overloads are viable (see swift#84587).
+    auto getSingleParameterFunctionParamType = [&](ValueDecl *D) -> const FunctionType * {
+      if (!D) return nullptr;
+      // Work with the interface type including curried self if needed.
+      Type ty = D->getInterfaceType();
+      if (!D->hasCurriedSelf())
+        ty = ty->addCurriedSelfType(D->getDeclContext());
+      auto *fn = ty->getAs<AnyFunctionType>();
+      if (!fn) return nullptr;
+      auto params = fn->getParams();
+      if (params.size() != 1) return nullptr;
+      return params[0].getPlainType()->getAs<FunctionType>();
+    };
+
+    if (score1 == score2) {
+      const FunctionType *lhsParamFn = getSingleParameterFunctionParamType(decl1);
+      const FunctionType *rhsParamFn = getSingleParameterFunctionParamType(decl2);
+      if (lhsParamFn && rhsParamFn) {
+        bool lhsThrows = lhsParamFn->isThrowing();
+        bool rhsThrows = rhsParamFn->isThrowing();
+        if (lhsThrows != rhsThrows) {
+          // Prefer the non-throwing candidate.
+          if (lhsThrows)
+            score2 += weight;
+          else
+            score1 += weight;
+        }
+      }
+    }
+
     // If both declarations come from Clang, and one is a type and the other
     // is a function, prefer the function.
     if (decl1->hasClangNode() &&
