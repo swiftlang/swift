@@ -134,8 +134,12 @@ public:
   }
 
   ArrayRef<FileUnit *> getFiles() const {
-    return isa<SourceFile *>(SFOrMod) ? *SFOrMod.getAddrOfPtr1()
-                                      : cast<ModuleDecl *>(SFOrMod)->getFiles();
+    if (isa<SourceFile *>(SFOrMod)) {
+      SourceFile *const *SF = SFOrMod.getAddrOfPtr1();
+      return ArrayRef((FileUnit *const *)SF, 1);
+    } else {
+      return cast<ModuleDecl *>(SFOrMod)->getFiles();
+    }
   }
 
   StringRef getFilename() const {
