@@ -103,6 +103,7 @@ protected:
   virtual void emitCallToUnmappedExplosion(llvm::CallBase *call,
                                            Explosion &out) = 0;
   void emitYieldsToExplosion(Explosion &out);
+  void emitGuaranteedAddressToExplosion(Explosion &out);
   void setKeyPathAccessorArguments(Explosion &in, bool isOutlined,
                                    Explosion &out);
   virtual FunctionPointer getCalleeFunctionPointer() = 0;

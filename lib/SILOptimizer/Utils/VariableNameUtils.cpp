@@ -599,6 +599,17 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       }
     }
 
+    // Borrow/mutate accessor
+    if (searchValue->isBorrowAccessorResult()) {
+      if (auto fas =
+              FullApplySite::isa(searchValue->getDefiningInstruction())) {
+        if (auto selfParam = getNamePathComponentFromCallee(fas)) {
+          searchValue = selfParam;
+          continue;
+        }
+      }
+    }
+
     // Addressor accessor.
     if (auto ptrToAddr =
             dyn_cast<PointerToAddressInst>(stripAccessMarkers(searchValue))) {

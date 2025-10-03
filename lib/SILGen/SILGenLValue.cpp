@@ -3053,13 +3053,19 @@ public:
   SILGenLValue &SGL;
   SILGenFunction &SGF;
   AbstractionPattern Orig;
+  bool forGuaranteedReturn;
+  bool forGuaranteedAddressReturn;
 
-  SILGenBorrowedBaseVisitor(SILGenLValue &SGL,
-                            SILGenFunction &SGF,
-                            AbstractionPattern Orig)
-      : SGL(SGL), SGF(SGF), Orig(Orig) {}
+  SILGenBorrowedBaseVisitor(SILGenLValue &SGL, SILGenFunction &SGF,
+                            AbstractionPattern Orig,
+                            bool forGuaranteedReturn = false,
+                            bool forGuaranteedAddressReturn = false)
+      : SGL(SGL), SGF(SGF), Orig(Orig),
+        forGuaranteedReturn(forGuaranteedReturn),
+        forGuaranteedAddressReturn(forGuaranteedAddressReturn) {}
 
-  static bool isNonCopyableBaseBorrow(SILGenFunction &SGF, Expr *e) {
+  static bool isNonCopyableBaseBorrow(SILGenFunction &SGF, Expr *e,
+                                      LValueOptions options) {
     if (auto *m = dyn_cast<MemberRefExpr>(e)) {
       // If our m is a pure noncopyable type or our base is, we need to perform
       // a noncopyable base borrow.
@@ -3067,13 +3073,22 @@ public:
       // DISCUSSION: We can have a noncopyable member_ref_expr with a copyable
       // base if the noncopyable member_ref_expr is from a computed method. In
       // such a case, we want to ensure that we wrap things the right way.
-      return m->getType()->isNoncopyable() ||
-          m->getBase()->getType()->isNoncopyable();
+      if (m->getType()->isNoncopyable() ||
+          m->getBase()->getType()->isNoncopyable()) {
+        return true;
+      }
+
+      if (options.ForGuaranteedAddressReturn || options.ForGuaranteedReturn) {
+        return true;
+      }
     }
 
     if (auto *le = dyn_cast<LoadExpr>(e)) {
       // Noncopyable type is obviously noncopyable.
       if (le->getType()->isNoncopyable()) {
+        return true;
+      }
+      if (options.ForGuaranteedAddressReturn || options.ForGuaranteedReturn) {
         return true;
       }
       // Otherwise, check if the thing we're loading from is a noncopyable
@@ -3085,6 +3100,9 @@ public:
     if (auto *de = dyn_cast<DeclRefExpr>(e)) {
       // Noncopyable type is obviously noncopyable.
       if (de->getType()->isNoncopyable()) {
+        return true;
+      }
+      if (options.ForGuaranteedAddressReturn || options.ForGuaranteedReturn) {
         return true;
       }
       // If the decl ref refers to a parameter with an explicit ownership
@@ -3110,7 +3128,7 @@ public:
   /// define a visitor stub, defer back to SILGenLValue's visitRec as it is
   /// most-likely a non-lvalue root expression.
   LValue visitExpr(Expr *e, SGFAccessKind accessKind, LValueOptions options) {
-    assert(!isNonCopyableBaseBorrow(SGF, e)
+    assert(!isNonCopyableBaseBorrow(SGF, e, options)
             && "unexpected recursion in SILGenLValue::visitRec!");
 
     return SGL.visitRec(e, accessKind, options, Orig);
@@ -3166,6 +3184,26 @@ public:
     // We are going to immediately use this base value, so we want to borrow it.
     ManagedValue mv =
         SGF.emitRValueAsSingleValue(e, SGFContext::AllowImmediatePlusZero);
+
+    if (forGuaranteedReturn && mv.getValue()->getType().isMoveOnly()) {
+      // SILGen eagerly generates copy_value +
+      // mark_unresolved_non_copyable_value for ~Copyable base values. The
+      // generated mark_unresolved_non_copyable_value instructions drive
+      // move-only checker diagnostics ensuring there are no consuming uses of
+      // this value. However, the copy_value +
+      // mark_unresolved_non_copyable_value pair creates an artifical scope out
+      // of which we cannot legally return a
+      // @guaranteed value.
+      // We have already diagosed borrow accessor returns, ensuring they return
+      // only projections, since projections don't create any consuming used we
+      // can safely look through copy_value + mark_unresolved_non_copyable_value + begin_borrow
+      // instructions while emitting the base value.
+      auto baseValue = lookThroughMoveOnlyCheckerPattern(mv.getValue());
+      assert(cast<SILArgument>(baseValue) ==
+             SGF.getFunction().getSelfArgument());
+      return ManagedValue::forBorrowedObjectRValue(baseValue);
+    }
+
     if (mv.isPlusZeroRValueOrTrivial())
       return mv;
 
@@ -3260,10 +3298,14 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
   // a `borrow x` operator, the operator is used on the base here), we want to
   // apply the lvalue within a formal access to the original value instead of
   // an actual loaded copy.
-  if (SILGenBorrowedBaseVisitor::isNonCopyableBaseBorrow(SGF, e) ||
-      options.NeedsBorrow) {
-    SILGenBorrowedBaseVisitor visitor(*this, SGF, orig);
+  if (SILGenBorrowedBaseVisitor::isNonCopyableBaseBorrow(SGF, e, options)) {
+    SILGenBorrowedBaseVisitor visitor(*this, SGF, orig,
+                                      options.ForGuaranteedReturn,
+                                      options.ForGuaranteedAddressReturn);
     auto accessKind = SGFAccessKind::BorrowedObjectRead;
+    if (options.ForGuaranteedAddressReturn) {
+      accessKind = SGFAccessKind::BorrowedAddressRead;
+    }
     assert(!e->getType()->is<LValueType>()
         && "maybe need SGFAccessKind::BorrowedAddressRead ?");
     return visitor.visit(e, accessKind, options);
@@ -5665,15 +5707,20 @@ SILGenFunction::tryEmitProjectedLValue(SILLocation loc, LValue &&src,
                                        TSanKind tsanKind) {
   assert(src.getAccessKind() == SGFAccessKind::BorrowedAddressRead ||
          src.getAccessKind() == SGFAccessKind::BorrowedObjectRead);
+
+  for (auto component = src.begin(); component != src.end(); component++) {
+    if (component->get()->getKind() != PathComponent::BorrowMutateKind &&
+        component->get()->getKind() != PathComponent::StructElementKind &&
+        component->get()->getKind() != PathComponent::TupleElementKind &&
+        component->get()->getKind() != PathComponent::ValueKind) {
+      return std::nullopt;
+    }
+  }
+
   ManagedValue base;
   PathComponent &&component =
       drillToLastComponent(loc, std::move(src), base, tsanKind);
 
-  if (component.getKind() != PathComponent::BorrowMutateKind &&
-      component.getKind() != PathComponent::StructElementKind &&
-      component.getKind() != PathComponent::TupleElementKind) {
-    return std::nullopt;
-  }
   auto value =
       drillIntoComponent(*this, loc, std::move(component), base, tsanKind);
   ASSERT(!value.hasCleanup());
