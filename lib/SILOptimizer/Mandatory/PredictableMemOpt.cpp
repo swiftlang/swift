@@ -2339,7 +2339,7 @@ SILValue OptimizeDeadAlloc::promoteMarkDepBase(
   }
   LLVM_DEBUG(llvm::dbgs() << "      To value: " << dependentValue);
   md->replaceAllUsesWith(dependentValue);
-  deleter.deleteIfDead(md);
+  deleter.forceDelete(md);
   return dependentValue;
 }
 
