@@ -200,7 +200,7 @@ extension UnsafeRawPointer {
   @_transparent
   @_preInverseGenerics
   @safe
-  public init<T: ~Copyable>(@_nonEphemeral _ other: UnsafePointer<T>) {
+  public init<T: ~Copyable & ~Escapable>(@_nonEphemeral _ other: UnsafePointer<T>) {
     _rawValue = other._rawValue
   }
 
@@ -215,7 +215,7 @@ extension UnsafeRawPointer {
   @_transparent
   @_preInverseGenerics
   @safe
-  public init?<T: ~Copyable>(@_nonEphemeral _ other: UnsafePointer<T>?) {
+  public init?<T: ~Copyable & ~Escapable>(@_nonEphemeral _ other: UnsafePointer<T>?) {
     guard let unwrapped = unsafe other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -262,7 +262,7 @@ extension UnsafeRawPointer {
   @_transparent
   @_preInverseGenerics
   @safe
-  public init<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
+  public init<T: ~Copyable & ~Escapable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
@@ -277,7 +277,7 @@ extension UnsafeRawPointer {
   @_transparent
   @_preInverseGenerics
   @safe
-  public init?<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
+  public init?<T: ~Copyable & ~Escapable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
     guard let unwrapped = unsafe other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -335,7 +335,7 @@ extension UnsafeRawPointer {
   @_transparent
   @_preInverseGenerics
   @discardableResult
-  public func bindMemory<T: ~Copyable>(
+  public func bindMemory<T: ~Copyable & ~Escapable>(
     to type: T.Type, capacity count: Int
   ) -> UnsafePointer<T> {
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
@@ -394,7 +394,7 @@ extension UnsafeRawPointer {
   ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
+  public func withMemoryRebound<T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
     _ body: (_ pointer: UnsafePointer<T>) throws(E) -> Result
@@ -421,7 +421,7 @@ extension UnsafeRawPointer {
   /// - Returns: A typed pointer to the same memory as this raw pointer.
   @_transparent
   @_preInverseGenerics
-  public func assumingMemoryBound<T: ~Copyable>(
+  public func assumingMemoryBound<T: ~Copyable & ~Escapable>(
     to: T.Type
   ) -> UnsafePointer<T> {
     return unsafe UnsafePointer<T>(_rawValue)
@@ -818,7 +818,7 @@ extension UnsafeMutableRawPointer {
   @_transparent
   @_preInverseGenerics
   @safe
-  public init<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
+  public init<T: ~Copyable & ~Escapable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
@@ -833,7 +833,7 @@ extension UnsafeMutableRawPointer {
   @_transparent
   @_preInverseGenerics
   @safe
-  public init?<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
+  public init?<T: ~Copyable & ~Escapable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
     guard let unwrapped = unsafe other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -958,7 +958,7 @@ extension UnsafeMutableRawPointer {
   @_transparent
   @_preInverseGenerics
   @discardableResult
-  public func bindMemory<T: ~Copyable>(
+  public func bindMemory<T: ~Copyable & ~Escapable>(
     to type: T.Type, capacity count: Int
   ) -> UnsafeMutablePointer<T> {
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
@@ -1015,7 +1015,7 @@ extension UnsafeMutableRawPointer {
   ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
+  public func withMemoryRebound<T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
     _ body: (_ pointer: UnsafeMutablePointer<T>) throws(E) -> Result
@@ -1042,7 +1042,7 @@ extension UnsafeMutableRawPointer {
   /// - Returns: A typed pointer to the same memory as this raw pointer.
   @_transparent
   @_preInverseGenerics
-  public func assumingMemoryBound<T: ~Copyable>(
+  public func assumingMemoryBound<T: ~Copyable & ~Escapable>(
     to: T.Type
   ) -> UnsafeMutablePointer<T> {
     return unsafe UnsafeMutablePointer<T>(_rawValue)
@@ -1079,7 +1079,7 @@ extension UnsafeMutableRawPointer {
   /// - Returns: A typed pointer to the memory referenced by this raw pointer.
   @discardableResult
   @_alwaysEmitIntoClient
-  public func initializeMemory<T: ~Copyable>(
+  public func initializeMemory<T: ~Copyable & ~Escapable>(
     as type: T.Type, to value: consuming T
   ) -> UnsafeMutablePointer<T> {
     Builtin.bindMemory(_rawValue, (1)._builtinWordValue, type)
@@ -1237,7 +1237,7 @@ extension UnsafeMutableRawPointer {
   @inlinable
   @_preInverseGenerics
   @discardableResult
-  public func moveInitializeMemory<T: ~Copyable>(
+  public func moveInitializeMemory<T: ~Copyable & ~Escapable>(
     as type: T.Type, from source: UnsafeMutablePointer<T>, count: Int
   ) -> UnsafeMutablePointer<T> {
     _debugPrecondition(
