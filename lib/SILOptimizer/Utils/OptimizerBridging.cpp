@@ -511,6 +511,13 @@ bool BridgedFunction::isConvertPointerToPointerArgument() const {
   return false;
 }
 
+bool BridgedFunction::isAddressor() const {
+  if (auto declRef = dyn_cast_or_null<AccessorDecl>(getFunction()->getDeclRef().getDecl())) {
+    return declRef->isAnyAddressor();
+  }
+  return false;
+}
+
 bool BridgedFunction::isAutodiffVJP() const {
   return swift::isDifferentiableFuncComponent(
       getFunction(), swift::AutoDiffFunctionComponent::VJP);
