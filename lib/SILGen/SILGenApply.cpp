@@ -3202,6 +3202,7 @@ done:
       // Otherwise, reset the current index adjustment.
       } else {
         indexAdjustment = 0;
+        indexAdjustmentSite = site;
       }
 
       assert(!siteArgs[argIndex] &&
