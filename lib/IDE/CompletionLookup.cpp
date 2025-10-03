@@ -693,7 +693,7 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
 
       // For a GenericFunctionType, we only want to substitute the
       // param/result types, as otherwise we might end up with a bad generic
-      // signature if there are UnresolvedTypes present in the base type. Note
+      // signature if there are ErrorTypes present in the base type. Note
       // we pass in DesugarMemberTypes so that we see the actual concrete type
       // witnesses instead of type alias types.
       if (auto *GFT = T->getAs<GenericFunctionType>()) {

@@ -2064,7 +2064,6 @@ private:
     return pass(ty, /*found=*/true);
   }
 
-  NEVER_VISIT(UnresolvedType)
   NEVER_VISIT(PlaceholderType)
   NEVER_VISIT(BuiltinType)
   NEVER_VISIT(BuiltinTupleType)

@@ -129,7 +129,7 @@ void ContextInfoCallbacks::readyForTypeChecking(SourceFile *SrcFile) {
   SmallVector<TypeContextInfoItem, 2> results;
 
   for (auto T : TypeCheckCallback.getTypes()) {
-    if (T->is<ErrorType>() || T->is<UnresolvedType>())
+    if (T->is<ErrorType>())
       continue;
 
     T = T->getRValueType();

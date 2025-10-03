@@ -519,7 +519,6 @@ void SubstitutionMap::verify(bool allowInvalid) const {
           !substType->is<PackElementType>() &&
           !substType->is<ArchetypeType>() &&
           !substType->isTypeVariableOrMember() &&
-          !substType->is<UnresolvedType>() &&
           !substType->is<PlaceholderType>() &&
           !substType->is<ErrorType>()) {
         ABORT([&](auto &out) {

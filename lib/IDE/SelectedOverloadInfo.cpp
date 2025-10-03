@@ -56,7 +56,7 @@ swift::ide::getSelectedOverloadInfo(const Solution &S,
         OverloadChoiceKind::KeyPathApplication) {
       auto Params = Result.ValueTy->getAs<AnyFunctionType>()->getParams();
       if (Params.size() == 1 &&
-          Params[0].getPlainType()->is<UnresolvedType>()) {
+          Params[0].getPlainType()->is<ErrorType>()) {
         auto *KPDecl = CS.getASTContext().getKeyPathDecl();
         Type KPTy =
             KPDecl->mapTypeIntoContext(KPDecl->getDeclaredInterfaceType());

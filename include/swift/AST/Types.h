@@ -141,24 +141,24 @@ public:
     /// This type expression contains a GenericTypeParamType.
     HasTypeParameter     = 0x04,
 
-    /// This type expression contains an UnresolvedType.
-    HasUnresolvedType    = 0x08,
-
     /// Whether this type expression contains an unbound generic type.
-    HasUnboundGeneric    = 0x10,
+    HasUnboundGeneric    = 0x08,
 
     /// This type expression contains an LValueType other than as a
     /// function input, and can be loaded to convert to an rvalue.
-    IsLValue             = 0x20,
+    IsLValue             = 0x10,
 
     /// This type expression contains an opened existential ArchetypeType.
-    HasOpenedExistential = 0x40,
+    HasOpenedExistential = 0x20,
 
     /// This type expression contains a DynamicSelf type.
-    HasDynamicSelf       = 0x80,
+    HasDynamicSelf       = 0x40,
 
     /// This type contains an Error type.
-    HasError             = 0x100,
+    HasError             = 0x80,
+
+    /// This type contains an Error type without an underlying original type.
+    HasBareError         = 0x100,
 
     /// This type contains a DependentMemberType.
     HasDependentMember   = 0x200,
@@ -225,14 +225,14 @@ public:
   /// Does a type with these properties have a type parameter somewhere in it?
   bool hasTypeParameter() const { return Bits & HasTypeParameter; }
 
-  /// Does a type with these properties have an unresolved type somewhere in it?
-  bool hasUnresolvedType() const { return Bits & HasUnresolvedType; }
-
   /// Is a type with these properties an lvalue?
   bool isLValue() const { return Bits & IsLValue; }
 
   /// Does this type contain an error?
   bool hasError() const { return Bits & HasError; }
+
+  /// Does this type contain an error without an original type?
+  bool hasBareError() const { return Bits & HasBareError; }
 
   /// Does this type contain a dependent member type, possibly with a
   /// non-type parameter base, such as a type variable or concrete type?
@@ -750,11 +750,6 @@ public:
   /// member root in a type variable.
   bool isTypeVariableOrMember();
 
-  /// Determine whether this type involves a UnresolvedType.
-  bool hasUnresolvedType() const {
-    return getRecursiveProperties().hasUnresolvedType();
-  }
-
   /// Determine whether this type involves a \c PlaceholderType.
   bool hasPlaceholder() const {
     return getRecursiveProperties().hasPlaceholder();
@@ -948,6 +943,16 @@ public:
   bool hasError() const {
     return getRecursiveProperties().hasError();
   }
+
+  /// Determine whether this type contains an error type without an
+  /// underlying original type, i.e prints as `_`.
+  bool hasBareError() const {
+    return getRecursiveProperties().hasBareError();
+  }
+
+  /// Whether this is a top-level ErrorType without an underlying original
+  /// type, i.e prints as `_`.
+  bool isBareErrorType() const;
 
   /// Does this type contain a dependent member type, possibly with a
   /// non-type parameter base, such as a type variable or concrete type?
@@ -1654,11 +1659,18 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalOrBoundGenericNominalType, AnyGenericType)
 /// have to emit further diagnostics to abort compilation.
 class ErrorType final : public TypeBase {
   friend class ASTContext;
+
+  static RecursiveTypeProperties getProperties(Type originalType) {
+    RecursiveTypeProperties props = RecursiveTypeProperties::HasError;
+    if (!originalType || originalType->hasBareError())
+      props |= RecursiveTypeProperties::HasBareError;
+
+    return props;
+  }
+
   // The Error type is always canonical.
-  ErrorType(ASTContext &C, Type originalType,
-            RecursiveTypeProperties properties)
-      : TypeBase(TypeKind::Error, &C, properties) {
-    assert(properties.hasError());
+  ErrorType(ASTContext &C, Type originalType)
+      : TypeBase(TypeKind::Error, &C, getProperties(originalType)) {
     if (originalType) {
       Bits.ErrorType.HasOriginalType = true;
       *reinterpret_cast<Type *>(this + 1) = originalType;
@@ -1689,25 +1701,6 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorType, Type)
-
-/// UnresolvedType - This represents a type variable that cannot be resolved to
-/// a concrete type because the expression is ambiguous.  This is produced when
-/// parsing expressions and producing diagnostics.  Any instance of this should
-/// cause the entire expression to be ambiguously typed.
-class UnresolvedType : public TypeBase {
-  friend class ASTContext;
-  // The Unresolved type is always canonical.
-  UnresolvedType(ASTContext &C)
-    : TypeBase(TypeKind::Unresolved, &C,
-       RecursiveTypeProperties(RecursiveTypeProperties::HasUnresolvedType)) { }
-public:
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Unresolved;
-  }
-};
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnresolvedType, Type)
-
   
 /// BuiltinType - An abstract class for all the builtin types.
 class BuiltinType : public TypeBase {
@@ -8122,6 +8115,17 @@ inline ASTContext &TypeBase::getASTContext() const {
 
   // If not, canonicalize it to get the Context.
   return *const_cast<ASTContext*>(getCanonicalType()->Context);
+}
+
+inline bool TypeBase::isBareErrorType() const {
+  auto *errTy = dyn_cast<ErrorType>(this);
+  if (!errTy)
+    return false;
+
+  // FIXME: We shouldn't need to check for a recursive bare error type, we can
+  // remove this once we flatten them.
+  auto originalTy = errTy->getOriginalType();
+  return !originalTy || originalTy->isBareErrorType();
 }
 
 // TODO: This will become redundant once InOutType is removed.

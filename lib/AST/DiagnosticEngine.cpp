@@ -983,11 +983,10 @@ static void formatDiagnosticArgument(StringRef Modifier,
       needsQualification = typeSpellingIsAmbiguous(type, Args, printOptions);
     }
 
-    // If a type has an unresolved type, print it with syntax sugar removed for
+    // If a type has a bare error type, print it with syntax sugar removed for
     // clarity. For example, print `Array<_>` instead of `[_]`.
-    if (type->hasUnresolvedType()) {
+    if (type->hasBareError())
       type = type->getWithoutSyntaxSugar();
-    }
 
     if (needsQualification &&
         isa<OpaqueTypeArchetypeType>(type.getPointer()) &&
