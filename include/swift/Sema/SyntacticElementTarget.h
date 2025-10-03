@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file defines the SyntacticElementTarget class.
+//  This file defines the SyntacticElementTarget class (a unit of
+//  type-checking).
 //
 //===----------------------------------------------------------------------===//
 
@@ -59,8 +60,8 @@ struct PackIterationInfo {
 /// within the constraint system.
 using ForEachStmtInfo = TaggedUnion<SequenceIterationInfo, PackIterationInfo>;
 
-/// Describes the target to which a constraint system's solution can be
-/// applied.
+/// Describes the target (a unit of type-checking) to which a constraint
+/// system's solution can be applied.
 class SyntacticElementTarget {
 public:
   enum class Kind {

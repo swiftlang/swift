@@ -4066,6 +4066,10 @@ namespace {
       elements.reserve(expr->getNumElements());
 
       if (auto *SVE = expr->getSingleValueStmtExpr()) {
+        if (SVE->getStmtKind() == SingleValueStmtExpr::Kind::For) {
+          auto &e = llvm::errs();
+          e << "for expr\n";
+        }
         // If we have a SingleValueStmtExpr, form a join of the branch types.
         SmallVector<Expr *, 4> scratch;
         auto branches = SVE->getResultExprs(scratch);

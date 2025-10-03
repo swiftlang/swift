@@ -1385,6 +1385,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
 
   Expr *visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
+    if (auto preamble = E->getForExpressionPreamble()) {
+      if (doIt(preamble->ForAccumulatorDecl)) {
+        return nullptr;
+      }
+
+      if (doIt(preamble->ForAccumulatorBinding)) {
+        return nullptr;
+      }
+    }
+
     if (auto *S = doIt(E->getStmt())) {
       E->setStmt(S);
     } else {
