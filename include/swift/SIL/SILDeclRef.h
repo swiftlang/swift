@@ -415,6 +415,10 @@ struct SILDeclRef {
   /// embedded linkage model.
   bool hasNonUniqueDefinition() const;
 
+  /// True if the declaration is explicitly marked as being exposed to a
+  /// foreign language or environment,
+  static bool declExposedToForeignLanguage(const ValueDecl *decl);
+
   /// True if the declaration should have a non-unique definition based on the
   /// embedded linkage model.
   static bool declHasNonUniqueDefinition(const ValueDecl *decl);
