@@ -4620,7 +4620,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
 
   // Figure out which nominal declaration this custom attribute refers to.
   auto *nominal = evaluateOrDefault(
-    Ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+    Ctx.evaluator, CustomAttrNominalRequest{attr, D}, nullptr);
 
   if (!nominal) {
     if (attr->isInvalid())
@@ -8786,8 +8786,7 @@ static void forEachCustomAttribute(
     auto *mutableAttr = const_cast<CustomAttr *>(attr);
 
     auto *nominal = evaluateOrDefault(
-        ctx.evaluator,
-        CustomAttrNominalRequest{mutableAttr, decl->getDeclContext()}, nullptr);
+        ctx.evaluator, CustomAttrNominalRequest{mutableAttr, decl}, nullptr);
     if (!nominal)
       continue;
 

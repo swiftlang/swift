@@ -231,6 +231,26 @@ void ExtendedNominalRequest::writeDependencySink(
 }
 
 //----------------------------------------------------------------------------//
+// CustomAttrOwner
+//----------------------------------------------------------------------------//
+
+DeclContext *CustomAttrOwner::getDeclContext() const {
+  if (auto *D = getAsDecl())
+    return D->getDeclContext();
+
+  return Owner.dyn_cast<DeclContext *>();
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const CustomAttrOwner &owner) {
+  if (auto *D = owner.getAsDecl()) {
+    simple_display(out, D);
+  } else {
+    simple_display(out, owner.getDeclContext());
+  }
+}
+
+//----------------------------------------------------------------------------//
 // Destructor computation.
 //----------------------------------------------------------------------------//
 

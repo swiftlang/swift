@@ -184,7 +184,7 @@ AttachedResultBuilderRequest::evaluate(Evaluator &evaluator,
     auto mutableAttr = const_cast<CustomAttr *>(attr);
     // Figure out which nominal declaration this custom attribute refers to.
     auto *nominal = evaluateOrDefault(ctx.evaluator,
-                                      CustomAttrNominalRequest{mutableAttr, dc},
+                                      CustomAttrNominalRequest{mutableAttr, decl},
                                       nullptr);
 
     if (!nominal)
