@@ -105,15 +105,16 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
   if (openedTypes == OpenedTypes.end())
     return SubstitutionMap();
 
+  auto &ctx = getConstraintSystem().getASTContext();
+
   SmallVector<Type, 4> replacementTypes;
   for (const auto &opened : openedTypes->second) {
     auto type = getFixedType(opened.second);
     if (opened.first->isParameterPack()) {
       if (type->is<PlaceholderType>()) {
-        auto &ctx = type->getASTContext();
-        type =
-        PackType::get(ctx, {PackExpansionType::get(ctx.TheUnresolvedType,
-                                                   ctx.TheUnresolvedType)});
+        type = PackType::get(
+            ctx,
+            {PackExpansionType::get(ErrorType::get(ctx), ErrorType::get(ctx))});
       } else if (!type->is<PackType>())
         type = PackType::getSingletonPackExpansion(type);
     }
@@ -126,8 +127,11 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
     auto replacement = original.subst(IFS);
     assert(!replacement->is<GenericTypeParamType>());
 
-    if (replacement->hasError() ||
-        isOpenedAnyObject(replacement) ||
+    if (replacement->hasError()) {
+      return ProtocolConformanceRef::forAbstract(ErrorType::get(replacement),
+                                                 protoType);
+    }
+    if (isOpenedAnyObject(replacement) ||
         replacement->is<GenericTypeParamType>()) {
       return ProtocolConformanceRef::forAbstract(replacement, protoType);
     }
@@ -7218,7 +7222,7 @@ Expr *ConstraintSystem::addImplicitLoadExpr(Expr *expr) {
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator) {
-  ASSERT(toType && !toType->hasError() && !toType->hasUnresolvedType() &&
+  ASSERT(toType && !toType->hasError() &&
          !toType->hasTypeVariableOrPlaceholder());
 
   // Diagnose conversions to invalid function types that couldn't be performed
@@ -10032,8 +10036,7 @@ ConstraintSystem::applySolution(Solution &solution,
   // unresolved types.
   {
     auto isValidType = [&](Type ty) {
-      return !ty->hasUnresolvedType() && !ty->hasError() &&
-             !ty->hasTypeVariableOrPlaceholder();
+      return !ty->hasError() && !ty->hasTypeVariableOrPlaceholder();
     };
     for (auto &[_, type] : solution.typeBindings) {
       ASSERT(isValidType(type) && "type binding has invalid type");

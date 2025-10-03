@@ -2320,7 +2320,6 @@ private:
     // The following types exist primarily for internal use by the type
     // checker.
     case TypeKind::Error:
-    case TypeKind::Unresolved:
     case TypeKind::LValue:
     case TypeKind::TypeVariable:
     case TypeKind::ErrorUnion:

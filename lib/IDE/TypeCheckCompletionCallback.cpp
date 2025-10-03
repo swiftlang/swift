@@ -27,7 +27,7 @@ Type swift::ide::getTypeForCompletion(const constraints::Solution &S,
   // Use the contextual type, unless it is still unresolved, in which case fall
   // back to getting the type from the expression.
   if (auto ContextualType = S.getContextualType(Node)) {
-    if (!ContextualType->hasUnresolvedType() &&
+    if (!ContextualType->hasError() &&
         !ContextualType->hasUnboundGenericType()) {
       return ContextualType;
     }
@@ -46,7 +46,7 @@ Type swift::ide::getTypeForCompletion(const constraints::Solution &S,
     Result = S.getResolvedType(Node);
   }
 
-  if (Result && Result->is<UnresolvedType>()) {
+  if (Result && Result->is<ErrorType>()) {
     Result = Type();
   }
   return Result;

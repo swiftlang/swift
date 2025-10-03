@@ -1886,7 +1886,7 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
   ASSERT(!(wantInterfaceType && resolvedType->hasPrimaryArchetype()));
 
   // We may have type variables and placeholders left over. These are solver
-  // allocated so cannot escape this function. Turn them into UnresolvedType.
+  // allocated so cannot escape this function. Turn them into ErrorType.
   // - Type variables may still be present from unresolved pack expansions where
   //   e.g the count type is a hole, so the pattern may never become a
   //   concrete type.
@@ -1900,7 +1900,7 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
 
           auto *typePtr = type.getPointer();
           if (isa<TypeVariableType>(typePtr) || isa<PlaceholderType>(typePtr))
-            return Type(ctx.TheUnresolvedType);
+            return ErrorType::get(ctx);
 
           return std::nullopt;
         });
@@ -4298,7 +4298,7 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     // If callee couldn't be resolved due to expression
     // issues e.g. it's a reference to an invalid member
     // let's just return here.
-    if (simplifyType(rawFnType)->is<UnresolvedType>())
+    if (simplifyType(rawFnType)->is<ErrorType>())
       return std::nullopt;
 
     // A tuple construction is spelled in the AST as a function call, but
