@@ -9,6 +9,7 @@
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: embedded_stdlib
 
 struct NoEscapeNoCopy: ~Escapable, ~Copyable {}
 
