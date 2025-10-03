@@ -750,7 +750,7 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
             theDecl, genericArgs.Types, NotForDefinition);
 
     response = IGF.emitGenericTypeMetadataAccessFunctionCall(
-        accessor, genericArgs.Values, request);
+        accessor, genericArgs.Values, request, genericArgs.hasPacks);
   }
 
   IGF.setScopedLocalTypeMetadata(theType, response);
@@ -2467,11 +2467,9 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM, llvm::Function *accessor,
   IGF.Builder.CreateRet(ret);
 }
 
-MetadataResponse
-IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
-                                              llvm::Function *accessFunction,
-                                              ArrayRef<llvm::Value *> args,
-                                              DynamicMetadataRequest request) {
+MetadataResponse IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
+    llvm::Function *accessFunction, ArrayRef<llvm::Value *> args,
+    DynamicMetadataRequest request, bool hasPacks) {
 
   SmallVector<llvm::Value *, 8> callArgs;
 
@@ -2495,7 +2493,7 @@ IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
                                  accessFunction, callArgs);
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
-  call->setMemoryEffects(allocatedArgsBuffer
+  call->setMemoryEffects(hasPacks || allocatedArgsBuffer
                              ? llvm::MemoryEffects::inaccessibleOrArgMemOnly()
                              : llvm::MemoryEffects::none());
 
