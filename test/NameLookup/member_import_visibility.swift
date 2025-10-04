@@ -99,6 +99,24 @@ extension X {
   func hasNestedInAInGenericReqs<T>(_ t: T) where T: ProtoNestedInA { }
   func hasNestedInBInGenericReqs<T>(_ t: T) where T: ProtoNestedInB { } // expected-member-visibility-error{{protocol 'ProtoNestedInB' is not available due to missing import of defining module 'members_B'}}
   func hasNestedInCInGenericReqs<T>(_ t: T) where T: ProtoNestedInC { }
+
+  func testMembersShadowingGlobals() {
+    shadowedByMemberOnXinA()
+    shadowedByMemberOnXinB() // expected-member-visibility-warning{{'shadowedByMemberOnXinB()' is deprecated}}
+    shadowedByMemberOnXinC()
+
+    _ = max(0, 1) // expected-ambiguity-error{{static member 'max' cannot be used on instance of type 'X'}}
+    // expected-ambiguity-error@-1{{cannot call value of non-function type 'Int'}}
+  }
+
+  static func testStaticMembersShadowingGlobals() {
+    shadowedByStaticMemberOnXinA()
+    shadowedByStaticMemberOnXinB() // expected-member-visibility-warning{{'shadowedByStaticMemberOnXinB()' is deprecated}}
+    shadowedByStaticMemberOnXinC()
+
+    _ = max(0, 1) // expected-ambiguity-error{{use of 'max' refers to instance method rather than global function 'max' in module 'Swift'}}
+    // expected-ambiguity-note@-1{{use 'Swift.' to reference the global function in module 'Swift'}}
+  }
 }
 
 extension X.NestedInA {}
