@@ -15,6 +15,12 @@ roots:
       - name: module.modulemap
         type: file
         external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\winsdk_shared.modulemap"
+  - name: "@UniversalCRTSdkDir@\\Include\\@UCRTVersion@\\winrt"
+    type: directory
+    contents:
+      - name: module.modulemap
+        type: file
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\WinRT.modulemap"
   - name: "@UniversalCRTSdkDir@\\Include\\@UCRTVersion@\\ucrt"
     type: directory
     contents:
