@@ -146,6 +146,8 @@ extension TypeProperties {
   public var isExistentialMetatype: Bool { rawType.bridged.isExistentialMetatypeType() }
   public var isDynamicSelf: Bool { rawType.bridged.isDynamicSelf()}
   public var isBox: Bool { rawType.bridged.isBox() }
+  public var isASTPack: Bool { rawType.bridged.isASTPack() }
+  public var isSILPack: Bool { rawType.bridged.isSILPack() }
 
   /// True if this is the type which represents an integer literal used in a type position.
   /// For example `N` in `struct T<let N: Int> {}`
@@ -241,6 +243,16 @@ extension TypeProperties {
   /// abstract, concrete or pack conformance, depending on the lookup type.
   public func checkConformance(to protocol: ProtocolDecl) -> Conformance {
     return Conformance(bridged: rawType.bridged.checkConformance(`protocol`.bridged))
+  }
+
+  public var containsPackExpansionType: Bool {
+    precondition(isASTPack)
+    return rawType.bridged.containsPackExpansionType()
+  }
+
+  public var numPackElements: Int {
+    precondition(isASTPack)
+    return rawType.bridged.getNumPackElements()
   }
 }
 
