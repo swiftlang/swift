@@ -14,3 +14,8 @@ module _GUIDDef {
   header "guiddef.h"
   export *
 }
+
+module WinAPIFamily {
+  header "winapifamily.h"
+  export *
+}
