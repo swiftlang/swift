@@ -1153,6 +1153,29 @@ bool SILDeclRef::hasNonUniqueDefinition() const {
   return false;
 }
 
+bool SILDeclRef::declExposedToForeignLanguage(const ValueDecl *decl) {
+  // @c / @_cdecl / @objc.
+  if (decl->getAttrs().hasAttribute<CDeclAttr>() ||
+      (decl->getAttrs().hasAttribute<ObjCAttr>() &&
+       decl->getDeclContext()->isModuleScopeContext())) {
+    return true;
+  }
+
+  // @_expose that isn't negated.
+  for (auto *expose : decl->getAttrs().getAttributes<ExposeAttr>()) {
+    switch (expose->getExposureKind()) {
+      case ExposureKind::Cxx:
+      case ExposureKind::Wasm:
+        return true;
+
+      case ExposureKind::NotCxx:
+        continue;
+    }
+  }
+
+  return false;
+}
+
 bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
   // This function only forces the issue in embedded.
   if (!decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
@@ -1166,6 +1189,28 @@ bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
   /// @_alwaysEmitIntoClient means that we have a non-unique definition.
   if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
     return true;
+
+  // If the declaration is marked in a manner that indicates that other
+  // systems will expect it to have a symbol, then it has a unique definition.
+  // There are a few cases here.
+
+  // - @implementation explicitly says that we are implementing something to
+  // be called from another language, so call it non-unique.
+  if (decl->isObjCImplementation())
+    return false;
+
+  // - @c / @_cdecl / @objc / @_expose expect to be called from another
+  // language if the symbol itself would be visible.
+  if (declExposedToForeignLanguage(decl) &&
+      decl->getFormalAccess() >= AccessLevel::Internal) {
+    return false;
+  }
+
+  // - @_section and @_used imply that external tools will look for this symbol.
+  if (decl->getAttrs().hasAttribute<SectionAttr>() ||
+      decl->getAttrs().hasAttribute<UsedAttr>()) {
+    return false;
+  }
 
   auto module = decl->getModuleContext();
   auto &ctx = module->getASTContext();

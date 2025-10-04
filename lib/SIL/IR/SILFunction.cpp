@@ -1069,6 +1069,18 @@ SILFunction::isPossiblyUsedExternally() const {
   if (markedAsUsed())
     return true;
 
+  // If this function is exposed to a foreign language, it can be used
+  // externally (by that language).
+  if (auto decl = getDeclRef().getDecl()) {
+    if (SILDeclRef::declExposedToForeignLanguage(decl))
+      return true;
+  }
+
+  // If this function was explicitly placed in a section or given a WebAssembly
+  // export, it can be used externally.
+  if (!Section.empty() || !WasmExportName.empty())
+    return true;
+
   if (shouldBePreservedForDebugger())
     return true;
 
