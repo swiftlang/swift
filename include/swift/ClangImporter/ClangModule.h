@@ -141,6 +141,10 @@ public:
   }
 };
 
+// Strips the inline namespaces from inner until we reach outer or a
+// non-inline namespace. Returns the stripped nominal type or null when
+// something unexpected happened during stripping.
+NominalType *stripInlineNamespaces(NominalType *outer, NominalType *inner);
 }
 
 #endif
