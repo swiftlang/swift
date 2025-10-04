@@ -1861,7 +1861,82 @@ void Solution::recordSingleArgMatchingChoice(ConstraintLocator *locator) {
        MatchCallArgumentResult::forArity(1)});
 }
 
-Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
+static GenericTypeParamType *
+getGenericParamForHoleTypeVar(TypeVariableType *tv, const Solution &S) {
+  auto getGenericParam = [](TypeVariableType *tv) -> GenericTypeParamType * {
+    auto *gp = tv->getImpl().getGenericParameter();
+    if (!gp)
+      return nullptr;
+    // Note we only consider generic parameters with underlying decls since for
+    // diagnostics we want something we can print, and for completion we want
+    // something we can extract a GenericEnvironment to produce an archetype.
+    return gp->getDecl() ? gp : nullptr;
+  };
+
+  if (auto *gp = getGenericParam(tv))
+    return gp;
+
+  // Sometimes we run into cases where the originator of a hole isn't for
+  // the generic parameter, instead it's for a member of its equivalence
+  // class. Handle this by looking through all the bindings to see if we have
+  // the same hole bound to a generic parameter type variable.
+  for (auto &binding : S.typeBindings) {
+    if (auto *hole = binding.second->getAs<PlaceholderType>()) {
+      if (hole->getOriginator().dyn_cast<TypeVariableType *>() == tv) {
+        if (auto *gp = getGenericParam(binding.first))
+          return gp;
+      }
+    }
+  }
+  return nullptr;
+}
+
+static Type replacePlaceholderType(PlaceholderType *placeholder,
+                                   const Solution &S, bool forCompletion) {
+  auto &ctx = S.getConstraintSystem().getASTContext();
+  auto origTy = [&]() -> Type {
+    auto orig = placeholder->getOriginator();
+    if (auto *tv = orig.dyn_cast<TypeVariableType *>())
+      return tv;
+    if (auto *dmt = orig.dyn_cast<DependentMemberType *>())
+      return dmt;
+    return Type();
+  }();
+  if (!origTy)
+    return ErrorType::get(ctx);
+
+  // Try replace the type variable with its original generic parameter type.
+  auto replacement = origTy.transformRec([&](Type ty) -> std::optional<Type> {
+    auto *tv = dyn_cast<TypeVariableType>(ty.getPointer());
+    if (!tv)
+      return std::nullopt;
+
+    auto *gp = getGenericParamForHoleTypeVar(tv, S);
+    if (!gp)
+      return std::nullopt;
+
+    return Type(gp);
+  });
+  if (isa<TypeVariableType>(replacement.getPointer()))
+    return ErrorType::get(ctx);
+
+  // For completion, we want to produce an archetype instead of an ErrorType
+  // for a top-level generic parameter.
+  // FIXME: This is pretty weird, we're producing a contextual type outside of
+  // the context it exists in. We ought to see if we can make the completion
+  // logic work with ErrorTypes instead.
+  if (forCompletion) {
+    if (auto *GP = replacement->getAs<GenericTypeParamType>())
+      return GP->getDecl()->getInnermostDeclContext()->mapTypeIntoContext(GP);
+  }
+  // Return an ErrorType with the replacement as the original type. Note that
+  // if we failed to replace a type variable with a generic parameter in a
+  // dependent member, `ErrorType::get` will fold it away.
+  return ErrorType::get(replacement);
+}
+
+Type Solution::simplifyType(Type type, bool wantInterfaceType,
+                            bool forCompletion) const {
   // If we've been asked for an interface type, start by mapping any archetypes
   // out of context.
   if (wantInterfaceType)
@@ -1899,7 +1974,11 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
             return type;
 
           auto *typePtr = type.getPointer();
-          if (isa<TypeVariableType>(typePtr) || isa<PlaceholderType>(typePtr))
+
+          if (auto *placeholder = dyn_cast<PlaceholderType>(typePtr))
+            return replacePlaceholderType(placeholder, *this, forCompletion);
+
+          if (isa<TypeVariableType>(typePtr))
             return ErrorType::get(ctx);
 
           return std::nullopt;
@@ -1911,136 +1990,8 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
 }
 
 Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
-  auto &CS = getConstraintSystem();
-
-  // First, instantiate all type variables that we know, but don't replace
-  // placeholders by unresolved types.
-  Ty = CS.simplifyTypeImpl(Ty, [this](TypeVariableType *typeVar) -> Type {
-    return getFixedType(typeVar);
-  });
-
-  // Next, replace all placeholders by type variables. We know that all type
-  // variables now in the type originate from placeholders.
-  Ty = Ty.transformRec([](Type type) -> std::optional<Type> {
-    if (auto *placeholder = type->getAs<PlaceholderType>()) {
-      if (auto *typeVar =
-              placeholder->getOriginator().dyn_cast<TypeVariableType *>()) {
-        return Type(typeVar);
-      }
-    }
-
-    return std::nullopt;
-  });
-
-  // Replace all type variables (which must come from placeholders) by their
-  // generic parameters. Because we call into simplifyTypeImpl
-  Ty = CS.simplifyTypeImpl(Ty, [&CS, this](TypeVariableType *typeVar) -> Type {
-    // Code completion depends on generic parameter type being represented in
-    // terms of `ArchetypeType` since it's easy to extract protocol requirements
-    // from it.
-    auto getTypeVarAsArchetype = [](TypeVariableType *typeVar) -> Type {
-      if (auto *GP = typeVar->getImpl().getGenericParameter()) {
-        if (auto *GPD = GP->getDecl()) {
-          return GPD->getInnermostDeclContext()->mapTypeIntoContext(GP);
-        }
-      }
-      return Type();
-    };
-
-    if (auto archetype = getTypeVarAsArchetype(typeVar)) {
-      return archetype;
-    }
-
-    // Sometimes the type variable itself doesn't have have an originator that
-    // can be replaced by an archetype but one of its equivalent type variable
-    // does.
-    // Search thorough all equivalent type variables, looking for one that can
-    // be replaced by a generic parameter.
-    std::vector<std::pair<TypeVariableType *, Type>> bindings(
-        typeBindings.begin(), typeBindings.end());
-    // Make sure we iterate the bindings in a deterministic order.
-    llvm::sort(bindings, [](const std::pair<TypeVariableType *, Type> &lhs,
-                            const std::pair<TypeVariableType *, Type> &rhs) {
-      return lhs.first->getID() < rhs.first->getID();
-    });
-    for (auto binding : bindings) {
-      if (auto placeholder = binding.second->getAs<PlaceholderType>()) {
-        if (placeholder->getOriginator().dyn_cast<TypeVariableType *>() ==
-            typeVar) {
-          if (auto archetype = getTypeVarAsArchetype(binding.first)) {
-            return archetype;
-          }
-        }
-      }
-    }
-
-    // When applying the logic below to get contextual types inside result
-    // builders, the code completion type variable is connected by a one-way
-    // constraint to a type variable in the buildBlock call, but that is not the
-    // type variable that represents the argument type. We need to find the type
-    // variable representing the argument to retrieve protocol requirements from
-    // it. Look for a ArgumentConversion constraint that allows us to retrieve
-    // the argument type var.
-    auto &cg = CS.getConstraintGraph();
-
-    // FIXME: The type variable is not going to be part of the constraint graph
-    // at this point unless it was created at the outermost decision level;
-    // otherwise it has already been rolled back! Work around this by creating
-    // an empty node if one doesn't exist.
-    cg.addTypeVariable(typeVar);
-
-    for (auto argConstraint : cg[typeVar].getConstraints()) {
-      if (argConstraint->getKind() == ConstraintKind::ArgumentConversion &&
-          argConstraint->getFirstType()->getRValueType()->isEqual(typeVar)) {
-        if (auto argTV =
-                argConstraint->getSecondType()->getAs<TypeVariableType>()) {
-          if (auto archetype = getTypeVarAsArchetype(argTV)) {
-            return archetype;
-          }
-        }
-      }
-    }
-
-    return typeVar;
-  });
-
-  // Logic to determine the contextual type inside buildBlock result builders:
-  //
-  // When completing inside a result builder, the result builder
-  //   @ViewBuilder var body: some View {
-  //     Text("Foo")
-  //     #^COMPLETE^#
-  //   }
-  // gets rewritten to
-  //   @ViewBuilder var body: some View {
-  //     let $__builder2: Text
-  //     let $__builder0 = Text("Foo")
-  //     let $__builder1 = #^COMPLETE^#
-  //     $__builder2 = ViewBuilder.buildBlock($__builder0, $__builder1)
-  //     return $__builder2
-  //   }
-  // Inside the constraint system
-  //     let $__builder1 = #^COMPLETE^#
-  // gets type checked without context, so we can't know the contextual type for
-  // the code completion token. But we know that $__builder1 (and thus the type
-  // of #^COMPLETE^#) is used as the second argument to ViewBuilder.buildBlock,
-  // so we can extract the contextual type from that call. To do this, figure
-  // out the type variable that is used for $__builder1 in the buildBlock call.
-  // This type variable is connected to the type variable of $__builder1's
-  // definition by a one-way constraint.
-  if (auto TV = Ty->getAs<TypeVariableType>()) {
-    for (auto constraint : CS.getConstraintGraph()[TV].getConstraints()) {
-      if (constraint->getKind() == ConstraintKind::OneWayEqual &&
-          constraint->getSecondType()->isEqual(TV)) {
-        return simplifyTypeForCodeCompletion(constraint->getFirstType());
-      }
-    }
-  }
-
-  // Remove any remaining type variables and placeholders
-  Ty = simplifyType(Ty);
-
-  return Ty->getRValueType();
+  return simplifyType(Ty, /*wantInterfaceType*/ false, /*forCompletion*/ true)
+      ->getRValueType();
 }
 
 template <typename T>
