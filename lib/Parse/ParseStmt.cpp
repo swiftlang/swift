@@ -474,7 +474,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         //       explicit '{' or '}', so the start and end locations should be
         //       the same as those of the result node, plus any junk consumed
         //       afterwards
-        auto Brace = BraceStmt::create(Context, Result.getStartLoc(),
+        auto Brace = BraceStmt::create(Context, StartLoc,
                                        Result, PreviousLoc, /*Implicit=*/true);
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);

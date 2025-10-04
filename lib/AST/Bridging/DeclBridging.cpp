@@ -32,17 +32,22 @@ using namespace swift;
 // MARK: DeclName
 //===----------------------------------------------------------------------===//
 
-BridgedDeclNameRef BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
-                                                   DeclBaseName baseName,
-                                                   BridgedArrayRef cLabels) {
+BridgedDeclNameRef
+BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
+                                swift::Identifier moduleSelector,
+                                DeclBaseName baseName,
+                                BridgedArrayRef cLabels) {
   ASTContext &context = cContext.unbridged();
   auto labels = cLabels.unbridged<swift::Identifier>();
 
-  return DeclNameRef(DeclName(context, baseName, labels));
+  return DeclNameRef(context, moduleSelector, baseName, labels);
 }
 
-BridgedDeclNameRef BridgedDeclNameRef_createParsed(DeclBaseName baseName) {
-  return DeclNameRef(baseName);
+BridgedDeclNameRef
+BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
+                                swift::Identifier moduleSelector,
+                                DeclBaseName baseName) {
+  return DeclNameRef(cContext.unbridged(), moduleSelector, baseName);
 }
 
 BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(BridgedASTContext cContext,

@@ -1978,7 +1978,8 @@ namespace {
 
       printFlag(!ABIRoleInfo(D).providesAPI(), "abi_only");
 
-      printSourceRange(D->getSourceRange(), &D->getASTContext());
+      if (D->getStartLoc().isValid() && D->getEndLoc().isValid())
+        printSourceRange(D->getSourceRange(), &D->getASTContext());
       printFlag(D->TrailingSemiLoc.isValid(), "trailing_semi",
                 DeclModifierColor);
 
