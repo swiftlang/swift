@@ -1561,6 +1561,11 @@ bool DiagnosticVerifier::finishProcessing() {
     // For <unknown>, all errors are unexpected.
     Result.HadUnexpectedDiag |= HadError;
   }
+  if (!IgnoreUnrelated) {
+    bool HadError = verifyUnrelated(CapturedDiagnostics);
+    Result.HadError |= HadError;
+    Result.HadUnexpectedDiag |= HadError;
+  }
 
   if (Result.HadUnexpectedDiag)
     printRemainingDiagnostics();
