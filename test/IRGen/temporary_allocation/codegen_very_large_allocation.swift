@@ -10,6 +10,10 @@
 // On iOS _stdlib_isOSVersionAtLeast() is @_transparent, which affects codegen.
 // UNSUPPORTED: OS=ios
 
+// When macCatalyst support is enabled, isOSVersionAtLeast transforms into
+// isOSVersionAtLeastOrVariantVersionAtLeast
+// UNSUPPORTED: maccatalyst_support
+
 @_silgen_name("blackHole")
 func blackHole(_ value: UnsafeMutableRawPointer?) -> Void
 
