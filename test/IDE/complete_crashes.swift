@@ -381,6 +381,6 @@ extension P_80635105 {
 func test_80635105() {
   let fn = { x in
     S_80635105.#^RDAR_80635105^#
-    // RDAR_80635105: Decl[InstanceMethod]/Super: foo({#(self): S_80635105<_>#})[#(P_80635105.T) -> Void#]; name=foo
+    // RDAR_80635105: Decl[InstanceMethod]/Super: foo({#(self): S_80635105<T>#})[#(P_80635105.T) -> Void#]; name=foo
   }
 }

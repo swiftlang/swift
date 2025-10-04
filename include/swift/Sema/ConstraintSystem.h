@@ -1677,7 +1677,11 @@ public:
   /// \param wantInterfaceType If true, maps the resulting type out of context,
   /// and replaces type variables for opened generic parameters with the
   /// generic parameter types. Should only be used for diagnostic logic.
-  Type simplifyType(Type type, bool wantInterfaceType = false) const;
+  /// \param forCompletion If true, will produce archetypes instead of
+  /// ErrorTypes for generic parameter originators, which is what completion
+  /// currently expects for the code completion token.
+  Type simplifyType(Type type, bool wantInterfaceType = false,
+                    bool forCompletion = false) const;
 
   // To aid code completion, we need to attempt to convert type placeholders
   // back into underlying generic parameters if possible, since type
