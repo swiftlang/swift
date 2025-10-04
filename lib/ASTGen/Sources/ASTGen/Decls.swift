@@ -67,6 +67,9 @@ extension ASTGenVisitor {
       return self.generate(subscriptDecl: node).asDecl
     case .typeAliasDecl(let node):
       return self.generate(typeAliasDecl: node)?.asDecl
+    case .unexpectedCodeDecl:
+      // Ignore unexpected code.
+      return nil
     case .variableDecl(let node):
       return self.generate(variableDecl: node)
     case .usingDecl(let node):
