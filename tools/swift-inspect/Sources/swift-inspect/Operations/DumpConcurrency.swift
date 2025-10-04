@@ -10,12 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+#if !os(Linux)
 
 import ArgumentParser
 import SwiftRemoteMirror
 #if canImport(string_h)
 import string_h
+#endif
+#if canImport(ucrt)
+import ucrt
 #endif
 
 struct DumpConcurrency: ParsableCommand {
@@ -28,7 +31,7 @@ struct DumpConcurrency: ParsableCommand {
   func run() throws {
     try inspect(options: options) { process in
       let dumper = ConcurrencyDumper(context: process.context,
-                                     process: process as! DarwinRemoteProcess)
+                                     process: process)
       dumper.dumpTasks()
       dumper.dumpActors()
       dumper.dumpThreads()
@@ -38,7 +41,7 @@ struct DumpConcurrency: ParsableCommand {
 
 fileprivate class ConcurrencyDumper {
   let context: SwiftReflectionContextRef
-  let process: DarwinRemoteProcess
+  let process: any RemoteProcess
   let jobMetadata: swift_reflection_ptr_t?
   let taskMetadata: swift_reflection_ptr_t?
 
@@ -87,13 +90,18 @@ fileprivate class ConcurrencyDumper {
   var metadataIsActorCache: [swift_reflection_ptr_t: Bool] = [:]
   var metadataNameCache: [swift_reflection_ptr_t: String?] = [:]
 
-  init(context: SwiftReflectionContextRef, process: DarwinRemoteProcess) {
+  init(context: SwiftReflectionContextRef, process: any RemoteProcess) {
     self.context = context
     self.process = process
 
     func getMetadata(symbolName: String) -> swift_reflection_ptr_t? {
-      if let addr = process.getAddr(symbolName: symbolName),
-         let ptr = process.read(address: addr, size: MemoryLayout<UInt>.size) {
+      let GetSymbolAddress: RemoteProcess.GetSymbolAddressFunction =
+            type(of: process).GetSymbolAddress
+      let ReadBytes: RemoteProcess.ReadBytesFunction =
+            type(of: process).ReadBytes
+      let this = process.toOpaqueRef()
+      let addr = GetSymbolAddress(this, symbolName, UInt64(symbolName.utf8.count))
+      if addr != 0, let ptr = ReadBytes(this, addr, UInt64(MemoryLayout<UInt>.size), nil) {
         return swift_reflection_ptr_t(ptr.load(as: UInt.self))
       }
       return nil
@@ -107,6 +115,7 @@ fileprivate class ConcurrencyDumper {
 
     process.iterateHeap { (pointer, size) in
       let metadata = swift_reflection_ptr_t(swift_reflection_metadataForObject(context, UInt(pointer)))
+      if metadata == 0 || metadata == .max { return }
       if metadata == jobMetadata {
         result.jobs.append(swift_reflection_ptr_t(pointer))
       } else if metadata == taskMetadata {
@@ -257,11 +266,12 @@ fileprivate class ConcurrencyDumper {
   }
 
   func symbolicateBacktracePointer(ptr: swift_reflection_ptr_t) -> String {
-    guard let name = process.symbolicate(swift_addr_t(ptr)).symbol else {
+    let info = process.symbolicate(swift_addr_t(ptr))
+    guard let name = info.symbol else {
       return "<\(hex: ptr)>"
     }
 
-    return remove(from: name, upTo: " resume partial function for ")
+    return remove(from: name, upTo: " resume partial function for ") + (info.offset.map { " + 0x\(String($0, radix: 16))" } ?? "") + " in \(info.module ?? "<unknown>")"
   }
 
   func decodeTaskFlags(_ info: TaskInfo) -> String {
@@ -347,7 +357,6 @@ fileprivate class ConcurrencyDumper {
       }
 
       let runJobSymbol = process.symbolicate(swift_addr_t(task.runJob))
-      let runJobLibrary = runJobSymbol.module ?? "<unknown>"
 
       let symbolicatedBacktrace = task.asyncBacktrace.map(symbolicateBacktracePointer)
 
@@ -360,11 +369,14 @@ fileprivate class ConcurrencyDumper {
       if let parent = task.parent {
         output("parent: \(hex: parent)")
       }
+      // Mach ports are Darwin-specific
+      #if canImport(Darwin)
       if let threadPort = task.threadPort, threadPort != 0 {
-        if let threadID = process.getThreadID(remotePort: threadPort) {
+        if let threadID = (process as! DarwinRemoteProcess).getThreadID(remotePort: threadPort) {
           output("waiting on thread: port=\(hex: threadPort) id=\(hex: threadID)")
         }
       }
+      #endif
 
       if let first = symbolicatedBacktrace.first {
         output("async backtrace: \(first)")
@@ -373,7 +385,7 @@ fileprivate class ConcurrencyDumper {
         }
       }
 
-      output("resume function: \(symbolicateBacktracePointer(ptr: task.runJob)) in \(runJobLibrary)")
+      output("resume function: \(symbolicateBacktracePointer(ptr: task.runJob))")
       output("task allocator: \(task.allocatorTotalSize) bytes in \(task.allocatorTotalChunks) chunks")
 
       if task.childTasks.count > 0 {
@@ -404,13 +416,16 @@ fileprivate class ConcurrencyDumper {
       let flags = decodeActorFlags(info)
 
       print("  \(hex: actor) \(metadataName) state=\(flags.state) flags=\(flags.flags) maxPriority=\(hex: flags.maxPriority)")
+      // Mach ports are Darwin-specific
+      #if canImport(Darwin)
       if info.HasThreadPort && info.ThreadPort != 0 {
-        if let threadID = process.getThreadID(remotePort: info.ThreadPort) {
+        if let threadID = (process as! DarwinRemoteProcess).getThreadID(remotePort: info.ThreadPort) {
           print("    waiting on thread: port=\(hex: info.ThreadPort) id=\(hex: threadID)")
         } else {
           print("    waiting on thread: port=\(hex: info.ThreadPort) (unknown thread ID)")
         }
       }
+      #endif
 
       func jobStr(_ job: swift_reflection_ptr_t) -> String {
         if let task = tasks[job] {
