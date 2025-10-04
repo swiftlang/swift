@@ -214,18 +214,22 @@ public enum _DebuggerSupport {
   
     print(String(repeating: " ", count: indent), terminator: "", to: &target)
 
-    // Do not expand types that conform to Custom(Debug)StringConvertible,
-    // unless the type also conform to CustomReflectable.
-    let isCustomStringConvertible = false
+    // 1. Do not expand classes, unless they conform to CustomReflectable.
+    // 2. Do not expand value types that conform to CustomStringConvertible
+    //    or CustomDebugStringConvertible, unless the type also conform to
+    //    CustomReflectable.
+    let isNonClass = mirror.displayStyle != .`class`
+    let isStringConvertible: Bool
     let isCustomReflectable: Bool
     if let value = value {
       isCustomReflectable = value is CustomReflectable
-      isCustomStringConvertible =
+      isStringConvertible =
         value is CustomStringConvertible || value is CustomDebugStringConvertible
     } else {
       isCustomReflectable = true
+      isStringConvertible = false
     }
-    let willExpand = isCustomReflectable || !isCustomStringConvertible
+    let willExpand = (isNonClass && !isStringConvertible) || isCustomReflectable
 
     let count = mirror.children.count
     let bullet = isRoot && (count == 0 || !willExpand) ? ""
