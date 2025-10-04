@@ -19,11 +19,11 @@ func attributedInOutFunc(x: inout @convention(c) () -> Int32) {} // expected-not
 attributedInOutFunc() // expected-error {{missing argument for parameter 'x' in call}} {{21-21=x: &<#@convention(c) () -> Int32#>}}
 
 func genericFunc1<T>(x: T) {} // expected-note * {{here}}
-genericFunc1() // expected-error {{missing argument for parameter 'x' in call}} {{14-14=x: <#_#>}}
+genericFunc1() // expected-error {{missing argument for parameter 'x' in call}} {{14-14=x: <#T#>}}
 
 protocol P {}
 func genericFunc2<T : P>(x: T) {} // expected-note * {{here}}
-genericFunc2() // expected-error {{missing argument for parameter 'x' in call}} {{14-14=x: <#_#>}}
+genericFunc2() // expected-error {{missing argument for parameter 'x' in call}} {{14-14=x: <#T#>}}
 
 typealias MyInt = Int
 func aliasedFunc(x: MyInt) {} // expected-note * {{here}}

@@ -1861,6 +1861,71 @@ void Solution::recordSingleArgMatchingChoice(ConstraintLocator *locator) {
        MatchCallArgumentResult::forArity(1)});
 }
 
+static GenericTypeParamType *
+getGenericParamForHoleTypeVar(TypeVariableType *tv, const Solution &S) {
+  auto getGenericParam = [](TypeVariableType *tv) -> GenericTypeParamType * {
+    auto *gp = tv->getImpl().getGenericParameter();
+    if (!gp)
+      return nullptr;
+    // Note we only consider generic parameters with underlying decls since for
+    // diagnostics we want something we can print, and for completion we want
+    // something we can extract a GenericEnvironment to produce an archetype.
+    return gp->getDecl() ? gp : nullptr;
+  };
+
+  if (auto *gp = getGenericParam(tv))
+    return gp;
+
+  // Sometimes we run into cases where the originator of a hole isn't for
+  // the generic parameter, instead it's for a member of its equivalence
+  // class. Handle this by looking through all the bindings to see if we have
+  // the same hole bound to a generic parameter type variable.
+  for (auto &binding : S.typeBindings) {
+    if (auto *hole = binding.second->getAs<PlaceholderType>()) {
+      if (hole->getOriginator().dyn_cast<TypeVariableType *>() == tv) {
+        if (auto *gp = getGenericParam(binding.first))
+          return gp;
+      }
+    }
+  }
+  return nullptr;
+}
+
+static Type replacePlaceholderType(PlaceholderType *placeholder,
+                                   const Solution &S) {
+  auto &ctx = S.getConstraintSystem().getASTContext();
+  auto origTy = [&]() -> Type {
+    auto orig = placeholder->getOriginator();
+    if (auto *tv = orig.dyn_cast<TypeVariableType *>())
+      return tv;
+    if (auto *dmt = orig.dyn_cast<DependentMemberType *>())
+      return dmt;
+    return Type();
+  }();
+  if (!origTy)
+    return ErrorType::get(ctx);
+
+  // Try replace the type variable with its original generic parameter type.
+  auto replacement = origTy.transformRec([&](Type ty) -> std::optional<Type> {
+    auto *tv = dyn_cast<TypeVariableType>(ty.getPointer());
+    if (!tv)
+      return std::nullopt;
+
+    auto *gp = getGenericParamForHoleTypeVar(tv, S);
+    if (!gp)
+      return std::nullopt;
+
+    return Type(gp);
+  });
+  if (isa<TypeVariableType>(replacement.getPointer()))
+    return ErrorType::get(ctx);
+
+  // Return an ErrorType with the replacement as the original type. Note that
+  // if we failed to replace a type variable with a generic parameter in a
+  // dependent member, `ErrorType::get` will fold it away.
+  return ErrorType::get(replacement);
+}
+
 Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
   // If we've been asked for an interface type, start by mapping any archetypes
   // out of context.
@@ -1899,7 +1964,11 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
             return type;
 
           auto *typePtr = type.getPointer();
-          if (isa<TypeVariableType>(typePtr) || isa<PlaceholderType>(typePtr))
+
+          if (auto *placeholder = dyn_cast<PlaceholderType>(typePtr))
+            return replacePlaceholderType(placeholder, *this);
+
+          if (isa<TypeVariableType>(typePtr))
             return ErrorType::get(ctx);
 
           return std::nullopt;
