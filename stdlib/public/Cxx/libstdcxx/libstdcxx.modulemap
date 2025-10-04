@@ -42,6 +42,7 @@ module std {
   header "ostream"
   header "queue"
   header "set"
+  header "span"
   header "sstream"
   header "stack"
   header "stdexcept"
