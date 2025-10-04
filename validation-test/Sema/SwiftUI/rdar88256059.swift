@@ -9,7 +9,7 @@ struct MyView: View {
 
   var body: some View {
     Table(self.data) {
-      // expected-error@-1 {{expected expression in result builder 'TableColumnBuilder'}} {{23-23=<#result#>}}
+      // expected-error@-1 {{expected expression of type 'Columns' in result builder 'TableColumnBuilder'}} {{23-23=<#T##Columns#>}}
     }
   }
 }

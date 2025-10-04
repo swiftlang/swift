@@ -12,10 +12,10 @@ struct MyStruct<T> {
 func test1() {
   let _ = MyStruct #^METATYPE_UNRESOLVED^#
 // METATYPE_UNRESOLVED: Begin completions, 4 items
-// METATYPE_UNRESOLVED-DAG: Decl[Subscript]/CurrNominal:        [{#(x): Int#}, {#static: _#}][#MyStruct<_>#];
-// METATYPE_UNRESOLVED-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ()[#MyStruct<_>#];
-// METATYPE_UNRESOLVED-DAG: Keyword[self]/CurrNominal:          .self[#MyStruct<_>.Type#];
-// METATYPE_UNRESOLVED-DAG: Keyword/CurrNominal:                .Type[#MyStruct<_>.Type#];
+// METATYPE_UNRESOLVED-DAG: Decl[Subscript]/CurrNominal:        [{#(x): Int#}, {#static: T#}][#MyStruct<T>#];
+// METATYPE_UNRESOLVED-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ()[#MyStruct<T>#];
+// METATYPE_UNRESOLVED-DAG: Keyword[self]/CurrNominal:          .self[#MyStruct<T>.Type#];
+// METATYPE_UNRESOLVED-DAG: Keyword/CurrNominal:                .Type[#MyStruct<T>.Type#];
 
   let _ = MyStruct[#^METATYPE_UNRESOLVED_BRACKET^#
 // METATYPE_UNRESOLVED_BRACKET-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]:        ['[']{#(x): Int#}, {#static: T#}[']'][#MyStruct<T>#];

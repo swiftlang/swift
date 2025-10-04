@@ -240,10 +240,10 @@ func patternInstantiationConcreteValid() {
 
 func patternInstantiationConcreteInvalid() {
   let _: Set<Int> = patternInstantiationTupleTest1()
-  // expected-error@-1 {{cannot convert value of type '(repeat Array<_>)' to specified type 'Set<Int>'}}
+  // expected-error@-1 {{cannot convert value of type 'Array<_>' to specified type 'Set<Int>'}}
   // expected-error@-2 {{could not infer pack element #0 from context}}
 
-  let _: (Array<Int>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{'(repeat Array<Int, _>)' is not convertible to '(Array<Int>, Set<String>)', tuples have a different number of elements}}
+  let _: (Array<Int>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{cannot convert value of type '(Array<Int>, Array<_>)' to specified type '(Array<Int>, Set<String>)'}}
   // expected-error@-1 {{could not infer pack element #1 from context}}
 }
 
@@ -274,7 +274,7 @@ func patternInstantiationGenericInvalid<each T: Hashable>(t: repeat each T) {
   let _: (repeat Set<each T>) = patternInstantiationTupleTest1() // expected-error {{cannot convert value of type '(repeat Array<each T>)' to specified type '(repeat Set<each T>)}}
   // expected-error@-1 {{generic parameter 'each T' could not be inferred}}
 
-  let _: (repeat Array<each T>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{'(repeat Array<repeat each T, _>)' is not convertible to '(repeat Array<each T>, Set<String>)', tuples have a different number of elements}}
+  let _: (repeat Array<each T>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{cannot convert value of type '(repeat Array<each T>, Array<_>)' to specified type '(repeat Array<each T>, Set<String>)'}}
   // expected-error@-1 {{could not infer pack element #1 from context}}
 }
 
