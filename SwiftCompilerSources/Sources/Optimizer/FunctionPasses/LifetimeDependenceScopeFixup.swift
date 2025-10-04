@@ -744,10 +744,9 @@ extension ScopeExtension {
 
     // Append each scope that needs extension to scopesToExtend from the inner to the outer scope.
     for extScope in scopes.reversed() {
-      // An outer scope might not originally cover one of its inner scopes. Therefore, extend 'extendedUseRange' to to
-      // cover this scope's end instructions. The extended scope must at least cover the original scopes because the
-      // original scopes may protect other operations.
       var mustExtend = false
+      // Iterating over scopeEndInst ignores unreachable paths which may not include the dealloc_stack. This is fine
+      // because the stack allocation effectively covers the entire unreachable path.
       for scopeEndInst in extScope.endInstructions {
         switch extendedUseRange.overlaps(pathBegin: extScope.firstInstruction, pathEnd: scopeEndInst, context) {
         case .containsPath, .containsEnd, .disjoint:
@@ -757,6 +756,10 @@ extension ScopeExtension {
           break
         case .containsBegin, .overlappedByPath:
           // containsBegin can occur when the extendable scope has the same begin as the use range.
+          //
+          // An outer scope might not originally cover one of its inner scopes. Therefore, extend 'extendedUseRange' to
+          // to cover this scope's end instructions. The extended scope must at least cover the original scopes because
+          // the original scopes may protect other operations.
           extendedUseRange.insert(scopeEndInst)
           break
         }
