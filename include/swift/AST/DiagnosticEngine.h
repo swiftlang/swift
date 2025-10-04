@@ -48,6 +48,8 @@ namespace swift {
   class FuncDecl;
   class SourceManager;
   class SourceFile;
+  class ParamDecl;
+  class AnyPattern;
 
   /// Enumeration describing all of possible diagnostics.
   ///
