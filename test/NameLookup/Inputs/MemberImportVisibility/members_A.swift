@@ -16,6 +16,24 @@ infix operator <<<
 infix operator >>>
 infix operator <>
 
+@available(*, deprecated)
+public func shadowedByMemberOnXinA() { }
+
+@available(*, deprecated)
+public func shadowedByMemberOnXinB() { }
+
+@available(*, deprecated)
+public func shadowedByMemberOnXinC() { }
+
+@available(*, deprecated)
+public func shadowedByStaticMemberOnXinA() { }
+
+@available(*, deprecated)
+public func shadowedByStaticMemberOnXinB() { }
+
+@available(*, deprecated)
+public func shadowedByStaticMemberOnXinC() { }
+
 extension X {
   public func XinA() { }
 
@@ -28,6 +46,9 @@ extension X {
 
   public struct NestedInA {}
   public protocol ProtoNestedInA {}
+
+  public func shadowedByMemberOnXinA() { }
+  public static func shadowedByStaticMemberOnXinA() { }
 }
 
 extension Y {

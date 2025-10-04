@@ -10,6 +10,9 @@ extension X {
 
   public var propXinC: Bool { return true }
 
+  public func shadowedByMemberOnXinC() { }
+  public static func shadowedByStaticMemberOnXinC() { }
+
   public static func <>(a: Self, b: Self) -> Self { a }
 
   public struct NestedInC {}

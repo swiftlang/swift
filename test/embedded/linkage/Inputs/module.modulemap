@@ -1,3 +1,7 @@
 module CDependency {
   header "CHeader.h"
 }
+
+module MyModuleExports {
+  header "MyModuleExports.h"
+}
