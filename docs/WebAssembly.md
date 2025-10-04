@@ -19,15 +19,25 @@ one wouldn't want end users to download multi-megabyte binaries.
 ## Building Swift SDK for WebAssembly
 
 The [Swift SDK](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0387-cross-compilation-destinations.md)
-for WebAssembly is built using the following command:
+for WebAssembly is built and tested using the following command:
 
 ```bash
-./utils/build-script --build-wasm-stdlib
+./utils/build-script --build-wasm-stdlib --wasmkit --install-llvm --install-swift --swiftpm --install-swiftpm \
+  --libcxx --install-libcxx --llbuild --install-llbuild --swift-testing --install-swift-testing \
+  --swift-testing-macros --install-swift-testing-macros --build-embedded-stdlib --build-embedded-stdlib-cross-compiling \
+  '--llvm-install-components=llvm-ar;llvm-nm;llvm-ranlib;llvm-cov;llvm-profdata;llvm-objdump;llvm-objcopy;llvm-symbolizer;IndexStore;clang;clang-resource-headers;builtins;runtimes;clangd;libclang;dsymutil;LTO;clang-features-file;lld'
 ```
 
 This command will build the Swift compiler for the host platform and then build the Swift standard library
-for WebAssembly targets. The resulting Swift SDK `.artifactbundle` will be placed in the `../swift-sdk-generator/Bundles`
-directory.
+for WebAssembly targets. Toolchain `lit.py` tests will run on the freshly built stdlib, both for embedded and non-embedded
+builds.
+
+The resulting Swift SDK `.artifactbundle` will be placed in the `../swift-sdk-generator/Bundles`
+directory. Install it using the following command (assuming you're in the `swift` directory of `update-checkout` clones):
+
+```
+swift sdk install ../swift-sdk-generator/Bundles/swift-DEVELOPMENT-SNAPSHOT_wasm.artifactbundle
+```
 
 ## Building Swift SDK for WebAssembly without building the compiler
 
