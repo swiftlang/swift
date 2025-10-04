@@ -62,7 +62,7 @@ func mainActorIsolated() {
   // CHECK: rewritten=current_context_isolation_expr
   // CHECK-NEXT: inject_into_optional
   // CHECK-NEXT: erasure_expr
-  // CHECK: member_ref_expr type="MainActor" location=@__swiftmacro_{{.*}} decl="_Concurrency.(file).MainActor.shared"
+  // CHECK: member_ref_expr type="MainActor" location=@__swiftmacro_{{.*}} decl="_Concurrency.(file).MainActor.shared{{.*}}"
   // CHECK-NEXT: type_expr implicit type="MainActor.Type"
   _ = #isolation
 }

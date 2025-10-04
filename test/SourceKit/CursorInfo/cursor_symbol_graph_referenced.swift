@@ -51,7 +51,7 @@ extension Parent {
 // GLOBAL:      SYMBOL GRAPH END
 //
 // GLOBAL:      REFERENCED DECLS BEGIN
-// GLOBAL-NEXT: [[Int_USR]] | public | <empty> | Swift | System | NonSPI | source.lang.swift
+// GLOBAL-NEXT: [[Int_USR]] | public | {{.*}} | Swift | System | NonSPI | source.lang.swift
 // GLOBAL-NEXT:   Int swift.struct [[Int_USR]]
 // GLOBAL-NEXT: REFERENCED DECLS END
 
@@ -127,7 +127,7 @@ extension Parent {
 // GENERIC:      SYMBOL GRAPH END
 //
 // GENERIC:      REFERENCED DECLS BEGIN
-// GENERIC-NEXT: [[Equatable_USR]] | public | <empty> | Swift | System | NonSPI | source.lang.swift
+// GENERIC-NEXT: [[Equatable_USR]] | public | {{.*}} | Swift | System | NonSPI | source.lang.swift
 // GENERIC-NEXT:   Equatable swift.protocol [[Equatable_USR]]
 // GENERIC-NEXT: REFERENCED DECLS END
 
@@ -220,7 +220,7 @@ extension Parent {
 // NESTED-NEXT: [[Inner_USR]] | internal | {{.*}}cursor_symbol_graph_referenced.swift | cursor_symbol_graph_referenced | User | NonSPI | source.lang.swift
 // NESTED-NEXT:   Parent swift.struct s:30cursor_symbol_graph_referenced6ParentV
 // NESTED-NEXT:   Inner swift.struct [[Inner_USR]]
-// NESTED-NEXT: [[Array_USR]] | public | <empty> | Swift | System | NonSPI | source.lang.swift
+// NESTED-NEXT: [[Array_USR]] | public | {{.*}} | Swift | System | NonSPI | source.lang.swift
 // NESTED-NEXT:   Array swift.struct [[Array_USR]]
 // NESTED-NEXT: [[ExtInner_USR]] | internal | {{.*}}cursor_symbol_graph_referenced.swift | cursor_symbol_graph_referenced | User | NonSPI | source.lang.swift
 // NESTED-NEXT:   Parent swift.struct s:30cursor_symbol_graph_referenced6ParentV

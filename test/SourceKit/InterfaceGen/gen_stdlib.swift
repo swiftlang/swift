@@ -29,7 +29,7 @@ var x: Int
 // RUN: %sourcekitd-test -req=interface-gen-open -module Swift \
 // RUN:   == -req=cursor -pos=2:8 %s -- %s | %FileCheck -check-prefix=CHECK1 %s
 
-// CHECK1:      source.lang.swift.ref.struct ()
+// CHECK1:      source.lang.swift.ref.struct ({{.*}})
 // CHECK1-NEXT: Int
 // CHECK1-NEXT: s:Si
 // CHECK1-NEXT: source.lang.swift
