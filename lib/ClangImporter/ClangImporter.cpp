@@ -6689,15 +6689,23 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
   else
     swiftName = func->getName();
 
-  NLOptions options = NL_IgnoreAccessControl | NL_IgnoreMissingImports;
   if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
+    NLOptions options = NL_IgnoreAccessControl | NL_IgnoreMissingImports;
     ty->lookupQualified({ ty }, DeclNameRef(swiftName), func->getLoc(),
                         NL_QualifiedDefault | options, results);
   }
   else {
-    auto mod = func->getDeclContext()->getParentModule();
-    mod->lookupQualified(mod, DeclNameRef(swiftName), func->getLoc(),
-                         NL_RemoveOverridden | options, results);
+    ASTContext &ctx = func->getASTContext();
+    UnqualifiedLookupOptions options =
+      UnqualifiedLookupFlags::IgnoreAccessControl;
+    UnqualifiedLookupDescriptor descriptor(
+        DeclNameRef(ctx, Identifier(), swiftName), func->getDeclContext(),
+        func->getLoc(), options);
+    auto lookup = evaluateOrDefault(func->getASTContext().evaluator,
+                                    UnqualifiedLookupRequest{descriptor}, {});
+    for (const auto &result : lookup) {
+      results.push_back(result.getValueDecl());
+    }
   }
 }
 
