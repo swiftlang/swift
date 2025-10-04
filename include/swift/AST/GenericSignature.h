@@ -606,7 +606,11 @@ enum class GenericSignatureErrorFlags {
 
   /// The Knuth-Bendix completion procedure failed to construct a confluent
   /// rewrite system.
-  CompletionFailed = (1<<2)
+  CompletionFailed = (1<<2),
+
+  /// A request evaluator cycle prevented us from computing this generic
+  /// signature.
+  CircularReference = (1<<3),
 };
 
 using GenericSignatureErrors = OptionSet<GenericSignatureErrorFlags>;

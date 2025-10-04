@@ -7,12 +7,16 @@ protocol MyCollectionProtocol: Collection where Iterator == MyCollectionIterator
 
 struct MyCollectionIterator<MyCollection: MyCollectionProtocol>: IteratorProtocol {
 // expected-note@-1 3{{through reference here}}
+// expected-error@-2 {{type 'MyCollectionIterator<MyCollection>' does not conform to protocol 'IteratorProtocol'}}
+// expected-note@-3 {{add stubs for conformance}}
     mutating func next() -> MyCollection.Element? {
+    // expected-error@-1 {{'Element' is not a member type of type 'MyCollection'}}
         return nil
     }
 }
 
 struct MyCollection: MyCollectionProtocol {
+// expected-error@-1 {{type 'MyCollection' does not conform to protocol 'Collection'}}
     struct Element {}
 
     var startIndex: Int { fatalError() }

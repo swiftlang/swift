@@ -7451,7 +7451,7 @@ RequirementSignature ProtocolDecl::getRequirementSignature() const {
                RequirementSignatureRequest{const_cast<ProtocolDecl *>(this)},
                [this]() {
                  return RequirementSignature::getPlaceholderRequirementSignature(
-                     this, GenericSignatureErrors());
+                     this, GenericSignatureErrorFlags::CircularReference);
                });
 }
 

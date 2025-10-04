@@ -5992,7 +5992,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
         !isa<TupleTypeRepr>(tyR)) {
       auto contextTy = GenericEnvironment::mapTypeIntoContext(
           resolution.getGenericSignature().getGenericEnvironment(), ty);
-      if (contextTy->isNoncopyable())
+      if (!contextTy->hasError() && contextTy->isNoncopyable())
         moveOnlyElementIndex = i;
     }
 
