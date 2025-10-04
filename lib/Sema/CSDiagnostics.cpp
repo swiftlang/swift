@@ -122,16 +122,16 @@ Type FailureDiagnostic::resolveType(Type rawType, bool reconstituteSugar,
           : resolvedType;
     }
 
-    if (type->hasElementArchetype()) {
-      auto *env = getDC()->getGenericEnvironmentOfContext();
-      return env->mapElementTypeIntoPackContext(type);
-    }
-
     if (type->isPlaceholder())
       return ErrorType::get(type->getASTContext());
 
     return std::nullopt;
   });
+
+  if (rawType->hasElementArchetype()) {
+    auto *env = getDC()->getGenericEnvironmentOfContext();
+    rawType = env->mapElementTypeIntoPackContext(rawType);
+  }
 
   if (reconstituteSugar)
     rawType = rawType->reconstituteSugar(/*recursive*/ true);
