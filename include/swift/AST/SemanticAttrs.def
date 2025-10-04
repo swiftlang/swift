@@ -96,6 +96,8 @@ SEMANTICS_ATTR(OSLOG_REQUIRES_CONSTANT_ARGUMENTS, "oslog.requires_constant_argum
 SEMANTICS_ATTR(OSLOG_LOG_WITH_LEVEL, "oslog.log_with_level")
 SEMANTICS_ATTR(ATOMICS_REQUIRES_CONSTANT_ORDERINGS, "atomics.requires_constant_orderings")
 
+SEMANTICS_ATTR(SWIFT_UI_REQUIRES_CONSTANT_RANGE, "swiftui.requires_constant_range")
+
 SEMANTICS_ATTR(TYPE_CHECKER_OPEN_EXISTENTIAL, "typechecker._openExistential(_:do:)")
 SEMANTICS_ATTR(TYPE_CHECKER_TYPE, "typechecker.type(of:)")
 SEMANTICS_ATTR(TYPE_CHECKER_WITHOUT_ACTUALLY_ESCAPING, "typechecker.withoutActuallyEscaping(_:do:)")
