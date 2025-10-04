@@ -9,6 +9,10 @@ import Builtin
 import Swift
 import SwiftShims
 
+struct NonTrivialStruct {
+  var s: String
+}
+
 sil_global [let] @g1 : $Int32
 sil_global [let] @g2 : $Int32
 
@@ -201,6 +205,27 @@ bb2:
   br bb3
 bb3:
   return %1 : $Int32
+}
+
+sil @createNonTrivialStruct : $@convention(thin) (Int) -> @owned NonTrivialStruct
+
+// CHECK-LABEL: sil [no_allocation] [perf_constraint] [ossa] @test_dead_alloc_elimination_with_mark_dependence :
+// CHECK-NOT:     alloc_stack
+// CHECK:       } // end sil function 'test_dead_alloc_elimination_with_mark_dependence'
+sil [ossa] [no_allocation] @test_dead_alloc_elimination_with_mark_dependence : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack [lexical] $Int
+  store %0 to [trivial] %1
+  %4 = load [trivial] %1
+  %5 = function_ref @createNonTrivialStruct : $@convention(thin) (Int) -> @owned NonTrivialStruct
+  %6 = apply %5(%4) : $@convention(thin) (Int) -> @owned NonTrivialStruct
+  %7 = mark_dependence [nonescaping] %6 on %1
+  %9 = mark_dependence [nonescaping] %7 on %1
+  %10 = destructure_struct %9
+  destroy_value %10
+  %12 = tuple ()
+  dealloc_stack %1
+  return %12
 }
 
 // CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @remove_metatype_arg :
