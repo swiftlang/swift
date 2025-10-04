@@ -9,10 +9,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-// NOTE: this cant use Synchronization because it is deployed before that was
+// NOTE: this can't use Synchronization because it is deployed before that was
 // introduced and availability wont let it be hidden behind an internal type.
 // The Swift internal runtime locking cannot be used since that emits dependent
-// symbols that are not provided by this library - so instead it has to re-implement 
+// symbols that are not provided by this library - so instead it has to re-implement
 // all of this on its own... 
 
 #if canImport(Darwin.os.lock)

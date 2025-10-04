@@ -217,7 +217,7 @@ public struct ObservationRegistrar: Sendable {
   ///
   /// You don't need to create an instance of
   /// ``Observation/ObservationRegistrar`` when using the
-  /// ``Observation/Observable()`` macro to indicate observably
+  /// ``Observation/Observable()`` macro to indicate observability
   /// of a type.
   public init() {
   }

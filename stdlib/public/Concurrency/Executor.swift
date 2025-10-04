@@ -93,7 +93,7 @@ public protocol SchedulingExecutor: Executor {
   ///              will not be executed before this time.
   /// - tolerance: The maximum additional delay permissible before the
   ///              job is executed.  `nil` means no limit.
-  /// - clock:     The clock used for the delay..
+  /// - clock:     The clock used for the delay.
   @available(StdlibDeploymentTarget 6.2, *)
   func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                          at instant: C.Instant,
