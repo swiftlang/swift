@@ -2631,8 +2631,8 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       if (!sawTopLevelArrowInLookahead)
         return makeParserSuccess();
 
-      // Okay, we have a closure signature.
     }
+    // Okay, we have a closure signature.
   } else {
     // No closure signature.
     return makeParserSuccess();
