@@ -57,6 +57,17 @@
 // RUN:   -scanner-prefix-map-paths %t/header-1 /^header \
 // RUN:   -scanner-output-dir %t/header-1 -I %t
 
+// RUN: %swift-scan-test -action get_chained_bridging_header -- %target-swift-frontend -scan-dependencies\
+// RUN:   -module-name User -module-cache-path %t/clang-module-cache -O \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN:   %t/user.swift -o %t/deps-3.json -auto-bridging-header-chaining -cache-compile-job -cas-path %t/cas \
+// RUN:   -scanner-prefix-map-paths %swift_src_root /^src -scanner-prefix-map-paths %t /^tmp \
+// RUN:   -scanner-prefix-map-paths %t/header-1 /^header \
+// RUN:   -scanner-output-dir %t/header-1 -I %t > %t/bridging-header1.h
+// RUN: %FileCheck %s --input-file=%t/bridging-header1.h --check-prefix=HEADER
+
+// HEADER: # 1 "<module-Test-embedded-bridging-header>" 1
+
 // RUN: %target-swift-frontend -scan-dependencies -module-name User -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/user.swift -o %t/deps-4.json -auto-bridging-header-chaining -cache-compile-job -cas-path %t/cas \
