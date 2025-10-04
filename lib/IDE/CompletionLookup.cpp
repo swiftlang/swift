@@ -2182,11 +2182,9 @@ bool CompletionLookup::tryModuleCompletions(Type ExprType,
     // If the module is shadowed by a separately imported overlay(s), look up
     // the symbols from the overlay(s) instead.
     SmallVector<ModuleDecl *, 1> ShadowingOrOriginal;
-    if (auto *SF = CurrDeclContext->getParentSourceFile()) {
-      SF->getSeparatelyImportedOverlays(M, ShadowingOrOriginal);
-      if (ShadowingOrOriginal.empty())
-        ShadowingOrOriginal.push_back(M);
-    }
+    CurrDeclContext->getSeparatelyImportedOverlays(M, ShadowingOrOriginal);
+    if (ShadowingOrOriginal.empty())
+      ShadowingOrOriginal.push_back(M);
     for (ModuleDecl *M : ShadowingOrOriginal) {
       RequestedResultsTy Request =
           RequestedResultsTy::fromModule(M, Filter).needLeadingDot(needDot());
