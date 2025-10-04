@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 enum EnumWithNonExcludedOptionalParameters : Codable { // expected-error {{type 'EnumWithNonExcludedOptionalParameters' does not conform to protocol 'Decodable'}}
     // expected-error@-1 {{type 'EnumWithNonExcludedOptionalParameters' does not conform to protocol 'Encodable'}}

@@ -36,7 +36,7 @@
 /// First errors in files, then diagnostics in other files.
 // RUN: %target-swift-frontend -typecheck %t/ClientPublic.swift -o %t -I %t \
 // RUN:   -enable-library-evolution -swift-version 6 \
-// RUN:   -verify
+// RUN:   -verify -verify-ignore-unrelated
 // RUN: not %target-swift-frontend -typecheck %t/ClientPublic.swift -o %t -I %t \
 // RUN:   -enable-library-evolution -swift-version 6 \
 // RUN:   -diagnostic-style llvm \
@@ -44,7 +44,7 @@
 
 // RUN: %target-swift-frontend -typecheck %t/ClientMiddle.swift -o %t -I %t \
 // RUN:   -enable-library-evolution -swift-version 6 \
-// RUN:   -verify
+// RUN:   -verify -verify-ignore-unrelated
 // RUN: not %target-swift-frontend -typecheck %t/ClientMiddle.swift -o %t -I %t \
 // RUN:   -enable-library-evolution -swift-version 6 \
 // RUN:   -diagnostic-style llvm \
@@ -53,13 +53,13 @@
 /// Test more diagnostics referencing modules.
 // RUN: %target-swift-frontend -typecheck %t/ClientAccessLevelOnImports.swift -o %t -I %t \
 // RUN:   -enable-library-evolution -swift-version 6 \
-// RUN:   -verify
+// RUN:   -verify -verify-ignore-unrelated
 
 /// Build client against textual swiftinterfaces.
 // RUN: rm %t/LibCore.swiftmodule %t/LibMiddle.swiftmodule %t/Lib.swiftmodule
 // RUN: %target-swift-frontend -typecheck %t/ClientPublic.swift -I %t \
 // RUN:   -enable-library-evolution -swift-version 6 \
-// RUN:   -verify
+// RUN:   -verify -verify-ignore-unrelated
 // RUN: not %target-swift-frontend -typecheck %t/ClientPublic.swift -o %t -I %t \
 // RUN:   -enable-library-evolution -swift-version 6 \
 // RUN:   -diagnostic-style llvm \
@@ -67,7 +67,7 @@
 
 // RUN: %target-swift-frontend -typecheck %t/ClientMiddle.swift -o %t -I %t \
 // RUN:   -enable-library-evolution -swift-version 6 \
-// RUN:   -verify
+// RUN:   -verify -verify-ignore-unrelated
 // RUN: not %target-swift-frontend -typecheck %t/ClientMiddle.swift -o %t -I %t \
 // RUN:   -enable-library-evolution -swift-version 6 \
 // RUN:   -diagnostic-style llvm \
@@ -75,7 +75,7 @@
 
 // RUN: %target-swift-frontend -typecheck %t/ClientAccessLevelOnImports.swift -o %t -I %t \
 // RUN:   -enable-library-evolution -swift-version 6 \
-// RUN:   -verify
+// RUN:   -verify -verify-ignore-unrelated
 
 //--- LibCore.swift
 public func ambiguous() {}

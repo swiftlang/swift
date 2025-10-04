@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules %s -swift-version 4 -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %S/Inputs/custom-modules %s -swift-version 4 -verify -verify-ignore-unrelated
 
 import UnimportableMembers
 import UnimportableMembersUser

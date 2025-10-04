@@ -6,7 +6,7 @@
 // RUN:   -import-objc-header %t/src/Test.h \
 // RUN:   -swift-version 6 \
 // RUN:   -enable-experimental-feature SendableCompletionHandlers \
-// RUN:   -module-name main -I %t -verify
+// RUN:   -module-name main -I %t -verify -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_SendableCompletionHandlers

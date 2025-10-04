@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/conformance_availability_overlapping_other.swift -emit-module-path %t/conformance_availability_overlapping_other.swiftmodule
-// RUN: %target-typecheck-verify-swift -I %t
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t
 
 // REQUIRES: OS=macosx
 

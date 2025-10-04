@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %clang-importer-sdk -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated %clang-importer-sdk -I %S/Inputs/custom-modules
 // RUN: not %target-swift-frontend -typecheck %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | %FileCheck %s
 
 // REQUIRES: OS=macosx

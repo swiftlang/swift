@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -verify-additional-prefix targeted-and-ni- -strict-concurrency=targeted -verify-additional-prefix targeted- -emit-sil -o /dev/null %s
-// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -strict-concurrency=complete -verify-additional-prefix tns-ni- -verify-additional-prefix tns- -emit-sil -o /dev/null %s -swift-version 5 -verify-additional-prefix targeted-and-ni-
-// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -strict-concurrency=complete -verify-additional-prefix tns-ni-ns- -verify-additional-prefix tns- -emit-sil -o /dev/null %s -enable-upcoming-feature NonisolatedNonsendingByDefault -swift-version 5 -DNONISOLATEDNONSENDING
+// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -verify-ignore-unrelated -verify-additional-prefix targeted-and-ni- -strict-concurrency=targeted -verify-additional-prefix targeted- -emit-sil -o /dev/null %s
+// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -verify-ignore-unrelated -strict-concurrency=complete -verify-additional-prefix tns-ni- -verify-additional-prefix tns- -emit-sil -o /dev/null %s -swift-version 5 -verify-additional-prefix targeted-and-ni-
+// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -verify-ignore-unrelated -strict-concurrency=complete -verify-additional-prefix tns-ni-ns- -verify-additional-prefix tns- -emit-sil -o /dev/null %s -enable-upcoming-feature NonisolatedNonsendingByDefault -swift-version 5 -DNONISOLATEDNONSENDING
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

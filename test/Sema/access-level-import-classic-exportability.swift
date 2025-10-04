@@ -16,13 +16,13 @@
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -package-name TestPackage -swift-version 5 \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -enable-experimental-feature AccessLevelOnImport -verify -verify-ignore-unrelated
 
 /// Check diagnostics with library-evolution.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -package-name TestPackage -swift-version 5 \
 // RUN:   -enable-library-evolution \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -enable-experimental-feature AccessLevelOnImport -verify -verify-ignore-unrelated
 
 // REQUIRES: swift_feature_AccessLevelOnImport
 

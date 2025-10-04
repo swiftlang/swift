@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=targeted %s
-// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete %s
+// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -verify-ignore-unrelated %s
+// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -verify-ignore-unrelated -strict-concurrency=targeted %s
+// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -verify-ignore-unrelated -strict-concurrency=complete %s
 
 // REQUIRES: concurrency
 

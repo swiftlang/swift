@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend-typecheck -verify %s -DILLEGAL \
+// RUN: %target-swift-frontend-typecheck -verify -verify-ignore-unrelated %s -DILLEGAL \
 // RUN:   -enable-builtin-module \
 // RUN:   -verify-additional-prefix illegal-
 
-// RUN: %target-swift-frontend -emit-sil -sil-verify-all -verify %s \
+// RUN: %target-swift-frontend -emit-sil -sil-verify-all -verify -verify-ignore-unrelated %s \
 // RUN:   -enable-builtin-module
 
 import Builtin

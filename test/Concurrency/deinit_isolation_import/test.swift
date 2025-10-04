@@ -9,7 +9,7 @@
 // RUN: cp -R %S/Inputs/Beta.framework %t/Frameworks/
 // RUN: %empty-directory(%t/Frameworks/Beta.framework/Headers/)
 // RUN: cp %S/Inputs/Beta.h %t/Frameworks/Beta.framework/Headers/Beta.h
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -disable-availability-checking -typecheck -verify %s -F %t/Frameworks -F %clang-importer-sdk-path/frameworks
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -disable-availability-checking -typecheck -verify -verify-ignore-unrelated %s -F %t/Frameworks -F %clang-importer-sdk-path/frameworks
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -disable-availability-checking -parse-as-library -emit-silgen -DSILGEN %s -F %t/Frameworks -F %clang-importer-sdk-path/frameworks | %FileCheck %s
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -disable-availability-checking -parse-as-library -emit-silgen -DSILGEN %s -F %t/Frameworks -F %clang-importer-sdk-path/frameworks | %FileCheck -check-prefix=CHECK-SYMB %s
 

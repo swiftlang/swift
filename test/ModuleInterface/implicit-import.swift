@@ -13,7 +13,7 @@
 // RUN: %target-swift-emit-module-interface(%t/DefinesExtension.swiftinterface) -I %t %t/DefinesExtension.swift -module-name DefinesExtension
 // RUN: %target-swift-typecheck-module-from-interface(%t/DefinesExtension.swiftinterface) -I %t -module-name DefinesExtension
 
-// RUN: %target-swift-emit-module-interface(%t/Client.swiftinterface) -verify -I %t %t/File2.swift %t/File1.swift -module-name Client
+// RUN: %target-swift-emit-module-interface(%t/Client.swiftinterface) -verify -verify-ignore-unrelated -I %t %t/File2.swift %t/File1.swift -module-name Client
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t -module-name Client
 // RUN: %FileCheck %t/File2.swift < %t/Client.swiftinterface
 

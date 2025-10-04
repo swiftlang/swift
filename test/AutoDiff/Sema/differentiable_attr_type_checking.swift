@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend-typecheck -verify -target %target-swift-5.1-abi-triple %s
-// RUN: %target-swift-frontend-typecheck -enable-testing -verify -target %target-swift-5.1-abi-triple %s
+// RUN: %target-swift-frontend-typecheck -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s
+// RUN: %target-swift-frontend-typecheck -enable-testing -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s
 
 import _Differentiation
 

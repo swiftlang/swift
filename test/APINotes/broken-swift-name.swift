@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs/broken-modules
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs/broken-modules
 import BrokenAPINotes
 
 func testBrokenSwiftName(x: inout ZXSpectrum) {

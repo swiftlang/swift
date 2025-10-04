@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // Check that all combinations of key paths produce the expected result type
 // and choose the expected overloads.

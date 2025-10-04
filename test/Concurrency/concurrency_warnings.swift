@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables %S/Inputs/GlobalVariables.swift -disable-availability-checking -parse-as-library
 
-// RUN: %target-swift-frontend -I %t -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -I %t -strict-concurrency=complete -parse-as-library %s -emit-sil -o /dev/null -verify -verify-ignore-unrelated
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

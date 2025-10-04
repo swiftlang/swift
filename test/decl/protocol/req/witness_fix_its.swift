@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/OtherOS.swiftmodule -module-name OtherOS %S/Inputs/witness_fix_its_other_module.swift -parse-as-library
-// RUN: %target-typecheck-verify-swift -I %t/
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t/
 
 prefix operator ^^^
 postfix operator ^^^^

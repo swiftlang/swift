@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature ImplicitSome
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -disable-availability-checking -enable-experimental-feature ImplicitSome
 
 // REQUIRES: swift_feature_ImplicitSome
 
