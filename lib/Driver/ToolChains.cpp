@@ -953,6 +953,12 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
   addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SwiftModuleSummaryFile,
                    "-emit-module-summary-path");
+
+  // Add extra output paths for SIL and LLVM IR
+  addOutputsOfType(arguments, Output, Args, file_types::TY_SIL,
+                   "-sil-output-path");
+  addOutputsOfType(arguments, Output, Args, file_types::TY_LLVM_IR,
+                   "-ir-output-path");
 }
 
 ToolChain::InvocationInfo
@@ -1236,6 +1242,12 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                    file_types::TY_ClangHeader, "-emit-objc-header-path");
   addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_TBD,
                    "-emit-tbd-path");
+
+  // Add extra output paths for SIL and LLVM IR
+  addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_SIL,
+                   "-sil-output-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::TY_LLVM_IR, "-ir-output-path");
 
   context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
   context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);

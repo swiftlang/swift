@@ -1773,6 +1773,37 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
     }
   }
 
+  // Write IR outputs if requested
+  // In WMO mode, IR generation creates separate modules per source file
+  auto irOutputFilenames = desc.parallelIROutputFilenames;
+
+  if (!irOutputFilenames.empty()) {
+    auto IRIter = irOutputFilenames.begin();
+
+    for (auto *File : M->getFiles()) {
+      auto nextSF = dyn_cast<SourceFile>(File);
+      if (!nextSF)
+        continue;
+
+      // Write IR output for this source file
+      if (IRIter != irOutputFilenames.end()) {
+        auto irOutputPath = *IRIter++;
+        if (!irOutputPath.empty()) {
+          CurrentIGMPtr IGM = irgen.getGenModule(nextSF);
+          std::error_code EC;
+          llvm::raw_fd_ostream irOut(irOutputPath, EC);
+          if (!EC) {
+            IGM->getModule()->print(irOut, nullptr);
+            irOut.close();
+          } else {
+            Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                               irOutputPath, EC.message());
+          }
+        }
+      }
+    }
+  }
+
   // Bail out if there are any errors.
   if (Ctx.hadError()) return;
 
@@ -1804,6 +1835,7 @@ GeneratedModule swift::performIRGeneration(
     const TBDGenOptions &TBDOpts, std::unique_ptr<SILModule> SILMod,
     StringRef ModuleName, const PrimarySpecificPaths &PSPs,
     ArrayRef<std::string> parallelOutputFilenames,
+    ArrayRef<std::string> parallelIROutputFilenames,
     llvm::GlobalVariable **outModuleHash) {
   // Get a pointer to the SILModule to avoid a potential use-after-move.
   const auto *SILModPtr = SILMod.get();
@@ -1811,7 +1843,7 @@ GeneratedModule swift::performIRGeneration(
   auto desc = IRGenDescriptor::forWholeModule(
       M, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
       ModuleName, PSPs, /*symsToEmit*/ std::nullopt, parallelOutputFilenames,
-      outModuleHash);
+      parallelIROutputFilenames, outModuleHash);
 
   if (Opts.shouldPerformIRGenerationInParallel() &&
       !parallelOutputFilenames.empty() &&
