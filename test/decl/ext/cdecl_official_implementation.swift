@@ -1,11 +1,17 @@
 // RUN: %target-typecheck-verify-swift -target %target-stable-abi-triple \
 // RUN:   -import-bridging-header %S/Inputs/objc_implementation.h \
+// RUN:   -I %S/Inputs \
 // RUN:   -disable-objc-interop \
 // RUN:   -enable-experimental-feature CImplementation \
 // RUN:   -enable-experimental-feature CDecl
 
 // REQUIRES: swift_feature_CImplementation
 // REQUIRES: swift_feature_CDecl
+
+import ToBeImplemented
+
+@implementation @c
+func c_function_returns_double() -> Double { 0 }
 
 @implementation @c
 func CImplFunc1(_: Int32) {
@@ -24,7 +30,7 @@ func CImplFunc2(_: Int32) {
 
 @implementation @c
 func CImplFuncMissing(_: Int32) {
-  // expected-error@-2 {{could not find imported function 'CImplFuncMissing' matching global function 'CImplFuncMissing'; make sure your umbrella or bridging header imports the header that declares it}}
+  // expected-error@-2 {{could not find imported function 'CImplFuncMissing' matching global function 'CImplFuncMissing'; make sure you import the module or header that declares it}}
 }
 
 @implementation @c
@@ -39,13 +45,13 @@ func CImplFuncMismatch2(_: Int32) -> Float {
 
 @implementation @c(CImplFuncNameMismatch1)
 func mismatchedName1(_: Int32) {
-  // expected-error@-2 {{could not find imported function 'CImplFuncNameMismatch1' matching global function 'mismatchedName1'; make sure your umbrella or bridging header imports the header that declares it}}
+  // expected-error@-2 {{could not find imported function 'CImplFuncNameMismatch1' matching global function 'mismatchedName1'; make sure you import the module or header that declares it}}
   // FIXME: Improve diagnostic for a partial match.
 }
 
 @implementation @c(mismatchedName2)
 func CImplFuncNameMismatch2(_: Int32) {
-  // expected-error@-2 {{could not find imported function 'mismatchedName2' matching global function 'CImplFuncNameMismatch2'; make sure your umbrella or bridging header imports the header that declares it}}
+  // expected-error@-2 {{could not find imported function 'mismatchedName2' matching global function 'CImplFuncNameMismatch2'; make sure you import the module or header that declares it}}
   // FIXME: Improve diagnostic for a partial match.
 }
 
@@ -56,14 +62,14 @@ var cImplComputedGlobal1: Int32 {
   @implementation @c(CImplGetComputedGlobal1)
   get {
     // FIXME: Lookup for vars isn't working yet
-    // expected-error@-3 {{could not find imported function 'CImplGetComputedGlobal1' matching getter for var 'cImplComputedGlobal1'; make sure your umbrella or bridging header imports the header that declares it}}
+    // expected-error@-3 {{could not find imported function 'CImplGetComputedGlobal1' matching getter for var 'cImplComputedGlobal1'; make sure you import the module or header that declares it}}
     return 0
   }
 
   @implementation @c(CImplSetComputedGlobal1)
   set {
     // FIXME: Lookup for vars isn't working yet
-    // expected-error@-3 {{could not find imported function 'CImplSetComputedGlobal1' matching setter for var 'cImplComputedGlobal1'; make sure your umbrella or bridging header imports the header that declares it}}
+    // expected-error@-3 {{could not find imported function 'CImplSetComputedGlobal1' matching setter for var 'cImplComputedGlobal1'; make sure you import the module or header that declares it}}
     print(newValue)
   }
 }
@@ -77,6 +83,6 @@ extension CImplStruct {
     // FIXME: Add underlying support for this
     // expected-error@-3 {{@c can only be applied to global functions}}
     // FIXME: Lookup in an enclosing type is not working yet
-    // expected-error@-5 {{could not find imported function 'CImplStructStaticFunc1' matching static method 'staticFunc1'; make sure your umbrella or bridging header imports the header that declares it}}
+    // expected-error@-5 {{could not find imported function 'CImplStructStaticFunc1' matching static method 'staticFunc1'; make sure you import the module or header that declares it}}
   }
 }
