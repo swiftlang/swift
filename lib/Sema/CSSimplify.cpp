@@ -12541,8 +12541,24 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(
                       locator);
   }
 
-  // It's definitely not either kind of metatype, so we can
-  // report failure right away.
+  // We don't have a non-metatype result, produce a fix.
+  if (shouldAttemptFixes()) {
+    // If we have a hole as a contextual type, eagerly produce holes in the
+    // argument of `type(of:)`.
+    if (type1->isPlaceholder()) {
+      recordTypeVariablesAsHoles(type2);
+      return SolutionKind::Solved;
+    }
+
+    // Otherwise we have some invalid contextual type, record a fix and let the
+    // argument be turned into a hole if needed.
+    recordAnyTypeVarAsPotentialHole(type2);
+
+    recordFix(IgnoreNonMetatypeDynamicType::create(
+        *this, type2, type1, getConstraintLocator(locator)));
+    return SolutionKind::Solved;
+  }
+
   return SolutionKind::Error;
 }
 
@@ -16100,6 +16116,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreMissingEachKeyword:
   case FixKind::AllowInlineArrayLiteralCountMismatch:
   case FixKind::TooManyDynamicMemberLookups:
+  case FixKind::IgnoreNonMetatypeDynamicType:
   case FixKind::IgnoreIsolatedConformance:
     llvm_unreachable("handled elsewhere");
   }

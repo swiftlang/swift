@@ -2428,6 +2428,15 @@ private:
   bool diagnoseMissingConformance() const;
 };
 
+class NonMetatypeDynamicTypeFailure final : public ContextualFailure {
+public:
+  NonMetatypeDynamicTypeFailure(const Solution &solution, Type instanceTy,
+                                Type metatypeTy, ConstraintLocator *locator)
+      : ContextualFailure(solution, instanceTy, metatypeTy, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 class MissingContextualBaseInMemberRefFailure final : public FailureDiagnostic {
   DeclNameRef MemberName;
 
