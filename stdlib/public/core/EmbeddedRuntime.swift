@@ -48,7 +48,7 @@ public struct ClassMetadata {
   └──────────────┴──────────────────────────────────────────────┘
 
   If the highest bit (doNotFreeBit) is set, the behavior of dropping the last reference (release operation where
-  refcount ends up being 0) is altered to avoid calling free() on the object (deinit is still run). This is crutial for
+  refcount ends up being 0) is altered to avoid calling free() on the object (deinit is still run). This is crucial for
   class instances that are promoted by the compiler from being heap-allocated to instead be located on the stack
   (see swift_initStackObject).
 
@@ -67,7 +67,7 @@ public struct ClassMetadata {
     _ContiguousArrayStorage can be promoted to __StaticArrayStorage with the HeapObject header emitted directly by the
     compiler and refcount field directly set to immortalRefCount | doNotFreeBit (see irgen::emitConstantObject).
 
-  Tne immortalRefCount is additionally also used as a placeholder value for objects (heap-allocated or stack-allocated)
+  The immortalRefCount is additionally also used as a placeholder value for objects (heap-allocated or stack-allocated)
   when they're currently inside their deinit(). This is done to prevent further retains and releases inside deinit from
   triggering deinitialization again, without the need to reserve another bit for this purpose. Retains and releases in
   deinit() are allowed, as long as they are balanced at the end, i.e. the object is not escaped (user's responsibility)
