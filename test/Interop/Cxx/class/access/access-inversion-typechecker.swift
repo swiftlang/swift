@@ -4,7 +4,7 @@
 // but does not necessarily specify it (in the deliberate sense). In other words,
 // there may be behaviors captured in these tests that deserve amending.
 
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers
 // REQUIRES: swift_feature_ImportNonPublicCxxMembers
 
 import AccessInversion

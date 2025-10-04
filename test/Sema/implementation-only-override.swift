@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-typecheck-verify-swift -I %S/Inputs/implementation-only-override -DERRORS -enable-library-evolution -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs/implementation-only-override -DERRORS -enable-library-evolution -enable-objc-interop
 
 // RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -I %S/Inputs/implementation-only-override -enable-objc-interop
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -I %S/Inputs/implementation-only-override

@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
-// RUN: %target-typecheck-verify-swift -swift-version 4.2
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 4
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 4.2
 
 public protocol PublicProto {
   func publicReq()
