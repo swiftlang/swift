@@ -508,6 +508,15 @@ public:
     return {pred_begin(), pred_end()};
   }
 
+  /// Return true if this block has a single predecessor block. Note that
+  /// the exact property we care about is that the block appears in
+  /// successor lists exactly once. As a precondition, the block must have
+  /// at least one predecessor.
+  bool hasSinglePredecessorBlock() {
+    assert(!pred_empty());
+    return std::next(pred_begin()) == pred_end();
+  }
+
   SILBasicBlock *getSinglePredecessorBlock() {
     if (pred_empty() || std::next(pred_begin()) != pred_end())
       return nullptr;

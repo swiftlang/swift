@@ -780,6 +780,107 @@ _lexical_ in order to specify this property for all contributing lifetimes.
 For details see [Variable Lifetimes](Ownership.md#variable-lifetimes) in the
 Ownership document.
 
+# Dominance
+
+## Value dominance
+
+Whenever an instruction uses a [value](#values-and-operands) as an
+operand, the definition of the value must dominate the instruction.
+This is a common concept across all SSA-like representations. SIL
+uses a standard definition of dominance, modified slightly to account
+for SIL's use of basic block arguments rather than phi instructions:
+
+- The value `undef` always dominates an instruction.
+
+- A result of an instruction `R` dominates an instruction `I` if all paths
+  to `I` from the start of the entry block must pass through `R`.
+
+- An argument of a basic block `B` dominates an instruction `I` if all
+  paths to `I` from the start of the entry block must pass through the
+  start of `B`.
+
+A basic block `B1` is said to dominate a basic block `B2` if they are
+different blocks and if all paths to the start of `B2` must pass
+through `B1`. This relationship can be thought of as creating a
+directed acyclic graph of basic blocks, called the *dominance tree*.
+The dominance tree is not directly represented in SIL; it is just
+a requirement that SIL functions must obey.
+
+When enumerating the paths through a function, the dominance rules
+always consider all successors of a basic block to be reachable.
+For example, consider the following function:
+
+```
+    bb0(%cond : $Builtin.Int1):
+      cond_br %cond, bb1, b22
+    bb1:
+      %value = integer_literal $Builtin.Int32, 0
+      br bb3
+    bb2:
+      br bb3
+    bb3:
+      cond_br %cond, bb4, bb5
+    bb4:
+      %twice_value = builtin "add_Int32"(%value, %value) : $Builtin.Int32
+      br bb6
+    bb5:
+      br bb6
+    bb6:
+      ret %cond
+```
+
+The definition of `%value` in this function is not considered to
+dominate its use by the `builtin` instruction in `bb4` because
+there is a path to that instruction from the start of `bb0` that
+does not pass through the definition of `%value` in `bb1`. This
+is true even though that path would require `cond_br` to make
+opposite choices about the value of `%cond`, because dominance
+considers all successors to be reachable, regardless of the path
+taken to reach that point.
+
+## Joint post-dominance
+
+Certain instructions are required to have a *joint post-dominance*
+relationship with certain other instructions. The dominating
+instruction is called the *begin instruction*. Other instructions
+may have the property of being an *end instruction* for that
+instruction.
+
+For example, an instruction `D` is an end instruction for
+an `alloc_stack` instruction `A` if `D` is a `dealloc_stack`
+instruction whose operand is the result of `A`.
+
+End instructions are always dominated by their begin instructions,
+generally because a result of the begin instruction is required to
+be an operand of the end instruction in order for the relationship
+to hold at all.
+
+A begin instruction `I` is jointly post-dominated by its end
+instructions if:
+
+- No path through the function that passes through `I` may pass
+  through `I` again without first passing through an end
+  instruction of `I`.
+
+- No path through the function that passes through `I` and an
+  end instruction of `I` may pass through another end instruction
+  of `I` without having first passed through `I` again.
+
+- No path through the function that passes through `I` may reach
+  an instruction that exits the function (such as `return`)
+  without having passed through an end instruction of `I`.
+
+That is, for every possible path through the function, consider
+the sequence of instances of `I` and its end instructions on that
+path. `I` and its end instructions must perfectly alternate, and
+if the path ends in an exit, the sequence must end in an end
+instruction.
+
+Note that a begin instruction need not have any end instructions
+in the function if no paths through the begin instruction lead to
+an exit (for example, if they lead to `unreachable` or an infinite
+loop).
+
 # Debug Information
 
 Each instruction may have a debug location and a SIL scope reference at
@@ -1364,48 +1465,39 @@ stack deallocation instructions. It can even be paired with no
 instructions at all; by the rules below, this can only happen in
 non-terminating functions.
 
--   At any point in a SIL function, there is an ordered list of stack
-    allocation instructions called the *active allocations list*.
+- All stack allocation instructions must be jointly post-dominated
+  by stack deallocation instructions paired with them.
 
--   The active allocations list is defined to be empty at the initial
-    point of the entry block of the function.
+- No path through the function that passes through a stack allocation
+  instruction `B`, having already passed a stack allocation
+  instruction `A`, may subsequently pass through a stack deallocation
+  instruction paired with `A` without first passing through a stack
+  deallocation instruction paired with `B`.
 
--   The active allocations list is required to be the same at the
-    initial point of any successor block as it is at the final point of
-    any predecessor block. Note that this also requires all
-    predecessors/successors of a given block to have the same
-    final/initial active allocations lists.
+These two rules statically enforce that all stack allocations are
+properly nested. In simpler terms:
 
-    In other words, the set of active stack allocations must be the same
-    at a given place in the function no matter how it was reached.
+- At every point in a SIL function, there is an ordered list of stack
+  allocation instructions called the *active allocations list*.
 
--   The active allocations list for the point following a stack
-    allocation instruction is defined to be the result of adding that
-    instruction to the end of the active allocations list for the point
-    preceding the instruction.
+- The active allocations list is empty at the start of the entry block
+  of the function, and it must be empty again whenever an instruction
+  that exits the function is reached, like `return` or `throw`.
 
--   The active allocations list for the point following a stack
-    deallocation instruction is defined to be the result of removing the
-    instruction from the end of the active allocations list for the
-    point preceding the instruction. The active allocations list for the
-    preceding point is required to be non-empty, and the last
-    instruction in it must be paired with the deallocation instruction.
+- Whenever a stack allocation instruction is reached, it is added to
+  the end of the list.
 
-    In other words, all stack allocations must be deallocated in
-    last-in, first-out order, aka stack order.
+- Whenever a stack deallocation instruction is reached, its paired
+  stack allocation instruction must be at the end of the list, which it
+  is then removed from.
 
--   The active allocations list for the point following any other
-    instruction is defined to be the same as the active allocations list
-    for the point preceding the instruction.
+- The active allocations list always be the same on both sides of a
+  control flow edge. This implies both that all successors of a block
+  must start with the same list and that all predecessors of a block
+  must end with the same list.
 
--   The active allocations list is required to be empty prior to
-    `return` or `throw` instructions.
-
-    In other words, all stack allocations must be deallocated prior to
-    exiting the function.
-
-Note that these rules implicitly prevent an allocation instruction from
-still being active when it is reached.
+Note that these rules implicitly prevent stack allocations from leaking
+or being double-freed.
 
 The control-flow rule forbids certain patterns that would theoretically
 be useful, such as conditionally performing an allocation around an

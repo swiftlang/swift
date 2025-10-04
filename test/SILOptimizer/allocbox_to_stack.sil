@@ -1086,6 +1086,9 @@ bb3:
   %3 = load %as1 : $*Bool
   unreachable
 }
+//   StackNesting used to split the edge to bb3, but that's not really
+//   necessary. Also, this input very arguably should not be allowed
+//   because there isn't a consistent stack depth on entry to bb3.
 // CHECK-LABEL: sil @nesting_and_unreachable_critical_edge
 // CHECK:      bb0(%0 : $Int):
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
@@ -1095,17 +1098,15 @@ bb3:
 // CHECK-NEXT:   [[STACK2:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   cond_br
 // CHECK:      bb2:
-// CHECK-NEXT:   dealloc_stack [[STACK2]]
-// CHECK-NEXT:   br bb4
-// CHECK:      bb3:
 // CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[STACK2]]
 // CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
-// CHECK:      bb4:
+// CHECK:      bb3:
 // CHECK-NEXT:   unreachable
+// CHECK:        // end sil function 'nesting_and_unreachable_critical_edge'
 sil @nesting_and_unreachable_critical_edge : $(Int) -> () {
 bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
