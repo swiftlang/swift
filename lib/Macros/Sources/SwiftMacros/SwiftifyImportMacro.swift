@@ -468,7 +468,14 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
     let functionRef = DeclReferenceExprSyntax(baseName: base.name)
     let args: [ExprSyntax] = base.signature.parameterClause.parameters.enumerated()
       .map { (i: Int, param: FunctionParameterSyntax) in
-        return pointerArgs[i] ?? ExprSyntax("\(param.name)")
+        if let overrideArg = pointerArgs[i] {
+          return overrideArg
+        }
+        if isInout(getParam(base.signature, i).type) {
+          return ExprSyntax("&\(param.name)")
+        } else {
+          return ExprSyntax("\(param.name)")
+        }
       }
     let labels: [TokenSyntax?] = base.signature.parameterClause.parameters.map { param in
       let firstName = param.firstName.trimmed
