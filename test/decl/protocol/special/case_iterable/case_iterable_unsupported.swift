@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/../Inputs/case_iterable_other.swift -verify-additional-prefix unsupported- -verify-ignore-unknown
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -primary-file %s %S/../Inputs/case_iterable_other.swift -verify-additional-prefix unsupported- -verify-ignore-unknown
 
 extension FromOtherFile: CaseIterable {} // expected-error {{extension outside of file declaring enum 'FromOtherFile' prevents automatic synthesis of 'allCases' for protocol 'CaseIterable'}} expected-note {{add stubs for conformance}}
 

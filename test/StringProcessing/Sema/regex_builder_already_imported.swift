@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-bare-slash-regex -disable-availability-checking
 
 import RegexBuilder
 

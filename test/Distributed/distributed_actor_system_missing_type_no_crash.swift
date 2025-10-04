@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency

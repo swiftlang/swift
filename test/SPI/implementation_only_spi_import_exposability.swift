@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -DLIB %s -module-name Lib -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -swift-version 5 -enable-library-evolution
-// RUN: %target-typecheck-verify-swift -DCLIENT -I %t \
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -DCLIENT -I %t \
 // RUN:   -swift-version 5 -enable-library-evolution
 
 #if LIB

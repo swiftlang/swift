@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -typo-correction-limit 5
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -typo-correction-limit 5
 
 // This is close enough to get typo-correction.
 func test_short_and_close() {

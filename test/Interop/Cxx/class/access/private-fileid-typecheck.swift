@@ -16,37 +16,37 @@
 // members are private (default) or protected. The result should be the same
 // no matter the configuration.
 //
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/blessed.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/blessed.swift -Xcc -DTEST_CLASS=struct
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/blessed.swift -Xcc -DTEST_PRIVATE=protected
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/blessed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/blessed.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/blessed.swift -Xcc -DTEST_CLASS=struct
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/blessed.swift -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/blessed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
 //
 // This test also includes a "cursed.swift", which expects to not have access to
 // non-public members:
 //
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/cursed.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/cursed.swift -Xcc -DTEST_CLASS=struct
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/cursed.swift -Xcc -DTEST_PRIVATE=protected
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/cursed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/cursed.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/cursed.swift -Xcc -DTEST_CLASS=struct
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/cursed.swift -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/cursed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
 //
 // To check that fileID is agnostic about directory structure within a module,
 // we move blessed.swift into a subdirectory (but keep its filename).
 //
 // RUN: mkdir -p %t/subdir/subsubdir
 // RUN: mv %t/blessed.swift %t/subdir/subsubdir/blessed.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/subdir/subsubdir/blessed.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/subdir/subsubdir/blessed.swift -Xcc -DTEST_CLASS=struct
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/subdir/subsubdir/blessed.swift -Xcc -DTEST_PRIVATE=protected
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/subdir/subsubdir/blessed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/subdir/subsubdir/blessed.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/subdir/subsubdir/blessed.swift -Xcc -DTEST_CLASS=struct
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/subdir/subsubdir/blessed.swift -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name main %t/subdir/subsubdir/blessed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
 //
 // To check that fileID is sensitive to module names, rename cursed.swift to
 // "blessed.swift", but typecheck in a module not called "main".
 //
 // RUN: mv %t/cursed.swift %t/blessed.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name brain %t/blessed.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name brain %t/blessed.swift -Xcc -DTEST_CLASS=struct
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name brain %t/blessed.swift -Xcc -DTEST_PRIVATE=protected
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -module-name brain %t/blessed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name brain %t/blessed.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name brain %t/blessed.swift -Xcc -DTEST_CLASS=struct
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name brain %t/blessed.swift -Xcc -DTEST_PRIVATE=protected
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -module-name brain %t/blessed.swift -Xcc -DTEST_CLASS=struct -Xcc -DTEST_PRIVATE=protected
 
 //--- blessed.swift
 

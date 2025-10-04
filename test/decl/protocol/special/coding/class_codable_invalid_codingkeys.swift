@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown
 
 // Classes with a CodingKeys entity which is not a type should not derive
 // conformance.

@@ -99,6 +99,7 @@ class DiagnosticVerifier : public DiagnosticConsumer {
   ArrayRef<std::string> AdditionalFilePaths;
   bool AutoApplyFixes;
   bool IgnoreUnknown;
+  bool IgnoreUnrelated;
   bool UseColor;
   ArrayRef<std::string> AdditionalExpectedPrefixes;
 
@@ -106,11 +107,11 @@ public:
   explicit DiagnosticVerifier(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
                               ArrayRef<std::string> AdditionalFilePaths,
                               bool AutoApplyFixes, bool IgnoreUnknown,
-                              bool UseColor,
+                              bool IgnoreUnrelated, bool UseColor,
                               ArrayRef<std::string> AdditionalExpectedPrefixes)
       : SM(SM), BufferIDs(BufferIDs), AdditionalFilePaths(AdditionalFilePaths),
         AutoApplyFixes(AutoApplyFixes), IgnoreUnknown(IgnoreUnknown),
-        UseColor(UseColor),
+        IgnoreUnrelated(IgnoreUnrelated), UseColor(UseColor),
         AdditionalExpectedPrefixes(AdditionalExpectedPrefixes) {}
 
   virtual void handleDiagnostic(SourceManager &SM,
@@ -130,6 +131,11 @@ private:
   };
 
   void printDiagnostic(const llvm::SMDiagnostic &Diag) const;
+
+  /// Check whether there were any diagnostics in files without expected
+  /// diagnostics
+  bool verifyUnrelated(
+      std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const;
 
   bool
   verifyUnknown(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const;

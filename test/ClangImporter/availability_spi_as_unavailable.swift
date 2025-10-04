@@ -1,6 +1,6 @@
 // REQUIRES: OS=macosx
-// RUN: %target-swift-frontend -typecheck %s -F %S/Inputs/frameworks -verify -DNOT_UNDERLYING -library-level api -parse-as-library -require-explicit-availability=ignore
-// RUN: %target-swift-frontend -typecheck %s -F %S/Inputs/frameworks -module-name SPIContainer -import-underlying-module -verify -library-level api -parse-as-library  -require-explicit-availability=ignore
+// RUN: %target-swift-frontend -typecheck %s -F %S/Inputs/frameworks -verify -verify-ignore-unrelated -DNOT_UNDERLYING -library-level api -parse-as-library -require-explicit-availability=ignore
+// RUN: %target-swift-frontend -typecheck %s -F %S/Inputs/frameworks -module-name SPIContainer -import-underlying-module -verify -verify-ignore-unrelated -library-level api -parse-as-library  -require-explicit-availability=ignore
 
 #if NOT_UNDERLYING
 import SPIContainer

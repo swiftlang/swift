@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift                       \
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated                       \
 // RUN:     -disable-availability-checking                   \
 // RUN:     -enable-experimental-feature Sensitive           \
 // RUN:     -enable-experimental-feature LifetimeDependence  \

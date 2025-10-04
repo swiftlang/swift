@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -module-name test
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -module-name test
 
 struct X {
   typealias MyInt = Int

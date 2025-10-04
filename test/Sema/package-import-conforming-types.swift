@@ -8,9 +8,9 @@
 // RUN:  %S/Inputs/implementation-only-import-in-decls-helper.swift -I %t \
 // RUN:  -enable-library-evolution -swift-version 5
 
-// RUN: %target-typecheck-verify-swift -I %t \
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t \
 // RUN:  -swift-version 5 -package-name pkg -enable-library-evolution
-// RUN: %target-typecheck-verify-swift -I %t \
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t \
 // RUN:  -swift-version 5 -package-name pkg
 
 package import BADLibrary // expected-note 8 {{protocol 'BadProto' imported as 'package' from 'BADLibrary' here}}

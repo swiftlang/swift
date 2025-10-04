@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t-scratch)
 // RUN: %target-swift-frontend -emit-module -o %t-scratch/def_property_wrappers~partial.swiftmodule -primary-file %S/Inputs/def_property_wrappers.swift -module-name def_property_wrappers -enable-testing
 // RUN: %target-swift-frontend -merge-modules -emit-module -parse-as-library -enable-testing %t-scratch/def_property_wrappers~partial.swiftmodule -module-name def_property_wrappers -o %t/def_property_wrappers.swiftmodule
-// RUN: %target-swift-frontend -typecheck -I%t -verify %s -verify-ignore-unknown
+// RUN: %target-swift-frontend -typecheck -I%t -verify -verify-ignore-unrelated %s -verify-ignore-unknown
 
 @testable import def_property_wrappers
 

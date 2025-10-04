@@ -8,7 +8,7 @@
 // RUN:   -enable-experimental-feature CustomAvailability
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %t/client.swift \
-// RUN:   -typecheck -verify \
+// RUN:   -typecheck -verify -verify-ignore-unrelated \
 // RUN:   -I %S/../Inputs/custom-modules/availability-domains \
 // RUN:   -I %t/modules -enable-experimental-feature CustomAvailability
 

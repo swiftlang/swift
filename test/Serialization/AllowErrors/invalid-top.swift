@@ -5,7 +5,7 @@
 // RUN: %{python} %utils/split_file.py -o %t %s
 
 // Errors often only occur during merging, hence creating an empty module here
-// RUN: %target-swift-frontend -verify -module-name errors -emit-module -o %t/mods/errorsmain.partial.swiftmodule -experimental-allow-module-with-compiler-errors %t/errors.swift
+// RUN: %target-swift-frontend -verify -verify-ignore-unrelated -module-name errors -emit-module -o %t/mods/errorsmain.partial.swiftmodule -experimental-allow-module-with-compiler-errors %t/errors.swift
 // RUN: %target-swift-frontend -module-name errors -emit-module -o %t/mods/errorsempty.partial.swiftmodule %t/empty.swift
 // RUN: %target-swift-frontend -module-name errors -emit-module -o %t/mods/errors.swiftmodule -experimental-allow-module-with-compiler-errors %t/mods/errorsmain.partial.swiftmodule %t/mods/errorsempty.partial.swiftmodule
 

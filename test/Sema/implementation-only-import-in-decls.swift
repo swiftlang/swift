@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t/BADLibrary.swiftmodule %S/Inputs/implementation-only-import-in-decls-helper.swift -I %t \
 // RUN:  -enable-library-evolution -swift-version 5
 
-// RUN: %target-typecheck-verify-swift -I %t \
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t \
 // RUN:  -enable-library-evolution -swift-version 5
 
 import NormalLibrary

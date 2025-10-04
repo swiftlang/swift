@@ -11,7 +11,7 @@
 // RUN:   -emit-module-path %t/B.swiftmodule
 
 // RUN: %target-swift-frontend -typecheck %t/src/main.swift \
-// RUN:   -module-name main -I %t -verify
+// RUN:   -module-name main -I %t -verify -verify-ignore-unrelated
 
 // https://github.com/apple/swift/issues/67799
 

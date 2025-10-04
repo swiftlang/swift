@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t/cache)
-// RUN: %target-typecheck-verify-swift -module-cache-path %t/cache
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -module-cache-path %t/cache
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx

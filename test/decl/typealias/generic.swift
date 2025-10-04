@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 struct MyType<TyA, TyB> { // expected-note {{generic struct 'MyType' declared here}}
   // expected-note @-1 {{arguments to generic parameter 'TyB' ('S' and 'Int') are expected to be equal}}

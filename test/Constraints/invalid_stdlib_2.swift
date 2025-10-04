@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 class Dictionary<K, V> : ExpressibleByDictionaryLiteral { // expected-error {{type 'Dictionary<K, V>' does not conform to protocol 'ExpressibleByDictionaryLiteral'}}  expected-note {{add stubs for conformance}}
   typealias Key = K

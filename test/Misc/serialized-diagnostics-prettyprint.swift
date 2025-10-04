@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift -module-name Lib -emit-module-path %t/Lib.swiftmodule
-// RUN: %target-swift-frontend -typecheck -I %t -serialize-diagnostics-path %t/diags.dia %t/Client.swift -verify
+// RUN: %target-swift-frontend -typecheck -I %t -serialize-diagnostics-path %t/diags.dia %t/Client.swift -verify -verify-ignore-unrelated
 // RUN: c-index-test -read-diagnostics %t/diags.dia > %t/diags.deserialized_diagnostics.txt 2>&1
 // RUN: %FileCheck --input-file=%t/diags.deserialized_diagnostics.txt %t/Client.swift
 

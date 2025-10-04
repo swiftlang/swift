@@ -4,7 +4,7 @@
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
 // Check for expected errors.
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -DTEST_DIAGNOSTICS -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -DTEST_DIAGNOSTICS -verify-ignore-unknown
 // RUN: not %target-swift-frontend -typecheck -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -DTEST_DIAGNOSTICS %s > %t/diags.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-DIAGS %s < %t/diags.txt
 

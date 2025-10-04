@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-module %S/Inputs/OpenHelpers.swift -o %t/OpenHelpers.swiftmodule
-// RUN: %target-typecheck-verify-swift -I %t
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t
 
 import OpenHelpers
 

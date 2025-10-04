@@ -20,7 +20,7 @@
 // RUN: echo "messmessmess" >> %t/inputs/Foo.swiftinterface
 // RUN: echo "messmessmess" >> %t/inputs/Bar.swiftinterface
 
-// RUN: %target-typecheck-verify-swift -disable-implicit-concurrency-module-import -I %t/inputs -backup-module-interface-path %t/alternative-inputs -module-cache-path %t/module-cache
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -disable-implicit-concurrency-module-import -I %t/inputs -backup-module-interface-path %t/alternative-inputs -module-cache-path %t/module-cache
 
 // RUN: touch -t 201401240005 %t/inputs/Bar.swiftinterface
 // RUN: %target-swift-frontend-typecheck -disable-implicit-concurrency-module-import -I %t/inputs -backup-module-interface-path %t/alternative-inputs -module-cache-path %t/module-cache -Rmodule-interface-rebuild %s &> %t/remarks.txt

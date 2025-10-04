@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules %s -verify-ignore-unknown
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated -I %S/Inputs/custom-modules %s -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 
