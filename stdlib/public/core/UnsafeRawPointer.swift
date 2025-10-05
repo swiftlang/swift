@@ -442,7 +442,9 @@ extension UnsafeRawPointer {
   ///   `offset`. The returned instance is memory-managed and unassociated
   ///   with the value in the memory referenced by this pointer.
   @inlinable
-  public func load<T>(
+  @_preInverseGenerics
+  @lifetime(borrow self)
+  public func load<T: ~Escapable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
@@ -488,7 +490,8 @@ extension UnsafeRawPointer {
   ///   with the value in the range of memory referenced by this pointer.
   @inlinable
   @_alwaysEmitIntoClient
-  public func loadUnaligned<T: BitwiseCopyable>(
+  @lifetime(borrow self)
+  public func loadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
@@ -1281,7 +1284,9 @@ extension UnsafeMutableRawPointer {
   ///   `offset`. The returned instance is memory-managed and unassociated
   ///   with the value in the memory referenced by this pointer.
   @inlinable
-  public func load<T>(
+  @_preInverseGenerics
+  @lifetime(borrow self)
+  public func load<T: ~Escapable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
@@ -1328,7 +1333,8 @@ extension UnsafeMutableRawPointer {
   ///   with the value in the range of memory referenced by this pointer.
   @inlinable
   @_alwaysEmitIntoClient
-  public func loadUnaligned<T: BitwiseCopyable>(
+  @lifetime(borrow self)
+  public func loadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
