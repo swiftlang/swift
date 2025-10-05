@@ -1,7 +1,26 @@
 import unittest
 from unittest.mock import patch
 
-from update_checkout.update_checkout import _is_any_repository_locked
+from update_checkout.update_checkout import UpdateArguments, _is_any_repository_locked
+
+
+def _update_arguments_with_fake_path(repo_name: str, path: str) -> UpdateArguments:
+    return UpdateArguments(
+        repo_name=repo_name,
+        source_root=path,
+        config={},
+        scheme_name="",
+        scheme_map=None,
+        tag="",
+        timestamp=None,
+        reset_to_remote=False,
+        clean=False,
+        stash=False,
+        cross_repos_pr=False,
+        output_prefix="",
+        verbose=False,
+    )
+
 
 class TestIsAnyRepositoryLocked(unittest.TestCase):
     @patch("os.path.exists")
@@ -9,8 +28,8 @@ class TestIsAnyRepositoryLocked(unittest.TestCase):
     @patch("os.listdir")
     def test_repository_with_lock_file(self, mock_listdir, mock_isdir, mock_exists):
         pool_args = [
-            ("/fake_path", None, "repo1"),
-            ("/fake_path", None, "repo2"),
+            _update_arguments_with_fake_path("repo1", "/fake_path"),
+            _update_arguments_with_fake_path("repo2", "/fake_path"),
         ]
 
         def listdir_side_effect(path):
@@ -32,7 +51,7 @@ class TestIsAnyRepositoryLocked(unittest.TestCase):
     @patch("os.listdir")
     def test_repository_without_git_dir(self, mock_listdir, mock_isdir, mock_exists):
         pool_args = [
-            ("/fake_path", None, "repo1"),
+            _update_arguments_with_fake_path("repo1", "/fake_path"),
         ]
 
         mock_exists.return_value = False
@@ -47,7 +66,7 @@ class TestIsAnyRepositoryLocked(unittest.TestCase):
     @patch("os.listdir")
     def test_repository_with_git_file(self, mock_listdir, mock_isdir, mock_exists):
         pool_args = [
-            ("/fake_path", None, "repo1"),
+            _update_arguments_with_fake_path("repo1", "/fake_path"),
         ]
 
         mock_exists.return_value = True
@@ -60,9 +79,11 @@ class TestIsAnyRepositoryLocked(unittest.TestCase):
     @patch("os.path.exists")
     @patch("os.path.isdir")
     @patch("os.listdir")
-    def test_repository_with_multiple_lock_files(self, mock_listdir, mock_isdir, mock_exists):
+    def test_repository_with_multiple_lock_files(
+        self, mock_listdir, mock_isdir, mock_exists
+    ):
         pool_args = [
-            ("/fake_path", None, "repo1"),
+            _update_arguments_with_fake_path("repo1", "/fake_path"),
         ]
 
         mock_exists.return_value = True
@@ -77,7 +98,7 @@ class TestIsAnyRepositoryLocked(unittest.TestCase):
     @patch("os.listdir")
     def test_repository_with_no_lock_files(self, mock_listdir, mock_isdir, mock_exists):
         pool_args = [
-            ("/fake_path", None, "repo1"),
+            _update_arguments_with_fake_path("repo1", "/fake_path"),
         ]
 
         mock_exists.return_value = True
@@ -86,4 +107,3 @@ class TestIsAnyRepositoryLocked(unittest.TestCase):
 
         result = _is_any_repository_locked(pool_args)
         self.assertEqual(result, set())
-
