@@ -243,8 +243,6 @@ BridgedParameterInfoArray SILFunctionType_getParameters(BridgedCanType);
 
 BRIDGED_INLINE bool SILFunctionType_hasSelfParam(BridgedCanType);
 
-BRIDGED_INLINE bool SILFunctionType_isTrivialNoescape(BridgedCanType);
-
 SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
 BridgedYieldInfoArray SILFunctionType_getYields(BridgedCanType);
 
