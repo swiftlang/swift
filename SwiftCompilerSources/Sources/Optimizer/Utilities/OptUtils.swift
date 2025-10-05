@@ -262,6 +262,18 @@ extension Builder {
     }
   }
 
+  static func insertCleanupAtFunctionExits(
+    of function: Function,
+    _ context: some MutatingContext,
+    insert: (Builder) -> ()
+  ) {
+    for exitBlock in function.blocks where exitBlock.terminator.isFunctionExiting {
+      let terminator = exitBlock.terminator
+      let builder = Builder(before: terminator, location: terminator.location.asCleanup, context)
+      insert(builder)
+    }
+  }
+
   func destroyCapturedArgs(for paiOnStack: PartialApplyInst) {
     precondition(paiOnStack.isOnStack, "Function must only be called for `partial_apply`s on stack!")
     self.bridged.destroyCapturedArgs(paiOnStack.bridged)
