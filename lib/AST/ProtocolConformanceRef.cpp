@@ -202,8 +202,12 @@ Type ProtocolConformanceRef::getTypeWitness(AssociatedTypeDecl *assocType,
   auto conformingType = abstract->getType();
   ASSERT(abstract->getProtocol() == assocType->getProtocol());
 
-  if (auto *archetypeType = conformingType->getAs<ArchetypeType>())
-    return archetypeType->getNestedType(assocType);
+  if (auto *archetypeType = conformingType->getAs<ArchetypeType>()) {
+    auto witnessType = archetypeType->getNestedType(assocType);
+    if (!witnessType)
+      return ErrorType::get(assocType->getASTContext());
+    return witnessType;
+  }
 
   return DependentMemberType::get(conformingType, assocType);
 }
