@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules -verify-ignore-unknown -target aarch64-unknown-linux-android24 %s
 
-// REQUIRES: OS=linux-android ||  OS=linux-androideabi
+// REQUIRES: OS=linux-android || OS=linux-androideabi
 
 import AndroidVersioning
 
