@@ -5,14 +5,14 @@ class Left // expected-error {{'Left' inherits from itself}}
   class Hand {}
 }
 
-class Right // expected-note {{class 'Right' declared here}}
+class Right // expected-note {{through class 'Right' declared here}}
   : Left.Hand { // expected-note {{through reference here}}
   class Hand {}
 }
 
 class C : B { } // expected-error{{'C' inherits from itself}}
-class B : A { } // expected-note{{class 'B' declared here}}
-class A : C { } // expected-note{{class 'A' declared here}}
+class B : A { } // expected-note{{through class 'B' declared here}}
+class A : C { } // expected-note{{through class 'A' declared here}}
 
 class TrivialCycle : TrivialCycle {} // expected-error{{'TrivialCycle' inherits from itself}}
 protocol P : P {} // expected-error {{protocol 'P' refines itself}}
