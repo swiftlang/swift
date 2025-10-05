@@ -1765,7 +1765,6 @@ CanType TypeBase::computeCanonicalType() {
 #define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::Error:
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
   case TypeKind::BuiltinTuple:
@@ -1778,6 +1777,14 @@ CanType TypeBase::computeCanonicalType() {
     break;
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+
+  case TypeKind::Error: {
+    auto errTy = cast<ErrorType>(this);
+    auto originalTy = errTy->getOriginalType();
+    ASSERT(originalTy && "The bare ErrorType singleton is already canonical");
+    Result = ErrorType::get(originalTy->getCanonicalType()).getPointer();
+    break;
+  }
 
   case TypeKind::Enum:
   case TypeKind::Struct:
