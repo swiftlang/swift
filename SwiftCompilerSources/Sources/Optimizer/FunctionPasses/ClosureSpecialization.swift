@@ -10,16 +10,64 @@
 //
 //===-----------------------------------------------------------------------===//
 
-/// This file contains the closure-specialization optimizations for general and differentiable Swift.
+import AST
+import SIL
 
-/// General Closure Specialization
-/// ------------------------------------
-/// TODO: Add description when the functionality is added.
+/// Closure Specialization
+/// ----------------------
+/// Specializes functions which take a closure (a `partial_apply` or `thin_to_thick_function` as argument.
+/// The closure is created directly in the specialized function whereas the captured arguments are passed
+/// as additional arguments to the specialized function. As a heuristic, this is only done if the closure
+/// is actually called in the function because after specialization, the closure and its call can be
+/// further optimized, e.g. the closure can be inlined.
+///
+/// ```
+///   %3 = function_ref @closure
+///   %4 = partial_apply %3(%1, %2) : (Float, Int, Bool) -> ()
+///   %5 = function_ref @closure_user
+///   apply %5(%4)
+///   ...
+///
+/// sil @closure_user : ((Float) -> (), Float) -> () {
+/// bb0(%0 : $(Float) -> (), %1 : $Float):
+///   apply %0(%1)
+///   ...
+/// ```
+/// ->
+/// ```
+///   %5 = function_ref @specialized_closure_user
+///   apply %5(%1, %2)
+///   ...
+///
+/// sil @specialized_closure_user : (Float, Int, Bool) -> () {
+/// bb0(%0 : $Float, %1 : $Int, %2 : $Bool):
+///   %3 = function_ref @closure
+///   %4 = partial_apply %3(%1, %2)
+///   apply %3(%0)
+///   ...
+/// ```
+///
+let closureSpecialization = FunctionPass(name: "closure-specialization") {
+  (function: Function, context: FunctionPassContext) in
+
+  guard function.hasOwnership else {
+    return
+  }
+
+  for inst in function.instructions {
+    if let apply = inst as? FullApplySite {
+      _ = trySpecialize(apply: apply, context)
+    }
+  }
+  if context.needFixStackNesting {
+    context.fixStackNesting(in: function)
+  }
+}
 
 /// AutoDiff Closure Specialization
 /// -------------------------------
 /// This optimization performs closure specialization tailored for the patterns seen in Swift Autodiff. In principle,
-/// the optimization does the same thing as the existing closure specialization pass. However, it is tailored to the
+/// the optimization does the same thing as the general closure specialization pass. However, it is tailored to the
 /// patterns of Swift Autodiff.
 ///
 /// The compiler performs reverse-mode differentiation on functions marked with `@differentiable(reverse)`. In doing so,
@@ -98,30 +146,13 @@
 ///   return %3: $Float
 /// }
 /// ```
-
-import AST
-import SIL
-import SILBridging
-
-private let verbose = false
-
-private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
-  if verbose {
-    debugLog(prefix: prefix, message())
-  }
-}
-
-// =========== Entry point =========== //
-let generalClosureSpecialization = FunctionPass(
-  name: "experimental-swift-based-closure-specialization"
-) {
-  (function: Function, context: FunctionPassContext) in
-  // TODO: Implement general closure specialization optimization
-  print("NOT IMPLEMENTED")
-}
-
+///
 let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-specialization") {
   (function: Function, context: FunctionPassContext) in
+
+  guard function.hasOwnership else {
+    return
+  }
 
   guard !function.isDefinedExternally,
     function.isAutodiffVJP
@@ -132,1078 +163,591 @@ let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-special
   var remainingSpecializationRounds = 5
 
   repeat {
-    guard let pullbackClosureInfo = getPullbackClosureInfo(in: function, context) else {
-      break
-    }
-
-    var (specializedFunction, alreadyExists) = getOrCreateSpecializedFunction(
-      basedOn: pullbackClosureInfo, context)
-
-    if !alreadyExists {
-      context.notifyNewFunction(
-        function: specializedFunction, derivedFrom: pullbackClosureInfo.pullbackFn)
-    }
-
-    rewriteApplyInstruction(
-      using: specializedFunction, pullbackClosureInfo: pullbackClosureInfo, context)
-
-    var deadClosures = InstructionWorklist(context)
-    pullbackClosureInfo.closureArgDescriptors
-      .map { $0.closure }
-      .forEach { deadClosures.pushIfNotVisited($0) }
-
-    defer {
-      deadClosures.deinitialize()
-    }
-
-    while let deadClosure = deadClosures.pop() {
-      let isDeleted = context.tryDeleteDeadClosure(closure: deadClosure as! SingleValueInstruction)
-      if isDeleted {
-        context.notifyInvalidatedStackNesting()
+    var changed = false
+    for inst in function.instructions {
+      if let partialApply = inst as? PartialApplyInst,
+         partialApply.isPullbackInResultOfAutodiffVJP
+      {
+        if trySpecialize(apply: partialApply, context) {
+          changed = true
+        }
       }
     }
-
     if context.needFixStackNesting {
       context.fixStackNesting(in: function)
+    }
+    if !changed {
+      break
     }
 
     remainingSpecializationRounds -= 1
   } while remainingSpecializationRounds > 0
 }
 
-// =========== Top-level functions ========== //
-
-private let specializationLevelLimit = 2
-
-private func getPullbackClosureInfo(in caller: Function, _ context: FunctionPassContext)
-  -> PullbackClosureInfo?
-{
-  /// __Root__ closures created via `partial_apply` or `thin_to_thick_function` may be converted and reabstracted
-  /// before finally being used at an apply site. We do not want to handle these intermediate closures separately
-  /// as they are handled and cloned into the specialized function as part of the root closures. Therefore, we keep
-  /// track of these intermediate closures in a set.
-  ///
-  /// This set is populated via the `markConvertedAndReabstractedClosuresAsUsed` function which is called when we're
-  /// handling the different uses of our root closures.
-  ///
-  /// Below SIL example illustrates the above point.
-  /// ```
-  /// // The below set of a "root" closure and its reabstractions/conversions
-  /// // will be handled as a unit and the entire set will be copied over
-  /// // in the specialized version of `takesClosure` if we determine that we
-  /// // can specialize `takesClosure` against its closure argument.
-  ///                                                                                                          __
-  /// %someFunction = function_ref @someFunction: $@convention(thin) (Int, Int) -> Int                            \
-  /// %rootClosure = partial_apply [callee_guaranteed] %someFunction (%someInt): $(Int, Int) -> Int                \
-  /// %thunk = function_ref @reabstractionThunk : $@convention(thin) (@callee_guaranteed (Int) -> Int) -> @out Int /
-  /// %reabstractedClosure = partial_apply [callee_guaranteed] %thunk(%rootClosure) :                             /
-  ///                        $@convention(thin) (@callee_guaranteed (Int) -> Int) -> @out Int                  __/
-  ///
-  /// %takesClosure = function_ref @takesClosure : $@convention(thin) (@owned @callee_guaranteed (Int) -> @out Int) -> Int
-  /// %result = partial_apply %takesClosure(%reabstractedClosure) : $@convention(thin) (@owned @callee_guaranteed () -> @out Int) -> Int
-  /// ret %result
-  /// ```
-  var convertedAndReabstractedClosures = InstructionSet(context)
-
-  defer {
-    convertedAndReabstractedClosures.deinitialize()
-  }
-
-  var pullbackClosureInfoOpt = PullbackClosureInfo?(nil)
-
-  for inst in caller.instructions {
-    if !convertedAndReabstractedClosures.contains(inst),
-      let rootClosure = inst.asSupportedClosure
-    {
-      updatePullbackClosureInfo(
-        for: rootClosure, in: &pullbackClosureInfoOpt,
-        convertedAndReabstractedClosures: &convertedAndReabstractedClosures, context)
-    }
-  }
-
-  return pullbackClosureInfoOpt
-}
-
-private func getOrCreateSpecializedFunction(
-  basedOn pullbackClosureInfo: PullbackClosureInfo, _ context: FunctionPassContext
-)
-  -> (function: Function, alreadyExists: Bool)
-{
-  let specializedFunctionName = pullbackClosureInfo.specializedCalleeName(context)
-  if let specializedFunction = context.lookupFunction(name: specializedFunctionName) {
-    return (specializedFunction, true)
-  }
-
-  let pullbackFn = pullbackClosureInfo.pullbackFn
-  let specializedParameters = pullbackFn.convention.getSpecializedParameters(
-    basedOn: pullbackClosureInfo)
-
-  let specializedFunction =
-    context.createSpecializedFunctionDeclaration(
-      from: pullbackFn, withName: specializedFunctionName,
-      withParams: specializedParameters,
-      makeThin: true, makeBare: true)
-
-  context.buildSpecializedFunction(
-    specializedFunction: specializedFunction,
-    buildFn: { (emptySpecializedFunction, functionPassContext) in
-      var closureSpecCloner = Cloner(
-        cloneToEmptyFunction: emptySpecializedFunction, functionPassContext)
-      closureSpecCloner.cloneAndSpecializeFunctionBody(using: pullbackClosureInfo)
-      closureSpecCloner.deinitialize()
-    })
-
-  return (specializedFunction, false)
-}
-
-private func rewriteApplyInstruction(
-  using specializedCallee: Function, pullbackClosureInfo: PullbackClosureInfo,
-  _ context: FunctionPassContext
-) {
-  let newApplyArgs = pullbackClosureInfo.getArgumentsForSpecializedApply(of: specializedCallee)
-
-  for newApplyArg in newApplyArgs {
-    if case let .PreviouslyCaptured(capturedArg, needsRetain, parentClosureArgIndex) = newApplyArg,
-      needsRetain
-    {
-      let closureArgDesc = pullbackClosureInfo.closureArgDesc(at: parentClosureArgIndex)!
-      var builder = Builder(before: closureArgDesc.closure, context)
-
-      // TODO: Support only OSSA instructions once the OSSA elimination pass is moved after all function optimization
-      // passes.
-      if pullbackClosureInfo.paiOfPullback.parentBlock != closureArgDesc.closure.parentBlock {
-        // Emit the retain and release that keeps the argument live across the callee using the closure.
-        builder.createRetainValue(operand: capturedArg)
-
-        for instr in closureArgDesc.lifetimeFrontier {
-          builder = Builder(before: instr, context)
-          builder.createReleaseValue(operand: capturedArg)
-        }
-
-        // Emit the retain that matches the captured argument by the partial_apply in the callee that is consumed by
-        // the partial_apply.
-        builder = Builder(before: pullbackClosureInfo.paiOfPullback, context)
-        builder.createRetainValue(operand: capturedArg)
-      } else {
-        builder.createRetainValue(operand: capturedArg)
-      }
-    }
-  }
-
-  // Rewrite apply instruction
-  var builder = Builder(before: pullbackClosureInfo.paiOfPullback, context)
-  let oldPartialApply = pullbackClosureInfo.paiOfPullback
-  let funcRef = builder.createFunctionRef(specializedCallee)
-  let capturedArgs = Array(newApplyArgs.map { $0.value })
-
-  let newPartialApply = builder.createPartialApply(
-    function: funcRef, substitutionMap: SubstitutionMap(),
-    capturedArguments: capturedArgs, calleeConvention: oldPartialApply.calleeConvention,
-    hasUnknownResultIsolation: oldPartialApply.hasUnknownResultIsolation,
-    isOnStack: oldPartialApply.isOnStack)
-
-  builder = Builder(before: pullbackClosureInfo.paiOfPullback.next!, context)
-  // TODO: Support only OSSA instructions once the OSSA elimination pass is moved after all function optimization
-  // passes.
-  for closureArgDesc in pullbackClosureInfo.closureArgDescriptors {
-    if closureArgDesc.isClosureConsumed,
-      !closureArgDesc.isPartialApplyOnStack,
-      !closureArgDesc.parameterInfo.isTrivialNoescapeClosure
-    {
-      builder.createReleaseValue(operand: closureArgDesc.closure)
-    }
-  }
-
-  oldPartialApply.replace(with: newPartialApply, context)
-}
-
 // ===================== Utility functions and extensions ===================== //
 
-private func updatePullbackClosureInfo(
-  for rootClosure: SingleValueInstruction, in pullbackClosureInfoOpt: inout PullbackClosureInfo?,
-  convertedAndReabstractedClosures: inout InstructionSet, _ context: FunctionPassContext
-) {
-  var rootClosurePossibleLiveRange = InstructionRange(begin: rootClosure, context)
-  defer {
-    rootClosurePossibleLiveRange.deinitialize()
-  }
-
-  var rootClosureApplies = OperandWorklist(context)
-  defer {
-    rootClosureApplies.deinitialize()
-  }
-
-  // A "root" closure undergoing conversions and/or reabstractions has additional restrictions placed upon it, in order
-  // for a pullback to be specialized against it. We handle conversion/reabstraction uses before we handle apply uses
-  // to gather the parameters required to evaluate these restrictions or to skip pullback's uses of "unsupported"
-  // closures altogether.
-  //
-  // There are currently 2 restrictions that are evaluated prior to specializing a pullback against a converted and/or
-  // reabstracted closure -
-  // 1. A reabstracted root closure can only be specialized against, if the reabstracted closure is ultimately passed
-  //    trivially (as a noescape+thick function) as captured argument of pullback's partial_apply.
-  //
-  // 2. A root closure may be a partial_apply [stack], in which case we need to make sure that all mark_dependence
-  //    bases for it will be available in the specialized callee in case the pullback is specialized against this root
-  //    closure.
-
-  let (foundUnexpectedUse, haveUsedReabstraction) =
-    handleNonApplies(
-      for: rootClosure, rootClosureApplies: &rootClosureApplies,
-      rootClosurePossibleLiveRange: &rootClosurePossibleLiveRange, context)
-
-  if foundUnexpectedUse {
-    return
-  }
-
-  let intermediateClosureArgDescriptorData =
-    handleApplies(
-      for: rootClosure, pullbackClosureInfoOpt: &pullbackClosureInfoOpt,
-      rootClosureApplies: &rootClosureApplies,
-      rootClosurePossibleLiveRange: &rootClosurePossibleLiveRange,
-      convertedAndReabstractedClosures: &convertedAndReabstractedClosures,
-      haveUsedReabstraction: haveUsedReabstraction, context)
-
-  if pullbackClosureInfoOpt == nil {
-    return
-  }
-
-  finalizePullbackClosureInfo(
-    for: rootClosure, in: &pullbackClosureInfoOpt,
-    rootClosurePossibleLiveRange: rootClosurePossibleLiveRange,
-    intermediateClosureArgDescriptorData: intermediateClosureArgDescriptorData, context)
-}
-
-/// Handles all non-apply direct and transitive uses of `rootClosure`.
-///
-/// Returns:
-/// haveUsedReabstraction - whether the root closure is reabstracted via a thunk
-/// foundUnexpectedUse - whether the root closure is directly or transitively used in an instruction that we don't know
-///                      how to handle. If true, then `rootClosure` should not be specialized against.
-private func handleNonApplies(
-  for rootClosure: SingleValueInstruction,
-  rootClosureApplies: inout OperandWorklist,
-  rootClosurePossibleLiveRange: inout InstructionRange,
-  _ context: FunctionPassContext
-)
-  -> (foundUnexpectedUse: Bool, haveUsedReabstraction: Bool)
-{
-  var foundUnexpectedUse = false
-  var haveUsedReabstraction = false
-
-  /// The root closure or an intermediate closure created by reabstracting the root closure may be a `partial_apply
-  /// [stack]` and we need to make sure that all `mark_dependence` bases for this `onStack` closure will be available in
-  /// the specialized callee, in case the pullback is specialized against this root closure.
-  ///
-  /// `possibleMarkDependenceBases` keeps track of all potential values that may be used as bases for creating
-  /// `mark_dependence`s for our `onStack` root/reabstracted closures. For root closures these values are non-trivial
-  /// closure captures (which are always available as function arguments in the specialized callee). For reabstracted
-  /// closures these values may be the root closure or its conversions (below is a short SIL example representing this
-  /// case).
-  /// ```
-  /// %someFunction = function_ref @someFunction : $@convention(thin) (Int) -> Int
-  /// %rootClosure = partial_apply [callee_guaranteed] %someFunction(%someInt) : $@convention(thin) (Int) -> Int
-  /// %noescapeRootClosure = convert_escape_to_noescape %rootClosure : $@callee_guaranteed () -> Int to $@noescape @callee_guaranteed () -> Int
-  /// %thunk = function_ref @reabstractionThunk : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
-  /// %thunkedRootClosure = partial_apply [callee_guaranteed] [on_stack] %thunk(%noescapeRootClosure) : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
-  /// %dependency = mark_dependence %thunkedRootClosure : $@noescape @callee_guaranteed () -> @out Int on %noescapeClosure : $@noescape @callee_guaranteed () -> Int
-  /// %takesClosure = function_ref @takesClosure : $@convention(thin) (@owned @noescape @callee_guaranteed () -> @out Int)
-  /// %ret = apply %takesClosure(%dependency) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> @out Int)
-  /// ```
-  ///
-  /// Any value outside of the aforementioned values is not going to be available in the specialized callee and a
-  /// `mark_dependence` of the root closure on such a value means that we cannot specialize the pullback against it.
-  var possibleMarkDependenceBases = ValueSet(context)
-  defer {
-    possibleMarkDependenceBases.deinitialize()
-  }
-
-  var rootClosureConversionsAndReabstractions = OperandWorklist(context)
-  rootClosureConversionsAndReabstractions.pushIfNotVisited(contentsOf: rootClosure.uses)
-  defer {
-    rootClosureConversionsAndReabstractions.deinitialize()
-  }
-
-  if let pai = rootClosure as? PartialApplyInst {
-    for arg in pai.arguments {
-      possibleMarkDependenceBases.insert(arg)
-    }
-  }
-
-  while let use = rootClosureConversionsAndReabstractions.pop() {
-    switch use.instruction {
-    case let cfi as ConvertFunctionInst:
-      rootClosureConversionsAndReabstractions.pushIfNotVisited(contentsOf: cfi.uses)
-      possibleMarkDependenceBases.insert(cfi)
-      rootClosurePossibleLiveRange.insert(use.instruction)
-
-    case let cvt as ConvertEscapeToNoEscapeInst:
-      rootClosureConversionsAndReabstractions.pushIfNotVisited(contentsOf: cvt.uses)
-      possibleMarkDependenceBases.insert(cvt)
-      rootClosurePossibleLiveRange.insert(use.instruction)
-
-    case let pai as PartialApplyInst:
-      if !pai.isPullbackInResultOfAutodiffVJP,
-        pai.isSupportedClosure,
-        pai.isPartialApplyOfThunk,
-        // Argument must be a closure
-        pai.arguments[0].type.isThickFunction
-      {
-        rootClosureConversionsAndReabstractions.pushIfNotVisited(contentsOf: pai.uses)
-        possibleMarkDependenceBases.insert(pai)
-        rootClosurePossibleLiveRange.insert(use.instruction)
-        haveUsedReabstraction = true
-      } else if pai.isPullbackInResultOfAutodiffVJP {
-        rootClosureApplies.pushIfNotVisited(use)
-      }
-
-    case let mv as MoveValueInst:
-      rootClosureConversionsAndReabstractions.pushIfNotVisited(contentsOf: mv.uses)
-      possibleMarkDependenceBases.insert(mv)
-      rootClosurePossibleLiveRange.insert(use.instruction)
-
-    case let mdi as MarkDependenceInst:
-      if possibleMarkDependenceBases.contains(mdi.base),
-        mdi.value == use.value,
-        mdi.value.type.isNoEscapeFunction,
-        mdi.value.type.isThickFunction
-      {
-        rootClosureConversionsAndReabstractions.pushIfNotVisited(contentsOf: mdi.uses)
-        rootClosurePossibleLiveRange.insert(use.instruction)
-      }
-
-    case is CopyValueInst,
-      is DestroyValueInst,
-      is RetainValueInst,
-      is ReleaseValueInst,
-      is StrongRetainInst,
-      is StrongReleaseInst:
-      rootClosurePossibleLiveRange.insert(use.instruction)
-
-    case let ti as TupleInst:
-      if ti.parentFunction.isAutodiffVJP,
-        let returnInst = ti.parentFunction.returnInstruction,
-        ti == returnInst.returnedValue
-      {
-        // This is the pullback closure returned from an Autodiff VJP and we don't need to handle it.
-      } else {
-        fallthrough
-      }
-
-    default:
-      foundUnexpectedUse = true
-      log("Found unexpected direct or transitive user of root closure: \(use.instruction)")
-      return (foundUnexpectedUse, haveUsedReabstraction)
-    }
-  }
-
-  return (foundUnexpectedUse, haveUsedReabstraction)
-}
-
-private typealias IntermediateClosureArgDescriptorDatum = (
-  applySite: SingleValueInstruction, closureArgIndex: Int, paramInfo: ParameterInfo
-)
-
-private func handleApplies(
-  for rootClosure: SingleValueInstruction, pullbackClosureInfoOpt: inout PullbackClosureInfo?,
-  rootClosureApplies: inout OperandWorklist,
-  rootClosurePossibleLiveRange: inout InstructionRange,
-  convertedAndReabstractedClosures: inout InstructionSet, haveUsedReabstraction: Bool,
-  _ context: FunctionPassContext
-) -> [IntermediateClosureArgDescriptorDatum] {
-  var intermediateClosureArgDescriptorData: [IntermediateClosureArgDescriptorDatum] = []
-
-  while let use = rootClosureApplies.pop() {
-    rootClosurePossibleLiveRange.insert(use.instruction)
-
-    // TODO [extend to general swift]: Handle full apply sites
-    guard let pai = use.instruction as? PartialApplyInst else {
-      continue
-    }
-
-    // TODO: Handling generic closures may be possible but is not yet implemented
-    if pai.hasSubstitutions || !pai.calleeIsDynamicFunctionRef
-      || !pai.isPullbackInResultOfAutodiffVJP
-    {
-      continue
-    }
-
-    guard let callee = pai.referencedFunction else {
-      continue
-    }
-
-    if callee.isDefinedExternally {
-      continue
-    }
-
-    // Don't specialize non-fragile (read as non-serialized) callees if the caller is fragile; the specialized callee
-    // will have shared linkage, and thus cannot be referenced from the fragile caller.
-    let caller = rootClosure.parentFunction
-    if caller.isSerialized && !callee.isSerialized {
-      continue
-    }
-
-    // If the callee uses a dynamic Self, we cannot specialize it, since the resulting specialization might no longer
-    // have 'self' as the last parameter.
-    //
-    // TODO: We could fix this by inserting new arguments more carefully, or changing how we model dynamic Self
-    // altogether.
-    if callee.mayBindDynamicSelf {
-      continue
-    }
-
-    // Proceed if the closure is passed as an argument (and not called). If it is called we have nothing to do.
-    //
-    // `closureArgumentIndex` is the index of the closure in the callee's argument list.
-    guard let closureArgumentIndex = pai.calleeArgumentIndex(of: use) else {
-      continue
-    }
-
-    // Ok, we know that we can perform the optimization but not whether or not the optimization is profitable. Check if
-    // the closure is actually called in the callee (or in a function called by the callee).
-    if !isClosureApplied(in: callee, closureArgIndex: closureArgumentIndex) {
-      continue
-    }
-
-    let onlyHaveThinToThickClosure =
-      rootClosure is ThinToThickFunctionInst && !haveUsedReabstraction
-
-    guard let closureParamInfo = pai.operandConventions[parameter: use.index] else {
-      fatalError("While handling apply uses, parameter info not found for operand: \(use)!")
-    }
-
-    // If we are going to need to release the copied over closure, we must make sure that we understand all the exit
-    // blocks, i.e., they terminate with an instruction that clearly indicates whether to release the copied over
-    // closure or leak it.
-    if closureParamInfo.convention.isGuaranteed,
-      !onlyHaveThinToThickClosure,
-      !callee.blocks.allSatisfy({ $0.isReachableExitBlock || $0.terminator is UnreachableInst })
-    {
-      continue
-    }
-
-    // Functions with a readnone, readonly or releasenone effect and a nontrivial context cannot be specialized.
-    // Inserting a release in such a function results in miscompilation after other optimizations. For now, the
-    // specialization is disabled.
-    //
-    // TODO: A @noescape closure should never be converted to an @owned argument regardless of the function's effect
-    // attribute.
-    if !callee.effectAllowsSpecialization && !onlyHaveThinToThickClosure {
-      continue
-    }
-
-    // Avoid an infinite specialization loop caused by repeated runs of ClosureSpecializer and CapturePropagation.
-    // CapturePropagation propagates constant function-literals. Such function specializations can then be optimized
-    // again by the ClosureSpecializer and so on. This happens if a closure argument is called _and_ referenced in
-    // another closure, which is passed to a recursive call. E.g.
-    //
-    // func foo(_ c: @escaping () -> ()) {
-    //  c() foo({ c() })
-    // }
-    //
-    // A limit of 2 is good enough and will not be exceed in "regular" optimization scenarios.
-    let closureCallee =
-      rootClosure is PartialApplyInst
-      ? (rootClosure as! PartialApplyInst).referencedFunction!
-      : (rootClosure as! ThinToThickFunctionInst).referencedFunction!
-
-    if closureCallee.specializationLevel > specializationLevelLimit {
-      continue
-    }
-
-    if haveUsedReabstraction {
-      markConvertedAndReabstractedClosuresAsUsed(
-        rootClosure: rootClosure, convertedAndReabstractedClosure: use.value,
-        convertedAndReabstractedClosures: &convertedAndReabstractedClosures)
-    }
-
-    if pullbackClosureInfoOpt == nil {
-      pullbackClosureInfoOpt = PullbackClosureInfo(paiOfPullback: pai)
-    } else {
-      assert(pullbackClosureInfoOpt!.paiOfPullback == pai)
-    }
-
-    intermediateClosureArgDescriptorData
-      .append((applySite: pai, closureArgIndex: closureArgumentIndex, paramInfo: closureParamInfo))
-  }
-
-  return intermediateClosureArgDescriptorData
-}
-
-/// Finalizes the pullback closure info for a given root closure by adding a corresponding `ClosureArgDescriptor`
-private func finalizePullbackClosureInfo(
-  for rootClosure: SingleValueInstruction, in pullbackClosureInfoOpt: inout PullbackClosureInfo?,
-  rootClosurePossibleLiveRange: InstructionRange,
-  intermediateClosureArgDescriptorData: [IntermediateClosureArgDescriptorDatum],
-  _ context: FunctionPassContext
-) {
-  assert(pullbackClosureInfoOpt != nil)
-
-  let closureInfo = ClosureInfo(
-    closure: rootClosure, lifetimeFrontier: Array(rootClosurePossibleLiveRange.ends))
-
-  for (applySite, closureArgumentIndex, parameterInfo) in intermediateClosureArgDescriptorData {
-    if pullbackClosureInfoOpt!.paiOfPullback != applySite {
-      fatalError(
-        "ClosureArgDescriptor's applySite field is not equal to pullback's partial_apply; got \(applySite)!"
-      )
-    }
-    let closureArgDesc = ClosureArgDescriptor(
-      closureInfo: closureInfo, closureArgumentIndex: closureArgumentIndex,
-      parameterInfo: parameterInfo)
-    pullbackClosureInfoOpt!.appendClosureArgDescriptor(closureArgDesc)
-  }
-}
-
-private func isClosureApplied(in callee: Function, closureArgIndex index: Int) -> Bool {
-  func inner(_ callee: Function, _ index: Int, _ handledFuncs: inout Set<Function>) -> Bool {
-    let closureArg = callee.argument(at: index)
-
-    for use in closureArg.uses {
-      if let fai = use.instruction as? ApplySite {
-        if fai.callee == closureArg {
-          return true
-        }
-
-        if let faiCallee = fai.referencedFunction,
-          !faiCallee.blocks.isEmpty,
-          handledFuncs.insert(faiCallee).inserted,
-          handledFuncs.count <= recursionBudget
-        {
-          if inner(faiCallee, fai.calleeArgumentIndex(of: use)!, &handledFuncs) {
-            return true
-          }
-        }
-      }
-    }
-
+private func trySpecialize(apply: ApplySite, _ context: FunctionPassContext) -> Bool {
+  guard isCalleeSpecializable(of: apply),
+        let specialization = analyzeArguments(of: apply, context)
+  else {
     return false
   }
 
-  // Limit the number of recursive calls to not go into exponential behavior in corner cases.
-  let recursionBudget = 8
-  var handledFuncs: Set<Function> = []
-  return inner(callee, index, &handledFuncs)
+  // We need to make each captured argument of all closures a unique Value. Otherwise the Cloner would
+  // wrongly map added capture arguments to the re-generated closure in the specialized function:
+  //
+  //   %4 = partial_apply %3(%1, %1) : (Int, Int) -> ()  // %1 is captured twice
+  //
+  // sil @specialized_closure_user : (Int, Int) -> () {
+  // bb0(%0 : $Int, %1 : $Int):
+  //   %3 = function_ref @closure
+  //   %4 = partial_apply %3(%0, %0)   <- instead of an argument list of `(%0, %1)`!
+  //
+  // This wouldn't be a problem per se - the code is correct. However, this is not reflected in the mangling.
+  // And the same specialized function could be re-used at a call-site where not two identical values are
+  // passed to the closure.
+  //
+  specialization.uniqueCaptureArguments(context)
+
+  let specializedFunction = specialization.getOrCreateSpecializedFunction(context)
+
+  specialization.unUniqueCaptureArguments(context)
+
+  specialization.rewriteApply(for: specializedFunction, context)
+
+  specialization.deleteDeadClosures(context)
+
+  return true
 }
 
-/// Marks any converted/reabstracted closures, corresponding to a given root closure as used. We do not want to
-/// look at such closures separately as during function specialization they will be handled as part of the root closure.
-private func markConvertedAndReabstractedClosuresAsUsed(
-  rootClosure: Value, convertedAndReabstractedClosure: Value,
-  convertedAndReabstractedClosures: inout InstructionSet
-) {
-  if convertedAndReabstractedClosure != rootClosure {
-    switch convertedAndReabstractedClosure {
-    case let pai as PartialApplyInst:
-      convertedAndReabstractedClosures.insert(pai)
-      return
-        markConvertedAndReabstractedClosuresAsUsed(
-          rootClosure: rootClosure,
-          convertedAndReabstractedClosure: pai.arguments[0],
-          convertedAndReabstractedClosures: &convertedAndReabstractedClosures)
-    case let cvt as ConvertFunctionInst:
-      convertedAndReabstractedClosures.insert(cvt)
-      return
-        markConvertedAndReabstractedClosuresAsUsed(
-          rootClosure: rootClosure,
-          convertedAndReabstractedClosure: cvt.fromFunction,
-          convertedAndReabstractedClosures: &convertedAndReabstractedClosures)
-    case let cvt as ConvertEscapeToNoEscapeInst:
-      convertedAndReabstractedClosures.insert(cvt)
-      return
-        markConvertedAndReabstractedClosuresAsUsed(
-          rootClosure: rootClosure,
-          convertedAndReabstractedClosure: cvt.fromFunction,
-          convertedAndReabstractedClosures: &convertedAndReabstractedClosures)
-    case let mdi as MarkDependenceInst:
-      convertedAndReabstractedClosures.insert(mdi)
-      return
-        markConvertedAndReabstractedClosuresAsUsed(
-          rootClosure: rootClosure, convertedAndReabstractedClosure: mdi.value,
-          convertedAndReabstractedClosures: &convertedAndReabstractedClosures)
-    default:
-      log("Parent function of pullbackClosureInfo: \(rootClosure.parentFunction)")
-      log("Root closure: \(rootClosure)")
-      log("Converted/reabstracted closure: \(convertedAndReabstractedClosure)")
-      fatalError(
-        "While marking converted/reabstracted closures as used, found unexpected instruction: \(convertedAndReabstractedClosure)"
-      )
-    }
+private func isCalleeSpecializable(of apply: ApplySite) -> Bool {
+  if let callee = apply.referencedFunction,
+     callee.isDefinition,
+
+     // We don't support generic functions (yet)
+     !apply.hasSubstitutions,
+
+     // Don't specialize non-fragile (read as non-serialized) callees if the caller is fragile; the
+     // specialized callee will have shared linkage, and thus cannot be referenced from the fragile caller.
+     !(apply.parentFunction.isSerialized && !callee.isSerialized),
+
+     // If the callee uses a dynamic Self, we cannot specialize it, since the resulting specialization
+     // might no longer have 'self' as the last parameter.
+     //
+     // TODO: Keep the self argument the last when appending arguments.
+     !callee.mayBindDynamicSelf
+  {
+    return true
   }
+  return false
 }
 
-extension Cloner where Context == FunctionPassContext {
-  fileprivate func cloneAndSpecializeFunctionBody(using pullbackClosureInfo: PullbackClosureInfo) {
-    self.cloneEntryBlockArgsWithoutOrigClosures(usingOrigCalleeAt: pullbackClosureInfo)
+private func analyzeArguments(of apply: ApplySite, _ context: FunctionPassContext) -> SpecializationInfo? {
+  var argumentsToSpecialize = [(Operand, Closure)]()
+  var rootClosures = [PartialApplyInst]()
+  var rootClosuresAdded = InstructionSet(context)
+  defer { rootClosuresAdded.deinitialize() }
 
-    let (allSpecializedEntryBlockArgs, closureArgIndexToAllClonedReleasableClosures) =
-      cloneAllClosures(at: pullbackClosureInfo)
-
-    self.cloneFunctionBody(from: pullbackClosureInfo.pullbackFn, entryBlockArguments: allSpecializedEntryBlockArgs)
-
-    self.insertCleanupCodeForClonedReleasableClosures(
-      from: pullbackClosureInfo,
-      closureArgIndexToAllClonedReleasableClosures: closureArgIndexToAllClonedReleasableClosures)
-  }
-
-  private func cloneEntryBlockArgsWithoutOrigClosures(
-    usingOrigCalleeAt pullbackClosureInfo: PullbackClosureInfo
-  ) {
-    let originalEntryBlock = pullbackClosureInfo.pullbackFn.entryBlock
-    let clonedFunction = self.targetFunction
-    let clonedEntryBlock = self.getOrCreateEntryBlock()
-
-    originalEntryBlock.arguments
-      .enumerated()
-      .filter { index, _ in !pullbackClosureInfo.hasClosureArg(at: index) }
-      .forEach { _, arg in
-        let clonedEntryBlockArgType = arg.type.getLoweredType(in: clonedFunction)
-        let clonedEntryBlockArg = clonedEntryBlock.addFunctionArgument(
-          type: clonedEntryBlockArgType, self.context)
-        clonedEntryBlockArg.copyFlags(from: arg as! FunctionArgument, self.context)
-      }
-  }
-
-  /// Clones all closures, originally passed to the callee at the given pullbackClosureInfo, into the specialized function.
-  ///
-  /// Returns the following -
-  /// - allSpecializedEntryBlockArgs: Complete list of entry block arguments for the specialized function. This includes
-  ///   the original arguments to the function (minus the closure arguments) and the arguments representing the values
-  ///   originally captured by the skipped closure arguments.
-  ///
-  /// - closureArgIndexToAllClonedReleasableClosures: Mapping from a closure's argument index at `pullbackClosureInfo` to the list
-  ///   of corresponding releasable closures cloned into the specialized function. We have a "list" because we clone
-  ///   "closure chains", which consist of a "root" closure and its conversions/reabstractions. This map is used to
-  ///   generate cleanup code for the cloned closures in the specialized function.
-  private func cloneAllClosures(at pullbackClosureInfo: PullbackClosureInfo)
-    -> (
-      allSpecializedEntryBlockArgs: [Value],
-      closureArgIndexToAllClonedReleasableClosures: [Int: [SingleValueInstruction]]
-    )
-  {
-    func entryBlockArgsWithOrigClosuresSkipped() -> [Value?] {
-      let clonedEntryBlock = self.getOrCreateEntryBlock()
-      var clonedNonClosureEntryBlockArgs = clonedEntryBlock.arguments.makeIterator()
-
-      return pullbackClosureInfo.pullbackFn
-        .entryBlock
-        .arguments
-        .enumerated()
-        .reduce(into: []) { result, origArgTuple in
-          let (index, _) = origArgTuple
-          if !pullbackClosureInfo.hasClosureArg(at: index) {
-            result.append(clonedNonClosureEntryBlockArgs.next())
-          } else {
-            result.append(Optional.none)
-          }
-        }
-    }
-
-    var entryBlockArgs: [Value?] = entryBlockArgsWithOrigClosuresSkipped()
-    var closureArgIndexToAllClonedReleasableClosures: [Int: [SingleValueInstruction]] = [:]
-
-    for closureArgDesc in pullbackClosureInfo.closureArgDescriptors {
-      let (finalClonedReabstractedClosure, allClonedReleasableClosures) =
-        self.cloneClosureChain(representedBy: closureArgDesc, at: pullbackClosureInfo)
-
-      entryBlockArgs[closureArgDesc.closureArgIndex] = finalClonedReabstractedClosure
-      closureArgIndexToAllClonedReleasableClosures[closureArgDesc.closureArgIndex] =
-        allClonedReleasableClosures
-    }
-
-    return (entryBlockArgs.map { $0! }, closureArgIndexToAllClonedReleasableClosures)
-  }
-
-  private func cloneClosureChain(
-    representedBy closureArgDesc: ClosureArgDescriptor, at pullbackClosureInfo: PullbackClosureInfo
-  )
-    -> (
-      finalClonedReabstractedClosure: SingleValueInstruction,
-      allClonedReleasableClosures: [SingleValueInstruction]
-    )
-  {
-    let (origToClonedValueMap, capturedArgRange) = self.addEntryBlockArgs(
-      forValuesCapturedBy: closureArgDesc)
-    let clonedFunction = self.targetFunction
-    let clonedEntryBlock = self.getOrCreateEntryBlock()
-    let clonedClosureArgs = Array(clonedEntryBlock.arguments[capturedArgRange])
-
-    let builder =
-      clonedEntryBlock.instructions.isEmpty
-      ? Builder(atStartOf: clonedFunction, self.context)
-      : Builder(
-        atEndOf: clonedEntryBlock, location: clonedEntryBlock.instructions.last!.location,
-        self.context)
-
-    let clonedRootClosure = builder.cloneRootClosure(
-      representedBy: closureArgDesc, capturedArguments: clonedClosureArgs)
-
-    let finalClonedReabstractedClosure =
-      builder.cloneRootClosureReabstractions(
-        rootClosure: closureArgDesc.closure, clonedRootClosure: clonedRootClosure,
-        reabstractedClosure: pullbackClosureInfo.appliedArgForClosure(
-          at: closureArgDesc.closureArgIndex)!,
-        origToClonedValueMap: origToClonedValueMap,
-        self.context)
-
-    let allClonedReleasableClosures = [finalClonedReabstractedClosure]
-    return (finalClonedReabstractedClosure, allClonedReleasableClosures)
-  }
-
-  private func addEntryBlockArgs(forValuesCapturedBy closureArgDesc: ClosureArgDescriptor)
-    -> (origToClonedValueMap: [HashableValue: Value], capturedArgRange: Range<Int>)
-  {
-    var origToClonedValueMap: [HashableValue: Value] = [:]
-    let clonedFunction = self.targetFunction
-    let clonedEntryBlock = self.getOrCreateEntryBlock()
-
-    let capturedArgRangeStart = clonedEntryBlock.arguments.count
-
-    for arg in closureArgDesc.arguments {
-      let capturedArg = clonedEntryBlock.addFunctionArgument(
-        type: arg.type.getLoweredType(in: clonedFunction),
-        self.context)
-      origToClonedValueMap[arg] = capturedArg
-    }
-
-    let capturedArgRangeEnd = clonedEntryBlock.arguments.count
-    let capturedArgRange =
-      capturedArgRangeStart == capturedArgRangeEnd
-      ? 0..<0
-      : capturedArgRangeStart..<capturedArgRangeEnd
-
-    return (origToClonedValueMap, capturedArgRange)
-  }
-
-  private func insertCleanupCodeForClonedReleasableClosures(
-    from pullbackClosureInfo: PullbackClosureInfo,
-    closureArgIndexToAllClonedReleasableClosures: [Int: [SingleValueInstruction]]
-  ) {
-    for closureArgDesc in pullbackClosureInfo.closureArgDescriptors {
-      let allClonedReleasableClosures = closureArgIndexToAllClonedReleasableClosures[
-        closureArgDesc.closureArgIndex]!
-
-      // Insert a `destroy_value`, for all releasable closures, in all reachable exit BBs if the closure was passed as a
-      // guaranteed parameter or its type was noescape+thick. This is b/c the closure was passed at +0 originally and we
-      // need to balance the initial increment of the newly created closure(s).
-      if closureArgDesc.isClosureGuaranteed
-        || closureArgDesc.parameterInfo.isTrivialNoescapeClosure,
-        !allClonedReleasableClosures.isEmpty
+  for argOp in apply.argumentOperands {
+    var visited = ValueSet(context)
+    defer { visited.deinitialize() }
+    if let closure = findSpecializableClosure(of: argOp.value, &visited),
+       // Ok, we know that we can perform the optimization but not whether or not the optimization
+       // is profitable. Check if the closure is actually called in the callee (or in a function
+       // called by the callee). This opens optimization opportunities, like inlining.
+       isClosureApplied(apply.calleeArgument(of: argOp, in: apply.referencedFunction!)!)
+    {
+      argumentsToSpecialize.append((argOp, closure))
+      if let partialApply = closure as? PartialApplyInst,
+         rootClosuresAdded.insert(partialApply)
       {
-        for exitBlock in pullbackClosureInfo.reachableExitBBsInCallee {
-          let clonedExitBlock = self.getClonedBlock(for: exitBlock)
-
-          let terminator =
-            clonedExitBlock.terminator is UnreachableInst
-            ? clonedExitBlock.terminator.previous!
-            : clonedExitBlock.terminator
-
-          let builder = Builder(before: terminator, self.context)
-
-          for closure in allClonedReleasableClosures {
-            if let pai = closure as? PartialApplyInst {
-              builder.destroyPartialApply(pai: pai, self.context)
-            }
-          }
-        }
+        rootClosures.append(partialApply)
       }
     }
+  }
+  if argumentsToSpecialize.isEmpty {
+    return nil
+  }
+  return SpecializationInfo(apply: apply, closureArguments: argumentsToSpecialize, rootClosures: rootClosures)
+}
 
-    if (self.context.needFixStackNesting) {
-      self.context.fixStackNesting(in: targetFunction)
+// Walks down the use-def chain of a function argument, recursively, to find a rootClosure.
+private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet) -> Closure? {
+  visited.insert(value)
+
+  let specializationLevelLimit = 2
+
+  switch value {
+  case is ConvertFunctionInst,
+       is ConvertEscapeToNoEscapeInst,
+       is MoveValueInst,
+       is CopyValueInst:
+    return findSpecializableClosure(of: (value as! UnaryInstruction).operand.value, &visited)
+
+  case let mdi as MarkDependenceInst:
+    guard mdi.value.type.isNoEscapeFunction, mdi.value.type.isThickFunction else {
+      return nil
     }
+    guard let operandClosure = findSpecializableClosure(of: mdi.value, &visited) else {
+      return nil
+    }
+    // Make sure that the mark_dependence's base is part of the use-def chain and will therefore be cloned as well.
+    if !visited.contains(mdi.base) {
+      return nil
+    }
+    return operandClosure
+
+  case let partialApply as PartialApplyInst:
+    // Don't specialize for re-abstractions via a partial_apply, but treat such re-abstractions like
+    // closure "conversions". E.g.
+    // ```
+    //   %1 = partial_apply             // root closure
+    //   %2 = function_ref @thunk
+    //   %3 = partial_apply %2(%1)      // re-abstraction
+    //   apply %f(%3)
+    // ```
+    if partialApply.isPartialApplyOfThunk,
+       let argumentClosure = findSpecializableClosure(of: partialApply.arguments[0], &visited)
+    {
+      return argumentClosure
+    }
+    guard let callee = partialApply.referencedFunction,
+          !partialApply.hasSubstitutions,
+
+          // Avoid an infinite specialization loop caused by repeated runs of ClosureSpecialization and
+          // ConstantCapturePropagation.
+          // ConstantCapturePropagation propagates constant function-literals. Such function specializations
+          // can then be optimized again by ClosureSpecialization and so on. This happens if a closure argument
+          // is called _and_ referenced in another closure, which is passed to a recursive call. E.g.
+          //
+          // func foo(_ c: @escaping () -> ()) {
+          //  c() foo({ c() })
+          // }
+          //
+          // A limit of 2 is good enough and will not be exceed in "regular" optimization scenarios.
+          callee.specializationLevel <= specializationLevelLimit,
+
+          // Functions with a readnone, readonly or releasenone effect and a consumed captures cannot be
+          // specialized because the captured arguments are passed as owned arguments to the specialized
+          // function. Destroy for such arguments in the specialized function violates the effect.
+          (partialApply.isOnStack || callee.effectAllowsSpecialization),
+
+          // TODO: handle other kind of indirect arguments
+          partialApply.hasOnlyInoutIndirectArguments,
+
+          (partialApply.isOnStack || partialApply.allArgumentsCanBeCopied)
+    else {
+      return nil
+    }
+    return partialApply
+
+  case let tttfi as ThinToThickFunctionInst:
+    guard let callee = tttfi.referencedFunction,
+          callee.specializationLevel <= specializationLevelLimit
+    else {
+      return nil
+    }
+    return tttfi
+
+  default:
+    return nil
   }
 }
 
-extension [HashableValue: Value] {
-  fileprivate subscript(key: Value) -> Value? {
-    get {
-      self[key.hashable]
-    }
-    set {
-      self[key.hashable] = newValue
-    }
-  }
-}
+/// Either a `partial_apply` or a `thin_to_thick_function`
+private typealias Closure = SingleValueInstruction
 
-extension PullbackClosureInfo {
-  fileprivate enum NewApplyArg {
-    case Original(Value)
-    // TODO: This can be simplified in OSSA. We can just do a copy_value for everything - except for addresses???
-    case PreviouslyCaptured(
-      value: Value, needsRetain: Bool, parentClosureArgIndex: Int)
+/// Information about the function to be specialized and for which closure arguments.
+private struct SpecializationInfo {
 
-    var value: Value {
-      switch self {
-      case let .Original(originalArg):
-        return originalArg
-      case let .PreviouslyCaptured(capturedArg, _, _):
-        return capturedArg
-      }
-    }
-  }
+  // The apply which we want to specialize
+  let apply: ApplySite
 
-  fileprivate func getArgumentsForSpecializedApply(of specializedCallee: Function) -> [NewApplyArg]
-  {
-    var newApplyArgs: [NewApplyArg] = []
+  // All closure arguments of the apply which we want to replace (usually there is one, but there can be
+  // multiple).
+  // Note that the `Closure` is not necessarily the value of the `Operand`. There can be function conventions
+  // and re-abstractions (via a thunk) in-between:
+  //
+  //   %4 = partial_apply %3(%1) : (Int) -> ()   // %4 = rootClosure
+  //   %5 = convert_function %4
+  //   %6 = copy_value %5
+  //   apply %5(%5)                              // %5 = closureArgument
+  //
+  let closureArguments: [(closureArgument: Operand, rootClosure: Closure)]
 
-    // Original arguments
-    for (applySiteIndex, arg) in self.paiOfPullback.arguments.enumerated() {
-      let calleeArgIndex = self.paiOfPullback.unappliedArgumentCount + applySiteIndex
-      if !self.hasClosureArg(at: calleeArgIndex) {
-        newApplyArgs.append(.Original(arg))
-      }
+  // All rootClosures of `closureArguments` which are `partial_apply`s, and uniqued: if a rootClosure
+  // appears multiple times in `closureArguments`, it's only added a single time here.
+  let rootClosures: [PartialApplyInst]
+
+  // The function to specialize
+  var callee: Function { apply.referencedFunction! }
+
+  private typealias Cloner = SIL.Cloner<FunctionPassContext>
+
+  func getOrCreateSpecializedFunction(_ context: FunctionPassContext) -> Function {
+    let specializedFunctionName = getSpecializedFunctionName(context)
+
+    if let existingSpecializedFunction = context.lookupFunction(name: specializedFunctionName) {
+      return existingSpecializedFunction
     }
 
-    // Previously captured arguments
-    for closureArgDesc in self.closureArgDescriptors {
-      for (applySiteIndex, capturedArg) in closureArgDesc.arguments.enumerated() {
-        let needsRetain = closureArgDesc.isCapturedArgNonTrivialObjectType(
-          applySiteIndex: applySiteIndex,
-          specializedCallee: specializedCallee)
+    let specializedParameters = getSpecializedParameters()
 
-        newApplyArgs.append(
-          .PreviouslyCaptured(
-            value: capturedArg, needsRetain: needsRetain,
-            parentClosureArgIndex: closureArgDesc.closureArgIndex))
-      }
-    }
+    let specializedFunction =
+      context.createSpecializedFunctionDeclaration(
+        from: callee, withName: specializedFunctionName,
+        withParams: specializedParameters,
+        // The specialized function is always a thin function. This is important because we add additional
+        // parameters after the Self parameter of witness methods. In this case the new function is not a
+        // method anymore.
+        makeThin: true, makeBare: true)
 
-    return newApplyArgs
-  }
-}
+    context.buildSpecializedFunction(
+      specializedFunction: specializedFunction,
+      buildFn: { (specializedFunction, specializedContext) in
+        var cloner = Cloner(cloneToEmptyFunction: specializedFunction, specializedContext)
+        defer { cloner.deinitialize() }
 
-extension ClosureArgDescriptor {
-  fileprivate func isCapturedArgNonTrivialObjectType(
-    applySiteIndex: Int, specializedCallee: Function
-  ) -> Bool {
-    precondition(
-      self.closure is PartialApplyInst, "ClosureArgDescriptor is not for a partial_apply closure!")
+        cloneAndSpecializeFunctionBody(using: &cloner)
+      })
 
-    let capturedArg = self.arguments[applySiteIndex]
-    let pai = self.closure as! PartialApplyInst
-    let capturedArgIndexInCallee = applySiteIndex + pai.unappliedArgumentCount
-    let capturedArgConvention = self.callee.argumentConventions[capturedArgIndexInCallee]
+    context.notifyNewFunction(function: specializedFunction, derivedFrom: callee)
 
-    return !capturedArg.type.isTrivial(in: specializedCallee)
-      && !capturedArgConvention.isAllowedIndirectConvForClosureSpec
-  }
-}
-
-extension Builder {
-  fileprivate func cloneRootClosure(
-    representedBy closureArgDesc: ClosureArgDescriptor, capturedArguments: [Value]
-  )
-    -> SingleValueInstruction
-  {
-    let function = self.createFunctionRef(closureArgDesc.callee)
-
-    if let pai = closureArgDesc.closure as? PartialApplyInst {
-      return self.createPartialApply(
-        function: function, substitutionMap: SubstitutionMap(),
-        capturedArguments: capturedArguments, calleeConvention: pai.calleeConvention,
-        hasUnknownResultIsolation: pai.hasUnknownResultIsolation,
-        isOnStack: pai.isOnStack)
-    } else {
-      return self.createThinToThickFunction(
-        thinFunction: function, resultType: closureArgDesc.closure.type)
-    }
+    return specializedFunction
   }
 
-  fileprivate func cloneRootClosureReabstractions(
-    rootClosure: Value, clonedRootClosure: Value, reabstractedClosure: Value,
-    origToClonedValueMap: [HashableValue: Value], _ context: FunctionPassContext
-  )
-    -> SingleValueInstruction
-  {
-    func inner(
-      _ rootClosure: Value, _ clonedRootClosure: Value, _ reabstractedClosure: Value,
-      _ origToClonedValueMap: inout [HashableValue: Value]
-    ) -> Value {
-      switch reabstractedClosure {
-      case let reabstractedClosure where reabstractedClosure == rootClosure:
-        origToClonedValueMap[reabstractedClosure] = clonedRootClosure
-        return clonedRootClosure
 
-      case let cvt as ConvertFunctionInst:
-        let toBeReabstracted = inner(
-          rootClosure, clonedRootClosure, cvt.fromFunction,
-          &origToClonedValueMap)
-        let reabstracted = self.createConvertFunction(
-          originalFunction: toBeReabstracted, resultType: cvt.type,
-          withoutActuallyEscaping: cvt.withoutActuallyEscaping)
-        origToClonedValueMap[cvt] = reabstracted
-        return reabstracted
+  private func getSpecializedFunctionName(_ context: FunctionPassContext) -> String {
+    var visited = Dictionary<Closure, Int>()
 
-      case let cvt as ConvertEscapeToNoEscapeInst:
-        let toBeReabstracted = inner(
-          rootClosure, clonedRootClosure, cvt.fromFunction,
-          &origToClonedValueMap)
-        let reabstracted = self.createConvertEscapeToNoEscape(
-          originalFunction: toBeReabstracted, resultType: cvt.type,
-          isLifetimeGuaranteed: true)
-        origToClonedValueMap[cvt] = reabstracted
-        return reabstracted
+    let argumentManglings = closureArguments.map { (argOp, closure) in
+      let argIdx = apply.calleeArgumentIndex(of: argOp)!
+      if let prevArgIdx = visited[closure] {
 
-      case let pai as PartialApplyInst:
-        let toBeReabstracted = inner(
-          rootClosure, clonedRootClosure, pai.arguments[0],
-          &origToClonedValueMap)
-
-        guard let function = pai.referencedFunction else {
-          log("Parent function of pullbackClosureInfo: \(rootClosure.parentFunction)")
-          log("Root closure: \(rootClosure)")
-          log("Unsupported reabstraction closure: \(pai)")
-          fatalError("Encountered unsupported reabstraction (via partial_apply) of root closure!")
-        }
-
-        let fri = self.createFunctionRef(function)
-        let reabstracted = self.createPartialApply(
-          function: fri, substitutionMap: SubstitutionMap(),
-          capturedArguments: [toBeReabstracted],
-          calleeConvention: pai.calleeConvention,
-          hasUnknownResultIsolation: pai.hasUnknownResultIsolation,
-          isOnStack: pai.isOnStack)
-        origToClonedValueMap[pai] = reabstracted
-        return reabstracted
-
-      case let mdi as MarkDependenceInst:
-        let toBeReabstracted = inner(
-          rootClosure, clonedRootClosure, mdi.value, &origToClonedValueMap)
-        let base = origToClonedValueMap[mdi.base]!
-        let reabstracted = self.createMarkDependence(
-          value: toBeReabstracted, base: base, kind: .Escaping)
-        origToClonedValueMap[mdi] = reabstracted
-        return reabstracted
-
-      default:
-        log("Parent function of pullbackClosureInfo: \(rootClosure.parentFunction)")
-        log("Root closure: \(rootClosure)")
-        log("Converted/reabstracted closure: \(reabstractedClosure)")
-        fatalError("Encountered unsupported reabstraction of root closure: \(reabstractedClosure)")
-      }
-    }
-
-    var origToClonedValueMap = origToClonedValueMap
-    let finalClonedReabstractedClosure = inner(
-      rootClosure, clonedRootClosure, reabstractedClosure,
-      &origToClonedValueMap)
-    return (finalClonedReabstractedClosure as! SingleValueInstruction)
-  }
-
-  fileprivate func destroyPartialApply(pai: PartialApplyInst, _ context: FunctionPassContext) {
-    // TODO: Support only OSSA instructions once the OSSA elimination pass is moved after all function optimization
-    // passes.
-
-    if pai.isOnStack {
-      // for arg in pai.arguments {
-      //   self.createDestroyValue(operand: arg)
-      // }
-      // self.createDestroyValue(operand: pai)
-
-      if pai.parentFunction.hasOwnership {
-        // Under OSSA, the closure acts as an owned value whose lifetime is a borrow scope for the captures, so we need to
-        // end the borrow scope before ending the lifetimes of the captures themselves.
-        self.createDestroyValue(operand: pai)
-        self.destroyCapturedArgs(for: pai)
+        // If the same closure is passed multiple times to a function, we need to reflect this in the mangling:
+        //
+        //   %3 = function_ref @closure
+        //   %4 = partial_apply %3(%1) : (Int) -> ()
+        //   apply %6(%4, %4)
+        //
+        // sil @specialized_closure_user : (Int) -> () {
+        //
+        // is different than
+        //
+        //   %3 = function_ref @closure
+        //   %4 = partial_apply %3(%1) : (Int) -> ()
+        //   %5 = partial_apply %3(%1) : (Int) -> ()
+        //   apply %6(%4, %5)
+        //
+        // sil @specialized_closure_user : (Int, Int) -> () {
+        //
+        return (argIdx, FunctionPassContext.ClosureArgumentMangling.previousArgumentIndex(prevArgIdx))
       } else {
-        self.destroyCapturedArgs(for: pai)
-        self.createDeallocStack(pai)
-        context.notifyInvalidatedStackNesting()
-      }
-    } else {
-      if pai.parentFunction.hasOwnership {
-        self.createDestroyValue(operand: pai)
-      } else {
-        self.createReleaseValue(operand: pai)
+        visited[closure] = argIdx
+        return (argIdx, FunctionPassContext.ClosureArgumentMangling.closure(closure))
       }
     }
+    return context.mangle(withClosureArguments: argumentManglings, from: callee)
   }
-}
 
-extension FunctionConvention {
-  fileprivate func getSpecializedParameters(basedOn pullbackClosureInfo: PullbackClosureInfo)
-    -> [ParameterInfo]
-  {
-    let pullbackFn = pullbackClosureInfo.pullbackFn
+  private func getSpecializedParameters() -> [ParameterInfo] {
     var specializedParamInfoList: [ParameterInfo] = []
 
     // Start by adding all original parameters except for the closure parameters.
-    let firstParamIndex = pullbackFn.argumentConventions.firstParameterIndex
-    for (index, paramInfo) in pullbackFn.convention.parameters.enumerated() {
+    let firstParamIndex = callee.argumentConventions.firstParameterIndex
+    for (index, paramInfo) in callee.convention.parameters.enumerated() {
       let argIndex = index + firstParamIndex
-      if !pullbackClosureInfo.hasClosureArg(at: argIndex) {
+      if !closureArguments.contains(where: { apply.calleeArgumentIndex(of: $0.0) == argIndex}) {
         specializedParamInfoList.append(paramInfo)
       }
     }
 
-    // Now, append parameters captured by each of the original closure parameter.
-    //
-    // Captured parameters are always appended to the function signature. If the argument type of the captured
-    // parameter in the callee is:
-    // - direct and trivial, pass the new parameter as Direct_Unowned.
-    // - direct and non-trivial, pass the new parameter as Direct_Owned.
-    // - indirect, pass the new parameter using the same parameter convention as in
-    //   the original closure.
-    for closureArgDesc in pullbackClosureInfo.closureArgDescriptors {
-      if let closure = closureArgDesc.closure as? PartialApplyInst {
-        let closureCallee = closureArgDesc.callee
-        let closureCalleeConvention = closureCallee.convention
-        let unappliedArgumentCount =
-          closure.unappliedArgumentCount - closureCalleeConvention.indirectSILResultCount
+    // Now, append parameters captured by each of the root closures.
+    for partialApply in rootClosures {
+      let closureConvention = partialApply.functionConvention
+      let unappliedArgumentCount = partialApply.unappliedArgumentCount - closureConvention.indirectSILResultCount
 
-        let prevCapturedParameters =
-          closureCalleeConvention
-          .parameters[unappliedArgumentCount...]
-          .enumerated()
-          .map { index, paramInfo in
-            let argIndexOfParam =
-              closureCallee.argumentConventions.firstParameterIndex + unappliedArgumentCount + index
-            let argType = closureCallee.argumentTypes[argIndexOfParam]
-            return paramInfo.withSpecializedConvention(
-              isArgTypeTrivial: argType.isTrivial(in: closureCallee))
-          }
-
-        specializedParamInfoList.append(contentsOf: prevCapturedParameters)
+      for paramInfo in closureConvention.parameters[unappliedArgumentCount...] {
+        let newParamInfo = paramInfo.withSpecializedConvention(for: partialApply, in: callee)
+        specializedParamInfoList.append(newParamInfo)
       }
     }
 
     return specializedParamInfoList
   }
+
+  private func cloneAndSpecializeFunctionBody(using cloner: inout Cloner) {
+    addFunctionArgumentsWithoutClosures(using: &cloner)
+
+    for rootClosure in rootClosures {
+      addFunctionArgumentsForCaptures(of: rootClosure, using: &cloner)
+    }
+
+    let clonedClosureArguments = cloneClosures(using: &cloner)
+
+    cloner.cloneFunctionBody(from: callee)
+
+    addMissingDestroysAtFunctionExits(for: clonedClosureArguments, cloner.context)
+  }
+
+  private func addFunctionArgumentsWithoutClosures(using cloner: inout Cloner) {
+    let clonedEntryBlock = cloner.getOrCreateEntryBlock()
+
+    for originalArg in callee.arguments where !isClosureArgument(calleeArgument: originalArg) {
+      let argType = originalArg.type.getLoweredType(in: cloner.targetFunction)
+      let clonedArg = clonedEntryBlock.addFunctionArgument(type: argType, cloner.context)
+      clonedArg.copyFlags(from: originalArg, cloner.context)
+      cloner.recordFoldedValue(originalArg, mappedTo: clonedArg)
+    }
+  }
+
+  private func addFunctionArgumentsForCaptures(of closure: PartialApplyInst, using cloner: inout Cloner) {
+    for originalClosureArg in closure.arguments {
+      let capturedArg = cloner.targetFunction.entryBlock.addFunctionArgument(
+        type: originalClosureArg.type.getLoweredType(in: cloner.targetFunction),
+        cloner.context)
+      if !cloner.isCloned(value: originalClosureArg) {
+        cloner.recordFoldedValue(originalClosureArg, mappedTo: capturedArg)
+      }
+    }
+  }
+
+  private func cloneClosures(using cloner: inout Cloner) -> [Value] {
+    return closureArguments.map { (closureArgOp, _) in
+      let clonedArg = cloner.cloneRecursively(value: closureArgOp.value)
+
+      let originalArg = apply.calleeArgument(of: closureArgOp, in: callee)!
+      cloner.recordFoldedValue(originalArg, mappedTo: clonedArg)
+
+      return clonedArg
+    }
+  }
+
+  func rewriteApply(for specializedFunction: Function, _ context: FunctionPassContext) {
+    insertCompensatingDestroysForOwnedClosureArguments(context)
+
+    let newApplyArgs = getNewApplyArguments(context)
+
+    let builder = Builder(before: apply, context)
+    let funcRef = builder.createFunctionRef(specializedFunction)
+
+    switch apply {
+    case let oldPartialApply as PartialApplyInst:
+      let newPartialApply = builder.createPartialApply(
+        function: funcRef, substitutionMap: SubstitutionMap(),
+        capturedArguments: newApplyArgs, calleeConvention: oldPartialApply.calleeConvention,
+        hasUnknownResultIsolation: oldPartialApply.hasUnknownResultIsolation,
+        isOnStack: oldPartialApply.isOnStack)
+      oldPartialApply.replace(with: newPartialApply, context)
+
+    case let oldApply as ApplyInst:
+      let newApply = builder.createApply(function: funcRef, SubstitutionMap(), arguments: newApplyArgs,
+                                         isNonThrowing: oldApply.isNonThrowing,
+                                         isNonAsync: oldApply.isNonAsync)
+      oldApply.replace(with: newApply, context)
+
+    case let oldTryApply as TryApplyInst:
+      builder.createTryApply(function: funcRef, SubstitutionMap(), arguments: newApplyArgs,
+                             normalBlock: oldTryApply.normalBlock, errorBlock: oldTryApply.errorBlock,
+                             isNonAsync: oldTryApply.isNonAsync)
+      context.erase(instruction: oldTryApply)
+
+    case let oldBeginApply as BeginApplyInst:
+      let newApply = builder.createBeginApply(function: funcRef, SubstitutionMap(), arguments: newApplyArgs,
+                                              isNonThrowing: oldBeginApply.isNonThrowing,
+                                              isNonAsync: oldBeginApply.isNonAsync)
+      oldBeginApply.replace(with: newApply, context)
+    default:
+      fatalError("unknown apply")
+    }
+  }
+
+  private func insertCompensatingDestroysForOwnedClosureArguments(_ context: FunctionPassContext) {
+    let builder = Builder(before: apply, context)
+    for (argOp, _) in closureArguments where argOp.endsLifetime {
+      builder.createDestroyValue(operand: argOp.value)
+    }
+  }
+
+  private func getNewApplyArguments(_ context: FunctionPassContext) -> [Value] {
+    let newCapturedArguments = rootClosures.flatMap { partialApply in
+      partialApply.arguments.map { capturedArg in
+        if partialApply.isOnStack || capturedArg.ownership == .none {
+          // Non-escaping closures don't consume their captures. Therefore we pass them also as "guaranteed"
+          // arguments to the specialized function.
+          // Note that because the non-escaping closure was passed to the original function, this guarantees
+          // that the lifetime of the captured arguments also extend to at least the apply of the function.
+          capturedArg
+        } else {
+          // Escaping closures consume their captures. Therefore we pass them as "owned" arguments to the
+          // specialized function.
+          capturedArg.copy(at: partialApply, andMakeAvailableIn: apply.parentBlock, context)
+        }
+      }
+    }
+    return nonClosureArguments.values + newCapturedArguments
+  }
+
+  func uniqueCaptureArguments(_ context: FunctionPassContext) {
+    let builder = Builder(before: apply, context)
+
+    // Insert identity cast instructions for all closure arguments to make them unique. We could use any kind
+    // of forwarding instruction - we'll delete them afterwards, anyway.
+    //
+    //   %4 = partial_apply %3(%1, %1) : (Int, Int) -> ()  // %1 is captured twice
+    // ->
+    //   %2 = unchecked_value_cast %1
+    //   %3 = unchecked_value_cast %1
+    //   %4 = partial_apply %3(%2, %3) : (Int, Int) -> ()  // all arguments are unique values now!
+    //
+    for closure in rootClosures {
+      for argOp in closure.argumentOperands {
+        let cast = builder.createUncheckedValueCast(from: argOp.value, to: argOp.value.type)
+        argOp.set(to: cast, context)
+      }
+    }
+  }
+
+  func unUniqueCaptureArguments(_ context: FunctionPassContext) {
+    // Remove the inserted identity casts again.
+    for closure in rootClosures {
+      for argOp in closure.argumentOperands {
+        let cast = argOp.value as! UncheckedValueCastInst
+        cast.replace(with: cast.fromValue, context)
+      }
+    }
+  }
+
+  func deleteDeadClosures(_ context: FunctionPassContext) {
+    for  (_, closure) in closureArguments where !closure.isDeleted {
+      if context.tryDeleteDeadClosure(closure: closure) {
+        context.notifyInvalidatedStackNesting()
+      }
+    }
+  }
+
+  private var nonClosureArguments: LazyFilterSequence<OperandArray> {
+    apply.argumentOperands.lazy.filter{ argOp in !closureArguments.contains{ $0.0 == argOp } }
+  }
+
+  private func isClosureArgument(calleeArgument: FunctionArgument) -> Bool {
+    closureArguments.contains { apply.calleeArgument(of: $0.0, in: callee) == calleeArgument }
+  }
 }
 
-extension ParameterInfo {
-  fileprivate func withSpecializedConvention(isArgTypeTrivial: Bool) -> Self {
-    let specializedParamConvention =
-      self.convention.isAllowedIndirectConvForClosureSpec
-      ? self.convention
-      : isArgTypeTrivial ? ArgumentConvention.directUnowned : ArgumentConvention.directOwned
+private func isClosureApplied(_ closure: Value) -> Bool {
+  var handledFuncs: Set<Function> = []
+  return checkRecursivelyIfClosureIsApplied(closure, &handledFuncs)
+}
+
+private func checkRecursivelyIfClosureIsApplied(_ closure: Value, _ handledFuncs: inout Set<Function>) -> Bool {
+  for use in closure.uses {
+    switch use.instruction {
+
+    case let apply as FullApplySite:
+      if apply.callee == closure {
+        return true
+      }
+      let recursionBudget = 8
+
+      // Recurse into called function
+      if let callee = apply.referencedFunction,
+         callee.isDefinition,
+         handledFuncs.insert(callee).inserted,
+         handledFuncs.count <= recursionBudget,
+         let calleeArg = apply.calleeArgument(of: use, in: callee)
+      {
+        if checkRecursivelyIfClosureIsApplied(calleeArg, &handledFuncs) {
+          return true
+        }
+      }
+
+    case is CopyValueInst, is MoveValueInst:
+      if checkRecursivelyIfClosureIsApplied(use.instruction as! SingleValueInstruction, &handledFuncs) {
+        return true
+      }
+
+    default:
+      break
+    }
+  }
+
+  return false
+}
+
+/// Add destroys for values which are not consumed, yet.
+/// There are two cases of values for which we need this:
+/// 1. guaranteed closure arguments
+/// 2. operands of copies at the call site
+///
+/// ```
+///   %1 = partial_apply %closure   // is cloned to the specialized function
+///   %2 = copy_value %1            // is cloned to the specialized function
+///   apply %function(%2) : (@guaranteed () -> ()) -> ()
+///   destroy_value %1
+///
+/// sil @specializedFunction() -> () {
+/// bb0:
+///   %1 = partial_apply %closure
+///   %2 = copy_value %1
+///   ... // body
+///   destroy_value %2              // case 1: destroy for the guaranteed closure argument
+///   destroy_value %1              // case 2: destroy for the operand of the copy
+///   return
+/// ```
+private func addMissingDestroysAtFunctionExits(for clonedArguments: [Value], _ context: FunctionPassContext) {
+  var needDestroy = ValueWorklist(context)
+  defer { needDestroy.deinitialize() }
+
+  for clonedArg in clonedArguments {
+    findValuesWhichNeedDestroyRecursively(value: clonedArg, needDestroy: &needDestroy)
+  }
+
+  while let valueToDestroy = needDestroy.pop() {
+    Builder.insertCleanupAtFunctionExits(of: valueToDestroy.parentFunction, context) { builder in
+      builder.createDestroyValue(operand: valueToDestroy)
+    }
+  }
+}
+
+private func findValuesWhichNeedDestroyRecursively(value: Value, needDestroy: inout ValueWorklist) {
+  if let svi = value as? SingleValueInstruction {
+    for op in svi.operands {
+      findValuesWhichNeedDestroyRecursively(value: op.value, needDestroy: &needDestroy)
+    }
+  }
+  if value.ownership == .owned && value.uses.endingLifetime.isEmpty {
+    needDestroy.pushIfNotVisited(value)
+  }
+}
+
+private extension ParameterInfo {
+  func withSpecializedConvention(for partialApply: PartialApplyInst, in callee: Function) -> Self {
+    let argType = type.loweredType(in: partialApply.parentFunction)
+    let specializedParamConvention = if self.convention.isIndirect {
+      self.convention
+    } else {
+      if argType.isTrivial(in: callee) {
+        ArgumentConvention.directUnowned
+      } else {
+        if partialApply.isOnStack {
+          ArgumentConvention.directGuaranteed
+        } else {
+          ArgumentConvention.directOwned
+        }
+      }
+    }
 
     return ParameterInfo(
       type: self.type, convention: specializedParamConvention, options: self.options,
       hasLoweredAddresses: self.hasLoweredAddresses)
   }
-
-  fileprivate var isTrivialNoescapeClosure: Bool {
-    SILFunctionType_isTrivialNoescape(type.bridged)
-  }
 }
 
-extension ArgumentConvention {
-  fileprivate var isAllowedIndirectConvForClosureSpec: Bool {
-    switch self {
-    case .indirectInout, .indirectInoutAliasable:
-      return true
-    default:
-      return false
-    }
-  }
-}
-
-extension PartialApplyInst {
+private extension PartialApplyInst {
   /// True, if the closure obtained from this partial_apply is the
   /// pullback returned from an autodiff VJP
-  fileprivate var isPullbackInResultOfAutodiffVJP: Bool {
+  var isPullbackInResultOfAutodiffVJP: Bool {
     if self.parentFunction.isAutodiffVJP,
       let use = self.uses.singleUse,
       let tupleInst = use.instruction as? TupleInst,
@@ -1216,262 +760,34 @@ extension PartialApplyInst {
     return false
   }
 
-  fileprivate var isPartialApplyOfThunk: Bool {
+  var isPartialApplyOfThunk: Bool {
     if self.numArguments == 1,
       let fun = self.referencedFunction,
       fun.thunkKind == .reabstractionThunk || fun.thunkKind == .thunk,
       self.arguments[0].type.isLoweredFunction,
-      self.arguments[0].type.isReferenceCounted(in: self.parentFunction)
-        || self.callee.type.isThickFunction
+      self.arguments[0].type.isReferenceCounted(in: self.parentFunction) || self.callee.type.isThickFunction
     {
       return true
     }
-
     return false
   }
 
-  fileprivate var hasOnlyInoutIndirectArguments: Bool {
+  var hasOnlyInoutIndirectArguments: Bool {
     self.argumentOperands
       .filter { !$0.value.type.isObject }
       .allSatisfy { self.convention(of: $0)!.isInout }
   }
-}
 
-extension Instruction {
-  fileprivate var asSupportedClosure: SingleValueInstruction? {
-    switch self {
-    case let tttf as ThinToThickFunctionInst where tttf.callee is FunctionRefInst:
-      return tttf
-    // TODO: figure out what to do with non-inout indirect arguments
-    // https://forums.swift.org/t/non-inout-indirect-types-not-supported-in-closure-specialization-optimization/70826
-    case let pai as PartialApplyInst
-    where pai.callee is FunctionRefInst && pai.hasOnlyInoutIndirectArguments:
-      return pai
-    default:
-      return nil
-    }
-  }
-
-  fileprivate var isSupportedClosure: Bool {
-    asSupportedClosure != nil
+  var allArgumentsCanBeCopied: Bool {
+    arguments.allSatisfy { !$0.type.isMoveOnly }
   }
 }
 
-extension ApplySite {
-  fileprivate var calleeIsDynamicFunctionRef: Bool {
-    return !(callee is DynamicFunctionRefInst || callee is PreviousDynamicFunctionRefInst)
-  }
-}
-
-extension Function {
-  fileprivate var effectAllowsSpecialization: Bool {
+private extension Function {
+  var effectAllowsSpecialization: Bool {
     switch self.effectAttribute {
     case .readNone, .readOnly, .releaseNone: return false
     default: return true
     }
   }
-}
-
-// ===================== Utility Types ===================== //
-private struct OrderedDict<Key: Hashable, Value> {
-  private var valueIndexDict: [Key: Int] = [:]
-  private var entryList: [(Key, Value)] = []
-
-  subscript(key: Key) -> Value? {
-    if let index = valueIndexDict[key] {
-      return entryList[index].1
-    }
-    return nil
-  }
-
-  mutating func insert(key: Key, value: Value) {
-    if valueIndexDict[key] == nil {
-      valueIndexDict[key] = entryList.count
-      entryList.append((key, value))
-    }
-  }
-
-  mutating func update(key: Key, value: Value) {
-    if let index = valueIndexDict[key] {
-      entryList[index].1 = value
-    }
-  }
-
-  var keys: LazyMapSequence<[(Key, Value)], Key> {
-    entryList.lazy.map { $0.0 }
-  }
-
-  var values: LazyMapSequence<[(Key, Value)], Value> {
-    entryList.lazy.map { $0.1 }
-  }
-}
-
-/// Represents all the information required to represent a closure in isolation, i.e., outside of a pullback's partial_apply context
-/// where the closure may be getting captured as an argument.
-///
-/// Composed with other information inside a `ClosureArgDescriptor` to represent a closure as a captured argument of a pullback's partial_apply.
-private struct ClosureInfo {
-  let closure: SingleValueInstruction
-  let lifetimeFrontier: [Instruction]
-
-  init(closure: SingleValueInstruction, lifetimeFrontier: [Instruction]) {
-    self.closure = closure
-    self.lifetimeFrontier = lifetimeFrontier
-  }
-
-}
-
-/// Represents a closure as a captured argument of a pullback's partial_apply.
-private struct ClosureArgDescriptor {
-  let closureInfo: ClosureInfo
-  /// The index of the closure in the pullback's partial_apply argument list.
-  let closureArgumentIndex: Int
-  let parameterInfo: ParameterInfo
-
-  var closure: SingleValueInstruction {
-    closureInfo.closure
-  }
-  var lifetimeFrontier: [Instruction] {
-    closureInfo.lifetimeFrontier
-  }
-
-  var isPartialApplyOnStack: Bool {
-    if let pai = closure as? PartialApplyInst {
-      return pai.isOnStack
-    }
-    return false
-  }
-
-  var callee: Function {
-    if let pai = closure as? PartialApplyInst {
-      return pai.referencedFunction!
-    } else {
-      return (closure as! ThinToThickFunctionInst).referencedFunction!
-    }
-  }
-
-  var location: Location {
-    closure.location
-  }
-
-  var closureArgIndex: Int {
-    closureArgumentIndex
-  }
-
-  var closureParamInfo: ParameterInfo {
-    parameterInfo
-  }
-
-  var numArguments: Int {
-    if let pai = closure as? PartialApplyInst {
-      return pai.numArguments
-    } else {
-      return 0
-    }
-  }
-
-  var arguments: LazyMapSequence<OperandArray, Value> {
-    if let pai = closure as? PartialApplyInst {
-      return pai.arguments
-    }
-
-    return OperandArray.empty.lazy.map { $0.value } as LazyMapSequence<OperandArray, Value>
-  }
-
-  var isClosureGuaranteed: Bool {
-    closureParamInfo.convention.isGuaranteed
-  }
-
-  var isClosureConsumed: Bool {
-    closureParamInfo.convention.isConsumed
-  }
-}
-
-/// Represents a partial_apply of pullback capturing one or more closure arguments.
-private struct PullbackClosureInfo {
-  let paiOfPullback: PartialApplyInst
-  var closureArgDescriptors: [ClosureArgDescriptor] = []
-
-  init(paiOfPullback: PartialApplyInst) {
-    self.paiOfPullback = paiOfPullback
-  }
-
-  mutating func appendClosureArgDescriptor(_ descriptor: ClosureArgDescriptor) {
-    self.closureArgDescriptors.append(descriptor)
-  }
-
-  var pullbackFn: Function {
-    paiOfPullback.referencedFunction!
-  }
-
-  var reachableExitBBsInCallee: [BasicBlock] {
-    pullbackFn.blocks.filter { $0.isReachableExitBlock }
-  }
-
-  func hasClosureArg(at index: Int) -> Bool {
-    closureArgDescriptors.contains { $0.closureArgumentIndex == index }
-  }
-
-  func closureArgDesc(at index: Int) -> ClosureArgDescriptor? {
-    closureArgDescriptors.first { $0.closureArgumentIndex == index }
-  }
-
-  func appliedArgForClosure(at index: Int) -> Value? {
-    if let closureArgDesc = closureArgDesc(at: index) {
-      return paiOfPullback.arguments[
-        closureArgDesc.closureArgIndex - paiOfPullback.unappliedArgumentCount]
-    }
-
-    return nil
-  }
-
-  func specializedCalleeName(_ context: FunctionPassContext) -> String {
-    let closureArgs = Array(self.closureArgDescriptors.map {
-      (argumentIndex: $0.closureArgIndex,
-       argumentValue: FunctionPassContext.ClosureArgumentMangling.closure($0.closure))
-    })
-    return context.mangle(withClosureArguments: closureArgs, from: pullbackFn)
-  }
-}
-
-// ===================== Unit tests ===================== //
-
-let getPullbackClosureInfoTest = FunctionTest(
-  "autodiff_closure_specialize_get_pullback_closure_info"
-) { function, arguments, context in
-  print("Specializing closures in function: \(function.name)")
-  print("===============================================")
-  let pullbackClosureInfo = getPullbackClosureInfo(in: function, context)!
-  print("PartialApply of pullback: \(pullbackClosureInfo.paiOfPullback)")
-  print("Passed in closures: ")
-  for index in pullbackClosureInfo.closureArgDescriptors.indices {
-    var closureArgDescriptor = pullbackClosureInfo.closureArgDescriptors[index]
-    print("\(index+1). \(closureArgDescriptor.closureInfo.closure)")
-  }
-  print("\n")
-}
-
-let specializedFunctionSignatureAndBodyTest = FunctionTest(
-  "autodiff_closure_specialize_specialized_function_signature_and_body"
-) { function, arguments, context in
-
-  let pullbackClosureInfo = getPullbackClosureInfo(in: function, context)!
-
-  let (specializedFunction, _) = getOrCreateSpecializedFunction(
-    basedOn: pullbackClosureInfo, context)
-  print("Generated specialized function: \(specializedFunction.name)")
-  print("\(specializedFunction)\n")
-}
-
-let rewrittenCallerBodyTest = FunctionTest("autodiff_closure_specialize_rewritten_caller_body") {
-  function, arguments, context in
-  let pullbackClosureInfo = getPullbackClosureInfo(in: function, context)!
-
-  let (specializedFunction, _) = getOrCreateSpecializedFunction(
-    basedOn: pullbackClosureInfo, context)
-  rewriteApplyInstruction(
-    using: specializedFunction, pullbackClosureInfo: pullbackClosureInfo, context)
-
-  print("Rewritten caller body for: \(function.name):")
-  print("\(function)\n")
 }

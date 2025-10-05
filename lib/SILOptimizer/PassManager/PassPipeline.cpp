@@ -1034,9 +1034,9 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   if (SILPrintFinalOSSAModule) {
     addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
   }
-  P.addOwnershipModelEliminator();
-
   P.addAutodiffClosureSpecialization();
+
+  P.addOwnershipModelEliminator();
 
   // After serialization run the function pass pipeline to iteratively lower
   // high-level constructs like @_semantics calls.
