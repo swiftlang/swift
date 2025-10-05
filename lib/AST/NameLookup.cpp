@@ -3630,7 +3630,17 @@ NominalTypeDecl *ExtensionDecl::computeExtendedNominal(
   if (nominalTypes.empty())
     return nullptr;
 
-  return nominalTypes[0];
+  auto *result = nominalTypes[0];
+
+  // Tuple extensions are experimental, if the feature isn't enabled let's not
+  // bind this extension at all. This fixes a bunch of crashers that we don't
+  // yet properly handle with the feature enabled.
+  if (isa<BuiltinTupleDecl>(result) &&
+      !ctx.LangOpts.hasFeature(Feature::TupleConformances)) {
+    return nullptr;
+  }
+
+  return result;
 }
 
 NominalTypeDecl *
