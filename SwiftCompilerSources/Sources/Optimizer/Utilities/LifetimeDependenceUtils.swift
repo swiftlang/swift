@@ -428,6 +428,10 @@ extension LifetimeDependence.Scope {
   ///
   /// Returns nil if the dependence scope covers the entire function. Returns an empty range for an unknown scope.
   ///
+  /// When this Scope is live on unreachable paths, the returned range may include blocks that are not dominated by the
+  /// scope introducer. Even though 'range.isValid == false' for such a range, it is still valid for checking that
+  /// dependencies are in scope since we already know that the Scope introducer dominates all dependent uses.
+  ///
   /// Ignore the lifetime of temporary trivial values (with .initialized and .unknown scopes). Temporaries have an
   /// unknown Scope, which means that LifetimeDependence.Scope did not recognize a VariableScopeInstruction. This is
   /// important to promote mark_dependence instructions emitted by SILGen to [nonescaping] (e.g. unsafeAddressor). It
@@ -558,10 +562,32 @@ extension LifetimeDependence.Scope {
         }
       }
       guard isAddressable, !deallocInsts.isEmpty else {
+        // Valid on all paths to function exit.
         return nil
       }
       var range = InstructionRange(begin: initializingStore, context)
       range.insert(contentsOf: deallocInsts)
+
+      // Insert unreachable paths with no dealloc_stack.
+      var forwardUnreachableWalk = BasicBlockWorklist(context)
+      defer { forwardUnreachableWalk.deinitialize() }
+
+      // TODO: ensure complete dealloc_stack on all paths in SIL verification, then assert exitBlock.isEmpty.
+      for exitBlock in range.exitBlocks {
+        forwardUnreachableWalk.pushIfNotVisited(exitBlock)
+      }
+      while let b = forwardUnreachableWalk.pop() {
+        if let unreachableInst = b.terminator as? UnreachableInst {
+          // Note: 'unreachableInst' is not necessarilly dominated by 'initializingStore'. This marks the range invalid,
+          // but leaves it in a usable state that includes all blocks covered by the temporary allocation. The extra
+          // blocks (backward up to the function entry) are irrelevant becase we already know that 'initializingStore'
+          // dominates dependent uses.
+          range.insert(unreachableInst)
+        }
+        for succBlock in b.successors {
+          forwardUnreachableWalk.pushIfNotVisited(succBlock)
+        }
+      }
       return range
     }
   }
