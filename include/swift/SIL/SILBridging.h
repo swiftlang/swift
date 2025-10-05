@@ -1549,6 +1549,7 @@ struct BridgedCloner {
   void recordClonedInstruction(BridgedInstruction origInst, BridgedInstruction clonedInst) const;
   void recordFoldedValue(BridgedValue orig, BridgedValue mapped) const;
   BridgedInstruction clone(BridgedInstruction inst) const;
+  void setInsertionBlockIfNotSet(BridgedBasicBlock block) const;
 };
 
 struct BridgedTypeSubstCloner {

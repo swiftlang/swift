@@ -699,6 +699,11 @@ BridgedInstruction BridgedCloner::clone(BridgedInstruction inst) const {
   return {cloner->cloneInst(inst.unbridged())->asSILNode()};
 }
 
+void BridgedCloner::setInsertionBlockIfNotSet(BridgedBasicBlock block) const {
+  if (!cloner->getBuilder().hasValidInsertionPoint())
+    cloner->getBuilder().setInsertionPoint(block.unbridged());
+}
+
 BridgedBasicBlock BridgedCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
   return { cloner->getOpBasicBlock(originalBasicBlock.unbridged()) };
 }
