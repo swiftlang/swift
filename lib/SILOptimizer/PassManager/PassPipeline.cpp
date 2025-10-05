@@ -789,12 +789,8 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   // take advantage of static dispatch.
   P.addConstantCapturePropagation();
 
-  // Specialize closure.
-  if (P.getOptions().EnableExperimentalSwiftBasedClosureSpecialization) {
-    P.addExperimentalSwiftBasedClosureSpecialization();
-  } else {
-    P.addClosureSpecializer();
-  }
+  // TODO: replace this with the new ClosureSpecialization pass once we have OSSA at this point in the pipeline
+  P.addClosureSpecializer();
 
   // Do the second stack promotion on low-level SIL.
   P.addStackPromotion();
