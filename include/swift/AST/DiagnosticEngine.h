@@ -217,6 +217,9 @@ namespace swift {
     const class Decl *getDecl() const { return Decl; }
     DiagnosticBehavior getBehaviorLimit() const { return BehaviorLimit; }
 
+    /// Retrieve the stored SourceLoc, or the location of the stored Decl.
+    SourceLoc getLocOrDeclLoc() const;
+
     void setLoc(SourceLoc loc) { Loc = loc; }
     void setIsChildNote(bool isChildNote) { IsChildNote = isChildNote; }
     void setDecl(const class Decl *decl) { Decl = decl; }
