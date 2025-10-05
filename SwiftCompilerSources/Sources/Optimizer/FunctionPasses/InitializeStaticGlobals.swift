@@ -404,7 +404,7 @@ private extension Value {
       case is LoadInst:
         return true
       case is StructInst, is TupleInst:
-        worklist.pushIfNotVisited(contentsOf: (v as! Instruction).operands.lazy.map { $0.value })
+        worklist.pushIfNotVisited(contentsOf: (v as! Instruction).operands.values)
       case let ei as EnumInst:
         if let payload = ei.payload {
           worklist.pushIfNotVisited(payload)

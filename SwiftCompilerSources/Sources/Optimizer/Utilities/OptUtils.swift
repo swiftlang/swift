@@ -71,7 +71,7 @@ extension Value {
       }
       switch v {
       case let fw as ForwardingInstruction:
-        worklist.pushIfNotVisited(contentsOf: fw.definedOperands.lazy.map { $0.value })
+        worklist.pushIfNotVisited(contentsOf: fw.definedOperands.values)
       case let bf as BorrowedFromInst:
         worklist.pushIfNotVisited(bf.borrowedValue)
       case let bb as BeginBorrowInst:
@@ -82,7 +82,7 @@ extension Value {
         } else if let termResult = TerminatorResult(arg),
                let fw = termResult.terminator as? ForwardingInstruction
         {
-          worklist.pushIfNotVisited(contentsOf: fw.definedOperands.lazy.map { $0.value })
+          worklist.pushIfNotVisited(contentsOf: fw.definedOperands.values)
         }
       default:
         continue

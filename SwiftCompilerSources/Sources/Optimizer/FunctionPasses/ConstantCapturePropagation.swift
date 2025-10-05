@@ -112,7 +112,7 @@ private func constantPropagateCaptures(of partialApply: PartialApplyInst, _ cont
     // Escaping closures consume their arguments. Therefore we need to destroy the removed argument values.
     addCompensatingDestroys(for: constArgs, context)
   }
-  let newArguments = nonConstArgs.map { $0.value }
+  let newArguments = Array(nonConstArgs.values)
   rewritePartialApply(partialApply, withSpecialized: specializedCallee, arguments: newArguments, context)
 }
 

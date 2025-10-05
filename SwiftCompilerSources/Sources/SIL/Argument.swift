@@ -170,7 +170,7 @@ public struct Phi {
   }
 
   public var incomingValues: LazyMapSequence<LazyMapSequence<PredecessorList, Operand>, Value> {
-    incomingOperands.lazy.map { $0.value }
+    incomingOperands.values
   }
 
   public var isReborrow: Bool { value.isReborrow }
