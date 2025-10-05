@@ -442,6 +442,7 @@ extension UnsafeRawPointer {
   ///   `offset`. The returned instance is memory-managed and unassociated
   ///   with the value in the memory referenced by this pointer.
   @inlinable
+  @_preInverseGenerics
   @lifetime(borrow self)
   // This custom silgen name is chosen to preserve the old ABI
   @_silgen_name("$sSV4load14fromByteOffset2asxSi_xmtlF")
@@ -491,6 +492,7 @@ extension UnsafeRawPointer {
   ///   with the value in the range of memory referenced by this pointer.
   @inlinable
   @_alwaysEmitIntoClient
+  @_preInverseGenerics
   @lifetime(borrow self)
   public func loadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromByteOffset offset: Int = 0,
