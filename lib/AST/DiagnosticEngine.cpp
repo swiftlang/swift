@@ -1784,6 +1784,20 @@ void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
   }
 }
 
+void DiagnosticQueue::forEach(
+    llvm::function_ref<void(const Diagnostic &)> body) const {
+  for (auto &activeDiag : QueueEngine.TentativeDiagnostics)
+    body(activeDiag.Diag);
+}
+
+void DiagnosticQueue::filter(
+    llvm::function_ref<bool(const Diagnostic &)> predicate) {
+  llvm::erase_if(QueueEngine.TentativeDiagnostics,
+                 [&](detail::ActiveDiagnostic &activeDiag) {
+                   return !predicate(activeDiag.Diag);
+                 });
+}
+
 EncodedDiagnosticMessage::EncodedDiagnosticMessage(StringRef S)
     : Message(Lexer::getEncodedStringSegment(S, Buf, /*IsFirstSegment=*/true,
                                              /*IsLastSegment=*/true,

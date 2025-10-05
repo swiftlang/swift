@@ -3,12 +3,13 @@
 // This is too circular to work, but it shouldn't crash.
 
 protocol MyCollectionProtocol: Collection where Iterator == MyCollectionIterator<Self> {}
-// expected-error@-1 {{circular reference}}
+// expected-error@-1:10 {{circular reference}}
 
 struct MyCollectionIterator<MyCollection: MyCollectionProtocol>: IteratorProtocol {
-// expected-note@-1 3{{through reference here}}
-// expected-error@-2 {{type 'MyCollectionIterator<MyCollection>' does not conform to protocol 'IteratorProtocol'}}
-// expected-note@-3 {{add stubs for conformance}}
+  // expected-note@-1:8 {{through reference here}}
+  // expected-note@-2:66 {{through reference here}}
+  // expected-error@-3 {{type 'MyCollectionIterator<MyCollection>' does not conform to protocol 'IteratorProtocol'}}
+  // expected-note@-4 {{add stubs for conformance}}
     mutating func next() -> MyCollection.Element? {
     // expected-error@-1 {{'Element' is not a member type of type 'MyCollection'}}
         return nil
