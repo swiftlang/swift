@@ -1427,7 +1427,8 @@ private struct PullbackClosureInfo {
 
   func specializedCalleeName(_ context: FunctionPassContext) -> String {
     let closureArgs = Array(self.closureArgDescriptors.map {
-      (argumentIndex: $0.closureArgIndex, argumentValue: $0.closure)
+      (argumentIndex: $0.closureArgIndex,
+       argumentValue: FunctionPassContext.ClosureArgumentMangling.closure($0.closure))
     })
     return context.mangle(withClosureArguments: closureArgs, from: pullbackFn)
   }
