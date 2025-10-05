@@ -3089,6 +3089,13 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     return error();
   }
 
+  // Tuple extensions are experimental.
+  if (extendedType->is<TupleType>() &&
+      !ctx.LangOpts.hasFeature(Feature::TupleConformances)) {
+    diags.diagnose(ext, diag::experimental_tuple_extension);
+    return error();
+  }
+
   // Cannot extend function types, metatypes, existentials, etc.
   if (!extendedType->is<TupleType>() &&
       !extendedType->getAnyNominal() &&
