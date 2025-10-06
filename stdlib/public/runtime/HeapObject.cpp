@@ -61,7 +61,8 @@ using namespace swift;
 #error "The runtime must be built with a compiler that supports swiftcall."
 #endif
 
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if SWIFT_REFCOUNT_CC_PRESERVEMOST
+asm(R"(
 // Define a mask used by ClientRetainRelease to determine when it must call into
 // the runtime. The symbol's address is used as the mask, rather than its
 // contents, to eliminate one load instruction when using it. This is imported
@@ -72,20 +73,25 @@ using namespace swift;
 // different mask is ever needed, the address of this symbol needs to be set to
 // 0x8000000000000000 less than that value so that it comes out right in
 // ClientRetainRelease.
-asm(".globl __swift_retainRelease_slowpath_mask_v1\n");
-asm(".set __swift_retainRelease_slowpath_mask_v1, 0\n");
-#endif
+  .globl __swift_retainRelease_slowpath_mask_v1
+  .set __swift_retainRelease_slowpath_mask_v1, 0
 
-// Export preservemost symbols for retain/release where appropriate.
-#if SWIFT_REFCOUNT_CC_PRESERVEMOST
-asm(".globl _swift_retain_preservemost\n");
-asm(".set _swift_retain_preservemost, _swift_retain\n");
-asm(".globl _swift_release_preservemost\n");
-asm(".set _swift_release_preservemost, _swift_release\n");
-asm(".weak_definition _swift_release_preservemost_weak_placeholder\n");
-asm(".globl _swift_release_preservemost_weak_placeholder\n");
-asm("_swift_release_preservemost_weak_placeholder:\n");
-asm(".byte 0\n");
+// Define aliases for swift_retain/release that indicate they use preservemost.
+// ClientRetainRelease will reference these so that it can fall back to a
+// register-preserving register on older runtimes.
+  .globl _swift_retain_preservemost
+  .set _swift_retain_preservemost, _swift_retain
+  .globl _swift_release_preservemost
+  .set _swift_release_preservemost, _swift_release
+
+// A weak definition can only be overridden by a strong definition if the
+// library with the strong definition contains at least one weak definition.
+// Create a placeholder weak definition here to allow that to work.
+  .weak_definition _swift_release_preservemost_weak_placeholder
+  .globl _swift_release_preservemost_weak_placeholder
+  _swift_release_preservemost_weak_placeholder:
+    .byte 0
+)");
 #endif
 
 
