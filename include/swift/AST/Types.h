@@ -1108,6 +1108,9 @@ public:
   /// Check if this is a std.string type from C++.
   bool isCxxString();
 
+  /// Check if this is the type Unicode.Scalar from the Swift standard library.
+  bool isUnicodeScalar();
+
   /// Check if this type is known to represent key paths.
   bool isKnownKeyPathType();
 

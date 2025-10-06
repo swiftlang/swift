@@ -4675,8 +4675,14 @@ namespace {
           // Do not attempts to import ObjCBool values, for similar reasons.
           bool isObjCBool = (type && type->isObjCBool()) ||
                             (type && synthesizer.isObjCBool(type));
+          // Do not attempts to import CWideChar (wchar_t) values. CWideChar is
+          // a typealias for Unicode.Scalar, which does not
+          // implement _ExpressibleByBuiltinIntegerLiteral.
+          // FIXME: import using _ExpressibleByUnicodeScalarLiteral.
+          bool isUnicodeScalar = (type && type->isUnicodeScalar()) ||
+                                 (type && synthesizer.isUnicodeScalar(type));
 
-          if (type && !isCGFloat && !isObjCBool) {
+          if (type && !isCGFloat && !isObjCBool && !isUnicodeScalar) {
             auto convertKind = ConstantConvertKind::None;
             // Request conversions on enums, and swift_wrapper((enum/struct))
             // types
