@@ -1,21 +1,34 @@
-import Foundation
 import SwiftParser
 import SwiftSyntax
 import SwiftSyntaxMacros
+
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#elseif os(WASI)
+import WASILibc
+#elseif os(Windows)
+import CRT
+import WinSDK
+#endif
 
 @main
 class SwiftMacroTestGen: SyntaxVisitor {
   static func main() {
     if CommandLine.argc < 2 {
-      print("error: missing module name (passed 1 argument, expected 2)")
+      printError("missing module name (passed 0 arguments, expected 2)")
       exit(1)
     }
-    let contents =
-      if CommandLine.argc > 2 {
-        read(file: CommandLine.arguments[2])
-      } else {
-        readStdin()
-      }
+    if CommandLine.argc < 3 {
+      printError("missing module name (passed 1 argument, expected 2)")
+      exit(1)
+    }
+    let contents = read(file: CommandLine.arguments[2])
     let syntaxTree = Parser.parse(source: contents)
     print("import \(CommandLine.arguments[1])\n")
     let visitor = SwiftMacroTestGen(viewMode: .all)
@@ -101,23 +114,27 @@ class TypeAliasReplacer: SyntaxRewriter {
 }
 
 func read(file path: String) -> String {
-  do {
-    return try String(contentsOfFile: path, encoding: .utf8)
-  } catch {
-    print("Error reading file \(path): \(error.localizedDescription)")
+  guard let f = fopen(path, "r") else {
+    printError("could not open file \(path)")
     exit(1)
   }
-}
-
-func readStdin() -> String {
-  if let data = try? FileHandle.standardInput.readToEnd(),
-    let input = String(data: data, encoding: .utf8)
-  {
-    return input
-  } else {
-    print("Error reading stdin)")
+  if fseek(f, 0, SEEK_END) != 0 {
+    printError("could not read file \(path)")
     exit(1)
   }
+  let len = Int(ftell(f))
+  if len < 0 {
+    printError("could not read size of file \(path)")
+    exit(1)
+  }
+  rewind(f)
+  let contents = String(
+    unsafeUninitializedCapacity: len,
+    initializingUTF8With: { stringBuffer in
+      fread(UnsafeMutableRawPointer(stringBuffer.baseAddress!), 1, len, f)
+    })
+  fclose(f)
+  return contents
 }
 
 func createBody(_ f: FunctionDeclSyntax, selfParam: TokenSyntax?) -> CodeBlockSyntax {
@@ -186,6 +203,17 @@ extension TypeSyntax {
         return false
       }
       return simpleSpec.specifier.text == "inout"
+    })
+  }
+}
+
+// String.contains is not available without Foundation
+extension String {
+  public func contains(_ other: String) -> Bool {
+    return self.withCString({ this in
+      return other.withCString({ that in
+        return strstr(this, that) != nil
+      })
     })
   }
 }
@@ -281,4 +309,8 @@ extension AttributeListSyntax.Element {
     case .ifConfigDecl: return false
     }
   }
+}
+
+func printError(_ s: String) {
+  fputs("error: \(s)\n", stderr)
 }
