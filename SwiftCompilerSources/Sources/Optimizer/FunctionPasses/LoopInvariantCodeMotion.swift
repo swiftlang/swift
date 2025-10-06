@@ -1221,10 +1221,10 @@ private extension ScopedInstruction {
       }
       return true
 
-    case is BeginAccessInst:
+    case let beginAccess as BeginAccessInst:
       for fullApplyInst in analyzedInstructions.fullApplies {
-        guard mayWriteToMemory && fullApplyInst.mayReadOrWrite(address: operands.first!.value, context.aliasAnalysis) ||
-              !mayWriteToMemory && fullApplyInst.mayWrite(toAddress: operands.first!.value, context.aliasAnalysis) else {
+        guard mayWriteToMemory && fullApplyInst.mayReadOrWrite(address: beginAccess.address, context.aliasAnalysis) ||
+              !mayWriteToMemory && fullApplyInst.mayWrite(toAddress: beginAccess.address, context.aliasAnalysis) else {
           continue
         }
 
@@ -1234,7 +1234,7 @@ private extension ScopedInstruction {
         }
       }
       
-      switch operands.first!.value.accessPath.base {
+      switch beginAccess.address.accessPath.base {
       case .class, .global:
         for sideEffect in analyzedInstructions.loopSideEffects where sideEffect.mayRelease {
           // Since a class might have a deinitializer, hoisting begin/end_access pair could violate
