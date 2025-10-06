@@ -23,6 +23,8 @@
 // The value of 1 strong refcount in the overall refcount field.
 #define STRONG_RC_ONE (1 << 33)
 
+.subsections_via_symbols
+
 .data
 
 // The slowpath mask is in the runtime. Its "address" is the mask, with an
@@ -94,6 +96,54 @@ LretainRelease_slowpath_mask:
 // NOTE: we're using the preserve_most calling convention, so x9-15 are off
 // limits, in addition to the usual x19 and up. Any calls to functions that use
 // the standard calling convention need to save/restore x9-x15.
+
+.globl _swift_retain_preservemost
+.weak_definition _swift_retain_preservemost
+_swift_retain_preservemost:
+  stp   x0, x9, [sp, #-0x50]!
+  stp   x10, x11, [sp, #0x10]
+  stp   x12, x13, [sp, #0x20]
+  stp   x14, x15, [sp, #0x30]
+  stp   fp, lr, [sp, #0x40];
+  add   fp, sp, #0x40
+
+  // Clear the unused bits from the pointer
+  and   x0, x0, #0x0ffffffffffffff8
+  bl    _swift_retain
+
+  ldp   fp, lr, [sp, #0x40]
+  ldp   x14, x15, [sp, #0x30]
+  ldp   x12, x13, [sp, #0x20]
+  ldp   x10, x11, [sp, #0x10]
+  ldp   x0, x9, [sp], #0x50
+  CONDITIONAL PTRAUTH, \
+    retab
+  CONDITIONAL !PTRAUTH, \
+    ret
+
+.globl _swift_release_preservemost
+.weak_definition _swift_release_preservemost
+_swift_release_preservemost:
+  str   x9, [sp, #-0x50]!
+  stp   x10, x11, [sp, #0x10]
+  stp   x12, x13, [sp, #0x20]
+  stp   x14, x15, [sp, #0x30]
+  stp   fp, lr, [sp, #0x40];
+  add   fp, sp, #0x40
+
+  // Clear the unused bits from the pointer
+  and   x0, x0, #0x0ffffffffffffff8
+  bl    _swift_release
+
+  ldp   fp, lr, [sp, #0x40]
+  ldp   x14, x15, [sp, #0x30]
+  ldp   x12, x13, [sp, #0x20]
+  ldp   x10, x11, [sp, #0x10]
+  ldr   x9, [sp], #0x50
+  CONDITIONAL PTRAUTH, \
+    retab
+  CONDITIONAL !PTRAUTH, \
+    ret
 
 .private_extern _swift_bridgeObjectReleaseClient
 #if SWIFT_OBJC_INTEROP
@@ -184,8 +234,9 @@ Lrelease_ret:
 Lslowpath_release:
   CONDITIONAL USE_LDX_STX, \
     clrex
-  CALL_SLOWPATH _swift_release
+  CALL_SLOWPATH _swift_release_preservemost
 
+.alt_entry _bridgeObjectReleaseClientObjC
 _bridgeObjectReleaseClientObjC:
   CONDITIONAL PTRAUTH, \
     pacibsp
@@ -297,8 +348,9 @@ Lretain_ret:
 Lslowpath_retain:
   CONDITIONAL USE_LDX_STX, \
     clrex
-  CALL_SLOWPATH _swift_retain
+  CALL_SLOWPATH _swift_retain_preservemost
 
+.alt_entry _swift_bridgeObjectRetainClientObjC
 _swift_bridgeObjectRetainClientObjC:
   CONDITIONAL PTRAUTH, \
     pacibsp
@@ -318,7 +370,6 @@ _swift_bridgeObjectRetainClientObjC:
   ldp   x12, x13, [sp, #0x20]
   ldp   x10, x11, [sp, #0x10]
   ldp   x0, x9, [sp], #0x50
-LbridgeObjectRetainObjCRet:
   CONDITIONAL PTRAUTH, \
     retab
   CONDITIONAL !PTRAUTH, \

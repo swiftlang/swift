@@ -76,6 +76,18 @@ asm(".globl __swift_retainRelease_slowpath_mask_v1\n");
 asm(".set __swift_retainRelease_slowpath_mask_v1, 0\n");
 #endif
 
+// Export preservemost symbols for retain/release where appropriate.
+#if SWIFT_REFCOUNT_CC_PRESERVEMOST
+asm(".globl _swift_retain_preservemost\n");
+asm(".set _swift_retain_preservemost, _swift_retain\n");
+asm(".globl _swift_release_preservemost\n");
+asm(".set _swift_release_preservemost, _swift_release\n");
+asm(".weak_definition _swift_release_preservemost_weak_placeholder\n");
+asm(".globl _swift_release_preservemost_weak_placeholder\n");
+asm("_swift_release_preservemost_weak_placeholder:\n");
+asm(".byte 0\n");
+#endif
+
 
 /// Returns true if the pointer passed to a native retain or release is valid.
 /// If false, the operation should immediately return.

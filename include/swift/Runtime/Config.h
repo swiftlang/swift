@@ -254,6 +254,7 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 // call.
 #if defined(__aarch64__)
 #define SWIFT_REFCOUNT_CC SWIFT_CC_PreserveMost
+#define SWIFT_REFCOUNT_CC_PRESERVEMOST 1
 #else
 #define SWIFT_REFCOUNT_CC
 #endif
