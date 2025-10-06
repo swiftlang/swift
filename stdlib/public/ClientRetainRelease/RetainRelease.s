@@ -40,8 +40,8 @@
 // This variable goes into a special section so it can be located and runtime
 // to override the value. Instrumentation can set it to all 1s to ensure the
 // slow path is always used.
-.align 3
 .section __DATA,__swift5_rr_mask
+.align 3
 LretainRelease_slowpath_mask:
 .quad __swift_retainRelease_slowpath_mask_v1 + 0x8000000000000000
 
