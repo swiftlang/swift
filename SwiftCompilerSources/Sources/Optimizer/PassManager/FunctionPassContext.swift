@@ -140,31 +140,47 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
-  func createSpecializedFunctionDeclaration(from original: Function, withName specializedFunctionName: String,
-                                            withParams specializedParameters: [ParameterInfo],
-                                            makeThin: Bool = false,
-                                            makeBare: Bool = false,
-                                            preserveGenericSignature: Bool = true,
-                                            withResults specializedResults: [ResultInfo]? = nil) -> Function {
+  func createSpecializedFunctionDeclaration(
+    from original: Function, withName specializedFunctionName: String,
+    withParams specializedParameters: [ParameterInfo],
+    makeThin: Bool = false,
+    makeBare: Bool = false,
+    preserveGenericSignature: Bool = true
+  ) -> Function {
     return specializedFunctionName._withBridgedStringRef { nameRef in
       let bridgedParamInfos = specializedParameters.map { $0._bridged }
 
       return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
 
-        if let bridgedResultInfos = specializedResults?.map({ $0._bridged }) {
+        return bridgedPassContext.createSpecializedFunctionDeclaration(
+          nameRef, paramBuf.baseAddress, paramBuf.count,
+          nil, 0,
+          original.bridged, makeThin, makeBare,
+          preserveGenericSignature
+        ).function
+      }
+    }
+  }
 
-          return bridgedResultInfos.withUnsafeBufferPointer { resultBuf in
-            return bridgedPassContext.createSpecializedFunctionDeclaration(
-              nameRef, paramBuf.baseAddress, paramBuf.count,
-              resultBuf.baseAddress, resultBuf.count,
-              original.bridged, makeThin, makeBare,
-              preserveGenericSignature
-            ).function
-          }
-        } else {
+  func createSpecializedFunctionDeclaration(
+    from original: Function, withName specializedFunctionName: String,
+    withParams specializedParameters: [ParameterInfo],
+    withResults specializedResults: [ResultInfo],
+    makeThin: Bool = false,
+    makeBare: Bool = false,
+    preserveGenericSignature: Bool = true
+  ) -> Function {
+    return specializedFunctionName._withBridgedStringRef { nameRef in
+      let bridgedParamInfos = specializedParameters.map { $0._bridged }
+
+      return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
+
+        let bridgedResultInfos = specializedResults.map({ $0._bridged })
+
+        return bridgedResultInfos.withUnsafeBufferPointer { resultBuf in
           return bridgedPassContext.createSpecializedFunctionDeclaration(
             nameRef, paramBuf.baseAddress, paramBuf.count,
-            nil, 0,
+            resultBuf.baseAddress, resultBuf.count,
             original.bridged, makeThin, makeBare,
             preserveGenericSignature
           ).function
