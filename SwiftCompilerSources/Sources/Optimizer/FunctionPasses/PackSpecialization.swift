@@ -384,7 +384,8 @@ private struct PackExplodedFunction {
         from: original,
         withName: specializedName,
         withParams: newParameters,
-        withResults: newResults)
+        withResults: newResults,
+        makeThin: true)
 
       self.buildSpecializedFunction(apply: apply, context)
     }
