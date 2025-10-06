@@ -1418,10 +1418,11 @@ extension UnsafeMutableRawPointer {
   ///   - type: The type of `value`.
   @inlinable
   @_alwaysEmitIntoClient
-  public func storeBytes<T: BitwiseCopyable>(
+  public func storeBytes<T: BitwiseCopyable & ~Escapable>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
-    unsafe Builtin.storeRaw(value, (self + offset)._rawValue)
+    let immortalValue = unsafe _overrideLifetime(value, borrowing: ())
+    unsafe Builtin.storeRaw(immortalValue, (self + offset)._rawValue)
   }
 
   /// Stores the given value's bytes into raw memory at the specified offset.
