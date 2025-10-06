@@ -868,4 +868,10 @@ Func ==(_:_:) has parameter 0 type change from (any Any.Type)? to τ_0_0
 Func ==(_:_:) has parameter 1 type change from (any Any.Type)? to τ_0_0                              
 Func type(of:) has been removed
 
+// Float-to-String conversions were reimplemented in Swift
+// The legacy C entry points now look like newly introduced Swift functions
+Func _float32ToStringImpl(_:_:_:_:) is a new API without '@available'
+Func _float64ToStringImpl(_:_:_:_:) is a new API without '@available'
+Func _float80ToStringImpl(_:_:_:_:) is a new API without '@available'
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

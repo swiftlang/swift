@@ -106,11 +106,7 @@ extension ${Self}: CustomStringConvertible {
     if isNaN {
       return "nan"
     } else {
-      var (buffer, length) = _float${bits}ToString(self, debug: false)
-      return unsafe buffer.withBytes { (bufferPtr) in
-        unsafe String._fromASCII(
-          UnsafeBufferPointer(start: bufferPtr, count: length))
-      }
+      return debugDescription
     }
   }
 }
@@ -122,21 +118,37 @@ extension ${Self}: CustomDebugStringConvertible {
   /// This property has the same value as the `description` property, except
   /// that NaN values are printed in an extended format.
   public var debugDescription: String {
-    var (buffer, length) = _float${bits}ToString(self, debug: true)
-    return unsafe buffer.withBytes { (bufferPtr) in
-      unsafe String._fromASCII(
-        UnsafeBufferPointer(start: bufferPtr, count: length))
+    if #available(SwiftStdlib 6.2, *) {
+        var buffer = InlineArray<64, UTF8.CodeUnit>(repeating: 0x30)
+        var span = buffer.mutableSpan
+        let textRange = _Float${bits}ToASCII(value: self, buffer: &span)
+        let textStart = unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self) + textRange.lowerBound
+        let textLength = textRange.upperBound - textRange.lowerBound
+
+        let textBuff = unsafe UnsafeBufferPointer<UTF8.CodeUnit>(_uncheckedStart: textStart,
+                                                                 count: textLength)
+        return unsafe String._fromASCII(textBuff)
+    } else {
+        fatalError()
     }
   }
 }
 
 ${Availability(bits)}
 extension ${Self}: TextOutputStreamable {
-  public func write<Target>(to target: inout Target) where Target: TextOutputStream {
-    var (buffer, length) = _float${bits}ToString(self, debug: true)
-    unsafe buffer.withBytes { (bufferPtr) in
-      let bufPtr = unsafe UnsafeBufferPointer(start: bufferPtr, count: length)
-      unsafe target._writeASCII(bufPtr)
+public func write<Target>(to target: inout Target) where Target: TextOutputStream {
+    if #available(SwiftStdlib 6.2, *) {
+        var buffer = InlineArray<64, UTF8.CodeUnit>(repeating: 0x30)
+        var span = buffer.mutableSpan
+        let textRange = _Float${bits}ToASCII(value: self, buffer: &span)
+        let textStart = unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self) + textRange.lowerBound
+        let textLength = textRange.upperBound - textRange.lowerBound
+
+        let textBuff = unsafe UnsafeBufferPointer<UTF8.CodeUnit>(_uncheckedStart: textStart,
+                                                                 count: textLength)
+        unsafe target._writeASCII(textBuff)
+    } else {
+        fatalError()
     }
   }
 }
