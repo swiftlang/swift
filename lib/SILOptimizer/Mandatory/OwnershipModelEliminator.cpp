@@ -408,13 +408,17 @@ bool OwnershipModelEliminatorVisitor::visitApplyInst(ApplyInst *ai) {
 
   // Insert a retain for unowned results.
   SILBuilderWithScope builder(ai->getNextInstruction(), builderCtx);
-  builder.emitDestructureValueOperation(
-      ai->getLoc(), ai, [&](unsigned idx, SILValue v) {
-        auto resultsIt = fnConv.getDirectSILResults().begin();
-        if (resultsIt->getConvention() == ResultConvention::Unowned)
-          builder.emitCopyValueOperation(ai->getLoc(), v);
-        ++resultsIt;
-      });
+  auto resultIt = fnConv.getDirectSILResults().begin();
+  auto copyValue = [&](unsigned idx, SILValue v) {
+    auto result = *resultIt;
+    if (result.getConvention() == ResultConvention::Unowned)
+      builder.emitCopyValueOperation(ai->getLoc(), v);
+    ++resultIt;
+  };
+  if (fnConv.getNumDirectSILResults() == 1)
+    copyValue(0, ai);
+  else
+    builder.emitDestructureValueOperation(ai->getLoc(), ai, copyValue);
 
   return changed;
 }

@@ -37,6 +37,17 @@ bb0(%0 : $@thick T.Type):
   return %1
 }
 
+// CHECK-LABEL: sil [ossa] @test_non_metatype :
+// CHECK:         %1 = unconditional_checked_cast %0
+// CHECK-NEXT:    %2 = copy_value %1
+// CHECK-NEXT:    return %2
+// CHECK:       } // end sil function 'test_non_metatype'
+sil [ossa] @test_non_metatype : $@convention(thin) (@guaranteed C) -> @owned any PC {
+bb0(%0 : @guaranteed $C):
+  %1 = unconditional_checked_cast %0 to any PC
+  %2 = copy_value %1
+  return %2
+}
 
 // CHECK-LABEL: sil [ossa] @test_non_existential_target :
 // CHECK:         %1 = unconditional_checked_cast %0
