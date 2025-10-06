@@ -109,7 +109,7 @@ extension ASTGenVisitor {
     return decl
   }
 
-  func generate(enumDecl node: EnumDeclSyntax) -> BridgedNominalTypeDecl? {
+  func generate(enumDecl node: EnumDeclSyntax) -> BridgedEnumDecl? {
     let attrs = self.generateDeclAttributes(node, allowStatic: false)
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
@@ -135,7 +135,7 @@ extension ASTGenVisitor {
       self.generate(memberBlockItemList: node.memberBlock.members)
     }
     let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
+    decl.asNominalTypeDecl.setParsedMembers(
       members.lazy.bridgedArray(in: self),
       fingerprint: fp.bridged
     )

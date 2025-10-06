@@ -1351,6 +1351,7 @@ final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var hasUnknownResultIsolation: Bool { bridged.PartialApplyInst_hasUnknownResultIsolation() }
   public var unappliedArgumentCount: Int { bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg() }
   public var calleeConvention: ArgumentConvention { type.bridged.getCalleeConvention().convention }
+  public var substitutionMap: SubstitutionMap { SubstitutionMap(bridged: bridged.PartialApplyInst_getSubstitutionMap()) }
 }
 
 final public class ApplyInst : SingleValueInstruction, FullApplySite {
@@ -1929,6 +1930,7 @@ final public class SwitchValueInst : TermInst {
 final public class SwitchEnumInst : TermInst {
 
   public var enumOp: Value { operands[0].value }
+  public var numCases: Int { bridged.SwitchEnumInst_getNumCases() }
 
   public struct CaseIndexArray : RandomAccessCollection {
     fileprivate let switchEnum: SwitchEnumInst
@@ -1951,6 +1953,10 @@ final public class SwitchEnumInst : TermInst {
   // the "missing" case.
   public func getUniqueSuccessor(forCaseIndex: Int) -> BasicBlock? {
     cases.first(where: { $0.0 == forCaseIndex })?.1
+  }
+
+  public func getSuccessorForDefault() -> BasicBlock? {
+    return self.bridged.SwitchEnumInst_getSuccessorForDefault().block
   }
 
   // This does not handle the special case where the default covers exactly
