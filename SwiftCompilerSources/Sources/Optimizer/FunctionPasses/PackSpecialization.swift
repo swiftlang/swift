@@ -522,7 +522,8 @@ private struct PackExplodedFunction {
           }
         }
       }
-      for bb in specialized.blocks where bb.isReachableExitBlock {
+      // Only emit deallocations when actually leaving the function context.
+      for bb in specialized.blocks where bb.terminator.isFunctionExiting {
         insertArgumentPackDeallocations(in: bb, argumentMap: argumentMap, specContext)
       }
     }
