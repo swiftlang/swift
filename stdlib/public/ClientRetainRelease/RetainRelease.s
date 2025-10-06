@@ -34,8 +34,13 @@
 // has any bits set that are in the mask, then we must take the slow path. The
 // offset is the value it will have when the variable isn't present at runtime,
 // and needs to be the correct mask for older runtimes.
+//
+// This variable goes into a special section so it can be located and runtime
+// to override the value. Instrumentation can set it to all 1s to ensure the
+// slow path is always used.
 .align 3
-_retainRelease_slowpath_mask:
+.section __DATA,__swift5_rr_mask
+LretainRelease_slowpath_mask:
 .quad __swift_retainRelease_slowpath_mask_v1 + 0x8000000000000000
 
 
@@ -122,8 +127,8 @@ _swift_releaseClient:
 Lrelease_retry:
 // Get the slow path mask and see if the refcount field has any of those bits
 // set.
-  adrp  x17, _retainRelease_slowpath_mask@PAGE
-  ldr   x17, [x17, _retainRelease_slowpath_mask@PAGEOFF]
+  adrp  x17, LretainRelease_slowpath_mask@PAGE
+  ldr   x17, [x17, LretainRelease_slowpath_mask@PAGEOFF]
 
 // Load-exclusive of the current value in the refcount field when using LLSC.
 // stxr does not update x16 like cas does, so this load must be inside the loop.
@@ -241,8 +246,8 @@ _swift_retainClient:
 Lretain_retry:
 // Get the slow path mask and see if the refcount field has any of those bits
 // set.
-  adrp  x17, _retainRelease_slowpath_mask@PAGE
-  ldr   x17, [x17, _retainRelease_slowpath_mask@PAGEOFF]
+  adrp  x17, LretainRelease_slowpath_mask@PAGE
+  ldr   x17, [x17, LretainRelease_slowpath_mask@PAGEOFF]
 
 // Load-exclusive of the current value in the refcount field when using LLSC.
 // stxr does not update x16 like cas does, so this load must be inside the loop.
