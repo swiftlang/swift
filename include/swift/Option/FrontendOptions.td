@@ -1457,6 +1457,10 @@ def mergeable_traps :
   Flag<["-"], "mergeable-traps">,
   HelpText<"Emit mergeable traps even in optimized builds">;
 
+def disable_client_retain_release :
+  Flag<["-"], "disable-client-retain-release">,
+  HelpText<"Disable use of swift_retain/releaseClient functions">;
+
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,
   HelpText<"Enable the new llvm pass manager">;

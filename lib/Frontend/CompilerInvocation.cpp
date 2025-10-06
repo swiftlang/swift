@@ -3939,6 +3939,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.MergeableTraps = Args.hasArg(OPT_mergeable_traps);
 
+  Opts.DisableClientRetainRelease =
+      Args.hasArg(OPT_disable_client_retain_release);
+
   Opts.EnableObjectiveCProtocolSymbolicReferences =
     Args.hasFlag(OPT_enable_objective_c_protocol_symbolic_references,
                  OPT_disable_objective_c_protocol_symbolic_references,

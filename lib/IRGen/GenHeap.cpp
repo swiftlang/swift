@@ -998,7 +998,9 @@ void IRGenFunction::emitNativeStrongRetain(llvm::Value *value,
 
   // Emit the call.
   FunctionPointer function;
-  if (atomicity == Atomicity::Atomic && IGM.TargetInfo.HasSwiftClientRRLibrary)
+  if (atomicity == Atomicity::Atomic &&
+      IGM.TargetInfo.HasSwiftClientRRLibrary &&
+      !getOptions().DisableClientRetainRelease)
     function = IGM.getNativeStrongRetainClientFunctionPointer();
   else if (atomicity == Atomicity::Atomic)
     function = IGM.getNativeStrongRetainFunctionPointer();
@@ -1261,7 +1263,9 @@ void IRGenFunction::emitNativeStrongRelease(llvm::Value *value,
   if (doesNotRequireRefCounting(value))
     return;
   llvm::Constant *function;
-  if (atomicity == Atomicity::Atomic && IGM.TargetInfo.HasSwiftClientRRLibrary)
+  if (atomicity == Atomicity::Atomic &&
+      IGM.TargetInfo.HasSwiftClientRRLibrary &&
+      !getOptions().DisableClientRetainRelease)
     function = IGM.getNativeStrongReleaseClientFn();
   else if (atomicity == Atomicity::Atomic)
     function = IGM.getNativeStrongReleaseFn();
@@ -1361,7 +1365,9 @@ void IRGenFunction::emitUnknownStrongRelease(llvm::Value *value,
 void IRGenFunction::emitBridgeStrongRetain(llvm::Value *value,
                                            Atomicity atomicity) {
   llvm::Constant *function;
-  if (atomicity == Atomicity::Atomic && IGM.TargetInfo.HasSwiftClientRRLibrary)
+  if (atomicity == Atomicity::Atomic &&
+      IGM.TargetInfo.HasSwiftClientRRLibrary &&
+      !getOptions().DisableClientRetainRelease)
     function = IGM.getBridgeObjectStrongRetainClientFn();
   else if (atomicity == Atomicity::Atomic)
     function = IGM.getBridgeObjectStrongRetainFn();
@@ -1373,7 +1379,9 @@ void IRGenFunction::emitBridgeStrongRetain(llvm::Value *value,
 void IRGenFunction::emitBridgeStrongRelease(llvm::Value *value,
                                             Atomicity atomicity) {
   llvm::Constant *function;
-  if (atomicity == Atomicity::Atomic && IGM.TargetInfo.HasSwiftClientRRLibrary)
+  if (atomicity == Atomicity::Atomic &&
+      IGM.TargetInfo.HasSwiftClientRRLibrary &&
+      !getOptions().DisableClientRetainRelease)
     function = IGM.getBridgeObjectStrongReleaseClientFn();
   else if (atomicity == Atomicity::Atomic)
     function = IGM.getBridgeObjectStrongReleaseFn();
