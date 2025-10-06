@@ -4409,6 +4409,12 @@ bool Type::findIf(llvm::function_ref<bool(Type)> pred) const {
 }
 
 TypeTraitResult TypeBase::canBeClass() {
+  // Foreign reference types are represented as Swift classes in the AST,
+  // however, they use custom retain/release operations, and therefore aren't
+  // AnyObjects.
+  if (isForeignReferenceType())
+    return TypeTraitResult::IsNot;
+
   // Any bridgeable object type can be a class.
   if (isBridgeableObjectType())
     return TypeTraitResult::Is;
