@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=10000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=10000 -target %target-cpu-apple-macosx10.15
 // Succeeds in 60ms with 5572 scopes
 
 // REQUIRES: objc_interop
@@ -23,6 +23,6 @@ struct Breathe: View {
                     .rotationEffect(.degrees(Double(index * 360 / Self.colors.count)))
             }
         }
-        .frame(width: self.leafSize, height: self.leafSize)   // <== The compiler is unable to type-check this expression in reasonable time
+        .frame(width: self.leafSize, height: self.leafSize)
     }
 }
