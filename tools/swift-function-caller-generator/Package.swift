@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
   name: "swift-function-caller-generator",
-  platforms: [.macOS(.v11)],
+  platforms: [.macOS(.v13)],
   products: [
     .executable(name: "swift-function-caller-generator", targets: ["swift-function-caller-generator"]),
   ],
