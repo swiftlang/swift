@@ -48,7 +48,7 @@ pdflatex generics
 
 ## Reading the PDF
 
-The book makes use of internal hyperlinks so it is is best to use PDF reader with support for PDF bookmarks and back/forward history:
+The book makes use of internal hyperlinks so it is best to use PDF reader with support for PDF bookmarks and back/forward history:
 
 - Preview.app on macOS fits the bill; you can add Back/Forward buttons to the toolbar with **View** > **Customize Toolbar**.
 - [Skim.app](https://skim-app.sourceforge.io) is a BSD-licensed open source PDF reader for macOS.

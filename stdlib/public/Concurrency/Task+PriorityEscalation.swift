@@ -94,7 +94,7 @@ extension UnsafeCurrentTask {
 /// The handler will only trigger if a priority escalation occurs while the
 /// operation is in progress.
 ///
-/// If multiple task escalation handlers are nester they will all be triggered.
+/// If multiple task escalation handlers are nested they will all be triggered.
 ///
 /// Task escalation propagates through structured concurrency child-tasks.
 ///

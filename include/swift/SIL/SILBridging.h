@@ -509,6 +509,9 @@ struct BridgedFunction {
   BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLocation getLocation() const;
   BRIDGED_INLINE bool isAccessor() const;
+  BRIDGED_INLINE bool isInitializer() const;
+  BRIDGED_INLINE bool isDeinitializer() const;
+  BRIDGED_INLINE bool isImplicit() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getAccessorName() const;
   BRIDGED_INLINE bool hasOwnership() const;
   BRIDGED_INLINE bool hasLoweredAddresses() const;

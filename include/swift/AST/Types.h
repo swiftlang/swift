@@ -1668,9 +1668,10 @@ class ErrorType final : public TypeBase {
     return props;
   }
 
-  // The Error type is always canonical.
   ErrorType(ASTContext &C, Type originalType)
-      : TypeBase(TypeKind::Error, &C, getProperties(originalType)) {
+      : TypeBase(TypeKind::Error,
+                 (!originalType || originalType->isCanonical()) ? &C : nullptr,
+                 getProperties(originalType)) {
     if (originalType) {
       Bits.ErrorType.HasOriginalType = true;
       *reinterpret_cast<Type *>(this + 1) = originalType;

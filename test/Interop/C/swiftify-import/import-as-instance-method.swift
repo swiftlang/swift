@@ -10,7 +10,7 @@
 //--- test.swift
 import Instance
 
-@available(macOS 13.3.0, *)
+@available(SwiftStdlib 5.8, *)
 func foo(_ p: inout MutableSpan<CInt>, a: A, aa: inout A, c: C, b: B, bb: inout B) {
   aa.basic(&p)
   aa.bar(&p)

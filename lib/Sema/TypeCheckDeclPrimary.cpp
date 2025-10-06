@@ -3652,10 +3652,8 @@ public:
       return;
 
     auto &ctx = ED->getASTContext();
-
-    if (!ctx.LangOpts.hasFeature(Feature::TupleConformances)) {
-      ED->diagnose(diag::experimental_tuple_extension);
-    }
+    ASSERT(ctx.LangOpts.hasFeature(Feature::TupleConformances) &&
+           "Extension binding should not have permitted this");
 
     if (!isValidExtendedTypeForTupleExtension(ED)) {
       ED->diagnose(diag::tuple_extension_wrong_type,
