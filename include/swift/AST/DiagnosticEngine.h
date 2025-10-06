@@ -616,6 +616,9 @@ namespace swift {
 
     /// Don't emit any warnings
     bool suppressWarnings = false;
+
+    /// Don't emit any notes
+    bool suppressNotes = false;
     
     /// Don't emit any remarks
     bool suppressRemarks = false;
@@ -663,6 +666,10 @@ namespace swift {
     void setSuppressWarnings(bool val) { suppressWarnings = val; }
     bool getSuppressWarnings() const { return suppressWarnings; }
     
+    /// Whether to skip emitting notes
+    void setSuppressNotes(bool val) { suppressNotes = val; }
+    bool getSuppressNotes() const { return suppressNotes; }
+
     /// Whether to skip emitting remarks
     void setSuppressRemarks(bool val) { suppressRemarks = val; }
     bool getSuppressRemarks() const { return suppressRemarks; }
@@ -708,6 +715,7 @@ namespace swift {
     void swap(DiagnosticState &other) {
       std::swap(showDiagnosticsAfterFatalError, other.showDiagnosticsAfterFatalError);
       std::swap(suppressWarnings, other.suppressWarnings);
+      std::swap(suppressNotes, other.suppressNotes);
       std::swap(suppressRemarks, other.suppressRemarks);
       std::swap(warningsAsErrors, other.warningsAsErrors);
       std::swap(fatalErrorOccurred, other.fatalErrorOccurred);
@@ -902,6 +910,12 @@ namespace swift {
     void setSuppressWarnings(bool val) { state.setSuppressWarnings(val); }
     bool getSuppressWarnings() const {
       return state.getSuppressWarnings();
+    }
+
+    /// Whether to skip emitting notes
+    void setSuppressNotes(bool val) { state.setSuppressNotes(val); }
+    bool getSuppressNotes() const {
+      return state.getSuppressNotes();
     }
 
     /// Whether to skip emitting remarks
