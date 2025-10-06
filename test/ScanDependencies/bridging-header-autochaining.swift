@@ -60,9 +60,8 @@
 // RUN:   %t/user.swift -auto-bridging-header-chaining -o %t/User.swiftmodule \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -I %t > %t/header1.h
 // RUN:   %FileCheck %s --check-prefix=HEADER1 --input-file=%t/header1.h
-// HEADER1: # 1 "<module-Test>/Bridging.h" 1
-// HEADER1: #include "Foo.h"
-// HEADER1: #include "Foo2.h"
+// HEADER1: #include
+// HEADER1-SAME: Bridging.h
 
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps2.json bridgingHeader > %t/header1.cmd
 // RUN: %target-swift-frontend @%t/header1.cmd -disable-implicit-swift-modules -O -o %t/bridging1.pch
@@ -94,8 +93,10 @@
 // RUN:   %t/user.swift -auto-bridging-header-chaining -o %t/User.swiftmodule -import-objc-header %t/Bridging2.h \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -I %t > %t/header2.h
 // RUN:   %FileCheck %s --check-prefix=HEADER2 --input-file=%t/header2.h
-// HEADER2: # 1 "<module-Test>/Bridging.h" 1
-// HEADER2: # 1 "<module-User>/Bridging2.h" 1
+// HEADER2: #include
+// HEADER2-SAME: Bridging.h
+// HEADER2: #include
+// HEADER2-SAME: Bridging2.h
 
 // RUN: %FileCheck %s --check-prefix DEPS_JSON --input-file=%t/deps3.json
 // DEPS_JSON: "chainedBridgingHeaderPath":

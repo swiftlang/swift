@@ -1644,16 +1644,6 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
                 allModules.end(), action);
 }
 
-static void appendHeaderContent(llvm::raw_ostream &OS,
-                                llvm::MemoryBufferRef buffer,
-                                ModuleDependencyID fromModule) {
-  // Use preprocessor directives to add some clues for where the content is
-  // coming from.
-  OS << "# 1 \"<module-" << fromModule.ModuleName << ">/"
-     << llvm::sys::path::filename(buffer.getBufferIdentifier()) << "\" 1\n";
-  OS << buffer.getBuffer();
-}
-
 llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
     const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
     ModuleDependencyIDSetVector &allModules) {
@@ -1663,35 +1653,60 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
   llvm::SmallString<256> chainedHeaderBuffer;
   llvm::raw_svector_ostream outOS(chainedHeaderBuffer);
 
+  // If prefix mapping is used, don't try to import header since that will add
+  // a path-relative component into dependency scanning and defeat the purpose
+  // of prefix mapping. Additionally, if everything is prefix mapped, the
+  // embedded header path is also prefix mapped, thus it can't be found anyway.
+  bool useImportHeader = !hasPathMapping();
+  auto FS = ScanASTContext.SourceMgr.getFileSystem();
+
+  auto chainBridgingHeader = [&](StringRef moduleName, StringRef headerPath,
+                                 StringRef binaryModulePath) -> llvm::Error {
+    if (useImportHeader) {
+      if (auto buffer = FS->getBufferForFile(headerPath)) {
+        outOS << "#include \"" << headerPath << "\"\n";
+        return llvm::Error::success();
+      }
+    }
+
+    if (binaryModulePath.empty())
+      return llvm::createStringError("failed to load bridging header " +
+                                     headerPath);
+
+    // Extract the embedded bridging header
+    auto moduleBuf = FS->getBufferForFile(binaryModulePath);
+    if (!moduleBuf)
+      return llvm::errorCodeToError(moduleBuf.getError());
+
+    auto content = extractEmbeddedBridgingHeaderContent(
+        std::move(*moduleBuf), /*headerPath=*/"", ScanASTContext);
+    if (!content)
+      return llvm::createStringError("can't load embedded header from " +
+                                     binaryModulePath);
+
+    outOS << "# 1 \"<module-" << moduleName
+          << "-embedded-bridging-header>\" 1\n";
+    outOS << content->getBuffer() << "\n";
+    return llvm::Error::success();
+  };
+
   // Iterate through all the modules and collect all the bridging header
   // and chain them into a single file. The allModules list is in the order of
   // discover, thus providing stable ordering for a deterministic generated
   // buffer.
-  auto FS = ScanASTContext.SourceMgr.getFileSystem();
   for (const auto &moduleID : allModules) {
     if (moduleID.Kind != ModuleDependencyKind::SwiftBinary)
       continue;
 
     auto moduleDependencyInfo = cache.findKnownDependency(moduleID);
     if (auto *binaryMod = moduleDependencyInfo.getAsSwiftBinaryModule()) {
-      if (!binaryMod->headerImport.empty()) {
-        if (auto buffer= FS->getBufferForFile(binaryMod->headerImport)) {
-          appendHeaderContent(outOS, (*buffer)->getMemBufferRef(), moduleID);
-        } else {
-          // Extract the embedded bridging header
-          auto moduleBuf = FS->getBufferForFile(binaryMod->compiledModulePath);
-          if (!moduleBuf)
-            return llvm::errorCodeToError(moduleBuf.getError());
+      if (binaryMod->headerImport.empty())
+        continue;
 
-          auto content = extractEmbeddedBridgingHeaderContent(
-              std::move(*moduleBuf), /*headerPath=*/"", ScanASTContext);
-          if (!content)
-            return llvm::createStringError("can't load embedded header from " +
-                                           binaryMod->compiledModulePath);
-
-          outOS << content->getBuffer() << "\n";
-        }
-      }
+      if (auto E =
+              chainBridgingHeader(moduleID.ModuleName, binaryMod->headerImport,
+                                  binaryMod->compiledModulePath))
+        return E;
     }
   }
 
@@ -1718,11 +1733,10 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
     // There are bridging header needed to be chained. Append the bridging
     // header from main module if needed and create use a new source buffer.
     if (mainModule->textualModuleDetails.bridgingHeaderFile) {
-      auto srcBuf = FS->getBufferForFile(
-          *mainModule->textualModuleDetails.bridgingHeaderFile);
-      if (!srcBuf)
-        return llvm::errorCodeToError(srcBuf.getError());
-      appendHeaderContent(outOS, (*srcBuf)->getMemBufferRef(), rootModuleID);
+      if (auto E = chainBridgingHeader(
+              rootModuleID.ModuleName,
+              *mainModule->textualModuleDetails.bridgingHeaderFile, ""))
+        return E;
     }
 
     SmallString<256> outputPath(
