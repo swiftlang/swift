@@ -74,3 +74,20 @@ func goodGenericLoadUnaligned<T: ~Escapable>(p: UnsafeRawPointer, _: T.Type) -> 
   return unsafe p.loadUnaligned(as: T.self) // OK
 }
 */
+
+//===----------------------------------------------------------------------===//
+// raw pointer .storeBytes()
+//===----------------------------------------------------------------------===//
+
+@available(Span 0.1, *)
+func storeSpan(span: RawSpan) {
+  let p = getMutRawPointer()
+  unsafe p.storeBytes(of: span, as: RawSpan.self)
+}
+
+/* TODO: support storeBytes<T: ~BitwiseCopyable>
+func storeGeneric<T: ~Escapable>(value: T) {
+  let p = getMutRawPointer()
+  unsafe p.storeBytes(of: value, as: T.self)
+}
+*/
