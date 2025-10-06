@@ -315,6 +315,10 @@ class SILLowerAggregate : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction *f = getFunction();
+
+    if (f->hasOwnership())
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "***** LowerAggregate on function: "
                             << f->getName() << " *****\n");
     bool changed = processFunction(*f);
