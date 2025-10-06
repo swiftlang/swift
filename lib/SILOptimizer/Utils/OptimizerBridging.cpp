@@ -19,7 +19,6 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "swift/SILOptimizer/IPO/ClosureSpecializer.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
@@ -555,11 +554,6 @@ bool BridgedFunction::isAddressor() const {
   return false;
 }
 
-bool BridgedFunction::isAutodiffVJP() const {
-  return swift::isDifferentiableFuncComponent(
-      getFunction(), swift::AutoDiffFunctionComponent::VJP);
-}
-
 bool BridgedFunction::isAutodiffSubsetParametersThunk() const {
   Demangle::Context Ctx;
   if (auto *root = Ctx.demangleSymbolAsNode(getFunction()->getName())) {
@@ -625,8 +619,4 @@ bool BridgedType::isAutodiffBranchTracingEnumInVJP(BridgedFunction vjp) const {
         return true;
 
   return false;
-}
-
-SwiftInt BridgedFunction::specializationLevel() const {
-  return swift::getSpecializationLevel(getFunction());
 }
