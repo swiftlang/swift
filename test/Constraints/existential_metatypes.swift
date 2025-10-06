@@ -125,7 +125,8 @@ func parameterizedExistentials() {
 func testNestedMetatype() {
   struct S: P {}
 
-  func bar<T>(_ x: T) -> T.Type { type(of: x) }
+  func bar<T>(_ x: T) -> T.Type { }
+  func metaBar<T>(_ x: T) -> T.Type.Type { }
   func foo1(_ x: P.Type) {}
   func foo2(_ x: P.Type.Type) { }
 
@@ -134,4 +135,5 @@ func testNestedMetatype() {
   // Make sure we don't crash.
   foo2(bar(S.self))
   foo2(bar(0)) // expected-error {{cannot convert value of type 'Int' to expected argument type 'any P.Type'}}
+  foo2(metaBar(0)) // expected-error {{argument type 'Int' does not conform to expected type 'P'}}
 }

@@ -8755,8 +8755,17 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   if (shouldAttemptFixes() && result.isFailure()) {
     auto *loc = getConstraintLocator(locator);
 
-    if (loc->isLastElement<LocatorPathElt::InstanceType>())
-      loc = getConstraintLocator(loc->getAnchor(), loc->getPath().drop_back());
+    ArrayRef<LocatorPathElt> path = loc->getPath();
+    while (!path.empty()) {
+      if (!path.back().is<LocatorPathElt::InstanceType>())
+        break;
+
+      path = path.drop_back();
+    }
+
+    if (path.size() != loc->getPath().size()) {
+      loc = getConstraintLocator(loc->getAnchor(), path);
+    }
 
     ConstraintFix *fix = nullptr;
     if (loc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
