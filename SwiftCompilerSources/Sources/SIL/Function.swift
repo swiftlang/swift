@@ -267,6 +267,18 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     return StringRef(bridged: bridged.getAccessorName()).string
   }
 
+  public var isInitializer: Bool {
+    return bridged.isInitializer()
+  }
+
+  public var isDeinitializer: Bool {
+    return bridged.isDeinitializer()
+  }
+
+  public var isImplicit: Bool {
+    return bridged.isImplicit()
+  }
+
   /// True, if the function runs with a swift 5.1 runtime.
   /// Note that this is function specific, because inlinable functions are de-serialized
   /// in a client module, which might be compiled with a different deployment target.
