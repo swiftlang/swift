@@ -1771,6 +1771,34 @@ bb3:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dont_hoist_load_borrow :
+// CHECK:       bb1:
+// CHECK-NEXT:    copy_addr
+// CHECK-NEXT:    load_borrow
+// CHECK:       } // end sil function 'dont_hoist_load_borrow'
+sil [ossa] @dont_hoist_load_borrow : $@convention(thin) (@in_guaranteed String) -> () {
+bb0(%0 : $*String):
+  %1 = alloc_stack $String
+  br bb1
+
+bb1:
+  copy_addr %0 to [init] %1
+  %3 = load_borrow %1
+  fix_lifetime %3
+  end_borrow %3
+  %6 = load [take] %1
+  destroy_value %6
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  dealloc_stack %1
+  %r = tuple()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil [ossa] @dont_hoist_struct :
 // CHECK:       bb1:
 // CHECK-NEXT:    struct $NonCopyable
