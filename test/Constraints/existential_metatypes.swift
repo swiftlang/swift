@@ -124,12 +124,15 @@ func testNestedMetatype() {
   struct S: P {}
 
   func bar<T>(_ x: T) -> T.Type { type(of: x) }
-  func foo(_ x: P.Type.Type) { }
+  func foo1(_ x: P.Type) {}
+  func foo2(_ x: P.Type.Type) { }
+
+  foo1(bar(S.self)) // expected-error {{argument type 'S.Type' does not conform to expected type 'P'}}
 
   // Make sure we don't crash.
-  foo(bar(S.self))
+  foo2(bar(S.self))
 
   // FIXME: Bad diagnostic
   // https://github.com/swiftlang/swift/issues/83991
-  foo(bar(0)) // expected-error {{failed to produce diagnostic for expression}}
+  foo2(bar(0)) // expected-error {{failed to produce diagnostic for expression}}
 }
