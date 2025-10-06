@@ -1240,6 +1240,8 @@ NOTE(lifetime_outside_scope_use, none,
 NOTE(lifetime_outside_scope_escape, none,
      "this use causes the lifetime-dependent value to escape", ())
 
+NOTE(implicit_function_note, none, "error in compiler-generated '%0'", (StringRef))
+
 ERROR(noncopyable_shared_case_block_unimplemented, none,
       "matching a non-'Copyable' value using a case label that has multiple patterns is not implemented", ())
 
