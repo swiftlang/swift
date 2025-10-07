@@ -46,6 +46,12 @@ public:
   /// allow diagnostics at <unknown>, that is controlled by VerifyIgnoreUnknown.
   bool VerifyIgnoreUnrelated = false;
 
+  /// Indicates whether to ignore \c diag::in_macro_expansion. This is useful
+  /// for when they occur in unnamed buffers (such as clang attribute buffers),
+  /// but VerifyIgnoreUnrelated is too blunt of a tool. Note that notes of this
+  /// kind are not printed by \c PrintingDiagnosticConsumer.
+  bool VerifyIgnoreMacroLocationNote = false;
+
   /// Indicates whether diagnostic passes should be skipped.
   bool SkipDiagnosticPasses = false;
 
