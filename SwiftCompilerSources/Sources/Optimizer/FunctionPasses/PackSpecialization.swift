@@ -859,7 +859,7 @@ private func loadOwnership(for value: any Value, normal: LoadInst.LoadOwnership)
   if value.type.isTrivial(in: function) {
     return .trivial
   } else {
-    return .take
+    return normal
   }
 }
 
