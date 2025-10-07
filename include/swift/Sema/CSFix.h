@@ -394,6 +394,9 @@ enum class FixKind : uint8_t {
   /// Ignore a type imposed by an assignment destination e.g. `let x: Int = ...`
   IgnoreAssignmentDestinationType,
 
+  /// Ignore a non-metatype contextual type for a `type(of:)` expression.
+  IgnoreNonMetatypeDynamicType,
+
   /// Allow argument-to-parameter subtyping even when parameter type
   /// is marked as `inout`.
   AllowConversionThroughInOut,
@@ -2431,6 +2434,30 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreAssignmentDestinationType;
+  }
+};
+
+/// Ignore a non-metatype contextual type for a `type(of:)` expression, for
+/// example `let x: Int = type(of: foo)`.
+class IgnoreNonMetatypeDynamicType final : public ContextualMismatch {
+  IgnoreNonMetatypeDynamicType(ConstraintSystem &cs, Type instanceTy,
+                               Type metatypeTy, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::IgnoreNonMetatypeDynamicType,
+                           instanceTy, metatypeTy, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore non-metatype result for 'type(of:)'";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static IgnoreNonMetatypeDynamicType *create(ConstraintSystem &cs,
+                                              Type instanceTy, Type metatypeTy,
+                                              ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreNonMetatypeDynamicType;
   }
 };
 

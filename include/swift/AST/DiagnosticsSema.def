@@ -359,6 +359,11 @@ ERROR(cannot_convert_return_type_to_anyobject,none,
 ERROR(cannot_convert_to_return_type_nil,none,
       "'nil' is incompatible with return type %0", (Type))
 
+ERROR(cannot_convert_metatype_to_non_metatype,none,
+      "cannot convert metatype %0 to non-metatype %1", (Type, Type))
+ERROR(cannot_convert_typeof_to_non_metatype,none,
+      "cannot convert 'type(of:)' metatype to non-metatype %0", (Type))
+
 ERROR(cannot_convert_thrown_type,none,
       "thrown expression type %0 %select{cannot be converted to error type %1|"
       "does not conform to 'Error'}2",
