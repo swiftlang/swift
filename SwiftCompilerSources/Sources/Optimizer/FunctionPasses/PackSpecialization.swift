@@ -63,8 +63,9 @@ let packSpecialization = FunctionPass(name: "pack-specialization") {
   for inst in function.instructions {
     // Only support full application for now.
     guard let apply = inst as? ApplyInst,
+      let callee = apply.referencedFunction,
       // Only specialize calls to OSSA functions
-      apply.referencedFunction?.hasOwnership ?? false,
+      callee.hasOwnership,
       let specialized = specializeCallee(apply: apply, context: context)
     else {
       continue
