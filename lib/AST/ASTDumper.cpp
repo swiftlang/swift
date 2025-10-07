@@ -4496,6 +4496,12 @@ public:
   void visitSingleValueStmtExpr(SingleValueStmtExpr *E, Label label) {
     printCommon(E, "single_value_stmt_expr", label);
     printDeclContext(E);
+    if (auto preamble = E->getForExpressionPreamble()) {
+      printRec(preamble->ForAccumulatorDecl,
+               Label::optional("for_preamble_accumulator_decl"));
+      printRec(preamble->ForAccumulatorBinding,
+               Label::optional("for_preamble_accumulator_binding"));
+    }
     printRec(E->getStmt(), &E->getDeclContext()->getASTContext(),
              Label::optional("stmt"));
     printFoot();

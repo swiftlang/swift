@@ -3224,6 +3224,12 @@ IsSingleValueStmtRequest::evaluate(Evaluator &eval, const Stmt *S,
     return areBranchesValidForSingleValueStmt(ctx, DCS,
                                               DCS->getBranches(scratch));
   }
+  if (auto *FS = dyn_cast<ForEachStmt>(S)) {
+    if (!ctx.LangOpts.hasFeature(Feature::ForExpressions))
+      return IsSingleValueStmtResult::unhandledStmt();
+
+    return areBranchesValidForSingleValueStmt(ctx, FS, FS->getBody());
+  }
   return IsSingleValueStmtResult::unhandledStmt();
 }
 
