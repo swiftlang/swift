@@ -15,22 +15,22 @@
 // RUN:   -module-name LibC -emit-module-path %t/LibC.swiftmodule \
 // RUN:   -swift-version 5 -enable-library-evolution -I %t
 
-// RUN: %target-swift-frontend -typecheck %t/TwoIOI.swift -I %t -verify \
+// RUN: %target-swift-frontend -typecheck %t/TwoIOI.swift -I %t -verify -verify-ignore-unrelated \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
-// RUN: %target-swift-frontend -typecheck %t/SPIOnlyAndIOI1.swift -I %t -verify \
+// RUN: %target-swift-frontend -typecheck %t/SPIOnlyAndIOI1.swift -I %t -verify -verify-ignore-unrelated \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
-// RUN: %target-swift-frontend -typecheck %t/SPIOnlyAndIOI2.swift -I %t -verify \
+// RUN: %target-swift-frontend -typecheck %t/SPIOnlyAndIOI2.swift -I %t -verify -verify-ignore-unrelated \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
-// RUN: %target-swift-frontend -typecheck %t/TwoSPIOnly.swift -I %t -verify \
+// RUN: %target-swift-frontend -typecheck %t/TwoSPIOnly.swift -I %t -verify -verify-ignore-unrelated \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
-// RUN: %target-swift-frontend -typecheck %t/OneSPIOnly1.swift -I %t -verify \
+// RUN: %target-swift-frontend -typecheck %t/OneSPIOnly1.swift -I %t -verify -verify-ignore-unrelated \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
-// RUN: %target-swift-frontend -typecheck %t/OneSPIOnly2.swift -I %t -verify \
+// RUN: %target-swift-frontend -typecheck %t/OneSPIOnly2.swift -I %t -verify -verify-ignore-unrelated \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
 

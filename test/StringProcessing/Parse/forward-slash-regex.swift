@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking -typo-correction-limit 0
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-bare-slash-regex -disable-availability-checking -typo-correction-limit 0
 // REQUIRES: swift_swift_parser
 // REQUIRES: concurrency
 

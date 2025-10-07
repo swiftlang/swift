@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -module-name themodule -enable-source-import -I %S/../decl/enum -sdk "" -verify -show-diagnostics-after-fatal -verify-ignore-unknown
+// RUN: %target-swift-frontend -typecheck %s -module-name themodule -enable-source-import -I %S/../decl/enum -sdk "" -verify -verify-ignore-unrelated -show-diagnostics-after-fatal -verify-ignore-unknown
 
 // -verify-ignore-unknown is for
 // <unknown>:0: error: unexpected note produced: did you forget to set an SDK using -sdk or SDKROOT?

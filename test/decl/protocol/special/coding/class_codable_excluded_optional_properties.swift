@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 class ClassWithNonExcludedLetMembers : Codable { // expected-error {{class 'ClassWithNonExcludedLetMembers' has no initializers}}
     // expected-error@-1 {{type 'ClassWithNonExcludedLetMembers' does not conform to protocol 'Decodable'}}

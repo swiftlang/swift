@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -target %target-swift-5.1-abi-triple
 
 struct IntList : ExpressibleByArrayLiteral {
   typealias Element = Int

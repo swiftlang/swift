@@ -10,7 +10,7 @@ func myFunc(_ ptr: UnsafePointer<CInt>, _ len: String) {
 // REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend %t/test.swift -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -verify 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace
+// RUN: %target-swift-frontend %t/test.swift -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -verify -verify-ignore-unrelated 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace
 
 // CHECK:@__swiftmacro_4main6myFunc15_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
