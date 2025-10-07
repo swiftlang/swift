@@ -7300,10 +7300,8 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
   // Instantiate a specialization of this template using the substitution map.
   auto *templateArgList = clang::TemplateArgumentList::CreateCopy(
       func->getASTContext(), templateSubst);
-  auto &sema = getClangInstance().getSema();
-  auto *spec = sema.InstantiateFunctionDeclaration(func, templateArgList,
-                                                   clang::SourceLocation());
-  if (!spec) {
+
+  auto diagnoseSubstFail = [&]() {
     std::string templateParams;
     llvm::raw_string_ostream templateParamsStream(templateParams);
     llvm::interleaveComma(templateArgList->asArray(), templateParamsStream,
@@ -7315,9 +7313,24 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
     Impl.diagnose(HeaderLoc(func->getBeginLoc()),
                   diag::unable_to_substitute_cxx_function_template,
                   getFuncName(), templateParams);
+  };
+
+  auto &sema = getClangInstance().getSema();
+  auto *spec = sema.InstantiateFunctionDeclaration(func, templateArgList,
+                                                   clang::SourceLocation());
+  if (!spec || spec->isInvalidDecl()) {
+    diagnoseSubstFail();
     return nullptr;
   }
+
   sema.InstantiateFunctionDefinition(clang::SourceLocation(), spec);
+  // Even if the declaration can be instantiated, the definition may contain
+  // a substitution failure that renders spec invalid as a side-effect.
+  if (spec->isInvalidDecl()) {
+    diagnoseSubstFail();
+    return nullptr;
+  }
+
   return spec;
 }
 
