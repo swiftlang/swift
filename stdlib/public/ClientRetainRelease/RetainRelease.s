@@ -154,11 +154,12 @@ LbridgeObjectReleaseNotTagged:
   tbnz  x0, #62, _bridgeObjectReleaseClientObjC
   and   x0, x0, 0x0ffffffffffffff8
 
-.alt_entry _swift_releaseClient
 #else
-.set _swift_bridgeObjectReleaseClient, _swift_releaseClient
+_swift_bridgeObjectReleaseClient:
+  and   x0, x0, 0x0ffffffffffffff8
 #endif
 
+.alt_entry _swift_releaseClient
 .private_extern _swift_releaseClient
 _swift_releaseClient:
 // RR of NULL or values with high bit set is a no-op.
