@@ -14,6 +14,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -98,7 +99,55 @@ appendSubstitutions(GenericSignature sig, SubstitutionMap subs) {
       auto ty = Type(ParamType);
       auto substTy = ty.subst(subs);
       auto canTy = substTy->getCanonicalType();
-      appendType(canTy, nullptr);
+
+      GenericSignature signature;
+      if (canTy->hasTypeParameter()) {
+        if (isa<GenericTypeParamType>(canTy) ||
+            isa<DependentMemberType>(canTy)) {
+          signature = sig;
+        } else {
+          SmallVector<Requirement, 2> requirements;
+          llvm::SmallSetVector<GenericTypeParamType *, 2> params;
+          auto mergeComponents = [&](GenericSignature signature) {
+            for (auto *param : signature.getGenericParams()) {
+              params.insert(param);
+            }
+            for (auto req : signature.getRequirements()) {
+              requirements.push_back(req);
+            }
+          };
+          for (auto conformance : subs.getConformances()) {
+            if (conformance.getType()->getCanonicalType() == canTy) {
+              if (!conformance.isConcrete()) {
+                continue;
+              }
+              auto concrete = conformance.getConcrete();
+              if (auto inherited =
+                      dyn_cast<InheritedProtocolConformance>(concrete)) {
+                mergeComponents(
+                    inherited->getSubstitutionMap().getGenericSignature());
+              } else if (auto specialized =
+                             dyn_cast<SpecializedProtocolConformance>(
+                                 concrete)) {
+                mergeComponents(
+                    specialized->getSubstitutionMap().getGenericSignature());
+              } else if (auto builtin =
+                             dyn_cast<BuiltinProtocolConformance>(concrete)) {
+                mergeComponents(builtin->getGenericSignature());
+              } else {
+                mergeComponents(concrete->getGenericSignature());
+              }
+            }
+          }
+          if (!params.empty()) {
+            signature =
+                GenericSignature::get(params.getArrayRef(), requirements);
+          }
+        }
+      }
+      // TODO: Enable this assertion.
+      // assert(!canTy->hasTypeParameter() || signature);
+      appendType(canTy, signature);
       appendListSeparator(First);
     }
   });
