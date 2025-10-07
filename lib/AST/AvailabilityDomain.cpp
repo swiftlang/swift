@@ -107,12 +107,14 @@ AvailabilityDomain::builtinDomainForString(StringRef string,
   // This parameter is used in downstream forks, do not remove.
   (void)declContext;
 
-  auto domain = llvm::StringSwitch<std::optional<AvailabilityDomain>>(string)
-                    .Case("*", AvailabilityDomain::forUniversal())
-                    .Case("swift", AvailabilityDomain::forSwiftLanguageMode())
-                    .Case("_PackageDescription",
-                          AvailabilityDomain::forPackageDescription())
-                    .Default(std::nullopt);
+  auto domain =
+      llvm::StringSwitch<std::optional<AvailabilityDomain>>(string)
+          .Case("*", AvailabilityDomain::forUniversal())
+          .Case("swift", AvailabilityDomain::forSwiftLanguageMode())
+          .Case("SwiftLanguageMode", AvailabilityDomain::forSwiftLanguageMode())
+          .Case("_PackageDescription",
+                AvailabilityDomain::forPackageDescription())
+          .Default(std::nullopt);
 
   if (domain)
     return domain;
@@ -480,6 +482,8 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
 
   bool hasCustomAvailability =
       ctx.LangOpts.hasFeature(Feature::CustomAvailability);
+  bool hasSwiftRuntimeAvailability =
+      ctx.LangOpts.hasFeature(Feature::SwiftRuntimeAvailability);
 
   if (!domain) {
     auto domainString = identifier.str();
@@ -500,11 +504,32 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
     return std::nullopt;
   }
 
-  if (domain->isCustom() && !hasCustomAvailability &&
-      !declContext->isInSwiftinterface()) {
-    diags.diagnose(loc, diag::attr_availability_requires_custom_availability,
-                   *domain);
-    return std::nullopt;
+  if (!declContext->isInSwiftinterface()) {
+    if (domain->isCustom() && !hasCustomAvailability) {
+      diags.diagnose(loc, diag::availability_domain_requires_feature, *domain,
+                     "CustomAvailability");
+      return std::nullopt;
+    }
+
+    if (domain->isSwiftLanguageMode()) {
+      // 'swift' -> 'SwiftLanguageMode'
+      if (hasSwiftRuntimeAvailability && identifier.str() == "swift") {
+        diags
+            .diagnose(loc, diag::availability_domain_renamed, identifier,
+                      "SwiftLanguageMode")
+            .fixItReplace(SourceRange(loc), "SwiftLanguageMode");
+      }
+
+      if (!hasSwiftRuntimeAvailability &&
+          identifier.str() == "SwiftLanguageMode") {
+        // This diagnostic ("Swift requires '-enable-experimental-feature
+        // SwiftRuntimeAvailability'") is confusing but it's also temporary,
+        // assuming the experimental feature becomes official.
+        diags.diagnose(loc, diag::availability_domain_requires_feature, *domain,
+                       "SwiftRuntimeAvailability");
+        return std::nullopt;
+      }
+    }
   }
 
   return domain;
