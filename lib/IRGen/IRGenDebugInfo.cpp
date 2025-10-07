@@ -2694,8 +2694,9 @@ private:
       // declarations may not have a unique ID to avoid a forward declaration
       // winning over a full definition.
       auto *FwdDecl = DBuilder.createReplaceableCompositeType(
-          llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, 0, 0,
-          llvm::dwarf::DW_LANG_Swift);
+          llvm::dwarf::DW_TAG_structure_type, Name, Scope, 0, 0,
+          llvm::dwarf::DW_LANG_Swift, 0, 0, llvm::DINode::FlagFwdDecl,
+          MangledName);
       FwdDeclTypes.emplace_back(
           std::piecewise_construct, std::make_tuple(MangledName),
           std::make_tuple(static_cast<llvm::Metadata *>(FwdDecl)));
