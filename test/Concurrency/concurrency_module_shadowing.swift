@@ -17,3 +17,8 @@ func f(_ t : UnsafeCurrentTask) -> Bool {
 
 @available(SwiftStdlib 5.1, *)
 func g(_: _Concurrency.UnsafeCurrentTask) {}
+
+// Should also be allowed since _Concurrency is a separately-imported overlay of
+// the standard library.
+@available(SwiftStdlib 5.1, *)
+func h(_: Swift.UnsafeCurrentTask) {}
