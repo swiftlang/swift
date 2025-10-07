@@ -1255,6 +1255,11 @@ namespace {
       if (!base.getType().isLoadable(SGF.F)) {
         return base;
       }
+
+      if (base.getValue()->getType().isTrivial(SGF.F)) {
+        return SGF.B.createLoadTrivial(loc, base);
+      }
+
       auto result = SGF.B.createLoadBorrow(loc, base.getValue());
       // Mark the load_borrow as unchecked. We can't stop the source code from
       // trying to mutate or consume the same lvalue during this borrow, so
