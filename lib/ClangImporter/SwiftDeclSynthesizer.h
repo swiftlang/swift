@@ -356,6 +356,8 @@ public:
 
   bool isObjCBool(Type type);
 
+  bool isUnicodeScalar(Type type);
+
 private:
   Type getConstantLiteralType(Type type, ConstantConvertKind convertKind);
 

@@ -416,7 +416,21 @@ static void getLibStdCxxFileMapping(
       "bits/unique_lock.h", "bits/unique_ptr.h", "bits/unordered_map.h",
       "bits/unordered_set.h", "bits/uses_allocator.h",
       "bits/uses_allocator_args.h", "bits/valarray_after.h",
-      "bits/valarray_array.h", "bits/valarray_before.h"};
+      "bits/valarray_array.h", "bits/valarray_before.h", "bits/version.h",
+      // C++20 and newer:
+      "barrier",
+      "compare",
+      "concepts",
+      "format",
+      "latch",
+      "numbers",
+      "ranges",
+      "semaphore",
+      "source_location",
+      "span",
+      "stop_token",
+      "syncstream",
+    };
   std::string additionalHeaderDirectives;
   llvm::raw_string_ostream os(additionalHeaderDirectives);
   os << contents.substr(0, headerInjectionPoint);

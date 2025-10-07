@@ -1307,6 +1307,25 @@ bool TypeBase::isCxxString() {
          ctx.Id_basic_string.is(clangDecl->getName());
 }
 
+bool TypeBase::isUnicodeScalar() {
+  if (!is<StructType>())
+    return false;
+  const auto *structType = castTo<StructType>();
+  if (!structType->getDecl()->getName().is("Scalar"))
+    return false;
+
+  Type parent = structType->getParent();
+  if (!parent->is<EnumType>())
+    return false;
+  const auto enumDecl = parent->castTo<EnumType>()->getDecl();
+  if (!enumDecl->getName().is("Unicode"))
+    return false;
+  const auto *parentDC = enumDecl->getDeclContext();
+  if (!parentDC->isModuleScopeContext() && parentDC->getParentModule()->isStdlibModule())
+    return false;
+  return true;
+}
+
 bool TypeBase::isKnownKeyPathType() {
   return isKeyPath() || isWritableKeyPath() || isReferenceWritableKeyPath() ||
          isPartialKeyPath() || isAnyKeyPath();
