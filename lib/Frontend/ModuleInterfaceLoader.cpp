@@ -1663,7 +1663,7 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     FrontendOptions::ActionType requestedAction,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
     const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
-    bool suppressRemarks) {
+    bool suppressNotes, bool suppressRemarks) {
   GenericArgs.push_back("-frontend");
   // Start with a genericSubInvocation that copies various state from our
   // invoking ASTContext.
@@ -1751,6 +1751,12 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   // user is not in a position to address them.
   genericSubInvocation.getDiagnosticOptions().SuppressWarnings = true;
   GenericArgs.push_back("-suppress-warnings");
+
+  // Inherit the parent invocation's setting on whether to suppress remarks
+  if (suppressNotes) {
+    genericSubInvocation.getDiagnosticOptions().SuppressNotes = true;
+    GenericArgs.push_back("-suppress-notes");
+  }
 
   // Inherit the parent invocation's setting on whether to suppress remarks
   if (suppressRemarks) {
@@ -1863,6 +1869,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   genericSubInvocation.setMainExecutablePath(LoaderOpts.mainExecutablePath);
   inheritOptionsForBuildingInterface(LoaderOpts.requestedAction, searchPathOpts,
                                      langOpts, clangImporterOpts, casOpts,
+                                     Diags->getSuppressNotes(),
                                      Diags->getSuppressRemarks());
   // Configure front-end input.
   auto &SubFEOpts = genericSubInvocation.getFrontendOptions();
