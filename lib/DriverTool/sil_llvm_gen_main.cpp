@@ -469,6 +469,15 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
   desc.out = &outFile->getOS();
 
   if (options.OutputKind == IRGenOutputKind::LLVMAssemblyBeforeOptimization) {
+    // We need to perform Sema here since IRGenRequest itself does not perform
+    // Sema (unlike OptimizedIRRequest).
+    CI.performSema();
+
+    // If Sema produced an error, exit early.
+    bool HadError = CI.getASTContext().hadError();
+    if (HadError)
+      exit(-1);
+
     auto generatedMod = evaluateOrFatal(eval, IRGenRequest{desc});
     if (!generatedMod)
       return 1;
