@@ -1345,6 +1345,11 @@ DiagnosticState::determineBehavior(const Diagnostic &diag) const {
     if (suppressWarnings)
       lvl = DiagnosticBehavior::Ignore;
   }
+
+  if (lvl == DiagnosticBehavior::Note) {
+    if (suppressNotes)
+      lvl = DiagnosticBehavior::Ignore;
+  }
   
   if (lvl == DiagnosticBehavior::Remark) {
     if (suppressRemarks)

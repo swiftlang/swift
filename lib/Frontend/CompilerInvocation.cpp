@@ -2653,6 +2653,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   }
 
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
+  Opts.SuppressNotes |= Args.hasArg(OPT_suppress_notes);
   Opts.SuppressRemarks |= Args.hasArg(OPT_suppress_remarks);
   for (const Arg *arg : Args.filtered(OPT_warning_treating_Group)) {
     Opts.WarningsAsErrorsRules.push_back([&] {
@@ -2732,6 +2733,9 @@ static void configureDiagnosticEngine(
   }
   if (Options.SuppressWarnings) {
     Diagnostics.setSuppressWarnings(true);
+  }
+  if (Options.SuppressNotes) {
+    Diagnostics.setSuppressNotes(true);
   }
   if (Options.SuppressRemarks) {
     Diagnostics.setSuppressRemarks(true);

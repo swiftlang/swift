@@ -929,6 +929,10 @@ def Wwarning : Separate<["-"], "Wwarning">,
   MetaVarName<"<diagnostic_group>">,
   HelpText<"Treat this warning group as warning">;
 
+def suppress_notes : Flag<["-"], "suppress-notes">,
+  Flags<[FrontendOption]>,
+  HelpText<"Suppress all notes">;
+
 def suppress_remarks : Flag<["-"], "suppress-remarks">,
   Flags<[FrontendOption]>,
   HelpText<"Suppress all remarks">;
