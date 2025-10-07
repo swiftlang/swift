@@ -185,12 +185,9 @@ private struct CallSiteSpecializer {
         continue
       }
 
-      assert(
-        argument.type.isPackElementAddress, "This code assumes the pack elements are all addresses")
-
       let packIndices = packArgumentIndices[index]!
       let (mappedParameterIdx, parameterInfos) = parameterIterator.next()!
-      assert(mappedParameterIdx == index)
+      assert(mappedParameterIdx == index, "Iteration over mapped and apply-site indirect parameter packs is misaligned.")
 
       for (packElementIdx, (parameterInfo, packIdx)) in zip(parameterInfos, packIndices)
         .enumerated()
@@ -198,12 +195,6 @@ private struct CallSiteSpecializer {
         let indirectParameterAddress = builder.createPackElementGet(
           packIndex: packIdx, pack: argument,
           elementType: argument.type.packElements[packElementIdx])
-
-        assert(
-          parameterInfo.convention != .packOut && parameterInfo.convention != .packInout
-            && parameterInfo.convention != .packOwned
-            && parameterInfo.convention != .packGuaranteed
-            && parameterInfo.convention != .indirectOut)
 
         switch parameterInfo.convention {
         case .directUnowned:
@@ -377,8 +368,10 @@ private struct PackExplodedFunction {
   /// corresponding to the pack argument of the original at the given
   /// index, in ascending order.
   public let parameterMap: [(Int, [ParameterInfo])]
-  // Maps indices of pack arguments of the original function to its
-  // `approximateFormalPackType` (a Canonical AST PackType).
+  /// Maps indices of pack arguments of the original function to its
+  /// `approximateFormalPackType` (a Canonical AST PackType).
+  /// Saves recomputing these types every time they are needed,
+  /// which would be unnecessarily expensive.
   public let packASTTypes: [Int: CanonicalType]
 
   init(at apply: ApplySite, _ context: FunctionPassContext) {
@@ -790,11 +783,6 @@ private func explodedPackElementArgumentConvention(
 )
   -> ArgumentConvention
 {
-  precondition(
-    pack.convention == .packGuaranteed
-      || pack.convention == .packOwned
-      || pack.convention == .packInout)
-
   // If the pack element type is loadable, then we can pass it directly in the generated function.
   // TODO: Account for pack.type.isPackElementAddress with packOwned and packGuaranteed packs
   let trivial = type.isTrivial(in: function)
