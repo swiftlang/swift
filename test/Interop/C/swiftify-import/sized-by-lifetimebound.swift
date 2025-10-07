@@ -87,9 +87,9 @@
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func opaque(_ len: Int32, _ p: RawSpan) -> RawSpan {
     let len2 = Int32(exactly: p.byteCount)!
-    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe p.withUnsafeBytes { _pPtr in
+    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: UnsafeRawPointer(unsafe p.withUnsafeBytes { _pPtr in
       return unsafe opaque(len, len2, OpaquePointer(_pPtr.baseAddress!))
-            }, byteCount: Int(len)), copying: ())
+                }), byteCount: Int(len)), copying: ())
 }
 ------------------------------
 @__swiftmacro_So16nonsizedLifetime15_SwiftifyImportfMp_.swift
