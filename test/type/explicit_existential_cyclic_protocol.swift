@@ -9,8 +9,8 @@
 do {
   do {
     protocol P1 : P2 {}
-    // expected-no-explicit-any-note@-1 2 {{protocol 'P1' declared here}}
-    // expected-explicit-any-note@-2 1 {{protocol 'P1' declared here}}
+    // expected-no-explicit-any-note@-1 2 {{through protocol 'P1' declared here}}
+    // expected-explicit-any-note@-2 1 {{through protocol 'P1' declared here}}
     protocol P2 : P1 {}
     // expected-no-explicit-any-error@-1 2 {{protocol 'P2' refines itself}}
     // expected-explicit-any-error@-2 1 {{protocol 'P2' refines itself}}
@@ -23,8 +23,8 @@ do {
   do {
     protocol P0 { associatedtype A }
     protocol P1 : P2, P0 {}
-    // expected-no-explicit-any-note@-1 2 {{protocol 'P1' declared here}}
-    // expected-explicit-any-note@-2 1 {{protocol 'P1' declared here}}
+    // expected-no-explicit-any-note@-1 2 {{through protocol 'P1' declared here}}
+    // expected-explicit-any-note@-2 1 {{through protocol 'P1' declared here}}
     protocol P2 : P1 {}
     // expected-no-explicit-any-error@-1 2 {{protocol 'P2' refines itself}}
     // expected-explicit-any-error@-2 1 {{protocol 'P2' refines itself}}

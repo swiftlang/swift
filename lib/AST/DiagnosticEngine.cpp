@@ -177,6 +177,16 @@ std::optional<const DiagnosticInfo *> Diagnostic::getWrappedDiagnostic() const {
   return std::nullopt;
 }
 
+SourceLoc Diagnostic::getLocOrDeclLoc() const {
+  if (auto loc = getLoc())
+    return loc;
+
+  if (auto *D = getDecl())
+    return D->getLoc();
+
+  return SourceLoc();
+}
+
 static CharSourceRange toCharSourceRange(SourceManager &SM, SourceRange SR) {
   return CharSourceRange(SM, SR.Start, Lexer::getLocForEndOfToken(SM, SR.End));
 }
@@ -1438,24 +1448,18 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
     return std::nullopt;
 
   // Figure out the source location.
-  SourceLoc loc = diagnostic.getLoc();
+  SourceLoc loc = diagnostic.getLocOrDeclLoc();
   if (loc.isInvalid() && diagnostic.getDecl()) {
+    // If the location of the decl is invalid, try to pretty-print it into a
+    // buffer and capture the source location there. Make sure we don't have an
+    // active request running since printing AST can kick requests that may
+    // themselves emit diagnostics. This won't help the underlying cycle, but it
+    // at least stops us from overflowing the stack.
     const Decl *decl = diagnostic.getDecl();
-    // If a declaration was provided instead of a location, and that declaration
-    // has a location we can point to, use that location.
-    loc = decl->getLoc();
-
-    // If the location of the decl is invalid still, try to pretty-print the
-    // declaration into a buffer and capture the source location there. Make
-    // sure we don't have an active request running since printing AST can
-    // kick requests that may themselves emit diagnostics. This won't help the
-    // underlying cycle, but it at least stops us from overflowing the stack.
-    if (loc.isInvalid()) {
-      PrettyPrintDeclRequest req(decl);
-      auto &eval = decl->getASTContext().evaluator;
-      if (!eval.hasActiveRequest(req))
-        loc = evaluateOrDefault(eval, req, SourceLoc());
-    }
+    PrettyPrintDeclRequest req(decl);
+    auto &eval = decl->getASTContext().evaluator;
+    if (!eval.hasActiveRequest(req))
+      loc = evaluateOrDefault(eval, req, SourceLoc());
   }
 
   auto groupID = diagnostic.getGroupID();
@@ -1783,6 +1787,20 @@ void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
     auto I = TransactionStrings.insert(content).first;
     argument = DiagnosticArgument(StringRef(I->getKeyData()));
   }
+}
+
+void DiagnosticQueue::forEach(
+    llvm::function_ref<void(const Diagnostic &)> body) const {
+  for (auto &activeDiag : QueueEngine.TentativeDiagnostics)
+    body(activeDiag.Diag);
+}
+
+void DiagnosticQueue::filter(
+    llvm::function_ref<bool(const Diagnostic &)> predicate) {
+  llvm::erase_if(QueueEngine.TentativeDiagnostics,
+                 [&](detail::ActiveDiagnostic &activeDiag) {
+                   return !predicate(activeDiag.Diag);
+                 });
 }
 
 EncodedDiagnosticMessage::EncodedDiagnosticMessage(StringRef S)
