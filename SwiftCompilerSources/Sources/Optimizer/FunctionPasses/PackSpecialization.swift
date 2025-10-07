@@ -25,10 +25,6 @@ import SIL
 /// each pack argument that are passed to (or returned from) the new function
 /// separately.
 ///
-/// The changes this pass makes would ideally occur during generic
-/// specialization. The two should be merged if the GenericSpecializer pass is
-/// ever re-written in Swift.
-///
 /// Original:
 ///
 /// sil [ossa] @double_up : $@convention(thin) (@pack_guaranteed Pack{Int, String}) -> (@pack_out Pack{Int, String}, @pack_out Pack{Int, String}) {
