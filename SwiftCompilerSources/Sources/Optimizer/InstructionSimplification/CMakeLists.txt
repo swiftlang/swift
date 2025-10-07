@@ -38,6 +38,7 @@ swift_compiler_sources(Optimizer
   SimplifyRefCasts.swift
   SimplifyRetainReleaseValue.swift
   SimplifyStrongRetainRelease.swift
+  SimplifyStruct.swift
   SimplifyStructExtract.swift
   SimplifySwitchEnum.swift
   SimplifyTuple.swift

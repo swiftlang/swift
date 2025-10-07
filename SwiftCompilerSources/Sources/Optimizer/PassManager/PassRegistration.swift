@@ -115,6 +115,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(BuiltinInst.self,          { run(BuiltinInst.self, $0) })
   registerForSILCombine(FixLifetimeInst.self,      { run(FixLifetimeInst.self, $0) })
   registerForSILCombine(GlobalValueInst.self,      { run(GlobalValueInst.self, $0) })
+  registerForSILCombine(StructInst.self,           { run(StructInst.self, $0) })
   registerForSILCombine(StrongRetainInst.self,     { run(StrongRetainInst.self, $0) })
   registerForSILCombine(StrongReleaseInst.self,    { run(StrongReleaseInst.self, $0) })
   registerForSILCombine(RetainValueInst.self,      { run(RetainValueInst.self, $0) })
