@@ -1206,27 +1206,25 @@ private extension ScopedInstruction {
     case is BeginApplyInst:
       return true // Has already been checked with other full applies.
     case let loadBorrowInst as LoadBorrowInst:
-      for case let destroyAddrInst as DestroyAddrInst in analyzedInstructions.loopSideEffects {
-        if context.aliasAnalysis.mayAlias(loadBorrowInst.address, destroyAddrInst.destroyedAddress) {
-          if !scope.contains(destroyAddrInst) {
-            return false
-          }
+      for sideEffectInst in analyzedInstructions.loopSideEffects {
+        if let endBorrow = sideEffectInst as? EndBorrowInst,
+           let begin = endBorrow.borrow as? LoadBorrowInst,
+           begin == self
+        {
+          continue
+        }
+        if sideEffectInst.mayWrite(toAddress: loadBorrowInst.address, context.aliasAnalysis),
+           !scope.contains(sideEffectInst)
+        {
+          return false
         }
       }
-      
-      for storeInst in analyzedInstructions.stores {
-        if storeInst.mayWrite(toAddress: loadBorrowInst.address, context.aliasAnalysis) {
-          if !scope.contains(storeInst) {
-            return false
-          }
-        }
-      }
-      
-      fallthrough
-    case is BeginAccessInst:
+      return true
+
+    case let beginAccess as BeginAccessInst:
       for fullApplyInst in analyzedInstructions.fullApplies {
-        guard mayWriteToMemory && fullApplyInst.mayReadOrWrite(address: operands.first!.value, context.aliasAnalysis) ||
-              !mayWriteToMemory && fullApplyInst.mayWrite(toAddress: operands.first!.value, context.aliasAnalysis) else {
+        guard mayWriteToMemory && fullApplyInst.mayReadOrWrite(address: beginAccess.address, context.aliasAnalysis) ||
+              !mayWriteToMemory && fullApplyInst.mayWrite(toAddress: beginAccess.address, context.aliasAnalysis) else {
           continue
         }
 
@@ -1236,7 +1234,7 @@ private extension ScopedInstruction {
         }
       }
       
-      switch operands.first!.value.accessPath.base {
+      switch beginAccess.address.accessPath.base {
       case .class, .global:
         for sideEffect in analyzedInstructions.loopSideEffects where sideEffect.mayRelease {
           // Since a class might have a deinitializer, hoisting begin/end_access pair could violate
