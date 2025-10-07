@@ -1,28 +1,19 @@
-# swift_build_support/products/foundation.py ---------------------*- python -*-
+# swift_build_support/products/system.py ---------------------*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ----------------------------------------------------------------------------
-
-from . import cmark
-from . import curl
-from . import libcxx
-from . import libdispatch
-from . import libxml2
-from . import llvm
+    
 from . import product
 from . import swift
-from . import system
-from . import zlib
 
-
-class Foundation(product.Product):
+class System(product.Product):
     @classmethod
     def is_build_script_impl_product(cls):
         """is_build_script_impl_product -> bool
@@ -45,19 +36,11 @@ class Foundation(product.Product):
 
         The name of the source code directory of this product.
         """
-        return "swift-corelibs-foundation"
+        return "swift-system"
 
     @classmethod
     def get_dependencies(cls):
-        return [cmark.CMark,
-                llvm.LLVM,
-                libcxx.LibCXX,
-                swift.Swift,
-                system.System,
-                libdispatch.LibDispatch,
-                libxml2.LibXML2,
-                zlib.Zlib,
-                curl.LibCurl]
+        return [swift.Swift]
 
     @classmethod
     def is_nondarwin_only_build_product(cls):
