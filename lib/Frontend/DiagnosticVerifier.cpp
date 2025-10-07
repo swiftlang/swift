@@ -431,14 +431,15 @@ bool DiagnosticVerifier::verifyUnrelated(
     printDiagnostic(diag);
 
     auto FileName = SM.getIdentifierForBuffer(SM.findBufferContainingLoc(Loc));
-    auto NoteMessage = ("file '" + FileName +
-                        "' is not parsed for 'expected' statements. Use "
-                        "'-verify-additional-file " +
-                        FileName +
-                        "' to enable, or '-verify-ignore-unrelated' to "
-                        "ignore diagnostics in this file");
     auto noteDiag =
-        SM.GetMessage(Loc, llvm::SourceMgr::DK_Note, NoteMessage, {}, {});
+        SM.GetMessage(Loc, llvm::SourceMgr::DK_Note,
+                      ("file '" + FileName +
+                       "' is not parsed for 'expected' statements. Use "
+                       "'-verify-additional-file " +
+                       FileName +
+                       "' to enable, or '-verify-ignore-unrelated' to "
+                       "ignore diagnostics in this file"),
+                      {}, {});
     printDiagnostic(noteDiag);
   }
 
