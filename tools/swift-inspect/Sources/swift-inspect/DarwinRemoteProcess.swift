@@ -241,7 +241,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
   internal func iteratePotentialMetadataPages(_ body: (swift_addr_t, UInt64) -> Void) {
     if let initialPoolPointer: UInt = readGlobalVariable(named: "_swift_debug_allocationPoolPointer"),
        let initialPoolSize: UInt = readGlobalVariable(named: "_swift_debug_allocationPoolSize") {
-      body(swift_reflection_ptr_t(initialPoolPointer), UInt64(initialPoolSize));
+      body(swift_addr_t(initialPoolPointer), UInt64(initialPoolSize));
     }
 
     if let pageSize: UInt = readGlobalVariable(named: "_swift_debug_metadataAllocatorPageSize") {
