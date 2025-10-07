@@ -2329,8 +2329,13 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
   case SILLinkage::Package: {
     auto linkage = llvm::GlobalValue::ExternalLinkage;
 
-    if (hasNonUniqueDefinition)
-      linkage = llvm::GlobalValue::WeakODRLinkage;
+    if (hasNonUniqueDefinition) {
+      // Keep Swift runtime functions around so IRGen can reference them.
+      if (SILFunction::isSwiftRuntimeFunction(name, nullptr))
+        linkage = llvm::GlobalValue::WeakODRLinkage;
+      else
+        linkage = llvm::GlobalValue::LinkOnceODRLinkage;
+    }
 
     return {linkage, PublicDefinitionVisibility,
             info.Internalize ? llvm::GlobalValue::DefaultStorageClass
@@ -2348,7 +2353,7 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
 
   case SILLinkage::Hidden:
     if (hasNonUniqueDefinition)
-      return RESULT(WeakODR, Hidden, Default);
+      return RESULT(LinkOnceODR, Hidden, Default);
 
     return RESULT(External, Hidden, Default);
 

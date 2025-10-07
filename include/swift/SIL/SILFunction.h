@@ -930,6 +930,10 @@ public:
   /// function, such as swift_retain.
   bool isSwiftRuntimeFunction() const;
 
+  /// Helper method that determines whether a function with the given name and
+  /// parent module is a Swift runtime function such as swift_retain.
+  static bool isSwiftRuntimeFunction(StringRef name, const ModuleDecl *module);
+
   /// Helper method which returns true if the linkage of the SILFunction
   /// indicates that the object's definition might be required outside the
   /// current SILModule.
