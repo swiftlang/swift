@@ -565,6 +565,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TildeSendable, false)
 /// Allow use of protocol typed values in Embedded mode (`Any` and friends)
 EXPERIMENTAL_FEATURE(EmbeddedExistentials, false)
 
+/// Check @_implementationOnly imports in non-library-evolution mode.
+EXPERIMENTAL_FEATURE(CheckImplementationOnly, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
