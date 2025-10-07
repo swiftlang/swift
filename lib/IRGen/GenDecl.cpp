@@ -6026,7 +6026,8 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
 llvm::Constant *
 IRGenModule::getAddrOfGlobalString(StringRef data, CStringSectionType type,
                                    bool willBeRelativelyAddressed) {
-  if (TargetInfo.OutputObjectFormat != llvm::Triple::MachO)
+  if (TargetInfo.OutputObjectFormat != llvm::Triple::MachO ||
+      willBeRelativelyAddressed)
     type = CStringSectionType::Default;
   StringRef sectionName;
   switch (type) {
