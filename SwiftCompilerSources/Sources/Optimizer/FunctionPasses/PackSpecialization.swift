@@ -78,6 +78,12 @@ let packSpecialization = FunctionPass(name: "pack-specialization") {
 
 }
 
+
+//===----------------------------------------------------------------------===//
+// Call Site Specialization
+//===----------------------------------------------------------------------===//
+
+
 /// A context in which to modify call sites during pack specialization.
 private struct CallSiteSpecializer {
   let apply: ApplyInst
@@ -108,7 +114,7 @@ private struct CallSiteSpecializer {
 
     self.createEndBorrows(for: parameters.borrows, after: specializedApply)
 
-    self.substituteNewDirectResults(specializedApply: specializedApply, using: packArgumentIndices)
+    self.substituteNewDirectResults(from: specializedApply, using: packArgumentIndices)
 
     self.context.erase(instruction: self.apply)
   }
@@ -264,7 +270,7 @@ private struct CallSiteSpecializer {
     return (newParameters, parameterBorrows)
   }
 
-  /// Create an application of the specialized function to the supplied arguments
+  /// Create an application of the specialized function to the supplied arguments.
   private func createSpecializedApply(arguments: [any Value]) -> ApplyInst {
     let builder = Builder(before: self.apply, self.context)
 
@@ -286,123 +292,131 @@ private struct CallSiteSpecializer {
   /// original function, and use them to replace all uses of the original
   /// result.
   ///
-  /// Before:
-  /// pack_element_set %addr to N of %result_pack
-  /// ...
-  /// %original_result = apply %fn(%result_pack, ...)
-  /// %value = load %addr
-  /// operate %original_result
-  ///
-  /// After:
-  ///
-  /// pack_element_set %addr to N of %result_pack
-  /// ...
-  /// %result = apply %specialized_fn(%result_pack, ...)
-  /// (%orig1, ..., %result_value, %orig2, ...) = destructure_tuple %result ─┬──╴code inserted by substituteNewDirectResults
-  /// %reconstructed_result = tuple (%orig1, %orig2, ...)                   ╶┘
-  /// %addr = pack_element_get N of %result_pack                            ╶┬──╴code inserted by writeBack
-  /// store %result_value to %addr                                          ╶┘
-  /// %value = load %addr
-  /// operate %reconstructed_result
-  ///
-  /// The stack allocations and accesses can then be easily eliminated by other passes.
+  /// The stack allocations and accesses for results can then be easily
+  /// eliminated by other passes.
   private func substituteNewDirectResults(
-    specializedApply: ApplyInst, using packArgumentIndices: PackArgumentIndices
+    from specializedApply: ApplyInst, using packArgumentIndices: PackArgumentIndices
   ) {
-    if !specializedApply.type.isTuple {
-      // Handle the single return value case
-      if !self.apply.type.isTuple {
-        // Both return a single value directly: just replace it
-        self.apply.uses.replaceAll(with: specializedApply, self.context)
-      } else {
-        // The original should have no more arguments than the specialized function (which has 1), and
-        // in this case it also doesn't have exactly 1. It must have none.
-        assert(
-          self.apply.type.isVoid,
-          "Pack specialization has fewer direct return values than original function.")
-        // Write back the single pack element
-        outerLoop: for (packArgumentIdx, mappedResultInfos) in self.callee.resultMap {
-          for (packElementIdx, resultInfo) in mappedResultInfos.enumerated() {
-            if !resultInfo.isSILIndirect {
-              self.writeBack(
-                resultPackElement: specializedApply, argumentIndex: packArgumentIdx,
-                elementIndex: packElementIdx, using: packArgumentIndices)
-              break outerLoop
-            }
-          }
-        }
-      }
+    if specializedApply.type == self.apply.type {
+      // No direct return values were added: we just need to replace the original result:
+      //
+      // Before: %fn : (...) -> Int
+      // %1 = apply %fn(...)
+      //
+      // After: %specialized_fn : (...) -> Int
+      // %1 = apply %specialized_fn(...)
 
-    } else if specializedApply.type.tupleElements.isEmpty {
-      // Handle both return types being void. To ensure it is safe to erase the original apply,
-      // substitute all uses, even though there's no reason why there should be any.
-      assert(self.apply.type.isVoid)
       self.apply.uses.replaceAll(with: specializedApply, self.context)
 
+    } else if !specializedApply.type.isTuple {
+      assert(
+        self.apply.type.isVoid,
+        "Pack specialized function has fewer direct return values than original function.")
+
+      // Write back the single direct result:
+      //
+      // Before: %fn : (...) -> @pack_out Pack{Int}
+      // %1 = apply %fn(%pack_addr, ...)
+      //
+      // After: %specialized_fn : (...) -> Int
+      // %result = apply %specialized_fn(...)
+      // %result_addr = pack_element_get 1 %pack_addr
+      // store %result to %result_addr
+
+      self.replaceOriginalResults(withResultsOf: specializedApply, using: packArgumentIndices)
+
     } else {
-      // Handle a tuple with multiple elements. Since there could be many uses of the original apply's
-      // result tuple, we construct a new one with the corresponding values from specializedApply.
+      // Write back multiple direct results:
+      //
+      // Before: %fn : () -> (Int, Int, @pack_out Pack{Int, Double})
+      //
+      // pack_element_set %addr to 0 of %result_pack
+      // ...
+      // %original_result = apply %fn(%result_pack)
+      //
+      // %value = load %addr
+      // operate %original_result
+      //
+      // After: %specialized_fn : () -> (Int, Int, Double)
+      //
+      // pack_element_set %addr to 0 of %result_pack
+      // ...
+      // %result = apply %specialized_fn()
+      // (%original1, %original2, %pack1, %pack2) = destructure_tuple %result  ╶┬──╴code inserted by substituteNewDirectResults
+      // %reconstructed_result = tuple (%original1, %original2)                ╶┘
+      // %addr = pack_element_get 0 of %result_pack                            ╶┬──╴code inserted by replaceOriginalResults
+      // store %result_value to %addr                                           │
+      // ... etc. for other pack elements                                      ╶┘
+      //
+      // %value = load %addr
+      // operate %reconstructed_result
 
       let builder = Builder(after: specializedApply, self.context)
-
-      var substitutedResultTupleElements = [any Value]()
-      var resultMapIterator = self.callee.resultMap.makeIterator()
-
       let destructuredTuple = builder.createDestructureTuple(tuple: specializedApply)
-      var destructuredTupleElements = destructuredTuple.results.makeIterator()
-      for (originalResultIdx, resultInfo) in self.apply.functionConvention.results.enumerated() {
-        // We only need to handle direct and pack results, since indirect results are handled above
-        if !resultInfo.isSILIndirect {
-          // Direct results of the original function are mapped to direct results of the specialized function.
-          substitutedResultTupleElements.append(destructuredTupleElements.next()!)
 
-        } else if resultInfo.type.loweredType(in: specializedApply.parentFunction).shouldExplode {
-          // Some elements of pack results may get mapped to direct results of the specialized function.
-          let (mappedOriginalResultIdx, mappedResults) = resultMapIterator.next()!
-          assert(originalResultIdx == mappedOriginalResultIdx)
-
-          for (packElementIdx, mappedDirectResult) in mappedResults.enumerated()
-          where !mappedDirectResult.isSILIndirect {
-            self.writeBack(
-              resultPackElement: destructuredTupleElements.next()!,
-              argumentIndex: originalResultIdx,
-              elementIndex: packElementIdx, using: packArgumentIndices)
-          }
-        }
-      }
-
-      // If exactly one direct result was mapped, don't generate a tuple
-      if substitutedResultTupleElements.count == 1 {
-        self.apply.uses.replaceAll(with: substitutedResultTupleElements[0], self.context)
-      } else {
-        let substitutedResultTuple = builder.createTuple(
-          type: self.apply.type, elements: substitutedResultTupleElements)
-        self.apply.uses.replaceAll(with: substitutedResultTuple, self.context)
-      }
+      self.replaceOriginalResults(withResultsOf: destructuredTuple, using: packArgumentIndices)
     }
   }
 
-  /// Store resultPackElement to the element at index elementIndex of the
-  /// parameter pack at index argumentIndex of the original apply.
+  /// Replace the results of the original callee that were mapped to direct
+  /// result values with the results of resultInstruction.
   ///
-  /// See substituteNewDirectResults for a code example.
-  private func writeBack(
-    resultPackElement: any Value, argumentIndex: Int, elementIndex: Int,
+  /// See substituteNewDirectResults for code examples.
+  private func replaceOriginalResults(
+    withResultsOf resultInstruction: Instruction,
     using packArgumentIndices: PackArgumentIndices
   ) {
-    let builder = Builder(before: self.apply, self.context)
-    let originalPackArgument = self.apply.arguments[argumentIndex]
-    let packIndex = packArgumentIndices[argumentIndex]![elementIndex]
-    let outputResultAddress = builder.createPackElementGet(
-      packIndex: packIndex, pack: originalPackArgument,
-      elementType: originalPackArgument.type.packElements[elementIndex])
-    builder.createStore(
-      source: resultPackElement, destination: outputResultAddress,
-      // The callee is responsible for initializing return pack elements
-      ownership: storeOwnership(for: resultPackElement, normal: .initialize))
+    let builder = Builder(after: resultInstruction, self.context)
+
+    var results = resultInstruction.results.makeIterator()
+    var substitutedResultTupleElements = [any Value]()
+    var resultMapIterator = self.callee.resultMap.makeIterator()
+
+    for (originalResultIdx, resultInfo) in self.apply.functionConvention.results.enumerated() {
+      // We only need to handle direct and pack results, since indirect results are handled above
+      if !resultInfo.isSILIndirect {
+        // Direct results of the original function are mapped to direct results of the specialized function.
+        substitutedResultTupleElements.append(results.next()!)
+
+      } else if resultInfo.type.loweredType(in: resultInstruction.parentFunction).shouldExplode {
+        // Some elements of pack results may get mapped to direct results of the specialized function.
+        let (mappedOriginalResultIdx, mappedResults) = resultMapIterator.next()!
+        assert(originalResultIdx == mappedOriginalResultIdx)
+
+        let originalPackArgument = self.apply.arguments[originalResultIdx]
+        let packIndices = packArgumentIndices[originalResultIdx]!
+
+        for (mappedDirectResult, (packIndex, elementType)) in zip(
+          mappedResults, zip(packIndices, originalPackArgument.type.packElements)
+        )
+        where !mappedDirectResult.isSILIndirect {
+
+          let result = results.next()!
+          let outputResultAddress = builder.createPackElementGet(
+            packIndex: packIndex, pack: originalPackArgument,
+            elementType: elementType)
+
+          builder.createStore(
+            source: result, destination: outputResultAddress,
+            // The callee is responsible for initializing return pack elements
+            ownership: storeOwnership(for: result, normal: .initialize))
+        }
+      }
+    }
+
+    // Since there could be many uses of the original apply's result tuple, we
+    // construct a new one with the corresponding values from specializedApply.
+    // If exactly one direct result was mapped, don't generate a tuple.
+    if substitutedResultTupleElements.count == 1 {
+      self.apply.uses.replaceAll(with: substitutedResultTupleElements[0], self.context)
+    } else {
+      let substitutedResultTuple = builder.createTuple(
+        type: self.apply.type, elements: substitutedResultTupleElements)
+      self.apply.uses.replaceAll(with: substitutedResultTuple, self.context)
+    }
   }
 
-  /// Release borrows of parameters that were passed @guaranteed
+  /// Release borrows of parameters that were passed as @guaranteed.
   private func createEndBorrows(for borrows: [LoadBorrowInst], after: Instruction) {
     let builder = Builder(after: after, self.context)
 
@@ -412,6 +426,10 @@ private struct CallSiteSpecializer {
     }
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Callee Specialization
+//===----------------------------------------------------------------------===//
 
 private func specializeCallee(apply: ApplySite, context: FunctionPassContext)
   -> PackExplodedFunction?
