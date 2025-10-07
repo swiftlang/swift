@@ -349,6 +349,16 @@ func transformType(
   return mainType
 }
 
+func peelOptionalType(_ type: TypeSyntax) -> TypeSyntax {
+  if let optType = type.as(OptionalTypeSyntax.self) {
+    return optType.wrappedType
+  }
+  if let impOptType = type.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
+    return impOptType.wrappedType
+  }
+  return type
+}
+
 func isMutablePointerType(_ type: TypeSyntax) -> Bool {
   if let optType = type.as(OptionalTypeSyntax.self) {
     return isMutablePointerType(optType.wrappedType)
@@ -757,14 +767,14 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
           if unsafe _resultValue == nil {
             return nil
           } else {
-            return unsafe _swiftifyOverrideLifetime(\(raw: cast)(\(raw: startLabel): _resultValue!, \(raw: countLabel): Int(\(countExpr))), copying: ())
+            return unsafe _swiftifyOverrideLifetime(\(raw: cast)(\(raw: startLabel): \(raw: castOpaquePointerToRawPointer("_resultValue!")), \(raw: countLabel): Int(\(countExpr))), copying: ())
           }
         }()
         """
     } else {
       expr =
         """
-        \(raw: cast)(\(raw: startLabel): \(call), \(raw: countLabel): Int(\(countExpr)))
+        \(raw: cast)(\(raw: startLabel): \(castOpaquePointerToRawPointer(call)), \(raw: countLabel): Int(\(countExpr)))
         """
     }
     if generateSpan {
@@ -772,6 +782,15 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
     }
     return "unsafe \(expr)"
   }
+
+  func castOpaquePointerToRawPointer(_ expr: ExprSyntax) -> ExprSyntax {
+    let type = peelOptionalType(oldType)
+    if type.canRepresentBasicType(type: OpaquePointer.self) {
+      return ExprSyntax("unsafe UnsafeRawPointer(\(expr))")
+    }
+    return expr
+  }
+
 }
 
 struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBoundsThunkBuilder {
@@ -894,16 +913,6 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
       return countVar.baseName
     }
     return "_\(raw: name)Count"
-  }
-
-  func peelOptionalType(_ type: TypeSyntax) -> TypeSyntax {
-    if let optType = type.as(OptionalTypeSyntax.self) {
-      return optType.wrappedType
-    }
-    if let impOptType = type.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
-      return impOptType.wrappedType
-    }
-    return type
   }
 
   func castPointerToTargetType(_ baseAddress: ExprSyntax) throws -> ExprSyntax {
