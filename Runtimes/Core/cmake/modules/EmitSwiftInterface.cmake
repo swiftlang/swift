@@ -27,9 +27,17 @@ function(emit_swift_interface target)
   endif()
   target_compile_options(${target} PRIVATE
     "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-path ${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftmodule>")
+  set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
+    "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftmodule"
+    "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftdoc"
+    "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftsourceinfo")
   if(SwiftCore_VARIANT_MODULE_TRIPLE)
     target_compile_options(${target} PRIVATE
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-path ${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftmodule>")
+    set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
+      "${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftmodule"
+      "${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftdoc"
+      "${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftsourceinfo")
   endif()
   add_custom_command(OUTPUT "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftmodule"
     DEPENDS ${target})
@@ -42,10 +50,16 @@ function(emit_swift_interface target)
     target_compile_options(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:Swift>:-emit-module-interface-path$<SEMICOLON>${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftinterface>
       $<$<COMPILE_LANGUAGE:Swift>:-emit-private-module-interface-path$<SEMICOLON>${module_directory}/${SwiftCore_MODULE_TRIPLE}.private.swiftinterface>)
+    set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
+      "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftinterface"
+      "${module_directory}/${SwiftCore_MODULE_TRIPLE}.private.swiftinterface")
     if(SwiftCore_VARIANT_MODULE_TRIPLE)
       target_compile_options(${target} PRIVATE
         "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-interface-path ${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftinterface>"
         "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-private-module-interface-path ${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.private.swiftinterface>")
+      set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
+        "${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftinterface"
+        "${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.private.swiftinterface")
     endif()
     target_compile_options(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:Swift>:-library-level$<SEMICOLON>api>
