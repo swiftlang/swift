@@ -217,6 +217,9 @@ namespace swift {
     const class Decl *getDecl() const { return Decl; }
     DiagnosticBehavior getBehaviorLimit() const { return BehaviorLimit; }
 
+    /// Retrieve the stored SourceLoc, or the location of the stored Decl.
+    SourceLoc getLocOrDeclLoc() const;
+
     void setLoc(SourceLoc loc) { Loc = loc; }
     void setIsChildNote(bool isChildNote) { IsChildNote = isChildNote; }
     void setDecl(const class Decl *decl) { Decl = decl; }
@@ -1472,6 +1475,13 @@ namespace swift {
 
     /// Retrieve the underlying engine which will receive the diagnostics.
     DiagnosticEngine &getUnderlyingDiags() const { return UnderlyingEngine; }
+
+    /// Iterates over each captured diagnostic, running a lambda with it.
+    void forEach(llvm::function_ref<void(const Diagnostic &)> body) const;
+
+    /// Filters the queued diagnostics, dropping any where the predicate
+    /// returns \c false.
+    void filter(llvm::function_ref<bool(const Diagnostic &)> predicate);
 
     /// Clear this queue and erase all diagnostics recorded.
     void clear() {
