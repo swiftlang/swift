@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t) 
-// RUN: %target-build-swift %s -emit-executable -enable-experimental-feature BorrowAndMutateAccessors -o %t/a.out
+// RUN: %target-build-swift %s -emit-executable -enable-experimental-feature BorrowAndMutateAccessors -Xfrontend -disable-experimental-parser-round-trip -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 
@@ -7,13 +7,17 @@
 // REQUIRES: executable_test
 
 public struct Container<Element: ~Copyable >: ~Copyable {
-  var _storage: UnsafeBufferPointer<Element>
+  var _storage: UnsafeMutableBufferPointer<Element>
   var _count: Int
 
   var first: Element {
     @_unsafeSelfDependentResult
     borrow {
       return _storage.baseAddress.unsafelyUnwrapped.pointee
+    }
+    @_unsafeSelfDependentResult
+    mutate {
+      return &_storage.baseAddress.unsafelyUnwrapped.pointee
     }
   }
 
@@ -23,6 +27,11 @@ public struct Container<Element: ~Copyable >: ~Copyable {
       precondition(index >= 0 && index < _count, "Index out of bounds")
       return _storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee
     }
+    @_unsafeSelfDependentResult
+    mutate {
+      precondition(index >= 0 && index < _count, "Index out of bounds")
+      return &_storage.baseAddress.unsafelyUnwrapped.advanced(by: index).pointee
+    }
   }
 }
 
@@ -30,9 +39,10 @@ extension Container: Copyable where Element: Copyable {}
 
 func test() {
   let n = 10_000
-  let arr = Array(0...n)
-  let sum = arr.withUnsafeBufferPointer { ubpointer in
-    let container = Container(_storage: ubpointer, _count: arr.count)
+  var arr = Array(0...n)
+  let count = arr.count
+  let sum = arr.withUnsafeMutableBufferPointer { ubpointer in
+    let container = Container(_storage: ubpointer, _count: count)
     var sum = 0
     for i in 0..<container._count {
       sum &+= container[i]
@@ -40,7 +50,18 @@ func test() {
     return sum
   }
   let expectedSum = n * (n + 1) / 2
-  assert(sum == expectedSum)  
+  assert(sum == expectedSum)
+  let mutated_sum = arr.withUnsafeMutableBufferPointer { ubpointer in
+    var container = Container(_storage: ubpointer, _count: count)
+    var sum = 0
+    for i in 0..<container._count {
+      container[i] &+= 1
+      sum += container[i]
+    }
+    return sum
+  }
+  let mutatedExpectedSum = (n + 1) * (n + 2) / 2
+  assert(mutated_sum == mutatedExpectedSum)
 }
 
 test()
