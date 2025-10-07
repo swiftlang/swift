@@ -36,7 +36,7 @@
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server
 
 // RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %target-swift-frontend \
-// RUN:   -typecheck -verify \
+// RUN:   -typecheck -verify -verify-ignore-unrelated \
 // RUN:   -I %t \
 // RUN:   -swift-version 5 \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \

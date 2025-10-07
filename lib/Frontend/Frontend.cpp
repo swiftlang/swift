@@ -434,8 +434,8 @@ bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
     DiagVerifier = std::make_unique<DiagnosticVerifier>(
         SourceMgr, InputSourceCodeBufferIDs, diagOpts.AdditionalVerifierFiles,
         diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
-        diagOpts.VerifyIgnoreUnknown, diagOpts.UseColor,
-        diagOpts.AdditionalDiagnosticVerifierPrefixes);
+        diagOpts.VerifyIgnoreUnknown, diagOpts.VerifyIgnoreUnrelated,
+        diagOpts.UseColor, diagOpts.AdditionalDiagnosticVerifierPrefixes);
 
     addDiagnosticConsumer(DiagVerifier.get());
   }

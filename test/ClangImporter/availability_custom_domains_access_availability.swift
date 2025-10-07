@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify \
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated \
 // RUN:   -import-objc-header %S/Inputs/availability_domains_bridging_header.h \
 // RUN:   -I %S/../Inputs/custom-modules/availability-domains \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -experimental-spi-only-imports -parse-as-library -swift-version 4 \
 // RUN:   %s
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify \
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated \
 // RUN:   -import-objc-header %S/Inputs/availability_domains_bridging_header.h \
 // RUN:   -I %S/../Inputs/custom-modules/availability-domains \
 // RUN:   -enable-experimental-feature CustomAvailability \

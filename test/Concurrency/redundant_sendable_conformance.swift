@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/SendableConformances.swiftmodule -module-name SendableConformances %S/Inputs/SendableConformances.swift
 
-// RUN: %target-swift-frontend -typecheck %s -verify -swift-version 6 -I %t
+// RUN: %target-swift-frontend -typecheck %s -verify -verify-ignore-unrelated -swift-version 6 -I %t
 
 // REQUIRES: concurrency
 

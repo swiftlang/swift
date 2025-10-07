@@ -5,7 +5,7 @@
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -swift-version 5 | %FileCheck -check-prefix=CHECK-5 %s
 
-// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/custom-modules  -swift-version 5 -D TEST -verify
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/custom-modules  -swift-version 5 -D TEST -verify -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
 

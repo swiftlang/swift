@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -disable-availability-checking
 
 // MARK: Functions
 

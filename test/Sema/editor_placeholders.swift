@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 func foo(_ x: Int) -> Int {}
 func foo(_ x: Float) -> Float {}
