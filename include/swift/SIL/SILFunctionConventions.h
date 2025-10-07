@@ -101,6 +101,15 @@ public:
   
   SILModule &getModule() const { return *M; }
 
+  /// Is the current convention to represent address-only types in their final,
+  /// lowered form of a raw address?
+  ///
+  /// Otherwise, address-only types are instead represented opaquely as SSA
+  /// values, until the mandatory SIL pass AddressLowering has run.
+  ///
+  /// See the -enable-sil-opaque-values flag.
+  ///
+  /// \returns true iff address-only types are represented as raw addresses
   bool useLoweredAddresses() const { return loweredAddresses; }
 
   bool isTypeIndirectForIndirectParamConvention(CanType paramTy) {
@@ -261,9 +270,20 @@ public:
   }
 
   bool isArgumentIndexOfIndirectErrorResult(unsigned idx) {
-    unsigned indirectResults = getNumIndirectSILResults();
-    return idx >= indirectResults &&
-           idx < indirectResults + getNumIndirectSILErrorResults();
+    if (auto errorIdx = getArgumentIndexOfIndirectErrorResult())
+      return idx == *errorIdx;
+
+    return false;
+  }
+
+  std::optional<unsigned> getArgumentIndexOfIndirectErrorResult() {
+    unsigned hasIndirectErrorResult = getNumIndirectSILErrorResults();
+    if (!hasIndirectErrorResult)
+      return std::nullopt;
+
+    assert(hasIndirectErrorResult == 1);
+    // Error index is the first one after the indirect return results, if any.
+    return getNumIndirectSILResults();
   }
 
   unsigned getNumAutoDiffSemanticResults() const {
