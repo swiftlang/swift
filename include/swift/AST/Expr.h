@@ -6498,16 +6498,20 @@ public:
   }
 };
 
+struct ForCollectionInit {
+  VarDecl *ForAccumulatorDecl;
+  PatternBindingDecl *ForAccumulatorBinding;
+};
+
 /// An expression that may wrap a statement which produces a single value.
 class SingleValueStmtExpr : public Expr {
 public:
-  enum class Kind {
-    If, Switch, Do, DoCatch
-  };
+  enum class Kind { If, Switch, Do, DoCatch, For };
 
 private:
   Stmt *S;
   DeclContext *DC;
+  std::optional<ForCollectionInit> ForExpressionPreamble;
 
   SingleValueStmtExpr(Stmt *S, DeclContext *DC)
       : Expr(ExprKind::SingleValueStmt, /*isImplicit*/ true), S(S), DC(DC) {}
@@ -6571,6 +6575,14 @@ public:
   DeclContext *getDeclContext() const { return DC; }
 
   SourceRange getSourceRange() const;
+
+  std::optional<ForCollectionInit> getForExpressionPreamble() const {
+    return this->ForExpressionPreamble;
+  }
+
+  void setForExpressionPreamble(ForCollectionInit newPreamble) {
+    this->ForExpressionPreamble = newPreamble;
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::SingleValueStmt;

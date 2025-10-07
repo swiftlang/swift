@@ -2763,6 +2763,8 @@ SingleValueStmtExpr::Kind SingleValueStmtExpr::getStmtKind() const {
     return Kind::Do;
   case StmtKind::DoCatch:
     return Kind::DoCatch;
+  case StmtKind::ForEach:
+    return Kind::For;
   default:
     llvm_unreachable("Unhandled kind!");
   }
@@ -2781,6 +2783,9 @@ SingleValueStmtExpr::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
     return scratch;
   case Kind::DoCatch:
     return cast<DoCatchStmt>(getStmt())->getBranches(scratch);
+  case Kind::For:
+    scratch.push_back(cast<ForEachStmt>(getStmt())->getBody());
+    return scratch;
   }
   llvm_unreachable("Unhandled case in switch!");
 }
