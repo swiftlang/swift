@@ -1,4 +1,4 @@
-// RUN:%target-swift-frontend -emit-silgen %s -enable-experimental-feature BorrowAndMutateAccessors -disable-experimental-parser-round-trip | %FileCheck %s
+// RUN:%target-swift-frontend -emit-silgen %s -enable-experimental-feature BorrowAndMutateAccessors | %FileCheck %s
 
 // REQUIRES: swift_feature_BorrowAndMutateAccessors
 

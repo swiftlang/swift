@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t) 
-// RUN: %target-build-swift %s -emit-executable -enable-experimental-feature BorrowAndMutateAccessors -Xfrontend -disable-experimental-parser-round-trip -o %t/a.out
+// RUN: %target-build-swift %s -emit-executable -enable-experimental-feature BorrowAndMutateAccessors -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 
