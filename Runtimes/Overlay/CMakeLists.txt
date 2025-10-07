@@ -64,7 +64,6 @@ add_compile_definitions(
   $<$<BOOL:${SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT}>:SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT>)
 
 add_compile_options(
-  $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-strict-memory-safety>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
@@ -90,6 +89,12 @@ add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
 
 include(ExperimentalFeatures)
+
+if(NOT LINUX)
+  # explicit module builds crash the Swift compiler when building the Glibc
+  # platform overlay https://github.com/swiftlang/swift/issues/84740
+  add_compile_options($<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>)
+endif()
 
 add_subdirectory(clang)
 if(ANDROID)
