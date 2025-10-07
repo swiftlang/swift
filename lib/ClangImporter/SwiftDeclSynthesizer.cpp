@@ -219,6 +219,16 @@ bool SwiftDeclSynthesizer::isObjCBool(Type type) {
   return importTy->isObjCBool();
 }
 
+bool SwiftDeclSynthesizer::isUnicodeScalar(Type type) {
+  auto found = ImporterImpl.RawTypes.find(type->getAnyNominal());
+  if (found == ImporterImpl.RawTypes.end()) {
+    return false;
+  }
+
+  Type importTy = found->second;
+  return importTy->isUnicodeScalar();
+}
+
 ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
                                                 DeclContext *dc, Type type,
                                                 const clang::APValue &value,
