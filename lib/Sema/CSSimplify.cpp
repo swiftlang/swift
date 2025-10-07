@@ -8750,7 +8750,36 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     return SolutionKind::Solved;
   }
 
-  return matchExistentialTypes(type, protocol, kind, flags, locator);
+  auto result = matchExistentialTypes(type, protocol, kind, flags, locator);
+
+  if (shouldAttemptFixes() && result.isFailure()) {
+    auto *loc = getConstraintLocator(locator);
+
+    ArrayRef<LocatorPathElt> path = loc->getPath();
+    while (!path.empty()) {
+      if (!path.back().is<LocatorPathElt::InstanceType>())
+        break;
+
+      path = path.drop_back();
+    }
+
+    if (path.size() != loc->getPath().size()) {
+      loc = getConstraintLocator(loc->getAnchor(), path);
+    }
+
+    ConstraintFix *fix = nullptr;
+    if (loc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+      fix = AllowArgumentMismatch::create(*this, type, protocol, loc);
+    } else if (loc->isLastElement<LocatorPathElt::ContextualType>()) {
+      fix = ContextualMismatch::create(*this, type, protocol, loc);
+    }
+
+    if (fix) {
+      return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+    }
+  }
+
+  return result;
 }
 
 void ConstraintSystem::recordSynthesizedConformance(
@@ -9124,6 +9153,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         continue;
       }
 
+      // Matching existentials could introduce constraints with `instance type`
+      // element at the end if the confirming type wasn't fully resolved.
+      if (path.back().is<LocatorPathElt::InstanceType>()) {
+        path.pop_back();
+        continue;
+      }
+
       break;
     }
 
@@ -9217,7 +9253,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       }
     }
 
-    if (loc->isLastElement<LocatorPathElt::MemberRefBase>()) {
+    if (path.back().is<LocatorPathElt::MemberRefBase>()) {
       auto *fix = ContextualMismatch::create(*this, protocolTy, type, loc);
       if (!recordFix(fix))
         return SolutionKind::Solved;
@@ -9227,7 +9263,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // for example to `AnyHashable`.
     if ((kind == ConstraintKind::ConformsTo ||
          kind == ConstraintKind::NonisolatedConformsTo) &&
-        loc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+        path.back().is<LocatorPathElt::ApplyArgToParam>()) {
       auto *fix = AllowArgumentMismatch::create(*this, type, protocolTy, loc);
       return recordFix(fix, /*impact=*/2) ? SolutionKind::Error
                                           : SolutionKind::Solved;
