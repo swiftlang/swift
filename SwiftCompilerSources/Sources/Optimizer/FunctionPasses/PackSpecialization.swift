@@ -78,34 +78,35 @@ let packSpecialization = FunctionPass(name: "pack-specialization") {
 
 }
 
-/// A context in which to modify call sites during pack specialization
+/// A context in which to modify call sites during pack specialization.
 private struct CallSiteSpecializer {
   let apply: ApplyInst
-  let specialized: PackExplodedFunction
+  let callee: PackExplodedFunction
   let context: FunctionPassContext
 
+  /// Mapping from the indices of the indirect pack arguments of the original
+  /// function to an array of scalar pack indices, used to access their elements
   typealias PackArgumentIndices = [Int: [ScalarPackIndexInst]]
 
   init(apply: ApplyInst, specialized: PackExplodedFunction, context: FunctionPassContext) {
     self.apply = apply
-    self.specialized = specialized
+    self.callee = specialized
     self.context = context
   }
 
-  /// Perform call-site specialization
+  /// Perform call-site specialization.
   func specialize() {
     let packArgumentIndices = self.createScalarPackIndices()
 
     // Populate the arguments list with the appropriate set of indirect results and parameters
-    let results = self.collectNewResultArguments(using: packArgumentIndices)
-    let parameters = self.collectNewParameterArguments(
+    let results = self.collectNewIndirectResults(using: packArgumentIndices)
+    let parameters = self.collectNewParameters(
       using: packArgumentIndices)
 
     // Emit a call to the specialized function
-    let specializedApply = self.createSpecializedApply(newArguments: results + parameters.arguments)
+    let specializedApply = self.createSpecializedApply(arguments: results + parameters.arguments)
 
-    // Release borrows of parameters that were passed @guaranteed
-    self.createEndBorrows(of: parameters.borrows, after: specializedApply)
+    self.createEndBorrows(for: parameters.borrows, after: specializedApply)
 
     self.substituteNewDirectResults(specializedApply: specializedApply, using: packArgumentIndices)
 
@@ -119,7 +120,7 @@ private struct CallSiteSpecializer {
     var packArgumentIndices = PackArgumentIndices()
     for (idx, argument) in self.apply.arguments.enumerated() where argument.type.shouldExplode {
       var indices = [ScalarPackIndexInst]()
-      let packType = self.specialized.packASTTypes[idx]!
+      let packType = self.callee.packASTTypes[idx]!
       for elementIdx in argument.type.packElements.indices {
         indices.append(
           builder.createScalarPackIndex(componentIndex: elementIdx, indexedPackType: packType))
@@ -131,13 +132,28 @@ private struct CallSiteSpecializer {
     return packArgumentIndices
   }
 
-  /// Collect values to pass as indirect result arguments to the new function from
+  /// Collect addresses to pass as indirect result arguments to the new function from
   /// the original call site.
-  private func collectNewResultArguments(using packArgumentIndices: PackArgumentIndices)
+  ///
+  /// Indirect results must be processed before generating the specialized call,
+  /// since they are passed as operands to the apply, while direct results must
+  /// be processed after generating the specialized call, since they are
+  /// extracted from its result value. See substituteNewDirectResults.
+  ///
+  /// Before: %fn : () -> (@pack_out Pack{C1, T2}, NP)
+  ///
+  /// %non_pack = apply %fn(%pack)
+  ///
+  /// After: %specialized_fn : () -> (@out C1, T2, NP)
+  ///
+  /// %c1_addr = pack_element_get 0 %pack
+  /// (%non_pack, %t2) = apply %specialized_fn(%c1_addr)
+  ///
+  private func collectNewIndirectResults(using packArgumentIndices: PackArgumentIndices)
     -> [any Value]
   {
     let builder = Builder(before: self.apply, self.context)
-    var resultIterator = self.specialized.resultMap.makeIterator()
+    var resultIterator = self.callee.resultMap.makeIterator()
     var newResults = [any Value]()
 
     for (index, resultOperand) in self.apply.indirectResultOperands.enumerated() {
@@ -165,19 +181,41 @@ private struct CallSiteSpecializer {
     return newResults
   }
 
-  // Collect values to pass as parameters to the new function from the original
-  // call site. Also collect any borrows of parameters that need to be released
-  // after the call.
-  private func collectNewParameterArguments(using packArgumentIndices: PackArgumentIndices) -> (
+  /// Collect values to pass as parameters to the new function from the original
+  /// call site. Also collect any borrows for @guaranteed parameters that need to
+  /// be released after the call.
+  ///
+  /// Non-pack parameters, and pack elements that map to indirect parameters, are
+  /// passed as addresses. Pack elements that map to direct parameters must be
+  /// loaded, if the original pack's elements were stored indirectly
+  /// (isPackElementAddress). We currently only attempt to eliminate indirect
+  /// packs (see Type.shouldExplode below), so these loads are always generated.
+  ///
+  /// Before: %fn : (@pack_owned Pack{C1, T2}, NP, @pack_guaranteed Pack{C3, T4}) -> ()
+  ///
+  /// %result = apply %fn(%pack1, %non_pack, %pack2)
+  ///
+  /// After: %specialized_fn : (@in C1, @owned T2, NP, @in_guaranteed C3, @guaranteed T4) -> ()
+  ///
+  /// %arg1addr = pack_element_get 0 %pack1
+  /// %arg2addr = pack_element_get 1 %pack1
+  /// %arg2 = load %arg2addr                 - arg2 is passed @owned or unowned
+  /// %arg3addr = pack_element_get 0 %pack2
+  /// %arg4addr = pack_element_get 1 %pack2
+  /// %arg4 = load_borrow %arg4addr          - arg4 is passed @guaranteed
+  ///
+  /// %new_result = apply %specialized_fn(%arg1addr, %arg2, %non_pack, %arg3addr, %arg4)
+  ///
+  private func collectNewParameters(using packArgumentIndices: PackArgumentIndices) -> (
     arguments: [any Value], borrows: [LoadBorrowInst]
   ) {
     let builder = Builder(before: self.apply, self.context)
 
-    var parameterIterator = self.specialized.parameterMap.makeIterator()
+    var parameterIterator = self.callee.parameterMap.makeIterator()
     var newParameters = [any Value]()
     var parameterBorrows = [LoadBorrowInst]()
     for (index, argument) in self.apply.arguments.enumerated().dropFirst(
-          self.specialized.original.argumentConventions.firstParameterIndex)
+      self.callee.original.argumentConventions.firstParameterIndex)
     {
 
       if !argument.type.shouldExplode {
@@ -187,7 +225,9 @@ private struct CallSiteSpecializer {
 
       let packIndices = packArgumentIndices[index]!
       let (mappedParameterIdx, parameterInfos) = parameterIterator.next()!
-      assert(mappedParameterIdx == index, "Iteration over mapped and apply-site indirect parameter packs is misaligned.")
+      assert(
+        mappedParameterIdx == index,
+        "Iteration over mapped and apply-site indirect parameter packs is misaligned.")
 
       for (packElementIdx, (parameterInfo, packIdx)) in zip(parameterInfos, packIndices)
         .enumerated()
@@ -224,18 +264,48 @@ private struct CallSiteSpecializer {
     return (newParameters, parameterBorrows)
   }
 
-  private func createSpecializedApply(newArguments: [any Value]) -> ApplyInst {
+  /// Create an application of the specialized function to the supplied arguments
+  private func createSpecializedApply(arguments: [any Value]) -> ApplyInst {
     let builder = Builder(before: self.apply, self.context)
 
     // Emit a call to the specialized function
-    let specializedFunctionRef = builder.createFunctionRef(self.specialized.specialized)
+    let specializedFunctionRef = builder.createFunctionRef(self.callee.specialized)
     let specializedApply = builder.createApply(
-      function: specializedFunctionRef, self.apply.substitutionMap, arguments: newArguments)
+      function: specializedFunctionRef, self.apply.substitutionMap, arguments: arguments)
     return specializedApply
   }
 
-  /// Map the direct results of the specialized function back to the corresponding
-  /// indirect pack or direct results of the original function.
+  /// Map the direct results of the specialized function back to the
+  /// corresponding indirect pack or direct results of the original function.
+  ///
+  /// If an element of an indirect result pack was mapped to a direct return
+  /// value, writeBack is used to write the value back to that original pack
+  /// element.
+  ///
+  /// Also collect the direct return values that correspond to those of the
+  /// original function, and use them to replace all uses of the original
+  /// result.
+  ///
+  /// Before:
+  /// pack_element_set %addr to N of %result_pack
+  /// ...
+  /// %original_result = apply %fn(%result_pack, ...)
+  /// %value = load %addr
+  /// operate %original_result
+  ///
+  /// After:
+  ///
+  /// pack_element_set %addr to N of %result_pack
+  /// ...
+  /// %result = apply %specialized_fn(%result_pack, ...)
+  /// (%orig1, ..., %result_value, %orig2, ...) = destructure_tuple %result ─┬──╴code inserted by substituteNewDirectResults
+  /// %reconstructed_result = tuple (%orig1, %orig2, ...)                   ╶┘
+  /// %addr = pack_element_get N of %result_pack                            ╶┬──╴code inserted by writeBack
+  /// store %result_value to %addr                                          ╶┘
+  /// %value = load %addr
+  /// operate %reconstructed_result
+  ///
+  /// The stack allocations and accesses can then be easily eliminated by other passes.
   private func substituteNewDirectResults(
     specializedApply: ApplyInst, using packArgumentIndices: PackArgumentIndices
   ) {
@@ -251,11 +321,11 @@ private struct CallSiteSpecializer {
           self.apply.type.isVoid,
           "Pack specialization has fewer direct return values than original function.")
         // Write back the single pack element
-        outerLoop: for (packArgumentIdx, mappedResultInfos) in self.specialized.resultMap {
+        outerLoop: for (packArgumentIdx, mappedResultInfos) in self.callee.resultMap {
           for (packElementIdx, resultInfo) in mappedResultInfos.enumerated() {
             if !resultInfo.isSILIndirect {
-              self.writeBackPackElement(
-                value: specializedApply, argumentIndex: packArgumentIdx,
+              self.writeBack(
+                resultPackElement: specializedApply, argumentIndex: packArgumentIdx,
                 elementIndex: packElementIdx, using: packArgumentIndices)
               break outerLoop
             }
@@ -276,7 +346,7 @@ private struct CallSiteSpecializer {
       let builder = Builder(after: specializedApply, self.context)
 
       var substitutedResultTupleElements = [any Value]()
-      var resultMapIterator = self.specialized.resultMap.makeIterator()
+      var resultMapIterator = self.callee.resultMap.makeIterator()
 
       let destructuredTuple = builder.createDestructureTuple(tuple: specializedApply)
       var destructuredTupleElements = destructuredTuple.results.makeIterator()
@@ -293,8 +363,9 @@ private struct CallSiteSpecializer {
 
           for (packElementIdx, mappedDirectResult) in mappedResults.enumerated()
           where !mappedDirectResult.isSILIndirect {
-            self.writeBackPackElement(
-              value: destructuredTupleElements.next()!, argumentIndex: originalResultIdx,
+            self.writeBack(
+              resultPackElement: destructuredTupleElements.next()!,
+              argumentIndex: originalResultIdx,
               elementIndex: packElementIdx, using: packArgumentIndices)
           }
         }
@@ -311,8 +382,12 @@ private struct CallSiteSpecializer {
     }
   }
 
-  private func writeBackPackElement(
-    value: any Value, argumentIndex: Int, elementIndex: Int,
+  /// Store resultPackElement to the element at index elementIndex of the
+  /// parameter pack at index argumentIndex of the original apply.
+  ///
+  /// See substituteNewDirectResults for a code example.
+  private func writeBack(
+    resultPackElement: any Value, argumentIndex: Int, elementIndex: Int,
     using packArgumentIndices: PackArgumentIndices
   ) {
     let builder = Builder(before: self.apply, self.context)
@@ -322,12 +397,13 @@ private struct CallSiteSpecializer {
       packIndex: packIndex, pack: originalPackArgument,
       elementType: originalPackArgument.type.packElements[elementIndex])
     builder.createStore(
-      source: value, destination: outputResultAddress,
+      source: resultPackElement, destination: outputResultAddress,
       // The callee is responsible for initializing return pack elements
-      ownership: storeOwnership(for: value, normal: .initialize))
+      ownership: storeOwnership(for: resultPackElement, normal: .initialize))
   }
 
-  private func createEndBorrows(of borrows: [LoadBorrowInst], after: Instruction) {
+  /// Release borrows of parameters that were passed @guaranteed
+  private func createEndBorrows(for borrows: [LoadBorrowInst], after: Instruction) {
     let builder = Builder(after: after, self.context)
 
     // Release any borrows that were created to pass parameters
