@@ -2598,6 +2598,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
     Opts.VerifyMode = DiagnosticOptions::VerifyAndApplyFixes;
   Opts.VerifyIgnoreUnknown |= Args.hasArg(OPT_verify_ignore_unknown);
   Opts.VerifyIgnoreUnrelated |= Args.hasArg(OPT_verify_ignore_unrelated);
+  Opts.VerifyIgnoreMacroLocationNote |= Args.hasArg(OPT_verify_ignore_macro_note);
   Opts.SkipDiagnosticPasses |= Args.hasArg(OPT_disable_diagnostic_passes);
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);

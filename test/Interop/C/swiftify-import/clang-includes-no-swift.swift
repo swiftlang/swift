@@ -5,7 +5,7 @@
 
 // RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t/Inputs -enable-experimental-feature SafeInteropWrappers %t/succeed.swift
 // RUN: not %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t/Inputs -enable-experimental-feature SafeInteropWrappers %t/fail.swift -dump-source-file-imports 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t/Inputs -enable-experimental-feature SafeInteropWrappers %t/fail.swift -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}B1.h
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t/Inputs -enable-experimental-feature SafeInteropWrappers %t/fail.swift -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}B1.h -verify-ignore-macro-note
 
 // Tests that we don't try to import modules that don't work well with Swift
 
