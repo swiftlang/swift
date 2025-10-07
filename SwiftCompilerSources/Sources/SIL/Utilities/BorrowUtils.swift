@@ -534,7 +534,7 @@ public final class EnclosingValueIterator : IteratorProtocol {
         } else if let forwardingInst = value.forwardingInstruction {
           // Recurse through guaranteed forwarding non-phi instructions.
           let ops = forwardingInst.forwardedOperands
-          worklist.pushIfNotVisited(contentsOf: ops.lazy.map { $0.value })
+          worklist.pushIfNotVisited(contentsOf: ops.values)
         } else if value.isGuaranteedApplyResult {
           let selfArgument = (value as! ApplyInst).arguments.last!
           worklist.pushIfNotVisited(selfArgument)

@@ -1968,7 +1968,11 @@ void ASTMangler::appendFlatGenericArgs(SubstitutionMap subs,
   for (auto replacement : subs.getReplacementTypes()) {
     if (replacement->hasArchetype())
       replacement = replacement->mapTypeOutOfContext();
-    appendType(replacement, sig, forDecl);
+    if (DWARFMangling) {
+      appendType(replacement, sig, forDecl);
+    } else {
+      appendType(replacement->getCanonicalType(), sig, forDecl);
+    }
   }
 }
 

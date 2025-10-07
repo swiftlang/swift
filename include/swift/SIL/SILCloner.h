@@ -217,6 +217,8 @@ public:
                          ArrayRef<SILValue> entryArgs,
                          bool replaceOriginalFunctionInPlace = false);
 
+  void cloneFunctionBody(SILFunction *F);
+
   /// Clone all blocks in this function and all instructions in those
   /// blocks.
   ///
@@ -836,8 +838,30 @@ void SILCloner<ImplClass>::cloneFunctionBody(SILFunction *F,
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::cloneFunctionBody(SILFunction *F) {
+  assert(!Builder.getFunction().empty() && "Expect the entry block to already be created");
+
+  assert(F != &Builder.getFunction() && "Must clone into a new function.");
+  assert(BBMap.empty() && "This API does not allow clients to map blocks.");
+
+  SILBasicBlock *clonedEntryBB = Builder.getFunction().getEntryBlock();
+  BBMap.insert(std::make_pair(&*F->begin(), clonedEntryBB));
+
+  Builder.setInsertionPoint(clonedEntryBB);
+
+  // This will layout all newly cloned blocks immediate after clonedEntryBB.
+  visitBlocksDepthFirst(&*F->begin());
+
+  commonFixUp(F);
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::cloneFunction(SILFunction *origF) {
   SILFunction *newF = &Builder.getFunction();
+  if (!newF->empty()) {
+    cloneFunctionBody(origF);
+    return;
+  }
 
   auto *newEntryBB = newF->createBasicBlock();
 
@@ -861,23 +885,12 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::cloneFunctionBody(
     SILFunction *F, SILBasicBlock *clonedEntryBB, ArrayRef<SILValue> entryArgs,
     llvm::function_ref<SILValue(SILValue)> entryArgIndexToOldArgIndex) {
-  assert(F != clonedEntryBB->getParent() && "Must clone into a new function.");
-  assert(BBMap.empty() && "This API does not allow clients to map blocks.");
   assert(ValueMap.empty() && "Stale ValueMap.");
-
   assert(entryArgs.size() == F->getArguments().size());
   for (unsigned i = 0, e = entryArgs.size(); i != e; ++i) {
     ValueMap[entryArgIndexToOldArgIndex(entryArgs[i])] = entryArgs[i];
   }
-
-  BBMap.insert(std::make_pair(&*F->begin(), clonedEntryBB));
-
-  Builder.setInsertionPoint(clonedEntryBB);
-
-  // This will layout all newly cloned blocks immediate after clonedEntryBB.
-  visitBlocksDepthFirst(&*F->begin());
-
-  commonFixUp(F);
+  cloneFunctionBody(F);
 }
 
 template<typename ImplClass>

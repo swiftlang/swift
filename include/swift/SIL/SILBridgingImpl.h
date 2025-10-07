@@ -260,10 +260,6 @@ bool SILFunctionType_hasSelfParam(BridgedCanType funcTy) {
   return funcTy.unbridged()->castTo<swift::SILFunctionType>()->hasSelfParam();
 }
 
-bool SILFunctionType_isTrivialNoescape(BridgedCanType funcTy) {
-  return funcTy.unbridged()->castTo<swift::SILFunctionType>()->isTrivialNoEscape();
-}
-
 BridgedYieldInfoArray SILFunctionType_getYields(BridgedCanType funcTy) {
   return {funcTy.unbridged()->castTo<swift::SILFunctionType>()->getYields()};
 }
@@ -1364,6 +1360,14 @@ BridgedGenericSpecializationInformation BridgedInstruction::TryApplyInst_getSpec
   return {getAs<swift::TryApplyInst>()->getSpecializationInfo()};
 }
 
+bool BridgedInstruction::BeginApplyInst_getNonThrowing() const {
+  return getAs<swift::BeginApplyInst>()->isNonThrowing();
+}
+
+bool BridgedInstruction::BeginApplyInst_getNonAsync() const {
+  return getAs<swift::BeginApplyInst>()->isNonAsync();
+}
+
 BridgedDeclRef BridgedInstruction::ClassMethodInst_getMember() const {
   return getAs<swift::ClassMethodInst>()->getMember();
 }
@@ -2313,6 +2317,11 @@ BridgedInstruction BridgedBuilder::createUncheckedRefCast(BridgedValue op, Bridg
 
 BridgedInstruction BridgedBuilder::createUncheckedAddrCast(BridgedValue op, BridgedType type) const {
   return {unbridged().createUncheckedAddrCast(regularLoc(), op.getSILValue(),
+                                              type.unbridged())};
+}
+
+BridgedInstruction BridgedBuilder::createUncheckedValueCast(BridgedValue op, BridgedType type) const {
+  return {unbridged().createUncheckedValueCast(regularLoc(), op.getSILValue(),
                                               type.unbridged())};
 }
 

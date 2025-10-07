@@ -43,7 +43,6 @@ public func registerOptimizerTests() {
   registerFunctionTests(
     addressOwnershipLiveRangeTest,
     argumentConventionsTest,
-    getPullbackClosureInfoTest,
     interiorLivenessTest,
     lifetimeDependenceRootTest,
     lifetimeDependenceScopeTest,
@@ -52,8 +51,6 @@ public func registerOptimizerTests() {
     localVariableReachableUsesTest,
     localVariableReachingAssignmentsTest,
     rangeOverlapsPathTest,
-    rewrittenCallerBodyTest,
-    specializedFunctionSignatureAndBodyTest,
     variableIntroducerTest
   )
 

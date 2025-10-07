@@ -1,5 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -experimental-swift-based-closure-specialization %s | %FileCheck %s
-// XFAIL: *
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-specialization %s | %FileCheck %s
 
 import Builtin
 
@@ -36,15 +35,15 @@ bb0(%0 : @guaranteed $C, %1 : @guaranteed $C, %2 : @guaranteed $C):
   return %15 : $()
 }
 
-sil @caller : $@convention(thin) (@owned C) -> () {
-bb0(%0 : $C):
+sil [ossa] @caller : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
   %3 = function_ref @closure : $@convention(thin) (@guaranteed C, @guaranteed C, @guaranteed C) -> ()
   %4 = partial_apply [callee_guaranteed] [on_stack] %3(%0) : $@convention(thin) (@guaranteed C, @guaranteed C, @guaranteed C) -> ()
   %take_closure = function_ref @take_closure : $@convention(thin) (@owned C, @guaranteed @noescape @callee_guaranteed (@guaranteed C, @guaranteed C) -> ()) -> ()
-  strong_retain %0 : $C
-  %5 = apply %take_closure(%0, %4) : $@convention(thin) (@owned C, @guaranteed @noescape @callee_guaranteed (@guaranteed C, @guaranteed C) -> ()) -> ()
-  strong_release %0 : $C
-  dealloc_stack %4 : $@noescape @callee_guaranteed (@guaranteed C, @guaranteed C) -> ()
+  %5 = copy_value %0
+  %6 = apply %take_closure(%5, %4) : $@convention(thin) (@owned C, @guaranteed @noescape @callee_guaranteed (@guaranteed C, @guaranteed C) -> ()) -> ()
+  destroy_value %4
+  destroy_value %0
   %retval = tuple()
   return %retval : $()
 }
@@ -58,30 +57,30 @@ bb0(%0 : $C):
 
 // This should not be specialized until we support guaranteed arguments.
 // CHECK-NOT: @$s20takesReadOnlyClosure
-sil private [readonly] @takesReadOnlyClosure : $@convention(thin) (@noescape @callee_guaranteed (Val) -> Val) -> Val {
-bb0(%2 : $@noescape @callee_guaranteed (Val) -> Val):
+sil private [readonly] [ossa] @takesReadOnlyClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Val) -> Val) -> Val {
+bb0(%2 : @guaranteed $@noescape @callee_guaranteed (Val) -> Val):
   %46 = struct $Val ()
   %261 = apply %2(%46) : $@noescape @callee_guaranteed (Val) -> Val
   return %261 : $Val
 }
 
-sil private @readOnlyClosure : $@convention(thin) (Val, @guaranteed Storage) -> Val {
-bb0(%0 : $Val, %1 : @closureCapture $Storage):
+sil private [ossa] @readOnlyClosure : $@convention(thin) (Val, @guaranteed Storage) -> Val {
+bb0(%0 : $Val, %1 : @closureCapture @guaranteed $Storage):
   %46 = struct $Val ()
   return %46 : $Val
 }
 
-// CHECK-LABEL: sil @testPassReadOnlyClosure : $@convention(method) (@guaranteed Storage) -> Val {
+// CHECK-LABEL: sil [ossa] @testPassReadOnlyClosure : $@convention(method) (@guaranteed Storage) -> Val {
 // CHECK-NOT: @owned Storage
-// CHECK: apply %{{.*}} : $@convention(thin) (@noescape @callee_guaranteed (Val) -> Val) -> Val
+// CHECK: apply %{{.*}} : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Val) -> Val) -> Val
 // CHECK-LABEL: } // end sil function 'testPassReadOnlyClosure'
-sil @testPassReadOnlyClosure : $@convention(method) (@guaranteed Storage) -> Val {
-bb0(%0 : $Storage):
+sil [ossa] @testPassReadOnlyClosure : $@convention(method) (@guaranteed Storage) -> Val {
+bb0(%0 : @guaranteed $Storage):
   %176 = function_ref @readOnlyClosure : $@convention(thin) (Val, @guaranteed Storage) -> Val
   %177 = partial_apply [callee_guaranteed] [on_stack] %176(%0) : $@convention(thin) (Val, @guaranteed Storage) -> Val
   %178 = mark_dependence %177 : $@noescape @callee_guaranteed (Val) -> Val on %0 : $Storage
-  %188 = function_ref @takesReadOnlyClosure : $@convention(thin) (@noescape @callee_guaranteed (Val) -> Val) -> Val
-  %189 = apply %188(%178) : $@convention(thin) (@noescape @callee_guaranteed (Val) -> Val) -> Val
-  dealloc_stack %177 : $@noescape @callee_guaranteed (Val) -> Val
+  %188 = function_ref @takesReadOnlyClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Val) -> Val) -> Val
+  %189 = apply %188(%178) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Val) -> Val) -> Val
+  destroy_value %178
   return %189 : $Val
 }

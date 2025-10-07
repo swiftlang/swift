@@ -112,7 +112,7 @@ private func constantPropagateCaptures(of partialApply: PartialApplyInst, _ cont
     // Escaping closures consume their arguments. Therefore we need to destroy the removed argument values.
     addCompensatingDestroys(for: constArgs, context)
   }
-  let newArguments = nonConstArgs.map { $0.value }
+  let newArguments = Array(nonConstArgs.values)
   rewritePartialApply(partialApply, withSpecialized: specializedCallee, arguments: newArguments, context)
 }
 
@@ -195,8 +195,7 @@ private func cloneArgument(_ argumentOp: Operand,
   if partialApply.calleeArgumentConventions[calleeArgIdx].isGuaranteed {
     // If the original argument was passed as guaranteed, i.e. is _not_ destroyed in the closure, we have
     // to destroy the cloned argument at function exits.
-    for block in targetFunction.blocks where block.terminator.isFunctionExiting {
-      let builder = Builder(before: block.terminator, context)
+    Builder.insertCleanupAtFunctionExits(of: targetFunction, context) { builder in
       builder.emitDestroy(of: clonedArg)
     }
   }
