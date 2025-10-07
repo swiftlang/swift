@@ -389,15 +389,6 @@ static void desugarConformanceRequirement(
 
   // Fast path.
   if (constraintType->is<ProtocolType>()) {
-    // Diagnose attempts to introduce a value generic like 'let N: P' where 'P'
-    // is some protocol in either the defining context or in an extension where
-    // clause.
-    if (req.getFirstType()->isValueParameter()) {
-      errors.push_back(
-        RequirementError::forInvalidValueGenericConformance(req, loc));
-      return;
-    }
-
     if (req.getFirstType()->isTypeParameter()) {
       result.push_back(req);
       return;
@@ -538,7 +529,26 @@ void swift::rewriting::realizeTypeRequirement(DeclContext *dc,
                                  Type constraintType,
                                  SourceLoc loc,
                                  SmallVectorImpl<StructuralRequirement> &result,
-                                 SmallVectorImpl<RequirementError> &errors) {
+                                 SmallVectorImpl<RequirementError> &errors,
+                                 bool isFromInheritanceClause) {
+  // Handle value generics first.
+  if (subjectType->isValueParameter()) {
+    if (isFromInheritanceClause) {
+      if (!constraintType->isLegalValueGenericType()) {
+        // The definition of a generic value parameter has an unsupported type,
+        // e.g. `<let N: UInt8>`.
+        errors.push_back(RequirementError::forInvalidValueGenericType(
+            subjectType, constraintType, loc));
+      }
+    } else {
+      // A generic value parameter was used as the subject of a subtype
+      // constraint, e.g. `N: X` in `struct S<let N: Int> where N: X`.
+      errors.push_back(RequirementError::forInvalidValueGenericConstraint(
+          subjectType, constraintType, loc));
+    }
+    return;
+  }
+
   // The GenericSignatureBuilder allowed the right hand side of a
   // conformance or superclass requirement to reference a protocol
   // typealias whose underlying type was a protocol or class.
@@ -574,22 +584,6 @@ void swift::rewriting::realizeTypeRequirement(DeclContext *dc,
     result.push_back({Requirement(RequirementKind::Superclass,
                                   subjectType, constraintType),
                       loc});
-  } else if (subjectType->isValueParameter() && !isa<ExtensionDecl>(dc)) {
-    // This is a correct value generic definition where 'let N: Int'.
-    //
-    // Note: This definition is only valid in non-extension contexts. If we are
-    // in an extension context then the user has written something like:
-    // 'extension T where N: Int' which is weird and not supported.
-    if (constraintType->isLegalValueGenericType()) {
-      return;
-    }
-
-    // Otherwise, we're trying to define a value generic parameter with an
-    // unsupported type right now e.g. 'let N: UInt8'.
-    errors.push_back(
-        RequirementError::forInvalidValueGenericType(subjectType,
-                                                     constraintType,
-                                                     loc));
   } else {
     errors.push_back(
         RequirementError::forInvalidTypeRequirement(subjectType,
@@ -792,7 +786,8 @@ void swift::rewriting::realizeRequirement(
       inferRequirements(secondType, moduleForInference, dc, result);
     }
 
-    realizeTypeRequirement(dc, firstType, secondType, loc, result, errors);
+    realizeTypeRequirement(dc, firstType, secondType, loc, result, errors,
+                           /*isFromInheritanceClause*/ false);
     break;
   }
 
@@ -845,7 +840,8 @@ void swift::rewriting::realizeInheritedRequirements(
     auto *typeRepr = inheritedTypes.getTypeRepr(index);
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
 
-    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
+    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors,
+                           /*isFromInheritanceClause*/ true);
   }
 
   // Also check for `SynthesizedProtocolAttr`s with additional constraints added
@@ -856,7 +852,8 @@ void swift::rewriting::realizeInheritedRequirements(
     auto inheritedType = attr->getProtocol()->getDeclaredType();
     auto loc = attr->getLocation();
 
-    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
+    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors,
+                           /*isFromInheritanceClause*/ false);
   }
 }
 
