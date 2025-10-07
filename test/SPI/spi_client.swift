@@ -61,10 +61,16 @@ public func inlinable1() -> SPIClass { // expected-error {{class 'SPIClass' cann
   _ = [SPIClass]() // expected-error {{class 'SPIClass' cannot be used in an '@inlinable' function because it is an SPI imported from 'SPIHelper'}}
 }
 
+public let o1 = PublicType()
+public let o2 = PublicType()
+
 @_spi(S)
 @inlinable
 public func inlinable2() -> SPIClass {
   spiFunc()
   _ = SPIClass()
   _ = [SPIClass]()
+  let _ = o1 - o2
 }
+
+let _ = o1 - o2
