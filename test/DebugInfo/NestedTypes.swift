@@ -16,3 +16,19 @@ public let e : Enum = .WithClass(C())
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "WithStruct",
 // CHECK-SAME:           size: 128)
 
+public struct D<U> {
+  var v : V
+  let u: U
+}
+
+extension D {
+  struct V {
+    internal var obj: Int
+  }
+}
+
+public let d = D<Int>(v: D.V(obj: 1), u: 2)
+
+// CHECK: ![[D:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "D"
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "V", scope: ![[D]],
+
