@@ -21,7 +21,7 @@
 
 //--- Library.swift
 
-// LIBRARY-IR: @"$e7Library10PointClassCN" = weak_odr global
+// LIBRARY-IR: @"$e7Library10PointClassCN" = weak_odr {{.*}}global
 
 // Never referenced.
 // LIBRARY-IR-NOT: @"$es23_swiftEmptyArrayStorageSi_S3itvp" = weak_odr {{(protected |dllexport )?}}global
