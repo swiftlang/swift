@@ -115,27 +115,26 @@ class TypeAliasReplacer: SyntaxRewriter {
 
 func read(file path: String) -> String {
   guard let f = fopen(path, "r") else {
-    let msg = String(validatingCString: strerror(errno))
-    printError("could not open file \(path): \(msg!)")
+    printError("could not open file \(path)")
     exit(1)
   }
   if fseek(f, 0, SEEK_END) != 0 {
-    let msg = String(validatingCString: strerror(errno))
-    printError("could not read file \(path): \(msg!)")
+    printError("could not read file \(path)")
     exit(1)
   }
-  let len = ftell(f)
+  let len = Int(ftell(f))
   if len < 0 {
-    let msg = String(validatingCString: strerror(errno))
-    printError("could not read size of file \(path): \(msg!)")
+    printError("could not read size of file \(path)")
     exit(1)
   }
   rewind(f)
-  return String(
+  let contents = String(
     unsafeUninitializedCapacity: len,
     initializingUTF8With: { stringBuffer in
       fread(UnsafeMutableRawPointer(stringBuffer.baseAddress!), 1, len, f)
     })
+  fclose(f)
+  return contents
 }
 
 func createBody(_ f: FunctionDeclSyntax, selfParam: TokenSyntax?) -> CodeBlockSyntax {
