@@ -3079,3 +3079,16 @@ func testNonSendableCaptures(ns: NonSendableKlass, a: isolated MyActor) {
     let _ = ns
   }
 }
+
+// https://github.com/swiftlang/swift/issues/84376
+
+@MainActor
+class NonFinalMainActorClass {
+  var nonSendableState: [NonSendableKlass] = []
+
+  func testClassMethodSubscriptLookupPropagatesIsolation() {
+    let alias = nonSendableState[0]
+    transferArg(alias) // expected-warning {{sending 'alias' risks causing data races}}
+    // expected-note @-1 {{main actor-isolated 'alias' is passed as a 'sending' parameter; Uses in callee may race with later main actor-isolated uses}}
+  }
+}
