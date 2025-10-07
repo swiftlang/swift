@@ -163,11 +163,18 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
       moduleOrFile->getParentModule(), overlays);
   if (!overlays.empty()) {
     // If so, look in each of those overlays.
-    for (auto overlay : overlays)
-      lookupInModule(decls, overlay, accessPath, moduleScopeContext, options);
+    bool selfOverlay = false;
+    for (auto overlay : overlays) {
+      if (overlay == moduleOrFile->getParentModule())
+        selfOverlay = true;
+      else
+        lookupInModule(decls, overlay, accessPath, moduleScopeContext,
+                       options);
+    }
     // FIXME: This may not work gracefully if more than one of these lookups
     // finds something.
-    return;
+    if (!selfOverlay)
+      return;
   }
 
   const size_t initialCount = decls.size();
