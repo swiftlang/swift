@@ -320,7 +320,7 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
   IRGenMangler mangler(IGM.Context);
   std::string symbolName =
     mangler.mangleSymbolNameForMangledMetadataAccessorString(
-                                                   "get_type_metadata", sig, t);
+                                                   "get_type_metadata", sig, t, role);
   auto constant = IGM.getAddrOfStringForMetadataRef(symbolName, /*align*/2,
                                                     /*low bit*/false,
     [&](ConstantInitBuilder &B) {
@@ -351,9 +351,22 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
           ? genericEnv->mapTypeIntoContext(t)->getCanonicalType()
           : t;
 
-        // If a type is noncopyable, lie about the resolved type unless the
-        // runtime is sufficiently aware of noncopyable types.
-        if (substT->isNoncopyable()) {
+        // If a type is noncopyable, lie about the resolved type to reflection
+        // APIs unless the runtime is sufficiently aware of noncopyable types.
+        bool shouldHideNoncopyableTypeFromOldRuntimes;
+        switch (role) {
+        case MangledTypeRefRole::Metadata:
+        case MangledTypeRefRole::DefaultAssociatedTypeWitness:
+        case MangledTypeRefRole::FlatUnique:
+          shouldHideNoncopyableTypeFromOldRuntimes = false;
+          break;
+        case MangledTypeRefRole::FieldMetadata:
+        case MangledTypeRefRole::Reflection:
+          shouldHideNoncopyableTypeFromOldRuntimes = true;
+          break;
+        }
+        if (shouldHideNoncopyableTypeFromOldRuntimes
+            && substT->isNoncopyable()) {
           // Darwin-based platforms have ABI stability, and we want binaries
           // that use noncopyable types nongenerically today to be forward
           // compatible with a future OS runtime that supports noncopyable
