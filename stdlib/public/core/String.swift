@@ -1112,4 +1112,30 @@ extension String {
   }
 }
 
-
+extension String {
+  /// Returns a boolean value indicating whether this string is identical to
+  /// `other`.
+  ///
+  /// Two string values are identical if there is no way to distinguish between
+  /// them.
+  /// 
+  /// For any values `a`, `b`, and `c`:
+  ///
+  /// - `a.isIdentical(to: a)` is always `true`. (Reflexivity)
+  /// - `a.isIdentical(to: b)` implies `b.isIdentical(to: a)`. (Symmetry)
+  /// - If `a.isIdentical(to: b)` and `b.isIdentical(to: c)` are both `true`,
+  ///   then `a.isIdentical(to: c)` is also `true`. (Transitivity)
+  /// - `a.isIdentical(b)` implies `a == b`
+  ///
+  /// Comparing strings this way includes comparing (normally) hidden
+  /// implementation details such as the memory location of any underlying
+  /// string storage object. Therefore, identical strings are guaranteed to
+  /// compare equal with `==`, but not all equal strings are considered
+  /// identical.
+  ///
+  /// - Performance: O(1)
+  @_alwaysEmitIntoClient
+  public func isIdentical(to other: Self) -> Bool {
+    self._guts.rawBits == other._guts.rawBits
+  }
+}
