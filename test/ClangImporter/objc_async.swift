@@ -404,3 +404,9 @@ extension CoffeeDelegate  {
         return await self.icedMochaServiceGenerateMocha!(NSObject())
     }
 }
+
+@MainActor
+func testGetSendableClasses() async {
+  let x = ImportObjCAsyncGetter()
+  _ = await x.sendableClasses
+}
