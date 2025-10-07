@@ -49,7 +49,7 @@ public:
     Universal,
 
     /// Represents availability with respect to Swift language mode.
-    SwiftLanguage,
+    SwiftLanguageMode,
 
     /// Represents PackageDescription availability.
     PackageDescription,
@@ -140,8 +140,8 @@ public:
     return AvailabilityDomain(platformKind);
   }
 
-  static AvailabilityDomain forSwiftLanguage() {
-    return AvailabilityDomain(Kind::SwiftLanguage);
+  static AvailabilityDomain forSwiftLanguageMode() {
+    return AvailabilityDomain(Kind::SwiftLanguageMode);
   }
 
   static AvailabilityDomain forPackageDescription() {
@@ -181,7 +181,9 @@ public:
 
   bool isPlatform() const { return getKind() == Kind::Platform; }
 
-  bool isSwiftLanguage() const { return getKind() == Kind::SwiftLanguage; }
+  bool isSwiftLanguageMode() const {
+    return getKind() == Kind::SwiftLanguageMode;
+  }
 
   bool isPackageDescription() const {
     return getKind() == Kind::PackageDescription;

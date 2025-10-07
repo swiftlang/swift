@@ -109,7 +109,7 @@ AvailabilityDomain::builtinDomainForString(StringRef string,
 
   auto domain = llvm::StringSwitch<std::optional<AvailabilityDomain>>(string)
                     .Case("*", AvailabilityDomain::forUniversal())
-                    .Case("swift", AvailabilityDomain::forSwiftLanguage())
+                    .Case("swift", AvailabilityDomain::forSwiftLanguageMode())
                     .Case("_PackageDescription",
                           AvailabilityDomain::forPackageDescription())
                     .Default(std::nullopt);
@@ -128,7 +128,7 @@ bool AvailabilityDomain::isVersioned() const {
   case Kind::Universal:
   case Kind::Embedded:
     return false;
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
   case Kind::PackageDescription:
   case Kind::Platform:
     return true;
@@ -146,7 +146,7 @@ bool AvailabilityDomain::isVersionValid(
   case Kind::Universal:
   case Kind::Embedded:
     llvm_unreachable("unexpected domain kind");
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
   case Kind::PackageDescription:
     return true;
   case Kind::Platform:
@@ -162,7 +162,7 @@ bool AvailabilityDomain::supportsContextRefinement() const {
   switch (getKind()) {
   case Kind::Universal:
   case Kind::Embedded:
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
   case Kind::PackageDescription:
     return false;
   case Kind::Platform:
@@ -175,7 +175,7 @@ bool AvailabilityDomain::supportsQueries() const {
   switch (getKind()) {
   case Kind::Universal:
   case Kind::Embedded:
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
   case Kind::PackageDescription:
     return false;
   case Kind::Platform:
@@ -188,7 +188,7 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx,
                                   bool forTargetVariant) const {
   switch (getKind()) {
   case Kind::Universal:
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
   case Kind::PackageDescription:
   case Kind::Embedded:
     return true;
@@ -216,7 +216,7 @@ getDeploymentVersion(const AvailabilityDomain &domain, const ASTContext &ctx) {
   case AvailabilityDomain::Kind::Embedded:
   case AvailabilityDomain::Kind::Custom:
     return std::nullopt;
-  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
     return ctx.LangOpts.EffectiveLanguageVersion;
   case AvailabilityDomain::Kind::PackageDescription:
     return ctx.LangOpts.PackageDescriptionVersion;
@@ -253,7 +253,7 @@ llvm::StringRef AvailabilityDomain::getNameForDiagnostics() const {
   switch (getKind()) {
   case Kind::Universal:
     return "*";
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
     return "Swift";
   case Kind::PackageDescription:
     return "PackageDescription";
@@ -270,7 +270,7 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
   switch (getKind()) {
   case Kind::Universal:
     return "*";
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
     return "swift";
   case Kind::PackageDescription:
     return "_PackageDescription";
@@ -301,7 +301,7 @@ bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
   switch (getKind()) {
   case Kind::Universal:
     return true;
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
   case Kind::PackageDescription:
   case Kind::Embedded:
   case Kind::Custom:
@@ -318,7 +318,7 @@ bool AvailabilityDomain::isRoot() const {
   switch (getKind()) {
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::Embedded:
-  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
   case AvailabilityDomain::Kind::PackageDescription:
     return true;
   case AvailabilityDomain::Kind::Platform:
@@ -403,7 +403,7 @@ void AvailabilityDomain::print(llvm::raw_ostream &os) const {
 AvailabilityDomain AvailabilityDomain::copy(ASTContext &ctx) const {
   switch (getKind()) {
   case Kind::Universal:
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
   case Kind::PackageDescription:
   case Kind::Embedded:
   case Kind::Platform:
@@ -425,7 +425,7 @@ bool StableAvailabilityDomainComparator::operator()(
 
   switch (lhsKind) {
   case AvailabilityDomain::Kind::Universal:
-  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
   case AvailabilityDomain::Kind::PackageDescription:
   case AvailabilityDomain::Kind::Embedded:
     return false;

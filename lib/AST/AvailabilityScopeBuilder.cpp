@@ -847,7 +847,7 @@ private:
 
     switch (domain.getKind()) {
     case AvailabilityDomain::Kind::Embedded:
-    case AvailabilityDomain::Kind::SwiftLanguage:
+    case AvailabilityDomain::Kind::SwiftLanguageMode:
     case AvailabilityDomain::Kind::PackageDescription:
       // These domains don't support queries.
       llvm::report_fatal_error("unsupported domain");
