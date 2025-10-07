@@ -850,12 +850,11 @@ public:
   /// type variables referenced by this type.
   void getTypeVariables(SmallPtrSetImpl<TypeVariableType *> &typeVariables);
 
-private:
+public:
   /// If the receiver is a `DependentMemberType`, returns its root. Otherwise,
   /// returns the receiver.
   Type getDependentMemberRoot();
 
-public:
   /// Determine whether this type is a type parameter, which is either a
   /// GenericTypeParamType or a DependentMemberType.
   ///
