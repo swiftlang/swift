@@ -6375,8 +6375,6 @@ static bool isReturningFRT(const clang::NamedDecl *ND,
 static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
                                                  clang::QualType retType,
                                                  ASTContext &Ctx) {
-  if (!Ctx.LangOpts.hasFeature(Feature::WarnUnannotatedReturnOfCxxFrt))
-    return false;
 
   auto attrInfo = importer::ReturnOwnershipInfo(ND);
   if (attrInfo.hasRetainAttr())

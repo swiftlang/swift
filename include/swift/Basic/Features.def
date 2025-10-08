@@ -213,6 +213,7 @@ BASELINE_LANGUAGE_FEATURE(BuiltinUnprotectedStackAlloc, 0, "Builtin.unprotectedS
 BASELINE_LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline")
 BASELINE_LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf")
 BASELINE_LANGUAGE_FEATURE(NewCxxMethodSafetyHeuristics, 0, "Only import C++ methods that return pointers (projections) on owned types as unsafe")
+BASELINE_LANGUAGE_FEATURE(WarnUnannotatedReturnOfCxxFrt, 0, "Warn about unannotated C++ functions returning foreign reference types")
 BASELINE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability")
 BASELINE_LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment")
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateTaskGroupWithFlags, 0, "Builtin.createTaskGroupWithFlags")
@@ -498,10 +499,9 @@ EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 /// Import inherited non-public members when importing C++ classes.
 EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 
-/// Emit a warning when a C++ API returns a SWIFT_SHARED_REFERENCE type
-/// without being explicitly annotated with either SWIFT_RETURNS_RETAINED
-/// or SWIFT_RETURNS_UNRETAINED.
-EXPERIMENTAL_FEATURE(WarnUnannotatedReturnOfCxxFrt, true)
+/// Suppress the synthesis of static factory methods for C++ foreign reference
+/// types and importing them as Swift initializers.
+EXPERIMENTAL_FEATURE(SuppressCXXForeignReferenceTypeInitializers, true)
 
 /// modify/read single-yield coroutines
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
