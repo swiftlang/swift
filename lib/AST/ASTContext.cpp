@@ -6012,16 +6012,16 @@ GenericSignature::forInvalid(ArrayRef<GenericTypeParamType *> params) {
   ASSERT(!params.empty());
   auto &ctx = params.front()->getASTContext();
 
+  // Add same type requirements that make each of the generic parameters
+  // concrete error types. This helps avoid downstream diagnostics and is
+  // handled the same as if the user wrote e.g `<T where T == Undefined>`.
   SmallVector<Requirement, 2> requirements;
   for (auto *param : params) {
     if (param->isValue())
       continue;
 
-    for (auto ip : InvertibleProtocolSet::allKnown()) {
-      auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
-      requirements.emplace_back(RequirementKind::Conformance, param,
-                                proto->getDeclaredInterfaceType());
-    }
+    requirements.emplace_back(RequirementKind::SameType, param,
+                              ErrorType::get(ctx));
   }
   return GenericSignature::get(params, requirements);
 }

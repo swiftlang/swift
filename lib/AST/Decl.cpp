@@ -1643,8 +1643,7 @@ bool GenericContext::isComputingGenericSignature() const {
 
 /// If we hit a cycle while building the generic signature, we can't return
 /// nullptr, since this breaks invariants elsewhere. Instead, build a dummy
-/// signature where everything is Copyable and Escapable, to avoid spurious
-/// downstream diagnostics concerning move-only types.
+/// invalid signature to avoid spurious downstream diagnostics.
 static GenericSignature getPlaceholderGenericSignature(
     ASTContext &ctx, const DeclContext *DC) {
   SmallVector<GenericParamList *, 2> gpLists;
