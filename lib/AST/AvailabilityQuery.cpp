@@ -133,6 +133,7 @@ FuncDecl *AvailabilityQuery::getDynamicQueryDeclAndArguments(
   switch (domain.getKind()) {
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::SwiftRuntime:
   case AvailabilityDomain::Kind::PackageDescription:
   case AvailabilityDomain::Kind::Embedded:
     return nullptr;

@@ -1046,6 +1046,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // HadError = true;
   }
 
+  if (auto A = Args.getLastArg(OPT_min_swift_runtime_version)) {
+    if (auto vers = VersionParser::parseVersionString(A->getValue(),
+                                                      SourceLoc(), &Diags)) {
+      Opts.MinSwiftRuntimeVersion = *vers;
+    } else {
+      return true;
+    }
+  }
+
   if (auto A = Args.getLastArg(OPT_package_description_version)) {
     auto vers =
         VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);

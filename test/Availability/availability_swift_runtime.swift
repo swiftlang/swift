@@ -1,16 +1,30 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library -enable-experimental-feature SwiftRuntimeAvailability
+// RUN: %target-typecheck-verify-swift -parse-as-library -enable-experimental-feature SwiftRuntimeAvailability -min-swift-runtime-version 5.5
 
 // REQUIRES: swift_feature_SwiftRuntimeAvailability
 
-@available(swift 99) // expected-warning {{'swift' has been renamed to 'SwiftLanguageMode'}}{{12-17=SwiftLanguageMode}}
-func availableInSwift99() { }
-// expected-note@-1 {{'availableInSwift99()' was introduced in Swift 99}}
+@available(Swift 5.0, *)
+func availableInSwift5_0Runtime() { }
 
-@available(SwiftLanguageMode 99)
-func availableInSwift99LanguageMode() { }
-// expected-note@-1 {{'availableInSwift99LanguageMode()' was introduced in Swift 99}}
+@available(Swift 5.5, *)
+func availableInSwift5_5Runtime() { }
 
-func testUses() {
-  availableInSwift99() // expected-error {{'availableInSwift99()' is unavailable in Swift}}
-  availableInSwift99LanguageMode() // expected-error {{'availableInSwift99LanguageMode()' is unavailable in Swift}}
+@available(Swift 6.0, *)
+func availableInSwift6_0Runtime() { }
+
+func alwaysAvailable() {
+  // expected-note@-1 {{add '@available' attribute to enclosing global function}}{{1-1=@available(Swift 6.0)\n}}
+
+  availableInSwift5_0Runtime()
+  availableInSwift5_5Runtime()
+  availableInSwift6_0Runtime() // expected-error {{'availableInSwift6_0Runtime()' is only available in Swift 6.0 or newer}}
+  // expected-note@-1 {{add 'if #available' version check}}{{3-31=if #available(Swift 6.0) {\n      availableInSwift6_0Runtime()\n  \} else {\n      // Fallback on earlier versions\n  \}}}
+
+  if #available(Swift 6.0, *) {
+    availableInSwift6_0Runtime()
+  }
+}
+
+@available(Swift 6.0, *)
+func availableSwift6() {
+  availableInSwift6_0Runtime()
 }

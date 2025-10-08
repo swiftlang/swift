@@ -5195,7 +5195,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
     SourceLoc groupEndLoc;
     bool foundWildcard = false;
     bool hasValidSpecs = false;
-    bool allValidSpecsArePlatform = true;
+    bool wildcardRequiredInList = true;
     int groupAttrCount = 0;
     for (auto *groupedAttr = groupHead; groupedAttr != nullptr;
          groupedAttr = groupedAttr->getNextGroupedAvailableAttr()) {
@@ -5219,7 +5219,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
           foundWildcard) {
         // Only platform availability is allowed to be written groups with more
         // than one member.
-        if (!domain.isPlatform()) {
+        if (domain.mustBeSpecifiedAlone()) {
           diagnose(loc, diag::availability_must_occur_alone, domain,
                    domain.isVersioned());
           continue;
@@ -5234,11 +5234,11 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
       }
 
       hasValidSpecs = true;
-      if (!domain.isPlatform())
-        allValidSpecsArePlatform = false;
+      if (domain.mustBeSpecifiedAlone())
+        wildcardRequiredInList = false;
     }
 
-    if (!foundWildcard && hasValidSpecs && allValidSpecsArePlatform) {
+    if (!foundWildcard && hasValidSpecs && wildcardRequiredInList) {
       diagnose(groupEndLoc, diag::availability_query_wildcard_required)
           .fixItInsert(groupEndLoc, ", *");
     }

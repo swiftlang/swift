@@ -5813,6 +5813,8 @@ decodeDomainKind(uint8_t kind) {
       return AvailabilityDomainKind::Universal;
     case static_cast<uint8_t>(AvailabilityDomainKind::SwiftLanguageMode):
       return AvailabilityDomainKind::SwiftLanguageMode;
+    case static_cast<uint8_t>(AvailabilityDomainKind::SwiftRuntime):
+      return AvailabilityDomainKind::SwiftRuntime;
     case static_cast<uint8_t>(AvailabilityDomainKind::PackageDescription):
       return AvailabilityDomainKind::PackageDescription;
     case static_cast<uint8_t>(AvailabilityDomainKind::Embedded):
@@ -5834,6 +5836,8 @@ decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
     return AvailabilityDomain::forUniversal();
   case AvailabilityDomainKind::SwiftLanguageMode:
     return AvailabilityDomain::forSwiftLanguageMode();
+  case AvailabilityDomainKind::SwiftRuntime:
+    return AvailabilityDomain::forSwiftRuntime();
   case AvailabilityDomainKind::PackageDescription:
     return AvailabilityDomain::forPackageDescription();
   case AvailabilityDomainKind::Embedded:

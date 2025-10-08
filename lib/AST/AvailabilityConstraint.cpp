@@ -343,6 +343,7 @@ domainCanBeUnconditionallyUnavailableAtRuntime(AvailabilityDomain domain,
     return domain.isActive(ctx);
 
   case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::SwiftRuntime:
   case AvailabilityDomain::Kind::PackageDescription:
     return false;
 
@@ -370,6 +371,7 @@ domainIsUnavailableAtRuntimeIfUnintroduced(AvailabilityDomain domain,
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::Platform:
   case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::SwiftRuntime:
   case AvailabilityDomain::Kind::PackageDescription:
     return false;
 
