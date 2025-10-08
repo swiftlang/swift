@@ -11,15 +11,15 @@
 import Instance
 
 @available(macOS 13.3.0, *)
-func foo(_ p: inout MutableSpan<CInt>, a: A, aa: inout A, c: C, b: B, bb: inout B) {
+func foo(_ p: inout MutableSpan<CInt>, a: A, aa: inout A, c: C/*, b: B, bb: inout B*/) {
   aa.basic(&p)
   aa.bar(&p)
   a.constSelf(&p)
   a.valSelf(&p)
   let _: MutableSpan<CInt> = a.lifetimeBoundSelf(3)
   c.refSelf(&p)
-  b.nonescaping(&p)
-  let _: MutableSpan<CInt> = bb.nonescapingLifetimebound(73)
+  //b.nonescaping(&p)
+  //let _: MutableSpan<CInt> = bb.nonescapingLifetimebound(73)
 
 #if VERIFY
   aa.countedSelf(&p)
@@ -55,9 +55,11 @@ void refSelf(struct C *c, int * __counted_by(len) p __noescape, int len) __attri
 
 int * __counted_by(len) lifetimeBoundSelf(struct A a __lifetimebound, int len) __attribute__((swift_name("A.lifetimeBoundSelf(self:_:)")));
 
-void nonescaping(const struct B *d, int * __counted_by(len) p __noescape, int len) __attribute__((swift_name("B.nonescaping(self:_:_:)")));
+//void nonescaping(const struct B *d, int * __counted_by(len) p __noescape, int len) __attribute__((swift_name("B.nonescaping(self:_:_:)")));
 
-int * __counted_by(len) nonescapingLifetimebound(struct B *d __lifetimebound, int len) __attribute__((swift_name("B.nonescapingLifetimebound(self:_:)")));
+// Swift 6.2 error: a mutating method cannot have a ~Escapable 'self'
+// requires https://github.com/swiftlang/swift/pull/84010
+//int * __counted_by(len) nonescapingLifetimebound(struct B *d __lifetimebound, int len) __attribute__((swift_name("B.nonescapingLifetimebound(self:_:)")));
 
 //--- Inputs/module.modulemap
 module Instance {
@@ -189,24 +191,5 @@ public func refSelf(_ c: C!, _ p: inout MutableSpan<Int32>) {
     return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
       return unsafe refSelf(c, _pPtr.baseAddress!, len)
     }
-}
-------------------------------
-@__swiftmacro_So1BV11nonescaping15_SwiftifyImportfMp_.swift
-------------------------------
-/// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-public func nonescaping(_ p: inout MutableSpan<Int32>) {
-    let len = Int32(exactly: p.count)!
-    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
-      return unsafe nonescaping(_pPtr.baseAddress!, len)
-    }
-}
-------------------------------
-@__swiftmacro_So1BV24nonescapingLifetimebound15_SwiftifyImportfMp_.swift
-------------------------------
-/// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy self) @_disfavoredOverload
-public mutating func nonescapingLifetimebound(_ len: Int32) -> MutableSpan<Int32> {
-    return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: unsafe nonescapingLifetimebound(len), count: Int(len)), copying: ())
 }
 ------------------------------

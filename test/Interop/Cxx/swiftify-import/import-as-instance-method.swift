@@ -9,16 +9,16 @@
 //--- test.swift
 import Instance
 
-func foo(_ p: inout MutableSpan<CInt>, a: A, aa: inout A, s: IntSpan, cs: ConstIntSpan, asp: AliasingSpan, b: inout baz.B) {
+func foo(_ p: inout MutableSpan<CInt>, a: A, aa: inout A, s: IntSpan, cs: ConstIntSpan, asp: AliasingSpan/*, b: inout baz.B*/) {
   aa.basic(&p)
   aa.bar(&p)
   a.constSelf(&p)
   a.valSelf(&p)
   aa.refSelf(&p)
-  aa.namespaced(&p)
-  b.decapseman(&p)
-  baz.bar(&aa, &p)
-  baz.this(&aa, &p)
+  //aa.namespaced(&p)
+  //b.decapseman(&p)
+  //baz.bar(&aa, &p)
+  //baz.this(&aa, &p)
 
   let _: IntSpan = unsafe s.spanSelf()
   let _: MutableSpan<CInt> = unsafe s.spanSelf()
@@ -60,6 +60,9 @@ const IntSpan spanConstSelf(const IntSpan p __lifetimebound) __attribute__((swif
 
 ConstIntSpan constSpanSelf(ConstIntSpan p __lifetimebound) __attribute__((swift_name("ConstIntSpan.constSpanSelf(self:)")));
 
+/*
+ * Swift 6.2 error: 'swift_name' attribute has invalid identifier for the base name.
+ * Requires https://github.com/llvm/llvm-project/pull/145947
 namespace baz {
   void namespaced(A *a, IntSpan p __noescape) __attribute__((swift_name("A.namespaced(self:_:)")));
   struct B {};
@@ -68,6 +71,7 @@ namespace baz {
 }
 
 void decapseman(baz::B *b, IntSpan p __noescape) __attribute__((swift_name("baz.B.decapseman(self:_:)")));
+*/
 
 //--- Inputs/module.modulemap
 module Instance {
@@ -173,86 +177,6 @@ module Instance {
 // CHECK-NEXT:public func refSelf(_ a: inout A, _ p: inout MutableSpan<CInt>) {
 // CHECK-NEXT:    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe refSelf(&a, IntSpan(_pPtr))
-// CHECK-NEXT:    }
-// CHECK-NEXT:}
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:@__swiftmacro_{{.*}}namespaced{{.*}}_SwiftifyImportfMp_.swift
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-// CHECK-NEXT:public mutating func namespaced(_ p: inout MutableSpan<CInt>) {
-// CHECK-NEXT:    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
-// CHECK-NEXT:      return unsafe namespaced(IntSpan(_pPtr))
-// CHECK-NEXT:    }
-// CHECK-NEXT:}
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:@__swiftmacro_{{.*}}baz{{.*}}namespaced{{.*}}_SwiftifyImportfMp_.swift
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "A.namespaced(self:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-// CHECK-NEXT:  public static func namespaced(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<CInt>) {
-// CHECK-NEXT:    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
-// CHECK-NEXT:      return unsafe namespaced(a, IntSpan(_pPtr))
-// CHECK-NEXT:    }
-// CHECK-NEXT:}
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:@__swiftmacro_{{.*}}baz{{.*}}Instance{{.*}}decapseman{{.*}}_SwiftifyImportfMp_.swift
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-// CHECK-NEXT:public mutating func decapseman(_ p: inout MutableSpan<CInt>)  {
-// CHECK-NEXT:    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
-// CHECK-NEXT:      return unsafe decapseman(IntSpan(_pPtr))
-// CHECK-NEXT:    }
-// CHECK-NEXT:}
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:@__swiftmacro_{{.*}}decapseman{{.*}}_SwiftifyImportfMp_.swift
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "baz.B.decapseman(self:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-// CHECK-NEXT:public func decapseman(_ b: UnsafeMutablePointer<baz.B>!, _ p: inout MutableSpan<CInt>) {
-// CHECK-NEXT:    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
-// CHECK-NEXT:      return unsafe decapseman(b, IntSpan(_pPtr))
-// CHECK-NEXT:    }
-// CHECK-NEXT:}
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:@__swiftmacro_{{.*}}baz{{.*}}Instance{{.*}}bar{{.*}}_SwiftifyImportfMp_.swift
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-// CHECK-NEXT:public static func bar(_ a: inout A, _ p: inout MutableSpan<CInt>) {
-// CHECK-NEXT:    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
-// CHECK-NEXT:      return unsafe bar(&a, IntSpan(_pPtr))
-// CHECK-NEXT:    }
-// CHECK-NEXT:}
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:@__swiftmacro_{{.*}}baz{{.*}}renamed{{.*}}_SwiftifyImportfMp_.swift
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "baz.bar(_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-// CHECK-NEXT:  public static func renamed(_ a: inout A, _ p: inout MutableSpan<CInt>) {
-// CHECK-NEXT:    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
-// CHECK-NEXT:      return unsafe renamed(&a, IntSpan(_pPtr))
-// CHECK-NEXT:    }
-// CHECK-NEXT:}
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:@__swiftmacro_{{.*}}baz{{.*}}this{{.*}}_SwiftifyImportfMp_.swift
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-// CHECK-NEXT:public static func this(_ a: inout A, _ p: inout MutableSpan<CInt>) {
-// CHECK-NEXT:    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
-// CHECK-NEXT:      return unsafe this(&a, IntSpan(_pPtr))
-// CHECK-NEXT:    }
-// CHECK-NEXT:}
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:@__swiftmacro_{{.*}}baz{{.*}}that{{.*}}_SwiftifyImportfMp_.swift
-// CHECK-NEXT:------------------------------
-// CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "this(_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-// CHECK-NEXT:  public static func that(_ a: inout A, _ p: inout MutableSpan<CInt>) {
-// CHECK-NEXT:    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
-// CHECK-NEXT:      return unsafe that(&a, IntSpan(_pPtr))
 // CHECK-NEXT:    }
 // CHECK-NEXT:}
 // CHECK-NEXT:------------------------------
