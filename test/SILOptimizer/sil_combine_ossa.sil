@@ -1596,18 +1596,6 @@ bb0(%0 : @guaranteed $B):
   return %3 : $F
 }
 
-// CHECK-LABEL: sil [ossa] @unchecked_ref_cast_formation_unowned : $@convention(thin) (B) -> F {
-// CHECK: bb0([[INPUT_REF:%[0-9]+]] :
-// CHECK: ref_to_raw_pointer
-// CHECK: raw_pointer_to_ref
-// CHECK: } // end sil function 'unchecked_ref_cast_formation_unowned'
-sil [ossa] @unchecked_ref_cast_formation_unowned : $@convention(thin) (B) -> F {
-bb0(%0 : @unowned $B):
-  %1 = ref_to_raw_pointer %0 : $B to $Builtin.RawPointer
-  %2 = raw_pointer_to_ref %1 : $Builtin.RawPointer to $F
-  return %2 : $F
-}
-
 // CHECK-LABEL: sil [ossa] @upcast_unchecked_ref_cast_roundtrip : $@convention(thin) (@owned B) -> @owned B {
 // CHECK-NOT: unchecked_ref_cast
 // CHECK-NOT: upcast
@@ -2735,27 +2723,6 @@ bb3(%11 : $Builtin.Int64):
 class XXImpl : XX {
   @objc deinit
   init()
-}
-
-// CHECK-LABEL: sil [ossa] @unowned_round_trips : $@convention(thin) (@guaranteed B, @guaranteed @sil_unowned B, @guaranteed AnyObject, @sil_unmanaged AnyObject) -> (B, @sil_unowned B, AnyObject, @sil_unmanaged AnyObject) {
-// CHECK: bb0(
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
-// CHECK: } // end sil function 'unowned_round_trips'
-sil [ossa] @unowned_round_trips : $@convention(thin) (@guaranteed B, @guaranteed @sil_unowned B, @guaranteed AnyObject, @sil_unmanaged AnyObject) -> (B, @sil_unowned B, AnyObject, @sil_unmanaged AnyObject) {
-bb0(%0 : @guaranteed $B, %1 : @guaranteed $@sil_unowned B, %2 : @guaranteed $AnyObject, %3 : $@sil_unmanaged AnyObject):
-  %4 = ref_to_unowned %0 : $B to $@sil_unowned B
-  %5 = unowned_to_ref %4 : $@sil_unowned B to $B
-  %6 = unowned_to_ref %1 : $@sil_unowned B to $B
-  %7 = ref_to_unowned %6 : $B to $@sil_unowned B
-
-  %8 = ref_to_unmanaged %2 : $AnyObject to $@sil_unmanaged AnyObject
-  %9 = unmanaged_to_ref %8 : $@sil_unmanaged AnyObject to $AnyObject
-  %10 = unmanaged_to_ref %3 : $@sil_unmanaged AnyObject to $AnyObject
-  %11 = ref_to_unmanaged %10 : $AnyObject to $@sil_unmanaged AnyObject
-
-  %9999 = tuple(%5 : $B, %7 : $@sil_unowned B, %9 : $AnyObject, %11 : $@sil_unmanaged AnyObject)
-  return %9999 : $(B, @sil_unowned B, AnyObject, @sil_unmanaged AnyObject)
 }
 
 // CHECK-LABEL: sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast :

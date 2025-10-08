@@ -22,6 +22,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Types.h"
+#include "swift/SIL/SILValue.h"
 #define DEBUG_TYPE "sil-ownership-model-eliminator"
 
 #include "swift/Basic/Assertions.h"
@@ -403,6 +405,20 @@ bool OwnershipModelEliminatorVisitor::visitApplyInst(ApplyInst *ai) {
     builder.createDestroyAddr(ai->getLoc(), arg);
     changed = true;
   }
+
+  // Insert a retain for unowned results.
+  SILBuilderWithScope builder(ai->getNextInstruction(), builderCtx);
+  auto resultIt = fnConv.getDirectSILResults().begin();
+  auto copyValue = [&](unsigned idx, SILValue v) {
+    auto result = *resultIt;
+    if (result.getConvention() == ResultConvention::Unowned)
+      builder.emitCopyValueOperation(ai->getLoc(), v);
+    ++resultIt;
+  };
+  if (fnConv.getNumDirectSILResults() == 1)
+    copyValue(0, ai);
+  else
+    builder.emitDestructureValueOperation(ai->getLoc(), ai, copyValue);
 
   return changed;
 }

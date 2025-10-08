@@ -6236,11 +6236,11 @@ RValue SILGenFunction::emitApply(
                                  B.getDefaultAtomicity());
         hasAlreadyLifetimeExtendedSelf = true;
       }
-      LLVM_FALLTHROUGH;
+      result = resultTL.emitCopyValue(B, loc, result);
+      break;
 
     case ResultConvention::Unowned:
-      // Unretained. Retain the value.
-      result = resultTL.emitCopyValue(B, loc, result);
+      // Handled in OwnershipModelEliminator.
       break;
     }
 
