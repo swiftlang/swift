@@ -125,16 +125,9 @@ public:
     SF->walk(Walker);
   }
 
-  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
-    if (P->isImplicit())
-      return Action::SkipNode(P);
-
-    return Action::Continue(P);
-  }
-
   PostWalkResult<Pattern *> walkToPatternPost(Pattern *P) override {
-    assert(!P->isImplicit() &&
-           "Traversing implicit patterns is disabled in the pre-walk visitor");
+    if (P->isImplicit())
+      return Action::Continue(P);
 
     if (const AnyPattern *AP = dyn_cast<AnyPattern>(P)) {
       checkExistentialInPatternType(AP, Ctx.Diags);
@@ -143,17 +136,9 @@ public:
     return Action::Continue(P);
   }
 
-  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    if (E->isImplicit())
-      return Action::SkipNode(E);
-
-    return Action::Continue(E);
-  }
-
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
-    assert(
-        !E->isImplicit() &&
-        "Traversing implicit expressions is disabled in the pre-walk visitor");
+    if (E->isImplicit())
+      return Action::Continue(E);
 
     if (const ClosureExpr *CE = dyn_cast<ClosureExpr>(E)) {
       checkImplicitCopyReturnType(CE, Ctx.Diags);
@@ -163,17 +148,9 @@ public:
     return Action::Continue(E);
   }
 
-  PreWalkAction walkToDeclPre(Decl *D) override {
-    if (D->isImplicit())
-      return Action::SkipNode();
-
-    return Action::Continue();
-  }
-
   PostWalkAction walkToDeclPost(Decl *D) override {
-    assert(
-        !D->isImplicit() &&
-        "Traversing implicit declarations is disabled in the pre-walk visitor");
+    if (D->isImplicit())
+      return Action::Continue();
 
     if (const FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
       checkImplicitCopyReturnType(FD, Ctx.Diags);
