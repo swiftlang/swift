@@ -2690,10 +2690,16 @@ bool PatternBindingDecl::hasStorage() const {
 
 const PatternBindingEntry *
 PatternBindingDecl::getCheckedPatternBindingEntry(unsigned i) const {
-  return evaluateOrDefault(
+  auto result = evaluateOrDefault(
       getASTContext().evaluator,
       PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i},
       nullptr);
+
+  // If we ran into a cycle, we can still return the entry.
+  if (!result)
+    return &getPatternList()[i];
+
+  return result;
 }
 
 void PatternBindingDecl::setPattern(unsigned i, Pattern *P,
@@ -7382,8 +7388,7 @@ bool ProtocolDecl::existentialConformsToSelf() const {
 }
 
 bool ProtocolDecl::hasSelfOrAssociatedTypeRequirements() const {
-  // Because we will have considered all the protocols in a cyclic hierarchy by
-  // the time the cycle is hit.
+  // Be conservative and avoid diagnosing if we hit a cycle.
   const bool resultForCycle = false;
 
   return evaluateOrDefault(getASTContext().evaluator,
