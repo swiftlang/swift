@@ -4,7 +4,7 @@
 // REQUIRES: OS=linux-android || OS=linux-androideabi
 
 // CHECK-LABEL: define{{.*}}$s20availability_android0A5CheckyyF
-// CHECK: call swiftcc i1 @"$ss26_stdlib_isOSVersionAtLeastyBi1#include_Bw_BwBwtF"(
+// CHECK: call swiftcc i1 @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
 
 // OPT-LABEL: define{{.*}}$s20availability_android0A5CheckyyF
 // OPT: call {{.*}} @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
