@@ -1,5 +1,3 @@
-// REQUIRES: rdar://162106747
-
 // REQUIRES: swift_feature_SafeInteropWrappers
 
 // RUN: rm -rf %t
