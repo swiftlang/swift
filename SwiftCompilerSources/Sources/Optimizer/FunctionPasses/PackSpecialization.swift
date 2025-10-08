@@ -654,9 +654,9 @@ private struct PackExplodedFunction {
       if resultMap.contains(where: { (_, resultInfos) in
         resultInfos.contains(where: { !$0.isSILIndirect })
       }) {
-        if let originalReturnStatement = original.returnInstruction {
+        if let originalReturnStatement = specialized.returnInstruction {
           self.createExplodedReturn(
-            replacing: originalReturnStatement, argumentMap: argumentMap, context)
+            replacing: originalReturnStatement, argumentMap: argumentMap, specContext)
         }
       }
 
