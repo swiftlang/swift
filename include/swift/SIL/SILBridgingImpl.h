@@ -489,39 +489,6 @@ BridgedType BridgedType::getPackElementType(SwiftInt idx) const {
   return unbridged().getPackElementType((unsigned) idx);
 }
 
-BridgedType BridgedType::getPackExpansionPatternType() const {
-  return unbridged().getPackExpansionPatternType();
-}
-
-bool BridgedType::hasParameterPack() const {
-  return unbridged().hasParameterPack();
-}
-
-bool BridgedType::hasPack() const {
-  return unbridged().hasPack();
-}
-
-bool BridgedType::hasPackArchetype() const {
-  return unbridged().hasPackArchetype();
-}
-
-bool BridgedType::hasAnyPack() const {
-  return unbridged().hasAnyPack();
-}
-
-bool BridgedType::isOrContainsPack(BridgedFunction f) const {
-  return unbridged().isOrContainsPack(*f.getFunction());
-}
-
-bool BridgedType::isPackElementAddress() const {
-  return unbridged().isPackElementAddress();
-}
-
-bool BridgedType::containsPackExpansionType() const {
-  auto packType = unbridged().castTo<swift::SILPackType>();
-  return packType->containsPackExpansionType();
-}
-
 BridgedCanType BridgedType::getApproximateFormalPackType() const {
   return unbridged().castTo<swift::SILPackType>()->getApproximateFormalPackType();
 }

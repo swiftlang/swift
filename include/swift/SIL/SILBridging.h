@@ -313,14 +313,6 @@ struct BridgedType {
 
   BRIDGED_INLINE SwiftInt getNumPackElements() const;
   BRIDGED_INLINE BridgedType getPackElementType(SwiftInt idx) const;
-  BRIDGED_INLINE BridgedType getPackExpansionPatternType() const;
-  BRIDGED_INLINE bool hasParameterPack() const;
-  BRIDGED_INLINE bool hasPack() const;
-  BRIDGED_INLINE bool hasPackArchetype() const;
-  BRIDGED_INLINE bool hasAnyPack() const;
-  BRIDGED_INLINE bool isOrContainsPack(BridgedFunction f) const;
-  BRIDGED_INLINE bool isPackElementAddress() const;
-  BRIDGED_INLINE bool containsPackExpansionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getApproximateFormalPackType() const;
 };
 

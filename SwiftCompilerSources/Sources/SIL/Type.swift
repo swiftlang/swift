@@ -113,38 +113,6 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     .init(bridgedOrNil: bridged.getRawLayoutSubstitutedCountType())
   }
 
-  public var packExpansionPatternType: Type { bridged.getPackExpansionPatternType().type }
-
-  public var hasParameterPack: Bool {
-    return bridged.hasParameterPack();
-  }
-
-  public var hasPack: Bool {
-    return bridged.hasPack();
-  }
-
-  public var hasPackArchetype: Bool {
-    return bridged.hasPackArchetype();
-  }
-
-  public var hasAnyPack: Bool {
-    return bridged.hasAnyPack();
-  }
-
-  public func isOrContainsPack(function: Function) -> Bool {
-    return bridged.isOrContainsPack(function.bridged);
-  }
-
-  public var isPackElementAddress: Bool {
-    precondition(isSILPack);
-    return bridged.isPackElementAddress();
-  }
-
-  public var containsPackExpansionType: Bool {
-    precondition(isSILPack);
-    return bridged.containsPackExpansionType();
-  }
-
   public var approximateFormalPackType: CanonicalType {
     precondition(isSILPack);
     return CanonicalType(bridged: bridged.getApproximateFormalPackType());

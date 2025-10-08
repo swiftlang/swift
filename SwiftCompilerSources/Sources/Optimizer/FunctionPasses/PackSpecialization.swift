@@ -166,11 +166,12 @@ private struct CallSiteSpecializer {
   /// call site. Also collect any borrows for @guaranteed parameters that need to
   /// be released after the call.
   ///
-  /// Non-pack parameters, and pack elements that map to indirect parameters, are
-  /// passed as addresses. Pack elements that map to direct parameters must be
-  /// loaded, if the original pack's elements were stored indirectly
+  /// Non-pack parameters, and pack elements that map to indirect parameters,
+  /// are passed as addresses. Pack elements that map to direct parameters must
+  /// be loaded, if the original pack's elements were stored indirectly
   /// (isPackElementAddress). We currently only attempt to eliminate indirect
-  /// packs (see Type.shouldExplode below), so these loads are always generated.
+  /// packs (see TypeProperties.shouldExplode below), so these loads are always
+  /// generated.
   ///
   /// Before: %fn : (@pack_owned Pack{C1, T2}, NP, @pack_guaranteed Pack{C3, T4}) -> ()
   ///
@@ -353,7 +354,7 @@ private struct CallSiteSpecializer {
         // Direct results of the original function are mapped to direct results of the specialized function.
         substitutedResultTupleElements.append(results.next()!)
 
-      } else if resultInfo.type.loweredType(in: resultInstruction.parentFunction).shouldExplode {
+      } else if resultInfo.type.shouldExplode {
         // Some elements of pack results may get mapped to direct results of the specialized function.
         let (mappedOriginalResultIdx, mappedResults) = resultMapIterator.next()!
         assert(originalResultIdx == mappedOriginalResultIdx)
@@ -434,7 +435,7 @@ private func specializeCallee(apply: ApplySite, context: FunctionPassContext)
 /// with calls to the other, while retaining the same behaviour.
 ///
 /// Whether a pack argument can be eliminated is determined using the
-/// Type.shouldExplode computed property (see below).
+/// TypeProperties.shouldExplode computed property (see below).
 ///
 /// For each pack argument of the original function, a corresponding pack is
 /// allocated on the stack at the start of the specialized function. Each
@@ -710,7 +711,7 @@ private struct PackExplodedFunction {
     var resultMapIndex = 0
     var originalReturnIndex = 0
     for (i, originalResult) in self.original.convention.results.enumerated()
-        where originalResult.type.loweredType(in: self.original).shouldExplode
+        where originalResult.type.shouldExplode
                 || !originalResult.isSILIndirect
     {
 
@@ -984,10 +985,10 @@ private func loadOwnership(for value: any Value, normal: LoadInst.LoadOwnership)
   }
 }
 
-extension Type {
+extension TypeProperties {
   /// A pack argument can explode if it contains no pack expansion types
   fileprivate var shouldExplode: Bool {
     // For now, we only attempt to explode indirect packs, since these are the most common and inefficient.
-    return isSILPack && !containsPackExpansionType && isPackElementAddress
+    return isSILPack && !containsSILPackExpansionType && isSILPackElementAddress
   }
 }

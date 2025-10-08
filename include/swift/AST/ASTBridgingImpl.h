@@ -525,7 +525,7 @@ bool BridgedASTType::isBox() const {
   return unbridged()->is<swift::SILBoxType>();
 }
 
-bool BridgedASTType::isASTPack() const {
+bool BridgedASTType::isPack() const {
   return unbridged()->is<swift::PackType>();
 }
 
@@ -615,12 +615,12 @@ BridgedConformance BridgedASTType::checkConformance(BridgedDeclObj proto) const 
   return swift::checkConformance(unbridged(), proto.getAs<swift::ProtocolDecl>(), /*allowMissing=*/ false);
 }
 
-bool BridgedASTType::containsPackExpansionType() const {
-  return unbridged()->castTo<swift::PackType>()->containsPackExpansionType();
+bool BridgedASTType::containsSILPackExpansionType() const {
+  return unbridged()->castTo<swift::SILPackType>()->containsPackExpansionType();
 }
 
-SwiftInt BridgedASTType::getNumPackElements() const {
-  return unbridged()->castTo<swift::PackType>()->getNumElements();
+bool BridgedASTType::isSILPackElementAddress() const {
+  return unbridged()->castTo<swift::SILPackType>()->isElementAddress();
 }
 
 static_assert((int)BridgedASTType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);
