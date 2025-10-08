@@ -1,4 +1,4 @@
-// REQUIRES: rdar162106747
+// REQUIRES: rdar://162106747
 
 // REQUIRES: swift_feature_SafeInteropWrappers
 
