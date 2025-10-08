@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/Test.h"
@@ -346,6 +347,39 @@ static void emitPendingDeallocations(State &state,
   }
 }
 
+#ifndef NDEBUG
+static void checkPreconditions(SILFunction *F) {
+  // StackNesting's really critical precondition is just that
+  // allocations dominate deallocations. If this doesn't hold, we
+  // can end up producing really corrupt SIL, and it might be very
+  // hard to debug.
+
+  // If the input just violates joint post-dominance, on the other
+  // hand, we generally maintain most of that structure, and it's
+  // relatively easy to debug.
+
+  DominanceInfo dominance(F);
+
+  for (auto &BB: *F) {
+    for (auto &I : BB) {
+      if (I.isDeallocatingStack()) {
+        SILInstruction *dealloc = &I;
+        SILInstruction *alloc = getAllocForDealloc(dealloc);
+        if (!dominance.properlyDominates(alloc, dealloc)) {
+          llvm::errs() << "FATAL ERROR: prior to StackNesting, deallocation\n  "
+                       << *dealloc
+                       << "is not properly dominated by its allocation\n  "
+                       << *alloc
+                       << "Complete function:\n" << *F;
+          abort();
+        }
+      }
+    }
+  }
+
+}
+#endif
+
 /// The main entrypoint for clients.
 ///
 /// We use a straightforward, single-pass algorithm:
@@ -472,6 +506,10 @@ static void emitPendingDeallocations(State &state,
 /// deallocations jointly post-dominate the allocation and whether
 /// they are properly nested with each other. TBD
 StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
+#ifndef NDEBUG
+  checkPreconditions(F);
+#endif
+
   bool madeChanges = false;
 
   // The index in the allocation stack for each allocation. Multiple
