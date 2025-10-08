@@ -25,33 +25,7 @@ import SIL
 /// each pack argument that are passed to (or returned from) the new function
 /// separately.
 ///
-/// Original:
-///
-/// sil [ossa] @double_up : $@convention(thin) (@pack_guaranteed Pack{Int, String}) -> (@pack_out Pack{Int, String}, @pack_out Pack{Int, String}) {
-/// bb0(%0 : $*Pack{Int, String}, %1 : $*Pack{Int, String}, %2 : $*Pack{Int, String}):
-///   debug_value %2, let, name "xs", argno 1, expr op_deref
-///   ...
-///
-/// Modified:
-///
-/// sil shared [ossa] @double_upTf8xxx_n : $@convention(thin) (Int, @guaranteed String) -> (Int, @owned String, Int, @owned String) {
-/// bb0(%0 : $Int, %1 : @guaranteed $String):
-///   %2 = alloc_pack $Pack{Int, String}
-///   %3 = scalar_pack_index 0 of $Pack{Int, String}
-///   %4 = alloc_stack $Int
-///   store %0 to [trivial] %4
-///   pack_element_set %4 into %3 of %2
-///   %7 = scalar_pack_index 1 of $Pack{Int, String}
-///   %8 = alloc_stack $String
-///   %9 = copy_value %1
-///   store %9 to [init] %8
-///   pack_element_set %8 into %7 of %2
-///
-///   ... etc. for indirect result arguments of original function (%0 and %1)
-///
-///   debug_value %2, let, name "xs", argno 1, expr op_deref
-///   ...
-///
+/// See below for SIL examples.
 let packSpecialization = FunctionPass(name: "pack-specialization") {
   (function: Function, context: FunctionPassContext) in
 
@@ -78,11 +52,9 @@ let packSpecialization = FunctionPass(name: "pack-specialization") {
 
 }
 
-
 //===----------------------------------------------------------------------===//
 // Call Site Specialization
 //===----------------------------------------------------------------------===//
-
 
 /// A context in which to modify call sites during pack specialization.
 private struct CallSiteSpecializer {
@@ -443,35 +415,86 @@ private func specializeCallee(apply: ApplySite, context: FunctionPassContext)
     return nil
   }
 
-  let exploded = PackExplodedFunction(at: apply, context)
+  let exploded = PackExplodedFunction(from: callee, context)
 
   return exploded
 }
 
-/// A description of the mapping from an original function with pack arguments,
-/// to a new one where those arguments have been exploded into separate
-/// parameters and results.
+/// Given a function with parameter pack arguments that can be eliminated (or
+/// "exploded"), this struct constructs a specialized version of that function,
+/// with each such argument split into individual parameters or results for each
+/// member of each pack.
+///
+/// It also produces a mapping between the results and parameters of the
+/// original and specialized functions, allowing calls to one to be replaced
+/// with calls to the other, while retaining the same behaviour.
+///
+/// Whether a pack argument can be eliminated is determined using the
+/// Type.shouldExplode computed property (see below).
+///
+/// For each pack argument of the original function, a corresponding pack is
+/// allocated on the stack at the start of the specialized function. Each
+/// parameter of the specialized function is stored at its corresponding element
+/// of the appropriate local pack.
+///
+/// Most packs store the addresses of their elements. For pack elements that are
+/// mapped to direct arguments, we allocate a stack location, store the value in
+/// it, and store its address in the appropriate local pack.
+///
+/// For result pack elements that are mapped to direct result values, we
+/// similarly store the address of a dedicated stack location in the
+/// corresponding local pack. We can then load the value from that stack
+/// location at the end of the function to return it.
+///
+/// Original:
+///
+/// sil [ossa] @double_up : $@convention(thin) (@pack_guaranteed Pack{Int, String}) -> (@pack_out Pack{Int, String}, @pack_out Pack{Int, String}) {
+/// bb0(%0 : $*Pack{Int, String}, %1 : $*Pack{Int, String}, %2 : $*Pack{Int, String}):
+///   debug_value %2, let, name "xs", argno 1, expr op_deref
+///   ...
+///
+/// Modified:
+///
+/// sil shared [ossa] @double_upTf8xxx_n : $@convention(thin) (Int, @guaranteed String) -> (Int, @owned String, Int, @owned String) {
+/// bb0(%0 : $Int, %1 : @guaranteed $String):
+///   %2 = alloc_pack $Pack{Int, String}
+///   %3 = scalar_pack_index 0 of $Pack{Int, String}
+///   %4 = alloc_stack $Int
+///   store %0 to [trivial] %4
+///   pack_element_set %4 into %3 of %2
+///   %7 = scalar_pack_index 1 of $Pack{Int, String}
+///   %8 = alloc_stack $String
+///   %9 = copy_value %1
+///   store %9 to [init] %8
+///   pack_element_set %8 into %7 of %2
+///
+///   ... etc. for indirect result arguments of original function (%0 and %1)
+///
+///   debug_value %2, let, name "xs", argno 1, expr op_deref
+///   ...
+///
 private struct PackExplodedFunction {
   public let original: Function
   public let specialized: Function
-  /// Each element stores the set of results of the new function corresponding
+  /// Each element storeOwnerships the set of results of the new function corresponding
   /// to the pack argument of the original at the given index, in ascending
   /// order.
-  public let resultMap: [(Int, [ResultInfo])]
+  typealias ResultMap = [(originalIndex: Int, expandedElements: [ResultInfo])]
+  public let resultMap: ResultMap
   /// Each element stores the set of parameters of the new function
   /// corresponding to the pack argument of the original at the given
   /// index, in ascending order.
-  public let parameterMap: [(Int, [ParameterInfo])]
+  typealias ParameterMap = [(originalIndex: Int, expandedElements: [ParameterInfo])]
+  public let parameterMap: ParameterMap
   /// Maps indices of pack arguments of the original function to its
   /// `approximateFormalPackType` (a Canonical AST PackType).
   /// Saves recomputing these types every time they are needed,
   /// which would be unnecessarily expensive.
   public let packASTTypes: [Int: CanonicalType]
 
-  init(at apply: ApplySite, _ context: FunctionPassContext) {
+  init(from original: Function, _ context: FunctionPassContext) {
 
-    let callee = apply.referencedFunction!
-    self.original = callee
+    self.original = original
 
     var packASTTypes = [Int: CanonicalType]()
     for (i, argument) in original.arguments.enumerated() where argument.type.shouldExplode {
@@ -499,11 +522,16 @@ private struct PackExplodedFunction {
         withResults: newResults,
         makeThin: true)
 
-      self.buildSpecializedFunction(apply: apply, context)
+      self.buildSpecializedFunction(context)
     }
   }
 
+  // Internal data structures used while building the specialized function.
+
+  /// A collection of local values used to associate an argument of the
+  /// specialized function with its corresponding pack element.
   private struct ExplodedArgument {
+    /// The index of this element within its original pack.
     public let packIdx: ScalarPackIndexInst
     /// A reference to the stack location holding the argument's value, if the argument/return value is direct
     public let allocStack: AllocStackInst?
@@ -511,23 +539,25 @@ private struct PackExplodedFunction {
     public let storeBorrow: StoreBorrowInst?
   }
 
+  /// Information about the local pack created to replace a pack parameter in
+  /// the specialized function.
   private struct ArgumentMapping {
     public let allocPack: AllocPackInst
     public let arguments: [ExplodedArgument]
   }
 
-  private struct ArgumentMap {
-    public let map: [Int: ArgumentMapping]
-  }
+  /// A mapping from the indices of pack arguments of the original function to
+  /// their corresponding local packs in the specialized function.
+  private typealias ArgumentMap = [Int: ArgumentMapping]
 
   /// Compute the parameter types for the pack-exploded version of a function,
   /// and the mapping between the original function's pack parameters, and the
   /// corresponding exploded parameters of the new function.
   fileprivate static func computeParameters(for function: Function) -> (
-    [ParameterInfo], [(Int, [ParameterInfo])]
+    parameters: [ParameterInfo], mapping: ParameterMap
   ) {
-    var newParams = [ParameterInfo]()
-    var parameterMap = [(Int, [ParameterInfo])]()
+    var newParameters = [ParameterInfo]()
+    var parameterMap = ParameterMap()
 
     for (argument, parameterInfo) in zip(function.parameters, function.convention.parameters) {
       if argument.type.shouldExplode {
@@ -545,24 +575,24 @@ private struct PackExplodedFunction {
         }
 
         parameterMap.append((argument.index, mappedParameterInfos))
-        newParams += mappedParameterInfos
+        newParameters += mappedParameterInfos
 
       } else {
         // Leave the original argument unchanged
-        newParams.append(parameterInfo)
+        newParameters.append(parameterInfo)
       }
     }
 
-    return (newParams, parameterMap)
+    return (newParameters, parameterMap)
   }
 
   /// Compute the result types for the pack-exploded version of a function, and
   /// the mapping between the original function's pack results, and the
   /// corresponding exploded results of the new function.
   private static func computeResults(for function: Function) -> (
-    [ResultInfo], [(Int, [ResultInfo])]
+    results: [ResultInfo], mapping: ResultMap
   ) {
-    var resultMap = [(Int, [ResultInfo])]()
+    var resultMap = ResultMap()
     var newResults = [ResultInfo]()
 
     var indirectResultIdx = 0
@@ -597,7 +627,7 @@ private struct PackExplodedFunction {
   }
 
   /// Build the body of the pack-specialized function
-  private func buildSpecializedFunction(apply: ApplySite, _ context: FunctionPassContext) {
+  private func buildSpecializedFunction(_ context: FunctionPassContext) {
 
     context.buildSpecializedFunction(specializedFunction: specialized) {
       (specialized, specContext) in
@@ -684,7 +714,7 @@ private struct PackExplodedFunction {
       return (localPack, packType)
     }
 
-    var argumentMap = [Int: ArgumentMapping]()
+    var argumentMap = ArgumentMap()
 
     // Explode parameters
     for (idx, parameterInfos) in parameterMap.reversed() {
@@ -773,7 +803,7 @@ private struct PackExplodedFunction {
 
     }
 
-    return ArgumentMap(map: argumentMap)
+    return argumentMap
   }
 
   /// Insert dealloc_pack instructions for the alloc_pack's corresponding to the original function's pack arguments.
@@ -786,7 +816,7 @@ private struct PackExplodedFunction {
     let builder = Builder(before: terminator, context)
 
     let createDeallocations = { (idx: Int) in
-      let mapped = argumentMap.map[idx]!
+      let mapped = argumentMap[idx]!
       for argument in mapped.arguments.reversed() {
         if let storeBorrow = argument.storeBorrow {
           // Also release borrows of any @guaranteed parameters
@@ -796,7 +826,7 @@ private struct PackExplodedFunction {
           builder.createDeallocStack(allocStack)
         }
       }
-      builder.createDeallocPack(argumentMap.map[idx]!.allocPack)
+      builder.createDeallocPack(argumentMap[idx]!.allocPack)
     }
 
     // Emit dealloc_packs in the opposite order to the alloc_packs
@@ -837,7 +867,7 @@ private struct PackExplodedFunction {
 
         let (originalPackArgumentIdx, _) = resultMap[resultMapIdx]
 
-        let argumentMapping = argumentMap.map[originalPackArgumentIdx]!
+        let argumentMapping = argumentMap[originalPackArgumentIdx]!
         for argument in argumentMapping.arguments
         where argument.allocStack != nil {
           assert(
