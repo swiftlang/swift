@@ -52,19 +52,20 @@ class ParallelRunner:
         self._terminal_width = shutil.get_terminal_size().columns
         self._n_processes = n_processes
         self._pool_args = pool_args
-        manager = Manager()
-        self._lock = manager.Lock()
-        self._running_tasks = manager.list()
-        self._updated_repos = manager.Value("i", 0)
         self._fn = fn
         self._pool = Pool(processes=self._n_processes)
-        self._verbose = pool_args[0].verbose
         self._output_prefix = pool_args[0].output_prefix
         self._nb_repos = len(pool_args)
         self._stop_event = Event()
-        self._monitored_fn = MonitoredFunction(
-            self._fn, self._running_tasks, self._updated_repos, self._lock
-        )
+        self._verbose = pool_args[0].verbose
+        if not self._verbose:
+            manager = Manager()
+            self._lock = manager.Lock()
+            self._running_tasks = manager.list()
+            self._updated_repos = manager.Value("i", 0)
+            self._monitored_fn = MonitoredFunction(
+                self._fn, self._running_tasks, self._updated_repos, self._lock
+            )
 
     def run(self) -> List[Any]:
         print(
