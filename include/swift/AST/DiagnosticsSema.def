@@ -8950,6 +8950,10 @@ ERROR(tilde_sendable_requires_feature_flag,none,
       "'~Sendable' requires -enable-experimental-feature TildeSendable",
       ())
 
+ERROR(conformance_repression_only_on_struct_class_enum,none,
+      "conformance to %0 can only be suppressed on structs, classes, and enums",
+      (const ProtocolDecl *))
+
 //===----------------------------------------------------------------------===//
 // MARK: Swift Performance hints
 //===----------------------------------------------------------------------===//
