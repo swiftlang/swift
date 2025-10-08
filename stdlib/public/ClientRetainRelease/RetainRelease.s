@@ -1,7 +1,6 @@
 
-// We currently have an implementation for ARM64, excluding ARM64_32 and
-// Android.
-#if __arm64__ && __LP64__ && !defined(__ANDROID__)
+// We currently have an implementation for ARM64 Mach-O.
+#if __arm64__ && __LP64__ && defined(__APPLE__) && defined(__MACH__)
 
 // Use the CAS instructions where available.
 #if __ARM_FEATURE_ATOMICS

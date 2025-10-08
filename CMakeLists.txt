@@ -271,9 +271,17 @@ option(SWIFT_BUILD_STDLIB_CXX_MODULE
   "If not building stdlib, controls whether to build the Cxx module"
   TRUE)
 
-option(SWIFT_BUILD_CLIENT_RETAIN_RELEASE
-  "Build the swiftClientRetainRelease library"
-  TRUE)
+# The swiftClientRetainRelease library is currently only available for Darwin
+# platforms.
+if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+  option(SWIFT_BUILD_CLIENT_RETAIN_RELEASE
+    "Build the swiftClientRetainRelease library"
+    TRUE)
+else()
+  option(SWIFT_BUILD_CLIENT_RETAIN_RELEASE
+    "Build the swiftClientRetainRelease library"
+    FALSE)
+endif()
 
 # In many cases, the CMake build system needs to determine whether to include
 # a directory, or perform other actions, based on whether the stdlib or SDK is

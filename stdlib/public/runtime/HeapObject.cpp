@@ -62,6 +62,9 @@ using namespace swift;
 #endif
 
 #if SWIFT_REFCOUNT_CC_PRESERVEMOST
+// These assembly definitions support the swiftClientRetainRelease library which
+// is currently implemented for ARM64 Mach-O.
+#if __arm64__ && __LP64__ && defined(__APPLE__) && defined(__MACH__)
 asm(R"(
 // Define a mask used by ClientRetainRelease to determine when it must call into
 // the runtime. The symbol's address is used as the mask, rather than its
@@ -92,6 +95,7 @@ asm(R"(
   _swift_release_preservemost_weak_placeholder:
     .byte 0
 )");
+#endif
 #endif
 
 
