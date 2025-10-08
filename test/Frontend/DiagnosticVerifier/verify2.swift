@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: not %target-swift-frontend -typecheck -verify -serialize-diagnostics-path %t/serialized.dia %s 2>&1 | %FileCheck %s
-// RUN: not %target-swift-frontend -typecheck -verify -warnings-as-errors %s 2>&1 | %FileCheck %s -check-prefix CHECK-WARNINGS-AS-ERRORS
+// RUN: not %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -serialize-diagnostics-path %t/serialized.dia %s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -warnings-as-errors %s 2>&1 | %FileCheck %s -check-prefix CHECK-WARNINGS-AS-ERRORS
 // RUN: %FileCheck %s -check-prefix CHECK-SERIALIZED <%t/serialized.dia
 
 // Wrong message
