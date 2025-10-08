@@ -200,7 +200,7 @@ extension UnsafeRawPointer {
   @_transparent
   @_preInverseGenerics
   @safe
-  public init<T: ~Copyable>(@_nonEphemeral _ other: UnsafePointer<T>) {
+  public init<T: ~Copyable & ~Escapable>(@_nonEphemeral _ other: UnsafePointer<T>) {
     _rawValue = other._rawValue
   }
 
@@ -215,7 +215,7 @@ extension UnsafeRawPointer {
   @_transparent
   @_preInverseGenerics
   @safe
-  public init?<T: ~Copyable>(@_nonEphemeral _ other: UnsafePointer<T>?) {
+  public init?<T: ~Copyable & ~Escapable>(@_nonEphemeral _ other: UnsafePointer<T>?) {
     guard let unwrapped = unsafe other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -262,7 +262,7 @@ extension UnsafeRawPointer {
   @_transparent
   @_preInverseGenerics
   @safe
-  public init<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
+  public init<T: ~Copyable & ~Escapable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
@@ -277,7 +277,7 @@ extension UnsafeRawPointer {
   @_transparent
   @_preInverseGenerics
   @safe
-  public init?<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
+  public init?<T: ~Copyable & ~Escapable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
     guard let unwrapped = unsafe other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -335,7 +335,7 @@ extension UnsafeRawPointer {
   @_transparent
   @_preInverseGenerics
   @discardableResult
-  public func bindMemory<T: ~Copyable>(
+  public func bindMemory<T: ~Copyable & ~Escapable>(
     to type: T.Type, capacity count: Int
   ) -> UnsafePointer<T> {
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
@@ -394,7 +394,7 @@ extension UnsafeRawPointer {
   ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
+  public func withMemoryRebound<T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
     _ body: (_ pointer: UnsafePointer<T>) throws(E) -> Result
@@ -421,7 +421,7 @@ extension UnsafeRawPointer {
   /// - Returns: A typed pointer to the same memory as this raw pointer.
   @_transparent
   @_preInverseGenerics
-  public func assumingMemoryBound<T: ~Copyable>(
+  public func assumingMemoryBound<T: ~Copyable & ~Escapable>(
     to: T.Type
   ) -> UnsafePointer<T> {
     return unsafe UnsafePointer<T>(_rawValue)
@@ -442,7 +442,9 @@ extension UnsafeRawPointer {
   ///   `offset`. The returned instance is memory-managed and unassociated
   ///   with the value in the memory referenced by this pointer.
   @inlinable
-  public func load<T>(
+  @_preInverseGenerics
+  @lifetime(borrow self)
+  public func load<T: ~Escapable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
@@ -488,7 +490,9 @@ extension UnsafeRawPointer {
   ///   with the value in the range of memory referenced by this pointer.
   @inlinable
   @_alwaysEmitIntoClient
-  public func loadUnaligned<T: BitwiseCopyable>(
+  @_preInverseGenerics
+  @lifetime(borrow self)
+  public func loadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
@@ -559,7 +563,7 @@ extension UnsafeRawPointer {
   /// - Returns: a pointer properly aligned to store a value of type `T`.
   @inlinable
   @_alwaysEmitIntoClient
-  public func alignedUp<T: ~Copyable>(for type: T.Type) -> Self {
+  public func alignedUp<T: ~Copyable & ~Escapable>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
     _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
@@ -577,7 +581,7 @@ extension UnsafeRawPointer {
   /// - Returns: a pointer properly aligned to store a value of type `T`.
   @inlinable
   @_alwaysEmitIntoClient
-  public func alignedDown<T: ~Copyable>(for type: T.Type) -> Self {
+  public func alignedDown<T: ~Copyable & ~Escapable>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
     _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
@@ -814,7 +818,7 @@ extension UnsafeMutableRawPointer {
   @_transparent
   @_preInverseGenerics
   @safe
-  public init<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
+  public init<T: ~Copyable & ~Escapable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
@@ -829,7 +833,7 @@ extension UnsafeMutableRawPointer {
   @_transparent
   @_preInverseGenerics
   @safe
-  public init?<T: ~Copyable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
+  public init?<T: ~Copyable & ~Escapable>(@_nonEphemeral _ other: UnsafeMutablePointer<T>?) {
     guard let unwrapped = unsafe other else { return nil }
     _rawValue = unwrapped._rawValue
   }
@@ -954,7 +958,7 @@ extension UnsafeMutableRawPointer {
   @_transparent
   @_preInverseGenerics
   @discardableResult
-  public func bindMemory<T: ~Copyable>(
+  public func bindMemory<T: ~Copyable & ~Escapable>(
     to type: T.Type, capacity count: Int
   ) -> UnsafeMutablePointer<T> {
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
@@ -1011,7 +1015,7 @@ extension UnsafeMutableRawPointer {
   ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
-  public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
+  public func withMemoryRebound<T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
     _ body: (_ pointer: UnsafeMutablePointer<T>) throws(E) -> Result
@@ -1038,7 +1042,7 @@ extension UnsafeMutableRawPointer {
   /// - Returns: A typed pointer to the same memory as this raw pointer.
   @_transparent
   @_preInverseGenerics
-  public func assumingMemoryBound<T: ~Copyable>(
+  public func assumingMemoryBound<T: ~Copyable & ~Escapable>(
     to: T.Type
   ) -> UnsafeMutablePointer<T> {
     return unsafe UnsafeMutablePointer<T>(_rawValue)
@@ -1075,11 +1079,11 @@ extension UnsafeMutableRawPointer {
   /// - Returns: A typed pointer to the memory referenced by this raw pointer.
   @discardableResult
   @_alwaysEmitIntoClient
-  public func initializeMemory<T: ~Copyable>(
+  public func initializeMemory<T: ~Copyable & ~Escapable>(
     as type: T.Type, to value: consuming T
   ) -> UnsafeMutablePointer<T> {
     Builtin.bindMemory(_rawValue, (1)._builtinWordValue, type)
-    Builtin.initialize(consume value, _rawValue)
+    unsafe Builtin.initialize(_overrideLifetime(consume value, borrowing: ()), _rawValue)
     return unsafe UnsafeMutablePointer(_rawValue)
   }
 
@@ -1233,7 +1237,7 @@ extension UnsafeMutableRawPointer {
   @inlinable
   @_preInverseGenerics
   @discardableResult
-  public func moveInitializeMemory<T: ~Copyable>(
+  public func moveInitializeMemory<T: ~Copyable & ~Escapable>(
     as type: T.Type, from source: UnsafeMutablePointer<T>, count: Int
   ) -> UnsafeMutablePointer<T> {
     _debugPrecondition(
@@ -1416,10 +1420,11 @@ extension UnsafeMutableRawPointer {
   ///   - type: The type of `value`.
   @inlinable
   @_alwaysEmitIntoClient
-  public func storeBytes<T: BitwiseCopyable>(
+  public func storeBytes<T: BitwiseCopyable & ~Escapable>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
-    unsafe Builtin.storeRaw(value, (self + offset)._rawValue)
+    let immortalValue = unsafe _overrideLifetime(value, borrowing: ())
+    unsafe Builtin.storeRaw(immortalValue, (self + offset)._rawValue)
   }
 
   /// Stores the given value's bytes into raw memory at the specified offset.
@@ -1563,7 +1568,7 @@ extension UnsafeMutableRawPointer {
   /// - Returns: a pointer properly aligned to store a value of type `T`.
   @inlinable
   @_alwaysEmitIntoClient
-  public func alignedUp<T: ~Copyable>(for type: T.Type) -> Self {
+  public func alignedUp<T: ~Copyable & ~Escapable>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
     _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
@@ -1581,7 +1586,7 @@ extension UnsafeMutableRawPointer {
   /// - Returns: a pointer properly aligned to store a value of type `T`.
   @inlinable
   @_alwaysEmitIntoClient
-  public func alignedDown<T: ~Copyable>(for type: T.Type) -> Self {
+  public func alignedDown<T: ~Copyable & ~Escapable>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
     _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")

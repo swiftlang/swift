@@ -971,7 +971,25 @@ extension LifetimeDependenceDefUseWalker {
       break
     case .yield:
       return storeToYieldDependence(address: address, of: operand)
-    case .global, .class, .tail, .storeBorrow, .pointer, .index, .unidentified:
+    case let .pointer(p2a):
+      if let base = p2a.isResultOfUnsafeAddressor() {
+        let selfValue = base.value
+        if selfValue.type.isAddress {
+          // Normally an unsafeMutableAddressor is mutating, so this is the common case (address-type
+          // 'selfValue'). Treat the store to this pointer-to-address projection just like any store to the local
+          // variable holding 'selfValue'.
+          return visitStoredUses(of: operand, into: selfValue)
+        }
+        // A nonmutating unsafeMutableAddress is only expected to happen for UnsafeMutable[Buffer]Pointer, in which case
+        // 'selfValue' is trivial so all uses can safely by ignored.
+        if selfValue.type.isTrivial(in: selfValue.parentFunction) {
+          return .continueWalk
+        }
+        // Otherwise conservatively a store to indirect memory as escaping.
+        return escapingDependence(on: operand)
+      }
+      break
+    case .global, .class, .tail, .storeBorrow, .index, .unidentified:
       // An address produced by .storeBorrow should never be stored into.
       //
       // TODO: allow storing an immortal value into a global.
