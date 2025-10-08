@@ -2646,7 +2646,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
 
   // If the "embedded" flag was provided, enable the EmbeddedRestrictions
   // warning group. This group is opt-in in non-Embedded builds.
-  if (isEmbedded(Args)) {
+  if (isEmbedded(Args) && !Args.hasArg(OPT_suppress_warnings)) {
     Opts.WarningsAsErrorsRules.push_back(
         WarningAsErrorRule(WarningAsErrorRule::Action::Disable,
                            "EmbeddedRestrictions"));
