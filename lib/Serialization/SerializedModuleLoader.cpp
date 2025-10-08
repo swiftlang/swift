@@ -732,8 +732,8 @@ bool SerializedModuleLoaderBase::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-    bool isCanImportLookup, bool isTestableDependencyLookup,
-    bool &isFramework, bool &isSystemModule) {
+    std::string *cacheKey, bool isCanImportLookup,
+    bool isTestableDependencyLookup, bool &isFramework, bool &isSystemModule) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
   //
@@ -1508,12 +1508,13 @@ bool SerializedModuleLoaderBase::canImportModule(
   bool isSystemModule = false;
 
   auto mID = path[0];
-  auto found = findModule(
-      mID, /*moduleInterfacePath=*/nullptr, &moduleInterfaceSourcePath,
-      &moduleInputBuffer,
-      /*moduleDocBuffer=*/nullptr, /*moduleSourceInfoBuffer=*/nullptr,
-      /*isCanImportLookup=*/true, isTestableDependencyLookup,
-      isFramework, isSystemModule);
+  auto found =
+      findModule(mID, /*moduleInterfacePath=*/nullptr,
+                 &moduleInterfaceSourcePath, &moduleInputBuffer,
+                 /*moduleDocBuffer=*/nullptr,
+                 /*moduleSourceInfoBuffer=*/nullptr, /*cacheKey=*/nullptr,
+                 /*isCanImportLookup=*/true, isTestableDependencyLookup,
+                 isFramework, isSystemModule);
   // If we cannot find the module, don't continue.
   if (!found)
     return false;
@@ -1597,6 +1598,7 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   bool isFramework = false;
   bool isSystemModule = false;
 
+  std::string cacheKey;
   llvm::SmallString<256> moduleInterfacePath;
   llvm::SmallString<256> moduleInterfaceSourcePath;
   std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer;
@@ -1606,10 +1608,9 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
   // Look on disk.
   if (!findModule(moduleID, &moduleInterfacePath, &moduleInterfaceSourcePath,
                   &moduleInputBuffer, &moduleDocInputBuffer,
-                  &moduleSourceInfoInputBuffer,
+                  &moduleSourceInfoInputBuffer, &cacheKey,
                   /*isCanImportLookup=*/false,
-                  /*isTestableDependencyLookup=*/false,
-                  isFramework,
+                  /*isTestableDependencyLookup=*/false, isFramework,
                   isSystemModule)) {
     return nullptr;
   }
@@ -1635,6 +1636,7 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
     }
     M->setHasResolvedImports();
   });
+  M->setCacheKey(cacheKey);
 
   if (dependencyTracker && file) {
     auto DepPath = file->getFilename();
