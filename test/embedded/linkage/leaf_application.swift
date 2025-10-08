@@ -21,13 +21,13 @@
 
 //--- Library.swift
 
-// LIBRARY-IR: @"$e7Library10PointClassCN" = weak_odr {{.*}}global
+// LIBRARY-IR: @"$e7Library10PointClassCN" = linkonce_odr {{.*}}global
 
 // Never referenced.
-// LIBRARY-IR-NOT: @"$es23_swiftEmptyArrayStorageSi_S3itvp" = weak_odr {{(protected |dllexport )?}}global
+// LIBRARY-IR-NOT: @"$es23_swiftEmptyArrayStorageSi_S3itvp" = linkonce_odr {{(protected |dllexport )?}}global
 
 // Note: referenced by swift_allocEmptyBox.
-// LIBRARY-IR: @"$es16_emptyBoxStorageSi_Sitvp" = weak_odr {{(protected |dllexport )?}}global
+// LIBRARY-IR: @"$es16_emptyBoxStorageSi_Sitvp" = linkonce_odr {{(protected |dllexport )?}}global
 
 // LIBRARY-IR-NOT: define {{.*}}@"$e7Library5helloSaySiGyF"()
 public func hello() -> [Int] {
