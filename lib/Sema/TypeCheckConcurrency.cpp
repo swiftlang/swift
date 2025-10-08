@@ -7499,6 +7499,10 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
   if (isa<ProtocolDecl>(nominal))
     return nullptr;
 
+  // An explicit use `~Sendable` suppresses the conformance.
+  if (nominal->suppressesConformance(KnownProtocolKind::Sendable))
+    return nullptr;
+
   // Actor types are always Sendable; they don't get it via this path.
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   if (classDecl && classDecl->isActor())

@@ -8944,6 +8944,13 @@ ERROR(attr_inline_always_on_accessor,none,
       " is not final are not allowed", ())
 
 //===----------------------------------------------------------------------===//
+// MARK: `~Sendable`
+//===----------------------------------------------------------------------===//
+ERROR(tilde_sendable_requires_feature_flag,none,
+      "'~Sendable' requires -enable-experimental-feature TildeSendable",
+      ())
+
+//===----------------------------------------------------------------------===//
 // MARK: Swift Performance hints
 //===----------------------------------------------------------------------===//
 

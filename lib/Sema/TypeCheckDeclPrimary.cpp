@@ -123,6 +123,15 @@ public:
                       ctx.getProtocol(*kp));
       return Type();
     }
+
+    if (rpk == RepressibleProtocolKind::Sendable) {
+      if (!ctx.LangOpts.hasFeature(Feature::TildeSendable)) {
+        diagnoseInvalid(repr, repr.getLoc(),
+                        diag::tilde_sendable_requires_feature_flag);
+        return Type();
+      }
+    }
+
     if (auto *extension = dyn_cast<const ExtensionDecl *>(decl)) {
       diagnoseInvalid(repr, extension,
                       diag::suppress_inferrable_protocol_extension,
