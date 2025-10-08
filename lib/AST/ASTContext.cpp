@@ -3618,15 +3618,11 @@ static Type replacingTypeVariablesAndPlaceholders(Type ty) {
 Type ErrorType::get(Type originalType) {
   // The original type is only used for printing/debugging, and we don't support
   // solver-allocated ErrorTypes. As such, fold any type variables and
-  // placeholders into bare ErrorTypes, which print as placeholders.
-  //
-  // FIXME: If the originalType is itself an ErrorType we ought to be flattening
-  // it, but that's currently load-bearing as it avoids crashing for recursive
-  // generic signatures such as in `0120-rdar34184392.swift`. To fix this we
-  // ought to change the evaluator to ensure the outer step of a request cycle
-  // returns the same default value as the inner step such that we don't end up
-  // with conflicting generic signatures on encountering a cycle.
+  // placeholders into ErrorTypes. If we have a top-level one, we can return
+  // that directly.
   originalType = replacingTypeVariablesAndPlaceholders(originalType);
+  if (isa<ErrorType>(originalType.getPointer()))
+    return originalType;
 
   ASSERT(originalType);
   ASSERT(!originalType->getRecursiveProperties().isSolverAllocated() &&

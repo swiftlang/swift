@@ -1917,9 +1917,6 @@ static Type replacePlaceholderType(PlaceholderType *placeholder,
 
     return Type(gp);
   });
-  if (isa<TypeVariableType>(replacement.getPointer()))
-    return ErrorType::get(ctx);
-
   // For completion, we want to produce an archetype instead of an ErrorType
   // for a top-level generic parameter.
   // FIXME: This is pretty weird, we're producing a contextual type outside of
@@ -1930,8 +1927,8 @@ static Type replacePlaceholderType(PlaceholderType *placeholder,
       return GP->getDecl()->getInnermostDeclContext()->mapTypeIntoContext(GP);
   }
   // Return an ErrorType with the replacement as the original type. Note that
-  // if we failed to replace a type variable with a generic parameter in a
-  // dependent member, `ErrorType::get` will fold it away.
+  // if we failed to replace a type variable with a generic parameter,
+  // `ErrorType::get` will fold it away.
   return ErrorType::get(replacement);
 }
 
