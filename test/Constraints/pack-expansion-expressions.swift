@@ -360,7 +360,7 @@ func test_pack_expansion_specialization(tuple: (Int, String, Float)) {
 }
 
 // rdar://107280056 - "Ambiguous without more context" with opaque return type + variadics
-protocol Q {
+protocol Q<B> {
   associatedtype B
 }
 
@@ -813,5 +813,23 @@ func testPackToScalarShortFormConstructor() {
   // Make sure we diagnose.
   func foo<each T>(_ xs: repeat each T) {
     S(repeat each xs) // expected-error {{cannot pass value pack expansion to non-pack parameter of type 'Int'}}
+  }
+}
+
+
+func test_dependent_members() {
+  struct Variadic<each T>: Q {
+    typealias B = (repeat (each T)?)
+
+    init(_: repeat each T) {}
+    static func f(_: repeat each T) -> Self {}
+  }
+
+  func test_init<C1, C2>(_ c1: C1, _ c2: C2) -> some Q<(C1?, C2?)> {
+    return Variadic(c1, c2) // Ok
+  }
+
+  func test_static<C1, C2>(_ c1: C1, _ c2: C2) -> some Q<(C1?, C2?)> {
+    return Variadic.f(c1, c2) // Ok
   }
 }
