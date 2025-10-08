@@ -25,12 +25,27 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeVisitor.h"
 
 using namespace swift;
 
 bool swift::performanceHintDiagnosticsEnabled(ASTContext &ctx) {
-  return !ctx.Diags.isIgnoredDiagnostic(diag::perf_hint_closure_returns_array.ID) ||
-         !ctx.Diags.isIgnoredDiagnostic(diag::perf_hint_function_returns_array.ID);
+  return !ctx.Diags.isIgnoredDiagnostic(
+             diag::perf_hint_closure_returns_array.ID) ||
+         !ctx.Diags.isIgnoredDiagnostic(
+             diag::perf_hint_function_returns_array.ID) ||
+         !ctx.Diags.isIgnoredDiagnostic(
+             diag::perf_hint_param_expects_existential.ID) ||
+         !ctx.Diags.isIgnoredDiagnostic(
+             diag::perf_hint_func_returns_existential.ID) ||
+         !ctx.Diags.isIgnoredDiagnostic(
+             diag::perf_hint_closure_returns_existential.ID) ||
+         !ctx.Diags.isIgnoredDiagnostic(
+             diag::perf_hint_var_uses_existential.ID) ||
+         !ctx.Diags.isIgnoredDiagnostic(
+             diag::perf_hint_any_pattern_uses_existential.ID) ||
+         !ctx.Diags.isIgnoredDiagnostic(
+             diag::perf_hint_typealias_uses_existential.ID);
 }
 
 namespace {
@@ -52,6 +67,52 @@ void checkImplicitCopyReturnType(const ClosureExpr *Closure,
   }
 }
 
+bool hasExistentialAnyInType(Type T) {
+  return T->getCanonicalType().findIf(
+      [](CanType CT) { return isa<ExistentialType>(CT); });
+}
+
+void checkExistentialInFunctionReturnType(const FuncDecl *FD,
+                                          DiagnosticEngine &Diags) {
+  Type T = FD->getResultInterfaceType();
+
+  if (hasExistentialAnyInType(T))
+    Diags.diagnose(FD, diag::perf_hint_func_returns_existential, FD);
+}
+
+void checkExistentialInClosureReturnType(const ClosureExpr *CE,
+                                         DiagnosticEngine &Diags) {
+  Type T = CE->getResultType();
+
+  if (hasExistentialAnyInType(T))
+    Diags.diagnose(CE->getLoc(), diag::perf_hint_closure_returns_existential);
+}
+
+void checkExistentialInVariableType(const VarDecl *VD,
+                                    DiagnosticEngine &Diags) {
+  Type T = VD->getInterfaceType();
+
+  if (hasExistentialAnyInType(T))
+    Diags.diagnose(VD, diag::perf_hint_var_uses_existential, VD);
+}
+
+void checkExistentialInPatternType(const AnyPattern *AP,
+                                   DiagnosticEngine &Diags) {
+  Type T = AP->getType();
+
+  if (hasExistentialAnyInType(T))
+    Diags.diagnose(AP->getLoc(), diag::perf_hint_any_pattern_uses_existential);
+}
+
+void checkExistentialInTypeAlias(const TypeAliasDecl *TAD,
+                                 DiagnosticEngine &Diags) {
+  Type T = TAD->getUnderlyingType();
+
+  if (hasExistentialAnyInType(T))
+    Diags.diagnose(TAD->getLoc(), diag::perf_hint_typealias_uses_existential,
+                   TAD);
+}
+
 /// Produce performance hint diagnostics for a SourceFile.
 class PerformanceHintDiagnosticWalker final : public ASTWalker {
   ASTContext &Ctx;
@@ -64,16 +125,64 @@ public:
     SF->walk(Walker);
   }
 
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+    if (P->isImplicit())
+      return Action::SkipNode(P);
+
+    return Action::Continue(P);
+  }
+
+  PostWalkResult<Pattern *> walkToPatternPost(Pattern *P) override {
+    assert(!P->isImplicit() &&
+           "Traversing implicit patterns is disabled in the pre-walk visitor");
+
+    if (const AnyPattern *AP = dyn_cast<AnyPattern>(P)) {
+      checkExistentialInPatternType(AP, Ctx.Diags);
+    }
+
+    return Action::Continue(P);
+  }
+
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    if (auto Closure = dyn_cast<ClosureExpr>(E))
-      checkImplicitCopyReturnType(Closure, Ctx.Diags);
+    if (E->isImplicit())
+      return Action::SkipNode(E);
+
+    return Action::Continue(E);
+  }
+
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    assert(
+        !E->isImplicit() &&
+        "Traversing implicit expressions is disabled in the pre-walk visitor");
+
+    if (const ClosureExpr *CE = dyn_cast<ClosureExpr>(E)) {
+      checkImplicitCopyReturnType(CE, Ctx.Diags);
+      checkExistentialInClosureReturnType(CE, Ctx.Diags);
+    }
 
     return Action::Continue(E);
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
-    if (auto *FD = dyn_cast<FuncDecl>(D))
+    if (D->isImplicit())
+      return Action::SkipNode();
+
+    return Action::Continue();
+  }
+
+  PostWalkAction walkToDeclPost(Decl *D) override {
+    assert(
+        !D->isImplicit() &&
+        "Traversing implicit declarations is disabled in the pre-walk visitor");
+
+    if (const FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
       checkImplicitCopyReturnType(FD, Ctx.Diags);
+      checkExistentialInFunctionReturnType(FD, Ctx.Diags);
+    } else if (const VarDecl *VD = dyn_cast<VarDecl>(D)) {
+      checkExistentialInVariableType(VD, Ctx.Diags);
+    } else if (const TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D)) {
+      checkExistentialInTypeAlias(TAD, Ctx.Diags);
+    }
 
     return Action::Continue();
   }
