@@ -96,7 +96,9 @@ private struct CallSiteSpecializer {
     let builder = Builder(before: self.apply, self.context)
     // Create scalar pack indices for each pack argument's elements
     var packArgumentIndices = PackArgumentIndices()
-    for (idx, argument) in self.apply.arguments.enumerated() where argument.type.shouldExplode {
+    for (idx, argument) in self.apply.arguments.enumerated()
+        where argument.type.shouldExplode
+    {
       var indices = [ScalarPackIndexInst]()
       let packType = self.callee.packASTTypes[idx]!
       for elementIdx in argument.type.packElements.indices {
@@ -148,7 +150,8 @@ private struct CallSiteSpecializer {
         "Iteration over mapped and apply-site indirect result packs is misaligned.")
 
       for (packElementIdx, (resultInfo, packIdx)) in zip(resultInfos, packIndices).enumerated()
-      where resultInfo.isSILIndirect {
+          where resultInfo.isSILIndirect
+      {
         let indirectResultAddress = builder.createPackElementGet(
           packIndex: packIdx, pack: argument,
           elementType: argument.type.packElements[packElementIdx])
@@ -361,7 +364,8 @@ private struct CallSiteSpecializer {
         for (mappedDirectResult, (packIndex, elementType)) in zip(
           mappedResults, zip(packIndices, originalPackArgument.type.packElements)
         )
-        where !mappedDirectResult.isSILIndirect {
+            where !mappedDirectResult.isSILIndirect
+        {
 
           let result = results.next()!
           let outputResultAddress = builder.createPackElementGet(
@@ -497,7 +501,9 @@ private struct PackExplodedFunction {
     self.original = original
 
     var packASTTypes = [Int: CanonicalType]()
-    for (i, argument) in original.arguments.enumerated() where argument.type.shouldExplode {
+    for (i, argument) in original.arguments.enumerated()
+        where argument.type.shouldExplode
+    {
       packASTTypes[i] = argument.type.approximateFormalPackType
     }
     self.packASTTypes = packASTTypes
@@ -654,7 +660,9 @@ private struct PackExplodedFunction {
       }
 
       // Emit cleanup code at all exit points of the function.
-      for bb in specialized.blocks where bb.terminator.isFunctionExiting {
+      for bb in specialized.blocks
+          where bb.terminator.isFunctionExiting
+      {
         self.createCleanup(before: bb.terminator, argumentMap: argumentMap, specContext)
       }
     }
@@ -702,8 +710,8 @@ private struct PackExplodedFunction {
     var resultMapIndex = 0
     var originalReturnIndex = 0
     for (i, originalResult) in self.original.convention.results.enumerated()
-    where originalResult.type.loweredType(in: self.original).shouldExplode
-      || !originalResult.isSILIndirect
+        where originalResult.type.loweredType(in: self.original).shouldExplode
+                || !originalResult.isSILIndirect
     {
 
       if !resultMap.indices.contains(resultMapIndex) || resultMap[resultMapIndex].0 != i {
