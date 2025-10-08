@@ -853,6 +853,7 @@ enum Project {
   Subprocess
   Build
   PackageManager
+  PackageManagerRuntime
   Markdown
   Format
   LMDB
@@ -3585,6 +3586,27 @@ function Build-PackageManager([Hashtable] $Platform) {
     }
 }
 
+function Build-PackageManagerRuntime([Hashtable] $Platform) {
+  $SrcDir = if (Test-Path -Path "$SourceCache\swift-package-manager" -PathType Container) {
+    "$SourceCache\swift-package-manager"
+  } else {
+    "$SourceCache\swiftpm"
+  }
+
+  Build-CMakeProject `
+    -Src $SrcDir\Sources\Runtimes `
+    -Bin (Get-ProjectBinaryCache $Platform PackageManagerRuntime) `
+    -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
+    -Platform $Platform `
+    -UseBuiltCompilers C,CXX,Swift `
+    -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
+    -UseGNUDriver `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+      SwiftPM_ENABLE_RUNTIME = "NO";
+    }
+}
+
 function Build-Markdown([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\swift-markdown `
@@ -4116,6 +4138,8 @@ if (-not $SkipBuild) {
     }
 
     Write-PlatformInfoPlist Windows
+
+    Invoke-BuildStep Build-PackageManagerRuntime $HostPlatform
 
     # Copy static dependencies
     foreach ($Build in $WindowsSDKBuilds) {
