@@ -71,7 +71,7 @@ func animalParam1(_ animal: any Animal) {}  // expected-error {{Performance: 'an
 // Multiple parameters
 func animalParam2(
   _ animal: any Animal,  // expected-error {{Performance: 'animal' uses an existential, leading to heap allocation, reference counting, and dynamic dispatch. Consider using generic constraints or concrete types instead.}}
-  to other: any Animal   // expected-error {{Performance: 'other' uses an existential, leading to heap allocation, reference counting, and dynamic dispatch. Consider using generic constraints or concrete types instead.}}
+  to other: any Animal  // expected-error {{Performance: 'other' uses an existential, leading to heap allocation, reference counting, and dynamic dispatch. Consider using generic constraints or concrete types instead.}}
 ) {}
 
 // Variadic parameters
@@ -144,7 +144,7 @@ func tupleTest() {
 
   let (
     animalsA,  // expected-error {{Performance: 'animalsA' uses an existential, leading to heap allocation, reference counting, and dynamic dispatch. Consider using generic constraints or concrete types instead.}}
-    animalsB   // expected-error {{Performance: 'animalsB' uses an existential, leading to heap allocation, reference counting, and dynamic dispatch. Consider using generic constraints or concrete types instead.}}
+    animalsB  // expected-error {{Performance: 'animalsB' uses an existential, leading to heap allocation, reference counting, and dynamic dispatch. Consider using generic constraints or concrete types instead.}}
   ) = ([Tiger() as any Animal], [Panda() as any Animal])
   print(type(of: animalsA))
   print(type(of: animalsB))
@@ -243,4 +243,22 @@ struct Outer<T> {
 
 func f() -> Outer<any Animal>.Inner {  // expected-error {{Performance: 'f()' returns an existential, leading to heap allocation, reference counting, and dynamic dispatch. Consider using generic constraints or concrete types instead.}}
   return Outer<any Animal>().i
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Implicit AST Nodes
+////////////////////////////////////////////////////////////////////////////////
+
+func stringPlusInReduce() {
+  let animalKinds = ["Tiger", "Panda", "Tiger", "Dodo"]
+  let animals: [any Animal] = // expected-error {{Performance: 'animals' uses an existential, leading to heap allocation, reference counting, and dynamic dispatch. Consider using generic constraints or concrete types instead.}}
+  animalKinds.map { animalKind in // expected-error {{Performance: closure returns an existential, leading to heap allocation, reference counting, and dynamic dispatch. Consider using generic constraints or concrete types instead.}}
+      switch animalKind {
+      case "Tiger":
+        return Tiger()
+      default:
+        return Panda()
+      }
+    }
+  print(animals)
 }
