@@ -1038,15 +1038,18 @@ bool SILFunction::hasValidLinkageForFragileRef(SerializedKind_t callerSerialized
   return hasPublicOrPackageVisibility(getLinkage(), /*includePackage*/ true);
 }
 
-bool SILFunction::isSwiftRuntimeFunction() const {
-  if (!getName().starts_with("swift_") &&
-      !getName().starts_with("_swift_"))
+bool SILFunction::isSwiftRuntimeFunction(
+    StringRef name, const ModuleDecl *module) {
+  if (!name.starts_with("swift_") && !name.starts_with("_swift_"))
     return false;
 
-  auto module = getParentModule();
   return !module ||
       module->getName().str() == "Swift" ||
       module->getName().str() == "_Concurrency";
+}
+
+bool SILFunction::isSwiftRuntimeFunction() const {
+  return isSwiftRuntimeFunction(getName(), getParentModule());
 }
 
 bool
