@@ -1,6 +1,6 @@
 // Tests for the Swift frontends `-verify` mode.
 
-// RUN: not %target-typecheck-verify-swift 2>&1 | %FileCheck %s
+// RUN: not %target-typecheck-verify-swift -verify-ignore-unrelated 2>&1 | %FileCheck %s
 
 // CHECK: [[@LINE+1]]:1: error: unexpected error produced: cannot find 'undefinedFunc' in scope
 undefinedFunc()
