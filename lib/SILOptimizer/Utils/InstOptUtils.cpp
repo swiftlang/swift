@@ -179,6 +179,14 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
   if (isa<BorrowedFromInst>(inst))
     return false;
 
+  // A dead `destructure_struct` with an owned argument can appear for a non-copyable or
+  // non-escapable struct which has only trivial elements. The instruction is not trivially
+  // dead because it ends the lifetime of its operand.
+  if (isa<DestructureStructInst>(inst) &&
+      inst->getOperand(0)->getOwnershipKind() == OwnershipKind::Owned) {
+    return false;
+  }
+
   // These invalidate enums so "write" memory, but that is not an essential
   // operation so we can remove these if they are trivially dead.
   if (isa<UncheckedTakeEnumDataAddrInst>(inst))
