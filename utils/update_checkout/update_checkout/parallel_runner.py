@@ -48,7 +48,13 @@ class ParallelRunner:
     ):
         self._monitor_polling_period = 0.1
         if n_processes == 0:
-            n_processes = cpu_count() * 2
+            if sys.version_info.minor < 10:
+                # On Python < 3.10, https://bugs.python.org/issue46391 causes
+                # Pool.map and its variants to hang. Limiting the number of
+                # processes fixes the issue.
+                n_processes = int(cpu_count() * 1.25)
+            else:
+                n_processes = cpu_count() * 2
         self._terminal_width = shutil.get_terminal_size().columns
         self._n_processes = n_processes
         self._pool_args = pool_args
