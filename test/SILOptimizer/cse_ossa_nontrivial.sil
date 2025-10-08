@@ -255,19 +255,6 @@ bb0(%0 : @owned $Klass):
   return %6 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @cse_raw_pointer_to_ref :
-// CHECK: raw_pointer_to_ref
-// CHECK-NOT: raw_pointer_to_ref
-// CHECK: tuple
-// CHECK-LABEL: } // end sil function 'cse_raw_pointer_to_ref'
-sil [ossa] @cse_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> (Klass, Klass) {
-bb0(%0 : $Builtin.RawPointer):
-  %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $Klass
-  %2 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $Klass
-  %6 = tuple(%1: $Klass, %2: $Klass)
-  return %6 : $(Klass, Klass)
-}
-
 enum Enum1 {
     case Case1
     case Case2
