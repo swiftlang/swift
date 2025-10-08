@@ -61,7 +61,7 @@ StringRef getDomain(const SemanticAvailableAttr &AvAttr) {
     case swift::PlatformKind::Windows:
       return { "Windows" };
     case swift::PlatformKind::Android:
-      return { "android" };
+      return { "Android" };
     case swift::PlatformKind::none:
       return { "*" };
   }

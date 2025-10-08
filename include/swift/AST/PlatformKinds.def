@@ -37,6 +37,6 @@ AVAILABILITY_PLATFORM(macCatalystApplicationExtension, "application extensions f
 AVAILABILITY_PLATFORM(FreeBSD, "FreeBSD")
 AVAILABILITY_PLATFORM(OpenBSD, "OpenBSD")
 AVAILABILITY_PLATFORM(Windows, "Windows")
-AVAILABILITY_PLATFORM(Android, "android")
+AVAILABILITY_PLATFORM(Android, "Android")
 
 #undef AVAILABILITY_PLATFORM

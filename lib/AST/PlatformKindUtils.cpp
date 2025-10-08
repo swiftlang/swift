@@ -222,6 +222,10 @@ static PlatformKind platformForTriple(const llvm::Triple &triple,
                 : PlatformKind::visionOS);
   }
 
+  if (triple.isAndroid()) {
+    return PlatformKind::Android;
+  }
+
   return PlatformKind::none;
 }
 
