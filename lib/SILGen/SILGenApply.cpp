@@ -524,7 +524,8 @@ public:
 
     auto &ci = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
     return Callee(
-        Kind::WitnessMethod, SGF, c, ci.FormalPattern, ci.FormalType,
+        Kind::WitnessMethod, SGF, c,
+        ci.FormalPattern.withSubstitutions(subs), ci.FormalType,
         subs.mapIntoTypeExpansionContext(SGF.getTypeExpansionContext()), l);
   }
   static Callee forDynamic(SILGenFunction &SGF,

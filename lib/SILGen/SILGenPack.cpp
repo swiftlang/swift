@@ -1131,8 +1131,9 @@ SILGenFunction::emitPackTransform(SILLocation loc,
       outputEltAddr = outputElt.forward(*this);
 
     // Otherwise, if the value is not already in the temporary, put it there.
-    } else if (!outputElt.isInContext()) {
-      outputElt.forwardInto(*this, loc, outputEltInit.get());
+    } else {
+      if (!outputElt.isInContext())
+        outputElt.forwardInto(*this, loc, outputEltInit.get());
       outputEltInit->getManagedAddress().forward(*this);
     }
 

@@ -2417,8 +2417,15 @@ private:
     return innerPackParam.getConvention();
   }
 
-  ParamInfo getInnerPackExpansionSlot(SILValue packAddr) {
-    return ParamInfo(IndirectSlot(packAddr), getInnerPackConvention());
+  ParamInfo getInnerPackExpansionSlot(ManagedValue packAddr) {
+    // Ignore the ownership of the pack address --- it'll be an
+    // l-value or r-value depending on what kind of argument we're
+    // producing, but there's no meaningful ownership yet, and in
+    // any case it won't have any cleanups attached.
+    assert(!packAddr.hasCleanup());
+
+    return ParamInfo(IndirectSlot(packAddr.getValue()),
+                     getInnerPackConvention());
   }
 
   /// Given an element of an inner pack that we're emitting into,
@@ -2771,15 +2778,29 @@ ManagedValue TranslateArguments::expandPackInnerParam(
         // cleanup onto the elements.
         auto outerComponent = outerParam.projectPackComponent(SGF, Loc);
 
-        // We can only do direct forwarding of of the pack elements in
-        // one very specific case right now.  That isn't great, but we
-        // have to live with it.
-        bool forwardouterToinner =
-          (outerExpansionTy.getPatternType()
-             == innerExpansionTy.getPatternType());
+        bool patternTypesMatch =
+          outerExpansionTy.getPatternType() == innerExpansionTy.getPatternType();
 
-        // The result of the transformation will be +1 unless we do that.
-        bool innerIsPlusOne = !forwardouterToinner;
+        auto innerPatternTypeIsTrivial =
+          SGF.getTypeLowering(innerExpansionTy.getPatternType()).isTrivial();
+        bool outerIsConsumed = outerComponent.hasCleanup();
+        bool innerIsConsumed =
+          isConsumedParameterInCaller(innerPackParam.getConvention());
+
+        // We can only do direct forwarding of of the pack elements (without
+        // needing temporary memory) if they have exactly the same type and
+        // we're not turning a borrowed parameter into a consuming one.
+        bool forwardOuterToInner =
+          (patternTypesMatch &&
+           (innerPatternTypeIsTrivial || outerIsConsumed || !innerIsConsumed));
+
+        // The result of the transformation function below will be +1 unless
+        // we directly forward that (or if direct forwarding produces an owned
+        // or trivial value).
+        bool innerIsPlusOne =
+          (!forwardOuterToInner ||
+           innerPatternTypeIsTrivial ||
+           outerIsConsumed);
 
         ManagedValue inner =
           SGF.emitPackTransform(Loc, outerComponent,
@@ -2788,13 +2809,18 @@ ManagedValue TranslateArguments::expandPackInnerParam(
                                 innerPackAddr,
                                 innerFormalPackType,
                                 innerComponentIndex,
-                                /*is trivial*/ forwardouterToinner,
+                                /*is simple projection*/ forwardOuterToInner,
                                 innerIsPlusOne,
             [&](ManagedValue outerEltAddr, SILType innerEltTy,
                 SGFContext ctxt) {
           // If we decided to just forward, we can do that now.
-          if (forwardouterToinner)
+          if (forwardOuterToInner) {
+            // It's okay to return an owned value here even if we're
+            // producing this for a borrowed parameter. We'll end up with
+            // an argument with cleanups, which in the end we just won't
+            // forward.
             return outerEltAddr;
+          }
 
           // Otherwise, map the subst pattern types into element context.
           CanType innerSubstEltType =
@@ -3455,8 +3481,8 @@ private:
     return temporary;
   }
 
-  IndirectSlot getInnerPackExpansionSlot(SILValue packAddr) {
-    return IndirectSlot(packAddr);
+  IndirectSlot getInnerPackExpansionSlot(ManagedValue packAddr) {
+    return IndirectSlot(packAddr.getLValueAddress());
   }
 
   IndirectSlot getInnerPackElementSlot(SILType elementTy) {
@@ -3810,8 +3836,8 @@ void ExpanderBase<Impl, InnerSlotType>::expandParallelTuples(
       ManagedValue outerPackComponent =
         outerElt.projectPackComponent(SGF, Loc);
 
-      auto innerEltSlot = asImpl().getInnerPackExpansionSlot(
-        innerElt.getPackValue().getLValueAddress());
+      auto innerEltSlot =
+        asImpl().getInnerPackExpansionSlot(innerElt.getPackValue());
       ManagedValue innerPackComponent = asImpl().expandPackExpansion(
                                 innerElt.getOrigType(),
         cast<PackExpansionType>(innerElt.getSubstType()),
@@ -4591,8 +4617,8 @@ void ExpanderBase<Impl, InnerSlotType>::expandParallelTuplesOuterIndirect(
       continue;
     }
 
-    auto innerExpansionSlot = asImpl().getInnerPackExpansionSlot(
-      innerElt.getPackValue().getLValueAddress());
+    auto innerExpansionSlot =
+      asImpl().getInnerPackExpansionSlot(innerElt.getPackValue());
     asImpl().expandPackExpansion(innerElt.getOrigType(),
          cast<PackExpansionType>(innerElt.getSubstType()),
                                  outerElt.getOrigType(),
