@@ -55,7 +55,8 @@ void realizeTypeRequirement(DeclContext *dc,
                             Type constraintType,
                             SourceLoc loc,
                             SmallVectorImpl<StructuralRequirement> &result,
-                            SmallVectorImpl<RequirementError> &errors);
+                            SmallVectorImpl<RequirementError> &errors,
+                            bool isFromInheritanceClause);
 
 void realizeRequirement(DeclContext *dc,
                         Requirement req, RequirementRepr *reqRepr,
