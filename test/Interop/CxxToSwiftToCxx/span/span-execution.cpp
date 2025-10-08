@@ -11,6 +11,8 @@
 
 // REQUIRES: executable_test
 
+// REQUIRES: OS=macosx || rdar-161999258
+
 //--- header.h
 #include <string>
 #include <span>
