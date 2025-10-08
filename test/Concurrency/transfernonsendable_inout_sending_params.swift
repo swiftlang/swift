@@ -80,6 +80,9 @@ struct MyError : Error {}
 
 func takeClosure(_ x: sending () -> ()) {}
 func takeClosureAndParam(_ x: NonSendableKlass, _ y: sending () -> ()) {}
+func useInOutSending(_ x: inout sending NonSendableKlass) {}
+func useInOutSending(_ x: inout sending NonSendableKlass,
+                     _ y: inout sending NonSendableKlass) {}
 
 ///////////////////////////////
 // MARK: InOut Sending Tests //
@@ -161,6 +164,17 @@ func testWrongIsolationGlobalIsolation(_ x: inout sending NonSendableKlass) {
   x = globalKlass
 } // expected-warning {{'inout sending' parameter 'x' cannot be main actor-isolated at end of function}}
 // expected-note @-1 {{main actor-isolated 'x' risks causing races in between main actor-isolated uses and caller uses since caller assumes value is not actor isolated}}
+
+func passInOutSendingToInOutSending(_ x: inout sending NonSendableKlass) {
+  useInOutSending(&x)
+}
+
+func passInOutSendingMultipleTimes(_ x: inout NonSendableStruct) {
+  useInOutSending(&x.first, &x.second) // expected-warning {{sending 'x.first' risks causing data races}}
+  // expected-note @-1 {{task-isolated 'x.first' is passed as a 'sending' parameter}}
+  // expected-warning @-2 {{sending 'x.second' risks causing data races}}
+  // expected-note @-3 {{task-isolated 'x.second' is passed as a 'sending' parameter}}
+}
 
 //////////////////////////////////////
 // MARK: Return Inout Sending Tests //

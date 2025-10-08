@@ -69,10 +69,21 @@ func transferArgAsync(_ x: sending NonSendableKlass) async {
 func transferArgWithOtherParam(_ x: sending NonSendableKlass, _ y: NonSendableKlass) {
 }
 
+@MainActor
+func transferArgWithOtherParamIsolationCrossing(_ x: sending NonSendableKlass, _ y: NonSendableKlass) async {
+}
+
 func transferArgWithOtherParam2(_ x: NonSendableKlass, _ y: sending NonSendableKlass) {
 }
 
+@MainActor
+func transferArgWithOtherParam2IsolationCrossing(_ x: NonSendableKlass, _ y: sending NonSendableKlass) async {
+}
+
 func twoTransferArg(_ x: sending NonSendableKlass, _ y: sending NonSendableKlass) {}
+
+@MainActor
+func twoTransferArgIsolationCrossing(_ x: sending NonSendableKlass, _ y: sending NonSendableKlass) async {}
 
 @MainActor var globalKlass = NonSendableKlass()
 
@@ -112,6 +123,22 @@ func testSimpleTransferUseOfOtherParamNoError2() {
   let k2 = NonSendableKlass()
   transferArgWithOtherParam2(k, k2)
   useValue(k)
+}
+
+func testSimpleTransferUseOfOtherParamError() async {
+  let k = NonSendableKlass()
+  await transferArgWithOtherParamIsolationCrossing(k, k) // expected-warning {{sending 'k' risks causing data races}}
+  // expected-note @-1 {{sending 'k' to main actor-isolated global function 'transferArgWithOtherParamIsolationCrossing' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-note @-2 {{access can happen concurrently}}
+}
+
+// TODO: Improve this error message. We should say that we are emitting an
+// error. Also need to add SILLocation to ApplyInst.
+func testSimpleTransferUseOfOtherParam2Error() async {
+  let k = NonSendableKlass()
+  await transferArgWithOtherParam2IsolationCrossing(k, k) // expected-warning {{sending 'k' risks causing data races}}
+  // expected-note @-1 {{sending 'k' to main actor-isolated global function 'transferArgWithOtherParam2IsolationCrossing' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-note @-2 {{access can happen concurrently}}
 }
 
 @MainActor func transferToMain2(_ x: sending NonSendableKlass, _ y: NonSendableKlass, _ z: NonSendableKlass) async {
@@ -354,6 +381,13 @@ func mergeDoesNotEliminateEarlierTransfer2(_ x: sending NonSendableStruct) async
 func doubleArgument() async {
   let x = NonSendableKlass()
   twoTransferArg(x, x) // expected-warning {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
+  // expected-note @-2 {{access can happen concurrently}}
+}
+
+func doubleArgumentIsolationCrossing() async {
+  let x = NonSendableKlass()
+  await twoTransferArgIsolationCrossing(x, x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
   // expected-note @-2 {{access can happen concurrently}}
 }
