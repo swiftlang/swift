@@ -634,61 +634,106 @@ private struct PackExplodedFunction {
 
       let argumentMap = explodePackArguments(from: original, to: specialized, specContext)
 
-      // Build a block that extracts the necessary direct return values and returns them, if necessary.
-      // This is only necessary if any pack result elements were mapped to direct results, and the
-      // function contains at least one return statement.
+      // Modify the return block to extract and return the necessary direct
+      // return values from their local stack allocations, if necessary. This is
+      // only necessary if any pack result elements were mapped to direct
+      // results, and the function contains at least one return statement.
       if resultMap.contains(where: { (_, resultInfos) in
         resultInfos.contains(where: { !$0.isSILIndirect })
       }) {
-        if let originalReturnStatement = original.blocks.lazy.first(where: {
-          $0.terminator is ReturnInst
-        })?.terminator as? ReturnInst {
-          let originalReturnType = originalReturnStatement.returnedValue.type
-
-          let originalReturnTupleElements: [Type]
-          if originalReturnType.isTuple {
-            originalReturnTupleElements = [Type](originalReturnType.tupleElements)
-          } else {
-            originalReturnTupleElements = [originalReturnType]
-          }
-          let returnShimBB = addReturnShimBlock(
-            in: specialized, argumentMap: argumentMap,
-            originalReturnTypes: originalReturnTupleElements,
-            specContext)
-
-          // Now modify all existing return blocks to instead branch to this return shim block
-          for bb in specialized.blocks where (bb.terminator is ReturnInst) && bb != returnShimBB {
-            redirect(returnBB: bb, to: returnShimBB, specContext)
-          }
+        if let originalReturnStatement = original.returnInstruction {
+          self.createExplodedReturn(replacing: originalReturnStatement, argumentMap: argumentMap, context)
         }
       }
-      // Only emit deallocations when actually leaving the function context.
+
+      // Emit cleanup code at all exit points of the function.
       for bb in specialized.blocks where bb.terminator.isFunctionExiting {
-        insertArgumentPackDeallocations(in: bb, argumentMap: argumentMap, specContext)
+        self.createCleanup(before: bb.terminator, argumentMap: argumentMap, specContext)
       }
     }
 
     context.notifyNewFunction(function: specialized, derivedFrom: original)
   }
 
-  private func redirect(
-    returnBB bb: BasicBlock, to returnShimBB: BasicBlock, _ specContext: FunctionPassContext
-  ) {
-    let returnInst = bb.terminator as! ReturnInst
-    let returnedValue = returnInst.returnedValue
-    let builder = Builder(atEndOf: bb, location: returnInst.location, specContext)
+  /// Replace the original return statement with one that returns all the
+  /// original result values, as well as the direct results corresponding to
+  /// indirect pack results in the original function.
+  ///
+  /// Care is taken to thread the original and new results together in an order
+  /// that matches the original function:
+  ///
+  /// Before: () -> (Int, @pack_out Pack{Double, Int}, Double)
+  ///
+  /// pack_element_set 0 of %out_pack to %pack_double
+  /// pack_element_set 1 of %out_pack to %pack_int
+  ///
+  /// return (%int, %double)
+  ///
+  /// After: () -> (Int, Double, Int, Double)
+  ///
+  /// return (%int, %pack_double, %pack_int, %double)
+  ///
+  private func createExplodedReturn(replacing originalReturn: ReturnInst, argumentMap: ArgumentMap, _ context: FunctionPassContext) {
+    let builder = Builder(before: originalReturn, location: originalReturn.location.asCleanup, context)
 
-    specContext.erase(instruction: returnInst)
+    let originalValue = originalReturn.returnedValue
 
-    let forwardedValues: [any Value]
-    if !returnedValue.type.isTuple {
-      forwardedValues = [returnedValue]
+    let originalReturnTupleElements: [Value]
+    if originalValue.type.isTuple {
+      originalReturnTupleElements = [Value](builder.createDestructureTuple(tuple: originalValue).results)
     } else {
-      forwardedValues = [any Value](
-        builder.createDestructureTuple(tuple: returnedValue).results)
+      originalReturnTupleElements = [originalValue]
     }
 
-    builder.createBranch(to: returnShimBB, arguments: forwardedValues)
+    var returnValues = [any Value]()
+
+    // Thread together the original and exploded direct return values.
+    var resultMapIndex = 0
+    var originalReturnIndex = 0
+    for (i, originalResult) in self.original.convention.results.enumerated()
+        where originalResult.type.loweredType(in: self.original).shouldExplode
+                || !originalResult.isSILIndirect
+    {
+
+      if !resultMap.indices.contains(resultMapIndex) || resultMap[resultMapIndex].0 != i {
+        returnValues.append(originalReturnTupleElements[originalReturnIndex])
+        originalReturnIndex += 1
+
+      } else {
+
+        let (originalPackArgumentIdx, _) = resultMap[resultMapIndex]
+
+        let argumentMapping = argumentMap[originalPackArgumentIdx]!
+        for argument in argumentMapping.arguments
+            where argument.allocStack != nil {
+          assert(
+            argument.storeBorrow == nil,
+            "Indirect results should not have an associated StoreBorrowInst.")
+
+          let allocStack = argument.allocStack!
+          returnValues.append(
+            builder.createLoad(
+              fromAddress: allocStack,
+              ownership: loadOwnership(for: allocStack, normal: .take))
+          )
+        }
+
+        resultMapIndex += 1
+      }
+    }
+
+    // Return the single value directly, rather than constructing a single-element tuple for it.
+    if returnValues.count == 1 {
+      builder.createReturn(of: returnValues[0])
+    } else {
+      let tupleElementTypes = returnValues.map { $0.type }
+      let tupleType = context.getTupleType(elements: tupleElementTypes).loweredType(
+        in: specialized)
+      let tuple = builder.createTuple(type: tupleType, elements: returnValues)
+      builder.createReturn(of: tuple)
+    }
+
+    context.erase(instruction: originalReturn)
   }
 
   /// Explode the types of the entry block's pack arguments, and track the
@@ -811,14 +856,12 @@ private struct PackExplodedFunction {
     return argumentMap
   }
 
-  /// Insert dealloc_pack instructions for the alloc_pack's corresponding to the original function's pack arguments.
-  private func insertArgumentPackDeallocations(
-    in bb: BasicBlock, argumentMap: ArgumentMap, _ context: FunctionPassContext
+  /// Clean up locals, most notably alloc_packs, created as part of pack specialization.
+  private func createCleanup(
+    before terminator: TermInst, argumentMap: ArgumentMap, _ context: FunctionPassContext
   ) {
 
-    let terminator = bb.terminator
-
-    let builder = Builder(before: terminator, context)
+    let builder = Builder(before: terminator, location: terminator.location.asCleanup, context)
 
     let createDeallocations = { (idx: Int) in
       let mapped = argumentMap[idx]!
@@ -834,75 +877,15 @@ private struct PackExplodedFunction {
       builder.createDeallocPack(argumentMap[idx]!.allocPack)
     }
 
-    // Emit dealloc_packs in the opposite order to the alloc_packs
+    // Emit dealloc_packs in the opposite order to the alloc_packs. Since
+    // alloc_packs are created while iterating backwards over the arguments,
+    // iterate forwards.
     for (key, _) in resultMap {
       createDeallocations(key)
     }
     for (key, _) in parameterMap {
       createDeallocations(key)
     }
-  }
-
-  private func addReturnShimBlock(
-    in specialized: Function, argumentMap: ArgumentMap, originalReturnTypes: [Type],
-    _ context: FunctionPassContext
-  ) -> BasicBlock {
-    let bb = specialized.appendNewBlock(context)
-    let builder = Builder(atEndOf: bb, location: specialized.location, context)
-
-    let returnBlockArguments = originalReturnTypes.map {
-      bb.addArgument(type: $0, ownership: .unowned, context)
-    }
-
-    var returnValues = [any Value]()
-
-    // Thread together the original and exploded direct return values
-    var resultMapIdx = 0
-    var returnBlockArgumentsIdx = 0
-    for (i, originalResult) in self.original.convention.results.enumerated()
-    where originalResult.type.loweredType(in: self.original).shouldExplode
-      || !originalResult.isSILIndirect
-    {
-
-      if !resultMap.indices.contains(resultMapIdx) || resultMap[resultMapIdx].0 != i {
-        returnValues.append(returnBlockArguments[returnBlockArgumentsIdx])
-        returnBlockArgumentsIdx += 1
-
-      } else {
-
-        let (originalPackArgumentIdx, _) = resultMap[resultMapIdx]
-
-        let argumentMapping = argumentMap[originalPackArgumentIdx]!
-        for argument in argumentMapping.arguments
-        where argument.allocStack != nil {
-          assert(
-            argument.storeBorrow == nil,
-            "Indirect results should not have an associated StoreBorrowInst.")
-
-          let allocStack = argument.allocStack!
-          returnValues.append(
-            builder.createLoad(
-              fromAddress: allocStack,
-              ownership: loadOwnership(for: allocStack, normal: .take))
-          )
-        }
-
-        resultMapIdx += 1
-      }
-    }
-
-    // Return the single value directly, rather than constructing a single-element tuple for it.
-    if returnValues.count == 1 {
-      builder.createReturn(of: returnValues[0])
-    } else {
-      let tupleElementTypes = returnValues.map { $0.type }
-      let tupleType = context.getTupleType(elements: tupleElementTypes).loweredType(
-        in: specialized)
-      let tuple = builder.createTuple(type: tupleType, elements: returnValues)
-      builder.createReturn(of: tuple)
-    }
-
-    return bb
   }
 }
 
