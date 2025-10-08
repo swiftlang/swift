@@ -262,12 +262,11 @@ func isRawPointerType(text: String) -> Bool {
 
 // Remove std. or std.__1. prefix
 func getUnqualifiedStdName(_ type: String) -> String? {
-  if type.hasPrefix("std.") {
-    var ty = type.dropFirst(4)
-    if ty.hasPrefix("__1.") {
-      ty = ty.dropFirst(4)
+  let prefixes = ["std.__1.", "std.__ndk1.", "std."]
+  for prefix in prefixes {
+    if type.hasPrefix(prefix) {
+      return String(type.dropFirst(prefix.count))
     }
-    return String(ty)
   }
   return nil
 }
