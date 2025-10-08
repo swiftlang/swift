@@ -2585,6 +2585,20 @@ static bool isEmbedded(ArgList &args) {
   return false;
 }
 
+/// Identifier modules for which we should temporarily suppress the diagnostics
+/// for Embedded restrictions despite building in Embedded Swift.
+static bool temporarilySuppressEmbeddedRestrictionDiagnostics(ArgList &args) {
+  using namespace swift::options;
+
+  if (const Arg *arg = args.getLastArgNoClaim(OPT_module_name)) {
+    StringRef moduleName(arg->getValue());
+    if (moduleName == "Swift" || moduleName == "_Concurrency")
+      return true;
+  }
+
+  return false;
+}
+
 static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags) {
   // NOTE: This executes at the beginning of parsing the command line and cannot
@@ -2655,7 +2669,8 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
 
   // If the "embedded" flag was provided, enable the EmbeddedRestrictions
   // warning group. This group is opt-in in non-Embedded builds.
-  if (isEmbedded(Args) && !Args.hasArg(OPT_suppress_warnings)) {
+  if (isEmbedded(Args) && !Args.hasArg(OPT_suppress_warnings) &&
+      !temporarilySuppressEmbeddedRestrictionDiagnostics(Args)) {
     Opts.WarningsAsErrorsRules.push_back(
         WarningAsErrorRule(WarningAsErrorRule::Action::Disable,
                            "EmbeddedRestrictions"));
