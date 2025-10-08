@@ -81,3 +81,16 @@ do {
   for t in #^LOOP_8^# {}
 }
 // LOOP_8-DAG: Keyword[repeat]/None:                   repeat; name=repeat
+
+do {
+  struct S {
+    var foo: Bool
+  }
+  func bar(_ xs: [S]) {
+    // Make sure we can resolve 'x' here without causing a request cycle.
+    for x in xs where x.foo {
+      x.#^LOOP_9^#
+      // LOOP_9-DAG: Decl[InstanceVar]/CurrNominal: foo[#Bool#]; name=foo
+    }
+  }
+}

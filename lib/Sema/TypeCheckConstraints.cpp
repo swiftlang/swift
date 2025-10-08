@@ -893,7 +893,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   return hadError;
 }
 
-bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt) {
+bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
+                                           bool skipWhere) {
   auto &Context = dc->getASTContext();
   FrontendStatsTracer statsTracer(Context.Stats, "typecheck-for-each", stmt);
   PrettyStackTraceStmt stackTrace(Context, "type-checking-for-each", stmt);
@@ -902,18 +903,20 @@ bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt) {
   if (!typeCheckTarget(target))
     return true;
 
-  if (auto *where = stmt->getWhere()) {
-    auto boolType = dc->getASTContext().getBoolType();
-    if (!boolType)
-      return true;
+  if (!skipWhere) {
+    if (auto *where = stmt->getWhere()) {
+      auto boolType = dc->getASTContext().getBoolType();
+      if (!boolType)
+        return true;
 
-    SyntacticElementTarget whereClause(where, dc, {boolType, CTP_Condition},
-                                       /*isDiscarded=*/false);
-    auto result = typeCheckTarget(whereClause);
-    if (!result)
-      return true;
+      SyntacticElementTarget whereClause(where, dc, {boolType, CTP_Condition},
+                                         /*isDiscarded=*/false);
+      auto result = typeCheckTarget(whereClause);
+      if (!result)
+        return true;
 
-    stmt->setWhere(result->getAsExpr());
+      stmt->setWhere(result->getAsExpr());
+    }
   }
 
   // Check to see if the sequence expr is throwing (in async context),

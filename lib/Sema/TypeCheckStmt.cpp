@@ -1463,7 +1463,15 @@ public:
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    TypeChecker::typeCheckForEachPreamble(DC, S);
+    // If we're performing IDE inspection, we also want to skip the where
+    // clause if we're leaving the body unchecked.
+    // FIXME: This is a hack to avoid cycles through NamingPatternRequest when
+    // doing lazy type-checking, we ought to fix the request to be granular in
+    // the type-checking work it kicks.
+    bool skipWhere = LeaveBraceStmtBodyUnchecked &&
+      Ctx.SourceMgr.hasIDEInspectionTargetBuffer();
+
+    TypeChecker::typeCheckForEachPreamble(DC, S, skipWhere);
 
     // Type-check the body of the loop.
     auto sourceFile = DC->getParentSourceFile();

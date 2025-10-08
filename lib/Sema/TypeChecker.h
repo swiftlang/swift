@@ -799,7 +799,8 @@ bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
 /// together.
 ///
 /// \returns true if a failure occurred.
-bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt);
+bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
+                              bool skipWhereClause);
 
 /// Compute the set of captures for the given closure.
 void computeCaptures(AbstractClosureExpr *ACE);
