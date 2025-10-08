@@ -534,10 +534,16 @@ private struct PackExplodedFunction {
   private struct ExplodedArgument {
     /// The index of this element within its original pack.
     public let packIdx: ScalarPackIndexInst
-    /// A reference to the stack location holding the argument's value, if the argument/return value is direct
-    public let allocStack: AllocStackInst?
-    /// The borrowing reference to an @guaranteed argument
-    public let storeBorrow: StoreBorrowInst?
+
+    enum ConventionResources {
+      case indirect
+      case direct(AllocStackInst)
+      case directGuaranteed(AllocStackInst, StoreBorrowInst)
+    }
+
+    /// The local resources associated with the argument that must be cleaned
+    /// up, determined by its argument convention.
+    public let resources: ConventionResources
   }
 
   /// Information about the local pack created to replace a pack parameter in
@@ -642,7 +648,8 @@ private struct PackExplodedFunction {
         resultInfos.contains(where: { !$0.isSILIndirect })
       }) {
         if let originalReturnStatement = original.returnInstruction {
-          self.createExplodedReturn(replacing: originalReturnStatement, argumentMap: argumentMap, context)
+          self.createExplodedReturn(
+            replacing: originalReturnStatement, argumentMap: argumentMap, context)
         }
       }
 
@@ -673,14 +680,18 @@ private struct PackExplodedFunction {
   ///
   /// return (%int, %pack_double, %pack_int, %double)
   ///
-  private func createExplodedReturn(replacing originalReturn: ReturnInst, argumentMap: ArgumentMap, _ context: FunctionPassContext) {
-    let builder = Builder(before: originalReturn, location: originalReturn.location.asCleanup, context)
+  private func createExplodedReturn(
+    replacing originalReturn: ReturnInst, argumentMap: ArgumentMap, _ context: FunctionPassContext
+  ) {
+    let builder = Builder(
+      before: originalReturn, location: originalReturn.location.asCleanup, context)
 
     let originalValue = originalReturn.returnedValue
 
     let originalReturnTupleElements: [Value]
     if originalValue.type.isTuple {
-      originalReturnTupleElements = [Value](builder.createDestructureTuple(tuple: originalValue).results)
+      originalReturnTupleElements = [Value](
+        builder.createDestructureTuple(tuple: originalValue).results)
     } else {
       originalReturnTupleElements = [originalValue]
     }
@@ -691,8 +702,8 @@ private struct PackExplodedFunction {
     var resultMapIndex = 0
     var originalReturnIndex = 0
     for (i, originalResult) in self.original.convention.results.enumerated()
-        where originalResult.type.loweredType(in: self.original).shouldExplode
-                || !originalResult.isSILIndirect
+    where originalResult.type.loweredType(in: self.original).shouldExplode
+      || !originalResult.isSILIndirect
     {
 
       if !resultMap.indices.contains(resultMapIndex) || resultMap[resultMapIndex].0 != i {
@@ -704,18 +715,22 @@ private struct PackExplodedFunction {
         let (originalPackArgumentIdx, _) = resultMap[resultMapIndex]
 
         let argumentMapping = argumentMap[originalPackArgumentIdx]!
-        for argument in argumentMapping.arguments
-            where argument.allocStack != nil {
-          assert(
-            argument.storeBorrow == nil,
-            "Indirect results should not have an associated StoreBorrowInst.")
+        for argument in argumentMapping.arguments {
 
-          let allocStack = argument.allocStack!
-          returnValues.append(
-            builder.createLoad(
-              fromAddress: allocStack,
-              ownership: loadOwnership(for: allocStack, normal: .take))
-          )
+          switch argument.resources {
+          case .indirect:
+            break
+          case .direct(let allocStack):
+            returnValues.append(
+              builder.createLoad(
+                fromAddress: allocStack,
+                ownership: loadOwnership(for: allocStack, normal: .take))
+            )
+          case .directGuaranteed(_, _):
+            preconditionFailure(
+              "A pack-exploded result value has an associated store_borrow, but there should be no initial value to borrow."
+            )
+          }
         }
 
         resultMapIndex += 1
@@ -778,36 +793,32 @@ private struct PackExplodedFunction {
           ownership: Ownership(in: specialized, of: type, with: parameterInfo.convention),
           context)
 
-        let allocStack: AllocStackInst?
-        let storeBorrow: StoreBorrowInst?
+        let address: Value
+        let resources: ExplodedArgument.ConventionResources
         if parameterInfo.isSILIndirect {
           builder.createPackElementSet(elementValue: argument, packIndex: packIdx, pack: localPack)
-          allocStack = nil
-          storeBorrow = nil
+          resources = .indirect
         } else {
           let alloc = builder.createAllocStack(type)
 
-          let address: any Value
           if parameterInfo.convention == .directGuaranteed {
             // We do not own @guaranteed arguments, so we must use store_borrow instead of store.
-            let result = builder.createStoreBorrow(source: argument, destination: alloc)
-            address = result
-            storeBorrow = result
+            let storeBorrow = builder.createStoreBorrow(source: argument, destination: alloc)
+            address = storeBorrow
+            resources = .directGuaranteed(alloc, storeBorrow)
           } else {
-
             let ownership = storeOwnership(for: argument, normal: .initialize)
             builder.createStore(
               source: argument, destination: alloc,
               ownership: ownership)
             address = alloc
-            storeBorrow = nil
+            resources = .direct(alloc)
           }
           builder.createPackElementSet(elementValue: address, packIndex: packIdx, pack: localPack)
-          allocStack = alloc
         }
 
         mappings.append(
-          ExplodedArgument(packIdx: packIdx, allocStack: allocStack, storeBorrow: storeBorrow))
+          ExplodedArgument(packIdx: packIdx, resources: resources))
 
       }
       argumentMap[idx] = ArgumentMapping(allocPack: localPack, arguments: mappings)
@@ -824,7 +835,7 @@ private struct PackExplodedFunction {
         let packIdx = builder.createScalarPackIndex(
           componentIndex: i, indexedPackType: self.packASTTypes[idx]!)
 
-        let allocStack: AllocStackInst?
+        let resources: ExplodedArgument.ConventionResources
         if resultInfo.isSILIndirect {
           let argument = entryBlock.insertFunctionArgument(
             atPosition: insertArgumentPosition, type: type,
@@ -833,7 +844,7 @@ private struct PackExplodedFunction {
               of: type, with: ArgumentConvention(result: resultInfo.convention)),
             context)
           builder.createPackElementSet(elementValue: argument, packIndex: packIdx, pack: localPack)
-          allocStack = nil
+          resources = .indirect
           insertArgumentPosition += 1
         } else {
           // It is the callee's responsibility to initialize indirect results,
@@ -841,12 +852,12 @@ private struct PackExplodedFunction {
           // We do not need to initialize here.
           let alloc = builder.createAllocStack(type)
           builder.createPackElementSet(elementValue: alloc, packIndex: packIdx, pack: localPack)
-          allocStack = alloc
+          resources = .direct(alloc)
         }
 
         // Results have no initial value that could need to be borrowed.
         mappings.append(
-          ExplodedArgument(packIdx: packIdx, allocStack: allocStack, storeBorrow: nil))
+          ExplodedArgument(packIdx: packIdx, resources: resources))
 
       }
       argumentMap[idx] = ArgumentMapping(allocPack: localPack, arguments: mappings)
@@ -866,11 +877,13 @@ private struct PackExplodedFunction {
     let createDeallocations = { (idx: Int) in
       let mapped = argumentMap[idx]!
       for argument in mapped.arguments.reversed() {
-        if let storeBorrow = argument.storeBorrow {
-          // Also release borrows of any @guaranteed parameters
+        switch argument.resources {
+        case .indirect:
+          break
+        case .direct(let allocStack):
+          builder.createDeallocStack(allocStack)
+        case .directGuaranteed(let allocStack, let storeBorrow):
           builder.createEndBorrow(of: storeBorrow)
-        }
-        if let allocStack = argument.allocStack {
           builder.createDeallocStack(allocStack)
         }
       }
