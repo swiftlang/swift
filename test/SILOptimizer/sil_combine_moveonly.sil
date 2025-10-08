@@ -11,6 +11,11 @@ struct S : ~Copyable {
   deinit {}
 }
 
+struct S2 : ~Copyable {
+  @_hasStorage var a: Int { get set }
+  @_hasStorage var b: Int { get set }
+}
+
 struct FileDescriptor: ~Copyable {
   var fd: Builtin.Int64
 
@@ -169,3 +174,14 @@ bb0:
   %13 = tuple ()
   return %13
 }
+
+// CHECK-LABEL: sil [ossa] @dont_remove_destructure_struct_of_non_copyable :
+// CHECK:         destructure_struct
+// CHECK-LABEL: } // end sil function 'dont_remove_destructure_struct_of_non_copyable'
+sil [ossa] @dont_remove_destructure_struct_of_non_copyable : $@convention(method) (@owned S2) -> () {
+bb0(%0 : @owned $S2):
+  (%1, %2) = destructure_struct %0
+  %r = tuple ()
+  return %r
+}
+
