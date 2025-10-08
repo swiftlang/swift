@@ -21,6 +21,8 @@
 
 //--- Library.swift
 
+// LIBRARY-IR: @"$e7Library10PointClassCN" = weak_odr {{.*}}global
+
 // Never referenced.
 // LIBRARY-IR-NOT: @"$es23_swiftEmptyArrayStorageSi_S3itvp" = weak_odr {{(protected |dllexport )?}}global
 
@@ -53,6 +55,34 @@ public func unnecessary() -> Int64 { 5 }
 // LIBRARY-IR: define {{.*}} @"$e7Library14unusedYetThere
 @_neverEmitIntoClient
 public func unusedYetThere() -> Int64 { 5 }
+
+public class PointClass {
+  public var x, y: Int
+
+  public init(x: Int, y: Int) {
+    self.x = x
+    self.y = y
+  }
+}
+
+public protocol Reflectable: AnyObject {
+  func reflect()
+}
+
+// LIBRARY-IR: define linkonce_odr hidden swiftcc void @"$es4swapyyxz_xztlFSi_Tg5"
+// LIBRARY-IR: define linkonce_odr hidden swiftcc void @"$e7Library10PointClassCAA11ReflectableA2aDP7reflectyyFTW"
+
+extension PointClass: Reflectable {
+  public func reflect() {
+    swap(&x, &y)
+  }
+}
+
+// LIBRARY-IR: define {{.*}} @"$e7Library18createsExistentialAA11Reflectable_pyF"()
+@_neverEmitIntoClient
+public func createsExistential() -> any Reflectable {
+  return PointClass(x: 5, y: 5)
+}
 
 // LIBRARY-IR-NOT: define swiftcc
 // LIBRARY-IR-NOT: define hidden swiftcc
