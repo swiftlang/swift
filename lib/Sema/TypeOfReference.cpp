@@ -22,17 +22,20 @@
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeTransform.h"
+#include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/PreparedOverload.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Statistic.h"
-#include "swift/Basic/Defer.h"
 
 using namespace swift;
 using namespace constraints;
@@ -1646,11 +1649,12 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
                               PreparedOverloadBuilder *preparedOverload) {
   assert(!selfTy->is<ProtocolType>());
 
-  // Otherwise, use a subtype constraint for classes to cope with inheritance.
+  // Otherwise, use a subtype constraint for classes to cope with
+  // inheritance.
   if (selfTy->getClassOrBoundGenericClass()) {
     cs.addConstraint(ConstraintKind::Subtype, objectTy, selfTy,
-                     cs.getConstraintLocator(locator), /*isFavored=*/false,
-                     preparedOverload);
+                     cs.getConstraintLocator(locator),
+                     /*isFavored=*/false, preparedOverload);
     return;
   }
 
@@ -1949,6 +1953,29 @@ ConstraintSystem::getTypeOfMemberReferencePre(
   unsigned numRemovedArgumentLabels = getNumRemovedArgumentLabels(
       value, /*isCurriedInstanceReference*/ !hasAppliedSelf, functionRefInfo);
   openedType = openedType->removeArgumentLabels(numRemovedArgumentLabels);
+
+  // Adjust for C++ inline namespaces.
+  if (const auto *FT = openedType->getAs<FunctionType>()) {
+    auto openedParams = FT->getParams();
+    assert(openedParams.size() == 1);
+    auto param = openedParams.front();
+
+    Type selfObjTy = param.getPlainType();
+    bool wasMetaType = false;
+    if (param.getPlainType()->is<MetatypeType>()) {
+      selfObjTy = param.getPlainType()->getMetatypeInstanceType();
+      wasMetaType = true;
+    }
+    if (auto *objectTyNominal = baseObjTy->getAs<NominalType>()) {
+      if (auto *selfTyNominal = selfObjTy->getAs<NominalType>())
+        if (auto newSelfTy =
+                swift::stripInlineNamespaces(objectTyNominal, selfTyNominal))
+          openedType = FunctionType::get(
+              param.withType(wasMetaType ? Type(MetatypeType::get(newSelfTy))
+                                         : Type(newSelfTy)),
+              FT->getResult(), FT->getExtInfo());
+    }
+  }
 
   Type baseOpenedTy = baseObjTy;
 

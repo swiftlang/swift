@@ -10660,7 +10660,7 @@ ClangImporter::Implementation::importDeclContextOf(
       // Treat friend decls like top-level decls.
       if (functionDecl->getFriendObjectKind()) {
         // Find the top-level decl context.
-        while (isa<clang::NamedDecl>(dc))
+        while (!dc->isFileContext())
           dc = dc->getParent();
       }
 
