@@ -563,16 +563,13 @@ private struct PackExplodedFunction {
     for (argument, parameterInfo) in zip(function.parameters, function.convention.parameters) {
       if argument.type.shouldExplode {
 
-        let mappedParameterInfos = argument.type.packElements.map { elem in
-
-          // TODO: Determine correct values for options and hasLoweredAddress
+        let mappedParameterInfos = argument.type.packElements.map { element in
           ParameterInfo(
-            type: elem.canonicalType,
+            type: element.canonicalType,
             convention: explodedPackElementArgumentConvention(
-              pack: parameterInfo, type: elem, in: function),
+              pack: parameterInfo, type: element, in: function),
             options: parameterInfo.options,
             hasLoweredAddresses: parameterInfo.hasLoweredAddresses)
-
         }
 
         parameterMap.append((argument.index, mappedParameterInfos))
@@ -621,18 +618,18 @@ private struct PackExplodedFunction {
       }
     }
 
-    // We should have walked through all the indirect results, and no further.
-    assert(indirectResultIdx == function.argumentConventions.firstParameterIndex)
+    assert(
+      indirectResultIdx == function.argumentConventions.firstParameterIndex,
+      "We should have walked through all the indirect results, and no further.")
 
     return (newResults, resultMap)
   }
 
-  /// Build the body of the pack-specialized function
+  /// Build the body of the pack-specialized function.
   private func buildSpecializedFunction(_ context: FunctionPassContext) {
 
     context.buildSpecializedFunction(specializedFunction: specialized) {
       (specialized, specContext) in
-      // Callee is a specialized function, so we don't need to specialize it again.
       cloneFunction(from: original, toEmpty: specialized, specContext)
 
       let argumentMap = explodePackArguments(from: original, to: specialized, specContext)
@@ -694,7 +691,8 @@ private struct PackExplodedFunction {
     builder.createBranch(to: returnShimBB, arguments: forwardedValues)
   }
 
-  /// Explode the types of the entry block's pack arguments, and track the correspondence between exploded arguments and local packs
+  /// Explode the types of the entry block's pack arguments, and track the
+  /// correspondence between exploded arguments and local packs.
   private func explodePackArguments(
     from original: Function, to specialized: Function, _ context: FunctionPassContext
   ) -> ArgumentMap {
@@ -717,7 +715,11 @@ private struct PackExplodedFunction {
 
     var argumentMap = ArgumentMap()
 
-    // Explode parameters
+    // Explode the arguments in reverse order. This ensures that the index of
+    // each argument is not affected by other arguments exploding before it has
+    // been processed. Parameters come after results, so we explode them first.
+
+    // Explode parameters.
     for (idx, parameterInfos) in parameterMap.reversed() {
 
       let (localPack, packType) = prepareExplosion(idx)
@@ -766,7 +768,7 @@ private struct PackExplodedFunction {
       argumentMap[idx] = ArgumentMapping(allocPack: localPack, arguments: mappings)
     }
 
-    // Explode results
+    // Explode results.
     for (idx, resultInfos) in resultMap.reversed() {
 
       let (localPack, packType) = prepareExplosion(idx)
@@ -789,7 +791,9 @@ private struct PackExplodedFunction {
           allocStack = nil
           insertArgumentPosition += 1
         } else {
-          // TODO: This is an indirect result, so we rely on the existing code to initialize it?
+          // It is the callee's responsibility to initialize indirect results,
+          // so the original function body already does this.
+          // We do not need to initialize here.
           let alloc = builder.createAllocStack(type)
           builder.createPackElementSet(elementValue: alloc, packIndex: packIdx, pack: localPack)
           allocStack = alloc
