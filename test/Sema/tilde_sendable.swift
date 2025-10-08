@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature TildeSendable
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -swift-version 5 -enable-experimental-feature TildeSendable
 
 // REQUIRES: swift_feature_TildeSendable
 
@@ -15,6 +15,7 @@ class B: ~Sendable {}
 enum C: ~Sendable {}
 
 struct E1: Sendable, ~Sendable {}
+// expected-error@-1 {{cannot both conform to and suppress conformance to 'Sendable'}}
 
 enum E2: ~Sendable, ~Sendable {} // expected-warning {{already suppressed conformance to 'Sendable'}}
 
@@ -32,3 +33,22 @@ struct Generic<T: ~Sendable> { // expected-error {{conformance to 'Sendable' can
 
 var x: some BinaryInteger & ~Sendable // expected-error {{type 'Sendable' cannot be suppressed}}
 
+protocol W: Sendable {
+}
+
+// Check that inference is suppressed by the annotation.
+do {
+  struct NonSendable: ~Sendable {
+    // expected-note@-1 {{struct 'NonSendable' explicitly suppresses conformance to 'Sendable' protocol}}
+    let x: Int = 0
+  }
+
+  struct NoInference: W, ~Sendable {
+    // expected-error@-1 {{cannot both conform to and suppress conformance to 'Sendable'}}
+  }
+
+  func check<T: Sendable>(_: T) {}
+
+  check(NonSendable()) // expected-warning {{type 'NonSendable' does not conform to the 'Sendable' protocol}}
+  check(NoInference()) // Ok
+}

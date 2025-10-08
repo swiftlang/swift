@@ -8950,6 +8950,13 @@ ERROR(tilde_sendable_requires_feature_flag,none,
       "'~Sendable' requires -enable-experimental-feature TildeSendable",
       ())
 
+NOTE(sendable_conformance_is_suppressed, none,
+     "%kind0 explicitly suppresses conformance to 'Sendable' protocol",
+     (const NominalTypeDecl *))
+
+ERROR(non_sendable_type_suppressed,none,
+      "cannot both conform to and suppress conformance to 'Sendable'", ())
+
 ERROR(conformance_repression_only_on_struct_class_enum,none,
       "conformance to %0 can only be suppressed on structs, classes, and enums",
       (const ProtocolDecl *))
