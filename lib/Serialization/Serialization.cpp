@@ -4764,6 +4764,7 @@ public:
         param->isConstVal(),
         param->isSending(),
         param->isCallerIsolated(),
+        param->isAddressable(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),
         getRawStableActorIsolationKind(isolation.getKind()),
