@@ -875,7 +875,7 @@ struct Twople<T> {
   }
 }
 
-// CHECK-LABEL: sil{{.*}} [ossa] @throwTypedValue : {{.*}} {
+// CHECK-LABEL: sil{{.*}} [ossa] @throwTypedValue : {{.*}} -> @error Err {
 // CHECK:       bb0([[E:%[^,]+]] :
 // CHECK:         [[SWIFT_WILL_THROW_TYPED:%[^,]+]] = function_ref @swift_willThrowTyped
 // CHECK:         apply [[SWIFT_WILL_THROW_TYPED]]<Err>([[E]])
@@ -883,6 +883,57 @@ struct Twople<T> {
 // CHECK-LABEL: } // end sil function 'throwTypedValue'
 @_silgen_name("throwTypedValue")
 func throwTypedValue(_ e: Err) throws(Err) { throw e }
+
+// CHECK-LABEL: sil{{.*}} [ossa] @callTypedThrowsFunc : {{.*}} -> @error any Error {
+// CHECK:       bb0:
+// CHECK:         [[TYPED_THROW_FN:%[^,]+]] = function_ref @throwTypedValue
+// CHECK:         try_apply [[TYPED_THROW_FN]]({{%[0-9]+}}) : $@convention(thin) (Err) -> @error Err, normal bb1, error bb2
+//
+// CHECK:       bb1({{%[0-9]+}} : $()):
+// CHECK:         return
+//
+// CHECK:       bb2([[E:%[^,]+]] : $Err):
+// CHECK:         [[STACK_ALLOC:%[^,]+]] = alloc_stack $any Error
+// CHECK:         [[BOX:%[^,]+]] = project_existential_box $Err
+// CHECK:         store [[E]] to [trivial] [[BOX]]
+// CHECK:         [[ANY_ERROR:%[^,]+]] = load [take] [[STACK_ALLOC]]
+// CHECK:         throw [[ANY_ERROR]]
+// CHECK-LABEL: } // end sil function 'callTypedThrowsFunc'
+@_silgen_name("callTypedThrowsFunc")
+func callTypedThrowsFunc() throws {
+  try throwTypedValue(Err())
+}
+
+// CHECK-LABEL: sil{{.*}} [ossa] @throwTypedValueGeneric : {{.*}} <GenErr where GenErr : Error> (@in_guaranteed GenErr) -> @error_indirect GenErr {
+// CHECK:       bb0([[BORROWED_ERR:%[^,]+]] : @guaranteed $GenErr):
+// CHECK:         [[E:%[^,]+]] = copy_value [[BORROWED_ERR]]
+// CHECK:         [[SWIFT_WILL_THROW_TYPED:%[^,]+]] = function_ref @swift_willThrowTyped
+// CHECK:         apply [[SWIFT_WILL_THROW_TYPED]]<GenErr>([[E]])
+// CHECK:         throw [[E]]
+// CHECK-LABEL: } // end sil function 'throwTypedValueGeneric'
+@_silgen_name("throwTypedValueGeneric")
+func throwTypedValueGeneric<GenErr: Error>(_ e: GenErr) throws(GenErr) { throw e }
+
+// CHECK-LABEL: sil{{.*}} [ossa] @callTypedThrowsFuncGeneric : {{.*}} -> @error any Error {
+// CHECK:       bb0:
+// CHECK:         [[ERR_VAL:%[^,]+]] = apply {{.*}} -> Err
+// CHECK:         [[GEN_TYPED_THROW_FN:%[^,]+]] = function_ref @throwTypedValueGeneric
+// CHECK:         try_apply [[GEN_TYPED_THROW_FN]]<Err>([[ERR_VAL]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> @error_indirect τ_0_0, normal bb1, error bb2
+//
+// CHECK:       bb1({{%[0-9]+}} : $()):
+// CHECK:         return
+//
+// CHECK:       bb2([[E:%[^,]+]] : $Err):
+// CHECK:         [[STACK_ALLOC:%[^,]+]] = alloc_stack $any Error
+// CHECK:         [[BOX:%[^,]+]] = project_existential_box $Err
+// CHECK:         store [[E]] to [trivial] [[BOX]]
+// CHECK:         [[ANY_ERROR:%[^,]+]] = load [take] [[STACK_ALLOC]]
+// CHECK:         throw [[ANY_ERROR]]
+// CHECK-LABEL: } // end sil function 'callTypedThrowsFuncGeneric'
+@_silgen_name("callTypedThrowsFuncGeneric")
+func callTypedThrowsFuncGeneric() throws {
+  try throwTypedValueGeneric(Err())
+}
 
 struct Err : Error {}
 
