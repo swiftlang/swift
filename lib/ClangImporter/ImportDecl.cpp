@@ -2544,15 +2544,6 @@ namespace {
         //    constructor available in Swift.
         ConstructorDecl *defaultCtor =
             synthesizer.createDefaultConstructor(result);
-        if (cxxRecordDecl) {
-          auto attr = AvailableAttr::createUniversallyDeprecated(
-              defaultCtor->getASTContext(),
-              "This zero-initializes the backing memory of the struct, which "
-              "is unsafe for some C++ structs. Consider adding an explicit "
-              "default initializer for this C++ struct.",
-              "");
-          defaultCtor->getAttrs().add(attr);
-        }
         ctors.push_back(defaultCtor);
       }
 

@@ -136,7 +136,6 @@
 // CHECK-NEXT: public func getCopyCounter() -> UnsafeMutablePointer<Int32>
 // CHECK-NEXT: public struct CopyTrackedBaseClass {
 // CHECK-NEXT:   public init(_ x: Int32)
-// CHECK-NEXT:   @available(*, deprecated, message: "This zero-initializes the backing memory of the struct, which is unsafe for some C++ structs. Consider adding an explicit default initializer for this C++ struct.")
 // CHECK-NEXT:   @_transparent public init()
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func getX() -> Int32
@@ -147,7 +146,6 @@
 
 // CHECK-NEXT: public struct CopyTrackedDerivedClass {
 // CHECK-NEXT:   public init(_ x: Int32)
-// CHECK-NEXT:   @available(*, deprecated, message: "This zero-initializes the backing memory of the struct, which is unsafe for some C++ structs. Consider adding an explicit default initializer for this C++ struct.")
 // CHECK-NEXT:   @_transparent public init()
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func getDerivedX() -> Int32
@@ -167,7 +165,6 @@
 
 // CHECK-NEXT: public struct CopyTrackedDerivedDerivedClass {
 // CHECK-NEXT:   public init(_ x: Int32)
-// CHECK-NEXT:   @available(*, deprecated, message: "This zero-initializes the backing memory of the struct, which is unsafe for some C++ structs. Consider adding an explicit default initializer for this C++ struct.")
 // CHECK-NEXT:   @_transparent public init()
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func getY() -> Int32
