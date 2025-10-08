@@ -34,10 +34,9 @@ let packSpecialization = FunctionPass(name: "pack-specialization") {
     return
   }
 
-  for inst in function.instructions {
-    // Only support full application for now.
-    guard let apply = inst as? ApplyInst,
-      let callee = apply.referencedFunction,
+  for case let apply as ApplyInst in function.instructions {
+    // Only support normal apply instructions for now.
+    guard let callee = apply.referencedFunction,
       // Only specialize calls to OSSA functions
       callee.hasOwnership,
       let specialized = specializeCallee(apply: apply, context: context)
@@ -414,7 +413,6 @@ private func specializeCallee(apply: ApplySite, context: FunctionPassContext)
   // Only perform pack specialization when the callee has pack arguments
   guard let callee = apply.referencedFunction,
     callee.isDefinition,
-    callee.isSpecialization,
     callee.argumentTypes.contains(where: { $0.shouldExplode })
   else {
     return nil
@@ -798,7 +796,7 @@ private struct PackExplodedFunction {
         let packIdx = builder.createScalarPackIndex(
           componentIndex: i, indexedPackType: self.packASTTypes[idx]!)
         let argument = entryBlock.insertFunctionArgument(
-          atPosition: idx + i, type: type,
+          atPosition: idx + i, type: parameterInfo.isSILIndirect ? type.addressType : type,
           ownership: Ownership(in: specialized, of: type, with: parameterInfo.convention),
           context)
 
