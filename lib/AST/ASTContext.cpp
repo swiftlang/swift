@@ -6007,6 +6007,25 @@ GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
   return newSig;
 }
 
+GenericSignature
+GenericSignature::forInvalid(ArrayRef<GenericTypeParamType *> params) {
+  ASSERT(!params.empty());
+  auto &ctx = params.front()->getASTContext();
+
+  SmallVector<Requirement, 2> requirements;
+  for (auto *param : params) {
+    if (param->isValue())
+      continue;
+
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
+      auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+      requirements.emplace_back(RequirementKind::Conformance, param,
+                                proto->getDeclaredInterfaceType());
+    }
+  }
+  return GenericSignature::get(params, requirements);
+}
+
 GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
   auto &ctx = signature->getASTContext();
 

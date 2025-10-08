@@ -120,6 +120,10 @@ public:
                               ArrayRef<Requirement> requirements,
                               bool isKnownCanonical = false);
 
+  /// Create a new placeholder generic signature from a set of generic
+  /// parameters. This is necessary for recovery in invalid cases.
+  static GenericSignature forInvalid(ArrayRef<GenericTypeParamType *> params);
+
   /// Produce a new generic signature which drops all of the marker
   /// protocol conformance requirements associated with this one.
   GenericSignature withoutMarkerProtocols() const;

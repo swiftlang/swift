@@ -1660,22 +1660,13 @@ static GenericSignature getPlaceholderGenericSignature(
     gpLists[i]->setDepth(i);
 
   SmallVector<GenericTypeParamType *, 2> genericParams;
-  SmallVector<Requirement, 2> requirements;
-
   for (auto *gpList : gpLists) {
     for (auto *genericParam : *gpList) {
       auto type = genericParam->getDeclaredInterfaceType();
       genericParams.push_back(type->castTo<GenericTypeParamType>());
-
-      for (auto ip : InvertibleProtocolSet::allKnown()) {
-        auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
-        requirements.emplace_back(RequirementKind::Conformance, type,
-                                  proto->getDeclaredInterfaceType());
-      }
     }
   }
-
-  return GenericSignature::get(genericParams, requirements);
+  return GenericSignature::forInvalid(genericParams);
 }
 
 GenericSignature GenericContext::getGenericSignature() const {
