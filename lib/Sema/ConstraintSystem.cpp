@@ -2773,7 +2773,7 @@ static bool diagnoseAmbiguity(
 
       auto emitGeneralFoundCandidateNote = [&]() {
         // Emit a general "found candidate" note
-        if (decl->getLoc().isInvalid()) {
+        if (decl->getLoc(/*SerializedOK=*/false).isInvalid()) {
           if (candidateTypes.insert(type->getCanonicalType()).second)
             DE.diagnose(getLoc(commonAnchor), diag::found_candidate_type, type);
         } else {

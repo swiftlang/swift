@@ -49,7 +49,7 @@ public struct Override: Hashable, P {
 
 // NO-OVERRIDE-OTHER-LABEL: "precise": "s:12SourceModule13NoDocOverrideV4hash4intoys6HasherVz_tF"
 // NO-OVERRIDE-OTHER:      "docComment": {
-// NO-OVERRIDE-OTHER-NEXT:        "module": "Swift",
+// NO-OVERRIDE-OTHER:        "module": "Swift",
 // NO-OVERRIDE-OTHER-NEXT:        "lines": [
 // actual doc comment lines skipped because they're from the stdlib
 

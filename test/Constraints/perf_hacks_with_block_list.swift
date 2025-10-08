@@ -13,4 +13,4 @@ ShouldUseTypeCheckerPerfHacks:
 //--- main.swift
 _ = 1 + 2 + 3
 
-// CHECK: [favored] {{.*}} bound to decl Swift.(file).Int extension.+ : (Int.Type) -> (Int, Int) -> Int
+// CHECK: [favored] {{.*}} bound to decl Swift.(file).Int extension.+{{.*}} : (Int.Type) -> (Int, Int) -> Int
