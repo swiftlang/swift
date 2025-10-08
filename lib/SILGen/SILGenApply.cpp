@@ -5225,7 +5225,7 @@ public:
 
   CleanupHandle applyCoroutine(SmallVectorImpl<ManagedValue> &yields);
 
-  ManagedValue applyBorrowAccessor();
+  ManagedValue applyBorrowMutateAccessor();
 
   RValue apply(SGFContext C = SGFContext()) {
     initialWritebackScope.verify();
@@ -5426,7 +5426,7 @@ CleanupHandle SILGenFunction::emitBeginApply(
   return endApplyHandle;
 }
 
-ManagedValue CallEmission::applyBorrowAccessor() {
+ManagedValue CallEmission::applyBorrowMutateAccessor() {
   auto origFormalType = callee.getOrigFormalType();
   // Get the callee type information.
   auto calleeTypeInfo = callee.getTypeInfo(SGF);
@@ -5453,14 +5453,14 @@ ManagedValue CallEmission::applyBorrowAccessor() {
             lookThroughMoveOnlyCheckerPattern(selfArgMV.getValue()));
   }
 
-  auto value = SGF.applyBorrowAccessor(uncurriedLoc.value(), fnValue, canUnwind,
-                                       callee.getSubstitutions(), uncurriedArgs,
-                                       calleeTypeInfo.substFnType, options);
+  auto value = SGF.applyBorrowMutateAccessor(
+      uncurriedLoc.value(), fnValue, canUnwind, callee.getSubstitutions(),
+      uncurriedArgs, calleeTypeInfo.substFnType, options);
 
   return value;
 }
 
-ManagedValue SILGenFunction::applyBorrowAccessor(
+ManagedValue SILGenFunction::applyBorrowMutateAccessor(
     SILLocation loc, ManagedValue fn, bool canUnwind, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, CanSILFunctionType substFnType,
     ApplyOptions options) {
@@ -7887,7 +7887,7 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
   return endApplyHandle;
 }
 
-ManagedValue SILGenFunction::emitBorrowAccessor(
+ManagedValue SILGenFunction::emitBorrowMutateAccessor(
     SILLocation loc, SILDeclRef accessor, SubstitutionMap substitutions,
     ArgumentSource &&selfValue, bool isSuper, bool isDirectUse,
     PreparedArguments &&subscriptIndices, bool isOnSelfParameter) {
@@ -7912,7 +7912,7 @@ ManagedValue SILGenFunction::emitBorrowAccessor(
 
   emission.setCanUnwind(false);
 
-  return emission.applyBorrowAccessor();
+  return emission.applyBorrowMutateAccessor();
 }
 
 ManagedValue SILGenFunction::emitAsyncLetStart(
