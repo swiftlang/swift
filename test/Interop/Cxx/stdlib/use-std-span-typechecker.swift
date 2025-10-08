@@ -1,5 +1,3 @@
-// REQUIRES: rdar://162106722
-
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -Xcc -std=c++20 2>&1
 
 import StdSpan
