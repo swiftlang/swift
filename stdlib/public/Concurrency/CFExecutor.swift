@@ -43,6 +43,7 @@ enum CoreFoundation {
 
 // .. Main Executor ............................................................
 
+/// A CFRunLoop-based main executor (Apple platforms only)
 @available(StdlibDeploymentTarget 6.2, *)
 final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
 
@@ -58,6 +59,7 @@ final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
 
 // .. Task Executor ............................................................
 
+/// A `TaskExecutor` to match `CFMainExecutor` (Apple platforms only)
 @available(StdlibDeploymentTarget 6.2, *)
 final class CFTaskExecutor: DispatchGlobalTaskExecutor,
                             @unchecked Sendable {
