@@ -160,7 +160,7 @@ private struct DiagnoseDependence {
   func checkInScope(operand: Operand) -> WalkResult {
     if let range, !range.inclusiveRangeContains(operand.instruction) {
       log("  out-of-range error: \(operand.instruction)")
-      reportError(operand: operand, diagID: .lifetime_outside_scope_use)
+      reportError(escapingValue: operand.value, user: operand.instruction, diagID: .lifetime_outside_scope_use)
       return .abortWalk
     }
     log("  contains: \(operand.instruction)")
@@ -169,7 +169,12 @@ private struct DiagnoseDependence {
 
   func reportEscaping(operand: Operand) {
     log("  escaping error: \(operand.instruction)")
-    reportError(operand: operand, diagID: .lifetime_outside_scope_escape)
+    reportError(escapingValue: operand.value, user: operand.instruction, diagID: .lifetime_outside_scope_escape)
+  }
+
+  func reportEscaping(value: Value, user: Instruction) {
+    log("  escaping error: \(value) at \(user)")
+    reportError(escapingValue: value, user: user, diagID: .lifetime_outside_scope_escape)
   }
 
   func reportUnknown(operand: Operand) {
@@ -258,7 +263,7 @@ private struct DiagnoseDependence {
     return .abortWalk
   }
 
-  func reportError(operand: Operand, diagID: DiagID) {
+  func reportError(escapingValue: Value, user: Instruction, diagID: DiagID) {
     // If the dependent value is Escapable, then mark_dependence resolution fails, but this is not a diagnostic error.
     if dependence.dependentValue.isEscapable {
       return
@@ -266,7 +271,7 @@ private struct DiagnoseDependence {
     onError()
 
     // Identify the escaping variable.
-    let escapingVar = LifetimeVariable(usedBy: operand, context)
+    let escapingVar = LifetimeVariable(definedBy: escapingValue, user: user, context)
     if let varDecl = escapingVar.varDecl {
       // Use the variable location, not the access location.
       // Variable names like $return_value and $implicit_value don't have source locations.
@@ -288,7 +293,7 @@ private struct DiagnoseDependence {
     diagnoseImplicitFunction()
     reportScope()
     // Identify the use point.
-    if let userSourceLoc = operand.instruction.location.sourceLoc {
+    if let userSourceLoc = user.location.sourceLoc {
       diagnose(userSourceLoc, diagID)
     }
   }
@@ -359,13 +364,12 @@ private struct LifetimeVariable {
     return varDecl?.userFacingName
   }
 
-  init(usedBy operand: Operand, _ context: some Context) {
-    self = .init(dependent: operand.value, context)
+  init(definedBy value: Value, user: Instruction, _ context: some Context) {
+    self = .init(dependent: value, context)
     // variable names like $return_value and $implicit_value don't have source locations.
-    // For @out arguments, the operand's location is the best answer.
+    // For @out arguments, the user's location is the best answer.
     // Otherwise, fall back to the function's location.
-    self.sourceLoc = self.sourceLoc ?? operand.instruction.location.sourceLoc
-      ?? operand.instruction.parentFunction.location.sourceLoc
+    self.sourceLoc = self.sourceLoc ?? user.location.sourceLoc ?? user.parentFunction.location.sourceLoc
   }
 
   init(definedBy value: Value, _ context: some Context) {
