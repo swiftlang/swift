@@ -167,3 +167,14 @@ func testLeadingDotSyntax() {
   takesP(.zInC)
   takesP(.zAmbiguous)
 }
+
+func testConformanceMember(_ h1: HasEquatableMembers, _ h2: HasEquatableMembers) {
+  _ = h1.a == h2.a
+  // Technically, this references the EquatableInB.== member that hasn't been
+  // imported. However, the conformance of EquatableInB: Equatable is visible
+  // here because conformances are not yet subject to import visibility rules.
+  // As a result, the == requirement is technically visible and therefore there
+  // should be no diagnostic with MemberImportVisibility enabled.
+  _ = h1.b == h2.b
+  _ = h1.c == h2.c
+}
