@@ -2089,10 +2089,17 @@ static void emitRawApply(SILGenFunction &SGF,
     auto result = normalBB->createPhiArgument(resultType, OwnershipKind::Owned);
     rawResults.push_back(result);
 
+    // If the error is not passed indirectly, include the expected error type
+    // according to the SILFunctionConvention.
+    std::optional<TaggedUnion<SILValue, SILType>> errorAddrOrType;
+    if (indirectErrorAddr)
+        errorAddrOrType = indirectErrorAddr;
+    else
+      errorAddrOrType = substFnConv.getSILErrorType(SGF.getTypeExpansionContext());
+
     SILBasicBlock *errorBB =
       SGF.getTryApplyErrorDest(loc, substFnType, prevExecutor,
-                               substFnType->getErrorResult(),
-                               indirectErrorAddr,
+                                *errorAddrOrType,
                                options.contains(ApplyFlags::DoesNotThrow));
 
     options -= ApplyFlags::DoesNotThrow;
@@ -5989,9 +5996,9 @@ RValue SILGenFunction::emitApply(
 
   SILValue indirectErrorAddr;
   if (substFnType->hasErrorResult()) {
-    auto errorResult = substFnType->getErrorResult();
-    if (errorResult.getConvention() == ResultConvention::Indirect) {
-      auto loweredErrorResultType = getSILType(errorResult, substFnType);
+    auto convention = silConv.getFunctionConventions(substFnType);
+    if (auto errorResult = convention.getIndirectErrorResult()) {
+      auto loweredErrorResultType = getSILType(*errorResult, substFnType);
       indirectErrorAddr = B.createAllocStack(loc, loweredErrorResultType);
       enterDeallocStackCleanup(indirectErrorAddr);
     }
