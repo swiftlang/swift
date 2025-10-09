@@ -790,6 +790,25 @@ public:
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
+  // For a direct error result, as a result of an @error convention, if any.
+  SILValue getDirectErrorResult() const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+    case FullApplySiteKind::BeginApplyInst:
+      return SILValue();
+    case FullApplySiteKind::TryApplyInst: {
+      if (getNumIndirectSILErrorResults())
+        return SILValue(); // Not a direct @error convention.
+
+      auto *errBlock = cast<TryApplyInst>(getInstruction())->getErrorBB();
+      assert(errBlock->getNumArguments() == 1 &&
+             "Expected this try_apply to have a single direct error result");
+      return errBlock->getArgument(0);
+    }
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
   unsigned getNumIndirectSILResults() const {
     return getSubstCalleeConv().getNumIndirectSILResults();
   }
