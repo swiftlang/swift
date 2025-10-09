@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -typecheck -swift-version 6 %s -verify
+// RUN:  %target-build-swift %s -o %t.exe
+// RUN: %target-codesign %t.exe
+// RUN: %target-run %t.exe
 // REQUIRES: executable_test
 // REQUIRES: OS=windows-msvc
 

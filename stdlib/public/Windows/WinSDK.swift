@@ -321,9 +321,9 @@ func _convertWindowsBoolToBool(_ b: WindowsBool) -> Bool {
 
 // GUID
 
-extension GUID: Equatable, Hashable {
+extension GUID: Equatable {
   @usableFromInline @_transparent
-  private var uint128Value: UInt128 {
+  var uint128Value: UInt128 {
     unsafe withUnsafeBytes(of: self) { buffer in
       // GUID is 32-bit-aligned only, so use loadUnaligned().
       unsafe buffer.baseAddress!.loadUnaligned(as: UInt128.self)
@@ -334,7 +334,9 @@ extension GUID: Equatable, Hashable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
     lhs.uint128Value == rhs.uint128Value
   }
+}
 
+extension GUID: Hashable {
   @_transparent
   public func hash(into: inout Hasher) {
     hasher.combine(uint128Value)
