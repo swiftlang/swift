@@ -68,7 +68,9 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
                                           (decl as Decl?).bridged).argument as! FunctionArgument
   }
 
-  public func insertPhiArgument(atPosition: Int, type: Type, ownership: Ownership, _ context: some MutatingContext) -> Argument {
+  public func insertPhiArgument(
+    atPosition: Int, type: Type, ownership: Ownership, _ context: some MutatingContext
+  ) -> Argument {
     context.notifyInstructionsChanged()
     return bridged.insertPhiArgument(atPosition, type.bridged, ownership._bridged).argument
   }

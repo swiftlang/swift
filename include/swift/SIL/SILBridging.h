@@ -251,8 +251,6 @@ BridgedYieldInfoArray SILFunctionType_getYields(BridgedCanType);
 SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLifetimeDependenceInfoArray
 SILFunctionType_getLifetimeDependencies(BridgedCanType);
 
-enum class BridgedValueCategory { Address, Object };
-
 struct BridgedType {
   void * _Nullable opaqueValue;
 
@@ -266,12 +264,12 @@ struct BridgedType {
   BRIDGED_INLINE BridgedType(swift::SILType t);
   BRIDGED_INLINE swift::SILType unbridged() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getCanType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType mapTypeOutOfContext() const;
 
   static SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType createSILType(BridgedCanType canTy);
   BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE bool isNull() const;
   BRIDGED_INLINE bool isAddress() const;
-  BRIDGED_INLINE BridgedValueCategory getCategory() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getAddressType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getObjectType() const;
   BRIDGED_INLINE bool isTrivial(BridgedFunction f) const;
@@ -312,12 +310,7 @@ struct BridgedType {
   getTupleElementLabel(SwiftInt idx) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getFunctionTypeWithNoEscape(bool withNoEscape) const;
   BRIDGED_INLINE BridgedArgumentConvention getCalleeConvention() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType mapTypeOutOfContext() const;
 };
-
-SWIFT_NAME("BridgedType.getPrimitiveType(canType:silValueCategory:)")
-BRIDGED_INLINE BridgedType BridgedType_getPrimitiveType(
-    BridgedCanType canType, BridgedValueCategory silValueCategory);
 
 // SIL Bridging
 
@@ -983,7 +976,6 @@ struct BridgedArgument {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getDecl() const;
   BRIDGED_INLINE void copyFlags(BridgedArgument fromArgument) const;
   BRIDGED_INLINE BridgedValue::Ownership getOwnership() const;
-  BRIDGED_INLINE void replaceAllUsesWith(BridgedArgument arg) const;
 };
 
 struct OptionalBridgedArgument {
@@ -1368,8 +1360,6 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDestructureStruct(BridgedValue str) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createTuple(BridgedType type,
                                                                     BridgedValueArray elements) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
-  createTuple(BridgedValueArray elements) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createTupleExtract(BridgedValue str,
                                                                            SwiftInt elementIndex) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createTupleElementAddr(BridgedValue addr,

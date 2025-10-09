@@ -683,11 +683,11 @@ swift::Identifier BridgedASTType::GenericTypeParam_getName() const {
   return llvm::cast<swift::GenericTypeParamType>(type)->getName();
 }
 
-SwiftUInt BridgedASTType::GenericTypeParam_getDepth() const {
+SwiftInt BridgedASTType::GenericTypeParam_getDepth() const {
   return llvm::cast<swift::GenericTypeParamType>(type)->getDepth();
 }
 
-SwiftUInt BridgedASTType::GenericTypeParam_getIndex() const {
+SwiftInt BridgedASTType::GenericTypeParam_getIndex() const {
   return llvm::cast<swift::GenericTypeParamType>(type)->getIndex();
 }
 

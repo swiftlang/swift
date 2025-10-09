@@ -27,7 +27,6 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
 
   public var isAddress: Bool { bridged.isAddress() }
   public var isObject: Bool { !isAddress }
-  public var category: ValueCategory { ValueCategory(bridged: bridged.getCategory()) }
 
   public var addressType: Type { bridged.getAddressType().type }
   public var objectType: Type { bridged.getObjectType().type }
@@ -186,6 +185,22 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return EnumCases(enumType: self, function: function)
   }
 
+  public func getEnumCase(in function: Function, at index: Int) -> EnumCase? {
+    guard let enumCases = getEnumCases(in: function) else {
+      return nil
+    }
+
+    var enumCaseIndex = 0
+    for enumCase in enumCases {
+      if index == enumCaseIndex {
+        return enumCase
+      }
+      enumCaseIndex += 1
+    }
+
+    return nil
+  }
+
   public func getIndexOfEnumCase(withName name: String) -> Int? {
     let idx = name._withBridgedStringRef {
       bridged.getCaseIdxOfEnumType($0)
@@ -216,14 +231,8 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return false
   }
 
-  public func getEnumCasePayload(caseIdx: Int, function: Function) -> Type {
-    bridged.getEnumCasePayload(caseIdx, function.bridged).type
-  }
-
-  public func mapTypeOutOfContext() -> Type { bridged.mapTypeOutOfContext().type }
-
-  public static func getPrimitiveType(canType: CanonicalType, silValueCategory: ValueCategory) -> Type {
-    BridgedType.getPrimitiveType(canType: canType.bridged, silValueCategory: silValueCategory._bridged).type
+  public func mapTypeOutOfContext(in function: Function) -> Type {
+    rawType.mapTypeOutOfContext().canonical.loweredType(in: function)
   }
 }
 
@@ -318,7 +327,7 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
     type.bridged.getTupleElementType(index).type
   }
 
-  public func label(at index: Int) -> swift.Identifier {
+  public func label(at index: Int) -> Identifier {
     type.bridged.getTupleElementLabel(index)
   }
 }

@@ -1332,7 +1332,7 @@ SWIFT_NAME("BridgedDecl.forEachDeclToHoist(self:_:)")
 void BridgedDecl_forEachDeclToHoist(BridgedDecl decl,
                                     BridgedSwiftClosure closure);
 
-SWIFT_NAME("BridgedDecl.getDeclContext(self:)")
+SWIFT_NAME("getter:BridgedDecl.declContext(self:)")
 BridgedDeclContext BridgedDecl_getDeclContext(BridgedDecl decl);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedStaticSpelling {
@@ -2923,8 +2923,8 @@ BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
 SWIFT_NAME("BridgedGenericTypeParamDecl.createImplicit(declContext:"
            "name:depth:index:paramKind:)")
 BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createImplicit(
-    BridgedDeclContext cDeclContext, swift::Identifier name, SwiftUInt depth,
-    SwiftUInt index, swift::GenericTypeParamKind paramKind);
+    BridgedDeclContext cDeclContext, swift::Identifier name, SwiftInt depth,
+    SwiftInt index, swift::GenericTypeParamKind paramKind);
 
 SWIFT_NAME(
     "BridgedTrailingWhereClause.createParsed(_:whereKeywordLoc:requirements:)")
@@ -3042,14 +3042,14 @@ struct BridgedASTType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getInvocationGenericSignatureOfFunctionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;  
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeOutOfContext() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType
   getReducedType(BridgedGenericSignature sig) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::Identifier
   GenericTypeParam_getName() const;
-  BRIDGED_INLINE SwiftUInt GenericTypeParam_getDepth() const;
-  BRIDGED_INLINE SwiftUInt GenericTypeParam_getIndex() const;
+  BRIDGED_INLINE SwiftInt GenericTypeParam_getDepth() const;
+  BRIDGED_INLINE SwiftInt GenericTypeParam_getIndex() const;
   BRIDGED_INLINE swift::GenericTypeParamKind
   GenericTypeParam_getParamKind() const;
 };

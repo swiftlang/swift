@@ -49,10 +49,7 @@ extension Context {
   public func getBuiltinIntegerType(bitWidth: Int) -> Type { _bridged.getBuiltinIntegerType(bitWidth).type }
 
   public func getTupleType(elements: [Type]) -> AST.`Type` {
-    let bridgedElements = elements.map { $0.bridged }
-    return bridgedElements.withBridgedArrayRef {
-      AST.`Type`(bridged: _bridged.getTupleType($0))
-    }
+    return getTupleType(elements: elements.map{ $0.rawType })
   }
 
   public func getTupleType(elements: [AST.`Type`]) -> AST.`Type` {
@@ -62,11 +59,10 @@ extension Context {
     }
   }
 
-  public func getTupleTypeWithLabels(elements: [AST.`Type`], labels: [swift.Identifier]) -> AST.`Type` {
-    assert(elements.count == labels.count)
-    return elements.withBridgedArrayRef{
-      eltArr in labels.withBridgedArrayRef{labelsArr in
-      AST.`Type`(bridged: _bridged.getTupleTypeWithLabels(eltArr, labelsArr))}}
+  public func getTupleType(elements: [(label: Identifier, type: AST.`Type`)]) -> AST.`Type` {
+    return elements.map{$0.type}.withBridgedArrayRef{
+      types in elements.map{$0.label}.withBridgedArrayRef{labels in
+      AST.`Type`(bridged: _bridged.getTupleTypeWithLabels(types, labels))}}
   }
 
   public var swiftArrayDecl: NominalTypeDecl {

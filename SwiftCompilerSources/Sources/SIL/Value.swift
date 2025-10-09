@@ -41,27 +41,6 @@ public protocol Value : AnyObject, CustomStringConvertible {
   var isLexical: Bool { get }
 }
 
-public enum ValueCategory {
-  case address
-  case object
-
-  public init(bridged: BridgedValueCategory) {
-    switch bridged {
-    case .Address: self = .address
-    case .Object:  self = .object
-    default:
-      fatalError("unsupported value category")
-    }
-  }
-
-  public var _bridged: BridgedValueCategory {
-    switch self {
-      case .address: return BridgedValueCategory.Address
-      case .object:  return BridgedValueCategory.Object
-    }
-  }
-}
-
 public enum Ownership {
   /// A Value with `unowned` ownership kind is an independent value that
   /// has a lifetime that is only guaranteed to last until the next program

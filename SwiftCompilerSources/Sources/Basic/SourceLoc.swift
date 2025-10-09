@@ -35,6 +35,14 @@ extension Optional<SourceLoc> {
   }
 }
 
+public struct SourceRange {
+  public let bridged: swift.SourceRange
+
+  public init(start: SourceLoc?) {
+    self.bridged = swift.SourceRange(start: start.bridgedLocation)
+  }
+}
+
 public struct CharSourceRange {
   public let start: SourceLoc
   public let byteLength: UInt32

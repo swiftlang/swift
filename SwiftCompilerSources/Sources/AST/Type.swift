@@ -71,24 +71,26 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
     return Type(bridged: bridged.mapTypeOutOfContext())
   }
 
-  public func getReducedType(sig: GenericSignature) -> CanonicalType {
-    CanonicalType(bridged: bridged.getReducedType(sig.bridged))
+  /// Returns a stronger canonicalization which folds away equivalent
+  /// associated types, or type parameters that have been made concrete.
+  public func getReducedType(of signature: GenericSignature) -> CanonicalType {
+    CanonicalType(bridged: bridged.getReducedType(signature.bridged))
   }
 
-  public func GenericTypeParam_getName() -> swift.Identifier {
-    return bridged.GenericTypeParam_getName()
+  public var nameOfGenericTypeParameter: Identifier {
+    bridged.GenericTypeParam_getName()
   }
 
-  public func GenericTypeParam_getDepth() -> UInt {
-    return bridged.GenericTypeParam_getDepth()
+  public var depthOfGenericTypeParameter: Int {
+    bridged.GenericTypeParam_getDepth()
   }
 
-  public func GenericTypeParam_getIndex() -> UInt {
-    return bridged.GenericTypeParam_getIndex()
+  public var indexOfGenericTypeParameter: Int {
+    bridged.GenericTypeParam_getIndex()
   }
 
-  public func GenericTypeParam_getParamKind() -> swift.GenericTypeParamKind {
-    return bridged.GenericTypeParam_getParamKind()
+  public var kindOfGenericTypeParameter: GenericTypeParameterKind {
+    bridged.GenericTypeParam_getParamKind()
   }
 }
 
@@ -109,10 +111,6 @@ public struct CanonicalType: TypeProperties, CustomStringConvertible, NoReflecti
 
   public func subst(with substitutionMap: SubstitutionMap) -> CanonicalType {
     return rawType.subst(with: substitutionMap).canonical
-  }
-
-  public func SILFunctionType_getSubstGenericSignature() -> CanGenericSignature {
-    CanGenericSignature(bridged: bridged.SILFunctionType_getSubstGenericSignature())
   }
 }
 
@@ -270,6 +268,12 @@ extension TypeProperties {
   public func checkConformance(to protocol: ProtocolDecl) -> Conformance {
     return Conformance(bridged: rawType.bridged.checkConformance(`protocol`.bridged))
   }
+
+  /// The generic signature that the component types are specified in terms of, if any.
+  public var substitutedGenericSignatureOfFunctionType: CanonicalGenericSignature {
+    CanonicalGenericSignature(
+      bridged: rawType.canonical.bridged.SILFunctionType_getSubstGenericSignature())
+  }
 }
 
 public struct TypeArray : RandomAccessCollection, CustomReflectable {
@@ -327,3 +331,5 @@ extension CanonicalType: Equatable {
     lhs.rawType == rhs.rawType
   }
 }
+
+public typealias GenericTypeParameterKind = swift.GenericTypeParamKind
