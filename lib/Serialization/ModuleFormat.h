@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 964; // serialize param decl isAddressable
+const uint16_t SWIFTMODULE_VERSION_MINOR = 965; // WriteImplKindField and ReadWriteImplKindField size
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -209,7 +209,10 @@ enum class ReadImplKind : uint8_t {
   Read,
   Read2,
   Borrow,
+  LastReadImplKind = Borrow,
 };
+static_assert(countBitsUsed(static_cast<unsigned>(
+                  ReadImplKind::LastReadImplKind)) <= 3);
 using ReadImplKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
@@ -224,8 +227,11 @@ enum class WriteImplKind : uint8_t {
   Modify,
   Modify2,
   Mutate,
+  LastWriteImplKind = Mutate,
 };
-using WriteImplKindField = BCFixed<3>;
+static_assert(countBitsUsed(static_cast<unsigned>(
+                  WriteImplKind::LastWriteImplKind)) <= 4);
+using WriteImplKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -239,8 +245,11 @@ enum class ReadWriteImplKind : uint8_t {
   StoredWithDidSet,
   InheritedWithDidSet,
   Mutate,
+  LastReadWriteImplKind = Mutate,
 };
-using ReadWriteImplKindField = BCFixed<3>;
+static_assert(countBitsUsed(static_cast<unsigned>(
+                  ReadWriteImplKind::LastReadWriteImplKind)) <= 4);
+using ReadWriteImplKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
