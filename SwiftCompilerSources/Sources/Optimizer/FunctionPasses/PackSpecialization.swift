@@ -343,23 +343,23 @@ private struct CallSiteSpecializer {
   ) {
     let builder = Builder(after: resultInstruction, self.context)
 
-    var results = resultInstruction.results.makeIterator()
+    var directResults = resultInstruction.results.makeIterator()
     var substitutedResultTupleElements = [any Value]()
-    var resultMapIterator = self.callee.resultMap.makeIterator()
+    var mappedResultPacks = self.callee.resultMap.makeIterator()
 
-    for (originalResultIdx, resultInfo) in self.apply.functionConvention.results.enumerated() {
+    for resultInfo in self.apply.functionConvention.results {
       // We only need to handle direct and pack results, since indirect results are handled above
       if !resultInfo.isSILIndirect {
         // Direct results of the original function are mapped to direct results of the specialized function.
-        substitutedResultTupleElements.append(results.next()!)
+        substitutedResultTupleElements.append(directResults.next()!)
 
       } else if resultInfo.type.shouldExplode {
         // Some elements of pack results may get mapped to direct results of the specialized function.
-        let (mappedOriginalResultIdx, mappedResults) = resultMapIterator.next()!
-        assert(originalResultIdx == mappedOriginalResultIdx)
+        // We handle those here.
+        let (resultPackArgumentIndex, mappedResults) = mappedResultPacks.next()!
 
-        let originalPackArgument = self.apply.arguments[originalResultIdx]
-        let packIndices = packArgumentIndices[originalResultIdx]!
+        let originalPackArgument = self.apply.arguments[resultPackArgumentIndex]
+        let packIndices = packArgumentIndices[resultPackArgumentIndex]!
 
         for (mappedDirectResult, (packIndex, elementType)) in zip(
           mappedResults, zip(packIndices, originalPackArgument.type.packElements)
@@ -367,7 +367,7 @@ private struct CallSiteSpecializer {
             where !mappedDirectResult.isSILIndirect
         {
 
-          let result = results.next()!
+          let result = directResults.next()!
           let outputResultAddress = builder.createPackElementGet(
             packIndex: packIndex, pack: originalPackArgument,
             elementType: elementType)
