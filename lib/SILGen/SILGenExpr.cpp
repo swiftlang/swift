@@ -2606,19 +2606,31 @@ RValue RValueEmitter::visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E,
 }
 
 RValue RValueEmitter::visitUnreachableExpr(UnreachableExpr *E, SGFContext C) {
-  // Emit the expression, followed by an unreachable. To produce a value of
-  // arbitrary type, we emit a temporary allocation, with the use of the
-  // allocation in the unreachable block. The SILOptimizer will eliminate both
-  // the unreachable block and unused allocation.
+  // Emit the expression, followed by an unreachable.
   SGF.emitIgnoredExpr(E->getSubExpr());
-
-  auto &lowering = SGF.getTypeLowering(E->getType());
-  auto resultAddr = SGF.emitTemporaryAllocation(E, lowering.getLoweredType());
-
   SGF.B.createUnreachable(E);
+
+  // Continue code generation in a block with no predecessors.
+  // Whatever code is emitted here is guaranteed to be removed by SIL passes.
   SGF.B.emitBlock(SGF.createBasicBlock());
 
-  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(resultAddr));
+  // Since the type is uninhabited, use a SILUndef of so that we can return
+  // some sort of RValue from this API.
+  auto &lowering = SGF.getTypeLowering(E->getType());
+  auto loweredTy = lowering.getLoweredType();
+  auto undef = SILUndef::get(SGF.F, loweredTy);
+
+  // Create an alloc initialized with contents from the undefined addr type.
+  // It seems pack addresses do not satisfy isPlusOneOrTrivial, so we need an
+  // actual allocation.
+  if (loweredTy.isAddress()) {
+    auto resultAddr = SGF.emitTemporaryAllocation(E, loweredTy);
+    SGF.emitSemanticStore(E, undef, resultAddr, lowering, IsInitialization);
+    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(resultAddr));
+  }
+
+  // Otherwise, if it's not an address, just emit the undef value itself.
+  return RValue(SGF, E, ManagedValue::forRValueWithoutOwnership(undef));
 }
 
 VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
