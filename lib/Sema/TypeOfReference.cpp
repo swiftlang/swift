@@ -43,8 +43,6 @@ using namespace inference;
 
 #define DEBUG_TYPE "ConstraintSystem"
 
-
-
 Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
                                               Type parentTy,
                                               ConstraintLocatorBuilder locator,
@@ -1235,38 +1233,37 @@ ConstraintSystem::getTypeOfReferencePost(OverloadChoice choice,
   auto *value = choice.getDecl();
 
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
-    auto *openedFnType = openedType->castTo<FunctionType>();
-
     // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
     assert(func->isOperator() && "Lookup should only find operators");
 
     auto functionRefInfo = choice.getFunctionRefInfo();
 
-    auto origOpenedType = openedFnType;
+    auto origOpenedType = openedType;
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
                                                functionRefInfo);
-      openedFnType = adjustFunctionTypeForConcurrency(
-          origOpenedType, /*baseType=*/Type(), func, useDC, numApplies,
-          /*isMainDispatchQueue=*/false, /*openGlobalActorType=*/true, locator);
+      openedType = adjustFunctionTypeForConcurrency(
+          origOpenedType->castTo<FunctionType>(), /*baseType=*/Type(),
+          func, useDC, numApplies, /*isMainDispatchQueue=*/false,
+          /*openGlobalActorType=*/true, locator);
     }
 
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type. Repeat the adjustment
     // for the original and adjusted types.
-    auto type = openedFnType;
-    if (openedFnType->hasDynamicSelfType()) {
-      auto params = openedFnType->getParams();
+    auto type = openedType;
+    if (openedType->hasDynamicSelfType()) {
+      auto params = openedType->castTo<FunctionType>()->getParams();
       assert(params.size() == 1);
       Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
-      type = openedFnType->replaceDynamicSelfType(selfTy)
+      type = openedType->replaceDynamicSelfType(selfTy)
           ->castTo<FunctionType>();
     }
 
     auto origType = origOpenedType;
     if (origOpenedType->hasDynamicSelfType()) {
-      auto params = origOpenedType->getParams();
+      auto params = origOpenedType->castTo<FunctionType>()->getParams();
       assert(params.size() == 1);
       Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
       origType = origOpenedType->replaceDynamicSelfType(selfTy)
@@ -1275,7 +1272,8 @@ ConstraintSystem::getTypeOfReferencePost(OverloadChoice choice,
 
     // The reference implicitly binds 'self'.
     return {origOpenedType, openedType,
-            origType->getResult(), type->getResult(), Type()};
+            origType->castTo<FunctionType>()->getResult(),
+            type->castTo<FunctionType>()->getResult(), Type()};
   }
 
   // Unqualified reference to a local or global function.
