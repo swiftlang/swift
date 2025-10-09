@@ -844,8 +844,9 @@ private struct PackExplodedFunction {
 
         let resources: ExplodedArgument.ConventionResources
         if resultInfo.isSILIndirect {
+          // We only insert arguments for results that must be returned indirectly, so always use the addressType.
           let argument = entryBlock.insertFunctionArgument(
-            atPosition: insertArgumentPosition, type: type,
+            atPosition: insertArgumentPosition, type: type.addressType,
             ownership: Ownership(
               in: specialized,
               of: type, with: ArgumentConvention(result: resultInfo.convention)),
