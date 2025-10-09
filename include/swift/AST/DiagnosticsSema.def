@@ -1388,10 +1388,10 @@ ERROR(ternary_expr_cases_mismatch,none,
       (Type, Type))
 
 // Statements as expressions
-ERROR(single_value_stmt_branches_mismatch,none,
+GROUPED_ERROR(single_value_stmt_branches_mismatch,BranchesHaveMismatchingTypes,none,
       "branches have mismatching types %0 and %1",
       (Type, Type))
-ERROR(single_value_stmt_out_of_place,none,
+GROUPED_ERROR(single_value_stmt_out_of_place,StatementExpressionOutOfPlace,none,
       "'%0' may only be used as expression in return, throw, or as the source "
       "of an assignment",
       (StmtKind))
