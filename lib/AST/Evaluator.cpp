@@ -155,8 +155,12 @@ void Evaluator::diagnoseCycle(const ActiveRequest &request) {
   request.diagnoseCycle(cycleDiags.getDiags());
 
   for (const auto &step : llvm::reverse(activeRequests)) {
-    if (step == request)
+    if (step == request) {
+      // Note that we diagnosed a cycle for the outermost step to ensure it
+      // also returns a cyclic result.
+      diagnosedActiveCycles.insert(step);
       return;
+    }
     step.noteCycleStep(cycleDiags.getDiags());
   }
 

@@ -28,17 +28,17 @@ class Cycle2_C: Cycle2_B {}
 // CHECK:   RelBase | class/Swift | Cycle2_C | {{[^ ]*}}
 
 class TestCase1: XCTestCase {}
-// CHECK: [[@LINE-1]]:7 | class(test)/Swift | TestCase1 | {{[^ ]*}} | Def | rel: 0
+// CHECK: [[@LINE-1]]:7 | class/Swift | TestCase1 | {{[^ ]*}} | Def | rel: 0
 // CHECK: [[@LINE-2]]:18 | class/Swift | XCTestCase | {{[^ ]*}} | Ref,RelBase | rel: 1
-// CHECK:   RelBase | class(test)/Swift | TestCase1 | {{[^ ]*}}
+// CHECK:   RelBase | class/Swift | TestCase1 | {{[^ ]*}}
 class XCTestCase: TestCase1 {}
 // CHECK: [[@LINE-1]]:7 | class/Swift | XCTestCase | {{[^ ]*}} | Def | rel: 0
-// CHECK: [[@LINE-2]]:19 | class(test)/Swift | TestCase1 | {{[^ ]*}} | Ref,RelBase | rel: 1
+// CHECK: [[@LINE-2]]:19 | class/Swift | TestCase1 | {{[^ ]*}} | Ref,RelBase | rel: 1
 // CHECK:   RelBase | class/Swift | XCTestCase | {{[^ ]*}}
 class TestCase2: TestCase1 {}
-// CHECK: [[@LINE-1]]:7 | class(test)/Swift | TestCase2 | {{[^ ]*}} | Def | rel: 0
-// CHECK: [[@LINE-2]]:18 | class(test)/Swift | TestCase1 | {{[^ ]*}} | Ref,RelBase | rel: 1
-// CHECK:   RelBase | class(test)/Swift | TestCase2 | {{[^ ]*}}
+// CHECK: [[@LINE-1]]:7 | class/Swift | TestCase2 | {{[^ ]*}} | Def | rel: 0
+// CHECK: [[@LINE-2]]:18 | class/Swift | TestCase1 | {{[^ ]*}} | Ref,RelBase | rel: 1
+// CHECK:   RelBase | class/Swift | TestCase2 | {{[^ ]*}}
 
 protocol SelfCycleP: SelfCycleP {}
 // CHECK: [[@LINE-1]]:10 | protocol/Swift | SelfCycleP | {{[^ ]*}} | Def | rel: 0

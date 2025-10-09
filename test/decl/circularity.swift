@@ -98,7 +98,7 @@ protocol P1 {
 }
 
 class C4 {
-  required init(x: Int) {}
+  required init(x: Int) {} // expected-note {{'required' initializer is declared in superclass here}}
 }
 
 class D4 : C4, P1 { // expected-note@:7 {{through reference here}}
@@ -107,7 +107,7 @@ class D4 : C4, P1 { // expected-note@:7 {{through reference here}}
     // expected-note@-2:17 {{through reference here}}
     super.init(x: x)
   }
-}
+} // expected-error {{'required' initializer 'init(x:)' must be provided by subclass of 'C4'}}
 
 // https://github.com/apple/swift/issues/54662
 // N.B. This used to compile in 5.1.
