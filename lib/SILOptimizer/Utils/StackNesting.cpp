@@ -21,7 +21,7 @@
 
 using namespace swift;
 
-#ifndef NDEBUG
+//#ifndef NDEBUG
 static void checkPreconditions(SILFunction *F) {
   // StackNesting has two preconditions: first, dominance still has
   // to hold among allocations and deallocations; and second,
@@ -57,7 +57,7 @@ static void checkPreconditions(SILFunction *F) {
   }
 
 }
-#endif
+//#endif
 
 /// Run the given function exactly once on each of the reachable blocks in
 /// a SIL function. Blocks will be visited in a post-order consistent with
@@ -594,9 +594,9 @@ static void emitPendingDeallocations(State &state,
       // will re-establish the joint post-dominance of `alloc` by its
       // deallocations with respect to this path.
 StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
-#ifndef NDEBUG
+//#ifndef NDEBUG
   checkPreconditions(F);
-#endif
+//#endif
 
   bool madeChanges = false;
 
