@@ -21,6 +21,44 @@
 
 using namespace swift;
 
+#ifndef NDEBUG
+static void checkPreconditions(SILFunction *F) {
+  // StackNesting has two preconditions: first, dominance still has
+  // to hold among allocations and deallocations; and second,
+  // allocations must be jointly post-dominated by their deallocations.
+  //
+  // Dominance is the more important precondition to check, because we
+  // don't want this pass to be held responsible if it ends up
+  // generating non-dominating loads and stores because its input didn't
+  // obey dominance either.
+  //
+  // Joint post-dominance is likely to just result in join
+  // If the input just violates joint post-dominance, on the other
+  // hand, we generally maintain most of that structure, and it's
+  // relatively easy to debug.
+
+  DominanceInfo dominance(F);
+
+  for (auto &BB: *F) {
+    for (auto &I : BB) {
+      if (I.isDeallocatingStack()) {
+        SILInstruction *dealloc = &I;
+        SILInstruction *alloc = getAllocForDealloc(dealloc);
+        if (!dominance.properlyDominates(alloc, dealloc)) {
+          llvm::errs() << "FATAL ERROR: prior to StackNesting, deallocation\n  "
+                       << *dealloc
+                       << "is not properly dominated by its allocation\n  "
+                       << *alloc
+                       << "Complete function:\n" << *F;
+          abort();
+        }
+      }
+    }
+  }
+
+}
+#endif
+
 /// Run the given function exactly once on each of the reachable blocks in
 /// a SIL function. Blocks will be visited in a post-order consistent with
 /// dominance, which is to say, after all dominating blocks but otherwise
@@ -28,25 +66,34 @@ using namespace swift;
 ///
 /// The function is passed a state value, which it can freely mutate. The
 /// initial value of the state will be the same as the value left in the
-/// state for an unspecified predecessor (or the initial value passed in,
-/// for the entry block of the function). Since the predecessor choice is
-/// arbitrary, you should only use this if the state is guaranteed to be
-/// the same for all predecessors. The state type must be copyable, but
-/// the algorithm makes a reasonable effort to avoid copying it.
+/// state for an unspecified predecessor. For the entry block of the
+/// function, this is the initial state passed to runInDominanceOrder.
+///
+/// Essentially, runInDominanceOrder finds an arbitrary simple path to
+/// the block and runs the callback function for each block in that path
+/// in order. As long as the callback:
+/// - only looks at instructions in the current block and the blocks
+///   it dominates,
+/// - has no dependencies outside of the state (which must have "value
+///   semantics"), and
+/// - can handle the arbitrariness of the choice of path,
+/// then the callback can act as if only the work done along the current
+/// path has happened and ignore the impact of arbitrary visitation order.
 ///
 /// This function assumes you don't change the CFG during its operation.
 template <class Fn, class State>
 void runInDominanceOrder(SILFunction &F, State &&state, const Fn &fn) {
   // The set of blocks that have ever been enqueued onto the worklist.
-  // (We actually skip the queue in a bunch of cases, but *abstractly*
-  // they're enqueued.)
+  // (We actually skip the worklist a lot, but *abstractly* they're
+  // enqueued, and everything but the entry block does get added to this
+  // set.)
   BasicBlockSet visitedBlocks(&F);
 
   // The next basic block to operate on. We always operate on `state`.
   SILBasicBlock *curBB = F.getEntryBlock();
 
   // We need to copy `state` whenever we enqueue a block onto the worklist.
-  // We'll then move-assign it back to `state` when we dequeue it.
+  // We'll move-assign it back to `state` when we dequeue it.
   using StateValue = std::remove_reference_t<State>;
   SmallVector<std::pair<SILBasicBlock *, StateValue>> worklist;
 
@@ -323,6 +370,10 @@ static void setAllocationAsPending(State &state, SILInstruction *alloc,
 static void emitPendingDeallocations(State &state,
                                      SILInstruction *insertAfterDealloc,
                                      bool &madeChanges) {
+  // The builder we use for inserting deallocations. Initialized lazily
+  // to insert after the initial dealloc. We have to reuse the same
+  // builder so that, if we pop multiple deallocations, we order them
+  // correctly w.r.t each other.
   std::optional<SILBuilderWithScope> builder;
 
   while (!state.allocations.empty() &&
@@ -330,10 +381,7 @@ static void emitPendingDeallocations(State &state,
     auto entry = state.allocations.pop_back_val();
     SILInstruction *alloc = entry.getValue();
 
-    // Create a builder that inserts after the initial dealloc, if we
-    // haven't already. Re-using the same builder for subsequent deallocs
-    // means we order them correctly w.r.t each other, which we wouldn't
-    // if we made a fresh builder after the initial dealloc each time.
+    // Create a builder if necessary.
     if (!builder) {
       // We want to use the location of (and inherit debug scopes from)
       // the initial dealloc that we're inserting after.
@@ -346,39 +394,6 @@ static void emitPendingDeallocations(State &state,
     madeChanges = true;
   }
 }
-
-#ifndef NDEBUG
-static void checkPreconditions(SILFunction *F) {
-  // StackNesting's really critical precondition is just that
-  // allocations dominate deallocations. If this doesn't hold, we
-  // can end up producing really corrupt SIL, and it might be very
-  // hard to debug.
-
-  // If the input just violates joint post-dominance, on the other
-  // hand, we generally maintain most of that structure, and it's
-  // relatively easy to debug.
-
-  DominanceInfo dominance(F);
-
-  for (auto &BB: *F) {
-    for (auto &I : BB) {
-      if (I.isDeallocatingStack()) {
-        SILInstruction *dealloc = &I;
-        SILInstruction *alloc = getAllocForDealloc(dealloc);
-        if (!dominance.properlyDominates(alloc, dealloc)) {
-          llvm::errs() << "FATAL ERROR: prior to StackNesting, deallocation\n  "
-                       << *dealloc
-                       << "is not properly dominated by its allocation\n  "
-                       << *alloc
-                       << "Complete function:\n" << *F;
-          abort();
-        }
-      }
-    }
-  }
-
-}
-#endif
 
 /// The main entrypoint for clients.
 ///
@@ -419,7 +434,8 @@ static void checkPreconditions(SILFunction *F) {
 /// that doesn't repeat blocks.) It consists of (1) an active stack
 /// of allocations which haven't yet been deallocated on this path
 /// and (2) a set of those allocations which are pending deallocation
-/// on this path. There are three invariants:
+/// on this path. (We actually store this set using a flag on the
+/// stack entry.) There are three invariants:
 ///
 /// 1. If A dominates B, A precedes B (is further from the top) in
 ///    the allocation stack.
@@ -431,9 +447,13 @@ static void checkPreconditions(SILFunction *F) {
 /// Invariant #1 is established by visiting blocks and instructions
 /// in an order consistent with dominance. Invariant #2 can be proven
 /// easily from how the stack is manipulated in the pseudocode.
-///
 /// Invariant #3 is more subtle and relies on proper dominance within
-/// the function. The property is fairly obvious while the CFG search
+/// the function.
+///
+/// Theorem.
+///   The algorithm maintains invariant #3.
+///
+/// Proof: This property is fairly obvious while the CFG search
 /// is still walking code that is dominated by an allocation, because
 /// it must dominate *all* allocations above it on the stack.
 /// But a CFG search is not a dominance-tree walk; it it is possible
@@ -446,14 +466,15 @@ static void checkPreconditions(SILFunction *F) {
 ///     block B that is not dominated by A, it cannot subsequently
 ///     visit (on the same path from entry) a block C that *is*
 ///     dominated by A.
-///   Pf. By construction of the search, there is a simple path
-///     from entry to A to B to C. The portion P_BC of this path
-///     from B to C cannot pass through A because it is a subpath
-///     of a simple path that includes A earlier. Meanwhile, if A
-///     does not dominate B, by definition there is a path P_EB
-///     that does not include A. The concatenation of P_EB and P_BC
-///     is therefore a path from entry that does not include A, so
-///     A does not dominate C.
+///
+///   Proof: By construction of the search, there is a simple path
+///   from entry to A to B to C. The portion P_BC of this path
+///   from B to C cannot pass through A because it is a subpath
+///   of a simple path that includes A earlier. Meanwhile, if A
+///   does not dominate B, by definition there is a path P_EB
+///   that does not include A. The concatenation of P_EB and P_BC
+///   is therefore a path from entry that does not include A, so
+///   A does not dominate C.
 ///
 /// Deallocations of an allocation must be dominated by the
 /// allocation. If an allocation A is added to the pending set,
@@ -502,79 +523,39 @@ static void checkPreconditions(SILFunction *F) {
 /// by B, and since B is dominated by A, A must dominate the current
 /// point.
 ///
+/// Theorem.
+///   The algorithm preserves the joint post-dominance of
+///   allocations and deallocations.
+/// 
+/// Proof: Prior to the algorithm running, each allocation is jointly
+/// post-dominated by its deallocations. This means that every simple
+/// path from the allocation must pass through at most one of its
+/// deallocations, and there must be a deallocation if the path reaches
+/// the exit.
+///
+/// Given an allocation A, consider its set of deallocations.
+/// Replacing any of these deallocations with a set of deallocations
+/// that jointly post-dominate the original deallocation point
+/// preserves the joint post-dominance of the original allocation.
+/// This is because 
+
+/// The
+/// algorithm finds each of these deallocations on some simple path
+/// from the entry block. 
+
+
+// By the definition of joint post-dominance, for each of the
+/// deallocations, there cannot be a path from that deallocation to
+/// another deallocation 
+/// a simple path from the 
+/// 
+/// 
+/// 
+///
 /// The last things to prove are whether the insertion points of the
 /// deallocations jointly post-dominate the allocation and whether
-/// they are properly nested with each other. TBD
-StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
-#ifndef NDEBUG
-  checkPreconditions(F);
-#endif
-
-  bool madeChanges = false;
-
-  // The index in the allocation stack for each allocation. Multiple
-  // allocations can map to the same index, since ultimately it's a stack;
-  // we should be looking up an allocation while it's still in use.
-  // This is very lazily filled in, because we don't want to do unnecessary
-  // work if nothing is unscoped. See setAllocationAsPending for invariants.
-  // This function never accesses it directly.
-  IndexForAllocationMap indexForAllocation;
-
-  // Visit each block of the function in an order consistent with dominance.
-  // The state represents the stack of active allocations, so it's appropriate
-  // that it starts with an empty stack. We're not worried about states
-  // potentially being different for different paths to the same block because
-  // that can only happen if deallocations don't properly post-dominate
-  // their allocations.
-  runInDominanceOrder(*F, State(), [&](SILBasicBlock *B, State &state) {
-
-    // We can't use a foreach loop because we sometimes remove the
-    // current instruction or add instructions (that we shouldn't visit)
-    // after it. Advancing the iterator immediately within the loop is
-    // sufficient to protect against both.
-    for (auto II = B->begin(), IE = B->end(); II != IE; ) {
-      SILInstruction *I = &*II++;
-
-      // Invariant: the top of the stack is never pending.
-      assert(state.allocations.empty() ||
-             !state.allocations.back().isPending());
-
-      // Push allocations onto the current stack in the non-pending state.
-      if (I->isAllocatingStack()) {
-        state.allocations.push_back(I);
-        continue;
-      }
-
-      // Ignore instructions other than allocations and deallocations.
-      if (!I->isDeallocatingStack()) {
-        continue;
-      }
-
-      // Get the allocation for the deallocation.
-      SILInstruction *dealloc = I;
-      SILInstruction *alloc = getAllocForDealloc(dealloc);
-
-#ifndef NDEBUG
-      if (state.allocations.empty()) {
-        state.abortForUnknownAllocation(alloc, dealloc);
-      }
-#endif
-
-      // If the allocation is the top of the allocations stack, we can
-      // leave it alone.
-      if (alloc == state.allocations.back().getValue()) {
-        // Pop off our record of the allocation.
-        state.allocations.pop_back();
-
-        // We may need to emit any pending deallocations still on the stack.
-        // Pop and emit them in order.
-        emitPendingDeallocations(state, /*after*/ dealloc, madeChanges);
-
-        continue;
-      }
-
-      // Otherwise, just remove the deallocation and set the allocation
-      // as having a pending deallocation on this path.
+/// they are properly nested with each other.
+///
       //
       // When we mark `alloc` as having a pending deallocation, we are
       // deferring its deallocation on this path to the deallocation
@@ -612,7 +593,70 @@ StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
       // are, replacing this deallocation of `alloc` with those points
       // will re-establish the joint post-dominance of `alloc` by its
       // deallocations with respect to this path.
+StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
+#ifndef NDEBUG
+  checkPreconditions(F);
+#endif
 
+  bool madeChanges = false;
+
+  // The index in the allocation stack for each allocation.
+  // This function never uses this directly; it's just a cache for
+  // setAllocationAsPending.
+  IndexForAllocationMap indexForAllocation;
+
+  // Visit each block of the function in an order consistent with dominance.
+  // The state represents the stack of active allocations; it starts
+  // with an empty stack because so does the function.
+  runInDominanceOrder(*F, State(), [&](SILBasicBlock *B, State &state) {
+
+    // We can't use a foreach loop because we sometimes remove the
+    // current instruction or add instructions (that we don't want to
+    // visit) after it. Advancing the iterator immediately within the
+    // loop is sufficient to protect against both.
+    for (auto II = B->begin(), IE = B->end(); II != IE; ) {
+      SILInstruction *I = &*II;
+      ++II;
+
+      // Invariant: the top of the stack is never pending.
+      assert(state.allocations.empty() ||
+             !state.allocations.back().isPending());
+
+      // Push allocations onto the current stack in the non-pending state.
+      if (I->isAllocatingStack()) {
+        state.allocations.push_back(I);
+        continue;
+      }
+
+      // Ignore instructions other than allocations and deallocations.
+      if (!I->isDeallocatingStack()) {
+        continue;
+      }
+
+      // Get the allocation for the deallocation.
+      SILInstruction *dealloc = I;
+      SILInstruction *alloc = getAllocForDealloc(dealloc);
+
+#ifndef NDEBUG
+      if (state.allocations.empty()) {
+        state.abortForUnknownAllocation(alloc, dealloc);
+      }
+#endif
+
+      // If the allocation is the top of the allocations stack, we can
+      // leave it alone.
+      if (alloc == state.allocations.back().getValue()) {
+        // Pop off our record of the allocation.
+        state.allocations.pop_back();
+
+        // Emit any pending deallocations that are on top of the stack.
+        emitPendingDeallocations(state, /*after*/ dealloc, madeChanges);
+
+        continue;
+      }
+
+      // Otherwise, just remove the deallocation and set the allocation
+      // as having a pending deallocation on this path.
       dealloc->eraseFromParent();
       madeChanges = true;
       setAllocationAsPending(state, alloc, dealloc, indexForAllocation);
