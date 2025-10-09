@@ -289,6 +289,9 @@ RequirementMachine::initWithProtocolSignatureRequirements(
   RuleBuilder builder(Context, System.getReferencedProtocols());
   builder.initWithProtocolSignatureRequirements(protos);
 
+  // Remember if any of our upstream protocols failed to complete.
+  Failed = builder.Failed;
+
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false, protos,
                     std::move(builder.ImportedRules),
@@ -336,6 +339,9 @@ RequirementMachine::initWithGenericSignature(GenericSignature sig) {
   RuleBuilder builder(Context, System.getReferencedProtocols());
   builder.initWithGenericSignature(sig.getGenericParams(),
                                    sig.getRequirements());
+
+  // Remember if any of our upstream protocols failed to complete.
+  Failed = builder.Failed;
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false,
@@ -390,6 +396,9 @@ RequirementMachine::initWithProtocolWrittenRequirements(
   RuleBuilder builder(Context, System.getReferencedProtocols());
   builder.initWithProtocolWrittenRequirements(component, protos);
 
+  // Remember if any of our upstream protocols failed to complete.
+  Failed = builder.Failed;
+
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true, component,
                     std::move(builder.ImportedRules),
@@ -436,6 +445,9 @@ RequirementMachine::initWithWrittenRequirements(
   // protocol requirement signatures.
   RuleBuilder builder(Context, System.getReferencedProtocols());
   builder.initWithWrittenRequirements(genericParams, requirements);
+
+  // Remember if any of our upstream protocols failed to complete.
+  Failed = builder.Failed;
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true,
@@ -551,10 +563,6 @@ void RequirementMachine::freeze() {
 
 ArrayRef<Rule> RequirementMachine::getLocalRules() const {
   return System.getLocalRules();
-}
-
-bool RequirementMachine::isComplete() const {
-  return Complete;
 }
 
 GenericSignatureErrors RequirementMachine::getErrors() const {

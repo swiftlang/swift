@@ -118,12 +118,6 @@ struct SILFuncExtractorOptions {
                  llvm::cl::init(false),
                  llvm::cl::desc("Do not dump AST."));
 
-  llvm::cl::opt<bool> EnableOSSAModules = llvm::cl::opt<bool>(
-      "enable-ossa-modules", llvm::cl::init(true),
-      llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
-                     "this is disabled we do not serialize in OSSA "
-                     "form when optimizing."));
-
   llvm::cl::opt<llvm::cl::boolOrDefault>
     EnableObjCInterop = llvm::cl::opt<llvm::cl::boolOrDefault>(
       "enable-objc-interop",
@@ -275,7 +269,6 @@ int sil_func_extractor_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOptions &Opts = Invocation.getSILOptions();
   Opts.EmitVerboseSIL = options.EmitVerboseSIL;
   Opts.EmitSortedSIL = options.EmitSortedSIL;
-  Opts.EnableOSSAModules = options.EnableOSSAModules;
   Opts.StopOptimizationAfterSerialization |= options.EmitSIB;
 
   serialization::ExtendedValidationInfo extendedInfo;
@@ -368,7 +361,6 @@ int sil_func_extractor_main(ArrayRef<const char *> argv, void *MainAddr) {
     serializationOpts.OutputPath = OutputFile;
     serializationOpts.SerializeAllSIL = true;
     serializationOpts.IsSIB = true;
-    serializationOpts.IsOSSA = options.EnableOSSAModules;
 
     symbolgraphgen::SymbolGraphOptions symbolGraphOpts;
 

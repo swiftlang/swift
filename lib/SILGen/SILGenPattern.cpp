@@ -1308,7 +1308,7 @@ void PatternMatchEmission::bindIrrefutableBorrows(const ClauseRow &row,
       // explicitly `borrowing`, then we can bind it as a normal copyable
       // value.
       if (named->getDecl()->getIntroducer() != VarDecl::Introducer::Borrowing
-          && !named->getType()->isNoncopyable()) {
+          && named->getType()->isCopyable()) {
         bindVariable(pattern, named->getDecl(), args[i], forIrrefutableRow,
                      hasMultipleItems);
       } else {
@@ -1405,7 +1405,10 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
   auto bindValue = value.asBorrowedOperand2(SGF, pattern).getFinalManagedValue();
 
   // Borrow bindings of copyable type should still be no-implicit-copy.
-  if (!bindValue.getType().isMoveOnly()) {
+  //
+  // If we're relying on ManualOwnership for explicit-copies enforcement,
+  // we don't need the MoveOnlyWrapper.
+  if (!bindValue.getType().isMoveOnly() && !SGF.B.hasManualOwnershipAttr()) {
     if (bindValue.getType().isAddress()) {
       bindValue = ManagedValue::forBorrowedAddressRValue(
         SGF.B.createCopyableToMoveOnlyWrapperAddr(pattern, bindValue.getValue()));
@@ -2836,7 +2839,7 @@ void PatternMatchEmission::initSharedCaseBlockDest(CaseStmt *caseBlock,
   result.first->second.first = block;
 
   // Add args for any pattern variables if we have any.
-  for (auto *vd : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
+  for (auto *vd : caseBlock->getCaseBodyVariables()) {
     if (!vd->hasName())
       continue;
 
@@ -2867,7 +2870,7 @@ void PatternMatchEmission::emitAddressOnlyAllocations() {
     // If we have a shared case with bound decls, setup the arguments for the
     // shared block by emitting the temporary allocation used for the arguments
     // of the shared block.
-    for (auto *vd : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
+    for (auto *vd : caseBlock->getCaseBodyVariables()) {
       if (!vd->hasName())
         continue;
 
@@ -2958,7 +2961,7 @@ void PatternMatchEmission::emitSharedCaseBlocks(
     SWIFT_DEFER { assert(SGF.getCleanupsDepth() == PatternMatchStmtDepth); };
 
     if (!caseBlock->hasCaseBodyVariables()) {
-      emitCaseBody(caseBlock);
+      bodyEmitter(caseBlock);
       continue;
     }
 
@@ -3173,8 +3176,6 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
           expectedLoc = SILGenFunction::VarLoc(vdLoc->second.value,
                                                vdLoc->second.access,
                                                vdLoc->second.box);
-          expectedLoc.addressableBuffer = vd;
-          // Alias the addressable buffer for the two variables.
           SGF.AddressableBuffers[expected] = vd;
 
           // Emit a debug description for the variable, nested within a scope
@@ -3359,6 +3360,10 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
     case AccessorKind::WillSet:
     case AccessorKind::DidSet:
       llvm_unreachable("should not be involved in a read");
+    case AccessorKind::Borrow:
+      llvm_unreachable("borrow accessor is not yet implemented");
+    case AccessorKind::Mutate:
+      llvm_unreachable("mutate accessor is not yet implemented");
     }
     llvm_unreachable("switch not covered?");
     
@@ -3502,7 +3507,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   //   exits out of the switch.
   //
   // When we break out of a case block, we take the subject's remnants with us
-  // in the former case, but not the latter.q
+  // in the former case, but not the latter.
   CleanupsDepth subjectDepth = Cleanups.getCleanupsDepth();
   LexicalScope switchScope(*this, CleanupLocation(S));
   std::optional<FormalEvaluationScope> switchFormalAccess;
@@ -3565,6 +3570,10 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   }
   case ValueOwnership::Owned: {
     // A consuming pattern match. Emit as a +1 rvalue.
+    // Create a tight evaluation scope for temporary borrows emitted during the
+    // evaluation.
+    FormalEvaluationScope limitedScope(*this);
+
     subjectMV = emitRValueAsSingleValue(S->getSubjectExpr());
     break;
   }

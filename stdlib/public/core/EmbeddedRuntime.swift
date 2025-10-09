@@ -48,7 +48,7 @@ public struct ClassMetadata {
   └──────────────┴──────────────────────────────────────────────┘
 
   If the highest bit (doNotFreeBit) is set, the behavior of dropping the last reference (release operation where
-  refcount ends up being 0) is altered to avoid calling free() on the object (deinit is still run). This is crutial for
+  refcount ends up being 0) is altered to avoid calling free() on the object (deinit is still run). This is crucial for
   class instances that are promoted by the compiler from being heap-allocated to instead be located on the stack
   (see swift_initStackObject).
 
@@ -149,6 +149,13 @@ func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
   return unsafe r
 }
 
+@_cdecl("swift_coroFrameAlloc")
+public func swift_coroFrameAlloc(_ size: Int, _ type: UInt) -> UnsafeMutableRawPointer? {
+  return unsafe alignedAlloc(
+    size: size,
+    alignment: _swift_MinAllocationAlignment)
+}
+
 @_cdecl("swift_slowAlloc")
 public func swift_slowAlloc(_ size: Int, _ alignMask: Int) -> UnsafeMutableRawPointer? {
   let alignment: Int
@@ -157,7 +164,7 @@ public func swift_slowAlloc(_ size: Int, _ alignMask: Int) -> UnsafeMutableRawPo
   } else {
     alignment = alignMask + 1
   }
-  return alignedAlloc(size: size, alignment: alignment)
+  return unsafe alignedAlloc(size: size, alignment: alignment)
 }
 
 @_cdecl("swift_slowDealloc")
@@ -171,11 +178,19 @@ public func swift_allocObject(metadata: Builtin.RawPointer, requiredSize: Int, r
 }
 
 func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, requiredSize: Int, requiredAlignmentMask: Int) -> UnsafeMutablePointer<HeapObject> {
-  let p = swift_slowAlloc(requiredSize, requiredAlignmentMask)!
+  let p = unsafe swift_slowAlloc(requiredSize, requiredAlignmentMask)!
   let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
   unsafe _swift_embedded_set_heap_object_metadata_pointer(object, metadata)
   unsafe object.pointee.refcount = 1
   return unsafe object
+}
+
+@_cdecl("swift_deallocUninitializedObject")
+public func swift_deallocUninitializedObject(object: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int) {
+  unsafe swift_deallocObject(
+    object: UnsafeMutablePointer<HeapObject>(object),
+    allocatedSize: allocatedSize,
+    allocatedAlignMask: allocatedAlignMask)
 }
 
 @_cdecl("swift_deallocObject")

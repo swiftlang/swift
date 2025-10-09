@@ -128,7 +128,7 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
         contextTy, TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
                             expansion.getResilienceExpansion()));
 
-    assert(!contextTy->isNoncopyable() && "Not implemented");
+    assert(contextTy->isCopyable() && "Not implemented");
     if (!props.isAddressOnly())
       return CaptureKind::Constant;
 
@@ -168,6 +168,15 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
   if (auto *param = dyn_cast<ParamDecl>(var)) {
     if (param->isInOut())
       return CaptureKind::StorageAddress;
+  }
+
+  // Reference storage types can appear in a capture list, which means
+  // we might allocate boxes to store the captures. However, those boxes
+  // have the same lifetime as the closure itself, so we must capture
+  // the box itself and not the payload, even if the closure is noescape,
+  // otherwise they will be destroyed when the closure is formed.
+  if (var->getInterfaceType()->is<ReferenceStorageType>()) {
+    return CaptureKind::Box;
   }
 
   // For 'let' constants
@@ -3983,6 +3992,41 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
                                  resultType, info);
 }
 
+static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
+    TypeConverter &TC, SILDeclRef wrappedPropertyRef) {
+  auto *wrappedProperty = cast<VarDecl>(wrappedPropertyRef.getDecl());
+  CanType wrappedValueType =
+      wrappedProperty->getPropertyWrapperInitValueInterfaceType()
+          ->getCanonicalType();
+  bool isLocalContext = wrappedProperty->getDeclContext()->isLocalContext();
+  GenericSignature sig =
+      TC.getGenericSignatureWithCapturedEnvironments(wrappedPropertyRef)
+          .genericSig;
+
+  SmallVector<FunctionType::Param, 2> params;
+
+  // Create the wrappedValue param
+  params.emplace_back(
+      wrappedValueType, Identifier(),
+      ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::LegacyOwned));
+
+  if (!isLocalContext) {
+    CanType selfType = wrappedProperty->getDeclContext()
+                           ->getSelfInterfaceType()
+                           ->getCanonicalType();
+    // Create the self param
+    params.emplace_back(
+        selfType, Identifier(),
+        ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::InOut));
+  }
+
+  CanType resultType = TupleType::getEmpty(TC.Context)->getCanonicalType();
+  AnyFunctionType::CanParamArrayRef paramRef(params);
+  CanAnyFunctionType::ExtInfo extInfo;
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), paramRef,
+                                 resultType, extInfo);
+}
+
 /// Get the type of a destructor function.
 static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
                                                      bool isDeallocating,
@@ -4226,6 +4270,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return getPropertyWrapperBackingInitializerInterfaceType(*this, c);
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
+    return getPropertyWrappedFieldInitAccessorInterfaceType(*this, c);
   case SILDeclRef::Kind::IVarInitializer:
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
                                              c.isForeign, false);
@@ -4268,6 +4314,7 @@ TypeConverter::getGenericSignatureWithCapturedEnvironments(SILDeclRef c) {
       vd->getInnermostDeclContext(), captureInfo);
   }
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue: {
     // FIXME: It might be better to compute lowered local captures of
     // the property wrapper generator directly and collapse this into the
@@ -4410,6 +4457,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
     return CaptureInfo::empty();
 
   default:
@@ -4550,6 +4598,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             break;
           case ReadImplKind::Inherited:
             llvm_unreachable("inherited local variable?");
+          case ReadImplKind::Borrow:
+            llvm_unreachable("borrow accessor is not yet implemented");
           }
 
           switch (impl.getWriteImpl()) {
@@ -4574,6 +4624,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             break;
           case WriteImplKind::InheritedWithObservers:
             llvm_unreachable("inherited local variable");
+          case WriteImplKind::Mutate:
+            llvm_unreachable("mutate accessor is not yet implemented");
           }
 
           switch (impl.getReadWriteImpl()) {
@@ -4597,6 +4649,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             break;
           case ReadWriteImplKind::InheritedWithDidSet:
             llvm_unreachable("inherited local variable");
+          case ReadWriteImplKind::Mutate:
+            llvm_unreachable("mutate accessor is not yet implemented");
           }
         }
 

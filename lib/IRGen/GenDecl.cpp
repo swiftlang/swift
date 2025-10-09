@@ -296,9 +296,9 @@ public:
     // Check if the ObjC runtime already has a descriptor for this
     // protocol. If so, use it.
     SmallString<32> buf;
-    auto protocolName
-      = IGM.getAddrOfGlobalString(proto->getObjCRuntimeName(buf));
-    
+    auto protocolName = IGM.getAddrOfGlobalString(
+        proto->getObjCRuntimeName(buf), CStringSectionType::ObjCClassName);
+
     auto existing = Builder.CreateCall(objc_getProtocol, protocolName);
     auto isNull = Builder.CreateICmpEQ(existing,
                    llvm::ConstantPointerNull::get(IGM.ProtocolDescriptorPtrTy));
@@ -1056,16 +1056,14 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
   case llvm::Triple::MachO:
     switch (Type) {
     case ObjCLabelType::ClassName:
-      GV->setSection("__TEXT,__objc_classname,cstring_literals");
+      GV->setSection(IRGenModule::ObjCClassNameSectionName);
       return;
     case ObjCLabelType::MethodVarName:
-      GV->setSection("__TEXT,__objc_methname,cstring_literals");
+    case ObjCLabelType::PropertyName:
+      GV->setSection(IRGenModule::ObjCMethodNameSectionName);
       return;
     case ObjCLabelType::MethodVarType:
-      GV->setSection("__TEXT,__objc_methtype,cstring_literals");
-      return;
-    case ObjCLabelType::PropertyName:
-      GV->setSection("__TEXT,__cstring,cstring_literals");
+      GV->setSection(IRGenModule::ObjCMethodTypeSectionName);
       return;
     }
   case llvm::Triple::ELF:
@@ -1156,12 +1154,35 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
       f.getLoweredFunctionType()->getSubstGenericSignature()) {
     return true;
   }
-  
-  if (f.isPossiblyUsedExternally())
+
+  if (f.isPossiblyUsedExternally()) {
+    // Under the embedded linkage model, if it has a non-unique definition,
+    // treat it lazily.
+    if (f.hasNonUniqueDefinition() && !f.isSwiftRuntimeFunction()
+        && !f.markedAsUsed()) {
+      return true;
+    }
+
     return false;
+  }
 
   if (f.getDynamicallyReplacedFunction())
     return false;
+
+  return true;
+}
+
+// Eagerly emit global variables that are externally visible.
+static bool isLazilyEmittedGlobalVariable(SILGlobalVariable &v, SILModule &m) {
+  if (v.isPossiblyUsedExternally()) {
+    // Under the embedded linkage model, if it has a non-unique definition,
+    // treat it lazily.
+    if (v.hasNonUniqueDefinition() && !v.markedAsUsed()) {
+      return true;
+    }
+
+    return false;
+  }
 
   return true;
 }
@@ -1199,6 +1220,9 @@ void IRGenerator::emitGlobalTopLevel(
     createLinkerDirectiveVariable(*PrimaryIGM, directive);
   }
   for (SILGlobalVariable &v : PrimaryIGM->getSILModule().getSILGlobals()) {
+    if (isLazilyEmittedGlobalVariable(v, PrimaryIGM->getSILModule()))
+      continue;
+
     Decl *decl = v.getDecl();
     CurrentIGMPtr IGM = getGenModule(decl ? decl->getDeclContext() : nullptr);
     IGM->emitSILGlobalVariable(&v);
@@ -1360,6 +1384,7 @@ void IRGenerator::emitLazyDefinitions() {
          !LazyExtensionDescriptors.empty() ||
          !LazyFieldDescriptors.empty() ||
          !LazyFunctionDefinitions.empty() || !LazyWitnessTables.empty() ||
+         !LazyGlobalVariables.empty() ||
          !LazyCanonicalSpecializedMetadataAccessors.empty() ||
          !LazyMetadataAccessors.empty() ||
          !LazyClassMetadata.empty() ||
@@ -1448,6 +1473,13 @@ void IRGenerator::emitLazyDefinitions() {
       IGM->emitSILFunction(f);
     }
 
+    // Emit any lazy global variables we require.
+    while (!LazyGlobalVariables.empty()) {
+      SILGlobalVariable *v = LazyGlobalVariables.pop_back_val();
+      CurrentIGMPtr IGM = getGenModule(v);
+      IGM->emitSILGlobalVariable(v);
+    }
+
     while (!LazyCanonicalSpecializedMetadataAccessors.empty()) {
       CanType theType =
           LazyCanonicalSpecializedMetadataAccessors.pop_back_val();
@@ -1519,6 +1551,26 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
 
   // Don't update the map if we already have an entry.
   DefaultIGMForFunction.insert(std::make_pair(f, CurrentIGM));
+}
+
+void IRGenerator::addLazyGlobalVariable(SILGlobalVariable *v) {
+  // Add it to the queue if it hasn't already been put there.
+  if (!LazilyEmittedGlobalVariables.insert(v).second)
+    return;
+
+  assert(!FinishedEmittingLazyDefinitions);
+  LazyGlobalVariables.push_back(v);
+
+  if (auto decl = v->getDecl()) {
+    if (decl->getDeclContext()->getParentSourceFile())
+      return;
+  }
+
+  if (CurrentIGM == nullptr)
+    return;
+
+  // Don't update the map if we already have an entry.
+  DefaultIGMForGlobalVariable.insert(std::make_pair(v, CurrentIGM));
 }
 
 bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
@@ -1991,6 +2043,7 @@ void IRGenerator::emitDynamicReplacements() {
       "\x01l_auto_dynamic_replacements", IGM.getPointerAlignment(),
       /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage);
   autoReplVar->setSection(getDynamicReplacementSection(IGM));
+  disableAddressSanitizer(IGM, autoReplVar);
   IGM.addUsedGlobal(autoReplVar);
 
   if (origFuncTypes.empty())
@@ -2244,7 +2297,8 @@ void IRGenerator::emitEntryPointInfo() {
 static IRLinkage
 getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
              SILLinkage linkage, ForDefinition_t isDefinition,
-             bool isWeakImported, bool isKnownLocal = false) {
+             bool isWeakImported, bool isKnownLocal,
+             bool hasNonUniqueDefinition) {
 #define RESULT(LINKAGE, VISIBILITY, DLL_STORAGE)                               \
   IRLinkage{llvm::GlobalValue::LINKAGE##Linkage,                               \
             llvm::GlobalValue::VISIBILITY##Visibility,                         \
@@ -2275,8 +2329,13 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
   case SILLinkage::Package: {
     auto linkage = llvm::GlobalValue::ExternalLinkage;
 
-    if (info.MergeableSymbols)
-      linkage = llvm::GlobalValue::WeakODRLinkage;
+    if (hasNonUniqueDefinition) {
+      // Keep Swift runtime functions around so IRGen can reference them.
+      if (SILFunction::isSwiftRuntimeFunction(name, nullptr))
+        linkage = llvm::GlobalValue::WeakODRLinkage;
+      else
+        linkage = llvm::GlobalValue::LinkOnceODRLinkage;
+    }
 
     return {linkage, PublicDefinitionVisibility,
             info.Internalize ? llvm::GlobalValue::DefaultStorageClass
@@ -2293,15 +2352,15 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
                         : RESULT(External, Hidden, Default);
 
   case SILLinkage::Hidden:
-    if (info.MergeableSymbols)
-      return RESULT(WeakODR, Hidden, Default);
+    if (hasNonUniqueDefinition)
+      return RESULT(LinkOnceODR, Hidden, Default);
 
     return RESULT(External, Hidden, Default);
 
   case SILLinkage::Private: {
     if (info.forcePublicDecls() && !isDefinition)
       return getIRLinkage(name, info, SILLinkage::PublicExternal, isDefinition,
-                          isWeakImported, isKnownLocal);
+                          isWeakImported, isKnownLocal, hasNonUniqueDefinition);
 
     auto linkage = info.needLinkerToMergeDuplicateSymbols()
                        ? llvm::GlobalValue::LinkOnceODRLinkage
@@ -2357,7 +2416,8 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
   auto IRL =
       getIRLinkage(global->hasName() ? global->getName() : StringRef(),
                    linkInfo, entity.getLinkage(ForDefinition), ForDefinition,
-                   weakImported, isKnownLocal);
+                   weakImported, isKnownLocal,
+                   entity.hasNonUniqueDefinition());
   ApplyIRLinkage(IRL).to(global);
 
   LinkInfo link = LinkInfo::get(IGM, entity, ForDefinition);
@@ -2410,7 +2470,8 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   bool weakImported = entity.isWeakImported(swiftModule);
   result.IRL = getIRLinkage(result.Name, linkInfo,
                             entity.getLinkage(isDefinition), isDefinition,
-                            weakImported, isKnownLocal);
+                            weakImported, isKnownLocal,
+                            entity.hasNonUniqueDefinition());
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -2421,7 +2482,8 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
   LinkInfo result;
   result.Name += name;
   result.IRL = getIRLinkage(name, linkInfo, linkage, isDefinition,
-                            isWeakImported, linkInfo.Internalize);
+                            isWeakImported, linkInfo.Internalize,
+                            /*hasNonUniqueDefinition=*/false);
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -2698,6 +2760,9 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     auto alignment =
       Alignment(getClangASTContext().getDeclAlign(clangDecl).getQuantity());
     return Address(addr, ti.getStorageType(), alignment);
+  } else if (!forDefinition &&
+             isLazilyEmittedGlobalVariable(*var, getSILModule())) {
+    IRGen.addLazyGlobalVariable(var);
   }
 
   ResilienceExpansion expansion = getResilienceExpansionForLayout(var);
@@ -2710,7 +2775,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
 
   if (var->isInitializedObject()) {
     assert(ti.isFixedSize(expansion));
-    StructLayout *Layout = StaticObjectLayouts[var].get();
+    StructLayout *Layout = StaticObjectLayouts[var].layout.get();
     if (!Layout) {
       // Create the layout (includes the llvm type) for the statically
       // initialized object and store it for later.
@@ -2721,7 +2786,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       }
       Layout = getClassLayoutWithTailElems(*this,
                                            var->getLoweredType(), TailTypes);
-      StaticObjectLayouts[var] = std::unique_ptr<StructLayout>(Layout);
+      StaticObjectLayouts[var] = {std::unique_ptr<StructLayout>(Layout), nullptr};
     }
     storageType = Layout->getType();
     fixedSize = Layout->getSize();
@@ -2837,7 +2902,7 @@ llvm::Constant *IRGenModule::getGlobalInitValue(SILGlobalVariable *var,
                                                 llvm::Type *storageType,
                                                 Alignment alignment) {
   if (var->isInitializedObject()) {
-    StructLayout *layout = StaticObjectLayouts[var].get();
+    StructLayout *layout = StaticObjectLayouts[var].layout.get();
     ObjectInst *oi = cast<ObjectInst>(var->getStaticInitializerValue());
     llvm::Constant *initVal = emitConstantObject(*this, oi, layout);
     if (!canMakeStaticObjectReadOnly(var->getLoweredType())) {
@@ -2847,13 +2912,18 @@ llvm::Constant *IRGenModule::getGlobalInitValue(SILGlobalVariable *var,
       //       swift_once_t token[fixedAlignment / sizeof(swift_once_t)];
       //       HeapObject object;
       //     };
-      std::string typeName = storageType->getStructName().str() + 'c';
-      assert(alignment >= getPointerAlignment());
-      unsigned numTokens = alignment.getValue() /
-                           getPointerAlignment().getValue();
-      auto *containerTy = llvm::StructType::create(getLLVMContext(),
-              {llvm::ArrayType::get(OnceTy, numTokens), initVal->getType()},
-              typeName);
+      llvm::StructType *containerTy = StaticObjectLayouts[var].containerTy;
+      if (!containerTy) {
+        std::string typeName = storageType->getStructName().str() + 'c';
+        assert(alignment >= getPointerAlignment());
+        unsigned numTokens = alignment.getValue() /
+                             getPointerAlignment().getValue();
+        containerTy = llvm::StructType::create(getLLVMContext(),
+                {llvm::ArrayType::get(OnceTy, numTokens), initVal->getType()},
+                typeName);
+        StaticObjectLayouts[var].containerTy = containerTy;
+      }
+
       auto *zero = llvm::ConstantAggregateZero::get(containerTy->getElementType(0));
       initVal = llvm::ConstantStruct::get(containerTy, {zero , initVal});
     }
@@ -2928,6 +2998,7 @@ static void addLLVMFunctionAttributes(SILFunction *f, Signature &signature) {
     attrs = attrs.addFnAttribute(signature.getType()->getContext(),
                                  llvm::Attribute::NoInline);
     break;
+  case HeuristicAlwaysInline:
   case AlwaysInline:
     // FIXME: We do not currently transfer AlwaysInline since doing so results
     // in test failures, which must be investigated first.
@@ -4173,9 +4244,10 @@ static TypeEntityReference
 getObjCClassByNameReference(IRGenModule &IGM, ClassDecl *cls) {
   auto kind = TypeReferenceKind::DirectObjCClassName;
   SmallString<64> objcRuntimeNameBuffer;
-  auto ref = IGM.getAddrOfGlobalString(
-                                 cls->getObjCRuntimeName(objcRuntimeNameBuffer),
-                                 /*willBeRelativelyAddressed=*/true);
+  auto ref =
+      IGM.getAddrOfGlobalString(cls->getObjCRuntimeName(objcRuntimeNameBuffer),
+                                CStringSectionType::ObjCClassName,
+                                /*willBeRelativelyAddressed=*/true);
 
   return TypeEntityReference(kind, ref);
 }
@@ -4732,9 +4804,9 @@ void IRGenModule::emitAccessibleFunction(StringRef sectionName,
 
   // -- Field: Name (record name)
   {
-    llvm::Constant *name =
-        getAddrOfGlobalString(func.getFunctionName(),
-                              /*willBeRelativelyAddressed=*/true);
+    llvm::Constant *name = getAddrOfGlobalString(
+        func.getFunctionName(), CStringSectionType::Default,
+        /*willBeRelativelyAddressed=*/true);
     fields.addRelativeAddress(name);
   }
 
@@ -5930,9 +6002,8 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
 Address IRGenFunction::createAlloca(llvm::Type *type,
                                     Alignment alignment,
                                     const llvm::Twine &name) {
-  llvm::AllocaInst *alloca =
-      new llvm::AllocaInst(type, IGM.DataLayout.getAllocaAddrSpace(), name,
-                           AllocaIP);
+  llvm::AllocaInst *alloca = new llvm::AllocaInst(
+      type, IGM.DataLayout.getAllocaAddrSpace(), name, AllocaIP->getIterator());
   alloca->setAlignment(llvm::MaybeAlign(alignment.getValue()).valueOrOne());
   return Address(alloca, type, alignment);
 }
@@ -5942,9 +6013,10 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
                                     llvm::Value *ArraySize,
                                     Alignment alignment,
                                     const llvm::Twine &name) {
-  llvm::AllocaInst *alloca = new llvm::AllocaInst(
-      type, IGM.DataLayout.getAllocaAddrSpace(), ArraySize,
-      llvm::MaybeAlign(alignment.getValue()).valueOrOne(), name, AllocaIP);
+  llvm::AllocaInst *alloca =
+      new llvm::AllocaInst(type, IGM.DataLayout.getAllocaAddrSpace(), ArraySize,
+                           llvm::MaybeAlign(alignment.getValue()).valueOrOne(),
+                           name, AllocaIP->getIterator());
   return Address(alloca, type, alignment);
 }
 
@@ -5956,15 +6028,35 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
 /// FIXME: willBeRelativelyAddressed is only needed to work around an ld64 bug
 /// resolving relative references to coalesceable symbols.
 /// It should be removed when fixed. rdar://problem/22674524
-llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
-                                               bool willBeRelativelyAddressed,
-                                               bool useOSLogSection) {
-  useOSLogSection = useOSLogSection &&
-    TargetInfo.OutputObjectFormat == llvm::Triple::MachO;
+llvm::Constant *
+IRGenModule::getAddrOfGlobalString(StringRef data, CStringSectionType type,
+                                   bool willBeRelativelyAddressed) {
+  if (TargetInfo.OutputObjectFormat != llvm::Triple::MachO ||
+      willBeRelativelyAddressed)
+    type = CStringSectionType::Default;
+  StringRef sectionName;
+  switch (type) {
+  case CStringSectionType::Default:
+    sectionName = "";
+    break;
+  case CStringSectionType::ObjCClassName:
+    sectionName = ObjCClassNameSectionName;
+    break;
+  case CStringSectionType::ObjCMethodName:
+    sectionName = ObjCMethodNameSectionName;
+    break;
+  case CStringSectionType::ObjCMethodType:
+    sectionName = ObjCMethodTypeSectionName;
+    break;
+  case CStringSectionType::OSLogString:
+    sectionName = OSLogStringSectionName;
+    break;
+  case CStringSectionType::NumTypes:
+    llvm_unreachable("invalid type");
+  }
 
   // Check whether this string already exists.
-  auto &entry = useOSLogSection ? GlobalOSLogStrings[data] :
-    GlobalStrings[data];
+  auto &entry = GlobalStrings[static_cast<size_t>(type)][data];
 
   if (entry.second) {
     // FIXME: Clear unnamed_addr if the global will be relative referenced
@@ -5986,9 +6078,6 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
     (llvm::Twine(".nul") + llvm::Twine(i)).toVector(name);
   }
 
-  auto sectionName =
-    useOSLogSection ? "__TEXT,__oslogstring,cstring_literals" : "";
-
   entry = createStringConstant(data, willBeRelativelyAddressed,
                                sectionName, name);
   return entry.second;
@@ -6000,9 +6089,11 @@ IRGenModule::getAddrOfGlobalIdentifierString(StringRef data,
   if (Lexer::identifierMustAlwaysBeEscaped(data)) {
     llvm::SmallString<256> name;
     Mangle::Mangler::appendRawIdentifierForRuntime(data, name);
-    return getAddrOfGlobalString(name, willBeRelativelyAddressed);
+    return getAddrOfGlobalString(name, CStringSectionType::Default,
+                                 willBeRelativelyAddressed);
   }
-  return getAddrOfGlobalString(data, willBeRelativelyAddressed);
+  return getAddrOfGlobalString(data, CStringSectionType::Default,
+                               willBeRelativelyAddressed);
 }
 
 /// Get or create a global UTF-16 string constant.
@@ -6277,13 +6368,14 @@ IRGenModule::getAddrOfDefaultAssociatedConformanceAccessor(
 }
 
 llvm::Function *
-IRGenModule::getAddrOfContinuationPrototype(CanSILFunctionType fnType) {
+IRGenModule::getAddrOfContinuationPrototype(CanSILFunctionType fnType,
+                                            CanGenericSignature sig) {
   LinkEntity entity = LinkEntity::forCoroutineContinuationPrototype(fnType);
 
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return entry;
 
-  GenericContextScope scope(*this, fnType->getInvocationGenericSignature());
+  GenericContextScope scope(*this, sig);
   auto signature = Signature::forCoroutineContinuation(*this, fnType);
   LinkInfo link = LinkInfo::get(*this, entity, NotForDefinition);
   entry = createFunction(*this, link, signature);

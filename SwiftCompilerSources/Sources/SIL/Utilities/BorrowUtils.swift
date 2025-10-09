@@ -300,7 +300,7 @@ public enum BorrowingInstruction : CustomStringConvertible, Hashable {
 extension BorrowingInstruction {
   private func visitEndBorrows(value: Value, _ context: Context, _ visitor: @escaping (Operand) -> WalkResult)
     -> WalkResult {
-    return value.lookThroughBorrowedFromUser.uses.filterUsers(ofType: EndBorrowInst.self).walk {
+    return value.lookThroughBorrowedFromUser.uses.filterUses(ofType: EndBorrowInst.self).walk {
       visitor($0)
     }
   }
@@ -534,7 +534,10 @@ public final class EnclosingValueIterator : IteratorProtocol {
         } else if let forwardingInst = value.forwardingInstruction {
           // Recurse through guaranteed forwarding non-phi instructions.
           let ops = forwardingInst.forwardedOperands
-          worklist.pushIfNotVisited(contentsOf: ops.lazy.map { $0.value })
+          worklist.pushIfNotVisited(contentsOf: ops.values)
+        } else if value.isGuaranteedApplyResult {
+          let selfArgument = (value as! ApplyInst).arguments.last!
+          worklist.pushIfNotVisited(selfArgument)
         } else {
           fatalError("cannot get borrow introducers for unknown guaranteed value")
         }
@@ -616,6 +619,19 @@ extension Value {
       }
     }
     return self
+  }
+
+  public var isGuaranteedApplyResult: Bool {
+    guard let definingInstruction = self.definingInstruction else {
+      return false
+    }
+    guard let apply = definingInstruction as? ApplyInst else {
+      return false
+    }
+    guard apply.singleDirectResult != nil else {
+      return false
+    }
+    return apply.functionConvention.results[0].convention == .guaranteed
   }
 }
 

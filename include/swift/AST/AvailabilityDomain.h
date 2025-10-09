@@ -22,6 +22,7 @@
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/PlatformKindUtils.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
@@ -33,10 +34,10 @@
 namespace swift {
 class ASTContext;
 class CustomAvailabilityDomain;
-class Decl;
 class DeclContext;
 class FuncDecl;
 class ModuleDecl;
+class ValueDecl;
 
 /// Represents a dimension of availability (e.g. macOS platform or Swift
 /// language mode).
@@ -153,8 +154,7 @@ public:
 
   /// If `decl` represents an availability domain, returns the corresponding
   /// `AvailabilityDomain` value. Otherwise, returns `std::nullopt`.
-  static std::optional<AvailabilityDomain> forCustom(Decl *decl,
-                                                     const ASTContext &ctx);
+  static std::optional<AvailabilityDomain> forCustom(ValueDecl *decl);
 
   static AvailabilityDomain forCustom(const CustomAvailabilityDomain *domain) {
     return AvailabilityDomain(domain);
@@ -227,11 +227,12 @@ public:
 
   /// Returns true if this domain is considered active in the current
   /// compilation context.
-  bool isActive(const ASTContext &ctx) const;
+  bool isActive(const ASTContext &ctx, bool forTargetVariant = false) const;
 
   /// Returns true if this domain is a platform domain and is considered active
   /// in the current compilation context.
-  bool isActivePlatform(const ASTContext &ctx) const;
+  bool isActivePlatform(const ASTContext &ctx,
+                        bool forTargetVariant = false) const;
 
   /// Returns the domain's minimum available range for type checking. For
   /// example, for the domain of the platform that compilation is targeting,
@@ -250,7 +251,7 @@ public:
 
   /// Returns the decl that represents the domain, or `nullptr` if the domain
   /// does not have a decl.
-  Decl *getDecl() const;
+  ValueDecl *getDecl() const;
 
   /// Returns the module that the domain belongs to, if it is a custom domain.
   ModuleDecl *getModule() const;
@@ -288,6 +289,12 @@ public:
     bool unused;
     return getRemappedDomain(ctx, unused);
   }
+
+  /// Returns true for a domain that is permanently always available, and
+  /// therefore availability constraints in the domain are effectively the same
+  /// as constraints in the `*` domain. This is used to diagnose unnecessary
+  /// `@available` attributes and `if #available` statements.
+  bool isPermanentlyAlwaysEnabled() const;
 
   bool operator==(const AvailabilityDomain &other) const {
     return storage.getOpaqueValue() == other.storage.getOpaqueValue();
@@ -328,11 +335,15 @@ struct StableAvailabilityDomainComparator {
 };
 
 /// Represents an availability domain that has been defined in a module.
-class CustomAvailabilityDomain : public llvm::FoldingSetNode {
+class alignas(1 << CustomAvailabilityDomainAlignInBits) CustomAvailabilityDomain
+    : public llvm::FoldingSetNode {
 public:
-  enum class Kind {
+  enum class Kind : uint8_t {
     /// A domain that is known to be enabled at compile time.
     Enabled,
+    /// A domain that is known to be enabled at compile time and is also assumed
+    /// to be enabled for all deployments.
+    AlwaysEnabled,
     /// A domain that is known to be disabled at compile time.
     Disabled,
     /// A domain with an enablement state that must be queried at runtime.
@@ -341,24 +352,34 @@ public:
 
 private:
   Identifier name;
-  Kind kind;
   ModuleDecl *mod;
-  Decl *decl;
+  ValueDecl *decl;
   FuncDecl *predicateFunc;
+  Kind kind;
+
+  struct {
+    /// Whether the "isPermanentlyEnabled" bit has been computed yet.
+    unsigned isPermanentlyEnabledComputed : 1;
+    /// Whether the domain is permanently enabled, which makes constraints in
+    /// the domain equivalent to those in the `*` domain.
+    unsigned isPermanentlyEnabled : 1;
+  } flags = {};
+
+  friend class IsCustomAvailabilityDomainPermanentlyEnabled;
 
   CustomAvailabilityDomain(Identifier name, Kind kind, ModuleDecl *mod,
-                           Decl *decl, FuncDecl *predicateFunc);
+                           ValueDecl *decl, FuncDecl *predicateFunc);
 
 public:
   static const CustomAvailabilityDomain *get(StringRef name, Kind kind,
-                                             ModuleDecl *mod, Decl *decl,
+                                             ModuleDecl *mod, ValueDecl *decl,
                                              FuncDecl *predicateFunc,
                                              const ASTContext &ctx);
 
   Identifier getName() const { return name; }
   Kind getKind() const { return kind; }
   ModuleDecl *getModule() const { return mod; }
-  Decl *getDecl() const { return decl; }
+  ValueDecl *getDecl() const { return decl; }
 
   /// Returns the function that should be called at runtime to determine whether
   /// the domain is available, or `nullptr` if the domain's availability is not
@@ -371,6 +392,11 @@ public:
 
   void Profile(llvm::FoldingSetNodeID &ID) const { Profile(ID, name, mod); }
 };
+
+inline void simple_display(llvm::raw_ostream &os,
+                           const CustomAvailabilityDomain *domain) {
+  os << domain->getName();
+}
 
 /// Represents either a resolved availability domain or an identifier written
 /// in source that has not yet been resolved to a domain.

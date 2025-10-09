@@ -44,7 +44,7 @@
 // CHECK-DEP-INTER-BC: <MODULE_PACKAGE_NAME abbrevid=7/> blob data = 'myPkg'
 
 // TEST Lib should error on loading Dep built from interface and accessing package symbols (unless usableFromInline or inlinable)
-// RUN: %target-swift-frontend -typecheck %t/Lib.swift -package-name myPkg -I %t -verify
+// RUN: %target-swift-frontend -typecheck %t/Lib.swift -package-name myPkg -I %t -verify -verify-ignore-unrelated
 
 // TEST Remove and rebuild Dep from source
 // RUN: rm %t/Dep.swiftmodule
@@ -64,7 +64,7 @@
 // RUN:   -emit-private-module-interface-path %t/LibPass.private.swiftinterface
 
 // TEST Loading LibPass and accessing lib func should pass
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -package-name myPkg -I %t -verify
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -package-name myPkg -I %t -verify -verify-ignore-unrelated
 
 // TEST Building LibPass from interface with Dep (built from interface) should succeed with or without package name
 // Without package name

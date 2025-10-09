@@ -112,7 +112,6 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
     : Stage(SILStage::Raw), loweredAddresses(!Options.EnableSILOpaqueValues),
       indexTrieRoot(new IndexTrieNode()), Options(Options),
       irgenOptions(irgenOptions), serialized(false),
-      regDeserializationNotificationHandlerForNonTransparentFuncOME(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),
       hasAccessMarkerHandler(false),
       prespecializedFunctionDeclsImported(false), SerializeSILAction(),
@@ -889,8 +888,8 @@ void SILModule::notifyMovedInstruction(SILInstruction *inst,
 bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
   const auto &IntrinsicInfo = getIntrinsicInfo(Name);
   if (IntrinsicInfo.ID != llvm::Intrinsic::not_intrinsic) {
-    return IntrinsicInfo.getOrCreateAttributes(getASTContext())
-        .hasFnAttr(llvm::Attribute::NoReturn);
+    return IntrinsicInfo.getOrCreateFnAttributes(getASTContext())
+        .hasAttribute(llvm::Attribute::NoReturn);
   }
   const auto &BuiltinInfo = getBuiltinInfo(Name);
   switch (BuiltinInfo.ID) {

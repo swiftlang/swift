@@ -30,9 +30,9 @@
 
 // CHECK: ->(plugin:[[#PID:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION:]]}}}
 // CHECK: <-(plugin:[[#PID]]) {"getCapabilityResult":{"capability":{"protocolVersion":1}}}
-// CHECK: ->(plugin:[[#PID]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","lexicalContext":[{{.*}}func test{{.*}}],"macro":{"moduleName":"TestPlugin","name":"testString","typeName":"TestStringMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":5,"offset":301},"source":"#testString(123)"}}}
+// CHECK: ->(plugin:[[#PID]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","lexicalContext":[{{.*}}func test{{.*}}],"macro":{"moduleName":"TestPlugin","name":"testString","typeName":"TestStringMacro"},"macroRole":"expression","staticBuildConfiguration"{{.*}},"syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":5,"offset":301},"source":"#testString(123)"}}}
 // CHECK: <-(plugin:[[#PID]]) {"expandFreestandingMacroResult":{"diagnostics":[],"expandedSource":"\"123\"\n  +   \"foo  \""}}
-// CHECK: ->(plugin:[[#PID]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"TestPlugin","name":"testStringWithError","typeName":"TestStringWithErrorMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":6,"offset":336},"source":"#testStringWithError(321)"}}}
+// CHECK: ->(plugin:[[#PID]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"TestPlugin","name":"testStringWithError","typeName":"TestStringWithErrorMacro"},"macroRole":"expression","staticBuildConfiguration"{{.*}},"syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":6,"offset":336},"source":"#testStringWithError(321)"}}}
 // CHECK: <-(plugin:[[#PID]]) {"expandFreestandingMacroResult":{"diagnostics":[{"fixIts":[],"highlights":[],"message":"message from plugin","notes":[],"position":{"fileName":"{{.*}}test.swift","offset":336},"severity":"error"}],"expandedSource":"\"bar\""}}
 
 //--- test.swift

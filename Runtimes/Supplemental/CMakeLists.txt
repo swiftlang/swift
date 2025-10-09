@@ -39,6 +39,7 @@ set(COMMON_OPTIONS
   -DCMAKE_Swift_COMPILER=${CMAKE_Swift_COMPILER}
   -DCMAKE_C_COMPILER_TARGET=${CMAKE_C_COMPILER_TARGET}
   -DCMAKE_CXX_COMPILER_TARGET=${CMAKE_CXX_COMPILER_TARGET}
+  -DCMAKE_ASM_COMPILER_TARGET=${CMAKE_ASM_COMPILER_TARGET}
   -DCMAKE_Swift_COMPILER_TARGET=${CMAKE_Swift_COMPILER_TARGET}
   -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=${CMAKE_FIND_PACKAGE_PREFER_CONFIG}
   ${SwiftCore_DIR_FLAG}
@@ -77,6 +78,8 @@ if(SwiftRuntime_ENABLE_distributed)
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Distributed"
     INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
     INSTALL_COMMAND ""
+    # To ensure incremental builds work as expected
+    BUILD_ALWAYS 1
     CMAKE_ARGS
       ${COMMON_OPTIONS})
 endif()
@@ -89,6 +92,34 @@ if(SwiftRuntime_ENABLE_differentiation)
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Differentiation"
     INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
     INSTALL_COMMAND ""
+    # To ensure incremental builds work as expected
+    BUILD_ALWAYS 1
+    CMAKE_ARGS
+      ${COMMON_OPTIONS})
+endif()
+
+# Observation
+if(SwiftRuntime_ENABLE_observation)
+  ExternalProject_Add(Observation
+    PREFIX "Observation"
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Observation"
+    INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
+    INSTALL_COMMAND ""
+    # To ensure incremental builds work as expected
+    BUILD_ALWAYS 1
+    CMAKE_ARGS
+      ${COMMON_OPTIONS})
+endif()
+
+# Runtime
+if(SwiftRuntime_ENABLE_runtime)
+  ExternalProject_Add(Runtime
+    PREFIX "Runtime"
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtime"
+    INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
+    INSTALL_COMMAND ""
+    # To ensure incremental builds work as expected
+    BUILD_ALWAYS 1
     CMAKE_ARGS
       ${COMMON_OPTIONS})
 endif()

@@ -262,12 +262,11 @@ func isRawPointerType(text: String) -> Bool {
 
 // Remove std. or std.__1. prefix
 func getUnqualifiedStdName(_ type: String) -> String? {
-  if type.hasPrefix("std.") {
-    var ty = type.dropFirst(4)
-    if ty.hasPrefix("__1.") {
-      ty = ty.dropFirst(4)
+  let prefixes = ["std.__1.", "std.__ndk1.", "std."]
+  for prefix in prefixes {
+    if type.hasPrefix(prefix) {
+      return String(type.dropFirst(prefix.count))
     }
-    return String(ty)
   }
   return nil
 }
@@ -468,7 +467,14 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
     let functionRef = DeclReferenceExprSyntax(baseName: base.name)
     let args: [ExprSyntax] = base.signature.parameterClause.parameters.enumerated()
       .map { (i: Int, param: FunctionParameterSyntax) in
-        return pointerArgs[i] ?? ExprSyntax("\(param.name)")
+        if let overrideArg = pointerArgs[i] {
+          return overrideArg
+        }
+        if isInout(getParam(base.signature, i).type) {
+          return ExprSyntax("&\(param.name)")
+        } else {
+          return ExprSyntax("\(param.name)")
+        }
       }
     let labels: [TokenSyntax?] = base.signature.parameterClause.parameters.map { param in
       let firstName = param.firstName.trimmed

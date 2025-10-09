@@ -1,14 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-/// Build CoreLib defining a @cdecl enum.
+/// Build CoreLib defining a @c enum.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   %t/CoreLib.swift -emit-module -verify -o %t \
 // RUN:   -emit-clang-header-path %t/CoreLib.h \
 // RUN:   -enable-experimental-feature CDecl
 // RUN: %check-in-clang-c %t/CoreLib.h -I %t
 
-/// Build MiddleLib using the @cdecl enum in API.
+/// Build MiddleLib using the @c enum in API.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   %t/MiddleLib.swift -emit-module -verify -o %t -I %t \
 // RUN:   -emit-clang-header-path %t/MiddleLib.h \
@@ -25,13 +25,13 @@
 // REQUIRES: swift_feature_CDecl
 
 //--- CoreLib.swift
-@cdecl("CEnum")
+@c("CEnum")
 public enum CEnum: CInt { case A, B }
 
 //--- MiddleLib.swift
 import CoreLib
 
-@cdecl("CFunc")
+@c("CFunc")
 public func CFunc(e: CEnum) {}
 // CHECK: typedef SWIFT_ENUM_FWD_DECL(int, CEnum)
 // CHECK: SWIFT_EXTERN void CFunc(SWIFT_ENUM_TAG CEnum e) SWIFT_NOEXCEPT;

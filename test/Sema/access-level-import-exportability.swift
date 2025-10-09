@@ -15,17 +15,17 @@
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/MinimalClient.swift -I %t \
-// RUN:   -package-name TestPackage -swift-version 5 -verify
+// RUN:   -package-name TestPackage -swift-version 5 -verify -verify-ignore-unrelated
 // RUN: %target-swift-frontend -typecheck %t/CompletenessClient.swift -I %t \
-// RUN:   -package-name TestPackage -swift-version 5 -verify
+// RUN:   -package-name TestPackage -swift-version 5 -verify -verify-ignore-unrelated
 
 /// Check diagnostics with library-evolution.
 // RUN: %target-swift-frontend -typecheck %t/MinimalClient.swift -I %t \
 // RUN:   -package-name TestPackage -swift-version 5 \
-// RUN:   -enable-library-evolution -verify
+// RUN:   -enable-library-evolution -verify -verify-ignore-unrelated
 // RUN: %target-swift-frontend -typecheck %t/CompletenessClient.swift -I %t \
 // RUN:   -package-name TestPackage -swift-version 5 \
-// RUN:   -enable-library-evolution -verify
+// RUN:   -enable-library-evolution -verify -verify-ignore-unrelated
 
 //--- PublicLib.swift
 public protocol PublicImportProto {

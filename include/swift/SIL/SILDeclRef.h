@@ -38,6 +38,7 @@ namespace swift {
   enum class EffectsKind : uint8_t;
   class AbstractFunctionDecl;
   class AbstractClosureExpr;
+  class ActorIsolation;
   class ValueDecl;
   class FuncDecl;
   class ClosureExpr;
@@ -167,6 +168,10 @@ struct SILDeclRef {
 
     /// The asynchronous main entry-point function.
     AsyncEntryPoint,
+
+    /// An init accessor that calls a propery wrapped field's
+    /// backing storage initializer
+    PropertyWrappedFieldInitAccessor
   };
 
   /// Represents the variants of a back deployable function.
@@ -302,6 +307,7 @@ struct SILDeclRef {
   AutoClosureExpr *getAutoClosureExpr() const;
   FuncDecl *getFuncDecl() const;
   AbstractFunctionDecl *getAbstractFunctionDecl() const;
+  AccessorDecl *getAccessorDecl() const;
   FileUnit *getFileUnit() const { return cast<FileUnit *>(loc); }
 
   /// Get ModuleDecl that contains the SILDeclRef
@@ -383,6 +389,10 @@ struct SILDeclRef {
 
   /// True if the SILDeclRef references an init accessor declaration.
   bool isInitAccessor() const;
+  /// True if the SILDeclRef references an borrow accessor declaration.
+  bool isBorrowAccessor() const;
+  /// True if the SILDeclRef references an mutate accessor declaration.
+  bool isMutateAccessor() const;
 
   /// True if the function should be treated as transparent.
   bool isTransparent() const;
@@ -394,10 +404,24 @@ struct SILDeclRef {
   SerializedKind_t getSerializedKind() const;
   /// True if the function has noinline attribute.
   bool isNoinline() const;
-  /// True if the function has __always inline attribute.
+  /// True if the function has always inline attribute.
   bool isAlwaysInline() const;
+  /// True if the function has __always inline attribute.
+  bool isUnderscoredAlwaysInline() const;
   /// True if the function has the @backDeployed attribute.
   bool isBackDeployed() const;
+
+  /// True if this entity should have a non-unique definition based on the
+  /// embedded linkage model.
+  bool hasNonUniqueDefinition() const;
+
+  /// True if the declaration is explicitly marked as being exposed to a
+  /// foreign language or environment,
+  static bool declExposedToForeignLanguage(const ValueDecl *decl);
+
+  /// True if the declaration should have a non-unique definition based on the
+  /// embedded linkage model.
+  static bool declHasNonUniqueDefinition(const ValueDecl *decl);
 
   /// Return the expected linkage for a definition of this declaration.
   SILLinkage getDefinitionLinkage() const;
@@ -495,6 +519,8 @@ struct SILDeclRef {
     result.loc = decl;
     return result;
   }
+
+  ActorIsolation getActorIsolation() const;
 
   /// True if the decl ref references a thunk from a natively foreign
   /// declaration to Swift calling convention.

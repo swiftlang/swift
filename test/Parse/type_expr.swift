@@ -313,13 +313,24 @@ func testFunctionCollectionTypes() {
   _ = [() -> Int]()
   _ = [(Int) -> ()]()
 
-  _ = 2 + () -> Int // expected-error {{expected type before '->'}}
-  _ = () -> (Int, Int).2 // expected-error {{expected type after '->'}}
+  // This is folded as '(2 + ()) -> Int'
+  _ = 2 + () -> Int
+  // expected-error@-1 {{expected type before '->'}}
+  // expected-error@-2 {{cannot convert value of type '()' to expected argument type 'Int'}}
+
+  _ = () -> (Int, Int).2
+  // expected-error@-1 {{expected type after '->'}}
+  // expected-error@-2 {{value of tuple type '(Int, Int)' has no member '2'}}
+
   _ = (Int) -> Int // expected-error {{expected member name or initializer call after type name}} expected-note{{use '.self' to reference the type object}}
 
   _ = @convention(c) () -> Int // expected-error{{expected member name or initializer call after type name}} expected-note{{use '.self' to reference the type object}}
   _ = 1 + (@convention(c) () -> Int).self // expected-error{{cannot convert value of type '(@convention(c) () -> Int).Type' to expected argument type 'Int'}}
-  _ = (@autoclosure () -> Int) -> (Int, Int).2 // expected-error {{expected type after '->'}}
+
+  _ = (@autoclosure () -> Int) -> (Int, Int).2
+  // expected-error@-1 {{expected type after '->'}}
+  // expected-error@-2 {{value of tuple type '(Int, Int)' has no member '2'}}
+
   _ = ((@autoclosure () -> Int) -> (Int, Int)).1 // expected-error {{type '(@autoclosure () -> Int) -> (Int, Int)' has no member '1'}}
   _ = ((inout Int) -> Void).self
 
@@ -329,6 +340,18 @@ func testFunctionCollectionTypes() {
   _ = [String: (@autoclosure (Int) -> Int32) -> Void]().keys // expected-error {{argument type of '@autoclosure' parameter must be '()'}}
   let _ = [(Int) -> throws Int]() // expected-error{{'throws' may only occur before '->'}}
   let _ = [Int throws Int](); // expected-error{{'throws' may only occur before '->'}} expected-error {{consecutive statements on a line must be separated by ';'}}
+}
+
+func testInvalidArrowWithClosure() {
+  _ = { undefined -> undefined2 }
+  // expected-error@-1 {{cannot find 'undefined' in scope}}
+  // expected-error@-2 {{cannot find 'undefined2' in scope}}
+  // expected-error@-3 {{expected type before '->'}}
+  // expected-error@-4 {{expected type after '->'}}
+
+  () -> { let x: Int = "" }
+  // expected-error@-1 {{expected type after '->'}}
+  // expected-error@-2 {{cannot convert value of type 'String' to specified type 'Int'}}
 }
 
 func compositionType() {

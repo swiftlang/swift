@@ -395,6 +395,12 @@ void SILDeclRef::print(raw_ostream &OS) const {
     case AccessorKind::Modify2:
       OS << "!modify2";
       break;
+    case AccessorKind::Borrow:
+      OS << "!borrow";
+      break;
+    case AccessorKind::Mutate:
+      OS << "!mutate";
+      break;
     }
     break;
   }
@@ -440,6 +446,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
     break;
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     OS << "!backinginit";
+    break;
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
+    OS << "!wrappedfieldinitaccessor";
     break;
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     OS << "!projectedvalueinit";
@@ -1967,27 +1976,6 @@ public:
     *this << getIDAndType(AI->getDest());
   }
 
-  void visitAssignByWrapperInst(AssignByWrapperInst *AI) {
-    *this << getIDAndType(AI->getSrc()) << " to ";
-    switch (AI->getMode()) {
-    case AssignByWrapperInst::Unknown:
-      break;
-    case AssignByWrapperInst::Initialization:
-      *this << "[init] ";
-      break;
-    case AssignByWrapperInst::Assign:
-      *this << "[assign] ";
-      break;
-    case AssignByWrapperInst::AssignWrappedValue:
-      *this << "[assign_wrapped_value] ";
-      break;
-    }
-
-    *this << getIDAndType(AI->getDest())
-          << ", init " << getIDAndType(AI->getInitializer())
-          << ", set " << getIDAndType(AI->getSetter());
-  }
-
   void visitAssignOrInitInst(AssignOrInitInst *AI) {
     switch (AI->getMode()) {
     case AssignOrInitInst::Unknown:
@@ -2008,10 +1996,15 @@ public:
     }
 
     *this << "#";
-    printFullContext(AI->getProperty()->getDeclContext(), PrintState.OS);
-    *this << AI->getPropertyName();
+    auto declContext = AI->getProperty()->getDeclContext();
 
-    *this << ", self " << getIDAndType(AI->getSelf());
+    if (!declContext->isLocalContext()) {
+      printFullContext(declContext, PrintState.OS);
+      *this << AI->getPropertyName() << ", self ";
+    } else {
+      *this << AI->getPropertyName() << ", local ";
+    }
+    *this << getIDAndType(AI->getSelfOrLocalOperand());
     *this << ", value " << getIDAndType(AI->getSrc());
     *this << ", init " << getIDAndType(AI->getInitializer())
           << ", set " << getIDAndType(AI->getSetter());
@@ -3646,6 +3639,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
 
   switch (getInlineStrategy()) {
     case NoInline: OS << "[noinline] "; break;
+    case HeuristicAlwaysInline: OS << "[heuristic_always_inline] "; break;
     case AlwaysInline: OS << "[always_inline] "; break;
     case InlineDefault: break;
   }
@@ -3665,6 +3659,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     case PerformanceConstraints::NoRuntime:      OS << "[no_runtime] "; break;
     case PerformanceConstraints::NoExistentials: OS << "[no_existentials] "; break;
     case PerformanceConstraints::NoObjCBridging: OS << "[no_objc_bridging] "; break;
+    case PerformanceConstraints::ManualOwnership: OS << "[manual_ownership] "; break;
   }
 
   if (isPerformanceConstraint())
@@ -3774,6 +3769,9 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
 
   if (isLet())
     OS << "[let] ";
+
+  if (markedAsUsed())
+    OS << "[used] ";
 
   printName(OS);
   OS << " : " << LoweredType;

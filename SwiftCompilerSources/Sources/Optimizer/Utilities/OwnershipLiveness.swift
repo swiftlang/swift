@@ -717,7 +717,7 @@ extension InteriorUseWalker: AddressUseVisitor {
       if handleInner(borrowed: sb) == .abortWalk {
         return .abortWalk
       }
-      return sb.uses.filterUsers(ofType: EndBorrowInst.self).walk {
+      return sb.uses.filterUses(ofType: EndBorrowInst.self).walk {
         useVisitor($0)
       }
     case let load as LoadBorrowInst:
@@ -805,6 +805,10 @@ extension InteriorUseWalker {
     }
     if let inst = operand.instruction as? ForwardingInstruction {
       return inst.forwardedResults.walk { walkDownUses(of: $0) }
+    }
+    // TODO: Represent apply of borrow accessors as ForwardingOperation and use that over ForwardingInstruction
+    if let apply = operand.instruction as? FullApplySite, apply.hasGuaranteedResult {
+      return walkDownUses(of: apply.singleDirectResult!)
     }
     // TODO: verify that ForwardInstruction handles all .forward operand ownership and assert that only phis can be
     // reached: assert(Phi(using: operand) != nil)

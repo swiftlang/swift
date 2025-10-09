@@ -22,6 +22,7 @@
 #include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/RequestCache.h"
 #include "swift/Basic/AnyValue.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Statistic.h"
@@ -208,6 +209,7 @@ public:
   void enumerateReferencesInFile(
       const SourceFile *SF,
       evaluator::DependencyRecorder::ReferenceEnumerator f) const {
+    ASSERT(recorder.isRecordingEnabled() && "Dep recording should be enabled");
     return recorder.enumerateReferencesInFile(SF, f);
   }
 
@@ -414,6 +416,8 @@ private:
             typename std::enable_if<Request::isDependencySink>::type * = nullptr>
   void handleDependencySinkRequest(const Request &r,
                                    const typename Request::OutputType &o) {
+    if (!recorder.isRecordingEnabled())
+      return;
     evaluator::DependencyCollector collector(recorder);
     r.writeDependencySink(collector, o);
   }
@@ -425,6 +429,8 @@ private:
   template <typename Request,
             typename std::enable_if<Request::isDependencySource>::type * = nullptr>
   void handleDependencySourceRequest(const Request &r) {
+    if (!recorder.isRecordingEnabled())
+      return;
     auto source = r.readDependencySource(recorder);
     if (!source.isNull() && source.get()->isPrimary()) {
       recorder.handleDependencySourceRequest(r, source.get());

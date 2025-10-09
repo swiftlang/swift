@@ -35,7 +35,9 @@ struct Allocation<T>: ~Copyable {
     _ body: (inout OutputSpan<T>) throws(E) -> Void
   ) throws(E) {
     if count != nil { fatalError() }
-    var outputBuffer = OutputSpan<T>(buffer: allocation, initializedCount: 0)
+    var allocation = allocation
+    if allocation.count == 0 { allocation = .init(start: nil, count: 0) }
+    var outputBuffer = OutputSpan(buffer: allocation, initializedCount: 0)
     do {
       try body(&outputBuffer)
       let initialized = outputBuffer.finalize(for: allocation)
@@ -188,6 +190,20 @@ suite.test("deinitialize buffer")
   catch {
     expectTrue(false)
   }
+
+  a = Allocation(of: 0, Int.self)
+  do {
+    try a.initialize {
+      expectEqual($0.freeCapacity, 0)
+      throw MyTestError.error
+    }
+  }
+  catch MyTestError.error {
+    expectEqual(a.isEmpty, true)
+  }
+  catch {
+    expectTrue(false)
+  }
 }
 
 suite.test("InlineArray initialization")
@@ -245,4 +261,17 @@ suite.test("InlineArray initialization throws")
   } catch {
     expectEqual(I.count, 0)
   }
+}
+
+private func send(_: borrowing some Sendable & ~Copyable & ~Escapable) {}
+
+private struct NCSendable: ~Copyable, Sendable {}
+
+suite.test("OutputSpan Sendability")
+.require(.stdlib_6_2).code {
+  let buffer = UnsafeMutableBufferPointer<NCSendable>.allocate(capacity: 1)
+  defer { buffer.deallocate() }
+
+  let span = OutputSpan(buffer: buffer, initializedCount: 0)
+  send(span)
 }

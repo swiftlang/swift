@@ -104,10 +104,6 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
       base: OptionalBridgedOperand(op: base.advancedBy(bounds.lowerBound).op),
       count: bounds.upperBound - bounds.lowerBound)
   }
-
-  public var values: LazyMapSequence<LazySequence<OperandArray>.Elements, Value> {
-    self.lazy.map { $0.value }
-  }
 }
 
 public struct UseList : CollectionLikeSequence {
@@ -143,6 +139,10 @@ public struct UseList : CollectionLikeSequence {
 }
 
 extension Sequence where Element == Operand {
+  public var values: LazyMapSequence<Self, Value> {
+    self.lazy.map { $0.value }
+  }
+
   public var singleUse: Operand? {
     var result: Operand? = nil
     for op in self {
@@ -164,11 +164,15 @@ extension Sequence where Element == Operand {
     self.lazy.filter { !($0.instruction is DebugValueInst) }
   }
 
-  public func filterUsers<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
+  public func filterUses<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
     self.lazy.filter { $0.instruction is I }
   }
 
-  public func ignoreUsers<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
+  public func filterUsers<I: Instruction>(ofType: I.Type) -> LazyMapSequence<LazyFilterSequence<Self>, I> {
+    self.lazy.filter { $0.instruction is I }.lazy.map { $0.instruction as! I }
+  }
+
+  public func ignoreUses<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
     self.lazy.filter { !($0.instruction is I) }
   }
 
@@ -177,11 +181,11 @@ extension Sequence where Element == Operand {
   }
 
   public func getSingleUser<I: Instruction>(ofType: I.Type) -> I? {
-    filterUsers(ofType: I.self).singleUse?.instruction as? I
+    filterUses(ofType: I.self).singleUse?.instruction as? I
   }
 
   public func getSingleUser<I: Instruction>(notOfType: I.Type) -> Instruction? {
-    ignoreUsers(ofType: I.self).singleUse?.instruction
+    ignoreUses(ofType: I.self).singleUse?.instruction
   }
 
   public var endingLifetime: LazyFilterSequence<Self> {

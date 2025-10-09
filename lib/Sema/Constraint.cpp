@@ -338,8 +338,7 @@ ProtocolDecl *Constraint::getProtocol() const {
 void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
                        unsigned indent, bool skipLocator) const {
   // Print all type variables as $T0 instead of _ here.
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
 
   if (Kind == ConstraintKind::Disjunction ||
       Kind == ConstraintKind::Conjunction) {
@@ -784,7 +783,7 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
   assert((kind != ConstraintKind::ConformsTo &&
           kind != ConstraintKind::NonisolatedConformsTo &&
           kind != ConstraintKind::TransitivelyConformsTo) ||
-         second->isExistentialType());
+         second->isAnyExistentialType());
 
   // Literal protocol conformances expect a protocol.
   assert((kind != ConstraintKind::LiteralConformsTo) ||

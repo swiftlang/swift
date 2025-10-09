@@ -57,15 +57,10 @@ public:
   /// be promoted to public external. Used by the LLDB expression evaluator.
   bool ForcePublicDecls;
 
-  /// When true, allows duplicate external and hidden declarations by marking
-  /// them as linkonce / weak.
-  bool MergeableSymbols;
-
   explicit UniversalLinkageInfo(IRGenModule &IGM);
 
   UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
-                       bool forcePublicDecls, bool isStaticLibrary,
-                       bool mergeableSymbols);
+                       bool forcePublicDecls, bool isStaticLibrary);
 
   /// In case of multiple llvm modules (in multi-threaded compilation) all
   /// private decls must be visible from other files.
@@ -1850,6 +1845,14 @@ public:
   bool isTypeKind() const { return isTypeKind(getKind()); }
 
   bool isAlwaysSharedLinkage() const;
+
+  /// Whether the link entity's definitions must be considered non-unique.
+  ///
+  /// This applies only in the Embedded Swift linkage model, and is used for
+  /// any symbols that have not been explicitly requested to have unique
+  /// definitions (e.g., with @_used).
+  bool hasNonUniqueDefinition() const;
+
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD
 

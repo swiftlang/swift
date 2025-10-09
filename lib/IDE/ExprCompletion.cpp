@@ -119,6 +119,12 @@ void ExprTypeCheckCompletionCallback::collectResults(
     UnifiedCanHandleAsync |= Result.IsInAsyncContext;
   }
 
+  // If we didn't find any results, at least try to collect unqualified results.
+  if (Results.empty()) {
+    Lookup.getValueCompletionsInDeclContext(CCLoc);
+    Lookup.getSelfTypeCompletionInDeclContext(CCLoc, /*isForDeclResult=*/false);
+  }
+
   collectCompletionResults(CompletionCtx, Lookup, DC, UnifiedTypeContext,
                            UnifiedCanHandleAsync);
 }

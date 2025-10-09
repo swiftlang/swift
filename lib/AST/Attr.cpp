@@ -805,6 +805,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector modifiers;
   bool libraryLevelAPI =
       D && D->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API;
+  auto *SF = D ? D->getDeclContext()->getParentSourceFile() : nullptr;
 
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
     // Don't skip implicit custom attributes. Custom attributes like global
@@ -848,6 +849,16 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
       auto semanticAttr = D->getSemanticAvailableAttr(availableAttr);
       if (!semanticAttr)
         continue;
+
+      // In the public interfaces of -library-level=api modules, skip @available
+      // attributes that refer to domains imported from @_spiOnly modules.
+      if (Options.printPublicInterface() && libraryLevelAPI) {
+        if (auto *domainDecl = semanticAttr->getDomain().getDecl()) {
+          if (SF->getRestrictedImportKind(domainDecl->getModuleContext()) ==
+              RestrictedImportKind::SPIOnly)
+            continue;
+        }
+      }
 
       if (isShortAvailable(*semanticAttr)) {
         if (semanticAttr->isSwiftLanguageModeSpecific())
@@ -1127,7 +1138,18 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       // Don't print into SIL. Necessary bits have already been generated.
       return false;
     } else {
-      Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
+      auto attrName = getAttrName();
+      if (getKind() == DeclAttrKind::Inline &&
+          cast<InlineAttr>(this)->getKind() == InlineKind::Always &&
+          Options.SuppressInlineAlways) {
+        attrName = "inline(__always)";
+        Printer.printSimpleAttr(attrName, /*needAt=*/true);
+        Printer << ' ';
+        // Add @inlinable
+        Printer.printSimpleAttr("inlinable", /*needAt=*/true);
+      } else {
+        Printer.printSimpleAttr(attrName, /*needAt=*/true);
+      }
     }
     return true;
 
@@ -1235,9 +1257,17 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DeclAttrKind::CDecl:
-    Printer << "@_cdecl(\"" << cast<CDeclAttr>(this)->Name << "\")";
+  case DeclAttrKind::CDecl: {
+    auto Attr = cast<CDeclAttr>(this);
+    if (Attr->Underscored)
+      Printer << "@_cdecl(\"" << cast<CDeclAttr>(this)->Name << "\")";
+    else {
+      Printer << "@c";
+      if (!Attr->Name.empty())
+        Printer << "(" << cast<CDeclAttr>(this)->Name << ")";
+    }
     break;
+  }
 
   case DeclAttrKind::Expose: {
     Printer.printAttrName("@_expose");
@@ -1248,6 +1278,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       break;
     case ExposureKind::Cxx:
       Printer << "(Cxx";
+      break;
+    case ExposureKind::NotCxx:
+      Printer << "(!Cxx";
       break;
     }
     if (!cast<ExposeAttr>(this)->Name.empty())
@@ -1439,14 +1472,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DeclAttrKind::Custom: {
-    Printer.callPrintNamePre(PrintNameContext::Attribute);
-    Printer << "@";
     auto *attr = cast<CustomAttr>(this);
-    if (auto type = attr->getType())
-      type.print(Printer, Options);
-    else
-      attr->getTypeRepr()->print(Printer, Options);
-    Printer.printNamePost(PrintNameContext::Attribute);
+    attr->printCustomAttr(Printer, Options);
     break;
   }
 
@@ -1817,7 +1844,7 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::CDecl:
     if (cast<CDeclAttr>(this)->Underscored)
       return "_cdecl";
-    return "cdecl";
+    return "c";
   case DeclAttrKind::SwiftNativeObjCRuntimeBase:
     return "_swift_native_objc_runtime_base";
   case DeclAttrKind::Semantics:
@@ -1843,8 +1870,10 @@ StringRef DeclAttribute::getAttrName() const {
     switch (cast<InlineAttr>(this)->getKind()) {
     case InlineKind::Never:
       return "inline(never)";
-    case InlineKind::Always:
+    case InlineKind::AlwaysUnderscored:
       return "inline(__always)";
+    case InlineKind::Always:
+      return "inline(always)";
     }
     llvm_unreachable("Invalid inline kind");
   }
@@ -2708,7 +2737,7 @@ SPIAccessControlAttr::SPIAccessControlAttr(SourceLoc atLoc, SourceRange range,
                     /*Implicit=*/false),
       numSPIGroups(spiGroups.size()) {
   std::uninitialized_copy(spiGroups.begin(), spiGroups.end(),
-                          getTrailingObjects<Identifier>());
+                          getTrailingObjects());
 }
 
 SPIAccessControlAttr *
@@ -2746,8 +2775,7 @@ DifferentiableAttr::DifferentiableAttr(bool implicit, SourceLoc atLoc,
   assert((diffKind != DifferentiabilityKind::Normal &&
           diffKind != DifferentiabilityKind::Forward) &&
          "'Normal' and 'Forward' are not supported");
-  std::copy(params.begin(), params.end(),
-            getTrailingObjects<ParsedAutoDiffParameter>());
+  std::copy(params.begin(), params.end(), getTrailingObjects());
 }
 
 DifferentiableAttr::DifferentiableAttr(Decl *original, bool implicit,
@@ -2849,8 +2877,7 @@ DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
     : DeclAttribute(DeclAttrKind::Derivative, atLoc, baseRange, implicit),
       BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
       NumParsedParameters(params.size()) {
-  std::copy(params.begin(), params.end(),
-            getTrailingObjects<ParsedAutoDiffParameter>());
+  std::copy(params.begin(), params.end(), getTrailingObjects());
 }
 
 DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
@@ -2916,8 +2943,7 @@ TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
     : DeclAttribute(DeclAttrKind::Transpose, atLoc, baseRange, implicit),
       BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
       NumParsedParameters(params.size()) {
-  std::uninitialized_copy(params.begin(), params.end(),
-                          getTrailingObjects<ParsedAutoDiffParameter>());
+  std::uninitialized_copy(params.begin(), params.end(), getTrailingObjects());
 }
 
 TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
@@ -2955,9 +2981,9 @@ StorageRestrictionsAttr::StorageRestrictionsAttr(
     : DeclAttribute(DeclAttrKind::StorageRestrictions, AtLoc, Range, Implicit),
       NumInitializes(initializes.size()), NumAccesses(accesses.size()) {
   std::uninitialized_copy(initializes.begin(), initializes.end(),
-                          getTrailingObjects<Identifier>());
+                          getTrailingObjects());
   std::uninitialized_copy(accesses.begin(), accesses.end(),
-                          getTrailingObjects<Identifier>() + NumInitializes);
+                          getTrailingObjects() + NumInitializes);
 }
 
 StorageRestrictionsAttr *
@@ -3217,7 +3243,7 @@ AllowFeatureSuppressionAttr::AllowFeatureSuppressionAttr(
   Bits.AllowFeatureSuppressionAttr.Inverted = inverted;
   Bits.AllowFeatureSuppressionAttr.NumFeatures = features.size();
   std::uninitialized_copy(features.begin(), features.end(),
-                          getTrailingObjects<Identifier>());
+                          getTrailingObjects());
 }
 
 AllowFeatureSuppressionAttr *AllowFeatureSuppressionAttr::create(

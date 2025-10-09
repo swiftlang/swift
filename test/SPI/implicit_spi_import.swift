@@ -8,14 +8,14 @@
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Lib.private.swiftinterface
 
-// RUN: %target-swift-frontend -typecheck -verify %t/ClientA.swift -I %t
-// RUN: %target-swift-frontend -typecheck -verify %t/ClientB.swift -I %t
-// RUN: %target-swift-frontend -typecheck -verify %t/ClientC.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/ClientA.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/ClientB.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/ClientC.swift -I %t
 
 // RUN: rm %t/Lib.swiftmodule
-// RUN: %target-swift-frontend -typecheck -verify %t/ClientA.swift -I %t
-// RUN: %target-swift-frontend -typecheck -verify %t/ClientB.swift -I %t
-// RUN: %target-swift-frontend -typecheck -verify %t/ClientC.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/ClientA.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/ClientB.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/ClientC.swift -I %t
 
 // RUN: %target-swift-frontend -emit-module %t/ClientA.swift \
 // RUN:   -module-name ClientA -swift-version 5 -I %t \
@@ -95,7 +95,9 @@ import Lib
 public func useImplicit() -> _Klass { return _Klass() } // expected-error{{cannot use class '_Klass' here; it is an SPI imported from 'Lib'}}
 
 @_spi(core)
-public func useSPICore() -> CoreStruct { return CoreStruct() } // expected-error{{cannot find type 'CoreStruct' in scope}}
+public func useSPICore() -> CoreStruct { return CoreStruct() }
+// expected-error@-1 {{cannot find type 'CoreStruct' in scope}}
+// expected-error@-2 {{cannot find 'CoreStruct' in scope}}
 
 public func useMain() -> APIProtocol? { return nil }
 

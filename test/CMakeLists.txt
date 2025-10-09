@@ -135,7 +135,8 @@ function(get_test_dependencies SDK result_var_name)
       llvm-strings
       llvm-readtapi
       not
-      split-file)
+      split-file
+      yaml2obj)
   endif()
 
   if(("${SDK}" STREQUAL "IOS") OR
@@ -348,6 +349,7 @@ set(profdata_merge_worker
 
 set(TEST_MODES
     optimize_none optimize optimize_unchecked optimize_size
+    optimize_none_with_opaque_values
     optimize_none_with_implicit_dynamic
     optimize_with_implicit_dynamic
     only_executable only_non_executable

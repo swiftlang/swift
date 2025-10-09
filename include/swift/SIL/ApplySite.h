@@ -562,6 +562,18 @@ public:
     llvm_unreachable("covered switch");
   }
 
+  bool hasGuaranteedResult() const {
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->hasGuaranteedResult();
+    case ApplySiteKind::BeginApplyInst:
+    case ApplySiteKind::TryApplyInst:
+    case ApplySiteKind::PartialApplyInst:
+      return false;
+    }
+    llvm_unreachable("covered switch");
+  }
+
   /// Returns true if \p op is an operand that passes an indirect
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const;
@@ -773,6 +785,25 @@ public:
       assert(normalBlock->getNumArguments() == 1 &&
              "Expected try apply to have a single result");
       return normalBlock->getArgument(0);
+    }
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+  // For a direct error result, as a result of an @error convention, if any.
+  SILValue getDirectErrorResult() const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+    case FullApplySiteKind::BeginApplyInst:
+      return SILValue();
+    case FullApplySiteKind::TryApplyInst: {
+      if (getNumIndirectSILErrorResults())
+        return SILValue(); // Not a direct @error convention.
+
+      auto *errBlock = cast<TryApplyInst>(getInstruction())->getErrorBB();
+      assert(errBlock->getNumArguments() == 1 &&
+             "Expected this try_apply to have a single direct error result");
+      return errBlock->getArgument(0);
     }
     }
     llvm_unreachable("Covered switch isn't covered?!");

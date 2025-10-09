@@ -4,7 +4,7 @@
 // but does not necessarily specify it (in the deliberate sense). In other words,
 // there may be behaviors captured in these tests that deserve amending.
 
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers
 // REQUIRES: swift_feature_ImportNonPublicCxxMembers
 
 import AccessInversion
@@ -208,10 +208,10 @@ func usePrivateEnum(a: inout Leaky.AliasToPrivateEnum) -> Leaky.AliasToPrivateEn
     // Constructing and reading PrivateEnum
     //
 
-    // TODO: nested enum members are not being imported (#54905)
-    // let _ = Leaky.privateEnumMember
-    let rv0 = Leaky.AliasToPrivateEnum(rawValue: 0)!
-    let _ = Leaky.PrivateEnum(rawValue: 0)!
+    let _ = Leaky.privateEnumMember // FIXME: nested enum members are not being imported (#54905)
+    // expected-error@-1 {{type 'Leaky' has no member 'privateEnumMember'}}
+    let rv0 = Leaky.AliasToPrivateEnum(rawValue: 0)
+    let _ = Leaky.PrivateEnum(rawValue: 0)
     // expected-error@-1 {{'PrivateEnum' is inaccessible due to 'private' protection level}}
 
     let _ = rv0.rawValue
@@ -276,16 +276,13 @@ func usePrivateEnumClass(a: inout Leaky.AliasToPrivateEnumClass) -> Leaky.AliasT
     // Constructing and reading PrivateEnumClass
     //
 
-    // NOTE: private enum class members are not accessible even if we can access
-    // instances of the private enum class via
+    // NOTE: private enum class members are accessible if we can access
+    // their parent enum class decl
 
     let _ = Leaky.AliasToPrivateEnumClass.privateEnumClassMember
-    // expected-error@-1 {{'privateEnumClassMember' is inaccessible due to 'private' protection level}}
     let _ = Leaky.PrivateEnumClass.privateEnumClassMember
     // expected-error@-1 {{'PrivateEnumClass' is inaccessible due to 'private' protection level}}
-    let _: Leaky.AliasToPrivateEnum = .privateEnumClassMember
-    // expected-error@-1 {{type 'Leaky.AliasToPrivateEnum' (aka 'Leaky.PrivateEnum') has no member 'privateEnumClassMember'}}
-    // TODO: ^this is not really the right error message
+    let _: Leaky.AliasToPrivateEnumClass = .privateEnumClassMember
 
     let rv0 = Leaky.AliasToPrivateEnumClass(rawValue: 0)!
     let _ = Leaky.PrivateEnumClass(rawValue: 0)!
@@ -298,7 +295,6 @@ func usePrivateEnumClass(a: inout Leaky.AliasToPrivateEnumClass) -> Leaky.AliasT
 
     switch rv0 {
     case .privateEnumClassMember:
-    // expected-error@-1 {{'privateEnumClassMember' is inaccessible due to 'private' protection level}}
       doSomething()
     default:
       doSomething()

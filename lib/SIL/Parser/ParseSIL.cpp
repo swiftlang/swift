@@ -783,6 +783,8 @@ static bool parseDeclSILOptional(
       *perfConstraints = PerformanceConstraints::NoExistentials;
     else if (perfConstraints && SP.P.Tok.getText() == "no_objc_bridging")
       *perfConstraints = PerformanceConstraints::NoObjCBridging;
+    else if (perfConstraints && SP.P.Tok.getText() == "manual_ownership")
+      *perfConstraints = PerformanceConstraints::ManualOwnership;
     else if (isPerformanceConstraint && SP.P.Tok.getText() == "perf_constraint")
       *isPerformanceConstraint = true;
     else if (markedAsUsed && SP.P.Tok.getText() == "used")
@@ -821,7 +823,9 @@ static bool parseDeclSILOptional(
 
       SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
       continue;
-    } else if (inlineStrategy && SP.P.Tok.getText() == "always_inline")
+    } else if (inlineStrategy && SP.P.Tok.getText() == "heuristic_always_inline")
+      *inlineStrategy = HeuristicAlwaysInline;
+    else if (inlineStrategy && SP.P.Tok.getText() == "always_inline")
       *inlineStrategy = AlwaysInline;
     else if (MRK && SP.P.Tok.getText() == "readnone")
       *MRK = EffectsKind::ReadNone;
@@ -1433,6 +1437,9 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else if (!ParseState && Id.str() == "backinginit") {
         Kind = SILDeclRef::Kind::PropertyWrapperBackingInitializer;
         ParseState = 1;
+      } else if (!ParseState && Id.str() == "wrappedfieldinitaccessor") {
+        Kind = SILDeclRef::Kind::PropertyWrappedFieldInitAccessor;
+        ParseState = 1;
       } else if (!ParseState && Id.str() == "projectedvalueinit") {
         Kind = SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue;
         ParseState = 1;
@@ -2043,32 +2050,6 @@ bool SILParser::parseSILDebugLocation(SILLocation &L, SILBuilder &B) {
     if (DS)
       B.setCurrentDebugScope(DS);
   }
-  return false;
-}
-
-static bool parseAssignByWrapperMode(AssignByWrapperInst::Mode &Result,
-                                          SILParser &P) {
-  StringRef Str;
-  // If we do not parse '[' ... ']', we have unknown. Set value and return.
-  if (!parseSILOptional(Str, P)) {
-    Result = AssignByWrapperInst::Unknown;
-    return false;
-  }
-
-  // Then try to parse one of our other initialization kinds. We do not support
-  // parsing unknown here so we use that as our fail value.
-  auto Tmp = llvm::StringSwitch<AssignByWrapperInst::Mode>(Str)
-        .Case("init", AssignByWrapperInst::Initialization)
-        .Case("assign", AssignByWrapperInst::Assign)
-        .Case("assign_wrapped_value", AssignByWrapperInst::AssignWrappedValue)
-        .Default(AssignByWrapperInst::Unknown);
-
-  // Thus return true (following the conventions in this file) if we fail.
-  if (Tmp == AssignByWrapperInst::Unknown)
-    return true;
-
-  // Otherwise, assign Result and return false.
-  Result = Tmp;
   return false;
 }
 
@@ -4650,32 +4631,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                          AddrVal, AssignQualifier.value());
     }
 
-    break;
-  }
-
-  case SILInstructionKind::AssignByWrapperInst: {
-    SILValue Src, DestAddr, InitFn, SetFn;
-    SourceLoc DestLoc;
-    AssignByWrapperInst::Mode mode;
-
-    if (parseTypedValueRef(Src, B) || parseVerbatim("to") ||
-        parseAssignByWrapperMode(mode, *this) ||
-        parseTypedValueRef(DestAddr, DestLoc, B) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseVerbatim("init") || parseTypedValueRef(InitFn, B) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseVerbatim("set") || parseTypedValueRef(SetFn, B) ||
-        parseSILDebugLocation(InstLoc, B))
-      return true;
-
-    if (!DestAddr->getType().isAddress()) {
-      P.diagnose(DestLoc, diag::sil_operand_not_address, "destination",
-                 OpcodeName);
-      return true;
-    }
-
-    ResultVal = B.createAssignByWrapper(InstLoc, Src, DestAddr,
-                                        InitFn, SetFn, mode);
     break;
   }
 
@@ -7601,6 +7556,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
   SILType GlobalType;
   SourceLoc NameLoc;
   SerializedKind_t isSerialized = IsNotSerialized;
+  bool isMarkedAsUsed = false;
   bool isLet = false;
 
   SILParser State(P);
@@ -7608,9 +7564,10 @@ bool SILParserState::parseSILGlobal(Parser &P) {
       parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, &isLet,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, State, M) ||
+                           nullptr, nullptr, nullptr, &isMarkedAsUsed, nullptr,
+                           &isLet, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, State,
+                           M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_value_name) ||
@@ -7636,6 +7593,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
       RegularLocation(NameLoc), VD.value());
 
   GV->setLet(isLet);
+  GV->setMarkedAsUsed(isMarkedAsUsed);
   // Parse static initializer if exists.
   if (State.P.consumeIf(tok::equal) && State.P.consumeIf(tok::l_brace)) {
     SILBuilder B(GV);

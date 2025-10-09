@@ -96,6 +96,11 @@ public class Instruction : CustomStringConvertible, Hashable {
     BridgedContext.moveInstructionBefore(bridged, otherInstruction.bridged)
     context.notifyInstructionsChanged()
   }
+  
+  public final func copy(before otherInstruction: Instruction, _ context: some MutatingContext) {
+    BridgedContext.copyInstructionBefore(bridged, otherInstruction.bridged)
+    context.notifyInstructionsChanged()
+  }
 
   public var mayTrap: Bool { false }
 
@@ -176,6 +181,10 @@ public class Instruction : CustomStringConvertible, Hashable {
 
   public static func ==(lhs: Instruction, rhs: Instruction) -> Bool {
     lhs === rhs
+  }
+  
+  public func isIdenticalTo(_ otherInst: Instruction) -> Bool {
+    return bridged.isIdenticalTo(otherInst.bridged)
   }
 
   public func hash(into hasher: inout Hasher) {
@@ -337,8 +346,6 @@ final public class AssignInst : Instruction, StoringInstruction {
     AssignOwnership(rawValue: bridged.AssignInst_getAssignOwnership())!
   }
 }
-
-final public class AssignByWrapperInst : Instruction, StoringInstruction {}
 
 final public class AssignOrInitInst : Instruction, StoringInstruction {}
 
@@ -699,7 +706,9 @@ final public class DeallocRefInst : Instruction, UnaryInstruction, Deallocation 
 
 final public class DeallocPartialRefInst : Instruction, Deallocation {}
 
-final public class DeallocBoxInst : Instruction, UnaryInstruction, Deallocation {}
+final public class DeallocBoxInst : Instruction, UnaryInstruction, Deallocation {
+  public var isDeadEnd: Bool { bridged.DeallocBoxInst_isDeadEnd() }
+}
 
 final public class DeallocExistentialBoxInst : Instruction, UnaryInstruction, Deallocation {}
 
@@ -779,7 +788,9 @@ final public class UncheckedTrivialBitCastInst : SingleValueInstruction, UnaryIn
 }
 
 final public class UncheckedBitwiseCastInst : SingleValueInstruction, UnaryInstruction {}
-final public class UncheckedValueCastInst : SingleValueInstruction, UnaryInstruction {}
+final public class UncheckedValueCastInst : SingleValueInstruction, UnaryInstruction {
+  public var fromValue: Value { operand.value }
+}
 
 final public class RefToRawPointerInst : SingleValueInstruction, UnaryInstruction {}
 final public class RefToUnmanagedInst : SingleValueInstruction, UnaryInstruction {}
@@ -1102,6 +1113,14 @@ final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public class KeyPathInst : SingleValueInstruction {
+  public var substitutionMap: SubstitutionMap {
+    SubstitutionMap(bridged: bridged.KeyPathInst_getSubstitutionMap())
+  }
+
+  public var hasPattern: Bool {
+    bridged.KeyPathInst_hasPattern()
+  }
+
   public override func visitReferencedFunctions(_ cl: (Function) -> ()) {
     var results = BridgedInstruction.KeyPathFunctionResults()
     for componentIdx in 0..<bridged.KeyPathInst_getNumComponents() {
@@ -1627,9 +1646,36 @@ final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
   public var accessKind: AccessKind {
     AccessKind(rawValue: bridged.BeginAccessInst_getAccessKind())!
   }
-  public func set(accessKind: BeginAccessInst.AccessKind, context: some MutatingContext) {
+  public func set(accessKind: AccessKind, context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.BeginAccess_setAccessKind(accessKind.rawValue)
+    context.notifyInstructionChanged(self)
+  }
+
+  // The raw values must match SILAccessEnforcement.
+  public enum Enforcement: Int {
+    /// The access's enforcement has not yet been determined.
+    case unknown = 0
+
+    /// The access is statically known to not conflict with other accesses.
+    case `static` = 1
+
+    /// The access is not statically known to not conflict with anything and must be dynamically checked.
+    case dynamic = 2
+
+    /// The access is not statically known to not conflict with anything but dynamic checking should
+    /// be suppressed, leaving it undefined behavior.
+    case unsafe = 3
+
+    /// Access to pointers that are signed via pointer authentication.
+    case signed = 4
+  }
+  public var enforcement: Enforcement {
+    Enforcement(rawValue: bridged.BeginAccessInst_getEnforcement())!
+  }
+  public func set(enforcement: Enforcement, context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.BeginAccess_setEnforcement(enforcement.rawValue)
     context.notifyInstructionChanged(self)
   }
 
@@ -1675,6 +1721,9 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   public var yieldedValues: Results {
     Results(inst: self, numResults: resultCount - (isCalleeAllocated ? 2 : 1))
   }
+
+  public var isNonThrowing: Bool { bridged.BeginApplyInst_getNonThrowing() }
+  public var isNonAsync: Bool { bridged.BeginApplyInst_getNonAsync() }
 }
 
 final public class EndApplyInst : SingleValueInstruction, UnaryInstruction {

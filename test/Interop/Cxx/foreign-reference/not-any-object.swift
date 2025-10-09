@@ -22,5 +22,5 @@ import Test;
 public func test(_ _: AnyObject) {}
 
 // TODO: make this a better error.
-test(Empty.create()) // expected-error {{type of expression is ambiguous without a type annotation}}
+test(Empty.create()) // expected-error {{failed to produce diagnostic for expression}}
 test([Empty.create()][0]) // expected-error {{argument type 'Any' expected to be an instance of a class or class-constrained type}}

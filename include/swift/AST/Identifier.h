@@ -123,7 +123,7 @@ public:
   bool nonempty() const { return !empty(); }
 #ifdef COMPILED_WITH_SWIFT
   SWIFT_COMPUTED_PROPERTY
-  bool getIsValid() const { return empty(); }
+  bool getIsValid() const { return nonempty(); }
 #endif
 
   /// isOperator - Return true if this identifier is an operator, false if it is
@@ -518,10 +518,10 @@ class DeclName {
         : BaseName(BaseName), NumArgs(NumArgs) { }
     
     ArrayRef<Identifier> getArgumentNames() const {
-      return {getTrailingObjects<Identifier>(), NumArgs};
+      return getTrailingObjects(NumArgs);
     }
     MutableArrayRef<Identifier> getArgumentNames() {
-      return {getTrailingObjects<Identifier>(), NumArgs};
+      return getTrailingObjects(NumArgs);
     }
 
     /// Uniquing for the ASTContext.

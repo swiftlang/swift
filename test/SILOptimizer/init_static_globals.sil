@@ -37,6 +37,15 @@ struct TwoFields {
   let b: Int32
 }
 
+struct WithOptionalEnum {
+  var e: E?
+}
+
+enum E {
+  case a
+  case b
+}
+
 @_rawLayout(like: Int32)
 struct Raw: ~Copyable {}
 
@@ -182,6 +191,13 @@ sil_global [let] @gIndirectNone: $Optional<TwoFields>
 // CHECK-NEXT:    %initval = enum $Optional<TwoFields>, #Optional.some!enumelt, %4
 // CHECK-NEXT:  }
 sil_global [let] @gIndirectSome: $Optional<TwoFields>
+
+// CHECK-LABEL: sil_global [let] @structWithOptionalEnum : $WithOptionalEnum = {
+// CHECK-NEXT:    %0 = enum $E, #E.a!enumelt
+// CHECK-NEXT:    %1 = enum $Optional<E>, #Optional.some!enumelt, %0
+// CHECK-NEXT:    %initval = struct $WithOptionalEnum (%1)
+// CHECK-NEXT:  }
+sil_global [let] @structWithOptionalEnum : $WithOptionalEnum
 
 sil @unknownfunc : $@convention(thin) () -> ()
 
@@ -618,5 +634,17 @@ bb0:
   store %8 to [trivial] %9
   %10 = tuple ()
   return %10 : $()
+}
+
+sil [global_init_once_fn] @globalinit_structWithOptionalEnum : $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @structWithOptionalEnum
+  %2 = global_addr @structWithOptionalEnum : $*WithOptionalEnum
+  %3 = struct_element_addr %2, #WithOptionalEnum.e
+  %4 = init_enum_data_addr %3, #Optional.some!enumelt
+  inject_enum_addr %4, #E.a!enumelt
+  inject_enum_addr %3, #Optional.some!enumelt
+  %7 = tuple ()
+  return %7
 }
 

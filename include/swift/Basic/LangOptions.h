@@ -22,6 +22,7 @@
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Version.h"
 #include "swift/Config.h"
@@ -67,22 +68,24 @@ namespace swift {
     Complete,
   };
 
-  /// Access or distribution level of a library.
+  /// Intended distribution level of a module.
+  ///
+  /// Ordered from more private to more public.
   enum class LibraryLevel : uint8_t {
-    /// Application Programming Interface that is publicly distributed so
-    /// public decls are really public and only @_spi decls are SPI.
-    API,
+    /// This isn't a library or the library distribution intent is unknown.
+    Other,
 
-    /// System Programming Interface that has restricted distribution
-    /// all decls in the module are considered to be SPI including public ones.
-    SPI,
-
-    /// Internal Programming Interface that is not distributed and only usable
-    /// from within a project.
+    /// Internal Programming Interface: the module is not distributed and
+    /// only usable from within its project.
     IPI,
 
-    /// The library has some other undefined distribution.
-    Other
+    /// System Programming Interface: the module has restricted distribution,
+    /// all public decls in the module are considered to be SPI.
+    SPI,
+
+    /// Application Programming Interface: the module is distributed publicly,
+    /// public decls are really public and only @_spi decls are SPI.
+    API,
   };
 
   enum class AccessNoteDiagnosticBehavior : uint8_t {
@@ -492,6 +495,9 @@ namespace swift {
     std::shared_ptr<llvm::Regex> OptimizationRemarkPassedPattern;
     std::shared_ptr<llvm::Regex> OptimizationRemarkMissedPattern;
 
+    /// The path to load access notes from.
+    std::string AccessNotesPath;
+
     /// How should we emit diagnostics about access notes?
     AccessNoteDiagnosticBehavior AccessNoteBehavior =
         AccessNoteDiagnosticBehavior::RemarkOnFailureOrSuccess;
@@ -614,11 +620,11 @@ namespace swift {
 
     /// Maximum nesting depth for type substitution operations, to prevent
     /// runaway recursion.
-    unsigned MaxSubstitutionDepth = 1000;
+    unsigned MaxSubstitutionDepth = 500;
 
     /// Maximum step count for type substitution operations, to prevent
     /// runaway recursion.
-    unsigned MaxSubstitutionCount = 32000;
+    unsigned MaxSubstitutionCount = 120000;
 
     /// Enable implicit lifetime dependence for ~Escapable return types.
     bool EnableExperimentalLifetimeDependenceInference = false;
@@ -641,6 +647,9 @@ namespace swift {
 
     /// Enables dumping macro expansions.
     bool DumpMacroExpansions = false;
+
+    /// Enables dumping imports for each SourceFile.
+    bool DumpSourceFileImports = false;
 
     /// The model of concurrency to be used.
     ConcurrencyModel ActiveConcurrencyModel = ConcurrencyModel::Standard;
@@ -693,18 +702,7 @@ namespace swift {
     /// This is only implemented on certain OSs. If no target has been
     /// configured, returns v0.0.0.
     llvm::VersionTuple getMinPlatformVersion() const {
-      if (Target.isMacOSX()) {
-        llvm::VersionTuple OSVersion;
-        Target.getMacOSXVersion(OSVersion);
-        return OSVersion;
-      } else if (Target.isiOS()) {
-        return Target.getiOSVersion();
-      } else if (Target.isWatchOS()) {
-        return Target.getOSVersion();
-      } else if (Target.isXROS()) {
-        return Target.getOSVersion();
-      }
-      return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
+      return getVersionForTriple(Target);
     }
 
     /// Sets an implicit platform condition.
@@ -1015,6 +1013,9 @@ namespace swift {
 
     /// Disable the component splitter phase of the expression type checker.
     bool SolverDisableSplitter = false;
+
+    /// Enable the experimental "prepared overloads" optimization.
+    bool SolverEnablePreparedOverloads = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.
@@ -1049,6 +1050,10 @@ namespace swift {
 
     /// The bridging header PCH file.
     std::string BridgingHeaderPCH;
+
+    /// Whether the bridging header and PCH file are considered to be
+    /// internal imports.
+    bool BridgingHeaderIsInternal = false;
 
     /// When automatically generating a precompiled header from the bridging
     /// header, place it in this directory.

@@ -1677,7 +1677,11 @@ public:
   /// \param wantInterfaceType If true, maps the resulting type out of context,
   /// and replaces type variables for opened generic parameters with the
   /// generic parameter types. Should only be used for diagnostic logic.
-  Type simplifyType(Type type, bool wantInterfaceType = false) const;
+  /// \param forCompletion If true, will produce archetypes instead of
+  /// ErrorTypes for generic parameter originators, which is what completion
+  /// currently expects for the code completion token.
+  Type simplifyType(Type type, bool wantInterfaceType = false,
+                    bool forCompletion = false) const;
 
   // To aid code completion, we need to attempt to convert type placeholders
   // back into underlying generic parameters if possible, since type
@@ -1764,7 +1768,7 @@ public:
   /// Retrieve the overload choice associated with the given
   /// locator.
   SelectedOverload getOverloadChoice(ConstraintLocator *locator) const {
-    return *getOverloadChoiceIfAvailable(locator);
+    return getOverloadChoiceIfAvailable(locator).value();
   }
 
   /// Retrieve the overload choice for the callee associated with the given
@@ -1937,13 +1941,6 @@ enum class ConstraintSystemFlags {
   /// Set if the client wants diagnostics suppressed.
   SuppressDiagnostics = 0x02,
 
-  /// If set, the client wants a best-effort solution to the constraint system,
-  /// but can tolerate a solution where all of the constraints are solved, but
-  /// not all type variables have been determined.  In this case, the constraint
-  /// system is not applied to the expression AST, but the ConstraintSystem is
-  /// left in-tact.
-  AllowUnresolvedTypeVariables = 0x04,
-
   /// If set, verbose output is enabled for this constraint system.
   ///
   /// Note that this flag is automatically applied to all constraint systems,
@@ -1952,12 +1949,12 @@ enum class ConstraintSystemFlags {
   /// \c DebugConstraintSolverAttempt. Finally, it can also be automatically
   /// enabled for a pre-configured set of expressions on line numbers by setting
   /// \c DebugConstraintSolverOnLines.
-  DebugConstraints = 0x08,
+  DebugConstraints = 0x04,
 
   /// If set, we are solving specifically to determine the type of a
   /// CodeCompletionExpr, and should continue in the presence of errors wherever
   /// possible.
-  ForCodeCompletion = 0x10,
+  ForCodeCompletion = 0x08,
 
   /// Include Clang function types when checking equality for function types.
   ///
@@ -1968,16 +1965,16 @@ enum class ConstraintSystemFlags {
   /// should be treated as semantically different, as they may have different
   /// calling conventions, say due to Clang attributes such as
   /// `__attribute__((ns_consumed))`.
-  UseClangFunctionTypes = 0x20,
+  UseClangFunctionTypes = 0x10,
 
   /// When set, ignore async/sync mismatches
-  IgnoreAsyncSyncMismatch = 0x40,
+  IgnoreAsyncSyncMismatch = 0x20,
 
   /// Disable macro expansions.
-  DisableMacroExpansions = 0x80,
+  DisableMacroExpansions = 0x40,
 
   /// Enable old type-checker performance hacks.
-  EnablePerformanceHacks = 0x100,
+  EnablePerformanceHacks = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -2400,6 +2397,10 @@ private:
   /// A dictionary of all conformances that have been looked up by the solver.
   llvm::DenseMap<std::pair<TypeBase *, ProtocolDecl *>, ProtocolConformanceRef>
       Conformances;
+
+  /// A cache for unavailability checks peformed by the solver.
+  llvm::DenseMap<std::pair<const Decl *, ConstraintLocator *>, bool>
+      UnavailableDecls;
 
   /// The list of all generic requirements fixed along the current
   /// solver path.
@@ -3071,7 +3072,7 @@ public:
     return nullptr;
   }
 
-  TypeBase* getFavoredType(Expr *E) {
+  TypeBase *getFavoredType(Expr *E) {
     assert(E != nullptr);
     return this->FavoredTypes[E];
   }
@@ -3085,39 +3086,15 @@ public:
   ///
   /// The side tables are used through the expression type checker to avoid
   /// mutating nodes until we know we have successfully type-checked them.
-  void setType(ASTNode node, Type type) {
-    ASSERT(!node.isNull() && "Cannot set type information on null node");
-    ASSERT(type && "Expected non-null type");
-
-    // Record the type.
-    Type &entry = NodeTypes[node];
-    Type oldType = entry;
-    entry = type;
-
-    if (oldType.getPointer() != type.getPointer()) {
-      // Record the fact that we assigned a type to this node.
-      if (solverState)
-        recordChange(SolverTrail::Change::RecordedNodeType(node, oldType));
-    }
-  }
+  void setType(ASTNode node, Type type,
+               PreparedOverloadBuilder *preparedOverload=nullptr);
 
   /// Undo the above change.
-  void restoreType(ASTNode node, Type oldType) {
-    ASSERT(!node.isNull() && "Cannot set type information on null node");
-
-    if (oldType) {
-      auto found = NodeTypes.find(node);
-      ASSERT(found != NodeTypes.end());
-      found->second = oldType;
-    } else {
-      bool erased = NodeTypes.erase(node);
-      ASSERT(erased);
-    }
-  }
+  void restoreType(ASTNode node, Type oldType);
 
   /// Check to see if we have a type for a node.
   bool hasType(ASTNode node) const {
-    assert(!node.isNull() && "Expected non-null node");
+    ASSERT(!node.isNull() && "Expected non-null node");
     return NodeTypes.count(node) > 0;
   }
 
@@ -3125,55 +3102,30 @@ public:
   /// map is used throughout the expression type checker in order to
   /// avoid mutating expressions until we know we have successfully
   /// type-checked them.
-  void setType(const KeyPathExpr *KP, unsigned I, Type T) {
-    ASSERT(KP && "Expected non-null key path parameter!");
-    ASSERT(T && "Expected non-null type!");
+  void setType(const KeyPathExpr *KP, unsigned I, Type T);
 
-    Type &entry = KeyPathComponentTypes[{KP, I}];
-    Type oldType = entry;
-    entry = T;
-
-    if (oldType.getPointer() != T.getPointer()) {
-      if (solverState) {
-        recordChange(
-          SolverTrail::Change::RecordedKeyPathComponentType(
-            KP, I, oldType));
-      }
-    }
-  }
-
-  void restoreType(const KeyPathExpr *KP, unsigned I, Type T) {
-    ASSERT(KP && "Expected non-null key path parameter!");
-
-    if (T) {
-      auto found = KeyPathComponentTypes.find({KP, I});
-      ASSERT(found != KeyPathComponentTypes.end());
-      found->second = T;
-    } else {
-      bool erased = KeyPathComponentTypes.erase({KP, I});
-      ASSERT(erased);
-    }
-  }
+  void restoreType(const KeyPathExpr *KP, unsigned I, Type T);
 
   bool hasType(const KeyPathExpr *KP, unsigned I) const {
-    assert(KP && "Expected non-null key path parameter!");
+    ASSERT(KP && "Expected non-null key path parameter!");
     return KeyPathComponentTypes.find(std::make_pair(KP, I))
               != KeyPathComponentTypes.end();
   }
 
   /// Get the type for an node.
   Type getType(ASTNode node) const {
-    assert(hasType(node) && "Expected type to have been set!");
-    // FIXME: lvalue differences
-    //    assert((!E->getType() ||
-    //            E->getType()->isEqual(ExprTypes.find(E)->second)) &&
-    //           "Mismatched types!");
-    return NodeTypes.find(node)->second;
+    ASSERT(!node.isNull() && "Expected non-null node");
+    auto found = NodeTypes.find(node);
+    ASSERT(found != NodeTypes.end() && "Expected type to have been set!");
+    return found->second;
   }
 
   Type getType(const KeyPathExpr *KP, unsigned I) const {
-    assert(hasType(KP, I) && "Expected type to have been set!");
-    return KeyPathComponentTypes.find(std::make_pair(KP, I))->second;
+    ASSERT(KP && "Expected non-null key path parameter!");
+    auto found = KeyPathComponentTypes.find(std::make_pair(KP, I));
+    ASSERT(found != KeyPathComponentTypes.end() &&
+           "Expected type to have been set!");
+    return found->second;
   }
 
   /// Retrieve the type of the node, if known.
@@ -3184,11 +3136,6 @@ public:
 
     return known->second;
   }
-
-  /// Retrieve type of the given declaration to be used in
-  /// constraint system, this is better than calling `getType()`
-  /// directly because it accounts of constraint system flags.
-  Type getVarType(const VarDecl *var);
 
   /// Cache the type of the expression argument and return that same
   /// argument.
@@ -3798,7 +3745,7 @@ public:
   /// Add a constraint that binds an overload set to a specific choice.
   void addBindOverloadConstraint(Type boundTy, OverloadChoice choice,
                                  ConstraintLocator *locator, DeclContext *useDC) {
-    resolveOverload(locator, boundTy, choice, useDC,
+    resolveOverload(choice, useDC, locator, boundTy,
                     /*preparedOverload=*/nullptr);
   }
 
@@ -4440,8 +4387,7 @@ public:
   FunctionType *adjustFunctionTypeForConcurrency(
       FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
       unsigned numApplies, bool isMainDispatchQueue,
-      ArrayRef<OpenedType> replacements, ConstraintLocatorBuilder locator,
-      PreparedOverloadBuilder *preparedOverload);
+      bool openGlobalActorType, ConstraintLocatorBuilder locator);
 
   /// Retrieve the type of a reference to the given value declaration.
   ///
@@ -4449,15 +4395,54 @@ public:
   /// the type by replacing each instance of an archetype with a fresh type
   /// variable.
   ///
-  /// \param decl The declarations whose type is being computed.
-  ///
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfReference(
-                          ValueDecl *decl,
-                          FunctionRefInfo functionRefInfo,
-                          ConstraintLocatorBuilder locator,
-                          DeclContext *useDC,
-                          PreparedOverloadBuilder *preparedOverload);
+      OverloadChoice choice, DeclContext *useDC, ConstraintLocatorBuilder locator,
+      PreparedOverloadBuilder *preparedOverload);
+
+  /// Retrieve the type of a reference to the given value declaration,
+  /// as a member with a base of the given type.
+  ///
+  /// For references to generic function types or members of generic types,
+  /// this routine "opens up" the type by replacing each instance of a generic
+  /// parameter with a fresh type variable.
+  ///
+  /// \returns a description of the type of this declaration reference.
+  DeclReferenceType getTypeOfMemberReference(
+      OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
+      PreparedOverloadBuilder *preparedOverload);
+
+  /// Retrieve a list of generic parameter types solver has "opened" (replaced
+  /// with a type variable) at the given location.
+  ArrayRef<OpenedType> getOpenedTypes(ConstraintLocator *locator) const {
+    auto substitutions = OpenedTypes.find(locator);
+    if (substitutions == OpenedTypes.end())
+      return {};
+    return substitutions->second;
+  }
+
+private:
+  /// \returns The opened type and the thrown error type.
+  std::pair<Type, Type> getTypeOfReferencePre(
+       OverloadChoice choice, DeclContext *useDC, ConstraintLocatorBuilder locator,
+       PreparedOverloadBuilder *preparedOverload);
+
+  DeclReferenceType getTypeOfReferencePost(
+       OverloadChoice choice, DeclContext *useDC, ConstraintLocatorBuilder locator,
+       Type openedType, Type thrownErrorType);
+
+  /// \returns the opened type and the thrown error type.
+  std::pair<Type, Type> getTypeOfMemberReferencePre(
+      OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
+      PreparedOverloadBuilder *preparedOverload);
+
+  DeclReferenceType getTypeOfMemberReferencePost(
+      OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
+      Type openedType, Type thrownErrorType);
+
+  Type getTypeOfMemberTypeReference(
+      Type baseObjTy, TypeDecl *typeDecl, ConstraintLocator *locator,
+      PreparedOverloadBuilder *preparedOverload);
 
   /// Return the type-of-reference of the given value.
   ///
@@ -4474,43 +4459,19 @@ public:
   Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                   DeclContext *UseDC,
                                   ConstraintLocator *locator,
-                                  bool wantInterfaceType = false,
-                                  bool adjustForPreconcurrency = true);
+                                  bool wantInterfaceType);
+
+  std::pair<Type, Type> getOpenedStorageType(
+      Type baseTy, AbstractStorageDecl *value, DeclContext *useDC,
+      bool hasAppliedSelf, ArrayRef<OpenedType> replacements,
+      ConstraintLocator *locator, PreparedOverloadBuilder *preparedOverload);
 
   /// Given the opened type and a pile of information about a member reference,
   /// determine the reference type of the member reference.
   Type getMemberReferenceTypeFromOpenedType(
-      Type &openedType, Type baseObjTy, ValueDecl *value, DeclContext *outerDC,
-      ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
-      ArrayRef<OpenedType> replacements);
+      Type type, Type baseObjTy, ValueDecl *value,
+      ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup);
 
-  /// Retrieve the type of a reference to the given value declaration,
-  /// as a member with a base of the given type.
-  ///
-  /// For references to generic function types or members of generic types,
-  /// this routine "opens up" the type by replacing each instance of a generic
-  /// parameter with a fresh type variable.
-  ///
-  /// \param isDynamicLookup Indicates that this declaration was found via
-  /// dynamic lookup.
-  ///
-  /// \returns a description of the type of this declaration reference.
-  DeclReferenceType getTypeOfMemberReference(
-      Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
-      FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
-      SmallVectorImpl<OpenedType> *replacements = nullptr,
-      PreparedOverloadBuilder *preparedOverload = nullptr);
-
-  /// Retrieve a list of generic parameter types solver has "opened" (replaced
-  /// with a type variable) at the given location.
-  ArrayRef<OpenedType> getOpenedTypes(ConstraintLocator *locator) const {
-    auto substitutions = OpenedTypes.find(locator);
-    if (substitutions == OpenedTypes.end())
-      return {};
-    return substitutions->second;
-  }
-
-private:
   /// Add the constraints needed to bind an overload's type variable.
   void bindOverloadType(const SelectedOverload &overload, Type boundType,
                         ConstraintLocator *locator, DeclContext *useDC);
@@ -4913,17 +4874,22 @@ public:
                               SelectedOverload choice);
 
   /// Build and allocate a prepared overload in the solver arena.
-  PreparedOverload *prepareOverload(ConstraintLocator *locator,
-                                    OverloadChoice choice,
-                                    DeclContext *useDC);
+  PreparedOverload *prepareOverload(OverloadChoice choice,
+                                    DeclContext *useDC,
+                                    ConstraintLocator *locator);
 
   /// Populate the prepared overload with all type variables and constraints
   /// that are to be introduced into the constraint system when this choice
   /// is taken.
-  DeclReferenceType
-  prepareOverloadImpl(ConstraintLocator *locator,
-                      OverloadChoice choice,
+  ///
+  /// Returns a pair consisting of the opened type, and the thrown error type.
+  ///
+  /// FIXME: As a transitional mechanism, if preparedOverload is nullptr, this
+  /// immediately performs all operations.
+  std::pair<Type, Type>
+  prepareOverloadImpl(OverloadChoice choice,
                       DeclContext *useDC,
+                      ConstraintLocator *locator,
                       PreparedOverloadBuilder *preparedOverload);
 
   void replayChanges(
@@ -4931,8 +4897,8 @@ public:
       PreparedOverload *preparedOverload);
 
   /// Resolve the given overload set to the given choice.
-  void resolveOverload(ConstraintLocator *locator, Type boundType,
-                       OverloadChoice choice, DeclContext *useDC,
+  void resolveOverload(OverloadChoice choice, DeclContext *useDC,
+                       ConstraintLocator *locator, Type boundType,
                        PreparedOverload *preparedOverload);
 
   /// Simplify a type, by replacing type variables with either their
@@ -5668,13 +5634,22 @@ public:
     if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed))
       return true;
 
+    auto markTooComplex = [&](SourceRange range, StringRef reason) {
+      if (isDebugMode()) {
+        if (solverState)
+          llvm::errs().indent(solverState->getCurrentIndent());
+        llvm::errs() << "(too complex: " << reason << ")\n";
+      }
+      isAlreadyTooComplex = {true, range};
+      return true;
+    };
+
     auto used = getASTContext().getSolverMemory() + solutionMemory;
     MaxMemory = std::max(used, MaxMemory);
     auto threshold = getASTContext().TypeCheckerOpts.SolverMemoryThreshold;
     if (MaxMemory > threshold) {
       // No particular location for OoM problems.
-      isAlreadyTooComplex.first = true;
-      return true;
+      return markTooComplex(SourceRange(), "exceeded memory limit");
     }
 
     if (Timer && Timer->isExpired()) {
@@ -5683,23 +5658,18 @@ public:
       // emitting an error.
       Timer->disableWarning();
 
-      isAlreadyTooComplex = {true, Timer->getAffectedRange()};
-      return true;
+      return markTooComplex(Timer->getAffectedRange(), "exceeded time limit");
     }
 
     auto &opts = getASTContext().TypeCheckerOpts;
 
     // Bail out once we've looked at a really large number of choices.
-    if (opts.SolverScopeThreshold && NumSolverScopes > opts.SolverScopeThreshold) {
-      isAlreadyTooComplex.first = true;
-      return true;
-    }
+    if (opts.SolverScopeThreshold && NumSolverScopes > opts.SolverScopeThreshold)
+      return markTooComplex(SourceRange(), "exceeded scope limit");
 
     // Bail out once we've taken a really large number of steps.
-    if (opts.SolverTrailThreshold && NumTrailSteps > opts.SolverTrailThreshold) {
-      isAlreadyTooComplex.first = true;
-      return true;
-    }
+    if (opts.SolverTrailThreshold && NumTrailSteps > opts.SolverTrailThreshold)
+      return markTooComplex(SourceRange(), "exceeded trail limit");
 
     return false;
   }
@@ -5733,7 +5703,7 @@ public:
 
   /// If we aren't certain that we've emitted a diagnostic, emit a fallback
   /// diagnostic.
-  void maybeProduceFallbackDiagnostic(SyntacticElementTarget target) const;
+  void maybeProduceFallbackDiagnostic(SourceLoc loc) const;
 
   /// Check whether given AST node represents an argument of an application
   /// of some sort (call, operator invocation, subscript etc.)
@@ -5795,6 +5765,23 @@ public:
                                      unboundTy->getParent(), locator,
                                      /*isTypeResolution=*/true);
   }
+};
+
+/// A function object suitable for use as an \c OpenRequirementFn that "opens"
+/// the requirements for a given type's generic signature given a set of
+/// argument substitutions.
+class OpenGenericTypeRequirements {
+  ConstraintSystem &cs;
+  const ConstraintLocatorBuilder &locator;
+  PreparedOverloadBuilder *preparedOverload;
+
+public:
+  explicit OpenGenericTypeRequirements(
+      ConstraintSystem &cs, const ConstraintLocatorBuilder &locator,
+      PreparedOverloadBuilder *preparedOverload)
+      : cs(cs), locator(locator), preparedOverload(preparedOverload) {}
+
+  void operator()(GenericTypeDecl *decl, TypeSubstitutionFn subst) const;
 };
 
 class HandlePlaceholderType {
@@ -6240,8 +6227,7 @@ public:
   fixForHole(ConstraintSystem &cs) const;
 
   void print(llvm::raw_ostream &Out, SourceManager *, unsigned indent) const {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
+    PrintOptions PO = PrintOptions::forDebugging();
     Out << "type variable binding " << TypeVar->getString(PO)
         << " := " << Binding.BindingType->getString(PO);
   }
@@ -6542,10 +6528,6 @@ public:
     return TypeVars.getArrayRef();
   }
 };
-
-/// Determine whether given type is a known one
-/// for a key path `{Any, Partial, Writable, ReferenceWritable}KeyPath`.
-bool isKnownKeyPathType(Type type);
 
 /// Determine whether the given type is a PartialKeyPath and
 /// AnyKeyPath or existential type thererof, for example,

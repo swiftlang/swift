@@ -1,8 +1,12 @@
 
+include(CheckSymbolExists)
+check_symbol_exists(_LIBCPP_VERSION "version" HAVE_LIBCPP_VERSION)
+check_symbol_exists(__GLIBCXX__ "version" HAVE___GLIBCXX__)
+
 if(NOT APPLE)
   add_subdirectory(cxxshim)
 endif()
-if(LINUX)
+if(HAVE___GLIBCXX__)
   add_subdirectory(libstdcxx)
 endif()
 add_subdirectory(std)
@@ -30,7 +34,7 @@ target_compile_options(swiftCxx PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -nostdinc++>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AllowUnsafeAttribute>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BuiltinModule>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Span>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Lifetimes>")
 target_link_libraries(swiftCxx PRIVATE
   swiftCore)
 

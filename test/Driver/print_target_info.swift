@@ -11,8 +11,8 @@
 // RUN: %swift_driver -print-target-info -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13.1-macabi | %FileCheck -check-prefix CHECK-PRE-CONCURRENCY-ZIPPERED %s
 // RUN: %target-swift-frontend -print-target-info -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13.1-macabi | %FileCheck -check-prefix CHECK-PRE-CONCURRENCY-ZIPPERED %s
 
-// RUN: %swift_driver -print-target-info -target x86_64-apple-macosx12.0 -target-variant x86_64-apple-ios15-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
-// RUN: %target-swift-frontend -print-target-info -target x86_64-apple-macosx12.0 -target-variant x86_64-apple-ios15-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
+// RUN: %swift_driver -print-target-info -target x86_64-apple-macosx26.0 -target-variant x86_64-apple-ios26-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
+// RUN: %target-swift-frontend -print-target-info -target x86_64-apple-macosx26.0 -target-variant x86_64-apple-ios26-macabi | %FileCheck -check-prefix CHECK-ZIPPERED %s
 
 // RUN: %swift_driver -print-target-info -target x86_64-apple-ios12.0 | %FileCheck -check-prefix CHECK-IOS-SIM %s
 
@@ -90,14 +90,14 @@
 // CHECK-PRE-CONCURRENCY-ZIPPERED: }
 
 // CHECK-ZIPPERED: "target": {
-// CHECK-ZIPPERED:   "triple": "x86_64-apple-macosx12.0"
+// CHECK-ZIPPERED:   "triple": "x86_64-apple-macosx26.0"
 // CHECK-ZIPPERED:   "unversionedTriple": "x86_64-apple-macosx"
 // CHECK-ZIPPERED:   "moduleTriple": "x86_64-apple-macos"
 // CHECK-ZIPPERED:   "librariesRequireRPath": false
 // CHECK-ZIPPERED: }
 
 // CHECK-ZIPPERED: "targetVariant": {
-// CHECK-ZIPPERED:   "triple": "x86_64-apple-ios15-macabi"
+// CHECK-ZIPPERED:   "triple": "x86_64-apple-ios26-macabi"
 // CHECK-ZIPPERED:   "unversionedTriple": "x86_64-apple-ios-macabi"
 // CHECK-ZIPPERED:   "moduleTriple": "x86_64-apple-ios-macabi"
 // CHECK-ZIPPERED:   "librariesRequireRPath": false

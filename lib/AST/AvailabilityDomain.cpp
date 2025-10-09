@@ -27,23 +27,23 @@ using namespace swift;
 CustomAvailabilityDomain::Kind
 getCustomDomainKind(clang::FeatureAvailKind featureAvailKind) {
   switch (featureAvailKind) {
-  case clang::FeatureAvailKind::None:
-    llvm_unreachable("unexpected kind");
   case clang::FeatureAvailKind::Available:
     return CustomAvailabilityDomain::Kind::Enabled;
   case clang::FeatureAvailKind::Unavailable:
     return CustomAvailabilityDomain::Kind::Disabled;
   case clang::FeatureAvailKind::Dynamic:
     return CustomAvailabilityDomain::Kind::Dynamic;
+  case clang::FeatureAvailKind::AlwaysAvailable:
+    return CustomAvailabilityDomain::Kind::AlwaysEnabled;
+  default:
+    llvm::report_fatal_error("unexpected kind");
   }
 }
 
 static const CustomAvailabilityDomain *
-customDomainForClangDecl(Decl *decl, const ASTContext &ctx) {
+customDomainForClangDecl(ValueDecl *decl) {
   auto *clangDecl = decl->getClangDecl();
-  ASSERT(clangDecl);
-
-  auto *varDecl = dyn_cast<clang::VarDecl>(clangDecl);
+  auto *varDecl = dyn_cast_or_null<clang::VarDecl>(clangDecl);
   if (!varDecl)
     return nullptr;
 
@@ -54,9 +54,18 @@ customDomainForClangDecl(Decl *decl, const ASTContext &ctx) {
   if (featureInfo.first.empty())
     return nullptr;
 
-  if (featureInfo.second.Kind == clang::FeatureAvailKind::None)
+  // Check that the domain has a supported availability kind.
+  switch (featureInfo.second.Kind) {
+  case clang::FeatureAvailKind::Available:
+  case clang::FeatureAvailKind::Unavailable:
+  case clang::FeatureAvailKind::Dynamic:
+  case clang::FeatureAvailKind::AlwaysAvailable:
+    break;
+  default:
     return nullptr;
+  }
 
+  auto &ctx = decl->getASTContext();
   FuncDecl *predicate = nullptr;
   if (featureInfo.second.Kind == clang::FeatureAvailKind::Dynamic)
     predicate =
@@ -68,18 +77,28 @@ customDomainForClangDecl(Decl *decl, const ASTContext &ctx) {
 }
 
 std::optional<AvailabilityDomain>
-AvailabilityDomain::forCustom(Decl *decl, const ASTContext &ctx) {
+AvailabilityDomainForDeclRequest::evaluate(Evaluator &evaluator,
+                                           ValueDecl *decl) const {
   if (!decl)
     return std::nullopt;
 
   if (decl->hasClangNode()) {
-    if (auto *customDomain = customDomainForClangDecl(decl, ctx))
+    if (auto *customDomain = customDomainForClangDecl(decl))
       return AvailabilityDomain::forCustom(customDomain);
   } else {
     // FIXME: [availability] Handle Swift availability domains decls.
   }
 
   return std::nullopt;
+}
+
+std::optional<AvailabilityDomain>
+AvailabilityDomain::forCustom(ValueDecl *decl) {
+  if (!decl)
+    return std::nullopt;
+
+  return evaluateOrDefault(decl->getASTContext().evaluator,
+                           AvailabilityDomainForDeclRequest{decl}, {});
 }
 
 std::optional<AvailabilityDomain>
@@ -165,7 +184,8 @@ bool AvailabilityDomain::supportsQueries() const {
   }
 }
 
-bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
+bool AvailabilityDomain::isActive(const ASTContext &ctx,
+                                  bool forTargetVariant) const {
   switch (getKind()) {
   case Kind::Universal:
   case Kind::SwiftLanguage:
@@ -173,7 +193,7 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   case Kind::Embedded:
     return true;
   case Kind::Platform:
-    return isPlatformActive(getPlatformKind(), ctx.LangOpts);
+    return isPlatformActive(getPlatformKind(), ctx.LangOpts, forTargetVariant);
   case Kind::Custom:
     // For now, custom domains are always active but it's conceivable that in
     // the future someone might want to define a domain but leave it inactive.
@@ -181,11 +201,12 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   }
 }
 
-bool AvailabilityDomain::isActivePlatform(const ASTContext &ctx) const {
+bool AvailabilityDomain::isActivePlatform(const ASTContext &ctx,
+                                          bool forTargetVariant) const {
   if (!isPlatform())
     return false;
 
-  return isActive(ctx);
+  return isActive(ctx, forTargetVariant);
 }
 
 static std::optional<llvm::VersionTuple>
@@ -208,8 +229,23 @@ getDeploymentVersion(const AvailabilityDomain &domain, const ASTContext &ctx) {
 
 std::optional<AvailabilityRange>
 AvailabilityDomain::getDeploymentRange(const ASTContext &ctx) const {
-  if (auto version = getDeploymentVersion(*this, ctx))
-    return AvailabilityRange{*version};
+  if (isVersioned()) {
+    if (auto version = getDeploymentVersion(*this, ctx))
+      return AvailabilityRange{*version};
+
+    return std::nullopt;
+  }
+
+  if (auto customDomain = getCustomDomain()) {
+    switch (customDomain->getKind()) {
+    case CustomAvailabilityDomain::Kind::AlwaysEnabled:
+      return AvailabilityRange::alwaysAvailable();
+    case CustomAvailabilityDomain::Kind::Enabled:
+    case CustomAvailabilityDomain::Kind::Disabled:
+    case CustomAvailabilityDomain::Kind::Dynamic:
+      return std::nullopt;
+    }
+  }
   return std::nullopt;
 }
 
@@ -247,7 +283,7 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
   }
 }
 
-Decl *AvailabilityDomain::getDecl() const {
+ValueDecl *AvailabilityDomain::getDecl() const {
   if (auto *customDomain = getCustomDomain())
     return customDomain->getDecl();
 
@@ -321,6 +357,45 @@ AvailabilityDomain::getRemappedDomain(const ASTContext &ctx,
   return *this;
 }
 
+bool IsCustomAvailabilityDomainPermanentlyEnabled::evaluate(
+    Evaluator &evaluator, const CustomAvailabilityDomain *customDomain) const {
+  switch (customDomain->getKind()) {
+  case CustomAvailabilityDomain::Kind::Enabled:
+  case CustomAvailabilityDomain::Kind::Disabled:
+  case CustomAvailabilityDomain::Kind::Dynamic:
+    return false;
+
+  case CustomAvailabilityDomain::Kind::AlwaysEnabled:
+    break;
+  }
+
+  auto *domainDecl = customDomain->getDecl();
+  if (!domainDecl)
+    return false;
+
+  if (auto deprecatedAttr = domainDecl->getDeprecatedAttr()) {
+    if (deprecatedAttr->getDomain().isUniversal())
+      return true;
+  }
+
+  if (auto unavailableAttr = domainDecl->getUnavailableAttr()) {
+    if (unavailableAttr->getDomain().isUniversal())
+      return true;
+  }
+
+  return false;
+}
+
+bool AvailabilityDomain::isPermanentlyAlwaysEnabled() const {
+  if (auto *customDomain = getCustomDomain()) {
+    if (auto *domainDecl = customDomain->getDecl())
+      return evaluateOrDefault(
+          domainDecl->getASTContext().evaluator,
+          IsCustomAvailabilityDomainPermanentlyEnabled{customDomain}, false);
+  }
+  return false;
+}
+
 void AvailabilityDomain::print(llvm::raw_ostream &os) const {
   os << getNameForAttributePrinting();
 }
@@ -369,10 +444,11 @@ bool StableAvailabilityDomainComparator::operator()(
 }
 
 CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name, Kind kind,
-                                                   ModuleDecl *mod, Decl *decl,
+                                                   ModuleDecl *mod,
+                                                   ValueDecl *decl,
                                                    FuncDecl *predicateFunc)
-    : name(name), kind(kind), mod(mod), decl(decl),
-      predicateFunc(predicateFunc) {
+    : name(name), mod(mod), decl(decl), predicateFunc(predicateFunc),
+      kind(kind) {
   ASSERT(!name.empty());
   ASSERT(mod);
   if (predicateFunc)

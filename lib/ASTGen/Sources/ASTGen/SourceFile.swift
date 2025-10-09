@@ -43,6 +43,14 @@ public struct ExportedSourceFile {
   /// This is a cached value; access via configuredRegions(astContext:).
   var _configuredRegions: ConfiguredRegions? = nil
 
+  /// Configured regions for this source file assuming if it were being treated
+  /// as Embedded Swift. This is used only when we are compiling non-Embedded
+  /// Swift but diagnosing uses of constructs that aren't allowed in Embedded
+  /// Swift.
+  ///
+  /// This is a cached value; access via configuredRegionsAsEmbedded(astContext:).
+  var _configuredRegionsIfEmbedded: ConfiguredRegions? = nil
+
   public func position(of location: SourceLoc) -> AbsolutePosition? {
     let sourceFileBaseAddress = UnsafeRawPointer(buffer.baseAddress!)
     guard let rawAddress = location.raw else {
@@ -64,7 +72,7 @@ extension Parser.ExperimentalFeatures {
     guard let context = context else { return }
 
     func mapFeature(_ bridged: BridgedFeature, to feature: Self) {
-      if context.langOptsHasFeature(bridged) {
+      if context.langOpts.hasFeature(bridged) {
         insert(feature)
       }
     }
@@ -78,6 +86,7 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.OldOwnershipOperatorSpellings, to: .oldOwnershipOperatorSpellings)
     mapFeature(.KeyPathWithMethodMembers, to: .keypathWithMethodMembers)
     mapFeature(.DefaultIsolationPerFile, to: .defaultIsolationPerFile)
+    mapFeature(.BorrowAndMutateAccessors, to: .borrowAndMutateAccessors)
   }
 }
 

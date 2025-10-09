@@ -1044,7 +1044,6 @@ public:
 
   // Builtin type and simple types that are used frequently.
   const CanType TheErrorType;             /// This is the ErrorType singleton.
-  const CanType TheUnresolvedType;        /// This is the UnresolvedType singleton.
   const CanType TheEmptyTupleType;        /// This is '()', aka Void
   const CanType TheEmptyPackType;
   const CanType TheAnyType;               /// This is 'Any', the empty protocol composition
@@ -1293,6 +1292,10 @@ public:
   ModuleDecl *getStdlibModule() const {
     return const_cast<ASTContext *>(this)->getStdlibModule(false);
   }
+
+  /// Names of underscored modules whose contents, if imported, should be
+  /// treated as separately-imported overlays of the standard library module.
+  ArrayRef<Identifier> StdlibOverlayNames;
 
   /// Insert an externally-sourced module into the set of known loaded modules
   /// in this context.
@@ -1625,6 +1628,10 @@ public:
   /// then this returns the universal domain (`*`).
   AvailabilityDomain getTargetAvailabilityDomain() const;
 };
+
+inline SourceLoc extractNearestSourceLoc(const ASTContext *ctx) {
+  return SourceLoc();
+}
 
 } // end namespace swift
 

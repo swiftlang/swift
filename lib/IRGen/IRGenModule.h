@@ -228,6 +228,10 @@ private:
   // It is used if a function has no source-file association.
   llvm::DenseMap<SILFunction *, IRGenModule *> DefaultIGMForFunction;
 
+  // Stores the IGM from which a global variable is referenced the first time.
+  // It is used if a global variable has no source-file association.
+  llvm::DenseMap<SILGlobalVariable *, IRGenModule *> DefaultIGMForGlobalVariable;
+
   // The IGMs where specializations of functions are emitted. The key is the
   // non-specialized function.
   // Storing all specializations of a function in the same IGM increases the
@@ -327,6 +331,13 @@ private:
   /// The queue of SIL functions to emit.
   llvm::SmallVector<SILFunction *, 4> LazyFunctionDefinitions;
 
+  /// SIL global variables that have already been lazily emitted, or are
+  /// queued up.
+  llvm::SmallPtrSet<SILGlobalVariable *, 4> LazilyEmittedGlobalVariables;
+
+  /// The queue of SIL global variables to emit.
+  llvm::SmallVector<SILGlobalVariable *, 4> LazyGlobalVariables;
+
   /// Witness tables that have already been lazily emitted, or are queued up.
   llvm::SmallPtrSet<SILWitnessTable *, 4> LazilyEmittedWitnessTables;
 
@@ -387,6 +398,12 @@ public:
   /// be determined, returns the IGM from which the function is referenced the
   /// first time.
   IRGenModule *getGenModule(SILFunction *f);
+
+  /// Get an IRGenModule for a global variable.
+  /// Returns the IRGenModule of the containing source file, or if this cannot
+  /// be determined, returns the IGM from which the global variable is
+  /// referenced the first time.
+  IRGenModule *getGenModule(SILGlobalVariable *v);
 
   /// Returns the primary IRGenModule. This is the first added IRGenModule.
   /// It is used for everything which cannot be correlated to a specific source
@@ -453,6 +470,8 @@ public:
   void emitLazyDefinitions();
 
   void addLazyFunction(SILFunction *f);
+
+  void addLazyGlobalVariable(SILGlobalVariable *v);
 
   void addDynamicReplacement(SILFunction *f) { DynamicReplacements.insert(f); }
 
@@ -648,6 +667,18 @@ public:
                                            std::string accessorName,
                                            CanSILFunctionType type,
                                            llvm::Constant *address);
+};
+
+enum class CStringSectionType {
+  Default,
+  ObjCClassName,
+  ObjCMethodName,
+  ObjCMethodType,
+  OSLogString,
+  // Place all new section types above this line
+  NumTypes,
+  // Place all alias below this line
+  ObjCPropertyName = ObjCMethodName,
 };
 
 /// IRGenModule - Primary class for emitting IR for global declarations.
@@ -1184,9 +1215,10 @@ public:
   std::pair<llvm::GlobalVariable *, llvm::Constant *> createStringConstant(
       StringRef Str, bool willBeRelativelyAddressed = false,
       StringRef sectionName = "", StringRef name = "");
-  llvm::Constant *getAddrOfGlobalString(StringRef utf8,
-                                        bool willBeRelativelyAddressed = false,
-                                        bool useOSLogSection = false);
+  llvm::Constant *getAddrOfGlobalString(
+      StringRef utf8,
+      CStringSectionType sectionType = CStringSectionType::Default,
+      bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *
   getAddrOfGlobalIdentifierString(StringRef utf8,
@@ -1310,10 +1342,11 @@ private:
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
-  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
-    GlobalStrings;
-  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
-    GlobalOSLogStrings;
+  // Maps sectionName -> string data -> constant
+  std::array<
+      llvm::StringMap<std::pair<llvm::GlobalVariable *, llvm::Constant *>>,
+      static_cast<size_t>(CStringSectionType::NumTypes)>
+      GlobalStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
     StringsForTypeRef;
@@ -1407,8 +1440,14 @@ private:
   friend struct ::llvm::DenseMapInfo<swift::irgen::IRGenModule::FixedLayoutKey>;
   llvm::DenseMap<FixedLayoutKey, llvm::Constant *> PrivateFixedLayouts;
 
+  /// Captures a static object layout.
+  struct StaticObjectLayout {
+    std::unique_ptr<StructLayout> layout;
+    llvm::StructType *containerTy = nullptr;
+  };
+
   /// A cache for layouts of statically initialized objects.
-  llvm::DenseMap<SILGlobalVariable *, std::unique_ptr<StructLayout>>
+  llvm::DenseMap<SILGlobalVariable *, StaticObjectLayout>
     StaticObjectLayouts;
 
   /// A mapping from order numbers to the LLVM functions which we
@@ -1517,6 +1556,15 @@ public:
   const char *getReflectionStringsSectionName();
   const char *getReflectionTypeRefSectionName();
   const char *getMultiPayloadEnumDescriptorSectionName();
+
+  static constexpr const char ObjCClassNameSectionName[] =
+      "__TEXT,__objc_classname,cstring_literals";
+  static constexpr const char ObjCMethodNameSectionName[] =
+      "__TEXT,__objc_methname,cstring_literals";
+  static constexpr const char ObjCMethodTypeSectionName[] =
+      "__TEXT,__objc_methtype,cstring_literals";
+  static constexpr const char OSLogStringSectionName[] =
+      "__TEXT,__oslogstring,cstring_literals";
 
   /// Returns the special builtin types that should be emitted in the stdlib
   /// module.
@@ -1874,7 +1922,8 @@ public:
 
   void emitDynamicReplacementOriginalFunctionThunk(SILFunction *f);
 
-  llvm::Function *getAddrOfContinuationPrototype(CanSILFunctionType fnType);
+  llvm::Function *getAddrOfContinuationPrototype(CanSILFunctionType fnType,
+                                                 CanGenericSignature sig);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                      const TypeInfo &ti,
                                      ForDefinition_t forDefinition);

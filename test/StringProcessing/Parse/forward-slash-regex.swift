@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking -typo-correction-limit 0
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-bare-slash-regex -disable-availability-checking -typo-correction-limit 0
 // REQUIRES: swift_swift_parser
 // REQUIRES: concurrency
 
@@ -445,6 +445,7 @@ _ = ^/"/"
 _ = ^/"[/"
 // expected-error@-1 {{'^' is not a prefix unary operator}}
 // expected-error@-2 {{unterminated string literal}}
+// expected-error@-3 {{cannot parse regular expression: expected custom character class members}}
 
 _ = (^/)("/")
 

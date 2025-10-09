@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // Ensure that key path exprs can tolerate being re-type-checked when necessary
 // to diagnose other errors in adjacent exprs.

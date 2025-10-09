@@ -25,7 +25,7 @@
 // RUN: %{python} %S/../CAS/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
 
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json bridgingHeader > %t/header.cmd
-// RUN: %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules -O -o %t/bridging.pch
+// RUN: %target-swift-frontend @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch
 
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 // RUN: echo "\"-disable-implicit-string-processing-module-import\"" >> %t/MyApp.cmd
@@ -94,9 +94,18 @@
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -I %t > %t/header2.h
 // RUN:   %FileCheck %s --check-prefix=HEADER2 --input-file=%t/header2.h
 // HEADER2: #include
-// HEADER2-SAME: Bridging2.h
-// HEADER2: #include
 // HEADER2-SAME: Bridging.h
+// HEADER2: #include
+// HEADER2-SAME: Bridging2.h
+
+// RUN: %FileCheck %s --check-prefix DEPS_JSON --input-file=%t/deps3.json
+// DEPS_JSON: "chainedBridgingHeaderPath":
+// DEPS_JSON-SAME: -ChainedBridgingHeader.h
+// DEPS_JSON: "bridgingHeader":
+// DEPS_JSON-NEXT: "path":
+// DEPS_JSON-SAME: Bridging2.h
+// DEPS_JSON-NEXT: "sourceFiles":
+// DEPS_JSON-NEXT: Bridging2.h
 
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps3.json clang:SwiftShims > %t/shim2.cmd
 // RUN: %swift_frontend_plain @%t/shim2.cmd
@@ -132,6 +141,15 @@
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap \
 // RUN:   -I %t %t/user2.swift -import-objc-header %t/Bridging3.h -auto-bridging-header-chaining -scanner-output-dir %t -scanner-debug-write-output \
 // RUN:   -o %t/deps4.json -Rdependency-scan-cache -serialize-dependency-scan-cache -dependency-scan-cache-path %t/cache.moddepcache
+
+// RUN: %FileCheck %s --check-prefix DEPS_JSON2 --input-file=%t/deps4.json
+// DEPS_JSON2: "chainedBridgingHeaderPath":
+// DEPS_JSON2-SAME: -ChainedBridgingHeader.h
+// DEPS_JSON2: "bridgingHeader":
+// DEPS_JSON2-NEXT: "path":
+// DEPS_JSON2-SAME: Bridging3.h
+// DEPS_JSON2-NEXT: "sourceFiles":
+// DEPS_JSON2-NEXT: Bridging3.h
 
 /// Make sure the cache is correct.
 // RUN: %target-swift-frontend -scan-dependencies -module-name User -O -module-load-mode prefer-serialized \

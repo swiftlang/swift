@@ -1097,9 +1097,15 @@ public:
     void verifyChecked(ReturnStmt *S) {
       auto func = Functions.back();
       Type resultType;
+      bool hasInOutResult = false;
+
       if (auto *FD = dyn_cast<FuncDecl>(func)) {
         resultType = FD->getResultInterfaceType();
         resultType = FD->mapTypeIntoContext(resultType);
+        hasInOutResult = FD->getInterfaceType()
+                             ->castTo<AnyFunctionType>()
+                             ->getExtInfo()
+                             .hasInOutResult();
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();
       } else if (isa<ConstructorDecl>(func)) {
@@ -1112,6 +1118,9 @@ public:
         auto result = S->getResult();
         auto returnType = result->getType();
         // Make sure that the return has the same type as the function.
+        if (hasInOutResult) {
+          resultType = InOutType::get(resultType);
+        }
         checkSameType(resultType, returnType, "return type");
       } else {
         // Make sure that the function has a Void result type.
@@ -2795,7 +2804,7 @@ public:
         // guarantee that all case label items bind corresponding patterns and
         // the case body var decls of a case stmt are created from the var decls
         // of the first case label items.
-        if (!caseStmt->hasBoundDecls()) {
+        if (!caseStmt->hasCaseBodyVariables()) {
           Out << "parent CaseStmt of VarDecl does not have any case body "
                  "decls?!\n";
           abort();

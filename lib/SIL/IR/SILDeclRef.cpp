@@ -303,6 +303,7 @@ bool SILDeclRef::hasUserWrittenCode() const {
   // Non-implicit decls generally have user-written code.
   if (!isImplicit()) {
     switch (kind) {
+    case Kind::PropertyWrappedFieldInitAccessor:
     case Kind::PropertyWrapperBackingInitializer: {
       // Only has user-written code if any of the property wrappers have
       // arguments to apply. Otherwise, it's just a forwarding initializer for
@@ -386,6 +387,7 @@ bool SILDeclRef::hasUserWrittenCode() const {
   case Kind::IVarInitializer:
   case Kind::IVarDestroyer:
   case Kind::PropertyWrapperBackingInitializer:
+  case Kind::PropertyWrappedFieldInitAccessor:
   case Kind::PropertyWrapperInitFromProjectedValue:
   case Kind::EntryPoint:
   case Kind::AsyncEntryPoint:
@@ -521,6 +523,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     return constant.isSerialized() ? Limit::AlwaysEmitIntoClient : Limit::None;
 
   case Kind::PropertyWrapperBackingInitializer:
+  case Kind::PropertyWrappedFieldInitAccessor:
   case Kind::PropertyWrapperInitFromProjectedValue: {
     if (!d->getDeclContext()->isTypeContext()) {
       // If the backing initializer is to be serialized, only use non-ABI public
@@ -571,6 +574,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::AsyncEntryPoint:
     llvm_unreachable("Already handled");
   }
+
   return Limit::None;
 }
 
@@ -800,13 +804,28 @@ AbstractFunctionDecl *SILDeclRef::getAbstractFunctionDecl() const {
   return dyn_cast_or_null<AbstractFunctionDecl>(getDecl());
 }
 
-bool SILDeclRef::isInitAccessor() const {
+AccessorDecl *SILDeclRef::getAccessorDecl() const {
   if (kind != Kind::Func || !hasDecl())
-    return false;
+    return nullptr;
+  return dyn_cast_or_null<AccessorDecl>(getDecl());
+}
 
-  if (auto accessor = dyn_cast<AccessorDecl>(getDecl()))
+bool SILDeclRef::isInitAccessor() const {
+  if (auto *accessor = getAccessorDecl())
     return accessor->getAccessorKind() == AccessorKind::Init;
 
+  return false;
+}
+
+bool SILDeclRef::isMutateAccessor() const {
+  if (auto *accessor = getAccessorDecl())
+    return accessor->getAccessorKind() == AccessorKind::Mutate;
+  return false;
+}
+
+bool SILDeclRef::isBorrowAccessor() const {
+  if (auto *accessor = getAccessorDecl())
+    return accessor->getAccessorKind() == AccessorKind::Borrow;
   return false;
 }
 
@@ -885,6 +904,11 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
 
   ASSERT(ABIRoleInfo(d).providesAPI()
             && "should not get serialization info from ABI-only decl");
+
+  // A declaration marked as "never emitted into client" will not have its SIL
+  // serialized, ever.
+  if (d->isNeverEmittedIntoClient())
+    return IsNotSerialized;
 
   // Default and property wrapper argument generators are serialized if the
   // containing declaration is public.
@@ -1041,13 +1065,13 @@ bool SILDeclRef::isNoinline() const {
   return false;
 }
 
-/// True if the function has the @inline(__always) attribute.
+/// True if the function has the @inline(always) attribute.
 bool SILDeclRef::isAlwaysInline() const {
   swift::Decl *decl = nullptr;
   if (hasDecl()) {
     decl = getDecl();
   } else if (auto *ce = getAbstractClosureExpr()) {
-    // Closures within @inline(__always) functions should be always inlined, too.
+    // Closures within @inline(always) functions should be always inlined, too.
     // Note that this is different from @inline(never), because closures inside
     // @inline(never) _can_ be inlined within the inline-never function.
     decl = ce->getParent()->getInnermostDeclarationDeclContext();
@@ -1074,6 +1098,39 @@ bool SILDeclRef::isAlwaysInline() const {
   return false;
 }
 
+/// True if the function has the @inline(__always) attribute.
+bool SILDeclRef::isUnderscoredAlwaysInline() const {
+  swift::Decl *decl = nullptr;
+  if (hasDecl()) {
+    decl = getDecl();
+  } else if (auto *ce = getAbstractClosureExpr()) {
+    // Closures within @inline(__always) functions should be always inlined, too.
+    // Note that this is different from @inline(never), because closures inside
+    // @inline(never) _can_ be inlined within the inline-never function.
+    decl = ce->getParent()->getInnermostDeclarationDeclContext();
+    if (!decl)
+      return false;
+  } else {
+    return false;
+  }
+
+  ASSERT(ABIRoleInfo(decl).providesAPI()
+            && "should not get inline attr from ABI-only decl");
+
+  if (auto attr = decl->getAttrs().getAttribute<InlineAttr>())
+    if (attr->getKind() == InlineKind::AlwaysUnderscored)
+      return true;
+
+  if (auto *accessorDecl = dyn_cast<AccessorDecl>(decl)) {
+    auto *storage = accessorDecl->getStorage();
+    if (auto *attr = storage->getAttrs().getAttribute<InlineAttr>())
+      if (attr->getKind() == InlineKind::AlwaysUnderscored)
+        return true;
+  }
+
+  return false;
+}
+
 bool SILDeclRef::isBackDeployed() const {
   if (!hasDecl())
     return false;
@@ -1087,6 +1144,85 @@ bool SILDeclRef::isBackDeployed() const {
     return afd->isBackDeployed();
 
   return false;
+}
+
+bool SILDeclRef::hasNonUniqueDefinition() const {
+  if (auto decl = getDecl())
+    return declHasNonUniqueDefinition(decl);
+
+  return false;
+}
+
+bool SILDeclRef::declExposedToForeignLanguage(const ValueDecl *decl) {
+  // @c / @_cdecl / @objc.
+  if (decl->getAttrs().hasAttribute<CDeclAttr>() ||
+      (decl->getAttrs().hasAttribute<ObjCAttr>() &&
+       decl->getDeclContext()->isModuleScopeContext())) {
+    return true;
+  }
+
+  // @_expose that isn't negated.
+  for (auto *expose : decl->getAttrs().getAttributes<ExposeAttr>()) {
+    switch (expose->getExposureKind()) {
+      case ExposureKind::Cxx:
+      case ExposureKind::Wasm:
+        return true;
+
+      case ExposureKind::NotCxx:
+        continue;
+    }
+  }
+
+  return false;
+}
+
+bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
+  // This function only forces the issue in embedded.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  // If the declaration is marked as @_neverEmitIntoClient, it has a unique
+  // definition.
+  if (decl->isNeverEmittedIntoClient())
+    return false;
+
+  /// @_alwaysEmitIntoClient means that we have a non-unique definition.
+  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    return true;
+
+  // If the declaration is marked in a manner that indicates that other
+  // systems will expect it to have a symbol, then it has a unique definition.
+  // There are a few cases here.
+
+  // - @implementation explicitly says that we are implementing something to
+  // be called from another language, so call it non-unique.
+  if (decl->isObjCImplementation())
+    return false;
+
+  // - @c / @_cdecl / @objc / @_expose expect to be called from another
+  // language if the symbol itself would be visible.
+  if (declExposedToForeignLanguage(decl) &&
+      decl->getFormalAccess() >= AccessLevel::Internal) {
+    return false;
+  }
+
+  // - @_section and @_used imply that external tools will look for this symbol.
+  if (decl->getAttrs().hasAttribute<SectionAttr>() ||
+      decl->getAttrs().hasAttribute<UsedAttr>()) {
+    return false;
+  }
+
+  auto module = decl->getModuleContext();
+  auto &ctx = module->getASTContext();
+
+  /// With deferred code generation, declarations are emitted as late as
+  /// possible, so they must have non-unique definitions.
+  if (module->deferredCodeGen())
+    return true;
+
+  // If the declaration is not from the main module, treat its definition as
+  // non-unique.
+  return module != ctx.MainModule && ctx.MainModule;
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {
@@ -1377,6 +1513,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return mangler.mangleBackingInitializerEntity(cast<VarDecl>(getDecl()),
                                                   SKind);
+
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
+    return mangler.manglePropertyWrappedFieldInitAccessorEntity(
+        cast<VarDecl>(getDecl()), SKind);
 
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return mangler.mangleInitFromProjectedValueEntity(cast<VarDecl>(getDecl()),
@@ -1733,6 +1873,7 @@ Expr *SILDeclRef::getInitializationExpr() const {
     }
     return init;
   }
+  case Kind::PropertyWrappedFieldInitAccessor:
   case Kind::PropertyWrapperBackingInitializer: {
     auto *var = cast<VarDecl>(getDecl());
     auto wrapperInfo = var->getPropertyWrapperInitializerInfo();
@@ -1872,4 +2013,22 @@ bool SILDeclRef::isCalleeAllocatedCoroutine() const {
     return false;
 
   return getASTContext().SILOpts.CoroutineAccessorsUseYieldOnce2;
+}
+
+ActorIsolation SILDeclRef::getActorIsolation() const {
+  // Deallocating destructor is always nonisolated. Isolation of the deinit
+  // applies only to isolated deallocator and destroyer.
+  if (kind == SILDeclRef::Kind::Deallocator) {
+    return ActorIsolation::forNonisolated(false);
+  }
+
+  // Default argument generators use the isolation of the initializer,
+  // not the general isolation of the function.
+  if (isDefaultArgGenerator()) {
+    auto param = getParameterAt(getDecl(), defaultArgIndex);
+    assert(param);
+    return param->getInitializerIsolation();
+  }
+
+  return getActorIsolationOfContext(getInnermostDeclContext());
 }

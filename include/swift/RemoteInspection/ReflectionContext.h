@@ -18,13 +18,14 @@
 #ifndef SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 #define SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/BinaryFormat/COFF.h"
-#include "llvm/BinaryFormat/MachO.h"
 #include "llvm/BinaryFormat/ELF.h"
+#include "llvm/BinaryFormat/MachO.h"
+#include "llvm/BinaryFormat/Wasm.h"
 #include "llvm/Object/COFF.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Memory.h"
-#include "llvm/ADT/STLExtras.h"
 
 #include "swift/ABI/Enum.h"
 #include "swift/ABI/ObjectFile.h"
@@ -40,6 +41,8 @@
 #include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/Basic/Unreachable.h"
 
+#include <cstdint>
+#include <map>
 #include <set>
 #include <utility>
 #include <vector>
@@ -72,6 +75,11 @@
 #define HAS_DISPATCH_LOCK_IS_LOCKED 1
 #endif
 
+#define DEBUG_TYPE "reflection"
+#ifdef SWIFT_RUNTIME
+#undef LLVM_DEBUG
+#define LLVM_DEBUG(IGNORE)
+#endif
 namespace {
 
 template <unsigned PointerSize> struct MachOTraits;
@@ -799,6 +807,297 @@ public:
     }
   }
 
+  /// Parses metadata information from a WebAssembly image.
+  ///
+  ///
+  /// \param[in] ImageStart
+  ///     A remote address pointing to the start of the image in the running
+  ///     process.
+  ///
+  /// \param[in] FileBuffer
+  ///     A buffer which contains the contents of the image's file
+  ///     in disk. If missing, all the information will be read using the
+  ///     instance's memory reader.
+  ///
+  /// \return The newly added reflection info ID if successful, \b std::nullopt
+  ///     otherwise.
+  std::optional<uint32_t>
+  readWasm(RemoteAddress ImageStart,
+           std::optional<llvm::sys::MemoryBlock> FileBuffer,
+           llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames) {
+    /// A WASM data segment. The reflection metadata "sections" are DATA
+    /// segments.
+    struct Segment {
+      RemoteAddress remoteAddr;
+      uint64_t offset;
+      uint64_t size;
+    };
+    std::map<std::string, Segment> sections;
+    std::vector<Segment> segments;
+    auto &reader = getReader();
+    RemoteAddress cursor = ImageStart;
+    cursor += sizeof(llvm::wasm::WasmMagic) + sizeof(llvm::wasm::WasmVersion);
+
+    /// Decode one byte and move the cursor.
+    auto decodeU8 = [&reader, &cursor](uint8_t &b) -> bool {
+      if (!reader.readInteger(cursor, 1, &b))
+        return false;
+      cursor += 1;
+      return true;
+    };
+
+    /// Decode 32-bit ULEB constants.
+    auto decodeULEB32 = [&](uint32_t &val) -> bool {
+      uint64_t result = 0;
+      uint8_t b;
+      for (uint8_t n = 0; n < 5; ++n) {
+        if (!decodeU8(b))
+          return false;
+        result |= (b & ~(1 << 7)) << 7 * n;
+        if ((b & (1 << 7)) == 0)
+          break;
+      }
+      if (result > std::numeric_limits<uint32_t>::max())
+        return false;
+      memcpy(&val, &result, 4);
+      return true;
+    };
+
+    /// Decode a string.
+    auto decodeString = [&](std::string &str) -> bool {
+      uint32_t len;
+      if (!decodeULEB32(len))
+        return false;
+      auto chars = reader.readBytes(cursor, len);
+      if (!chars)
+        return false;
+      str = std::string((const char *)chars.get(), len);
+      cursor += len;
+      chars.release();
+      return true;
+    };
+
+    /// Decode one section header.
+    auto decodeSection = [&]() -> bool {
+      uint8_t sectionID;
+      if (!decodeU8(sectionID))
+        return false;
+
+      if (sectionID > llvm::wasm::WASM_SEC_LAST_KNOWN)
+        return false;
+
+      uint32_t payloadLen;
+      if (!decodeULEB32(payloadLen))
+        return false;
+      RemoteAddress payloadStart = cursor;
+      std::string sectName;
+      if (sectionID == llvm::wasm::WASM_SEC_CUSTOM) {
+        if (!decodeString(sectName))
+          return false;
+        RemoteAddress sectionStart = cursor;
+        sections.insert(
+            {sectName, {cursor, 0, payloadLen - (sectionStart - cursor)}});
+      } else {
+        sectName = llvm::wasm::sectionTypeToString(sectionID);
+        sections.insert({sectName, {cursor, 0, payloadLen}});
+      }
+      LLVM_DEBUG(llvm::dbgs()
+                 << "section " << sectName << " size=" << payloadLen << "\n");
+
+      cursor = payloadStart + payloadLen;
+      return true;
+    };
+
+    // Decode the DATA segments.
+    auto decodeData = [&](uint64_t sectLength) -> bool {
+      RemoteAddress start = cursor;
+      RemoteAddress end = start + sectLength;
+      uint32_t count;
+
+      auto decodeActiveSegmentOffset = [&]() -> std::optional<uint32_t> {
+        uint32_t offset = 0;
+        while (true) {
+          uint8_t b;
+          if (!decodeU8(b))
+            return {};
+
+          if (b == llvm::wasm::WASM_OPCODE_I32_CONST) {
+            if (!decodeULEB32(offset)) // FIXME: Actually an SLEB.
+              return {};
+          } else if (b == llvm::wasm::WASM_OPCODE_END) {
+            break;
+          } else {
+            // Unhandled opcode.
+            return {};
+          }
+        }
+        return offset;
+      };
+
+      if (!decodeULEB32(count))
+        return false;
+      // Parse the segment header.
+      for (uint32_t i = 0; i < count && cursor < end; ++i) {
+        uint32_t flags;
+        uint32_t offset = 0;
+        if (!decodeULEB32(flags))
+          return false;
+        if ((flags & 2) == 2) {
+          uint32_t memidx;
+          if (!decodeULEB32(memidx))
+            return false;
+        }
+        if ((flags & 1) == 0) {
+          auto offsOrErr = decodeActiveSegmentOffset();
+          if (!offsOrErr)
+            return false;
+          offset = *offsOrErr;
+        }
+        uint32_t size;
+        if (!decodeULEB32(size))
+          return false;
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Segment[" << i << "]: flags=" << flags
+                   << " offset=" << offset << " size=" << size << "\n");
+        segments.push_back({cursor, offset, size});
+        cursor += size;
+      }
+      return true;
+    };
+    // Decode the NAMES table pointing to the DATA segments.
+    auto decodeNames = [&](uint64_t sectLength) -> bool {
+      RemoteAddress start = cursor;
+      RemoteAddress end = start + sectLength;
+      while (cursor < end) {
+        uint8_t type;
+        if (!decodeU8(type))
+          return false;
+        uint32_t len;
+        if (!decodeULEB32(len))
+          return false;
+        if (type == llvm::wasm::WASM_NAMES_DATA_SEGMENT) {
+          uint32_t count;
+          if (!decodeULEB32(count))
+            return false;
+          for (uint32_t i = 0; i < count; ++i) {
+            uint32_t idx;
+            if (!decodeULEB32(idx))
+              return false;
+            std::string sectName;
+            if (!decodeString(sectName))
+              return false;
+            if (idx >= segments.size())
+              return false;
+            LLVM_DEBUG(llvm::dbgs() << sectName << ": " << idx << "\n");
+            sections.insert({sectName, segments[idx]});
+          }
+        }
+        cursor += len;
+      }
+      return true;
+    };
+    // Decode the LINK section of object files.
+    auto decodeLinking = [&](RemoteAddress dataStart,
+                             uint64_t sectLength) -> bool {
+      RemoteAddress start = cursor;
+      RemoteAddress end = start + sectLength;
+
+      uint32_t version;
+      if (!decodeULEB32(version) || version != 2)
+        return false;
+      while (cursor < end) {
+        uint8_t type;
+        if (!decodeU8(type))
+          return false;
+        uint32_t len;
+        if (!decodeULEB32(len))
+          return false;
+        if (type == llvm::wasm::WASM_SEGMENT_INFO) {
+          uint32_t count;
+          if (!decodeULEB32(count))
+            return false;
+          for (uint32_t idx = 0; idx < count; ++idx) {
+            std::string sectName;
+            if (!decodeString(sectName))
+              return false;
+            uint32_t align;
+            if (!decodeULEB32(align))
+              return false;
+            uint32_t flags;
+            if (!decodeULEB32(flags))
+              return false;
+            LLVM_DEBUG(llvm::dbgs() << sectName << ": " << idx << "\n");
+            sections.insert({sectName, segments[idx]});
+          }
+        }
+        cursor += len;
+      }
+      return true;
+    };
+
+    while (decodeSection()) {
+    };
+    auto dataSect = sections.find("DATA");
+    if (dataSect == sections.end())
+      return false;
+
+    auto [dataStart, _, dataLength] = dataSect->second;
+    cursor = dataStart;
+    if (!decodeData(dataLength))
+      return false;
+
+    auto nameSect = sections.find("name");
+    if (nameSect != sections.end()) {
+      cursor = nameSect->second.remoteAddr;
+      if (!decodeNames(nameSect->second.size))
+        return false;
+    } else {
+      // This may be an object file?
+      auto linkingSect = sections.find("linking");
+      if (linkingSect == sections.end())
+        return false;
+      cursor = linkingSect->second.remoteAddr;
+      if (!decodeLinking(dataStart, linkingSect->second.size))
+        return false;
+    }
+
+    // Find reflection sections within the data section segments.
+    auto lookup =
+        [&](const std::string &name) -> std::pair<RemoteRef<void>, uint64_t> {
+      auto sectionIt = sections.find(name);
+      if (sectionIt == sections.end())
+        return {{}, 0};
+      auto &section = sectionIt->second;
+      RemoteAddress mappedSectionStart(0 + section.offset,
+                                       RemoteAddress::DefaultAddressSpace);
+      auto secBuf = reader.readBytes(section.remoteAddr, section.size);
+      auto secContents = RemoteRef<void>(mappedSectionStart, secBuf.get());
+      savedBuffers.push_back(std::move(secBuf));
+      LLVM_DEBUG(llvm::dbgs() << name << " @ " << section.offset << "\n");
+      return {secContents, section.size};
+    };
+
+    auto FieldMdSec = lookup("swift5_fieldmd");
+    auto AssocTySec = lookup("swift5_assocty");
+    auto BuiltinTySec = lookup("swift5_builtin");
+    auto CaptureSec = lookup("swift5_capture");
+    auto TypeRefMdSec = lookup("swift5_typeref");
+    auto ReflStrMdSec = lookup("swift5_reflstr");
+    auto ConformMdSec = lookup("swift5_protocol_conformances");
+    auto MPEnumMdSec = lookup("swift5_mpenum");
+
+    ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
+                           {AssocTySec.first, AssocTySec.second},
+                           {BuiltinTySec.first, BuiltinTySec.second},
+                           {CaptureSec.first, CaptureSec.second},
+                           {TypeRefMdSec.first, TypeRefMdSec.second},
+                           {ReflStrMdSec.first, ReflStrMdSec.second},
+                           {ConformMdSec.first, ConformMdSec.second},
+                           {MPEnumMdSec.first, MPEnumMdSec.second},
+                           PotentialModuleNames};
+    return addReflectionInfo(info);
+  }
+
   /// On success returns the ID of the newly registered Reflection Info.
   std::optional<uint32_t>
   addImage(RemoteAddress ImageStart,
@@ -827,7 +1126,6 @@ public:
       return readPECOFF(ImageStart, PotentialModuleNames);
     }
 
-
     // ELF.
     if (MagicBytes[0] == llvm::ELF::ElfMagic[0]
         && MagicBytes[1] == llvm::ELF::ElfMagic[1]
@@ -837,6 +1135,14 @@ public:
                      PotentialModuleNames);
     }
 
+    // WASM.
+    if (MagicBytes[0] == llvm::wasm::WasmMagic[0] &&
+        MagicBytes[1] == llvm::wasm::WasmMagic[1] &&
+        MagicBytes[2] == llvm::wasm::WasmMagic[2] &&
+        MagicBytes[3] == llvm::wasm::WasmMagic[3]) {
+      return readWasm(ImageStart, std::optional<llvm::sys::MemoryBlock>(),
+                      PotentialModuleNames);
+    }
     // We don't recognize the format.
     return std::nullopt;
   }
@@ -1857,7 +2163,10 @@ private:
           RemoteAddress(RecordObj->Parent, RemoteAddress::DefaultAddressSpace);
     }
 
-    const auto TaskResumeContext = AsyncTaskObj->ResumeContextAndReserved[0];
+    const auto TaskResumeContext = stripSignedPointer(
+      RemoteAddress(AsyncTaskObj->ResumeContextAndReserved[0],
+                    RemoteAddress::DefaultAddressSpace)
+    ).getRawAddress();
     Info.ResumeAsyncContext = TaskResumeContext;
 
     // Walk the async backtrace.

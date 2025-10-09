@@ -126,19 +126,18 @@ class OverloadChoice {
   /// FIXME: This needs three bits. Can we pack them somewhere?
   FunctionRefInfo TheFunctionRefInfo = FunctionRefInfo::unappliedBaseName();
 
-public:
-  OverloadChoice() : BaseAndDeclKind(nullptr, 0), DeclOrKind() {}
-
   OverloadChoice(Type base, ValueDecl *value,
                  FunctionRefInfo functionRefInfo)
     : BaseAndDeclKind(base, 0),
       TheFunctionRefInfo(functionRefInfo) {
-    assert(!base || !base->hasTypeParameter());
     assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0 &&
            "Badly aligned decl");
     
     DeclOrKind = value;
   }
+
+public:
+  OverloadChoice() : BaseAndDeclKind(nullptr, 0), DeclOrKind() {}
 
   OverloadChoice(Type base, OverloadChoiceKind kind)
       : BaseAndDeclKind(base, 0), DeclOrKind(uint32_t(kind)) {
@@ -160,6 +159,22 @@ public:
   bool isInvalid() const {
     return BaseAndDeclKind.getPointer().isNull() &&
            BaseAndDeclKind.getInt() == 0 && DeclOrKind.isNull();
+  }
+
+  /// Retrieve an overload choice for a declaration that was found via
+  /// unqualified lookup.
+  static OverloadChoice getDecl(ValueDecl *value,
+                                FunctionRefInfo functionRefInfo) {
+    return OverloadChoice(Type(), value, functionRefInfo);
+  }
+
+
+  /// Retrieve an overload choice for a declaration that was found via
+  /// qualified lookup.
+  static OverloadChoice getDecl(Type base, ValueDecl *value,
+                                FunctionRefInfo functionRefInfo) {
+    ASSERT(!base->hasTypeParameter());
+    return OverloadChoice(base, value, functionRefInfo);
   }
 
   /// Retrieve an overload choice for a declaration that was found via

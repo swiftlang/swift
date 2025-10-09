@@ -41,25 +41,27 @@ def Availability(bits):
 
 if Self == 'Float16':
     SelfDocComment = '''\
-/// A half-precision (16b), floating-point value type.
+/// A half-precision (16-bit), floating-point value type.
 ///
-/// `Float16` is available on Apple silicon,
-/// and unavailable on Intel when targeting macOS.'''
+/// On macOS, `Float16` is only available when targeting Apple silicon.
+/// On other supported platforms, `Float16` is available for all
+/// architectures. If the specified target supports 16-bit floating point
+/// arithmetic directly, those instructions will be used; otherwise Float16
+/// arithmetic will be emulated by the swift compiler and runtime.'''
 elif Self == 'Float':
     SelfDocComment = '''\
-/// A single-precision, floating-point value type.'''
+/// A single-precision (32-bit), floating-point value type.'''
 
 elif Self == 'Double':
     SelfDocComment = '''\
-/// A double-precision, floating-point value type.'''
+/// A double-precision (64-bit), floating-point value type.'''
 
 elif Self == 'Float80':
     SelfDocComment = '''\
 /// An extended-precision, floating-point value type.
 ///
-/// `Float80` is available on Intel
-/// when the target system supports an 80-bit long double type,
-/// and unavailable on Apple silicon.'''
+/// `Float80` is available on x86 if the target system's `long double` C type
+/// is 80-bit, and unavailable otherwise.'''
 
 else:
     raise ValueError('Unhandled float type.')

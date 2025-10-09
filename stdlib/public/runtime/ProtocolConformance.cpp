@@ -789,7 +789,13 @@ struct ConformanceState {
         envAllowCacheByDescriptors && allowSaveDescriptor &&
         typeDescriptor && result.witnessTable &&
         CanCacheTypeByDescriptor(*typeDescriptor)) {
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
+      auto conformance = lookThroughOptionalConditionalWitnessTable(
+                         reinterpret_cast<const RelativeWitnessTable *>(result.witnessTable))
+                         ->getDescription();
+#else
       auto conformance = result.witnessTable->getDescription();
+#endif
       lockedCache.getOrInsert(ConformanceCacheKey(typeDescriptor, proto),
                               [&](ConformanceCacheEntry *entry, bool created) {
                                 if (!created)

@@ -61,7 +61,8 @@ void SILFunctionBuilder::addFunctionAttributes(
   // function as force emitting all optremarks including assembly vision
   // remarks. This allows us to emit the assembly vision remarks without needing
   // to change any of the underlying optremark mechanisms.
-  if (Attrs.getAttribute(DeclAttrKind::EmitAssemblyVisionRemarks))
+  if (Attrs.getAttribute(DeclAttrKind::EmitAssemblyVisionRemarks) ||
+      M.getOptions().EnableGlobalAssemblyVision)
     F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
 
   // Propagate @_specialize.
@@ -169,7 +170,7 @@ void SILFunctionBuilder::addFunctionAttributes(
   for (auto *EA : Attrs.getAttributes<ExposeAttr>()) {
     bool shouldExportDecl = true;
     if (Attrs.hasAttribute<CDeclAttr>()) {
-      // If the function is marked with @cdecl, expose only C compatible
+      // If the function is marked with @c, expose only C compatible
       // thunk function.
       shouldExportDecl = constant.isNativeToForeignThunk();
     }
@@ -202,6 +203,8 @@ void SILFunctionBuilder::addFunctionAttributes(
     F->setPerfConstraints(PerformanceConstraints::NoExistentials);
   } else if (Attrs.hasAttribute<NoObjCBridgingAttr>()) {
     F->setPerfConstraints(PerformanceConstraints::NoObjCBridging);
+  } else if (Attrs.hasAttribute<ManualOwnershipAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::ManualOwnership);
   }
 
   if (Attrs.hasAttribute<LexicalLifetimesAttr>()) {
@@ -334,6 +337,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   Inline_t inlineStrategy = InlineDefault;
   if (constant.isNoinline())
     inlineStrategy = NoInline;
+  else if (constant.isUnderscoredAlwaysInline())
+    inlineStrategy = HeuristicAlwaysInline;
   else if (constant.isAlwaysInline())
     inlineStrategy = AlwaysInline;
 

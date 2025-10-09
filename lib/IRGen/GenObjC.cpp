@@ -661,6 +661,7 @@ namespace {
       case SILDeclRef::Kind::EnumElement:
       case SILDeclRef::Kind::GlobalAccessor:
       case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+      case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
       case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
       case SILDeclRef::Kind::EntryPoint:
       case SILDeclRef::Kind::AsyncEntryPoint:
@@ -934,6 +935,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
     case ResultConvention::Pack:
+    case ResultConvention::GuaranteedAddress:
+    case ResultConvention::Guaranteed:
       lifetimeExtendsSelf = false;
       break;
     }
@@ -1315,7 +1318,8 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
   encodingString += llvm::itostr(parmOffset);
   encodingString += fixedParamsString;
   encodingString += paramsString;
-  return IGM.getAddrOfGlobalString(encodingString);
+  return IGM.getAddrOfGlobalString(encodingString,
+                                   CStringSectionType::ObjCMethodType);
 }
 
 static llvm::Constant *
@@ -1326,16 +1330,19 @@ getObjectEncodingFromClangNode(IRGenModule &IGM, Decl *d,
     auto clangDecl = d->getClangNode().castAsDecl();
     auto &clangASTContext = IGM.getClangASTContext();
     std::string typeStr;
+    CStringSectionType sectionType;
     if (auto objcMethodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
       typeStr = clangASTContext.getObjCEncodingForMethodDecl(
           objcMethodDecl, useExtendedEncoding /*extended*/);
+      sectionType = CStringSectionType::ObjCMethodType;
     }
     if (auto objcPropertyDecl = dyn_cast<clang::ObjCPropertyDecl>(clangDecl)) {
       typeStr = clangASTContext.getObjCEncodingForPropertyDecl(objcPropertyDecl,
                                                                nullptr);
+      sectionType = CStringSectionType::ObjCPropertyName;
     }
     if (!typeStr.empty()) {
-      return IGM.getAddrOfGlobalString(typeStr.c_str());
+      return IGM.getAddrOfGlobalString(typeStr.c_str(), sectionType);
     }
   }
   return nullptr;
@@ -1431,7 +1438,8 @@ irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM, VarDecl *property) {
   TypeStr += llvm::itostr(ParmOffset);
   TypeStr += "@0:";
   TypeStr += llvm::itostr(PtrSize.getValue());
-  descriptor.typeEncoding = IGM.getAddrOfGlobalString(TypeStr.c_str());
+  descriptor.typeEncoding = IGM.getAddrOfGlobalString(
+      TypeStr.c_str(), CStringSectionType::ObjCMethodType);
   descriptor.silFunction = nullptr;
   descriptor.impl = getObjCGetterPointer(IGM, property, descriptor.silFunction);
   return descriptor;
@@ -1508,7 +1516,8 @@ irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   ParmOffset = 2 * PtrSize.getValue();
   clangASTContext.getObjCEncodingForType(clangType, TypeStr);
   TypeStr += llvm::itostr(ParmOffset);
-  descriptor.typeEncoding = IGM.getAddrOfGlobalString(TypeStr.c_str());
+  descriptor.typeEncoding = IGM.getAddrOfGlobalString(
+      TypeStr.c_str(), CStringSectionType::ObjCMethodType);
   descriptor.silFunction = nullptr;
   descriptor.impl = getObjCSetterPointer(IGM, property, descriptor.silFunction);
   return descriptor;
@@ -1614,7 +1623,8 @@ void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
   auto ptrSize = IGM.getPointerSize().getValue();
   llvm::SmallString<8> signature;
   signature = "v" + llvm::itostr(ptrSize * 2) + "@0:" + llvm::itostr(ptrSize);
-  descriptor.typeEncoding = IGM.getAddrOfGlobalString(signature);
+  descriptor.typeEncoding =
+      IGM.getAddrOfGlobalString(signature, CStringSectionType::ObjCMethodType);
 
   /// The third element is the method implementation pointer.
   descriptor.impl = llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
@@ -1721,6 +1731,11 @@ void IRGenFunction::emitBlockRelease(llvm::Value *value) {
 
 void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
     ValueDecl *fn, llvm::Value *value, bool needsNullCheck) {
+  if (auto originalDecl = fn->getASTContext()
+                              .getClangModuleLoader()
+                              ->getOriginalForClonedMember(fn))
+    fn = originalDecl;
+
   assert(fn->getClangDecl() && isa<clang::FunctionDecl>(fn->getClangDecl()));
 
   auto clangFn = cast<clang::FunctionDecl>(fn->getClangDecl());

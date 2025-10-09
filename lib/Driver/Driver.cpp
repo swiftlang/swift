@@ -144,7 +144,8 @@ static void validateLegacyUnsupportedArgs(DiagnosticEngine &diags,
 
 static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
                                        const ArgList &args) {
-  if (!args.hasArgNoClaim(options::OPT_import_objc_header))
+  if (!args.hasArgNoClaim(options::OPT_import_bridging_header,
+                          options::OPT_internal_import_bridging_header))
     return;
 
   if (args.hasArgNoClaim(options::OPT_import_underlying_module))
@@ -1521,7 +1522,9 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     if (Args.hasFlag(options::OPT_enable_bridging_pch,
                      options::OPT_disable_bridging_pch,
                      true)) {
-      if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
+      if (Arg *A = Args.getLastArg(
+              options::OPT_import_bridging_header,
+              options::OPT_internal_import_bridging_header)) {
         StringRef Value = A->getValue();
         auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
         if (Ty == file_types::TY_ClangHeader) {
@@ -1982,6 +1985,27 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
     return false;
   }
 
+  if (Args.hasArg(options::OPT_print_static_build_config)) {
+    SmallVector<const char *, 5> commandLine;
+    commandLine.push_back("-frontend");
+    commandLine.push_back("-print-static-build-config");
+
+    std::string executable = getSwiftProgramPath();
+
+    // FIXME(https://github.com/apple/swift/issues/54554): This bypasses
+    // mechanisms like -v and -###.
+    sys::TaskQueue queue;
+    queue.addTask(executable.c_str(), commandLine);
+    queue.execute(nullptr,
+                  [](sys::ProcessId PID, int returnCode, StringRef output,
+                     StringRef errors, sys::TaskProcessInformation ProcInfo,
+                     void *unused) -> sys::TaskFinishedResponse {
+                    llvm::outs() << output;
+                    llvm::errs() << errors;
+                    return sys::TaskFinishedResponse::ContinueExecution;
+                  });
+    return false;
+  }
   return true;
 }
 

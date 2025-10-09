@@ -1,10 +1,8 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=targeted
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=complete
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 func f(_: @escaping @Sendable () -> Void) { }
 open class F {

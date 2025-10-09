@@ -5290,6 +5290,7 @@ void ResultPlanner::execute(SmallVectorImpl<SILValue> &innerDirectResultStack,
       LLVM_FALLTHROUGH;
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
+    case ResultConvention::Unowned: // Handled in OwnershipModelEliminator.
       return SGF.emitManagedRValueWithCleanup(resultValue, resultTL);
     case ResultConvention::Pack:
       llvm_unreachable("shouldn't have direct result with pack results");
@@ -5299,9 +5300,10 @@ void ResultPlanner::execute(SmallVectorImpl<SILValue> &innerDirectResultStack,
       // originally 'self'.
       SGF.SGM.diagnose(Loc.getSourceLoc(), diag::not_implemented,
                        "reabstraction of returns_inner_pointer function");
-      LLVM_FALLTHROUGH;
-    case ResultConvention::Unowned:
       return SGF.emitManagedCopy(Loc, resultValue, resultTL);
+    case ResultConvention::GuaranteedAddress:
+    case ResultConvention::Guaranteed:
+      llvm_unreachable("borrow accessor not yet implemented");
     }
     llvm_unreachable("bad result convention!");
   };
@@ -5485,10 +5487,10 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
   // isolated parameter preventing us from having to memcpy over the array.
   if (outputSubstType->isAsync()) {
     if (outputSubstType->getIsolation().getKind() ==
-        FunctionTypeIsolation::Kind::NonIsolatedCaller)
+        FunctionTypeIsolation::Kind::NonIsolatedNonsending)
       options |= ThunkGenFlag::ThunkHasImplicitIsolatedParam;
     if (inputSubstType->getIsolation().getKind() ==
-        FunctionTypeIsolation::Kind::NonIsolatedCaller)
+        FunctionTypeIsolation::Kind::NonIsolatedNonsending)
       options |= ThunkGenFlag::CalleeHasImplicitIsolatedParam;
   }
 
@@ -5552,7 +5554,7 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
     // For a function for caller isolation, we'll have to figure out what the
     // output function's formal isolation is. This is quite doable, but we don't
     // have to do it yet.
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
       llvm_unreachable("synchronous function has caller isolation?");
 
     // For a function with parameter isolation, we'll have to dig the
@@ -5654,7 +5656,7 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
             outputIsolation.getGlobalActorType()->getCanonicalType();
         return SGF.emitGlobalActorIsolation(loc, globalActor).getValue();
       }
-      case FunctionTypeIsolation::Kind::NonIsolatedCaller: {
+      case FunctionTypeIsolation::Kind::NonIsolatedNonsending: {
         return implicitIsolationParam.getValue();
       }
       case FunctionTypeIsolation::Kind::Parameter:
@@ -6589,7 +6591,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       customDerivativeFn->getClassSubclassScope());
   // This thunk may be publicly exposed and cannot be transparent.
   // Instead, mark it as "always inline" for optimization.
-  thunk->setInlineStrategy(AlwaysInline);
+  thunk->setInlineStrategy(HeuristicAlwaysInline);
   if (!thunk->empty())
     return thunk;
   thunk->setGenericEnvironment(thunkGenericEnv);

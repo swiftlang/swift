@@ -672,6 +672,12 @@ private:
         case AccessorKind::Read2:
           Kind = ".read2";
           break;
+        case AccessorKind::Borrow:
+          Kind = ".borrow";
+          break;
+        case AccessorKind::Mutate:
+          Kind = ".mutate";
+          break;
         }
 
         SmallVector<char, 64> Buf;
@@ -723,6 +729,16 @@ private:
     if (!DC)
       return TheCU;
 
+    auto createContext = [&](NominalTypeDecl &NTD) {
+      GenericContextScope scope(
+          IGM, NTD.getGenericSignature().getCanonicalSignature());
+
+      auto Ty = NTD.getDeclaredInterfaceType();
+      // Create a Forward-declared type.
+      auto DbgTy = DebugTypeInfo::getForwardDecl(Ty);
+      return getOrCreateType(DbgTy);
+    };
+
     if (isa<FuncDecl>(DC))
       if (auto *Decl = IGM.getSILModule().lookUpFunction(SILDeclRef(
               cast<AbstractFunctionDecl>(DC), SILDeclRef::Kind::Func)))
@@ -736,7 +752,6 @@ private:
 
     // We don't model these in DWARF.
     case DeclContextKind::Initializer:
-    case DeclContextKind::ExtensionDecl:
     case DeclContextKind::SubscriptDecl:
     case DeclContextKind::EnumElementDecl:
     case DeclContextKind::TopLevelCodeDecl:
@@ -755,16 +770,17 @@ private:
       return getOrCreateContext(DC->getParent());
     case DeclContextKind::MacroDecl:
       return getOrCreateContext(DC->getParent());
+    case DeclContextKind::ExtensionDecl: {
+      auto *ED = cast<ExtensionDecl>(DC);
+      if (auto *NTD = ED->getExtendedNominal())
+        return createContext(*NTD);
+      return getOrCreateContext(DC->getParent());
+    }
     case DeclContextKind::GenericTypeDecl: {
-      // The generic signature of this nominal type has no relation to the current
-      // function's generic signature.
+      // The generic signature of this nominal type has no relation to the
+      // current function's generic signature.
       auto *NTD = cast<NominalTypeDecl>(DC);
-      GenericContextScope scope(IGM, NTD->getGenericSignature().getCanonicalSignature());
-
-      auto Ty = NTD->getDeclaredInterfaceType();
-      // Create a Forward-declared type.
-      auto DbgTy = DebugTypeInfo::getForwardDecl(Ty);
-      return getOrCreateType(DbgTy);
+      return createContext(*NTD);
     }
     }
     return TheCU;
@@ -1945,7 +1961,8 @@ private:
           nullptr, PtrSize, 0,
           /* DWARFAddressSpace */ std::nullopt, MangledName);
 
-      return DBuilder.createObjectPointerType(PTy);
+      // FIXME: Set DIFlagObjectPointer and make sure it is only set for `self`.
+      return PTy;
     }
     case TypeKind::BuiltinExecutor: {
       return createDoublePointerSizedStruct(
@@ -2313,7 +2330,6 @@ private:
     // The following types exist primarily for internal use by the type
     // checker.
     case TypeKind::Error:
-    case TypeKind::Unresolved:
     case TypeKind::LValue:
     case TypeKind::TypeVariable:
     case TypeKind::ErrorUnion:
@@ -2678,8 +2694,9 @@ private:
       // declarations may not have a unique ID to avoid a forward declaration
       // winning over a full definition.
       auto *FwdDecl = DBuilder.createReplaceableCompositeType(
-          llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, 0, 0,
-          llvm::dwarf::DW_LANG_Swift);
+          llvm::dwarf::DW_TAG_structure_type, Name, Scope, 0, 0,
+          llvm::dwarf::DW_LANG_Swift, 0, 0, llvm::DINode::FlagFwdDecl,
+          MangledName);
       FwdDeclTypes.emplace_back(
           std::piecewise_construct, std::make_tuple(MangledName),
           std::make_tuple(static_cast<llvm::Metadata *>(FwdDecl)));
@@ -3678,16 +3695,16 @@ struct DbgIntrinsicEmitter {
   PointerUnion<llvm::BasicBlock *, llvm::Instruction *> InsertPt;
   irgen::IRBuilder &IRBuilder;
   llvm::DIBuilder &DIBuilder;
-  AddrDbgInstrKind ForceDbgDeclare;
+  AddrDbgInstrKind ForceDbgDeclareOrCoro;
 
   /// Initialize the emitter and initialize the emitter to assume that it is
   /// going to insert an llvm.dbg.declare or an llvm.dbg.addr either at the
   /// current "generalized insertion point" of the IRBuilder. The "generalized
   /// insertion point" is
   DbgIntrinsicEmitter(irgen::IRBuilder &IRBuilder, llvm::DIBuilder &DIBuilder,
-                      AddrDbgInstrKind ForceDebugDeclare)
+                      AddrDbgInstrKind AddrDInstrKind)
       : InsertPt(), IRBuilder(IRBuilder), DIBuilder(DIBuilder),
-        ForceDbgDeclare(ForceDebugDeclare) {
+        ForceDbgDeclareOrCoro(AddrDInstrKind) {
     auto *ParentBB = IRBuilder.GetInsertBlock();
     auto InsertBefore = IRBuilder.GetInsertPoint();
 
@@ -3714,19 +3731,29 @@ struct DbgIntrinsicEmitter {
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::Instruction *InsertBefore) {
-    if (ForceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
-      return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, InsertBefore);
+    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgDeclare)
+      return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL,
+                                     InsertBefore->getIterator());
+
+    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgCoroFrameEntry)
+      return DIBuilder.insertCoroFrameEntry(Addr, VarInfo, Expr, DL,
+                                            InsertBefore->getIterator());
+
     Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
     return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL,
-                                            InsertBefore);
+                                             InsertBefore->getIterator());
   }
 
   llvm::DbgInstPtr insert(llvm::Value *Addr, llvm::DILocalVariable *VarInfo,
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::BasicBlock *Block) {
-    if (ForceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
+    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgDeclare)
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, Block);
+
+    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgCoroFrameEntry)
+      return DIBuilder.insertCoroFrameEntry(Addr, VarInfo, Expr, DL, Block);
+
     Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
     return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL, Block);
   }
@@ -3786,13 +3813,17 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   if (optimized && (!InCoroContext || !Var->isParameter()))
     AddrDInstKind = AddrDbgInstrKind::DbgValueDeref;
 
+  if (InCoroContext && AddrDInstKind != AddrDbgInstrKind::DbgValueDeref)
+    AddrDInstKind = AddrDbgInstrKind::DbgCoroFrameEntry;
+
   DbgIntrinsicEmitter inserter{Builder, DBuilder, AddrDInstKind};
 
   // If we have a single alloca...
   if (auto *Alloca = dyn_cast<llvm::AllocaInst>(Storage)) {
     auto InsertBefore = Builder.GetInsertPoint();
 
-    if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare) {
+    if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare ||
+        AddrDInstKind == AddrDbgInstrKind::DbgCoroFrameEntry) {
       ParentBlock = Alloca->getParent();
       InsertBefore = std::next(Alloca->getIterator());
     }
@@ -3819,7 +3850,8 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     // splitter that in split coroutines we always create debug info for values
     // in the coroutine context by creating a llvm.dbg.declare for the variable
     // in the entry block of each funclet.
-    if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare) {
+    if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare ||
+        AddrDInstKind == AddrDbgInstrKind::DbgCoroFrameEntry) {
       // Function arguments in async functions are emitted without a shadow copy
       // (that would interfere with coroutine splitting) but with a
       // llvm.dbg.declare to give CoroSplit.cpp license to emit a shadow copy
@@ -3862,19 +3894,23 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   }
 
   // Insert a dbg.value at the current insertion point.
-  if (isa<llvm::Argument>(Storage) && !Var->getArg() &&
-      ParentBlock->getFirstNonPHIOrDbg())
-    // SelectionDAGISel only generates debug info for a dbg.value
-    // that is associated with a llvm::Argument if either its !DIVariable
-    // is marked as argument or there is no non-debug intrinsic instruction
-    // before it. So In the case of associating a llvm::Argument with a
-    // non-argument debug variable -- usually via a !DIExpression -- we
-    // need to make sure that dbg.value is before any non-phi / no-dbg
-    // instruction.
-    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL,
-                                     ParentBlock->getFirstNonPHIOrDbg());
-  else
-    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, ParentBlock);
+  if (isa<llvm::Argument>(Storage) && !Var->getArg()) {
+    const auto InsertPt = ParentBlock->getFirstNonPHIOrDbg();
+    if (InsertPt != ParentBlock->end()) {
+      // SelectionDAGISel only generates debug info for a dbg.value
+      // that is associated with a llvm::Argument if either its !DIVariable
+      // is marked as argument or there is no non-debug intrinsic instruction
+      // before it. So In the case of associating a llvm::Argument with a
+      // non-argument debug variable -- usually via a !DIExpression -- we
+      // need to make sure that dbg.value is before any non-phi / no-dbg
+      // instruction.
+      DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, InsertPt);
+
+      return;
+    }
+  }
+
+  DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, ParentBlock->end());
 }
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(

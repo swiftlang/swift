@@ -192,11 +192,11 @@ bool ValueBase::isGuaranteedForwarding() const {
   }
   // If not a phi, return false
   auto *phi = dyn_cast<SILPhiArgument>(this);
-  if (!phi || !phi->isPhi()) {
-    return false;
+  if (phi && phi->isPhi()) {
+    return phi->isGuaranteedForwarding();
   }
 
-  return phi->isGuaranteedForwarding();
+  return isBorrowAccessorResult();
 }
 
 bool ValueBase::isBeginApplyToken() const {
@@ -204,6 +204,13 @@ bool ValueBase::isBeginApplyToken() const {
   if (!result)
     return false;
   return result->isBeginApplyToken();
+}
+
+bool ValueBase::isBorrowAccessorResult() const {
+  auto *apply = dyn_cast_or_null<ApplyInst>(getDefiningInstruction());
+  if (!apply)
+    return false;
+  return apply->hasGuaranteedResult() || apply->hasGuaranteedAddressResult();
 }
 
 bool ValueBase::hasDebugTrace() const {

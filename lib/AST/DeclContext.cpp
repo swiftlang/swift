@@ -214,8 +214,10 @@ AccessorDecl *DeclContext::getInnermostPropertyAccessorContext() {
         return nullptr;
 
       auto *storage = accessor->getStorage();
-      if (isa<VarDecl>(storage) && storage->getDeclContext()->isTypeContext())
+      if ((isa<VarDecl>(storage) || isa<SubscriptDecl>(storage)) &&
+          storage->getDeclContext()->isTypeContext()) {
         return accessor;
+      }
     }
   } while ((dc = dc->getParent()));
 
@@ -447,6 +449,16 @@ DeclContext *DeclContext::getModuleScopeContext() const {
 
 void DeclContext::getSeparatelyImportedOverlays(
     ModuleDecl *declaring, SmallVectorImpl<ModuleDecl *> &overlays) const {
+  if (declaring->isStdlibModule()) {
+    auto &ctx = getASTContext();
+    for (auto overlayName: ctx.StdlibOverlayNames) {
+      if (auto module = ctx.getLoadedModule(overlayName))
+        overlays.push_back(module);
+    }
+    overlays.push_back(declaring);
+    return;
+  }
+
   if (auto SF = getOutermostParentSourceFile())
     SF->getSeparatelyImportedOverlays(declaring, overlays);
 }
@@ -554,7 +566,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         return {FragileFunctionKind::Transparent};
       }
 
-      if (AFD->getAttrs().hasAttribute<InlinableAttr>()) {
+      if (AFD->hasAttributeWithInlinableSemantics()) {
         return {FragileFunctionKind::Inlinable};
       }
 
@@ -570,7 +582,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
       // @backDeployed, and @inlinable from their storage declarations.
       if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
         auto *storage = accessor->getStorage();
-        if (storage->getAttrs().getAttribute<InlinableAttr>()) {
+        if (storage->hasAttributeWithInlinableSemantics()) {
           return {FragileFunctionKind::Inlinable};
         }
         if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
@@ -1497,14 +1509,32 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
     auto clangDecl = sourceNTD->getDecl()->getClangDecl();
 
     if (isa_and_nonnull<clang::EnumDecl>(clangDecl)) {
-      // Consider:  class C { private: enum class E { M }; };
-      // If sourceDC is a C++ enum (e.g, E), then we are looking at one of its
-      // members (e.g., E.M). If this is the case, then we should consider
-      // the SWIFT_PRIVATE_FILEID of its enclosing class decl (e.g., C), if any.
-      // Doing so allows the nested private enum's members to inherit the access
-      // of the nested enum type itself.
-      clangDecl = dyn_cast<clang::CXXRecordDecl>(clangDecl->getDeclContext());
-      sourceDC = sourceNTD->getDeclContext();
+      // C/C++ enums are an odd case for access checking because they can only
+      // contain variants as members, and those variants cannot be assigned
+      // access specifiers. Instead, those variants should simply inherit the
+      // access of their parent enum, if any. For instance:
+      //
+      //   class Base { protected: enum class E { M }; };
+      //   class Derived : public Base {};
+      //
+      // In C++, E::M should be accessible within Base and Derived; we should
+      // follow suit in Swift.
+      //
+      // When we check the access of something like E.M, clangDecl will point to
+      // enum class E (the DeclContext of M), and if we've gotten this far, we
+      // can infer that E was accessible in useDC, so its members should be too.
+      //
+      // This is technically unsound (i.e., encapsulation-breaking), because it
+      // is possible to extend imported Clang enums private in Swift extensions.
+      // With this hack, those private members would be accessible everywhere
+      // even though they shouldn't. But right here, when we're checking the E
+      // of E.M, there's no way to tell whether the M is something we imported
+      // from Clang (which we should allow) versus something we defined in Swift
+      // (which we should disallow), without over-complicating the access check.
+      // To limit the encapsulate the breakage, we do an additional check to
+      // ensure we're checking an imported enum that is *nested* in a Clang
+      // record (which is the only way this enum can be imported as private).
+      return isa_and_nonnull<clang::CXXRecordDecl>(clangDecl->getDeclContext());
     }
 
     if (!isa_and_nonnull<clang::CXXRecordDecl>(clangDecl))

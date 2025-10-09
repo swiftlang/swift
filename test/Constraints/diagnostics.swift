@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 protocol P {
   associatedtype SomeType
@@ -1577,4 +1577,11 @@ func testAddMemberVsRemoveCall() {
   let a = Foo_74617()
   let b = Foo_74617()
   let c = (a + b).bar() // expected-error {{cannot call value of non-function type 'Float'}} {{22-24=}}
+}
+
+// Make sure we can still type-check the closure.
+do {
+  _ = {
+    let x: String = 0 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
+  }. // expected-error {{expected member name following '.'}}
 }

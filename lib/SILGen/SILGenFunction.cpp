@@ -192,6 +192,8 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
+    return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::IVarInitializer:
@@ -1929,11 +1931,6 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
 
   auto initTy = initFRef->getType().castTo<SILFunctionType>();
 
-  // If there are substitutions we need to emit partial apply to
-  // apply substitutions to the init accessor reference type.
-  initTy = initTy->substGenericArgs(SGM.M, substitutions,
-                                    getTypeExpansionContext());
-
   // Emit partial apply with self metatype argument to produce a substituted
   // init accessor reference.
   auto selfTy = selfValue.getType().getASTType();
@@ -1947,8 +1944,9 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
     selfMetatype = B.createMetatype(loc, getLoweredType(metatypeTy));
   }
 
-  auto expectedSelfTy = initAccessor->getDeclContext()->getSelfInterfaceType()
-      .subst(substitutions);
+  auto expectedSelfTy =
+      initAccessor->getDeclContext()->getSelfInterfaceType().subst(
+          substitutions);
 
   // This should only happen in the invalid case where we attempt to initialize
   // superclass storage from a subclass initializer. However, we shouldn't
@@ -1958,6 +1956,14 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
     selfMetatype = B.createUpcast(loc, selfMetatype,
                              getLoweredType(MetatypeType::get(expectedSelfTy)));
   }
+
+  if (auto invocationSig = initTy->getInvocationGenericSignature()) {
+    if (invocationSig->areAllParamsConcrete())
+      substitutions = SubstitutionMap();
+  } else {
+    substitutions = SubstitutionMap();
+  }
+
   PartialApplyInst *initPAI =
       B.createPartialApply(loc, initFRef, substitutions, selfMetatype,
                            ParameterConvention::Direct_Guaranteed,
@@ -2005,19 +2011,16 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
                        AssignOrInitInst::Unknown);
 }
 
-SILGenFunction::VarLoc::AddressableBuffer *
+SILGenFunction::AddressableBuffer *
 SILGenFunction::getAddressableBufferInfo(ValueDecl *vd) {
   do {
-    auto found = VarLocs.find(vd);
-    if (found == VarLocs.end()) {
-      return nullptr;
-    }
+    auto &found = AddressableBuffers[vd];
 
-    if (auto orig = found->second.addressableBuffer.stateOrAlias
+    if (auto orig = found.stateOrAlias
                       .dyn_cast<VarDecl*>()) {
       vd = orig;
       continue;
     }
-    return &found->second.addressableBuffer;
+    return &found;
   } while (true);
 }

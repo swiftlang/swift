@@ -67,17 +67,17 @@ public:
     /// Inherits isolation from the caller. This is only applicable
     /// to asynchronous function types.
     ///
-    /// NOTE: The difference in between NonIsolatedCaller and
-    /// NonIsolated is that NonIsolatedCaller is a strictly
+    /// NOTE: The difference in between NonIsolatedNonsending and
+    /// NonIsolated is that NonIsolatedNonsending is a strictly
     /// weaker form of nonisolation. While both in their bodies cannot
-    /// access isolated state directly, NonIsolatedCaller functions
+    /// access isolated state directly, NonIsolatedNonsending functions
     /// /are/ allowed to access state isolated to their caller via
     /// function arguments since we know that the callee will stay
     /// in the caller's isolation domain. In contrast, NonIsolated
     /// is strongly nonisolated and is not allowed to access /any/
     /// isolated state (even via function parameters) since it is
     /// considered safe to run on /any/ actor.
-    NonIsolatedCaller,
+    NonIsolatedNonsending,
   };
 
   static constexpr size_t NumBits = 3; // future-proof this slightly
@@ -103,7 +103,7 @@ public:
     return { Kind::Erased };
   }
   static FunctionTypeIsolation forNonIsolatedCaller() {
-    return { Kind::NonIsolatedCaller };
+    return { Kind::NonIsolatedNonsending };
   }
 
   Kind getKind() const { return value.getInt(); }
@@ -124,7 +124,7 @@ public:
     return getKind() == Kind::Erased;
   }
   bool isNonIsolatedCaller() const {
-    return getKind() == Kind::NonIsolatedCaller;
+    return getKind() == Kind::NonIsolatedNonsending;
   }
 
   /// Two function type isolations are equal if they have the same kind and
@@ -537,7 +537,8 @@ class ASTExtInfoBuilder {
     DifferentiabilityMaskOffset = 11,
     DifferentiabilityMask = 0x7 << DifferentiabilityMaskOffset,
     SendingResultMask = 1 << 14,
-    NumMaskBits = 15
+    InOutResultMask = 1 << 15,
+    NumMaskBits = 16
   };
 
   static_assert(FunctionTypeIsolation::Mask == 0x7, "update mask manually");
@@ -659,6 +660,8 @@ public:
     return FunctionTypeIsolation::fromOpaqueValues(getIsolationKind(),
                                                    globalActor);
   }
+
+  constexpr bool hasInOutResult() const { return bits & InOutResultMask; }
 
   constexpr bool hasSelfParam() const {
     switch (getSILRepresentation()) {
@@ -782,6 +785,11 @@ public:
         lifetimeDependencies);
   }
 
+  [[nodiscard]] ASTExtInfoBuilder withHasInOutResult() const {
+    return ASTExtInfoBuilder((bits | InOutResultMask), clangTypeInfo,
+                             globalActor, thrownError, lifetimeDependencies);
+  }
+
   void Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddInteger(bits);
     ID.AddPointer(clangTypeInfo.getType());
@@ -876,6 +884,8 @@ public:
   }
 
   FunctionTypeIsolation getIsolation() const { return builder.getIsolation(); }
+
+  constexpr bool hasInOutResult() const { return builder.hasInOutResult(); }
 
   /// Helper method for changing the representation.
   ///

@@ -387,7 +387,7 @@ Takes a list of rewrite rules as input, and outputs a list of critical pairs. Al
 \end{enumerate}
 \end{algorithm}
 
-We can now describe the main loop of the Knuth-Bendix completion procedure, which repeatedly finds and resolves critical pairs until no more non-trivial critical pairs remain. This process might not terminate, and we might find ourselves discovering new critical pairs and adding new rules to resolve them, forever. To prevent an infinite loop in the case of failure, we implement a termination check; if we think we've done too much work already, we give up on constructing a covergent rewriting system. We already mentioned the \textbf{left-simplified}, \textbf{right-simplified}, and \textbf{substitution-simplified} flags a few times; they are set by the rule simplification passes, with the first two described in \SecRef{rule reduction} and the third one in \SecRef{subst simplification}. These passes are invoked at appropriate times in the main loop below.
+We can now describe the main loop of the Knuth-Bendix completion procedure, which repeatedly finds and resolves critical pairs until no more non-trivial critical pairs remain. This process might not terminate, and we might find ourselves discovering new critical pairs and adding new rules to resolve them, forever. To prevent an infinite loop in the case of failure, we implement a termination check; if we think we've done too much work already, we give up on constructing a convergent rewriting system. We already mentioned the \textbf{left-simplified}, \textbf{right-simplified}, and \textbf{substitution-simplified} flags a few times; they are set by the rule simplification passes, with the first two described in \SecRef{rule reduction} and the third one in \SecRef{subst simplification}. These passes are invoked at appropriate times in the main loop below.
 
 \begin{algorithm}[Knuth-Bendix completion procedure]\label{knuthbendix} Takes a list of rewrite rules as input. Records new rewrite rules, as well as rewrite loops, and returns success or failure. On success, the rewrite rules define a convergent rewriting system. Failure indicates we got a non-orientable rewrite rule, or we triggered the termination check.
 \begin{enumerate}
@@ -1233,7 +1233,7 @@ This critical pair resolves \index{trivial critical pair}trivially, by way of th
 {\assocsym{S}{C}\cdot(\ProtoConfInv{\assocsym{S}{C}}{S})}
 \end{center}
 
-If the identity conformance rule had not been part of that initial set, this last critical pair would \emph{define} the identity conformance rule, and we would obtain the same rewrite system in the end. We don't need to explicitly add the identity conformance rule, after all. There is a practical consideration though. By making this rule part of the initial set, and cruicially, marking it \index{permanent rule}\textbf{permanent}, we remove it from consideration in the rewrite system minimization algorithm. This cuts out a lot of unnecessary work.
+If the identity conformance rule had not been part of that initial set, this last critical pair would \emph{define} the identity conformance rule, and we would obtain the same rewrite system in the end. We don't need to explicitly add the identity conformance rule, after all. There is a practical consideration though. By making this rule part of the initial set, and crucially, marking it \index{permanent rule}\textbf{permanent}, we remove it from consideration in the rewrite system minimization algorithm. This cuts out a lot of unnecessary work.
 
 \smallskip
 
@@ -1523,7 +1523,7 @@ The generic signature $G_\tQ$ has all the derived requirements of $G_\texttt{N}$
 \end{tabular}
 \end{center}
 
-\ListingRef{rewrite system q} shows the convegent rewrite system for \tQ, which imports rules from protocol~\texttt{N}. Completion discovers the following critical pairs; we will be content to just summarize because they are similar to previous examples:
+\ListingRef{rewrite system q} shows the convergent rewrite system for \tQ, which imports rules from protocol~\texttt{N}. Completion discovers the following critical pairs; we will be content to just summarize because they are similar to previous examples:
 \begin{itemize}
 \item Rule (6) overlaps with (7) on $\pQ\cdot\pQ\cdot\nA$. We define rule (\CRule{10}) (this general principle was established in \ExRef{proto assoc rule}).
 \item Rule (8) overlaps with (2) on $\pQ\cdot\protosym{N}\cdot\nA$. We define rule (\CRule{11}) (\ExRef{protocol inheritance completion example}).

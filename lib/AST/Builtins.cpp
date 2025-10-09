@@ -49,23 +49,61 @@ bool BuiltinInfo::isReadNone() const {
   return strchr(BuiltinExtraInfo[(unsigned)ID].Attributes, 'n') != nullptr;
 }
 
-const llvm::AttributeList &
-IntrinsicInfo::getOrCreateAttributes(ASTContext &Ctx) const {
-  using DenseMapInfo = llvm::DenseMapInfo<llvm::AttributeList>;
-  if (DenseMapInfo::isEqual(Attrs, DenseMapInfo::getEmptyKey())) {
-    Attrs = llvm::Intrinsic::getAttributes(Ctx.getIntrinsicScratchContext(), ID);
+const llvm::AttributeSet &
+IntrinsicInfo::getOrCreateFnAttributes(ASTContext &Ctx) const {
+  using DenseMapInfo = llvm::DenseMapInfo<llvm::AttributeSet>;
+  if (DenseMapInfo::isEqual(FnAttrs, DenseMapInfo::getEmptyKey())) {
+    FnAttrs =
+        llvm::Intrinsic::getFnAttributes(Ctx.getIntrinsicScratchContext(), ID);
   }
-  return Attrs;
+  return FnAttrs;
 }
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
-  if (Name == "FixedArray") {
-    return BuiltinUnboundGenericType::get(TypeKind::BuiltinFixedArray, Context);
+  // We first map to a kind using a StringSwitch so that we can perform an
+  // exhaustive switch making it easier to know to update this code.
+  auto kind =
+      llvm::StringSwitch<std::optional<BuiltinTypeKind>>(Name)
+          .Case("FixedArray", BuiltinTypeKind::BuiltinFixedArray)
+          .StartsWith("Vec", BuiltinTypeKind::BuiltinVector)
+          .Case("RawPointer", BuiltinTypeKind::BuiltinRawPointer)
+          .Case("RawUnsafeContinuation",
+                BuiltinTypeKind::BuiltinRawUnsafeContinuation)
+          .Case("Job", BuiltinTypeKind::BuiltinJob)
+          .Case("DefaultActorStorage",
+                BuiltinTypeKind::BuiltinDefaultActorStorage)
+          .Case("NonDefaultDistributedActorStorage",
+                BuiltinTypeKind::BuiltinNonDefaultDistributedActorStorage)
+          .Case("Executor", BuiltinTypeKind::BuiltinExecutor)
+          .Case("NativeObject", BuiltinTypeKind::BuiltinNativeObject)
+          .Case("BridgeObject", BuiltinTypeKind::BuiltinBridgeObject)
+          .Case("UnsafeValueBuffer", BuiltinTypeKind::BuiltinUnsafeValueBuffer)
+          .Case("PackIndex", BuiltinTypeKind::BuiltinPackIndex)
+          .StartsWith("FP", BuiltinTypeKind::BuiltinFloat)
+          .Case("Word", BuiltinTypeKind::BuiltinInteger)
+          .Case("IntLiteral", BuiltinTypeKind::BuiltinIntegerLiteral)
+          .StartsWith("Int", BuiltinTypeKind::BuiltinInteger)
+          .Default({});
+
+  // Handle types that are not BuiltinTypeKinds.
+  if (!kind) {
+    if (Name == "SILToken")
+      return Context.TheSILTokenType;
+
+    // AnyObject is the empty class-constrained existential.
+    if (Name == "AnyObject")
+      return CanType(ProtocolCompositionType::theAnyObjectType(Context));
+
+    return Type();
   }
 
-  // Vectors are VecNxT, where "N" is the number of elements and
-  // T is the element type.
-  if (Name.starts_with("Vec")) {
+  switch (*kind) {
+  case BuiltinTypeKind::BuiltinFixedArray:
+    return BuiltinUnboundGenericType::get(TypeKind::BuiltinFixedArray, Context);
+
+  case BuiltinTypeKind::BuiltinVector: {
+    // Vectors are VecNxT, where "N" is the number of elements and
+    // T is the element type.
     Name = Name.substr(3);
     StringRef::size_type xPos = Name.find('x');
     if (xPos == StringRef::npos)
@@ -82,67 +120,62 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
 
     return BuiltinVectorType::get(Context, elementType, numElements);
   }
-
-  if (Name == "RawPointer")
+  case BuiltinTypeKind::BuiltinRawPointer:
     return Context.TheRawPointerType;
-  if (Name == "RawUnsafeContinuation")
+  case BuiltinTypeKind::BuiltinRawUnsafeContinuation:
     return Context.TheRawUnsafeContinuationType;
-  if (Name == "Job")
+  case BuiltinTypeKind::BuiltinJob:
     return Context.TheJobType;
-  if (Name == "DefaultActorStorage")
+  case BuiltinTypeKind::BuiltinDefaultActorStorage:
     return Context.TheDefaultActorStorageType;
-  if (Name == "NonDefaultDistributedActorStorage")
+  case BuiltinTypeKind::BuiltinNonDefaultDistributedActorStorage:
     return Context.TheNonDefaultDistributedActorStorageType;
-  if (Name == "Executor")
+  case BuiltinTypeKind::BuiltinExecutor:
     return Context.TheExecutorType;
-  if (Name == "NativeObject")
+  case BuiltinTypeKind::BuiltinNativeObject:
     return Context.TheNativeObjectType;
-  if (Name == "BridgeObject")
+  case BuiltinTypeKind::BuiltinBridgeObject:
     return Context.TheBridgeObjectType;
-  if (Name == "SILToken")
-    return Context.TheSILTokenType;
-  if (Name == "UnsafeValueBuffer")
+  case BuiltinTypeKind::BuiltinUnsafeValueBuffer:
     return Context.TheUnsafeValueBufferType;
-  if (Name == "PackIndex")
+  case BuiltinTypeKind::BuiltinPackIndex:
     return Context.ThePackIndexType;
-  
-  if (Name == "FPIEEE32")
-    return Context.TheIEEE32Type;
-  if (Name == "FPIEEE64")
-    return Context.TheIEEE64Type;
+  case BuiltinTypeKind::BuiltinFloat:
+    // Target specific FP types.
+    if (Name == "FPIEEE32")
+      return Context.TheIEEE32Type;
+    if (Name == "FPIEEE64")
+      return Context.TheIEEE64Type;
+    if (Name == "FPIEEE16")
+      return Context.TheIEEE16Type;
+    if (Name == "FPIEEE80")
+      return Context.TheIEEE80Type;
+    if (Name == "FPIEEE128")
+      return Context.TheIEEE128Type;
+    if (Name == "FPPPC128")
+      return Context.ThePPC128Type;
+    return Type();
+  case BuiltinTypeKind::BuiltinInteger:
+    if (Name == "Word")
+      return BuiltinIntegerType::getWordType(Context);
 
-  if (Name == "Word")
-    return BuiltinIntegerType::getWordType(Context);
+    if (Name == "Int") {
+      return BuiltinUnboundGenericType::get(TypeKind::BuiltinInteger, Context);
+    }
 
-  if (Name == "IntLiteral")
+    // Handle 'int8' and friends.
+    if (Name.substr(0, 3) == "Int") {
+      unsigned BitWidth;
+      if (!Name.substr(3).getAsInteger(10, BitWidth) && BitWidth <= 2048 &&
+          BitWidth != 0) // Cap to prevent unsound things.
+        return BuiltinIntegerType::get(BitWidth, Context);
+    }
+    return Type();
+  case BuiltinTypeKind::BuiltinIntegerLiteral:
     return Context.TheIntegerLiteralType;
-
-  if (Name == "Int") {
-    return BuiltinUnboundGenericType::get(TypeKind::BuiltinInteger, Context);
+  case BuiltinTypeKind::BuiltinUnboundGeneric:
+    return Type();
   }
-  
-  // Handle 'int8' and friends.
-  if (Name.substr(0, 3) == "Int") {
-    unsigned BitWidth;
-    if (!Name.substr(3).getAsInteger(10, BitWidth) &&
-        BitWidth <= 2048 && BitWidth != 0)  // Cap to prevent unsound things.
-      return BuiltinIntegerType::get(BitWidth, Context);
-  }
-  
-  // Target specific FP types.
-  if (Name == "FPIEEE16")
-    return Context.TheIEEE16Type;
-  if (Name == "FPIEEE80")
-    return Context.TheIEEE80Type;
-  if (Name == "FPIEEE128")
-    return Context.TheIEEE128Type;
-  if (Name == "FPPPC128")
-    return Context.ThePPC128Type;
-
-  // AnyObject is the empty class-constrained existential.
-  if (Name == "AnyObject")
-    return CanType(
-      ProtocolCompositionType::theAnyObjectType(Context));
 
   return Type();
 }
@@ -890,16 +923,14 @@ static ValueDecl *getRefCountingOperation(ASTContext &ctx, Identifier id) {
 static ValueDecl *getLoadOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted,
-                                      _conformsTo(_typeparam(0), _copyable),
-                                      _conformsTo(_typeparam(0), _escapable)),
+                                      _conformsTo(_typeparam(0), _copyable)),
                             _parameters(_rawPointer),
                             _typeparam(0));
 }
 
 static ValueDecl *getTakeOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
-                            _generics(_unrestricted,
-                                      _conformsTo(_typeparam(0), _escapable)),
+                            _generics(_unrestricted),
                             _parameters(_rawPointer),
                             _typeparam(0));
 }
@@ -2395,18 +2426,6 @@ bool swift::canBuiltinBeOverloadedForType(BuiltinValueKind ID, Type Ty) {
   return isBuiltinTypeOverloaded(Ty, OverloadedBuiltinKinds[unsigned(ID)]);
 }
 
-/// Table of string intrinsic names indexed by enum value.
-static const char *const IntrinsicNameTable[] = {
-    "not_intrinsic",
-#define GET_INTRINSIC_NAME_TABLE
-#include "llvm/IR/IntrinsicImpl.inc"
-#undef GET_INTRINSIC_NAME_TABLE
-};
-
-#define GET_INTRINSIC_TARGET_DATA
-#include "llvm/IR/IntrinsicImpl.inc"
-#undef GET_INTRINSIC_TARGET_DATA
-
 llvm::Intrinsic::ID swift::getLLVMIntrinsicID(StringRef InName) {
   using namespace llvm;
 
@@ -2422,10 +2441,8 @@ llvm::Intrinsic::ID swift::getLLVMIntrinsicID(StringRef InName) {
     NameS.push_back(C == '_' ? '.' : C);
 
   const char *Name = NameS.c_str();
-  ArrayRef<const char *> NameTable(&IntrinsicNameTable[1],
-                                   TargetInfos[1].Offset);
-  int Idx = Intrinsic::lookupLLVMIntrinsicByName(NameTable, Name);
-  return static_cast<Intrinsic::ID>(Idx + 1);
+
+  return Intrinsic::lookupIntrinsicID(Name);
 }
 
 llvm::Intrinsic::ID
@@ -2511,7 +2528,6 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Metadata:
   case IITDescriptor::ExtendArgument:
   case IITDescriptor::TruncArgument:
-  case IITDescriptor::HalfVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
   case IITDescriptor::VecOfAnyPtrsToElt:
@@ -2520,6 +2536,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Subdivide4Argument:
   case IITDescriptor::PPCQuad:
   case IITDescriptor::AArch64Svcount:
+  case IITDescriptor::OneNthEltsVecArgument:
     // These types cannot be expressed in swift yet.
     return Type();
 
@@ -2617,8 +2634,8 @@ getSwiftFunctionTypeForIntrinsic(llvm::Intrinsic::ID ID,
   // Translate LLVM function attributes to Swift function attributes.
   IntrinsicInfo II;
   II.ID = ID;
-  auto attrs = II.getOrCreateAttributes(Context);
-  if (attrs.hasFnAttr(llvm::Attribute::NoReturn)) {
+  auto &attrs = II.getOrCreateFnAttributes(Context);
+  if (attrs.hasAttribute(llvm::Attribute::NoReturn)) {
     ResultTy = Context.getNeverType();
     if (!ResultTy)
       return false;

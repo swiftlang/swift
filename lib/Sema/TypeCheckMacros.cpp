@@ -52,6 +52,8 @@
 #include "swift/Subsystems.h"
 #include "llvm/Config/config.h"
 
+#define DEBUG_TYPE "macros"
+
 using namespace swift;
 
 /// Translate an argument provided as a string literal into an identifier,
@@ -1060,10 +1062,13 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
   if (auto parentSourceFile = dc->getParentSourceFile())
     macroSourceFile->setImports(parentSourceFile->getImports());
-  else if (auto clangModuleUnit =
-               dyn_cast<ClangModuleUnit>(dc->getModuleScopeContext())) {
-    auto clangModule = clangModuleUnit->getParentModule();
-    performImportResolutionForClangMacroBuffer(*macroSourceFile, clangModule);
+  else if (isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
+    ModuleDecl *originModule = nullptr;
+    // FIXME: remove this workaround once namespace contents are imported into
+    // their corresponding modules
+    if (macroSourceFile->getParentModule()->isClangHeaderImportModule())
+      originModule = cast<Decl *>(target)->getModuleContextForNameLookup();
+    performImportResolutionForClangMacroBuffer(*macroSourceFile, originModule);
   }
   return macroSourceFile;
 }
@@ -1201,6 +1206,11 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
 
     PrettyStackTraceFreestandingMacroExpansion debugStack(
         "expanding freestanding macro", expansion);
+    LLVM_DEBUG(
+      llvm::dbgs() << "\nexpanding macro:\n";
+      macro->print(llvm::dbgs(), PrintOptions::printEverything());
+      llvm::dbgs() << "\n";
+    );
 
     // Builtin macros are handled via ASTGen.
     auto *astGenSourceFile = sourceFile->getExportedSourceFile();
@@ -1210,7 +1220,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     BridgedStringRef evaluatedSourceOut{nullptr, 0};
     assert(!externalDef.isError());
     swift_Macros_expandFreestandingMacro(
-        &ctx.Diags, externalDef.get(), discriminator->c_str(),
+        ctx, externalDef.get(), discriminator->c_str(),
         getRawMacroRole(macroRole), astGenSourceFile,
         expansion->getSourceRange().Start.getOpaquePointerValue(),
         &evaluatedSourceOut);
@@ -1527,6 +1537,18 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     auto *astGenAttrSourceFile = attrSourceFile->getExportedSourceFile();
     if (!astGenAttrSourceFile)
       return nullptr;
+    LLVM_DEBUG(
+      StreamPrinter P(llvm::dbgs());
+      llvm::dbgs() << "\nexpanding macro:\n";
+      attr->print(P, PrintOptions::printEverything(), attachedTo);
+      llvm::dbgs() << "\nattached to:\n";
+      attachedTo->print(P, PrintOptions::printEverything());
+      if (parentDecl) {
+        llvm::dbgs() << "\nwith parent:\n";
+        parentDecl->print(P, PrintOptions::printEverything());
+      }
+      llvm::dbgs() << "\n";
+    );
 
     auto *astGenDeclSourceFile = declSourceFile->getExportedSourceFile();
     if (!astGenDeclSourceFile)
@@ -1555,7 +1577,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     BridgedStringRef evaluatedSourceOut{nullptr, 0};
     assert(!externalDef.isError());
     swift_Macros_expandAttachedMacro(
-        &ctx.Diags, externalDef.get(), discriminator->c_str(),
+        ctx, externalDef.get(), discriminator->c_str(),
         extendedType.c_str(), conformanceList.c_str(), getRawMacroRole(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, startLoc.getOpaquePointerValue(),
@@ -1677,6 +1699,14 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro,
 #if SWIFT_BUILD_SWIFT_SYNTAX
     PrettyStackTraceExpr debugStack(
       ctx, "expanding attached macro", attachedTo);
+    LLVM_DEBUG(
+      StreamPrinter P(llvm::dbgs());
+      llvm::dbgs() << "\nexpanding macro:\n";
+      attr->print(P, PrintOptions::printEverything(), nullptr);
+      llvm::dbgs() << "\nattached to:\n";
+      attachedTo->print(P, PrintOptions::printEverything());
+      llvm::dbgs() << "\n";
+    );
 
     auto *astGenAttrSourceFile = attrSourceFile->getExportedSourceFile();
     if (!astGenAttrSourceFile)
@@ -1690,7 +1720,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro,
     BridgedStringRef evaluatedSourceOut{nullptr, 0};
     assert(!externalDef.isError());
     swift_Macros_expandAttachedMacro(
-        &ctx.Diags, externalDef.get(), discriminator->c_str(),
+        ctx, externalDef.get(), discriminator->c_str(),
         "", "", getRawMacroRole(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenClosureSourceFile, startLoc.getOpaquePointerValue(),

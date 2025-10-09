@@ -3,11 +3,10 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -target %target-swift-5.1-abi-triple
 
 // RUN: %target-swift-frontend -I %t  -target %target-swift-5.1-abi-triple -strict-concurrency=complete -enable-upcoming-feature IsolatedDefaultValues -parse-as-library -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -I %t  -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature IsolatedDefaultValues -enable-upcoming-feature RegionBasedIsolation %s
+// RUN: %target-swift-frontend -I %t  -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature IsolatedDefaultValues %s
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_IsolatedDefaultValues
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 // This tests errors emitted in definite initialization; this test file cannot
 // have any type checker errors. Type checker errors for IsolatedDefaultValues

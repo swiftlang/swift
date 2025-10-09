@@ -71,7 +71,7 @@ extension Value {
       }
       switch v {
       case let fw as ForwardingInstruction:
-        worklist.pushIfNotVisited(contentsOf: fw.definedOperands.lazy.map { $0.value })
+        worklist.pushIfNotVisited(contentsOf: fw.definedOperands.values)
       case let bf as BorrowedFromInst:
         worklist.pushIfNotVisited(bf.borrowedValue)
       case let bb as BeginBorrowInst:
@@ -82,7 +82,7 @@ extension Value {
         } else if let termResult = TerminatorResult(arg),
                let fw = termResult.terminator as? ForwardingInstruction
         {
-          worklist.pushIfNotVisited(contentsOf: fw.definedOperands.lazy.map { $0.value })
+          worklist.pushIfNotVisited(contentsOf: fw.definedOperands.values)
         }
       default:
         continue
@@ -125,20 +125,32 @@ extension Value {
     return true
   }
 
+  /// Project out a sub-field of this value according to `path`.
+  /// If this is an "owned" value the result is an "owned" value which forwards the original value.
+  /// This only works if _all_ non-trivial fields are projected. Otherwise some non-trivial results of
+  /// `destructure_struct` or `destructure_tuple` will be leaked.
   func createProjection(path: SmallProjectionPath, builder: Builder) -> Value {
     let (kind, index, subPath) = path.pop()
+    let result: Value
     switch kind {
     case .root:
       return self
     case .structField:
-      let structExtract = builder.createStructExtract(struct: self, fieldIndex: index)
-      return structExtract.createProjection(path: subPath, builder: builder)
+      if ownership == .owned {
+        result = builder.createDestructureStruct(struct: self).results[index]
+      } else {
+        result = builder.createStructExtract(struct: self, fieldIndex: index)
+      }
     case .tupleField:
-      let tupleExtract = builder.createTupleExtract(tuple: self, elementIndex: index)
-      return tupleExtract.createProjection(path: subPath, builder: builder)
+      if ownership == .owned {
+        result = builder.createDestructureTuple(tuple: self).results[index]
+      } else {
+        result = builder.createTupleExtract(tuple: self, elementIndex: index)
+      }
     default:
       fatalError("path is not materializable")
     }
+    return result.createProjection(path: subPath, builder: builder)
   }
 
   func createAddressProjection(path: SmallProjectionPath, builder: Builder) -> Value {
@@ -247,6 +259,18 @@ extension Builder {
     } else {
       let builder = Builder(after: inst, location: location, context)
       insertFunc(builder)
+    }
+  }
+
+  static func insertCleanupAtFunctionExits(
+    of function: Function,
+    _ context: some MutatingContext,
+    insert: (Builder) -> ()
+  ) {
+    for exitBlock in function.blocks where exitBlock.terminator.isFunctionExiting {
+      let terminator = exitBlock.terminator
+      let builder = Builder(before: terminator, location: terminator.location.asCleanup, context)
+      insert(builder)
     }
   }
 
@@ -484,6 +508,22 @@ extension Instruction {
     }
     return false
   }
+  
+  /// Returns true if `otherInst` is in the same block and is strictly dominated by this instruction or
+  /// the parent block of the instruction dominates parent block of `otherInst`.
+  func dominates(
+    _ otherInst: Instruction,
+    _ domTree: DominatorTree
+  ) -> Bool {
+    if parentBlock == otherInst.parentBlock {
+      return dominatesInSameBlock(otherInst)
+    } else {
+      return parentBlock.dominates(
+        otherInst.parentBlock,
+        domTree
+      )
+    }
+  }
 
   /// If this instruction uses a (single) existential archetype, i.e. it has a type-dependent operand,
   /// returns the concrete type if it is known.
@@ -583,36 +623,22 @@ extension StoreInst {
 extension LoadInst {
   @discardableResult
   func trySplit(_ context: FunctionPassContext) -> Bool {
-    var elements = [Value]()
-    let builder = Builder(before: self, context)
     if type.isStruct {
-      if (type.nominal as! StructDecl).hasUnreferenceableStorage {
+      guard !(type.nominal as! StructDecl).hasUnreferenceableStorage,
+            let fields = type.getNominalFields(in: parentFunction) else {
         return false
       }
-      guard let fields = type.getNominalFields(in: parentFunction) else {
-        return false
-      }
-      for idx in 0..<fields.count {
-        let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
-        let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
-        elements.append(splitLoad)
-      }
-      let newStruct = builder.createStruct(type: self.type, elements: elements)
-      self.replace(with: newStruct, context)
+      
+      _ = splitStruct(fields: fields, context)
+      
       return true
     } else if type.isTuple {
-      var elements = [Value]()
-      let builder = Builder(before: self, context)
-      for idx in 0..<type.tupleElements.count {
-        let fieldAddr = builder.createTupleElementAddr(tupleAddress: address, elementIndex: idx)
-        let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
-        elements.append(splitLoad)
-      }
-      let newTuple = builder.createTuple(type: self.type, elements: elements)
-      self.replace(with: newTuple, context)
+      _ = splitTuple(context)
+      
       return true
+    } else {
+      return false
     }
-    return false
   }
 
   private func splitOwnership(for fieldValue: Value) -> LoadOwnership {
@@ -622,6 +648,70 @@ extension LoadInst {
     case .copy, .take:
       return fieldValue.type.isTrivial(in: parentFunction) ? .trivial : self.loadOwnership
     }
+  }
+  
+  func trySplit(
+    alongPath projectionPath: SmallProjectionPath,
+    _ context: FunctionPassContext
+  ) -> [LoadInst]? {
+    if projectionPath.isEmpty {
+      return nil
+    }
+    
+    let (fieldKind, index, pathRemainder) = projectionPath.pop()
+    
+    var elements: [LoadInst]
+    
+    switch fieldKind {
+    case .structField where type.isStruct:
+      guard !(type.nominal as! StructDecl).hasUnreferenceableStorage,
+            let fields = type.getNominalFields(in: parentFunction) else {
+        return nil
+      }
+      
+      elements = splitStruct(fields: fields, context)
+    case .tupleField where type.isTuple:
+      elements = splitTuple(context)
+    default:
+      return nil
+    }
+    
+    if let recursiveSplitLoad = elements[index].trySplit(alongPath: pathRemainder, context) {
+      elements.remove(at: index)
+      elements += recursiveSplitLoad
+    }
+    
+    return elements
+  }
+  
+  private func splitStruct(fields: NominalFieldsArray, _ context: FunctionPassContext) -> [LoadInst] {
+    var elements = [LoadInst]()
+    let builder = Builder(before: self, context)
+    
+    for idx in 0..<fields.count {
+      let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
+      let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
+      elements.append(splitLoad)
+    }
+    let newStruct = builder.createStruct(type: self.type, elements: elements)
+    self.replace(with: newStruct, context)
+    
+    return elements
+  }
+  
+  private func splitTuple(_ context: FunctionPassContext) -> [LoadInst] {
+    var elements = [LoadInst]()
+    let builder = Builder(before: self, context)
+    
+    for idx in 0..<type.tupleElements.count {
+      let fieldAddr = builder.createTupleElementAddr(tupleAddress: address, elementIndex: idx)
+      let splitLoad = builder.createLoad(fromAddress: fieldAddr, ownership: self.splitOwnership(for: fieldAddr))
+      elements.append(splitLoad)
+    }
+    let newTuple = builder.createTuple(type: self.type, elements: elements)
+    self.replace(with: newTuple, context)
+    
+    return elements
   }
 }
 
@@ -1011,4 +1101,35 @@ func eraseIfDead(functions: [Function], _ context: ModulePassContext) {
     }
     toDelete = remaining
   }
+}
+
+func isInLoop(block startBlock: BasicBlock, _ context: FunctionPassContext) -> Bool {
+  var worklist = BasicBlockWorklist(context)
+  defer { worklist.deinitialize() }
+
+  worklist.pushIfNotVisited(contentsOf: startBlock.successors)
+  while let block = worklist.pop() {
+    if block == startBlock {
+      return true
+    }
+    worklist.pushIfNotVisited(contentsOf: block.successors)
+  }
+  return false
+}
+
+func cloneFunction(from originalFunction: Function, toEmpty targetFunction: Function, _ context: FunctionPassContext) {
+  var cloner = Cloner(cloneToEmptyFunction: targetFunction, context)
+  defer { cloner.deinitialize() }
+  cloner.cloneFunctionBody(from: originalFunction)
+}
+
+func cloneAndSpecializeFunction(from originalFunction: Function,
+                                toEmpty targetFunction: Function,
+                                substitutions: SubstitutionMap,
+                                _ context: FunctionPassContext
+) {
+  var cloner = TypeSubstitutionCloner(fromFunction: originalFunction, toEmptyFunction: targetFunction,
+                                      substitutions: substitutions, context)
+  defer { cloner.deinitialize() }
+  cloner.cloneFunctionBody()
 }

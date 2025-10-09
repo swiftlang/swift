@@ -309,10 +309,13 @@ static bool isViableElement(ASTNode element,
       // Skip if we're doing completion for a SingleValueStmtExpr, and have a
       // brace that doesn't involve a single expression, and doesn't have a
       // code completion token, as it won't contribute to the type of the
-      // SingleValueStmtExpr.
+      // SingleValueStmtExpr. We also need to skip if the body has a ReturnStmt,
+      // which isn't something that's currently allowed, but is necessary to
+      // correctly infer the contextual type without leaving it unbound.
       if (isForSingleValueStmtCompletion &&
           !SingleValueStmtExpr::hasResult(braceStmt) &&
-          !cs.containsIDEInspectionTarget(braceStmt)) {
+          !cs.containsIDEInspectionTarget(braceStmt) &&
+          !braceStmt->hasExplicitReturnStmt(cs.getASTContext())) {
         return false;
       }
     }
@@ -738,23 +741,6 @@ private:
                   LocatorPathElt::ContextualType(context.purpose)});
     cs.addConstraint(ConstraintKind::Equal, context.getType(), patternType,
                      loc);
-
-    // For any pattern variable that has a parent variable (i.e., another
-    // pattern variable with the same name in the same case), require that
-    // the types be equivalent.
-    pattern->forEachNode([&](Pattern *pattern) {
-      auto namedPattern = dyn_cast<NamedPattern>(pattern);
-      if (!namedPattern)
-        return;
-
-      auto var = namedPattern->getDecl();
-      if (auto parentVar = var->getParentVarDecl()) {
-        cs.addConstraint(
-            ConstraintKind::Equal, cs.getType(parentVar), cs.getType(var),
-            cs.getConstraintLocator(
-                locator, LocatorPathElt::PatternMatch(namedPattern)));
-      }
-    });
   }
 
   void visitPatternBinding(PatternBindingDecl *patternBinding,
@@ -844,12 +830,6 @@ private:
     auto contextualPattern =
         ContextualPattern::forPatternBindingDecl(patternBinding, index);
     Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-
-    // Fail early if pattern couldn't be type-checked.
-    if (!patternType || patternType->hasError()) {
-      hadError = true;
-      return;
-    }
 
     auto target = getTargetForPattern(patternBinding, index, patternType);
     if (!target) {
@@ -1312,8 +1292,12 @@ private:
 
     // First check to make sure the ThenStmt is in a valid position.
     SmallVector<ThenStmt *, 4> validThenStmts;
-    if (auto SVE = context.getAsSingleValueStmtExpr())
+    if (auto SVE = context.getAsSingleValueStmtExpr()) {
       (void)SVE.get()->getThenStmts(validThenStmts);
+      if (SVE.get()->getStmtKind() == SingleValueStmtExpr::Kind::For) {
+        contextInfo = std::nullopt;
+      }
+    }
 
     if (!llvm::is_contained(validThenStmts, thenStmt)) {
       auto *thenLoc = cs.getConstraintLocator(thenStmt);
@@ -1401,7 +1385,7 @@ private:
       pattern->forEachVariable([&](VarDecl *var) { recordVar(var); });
     }
 
-    for (auto bodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+    for (auto bodyVar : caseStmt->getCaseBodyVariables()) {
       if (!bodyVar->hasName())
         continue;
 
@@ -1508,8 +1492,37 @@ bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
   auto &ctx = getASTContext();
 
   auto *loc = getConstraintLocator(E);
-  Type resultTy = createTypeVariable(loc, /*options*/ 0);
-  setType(E, resultTy);
+  Type resultType = createTypeVariable(loc, /*options*/ 0);
+  setType(E, resultType);
+
+  if (E->getStmtKind() == SingleValueStmtExpr::Kind::For) {
+    auto *rrcProtocol =
+        ctx.getProtocol(KnownProtocolKind::RangeReplaceableCollection);
+    auto *sequenceProtocol = ctx.getProtocol(KnownProtocolKind::Sequence);
+
+    addConstraint(ConstraintKind::ConformsTo, resultType,
+                  rrcProtocol->getDeclaredInterfaceType(), loc);
+    Type elementTypeVar = createTypeVariable(loc, /*options*/ 0);
+    Type elementType = DependentMemberType::get(
+        resultType, sequenceProtocol->getAssociatedType(ctx.Id_Element));
+
+    addConstraint(ConstraintKind::Bind, elementTypeVar, elementType, loc);
+    addConstraint(ConstraintKind::Defaultable, resultType,
+                  ArraySliceType::get(elementTypeVar), loc);
+
+    auto *binding = E->getForExpressionPreamble()->ForAccumulatorBinding;
+
+    auto *initializer = binding->getInit(0);
+    auto target = SyntacticElementTarget::forInitialization(initializer, Type(),
+                                                            binding, 0, false);
+    setTargetFor({binding, 0}, target);
+
+    if (generateConstraints(target)) {
+      return true;
+    }
+
+    addConstraint(ConstraintKind::Bind, getType(initializer), resultType, loc);
+  }
 
   // Propagate the implied result kind from the if/switch expression itself
   // into the branches.
@@ -1533,21 +1546,24 @@ bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
     auto *loc = getConstraintLocator(
         E, {LocatorPathElt::SingleValueStmtResult(idx), ctpElt});
 
-    ContextualTypeInfo info(resultTy, CTP_SingleValueStmtBranch, loc);
+    ContextualTypeInfo info(resultType, CTP_SingleValueStmtBranch, loc);
     setContextualInfo(result, info);
   }
 
   TypeJoinExpr *join = nullptr;
-  if (branches.empty()) {
-    // If we only have statement branches, the expression is typed as Void. This
-    // should only be the case for 'if' and 'switch' statements that must be
-    // expressions that have branches that all end in a throw, and we'll warn
-    // that we've inferred Void.
-    addConstraint(ConstraintKind::Bind, resultTy, ctx.getVoidType(), loc);
-  } else {
-    // Otherwise, we join the result types for each of the branches.
-    join = TypeJoinExpr::forBranchesOfSingleValueStmtExpr(
-        ctx, resultTy, E, AllocationArena::ConstraintSolver);
+
+  if (E->getStmtKind() != SingleValueStmtExpr::Kind::For) {
+    if (branches.empty()) {
+      // If we only have statement branches, the expression is typed as Void.
+      // This should only be the case for 'if' and 'switch' statements that must
+      // be expressions that have branches that all end in a throw, and we'll
+      // warn that we've inferred Void.
+      addConstraint(ConstraintKind::Bind, resultType, ctx.getVoidType(), loc);
+    } else {
+      // Otherwise, we join the result types for each of the branches.
+      join = TypeJoinExpr::forBranchesOfSingleValueStmtExpr(
+          ctx, resultType, E, AllocationArena::ConstraintSolver);
+    }
   }
 
   // If this is an implied return in a closure, we need to account for the fact
@@ -1588,11 +1604,11 @@ bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
       if (auto *closureTy = getClosureTypeIfAvailable(CE)) {
         auto closureResultTy = closureTy->getResult();
         auto *bindToClosure = Constraint::create(
-            *this, ConstraintKind::Bind, resultTy, closureResultTy, loc);
+            *this, ConstraintKind::Bind, resultType, closureResultTy, loc);
         bindToClosure->setFavored();
 
-        auto *bindToVoid = Constraint::create(*this, ConstraintKind::Bind,
-                                              resultTy, ctx.getVoidType(), loc);
+        auto *bindToVoid = Constraint::create(
+            *this, ConstraintKind::Bind, resultType, ctx.getVoidType(), loc);
 
         addDisjunctionConstraint({bindToClosure, bindToVoid}, loc);
       }
@@ -2028,9 +2044,9 @@ private:
       }
     }
 
-    bindSwitchCasePatternVars(context.getAsDeclContext(), caseStmt);
+    diagnoseCaseVarMutabilityMismatch(context.getAsDeclContext(), caseStmt);
 
-    for (auto *expected : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+    for (auto *expected : caseStmt->getCaseBodyVariables()) {
       assert(expected->hasName());
       auto prev = expected->getParentVarDecl();
       auto type = solution.getResolvedType(prev)->mapTypeOutOfContext();
@@ -2241,7 +2257,9 @@ private:
     // not the branch result type. This is necessary as there may be
     // an additional conversion required for the branch.
     auto target = solution.getTargetFor(thenStmt->getResult());
-    target->setExprConversionType(ty);
+    if (SVE.get()->getStmtKind() != SingleValueStmtExpr::Kind::For) {
+      target->setExprConversionType(ty);
+    }
 
     auto *resultExpr = thenStmt->getResult();
     if (auto newResultTarget = rewriter.rewriteTarget(*target))
@@ -2682,6 +2700,18 @@ bool ConstraintSystem::applySolutionToSingleValueStmt(
   auto *stmt = application.apply();
   if (!stmt || application.hadError)
     return true;
+
+  if (SVE->getStmtKind() == SingleValueStmtExpr::Kind::For) {
+    auto *binding = SVE->getForExpressionPreamble()->ForAccumulatorBinding;
+    auto target = getTargetFor({binding, 0}).value();
+
+    auto newTarget = rewriter.rewriteTarget(target);
+    if (!newTarget) {
+      return true;
+    }
+
+    binding->setInit(0, newTarget->getAsExpr());
+  }
 
   SVE->setStmt(stmt);
   return false;

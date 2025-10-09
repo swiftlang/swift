@@ -233,19 +233,19 @@ public:
     // Check that the analysis can handle this function.
     verifyFunction(f);
 
-    auto &it = storage.FindAndConstruct(f);
-    if (!it.second)
-      it.second = newFunctionAnalysis(f);
-    return it.second.get();
+    auto &value = storage[f];
+    if (!value)
+      value = newFunctionAnalysis(f);
+    return value.get();
   }
 
   virtual void forcePrecompute(SILFunction *f) override {
     // Check that the analysis can handle this function.
     verifyFunction(f);
 
-    auto &it = storage.FindAndConstruct(f);
-    if (!it.second)
-      it.second = newFunctionAnalysis(f);
+    auto &value = storage[f];
+    if (!value)
+      value = newFunctionAnalysis(f);
   }
 
   /// Invalidate all information in this analysis.

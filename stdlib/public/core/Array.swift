@@ -1509,6 +1509,7 @@ extension Array {
 }
 
 extension Array {
+#if !$Embedded
   /// Implementation preserved (for ABI reasons) for:
   /// Array(unsafeUninitializedCapacity:initializingWith:)
   /// and ContiguousArray(unsafeUninitializedCapacity:initializingWith:)
@@ -1525,6 +1526,7 @@ extension Array {
       initializingWithTypedThrowsInitializer: initializer
     )
   }
+#endif
 
   /// Implementation for:
   /// Array(unsafeUninitializedCapacity:initializingWith:)
@@ -1601,9 +1603,9 @@ extension Array {
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
-  @_disfavoredOverload
-  func withUnsafeBufferPointer<R>(
+  internal func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     return try unsafe _buffer.withUnsafeBufferPointer(body)

@@ -1,0 +1,13 @@
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// REQUIRES: asserts, no_asan
+
+// https://github.com/swiftlang/swift/issues/47685
+
+func slow() {
+  let a = 0
+
+  let diff = abs(a - a) + abs(a + a)
+%for i in range(0, N):
+             + abs(a - a) + abs(a + a)
+%end
+}

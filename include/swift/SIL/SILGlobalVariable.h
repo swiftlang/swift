@@ -51,7 +51,11 @@ private:
 
   /// The SIL module that the global variable belongs to.
   SILModule &Module;
-  
+
+  /// The module that defines this global variable. This member should only be
+  /// when a global variable is deserialized to be emitted into another module.
+  ModuleDecl *ParentModule = nullptr;
+
   /// The mangled name of the variable, which will be propagated to the
   /// binary.  A pointer into the module's lookup table.
   StringRef Name;
@@ -74,6 +78,10 @@ private:
   /// Whether this is a 'let' property, which can only be initialized
   /// once (either in its declaration, or once later), making it immutable.
   unsigned IsLet : 1;
+
+  /// Whether this declaration was marked `@_used`, meaning that it should be
+  /// added to the llvm.used list.
+  unsigned IsUsed : 1;
 
   /// Whether or not this is a declaration.
   unsigned IsDeclaration : 1;
@@ -116,6 +124,15 @@ public:
 
   SILModule &getModule() const { return Module; }
 
+  /// Returns the module that defines this function.
+  ModuleDecl *getParentModule() const;
+
+  /// Sets \c ParentModule as fallback if \c DeclCtxt is not available to
+  /// provide the parent module.
+  void setParentModule(ModuleDecl *module) {
+    ParentModule = module;
+  }
+
   SILType getLoweredType() const { return LoweredType; }
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType.castTo<SILFunctionType>();
@@ -146,6 +163,10 @@ public:
   /// Returns true if the linkage of the SILFunction indicates that the global
   /// might be referenced from outside the current compilation unit.
   bool isPossiblyUsedExternally() const;
+
+  /// True if this variable should have a non-unique definition based on the
+  /// embedded linkage model.
+  bool hasNonUniqueDefinition() const;
 
   /// Returns true if this global variable should be preserved so it can
   /// potentially be inspected by the debugger.
@@ -207,10 +228,9 @@ public:
   }
 
   /// Returns true if this global variable has `@_used` attribute.
-  bool markedAsUsed() const {
-    auto *V = getDecl();
-    return V && V->getAttrs().hasAttribute<UsedAttr>();
-  }
+  bool markedAsUsed() const { return IsUsed; }
+
+  void setMarkedAsUsed(bool used) { IsUsed = used; }
 
   /// Returns a SectionAttr if this global variable has `@_section` attribute.
   SectionAttr *getSectionAttr() const {

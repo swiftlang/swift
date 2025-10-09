@@ -784,6 +784,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.AllowNonResilientAccess = 0;
   Bits.ModuleDecl.SerializePackageEnabled = 0;
   Bits.ModuleDecl.StrictMemorySafety = 0;
+  Bits.ModuleDecl.DeferredCodeGen = 0;
 
   // Populate the module's files.
   SmallVector<FileUnit *, 2> files;
@@ -820,6 +821,16 @@ ImplicitImportList ModuleDecl::getImplicitImports() const {
   auto *mutableThis = const_cast<ModuleDecl *>(this);
   return evaluateOrDefault(evaluator, ModuleImplicitImportsRequest{mutableThis},
                            {});
+}
+
+const AccessNotesFile *ModuleDecl::getAccessNotes() const {
+  // Only the main module has access notes.
+  if (!isMainModule())
+    return nullptr;
+
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator, LoadAccessNotesRequest{&ctx},
+                           nullptr);
 }
 
 SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
@@ -1031,6 +1042,20 @@ void ModuleDecl::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
   FORWARD(lookupImportedSPIGroups, (importedModule, spiGroups));
+}
+
+bool ModuleDecl::isModuleImportedPreconcurrency(
+    const ModuleDecl *importedModule) const {
+  for (const FileUnit *file : getFiles()) {
+    if (file->isModuleImportedPreconcurrency(importedModule))
+      return true;
+
+    if (auto *synth = file->getSynthesizedFile()) {
+      if (synth->isModuleImportedPreconcurrency(importedModule))
+        return true;
+    }
+  }
+  return false;
 }
 
 void ModuleDecl::lookupAvailabilityDomains(
@@ -2373,28 +2398,41 @@ void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
   if (auto *clangModule = getUnderlyingModuleIfOverlay())
     worklist.push_back(clangModule);
 
+  auto addOverlay = [&](Identifier overlay) {
+    // We don't present non-underscored overlays as part of the underlying
+    // module, so ignore them.
+    if (!overlay.hasUnderscoredNaming())
+      return;
+
+    ModuleDecl *overlayMod =
+        getASTContext().getModuleByIdentifier(overlay);
+    if (!overlayMod && overlayMod != this)
+      return;
+
+    if (seen.insert(overlayMod).second) {
+      overlayModules.push_back(overlayMod);
+      worklist.push_back(overlayMod);
+      if (auto *clangModule = overlayMod->getUnderlyingModuleIfOverlay())
+        worklist.push_back(clangModule);
+    }
+  };
+
   while (!worklist.empty()) {
     ModuleDecl *current = worklist.back();
     worklist.pop_back();
+
+    if (current->isStdlibModule()) {
+      for (auto overlay : getASTContext().StdlibOverlayNames) {
+        addOverlay(overlay);
+      }
+    }
+
     for (auto &pair: current->declaredCrossImports) {
       Identifier &bystander = std::get<0>(pair);
       for (auto *file: std::get<1>(pair)) {
         auto overlays = file->getOverlayModuleNames(current, unused, bystander);
         for (Identifier overlay: overlays) {
-          // We don't present non-underscored overlays as part of the underlying
-          // module, so ignore them.
-          if (!overlay.hasUnderscoredNaming())
-            continue;
-          ModuleDecl *overlayMod =
-              getASTContext().getModuleByName(overlay.str());
-          if (!overlayMod)
-            continue;
-          if (seen.insert(overlayMod).second) {
-            overlayModules.push_back(overlayMod);
-            worklist.push_back(overlayMod);
-            if (auto *clangModule = overlayMod->getUnderlyingModuleIfOverlay())
-              worklist.push_back(clangModule);
-          }
+          addOverlay(overlay);
         }
       }
     }
@@ -2430,6 +2468,12 @@ ModuleDecl::getDeclaringModuleAndBystander() {
 
   if (!hasUnderscoredNaming())
     return *(declaringModuleAndBystander = {nullptr, Identifier()});
+
+  // If this is one of the stdlib overlays, indicate as much.
+  auto &ctx = getASTContext();
+  if (llvm::is_contained(ctx.StdlibOverlayNames, getRealName()))
+    return *(declaringModuleAndBystander = { ctx.getStdlibModule(),
+                                             Identifier() });
 
   // Search the transitive set of imported @_exported modules to see if any have
   // this module as their overlay.
@@ -2510,7 +2554,8 @@ bool ModuleDecl::getRequiredBystandersIfCrossImportOverlay(
   auto *clangModule = declaring->getUnderlyingModuleIfOverlay();
   auto current = std::make_pair(this, Identifier());
   while ((current = current.first->getDeclaringModuleAndBystander()).first) {
-    bystanderNames.push_back(current.second);
+    if (!current.second.empty())
+      bystanderNames.push_back(current.second);
     if (current.first == declaring || current.first == clangModule)
       return true;
   }
@@ -2664,6 +2709,11 @@ void
 SourceFile::setImports(ArrayRef<AttributedImport<ImportedModule>> imports) {
   assert(!Imports && "Already computed imports");
   Imports = getASTContext().AllocateCopy(imports);
+  if (getASTContext().LangOpts.DumpSourceFileImports) {
+    llvm::errs() << "imports for " << getFilename() << ":\n";
+    for (auto Import : imports)
+      llvm::errs() << "\t" << Import.module.importedModule->getName() << "\n";
+  }
 }
 
 std::optional<AttributedImport<ImportedModule>>
@@ -2878,6 +2928,7 @@ bool SourceFile::hasTestableOrPrivateImport(
       });
 }
 
+// FIXME: This should probably be requestified.
 RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *module) const {
   auto &imports = getASTContext().getImportCache();
   RestrictedImportKind importKind = RestrictedImportKind::MissingImport;
@@ -2965,7 +3016,9 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
   // they are recommended over indirect imports.
   if ((!restrictiveImport.has_value() ||
        restrictiveImport->accessLevel < AccessLevel::Public) &&
-     imports.isImportedBy(targetModule, getParentModule()))
+      !(restrictiveImport &&
+        restrictiveImport->module.importedModule->isClangHeaderImportModule()) &&
+      imports.isImportedBy(targetModule, getParentModule()))
     return std::nullopt;
 
   return restrictiveImport;
@@ -3036,6 +3089,20 @@ void SourceFile::lookupImportedSPIGroups(
       spiGroups.insert(import.spiGroups.begin(), import.spiGroups.end());
     }
   }
+}
+
+bool SourceFile::isModuleImportedPreconcurrency(
+    const ModuleDecl *importedModule) const {
+  auto &imports = getASTContext().getImportCache();
+  for (auto &import : *Imports) {
+    if (import.options.contains(ImportFlags::Preconcurrency) &&
+        (importedModule == import.module.importedModule ||
+         imports.isImportedByViaSwiftOnly(importedModule,
+                                          import.module.importedModule))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool shouldImplicitImportAsSPI(ArrayRef<Identifier> spiGroups) {

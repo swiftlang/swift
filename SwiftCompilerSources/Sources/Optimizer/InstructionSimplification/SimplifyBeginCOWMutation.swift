@@ -65,8 +65,8 @@ private extension BeginCOWMutationInst {
       return
     }
     let builder = Builder(before: self, location: location, context)
-    let zero = builder.createIntegerLiteral(0, type: uniquenessResult.type);
-    uniquenessResult.uses.replaceAll(with: zero, context)
+    let falseLiteral = builder.createBoolLiteral(false)
+    uniquenessResult.uses.replaceAll(with: falseLiteral, context)
   }
 
   func optimizeEmptyBeginEndPair(_ context: SimplifyContext) -> Bool {

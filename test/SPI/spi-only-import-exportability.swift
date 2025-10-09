@@ -13,9 +13,9 @@
 // RUN:   -swift-version 5 -enable-library-evolution -I %t
 
 /// Test the client.
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t -verify \
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t -verify -verify-ignore-unrelated \
 // RUN:   -experimental-spi-only-imports
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t -verify \
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t -verify -verify-ignore-unrelated \
 // RUN:   -experimental-spi-only-imports \
 // RUN:   -enable-library-evolution
 

@@ -216,35 +216,29 @@ public:
 /// A TypeRepr for a type with a syntax error.  Can be used both as a
 /// top-level TypeRepr and as a part of other TypeRepr.
 ///
-/// The client can either emit a detailed diagnostic at the construction time
-/// (in the parser) or store a zero-arg diagnostic in this TypeRepr to be
-/// emitted after parsing, during type resolution.
-///
 /// All uses of this type should be ignored and not re-diagnosed.
 class ErrorTypeRepr : public TypeRepr {
   SourceRange Range;
-  std::optional<ZeroArgDiagnostic> DelayedDiag;
 
-  ErrorTypeRepr(SourceRange Range, std::optional<ZeroArgDiagnostic> Diag)
-      : TypeRepr(TypeReprKind::Error), Range(Range), DelayedDiag(Diag) {}
+  /// The original expression that failed to be resolved as a TypeRepr. Like
+  /// ErrorExpr's original expr, this exists to ensure that semantic
+  /// functionality can still work correctly, and is used to ensure we don't
+  /// drop nodes from the AST.
+  Expr *OriginalExpr;
+
+  ErrorTypeRepr(SourceRange Range, Expr *OriginalExpr)
+      : TypeRepr(TypeReprKind::Error), Range(Range),
+        OriginalExpr(OriginalExpr) {}
 
 public:
-  static ErrorTypeRepr *
-  create(ASTContext &Context, SourceRange Range,
-         std::optional<ZeroArgDiagnostic> DelayedDiag = std::nullopt) {
-    assert((!DelayedDiag || Range) && "diagnostic needs a location");
-    return new (Context) ErrorTypeRepr(Range, DelayedDiag);
+  static ErrorTypeRepr *create(ASTContext &Context, SourceRange Range,
+                               Expr *OriginalExpr = nullptr) {
+    return new (Context) ErrorTypeRepr(Range, OriginalExpr);
   }
 
-  static ErrorTypeRepr *
-  create(ASTContext &Context, SourceLoc Loc = SourceLoc(),
-         std::optional<ZeroArgDiagnostic> DelayedDiag = std::nullopt) {
-    return create(Context, SourceRange(Loc), DelayedDiag);
-  }
-
-  /// If there is a delayed diagnostic stored in this TypeRepr, consumes and
-  /// emits that diagnostic.
-  void dischargeDiagnostic(ASTContext &Context);
+  /// Retrieve the original expression that failed to be resolved as a TypeRepr.
+  Expr *getOriginalExpr() const { return OriginalExpr; }
+  void setOriginalExpr(Expr *newExpr) { OriginalExpr = newExpr; }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Error;
@@ -272,9 +266,7 @@ class AttributedTypeRepr final
       : TypeRepr(TypeReprKind::Attributed), Ty(Ty) {
     assert(!attrs.empty());
     Bits.AttributedTypeRepr.NumAttributes = attrs.size();
-    std::uninitialized_copy(attrs.begin(), attrs.end(),
-                            getTrailingObjects<TypeOrCustomAttr>());
-
+    std::uninitialized_copy(attrs.begin(), attrs.end(), getTrailingObjects());
   }
 
   friend TrailingObjects;
@@ -285,8 +277,7 @@ public:
                                     TypeRepr *ty);
 
   ArrayRef<TypeOrCustomAttr> getAttrs() const {
-    return llvm::ArrayRef(getTrailingObjects<TypeOrCustomAttr>(),
-                          Bits.AttributedTypeRepr.NumAttributes);
+    return getTrailingObjects(Bits.AttributedTypeRepr.NumAttributes);
   }
 
   TypeAttribute *get(TypeAttrKind kind) const;
@@ -876,12 +867,10 @@ public:
   SourceRange getBracesRange() const { return BraceLocs; }
 
   MutableArrayRef<TypeRepr*> getMutableElements() {
-    return llvm::MutableArrayRef(getTrailingObjects<TypeRepr *>(),
-                                 Bits.PackTypeRepr.NumElements);
+    return getTrailingObjects(Bits.PackTypeRepr.NumElements);
   }
   ArrayRef<TypeRepr*> getElements() const {
-    return llvm::ArrayRef(getTrailingObjects<TypeRepr *>(),
-                          Bits.PackTypeRepr.NumElements);
+    return getTrailingObjects(Bits.PackTypeRepr.NumElements);
   }
 
   static bool classof(const TypeRepr *T) {
@@ -964,8 +953,8 @@ public:
   }
 
   ArrayRef<TupleTypeReprElement> getElements() const {
-    return { getTrailingObjects<TupleTypeReprElement>(),
-             static_cast<size_t>(Bits.TupleTypeRepr.NumElements) };
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.TupleTypeRepr.NumElements));
   }
 
   void getElementTypes(SmallVectorImpl<TypeRepr *> &Types) const {
@@ -1046,13 +1035,13 @@ class CompositionTypeRepr final : public TypeRepr,
       : TypeRepr(TypeReprKind::Composition), FirstTypeLoc(FirstTypeLoc),
         CompositionRange(CompositionRange) {
     Bits.CompositionTypeRepr.NumTypes = Types.size();
-    std::uninitialized_copy(Types.begin(), Types.end(),
-                            getTrailingObjects<TypeRepr*>());
+    std::uninitialized_copy(Types.begin(), Types.end(), getTrailingObjects());
   }
 
 public:
   ArrayRef<TypeRepr *> getTypes() const {
-    return {getTrailingObjects<TypeRepr*>(), static_cast<size_t>(Bits.CompositionTypeRepr.NumTypes)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.CompositionTypeRepr.NumTypes));
   }
   SourceLoc getSourceLoc() const { return FirstTypeLoc; }
   SourceRange getCompositionRange() const { return CompositionRange; }

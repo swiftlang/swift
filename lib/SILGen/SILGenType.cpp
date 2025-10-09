@@ -863,8 +863,13 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // setting on the theory that forcing inlining off should only
   // effect the user's function, not otherwise invisible thunks.
   Inline_t InlineStrategy = InlineDefault;
-  if (witnessRef.isAlwaysInline())
-    InlineStrategy = AlwaysInline;
+  if (witnessRef.isUnderscoredAlwaysInline())
+    InlineStrategy = HeuristicAlwaysInline;
+  // We don't guarantee @inline(always) will inline devirtualized thunks. But we
+  // want to make an best-effort attempt to inline.
+  else if (witnessRef.isAlwaysInline())
+    InlineStrategy = HeuristicAlwaysInline;
+
 
   SILFunction *f = M.lookUpFunction(nameBuffer);
   if (allowDuplicateThunk && f)
@@ -1171,6 +1176,8 @@ originalAccessorKindForReplacementKind(AccessorKind kind) {
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Init:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
     return std::nullopt;
   }
 }
@@ -1537,6 +1544,8 @@ public:
     auto initInfo = vd->getPropertyWrapperInitializerInfo();
     if (initInfo.hasInitFromWrappedValue() && !vd->isStatic()) {
       SGM.emitPropertyWrapperBackingInitializer(vd);
+      // Output this unconditionally, SIL optimizer will remove it if not needed
+      SGM.emitPropertyWrappedFieldInitAccessor(vd);
     }
 
     visitAbstractStorageDecl(vd);

@@ -12,10 +12,10 @@ struct MyStruct<T> {
 func test1() {
   let _ = MyStruct #^METATYPE_UNRESOLVED^#
 // METATYPE_UNRESOLVED: Begin completions, 4 items
-// METATYPE_UNRESOLVED-DAG: Decl[Subscript]/CurrNominal:        [{#(x): Int#}, {#static: _#}][#MyStruct<_>#];
-// METATYPE_UNRESOLVED-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ()[#MyStruct<_>#];
-// METATYPE_UNRESOLVED-DAG: Keyword[self]/CurrNominal:          .self[#MyStruct<_>.Type#];
-// METATYPE_UNRESOLVED-DAG: Keyword/CurrNominal:                .Type[#MyStruct<_>.Type#];
+// METATYPE_UNRESOLVED-DAG: Decl[Subscript]/CurrNominal:        [{#(x): Int#}, {#static: T#}][#MyStruct<T>#];
+// METATYPE_UNRESOLVED-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ()[#MyStruct<T>#];
+// METATYPE_UNRESOLVED-DAG: Keyword[self]/CurrNominal:          .self[#MyStruct<T>.Type#];
+// METATYPE_UNRESOLVED-DAG: Keyword/CurrNominal:                .Type[#MyStruct<T>.Type#];
 
   let _ = MyStruct[#^METATYPE_UNRESOLVED_BRACKET^#
 // METATYPE_UNRESOLVED_BRACKET-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]:        ['[']{#(x): Int#}, {#static: T#}[']'][#MyStruct<T>#];
@@ -110,7 +110,7 @@ func testSubscriptCallSig<T>(val: MyStruct1<T>) {
   val[#^LABELED_SUBSCRIPT^#
 // LABELED_SUBSCRIPT: Begin completions, 2 items
 // LABELED_SUBSCRIPT-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]:        ['[']{#idx1: Int#}, {#idx2: Comparable#}[']'][#Int!#];
-// LABELED_SUBSCRIPT-DAG: Pattern/CurrNominal/Flair[ArgLabels]:                ['[']{#keyPath: KeyPath<MyStruct1<T>, Value>#}[']'][#Value#];
+// LABELED_SUBSCRIPT-DAG: Pattern/CurrNominal/Flair[ArgLabels]:                ['[']{#keyPath: KeyPath<MyStruct1<Comparable>, Value>#}[']'][#Value#];
 }
 
 func testSubcscriptTuple(val: (x: Int, String)) {

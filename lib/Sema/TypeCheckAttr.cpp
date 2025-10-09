@@ -18,12 +18,15 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
+#include "TypeCheckEmbedded.h"
 #include "TypeCheckMacros.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -132,6 +135,12 @@ public:
     }
 
     if (!getActorIsolation(nominal).isMainActor() && destructor->hasBody()) {
+      // In module emission jobs, type checking the body of the destructor may
+      // be skipped which means availability in the body cannot be diagnosed
+      // accurately.
+      if (destructor->isBodySkipped())
+        return;
+
       TypeChecker::checkAvailability(
           destructor->getBodySourceRange(), C.getIsolatedDeinitAvailability(),
           D->getDeclContext(),
@@ -153,6 +162,7 @@ public:
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(AlwaysEmitIntoClient)
+  IGNORED_ATTR(NeverEmitIntoClient)
   IGNORED_ATTR(HasInitialValue)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
@@ -162,7 +172,6 @@ public:
   IGNORED_ATTR(HasStorage)
   IGNORED_ATTR(HasMissingDesignatedInitializers)
   IGNORED_ATTR(InheritsConvenienceInitializers)
-  IGNORED_ATTR(Inline)
   IGNORED_ATTR(ObjCBridged)
   IGNORED_ATTR(ObjCNonLazyRealization)
   IGNORED_ATTR(ObjCRuntimeName)
@@ -396,6 +405,7 @@ public:
   void visitFixedLayoutAttr(FixedLayoutAttr *attr);
   void visitUsableFromInlineAttr(UsableFromInlineAttr *attr);
   void visitInlinableAttr(InlinableAttr *attr);
+  void visitInlineAttr(InlineAttr *attr);
   void visitOptimizeAttr(OptimizeAttr *attr);
   void visitExclusivityAttr(ExclusivityAttr *attr);
 
@@ -466,12 +476,14 @@ public:
   void visitUnsafeNonEscapableResultAttr(UnsafeNonEscapableResultAttr *attr);
 
   void visitStaticExclusiveOnlyAttr(StaticExclusiveOnlyAttr *attr);
+  void visitManualOwnershipAttr(ManualOwnershipAttr *attr);
   void visitWeakLinkedAttr(WeakLinkedAttr *attr);
   void visitSILGenNameAttr(SILGenNameAttr *attr);
   void visitLifetimeAttr(LifetimeAttr *attr);
   void visitAddressableSelfAttr(AddressableSelfAttr *attr);
   void visitAddressableForDependenciesAttr(AddressableForDependenciesAttr *attr);
   void visitUnsafeAttr(UnsafeAttr *attr);
+  void visitUnsafeSelfDependentResultAttr(UnsafeSelfDependentResultAttr *attr);
 };
 
 } // end anonymous namespace
@@ -484,6 +496,11 @@ void AttributeChecker::visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr) {
         diag::experimental_moveonly_feature_can_only_be_used_when_enabled;
     diagnoseAndRemoveAttr(attr, error);
     return;
+  }
+
+  // Don't allow it to be combined with ManualOwnership.
+  if (D->getASTContext().LangOpts.hasFeature(Feature::ManualOwnership)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_manual_ownership_noimplicitcopy);
   }
 
   if (auto *funcDecl = dyn_cast<FuncDecl>(D)) {
@@ -562,6 +579,9 @@ void AttributeChecker::visitSensitiveAttr(SensitiveAttr *attr) {
 }
 
 void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
+  if (attr->isImplicit())
+    return;
+
   DeclContext *dc = D->getDeclContext();
   // Protocol declarations cannot be transparent.
   if (isa<ProtocolDecl>(dc))
@@ -2171,7 +2191,9 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
                             diag::dynamic_member_lookup_candidate_inaccessible,
                             inaccessibleCandidate);
       fixItAccess(diag, inaccessibleCandidate,
-                  requiredAccessScope.requiredAccessForDiagnostics());
+                  requiredAccessScope.requiredAccessForDiagnostics(),
+                  /*isForSetter=*/false, /*useDefaultAccess=*/false,
+                  /*updateAttr=*/false);
       diag.warnUntilSwiftVersionIf(!shouldError, futureVersion);
 
       if (shouldError) {
@@ -2436,12 +2458,12 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
              attr, "func");
   }
 
-  // Reject using both @cdecl and @objc on the same decl.
+  // Reject using both @c and @objc on the same decl.
   if (D->getAttrs().getAttribute<ObjCAttr>()) {
     diagnose(attr->getLocation(), diag::cdecl_incompatible_with_objc, D);
   }
 
-  // @cdecl needs to be enabled via a feature flag.
+  // @c needs to be enabled via a feature flag.
   if (!attr->Underscored &&
       !Ctx.LangOpts.hasFeature(Feature::CDecl)) {
     diagnose(attr->getLocation(), diag::cdecl_feature_required);
@@ -2456,6 +2478,14 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
       diagnose(attr->getLocation(), diag::expose_wasm_not_at_top_level_func);
     break;
   }
+  case ExposureKind::NotCxx:
+    for (const auto *attr : D->getAttrs().getAttributes<ExposeAttr>())
+      if (attr->getExposureKind() == ExposureKind::Cxx)
+        diagnose(attr->getLocation(), diag::expose_only_non_other_attr,
+                 "@_expose(Cxx)");
+    if (!attr->Name.empty())
+      diagnose(attr->getLocation(), diag::expose_redundant_name_provided);
+    break;
   case ExposureKind::Cxx: {
     auto *VD = cast<ValueDecl>(D);
     // Expose cannot be mixed with '@_cdecl' declarations.
@@ -3665,6 +3695,55 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
       diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline,
                             VD);
     return;
+  }
+}
+
+void AttributeChecker::visitInlineAttr(InlineAttr *attr) {
+  if (attr->getKind() == InlineKind::Always &&
+      !Ctx.LangOpts.hasFeature(Feature::InlineAlways)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_inline_always_experimental);
+    return;
+  }
+
+  if (attr->getKind() != InlineKind::Always)
+    return;
+
+  // Can't have @inline(always) on @usableFromInline.
+  auto *VD = cast<ValueDecl>(D);
+  if (VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_inline_always_no_usable_from_inline);
+    return;
+  }
+  // Check that @inline(always) is only used on statically dispatched methods
+  // (final, static, and methods in extensions mostly).
+  bool isAccessorDecl = false;
+  if (auto *accessorDecl = dyn_cast<AccessorDecl>(D)) {
+    VD = accessorDecl->getStorage();
+    isAccessorDecl = true;
+  }
+
+  auto dc = dyn_cast<ClassDecl>(VD->getDeclContext());
+  if (!dc)
+   return;
+  // In a `class` context.
+
+  if (dc->isActor())
+    return;
+
+  if (auto *vd = dyn_cast<VarDecl>(VD)) {
+    if (vd->isFinal())
+      return;
+    if (isAccessorDecl) {
+      diagnoseAndRemoveAttr(attr, diag::attr_inline_always_on_accessor);
+    } else {
+      diagnoseAndRemoveAttr(attr, diag::attr_inline_always_requires_final_method,
+                            vd->getName(), true/*isVar*/);
+    }
+  } else if (auto *afd = dyn_cast<AbstractFunctionDecl>(VD)) {
+    if (afd->isFinal())
+      return;
+    diagnoseAndRemoveAttr(attr, diag::attr_inline_always_requires_final_method,
+                              afd->getName(), false/*isVar*/);
   }
 }
 
@@ -5449,13 +5528,28 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   }
 
   ClassDecl *underlyingClass = underlyingType->getClassOrBoundGenericClass();
-  if (underlyingClass && underlyingClass->isIncompatibleWithWeakReferences()) {
-    Diags
-        .diagnose(attr->getLocation(),
-                  diag::invalid_ownership_incompatible_class, underlyingType,
-                  ownershipKind)
-        .fixItRemove(attr->getRange());
-    attr->setInvalid();
+  if (underlyingClass) {
+    if (underlyingClass->isIncompatibleWithWeakReferences()) {
+      Diags
+          .diagnose(attr->getLocation(),
+                    diag::invalid_ownership_incompatible_class, underlyingType,
+                    ownershipKind)
+          .fixItRemove(attr->getRange());
+      attr->setInvalid();
+    }
+    // Foreign reference types cannot be held as weak references, since the
+    // Swift runtime has no way to make the pointer null when the object is
+    // deallocated.
+    // Unowned references to foreign reference types are supported.
+    if (ownershipKind == ReferenceOwnership::Weak &&
+        underlyingClass->isForeignReferenceType()) {
+      Diags
+          .diagnose(attr->getLocation(),
+                    diag::invalid_ownership_incompatible_foreign_reference_type,
+                    underlyingType)
+          .fixItRemove(attr->getRange());
+      attr->setInvalid();
+    }
   }
 
   auto PDC = dyn_cast<ProtocolDecl>(dc);
@@ -5470,12 +5564,14 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   }
 
   // Embedded Swift prohibits weak/unowned but allows unowned(unsafe).
-  if (ctx.LangOpts.hasFeature(Feature::Embedded)) {
+  if (auto behavior = shouldDiagnoseEmbeddedLimitations(
+          dc, attr->getLocation(),
+          /*wasAlwaysEmbeddedError=*/true)) {
     if (ownershipKind == ReferenceOwnership::Weak ||
         ownershipKind == ReferenceOwnership::Unowned) {
       Diags.diagnose(attr->getLocation(), diag::weak_unowned_in_embedded_swift,
-               ownershipKind);
-      attr->setInvalid();
+               ownershipKind)
+        .limitBehavior(*behavior);
     }
   }
 
@@ -5963,6 +6059,10 @@ static DescriptiveDeclKind getAccessorDescriptiveDeclKind(AccessorKind kind) {
     return DescriptiveDeclKind::MutableAddressor;
   case AccessorKind::Init:
     return DescriptiveDeclKind::InitAccessor;
+  case AccessorKind::Borrow:
+    return DescriptiveDeclKind::BorrowAccessor;
+  case AccessorKind::Mutate:
+    return DescriptiveDeclKind::MutateAccessor;
   }
 }
 
@@ -6620,21 +6720,21 @@ typecheckDifferentiableAttrforDecl(AbstractFunctionDecl *original,
     // Dynamic `Self` is supported only as a single top-level result for class
     // members. JVP/VJP functions returning `(Self, ...)` tuples would not
     // type-check.
-    bool diagnoseDynamicSelfResult = original->hasDynamicSelfResult();
-    if (diagnoseDynamicSelfResult) {
-      // Diagnose class initializers in non-final classes.
-      if (isa<ConstructorDecl>(original)) {
-        if (!classDecl->isSemanticallyFinal()) {
-          diags.diagnose(
-              attr->getLocation(),
-              diag::differentiable_attr_nonfinal_class_init_unsupported,
-              classDecl->getDeclaredInterfaceType());
-          attr->setInvalid();
-          return nullptr;
-        }
+    // Diagnose class initializers in non-final classes.
+    if (isa<ConstructorDecl>(original)) {
+      if (!classDecl->isSemanticallyFinal()) {
+        diags.diagnose(
+            attr->getLocation(),
+            diag::differentiable_attr_nonfinal_class_init_unsupported,
+            classDecl->getDeclaredInterfaceType());
+        attr->setInvalid();
+        return nullptr;
       }
+    }
+
+    if (auto *funcDecl = dyn_cast<FuncDecl>(original)) {
       // Diagnose all other declarations returning dynamic `Self`.
-      else {
+      if (funcDecl->getResultInterfaceType()->hasDynamicSelfType()) {
         diags.diagnose(
             attr->getLocation(),
             diag::
@@ -7014,19 +7114,19 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     // Dynamic `Self` is supported only as a single top-level result for class
     // members. JVP/VJP functions returning `(Self, ...)` tuples would not
     // type-check.
-    bool diagnoseDynamicSelfResult = originalAFD->hasDynamicSelfResult();
-    if (diagnoseDynamicSelfResult) {
+    if (isa<ConstructorDecl>(originalAFD)) {
       // Diagnose class initializers in non-final classes.
-      if (isa<ConstructorDecl>(originalAFD)) {
-        if (!classDecl->isSemanticallyFinal()) {
-          diags.diagnose(attr->getLocation(),
-                         diag::derivative_attr_nonfinal_class_init_unsupported,
-                         classDecl->getDeclaredInterfaceType());
-          return true;
-        }
+      if (!classDecl->isSemanticallyFinal()) {
+        diags.diagnose(attr->getLocation(),
+                       diag::derivative_attr_nonfinal_class_init_unsupported,
+                       classDecl->getDeclaredInterfaceType());
+        return true;
       }
+    }
+
+    if (auto *FD = dyn_cast<FuncDecl>(originalAFD)) {
       // Diagnose all other declarations returning dynamic `Self`.
-      else {
+      if (FD->getResultInterfaceType()->hasDynamicSelfType()) {
         diags.diagnose(
             attr->getLocation(),
             diag::derivative_attr_class_member_dynamic_self_result_unsupported,
@@ -7742,43 +7842,8 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   if (auto var = dyn_cast<VarDecl>(D)) {
     // stored properties have limitations as to when they can be nonisolated.
     auto type = var->getTypeInContext();
-    if (var->hasStorage()) {
-      {
-        // A stored property can be 'nonisolated' if it is a 'Sendable' member
-        // of a 'Sendable' value type.
-        bool canBeNonisolated = false;
-        if (auto nominal = dc->getSelfStructDecl()) {
-          if (nominal->getDeclaredTypeInContext()->isSendableType() &&
-              !var->isStatic() && type->isSendableType()) {
-            canBeNonisolated = true;
-          }
-        }
-
-          // Additionally, a stored property of a non-'Sendable' type can be
-          // explicitly marked 'nonisolated'.
-          if (auto parentDecl = dc->getDeclaredTypeInContext())
-            if (!parentDecl->isSendableType()) {
-              canBeNonisolated = true;
-            }
-
-        // Otherwise, this stored property has to be qualified as 'unsafe'.
-        if (var->supportsMutation() && !attr->isUnsafe() && !canBeNonisolated) {
-          diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
-              .fixItInsertAfter(attr->getRange().End, "(unsafe)");
-          var->diagnose(diag::nonisolated_mutable_storage_note, var);
-          return;
-        }
-
-        // 'nonisolated' without '(unsafe)' is not allowed on non-Sendable
-        // variables, unless they are a member of a non-'Sendable' type.
-        if (!attr->isUnsafe() && !type->hasError() && !canBeNonisolated) {
-          bool diagnosed = diagnoseIfAnyNonSendableTypes(
-              type, SendableCheckContext(dc), Type(), SourceLoc(),
-              attr->getLocation(), diag::nonisolated_non_sendable);
-          if (diagnosed)
-            return;
-        }
-      }
+    if (var->hasStorage() || var->hasAttachedPropertyWrapper() ||
+        var->getAttrs().hasAttribute<LazyAttr>()) {
 
       if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
         // 'nonisolated' can not be applied to stored properties inside
@@ -7794,6 +7859,61 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
           diagnoseAndRemoveAttr(attr,
                                 diag::nonisolated_distributed_actor_storage);
           return;
+        }
+      }
+
+      {
+        // A stored property can be 'nonisolated' if it is a 'Sendable' member
+        // of a 'Sendable' value type.
+        // The above rule does not apply to lazy properties and properties with
+        // property wrappers, because backing storage is a stored
+        // 'var' that is part of the internal state of the actor which could
+        // only be accessed in actor's isolation context.
+        bool canBeNonisolated = false;
+        if (auto nominal = dc->getSelfStructDecl()) {
+          if (var->hasStorage() &&
+              nominal->getDeclaredTypeInContext()->isSendableType() &&
+              !var->isStatic() && type->isSendableType()) {
+            canBeNonisolated = true;
+          }
+        }
+
+        // Additionally, a stored property of a non-'Sendable' type can be
+        // explicitly marked 'nonisolated'.
+        if (auto parentDecl = dc->getDeclaredTypeInContext())
+          if (!parentDecl->isSendableType()) {
+            canBeNonisolated = true;
+          }
+
+        // Otherwise, this stored property has to be qualified as 'unsafe'.
+        if (var->supportsMutation() && !attr->isUnsafe() && !canBeNonisolated) {
+          if (var->hasAttachedPropertyWrapper()) {
+            diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
+              .warnUntilSwiftVersionIf(attr->isImplicit(), 6)
+              .fixItInsertAfter(attr->getRange().End, "(unsafe)");
+            return;
+          } else if (var->getAttrs().hasAttribute<LazyAttr>()) {
+            diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
+              .warnUntilSwiftVersion(6)
+              .fixItInsertAfter(attr->getRange().End, "(unsafe)");
+            return;
+          } else {
+            diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
+              .fixItInsertAfter(attr->getRange().End, "(unsafe)");
+            if (var->hasStorage())
+              var->diagnose(diag::nonisolated_mutable_storage_note, var);
+            return;
+          }
+        }
+
+        // 'nonisolated' without '(unsafe)' is not allowed on non-Sendable
+        // variables, unless they are a member of a non-'Sendable' type.
+        if (!attr->isUnsafe() && !type->hasError() && !canBeNonisolated) {
+          bool diagnosed = diagnoseIfAnyNonSendableTypes(
+              type, SendableCheckContext(dc), Type(), SourceLoc(),
+              attr->getLocation(), diag::nonisolated_non_sendable);
+          if (diagnosed)
+            return;
         }
       }
 
@@ -7830,22 +7950,6 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
               .fixItRemove(attr->getRange());
         }
       }
-    }
-
-    // Using 'nonisolated' with lazy properties and wrapped properties is
-    // unsupported, because backing storage is a stored 'var' that is part
-    // of the internal state of the actor which could only be accessed in
-    // actor's isolation context.
-    if (var->hasAttachedPropertyWrapper()) {
-      diagnoseAndRemoveAttr(attr, diag::nonisolated_wrapped_property)
-        .warnUntilSwiftVersionIf(attr->isImplicit(), 6);
-      return;
-    }
-
-    if (var->getAttrs().hasAttribute<LazyAttr>()) {
-      diagnose(attr->getLocation(), diag::nonisolated_lazy)
-        .warnUntilSwiftVersion(6);
-      return;
     }
 
     // nonisolated can not be applied to local properties unless qualified as
@@ -8320,6 +8424,13 @@ void AttributeChecker::visitStaticExclusiveOnlyAttr(
   }
 }
 
+void AttributeChecker::visitManualOwnershipAttr(ManualOwnershipAttr *attr) {
+  if (Ctx.LangOpts.hasFeature(Feature::ManualOwnership))
+    return;
+
+  diagnoseAndRemoveAttr(attr, diag::attr_manual_ownership_experimental);
+}
+
 void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {
   if (!Ctx.LangOpts.Target.isOSBinFormatCOFF())
     return;
@@ -8380,6 +8491,18 @@ void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
       .highlight(safeAttr->getRange())
       .warnInSwiftInterface(D->getDeclContext());
   }
+}
+
+void AttributeChecker::visitUnsafeSelfDependentResultAttr(
+    UnsafeSelfDependentResultAttr *attr) {
+  // TODO: Introduce a new experimental feature and check for presence
+  auto *accessor = dyn_cast<AccessorDecl>(D);
+  if (accessor &&
+      (accessor->isBorrowAccessor() || accessor->isMutateAccessor())) {
+    return;
+  }
+  Ctx.Diags.diagnose(attr->getLocation(),
+                     diag::unsafe_self_dependent_result_attr_on_invalid_decl);
 }
 
 namespace {

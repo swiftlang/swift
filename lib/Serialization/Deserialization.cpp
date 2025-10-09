@@ -255,9 +255,7 @@ ModularizationError::diagnose(const ModuleFile *MF,
     llvm_unreachable("Unhandled ModularizationError::Kind in switch.");
   };
 
-  auto inFlight = diagnoseError(errorKind);
-  inFlight.limitBehavior(limit);
-  inFlight.flush();
+  diagnoseError(errorKind).limitBehavior(limit);
 
   // We could pass along the `path` information through notes.
   // However, for a top-level decl a path would just duplicate the
@@ -1726,7 +1724,7 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
   }
   default:
     // Not a generic signature; no way to recover.
-    fatal(llvm::make_error<InvalidRecordKindError>(recordID));
+    return diagnoseFatal(llvm::make_error<InvalidRecordKindError>(recordID));
   }
 
   // If we've already deserialized this generic signature, start over to return
@@ -3199,6 +3197,7 @@ getActualReadImplKind(unsigned rawKind) {
   CASE(Address)
   CASE(Read)
   CASE(Read2)
+  CASE(Borrow)
 #undef CASE
   }
   return std::nullopt;
@@ -3218,6 +3217,7 @@ getActualWriteImplKind(unsigned rawKind) {
   CASE(MutableAddress)
   CASE(Modify)
   CASE(Modify2)
+  CASE(Mutate)
 #undef CASE
   }
   return std::nullopt;
@@ -3237,6 +3237,7 @@ getActualReadWriteImplKind(unsigned rawKind) {
   CASE(Modify2)
   CASE(StoredWithDidSet)
   CASE(InheritedWithDidSet)
+  CASE(Mutate)
 #undef CASE
   }
   return std::nullopt;
@@ -4166,6 +4167,7 @@ public:
     bool isCompileTimeLiteral, isConstValue;
     bool isSending;
     bool isCallerIsolated;
+    bool isAddressable;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
     uint8_t rawDefaultArgIsolation;
@@ -4179,6 +4181,7 @@ public:
                                          isConstValue,
                                          isSending,
                                          isCallerIsolated,
+                                         isAddressable,
                                          rawDefaultArg,
                                          defaultExprType,
                                          rawDefaultArgIsolation,
@@ -4225,6 +4228,7 @@ public:
     param->setConstValue(isConstValue);
     param->setSending(isSending);
     param->setCallerIsolated(isCallerIsolated);
+    param->setAddressable(isAddressable);
 
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.
@@ -5824,8 +5828,7 @@ decodeDomainKind(uint8_t kind) {
 
 static std::optional<AvailabilityDomain>
 decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
-                         PlatformKind platformKind, Decl *decl,
-                         const ASTContext &ctx) {
+                         PlatformKind platformKind, ValueDecl *decl) {
   switch (domainKind) {
   case AvailabilityDomainKind::Universal:
     return AvailabilityDomain::forUniversal();
@@ -5838,7 +5841,7 @@ decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
   case AvailabilityDomainKind::Platform:
     return AvailabilityDomain::forPlatform(platformKind);
   case AvailabilityDomainKind::Custom:
-    return AvailabilityDomain::forCustom(decl, ctx);
+    return AvailabilityDomain::forCustom(decl);
   }
 }
 
@@ -5893,12 +5896,19 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   else
     kind = AvailableAttr::Kind::Default;
 
-  Decl *domainDecl = nullptr;
+  ValueDecl *domainDecl = nullptr;
   if (domainDeclID) {
-    SET_OR_RETURN_ERROR(domainDecl, MF.getDeclChecked(domainDeclID));
+    Decl *decodedDomainDecl = nullptr;
+    SET_OR_RETURN_ERROR(decodedDomainDecl, MF.getDeclChecked(domainDeclID));
+
+    if (decodedDomainDecl) {
+      domainDecl = dyn_cast<ValueDecl>(decodedDomainDecl);
+      if (!domainDecl)
+        return llvm::make_error<InavalidAvailabilityDomainError>();
+    }
   }
 
-  auto domain = decodeAvailabilityDomain(domainKind, platform, domainDecl, ctx);
+  auto domain = decodeAvailabilityDomain(domainKind, platform, domainDecl);
   if (!domain)
     return llvm::make_error<InavalidAvailabilityDomainError>();
 
@@ -7067,6 +7077,8 @@ getActualResultConvention(uint8_t raw) {
   CASE(UnownedInnerPointer)
   CASE(Autoreleased)
   CASE(Pack)
+  CASE(GuaranteedAddress)
+  CASE(Guaranteed)
 #undef CASE
   }
   return std::nullopt;
@@ -7390,7 +7402,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   auto isolation = swift::FunctionTypeIsolation::forNonIsolated();
   if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolated)) {
     // do nothing
-  } else if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolatedCaller)) {
+  } else if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolatedNonsending)) {
     isolation = swift::FunctionTypeIsolation::forNonIsolatedCaller();
   } else if (rawIsolation == unsigned(FunctionTypeIsolation::Parameter)) {
     isolation = swift::FunctionTypeIsolation::forParameter();
@@ -8480,7 +8492,8 @@ public:
     bool isRegularKeywordAttribute = readBool();
 
     clang::AttributeCommonInfo info(
-        name, scopeName, {rangeStart, rangeEnd}, scopeLoc, parsedKind,
+        name, clang::AttributeScopeInfo(scopeName, scopeLoc),
+        {rangeStart, rangeEnd}, parsedKind,
         {syntax, spellingListIndex, /*IsAlignas=*/false,
          isRegularKeywordAttribute});
 
@@ -8509,15 +8522,15 @@ public:
   clang::TypeCoupledDeclRefInfo readTypeCoupledDeclRefInfo() {
     llvm_unreachable("TypeCoupledDeclRefInfo shouldn't be reached from swift");
   }
+  clang::SpirvOperand readHLSLSpirvOperand() {
+    llvm_unreachable("SpirvOperand shouldn't be reached from swift");
+  }
 };
 
 } // end anonymous namespace
 
 llvm::Expected<const clang::Type *>
 ModuleFile::getClangType(ClangTypeID TID) {
-  if (!getContext().LangOpts.UseClangFunctionTypes)
-    return nullptr;
-
   if (TID == 0)
     return nullptr;
 
@@ -8764,7 +8777,7 @@ class LazyConformanceLoaderInfo final
 
   LazyConformanceLoaderInfo(ArrayRef<uint64_t> ids)
     : NumConformances(ids.size()) {
-    auto buffer = getTrailingObjects<ProtocolConformanceID>();
+    auto *buffer = getTrailingObjects();
     for (unsigned i = 0, e = ids.size(); i != e; ++i)
       buffer[i] = ProtocolConformanceID(ids[i]);
   }
@@ -8782,8 +8795,7 @@ public:
 
   ArrayRef<ProtocolConformanceID> claim() {
     // TODO: free the memory here (if it's not used in multiple places?)
-    return llvm::ArrayRef(getTrailingObjects<ProtocolConformanceID>(),
-                          NumConformances);
+    return getTrailingObjects(NumConformances);
   }
 };
 } // end anonymous namespace

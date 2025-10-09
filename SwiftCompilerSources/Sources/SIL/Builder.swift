@@ -190,11 +190,40 @@ public struct Builder {
     }
   }
 
-  public func createIntegerLiteral(_ value: Int, type: Type) -> IntegerLiteralInst {
-    let literal = bridged.createIntegerLiteral(type.bridged, value)
+  /// Creates a integer literal instruction with the given integer value and
+  /// type. If an extension is necessary, the value is extended in accordance
+  /// with the signedness of `Value`.
+  public func createIntegerLiteral<Value: FixedWidthInteger>(
+    _ value: Value,
+    type: Type
+  ) -> IntegerLiteralInst {
+    precondition(
+      Value.bitWidth <= Int.bitWidth,
+      "Cannot fit \(Value.bitWidth)-bit integer into \(Int.bitWidth)-bit 'Swift.Int'"
+    )
+    // Extend the value based on its signedness to the bit width of `Int` and
+    // reinterpret it as an `Int`.
+    let extendedValue: Int =
+      if Value.isSigned {
+        Int(value)
+      } else {
+        // NB: This initializer is effectively a generic equivalent
+        // of `Int(bitPattern:)`
+        Int(truncatingIfNeeded: value)
+      }
+
+    let literal = bridged.createIntegerLiteral(type.bridged, extendedValue, Value.isSigned)
     return notifyNew(literal.getAs(IntegerLiteralInst.self))
   }
-    
+
+  /// Creates a `Builtin.Int1` integer literal instruction with a value
+  /// corresponding to the given Boolean.
+  public func createBoolLiteral(_ value: Bool) -> IntegerLiteralInst {
+    let boolType = notificationHandler.getBuiltinIntegerType(1).type
+    let integerValue: UInt = value ? 1 : 0
+    return createIntegerLiteral(integerValue, type: boolType)
+  }
+
   public func createAllocRef(_ type: Type, isObjC: Bool = false, canAllocOnStack: Bool = false, isBare: Bool = false,
                              tailAllocatedTypes: TypeArray, tailAllocatedCounts: [Value]) -> AllocRefInst {
     return tailAllocatedCounts.withBridgedValues { countsRef in
@@ -258,6 +287,11 @@ public struct Builder {
   public func createUncheckedAddrCast(from value: Value, to type: Type) -> UncheckedAddrCastInst {
     let cast = bridged.createUncheckedAddrCast(value.bridged, type.bridged)
     return notifyNew(cast.getAs(UncheckedAddrCastInst.self))
+  }
+
+  public func createUncheckedValueCast(from value: Value, to type: Type) -> UncheckedValueCastInst {
+    let cast = bridged.createUncheckedValueCast(value.bridged, type.bridged)
+    return notifyNew(cast.getAs(UncheckedValueCastInst.self))
   }
 
   public func createUpcast(from value: Value, to type: Type) -> UpcastInst {
@@ -568,6 +602,12 @@ public struct Builder {
   }
 
   @discardableResult
+  public func createCondBranch(condition: Value, trueBlock: BasicBlock, falseBlock: BasicBlock) -> CondBranchInst {
+    let condBr = bridged.createCondBranch(condition.bridged, trueBlock.bridged, falseBlock.bridged)
+    return notifyNew(condBr.getAs(CondBranchInst.self))
+  }
+
+  @discardableResult
   public func createUnreachable() -> UnreachableInst {
     let ui = bridged.createUnreachable()
     return notifyNew(ui.getAs(UnreachableInst.self))
@@ -748,5 +788,28 @@ public struct Builder {
   public func createConvertEscapeToNoEscape(originalFunction: Value, resultType: Type, isLifetimeGuaranteed: Bool) -> ConvertEscapeToNoEscapeInst {
     let convertFunction = bridged.createConvertEscapeToNoEscape(originalFunction.bridged, resultType.bridged, isLifetimeGuaranteed)
     return notifyNew(convertFunction.getAs(ConvertEscapeToNoEscapeInst.self))
+  }
+}
+
+
+//===----------------------------------------------------------------------===//
+//                                  Utilities
+//===----------------------------------------------------------------------===//
+
+extension Builder {
+  public func emitDestroy(of value: Value) {
+    if value.type.isTrivial(in: value.parentFunction) {
+      return
+    }
+    if value.type.isAddress {
+      return
+    }
+    if value.parentFunction.hasOwnership {
+      createDestroyValue(operand: value)
+    } else if value.type.isClass {
+      createStrongRelease(operand: value)
+    } else {
+      createReleaseValue(operand: value)
+    }
   }
 }

@@ -492,19 +492,6 @@ public:
 
   void verifyAllModules() override;
 
-  using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
-  using LookupModuleOutputCallback =
-      llvm::function_ref<std::string(const clang::tooling::dependencies::ModuleDeps &,
-                                     clang::tooling::dependencies::ModuleOutputKind)>;
-
-  static llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  bridgeClangModuleDependencies(
-      const ASTContext &ctx,
-      clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-      clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-      LookupModuleOutputCallback LookupModuleOutput,
-      RemapPathCallback remapPath = nullptr);
-
   static void getBridgingHeaderOptions(
       const ASTContext &ctx,
       const clang::tooling::dependencies::TranslationUnitDeps &deps,
@@ -683,6 +670,24 @@ getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 bool isCompletionHandlerParamName(StringRef paramName);
 
 namespace importer {
+/// Returns true if the given C/C++ reference type uses "immortal"
+/// retain/release functions.
+bool hasImmortalAttrs(const clang::RecordDecl *decl);
+
+struct ReturnOwnershipInfo {
+  ReturnOwnershipInfo(const clang::NamedDecl *decl);
+
+  bool hasRetainAttr() const {
+    return hasReturnsRetained || hasReturnsUnretained;
+  }
+  bool hasConflictingAttr() const {
+    return hasReturnsRetained && hasReturnsUnretained;
+  }
+
+private:
+  bool hasReturnsRetained = false;
+  bool hasReturnsUnretained = false;
+};
 
 /// Returns true if the given module has a 'cplusplus' requirement.
 bool requiresCPlusPlus(const clang::Module *module);
@@ -827,17 +832,24 @@ std::optional<T> matchSwiftAttrConsideringInheritance(
 /// Matches a `swift_attr("...")` on the record type pointed to by the given
 /// Clang type, searching base classes if it's a C++ class.
 ///
-/// \param type A Clang pointer type.
+/// \param type A Clang pointer or reference type.
 /// \param patterns List of attribute name-value pairs to match.
 /// \returns Matched value or std::nullopt.
 template <typename T>
 std::optional<T> matchSwiftAttrOnRecordPtr(
     const clang::QualType &type,
     llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  clang::QualType pointeeType;
   if (const auto *ptrType = type->getAs<clang::PointerType>()) {
-    if (const auto *recordDecl = ptrType->getPointeeType()->getAsRecordDecl()) {
-      return matchSwiftAttrConsideringInheritance<T>(recordDecl, patterns);
-    }
+    pointeeType = ptrType->getPointeeType();
+  } else if (const auto *refType = type->getAs<clang::ReferenceType>()) {
+    pointeeType = refType->getPointeeType();
+  } else {
+    return std::nullopt;
+  }
+
+  if (const auto *recordDecl = pointeeType->getAsRecordDecl()) {
+    return matchSwiftAttrConsideringInheritance<T>(recordDecl, patterns);
   }
   return std::nullopt;
 }

@@ -902,6 +902,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability TypedCoroAllocAvailability(ASTContext &context) {
+    auto featureAvailability = context.getTypedCoroAllocAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability ConcurrencyDiscardingTaskGroupAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getConcurrencyDiscardingTaskGroupAvailability();
@@ -2300,6 +2308,22 @@ IRGenModule *IRGenerator::getGenModule(SILFunction *f) {
   return getPrimaryIGM();
 }
 
+IRGenModule *IRGenerator::getGenModule(SILGlobalVariable *v) {
+  if (GenModules.size() == 1) {
+    return getPrimaryIGM();
+  }
+
+  auto found = DefaultIGMForGlobalVariable.find(v);
+  if (found != DefaultIGMForGlobalVariable.end())
+    return found->second;
+
+  if (auto decl = v->getDecl()) {
+    return getGenModule(decl->getDeclContext());
+  }
+
+  return getPrimaryIGM();
+}
+
 uint32_t swift::irgen::getSwiftABIVersion() {
   return IRGenModule::swiftVersion;
 }
@@ -2395,7 +2419,7 @@ bool swift::writeEmptyOutputFilesFor(
     auto *clangImporter = static_cast<ClangImporter *>(
       Context.getClangModuleLoader());
     llvmModule->setTargetTriple(
-      clangImporter->getTargetInfo().getTargetOpts().Triple);
+        llvm::Triple(clangImporter->getTargetInfo().getTargetOpts().Triple));
 
     // Add LLVM module flags.
     auto &clangASTContext = clangImporter->getClangASTContext();

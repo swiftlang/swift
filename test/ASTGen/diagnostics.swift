@@ -44,7 +44,7 @@ struct S {
 }
 
 struct ExpansionRequirementTest<each T> {}
-extension ExpansionRequirementTest where repeat each T == Int {} // expected-error {{same-element requirements are not yet supported}}
+extension ExpansionRequirementTest where repeat each T == Int {} // expected-error {{same-type requirements between packs and concrete types are not yet supported}}
 
 
 #warning("this is a warning") // expected-warning {{this is a warning}}

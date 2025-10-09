@@ -41,6 +41,11 @@ public:
   /// \c VerifyMode is not \c NoVerify.
   bool VerifyIgnoreUnknown = false;
 
+  /// Indicates whether to allow diagnostics for locations outside files parsed
+  /// for 'expected' diagnostics if \c VerifyMode is not \c NoVerify. Does not
+  /// allow diagnostics at <unknown>, that is controlled by VerifyIgnoreUnknown.
+  bool VerifyIgnoreUnrelated = false;
+
   /// Indicates whether diagnostic passes should be skipped.
   bool SkipDiagnosticPasses = false;
 
@@ -58,6 +63,9 @@ public:
   /// Suppress all warnings
   bool SuppressWarnings = false;
   
+  /// Suppress all notes
+  bool SuppressNotes = false;
+
   /// Suppress all remarks
   bool SuppressRemarks = false;
 

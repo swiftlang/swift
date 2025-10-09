@@ -646,9 +646,12 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
   if (version > ImportNameVersion::swift2()) {
     // FIXME: Until Apple gets a chance to update UIKit's API notes, always use
     // the new name for certain properties.
-    if (auto *namedDecl = dyn_cast<clang::NamedDecl>(decl))
+    if (auto *namedDecl = dyn_cast<clang::NamedDecl>(decl)) {
       if (importer::isSpecialUIKitStructZeroProperty(namedDecl))
         version = ImportNameVersion::swift4_2();
+      if (importer::isSpecialAppKitFunctionKeyProperty(namedDecl))
+        return std::nullopt;
+    }
 
     // Dig out the attribute that specifies the Swift name.
     std::optional<AnySwiftNameAttr> activeAttr;
@@ -1535,6 +1538,10 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   if (!swift3OrLaterName && isa<clang::CXXMethodDecl>(D)) {
     return ImportedName();
   }
+  // If this function uses C++23 deducing this, bail.
+  if (auto functionDecl = dyn_cast<clang::FunctionDecl>(D))
+    if (functionDecl->hasCXXExplicitFunctionObjectParameter())
+      return {};
 
   // Dig out the definition, if there is one.
   if (auto def = getDefinitionForClangTypeDecl(D)) {
@@ -1961,6 +1968,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_Caret:
     case clang::OverloadedOperatorKind::OO_Amp:
     case clang::OverloadedOperatorKind::OO_Pipe:
+    case clang::OverloadedOperatorKind::OO_Tilde:
     case clang::OverloadedOperatorKind::OO_Exclaim:
     case clang::OverloadedOperatorKind::OO_Less:
     case clang::OverloadedOperatorKind::OO_Greater:

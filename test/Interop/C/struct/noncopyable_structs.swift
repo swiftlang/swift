@@ -26,10 +26,16 @@ func testNC() {
   let nc = NonCopyable() // expected-error{{'nc' consumed more than once}}
   consumeNC(nc) // expected-note{{consumed here}}
 
+  let ncAPI = NonCopyableWithAPINotesDeinit() // expected-error{{consumed more than once}}
+  consumeNCAPI(ncAPI) // expected-note{{consumed here}}
+
   #if ERRORS
   consumeNC(nc) // expected-note{{consumed again here}}
+  consumeNCAPI(ncAPI) // expected-note{{consumed again here}}
   #endif
 }
+
+func consumeNCAPI(_ nc: consuming NonCopyableWithAPINotesDeinit) { }
 
 func consumeNCWithDeinit(_ nc: consuming NonCopyableWithDeinit) { }
 
@@ -55,6 +61,11 @@ func bad1(_: borrowing BadDestroyNonCopyableType) { }
 // expected-warning@+1{{'BadDestroyNonCopyableType2' is deprecated: destroy function 'badDestroy2' must have a single parameter with type 'BadDestroyNonCopyableType2'}}
 func bad2(_: borrowing BadDestroyNonCopyableType2) { }
 
+#endif
+
+#if CPLUSPLUS
+// expected-cplusplus-warning@+1{{'ExtraDestroy' is deprecated: destroy operation 'extraDestroy' is not allowed on types with a non-trivial destructor}}
+func extra(_: borrowing ExtraDestroy) { }
 #endif
 
 // CHECK-SIL: sil shared @$sSo21NonCopyableWithDeinitVfD : $@convention(method) (@owned NonCopyableWithDeinit) -> () {

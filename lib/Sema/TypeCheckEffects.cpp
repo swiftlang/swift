@@ -395,7 +395,10 @@ public:
     }
     case Kind::Closure: return getClosure()->getType();
     case Kind::Parameter:
-      return getParameter()->getInterfaceType()->lookThroughAllOptionalTypes();
+      auto *param = getParameter();
+      auto *dc = param->getDeclContext();
+      return dc->mapTypeIntoContext(param->getInterfaceType())
+          ->lookThroughAllOptionalTypes();
     }
     llvm_unreachable("bad kind");
   }
@@ -4033,6 +4036,12 @@ private:
     ContextScope scope(*this, /*newContext*/ std::nullopt);
     scope.setCoverageForSingleValueStmtExpr();
     SVE->getStmt()->walk(*this);
+
+    if (auto preamble = SVE->getForExpressionPreamble()) {
+      preamble->ForAccumulatorDecl->walk(*this);
+      preamble->ForAccumulatorBinding->walk(*this);
+    }
+
     scope.preserveCoverageFromSingleValueStmtExpr();
     return ShouldNotRecurse;
   }

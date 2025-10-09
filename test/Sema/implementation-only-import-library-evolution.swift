@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t/NormalLibrary.swiftmodule %S/Inputs/implementation-only-import-in-decls-public-helper.swift
 // RUN: %target-swift-frontend -emit-module -o %t/BADLibrary.swiftmodule %S/Inputs/implementation-only-import-in-decls-helper.swift -I %t
 
-// RUN: %target-typecheck-verify-swift -I %t -enable-library-evolution
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t -enable-library-evolution
 
 @_implementationOnly import BADLibrary
 // expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}

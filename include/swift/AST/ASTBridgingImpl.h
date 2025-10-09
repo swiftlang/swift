@@ -67,6 +67,17 @@ swift::DeclNameLoc BridgedDeclNameLoc::unbridged() const {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedLangOptions
+//===----------------------------------------------------------------------===//
+
+BridgedLangOptions::BridgedLangOptions(const swift::LangOptions &langOpts)
+  : LangOpts(&langOpts) { }
+
+const swift::LangOptions &BridgedLangOptions::unbridged() const {
+  return *LangOpts;
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: BridgedASTContext
 //===----------------------------------------------------------------------===//
 
@@ -573,6 +584,10 @@ BridgedASTType BridgedASTType::getInstanceTypeOfMetatype() const {
 
 BridgedASTType BridgedASTType::getStaticTypeOfDynamicSelf() const {
   return {unbridged()->getAs<swift::DynamicSelfType>()->getSelfType().getPointer()};
+}
+
+BridgedASTType BridgedASTType::getInterfaceTypeOfArchetype() const {
+  return {unbridged()->getAs<swift::ArchetypeType>()->getInterfaceType().getPointer()};
 }
 
 BridgedASTType BridgedASTType::getSuperClassType() const {

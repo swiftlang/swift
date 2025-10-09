@@ -177,7 +177,7 @@ bb0(%0 : $*T, %1 : $Foo<T>):
 } // end sil function 'Foo_init'
 
 // P.foo()
-sil [always_inline] @P_foo : $@convention(method) <Self where Self : P> (@in_guaranteed Self) -> () {
+sil [heuristic_always_inline] @P_foo : $@convention(method) <Self where Self : P> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
   // function_ref Foo.__allocating_init(_:)
   %2 = function_ref @Foo_alloc_init : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in τ_0_0, @thick Foo<τ_0_0>.Type) -> @owned Foo<τ_0_0>

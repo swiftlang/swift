@@ -2666,7 +2666,8 @@ namespace {
 
     /// Some function conversions synthesized by the constraint solver may not
     /// be correct AND the solver doesn't know, so we must emit a diagnostic.
-    void checkFunctionConversion(Expr *funcConv, Type fromType, Type toType) {
+    void checkFunctionConversion(ImplicitConversionExpr *funcConv,
+                                 Type fromType, Type toType) {
       auto diagnoseNonSendableParametersAndResult =
           [&](FunctionType *fnType,
               std::optional<unsigned> warnUntilSwiftMode = std::nullopt) {
@@ -2763,13 +2764,25 @@ namespace {
 
           switch (toIsolation.getKind()) {
           // Converting to `nonisolated(nonsending)` function type
-          case FunctionTypeIsolation::Kind::NonIsolatedCaller: {
+          case FunctionTypeIsolation::Kind::NonIsolatedNonsending: {
             switch (fromIsolation.getKind()) {
             case FunctionTypeIsolation::Kind::NonIsolated: {
               // nonisolated -> nonisolated(nonsending) doesn't cross
               // an isolation boundary.
               if (!fromFnType->isAsync())
                 break;
+
+              // Applying `nonisolated(nonsending)` to an interface type
+              // of a declaration.
+              if (auto *declRef =
+                      dyn_cast<DeclRefExpr>(funcConv->getSubExpr())) {
+                auto *decl = declRef->getDecl();
+                if (auto *nonisolatedAttr =
+                        decl->getAttrs().getAttribute<NonisolatedAttr>()) {
+                  if (nonisolatedAttr->isNonSending())
+                    return;
+                }
+              }
 
               // @concurrent -> nonisolated(nonsending)
               // crosses an isolation boundary.
@@ -2780,16 +2793,13 @@ namespace {
               diagnoseNonSendableParametersAndResult(toFnType);
               break;
 
+            // @Sendable nonisolated(nonsending) -> nonisolated(nonsending)
+            // doesn't require Sendable checking.
+            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
+              break;
+
             case FunctionTypeIsolation::Kind::Parameter:
               llvm_unreachable("invalid conversion");
-
-            case FunctionTypeIsolation::Kind::NonIsolatedCaller:
-              // Non isolated caller is always async. This can only occur if we
-              // are converting from an `@Sendable` representation to something
-              // else. So we need to just check that we diagnose non sendable
-              // parameters and results.
-              diagnoseNonSendableParametersAndResult(toFnType);
-              break;
             }
             break;
           }
@@ -2800,7 +2810,7 @@ namespace {
           case FunctionTypeIsolation::Kind::NonIsolated: {
             switch (fromIsolation.getKind()) {
             case FunctionTypeIsolation::Kind::Parameter:
-            case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
             case FunctionTypeIsolation::Kind::Erased:
               diagnoseNonSendableParametersAndResult(
                   toFnType, version::Version::getFutureMajorLanguageVersion());
@@ -2851,7 +2861,7 @@ namespace {
             }
 
             // Runs on the actor.
-            case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
               break;
 
             case FunctionTypeIsolation::Kind::GlobalActor:
@@ -3460,19 +3470,6 @@ namespace {
         }
       }
 
-      // The constraint solver may not have chosen legal casts.
-      if (auto funcConv = dyn_cast<FunctionConversionExpr>(expr)) {
-        checkFunctionConversion(funcConv,
-                                funcConv->getSubExpr()->getType(),
-                                funcConv->getType());
-      }
-
-      if (auto *isolationErasure = dyn_cast<ActorIsolationErasureExpr>(expr)) {
-        checkFunctionConversion(isolationErasure,
-                                isolationErasure->getSubExpr()->getType(),
-                                isolationErasure->getType());
-      }
-
       if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(expr)) {
         checkDefaultArgument(defaultArg);
       }
@@ -3562,6 +3559,19 @@ namespace {
             }
           }
         }
+      }
+
+      // The constraint solver may not have chosen legal casts.
+      if (auto funcConv = dyn_cast<FunctionConversionExpr>(expr)) {
+        checkFunctionConversion(funcConv,
+                                funcConv->getSubExpr()->getType(),
+                                funcConv->getType());
+      }
+
+      if (auto *isolationErasure = dyn_cast<ActorIsolationErasureExpr>(expr)) {
+        checkFunctionConversion(isolationErasure,
+                                isolationErasure->getSubExpr()->getType(),
+                                isolationErasure->getType());
       }
 
       return Action::Continue(expr);
@@ -4988,16 +4998,6 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
         return ActorIsolation::forActorInstanceCapture(param);
     }
 
-    // If we have a closure that acts as an isolation inference boundary, then
-    // we return that it is non-isolated.
-    //
-    // NOTE: Since we already checked for global actor isolated things, we
-    // know that all Sendable closures must be nonisolated. That is why it is
-    // safe to rely on this path to handle Sendable closures.
-    if (isIsolationInferenceBoundaryClosure(closure,
-                                            /*canInheritActorContext=*/true))
-      return ActorIsolation::forNonisolated(/*unsafe=*/false);
-
     // A non-Sendable closure gets its isolation from its context.
     auto parentIsolation = getActorIsolationOfContext(
         closure->getParent(), getClosureActorIsolation);
@@ -5028,6 +5028,16 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
         }
       }
     }
+
+    // If we have a closure that acts as an isolation inference boundary, then
+    // we return that it is non-isolated.
+    //
+    // NOTE: Since we already checked for global actor isolated things, we
+    // know that all Sendable closures must be nonisolated. That is why it is
+    // safe to rely on this path to handle Sendable closures.
+    if (isIsolationInferenceBoundaryClosure(closure,
+                                            /*canInheritActorContext=*/true))
+      return ActorIsolation::forNonisolated(/*unsafe=*/false);
 
     return normalIsolation;
   }();
@@ -6307,14 +6317,9 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
 
   // Asynchronous variants for functions imported from ObjC are
   // `nonisolated(nonsending)` by default.
-  if (value->hasClangNode()) {
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(value)) {
-      if (!isa<ProtocolDecl>(AFD->getDeclContext()) &&
-          AFD->getForeignAsyncConvention()) {
-        return {
-            {ActorIsolation::forCallerIsolationInheriting(), {}}, nullptr, {}};
-      }
-    }
+  if (value->hasClangNode() && value->isAsync() &&
+      !isa<ProtocolDecl>(value->getDeclContext())) {
+    return {{ActorIsolation::forCallerIsolationInheriting(), {}}, nullptr, {}};
   }
 
   // We did not find anything special, return unspecified.
@@ -6353,6 +6358,14 @@ static bool shouldSelfIsolationOverrideDefault(
 
 static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
                                                     ValueDecl *value) {
+  // Defer bodies share the actor isolation of their enclosing context.
+  if (value->isDeferBody()) {
+    return {
+      getActorIsolationOfContext(value->getDeclContext()),
+      IsolationSource()
+    };
+  }
+
   // If this declaration has actor-isolated "self", it's isolated to that
   // actor.
   if (evaluateOrDefault(evaluator, HasIsolatedSelfRequest{value}, false)) {
@@ -7908,6 +7921,10 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
       (isa<AbstractFunctionDecl>(decl) &&
        cast<AbstractFunctionDecl>(decl)->hasImplicitSelfDecl()));
   if (!hasImplicitSelfDecl) {
+    // Fast path.
+    if (fnType->getExtInfo().getIsolation() == *funcIsolation)
+      return fnType;
+
     return fnType->withExtInfo(
         fnType->getExtInfo().withIsolation(*funcIsolation));
   }
@@ -7915,6 +7932,10 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
   // Dig out the inner function type.
   auto innerFnType = fnType->getResult()->getAs<AnyFunctionType>();
   if (!innerFnType)
+    return fnType;
+
+  // Fast path.
+  if (innerFnType->getExtInfo().getIsolation() == *funcIsolation)
     return fnType;
 
   // Update the inner function type with the isolation.

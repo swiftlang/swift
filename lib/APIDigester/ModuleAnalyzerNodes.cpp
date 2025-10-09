@@ -3,6 +3,8 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/DeclObjC.h"
+#include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/STLExtras.h"
 #include <algorithm>
 #include <swift/APIDigester/ModuleAnalyzerNodes.h>
@@ -1986,7 +1988,7 @@ SwiftDeclCollector::addConformancesToTypeDecl(SDKNodeDeclType *Root,
   } else {
     // Avoid adding the same conformance twice.
     SmallPtrSet<ProtocolConformance*, 4> Seen;
-    for (auto &Conf: NTD->getAllConformances()) {
+    for (auto &Conf: NTD->getAllConformances(/*sorted=*/true)) {
       if (!Ctx.shouldIgnore(Conf->getProtocol()) && !Seen.count(Conf))
         Root->addConformance(constructConformanceNode(Conf));
       Seen.insert(Conf);

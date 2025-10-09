@@ -1589,6 +1589,7 @@ namespace  {
     UNINTERESTING_ATTR(AccessControl)
     UNINTERESTING_ATTR(Alignment)
     UNINTERESTING_ATTR(AlwaysEmitIntoClient)
+    UNINTERESTING_ATTR(NeverEmitIntoClient)
     UNINTERESTING_ATTR(Borrowed)
     UNINTERESTING_ATTR(Borrowing)
     UNINTERESTING_ATTR(CDecl)
@@ -1620,6 +1621,7 @@ namespace  {
     UNINTERESTING_ATTR(NoRuntime)
     UNINTERESTING_ATTR(NoExistentials)
     UNINTERESTING_ATTR(NoObjCBridging)
+    UNINTERESTING_ATTR(ManualOwnership)
     UNINTERESTING_ATTR(Inlinable)
     UNINTERESTING_ATTR(Effects)
     UNINTERESTING_ATTR(Expose)
@@ -1752,6 +1754,7 @@ namespace  {
     UNINTERESTING_ATTR(Unsafe)
     UNINTERESTING_ATTR(Safe)
     UNINTERESTING_ATTR(AddressableForDependencies)
+    UNINTERESTING_ATTR(UnsafeSelfDependentResult)
 #undef UNINTERESTING_ATTR
 
     void visitABIAttr(ABIAttr *attr) {
@@ -2191,17 +2194,23 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     auto domain = unavailableAttr.getDomain();
     auto parsedAttr = unavailableAttr.getParsedAttr();
 
-    if (domain.isPlatform() || domain.isUniversal()) {
+    switch (domain.getKind()) {
+    case AvailabilityDomain::Kind::Universal:
+    case AvailabilityDomain::Kind::SwiftLanguage:
+    case AvailabilityDomain::Kind::PackageDescription:
+    case AvailabilityDomain::Kind::Platform:
       // FIXME: [availability] Diagnose as an error in a future Swift version.
       break;
+    case AvailabilityDomain::Kind::Embedded:
+    case AvailabilityDomain::Kind::Custom:
+      if (parsedAttr->getLocation().isValid())
+        ctx.Diags.diagnose(override, diag::override_unavailable, override)
+            .fixItRemove(parsedAttr->getRangeWithAt());
+      else
+        ctx.Diags.diagnose(override, diag::override_unavailable, override);
+      ctx.Diags.diagnose(base, diag::overridden_here);
+      break;
     }
-
-    if (parsedAttr->getLocation().isValid())
-      ctx.Diags.diagnose(override, diag::override_unavailable, override)
-          .fixItRemove(parsedAttr->getRangeWithAt());
-    else
-      ctx.Diags.diagnose(override, diag::override_unavailable, override);
-    ctx.Diags.diagnose(base, diag::overridden_here);
     break;
   }
   case OverrideAvailability::OverrideLessAvailable: {
@@ -2361,6 +2370,8 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
     case AccessorKind::Read2:
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
       break;
 
     case AccessorKind::WillSet:

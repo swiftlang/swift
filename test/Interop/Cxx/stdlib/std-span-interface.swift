@@ -8,9 +8,6 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_Lifetimes
 
-// FIXME swift-ci linux tests do not support std::span
-// UNSUPPORTED: OS=linux-gnu, OS=linux-android, OS=linux-androideabi
-
 #if !BRIDGING_HEADER
 import StdSpan
 #endif
@@ -166,7 +163,7 @@ func callMixedFuncWithMutableSafeWrapper1(_ span: inout MutableSpan<CInt>, ) {
 
 func MixedFuncWithMutableSafeWrapper2(_ v: VecOfInt) {
     var v2 = v
-    let _ = MixedFuncWithMutableSafeWrapper2(&v2, 37)
+    let _ : MutableSpan<Int32> = MixedFuncWithMutableSafeWrapper2(&v2, 37)
 }
 
 @_lifetime(span: copy span)

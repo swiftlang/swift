@@ -574,7 +574,11 @@ public:
   /// the '(' by a space.
   ///
   /// If the next token is not '(' or it's on a new line, return false.
-  bool consumeIfAttributeLParen();
+  bool consumeIfAttributeLParen(bool isCustomAttr = false);
+
+  /// Check if the current token is '(' and it looks like a start of an
+  /// attribute argument list.
+  bool isAtAttributeLParen(bool isCustomAttr = false);
 
   bool consumeIfNotAtStartOfLine(tok K) {
     if (Tok.isAtStartOfLine()) return false;
@@ -688,6 +692,14 @@ public:
   /// passed the `-enable-experimental-concurrency` flag to the frontend.
   bool shouldParseExperimentalConcurrency() const {
     return Context.LangOpts.EnableExperimentalConcurrency;
+  }
+
+  /// Returns true if a Swift declaration starts after the current token,
+  /// otherwise returns false.
+  bool isNextStartOfSwiftDecl() {
+    BacktrackingScope backtrack(*this);
+    consumeToken();
+    return isStartOfSwiftDecl();
   }
 
 public:
@@ -1139,7 +1151,6 @@ public:
                                   SourceLoc AtEndLoc,
                                   bool isFromClangAttribute = false);
 
-  bool isCustomAttributeArgument();
   bool canParseCustomAttribute();
 
   /// Parse a custom attribute after the initial '@'.

@@ -607,7 +607,7 @@ bb0:
 
 // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
 // The semantics attribute is used by the interpreter.
-sil [serialized] [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+sil [serialized] [heuristic_always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
 
 // CHECK-LABEL: @interpretStringInitIntrinsic
 sil hidden @interpretStringInitIntrinsic : $@convention(thin) () ->  @owned String {
@@ -1220,7 +1220,7 @@ sil @interpretAssertionFailure : $@convention(thin) () -> Never {
 sil [serialized] [_semantics "array.init.empty"] @$sS2ayxGycfC : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
 
 // _allocateUninitializedArray<A>(_:)
-sil [serialized] [always_inline] [_semantics "array.uninitialized_intrinsic"] @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+sil [serialized] [heuristic_always_inline] [_semantics "array.uninitialized_intrinsic"] @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 
 // CHECK-LABEL: @interpretArrayInit
 sil @interpretArrayInit : $@convention(thin) () -> @owned Array<Int> {

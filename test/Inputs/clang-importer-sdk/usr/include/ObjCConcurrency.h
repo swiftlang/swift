@@ -11,6 +11,7 @@
   #define NONSENDABLE __attribute__((__swift_attr__("@_nonSendable")))
   #define ASSUME_NONSENDABLE_BEGIN _Pragma("clang attribute ASSUME_NONSENDABLE.push (__attribute__((swift_attr(\"@_nonSendable(_assumed)\"))), apply_to = any(objc_interface, record, enum))")
   #define ASSUME_NONSENDABLE_END _Pragma("clang attribute ASSUME_NONSENDABLE.pop")
+  #define ASYNC_NAME(NAME) __attribute__((swift_async_name(#NAME)))
 #else
   // If we take this #else, we should see minor failures of some subtests,
   // but not systematic failures of everything that uses this header.
@@ -18,6 +19,7 @@
   #define NONSENDABLE
   #define ASSUME_NONSENDABLE_BEGIN
   #define ASSUME_NONSENDABLE_END
+  #define ASYNC_NAME(NAME)
 #endif
 
 #define NS_ENUM(_type, _name) enum _name : _type _name; \
@@ -379,6 +381,15 @@ MAIN_ACTOR
 
 @protocol FailableFloatLoader
 - (void)loadFloatOrThrowWithCompletionHandler:(void (^)(float, NSError* __nullable)) completionHandler;
+@end
+
+NONSENDABLE
+@interface ImportObjCAsyncGetter : NSObject
+
+- (void)getSendableClassesWithCompletionHandler:
+    (void (^SENDABLE)(NSArray<SendableClass *> *myClasses))handler
+    ASYNC_NAME(getter:sendableClasses());
+
 @end
 
 #pragma clang assume_nonnull end

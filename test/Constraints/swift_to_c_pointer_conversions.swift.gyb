@@ -2,7 +2,7 @@
 
 // RUN: %gyb %s -o %t/swift_to_c_pointer_conversions.swift
 
-// RUN: %line-directive %t/swift_to_c_pointer_conversions.swift -- %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -import-objc-header %S/Inputs/c_pointer_conversions.h %t/swift_to_c_pointer_conversions.swift -typecheck -verify
+// RUN: %line-directive %t/swift_to_c_pointer_conversions.swift -- %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -import-objc-header %S/Inputs/c_pointer_conversions.h %t/swift_to_c_pointer_conversions.swift -typecheck -verify -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
 

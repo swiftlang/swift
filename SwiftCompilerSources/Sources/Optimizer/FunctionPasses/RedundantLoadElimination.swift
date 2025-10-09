@@ -89,6 +89,11 @@ func eliminateRedundantLoads(in function: Function,
                              variant: RedundantLoadEliminationVariant,
                              _ context: FunctionPassContext) -> Bool
 {
+  // FIXME: this skip is a hack for ManualOwnership prototyping, to workaround rdar://161359163
+  if function.performanceConstraints == .manualOwnership && variant == .mandatory {
+    return false
+  }
+
   // Avoid quadratic complexity by limiting the number of visited instructions.
   // This limit is sufficient for most "real-world" functions, by far.
   var complexityBudget = 50_000

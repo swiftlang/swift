@@ -29,6 +29,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -1502,9 +1503,12 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
-  if (Availability.isDeprecated()) {
+  if (Availability.isDeprecated())
     return;
-  }
+
+  // Skip diagnosing deprecated types in unavailable contexts.
+  if (Availability.isUnavailable() && isa<TypeDecl>(DeprecatedDecl))
+    return;
 
   auto *ReferenceDC = Where.getDeclContext();
   auto &Context = ReferenceDC->getASTContext();
@@ -2201,7 +2205,7 @@ class ExprAvailabilityWalker : public BaseDiagnosticWalker {
   /// Models how member references will translate to accessor usage. This is
   /// used to diagnose the availability of individual accessors that may be
   /// called by the expression being checked.
-  enum class MemberAccessContext : unsigned {
+  enum class MemberAccessContext : uint8_t {
     /// The starting access context for the root of any expression tree. In this
     /// context, a member access will call the get accessor only.
     Default,
@@ -2222,11 +2226,45 @@ class ExprAvailabilityWalker : public BaseDiagnosticWalker {
     Writeback
   };
 
+  /// Models how key path references will translate to accessor usage. This is
+  /// used to diagnose the availability of individual accessors that may be
+  /// called by the expression being checked.
+  enum class KeyPathAccessContext : uint8_t {
+    /// The context does not involve a key path access.
+    None,
+
+    /// The context is a key path application (`x[keyPath: \.member]`).
+    Application,
+  };
+
   ASTContext &Context;
-  MemberAccessContext AccessContext = MemberAccessContext::Default;
   SmallVector<const Expr *, 16> ExprStack;
   SmallVector<bool, 4> PreconcurrencyCalleeStack;
   const ExportContext &Where;
+  MemberAccessContext MemberAccess = MemberAccessContext::Default;
+  KeyPathAccessContext KeyPathAccess = KeyPathAccessContext::None;
+  bool InInOutExpr = false;
+
+  /// A categorization of which accessors are used by a given storage access.
+  enum class StorageAccessKind {
+    Get,
+    Set,
+    GetSet,
+  };
+
+  /// Returns the storage access kind as indicated by the current member access
+  /// context.
+  StorageAccessKind getMemberStorageAccessKind() const {
+    switch (MemberAccess) {
+    case MemberAccessContext::Default:
+    case MemberAccessContext::Load:
+      return StorageAccessKind::Get;
+    case MemberAccessContext::Assignment:
+      return StorageAccessKind::Set;
+    case MemberAccessContext::Writeback:
+      return StorageAccessKind::GetSet;
+    }
+  }
 
 public:
   explicit ExprAvailabilityWalker(const ExportContext &Where)
@@ -2235,7 +2273,7 @@ public:
   PreWalkAction walkToArgumentPre(const Argument &Arg) override {
     // Arguments should be walked in their own member access context which
     // starts out read-only by default.
-    walkInContext(Arg.getExpr(), MemberAccessContext::Default);
+    walkInMemberAccessContext(Arg.getExpr(), MemberAccessContext::Default);
     return Action::SkipChildren();
   }
 
@@ -2252,7 +2290,8 @@ public:
     if (auto DR = dyn_cast<DeclRefExpr>(E)) {
       diagnoseDeclRefAvailability(DR->getDeclRef(), DR->getSourceRange(),
                                   getEnclosingApplyExpr(), std::nullopt);
-      maybeDiagStorageAccess(DR->getDecl(), DR->getSourceRange(), DC);
+      maybeDiagStorageAccess(DR->getDecl(), getMemberStorageAccessKind(),
+                             DR->getSourceRange(), DC);
     }
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
       walkMemberRef(MR);
@@ -2271,7 +2310,9 @@ public:
     if (auto S = dyn_cast<SubscriptExpr>(E)) {
       if (S->hasDecl()) {
         diagnoseDeclRefAvailability(S->getDecl(), S->getSourceRange(), S);
-        maybeDiagStorageAccess(S->getDecl().getDecl(), S->getSourceRange(), DC);
+        maybeDiagStorageAccess(S->getDecl().getDecl(),
+                               getMemberStorageAccessKind(),
+                               S->getSourceRange(), DC);
         PreconcurrencyCalleeStack.push_back(
             hasReferenceToPreconcurrencyDecl(S));
       }
@@ -2320,6 +2361,12 @@ public:
     }
     if (auto KP = dyn_cast<KeyPathExpr>(E)) {
       maybeDiagKeyPath(KP);
+    }
+    if (auto KPAE = dyn_cast<KeyPathApplicationExpr>(E)) {
+      KPAE->getBase()->walk(*this);
+      walkInKeyPathAccessContext(KPAE->getKeyPath(),
+                                 KeyPathAccessContext::Application);
+      return Action::SkipChildren(E);
     }
     if (auto A = dyn_cast<AssignExpr>(E)) {
       // Attempting to assign to a @preconcurrency declaration should
@@ -2399,7 +2446,7 @@ public:
     }
 
     if (auto LE = dyn_cast<LoadExpr>(E)) {
-      walkLoadExpr(LE);
+      walkInMemberAccessContext(LE->getSubExpr(), MemberAccessContext::Load);
       return Action::SkipChildren(E);
     }
 
@@ -2486,19 +2533,14 @@ private:
     // encountered walking (pre-order) is the Dest is the destination of the
     // write. For the moment this is fine -- but future syntax might violate
     // this assumption.
-    walkInContext(Dest, MemberAccessContext::Assignment);
+    walkInMemberAccessContext(Dest, MemberAccessContext::Assignment);
 
     // Check RHS in getter context
     Expr *Source = E->getSrc();
     if (!Source) {
       return;
     }
-    walkInContext(Source, MemberAccessContext::Default);
-  }
-
-  /// Walk a load expression, checking for availability.
-  void walkLoadExpr(LoadExpr *E) {
-    walkInContext(E->getSubExpr(), MemberAccessContext::Load);
+    walkInMemberAccessContext(Source, MemberAccessContext::Default);
   }
 
   /// Walk a member reference expression, checking for availability.
@@ -2514,10 +2556,10 @@ private:
     //           ╰─── MemberAccessContext::Writeback
     //
     MemberAccessContext accessContext =
-        (AccessContext == MemberAccessContext::Assignment)
+        (MemberAccess == MemberAccessContext::Assignment)
             ? MemberAccessContext::Writeback
-            : AccessContext;
-    walkInContext(E->getBase(), accessContext);
+            : MemberAccess;
+    walkInMemberAccessContext(E->getBase(), accessContext);
 
     ConcreteDeclRef DR = E->getMember();
     // Diagnose for the member declaration itself.
@@ -2527,7 +2569,62 @@ private:
 
     // Diagnose for appropriate accessors, given the access context.
     auto *DC = Where.getDeclContext();
-    maybeDiagStorageAccess(DR.getDecl(), E->getSourceRange(), DC);
+    maybeDiagStorageAccess(DR.getDecl(), getMemberStorageAccessKind(),
+                           E->getSourceRange(), DC);
+  }
+
+  StorageAccessKind getStorageAccessKindForKeyPath(KeyPathExpr *KP) const {
+    switch (KeyPathAccess) {
+    case KeyPathAccessContext::None: {
+      // Obj-C key paths are always considered mutable.
+      if (KP->isObjC())
+        return StorageAccessKind::GetSet;
+
+      // Check whether key path type indicates immutability, in which case only
+      // the getter will be used.
+      if (auto keyPathType = KP->getKeyPathType())
+        if (keyPathType->isKnownImmutableKeyPathType())
+          return StorageAccessKind::Get;
+
+      // Check if there's a conversion expression containing this one directly
+      // above it in the stack. If so, and that conversion is to an immutable
+      // key path type, then we should infer that use of the key path only
+      // implies use of the getter.
+      ArrayRef<const Expr *> exprs = ExprStack;
+      // Must be called while visiting the given key path expression.
+      ASSERT(exprs.back() == KP);
+
+      for (auto *expr : llvm::reverse(exprs.drop_back())) {
+        // Only traverse through conversions on the stack.
+        if (!isa<ImplicitConversionExpr>(expr) &&
+            !isa<OpenExistentialExpr>(expr))
+          break;
+
+        if (auto ty = expr->getType()) {
+          if (ty->isKnownImmutableKeyPathType())
+            return StorageAccessKind::Get;
+
+          if (auto existential = dyn_cast<ExistentialType>(ty)) {
+            if (auto superclass =
+                    existential->getExistentialLayout().getSuperclass()) {
+              if (superclass->isKnownImmutableKeyPathType())
+                return StorageAccessKind::Get;
+            }
+          }
+        }
+      }
+
+      // We failed to prove that the key path is only used immutably,
+      // so diagnose both get and set access.
+      return StorageAccessKind::GetSet;
+    }
+
+    case KeyPathAccessContext::Application:
+      // The key path is being applied directly to a base so treat it as if it
+      // were a direct access to the member in the current member access
+      // context.
+      return getMemberStorageAccessKind();
+    }
   }
 
   /// Walk a keypath expression, checking all of its components for
@@ -2538,6 +2635,8 @@ private:
     if (KP->isObjC())
       flags = DeclAvailabilityFlag::ForObjCKeyPath;
 
+    auto accessKind = getStorageAccessKindForKeyPath(KP);
+
     for (auto &component : KP->getComponents()) {
       switch (component.getKind()) {
       case KeyPathExpr::Component::Kind::Member:
@@ -2547,7 +2646,7 @@ private:
         auto range = component.getSourceRange();
         if (diagnoseDeclRefAvailability(decl, loc, nullptr, flags))
           break;
-        maybeDiagStorageAccess(decl.getDecl(), range, declContext);
+        maybeDiagStorageAccess(decl.getDecl(), accessKind, range, declContext);
         break;
       }
 
@@ -2572,13 +2671,15 @@ private:
 
   /// Walk an inout expression, checking for availability.
   void walkInOutExpr(InOutExpr *E) {
+    llvm::SaveAndRestore<bool> S(this->InInOutExpr, true);
+
     // Typically an InOutExpr should begin a `Writeback` context. However,
     // inside a LoadExpr this transition is suppressed since the entire
     // expression is being coerced to an r-value.
-    auto accessContext = AccessContext != MemberAccessContext::Load
+    auto accessContext = MemberAccess != MemberAccessContext::Load
                              ? MemberAccessContext::Writeback
-                             : AccessContext;
-    walkInContext(E->getSubExpr(), accessContext);
+                             : MemberAccess;
+    walkInMemberAccessContext(E->getSubExpr(), accessContext);
   }
 
   /// Walk an abstract closure expression, checking for availability
@@ -2595,16 +2696,23 @@ private:
     return;
   }
 
-  /// Walk the given expression in the member access context.
-  void walkInContext(Expr *E, MemberAccessContext AccessContext) {
-    llvm::SaveAndRestore<MemberAccessContext>
-      C(this->AccessContext, AccessContext);
+  /// Walk the given expression in a specific member access context.
+  void walkInMemberAccessContext(Expr *E, MemberAccessContext AccessContext) {
+    llvm::SaveAndRestore<MemberAccessContext> C(this->MemberAccess,
+                                                AccessContext);
+    E->walk(*this);
+  }
+
+  /// Walk the given expression in a specific key path access context.
+  void walkInKeyPathAccessContext(Expr *E, KeyPathAccessContext AccessContext) {
+    llvm::SaveAndRestore<KeyPathAccessContext> C(this->KeyPathAccess,
+                                                 AccessContext);
     E->walk(*this);
   }
 
   /// Emit diagnostics, if necessary, for accesses to storage where
   /// the accessor for the AccessContext is not available.
-  void maybeDiagStorageAccess(const ValueDecl *VD,
+  void maybeDiagStorageAccess(const ValueDecl *VD, StorageAccessKind accessKind,
                               SourceRange ReferenceRange,
                               const DeclContext *ReferenceDC) const {
     if (Context.LangOpts.DisableAvailabilityChecking)
@@ -2618,30 +2726,47 @@ private:
       return;
     }
 
+    // Avoid checking lazy property accessors if they haven't been
+    // synthesized yet, their availability is going to match the
+    // property itself. This is a workaround for lazy type-checking
+    // because synthesis of accessors for such properties requires
+    // a reference to `self` which won't be available because pattern
+    // binding for the variable was skipped.
+    //
+    // TODO: To fix this properly `getParentPatternBinding()`
+    // has to be refactored into a request to help establish association
+    // between a variable declaration and its pattern binding on demand
+    // instead of by using `typeCheckPatternBinding` called from the
+    // declaration checker.
+    if (D->getAttrs().hasAttribute<LazyAttr>()) {
+      auto *DC = D->getDeclContext();
+      if (DC->isTypeContext() && !(D->getAccessor(AccessorKind::Get) &&
+                                   D->getAccessor(AccessorKind::Set)))
+        return;
+    }
+
+    DeclAvailabilityFlags flags;
+    if (InInOutExpr)
+      flags |= DeclAvailabilityFlag::ForInout;
+
     // Check availability of accessor functions.
     // TODO: if we're talking about an inlineable storage declaration,
     // this probably needs to be refined to not assume that the accesses are
     // specifically using the getter/setter.
-    switch (AccessContext) {
-    case MemberAccessContext::Default:
-    case MemberAccessContext::Load:
+    switch (accessKind) {
+    case StorageAccessKind::Get:
       diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Get),
-                               ReferenceRange, ReferenceDC, std::nullopt);
+                               ReferenceRange, ReferenceDC, flags);
       break;
-
-    case MemberAccessContext::Assignment:
+    case StorageAccessKind::Set:
       diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
-                               ReferenceRange, ReferenceDC, std::nullopt);
+                               ReferenceRange, ReferenceDC, flags);
       break;
-
-    case MemberAccessContext::Writeback:
+    case StorageAccessKind::GetSet:
       diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Get),
-                               ReferenceRange, ReferenceDC,
-                               DeclAvailabilityFlag::ForInout);
-
+                               ReferenceRange, ReferenceDC, flags);
       diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
-                               ReferenceRange, ReferenceDC,
-                               DeclAvailabilityFlag::ForInout);
+                               ReferenceRange, ReferenceDC, flags);
       break;
     }
   }

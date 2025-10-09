@@ -630,3 +630,18 @@ suite.test("MutableSpan from UnsafeMutableBufferPointer")
 
   expectTrue(b.elementsEqual((0..<capacity).reversed()))
 }
+
+private func send(_: borrowing some Sendable & ~Copyable & ~Escapable) {}
+
+private struct NCSendable: ~Copyable, Sendable {}
+
+suite.test("MutableSpan Sendability")
+.require(.stdlib_6_2).code {
+  let buffer = UnsafeMutableBufferPointer<NCSendable>.allocate(capacity: 1)
+  defer { buffer.deallocate() }
+  buffer.initializeElement(at: 0, to: NCSendable())
+  defer { buffer.deinitialize() }
+
+  let span = MutableSpan(_unsafeElements: buffer)
+  send(span)
+}

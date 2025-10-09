@@ -92,7 +92,7 @@ struct LoweredParamGenerator {
                         unsigned numIgnoredTrailingParameters)
     : SGF(SGF), fnTy(SGF.F.getLoweredFunctionType()),
       parameterTypes(
-          SGF.F.getLoweredFunctionTypeInContext(SGF.B.getTypeExpansionContext())
+          SGF.F.getLoweredFunctionTypeInContext()
               ->getParameters().drop_back(numIgnoredTrailingParameters)) {}
 
   ParamDecl *paramDecl = nullptr;
@@ -631,7 +631,6 @@ class ArgumentInitHelper {
   std::optional<FunctionInputGenerator> FormalParamTypes;
 
   SmallPtrSet<ParamDecl *, 2> ScopedDependencies;
-  SmallPtrSet<ParamDecl *, 2> AddressableParams;
 
 public:
   ArgumentInitHelper(SILGenFunction &SGF,
@@ -729,16 +728,15 @@ private:
                                         : AbstractionPattern(substType));
 
       // A parameter can be directly marked as addressable, or its
-      // addressability can be implied by a scoped dependency.
-      bool isAddressable = false;
-      
-      isAddressable = pd->isAddressable()
-        || (ScopedDependencies.contains(pd)
-            && SGF.getTypeProperties(origType, substType)
-                  .isAddressableForDependencies());
-      if (isAddressable) {
-        AddressableParams.insert(pd);
-      }
+      // addressability can be implied by a scoped dependency or a borrow
+      // dependency.
+      bool isAddressable =
+          pd->isAddressable() ||
+          (ScopedDependencies.contains(pd) &&
+           SGF.getTypeProperties(origType, substType)
+               .isAddressableForDependencies()) ||
+          SGF.getFunction().getConventions().hasGuaranteedAddressResult() ||
+          SGF.getFunction().getConventions().hasGuaranteedResult();
       paramValue = argEmitter.handleParam(origType, substType, pd,
                                           isAddressable);
     }
@@ -793,6 +791,10 @@ private:
         }
       }
     }
+    // If we're relying on ManualOwnership for explicit-copies enforcement,
+    // we don't need @noImplicitCopy / MoveOnlyWrapper.
+    if (SGF.B.hasManualOwnershipAttr())
+      isNoImplicitCopy = false;
 
     // If we have a no implicit copy argument and the argument is trivial,
     // we need to use copyable to move only to convert it to its move only
@@ -1216,8 +1218,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   SILType ty = lowering.getLoweredType();
 
   bool isNoImplicitCopy;
-  
-  if (ty.isTrivial(SGF.F) || ty.isMoveOnly()) {
+
+  if (ty.isTrivial(SGF.F) || ty.isMoveOnly() ||
+      SGF.B.hasManualOwnershipAttr()) {
     isNoImplicitCopy = false;
   } else if (VD->isNoImplicitCopy()) {
     isNoImplicitCopy = true;
@@ -1537,6 +1540,13 @@ static void emitIndirectResultParameters(SILGenFunction &SGF,
                                          Type resultType,
                                          AbstractionPattern origResultType,
                                          DeclContext *DC) {
+  // Borrow and mutate accessors do not return indirectly.
+  if (auto *accessor = dyn_cast<AccessorDecl>(DC)) {
+    if (accessor->isBorrowAccessor() || accessor->isMutateAccessor()) {
+      return;
+    }
+  }
+
   CanType resultTypeInContext =
     DC->mapTypeIntoContext(resultType)->getCanonicalType();
 
@@ -1658,7 +1668,8 @@ uint16_t SILGenFunction::emitBasicProlog(
   emitIndirectResultParameters(*this, resultType, origResultType, DC);
 
   std::optional<AbstractionPattern> origErrorType;
-  if (origClosureType && !origClosureType->isTypeParameterOrOpaqueArchetype()) {
+  if (origClosureType && !origClosureType->isTypeParameterOrOpaqueArchetype() &&
+      !origClosureType->isClangType()) {
     origErrorType = origClosureType->getFunctionThrownErrorType();
     if (origErrorType && !errorType)
       errorType = origErrorType->getEffectiveThrownErrorType();

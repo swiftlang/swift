@@ -43,10 +43,8 @@ using llvm::SmallVectorImpl;
 /// Create a SILCloner for Existential Specilizer.
 namespace {
 class ExistentialSpecializerCloner
-    : public TypeSubstCloner<ExistentialSpecializerCloner,
-                             SILOptFunctionBuilder> {
-  using SuperTy =
-      TypeSubstCloner<ExistentialSpecializerCloner, SILOptFunctionBuilder>;
+    : public TypeSubstCloner<ExistentialSpecializerCloner> {
+  using SuperTy = TypeSubstCloner<ExistentialSpecializerCloner>;
   friend class SILInstructionVisitor<ExistentialSpecializerCloner>;
   friend class SILCloner<ExistentialSpecializerCloner>;
 
@@ -383,7 +381,7 @@ void ExistentialTransform::populateThunkBody() {
   SILModule &M = F->getModule();
 
   F->setThunk(IsSignatureOptimizedThunk);
-  F->setInlineStrategy(AlwaysInline);
+  F->setInlineStrategy(HeuristicAlwaysInline);
 
   /// Remove original body of F.
   for (auto It = F->begin(), End = F->end(); It != End;) {

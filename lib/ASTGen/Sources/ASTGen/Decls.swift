@@ -67,6 +67,9 @@ extension ASTGenVisitor {
       return self.generate(subscriptDecl: node).asDecl
     case .typeAliasDecl(let node):
       return self.generate(typeAliasDecl: node)?.asDecl
+    case .unexpectedCodeDecl:
+      // Ignore unexpected code.
+      return nil
     case .variableDecl(let node):
       return self.generate(variableDecl: node)
     case .usingDecl(let node):
@@ -396,10 +399,10 @@ extension ASTGenVisitor {
     case .`init`:
       return .Init
     case .read:
-      precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'read' accessor should only be parsed with 'CoroutineAccessors' feature")
+      precondition(ctx.langOpts.hasFeature(.CoroutineAccessors), "(compiler bug) 'read' accessor should only be parsed with 'CoroutineAccessors' feature")
       return .read
     case .modify:
-      precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'modify' accessor should only be parsed with 'CoroutineAccessors' feature")
+      precondition(ctx.langOpts.hasFeature(.CoroutineAccessors), "(compiler bug) 'modify' accessor should only be parsed with 'CoroutineAccessors' feature")
       return .modify
     default:
       self.diagnose(.unknownAccessorSpecifier(specifier))

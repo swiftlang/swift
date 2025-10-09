@@ -223,7 +223,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   // Special diagnostic for enums.
   if (T->is<EnumType>()) {
     if (DC->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
-      // New dialog mentioning @cdecl.
+      // New dialog mentioning @c.
       diags.diagnose(TypeRange.Start, diag::not_cdecl_or_objc_swift_enum,
                      language)
           .highlight(TypeRange)
@@ -776,7 +776,13 @@ bool swift::isRepresentableInLanguage(
           .limitBehavior(behavior);
       Reason.describe(accessor);
       return false;
-
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
+      diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
+                            diag::objc_borrow_mutate_accessor)
+          .limitBehavior(behavior);
+      Reason.describe(accessor);
+      return false;
     case AccessorKind::Read:
     case AccessorKind::Read2:
     case AccessorKind::Modify:
@@ -839,6 +845,23 @@ bool swift::isRepresentableInLanguage(
     }
   }
 
+  // Check that @objc functions can't have typed throw.
+  if (AFD->hasThrows()) {
+    Type thrownType = AFD->getThrownInterfaceType();
+    // TODO: only `throws(Error)` is allowed.
+    // Throwing `any MyError` that confronts `Error` is not implemented yet.
+    // Shall we allow `any MyError` in the future, we should check against
+    // `isExistentialType` instead, and other type checks will make sure it
+    // confrons to `Error`.
+    if (thrownType && !thrownType->isErrorExistentialType()) {
+      softenIfAccessNote(AFD, Reason.getAttr(),
+                         AFD->diagnose(diag::typed_throw_in_objc_forbidden, AFD)
+                             .limitBehavior(behavior));
+      Reason.describe(AFD);
+      return false;
+    }
+  }
+
   if (AFD->hasAsync()) {
     // Asynchronous functions move all of the result value and thrown error
     // information into a completion handler.
@@ -855,7 +878,7 @@ bool swift::isRepresentableInLanguage(
 
     // The completion handler transformation cannot properly represent a
     // dynamic 'Self' type, so disallow @objc for such methods.
-    if (FD->hasDynamicSelfResult()) {
+    if (FD->getResultInterfaceType()->hasDynamicSelfType()) {
       AFD->diagnose(diag::async_objc_dynamic_self)
           .highlight(AFD->getAsyncLoc())
           .limitBehavior(behavior);
@@ -1519,6 +1542,8 @@ shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit,
       case AccessorKind::WillSet:
       case AccessorKind::Init:
       case AccessorKind::DistributedGet:
+      case AccessorKind::Borrow:
+      case AccessorKind::Mutate:
         return false;
 
       case AccessorKind::MutableAddress:
@@ -1774,13 +1799,13 @@ static bool isCIntegerType(Type type) {
 static bool isEnumObjC(EnumDecl *enumDecl, DeclAttribute *attr) {
   // FIXME: Use shouldMarkAsObjC once it loses it's TypeChecker argument.
 
-  // If there is no @objc or @cdecl attribute, skip it.
+  // If there is no @objc or @c attribute, skip it.
   if (!attr)
     return false;
 
   Type rawType = enumDecl->getRawType();
 
-  // @objc/@cdecl enums must have a raw type.
+  // @objc/@c enums must have a raw type.
   if (!rawType) {
     enumDecl->diagnose(diag::objc_enum_no_raw_type, attr);
     return false;
@@ -4219,7 +4244,7 @@ TypeCheckCDeclFunctionRequest::evaluate(Evaluator &evaluator,
   auto &ctx = FD->getASTContext();
 
   auto lang = FD->getCDeclKind();
-  assert(lang && "missing @cdecl?");
+  assert(lang && "missing @c?");
   auto kind = lang == ForeignLanguage::ObjectiveC
                       ? ObjCReason::ExplicitlyUnderscoreCDecl
                       : ObjCReason::ExplicitlyCDecl;

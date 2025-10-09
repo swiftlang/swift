@@ -127,9 +127,13 @@ std::pair<clang::driver::Driver,
 ClangImporter::createClangDriver(
     const LangOptions &LangOpts, const ClangImporterOptions &ClangImporterOpts,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs) {
+
+  auto diagVFS = vfs ? vfs : llvm::vfs::getRealFileSystem();
+
+  clang::DiagnosticOptions diagOpts;
   auto *silentDiagConsumer = new clang::DiagnosticConsumer();
   auto clangDiags = clang::CompilerInstance::createDiagnostics(
-      new clang::DiagnosticOptions(), silentDiagConsumer);
+      *diagVFS, diagOpts, silentDiagConsumer);
   clang::driver::Driver clangDriver(ClangImporterOpts.clangPath,
                                     LangOpts.Target.str(), *clangDiags,
                                     "clang LLVM compiler", vfs);
@@ -412,7 +416,21 @@ static void getLibStdCxxFileMapping(
       "bits/unique_lock.h", "bits/unique_ptr.h", "bits/unordered_map.h",
       "bits/unordered_set.h", "bits/uses_allocator.h",
       "bits/uses_allocator_args.h", "bits/valarray_after.h",
-      "bits/valarray_array.h", "bits/valarray_before.h"};
+      "bits/valarray_array.h", "bits/valarray_before.h", "bits/version.h",
+      // C++20 and newer:
+      "barrier",
+      "compare",
+      "concepts",
+      "format",
+      "latch",
+      "numbers",
+      "ranges",
+      "semaphore",
+      "source_location",
+      "span",
+      "stop_token",
+      "syncstream",
+    };
   std::string additionalHeaderDirectives;
   llvm::raw_string_ostream os(additionalHeaderDirectives);
   os << contents.substr(0, headerInjectionPoint);
@@ -482,14 +500,23 @@ void GetWindowsFileMappings(
                              WindowsSDK.Path, WindowsSDK.MajorVersion,
                              WindowsSDK.IncludeVersion,
                              WindowsSDK.LibraryVersion)) {
+    assert(WindowsSDK.MajorVersion > 8);
     llvm::SmallString<261> WinSDKInjection{WindowsSDK.Path};
     llvm::sys::path::append(WinSDKInjection, "Include");
-    if (WindowsSDK.MajorVersion > 8)
-      llvm::sys::path::append(WinSDKInjection, WindowsSDK.IncludeVersion, "um");
+    llvm::sys::path::append(WinSDKInjection, WindowsSDK.IncludeVersion, "um");
     llvm::sys::path::append(WinSDKInjection, "module.modulemap");
 
-    AuxiliaryFile =
-        GetPlatformAuxiliaryFile("windows", "winsdk.modulemap", SearchPathOpts);
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "winsdk_um.modulemap",
+                                             SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
+                                               AuxiliaryFile);
+
+    llvm::sys::path::remove_filename(WinSDKInjection);
+    llvm::sys::path::remove_filename(WinSDKInjection);
+    llvm::sys::path::append(WinSDKInjection, "shared", "module.modulemap");
+    AuxiliaryFile = GetPlatformAuxiliaryFile(
+        "windows", "winsdk_shared.modulemap", SearchPathOpts);
     if (!AuxiliaryFile.empty())
       fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
                                                AuxiliaryFile);

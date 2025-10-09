@@ -1168,21 +1168,22 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
 
     // Open up the type of the requirement.
-    SmallVector<OpenedType, 4> reqReplacements;
-
     reqLocator =
         cs->getConstraintLocator(req, ConstraintLocator::ProtocolRequirement);
-    reqType =
-        cs->getTypeOfMemberReference(selfTy, req, dc,
-                                     /*isDynamicResult=*/false,
-                                     FunctionRefInfo::doubleBaseNameApply(),
-                                     reqLocator, &reqReplacements)
-            .adjustedReferenceType;
+    auto reqChoice = OverloadChoice::getDecl(
+        selfTy, req, FunctionRefInfo::doubleBaseNameApply());
+    auto reqTypeInfo =
+        cs->getTypeOfMemberReference(reqChoice, dc, reqLocator,
+                                     /*preparedOverload=*/nullptr);
+
+    reqType = reqTypeInfo.adjustedReferenceType;
     reqType = reqType->getRValueType();
+
+    Type reqThrownError = reqTypeInfo.thrownErrorTypeOnAccess;
 
     // For any type parameters we replaced in the witness, map them
     // to the corresponding archetypes in the witness's context.
-    for (const auto &replacement : reqReplacements) {
+    for (const auto &replacement : cs->getOpenedTypes(reqLocator)) {
       auto replacedInReq = Type(replacement.first).subst(reqSubMap);
 
       // If substitution failed, skip the requirement. This only occurs in
@@ -1200,55 +1201,30 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     }
 
     // Open up the witness type.
-    SmallVector<OpenedType, 4> witnessReplacements;
-
     witnessType = witness->getInterfaceType();
     witnessLocator =
         cs->getConstraintLocator(req, LocatorPathElt::Witness(witness));
+    DeclReferenceType openWitnessTypeInfo;
+
     if (witness->getDeclContext()->isTypeContext()) {
-      openWitnessType =
-          cs->getTypeOfMemberReference(selfTy, witness, dc,
-                                       /*isDynamicResult=*/false,
-                                       FunctionRefInfo::doubleBaseNameApply(),
-                                       witnessLocator, &witnessReplacements)
-              .adjustedReferenceType;
+      auto witnessChoice = OverloadChoice::getDecl(
+          selfTy, witness, FunctionRefInfo::doubleBaseNameApply());
+      openWitnessTypeInfo =
+          cs->getTypeOfMemberReference(witnessChoice, dc, witnessLocator,
+                                       /*preparedOverload=*/nullptr);
     } else {
-      openWitnessType =
+      auto witnessChoice = OverloadChoice::getDecl(
+          witness, FunctionRefInfo::doubleBaseNameApply());
+      openWitnessTypeInfo =
           cs->getTypeOfReference(
-                witness, FunctionRefInfo::doubleBaseNameApply(), witnessLocator,
-                /*useDC=*/nullptr, /*preparedOverload=*/nullptr)
-              .adjustedReferenceType;
+                witnessChoice, /*useDC=*/nullptr, witnessLocator,
+                /*preparedOverload=*/nullptr);
     }
+
+    openWitnessType = openWitnessTypeInfo.adjustedReferenceType;
     openWitnessType = openWitnessType->getRValueType();
 
-    Type reqThrownError;
-    Type witnessThrownError;
-
-    if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
-      auto *reqASD = cast<AbstractStorageDecl>(req);
-
-      // Dig out the thrown error types from the getter so we can compare them
-      // later.
-      auto getThrownErrorType = [](AbstractStorageDecl *asd) -> Type {
-        if (auto getter = asd->getEffectfulGetAccessor()) {
-          if (Type thrownErrorType = getter->getThrownInterfaceType()) {
-            return thrownErrorType;
-          } else if (getter->hasThrows()) {
-            return asd->getASTContext().getErrorExistentialType();
-          }
-        }
-
-        return asd->getASTContext().getNeverType();
-      };
-
-      reqThrownError = getThrownErrorType(reqASD);
-      reqThrownError = cs->openType(reqThrownError, reqReplacements,
-                                    reqLocator, /*preparedOverload=*/nullptr);
-
-      witnessThrownError = getThrownErrorType(witnessASD);
-      witnessThrownError = cs->openType(witnessThrownError, witnessReplacements,
-                                        witnessLocator, /*preparedOverload=*/nullptr);
-    }
+    Type witnessThrownError = openWitnessTypeInfo.thrownErrorTypeOnAccess;
 
     return std::make_tuple(std::nullopt, reqType, openWitnessType,
                            reqThrownError, witnessThrownError);
@@ -4049,16 +4025,14 @@ static void diagnoseProtocolStubFixit(
 
     // Issue diagnostics for witness types.
     if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(VD)) {
-      std::optional<InFlightDiagnostic> diag;
       if (isa<BuiltinTupleDecl>(DC->getSelfNominalTypeDecl())) {
         auto expectedTy = getTupleConformanceTypeWitness(DC, MissingTypeWitness);
-        diag.emplace(Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type_tuple,
-                                    MissingTypeWitness, expectedTy));
+        Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type_tuple,
+                       MissingTypeWitness, expectedTy);
       } else {
-        diag.emplace(Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
-                                    MissingTypeWitness));
+        Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
+                       MissingTypeWitness);
       }
-      diag.value().flush();
       continue;
     }
 
@@ -4208,7 +4182,6 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
             // If the main diagnostic is emitted on the conformance, we want to
             // attach the fix-it to the note that shows where the initializer is
             // defined.
-            fixItDiag.value().flush();
             fixItDiag.emplace(diags.diagnose(ctor, diag::decl_declared_here,
                                              ctor));
           }
@@ -4246,8 +4219,10 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
     // by holding onto Self accordingly.
     if (witness->getDeclContext()->getSelfClassDecl()) {
       const bool hasDynamicSelfResult = [&] {
-        if (auto func = dyn_cast<AbstractFunctionDecl>(witness)) {
-          return func->hasDynamicSelfResult();
+        if (isa<ConstructorDecl>(witness)) {
+          return true;
+        } else if (auto func = dyn_cast<FuncDecl>(witness)) {
+          return func->getResultInterfaceType()->hasDynamicSelfType();
         } else if (auto var = dyn_cast<VarDecl>(witness)) {
           return var->getInterfaceType()->hasDynamicSelfType();
         }
@@ -4387,7 +4362,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             if (diagLoc == witness->getLoc()) {
               fixDeclarationName(diag, witness, requirement->getName());
             } else {
-              diag.flush();
               diags.diagnose(witness, diag::decl_declared_here, witness);
             }
           }
@@ -4568,7 +4542,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             if (diagLoc == witness->getLoc()) {
               addOptionalityFixIts(adjustments, ctx, witness, diag);
             } else {
-              diag.flush();
               diags.diagnose(witness, diag::decl_declared_here, witness);
             }
           }
@@ -5661,7 +5634,6 @@ void ConformanceChecker::resolveValueWitnesses() {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
               // witness is defined.
-              fixItDiag.value().flush();
               fixItDiag.emplace(
                   witness->diagnose(diag::make_decl_objc, witness));
             }
@@ -5681,7 +5653,6 @@ void ConformanceChecker::resolveValueWitnesses() {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
               // witness is defined.
-              fixItDiag.value().flush();
               fixItDiag.emplace(
                   witness->diagnose(diag::make_decl_objc, witness));
             }
@@ -5701,7 +5672,6 @@ void ConformanceChecker::resolveValueWitnesses() {
               // If the main diagnostic is emitted on the conformance, we want
               // to attach the fix-it to the note that shows where the
               // witness is defined.
-              fixItDiag.value().flush();
               fixItDiag.emplace(
                   witness->diagnose(diag::make_decl_objc, witness));
             }
@@ -7126,6 +7096,8 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
     case AccessorKind::Init:
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
       // These accessors are never exposed to Objective-C.
       return result;
     case AccessorKind::DidSet:

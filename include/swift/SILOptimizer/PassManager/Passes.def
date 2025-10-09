@@ -51,7 +51,7 @@
 ///   This macro follows the same conventions as PASS(Id, Tag, Description),
 ///   but is used for IRGen passes which are built outside of the
 ///   SILOptimizer library.
-///   
+///
 ///   An IRGen pass is created by IRGen and needs to be registered with the pass
 ///   manager dynamically.
 #ifndef IRGEN_PASS
@@ -79,6 +79,8 @@ PASS(AddressEscapeInfoDumper, "dump-addr-escape-info",
      "Dumps address escape information")
 PASS(AccessDumper, "dump-access",
      "Dump access information")
+PASS(ConstantCapturePropagation, "constant-capture-propagation",
+     "Specialize closures with constant captures")
 PASS(ComputeEscapeEffects, "compute-escape-effects",
      "Computes function escape effects")
 PASS(ComputeSideEffects, "compute-side-effects",
@@ -148,10 +150,11 @@ PASS(TempRValueElimination, "temp-rvalue-elimination",
      "Remove short-lived immutable temporary copies")
 PASS(TempLValueElimination, "temp-lvalue-elimination",
      "Remove short-lived immutable temporary l-values")
+PASS(LoopInvariantCodeMotion, "loop-invariant-code-motion",
+     "New Loop Invariant Code Motion")
 
-// NOTE - ExperimentalSwiftBasedClosureSpecialization and AutodiffClosureSpecialization are a WIP
-PASS(ExperimentalSwiftBasedClosureSpecialization, "experimental-swift-based-closure-specialization",
-     "General closure-specialization pass written in Swift")
+PASS(ClosureSpecialization, "closure-specialization",
+     "Specialize functions with closure arguments")
 PASS(AutodiffClosureSpecialization, "autodiff-closure-specialization",
      "Autodiff specific closure-specialization pass")
 
@@ -159,8 +162,6 @@ MODULE_PASS(MandatoryAllocBoxToStack, "mandatory-allocbox-to-stack",
      "Mandatory stack promotion of box objects")
 MODULE_PASS(AsyncDemotion, "async-demotion",
      "Convert async functions to be synchronous")
-MODULE_PASS(RunUnitTests, "run-unit-tests",
-     "Runs the compiler internal unit tests")
 MODULE_PASS(FunctionUsesDumper, "dump-function-uses",
      "Dump the results of FunctionUses")
 MODULE_PASS(MandatoryPerformanceOptimizations, "mandatory-performance-optimizations",
@@ -236,8 +237,6 @@ LEGACY_PASS(CallerAnalysisPrinter, "caller-analysis-printer",
      "Print Caller Analysis for Testing")
 LEGACY_PASS(CapturePromotion, "capture-promotion",
      "Capture Promotion to Eliminate Escaping Boxes")
-LEGACY_PASS(CapturePropagation, "capture-prop",
-     "Captured Constant Propagation")
 LEGACY_PASS(ClosureSpecializer, "closure-specialize",
      "Closure Specialization on Constant Function Arguments")
 
@@ -331,8 +330,6 @@ LEGACY_PASS(MandatoryARCOpts, "mandatory-arc-opts",
      "Mandatory ARC Optimization")
 LEGACY_PASS(HighLevelCSE, "high-level-cse",
      "Common Subexpression Elimination on High-Level SIL")
-LEGACY_PASS(HighLevelLICM, "high-level-licm",
-     "Loop Invariant Code Motion in High-Level SIL")
 LEGACY_PASS(IVInfoPrinter, "iv-info-printer",
      "Print Induction Variable Information for Testing")
 LEGACY_PASS(LowerHopToActor, "lower-hop-to-actor",
@@ -345,8 +342,6 @@ LEGACY_PASS(JumpThreadSimplifyCFG, "jumpthread-simplify-cfg",
      "Simplify CFG via Jump Threading")
 LEGACY_PASS(LetPropertiesOpt, "let-properties-opt",
      "Let Property Optimization")
-LEGACY_PASS(LICM, "licm",
-     "Loop Invariant Code Motion")
 LEGACY_PASS(LateCodeMotion, "late-codemotion",
      "Late Code Motion with Release Hoisting")
 LEGACY_PASS(LateDeadFunctionAndGlobalElimination, "late-deadfuncelim",
@@ -367,6 +362,8 @@ LEGACY_PASS(LowerAggregateInstrs, "lower-aggregate-instrs",
      "Lower Aggregate SIL Instructions to Multiple Scalar Operations")
 LEGACY_PASS(MandatoryInlining, "mandatory-inlining",
      "Mandatory Inlining of Transparent Functions")
+LEGACY_PASS(InlineAlwaysInlining, "inline-always-inlining",
+     "Inlining of '@inline(always)' Functions")
 LEGACY_PASS(Mem2Reg, "mem2reg",
      "Memory to SSA Value Conversion to Remove Stack Allocation")
 LEGACY_PASS(MoveCondFailToPreds, "move-cond-fail-to-preds",
@@ -381,9 +378,6 @@ LEGACY_PASS(ModulePrinter, "module-printer",
      "Print the module")
 LEGACY_PASS(NestedSemanticFunctionCheck, "nested-semantic-function-check",
      "Diagnose improperly nested '@_semantics' functions")
-LEGACY_PASS(NonTransparentFunctionOwnershipModelEliminator,
-     "non-transparent-func-ownership-model-eliminator",
-     "Eliminate Ownership Annotations from non-transparent SIL Functions")
 LEGACY_PASS(RCIdentityDumper, "rc-id-dumper",
      "Print Reference Count Identities")
 LEGACY_PASS(AlwaysInlineInliner, "always-inline",

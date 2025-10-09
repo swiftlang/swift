@@ -31,7 +31,7 @@ extension ASTGenVisitor {
 
     // Comments.
     COMMENT: if
-      self.ctx.langOptsAttachCommentsToDecls,
+      self.ctx.langOpts.attachCommentsToDecls,
       let firstTok = node.firstToken(viewMode: .sourceAccurate)
     {
       var pos = firstTok.position
@@ -265,8 +265,10 @@ extension ASTGenVisitor {
         .LexicalLifetimes,
         .LLDBDebuggerFunction,
         .MainType,
+        .ManualOwnership,
         .Marker,
         .MoveOnly,
+        .NeverEmitIntoClient,
         .NoAllocation,
         .NoDerivative,
         .NoEagerMove,
@@ -307,7 +309,8 @@ extension ASTGenVisitor {
         .UsableFromInline,
         .Used,
         .WarnUnqualifiedAccess,
-        .WeakLinked:
+        .WeakLinked,
+        .UnsafeSelfDependentResult:
 
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: attrKind!))
 
@@ -1061,6 +1064,7 @@ extension ASTGenVisitor {
   ///   ```
   ///   @inline(never)
   ///   @inline(__always)
+  ///   @inline(always)
   ///   ```
   func generateInlineAttr(attribute node: AttributeSyntax) -> BridgedInlineAttr? {
     let kind: swift.InlineKind? = self.generateSingleAttrOption(
@@ -1068,7 +1072,8 @@ extension ASTGenVisitor {
       {
         switch $0.rawText {
         case "never": return .never
-        case "__always": return .always
+        case "__always": return .alwaysUnderscored
+        case "always": return .always
         default: return nil
         }
       }
@@ -2226,7 +2231,7 @@ extension ASTGenVisitor {
   }
 
   func generateUnavailableInEmbeddedAttr(attribute node: AttributeSyntax) -> BridgedAvailableAttr? {
-    if ctx.langOptsHasFeature(.Embedded) {
+    if ctx.langOpts.hasFeature(.Embedded) {
       return BridgedAvailableAttr.createUnavailableInEmbedded(
         self.ctx,
         atLoc: self.generateSourceLoc(node.atSign),

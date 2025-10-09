@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -import-objc-header %S/Inputs/protocol-member-renaming.h -verify %s
+// RUN: %target-swift-frontend -typecheck -import-objc-header %S/Inputs/protocol-member-renaming.h -verify -verify-ignore-unrelated %s
 
 // REQUIRES: objc_interop
 

@@ -3,6 +3,8 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
 

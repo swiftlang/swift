@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/main.swift
-// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify -swift-version 4.2 %t/main.swift
+// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -swift-version 4.2 %t/main.swift
 
 func testUnaryMinusInUnsigned() {
   var a: UInt8 = -(1) // expected-error {{no '-' candidates produce the expected contextual result type 'UInt8'}} expected-note * {{}} expected-warning * {{}}

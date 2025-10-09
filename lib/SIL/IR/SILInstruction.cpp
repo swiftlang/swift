@@ -1026,15 +1026,15 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     // Handle LLVM intrinsic functions.
     const IntrinsicInfo &IInfo = BI->getIntrinsicInfo();
     if (IInfo.ID != llvm::Intrinsic::not_intrinsic) {
-      auto IAttrs = IInfo.getOrCreateAttributes(getModule().getASTContext());
+      auto &IAttrs = IInfo.getOrCreateFnAttributes(getModule().getASTContext());
       auto MemEffects = IAttrs.getMemoryEffects();
       // Read-only.
       if (MemEffects.onlyReadsMemory() &&
-          IAttrs.hasFnAttr(llvm::Attribute::NoUnwind))
+          IAttrs.hasAttribute(llvm::Attribute::NoUnwind))
         return MemoryBehavior::MayRead;
       // Read-none?
       return MemEffects.doesNotAccessMemory() &&
-                     IAttrs.hasFnAttr(llvm::Attribute::NoUnwind)
+                     IAttrs.hasAttribute(llvm::Attribute::NoUnwind)
                  ? MemoryBehavior::None
                  : MemoryBehavior::MayHaveSideEffects;
     }

@@ -54,7 +54,7 @@ import SIL
 let allocBoxToStack = FunctionPass(name: "allocbox-to-stack") {
   (function: Function, context: FunctionPassContext) in
 
-  _ = tryConvertBoxesToStack(in: function, context)
+  _ = tryConvertBoxesToStack(in: function, isMandatory: false, context)
 }
 
 /// The "mandatory" version of the pass, which runs in the mandatory pipeline.
@@ -72,7 +72,7 @@ let mandatoryAllocBoxToStack = ModulePass(name: "mandatory-allocbox-to-stack") {
 
   while let function = worklist.pop() {
     moduleContext.transform(function: function) { context in
-      let specFns = tryConvertBoxesToStack(in: function, context)
+      let specFns = tryConvertBoxesToStack(in: function, isMandatory: true, context)
       worklist.pushIfNotVisited(contentsOf: specFns.specializedFunctions)
       originalsOfSpecializedFunctions.pushIfNotVisited(contentsOf: specFns.originalFunctions)
     }
@@ -86,9 +86,11 @@ let mandatoryAllocBoxToStack = ModulePass(name: "mandatory-allocbox-to-stack") {
 /// Converts all non-escaping `alloc_box` to `alloc_stack` and specializes called functions if a
 /// box is passed to a function.
 /// Returns the list of original functions for which a specialization has been created.
-private func tryConvertBoxesToStack(in function: Function, _ context: FunctionPassContext) -> FunctionSpecializations {
+private func tryConvertBoxesToStack(in function: Function, isMandatory: Bool,
+                                    _ context: FunctionPassContext
+) -> FunctionSpecializations {
   var promotableBoxes = Array<(AllocBoxInst, Flags)>()
-  var functionsToSpecialize = FunctionSpecializations()
+  var functionsToSpecialize = FunctionSpecializations(isMandatory: isMandatory)
 
   findPromotableBoxes(in: function, &promotableBoxes, &functionsToSpecialize)
 
@@ -189,6 +191,9 @@ private struct FunctionSpecializations {
   private var promotableArguments = CrossFunctionValueWorklist()
   private var originals = FunctionWorklist()
   private var originalToSpecialized = Dictionary<Function, Function>()
+  private let isMandatory: Bool
+
+  init(isMandatory: Bool) { self.isMandatory = isMandatory }
 
   var originalFunctions: [Function] { originals.functions }
   var specializedFunctions: [Function] { originals.functions.lazy.map { originalToSpecialized[$0]! } }
@@ -221,6 +226,12 @@ private struct FunctionSpecializations {
         context.erase(instruction: user)
       case let projectBox as ProjectBoxInst:
         assert(projectBox.fieldIndex == 0, "only single-field boxes are handled")
+        if isMandatory {
+          // Once we have promoted the box to stack, access violations can be detected statically by the
+          // DiagnoseStaticExclusivity pass (which runs after MandatoryAllocBoxToStack).
+          // Therefore we can convert dynamic accesses to static accesses.
+          makeAccessesStatic(of: projectBox, context)
+        }
         projectBox.replace(with: stack, context)
       case is MarkUninitializedInst, is CopyValueInst, is BeginBorrowInst, is MoveValueInst:
         // First, replace the instruction with the original `box`, which adds more uses to `box`.
@@ -250,7 +261,7 @@ private struct FunctionSpecializations {
 
     switch apply {
     case let applyInst as ApplyInst:
-      let newApply = builder.createApply(function: specializedCallee, applyInst.substitutionMap, arguments: newArgs)
+      let newApply = builder.createApply(function: specializedCallee, applyInst.substitutionMap, arguments: newArgs, isNonThrowing: applyInst.isNonThrowing)
       applyInst.replace(with: newApply, context)
     case let partialAp as PartialApplyInst:
       let newApply = builder.createPartialApply(function: specializedCallee, substitutionMap:
@@ -311,10 +322,9 @@ private struct FunctionSpecializations {
       // This can happen if a previous run of the pass already created this specialization.
       return
     }
-    let cloner = SpecializationCloner(emptySpecializedFunction: specializedFunc, context)
-    cloner.cloneFunctionBody(from: original)
-
     context.buildSpecializedFunction(specializedFunction: specializedFunc) { (specializedFunc, specContext) in
+      cloneFunction(from: original, toEmpty: specializedFunc, specContext)
+
       replaceBoxWithStackArguments(in: specializedFunc, original: original, specContext)
     }
     context.notifyNewFunction(function: specializedFunc, derivedFrom: original)
@@ -362,8 +372,33 @@ private func createAllocStack(for allocBox: AllocBoxInst, flags: Flags, _ contex
   for destroy in getFinalDestroys(of: allocBox, context) {
     let loc = allocBox.location.asCleanup.withScope(of: destroy.location)
     Builder.insert(after: destroy, location: loc, context) { builder in
-      if  !unboxedType.isTrivial(in: allocBox.parentFunction), !(destroy is DeallocBoxInst) {
+      if !(destroy is DeallocBoxInst),
+         context.deadEndBlocks.isDeadEnd(destroy.parentBlock),
+         !isInLoop(block: destroy.parentBlock, context) {
+        // "Last" releases in dead-end regions may not actually destroy the box
+        // and consequently may not actually release the stored value.  That's
+        // because values (including boxes) may be leaked along paths into
+        // dead-end regions.  Thus it is invalid to lower such final releases of
+        // the box to destroy_addr's/dealloc_box's of the stack-promoted storage.
+        //
+        // There is one exception: if the alloc_box is in a dead-end loop.  In
+        // that case SIL invariants require that the final releases actually
+        // destroy the box; otherwise, a box would leak once per loop.  To check
+        // for this, it is sufficient check that the LastRelease is in a dead-end
+        // loop: if the alloc_box is not in that loop, then the entire loop is in
+        // the live range, so no release within the loop would be a "final
+        // release".
+        //
+        // None of this applies to dealloc_box instructions which always destroy
+        // the box.
+        return
+      }
+      if !unboxedType.isTrivial(in: allocBox.parentFunction), !(destroy is DeallocBoxInst) {
         builder.createDestroyAddr(address: stackLocation)
+      }
+      if let dbi = destroy as? DeallocBoxInst, dbi.isDeadEnd {
+        // Don't bother to create dealloc_stack instructions in dead-ends.
+        return
       }
       builder.createDeallocStack(asi)
     }
@@ -449,8 +484,16 @@ private func hoistMarkUnresolvedInsts(stackAddress: Value,
     builder = Builder(atBeginOf: stackAddress.parentBlock, context)
   }
   let mu = builder.createMarkUnresolvedNonCopyableValue(value: stackAddress, checkKind: checkKind,  isStrict: false)
-  stackAddress.uses.ignore(user: mu).ignoreDebugUses.ignoreUsers(ofType: DeallocStackInst.self)
+  stackAddress.uses.ignore(user: mu).ignoreDebugUses.ignoreUses(ofType: DeallocStackInst.self)
     .replaceAll(with: mu, context)
+}
+
+private func makeAccessesStatic(of address: Value, _ context: FunctionPassContext) {
+  for beginAccess in address.uses.users(ofType: BeginAccessInst.self) {
+    if beginAccess.enforcement == .dynamic {
+      beginAccess.set(enforcement: .static, context: context)
+    }
+  }
 }
 
 private extension ApplySite {
@@ -461,7 +504,8 @@ private extension ApplySite {
     {
       if self is FullApplySite,
          // If the function is inlined later, there is no point in specializing it.
-         !callee.shouldOptimize || callee.inlineStrategy == .always
+         !callee.shouldOptimize || callee.inlineStrategy == .heuristicAlways ||
+         callee.inlineStrategy == .always
       {
         return nil
       }

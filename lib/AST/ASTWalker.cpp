@@ -616,7 +616,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }                                                      \
   } while (false)
 
-  Expr *visitErrorExpr(ErrorExpr *E) { return E; }
+  Expr *visitErrorExpr(ErrorExpr *E) {
+    if (auto *origExpr = E->getOriginalExpr()) {
+      auto *newOrigExpr = doIt(origExpr);
+      if (!newOrigExpr)
+        return nullptr;
+      E->setOriginalExpr(newOrigExpr);
+    }
+    return E;
+  }
   Expr *visitCodeCompletionExpr(CodeCompletionExpr *E) {
     if (Expr *baseExpr = E->getBase()) {
       Expr *newBaseExpr = doIt(baseExpr);
@@ -1377,6 +1385,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
 
   Expr *visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
+    if (auto preamble = E->getForExpressionPreamble()) {
+      if (doIt(preamble->ForAccumulatorDecl)) {
+        return nullptr;
+      }
+
+      if (doIt(preamble->ForAccumulatorBinding)) {
+        return nullptr;
+      }
+    }
+
     if (auto *S = doIt(E->getStmt())) {
       E->setStmt(S);
     } else {
@@ -2259,6 +2277,12 @@ Pattern *Traversal::visitBoolPattern(BoolPattern *P) {
 
 #pragma mark Type representation traversal
 bool Traversal::visitErrorTypeRepr(ErrorTypeRepr *T) {
+  if (auto *originalExpr = T->getOriginalExpr()) {
+    auto *newExpr = doIt(originalExpr);
+    if (!newExpr)
+      return true;
+    T->setOriginalExpr(newExpr);
+  }
   return false;
 }
 

@@ -18,7 +18,7 @@ import CountedByNoEscapeClang
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(func: copy func)
+// CHECK-NEXT: @_lifetime(`func`: copy `func`)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func clash(func: inout MutableSpan<Int32>?, clash where: Int32)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
@@ -38,7 +38,7 @@ import CountedByNoEscapeClang
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(func: copy func)
+// CHECK-NEXT: @_lifetime(`func`: copy `func`)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func funcRenamed(func: inout MutableSpan<Int32>?, extension: Int32, init: Int32, open: Int32, var: Int32, is: Int32, as: Int32, in: Int32, guard: Int32, where: Int32) -> UnsafeMutableRawPointer!
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
@@ -53,7 +53,7 @@ import CountedByNoEscapeClang
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(func: copy func)
+// CHECK-NEXT: @_lifetime(`func`: copy `func`)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func keyword(_ func: inout MutableSpan<Int32>?, _ extension: Int32, _ init: Int32, _ open: Int32, _ var: Int32, _ is: Int32, _ as: Int32, _ in: Int32, _ guard: Int32, _ where: Int32)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
@@ -83,7 +83,7 @@ import CountedByNoEscapeClang
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(func: copy func)
+// CHECK-NEXT: @_lifetime(`func`: copy `func`)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func open(func: inout MutableSpan<Int32>?, open where: Int32)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
@@ -154,8 +154,8 @@ public func callReturnLifetimeBound(_ p: inout MutableSpan<CInt>) {
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @inlinable
 public func callReturnPointer() {
-  let _: UnsafeMutableBufferPointer<CInt>? = returnPointer(4) // call wrapper
-  let _: UnsafeMutablePointer<CInt>? = returnPointer(4) // call unsafe interop
+  let _: UnsafeMutableBufferPointer<CInt>? = unsafe returnPointer(4) // call wrapper
+  let _: UnsafeMutablePointer<CInt>? = unsafe returnPointer(4) // call unsafe interop
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -205,7 +205,7 @@ public func callFunc(_ p: inout MutableSpan<CInt>?) {
 @_lifetime(p: copy p)
 @inlinable
 public func callFuncRenameKeyword(_ p: inout MutableSpan<CInt>?) {
-  let _ = funcRenamed(func: &p, extension: 1, init: 2, open: 3, var: 4, is: 5, as: 6, in: 7, guard: 8, where: 9)
+  let _ = unsafe funcRenamed(func: &p, extension: 1, init: 2, open: 3, var: 4, is: 5, as: 6, in: 7, guard: 8, where: 9)
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)

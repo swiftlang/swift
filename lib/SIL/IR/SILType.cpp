@@ -655,10 +655,19 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
   case ResultConvention::Owned:
     return OwnershipKind::Owned;
   case ResultConvention::Unowned:
+    // We insert a retain right after the call returning an unowned value in
+    // OwnershipModelEliminator. So treat the result as owned.
+    if (IsTrivial)
+      return OwnershipKind::None;
+    return OwnershipKind::Owned;
   case ResultConvention::UnownedInnerPointer:
     if (IsTrivial)
       return OwnershipKind::None;
     return OwnershipKind::Unowned;
+  case ResultConvention::GuaranteedAddress:
+    return OwnershipKind::None;
+  case ResultConvention::Guaranteed:
+    return OwnershipKind::Guaranteed;
   }
 
   llvm_unreachable("Unhandled ResultConvention in switch.");
@@ -1239,7 +1248,7 @@ SILType SILType::addingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
   auto oldField = oldLayout->getFields()[0];
   if (oldField.getLoweredType()->is<SILMoveOnlyWrappedType>())
     return *this;
-  assert(!oldField.getLoweredType()->isNoncopyable() &&
+  assert(oldField.getLoweredType()->isCopyable() &&
          "Cannot moveonlywrapped in a moveonly type");
   auto newField =
       SILField(SILMoveOnlyWrappedType::get(oldField.getLoweredType()),

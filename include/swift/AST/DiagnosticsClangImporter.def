@@ -105,6 +105,12 @@ GROUPED_WARNING(clang_ignored_sendable_attr, ClangDeclarationImport, none,
         "cannot be added to it",
         (Type))
 
+GROUPED_WARNING(warn_clang_ignored_bounds_on_self, ClangDeclarationImport, none,
+                "bounds attribute '%0' ignored on parameter mapped to 'self'",
+                (StringRef))
+NOTE(note_swift_name_instance_method, none,
+     "swift_name maps free function to instance method here", ())
+
 WARNING(implicit_bridging_header_imported_from_module,none,
         "implicit import of bridging header '%0' via module %1 "
         "is deprecated and will be removed in a later version of Swift",
@@ -261,14 +267,17 @@ ERROR(foreign_reference_types_invalid_retain_release, none,
 
 ERROR(foreign_reference_types_retain_non_void_or_self_return_type, none,
       "specified retain function '%0' is invalid; "
-      "retain function must have 'void' or parameter return type",
+      "retain function must either return have 'void', the reference count as an integer, or the parameter type",
       (StringRef))
 ERROR(foreign_reference_types_release_non_void_return_type, none,
       "specified release function '%0' is invalid; "
-      "release function must have 'void' return type",
+      "release function must either return 'void' or the reference count as an integer",
       (StringRef))
 ERROR(foreign_reference_types_retain_release_not_a_function_decl, none,
       "specified %select{retain|release}0 function '%1' is not a function",
+      (bool, StringRef))
+ERROR(foreign_reference_types_retain_release_not_an_instance_function, none,
+      "specified %select{retain|release}0 function '%1' is a static function; expected an instance function",
       (bool, StringRef))
 ERROR(conforms_to_missing_dot, none,
       "expected module name and protocol name separated by '.' in protocol "
@@ -299,19 +308,11 @@ ERROR(both_returns_retained_returns_unretained, none,
 ERROR(redundant_conformance_protocol,none,
      "redundant conformance of %0 to protocol '%1'", (Type, StringRef))
 
-ERROR(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
-      "%0 cannot be annotated with either SWIFT_RETURNS_RETAINED or "
+WARNING(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
+      "%0 should not be annotated with SWIFT_RETURNS_RETAINED or "
       "SWIFT_RETURNS_UNRETAINED because it is not returning "
       "a SWIFT_SHARED_REFERENCE type",
       (const clang::NamedDecl *))
-
-// TODO: In the next C++ interop version, convert this warning into an error and
-// stop importing unannotated C++ APIs that return SWIFT_SHARED_REFERENCE.
-// rdar://138806722
-GROUPED_WARNING(no_returns_retained_returns_unretained, ClangDeclarationImport, none,
-        "%0 should be annotated with either SWIFT_RETURNS_RETAINED or "
-        "SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE",
-        (const clang::NamedDecl *))
 
 GROUPED_WARNING(returns_retained_returns_unretained_on_overloaded_operator,  ClangDeclarationImport, none,
         "SWIFT_RETURNS_RETAINED and SWIFT_RETURNS_UNRETAINED is not supported "

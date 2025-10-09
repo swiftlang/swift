@@ -45,6 +45,7 @@ add_swift_host_library(swiftAST STATIC
   Decl.cpp
   DeclContext.cpp
   DeclContextDumper.cpp
+  DeclNameExtractor.cpp
   DeclNameLoc.cpp
   DiagnosticArgument.cpp
   DiagnosticBridge.cpp
@@ -179,7 +180,7 @@ target_link_libraries(swiftAST
 
 if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_link_libraries(swiftAST
-    PRIVATE swiftASTGen)
+    PRIVATE swiftASTGen swiftBasicSwift)
 endif()
 
 set_swift_llvm_is_available(swiftAST)

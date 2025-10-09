@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 956; // nonisolated(nonsending) isolation was moved
+const uint16_t SWIFTMODULE_VERSION_MINOR = 965; // WriteImplKindField and ReadWriteImplKindField size
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -208,7 +208,11 @@ enum class ReadImplKind : uint8_t {
   Address,
   Read,
   Read2,
+  Borrow,
+  LastReadImplKind = Borrow,
 };
+static_assert(countBitsUsed(static_cast<unsigned>(
+                  ReadImplKind::LastReadImplKind)) <= 3);
 using ReadImplKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
@@ -222,8 +226,12 @@ enum class WriteImplKind : uint8_t {
   MutableAddress,
   Modify,
   Modify2,
+  Mutate,
+  LastWriteImplKind = Mutate,
 };
-using WriteImplKindField = BCFixed<3>;
+static_assert(countBitsUsed(static_cast<unsigned>(
+                  WriteImplKind::LastWriteImplKind)) <= 4);
+using WriteImplKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -236,8 +244,12 @@ enum class ReadWriteImplKind : uint8_t {
   Modify2,
   StoredWithDidSet,
   InheritedWithDidSet,
+  Mutate,
+  LastReadWriteImplKind = Mutate,
 };
-using ReadWriteImplKindField = BCFixed<3>;
+static_assert(countBitsUsed(static_cast<unsigned>(
+                  ReadWriteImplKind::LastReadWriteImplKind)) <= 4);
+using ReadWriteImplKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -344,6 +356,8 @@ enum AccessorKind : uint8_t {
   Modify2,
   Init,
   DistributedGet,
+  Borrow,
+  Mutate,
 };
 using AccessorKindField = BCFixed<4>;
 
@@ -428,6 +442,8 @@ enum class ResultConvention : uint8_t {
   UnownedInnerPointer,
   Autoreleased,
   Pack,
+  GuaranteedAddress,
+  Guaranteed,
 };
 using ResultConventionField = BCFixed<3>;
 
@@ -707,7 +723,7 @@ enum class FunctionTypeIsolation : uint8_t {
   NonIsolated,
   Parameter,
   Erased,
-  NonIsolatedCaller,
+  NonIsolatedNonsending,
   // NOTE: All of the new kinds should be added above.
   GlobalActorOffset, // Add this to the global actor type ID
 };
@@ -898,7 +914,6 @@ namespace control_block {
     TARGET,
     SDK_NAME,
     REVISION,
-    IS_OSSA,
     ALLOWABLE_CLIENT_NAME,
     CHANNEL,
     SDK_VERSION,
@@ -935,11 +950,6 @@ namespace control_block {
   using RevisionLayout = BCRecordLayout<
     REVISION,
     BCBlob
-  >;
-
-  using IsOSSALayout = BCRecordLayout<
-    IS_OSSA,
-    BCFixed<1>
   >;
 
   using AllowableClientLayout = BCRecordLayout<
@@ -987,7 +997,8 @@ namespace options_block {
     CXX_STDLIB_KIND,
     PUBLIC_MODULE_NAME,
     SWIFT_INTERFACE_COMPILER_VERSION,
-    STRICT_MEMORY_SAFETY
+    STRICT_MEMORY_SAFETY,
+    DEFERRED_CODE_GEN,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1086,6 +1097,10 @@ namespace options_block {
 
   using StrictMemorySafetyLayout = BCRecordLayout<
     STRICT_MEMORY_SAFETY
+  >;
+
+  using DeferredCodeGenLayout = BCRecordLayout<
+    DEFERRED_CODE_GEN
   >;
 
   using PublicModuleNameLayout = BCRecordLayout<
@@ -1740,6 +1755,7 @@ namespace decls_block {
     BCFixed<1>,              // isConst?
     BCFixed<1>,              // isSending?
     BCFixed<1>,              // isCallerIsolated?
+    BCFixed<1>,              // isAddressable?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type
     ActorIsolationField,     // default argument isolation
@@ -2535,7 +2551,7 @@ namespace decls_block {
   >;
 
   using ExposeDeclAttrLayout = BCRecordLayout<Expose_DECL_ATTR,
-                                              BCFixed<1>, // exposure kind
+                                              BCFixed<2>, // exposure kind
                                               BCFixed<1>, // implicit flag
                                               BCBlob      // declaration name
                                               >;

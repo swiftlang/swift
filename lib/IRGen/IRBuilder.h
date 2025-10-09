@@ -139,11 +139,11 @@ public:
 
   using IRBuilderBase::CreateOr;
   llvm::Value *CreateOr(llvm::Value *LHS, llvm::Value *RHS,
-                        const Twine &Name = "") {
+                        const Twine &Name = "", bool IsDisjoint = false) {
     if (auto *RC = dyn_cast<llvm::Constant>(RHS))
       if (RC->isNullValue())
         return LHS;  // LHS | 0 -> LHS
-    return IRBuilderBase::CreateOr(LHS, RHS, Name);
+    return IRBuilderBase::CreateOr(LHS, RHS, Name, IsDisjoint);
   }
   llvm::Value *CreateOr(llvm::Value *LHS, const APInt &RHS,
                         const Twine &Name = "") {
@@ -311,8 +311,8 @@ public:
   // FunctionPointer.
 
   bool isTrapIntrinsic(llvm::Value *Callee) {
-    return Callee ==
-           llvm::Intrinsic::getDeclaration(getModule(), llvm::Intrinsic::trap);
+    return Callee == llvm::Intrinsic::getOrInsertDeclaration(
+                         getModule(), llvm::Intrinsic::trap);
   }
   bool isTrapIntrinsic(llvm::Intrinsic::ID intrinsicID) {
     return intrinsicID == llvm::Intrinsic::trap;
@@ -382,7 +382,7 @@ public:
                                       const Twine &name = "") {
     assert(!isTrapIntrinsic(intrinsicID) && "Use CreateNonMergeableTrap");
     auto intrinsicFn =
-      llvm::Intrinsic::getDeclaration(getModule(), intrinsicID);
+        llvm::Intrinsic::getOrInsertDeclaration(getModule(), intrinsicID);
     return CreateCallWithoutDbgLoc(
         cast<llvm::FunctionType>(intrinsicFn->getValueType()), intrinsicFn,
         args, name);
@@ -394,8 +394,8 @@ public:
                                       ArrayRef<llvm::Value *> args,
                                       const Twine &name = "") {
     assert(!isTrapIntrinsic(intrinsicID) && "Use CreateNonMergeableTrap");
-    auto intrinsicFn =
-      llvm::Intrinsic::getDeclaration(getModule(), intrinsicID, typeArgs);
+    auto intrinsicFn = llvm::Intrinsic::getOrInsertDeclaration(
+        getModule(), intrinsicID, typeArgs);
     return CreateCallWithoutDbgLoc(
         cast<llvm::FunctionType>(intrinsicFn->getValueType()), intrinsicFn,
         args, name);

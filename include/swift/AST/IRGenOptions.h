@@ -29,9 +29,9 @@
 #include "llvm/IR/CallingConv.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
-#include "llvm/Transforms/Instrumentation.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/VersionTuple.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Instrumentation.h"
 #include <optional>
 #include <string>
 #include <tuple>
@@ -498,8 +498,6 @@ public:
   /// Internalize symbols (static library) - do not export any public symbols.
   unsigned InternalizeSymbols : 1;
 
-  unsigned MergeableSymbols : 1;
-
   /// Emit a section with references to class_ro_t* in generic class patterns.
   unsigned EmitGenericRODatas : 1;
 
@@ -607,6 +605,9 @@ public:
   /// Paths to the pass plugins registered via -load-pass-plugin.
   std::vector<std::string> LLVMPassPlugins;
 
+  /// Set to true if we support AArch64TBI.
+  bool HasAArch64TBI = false;
+
   IRGenOptions()
       : OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
         Verify(true), VerifyEach(false), OptMode(OptimizationMode::NotSet),
@@ -643,22 +644,20 @@ public:
         DisableStandardSubstitutionsInReflectionMangling(false),
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
-        AnnotateCondFailMessage(false),
-        InternalizeAtLink(false), InternalizeSymbols(false),
-        MergeableSymbols(false), EmitGenericRODatas(true),
+        AnnotateCondFailMessage(false), InternalizeAtLink(false),
+        InternalizeSymbols(false), EmitGenericRODatas(true),
         NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(true),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
-        UseCoroCCX8664(false), UseCoroCCArm64(false),
-        MergeableTraps(false),
+        UseCoroCCX8664(false), UseCoroCCArm64(false), MergeableTraps(false),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
-        CASObjMode(llvm::CASBackendMode::Native) {
+        CASObjMode(llvm::CASBackendMode::Native), HasAArch64TBI(false) {
     DisableRoundTripDebugTypes = !CONDITIONAL_ASSERT_enabled();
   }
 

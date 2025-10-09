@@ -561,8 +561,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.getSpecialPurpose(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getPerfConstraints(),
       (unsigned)F.getClassSubclassScope(), (unsigned)F.hasCReferences(),
-      (unsigned)F.getEffectsKind(), (unsigned)numAttrs,
-      (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
+      (unsigned)F.markedAsUsed(), (unsigned)F.getEffectsKind(),
+      (unsigned)numAttrs, (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
       LIST_VER_TUPLE_PIECES(available), (unsigned)F.isDynamicallyReplaceable(),
       (unsigned)F.isExactSelfClass(), (unsigned)F.isDistributed(),
       (unsigned)F.isRuntimeAccessible(),
@@ -2448,7 +2448,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                   addValueRef(operand));
     break;
   }
-  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::AssignOrInitInst:
     llvm_unreachable("not supported");
   case SILInstructionKind::BindMemoryInst: {
@@ -3115,13 +3114,19 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
   GlobalVarOffset.push_back(Out.GetCurrentBitNo());
   TypeID TyID = S.addTypeRef(g.getLoweredType().getRawASTType());
   DeclID dID = S.addDeclRef(g.getDecl());
+
+  ModuleID parentModuleID;
+  if (auto *parentModule = g.getParentModule())
+    parentModuleID = S.addModuleRef(parentModule);
+
   SILGlobalVarLayout::emitRecord(Out, ScratchRecord,
                                  SILAbbrCodes[SILGlobalVarLayout::Code],
                                  toStableSILLinkage(g.getLinkage()),
                                  (unsigned)g.getSerializedKind(),
                                  (unsigned)!g.isDefinition(),
                                  (unsigned)g.isLet(),
-                                 TyID, dID);
+                                 (unsigned)g.markedAsUsed(),
+                                 TyID, dID, parentModuleID);
 
   // Don't emit the initializer instructions if not marked as "serialized".
   if (!g.isAnySerialized())
@@ -3573,6 +3578,12 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
   // Never serialize any function definitions available externally.
   if (F->isAvailableExternally())
     return false;
+
+  if (F->getDeclRef().hasDecl()) {
+    if (auto decl = F->getDeclRef().getDecl())
+      if (decl->isNeverEmittedIntoClient())
+        return false;
+  }
 
   // If we are asked to serialize everything, go ahead and do it.
   if (ShouldSerializeAll)

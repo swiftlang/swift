@@ -277,11 +277,11 @@ public:
                                   SourceLoc RAngleLoc);
 
   MutableArrayRef<GenericTypeParamDecl *> getParams() {
-    return {getTrailingObjects<GenericTypeParamDecl *>(), NumParams};
+    return getTrailingObjects(NumParams);
   }
 
   ArrayRef<GenericTypeParamDecl *> getParams() const {
-    return {getTrailingObjects<GenericTypeParamDecl *>(), NumParams};
+    return getTrailingObjects(NumParams);
   }
 
   using iterator = GenericTypeParamDecl **;
@@ -387,12 +387,12 @@ public:
 
   /// Retrieve the set of requirements.
   MutableArrayRef<RequirementRepr> getRequirements() {
-    return {getTrailingObjects<RequirementRepr>(), NumRequirements};
+    return getTrailingObjects(NumRequirements);
   }
 
   /// Retrieve the set of requirements.
   ArrayRef<RequirementRepr> getRequirements() const {
-    return {getTrailingObjects<RequirementRepr>(), NumRequirements};
+    return getTrailingObjects(NumRequirements);
   }
 
   /// Compute the source range containing this trailing where clause.

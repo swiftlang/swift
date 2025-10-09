@@ -24,7 +24,7 @@ add_library(swift_Concurrency
   ThreadingError.cpp
   TracingSignpost.cpp
   "${PROJECT_SOURCE_DIR}/CompatibilityOverride/CompatibilityOverride.cpp"
-  "${PROJECT_SOURCE_DIR}/linker-support/magic-symbols-for-install-name.c"
+  "./linker-support/magic-symbols-for-install-name.c"
   Actor.swift
   AsyncCompactMapSequence.swift
   AsyncDropFirstSequence.swift
@@ -136,6 +136,7 @@ target_link_libraries(swift_Concurrency PRIVATE
   swiftShims
   swiftConcurrencyInternalShims
   $<$<BOOL:${BUILD_SHARED_LIBS}>:swiftThreading>
+  $<$<PLATFORM_ID:Android>:log>
   $<$<PLATFORM_ID:Windows>:Synchronization>
   $<$<PLATFORM_ID:Windows>:mincore>
   # Link to the runtime that we are just building.
@@ -158,5 +159,5 @@ emit_swift_interface(swift_Concurrency)
 install_swift_interface(swift_Concurrency)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swift_Concurrency)
+generate_plist(swift_Concurrency "${CMAKE_PROJECT_VERSION}" swift_Concurrency)
 embed_manifest(swift_Concurrency)

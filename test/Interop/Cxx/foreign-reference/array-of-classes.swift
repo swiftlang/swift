@@ -8,9 +8,6 @@
 // REQUIRES: executable_test
 // UNSUPPORTED: back_deployment_runtime
 
-// Metadata for foreign reference types is not supported on Windows.
-// UNSUPPORTED: OS=windows-msvc
-
 //--- Inputs/module.modulemap
 
 module Test {
@@ -61,6 +58,15 @@ func go() {
     y.append(x)
 // CHECK: 1
     print(y.count)
+
+    var loopCount = 0 
+    for it in y {
+// CHECK: RefType()
+        print(it)
+        loopCount += 1
+    }
+// CHECK: 1
+    print(loopCount)
 }
 
 go()

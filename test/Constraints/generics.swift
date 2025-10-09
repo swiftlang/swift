@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-objc-interop
 
 infix operator +++
 
@@ -452,6 +452,7 @@ class GenericClass<A> {}
 func genericFunc<T>(t: T) {
   _ = [T: GenericClass] // expected-error {{generic parameter 'A' could not be inferred}}
   // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+  // expected-error@-2 {{generic struct 'Dictionary' requires that 'T' conform to 'Hashable'}}
 }
 
 // https://github.com/apple/swift/issues/46113
@@ -471,7 +472,9 @@ do {
 }
 
 class testStdlibType {
-  let _: Array // expected-error {{reference to generic type 'Array' requires arguments in <...>}} {{15-15=<Any>}}
+  let _: Array
+  // expected-error@-1 {{reference to generic type 'Array' requires arguments in <...>}} {{15-15=<Any>}}
+  // expected-error@-2 {{property declaration does not bind any variables}}
 }
 
 // rdar://problem/32697033
@@ -1037,8 +1040,8 @@ func test_requirement_failures_in_ambiguous_context() {
 // rdar://106054263 - failed to produce a diagnostic upon generic argument mismatch
 func test_mismatches_with_dependent_member_generic_arguments() {
   struct Binding<T, U> {}
-  // expected-note@-1 {{arguments to generic parameter 'T' ('Double?' and 'Data.SomeAssociated') are expected to be equal}}
-  // expected-note@-2 {{arguments to generic parameter 'U' ('Int' and 'Data.SomeAssociated') are expected to be equal}}
+  // expected-note@-1 {{arguments to generic parameter 'T' ('Double?' and 'Data.SomeAssociated' (aka 'String')) are expected to be equal}}
+  // expected-note@-2 {{arguments to generic parameter 'U' ('Int' and 'Data.SomeAssociated' (aka 'String')) are expected to be equal}}
 
   struct Data : SomeProtocol {
     typealias SomeAssociated = String
@@ -1055,7 +1058,7 @@ func test_mismatches_with_dependent_member_generic_arguments() {
 
   test2(Optional<Int>(nil), Data())
   // expected-error@-1 {{cannot convert value of type 'Optional<Int>' to expected argument type 'Optional<Data.SomeAssociated>'}}
-  // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Int' and 'Data.SomeAssociated') are expected to be equal}}
+  // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Int' and 'Data.SomeAssociated' (aka 'String')) are expected to be equal}}
 }
 
 extension Dictionary where Value == Any { // expected-note {{where 'Value' = 'any P'}}
@@ -1085,5 +1088,45 @@ do {
   func test(x: Int?.Type) {
       // Note that it's important that Task stays unused, using `_ = ` changes constraint generation behavior.
       f(x, { $0 }, { _ in Task {} }) // expected-warning {{result of 'Task<E>' initializer is unused}}
+  }
+}
+
+func testHolePropagation() {
+  struct S<T: P> {}
+  struct R {}
+
+  // The hole from the contextual type should propagate such that we don't
+  // complain about not being able to infer 'T'.
+  _ = { () -> S<R> in S() } // expected-error {{type 'R' does not conform to protocol 'P'}}
+  _ = { () -> S<R> in return S() } // expected-error {{type 'R' does not conform to protocol 'P'}}
+  _ = { () -> S<R> in (); return S() } // expected-error {{type 'R' does not conform to protocol 'P'}}
+
+  let _: () -> S<R> = { S() } // expected-error {{type 'R' does not conform to protocol 'P'}}
+  let _: () -> S<R> = { return S() } // expected-error {{type 'R' does not conform to protocol 'P'}}
+  let _: () -> S<R> = { (); return S() } // expected-error {{type 'R' does not conform to protocol 'P'}}
+
+  _ = { S() }() as S<R> // expected-error {{type 'R' does not conform to protocol 'P'}}
+  _ = { return S() }() as S<R> // expected-error {{type 'R' does not conform to protocol 'P'}}
+  _ = { (); return S() } as () -> S<R> // expected-error {{type 'R' does not conform to protocol 'P'}}
+
+  func makeT<T>() -> T {}
+
+  _ = { () -> (S<R>, Int) in (makeT(), 0) } // expected-error {{type 'R' does not conform to protocol 'P'}}
+  _ = { () -> (S<R>, Int) in return (makeT(), 0) } // expected-error {{type 'R' does not conform to protocol 'P'}}
+  _ = { () -> (S<R>, Int) in (); return (makeT(), 0) } // expected-error {{type 'R' does not conform to protocol 'P'}}
+}
+
+@freestanding(expression) macro overloadedMacro<T>() -> String = #file
+@freestanding(expression) macro overloadedMacro<T>(_ x: T = 0) -> String = #file
+
+do {
+  func foo(_ fn: () -> Int) {}
+  func foo(_ fn: () -> String) {}
+
+  // Make sure we only emit a single note here.
+  foo {
+    #overloadedMacro < Undefined >
+    // expected-error@-1 {{cannot find type 'Undefined' in scope}}
+    // expected-note@-2 {{while parsing this '<' as a type parameter bracket}}
   }
 }

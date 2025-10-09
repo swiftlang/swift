@@ -3,7 +3,7 @@ public enum E : Error { case Err }
 
 // Function throws.
 public func throwError() throws { throw E.Err }
-// CHECK: !DISubprogram(name: "throwError", {{.*}}thrownTypes: ![[THROWN:.*]])
+// CHECK-DAG: !DISubprogram(name: "throwError", {{.*}}thrownTypes: ![[THROWN:.*]])
 // CHECK-DAG: ![[THROWN]] = !{![[ERROR:[0-9]+]]}
 // CHECK-DAG: ![[ERROR]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Error"
 

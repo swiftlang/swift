@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,6 +23,7 @@
 #include "swift/FrontendTool/FrontendTool.h"
 #include "Dependencies.h"
 #include "TBD.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTDumper.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AvailabilityScope.h"
@@ -38,6 +39,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
@@ -50,6 +52,7 @@
 #include "swift/Basic/TargetInfo.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/ConstExtract/ConstExtract.h"
 #include "swift/DependencyScan/ScanDependencies.h"
 #include "swift/Frontend/CachedDiagnostics.h"
@@ -353,7 +356,8 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
   assert(FEOpts.InputsAndOutputs.hasSingleInput());
   StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
-  ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
+  ModuleInterfaceLoaderOptions LoaderOpts(FEOpts,
+                                          /*inheritDebuggingOpts=*/true);
   StringRef ABIPath = Instance.getPrimarySpecificPathsForAtMostOnePrimary()
                           .SupplementaryOutputs.ABIDescriptorOutputPath;
   bool IgnoreAdjacentModules = Instance.hasASTContext() &&
@@ -387,10 +391,9 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
       Invocation.getClangImporterOptions(), Invocation.getCASOptions(),
       Invocation.getClangModuleCachePath(), PrebuiltCachePath,
       FEOpts.BackupModuleInterfaceDir, Invocation.getModuleName(), InputPath,
-      Invocation.getOutputFilename(), ABIPath,
+      Invocation.getOutputFilename(), ABIPath, FEOpts.CacheReplayPrefixMap,
       FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.shouldTrackSystemDependencies(), LoaderOpts,
-      RequireOSSAModules_t(Invocation.getSILOptions()),
       IgnoreAdjacentModules);
 }
 
@@ -458,14 +461,6 @@ static bool dumpAndPrintScopeMap(const CompilerInstance &Instance,
   return Instance.getASTContext().hadError();
 }
 
-static SourceFile &
-getPrimaryOrMainSourceFile(const CompilerInstance &Instance) {
-  if (SourceFile *SF = Instance.getPrimarySourceFile()) {
-    return *SF;
-  }
-  return Instance.getMainModule()->getMainSourceFile();
-}
-
 /// Dumps the AST of all available primary source files. If corresponding output
 /// files were specified, use them; otherwise, dump the AST to stdout.
 static bool dumpAST(CompilerInstance &Instance,
@@ -512,7 +507,7 @@ static bool dumpAST(CompilerInstance &Instance,
   } else {
     // Some invocations don't have primary files. In that case, we default to
     // looking for the main file and dumping it to `stdout`.
-    auto &SF = getPrimaryOrMainSourceFile(Instance);
+    auto &SF = Instance.getPrimaryOrMainSourceFile();
     dumpAST(&SF, llvm::outs());
   }
   return Instance.getASTContext().hadError();
@@ -1029,20 +1024,15 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
 
-  // If we were asked to print Clang stats, do so.
-  if (opts.PrintClangStats && ctx.getClangModuleLoader())
-    ctx.getClangModuleLoader()->printStatistics();
-
   // Report AST stats if needed.
   if (auto *stats = ctx.Stats)
     countASTStats(*stats, Instance);
 
-  if (opts.DumpClangLookupTables && ctx.getClangModuleLoader())
-    ctx.getClangModuleLoader()->dumpSwiftLookupTables();
-
   // Report mangling stats if there was no error.
   if (!ctx.hadError())
     Mangle::printManglingStats();
+
+  Instance.emitEndOfPipelineDebuggingOutput();
 
   // Make sure we didn't load a module during a parse-only invocation, unless
   // it's -emit-imported-modules, which can load modules.
@@ -1282,32 +1272,27 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::PrintAST:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
-          getPrimaryOrMainSourceFile(Instance).print(
+          Instance.getPrimaryOrMainSourceFile().print(
               llvm::outs(), PrintOptions::printEverything());
           return Instance.getASTContext().hadError();
         });
   case FrontendOptions::ActionType::PrintASTDecl:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
-          getPrimaryOrMainSourceFile(Instance).print(
+          Instance.getPrimaryOrMainSourceFile().print(
               llvm::outs(), PrintOptions::printDeclarations());
           return Instance.getASTContext().hadError();
         });
   case FrontendOptions::ActionType::DumpScopeMaps:
     return withSemanticAnalysis(
-        Instance, observer, [](CompilerInstance &Instance) {
+        Instance, observer,
+        [](CompilerInstance &Instance) {
           return dumpAndPrintScopeMap(Instance,
-                                      getPrimaryOrMainSourceFile(Instance));
-        }, /*runDespiteErrors=*/true);
-  case FrontendOptions::ActionType::DumpAvailabilityScopes:
-    return withSemanticAnalysis(
-        Instance, observer, [](CompilerInstance &Instance) {
-          getPrimaryOrMainSourceFile(Instance).getAvailabilityScope()->dump(
-              llvm::errs(), Instance.getASTContext().SourceMgr);
-          return Instance.getASTContext().hadError();
-        }, /*runDespiteErrors=*/true);
+                                      Instance.getPrimaryOrMainSourceFile());
+        },
+        /*runDespiteErrors=*/true);
   case FrontendOptions::ActionType::DumpInterfaceHash:
-    getPrimaryOrMainSourceFile(Instance).dumpInterfaceHash(llvm::errs());
+    Instance.getPrimaryOrMainSourceFile().dumpInterfaceHash(llvm::errs());
     return Instance.getASTContext().hadError();
   case FrontendOptions::ActionType::EmitImportedModules:
     return emitImportedModules(Instance.getMainModule(), opts,
@@ -1622,8 +1607,12 @@ static bool generateReproducer(CompilerInstance &Instance,
     }
     auto map = llvm::json::parse(mapProxy->getData());
     if (!map) {
-      diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_corrupted,
-                     mapOpts);
+      llvm::handleAllErrors(
+          map.takeError(), [&diags, &mapOpts](const llvm::json::ParseError &E) {
+            diags.diagnose(SourceLoc(),
+                           diag::explicit_swift_module_map_corrupted, mapOpts,
+                           E.message());
+          });
       return true;
     }
     if (auto array = map->getAsArray()) {
@@ -1768,7 +1757,6 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
   serializationOpts.OutputPath = moduleOutputPath;
   serializationOpts.SerializeAllSIL = true;
   serializationOpts.IsSIB = true;
-  serializationOpts.IsOSSA = Context.SILOpts.EnableOSSAModules;
 
   symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
 
@@ -2269,11 +2257,18 @@ public:
   };
 };
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+extern "C" BridgedStringRef
+swift_ASTGen_printStaticBuildConfiguration(BridgedLangOptions cLangOpts);
+#pragma clang diagnostic pop
+#endif
+
 int swift::performFrontend(ArrayRef<const char *> Args,
                            const char *Argv0, void *MainAddr,
                            FrontendObserver *observer) {
   INITIALIZE_LLVM();
-  llvm::setBugReportMsg(SWIFT_CRASH_BUG_REPORT_MESSAGE "\n");
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   std::unique_ptr<CompilerInstance> Instance =
@@ -2397,6 +2392,16 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   if (Invocation.getFrontendOptions().PrintTargetInfo) {
     swift::targetinfo::printTargetInfo(Invocation, llvm::outs());
+    return finishDiagProcessing(0, /*verifierEnabled*/ false);
+  }
+
+  if (Invocation.getFrontendOptions().PrintBuildConfig) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    auto resultText =
+        swift_ASTGen_printStaticBuildConfiguration(Invocation.getLangOptions());
+    llvm::outs() << resultText.unbridged();
+    swift_ASTGen_freeBridgedString(resultText);
+#endif
     return finishDiagProcessing(0, /*verifierEnabled*/ false);
   }
 

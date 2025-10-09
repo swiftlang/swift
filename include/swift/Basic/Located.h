@@ -71,7 +71,7 @@ struct DenseMapInfo<swift::Located<T>> {
   }
 
   static unsigned getHashValue(const swift::Located<T> &LocatedVal) {
-    return combineHashValue(DenseMapInfo<T>::getHashValue(LocatedVal.Item),
+    return detail::combineHashValue(DenseMapInfo<T>::getHashValue(LocatedVal.Item),
                             DenseMapInfo<swift::SourceLoc>::getHashValue(LocatedVal.Loc));
   }
 
@@ -81,5 +81,13 @@ struct DenseMapInfo<swift::Located<T>> {
   }
 };
 } // namespace llvm
+
+namespace swift {
+  template<typename T>
+  llvm::hash_code hash_value(const Located<T> &LocatedVal) {
+    return llvm::DenseMapInfo<Located<T>>::getHashValue(LocatedVal);
+  }
+} // namespace swift
+
 
 #endif // SWIFT_BASIC_LOCATED_H

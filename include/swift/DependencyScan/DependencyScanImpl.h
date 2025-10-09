@@ -65,6 +65,9 @@ struct swiftscan_dependency_info_s {
   /// The list of source import infos.
   swiftscan_import_info_set_t *imports;
 
+  /// The list of source optional import infos.
+  swiftscan_import_info_set_t *optional_imports;
+
   /// Specific details of a particular kind of module.
   swiftscan_module_details_t details;
 };

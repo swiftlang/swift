@@ -76,15 +76,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   }
 
   // Remember that the module defining the decl must be imported publicly.
-  recordRequiredImportAccessLevelForDecl(
-      D, DC, AccessLevel::Public,
-      [&](AttributedImport<ImportedModule> attributedImport) {
-        ModuleDecl *importedVia = attributedImport.module.importedModule,
-                   *sourceModule = D->getModuleContext();
-        Context.Diags.diagnose(loc, diag::module_api_import, D, importedVia,
-                               sourceModule, importedVia == sourceModule,
-                               /*isImplicit*/ false);
-      });
+  recordRequiredImportAccessLevelForDecl(D, DC, AccessLevel::Public, loc);
 
   // General check on access-level of the decl.
   auto declAccessScope =
@@ -141,7 +133,9 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
     Context.Diags.diagnose(problematicImport->importLoc,
                            diag::decl_import_via_here, D,
                            problematicImport->accessLevel,
-                           problematicImport->module.importedModule);
+                           problematicImport->module.importedModule,
+                           problematicImport->module.importedModule
+                             ->isClangHeaderImportModule());
   }
 
   return (downgradeToWarning == DowngradeToWarning::No);
@@ -221,10 +215,48 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
     ctx.Diags.diagnose(limitImport->importLoc,
                        diag::decl_import_via_here, D,
                        limitImport->accessLevel,
-                       limitImport->module.importedModule);
+                       limitImport->module.importedModule,
+                       limitImport->module.importedModule
+                         ->isClangHeaderImportModule());
   }
 
   return true;
+}
+
+/// Returns true if access to \p D should be diagnosed during exportability
+/// checking. These diagnostics would typically be handled by the access
+/// checker, and therefore should be suppressed to avoid duplicate diagnostics.
+/// However, extensions are special because they do not have an intrinsic access
+/// level and therefore the access checker does not currently handle them.
+/// Instead, diagnostics for decls referenced in extension signatures are
+/// deferred to exportability checking. An exportable extension is effectively a
+/// public extension.
+static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
+                                     const ExportContext &where) {
+  auto reason = where.getExportabilityReason();
+  auto DC = where.getDeclContext();
+  if (!reason)
+    return false;
+
+  switch (*reason) {
+  case ExportabilityReason::ExtensionWithPublicMembers:
+  case ExportabilityReason::ExtensionWithConditionalConformances:
+    return true;
+  case ExportabilityReason::Inheritance:
+    return isa<ProtocolDecl>(D);
+  case ExportabilityReason::AvailableAttribute:
+    // If the context is an extension and that extension has an explicit
+    // access level then availability domains access has already been
+    // diagnosed.
+    if (auto *ED = dyn_cast_or_null<ExtensionDecl>(DC->getAsDecl()))
+      return !ED->getAttrs().getAttribute<AccessControlAttr>();
+    return false;
+
+  case ExportabilityReason::General:
+  case ExportabilityReason::ResultBuilder:
+  case ExportabilityReason::PropertyWrapper:
+    return false;
+  }
 }
 
 static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
@@ -245,7 +277,8 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
       D, DC, AccessLevel::Public,
       [&](AttributedImport<ImportedModule> attributedImport) {
         if (where.isExported() && reason != ExportabilityReason::General &&
-            originKind != DisallowedOriginKind::NonPublicImport) {
+            originKind != DisallowedOriginKind::NonPublicImport &&
+            originKind != DisallowedOriginKind::InternalBridgingHeaderImport) {
           // These may be reported twice, for the Type and for the TypeRepr.
           ModuleDecl *importedVia = attributedImport.module.importedModule,
                      *sourceModule = D->getModuleContext();
@@ -255,34 +288,45 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
         }
       });
 
-  // Access levels from imports are reported with the others access levels.
-  // Except for extensions and protocol conformances, we report them here.
-  if (originKind == DisallowedOriginKind::NonPublicImport) {
-    bool reportHere = [&] {
-      switch (*reason) {
-        case ExportabilityReason::ExtensionWithPublicMembers:
-        case ExportabilityReason::ExtensionWithConditionalConformances:
-          return true;
-        case ExportabilityReason::Inheritance:
-          return isa<ProtocolDecl>(D);
-        default:
-          return false;
-      }
-    }();
-    if (!reportHere)
+  switch (originKind) {
+  case DisallowedOriginKind::None:
+    // The decl does not come from a source that needs to be checked for
+    // exportability.
+    return false;
+
+  case DisallowedOriginKind::NonPublicImport:
+  case DisallowedOriginKind::InternalBridgingHeaderImport:
+    // With a few exceptions, access levels from imports are diagnosed during
+    // access checking and should be skipped here.
+    if (!shouldDiagnoseDeclAccess(D, where))
       return false;
+    break;
+
+  case DisallowedOriginKind::MissingImport:
+    // Some diagnostics emitted with the `MemberImportVisibility` feature
+    // enabled subsume these diagnostics.
+    if (ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                                /*allowMigration=*/true) &&
+        SF)
+      return false;
+    break;
+
+  case DisallowedOriginKind::SPIOnly:
+    // Availability attributes referring to availability domains from modules
+    // that are imported @_spiOnly in a -library-level=api will not be printed
+    // in the public swiftinterface of the module and should therefore not be
+    // diagnosed for exportability.
+    if (reason && reason == ExportabilityReason::AvailableAttribute &&
+        ctx.LangOpts.LibraryLevel == LibraryLevel::API)
+      return false;
+    break;
+
+  case DisallowedOriginKind::ImplementationOnly:
+  case DisallowedOriginKind::SPIImported:
+  case DisallowedOriginKind::SPILocal:
+  case DisallowedOriginKind::FragileCxxAPI:
+    break;
   }
-
-  if (originKind == DisallowedOriginKind::None)
-    return false;
-
-  // Some diagnostics emitted with the `MemberImportVisibility` feature enabled
-  // subsume these diagnostics.
-  if (originKind == DisallowedOriginKind::MissingImport &&
-      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
-                              /*allowMigration=*/true) &&
-      SF)
-    return false;
 
   if (auto accessor = dyn_cast<AccessorDecl>(D)) {
     // Only diagnose accessors if their disallowed origin kind differs from
@@ -330,7 +374,9 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
     ctx.Diags.diagnose(import->importLoc,
                        diag::decl_import_via_here, D,
                        import->accessLevel,
-                       import->module.importedModule);
+                       import->module.importedModule,
+                       import->module.importedModule
+                         ->isClangHeaderImportModule());
   }
 
   return true;
@@ -416,7 +462,9 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
     ctx.Diags.diagnose(limitImport->importLoc,
                        diag::decl_import_via_here, ext,
                        limitImport->accessLevel,
-                       limitImport->module.importedModule);
+                       limitImport->module.importedModule,
+                       limitImport->module.importedModule
+                         ->isClangHeaderImportModule());
   }
 
   return true;

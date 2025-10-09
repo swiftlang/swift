@@ -97,6 +97,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
   Opts.IndexIgnoreStdlib |= Args.hasArg(OPT_index_ignore_stdlib);
   Opts.IndexIncludeLocals |= Args.hasArg(OPT_index_include_locals);
+  Opts.IndexStoreCompress |= Args.hasArg(OPT_index_store_compress);
   Opts.SerializeDebugInfoSIL |=
       Args.hasArg(OPT_experimental_serialize_debug_info);
 
@@ -107,15 +108,11 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
   Opts.EnablePrivateImports |= Args.hasArg(OPT_enable_private_imports);
-  Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_library_evolution);
   Opts.FrontendParseableOutput |= Args.hasArg(OPT_frontend_parseable_output);
   Opts.ExplicitInterfaceBuild |= Args.hasArg(OPT_explicit_interface_module_build);
 
   Opts.EmitClangHeaderWithNonModularIncludes |=
       Args.hasArg(OPT_emit_clang_header_nonmodular_includes);
-
-  // FIXME: Remove this flag
-  Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_resilience);
 
   Opts.EnableImplicitDynamic |= Args.hasArg(OPT_enable_implicit_dynamic);
 
@@ -197,7 +194,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeDebugTimeOptions();
   computeTBDOptions();
 
-  Opts.DumpClangLookupTables |= Args.hasArg(OPT_dump_clang_lookup_tables);
+  Opts.CompilerDebuggingOpts.DumpAvailabilityScopes |=
+      Args.hasArg(OPT_dump_availability_scopes);
+
+  Opts.CompilerDebuggingOpts.DumpClangLookupTables |=
+      Args.hasArg(OPT_dump_clang_lookup_tables);
 
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
@@ -208,6 +209,10 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   if (Args.hasArg(OPT_print_target_info)) {
     Opts.PrintTargetInfo = true;
+  }
+
+  if (Args.hasArg(OPT_print_static_build_config)) {
+    Opts.PrintBuildConfig = true;
   }
 
   if (Args.hasArg(OPT_print_supported_features)) {
@@ -368,9 +373,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (!computeModuleAliases())
     return true;
 
-  if (const Arg *A = Args.getLastArg(OPT_access_notes_path))
-    Opts.AccessNotesPath = A->getValue();
-
   if (const Arg *A = Args.getLastArg(OPT_serialize_debugging_options,
                                      OPT_no_serialize_debugging_options)) {
     Opts.SerializeOptionsForDebugging =
@@ -471,10 +473,11 @@ void ArgsToFrontendOptionsConverter::handleDebugCrashGroupArguments() {
 void ArgsToFrontendOptionsConverter::computePrintStatsOptions() {
   using namespace options;
   Opts.PrintStats |= Args.hasArg(OPT_print_stats);
-  Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
+  Opts.CompilerDebuggingOpts.PrintClangStats |=
+      Args.hasArg(OPT_print_clang_stats);
   Opts.PrintZeroStats |= Args.hasArg(OPT_print_zero_stats);
 #if defined(NDEBUG) && !LLVM_ENABLE_STATS
-  if (Opts.PrintStats || Opts.PrintClangStats)
+  if (Opts.PrintStats || Opts.CompilerDebuggingOpts.PrintClangStats)
     Diags.diagnose(SourceLoc(), diag::stats_disabled);
 #endif
 }
@@ -581,6 +584,7 @@ bool ArgsToFrontendOptionsConverter::computeAvailabilityDomains() {
 
   for (const Arg *A :
        Args.filtered_reverse(OPT_define_enabled_availability_domain,
+                             OPT_define_always_enabled_availability_domain,
                              OPT_define_disabled_availability_domain,
                              OPT_define_dynamic_availability_domain)) {
     std::string domain = A->getValue();
@@ -597,6 +601,8 @@ bool ArgsToFrontendOptionsConverter::computeAvailabilityDomains() {
     auto &option = A->getOption();
     if (option.matches(OPT_define_enabled_availability_domain))
       Opts.AvailabilityDomains.EnabledDomains.emplace_back(domain);
+    if (option.matches(OPT_define_always_enabled_availability_domain))
+      Opts.AvailabilityDomains.AlwaysEnabledDomains.emplace_back(domain);
     else if (option.matches(OPT_define_disabled_availability_domain))
       Opts.AvailabilityDomains.DisabledDomains.emplace_back(domain);
     else if (option.matches(OPT_define_dynamic_availability_domain))
@@ -665,8 +671,6 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::MergeModules;
   if (Opt.matches(OPT_dump_scope_maps))
     return FrontendOptions::ActionType::DumpScopeMaps;
-  if (Opt.matches(OPT_dump_availability_scopes))
-    return FrontendOptions::ActionType::DumpAvailabilityScopes;
   if (Opt.matches(OPT_dump_interface_hash))
     return FrontendOptions::ActionType::DumpInterfaceHash;
   if (Opt.matches(OPT_dump_type_info))
@@ -910,18 +914,40 @@ static inline bool isPCHFilenameExtension(StringRef path) {
 
 void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
-  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
-    // Legacy support for passing PCH file through `-import-objc-header`.
+  bool hadNormalBridgingHeader = false;
+  if (const Arg *A = Args.getLastArgNoClaim(
+          OPT_import_bridging_header,
+          OPT_internal_import_bridging_header)) {
+    // Legacy support for passing PCH file through `-import-bridging-header`.
     if (isPCHFilenameExtension(A->getValue()))
       Opts.ImplicitObjCPCHPath = A->getValue();
     else
       Opts.ImplicitObjCHeaderPath = A->getValue();
-    // If `-import-object-header` is used, it means the module has a direct
+    // If `-import-bridging-header` is used, it means the module has a direct
     // bridging header dependency and it can be serialized into binary module.
     Opts.ModuleHasBridgingHeader |= true;
+
+    Opts.ImportHeaderAsInternal =
+        A->getOption().getID() == OPT_internal_import_bridging_header;
+
+    hadNormalBridgingHeader = true;
   }
-  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_pch))
+  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_pch,
+                                            OPT_internal_import_pch)) {
     Opts.ImplicitObjCPCHPath = A->getValue();
+
+    bool importAsInternal = A->getOption().getID() == OPT_internal_import_pch;
+
+    /// Don't let the bridging-header and precompiled-header options differ in
+    /// whether they are treated as internal or public imports.
+    if (hadNormalBridgingHeader &&
+        importAsInternal != Opts.ImportHeaderAsInternal) {
+      Diags.diagnose(SourceLoc(),
+                     diag::bridging_header_and_pch_internal_mismatch);
+    }
+
+    Opts.ImportHeaderAsInternal = importAsInternal;
+  }
 }
 void ArgsToFrontendOptionsConverter::
 computeImplicitImportModuleNames(OptSpecifier id, bool isTestable) {

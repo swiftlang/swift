@@ -9,13 +9,14 @@ if(POLICY CMP0157 AND CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
   cmake_policy(SET CMP0157 OLD)
 endif()
 
-if($ENV{BUILD_NUMBER})
-  math(EXPR BUILD_NUMBER "$ENV{BUILD_NUMBER} % 65535")
-  set(BUILD_NUMBER ".${BUILD_NUMBER}")
-endif()
+list(APPEND CMAKE_MODULE_PATH
+  "${CMAKE_SOURCE_DIR}/../cmake/modules"
+  "${CMAKE_SOURCE_DIR}/../../cmake/modules")
+
+include(SwiftProjectVersion)
 project(SwiftDifferentiation
   LANGUAGES Swift C
-  VERSION 6.1.0${BUILD_NUMBER})
+  VERSION ${SWIFT_RUNTIME_VERSION})
 
 if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Differentiation must build as a standalone project")
@@ -23,8 +24,6 @@ endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE YES)
 set(CMAKE_Swift_LANGUAGE_VERSION 5)
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake/modules")
 
 set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../../"
@@ -88,6 +87,8 @@ add_compile_options(
 # FIXME(#83444) - enable this once we fix DLL storage for
 # `_fatalErrorForwardModeDifferentiationDisabled`
 # add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
+# Ensure all symbols are fully resolved on Linux
+add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 if(SwiftDifferentiation_ENABLE_VECTOR_TYPES)
   gyb_expand(SIMDDifferentiation.swift.gyb SIMDDifferentiation.swift)
@@ -132,7 +133,7 @@ emit_swift_interface(swift_Differentiation)
 install_swift_interface(swift_Differentiation)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swift_Differentiation)
+generate_plist(swift_Differentiation "${CMAKE_PROJECT_VERSION}" swift_Differentiation)
 embed_manifest(swift_Differentiation)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swift_Differentiation.cmake" OPTIONAL)

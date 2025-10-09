@@ -59,6 +59,9 @@ static std::optional<std::string_view> optionalFlagName(Feature feature) {
   case Feature::StrictMemorySafety:
     return "-strict-memory-safety";
 
+  case Feature::LibraryEvolution:
+    return "-enable-library-evolution";
+
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description) case Feature::FeatureName:
 #define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"
@@ -91,7 +94,7 @@ void printSupportedFeatures(llvm::raw_ostream &out) {
 
   // Include only experimental features that are available in production.
   llvm::erase_if(experimental, [](auto &feature) {
-    return feature.isAvailableInProduction();
+    return !feature.isAvailableInProduction();
   });
 
   out << "{\n";

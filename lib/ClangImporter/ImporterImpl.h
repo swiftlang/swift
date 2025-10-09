@@ -481,6 +481,7 @@ public:
   const bool ImportForwardDeclarations;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
+  const bool BridgingHeaderIsInternal;
   const bool DisableOverlayModules;
   const bool EnableClangSPI;
 
@@ -640,22 +641,22 @@ private:
   /// corresponding to the instantiating Swift compilation's triple. These are
   /// to be used by all IRGen/CodeGen clients of `ClangImporter`.
   std::unique_ptr<clang::TargetInfo> CodeGenTargetInfo;
+  /// - Important: Do not access directly. This field exists only to make sure
+  ///   we own the target options stored in `CodeGenTargetInfo` because
+  ///   `clang::TargetOptions` no longer co-owns them:
+  ///   https://github.com/llvm/llvm-project/pull/106271.
+  std::unique_ptr<clang::TargetOptions> TargetOpts;
   std::unique_ptr<clang::CodeGenOptions> CodeGenOpts;
 
-public:
-  void setSwiftTargetInfo(clang::TargetInfo *SwiftTargetInfo) {
-    CodeGenTargetInfo.reset(SwiftTargetInfo);
-  }
-  clang::TargetInfo *getSwiftTargetInfo() const {
-    return CodeGenTargetInfo.get();
-  }
+  /// Sets the target & code generation options for use by IRGen/CodeGen
+  /// clients of `ClangImporter`. If `CI` is null, the data is drawn from the
+  /// importer's invocation.
+  void configureOptionsForCodeGen(clang::DiagnosticsEngine &Diags,
+                                  clang::CompilerInvocation *CI = nullptr);
 
-  void setSwiftCodeGenOptions(clang::CodeGenOptions *SwiftCodeGenOpts) {
-    CodeGenOpts.reset(SwiftCodeGenOpts);
-  }
-  clang::CodeGenOptions *getSwiftCodeGenOptions() const {
-    return CodeGenOpts.get();
-  }
+  clang::TargetInfo &getCodeGenTargetInfo() const { return *CodeGenTargetInfo; }
+
+  clang::CodeGenOptions &getCodeGenOptions() const;
 
 private:
   /// Generation number that is used for crude versioning.
@@ -731,6 +732,12 @@ public:
   /// Keeps track of the Clang functions that have been turned into
   /// properties.
   llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
+
+  /// Calling AbstractFunctionDecl::getLifetimeDependencies before we added
+  /// the conformances we want to all the imported types is problematic because
+  /// it will populate the conformance too early. To avoid the need for that we
+  /// store functions with interesting lifetimes.
+  llvm::DenseSet<const AbstractFunctionDecl *> returnsSelfDependentValue;
 
   importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
     return getNameImporter().getEnumInfo(decl);
@@ -1271,6 +1278,8 @@ public:
   ///
   /// \returns The named module, or null if the module has not been imported.
   ModuleDecl *getNamedModule(StringRef name);
+
+  ImportPath::Builder getSwiftModulePath(const clang::Module *M);
 
   /// Returns the "Foundation" module, if it can be loaded.
   ///
@@ -1965,10 +1974,6 @@ namespace importer {
 bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
                                  ClangImporter::Implementation *importerImpl);
 
-/// Returns true if the given C/C++ reference type uses "immortal"
-/// retain/release functions.
-bool hasImmortalAttrs(const clang::RecordDecl *decl);
-
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
 bool isForwardDeclOfType(const clang::Decl *decl);
@@ -1979,6 +1984,12 @@ bool shouldSuppressDeclImport(const clang::Decl *decl);
 /// Identifies certain UIKit constants that used to have overlay equivalents,
 /// but are now renamed using the swift_name attribute.
 bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
+
+/// Identifies certain AppKit constants that have overlay equivalents but are
+/// also annotated with SwiftName API Notes attributes at the same time. Older
+/// Clang versions were silently dropping the API Notes attribute on those
+/// constants.
+bool isSpecialAppKitFunctionKeyProperty(const clang::NamedDecl *decl);
 
 /// \returns true if \p a has the same underlying type as \p b after removing
 /// any pointer/reference specifiers. Note that this does not currently look through
@@ -2192,7 +2203,7 @@ ImportedType findOptionSetEnum(clang::QualType type,
 ///
 /// The name we're looking for is the Swift name.
 llvm::SmallVector<ValueDecl *, 1>
-getValueDeclsForName(const clang::Decl *decl, ASTContext &ctx, StringRef name);
+getValueDeclsForName(NominalTypeDecl* decl, StringRef name);
 
 } // end namespace importer
 } // end namespace swift

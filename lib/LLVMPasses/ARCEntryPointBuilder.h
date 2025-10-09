@@ -251,11 +251,16 @@ private:
 
     auto *ObjectPtrTy = PtrTy;
     auto &M = getModule();
-    auto AttrList = AttributeList::get(M.getContext(), 1, Attribute::NoCapture);
-    AttrList = AttrList.addFnAttribute(M.getContext(), Attribute::NoUnwind);
+    auto &C = M.getContext();
+
+    AttributeList AttrList;
+    AttrList = AttrList.addFnAttribute(C, Attribute::NoUnwind);
+    AttrList = AttrList.addParamAttribute(
+        C, 0, Attribute::getWithCaptureInfo(C, llvm::CaptureInfo::none()));
+
     CheckUnowned = cast<llvm::Function>(
         M.getOrInsertFunction("swift_checkUnowned", AttrList,
-                              Type::getVoidTy(M.getContext()), ObjectPtrTy)
+                              Type::getVoidTy(C), ObjectPtrTy)
             .getCallee());
     if (llvm::Triple(M.getTargetTriple()).isOSBinFormatCOFF() &&
         !llvm::Triple(M.getTargetTriple()).isOSCygMing())

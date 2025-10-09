@@ -757,6 +757,48 @@ public:
   bool isCached() const;
 };
 
+/// Generate the Clang USR for the given declaration.
+class ClangUSRGenerationRequest
+    : public SimpleRequest<ClangUSRGenerationRequest,
+                           std::optional<std::string>(const ValueDecl *),
+                           RequestFlags::SeparatelyCached |
+                               RequestFlags::SplitCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  std::optional<std::string> evaluate(Evaluator &eval,
+                                      const ValueDecl *d) const;
+
+public:
+  // Split caching.
+  bool isCached() const { return true; }
+  std::optional<std::optional<std::string>> getCachedResult() const;
+  void cacheResult(std::optional<std::string> result) const;
+};
+
+/// Generate the Swift USR for the given declaration.
+class SwiftUSRGenerationRequest
+    : public SimpleRequest<SwiftUSRGenerationRequest,
+                           std::string(const ValueDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  std::string evaluate(Evaluator &eval, const ValueDecl *d) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 struct USRGenerationOptions {
   /// @brief Whether to emit USRs using the Swift declaration when it is
   /// synthesized from a Clang based declaration. Useful in cases where Swift
@@ -764,13 +806,21 @@ struct USRGenerationOptions {
   /// wants the USR of the Swift declaration.
   bool distinguishSynthesizedDecls;
 
+  /// @brief Whether to emit USRs using the Swift declaration for all
+  /// declarations specifically, emits a Swift USR for all Clang-based
+  /// declarations.
+  bool useSwiftUSR;
+
   friend llvm::hash_code hash_value(const USRGenerationOptions &options) {
-    return llvm::hash_value(options.distinguishSynthesizedDecls);
+    return llvm::hash_combine(
+        llvm::hash_value(options.distinguishSynthesizedDecls),
+        llvm::hash_value(options.useSwiftUSR));
   }
 
   friend bool operator==(const USRGenerationOptions &lhs,
                          const USRGenerationOptions &rhs) {
-    return lhs.distinguishSynthesizedDecls == rhs.distinguishSynthesizedDecls;
+    return lhs.distinguishSynthesizedDecls == rhs.distinguishSynthesizedDecls &&
+           lhs.useSwiftUSR == rhs.useSwiftUSR;
   }
 
   friend bool operator!=(const USRGenerationOptions &lhs,
@@ -783,10 +833,12 @@ void simple_display(llvm::raw_ostream &out,
                     const USRGenerationOptions &options);
 
 /// Generate the USR for the given declaration.
+/// This is an umbrella request that forwards to ClangUSRGenerationRequest or
+/// SwiftUSRGenerationRequest.
 class USRGenerationRequest
     : public SimpleRequest<USRGenerationRequest,
                            std::string(const ValueDecl *, USRGenerationOptions),
-                           RequestFlags::Cached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -796,10 +848,6 @@ private:
   // Evaluation.
   std::string evaluate(Evaluator &eval, const ValueDecl *d,
                        USRGenerationOptions options) const;
-
-public:
-  // Caching
-  bool isCached() const { return true; }
 };
 
 /// Generate the mangling for the given local type declaration.
@@ -4041,6 +4089,31 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Load the access notes to apply for the main module.
+///
+/// Note this is keyed on the ASTContext instead of the ModuleDecl to avoid
+/// needing to re-load the access notes in cases where we have multiple main
+/// modules, e.g when doing cached top-level code completion.
+///
+/// FIXME: This isn't really a type-checking request, if we ever split off a
+/// zone for more general requests, this should be moved there.
+class LoadAccessNotesRequest
+    : public SimpleRequest<LoadAccessNotesRequest,
+                           const AccessNotesFile *(ASTContext *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  const AccessNotesFile *evaluate(Evaluator &evaluator, ASTContext *ctx) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 /// Kinds of types for CustomAttr.
 enum class CustomAttrTypeKind {
   /// The type is required to not be expressed in terms of
@@ -4875,7 +4948,7 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Check @cdecl functions for compatibility with the foreign language.
+/// Check @c functions for compatibility with the foreign language.
 class TypeCheckCDeclFunctionRequest
     : public SimpleRequest<TypeCheckCDeclFunctionRequest,
                            evaluator::SideEffect(FuncDecl *FD,
@@ -4894,7 +4967,25 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Check @cdecl enums for compatibility with C.
+/// A request to emit performance hints
+class EmitPerformanceHints
+: public SimpleRequest<EmitPerformanceHints,
+                       evaluator::SideEffect(SourceFile *),
+                       RequestFlags::Cached> {
+public:
+using SimpleRequest::SimpleRequest;
+
+private:
+friend SimpleRequest;
+
+evaluator::SideEffect
+evaluate(Evaluator &evaluator, SourceFile *SF) const;
+
+public:
+bool isCached() const { return true; }
+};
+
+/// Check @c enums for compatibility with C.
 class TypeCheckCDeclEnumRequest
     : public SimpleRequest<TypeCheckCDeclEnumRequest,
                            evaluator::SideEffect(EnumDecl *ED,
@@ -5389,6 +5480,23 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Performs extension binding for all of the extensions in a module.
+class BindExtensionsRequest
+    : public SimpleRequest<BindExtensionsRequest,
+                           evaluator::SideEffect(ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, ModuleDecl *M) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class ModuleHasTypeCheckerPerformanceHacksEnabledRequest
     : public SimpleRequest<ModuleHasTypeCheckerPerformanceHacksEnabledRequest,
                            bool(const ModuleDecl *),
@@ -5403,6 +5511,49 @@ private:
 
 public:
   bool isCached() const { return true; }
+};
+
+class AvailabilityDomainForDeclRequest
+    : public SimpleRequest<AvailabilityDomainForDeclRequest,
+                           std::optional<AvailabilityDomain>(ValueDecl *),
+                           RequestFlags::Cached | RequestFlags::SplitCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<AvailabilityDomain> evaluate(Evaluator &evaluator,
+                                             ValueDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<std::optional<AvailabilityDomain>> getCachedResult() const;
+  void cacheResult(std::optional<AvailabilityDomain> domain) const;
+};
+
+class IsCustomAvailabilityDomainPermanentlyEnabled
+    : public SimpleRequest<IsCustomAvailabilityDomainPermanentlyEnabled,
+                           bool(const CustomAvailabilityDomain *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator,
+                const CustomAvailabilityDomain *customDomain) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<bool> getCachedResult() const;
+  void cacheResult(bool isPermanentlyEnabled) const;
+
+  SourceLoc getNearestLoc() const {
+    auto *domain = std::get<0>(getStorage());
+    return extractNearestSourceLoc(domain->getDecl());
+  }
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

@@ -62,7 +62,7 @@ ERROR(pound_diagnostic_expected_string,none,
       "expected string literal in %select{#warning|#error}0 directive",(bool))
 ERROR(pound_diagnostic_expected,none,
       "expected '%0' in %select{#warning|#error}1 directive",(StringRef,bool))
-ERROR(pound_diagnostic_expected_parens,none,
+ERROR(pound_diagnostic_expected_parens,PointsToFirstBadToken,
       "%select{#warning|#error}0 directive requires parentheses",(bool))
 ERROR(pound_diagnostic_interpolation,none,
       "string interpolation is not allowed in %select{#warning|#error}0 directives",(bool))
@@ -303,6 +303,10 @@ ERROR(missing_reading_accessor,none,
       "%select{variable|subscript}0 with %1 must also have "
       "a getter, addressor, or 'read' accessor",
       (unsigned, StringRef))
+ERROR(missing_borrow_accessor,none,
+      "%select{variable|subscript}0 with %1 must also have "
+      "a 'borrow' accessor, getter, addressor or 'read' accessor",
+      (unsigned, StringRef))
 ERROR(observing_accessor_conflicts_with_accessor,none,
       "%select{'willSet'|'didSet'}0 cannot be provided together with %1",
       (unsigned, StringRef))
@@ -312,6 +316,9 @@ ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
 ERROR(accessor_requires_coroutine_accessors,none,
       "%0 is only valid when experimental feature coroutine accessors is enabled",
+      (StringRef))
+ERROR(accessor_requires_borrow_and_mutate_accessors,none,
+      "%0 requires '-enable-experimental-feature BorrowAndMutateAccessors'",
       (StringRef))
 
 // Import

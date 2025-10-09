@@ -138,9 +138,8 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       case let initExRef as InitExistentialRefInst:
         if context.options.enableEmbeddedSwift {
           for c in initExRef.conformances where c.isConcrete {
-            specializeWitnessTable(for: c, moduleContext) {
-              worklist.addWitnessMethods(of: $0)
-            }
+            specializeWitnessTable(for: c, moduleContext)
+            worklist.addWitnessMethods(of: c, moduleContext)
           }
         }
 
@@ -149,14 +148,18 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         case .BuildOrdinaryTaskExecutorRef,
              .BuildOrdinarySerialExecutorRef,
              .BuildComplexEqualitySerialExecutorRef:
-          specializeWitnessTable(for: bi.substitutionMap.conformances[0], moduleContext) {
-            worklist.addWitnessMethods(of: $0)
-          }
+          let conformance = bi.substitutionMap.conformances[0]
+          specializeWitnessTable(for: conformance, moduleContext)
+          worklist.addWitnessMethods(of: conformance, moduleContext)
 
         default:
-          break
+          if !devirtualizeDeinits(of: bi, simplifyCtxt) {
+            // If invoked from SourceKit avoid reporting false positives when WMO is turned off for indexing purposes.
+            if moduleContext.enableWMORequiredDiagnostics {
+              context.diagnosticEngine.diagnose(.deinit_not_visible, at: bi.location)
+            }
+          }
         }
-
 
       // We need to de-virtualize deinits of non-copyable types to be able to specialize the deinitializers.
       case let destroyValue as DestroyValueInst:
@@ -299,7 +302,9 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
     return false
   }
 
-  if apply.parentFunction.isGlobalInitOnceFunction && callee.inlineStrategy == .always {
+  if apply.parentFunction.isGlobalInitOnceFunction && (
+      callee.inlineStrategy == .heuristicAlways ||
+      callee.inlineStrategy == .always) {
     // Some arithmetic operations, like integer conversions, are not transparent but `inline(__always)`.
     // Force inlining them in global initializers so that it's possible to statically initialize the global.
     return true
@@ -401,7 +406,7 @@ private extension Value {
       //   var p = Point(x: 10, y: 20)
       //   let o = UnsafePointer(&p)
       // Therefore ignore the `end_access` use of a `begin_access`.
-      let relevantUses = singleUseValue.uses.ignoreDebugUses.ignoreUsers(ofType: EndAccessInst.self)
+      let relevantUses = singleUseValue.uses.ignoreDebugUses.ignoreUses(ofType: EndAccessInst.self)
 
       guard let use = relevantUses.singleUse else {
         return nil
@@ -515,15 +520,44 @@ extension FunctionWorklist {
     }
   }
 
-  mutating func addWitnessMethods(of witnessTable: WitnessTable) {
+  mutating func addWitnessMethods(of conformance: Conformance, _ context: ModulePassContext) {
+    var visited = Set<Conformance>()
+    addWitnessMethodsRecursively(of: conformance, visited: &visited, context)
+  }
+
+  private mutating func addWitnessMethodsRecursively(of conformance: Conformance,
+                                                     visited: inout Set<Conformance>,
+                                                     _ context: ModulePassContext)
+  {
+    guard conformance.isConcrete,
+          visited.insert(conformance).inserted
+    else {
+      return
+    }
+    let witnessTable: WitnessTable
+    if let wt = context.lookupWitnessTable(for: conformance) {
+      witnessTable = wt
+    } else if let wt = context.lookupWitnessTable(for: conformance.rootConformance) {
+      witnessTable = wt
+    } else {
+      return
+    }
     for entry in witnessTable.entries {
-      if case .method(_, let witness) = entry,
-         let method = witness,
-         // A new witness table can still contain a generic function if the method couldn't be specialized for
-         // some reason and an error has been printed. Exclude generic functions to not run into an assert later.
-         !method.isGeneric
-      {
-        pushIfNotVisited(method)
+      switch entry {
+      case .invalid, .associatedType:
+        break
+      case .method(_, let witness):
+        if let method = witness,
+           // A new witness table can still contain a generic function if the method couldn't be specialized for
+           // some reason and an error has been printed. Exclude generic functions to not run into an assert later.
+           !method.isGeneric
+        {
+          pushIfNotVisited(method)
+        }
+      case .baseProtocol(_, let baseConf):
+        addWitnessMethodsRecursively(of: baseConf, visited: &visited, context)
+      case .associatedConformance(_, let assocConf):
+        addWitnessMethodsRecursively(of: assocConf, visited: &visited, context)
       }
     }
   }

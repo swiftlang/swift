@@ -1,0 +1,15 @@
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// REQUIRES: asserts, no_asan
+
+// https://github.com/swiftlang/swift/issues/52563
+
+func slow() {
+  let a = 1
+  let b = 1
+  let c = 1
+  let result = [(-b + c) / (2 * a), (-b - c) / (2 * a),
+%for i in range(0, N):
+                (-b + c) / (2 * a), (-b - c) / (2 * a),
+%end
+  ]
+}

@@ -1,7 +1,6 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: rdar162106747
 
-// FIXME swift-ci linux tests do not support std::span
-// UNSUPPORTED: OS=linux-gnu, OS=linux-android, OS=linux-androideabi
+// REQUIRES: swift_feature_SafeInteropWrappers
 
 // RUN: rm -rf %t
 // RUN: split-file %s %t

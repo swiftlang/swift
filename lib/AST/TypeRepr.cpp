@@ -525,7 +525,7 @@ TupleTypeRepr::TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
   Bits.TupleTypeRepr.NumElements = Elements.size();
 
   std::uninitialized_copy(Elements.begin(), Elements.end(),
-                          getTrailingObjects<TupleTypeReprElement>());
+                          getTrailingObjects());
 }
 
 TupleTypeRepr *TupleTypeRepr::create(const ASTContext &C,
@@ -682,7 +682,7 @@ PackTypeRepr::PackTypeRepr(SourceLoc keywordLoc, SourceRange braceLocs,
   : TypeRepr(TypeReprKind::Pack),
     KeywordLoc(keywordLoc), BraceLocs(braceLocs) {
   Bits.PackTypeRepr.NumElements = elements.size();
-  memcpy(getTrailingObjects<TypeRepr*>(), elements.data(),
+  memcpy(getTrailingObjects(), elements.data(),
          elements.size() * sizeof(TypeRepr*));
 }
 
@@ -968,15 +968,6 @@ void IntegerTypeRepr::printImpl(ASTPrinter &Printer,
                                 const PrintOptions &Opts,
                                 NonRecursivePrintOptions nrOpts) const {
   Printer.printText(getValue());
-}
-
-void ErrorTypeRepr::dischargeDiagnostic(swift::ASTContext &Context) {
-  if (!DelayedDiag)
-    return;
-
-  // Consume and emit the diagnostic.
-  Context.Diags.diagnose(Range.Start, *DelayedDiag).highlight(Range);
-  DelayedDiag = std::nullopt;
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

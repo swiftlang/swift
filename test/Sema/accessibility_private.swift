@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 4
 
 class Container {
   private func foo() {} // expected-note * {{declared here}}

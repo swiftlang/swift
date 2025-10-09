@@ -275,6 +275,8 @@ SWIFT_REQUEST(TypeChecker, PatternBindingCheckedAndContextualizedInitRequest,
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PrimarySourceFilesRequest,
               ArrayRef<SourceFile *>(ModuleDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, LoadAccessNotesRequest,
+              const AccessNotesFile *(ASTContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PropertyWrapperAuxiliaryVariablesRequest,
               PropertyWrapperAuxiliaryVariables(VarDecl *),
               SeparatelyCached | SplitCached,
@@ -364,9 +366,15 @@ SWIFT_REQUEST(TypeChecker, TypeCheckASTNodeAtLocRequest,
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UnderlyingTypeRequest, Type(TypeAliasDecl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ClangUSRGenerationRequest,
+              std::optional<std::string>(const ValueDecl *),
+              SeparatelyCached | SplitCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SwiftUSRGenerationRequest,
+              std::string(const ValueDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, USRGenerationRequest,
               std::string(const ValueDecl *, USRGenerationOptions),
-              Cached, NoLocationInfo)
+              Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsABICompatibleOverrideRequest,
               bool(ValueDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsStaticRequest,
@@ -641,6 +649,22 @@ SWIFT_REQUEST(TypeChecker, DefaultIsolationInSourceFileRequest,
               std::optional<DefaultIsolation>(const SourceFile *),
               Cached, NoLocationInfo)
 
+SWIFT_REQUEST(TypeChecker, BindExtensionsRequest,
+              evaluator::SideEffect(ModuleDecl *),
+              Cached, NoLocationInfo)
+
 SWIFT_REQUEST(TypeChecker, ModuleHasTypeCheckerPerformanceHacksEnabledRequest,
               bool(const ModuleDecl *),
+              Cached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, AvailabilityDomainForDeclRequest,
+              std::optional<AvailabilityDomain>(ValueDecl *),
+              Cached | SplitCached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, IsCustomAvailabilityDomainPermanentlyEnabled,
+              bool(const CustomAvailabilityDomain *),
+              SeparatelyCached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, EmitPerformanceHints,
+              evaluator::SideEffect(SourceFile *),
               Cached, NoLocationInfo)

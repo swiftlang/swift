@@ -235,7 +235,7 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
         // the task was cancelled while awaiting a willChange so ensure a proper termination
         return try terminate(id: id)
       }
-      // start by directly tracking the emission via a withObservation tracking on the isolation specified fro mthe init
+      // start by directly tracking the emission via a withObservation tracking on the isolation specified from the init
       switch try await Iterator.trackEmission(isolation: emit.isolation, state: state, emit: emit) {
       case .finish: return try terminate(id: id)
       case .next(let element): return element

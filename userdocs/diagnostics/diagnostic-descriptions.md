@@ -24,10 +24,12 @@ presented specially within your IDE of choice. See below for the full list of th
 - <doc:string-interpolation-conformance>
 - <doc:isolated-conformances>
 - <doc:error-in-future-swift-version>
+- <doc:module-not-testable>
 - <doc:multiple-inheritance>
 - <doc:nominal-types>
 - <doc:property-wrapper-requirements>
 - <doc:protocol-type-non-conformance>
+- <doc:exclusivity-violation>
 - <doc:conformance-isolation>
 - <doc:result-builder-methods>
 - <doc:sendable-metatypes>
@@ -37,3 +39,4 @@ presented specially within your IDE of choice. See below for the full list of th
 - <doc:opaque-type-inference>
 - <doc:mutable-global-variable>
 - <doc:existential-member-access-limitations>
+- <doc:performance-hints>

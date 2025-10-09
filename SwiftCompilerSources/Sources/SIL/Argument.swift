@@ -170,7 +170,7 @@ public struct Phi {
   }
 
   public var incomingValues: LazyMapSequence<LazyMapSequence<PredecessorList, Operand>, Value> {
-    incomingOperands.lazy.map { $0.value }
+    incomingOperands.values
   }
 
   public var isReborrow: Bool { value.isReborrow }
@@ -488,6 +488,8 @@ public enum ArgumentConvention : CustomStringConvertible {
       self = .directUnowned
     case .pack:
       self = .packOut
+    case .guaranteed, .guaranteedAddress:
+      fatalError("Result conventions @guaranteed and @guaranteed_addr are always returned directly")
     }
   }
 

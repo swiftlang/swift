@@ -30,11 +30,10 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
 
   /// The starting address of this `Span`.
   ///
-  /// `_pointer` can be `nil` if and only if `_count` equals 0.
-  /// Otherwise, `_pointer` must point to memory that will remain
-  /// valid and not mutated as long as this `Span` exists.
-  /// The memory at `_pointer` must be initialized
-  /// as `_count` instances of `Element`.
+  /// If `_count` is zero, `_pointer` may point to valid memory or it may be `nil`,
+  /// but no accesses may be performed through it. Otherwise, `_pointer` must point
+  /// to initialized memory containing `_count` instances of `Element`, which must
+  /// remain valid and not be mutated during the lifetime of this `Span`.
   @usableFromInline
   internal let _pointer: UnsafeRawPointer?
 

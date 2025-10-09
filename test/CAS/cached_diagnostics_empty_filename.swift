@@ -1,4 +1,3 @@
-// REQUIRES: swift_feature_RegionBasedIsolation
 // REQUIRES: objc_interop
 
 // RUN: %empty-directory(%t)
@@ -36,7 +35,7 @@
 // RUN: echo "\"@%t/map.casid\"" >> %t/MyApp.cmd
 
 // RUN: %target-swift-frontend  -cache-compile-job -module-name Test -O -cas-path %t/cas @%t/MyApp.cmd %t/test.swift \
-// RUN:   -emit-module -o %t/test.swiftmodule -require-explicit-sendable -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
+// RUN:   -emit-module -o %t/test.swiftmodule -require-explicit-sendable -strict-concurrency=complete
 
 //--- module.modulemap
 module A {

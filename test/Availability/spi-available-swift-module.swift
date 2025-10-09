@@ -3,7 +3,7 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -parse-as-library %t/Foo.swift -emit-module -library-level api -emit-module-path %t/Foo.swiftmodule -module-name Foo
-// RUN: %target-swift-frontend-typecheck -parse-as-library %t/Client.swift -verify -library-level api -I %t
+// RUN: %target-swift-frontend-typecheck -parse-as-library %t/Client.swift -verify -verify-ignore-unrelated -library-level api -I %t
 
 //--- Foo.swift
 

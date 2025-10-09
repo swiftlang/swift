@@ -347,15 +347,24 @@ def import_underlying_module : Flag<["-"], "import-underlying-module">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Implicitly imports the Objective-C half of a module">;
 
+def import_bridging_header : Separate<["-"], "import-bridging-header">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Implicitly imports a C header file">;
 def import_objc_header : Separate<["-"], "import-objc-header">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
-  HelpText<"Implicitly imports an Objective-C header file">;
-def import_bridging_header : Separate<["-"], "import-bridging-header">,
-  Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
-  Alias<import_objc_header>;
+  Alias<import_bridging_header>;
+
+def internal_import_bridging_header : Separate<["-"], "internal-import-bridging-header">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Implicitly imports a C header file as an internal import">;
+
 def import_pch : Separate<["-"], "import-pch">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Import bridging header PCH file">;
+
+def internal_import_pch : Separate<["-"], "internal-import-pch">,
+  Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
+  HelpText<"Import bridging header PCH file as internal">;
 
 def pch_output_dir: Separate<["-"], "pch-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
@@ -575,6 +584,14 @@ def define_enabled_availability_domain : Separate<["-"], "define-enabled-availab
     Flags<[HelpHidden, FrontendOption, NoInteractiveOption, ModuleInterfaceOptionIgnorable]>,
     HelpText<"Defines a custom availability domain that is available at compile time">,
     MetaVarName<"<domain>">;
+
+def define_always_enabled_availability_domain
+    : Separate<["-"], "define-always-enabled-availability-domain">,
+      Flags<[HelpHidden, FrontendOption, NoInteractiveOption,
+             ModuleInterfaceOptionIgnorable]>,
+      HelpText<"Defines a custom availability domain that is available for all "
+               "deployments">,
+      MetaVarName<"<domain>">;
 
 def define_disabled_availability_domain : Separate<["-"], "define-disabled-availability-domain">,
     Flags<[HelpHidden, FrontendOption, NoInteractiveOption, ModuleInterfaceOptionIgnorable]>,
@@ -882,7 +899,7 @@ def experimental_package_interface_load:
 def experimental_serialize_debug_info:
   Flag<["-"], "experimental-serialize-debug-info">,
   Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Enables seriailzation/deserialization of debug scopes">;
+  HelpText<"Enables serialization/deserialization of debug scopes">;
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
@@ -911,6 +928,10 @@ def Wwarning : Separate<["-"], "Wwarning">,
   Flags<[FrontendOption, HelpHidden]>,
   MetaVarName<"<diagnostic_group>">,
   HelpText<"Treat this warning group as warning">;
+
+def suppress_notes : Flag<["-"], "suppress-notes">,
+  Flags<[FrontendOption]>,
+  HelpText<"Suppress all notes">;
 
 def suppress_remarks : Flag<["-"], "suppress-remarks">,
   Flags<[FrontendOption]>,
@@ -1163,7 +1184,7 @@ def ExperimentalPackageCMO : Flag<["-"], "experimental-package-cmo">,
 
 def PackageCMO : Flag<["-"], "package-cmo">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable optimization to perform defalut CMO within a package boundary">;
+  HelpText<"Enable optimization to perform default CMO within a package boundary">;
 
 def EnableDefaultCMO : Flag<["-"], "enable-default-cmo">,
   Flags<[HelpHidden, FrontendOption]>,
@@ -1435,11 +1456,7 @@ def dump_scope_maps : Separate<["-"], "dump-scope-maps">,
   MetaVarName<"<expanded-or-list-of-line:column>">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def dump_availability_scopes :
-  Flag<["-"], "dump-availability-scopes">,
-  HelpText<"Type-check input file(s) and dump availability scopes">,
-  ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+
 def dump_type_info : Flag<["-"], "dump-type-info">,
   HelpText<"Output YAML dump of fixed-size types from all imported modules">,
   ModeOpt,
@@ -1529,6 +1546,9 @@ def target_legacy_spelling : Joined<["--"], "target=">,
 def print_target_info : Flag<["-"], "print-target-info">,
     Flags<[FrontendOption]>,
     HelpText<"Print target information for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
+def print_static_build_config : Flag<["-"], "print-static-build-config">,
+    Flags<[FrontendOption]>,
+    HelpText<"Print static build configuration that can be used to evaluate #ifs in Swift source code">;
 
 def print_supported_features : Flag<["-"], "print-supported-features">,
     Flags<[FrontendOption]>,
@@ -1782,6 +1802,19 @@ def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
          SupplementaryOutput, HelpHidden, CacheInvariant]>,
   HelpText<"Emit a symbol graph to directory <dir>">,
   MetaVarName<"<dir>">;
+
+def symbol_graph_pretty_print: Flag<["-"], "symbol-graph-pretty-print">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden, SupplementaryOutput]>,
+  HelpText<"Pretty-print the output symbol graph JSON">;
+
+def symbol_graph_skip_inherited_docs: Flag<["-"], "symbol-graph-skip-inherited-docs">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden, SupplementaryOutput]>,
+  HelpText<"Skip emitting doc comments for members inherited through classes or "
+           "default implementations">;
+
+def symbol_graph_skip_synthesized_members: Flag<["-"], "symbol-graph-skip-synthesized-members">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden, SupplementaryOutput]>,
+  HelpText<"Skip members inherited through classes or default implementations">;
 
 def symbol_graph_minimum_access_level: Separate<["-"], "symbol-graph-minimum-access-level">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
@@ -2111,6 +2144,13 @@ def emit_module_serialize_diagnostics_path:
            "<path>">,
   MetaVarName<"<path>">;
 
+def dependency_scan_serialize_diagnostics_path:
+  Separate<["-"], "dependency-scan-serialize-diagnostics-path">,
+  Flags<[ArgumentIsPath, SupplementaryOutput, NewDriverOnlyOption]>,
+  HelpText<"Emit a serialized diagnostics file for the dependency scanning task to "
+           "<path>">,
+  MetaVarName<"<path>">;
+
 def emit_module_dependencies_path:
   Separate<["-"], "emit-module-dependencies-path">,
   Flags<[ArgumentIsPath, SupplementaryOutput, NewDriverOnlyOption]>,
@@ -2298,7 +2338,7 @@ def load_resolved_plugin:
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Path to resolved plugin configuration and a comma-separated list "
            "of module names where the macro types are declared. Library path "
-           "and exectuable path can be empty if not used">,
+           "and executable path can be empty if not used">,
   MetaVarName<"<library-path>#<executable-path>#<module-names>">;
 
 def resolved_plugin_verification : Flag<["-"], "resolved-plugin-verification">,

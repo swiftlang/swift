@@ -750,7 +750,7 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
             theDecl, genericArgs.Types, NotForDefinition);
 
     response = IGF.emitGenericTypeMetadataAccessFunctionCall(
-        accessor, genericArgs.Values, request);
+        accessor, genericArgs.Values, request, genericArgs.hasPacks);
   }
 
   IGF.setScopedLocalTypeMetadata(theType, response);
@@ -2462,11 +2462,9 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM, llvm::Function *accessor,
   IGF.Builder.CreateRet(ret);
 }
 
-MetadataResponse
-IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
-                                              llvm::Function *accessFunction,
-                                              ArrayRef<llvm::Value *> args,
-                                              DynamicMetadataRequest request) {
+MetadataResponse IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
+    llvm::Function *accessFunction, ArrayRef<llvm::Value *> args,
+    DynamicMetadataRequest request, bool hasPacks) {
 
   SmallVector<llvm::Value *, 8> callArgs;
 
@@ -2490,7 +2488,7 @@ IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
                                  accessFunction, callArgs);
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
-  call->setMemoryEffects(allocatedArgsBuffer
+  call->setMemoryEffects(hasPacks || allocatedArgsBuffer
                              ? llvm::MemoryEffects::inaccessibleOrArgMemOnly()
                              : llvm::MemoryEffects::none());
 
@@ -3592,8 +3590,8 @@ IRGenFunction::emitTypeMetadataRefForLayout(SILType ty,
 
 llvm::Value *IRGenFunction::emitValueGenericRef(CanType type) {
   if (auto integer = type->getAs<IntegerType>()) {
-    return llvm::ConstantInt::get(IGM.SizeTy,
-                    integer->getValue().zextOrTrunc(IGM.SizeTy->getBitWidth()));
+    auto value = integer->getValue().sextOrTrunc(IGM.SizeTy->getBitWidth());
+    return llvm::ConstantInt::get(IGM.SizeTy, value);
   }
 
   return tryGetLocalTypeData(type, LocalTypeDataKind::forValue());
@@ -3615,8 +3613,8 @@ namespace {
   ///   valid recursive types bottom out in fixed-sized types like classes
   ///   or pointers.)
   class EmitTypeLayoutRef
-    : public CanTypeVisitor<EmitTypeLayoutRef, llvm::Value *,
-                            DynamicMetadataRequest> {
+    : public CanTypeVisitor_AnyNominal<EmitTypeLayoutRef, llvm::Value *,
+                                       DynamicMetadataRequest> {
   private:
     IRGenFunction &IGF;
   public:
@@ -3755,10 +3753,9 @@ namespace {
       llvm_unreachable("Not a valid MetatypeRepresentation.");
     }
 
-    llvm::Value *visitAnyClassType(ClassDecl *classDecl,
+    llvm::Value *visitAnyClassType(CanType type, ClassDecl *classDecl,
                                    DynamicMetadataRequest request) {
       // All class types have the same layout.
-      auto type = classDecl->getDeclaredType()->getCanonicalType();
       switch (type->getReferenceCounting()) {
       case ReferenceCounting::Native:
         return emitFromValueWitnessTable(IGF.IGM.Context.TheNativeObjectType);
@@ -3777,16 +3774,6 @@ namespace {
       }
 
       llvm_unreachable("Not a valid ReferenceCounting.");
-    }
-
-    llvm::Value *visitClassType(CanClassType type,
-                                DynamicMetadataRequest request) {
-      return visitAnyClassType(type->getClassOrBoundGenericClass(), request);
-    }
-
-    llvm::Value *visitBoundGenericClassType(CanBoundGenericClassType type,
-                                            DynamicMetadataRequest request) {
-      return visitAnyClassType(type->getClassOrBoundGenericClass(), request);
     }
 
     llvm::Value *visitPackType(CanPackType type,

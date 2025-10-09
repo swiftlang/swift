@@ -9,7 +9,7 @@
 // CHECK-LABEL: sil hidden [thunk] [ossa] @pear : $@convention(c)
 // CHECK:         function_ref @$s5cdecl5apple{{[_0-9a-zA-Z]*}}F
 // CHECK-LABEL: sil hidden [ossa] @$s5cdecl5apple{{[_0-9a-zA-Z]*}}F
-@cdecl(pear)
+@c(pear)
 func apple(_ f: @convention(c) (Int) -> Int) { }
 
 // CHECK-LABEL: sil hidden [ossa] @$s5cdecl16forceCEntryPoint{{[_0-9a-zA-Z]*}}F
@@ -24,7 +24,7 @@ func forceCEntryPoint() {
 // CHECK-LABEL: sil hidden [thunk] [ossa] @grapefruit : $@convention(c)
 // CHECK:         function_ref @$s5cdecl6orange{{[_0-9a-zA-Z]*}}F
 // CHECK-LABEL: sil hidden [ossa] @$s5cdecl6orange{{[_0-9a-zA-Z]*}}F
-@cdecl(grapefruit)
+@c(grapefruit)
 func orange(_ x: Int) -> Int {
   return x
 }
@@ -33,7 +33,7 @@ func orange(_ x: Int) -> Int {
 // CHECK:         function_ref @$s5cdecl8broccoli{{[_0-9a-zA-Z]*}}F
 // CHECK-LABEL: sil [ossa] @$s5cdecl8broccoli{{[_0-9a-zA-Z]*}}F
 // FIXME should it be `sil hidden`?
-@cdecl(cauliflower)
+@c(cauliflower)
 public func broccoli(_ x: Int) -> Int {
   return x
 }
@@ -41,7 +41,7 @@ public func broccoli(_ x: Int) -> Int {
 // CHECK-LABEL: sil private [thunk] [ossa] @collard_greens : $@convention(c)
 // CHECK:         function_ref @$s5cdecl4kale[[PRIVATE:.*]]
 // CHECK:       sil private [ossa] @$s5cdecl4kale[[PRIVATE:.*]]
-@cdecl(collard_greens)
+@c(collard_greens)
 private func kale(_ x: Int) -> Int {
   return x
 }
@@ -49,7 +49,7 @@ private func kale(_ x: Int) -> Int {
 // CHECK-LABEL: sil private [thunk] [ossa] @defaultName : $@convention(c)
 // CHECK:         function_ref @$s5cdecl11defaultName[[PRIVATE:.*]]
 // CHECK:       sil private [ossa] @$s5cdecl11defaultName[[PRIVATE:.*]]
-@cdecl
+@c
 private func defaultName(_ x: Int) -> Int {
   return x
 }
