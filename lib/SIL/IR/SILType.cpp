@@ -656,6 +656,11 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
   case ResultConvention::Owned:
     return OwnershipKind::Owned;
   case ResultConvention::Unowned:
+    // We insert a retain right after the call returning an unowned value in
+    // OwnershipModelEliminator. So treat the result as owned.
+    if (IsTrivial)
+      return OwnershipKind::None;
+    return OwnershipKind::Owned;
   case ResultConvention::UnownedInnerPointer:
     if (IsTrivial)
       return OwnershipKind::None;

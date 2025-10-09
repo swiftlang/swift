@@ -5291,6 +5291,7 @@ void ResultPlanner::execute(SmallVectorImpl<SILValue> &innerDirectResultStack,
       LLVM_FALLTHROUGH;
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
+    case ResultConvention::Unowned: // Handled in OwnershipModelEliminator.
       return SGF.emitManagedRValueWithCleanup(resultValue, resultTL);
     case ResultConvention::Pack:
       llvm_unreachable("shouldn't have direct result with pack results");
@@ -5300,8 +5301,6 @@ void ResultPlanner::execute(SmallVectorImpl<SILValue> &innerDirectResultStack,
       // originally 'self'.
       SGF.SGM.diagnose(Loc.getSourceLoc(), diag::not_implemented,
                        "reabstraction of returns_inner_pointer function");
-      LLVM_FALLTHROUGH;
-    case ResultConvention::Unowned:
       return SGF.emitManagedCopy(Loc, resultValue, resultTL);
     }
     llvm_unreachable("bad result convention!");
