@@ -1441,28 +1441,31 @@ NodePointer Demangler::demangleBuiltinType() {
   NodePointer Ty = nullptr;
   const int maxTypeSize = 4096; // a very conservative upper bound
   switch (nextChar()) {
-    case 'b':
-      Ty = createNode(Node::Kind::BuiltinTypeName,
-                               BUILTIN_TYPE_NAME_BRIDGEOBJECT);
-      break;
-    case 'B':
-      Ty = createNode(Node::Kind::BuiltinTypeName,
-                              BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER);
-      break;
-    case 'e':
-      Ty = createNode(Node::Kind::BuiltinTypeName,
-                              BUILTIN_TYPE_NAME_EXECUTOR);
-      break;
-    case 'f': {
-      int size = demangleIndex() - 1;
-      if (size <= 0 || size > maxTypeSize)
-        return nullptr;
-      CharVector name;
-      name.append(BUILTIN_TYPE_NAME_FLOAT, *this);
-      name.append(size, *this);
-      Ty = createNode(Node::Kind::BuiltinTypeName, name);
-      break;
-    }
+  case 'A':
+    Ty = createNode(Node::Kind::BuiltinTypeName,
+                    BUILTIN_TYPE_NAME_IMPLICITACTOR);
+    break;
+  case 'b':
+    Ty =
+        createNode(Node::Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_BRIDGEOBJECT);
+    break;
+  case 'B':
+    Ty = createNode(Node::Kind::BuiltinTypeName,
+                    BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER);
+    break;
+  case 'e':
+    Ty = createNode(Node::Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_EXECUTOR);
+    break;
+  case 'f': {
+    int size = demangleIndex() - 1;
+    if (size <= 0 || size > maxTypeSize)
+      return nullptr;
+    CharVector name;
+    name.append(BUILTIN_TYPE_NAME_FLOAT, *this);
+    name.append(size, *this);
+    Ty = createNode(Node::Kind::BuiltinTypeName, name);
+    break;
+  }
     case 'i': {
       int size = demangleIndex() - 1;
       if (size <= 0 || size > maxTypeSize)

@@ -5671,7 +5671,8 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
 
     assert(forwardedIsolationValue);
     SGF.B.createHopToExecutor(loc, forwardedIsolationValue, false);
-    argValues.push_back(forwardedIsolationValue);
+    argValues.push_back(
+        SGF.B.convertToImplicitActor(loc, forwardedIsolationValue));
   }
 
   // Add the rest of the arguments.
@@ -7130,49 +7131,47 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
       return *derivedIsolationCache;
     };
 
-    switch (baseIsolation) {
-    case ActorIsolation::Unspecified:
-    case ActorIsolation::Nonisolated:
-    case ActorIsolation::NonisolatedUnsafe:
-      args.push_back(emitNonIsolatedIsolation(loc).getValue());
-      break;
-    case ActorIsolation::Erased:
-      llvm::report_fatal_error("Found erased actor isolation?!");
-      break;
-    case ActorIsolation::GlobalActor: {
-      auto globalActor = baseIsolation.getGlobalActor()->getCanonicalType();
-      args.push_back(emitGlobalActorIsolation(loc, globalActor).getValue());
-      break;
-    }
-    case ActorIsolation::ActorInstance:
-    case ActorIsolation::CallerIsolationInheriting: {
-      auto derivedIsolation = getDerivedIsolation();
-      switch (derivedIsolation) {
+    auto arg = [&]() -> SILValue {
+      switch (baseIsolation) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
-        args.push_back(emitNonIsolatedIsolation(loc).getValue());
-        break;
+        return emitNonIsolatedIsolation(loc).getValue();
       case ActorIsolation::Erased:
         llvm::report_fatal_error("Found erased actor isolation?!");
-        break;
+        return SILValue();
       case ActorIsolation::GlobalActor: {
-        auto globalActor =
-            derivedIsolation.getGlobalActor()->getCanonicalType();
-        args.push_back(emitGlobalActorIsolation(loc, globalActor).getValue());
-        break;
+        auto globalActor = baseIsolation.getGlobalActor()->getCanonicalType();
+        return emitGlobalActorIsolation(loc, globalActor).getValue();
       }
       case ActorIsolation::ActorInstance:
       case ActorIsolation::CallerIsolationInheriting: {
-        auto isolatedArg = F.maybeGetIsolatedArgument();
-        assert(isolatedArg);
-        args.push_back(isolatedArg);
-        break;
+        auto derivedIsolation = getDerivedIsolation();
+        switch (derivedIsolation) {
+        case ActorIsolation::Unspecified:
+        case ActorIsolation::Nonisolated:
+        case ActorIsolation::NonisolatedUnsafe:
+          return emitNonIsolatedIsolation(loc).getValue();
+        case ActorIsolation::Erased:
+          llvm::report_fatal_error("Found erased actor isolation?!");
+          return SILValue();
+        case ActorIsolation::GlobalActor: {
+          auto globalActor =
+              derivedIsolation.getGlobalActor()->getCanonicalType();
+          return emitGlobalActorIsolation(loc, globalActor).getValue();
+        }
+        case ActorIsolation::ActorInstance:
+        case ActorIsolation::CallerIsolationInheriting: {
+          auto isolatedArg = F.maybeGetIsolatedArgument();
+          assert(isolatedArg);
+          return isolatedArg;
+        }
+        }
       }
       }
-      break;
-    }
-    }
+    }();
+
+    args.push_back(B.convertToImplicitActor(loc, arg));
 
     // If our derived isolation is caller isolation inheriting and our base
     // isn't, we need to insert a hop so that derived can assume that it does
@@ -7634,49 +7633,47 @@ void SILGenFunction::emitProtocolWitness(
       }
       return *witnessIsolationCache;
     };
-    switch (reqtIsolation) {
-    case ActorIsolation::Unspecified:
-    case ActorIsolation::Nonisolated:
-    case ActorIsolation::NonisolatedUnsafe:
-      args.push_back(emitNonIsolatedIsolation(loc).getValue());
-      break;
-    case ActorIsolation::Erased:
-      llvm::report_fatal_error("Found erased actor isolation?!");
-      break;
-    case ActorIsolation::GlobalActor: {
-      auto globalActor = reqtIsolation.getGlobalActor()->getCanonicalType();
-      args.push_back(emitGlobalActorIsolation(loc, globalActor).getValue());
-      break;
-    }
-    case ActorIsolation::ActorInstance:
-    case ActorIsolation::CallerIsolationInheriting: {
-      auto witnessIsolation = getWitnessIsolation();
-      switch (witnessIsolation) {
+    auto arg = [&]() -> SILValue {
+      switch (reqtIsolation) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
-        args.push_back(emitNonIsolatedIsolation(loc).getValue());
-        break;
+        return emitNonIsolatedIsolation(loc).getValue();
       case ActorIsolation::Erased:
         llvm::report_fatal_error("Found erased actor isolation?!");
-        break;
+        return SILValue();
       case ActorIsolation::GlobalActor: {
-        auto globalActor =
-            witnessIsolation.getGlobalActor()->getCanonicalType();
-        args.push_back(emitGlobalActorIsolation(loc, globalActor).getValue());
-        break;
+        auto globalActor = reqtIsolation.getGlobalActor()->getCanonicalType();
+        return emitGlobalActorIsolation(loc, globalActor).getValue();
       }
       case ActorIsolation::ActorInstance:
       case ActorIsolation::CallerIsolationInheriting: {
-        auto isolatedArg = F.maybeGetIsolatedArgument();
-        assert(isolatedArg);
-        args.push_back(isolatedArg);
-        break;
+        auto witnessIsolation = getWitnessIsolation();
+        switch (witnessIsolation) {
+        case ActorIsolation::Unspecified:
+        case ActorIsolation::Nonisolated:
+        case ActorIsolation::NonisolatedUnsafe:
+          return emitNonIsolatedIsolation(loc).getValue();
+        case ActorIsolation::Erased:
+          llvm::report_fatal_error("Found erased actor isolation?!");
+          return SILValue();
+        case ActorIsolation::GlobalActor: {
+          auto globalActor =
+              witnessIsolation.getGlobalActor()->getCanonicalType();
+          return emitGlobalActorIsolation(loc, globalActor).getValue();
+        }
+        case ActorIsolation::ActorInstance:
+        case ActorIsolation::CallerIsolationInheriting: {
+          auto isolatedArg = F.maybeGetIsolatedArgument();
+          assert(isolatedArg);
+          return isolatedArg;
+        }
+        }
       }
       }
-      break;
-    }
-    }
+    }();
+
+    args.push_back(B.convertToImplicitActor(loc, arg));
 
     // If our reqtIsolation was not caller isolation inheriting, but our witness
     // isolation is caller isolation inheriting, hop onto the reqtIsolation so

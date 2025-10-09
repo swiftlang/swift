@@ -3,7 +3,7 @@
 // REQUIRES: asserts
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test8callSync2fnyyyYbYAXE_tYaF
-// CHECK:         [[NIL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+// CHECK:         [[NIL_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
 // CHECK-NEXT:    hop_to_executor [[NIL_EXECUTOR]]
 // CHECK-NEXT:    [[FN_COPY:%.*]] = copy_value %0 : $@isolated(any) @noescape @Sendable @callee_guaranteed () -> ()
 // CHECK-NEXT:    [[FN_BORROW1:%.*]] = begin_borrow [[FN_COPY]] :
@@ -19,7 +19,7 @@ func callSync(fn: @isolated(any) @Sendable () -> ()) async {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test9callAsync2fnyyyYaYbYAXE_tYaF
-// CHECK:         [[NIL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+// CHECK:         [[NIL_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
 // CHECK-NEXT:    hop_to_executor [[NIL_EXECUTOR]]
 // CHECK-NEXT:    [[FN_COPY:%.*]] = copy_value %0 : $@isolated(any) @noescape @Sendable @async @callee_guaranteed () -> ()
 // CHECK-NEXT:    [[FN_BORROW2:%.*]] = begin_borrow [[FN_COPY]] :
