@@ -390,7 +390,8 @@ void CompilerInvocation::computeCXXStdlibOptions() {
     // (see https://reviews.llvm.org/D101479).
     LangOpts.CXXStdlib = CXXStdlibKind::Msvcprt;
     LangOpts.PlatformDefaultCXXStdlib = CXXStdlibKind::Msvcprt;
-  } else if (LangOpts.Target.isOSLinux() || LangOpts.Target.isOSDarwin()) {
+  } else if (LangOpts.Target.isOSLinux() || LangOpts.Target.isOSDarwin() ||
+             LangOpts.Target.isOSFreeBSD()) {
     auto [clangDriver, clangDiagEngine] =
         ClangImporter::createClangDriver(LangOpts, ClangImporterOpts);
     auto clangDriverArgs = ClangImporter::createClangArgs(
