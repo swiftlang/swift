@@ -21,44 +21,6 @@
 
 using namespace swift;
 
-//#ifndef NDEBUG
-static void checkPreconditions(SILFunction *F) {
-  // StackNesting has two preconditions: first, dominance still has
-  // to hold among allocations and deallocations; and second,
-  // allocations must be jointly post-dominated by their deallocations.
-  //
-  // Dominance is the more important precondition to check, because we
-  // don't want this pass to be held responsible if it ends up
-  // generating non-dominating loads and stores because its input didn't
-  // obey dominance either.
-  //
-  // Joint post-dominance is likely to just result in join
-  // If the input just violates joint post-dominance, on the other
-  // hand, we generally maintain most of that structure, and it's
-  // relatively easy to debug.
-
-  DominanceInfo dominance(F);
-
-  for (auto &BB: *F) {
-    for (auto &I : BB) {
-      if (I.isDeallocatingStack()) {
-        SILInstruction *dealloc = &I;
-        SILInstruction *alloc = getAllocForDealloc(dealloc);
-        if (!dominance.properlyDominates(alloc, dealloc)) {
-          llvm::errs() << "FATAL ERROR: prior to StackNesting, deallocation\n  "
-                       << *dealloc
-                       << "is not properly dominated by its allocation\n  "
-                       << *alloc
-                       << "Complete function:\n" << *F;
-          abort();
-        }
-      }
-    }
-  }
-
-}
-//#endif
-
 /// Run the given function exactly once on each of the reachable blocks in
 /// a SIL function. Blocks will be visited in a post-order consistent with
 /// dominance, which is to say, after all dominating blocks but otherwise
@@ -394,6 +356,44 @@ static void emitPendingDeallocations(State &state,
     madeChanges = true;
   }
 }
+
+//#ifndef NDEBUG
+static void checkPreconditions(SILFunction *F) {
+  // StackNesting has two preconditions: first, dominance still has
+  // to hold among allocations and deallocations; and second,
+  // allocations must be jointly post-dominated by their deallocations.
+  //
+  // Dominance is the more important precondition to check, because we
+  // don't want this pass to be held responsible if it ends up
+  // generating non-dominating loads and stores because its input didn't
+  // obey dominance either.
+  //
+  // Joint post-dominance is likely to just result in join
+  // If the input just violates joint post-dominance, on the other
+  // hand, we generally maintain most of that structure, and it's
+  // relatively easy to debug.
+
+  DominanceInfo dominance(F);
+
+  for (auto &BB: *F) {
+    for (auto &I : BB) {
+      if (I.isDeallocatingStack()) {
+        SILInstruction *dealloc = &I;
+        SILInstruction *alloc = getAllocForDealloc(dealloc);
+        if (!dominance.properlyDominates(alloc, dealloc)) {
+          llvm::errs() << "FATAL ERROR: prior to StackNesting, deallocation\n  "
+                       << *dealloc
+                       << "is not properly dominated by its allocation\n  "
+                       << *alloc
+                       << "Complete function:\n" << *F;
+          abort();
+        }
+      }
+    }
+  }
+
+}
+//#endif
 
 /// The main entrypoint for clients.
 ///
