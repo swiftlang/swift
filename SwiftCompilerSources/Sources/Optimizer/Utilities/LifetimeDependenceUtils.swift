@@ -614,7 +614,7 @@ extension LifetimeDependence.Scope {
 ///   leafUse(of: Operand) -> WalkResult
 ///   deadValue(_ value: Value, using operand: Operand?) -> WalkResult
 ///   escapingDependence(on operand: Operand) -> WalkResult
-///   inoutDependence(argument: FunctionArgument, on: Operand) -> WalkResult
+///   inoutDependence(argument: FunctionArgument, functionExit: Instruction) -> WalkResult
 ///   returnedDependence(result: Operand) -> WalkResult
 ///   returnedDependence(address: FunctionArgument, on: Operand) -> WalkResult
 ///   yieldedDependence(result: Operand) -> WalkResult
@@ -634,9 +634,9 @@ protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
 
   mutating func escapingDependence(on operand: Operand) -> WalkResult
 
-  // Assignment to an inout argument. This does not include the indirect out result, which is considered a return
+  // Assignment to an inout argument. This does not include the @out result, which is considered a return
   // value.
-  mutating func inoutDependence(argument: FunctionArgument, on: Operand) -> WalkResult
+  mutating func inoutDependence(argument: FunctionArgument, functionExit: Instruction) -> WalkResult
 
   mutating func returnedDependence(result: Operand) -> WalkResult
 
@@ -1025,15 +1025,12 @@ extension LifetimeDependenceDefUseWalker {
     if !localReachability.gatherAllReachableUses(of: storeAccess, in: &accessStack) {
       return escapingDependence(on: storedOperand)
     }
-    for localAccess in accessStack {
-      if visitLocalAccess(allocation: allocation, localAccess: localAccess, initialValue: storedOperand) == .abortWalk {
-        return .abortWalk
-      }
+    return accessStack.walk { localAccess in
+      visitLocalAccess(allocation: allocation, localAccess: localAccess)
     }
-    return .continueWalk
   }
 
-  private mutating func visitLocalAccess(allocation: Value, localAccess: LocalVariableAccess, initialValue: Operand)
+  private mutating func visitLocalAccess(allocation: Value, localAccess: LocalVariableAccess)
     -> WalkResult {
     switch localAccess.kind {
     case .beginAccess:
@@ -1080,7 +1077,7 @@ extension LifetimeDependenceDefUseWalker {
     case .outgoingArgument:
       let arg = allocation as! FunctionArgument
       assert(arg.type.isAddress, "returned local must be allocated with an indirect argument")
-      return inoutDependence(argument: arg, on: initialValue)
+      return inoutDependence(argument: arg, functionExit: localAccess.instruction!)
     case .inoutYield:
       return yieldedDependence(result: localAccess.operand!)
     case .incomingArgument:
@@ -1180,8 +1177,8 @@ private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
     return .continueWalk
   }
 
-  mutating func inoutDependence(argument: FunctionArgument, on operand: Operand) -> WalkResult {
-    print("Out use: \(operand) in: \(argument)")
+  mutating func inoutDependence(argument: FunctionArgument, functionExit: Instruction) -> WalkResult {
+    print("Returned inout: \(argument) exit: \(functionExit)")
     return .continueWalk
   }
 

@@ -557,9 +557,9 @@ extension DiagnoseDependenceWalker : LifetimeDependenceDefUseWalker {
     return .abortWalk
   }
 
-  mutating func inoutDependence(argument: FunctionArgument, on operand: Operand) -> WalkResult {
+  mutating func inoutDependence(argument: FunctionArgument, functionExit: Instruction) -> WalkResult {
     if diagnostics.checkInoutResult(argument: argument) == .abortWalk {
-      diagnostics.reportEscaping(operand: operand)
+      diagnostics.reportEscaping(value: argument, user: functionExit)
       return .abortWalk
     }
     return .continueWalk

@@ -857,6 +857,7 @@ extension LocalVariableReachableAccess {
         break
       }
       if block.terminator.isFunctionExiting {
+        // Record any reachable function exit as .outgoingArgument.
         accessStack.push(LocalVariableAccess(.outgoingArgument, block.terminator))
       } else if block.successors.isEmpty {
         accessStack.push(LocalVariableAccess(.deadEnd, block.terminator))
