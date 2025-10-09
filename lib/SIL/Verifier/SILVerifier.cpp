@@ -6752,9 +6752,9 @@ public:
     bool FoundThrowBlock = false;
     bool FoundUnwindBlock = false;
     for (auto &BB : *F) {
-      if (isa<ReturnInst>(BB.getTerminator())) {
-        require(!FoundReturnBlock,
-                "more than one return block in function");
+      if (isa<ReturnInst>(BB.getTerminator()) ||
+          isa<ReturnBorrowInst>(BB.getTerminator())) {
+        require(!FoundReturnBlock, "more than one return block in function");
         FoundReturnBlock = true;
       } else if (isa<ThrowInst>(BB.getTerminator()) ||
                  isa<ThrowAddrInst>(BB.getTerminator())) {

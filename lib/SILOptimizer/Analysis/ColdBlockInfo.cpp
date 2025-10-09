@@ -102,6 +102,7 @@ static bool isColdTerminator(const TermInst *term) {
   case TermKind::TryApplyInst:
   case TermKind::YieldInst:
   case TermKind::ReturnInst:
+  case TermKind::ReturnBorrowInst:
     return false;
   case TermKind::ThrowInst:
   case TermKind::ThrowAddrInst:

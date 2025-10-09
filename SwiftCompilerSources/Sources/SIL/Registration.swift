@@ -247,6 +247,7 @@ private func registerSILClasses() {
 
   register(UnreachableInst.self)
   register(ReturnInst.self)
+  register(ReturnBorrowInst.self)
   register(ThrowInst.self)
   register(ThrowAddrInst.self)
   register(YieldInst.self)

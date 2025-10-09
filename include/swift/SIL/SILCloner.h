@@ -3417,6 +3417,22 @@ SILCloner<ImplClass>::visitReturnInst(ReturnInst *Inst) {
                                       getOpValue(Inst->getOperand())));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitReturnBorrowInst(ReturnBorrowInst *rbi) {
+  getBuilder().setCurrentDebugScope(getOpScope(rbi->getDebugScope()));
+  if (!getBuilder().hasOwnership()) {
+    return recordClonedInstruction(
+        rbi, getBuilder().createReturn(getOpLocation(rbi->getLoc()),
+                                       getOpValue(rbi->getReturnValue())));
+  }
+
+  auto enclosingValues = getOpValueArray<8>(rbi->getEnclosingValues());
+  recordClonedInstruction(
+      rbi, getBuilder().createReturnBorrow(getOpLocation(rbi->getLoc()),
+                                           getOpValue(rbi->getReturnValue()),
+                                           enclosingValues));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitThrowInst(ThrowInst *Inst) {

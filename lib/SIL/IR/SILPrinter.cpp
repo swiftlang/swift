@@ -2907,6 +2907,21 @@ public:
     *this << getIDAndType(RI->getOperand());
   }
 
+  void visitReturnBorrowInst(ReturnBorrowInst *rbi) {
+    *this << getIDAndType(rbi->getReturnValue());
+
+    *this << " from_scopes (";
+    bool first = true;
+    for (SILValue ev : rbi->getEnclosingValues()) {
+      if (!first) {
+        *this << ", ";
+      }
+      first = false;
+      *this << getIDAndType(ev);
+    }
+    *this << ")";
+  }
+
   void visitSpecifyTestInst(SpecifyTestInst *TSI) {
     *this << QuotedString(TSI->getArgumentsSpecification());
   }

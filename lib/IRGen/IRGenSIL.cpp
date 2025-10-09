@@ -1504,6 +1504,9 @@ public:
   void visitBranchInst(BranchInst *i);
   void visitCondBranchInst(CondBranchInst *i);
   void visitReturnInst(ReturnInst *i);
+  void visitReturnBorrowInst(ReturnBorrowInst *i) {
+    llvm_unreachable("unimplemented");
+  }
   void visitThrowInst(ThrowInst *i);
   void visitThrowAddrInst(ThrowAddrInst *i);
   void visitUnwindInst(UnwindInst *i);

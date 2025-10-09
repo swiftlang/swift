@@ -5449,6 +5449,28 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       ResultVal = B.createReturn(InstLoc, Val);
       break;
     }
+    case SILInstructionKind::ReturnBorrowInst: {
+      SILValue returnValue;
+      if (parseTypedValueRef(returnValue, B))
+        return true;
+
+      if (parseVerbatim("from_scopes") ||
+          P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
+        return true;
+
+      if (P.Tok.isNot(tok::r_paren)) {
+        do {
+          if (parseTypedValueRef(Val, B))
+            return true;
+          OpList.push_back(Val);
+        } while (P.consumeIf(tok::comma));
+      }
+      if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
+        return true;
+
+      ResultVal = B.createReturnBorrow(InstLoc, returnValue, OpList);
+      break;
+    }
     case SILInstructionKind::ThrowInst: {
       if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
         return true;

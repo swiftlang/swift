@@ -1057,6 +1057,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   // Return and unreachable are free.
   case SILInstructionKind::UnreachableInst:
   case SILInstructionKind::ReturnInst:
+  case SILInstructionKind::ReturnBorrowInst:
   case SILInstructionKind::ThrowInst:
   case SILInstructionKind::ThrowAddrInst:
   case SILInstructionKind::UnwindInst:

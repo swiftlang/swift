@@ -10123,6 +10123,7 @@ public:
     case TermKind::UnwindInst:
     case TermKind::UnreachableInst:
     case TermKind::ReturnInst:
+    case TermKind::ReturnBorrowInst:
     case TermKind::ThrowInst:
     case TermKind::ThrowAddrInst:
     case TermKind::YieldInst:
@@ -10245,6 +10246,34 @@ public:
   /// Return the ownership kind for this instruction if we had any direct
   /// results.
   ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }
+
+  SuccessorListTy getSuccessors() {
+    // No Successors.
+    return SuccessorListTy();
+  }
+};
+
+class ReturnBorrowInst final
+    : public InstructionBaseWithTrailingOperands<
+          SILInstructionKind::ReturnBorrowInst, ReturnBorrowInst, TermInst> {
+  friend SILBuilder;
+
+  ReturnBorrowInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> operands);
+
+  static ReturnBorrowInst *create(SILDebugLocation DebugLoc, SILValue value,
+                                  ArrayRef<SILValue> enclosingValues,
+                                  SILModule &M);
+
+public:
+  SILValue getReturnValue() const { return getAllOperands()[0].get(); }
+
+  ArrayRef<Operand> getEnclosingValueOperands() const {
+    return getAllOperands().drop_front();
+  }
+
+  OperandValueArrayRef getEnclosingValues() const {
+    return OperandValueArrayRef(getEnclosingValueOperands());
+  }
 
   SuccessorListTy getSuccessors() {
     // No Successors.

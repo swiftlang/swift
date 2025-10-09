@@ -3116,6 +3116,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     }
     break;
   }
+  case SILInstructionKind::ReturnBorrowInst: {
+    SmallVector<SILValue, 4> OpList;
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 3) {
+      auto EltTy = MF->getType(ListOfValues[I]);
+      OpList.push_back(getLocalValue(
+          Builder.maybeGetFunction(), ListOfValues[I + 2],
+          getSILType(EltTy, (SILValueCategory)ListOfValues[I + 1], Fn)));
+    }
+    ResultInst = Builder.createReturnBorrow(Loc, OpList[0],
+                                            ArrayRef(OpList).drop_front());
+    break;
+  }
   case SILInstructionKind::TupleElementAddrInst:
   case SILInstructionKind::TupleExtractInst: {
     // Use OneTypeOneOperand layout where the field number is stored in TypeID.

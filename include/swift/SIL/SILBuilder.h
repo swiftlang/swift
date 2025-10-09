@@ -2658,6 +2658,12 @@ public:
         getFunction(), getSILDebugLocation(Loc), ReturnValue));
   }
 
+  ReturnBorrowInst *createReturnBorrow(SILLocation Loc, SILValue returnValue,
+                                       ArrayRef<SILValue> enclosingValues) {
+    return insertTerminator(ReturnBorrowInst::create(
+        getSILDebugLocation(Loc), returnValue, enclosingValues, getModule()));
+  }
+
   ThrowInst *createThrow(SILLocation Loc, SILValue errorValue) {
     return insertTerminator(
         new (getModule()) ThrowInst(getSILDebugLocation(Loc), errorValue));

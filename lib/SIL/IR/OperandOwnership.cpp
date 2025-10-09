@@ -636,6 +636,12 @@ OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {
   llvm_unreachable("covered switch");
 }
 
+OperandOwnership
+OperandOwnershipClassifier::visitReturnBorrowInst(ReturnBorrowInst *rbi) {
+  return getOperandIndex() == 0 ? OperandOwnership::GuaranteedForwarding
+                                : OperandOwnership::EndBorrow;
+}
+
 OperandOwnership OperandOwnershipClassifier::visitAssignInst(AssignInst *i) {
   if (getValue() != i->getSrc()) {
     return OperandOwnership::TrivialUse;

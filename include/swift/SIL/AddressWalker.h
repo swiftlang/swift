@@ -185,6 +185,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         llvm_unreachable("Never takes an address");
       // Point uses.
       case TermKind::ReturnInst:
+      case TermKind::ReturnBorrowInst:
       case TermKind::ThrowInst:
       case TermKind::YieldInst:
       case TermKind::TryApplyInst:

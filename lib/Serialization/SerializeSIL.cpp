@@ -2588,6 +2588,24 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)svi->getType().getCategory(), ListOfValues);
     break;
   }
+
+  case SILInstructionKind::ReturnBorrowInst: {
+    // Format: a type followed by a list of typed values. A typed value is
+    // expressed by 4 IDs: TypeID, TypeCategory, ValueID, ValueResultNumber.
+    const auto *rbi = cast<ReturnBorrowInst>(&SI);
+    SmallVector<ValueID, 4> ListOfValues;
+    for (auto Elt : rbi->getOperandValues()) {
+      ListOfValues.push_back(S.addTypeRef(Elt->getType().getRawASTType()));
+      ListOfValues.push_back((unsigned)Elt->getType().getCategory());
+      ListOfValues.push_back(addValueRef(Elt));
+    }
+
+    SILValuesLayout::emitRecord(Out, ScratchRecord,
+                                SILAbbrCodes[SILValuesLayout::Code],
+                                (unsigned)SI.getKind(), ListOfValues);
+    break;
+  }
+
   case SILInstructionKind::TupleElementAddrInst:
   case SILInstructionKind::TupleExtractInst: {
     SILValue operand;

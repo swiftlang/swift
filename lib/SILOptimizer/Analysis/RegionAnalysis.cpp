@@ -378,6 +378,7 @@ struct TermArgSources {
     switch (cast<TermInst>(inst)->getTermKind()) {
     case TermKind::UnreachableInst:
     case TermKind::ReturnInst:
+    case TermKind::ReturnBorrowInst:
     case TermKind::ThrowInst:
     case TermKind::ThrowAddrInst:
     case TermKind::YieldInst:
@@ -3885,6 +3886,15 @@ PartitionOpTranslator::visitLoadBorrowInst(LoadBorrowInst *lbi) {
 }
 
 TranslationSemantics PartitionOpTranslator::visitReturnInst(ReturnInst *ri) {
+  addEndOfFunctionChecksForInOutSendingParameters(ri);
+  if (ri->getFunction()->getLoweredFunctionType()->hasSendingResult()) {
+    return TranslationSemantics::SendingNoResult;
+  }
+  return TranslationSemantics::Require;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitReturnBorrowInst(ReturnBorrowInst *ri) {
   addEndOfFunctionChecksForInOutSendingParameters(ri);
   if (ri->getFunction()->getLoweredFunctionType()->hasSendingResult()) {
     return TranslationSemantics::SendingNoResult;
