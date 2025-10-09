@@ -847,7 +847,7 @@ private:
 
     switch (domain.getKind()) {
     case AvailabilityDomain::Kind::Embedded:
-    case AvailabilityDomain::Kind::SwiftLanguage:
+    case AvailabilityDomain::Kind::SwiftLanguageMode:
     case AvailabilityDomain::Kind::PackageDescription:
       // These domains don't support queries.
       llvm::report_fatal_error("unsupported domain");
@@ -869,11 +869,12 @@ private:
       return AvailabilityQuery::dynamic(variantSpec->getDomain(), primaryRange,
                                         variantRange);
 
+    case AvailabilityDomain::Kind::SwiftRuntime:
     case AvailabilityDomain::Kind::Platform:
-      // Platform checks are always dynamic. The SIL optimizer is responsible
-      // eliminating these checks when it can prove that they can never fail
-      // (due to the deployment target). We can't perform that analysis here
-      // because it may depend on inlining.
+      // Platform and Swift runtime checks are always dynamic. The SIL optimizer
+      // is responsible eliminating these checks when it can prove that they can
+      // never fail (due to the deployment target). We can't perform that
+      // analysis here because it may depend on inlining.
       return AvailabilityQuery::dynamic(domain, primaryRange, variantRange);
     case AvailabilityDomain::Kind::Custom:
       auto customDomain = domain.getCustomDomain();

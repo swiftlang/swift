@@ -49,7 +49,10 @@ public:
     Universal,
 
     /// Represents availability with respect to Swift language mode.
-    SwiftLanguage,
+    SwiftLanguageMode,
+
+    /// Represents availability with respect to the Swift runtime.
+    SwiftRuntime,
 
     /// Represents PackageDescription availability.
     PackageDescription,
@@ -140,8 +143,12 @@ public:
     return AvailabilityDomain(platformKind);
   }
 
-  static AvailabilityDomain forSwiftLanguage() {
-    return AvailabilityDomain(Kind::SwiftLanguage);
+  static AvailabilityDomain forSwiftLanguageMode() {
+    return AvailabilityDomain(Kind::SwiftLanguageMode);
+  }
+
+  static AvailabilityDomain forSwiftRuntime() {
+    return AvailabilityDomain(Kind::SwiftRuntime);
   }
 
   static AvailabilityDomain forPackageDescription() {
@@ -181,7 +188,11 @@ public:
 
   bool isPlatform() const { return getKind() == Kind::Platform; }
 
-  bool isSwiftLanguage() const { return getKind() == Kind::SwiftLanguage; }
+  bool isSwiftLanguageMode() const {
+    return getKind() == Kind::SwiftLanguageMode;
+  }
+
+  bool isSwiftRuntime() const { return getKind() == Kind::SwiftRuntime; }
 
   bool isPackageDescription() const {
     return getKind() == Kind::PackageDescription;
@@ -233,6 +244,10 @@ public:
   /// in the current compilation context.
   bool isActivePlatform(const ASTContext &ctx,
                         bool forTargetVariant = false) const;
+
+  /// Returns true if availability in this domain must be specified alone in
+  /// `@available` attributes and `if #available` queries.
+  bool mustBeSpecifiedAlone() const;
 
   /// Returns the domain's minimum available range for type checking. For
   /// example, for the domain of the platform that compilation is targeting,

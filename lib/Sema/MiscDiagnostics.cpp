@@ -5131,7 +5131,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       info->isUnavailability() ? "#unavailable" : "#available";
 
   bool hasValidSpecs = false;
-  bool allValidSpecsArePlatform = true;
+  bool wildcardRequiredInList = false;
   std::optional<SourceLoc> wildcardLoc;
   llvm::SmallSet<AvailabilityDomain, 8> seenDomains;
   for (auto spec : info->getSemanticAvailabilitySpecs(DC)) {
@@ -5144,6 +5144,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
     auto domain = spec.getDomain();
     auto loc = parsedSpec->getStartLoc();
     bool hasVersion = !spec.getVersion().empty();
+    bool mustBeSpecifiedAlone = domain.mustBeSpecifiedAlone();
 
     if (!domain.supportsQueries()) {
       diags.diagnose(loc, diag::availability_query_not_allowed, domain,
@@ -5151,7 +5152,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       return true;
     }
 
-    if (!domain.isPlatform() && info->getQueries().size() > 1) {
+    if (mustBeSpecifiedAlone && info->getQueries().size() > 1) {
       diags.diagnose(loc, diag::availability_must_occur_alone, domain,
                      hasVersion);
       return true;
@@ -5199,8 +5200,8 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
     }
 
     hasValidSpecs = true;
-    if (!domain.isPlatform())
-      allValidSpecsArePlatform = false;
+    if (!mustBeSpecifiedAlone)
+      wildcardRequiredInList = true;
   }
 
   if (info->isUnavailability()) {
@@ -5210,7 +5211,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
                     diag::unavailability_query_wildcard_not_required)
           .fixItRemove(*wildcardLoc);
     }
-  } else if (!wildcardLoc && hasValidSpecs && allValidSpecsArePlatform) {
+  } else if (!wildcardLoc && hasValidSpecs && wildcardRequiredInList) {
     if (info->getQueries().size() > 0) {
       auto insertLoc = info->getQueries().back()->getSourceRange().End;
       diags.diagnose(insertLoc, diag::availability_query_wildcard_required)

@@ -978,7 +978,7 @@ static void printAvailableAttr(const Decl *D, const SemanticAvailableAttr &Attr,
   // attributes that are universally unavailable in Swift, we must print them
   // as universally unavailable instead.
   // FIXME: Reconsider this, it's a weird special case.
-  if (Domain.isSwiftLanguage() && Attr.isUnconditionallyUnavailable())
+  if (Domain.isSwiftLanguageMode() && Attr.isUnconditionallyUnavailable())
     Printer << "*";
   else
     Printer << Domain.getNameForAttributePrinting();
@@ -1020,7 +1020,8 @@ static void printAvailableAttr(const Decl *D, const SemanticAvailableAttr &Attr,
   if (!Attr.getMessage().empty()) {
     Printer << ", message: ";
     Printer.printEscapedStringLiteral(Attr.getMessage());
-  } else if (Domain.isSwiftLanguage() && Attr.isUnconditionallyUnavailable())
+  } else if (Domain.isSwiftLanguageMode() &&
+             Attr.isUnconditionallyUnavailable())
     Printer << ", message: \"Not available in Swift\"";
 }
 
@@ -2329,7 +2330,7 @@ AvailableAttr *AvailableAttr::createUnavailableInSwift(ASTContext &C,
                                                        StringRef Message,
                                                        StringRef Rename) {
   return new (C) AvailableAttr(
-      SourceLoc(), SourceRange(), AvailabilityDomain::forSwiftLanguage(),
+      SourceLoc(), SourceRange(), AvailabilityDomain::forSwiftLanguageMode(),
       SourceLoc(), Kind::Unavailable, Message, Rename,
       /*Introduced=*/{}, SourceRange(), /*Deprecated=*/{}, SourceRange(),
       /*Obsoleted=*/{}, SourceRange(),
@@ -2341,7 +2342,7 @@ AvailableAttr *AvailableAttr::createSwiftLanguageModeVersioned(
     ASTContext &C, StringRef Message, StringRef Rename,
     llvm::VersionTuple Introduced, llvm::VersionTuple Obsoleted) {
   return new (C) AvailableAttr(
-      SourceLoc(), SourceRange(), AvailabilityDomain::forSwiftLanguage(),
+      SourceLoc(), SourceRange(), AvailabilityDomain::forSwiftLanguageMode(),
       SourceLoc(), Kind::Default, Message, Rename, Introduced, SourceRange(),
       /*Deprecated=*/{}, SourceRange(), Obsoleted, SourceRange(),
       /*Implicit=*/false,

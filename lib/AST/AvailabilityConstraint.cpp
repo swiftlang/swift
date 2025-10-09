@@ -162,7 +162,7 @@ static bool canIgnoreConstraintInUnavailableContexts(
   if (!flags.contains(AvailabilityConstraintFlag::
                       AllowUniversallyUnavailableInCompatibleContexts)) {
     if (!isa<TypeDecl>(decl) && !isa<ExtensionDecl>(decl)) {
-      if (domain.isUniversal() || domain.isSwiftLanguage())
+      if (domain.isUniversal() || domain.isSwiftLanguageMode())
         return false;
     }
   }
@@ -342,7 +342,8 @@ domainCanBeUnconditionallyUnavailableAtRuntime(AvailabilityDomain domain,
       return true;
     return domain.isActive(ctx);
 
-  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::SwiftRuntime:
   case AvailabilityDomain::Kind::PackageDescription:
     return false;
 
@@ -369,7 +370,8 @@ domainIsUnavailableAtRuntimeIfUnintroduced(AvailabilityDomain domain,
   switch (domain.getKind()) {
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::Platform:
-  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::SwiftRuntime:
   case AvailabilityDomain::Kind::PackageDescription:
     return false;
 

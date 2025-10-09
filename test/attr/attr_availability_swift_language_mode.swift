@@ -58,10 +58,13 @@ func testMemberAvailability() {
   TestStruct().doAnotherThing() // expected-error {{'doAnotherThing()' is unavailable}}
 }
 
-@available(swift 400) // FIXME: This has no effect and should be complained about.
+@available(swift 400)
 @available(macOS 10.11, *)
 extension TestStruct {}
 
 @available(macOS 10.11, *)
-@available(swift 400) // FIXME: This has no effect and should be complained about.
+@available(swift 400)
+extension TestStruct {}
+
+@available(SwiftLanguageMode 400) // expected-error {{Swift requires '-enable-experimental-feature SwiftRuntimeAvailability'}}
 extension TestStruct {}

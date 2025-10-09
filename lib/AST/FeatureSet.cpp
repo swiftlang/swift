@@ -448,6 +448,8 @@ static bool usesFeatureInlineAlways(Decl *decl) {
   return false;
 }
 
+UNINTERESTING_FEATURE(SwiftRuntimeAvailability)
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
