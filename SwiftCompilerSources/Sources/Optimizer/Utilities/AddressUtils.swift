@@ -649,7 +649,7 @@ extension AddressOwnershipLiveRange {
     var reachableUses = Stack<LocalVariableAccess>(context)
     defer { reachableUses.deinitialize() }
 
-    localReachability.gatherKnownLifetimeUses(from: assignment, in: &reachableUses)
+    localReachability.gatherKnownLivenessUses(from: assignment, in: &reachableUses)
 
     let assignmentInst = assignment.instruction ?? allocation.parentFunction.entryBlock.instructions.first!
     var range = InstructionRange(begin: assignmentInst, context)

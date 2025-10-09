@@ -662,11 +662,37 @@ extension LifetimeDependenceDefUseWalker {
     }
     let root = dependence.dependentValue
     if root.type.isAddress { 
-      // The root address may be an escapable mark_dependence that guards its address uses (unsafeAddress), an
-      // allocation, an incoming argument, or an outgoing argument. In all these cases, walk down the address uses.
+      // 'root' may be an incoming ~Escapable argument (where the argument is both the scope and the dependent value).
+      // If it is @inout, treat it like a local variable initialized on entry and possibly reassigned.
+      if let arg = root as? FunctionArgument, arg.convention.isInout {
+        return visitInoutAccess(argument: arg)
+      }
+
+      // Conservatively walk down any other address. This includes:
+      // An @in argument: assume it is initialized on entry and never reassigned.
+      // An @out argument: assume the first address use is the one and only assignment on each return path.
+      // An escapable mark_dependence that guards its address uses (unsafeAddress).
+      // Any other unknown address producer.
       return walkDownAddressUses(of: root)
     }
     return walkDownUses(of: root, using: nil)
+  }
+
+  // Find all @inout local variable uses reachabile from function entry. If local analysis fails to gather reachable
+  // uses, fall back to walkDownAddressUse to produce a better diagnostic.
+  mutating func visitInoutAccess(argument: FunctionArgument) -> WalkResult {
+    guard let localReachability = localReachabilityCache.reachability(for: argument, walkerContext) else {
+      return walkDownAddressUses(of: argument)
+    }
+    var reachableUses = Stack<LocalVariableAccess>(walkerContext)
+    defer { reachableUses.deinitialize() }
+
+    if !localReachability.gatherAllReachableDependentUsesFromEntry(in: &reachableUses) {
+      return walkDownAddressUses(of: argument)
+    }
+    return reachableUses.walk { localAccess in
+      visitLocalAccess(allocation: argument, localAccess: localAccess)
+    }
   }
 }
 
@@ -1022,7 +1048,7 @@ extension LifetimeDependenceDefUseWalker {
     if case let .access(beginAccess) = storeAddress.enclosingAccessScope {
       storeAccess = beginAccess
     }
-    if !localReachability.gatherAllReachableUses(of: storeAccess, in: &accessStack) {
+    if !localReachability.gatherAllReachableDependentUses(of: storeAccess, in: &accessStack) {
       return escapingDependence(on: storedOperand)
     }
     return accessStack.walk { localAccess in
