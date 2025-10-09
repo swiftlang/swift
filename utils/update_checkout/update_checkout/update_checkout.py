@@ -13,6 +13,7 @@ import json
 import os
 import platform
 import re
+import tempfile
 import sys
 import traceback
 from multiprocessing import freeze_support
@@ -26,6 +27,29 @@ from swift_build_support.swift_build_support import shell
 
 SCRIPT_FILE = os.path.abspath(__file__)
 SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
+
+def is_unix_sock_path_too_long() -> bool:
+    """Check if the unix socket_path exceeds the 104 limit (108 on Linux).
+
+    The multiprocessing module creates a socket in the TEMPDIR folder. The
+    socket path should not exceed:
+        - 104 bytes on macOS
+        - 108 bytes on Linux (https://www.man7.org/linux/man-pages/man7/unix.7.html)
+
+    Returns:
+        bool: Whether the socket path exceeds the limit. Always False on Windows.
+    """
+
+    if os.name != "posix":
+        return False
+
+    MAX_UNIX_SOCKET_PATH = 104
+    # `tempfile.mktemp` is deprecated yet that's what the multiprocessing
+    # module uses internally: https://github.com/python/cpython/blob/c4e7d245d61ac4547ecf3362b28f64fc00aa88c0/Lib/multiprocessing/connection.py#L72
+    # Since we are not using the resulting file, it is safe to use this
+    # method.
+    sock_path = tempfile.mktemp(prefix="sock-", dir=tempfile.gettempdir())
+    return len(sock_path.encode("utf-8")) > MAX_UNIX_SOCKET_PATH
 
 def confirm_tag_in_repo(tag: str, repo_name: str) -> Optional[str]:
     """Confirm that a given tag exists in a git repository. This function
@@ -770,6 +794,13 @@ repositories.
             print("update-checkout usage error: --match-timestamp must "
                   "specify --scheme=foo")
             sys.exit(1)
+
+    if is_unix_sock_path_too_long():
+        print(
+            f"TEMPDIR={tempfile.gettempdir()} is too long and multiprocessing "
+            "sockets will exceed the size limit. Falling back to verbose mode."
+        )
+        args.verbose = True
 
     clone = args.clone
     clone_with_ssh = args.clone_with_ssh
