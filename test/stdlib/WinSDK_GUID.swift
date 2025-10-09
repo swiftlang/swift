@@ -1,4 +1,4 @@
-// RUN:  %target-build-swift %s -o %t.exe
+// RUN: %target-build-swift %s -o %t.exe
 // RUN: %target-codesign %t.exe
 // RUN: %target-run %t.exe
 // REQUIRES: executable_test
