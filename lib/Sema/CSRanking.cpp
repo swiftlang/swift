@@ -1224,35 +1224,66 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       }
     }
 
-    // Tie-breaker: prefer the overload whose single function-typed parameter
-    // is non-throwing when the candidates differ only by `throws` on that
-    // parameter. This addresses ambiguities like Task.init(name:priority:operation:)
-    // where both throwing and non-throwing overloads are viable (see swift#84587).
-    auto getSingleParameterFunctionParamType = [&](ValueDecl *D) -> const FunctionType * {
-      if (!D) return nullptr;
-      // Work with the interface type including curried self if needed.
-      Type ty = D->getInterfaceType();
-      if (!D->hasCurriedSelf())
-        ty = ty->addCurriedSelfType(D->getDeclContext());
-      auto *fn = ty->getAs<AnyFunctionType>();
-      if (!fn) return nullptr;
-      auto params = fn->getParams();
-      if (params.size() != 1) return nullptr;
-      return params[0].getPlainType()->getAs<FunctionType>();
-    };
+    // Tie-breaker: Prefer the overload that is non-throwing in more of its
+    // function-typed parameters when compared positionally against the other
+    // candidate. This generalizes the Task.init(...) case to multi-parameter
+    // functions (swiftlang/swift#84587).
+    //
+    // Heuristic details:
+    // - We look at the *interface* function type (with curried self added if needed).
+    // - For each parameter that itself is a function type, we record whether it
+    //   is `throws`.
+    // - We compare positionally up to the min(#params(lhs), #params(rhs)).
+    // - For each index where both sides are function-typed and differ in throws-ness,
+    //   we award a bias to the non-throwing side.
+    // - If the accumulated bias is positive for one side and scores are still tied,
+    //   that side gets `weight`.
+    //
+    // This is intentionally conservative (no argument-shape inspection here), but
+    // aligns with user intent and avoids spurious ambiguity when non-throwing
+    // closure literals are supplied.
+    auto collectParamFunctionThrows =
+      [&](ValueDecl *D, SmallVectorImpl<int> &out) {
+        out.clear();
+        if (!D) return;
+        Type ty = D->getInterfaceType();
+        if (!D->hasCurriedSelf())
+          ty = ty->addCurriedSelfType(D->getDeclContext());
+        auto *fn = ty->getAs<AnyFunctionType>();
+        if (!fn) return;
+
+        auto params = fn->getParams();
+        out.reserve(params.size());
+        for (const auto &p : params) {
+          // -1 => not a function param; 0 => non-throwing fn param; 1 => throwing
+          if (auto *pfn = p.getPlainType()->getAs<FunctionType>()) {
+            out.push_back(pfn->isThrowing() ? 1 : 0);
+          } else {
+            out.push_back(-1);
+          }
+        }
+      };
 
     if (score1 == score2) {
-      const FunctionType *lhsParamFn = getSingleParameterFunctionParamType(decl1);
-      const FunctionType *rhsParamFn = getSingleParameterFunctionParamType(decl2);
-      if (lhsParamFn && rhsParamFn) {
-        bool lhsThrows = lhsParamFn->isThrowing();
-        bool rhsThrows = rhsParamFn->isThrowing();
-        if (lhsThrows != rhsThrows) {
-          // Prefer the non-throwing candidate.
-          if (lhsThrows)
-            score2 += weight;
-          else
-            score1 += weight;
+      SmallVector<int, 8> lhsInfo, rhsInfo;
+      collectParamFunctionThrows(decl1, lhsInfo);
+      collectParamFunctionThrows(decl2, rhsInfo);
+
+      if (!lhsInfo.empty() && !rhsInfo.empty()) {
+        const size_t n = std::min(lhsInfo.size(), rhsInfo.size());
+        int biasL = 0, biasR = 0;
+        for (size_t i = 0; i < n; ++i) {
+          const int l = lhsInfo[i], r = rhsInfo[i];
+          if (l >= 0 && r >= 0 && l != r) {
+            // Prefer the non-throwing side at this position.
+            if (l == 0 && r == 1) ++biasL;
+            else if (l == 1 && r == 0) ++biasR;
+          }
+        }
+
+        if (biasL != biasR) {
+          if (biasL > biasR) score1 += weight;
+          else score2 += weight;
         }
       }
     }
