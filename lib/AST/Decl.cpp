@@ -1643,8 +1643,7 @@ bool GenericContext::isComputingGenericSignature() const {
 
 /// If we hit a cycle while building the generic signature, we can't return
 /// nullptr, since this breaks invariants elsewhere. Instead, build a dummy
-/// signature where everything is Copyable and Escapable, to avoid spurious
-/// downstream diagnostics concerning move-only types.
+/// invalid signature to avoid spurious downstream diagnostics.
 static GenericSignature getPlaceholderGenericSignature(
     ASTContext &ctx, const DeclContext *DC) {
   SmallVector<GenericParamList *, 2> gpLists;
@@ -1660,22 +1659,13 @@ static GenericSignature getPlaceholderGenericSignature(
     gpLists[i]->setDepth(i);
 
   SmallVector<GenericTypeParamType *, 2> genericParams;
-  SmallVector<Requirement, 2> requirements;
-
   for (auto *gpList : gpLists) {
     for (auto *genericParam : *gpList) {
       auto type = genericParam->getDeclaredInterfaceType();
       genericParams.push_back(type->castTo<GenericTypeParamType>());
-
-      for (auto ip : InvertibleProtocolSet::allKnown()) {
-        auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
-        requirements.emplace_back(RequirementKind::Conformance, type,
-                                  proto->getDeclaredInterfaceType());
-      }
     }
   }
-
-  return GenericSignature::get(genericParams, requirements);
+  return GenericSignature::forInvalid(genericParams);
 }
 
 GenericSignature GenericContext::getGenericSignature() const {
@@ -2700,10 +2690,16 @@ bool PatternBindingDecl::hasStorage() const {
 
 const PatternBindingEntry *
 PatternBindingDecl::getCheckedPatternBindingEntry(unsigned i) const {
-  return evaluateOrDefault(
+  auto result = evaluateOrDefault(
       getASTContext().evaluator,
       PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i},
       nullptr);
+
+  // If we ran into a cycle, we can still return the entry.
+  if (!result)
+    return &getPatternList()[i];
+
+  return result;
 }
 
 void PatternBindingDecl::setPattern(unsigned i, Pattern *P,
@@ -7392,8 +7388,7 @@ bool ProtocolDecl::existentialConformsToSelf() const {
 }
 
 bool ProtocolDecl::hasSelfOrAssociatedTypeRequirements() const {
-  // Because we will have considered all the protocols in a cyclic hierarchy by
-  // the time the cycle is hit.
+  // Be conservative and avoid diagnosing if we hit a cycle.
   const bool resultForCycle = false;
 
   return evaluateOrDefault(getASTContext().evaluator,

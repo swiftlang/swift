@@ -3,9 +3,8 @@
 
 // REQUIRES: swift_feature_ExistentialAny
 
-// 'HasSelfOrAssociatedTypeRequirementsRequest' should evaluate to false in
-// the event of a cycle because we will have considered all the protocols in a
-// cyclic hierarchy by the time the cycle is hit.
+// 'HasSelfOrAssociatedTypeRequirementsRequest' evaluates to false in the event
+// of a cycle.
 do {
   do {
     protocol P1 : P2 {}
@@ -30,6 +29,6 @@ do {
     // expected-explicit-any-error@-2 1 {{protocol 'P2' refines itself}}
 
     let _: P2
-    // expected-warning@-1 {{use of protocol 'P2' as a type must be written 'any P2'}}
+    // expected-explicit-any-warning@-1 {{use of protocol 'P2' as a type must be written 'any P2'}}
   }
 }

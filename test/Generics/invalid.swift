@@ -154,3 +154,13 @@ func errorMessageVariants(x: X<Int>, x2: X<Bool> = X<Int>()) -> X<Bool> {
   let _: X<Int>.Foo = X<Bool>.Foo() // expected-error {{cannot convert parent type 'X<Bool>' to expected type 'X<Int>'}}
   return x // expected-error {{cannot convert return expression of type 'X<Int>' to return type 'X<Bool>'}}
 }
+
+protocol P2 {
+  func foo()
+}
+
+// Make sure we don't diagnose the conformance failure or 'T.K'.
+struct HasInvalidSameType<T>: P2 where T == Undefined, T.K == Int {
+  // expected-error@-1 {{cannot find type 'Undefined' in scope}}
+  func foo() {}
+}
