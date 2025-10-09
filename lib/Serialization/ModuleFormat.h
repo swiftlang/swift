@@ -780,11 +780,12 @@ using GenericParamKindField = BCFixed<2>;
 // the module version.
 enum class AvailabilityDomainKind : uint8_t {
   Universal = 0,
-  SwiftLanguage,
+  SwiftLanguageMode,
   PackageDescription,
   Embedded,
   Platform,
   Custom,
+  SwiftRuntime,
 };
 using AvailabilityDomainKindField = BCFixed<3>;
 

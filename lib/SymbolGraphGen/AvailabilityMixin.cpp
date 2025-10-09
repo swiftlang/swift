@@ -25,7 +25,7 @@ StringRef getDomain(const SemanticAvailableAttr &AvAttr) {
   if (AvAttr.getDomain().isPackageDescription())
     return { "SwiftPM" };
 
-  if (AvAttr.getDomain().isSwiftLanguage())
+  if (AvAttr.getDomain().isSwiftLanguageMode())
     return { "Swift" };
 
   // Platform-specific availability.

@@ -3972,7 +3972,7 @@ public:
 
   /// Whether this is a language mode specific attribute.
   bool isSwiftLanguageModeSpecific() const {
-    return getDomain().isSwiftLanguage() && isVersionSpecific();
+    return getDomain().isSwiftLanguageMode() && isVersionSpecific();
   }
 
   /// Whether this is a PackageDescription version specific attribute.

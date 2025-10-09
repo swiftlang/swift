@@ -1380,7 +1380,7 @@ StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
   for (auto attr : D->getSemanticAvailableAttrs()) {
     auto domain = attr.getDomain();
 
-    if (domain.isSwiftLanguage() && attr.getIntroduced()) {
+    if (domain.isSwiftLanguageMode() && attr.getIntroduced()) {
       return buffer(attr.getIntroduced()->getAsString());
     }
   }

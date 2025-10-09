@@ -188,6 +188,9 @@ namespace swift {
     /// Swift runtime version to compile for.
     version::Version RuntimeVersion = version::Version::getCurrentLanguageVersion();
 
+    /// The minimum Swift runtime version that the progam can be deployed to.
+    version::Version MinSwiftRuntimeVersion;
+
     /// PackageDescription version to compile for.
     version::Version PackageDescriptionVersion;
 
