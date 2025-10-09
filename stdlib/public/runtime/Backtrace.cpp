@@ -996,10 +996,18 @@ _swift_backtrace_isThunkFunction(const char *mangledName) {
 
 // Try to demangle a symbol.
 SWIFT_RUNTIME_STDLIB_SPI char *
-_swift_backtrace_demangle(const char *mangledName,
+_swift_runtime_demangle(const char *mangledName,
                           size_t mangledNameLength,
                           char *outputBuffer,
-                          size_t *outputBufferSize) {
+                          size_t *outputBufferSize,
+                          uint32_t flags) {
+  if (flags > 1) {
+    swift::fatalError(0, "Only 'flags' value of '0' and '1' is currently supported.");
+  }
+  if (outputBuffer != nullptr && outputBufferSize == nullptr) {
+    swift::fatalError(0, "'outputBuffer' is passed but the size is 'nullptr'.");
+  }
+
   llvm::StringRef name = llvm::StringRef(mangledName, mangledNameLength);
 
   // You must provide buffer size if you're providing your own output buffer
@@ -1008,8 +1016,13 @@ _swift_backtrace_demangle(const char *mangledName,
   }
 
   if (Demangle::isSwiftSymbol(name)) {
-    // This is a Swift mangling
-    auto options = DemangleOptions::SimplifiedUIDemangleOptions();
+    // Determine demangling/formatting options:
+    auto options = DemangleOptions();
+    if (flags == 1) {
+      // simplified display options, for backtraces
+      options = DemangleOptions::SimplifiedUIDemangleOptions();
+    }
+
     auto result = Demangle::demangleSymbolAsString(name, options);
     size_t bufferSize;
 
@@ -1065,6 +1078,17 @@ _swift_backtrace_demangle(const char *mangledName,
   }
 
   return nullptr;
+}
+
+SWIFT_RUNTIME_STDLIB_SPI char *
+_swift_backtrace_demangle(const char *mangledName,
+                          size_t mangledNameLength,
+                          char *outputBuffer,
+                          size_t *outputBufferSize) {
+  return _swift_runtime_demangle(
+    mangledName, mangledNameLength,
+    outputBuffer, outputBufferSize,
+    /*flags=*/1 /* to use the SimplifiedUIDemangleOptions*/);
 }
 
 #if SWIFT_BACKTRACE_ON_CRASH_SUPPORTED

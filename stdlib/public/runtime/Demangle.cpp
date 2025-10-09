@@ -1033,3 +1033,14 @@ char *swift_demangle(const char *mangledName,
   return outputBuffer;
 #endif
 }
+
+
+SWIFT_RUNTIME_STDLIB_SPI char *
+_swift_stdlib_demangle(const char *mangledName,
+                       size_t mangledNameLength,
+                       char *outputBuffer,
+                       size_t *outputBufferSize,
+                       uint32_t flags) {
+  return swift_demangle(mangledName, mangledNameLength, outputBuffer,
+                        outputBufferSize, flags);
+}
