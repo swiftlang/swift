@@ -5,8 +5,11 @@ sil_stage canonical
 import Builtin
 import Swift
 
+protocol P {}
 
-// TESTS FOR NORMAL BEHAVIOUR:
+class C : P {}
+
+// TESTS FOR NORMAL BEHAVIOR:
 
 // (Name Mangling: Implicitly tested throughout the test suite)
 
@@ -42,6 +45,7 @@ import Swift
 // * no *concrete* pack arguments
 // * the caller or callee is non-OSSA
 
+// Check that name mangling, parameter & result pack explosion, local pack allocation, cleanup and use work as expected.
 // CHECK-LABEL: sil shared [ossa] @$s24copy_pack_int_guaranteedTf8xx_n : $@convention(thin) (Int) -> Int {
 // CHECK: bb0(%0 : $Int):
 // CHECK-NEXT: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{Int}
@@ -73,6 +77,8 @@ bb0(%0 : $*Pack{Int}, %1 : $*Pack{Int}):
   return %9
 }
 
+// Check that parameters and results are correctly extracted from and written back to the former argument packs,
+// including any borrows of indirect parameters.
 // CHECK-LABEL: sil [ossa] @call_copy_pack_int_guaranteed : $@convention(thin) () -> Int {
 // CHECK: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{Int}
 // CHECK: [[ARG_STACK_LOC:%[^,]+]] = alloc_stack $Int
@@ -110,6 +116,7 @@ bb0:
   return %14
 }
 
+// As above, for an owned pack.
 // CHECK-LABEL: sil shared [ossa] @$s19copy_pack_int_ownedTf8xx_n : $@convention(thin) (Int) -> Int {
 // CHECK: bb0(%0 : $Int):
 // CHECK-NEXT: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{Int}
@@ -178,6 +185,7 @@ bb0:
   return %14
 }
 
+// As above, for an inout pack.
 // CHECK-LABEL: sil shared [ossa] @$s19copy_pack_int_inoutTf8xx_n : $@convention(thin) (@inout Int) -> Int {
 // CHECK: bb0([[ADDR:%[^,]+]] : $*Int):
 // CHECK-NEXT: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{Int}
@@ -238,4 +246,175 @@ bb0:
   dealloc_stack %1
   dealloc_pack %0
   return %14
+}
+
+
+// Check that borrowed lifetimes are managed correctly for guaranteed pack-exploded arguments.
+// CHECK-LABEL: sil shared [ossa] @$s28copy_pack_class_c_guaranteedTf8xx_n : $@convention(thin) (@guaranteed C) -> @owned C {
+// CHECK: bb0(%0 : @guaranteed $C):
+// CHECK: [[IN_ADDR:%[^,]+]] = alloc_stack $C
+// CHECK: [[BORROW:%[^,]+]] = store_borrow %0 to [[IN_ADDR]]
+// CHECK: [[OUT_ADDR:%[^,]+]] = alloc_stack $C
+// CHECK: [[RESULT:%[^,]+]] = load [take] [[OUT_ADDR]]
+// CHECK: end_borrow [[BORROW]]
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function '$s28copy_pack_class_c_guaranteedTf8xx_n'
+sil [ossa] @copy_pack_class_c_guaranteed : $@convention(thin) (@pack_guaranteed Pack{C}) -> @pack_out Pack{C} {
+bb0(%0 : $*Pack{C}, %1 : $*Pack{C}):
+  %3 = scalar_pack_index 0 of $Pack{C}
+  %4 = pack_element_get %3 of %0 as $*C
+  %5 = pack_element_get %3 of %1 as $*C
+  copy_addr %5 to [init] %4
+  %8 = tuple ()
+  return %8
+}
+
+// Check that non-trivial guaranteed parameters are correctly borrowed
+// CHECK-LABEL: sil [ossa] @call_copy_pack_class_c_guaranteed : $@convention(thin) (@owned C) -> @owned C {
+// CHECK: bb0([[IN_C:%[^,]+]] : @owned $C)
+// CHECK: store [[IN_C]] to [init] [[IN_ADDR:%[0-9]+]]
+// CHECK: pack_element_set [[IN_ADDR]] into [[PACK_SET_IDX:%[^,]+]] of [[IN_PACK:%[0-9]+]]
+// CHECK: [[IN_C_PACK_ADDR:%[^,]+]] = pack_element_get [[PACK_GET_IDX:%[^,]+]] of [[IN_PACK]] as $*C
+// CHECK-NEXT: [[BORROW:%[^,]+]] = load_borrow [[IN_C_PACK_ADDR]]
+// CHECK: [[SPECIALIZED:%[^,]+]] = function_ref @$s28copy_pack_class_c_guaranteedTf8xx_n : $@convention(thin) (@guaranteed C) -> @owned C
+// CHECK-NEXT: [[RESULT:%[^,]+]] = apply [[SPECIALIZED]]([[BORROW]]) : $@convention(thin) (@guaranteed C) -> @owned C
+// CHECK: end_borrow [[BORROW]]
+// CHECK-LABEL: } // end sil function 'call_copy_pack_class_c_guaranteed'
+sil [ossa] @call_copy_pack_class_c_guaranteed : $@convention(thin) (@owned C) -> @owned C {
+bb0(%c : @owned $C):
+  %0 = alloc_pack $Pack{C}
+  %1 = alloc_stack $C
+  %2 = scalar_pack_index 0 of $Pack{C}
+  pack_element_set %1 into %2 of %0
+  %4 = alloc_pack $Pack{C}
+  %5 = alloc_stack $C
+  store %c to [init] %5
+  pack_element_set %5 into %2 of %4
+  %16 = function_ref @copy_pack_class_c_guaranteed : $@convention(thin) (@pack_guaranteed Pack{C}) -> @pack_out Pack{C}
+  %17 = apply %16(%0, %4) : $@convention(thin) (@pack_guaranteed Pack{C}) -> @pack_out Pack{C}
+  destroy_addr %5
+  dealloc_stack %5
+  dealloc_pack %4
+  %22 = load [take] %1
+  dealloc_stack %1
+  dealloc_pack %0
+  return %22
+}
+
+
+// Check that lifetimes are managed correctly for owned pack-exploded arguments.
+// The original code already manages lifetimes sufficiently, so no additions are necessary.
+// CHECK-LABEL: sil shared [ossa] @$s23copy_pack_class_c_ownedTf8xx_n : $@convention(thin) (@owned C) -> @owned C {
+// CHECK: bb0(%0 : @owned $C):
+// CHECK: [[IN_ADDR:%[^,]+]] = alloc_stack $C
+// CHECK: store %0 to [init] [[IN_ADDR]]
+// CHECK: [[OUT_ADDR:%[^,]+]] = alloc_stack $C
+// CHECK: [[RESULT:%[^,]+]] = load [take] [[OUT_ADDR]]
+// CHECK-NEXT: dealloc_stack [[OUT_ADDR]]
+// CHECK: dealloc_stack [[IN_ADDR]]
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function '$s23copy_pack_class_c_ownedTf8xx_n'
+sil [ossa] @copy_pack_class_c_owned : $@convention(thin) (@pack_owned Pack{C}) -> @pack_out Pack{C} {
+bb0(%0 : $*Pack{C}, %1 : $*Pack{C}):
+  %3 = scalar_pack_index 0 of $Pack{C}
+  %4 = pack_element_get %3 of %0 as $*C
+  %5 = pack_element_get %3 of %1 as $*C
+  copy_addr %5 to [init] %4
+  destroy_addr %5
+  %8 = tuple ()
+  return %8
+}
+
+// Check that non-trivial owned pack-exploded parameters are loaded and passed correctly.
+// CHECK-LABEL: sil [ossa] @call_copy_pack_class_c_owned : $@convention(thin) (@owned C) -> @owned C {
+// CHECK: bb0([[IN_C:%[^,]+]] : @owned $C)
+// CHECK: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{C}
+// CHECK: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{C}
+// CHECK: store [[IN_C]] to [init] [[IN_ADDR:%[0-9]+]]
+// CHECK: pack_element_set [[IN_ADDR]] into [[PACK_SET_IDX:%[^,]+]] of [[IN_PACK]]
+// CHECK: [[IN_C_PACK_ADDR:%[^,]+]] = pack_element_get [[PACK_GET_IDX:%[^,]+]] of [[IN_PACK]] as $*C
+// CHECK-NEXT: [[INPUT:%[^,]+]] = load [take] [[IN_C_PACK_ADDR]]
+// CHECK: [[SPECIALIZED:%[^,]+]] = function_ref @$s23copy_pack_class_c_ownedTf8xx_n : $@convention(thin) (@owned C) -> @owned C
+// CHECK-NEXT: [[RESULT:%[^,]+]] = apply [[SPECIALIZED]]([[INPUT]]) : $@convention(thin) (@owned C) -> @owned C
+// CHECK-LABEL: } // end sil function 'call_copy_pack_class_c_owned'
+sil [ossa] @call_copy_pack_class_c_owned : $@convention(thin) (@owned C) -> @owned C {
+bb0(%c : @owned $C):
+  %0 = alloc_pack $Pack{C}
+  %1 = alloc_stack $C
+  %2 = scalar_pack_index 0 of $Pack{C}
+  pack_element_set %1 into %2 of %0
+  %4 = alloc_pack $Pack{C}
+  %5 = alloc_stack $C
+  store %c to [init] %5
+  pack_element_set %5 into %2 of %4
+  %16 = function_ref @copy_pack_class_c_owned : $@convention(thin) (@pack_owned Pack{C}) -> @pack_out Pack{C}
+  %17 = apply %16(%0, %4) : $@convention(thin) (@pack_owned Pack{C}) -> @pack_out Pack{C}
+  destroy_addr %5
+  dealloc_stack %5
+  dealloc_pack %4
+  %22 = load [take] %1
+  dealloc_stack %1
+  dealloc_pack %0
+  return %22
+}
+
+// As above, for an inout Pack{C}. The code in this function should be almost identical to the @pack_inout Pack{Int} one.
+// CHECK-LABEL: sil shared [ossa] @$s23copy_pack_class_c_inoutTf8xx_n : $@convention(thin) (@inout C) -> @owned C {
+// CHECK: bb0([[ADDR:%[^,]+]] : $*C):
+// CHECK-NEXT: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{C}
+// CHECK-NEXT: [[IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{C}
+// CHECK-NEXT: pack_element_set [[ADDR]] into [[IDX]] of [[IN_PACK]]
+// CHECK-NEXT: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{C}
+// CHECK-NEXT: [[OUT_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{C}
+// CHECK-NEXT: [[OUT_ADDR:%[^,]+]] = alloc_stack $C
+// CHECK: [[ORIG_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{C}
+// CHECK-NEXT: [[TO:%[^,]+]] = pack_element_get [[ORIG_IDX]] of [[OUT_PACK]] as $*C
+// CHECK-NEXT: [[FROM:%[^,]+]] = pack_element_get [[ORIG_IDX]] of [[IN_PACK]] as $*C
+// CHECK-NEXT: copy_addr [[FROM]] to [init] [[TO]]
+// CHECK: [[RESULT:%[^,]+]] = load [take] [[OUT_ADDR]]
+// CHECK-NEXT: dealloc_stack [[OUT_ADDR]]
+// CHECK-NEXT: dealloc_pack [[OUT_PACK]]
+// CHECK-NEXT: dealloc_pack [[IN_PACK]]
+// CHECK-NEXT: return [[RESULT]]
+// CHECK-LABEL: } // end sil function '$s23copy_pack_class_c_inoutTf8xx_n'
+sil [ossa] @copy_pack_class_c_inout : $@convention(thin) (@pack_inout Pack{C}) -> @pack_out Pack{C} {
+bb0(%0 : $*Pack{C}, %1 : $*Pack{C}):
+  %4 = scalar_pack_index 0 of $Pack{C}
+  %6 = pack_element_get %4 of %0 as $*C
+  %7 = pack_element_get %4 of %1 as $*C
+  copy_addr %7 to [init] %6
+  %9 = tuple ()
+  return %9
+}
+
+// Check that non-trivial owned pack-exploded parameters are loaded and passed correctly.
+// CHECK-LABEL: sil [ossa] @call_copy_pack_class_c_inout : $@convention(thin) (@owned C) -> @owned C {
+// CHECK: bb0([[IN_C:%[^,]+]] : @owned $C)
+// CHECK: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{C}
+// CHECK: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{C}
+// CHECK: store [[IN_C]] to [init] [[IN_ADDR:%[0-9]+]]
+// CHECK: pack_element_set [[IN_ADDR]] into [[PACK_SET_IDX:%[^,]+]] of [[IN_PACK]]
+// CHECK: [[IN_C_PACK_ADDR:%[^,]+]] = pack_element_get [[PACK_GET_IDX:%[^,]+]] of [[IN_PACK]] as $*C
+// CHECK: [[SPECIALIZED:%[^,]+]] = function_ref @$s23copy_pack_class_c_inoutTf8xx_n : $@convention(thin) (@inout C) -> @owned C
+// CHECK-NEXT: [[RESULT:%[^,]+]] = apply [[SPECIALIZED]]([[IN_C_PACK_ADDR]]) : $@convention(thin) (@inout C) -> @owned C
+// CHECK-LABEL: } // end sil function 'call_copy_pack_class_c_inout'
+sil [ossa] @call_copy_pack_class_c_inout : $@convention(thin) (@owned C) -> @owned C {
+bb0(%c : @owned $C):
+  %0 = alloc_pack $Pack{C}
+  %1 = alloc_stack $C
+  %2 = scalar_pack_index 0 of $Pack{C}
+  pack_element_set %1 into %2 of %0
+  %4 = alloc_pack $Pack{C}
+  %5 = alloc_stack $C
+  store %c to [init] %5
+  pack_element_set %5 into %2 of %4
+  %16 = function_ref @copy_pack_class_c_inout : $@convention(thin) (@pack_inout Pack{C}) -> @pack_out Pack{C}
+  %17 = apply %16(%0, %4) : $@convention(thin) (@pack_inout Pack{C}) -> @pack_out Pack{C}
+  destroy_addr %5
+  dealloc_stack %5
+  dealloc_pack %4
+  %22 = load [take] %1
+  dealloc_stack %1
+  dealloc_pack %0
+  return %22
 }
