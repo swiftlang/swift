@@ -169,6 +169,12 @@ extension MutatingContext {
     }
     notifyInstructionsChanged()
 
+    for operand in instruction.operands {
+      if let opInst = operand.value.definingInstruction {
+        notifyInstructionChanged(opInst)
+      }
+    }
+
     _bridged.eraseInstruction(instruction.bridged, salvageDebugInfo)
   }
 
