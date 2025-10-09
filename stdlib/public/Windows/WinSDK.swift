@@ -331,14 +331,17 @@ extension GUID {
   }
 }
 
-extension GUID: Equatable {
+// These conformances are marked @retroactive because the GUID type nominally
+// comes from the _GUIDDef clang module rather than the WinSDK clang module.
+
+extension GUID: @retroactive Equatable {
   @_transparent
   public static func ==(lhs: Self, rhs: Self) -> Bool {
     lhs.uint128Value == rhs.uint128Value
   }
 }
 
-extension GUID: Hashable {
+extension GUID: @retroactive Hashable {
   @_transparent
   public func hash(into hasher: inout Hasher) {
     hasher.combine(uint128Value)
