@@ -340,7 +340,7 @@ extension GUID: Equatable {
 
 extension GUID: Hashable {
   @_transparent
-  public func hash(into: inout Hasher) {
+  public func hash(into hasher: inout Hasher) {
     hasher.combine(uint128Value)
   }
 }
