@@ -20,6 +20,7 @@
 
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/Lifetime.h"
 #include "llvm/ADT/Hashing.h"
@@ -109,7 +110,7 @@ private:
   SILType(CanType ty, SILValueCategory category)
       : value(ty.getPointer(), unsigned(category)) {
     if (!ty) return;
-    assert(ty->isLegalSILType() &&
+    ASSERT(ty->isLegalSILType() &&
            "constructing SILType with type that should have been "
            "eliminated by SIL lowering");
   }
