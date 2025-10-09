@@ -91,14 +91,16 @@ std::string SpecializationMangler::finalize() {
 //===----------------------------------------------------------------------===//
 
 void GenericSpecializationMangler::
-appendSubstitutions(GenericSignature sig, SubstitutionMap subs) {
+appendSubstitutions(GenericSignature calleeSig,
+                    SubstitutionMap calleeSubs,
+                    GenericSignature callerSig) {
   bool First = true;
-  sig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
+  calleeSig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
     if (Canonical) {
       auto ty = Type(ParamType);
-      auto substTy = ty.subst(subs);
+      auto substTy = ty.subst(calleeSubs);
       auto canTy = substTy->getCanonicalType();
-      appendType(canTy, nullptr);
+      appendType(canTy, callerSig);
       appendListSeparator(First);
     }
   });
@@ -108,7 +110,7 @@ appendSubstitutions(GenericSignature sig, SubstitutionMap subs) {
 std::string GenericSpecializationMangler::
 manglePrespecialized(GenericSignature sig, SubstitutionMap subs) {
   beginMangling();
-  appendSubstitutions(sig, subs);
+  appendSubstitutions(sig, subs, GenericSignature());
   appendSpecializationOperator("Ts");
   return finalize();
 }
@@ -117,7 +119,7 @@ std::string GenericSpecializationMangler::
 mangleNotReabstracted(SubstitutionMap subs,
                       const SmallBitVector &paramsRemoved) {
   beginMangling();
-  appendSubstitutions(getGenericSignature(), subs);
+  appendSubstitutions(getGenericSignature(), subs, GenericSignature());
   appendOperator("T");
   appendRemovedParams(paramsRemoved);
   appendSpecializationOperator("G");
@@ -128,7 +130,7 @@ std::string GenericSpecializationMangler::
 mangleReabstracted(SubstitutionMap subs, bool alternativeMangling,
                    const SmallBitVector &paramsRemoved) {
   beginMangling();
-  appendSubstitutions(getGenericSignature(), subs);
+  appendSubstitutions(getGenericSignature(), subs, GenericSignature());
   appendOperator("T");
   appendRemovedParams(paramsRemoved);
 
@@ -147,9 +149,10 @@ void GenericSpecializationMangler::appendRemovedParams(const SmallBitVector &par
 }
 
 std::string GenericSpecializationMangler::
-mangleForDebugInfo(GenericSignature sig, SubstitutionMap subs, bool forInlining) {
+mangleForDebugInfo(GenericSignature calleeSig, SubstitutionMap calleeSubs,
+                   GenericSignature callerSig, bool forInlining) {
   beginMangling();
-  appendSubstitutions(sig, subs);
+  appendSubstitutions(calleeSig, calleeSubs, callerSig);
   appendSpecializationOperator(forInlining ? "Ti" : "TG");
   return finalize();
 }
