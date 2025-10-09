@@ -315,9 +315,8 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
 // where completing the metadata during demangling might cause cyclic
 // dependencies.
 static std::pair<llvm::Constant *, unsigned>
-getTypeRefByFunction(IRGenModule &IGM,
-                     CanGenericSignature sig,
-                     CanType t) {
+getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
+                     MangledTypeRefRole role) {
   IRGenMangler mangler(IGM.Context);
   std::string symbolName =
     mangler.mangleSymbolNameForMangledMetadataAccessorString(
@@ -433,7 +432,11 @@ getTypeRefByFunction(IRGenModule &IGM,
       // Form the mangled name with its relative reference.
       auto S = B.beginStruct();
       S.setPacked(true);
-      S.add(llvm::ConstantInt::get(IGM.Int8Ty, 255));
+      if (role == MangledTypeRefRole::DefaultAssociatedTypeWitness) {
+        S.add(llvm::ConstantInt::get(
+            IGM.Int8Ty,
+            ProtocolRequirementFlags::AssociatedTypeInProtocolContextByte));
+      }
       S.add(llvm::ConstantInt::get(IGM.Int8Ty, 9));
       S.addCompactFunctionReference(accessor);
 
@@ -513,7 +516,7 @@ getTypeRefImpl(IRGenModule &IGM,
     // the field will be artificially hidden to reflectors.
     if (isAlwaysNoncopyable) {
       IGM.IRGen.noteUseOfTypeMetadata(type);
-      return getTypeRefByFunction(IGM, sig, type);
+      return getTypeRefByFunction(IGM, sig, type, role);
     }
   }
   LLVM_FALLTHROUGH;
@@ -524,12 +527,12 @@ getTypeRefImpl(IRGenModule &IGM,
     // ensuring that we can always reconstruct type metadata from a mangled name
     // in-process.
     IGM.IRGen.noteUseOfTypeMetadata(type);
-    
+
     // If the minimum deployment target's runtime demangler wouldn't understand
     // this mangled name, then fall back to generating a "mangled name" with a
     // symbolic reference with a callback function.
     if (mangledNameIsUnknownToDeployTarget(IGM, type)) {
-      return getTypeRefByFunction(IGM, sig, type);
+      return getTypeRefByFunction(IGM, sig, type, role);
     }
 
     break;
