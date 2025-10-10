@@ -12,8 +12,8 @@ import asdf
 
 var a : A // expected-error {{'A' is ambiguous for type lookup in this context}}
 // CHECK: error: 'A' is ambiguous for type lookup in this context
-// CHECK-DAG: abcde{{.+}}note: found this candidate
-// CHECK-DAG: asdf{{.+}}note: found this candidate
+// CHECK-DAG: abcde{{.+}}note: found candidate 'A'
+// CHECK-DAG: asdf{{.+}}note: found candidate 'A'
 
 var b : B = abcde.B()
 var e : E = aeiou.E()

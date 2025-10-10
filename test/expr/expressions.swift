@@ -562,8 +562,8 @@ struct SpecialPi {} // Type with no implicit construction.
 
 var pi_s: SpecialPi
 
-func getPi() -> Float {}  // expected-note 3 {{found this candidate}}
-func getPi() -> Double {} // expected-note 3 {{found this candidate}}
+func getPi() -> Float {}  // expected-note 3 {{found candidate with type '() -> Float'}}
+func getPi() -> Double {} // expected-note 3 {{found candidate with type '() -> Double'}}
 func getPi() -> SpecialPi {}
 
 enum Empty { }

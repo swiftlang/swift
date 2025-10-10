@@ -25,7 +25,8 @@ var x = S.init // expected-error {{ambiguous use of 'init'}}
 // keying the source file contents on the buffer identifier, so we end up
 // with duplicated 'init(b:)'.
 
-// CHECK: Lib.S.init:3:10: note: found this candidate
+// CHECK: Lib.S.init:2:8: note: found candidate with type '(String) -> S' in module 'Lib'
+// CHECK: Lib.S.init:3:10: note: found candidate with type '(Int) -> S' in module 'Lib'
 // CHECK:      CONTENTS OF FILE Lib.S.init:
 // CHECK:      struct S {
 // CHECK-NEXT:    @discardableResult
