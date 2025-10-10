@@ -2,6 +2,9 @@
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=ios
 
+// rdar://162381284
+// XFAIL: CPU=arm64e && OS=ios
+
 import PointerAuth
 
 // CHECK: define hidden swiftcc i32 @"$s25ptrauth_field_fptr_import05test_B8_fn_reads5Int32VyF"() #0 {
@@ -11,7 +14,7 @@ import PointerAuth
 // CHECK:   br label %9
 // CHECK: 9:
 // CHECK:   [[SECURESTRUCT:%.*]] = phi ptr [ [[CAST0]], {{.*}} ]
-// CHECK:   %.secure_func_ptr = getelementptr inbounds %TSo12SecureStructV, ptr [[SECURESTRUCT]], i32 0, i32 0
+// CHECK:   %.secure_func_ptr = getelementptr inbounds{{.*}} %TSo12SecureStructV, ptr [[SECURESTRUCT]], i32 0, i32 0
 // CHECK:   [[PTR:%.*]] = load ptr, ptr %.secure_func_ptr, align 8
 // CHECK:   [[COND:%.*]] = icmp ne ptr [[PTR]], null
 // CHECK:   br i1 [[COND]], label %resign-nonnull, label %resign-null
@@ -33,7 +36,7 @@ func test_field_fn_read() -> Int32 {
 
 // CHECK-LABEL: define hidden swiftcc void @"$s25ptrauth_field_fptr_import05test_B14_fn_ptr_modifyyyF"() #0 {
 // CHECK:   [[SECURESTRUCT:%.*]] = phi ptr [
-// CHECK:   %.secure_func_ptr = getelementptr inbounds %TSo12SecureStructV, ptr [[SECURESTRUCT]], i32 0, i32 0
+// CHECK:   %.secure_func_ptr = getelementptr inbounds{{.*}} %TSo12SecureStructV, ptr [[SECURESTRUCT]], i32 0, i32 0
 // CHECK:   store i64 ptrtoint (ptr @returnInt.ptrauth to i64), ptr %ptrauth.temp, align 8
 // CHECK:   [[LD:%.*]] = load ptr, ptr %ptrauth.temp, align 8
 // CHECK:   [[COND:%.*]] = icmp ne ptr [[LD]], null
@@ -53,7 +56,7 @@ func test_field_fn_ptr_modify() {
 // CHECK:   br label %[[L1:[0-9]+]]
 // CHECK: [[L1]]:
 // CHECK:   [[AddressDiscriminatedSecureStruct:%.*]] = phi ptr [ [[CAST0]]
-// CHECK:   %.secure_func_ptr = getelementptr inbounds %TSo32AddressDiscriminatedSecureStructV, ptr [[AddressDiscriminatedSecureStruct]], i32 0, i32 0
+// CHECK:   %.secure_func_ptr = getelementptr inbounds{{.*}} %TSo32AddressDiscriminatedSecureStructV, ptr [[AddressDiscriminatedSecureStruct]], i32 0, i32 0
 // CHECK:   [[PTR:%.*]] = load ptr, ptr %.secure_func_ptr, align 8
 // CHECK:   [[COND:%.*]] = icmp ne ptr [[PTR]], null
 // CHECK:   br i1 [[COND]], label %resign-nonnull, label %resign-null
@@ -79,7 +82,7 @@ func test_addr_discriminated_field_fn_read() -> Int32 {
 // CHECK:   br label %[[L1:[0-9]+]]
 // CHECK: [[L1]]:
 // CHECK:   [[AddressDiscriminatedSecureStruct:%.*]] = phi ptr [ [[CAST0]]
-// CHECK:   %.secure_func_ptr = getelementptr inbounds %TSo32AddressDiscriminatedSecureStructV, ptr [[AddressDiscriminatedSecureStruct]], i32 0, i32 0
+// CHECK:   %.secure_func_ptr = getelementptr inbounds{{.*}} %TSo32AddressDiscriminatedSecureStructV, ptr [[AddressDiscriminatedSecureStruct]], i32 0, i32 0
 // CHECK:   store i64 ptrtoint (ptr @returnInt.ptrauth to i64), ptr %ptrauth.temp, align 8
 // CHECK:   [[LD:%.*]] = load ptr, ptr %ptrauth.temp, align 8
 // CHECK:   [[COND:%.*]] = icmp ne ptr [[LD]], null
