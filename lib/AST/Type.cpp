@@ -2237,7 +2237,10 @@ GenericTypeParamType::GenericTypeParamType(GenericTypeParamDecl *param,
   Weight = 0;
   Index = param->getIndex();
   ParamKind = param->getParamKind();
-  ValueType = param->getValueType();
+  // Note we intentionally don't compute `ValueType` here since that could
+  // trigger a request cycle with the interface type computation of the
+  // GenericTypeParamDecl. Instead, `getValueType` forwards the query to the
+  // decl.
 }
 
 GenericTypeParamType::GenericTypeParamType(Identifier name,
