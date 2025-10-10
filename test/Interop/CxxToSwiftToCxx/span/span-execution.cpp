@@ -12,7 +12,7 @@
 // REQUIRES: executable_test
 
 //--- header.h
-#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <span>
 
