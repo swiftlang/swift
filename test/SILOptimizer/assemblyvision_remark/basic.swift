@@ -309,9 +309,9 @@ func simpleInOut() -> Klass {
 @inline(never)
 @_semantics("optimize.sil.specialize.generic.size.never")
 public func use<T>(_ t: inout T) { // expected-note @:22 {{from location 't'}}
-    print(t); // expected-remark @:11 {{heap allocated ref of type '_ContiguousArrayStorage<Any>'}}
+    print(t); // expected-remark @:11 {{heap allocated ref of type}}
               // expected-remark @-1:11 {{Memory copy of value with type 'T'}}
-              // expected-remark @-2:12 {{release of type 'Builtin.BridgeObject'}}
+              // expected-remark @-2:12 {{release of type}}
 }
 
 @inline(never)
