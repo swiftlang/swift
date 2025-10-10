@@ -112,8 +112,6 @@
 /// * The Swift version is slightly faster than the C version;
 ///   mostly thanks to various minor algorithmic tweaks that were
 ///   found during the translation process.
-/// * Most of this file is annotated for SwiftStdlib 6.2
-///   because it relies on UInt128, MutableSpan, and InlineArray.
 ///
 // ----------------------------------------------------------------------------
 
@@ -141,7 +139,7 @@ public func _float16ToStringImpl(
   _ value: Float,
   _ debug: Bool
 ) -> UInt64 {
-    fatalError()
+  fatalError()
 }
 
 #else
@@ -155,25 +153,21 @@ public func _float16ToStringImpl(
   _ value: Float16,
   _ debug: Bool
 ) -> UInt64 {
-  if #available(SwiftStdlib 6.2, *) {
-    // Code below works with raw memory.
-    var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
-      _unchecked: textBuffer,
-      count: Int(bufferLength))
-    let textRange = _Float16ToASCII(value: value, buffer: &buffer)
-    let textLength = textRange.upperBound - textRange.lowerBound
+  // Code below works with raw memory.
+  var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
+    _unchecked: textBuffer,
+    count: Int(bufferLength))
+  let textRange = _Float16ToASCII(value: value, buffer: &buffer)
+  let textLength = textRange.upperBound - textRange.lowerBound
 
-    // Move the text to the start of the buffer
-    if textRange.lowerBound != 0 {
-      unsafe _memmove(
-        dest: textBuffer,
-        src: textBuffer + textRange.lowerBound,
-        size: UInt(truncatingIfNeeded: textLength))
-    }
-    return UInt64(truncatingIfNeeded: textLength)
-  } else {
-    fatalError()
+  // Move the text to the start of the buffer
+  if textRange.lowerBound != 0 {
+    unsafe _memmove(
+      dest: textBuffer,
+      src: textBuffer + textRange.lowerBound,
+      size: UInt(truncatingIfNeeded: textLength))
   }
+  return UInt64(truncatingIfNeeded: textLength)
 }
 
 // Convert a Float16 to an optimal ASCII representation.
@@ -187,7 +181,6 @@ public func _float16ToStringImpl(
 // with "0" characters, e.g., via
 // `InlineArray<32,UTF8.CodeUnit>(repeating:0x30)`
 
-@available(SwiftStdlib 6.2, *)
 internal func _Float16ToASCII(
   value f: Float16,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
@@ -448,25 +441,21 @@ internal func _float32ToStringImpl(
   _ value: Float32,
   _ debug: Bool
 ) -> UInt64 {
-  if #available(SwiftStdlib 6.2, *) {
-    // Code below works with raw memory.
-    var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
-      _unchecked: textBuffer,
-      count: Int(bufferLength))
-    let textRange = _Float32ToASCII(value: value, buffer: &buffer)
-    let textLength = textRange.upperBound - textRange.lowerBound
+  // Code below works with raw memory.
+  var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
+    _unchecked: textBuffer,
+    count: Int(bufferLength))
+  let textRange = _Float32ToASCII(value: value, buffer: &buffer)
+  let textLength = textRange.upperBound - textRange.lowerBound
 
-    // Move the text to the start of the buffer
-    if textRange.lowerBound != 0 {
-      unsafe _memmove(
-        dest: textBuffer,
-        src: textBuffer + textRange.lowerBound,
-        size: UInt(truncatingIfNeeded: textLength))
-    }
-    return UInt64(truncatingIfNeeded: textLength)
-  } else {
-    fatalError()
+  // Move the text to the start of the buffer
+  if textRange.lowerBound != 0 {
+    unsafe _memmove(
+      dest: textBuffer,
+      src: textBuffer + textRange.lowerBound,
+      size: UInt(truncatingIfNeeded: textLength))
   }
+  return UInt64(truncatingIfNeeded: textLength)
 }
 
 // Convert a Float32 to an optimal ASCII representation.
@@ -480,7 +469,6 @@ internal func _float32ToStringImpl(
 // Buffer must be at least 32 bytes long and must be pre-filled
 // with "0" characters, e.g., via
 // `InlineArray<32,UTF8.CodeUnit>(repeating:0x30)`
-@available(SwiftStdlib 6.2, *)
 internal func _Float32ToASCII(
   value f: Float32,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
@@ -701,25 +689,21 @@ internal func _float64ToStringImpl(
   _ value: Float64,
   _ debug: Bool
 ) -> UInt64 {
-  if #available(SwiftStdlib 6.2, *) {
-    // Code below works with raw memory.
-    var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
-      _unchecked: textBuffer,
-      count: Int(bufferLength))
-    let textRange = _Float64ToASCII(value: value, buffer: &buffer)
-    let textLength = textRange.upperBound - textRange.lowerBound
+  // Code below works with raw memory.
+  var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
+    _unchecked: textBuffer,
+    count: Int(bufferLength))
+  let textRange = _Float64ToASCII(value: value, buffer: &buffer)
+  let textLength = textRange.upperBound - textRange.lowerBound
 
-    // Move the text to the start of the buffer
-    if textRange.lowerBound != 0 {
-      unsafe _memmove(
-        dest: textBuffer,
-        src: textBuffer + textRange.lowerBound,
-        size: UInt(truncatingIfNeeded: textLength))
-    }
-    return UInt64(truncatingIfNeeded: textLength)
-  } else {
-    fatalError()
+  // Move the text to the start of the buffer
+  if textRange.lowerBound != 0 {
+    unsafe _memmove(
+      dest: textBuffer,
+      src: textBuffer + textRange.lowerBound,
+      size: UInt(truncatingIfNeeded: textLength))
   }
+  return UInt64(truncatingIfNeeded: textLength)
 }
 
 // Convert a Float64 to an optimal ASCII representation.
@@ -734,7 +718,6 @@ internal func _float64ToStringImpl(
 // Buffer must be at least 32 bytes long and must be pre-filled
 // with "0" characters, e.g., via
 // `InlineArray<32,UTF8.CodeUnit>(repeating:0x30)`
-@available(SwiftStdlib 6.2, *)
 internal func _Float64ToASCII(
   value d: Float64,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
@@ -826,8 +809,8 @@ internal func _Float64ToASCII(
   // The `powerOfTenRounded{Up,Down}` values are 128-bit
   // pure fractions with the decimal point at the far left.
 
-  var powerOfTenRoundedDown: UInt128 = 0
-  var powerOfTenRoundedUp: UInt128 = 0
+  var powerOfTenRoundedDown: _UInt128 = 0
+  var powerOfTenRoundedUp: _UInt128 = 0
 
   // Note the extra factor of 10^bulkFirstDigits -- that will give
   // us a headstart on digit generation later on.  (In contrast, Ryu
@@ -860,9 +843,9 @@ internal func _Float64ToASCII(
 
   let integerBits = 32
   let roundingBias =
-    UInt128((1 &<< UInt64(truncatingIfNeeded: integerBits &- extraBits)) &- 1)
-  var u: UInt128
-  var l: UInt128
+    _UInt128((1 &<< UInt64(truncatingIfNeeded: integerBits &- extraBits)) &- 1)
+  var u: _UInt128
+  var l: _UInt128
   if isOddSignificand {
     // Case A: Narrow the interval (odd significand)
 
@@ -941,7 +924,7 @@ internal func _Float64ToASCII(
 
   // Except for subnormals, this loop never runs more than once.
   // For subnormals, this might run as many as 16 times.
-  let minimumU = UInt128(bulkFirstDigitFactor) << (128 - integerBits)
+  let minimumU = _UInt128(bulkFirstDigitFactor) << (128 - integerBits)
   while u < minimumU {
     base10Exponent -= 1
     l &*= 10
@@ -983,7 +966,7 @@ internal func _Float64ToASCII(
   // As above, these are fixed-point with 32-bit integer, 96-bit fraction
   var t = u
   var delta = u &- l
-  let fractionMask = (UInt128(1) << 96) - 1
+  let fractionMask = (_UInt128(1) << 96) - 1
 
   var nextDigit = 5
   var firstDigit = nextDigit
@@ -1023,7 +1006,7 @@ internal func _Float64ToASCII(
     // with bulkDigits = 1.
 
     let uHigh = u._high
-    let lHigh = (l &+ UInt128(UInt64.max))._high
+    let lHigh = (l &+ _UInt128(UInt64.max))._high
     let tHigh: UInt64
     if d.significand == 0 {
       tHigh = (uHigh &+ lHigh &* 2) / 3
@@ -1087,7 +1070,7 @@ internal func _Float64ToASCII(
     // >90% of random binary64 values need at least 15 digits.
     // We have seven so there's probably at least 8 more, which
     // we can grab all at once.
-    let TenToTheEighth = 100000000 as UInt128 // 10^(15-bulkFirstDigits)
+    let TenToTheEighth = 100000000 as _UInt128 // 10^(15-bulkFirstDigits)
     let d0 = delta * TenToTheEighth
     var t0 = t * TenToTheEighth
     // The integer part of t0 is the next 8 digits
@@ -1209,25 +1192,21 @@ internal func _float80ToStringImpl(
   _ value: Float80,
   _ debug: Bool
 ) -> UInt64 {
-  if #available(SwiftStdlib 6.2, *) {
-    // Code below works with raw memory.
-    var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
-      _unchecked: textBuffer,
-      count: Int(bufferLength))
-    let textRange = _Float80ToASCII(value: value, buffer: &buffer)
-    let textLength = textRange.upperBound - textRange.lowerBound
+  // Code below works with raw memory.
+  var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
+    _unchecked: textBuffer,
+    count: Int(bufferLength))
+  let textRange = _Float80ToASCII(value: value, buffer: &buffer)
+  let textLength = textRange.upperBound - textRange.lowerBound
 
-    // Move the text to the start of the buffer
-    if textRange.lowerBound != 0 {
-      unsafe _memmove(
-        dest: textBuffer,
-        src: textBuffer + textRange.lowerBound,
-        size: UInt(truncatingIfNeeded: textLength))
-    }
-    return UInt64(truncatingIfNeeded: textLength)
-  } else {
-    fatalError()
+  // Move the text to the start of the buffer
+  if textRange.lowerBound != 0 {
+    unsafe _memmove(
+      dest: textBuffer,
+      src: textBuffer + textRange.lowerBound,
+      size: UInt(truncatingIfNeeded: textLength))
   }
+  return UInt64(truncatingIfNeeded: textLength)
 }
 
 // Convert a Float80 to an optimal ASCII representation.
@@ -1241,7 +1220,6 @@ internal func _float80ToStringImpl(
 // Buffer must be at least 32 bytes long and must be pre-filled
 // with "0" characters, e.g., via
 // `InlineArray<32,UTF8.CodeUnit>(repeating:0x30)`
-@available(SwiftStdlib 6.2, *)
 internal func _Float80ToASCII(
   value f: Float80,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
@@ -1331,9 +1309,9 @@ internal func _Float80ToASCII(
   let threeQuarterUlp = halfUlp + quarterUlp
   // Significand is the upper 64 bits of our 128-bit franction
   // Upper midpoint adds 1/2 ULP:
-  let upperMidpointExact = UInt128(_low: halfUlp, _high: significand)
+  let upperMidpointExact = _UInt128(_low: halfUlp, _high: significand)
   // Lower midpoint subtracts 1 ULP and then adds 1/2 or 3/4 ULP:
-  let lowerMidpointExact = UInt128(
+  let lowerMidpointExact = _UInt128(
     _low: isBoundary ? threeQuarterUlp : halfUlp,
     _high: significand - 1)
 
@@ -1363,7 +1341,6 @@ internal func _Float80ToASCII(
 // backwards compatibility, and the legacy ABI never supported
 // Float128.
 
-@available(SwiftStdlib 6.2, *)
 internal func _Float128ToASCII(
   value d: Float128,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
@@ -1407,11 +1384,10 @@ internal func _Float128ToASCII(
 
 #if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
 
-@available(SwiftStdlib 6.2, *)
 fileprivate func _backend_256bit(
   buffer: inout MutableRawSpan,
-  upperMidpointExact: UInt128,
-  lowerMidpointExact: UInt128,
+  upperMidpointExact: _UInt128,
+  lowerMidpointExact: _UInt128,
   sign: FloatingPointSign,
   isBoundary: Bool,
   isOddSignificand: Bool,
@@ -1582,7 +1558,6 @@ fileprivate func _backend_256bit(
 // `firstDigit` and that all unused bytes are filled with `"0"` (0x30)
 // characters.
 
-@available(SwiftStdlib 6.2, *)
 fileprivate func _finishFormatting(
   buffer: inout MutableRawSpan,
   sign: FloatingPointSign,
@@ -1719,8 +1694,7 @@ fileprivate func _finishFormatting(
 
 // Table with ASCII strings for all 2-digit decimal numbers.
 // Stored as little-endian UInt16s for efficiency
-@available(SwiftStdlib 6.2, *)
-fileprivate let asciiDigitTable: InlineArray<100, UInt16> = [
+fileprivate let asciiDigitTable: _InlineArray<100, UInt16> = [
   0x3030, 0x3130, 0x3230, 0x3330, 0x3430,
   0x3530, 0x3630, 0x3730, 0x3830, 0x3930,
   0x3031, 0x3131, 0x3231, 0x3331, 0x3431,
@@ -1744,7 +1718,6 @@ fileprivate let asciiDigitTable: InlineArray<100, UInt16> = [
 ]
 
 // The constants below assume we're on a little-endian processor
-@available(SwiftStdlib 6.2, *)
 fileprivate func _infinity(
   buffer: inout MutableRawSpan,
   sign: FloatingPointSign
@@ -1764,7 +1737,6 @@ fileprivate func _infinity(
   }
 }
 
-@available(SwiftStdlib 6.2, *)
 fileprivate func _zero(
   buffer: inout MutableRawSpan,
   sign: FloatingPointSign
@@ -1784,13 +1756,11 @@ fileprivate func _zero(
   }
 }
 
-@available(SwiftStdlib 6.2, *)
-fileprivate let hexdigits: InlineArray<16, UInt8> = [
+fileprivate let hexdigits: _InlineArray<16, UInt8> = [
   0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
   0x38, 0x39, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66
 ]
 
-@available(SwiftStdlib 6.2, *)
 fileprivate func _hexWithoutLeadingZeros(
   buffer: inout MutableRawSpan,
   offset: inout Int,
@@ -1811,7 +1781,6 @@ fileprivate func _hexWithoutLeadingZeros(
   }
 }
 
-@available(SwiftStdlib 6.2, *)
 fileprivate func _hexWithLeadingZeros(
   buffer: inout MutableRawSpan,
   offset: inout Int,
@@ -1829,7 +1798,6 @@ fileprivate func _hexWithLeadingZeros(
   }
 }
 
-@available(SwiftStdlib 6.2, *)
 fileprivate func nan_details(
   buffer: inout MutableRawSpan,
   sign: FloatingPointSign,
@@ -1882,7 +1850,6 @@ fileprivate func nan_details(
 //
 // This implementation is based on work by Paul Khuong:
 // https://pvk.ca/Blog/2017/12/22/appnexus-common-framework-its-out-also-how-to-print-integers-faster/
-@available(SwiftStdlib 6.2, *)
 @inline(__always)
 fileprivate func _intToEightDigits(_ n: UInt32) -> UInt64 {
   // Break into two numbers of 4 decimal digits each
@@ -1940,40 +1907,37 @@ fileprivate func _multiply64x32RoundingUp(
   return t + (lhs >> 32) * UInt64(rhs)
 }
 
-@available(SwiftStdlib 6.2, *)
 @inline(__always)
 fileprivate func _multiply128x64RoundingDown(
-  _ lhs: UInt128,
+  _ lhs: _UInt128,
   _ rhs: UInt64
-) -> UInt128 {
-  let lhsHigh = UInt128(truncatingIfNeeded: lhs._high)
-  let lhsLow = UInt128(truncatingIfNeeded: lhs._low)
-  let rhs128 = UInt128(truncatingIfNeeded: rhs)
+) -> _UInt128 {
+  let lhsHigh = _UInt128(truncatingIfNeeded: lhs._high)
+  let lhsLow = _UInt128(truncatingIfNeeded: lhs._low)
+  let rhs128 = _UInt128(truncatingIfNeeded: rhs)
   return (lhsHigh &* rhs128) &+ ((lhsLow &* rhs128) >> 64)
 }
 
-@available(SwiftStdlib 6.2, *)
 @inline(__always)
 fileprivate func _multiply128x64RoundingUp(
-  _ lhs: UInt128,
+  _ lhs: _UInt128,
   _ rhs: UInt64
-) -> UInt128 {
-  let lhsHigh = UInt128(truncatingIfNeeded: lhs._high)
-  let lhsLow = UInt128(truncatingIfNeeded: lhs._low)
-  let rhs128 = UInt128(truncatingIfNeeded: rhs)
+) -> _UInt128 {
+  let lhsHigh = _UInt128(truncatingIfNeeded: lhs._high)
+  let lhsLow = _UInt128(truncatingIfNeeded: lhs._low)
+  let rhs128 = _UInt128(truncatingIfNeeded: rhs)
   let h = lhsHigh &* rhs128
   let l = lhsLow &* rhs128
-  let bias = (UInt128(1) << 64) &- 1
+  let bias = (_UInt128(1) << 64) &- 1
   return h + ((l &+ bias) &>> 64)
 }
 
 // Custom 256-bit unsigned integer type, with various arithmetic
 // helpers as methods.
 // Used by 80- and 128-bit floating point formatting logic above...
-@available(SwiftStdlib 6.2, *)
 fileprivate struct _UInt256 {
-  var high: UInt128
-  var low: UInt128
+  var high: _UInt128
+  var low: _UInt128
 
   init() {
     self.high = 0
@@ -1981,140 +1945,140 @@ fileprivate struct _UInt256 {
   }
 
   init(high: UInt64, _ midHigh: UInt64, _ midLow: UInt64, low: UInt64) {
-    self.high = UInt128(_low: midHigh, _high: high)
-    self.low = UInt128(_low: low, _high: midLow)
+    self.high = _UInt128(_low: midHigh, _high: high)
+    self.low = _UInt128(_low: low, _high: midLow)
   }
 
-  init(high: UInt128, low: UInt128) {
+  init(high: _UInt128, low: _UInt128) {
     self.high = high
     self.low = low
   }
 
   mutating func shiftRightRoundingDown(by shift: Int) {
     assert(shift < 32 && shift >= 0)
-    var t = UInt128(low._low >> shift)
-    t |= UInt128(low._high) &<< (64 - shift)
+    var t = _UInt128(low._low >> shift)
+    t |= _UInt128(low._high) &<< (64 - shift)
     let newlow = t._low
-    t = UInt128(t._high)
-    t |= UInt128(high._low) &<< (64 - shift)
-    low = UInt128(_low: newlow, _high: t._low)
-    t = UInt128(t._high)
-    t |= UInt128(high._high) &<< (64 - shift)
+    t = _UInt128(t._high)
+    t |= _UInt128(high._low) &<< (64 - shift)
+    low = _UInt128(_low: newlow, _high: t._low)
+    t = _UInt128(t._high)
+    t |= _UInt128(high._high) &<< (64 - shift)
     high = t
   }
 
   mutating func shiftRightRoundingUp(by shift: Int) {
     assert(shift < 32 && shift >= 0)
     let bias = (UInt64(1) &<< shift) - 1
-    var t = UInt128((low._low + bias) >> shift)
-    t |= UInt128(low._high) &<< (64 - shift)
+    var t = _UInt128((low._low + bias) >> shift)
+    t |= _UInt128(low._high) &<< (64 - shift)
     let newlow = t._low
-    t = UInt128(t._high)
-    t |= UInt128(high._low) &<< (64 - shift)
-    low = UInt128(_low: newlow, _high: t._low)
-    t = UInt128(t._high)
-    t |= UInt128(high._high) &<< (64 - shift)
+    t = _UInt128(t._high)
+    t |= _UInt128(high._low) &<< (64 - shift)
+    low = _UInt128(_low: newlow, _high: t._low)
+    t = _UInt128(t._high)
+    t |= _UInt128(high._high) &<< (64 - shift)
     high = t
   }
 
   mutating func multiply(by rhs: UInt32) {
-    var t = UInt128(low._low) &* UInt128(rhs)
+    var t = _UInt128(low._low) &* _UInt128(rhs)
     let newlow = t._low
-    t = UInt128(t._high) &+ UInt128(low._high) &* UInt128(rhs)
-    low = UInt128(_low: newlow, _high: t._low)
-    t = UInt128(t._high) &+ UInt128(high._low) &* UInt128(rhs)
+    t = _UInt128(t._high) &+ _UInt128(low._high) &* _UInt128(rhs)
+    low = _UInt128(_low: newlow, _high: t._low)
+    t = _UInt128(t._high) &+ _UInt128(high._low) &* _UInt128(rhs)
     let newmidhigh = t._low
-    t = UInt128(t._high) &+ UInt128(high._high) &* UInt128(rhs)
-    high = UInt128(_low: newmidhigh, _high: t._low)
+    t = _UInt128(t._high) &+ _UInt128(high._high) &* _UInt128(rhs)
+    high = _UInt128(_low: newmidhigh, _high: t._low)
     assert(t._high == 0)
   }
 
-  mutating func multiplyRoundingDown(by rhs: UInt128) {
-    var current = UInt128(low._low) * UInt128(rhs._low)
+  mutating func multiplyRoundingDown(by rhs: _UInt128) {
+    var current = _UInt128(low._low) * _UInt128(rhs._low)
 
-    current = UInt128(current._high)
-    var t = UInt128(low._low) &* UInt128(rhs._high)
-    current += UInt128(t._low)
-    var next = UInt128(t._high)
-    t = UInt128(low._high) &* UInt128(rhs._low)
-    current += UInt128(t._low)
-    next += UInt128(t._high)
+    current = _UInt128(current._high)
+    var t = _UInt128(low._low) &* _UInt128(rhs._high)
+    current += _UInt128(t._low)
+    var next = _UInt128(t._high)
+    t = _UInt128(low._high) &* _UInt128(rhs._low)
+    current += _UInt128(t._low)
+    next += _UInt128(t._high)
 
-    current = next + UInt128(current._high)
-    t = UInt128(low._high) &* UInt128(rhs._high)
-    current += UInt128(t._low)
-    next = UInt128(t._high)
-    t = UInt128(high._low) &* UInt128(rhs._low)
-    current += UInt128(t._low)
-    next += UInt128(t._high)
+    current = next + _UInt128(current._high)
+    t = _UInt128(low._high) &* _UInt128(rhs._high)
+    current += _UInt128(t._low)
+    next = _UInt128(t._high)
+    t = _UInt128(high._low) &* _UInt128(rhs._low)
+    current += _UInt128(t._low)
+    next += _UInt128(t._high)
     let newlow = current._low
 
-    current = next + UInt128(current._high)
-    t = UInt128(high._low) &* UInt128(rhs._high)
-    current += UInt128(t._low)
-    next = UInt128(t._high)
-    t = UInt128(high._high) &* UInt128(rhs._low)
-    current += UInt128(t._low)
-    next += UInt128(t._high)
-    low = UInt128(_low: newlow, _high: current._low)
+    current = next + _UInt128(current._high)
+    t = _UInt128(high._low) &* _UInt128(rhs._high)
+    current += _UInt128(t._low)
+    next = _UInt128(t._high)
+    t = _UInt128(high._high) &* _UInt128(rhs._low)
+    current += _UInt128(t._low)
+    next += _UInt128(t._high)
+    low = _UInt128(_low: newlow, _high: current._low)
 
-    current = next + UInt128(current._high)
-    t = UInt128(high._high) &* UInt128(rhs._high)
+    current = next + _UInt128(current._high)
+    t = _UInt128(high._high) &* _UInt128(rhs._high)
     high = current + t
   }
 
-  mutating func multiplyRoundingUp(by rhs: UInt128) {
-    var current = UInt128(low._low) &* UInt128(rhs._low)
-    current += UInt128(UInt64.max)
+  mutating func multiplyRoundingUp(by rhs: _UInt128) {
+    var current = _UInt128(low._low) &* _UInt128(rhs._low)
+    current += _UInt128(UInt64.max)
 
-    current = UInt128(current._high)
-    var t = UInt128(low._low) &* UInt128(rhs._high)
-    current += UInt128(t._low)
-    var next = UInt128(t._high)
-    t = UInt128(low._high) &* UInt128(rhs._low)
-    current += UInt128(t._low)
-    next += UInt128(t._high)
-    current += UInt128(UInt64.max)
+    current = _UInt128(current._high)
+    var t = _UInt128(low._low) &* _UInt128(rhs._high)
+    current += _UInt128(t._low)
+    var next = _UInt128(t._high)
+    t = _UInt128(low._high) &* _UInt128(rhs._low)
+    current += _UInt128(t._low)
+    next += _UInt128(t._high)
+    current += _UInt128(UInt64.max)
 
-    current = next + UInt128(current._high)
-    t = UInt128(low._high) &* UInt128(rhs._high)
-    current += UInt128(t._low)
-    next = UInt128(t._high)
-    t = UInt128(high._low) &* UInt128(rhs._low)
-    current += UInt128(t._low)
-    next += UInt128(t._high)
+    current = next + _UInt128(current._high)
+    t = _UInt128(low._high) &* _UInt128(rhs._high)
+    current += _UInt128(t._low)
+    next = _UInt128(t._high)
+    t = _UInt128(high._low) &* _UInt128(rhs._low)
+    current += _UInt128(t._low)
+    next += _UInt128(t._high)
     let newlow = current._low
 
-    current = next + UInt128(current._high)
-    t = UInt128(high._low) &* UInt128(rhs._high)
-    current += UInt128(t._low)
-    next = UInt128(t._high)
-    t = UInt128(high._high) &* UInt128(rhs._low)
-    current += UInt128(t._low)
-    next += UInt128(t._high)
-    low = UInt128(_low: newlow, _high: current._low)
+    current = next + _UInt128(current._high)
+    t = _UInt128(high._low) &* _UInt128(rhs._high)
+    current += _UInt128(t._low)
+    next = _UInt128(t._high)
+    t = _UInt128(high._high) &* _UInt128(rhs._low)
+    current += _UInt128(t._low)
+    next += _UInt128(t._high)
+    low = _UInt128(_low: newlow, _high: current._low)
 
-    current = next + UInt128(current._high)
-    t = UInt128(high._high) &* UInt128(rhs._high)
+    current = next + _UInt128(current._high)
+    t = _UInt128(high._high) &* _UInt128(rhs._high)
     high = current + t
   }
 
   mutating func extractIntegerPart(_ bits: Int) -> UInt {
     assert(bits < 16)
     let integral = high._high >> (64 &- bits)
-    high = UInt128(
+    high = _UInt128(
       _low: high._low,
       _high: high._high &- (integral &<< (64 &- bits)))
     return UInt(truncatingIfNeeded: integral)
   }
 
   static func &- (lhs: _UInt256, rhs: _UInt256) -> _UInt256 {
-    var t = UInt128(lhs.low._low) &+ UInt128(~rhs.low._low) &+ 1
+    var t = _UInt128(lhs.low._low) &+ _UInt128(~rhs.low._low) &+ 1
     let newlowlow = t._low
-    t = UInt128(t._high) &+ UInt128(lhs.low._high) &+ UInt128(~rhs.low._high)
-    let newlow = UInt128(_low: newlowlow, _high: t._low)
-    t = UInt128(t._high) &+ UInt128(lhs.high._low) &+ UInt128(~rhs.high._low)
-    let newhigh = UInt128(
+    t = _UInt128(t._high) &+ _UInt128(lhs.low._high) &+ _UInt128(~rhs.low._high)
+    let newlow = _UInt128(_low: newlowlow, _high: t._low)
+    t = _UInt128(t._high) &+ _UInt128(lhs.high._low) &+ _UInt128(~rhs.high._low)
+    let newhigh = _UInt128(
       _low: t._low,
       _high: t._high &+ lhs.high._high &+ ~rhs.high._high)
     return _UInt256(high: newhigh, low: newlow)
@@ -2133,7 +2097,6 @@ fileprivate struct _UInt256 {
 //
 // ================================================================
 
-@available(SwiftStdlib 6.2, *)
 @inline(__always)
 fileprivate func _intervalContainingPowerOf10_Binary32(
   p: Int,
@@ -2156,17 +2119,16 @@ fileprivate func _intervalContainingPowerOf10_Binary32(
   return binaryExponentFor10ToThe(p)
 }
 
-@available(SwiftStdlib 6.2, *)
 @inline(__always)
 fileprivate func _intervalContainingPowerOf10_Binary64(
   p: Int,
-  lower: inout UInt128,
-  upper: inout UInt128
+  lower: inout _UInt128,
+  upper: inout _UInt128
 ) -> Int {
   if p >= 0 && p <= 55 {
     let upper64 = powersOf10_Exact128[p &* 2 &+ 1]
     let lower64 = powersOf10_Exact128[p &* 2]
-    upper = UInt128(_low: lower64, _high: upper64)
+    upper = _UInt128(_low: lower64, _high: upper64)
     lower = upper
     return binaryExponentFor10ToThe(p)
   }
@@ -2179,15 +2141,15 @@ fileprivate func _intervalContainingPowerOf10_Binary64(
   let baseExponent = binaryExponentFor10ToThe(p &- extraPower)
 
   if extraPower == 0 {
-    lower = UInt128(_low: baseLow, _high: baseHigh)
+    lower = _UInt128(_low: baseLow, _high: baseHigh)
     upper = lower &+ 1
     return baseExponent
   } else {
     let extra = powersOf10_Exact128[extraPower &* 2 &+ 1]
-    lower = ((UInt128(truncatingIfNeeded:baseHigh)
-                &* UInt128(truncatingIfNeeded:extra))
-               &+ ((UInt128(truncatingIfNeeded:baseLow)
-                      &* UInt128(truncatingIfNeeded:extra)) &>> 64))
+    lower = ((_UInt128(truncatingIfNeeded:baseHigh)
+                &* _UInt128(truncatingIfNeeded:extra))
+               &+ ((_UInt128(truncatingIfNeeded:baseLow)
+                      &* _UInt128(truncatingIfNeeded:extra)) &>> 64))
     upper = lower &+ 2
     return baseExponent &+ binaryExponentFor10ToThe(extraPower)
   }
@@ -2220,8 +2182,7 @@ fileprivate func decimalExponentFor2ToThe(_ p: Int) -> Int {
 // This covers the negative powers of 10 for Float32.
 // Positive powers of 10 come from the next table below.
 // Table size: 320 bytes
-@available(SwiftStdlib 6.2, *)
-fileprivate let powersOf10_negativeBinary32: InlineArray<_, UInt64> = [
+fileprivate let powersOf10_negativeBinary32: _InlineArray<_, UInt64> = [
   0x8b61313bbabce2c6, // x 2^-132 ~= 10^-40
   0xae397d8aa96c1b77, // x 2^-129 ~= 10^-39
   0xd9c7dced53c72255, // x 2^-126 ~= 10^-38
@@ -2279,8 +2240,7 @@ fileprivate let powersOf10_negativeBinary32: InlineArray<_, UInt64> = [
 //   support.
 
 // Table size: 896 bytes
-@available(SwiftStdlib 6.2, *)
-fileprivate let powersOf10_Exact128: InlineArray<_, UInt64> = [
+fileprivate let powersOf10_Exact128: _InlineArray<_, UInt64> = [
   // Low order ... high order
   0x0000000000000000, 0x8000000000000000, // x 2^1 == 10^0 exactly
   0x0000000000000000, 0xa000000000000000, // x 2^4 == 10^1 exactly
@@ -2352,8 +2312,7 @@ fileprivate let powersOf10_Exact128: InlineArray<_, UInt64> = [
 // penalty.
 
 // Table size: 464 bytes
-@available(SwiftStdlib 6.2, *)
-fileprivate let powersOf10_Binary64: InlineArray<_, UInt64> = [
+fileprivate let powersOf10_Binary64: _InlineArray<_, UInt64> = [
   // low-order half, high-order half
   0x3931b850df08e738, 0x95fe7e07c91efafa, // x 2^-1328 ~= 10^-400
   0xba954f8e758fecb3, 0x9774919ef68662a3, // x 2^-1235 ~= 10^-372
@@ -2392,8 +2351,7 @@ fileprivate let powersOf10_Binary64: InlineArray<_, UInt64> = [
 // a single additional 256-bit multiplication by 10^-4984 to recover the negative powers.
 
 // Table size: 5728 bytes
-@available(SwiftStdlib 6.2, *)
-fileprivate let powersOf10_Binary128: InlineArray<_, UInt64> = [
+fileprivate let powersOf10_Binary128: _InlineArray<_, UInt64> = [
   // Low-order ... high-order
   0xaec2e6aff96b46ae, 0xf91044c2eff84750, 0x2b55c9e70e00c557, 0xb6536903bf8f2bda, // x 2^-16556 ~= 10^-4984
   0xda1b3c3dd3889587, 0x73a7380aba84a6b1, 0xbddb2dfde3f8a6e3, 0xb9e5428330737362, // x 2^-16370 ~= 10^-4928
@@ -2576,7 +2534,6 @@ fileprivate let powersOf10_Binary128: InlineArray<_, UInt64> = [
   0x7128a8aad239ce8f, 0x8737bd250290cd5b, 0xd950102978dbd0ff, 0xb3b8e2eda91a232d, // x 2^16557 ~= 10^4984
 ]
 
-@available(SwiftStdlib 6.2, *)
 fileprivate func _intervalContainingPowerOf10_Binary128(
   p: Int,
   lower: inout _UInt256,
@@ -2601,7 +2558,7 @@ fileprivate func _intervalContainingPowerOf10_Binary128(
   var e = binaryExponentFor10ToThe(p - extraPower)
 
   if extraPower > 0 {
-    let extra = UInt128(
+    let extra = _UInt128(
       _low: powersOf10_Exact128[extraPower * 2],
       _high: powersOf10_Exact128[extraPower * 2 + 1])
     lower.multiplyRoundingDown(by: extra)
