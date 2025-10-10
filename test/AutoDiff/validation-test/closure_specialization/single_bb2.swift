@@ -11,11 +11,15 @@
 // RUN: %target-run %t/opt.out
 
 // RUN: %target-swift-frontend -emit-sil %s -O -o %t/out.sil
-// RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK4
-// RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK5
 
-// TODO: re-enable this test once we have OSSA throughout the pipeline
-// XFAIL: *
+// TODO: Re-enable these tests once we have OSSA throughout the pipeline.
+//       AutoDiff Closure Specialization pass runs twice, but at the second
+//       run we currently do not perform any transformation because ownership
+//       eliminator is run before. Disabled tests below rely on the second
+//       pass run performing transformation, so they currently fail.
+// TODO: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK4
+
+// RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK5
 
 import DifferentiationUnittest
 import StdlibUnittest
