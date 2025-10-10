@@ -111,6 +111,13 @@ cmake_policy(GET CMP0157 Policy157Enabled)
 if(Policy157Enabled STREQUAL NEW)
   set_target_properties(swiftDistributed PROPERTIES
     LINKER_LANGUAGE CXX)
+  # `CMAKE_STATIC_LIBRARY_PREFIX_Swift` will not impact the prefix for this
+  # library because we have changed the linker language to C++. This is required
+  # for Windows to properly reference this library.
+  if(NOT BUILD_SHARED_LIBS)
+    set_target_properties(swiftDistributed PROPERTIES
+      PREFIX lib)
+  endif()
 endif()
 
 target_compile_definitions(swiftDistributed PRIVATE
