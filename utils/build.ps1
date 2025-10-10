@@ -1154,25 +1154,50 @@ function Get-Dependencies {
           [bool]$CreateExtractPath = $true
       )
 
-      $source = Join-Path -Path $BinaryCache -ChildPath $ZipFileName
-      $destination = Join-Path -Path $BinaryCache -ChildPath $ExtractPath
+      $Source = Join-Path -Path $BinaryCache -ChildPath $ZipFileName
+      $Destination = Join-Path -Path $BinaryCache -ChildPath $ExtractPath
 
       # Check if the extracted directory already exists and is up to date.
-      if (Test-Path $destination) {
-          $zipLastWriteTime = (Get-Item $source).LastWriteTime
-          $extractedLastWriteTime = (Get-Item $destination).LastWriteTime
+      if (Test-Path $Destination) {
+          $ZipLastWriteTime = (Get-Item $Source).LastWriteTime
+          $ExtractedLastWriteTime = (Get-Item $Destination).LastWriteTime
           # Compare the last write times
-          if ($zipLastWriteTime -le $extractedLastWriteTime) {
+          if ($ZipLastWriteTime -le $ExtractedLastWriteTime) {
               Write-Output "'$ZipFileName' is already extracted and up to date."
               return
           }
       }
 
-      $destination = if ($CreateExtractPath) { $destination } else { $BinaryCache }
+      $Destination = if ($CreateExtractPath) { $Destination } else { $BinaryCache }
 
       Write-Output "Extracting '$ZipFileName' ..."
       New-Item -ItemType Directory -ErrorAction Ignore -Path $BinaryCache | Out-Null
-      Expand-Archive -Path $source -DestinationPath $destination -Force
+      Expand-Archive -Path $Source -DestinationPath $Destination -Force
+    }
+
+    function Expand-TapeArchive {
+      param
+      (
+          [string]$SourceName,
+          [string]$DestinationName
+      )
+      $Source = Join-Path -Path $BinaryCache -ChildPath $SourceName
+      $Destination = Join-Path -Path $BinaryCache -ChildPath $DestinationName
+
+      # Check if the extracted directory already exists and is up to date.
+      if (Test-Path $Destination) {
+          $TarLastWriteTime = (Get-Item $Source).LastWriteTime
+          $ExtractedLastWriteTime = (Get-Item $Destination).LastWriteTime
+          # Compare the last write times
+          if ($TarLastWriteTime -le $ExtractedLastWriteTime) {
+              Write-Output "'$SourceName' is already extracted and up to date."
+              return
+          }
+      }
+
+      Write-Output "Extracting '$Source' ..."
+      New-Item -ItemType Directory -ErrorAction Ignore -Path $Destination | Out-Null
+      tar -xvf $Source -C $Destination | Out-Null
     }
 
     function Extract-Toolchain {
@@ -1228,8 +1253,13 @@ function Get-Dependencies {
 
     if ($EnableCaching) {
       $SCCache = Get-SCCache
-      DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion.zip" $SCCache.SHA256
-      Expand-ZipFile sccache-$SCCacheVersion.zip $BinaryCache sccache-$SCCacheVersion
+      $FileExtension = [System.IO.Path]::GetExtension($SCCache.URL)
+      DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion.$FileExtension" $SCCache.SHA256
+      if ($FileExtension -eq "tar.gz") {
+        Expand-TapeArchive sccache-$SCCacheVersion.$FileExtension $BinaryCache sccache-$SCCacheVersion
+      } else {
+        Expand-ZipFile sccache-$SCCacheVersion.$FileExtension $BinaryCache sccache-$SCCacheVersion
+      }
     }
 
     DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
