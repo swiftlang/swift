@@ -42,6 +42,13 @@ public enum FakeOptional<T> {
 
 struct MOS: ~Copyable {}
 
+struct NCWithDeinit : ~Copyable {
+  var x: Int
+
+  deinit
+}
+
+
 protocol P {
   func foo()
 }
@@ -1330,6 +1337,22 @@ sil [ossa] @take_from_original_copy_addr__final_use_apply__move_only : $() -> ()
   dealloc_stack %src : $*MOS
   %tuple = tuple ()
   return %tuple : $()
+}
+
+// CHECK-LABEL: sil [ossa] @missing_destroy :
+// CHECK-NOT:     destroy_addr
+// CHECK-NOT:     copy_addr
+// CHECK:           = drop_deinit %0
+// CHECK-NEXT:      = tuple ()
+// CHECK-LABEL: } // end sil function 'missing_destroy'
+sil [ossa] @missing_destroy : $@convention(thin) (@in NCWithDeinit) -> () {
+bb0(%0 : $*NCWithDeinit):
+  %1 = alloc_stack $NCWithDeinit
+  copy_addr [take] %0 to [init] %1
+  %3 = drop_deinit %1
+  dealloc_stack %1
+  %5 = tuple ()
+  return %5
 }
 
 // CHECK-LABEL: sil [ossa] @test_temprvoborrowboundary1 :
