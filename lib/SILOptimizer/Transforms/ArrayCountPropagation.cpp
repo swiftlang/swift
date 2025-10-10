@@ -49,6 +49,7 @@ class ArrayAllocation {
   SILValue ArrayValue;
   /// The count of the allocated array.
   SILValue ArrayCount;
+  bool isUninitialized = false;
   // The calls to Array.count that use this array allocation.
   llvm::SmallSetVector<ApplyInst *, 16> CountCalls;
   // Array count calls that are dead as a consequence of propagating the count
@@ -61,7 +62,7 @@ class ArrayAllocation {
   bool propagate();
   bool isInitializationWithKnownCount();
   bool analyzeArrayValueUses();
-  bool recursivelyCollectUses(ValueBase *Def);
+  bool recursivelyCollectUses(ValueBase *Def, bool isInInitSection);
   bool propagateCountToUsers();
 
 public:
@@ -100,8 +101,10 @@ bool ArrayAllocation::isInitializationWithKnownCount() {
   ArraySemanticsCall Uninitialized(Alloc, "array.uninitialized");
   if (Uninitialized &&
       (ArrayCount = Uninitialized.getInitializationCount()) &&
-      (ArrayValue = Uninitialized.getArrayValue()))
+      (ArrayValue = Uninitialized.getArrayValue())) {
+    isUninitialized = true;
     return true;
+  }
 
   ArraySemanticsCall Init(Alloc, "array.init", /*matchPartialName*/true);
   if (Init &&
@@ -115,18 +118,29 @@ bool ArrayAllocation::isInitializationWithKnownCount() {
 /// Collect all getCount users and check that there are no escapes or uses that
 /// could change the array value.
 bool ArrayAllocation::analyzeArrayValueUses() {
-  return recursivelyCollectUses(ArrayValue);
+  return recursivelyCollectUses(ArrayValue, /*isInInitSection=*/ isUninitialized);
 }
 
 /// Recursively look at all uses of this definition. Abort if the array value
 /// could escape or be changed. Collect all uses that are calls to array.count.
-bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
+bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def, bool isInInitSection) {
   for (auto *Opd : Def->getUses()) {
     auto *User = Opd->getUser();
     // Ignore reference counting and debug instructions.
     if (isa<RefCountingInst>(User) || isa<DestroyValueInst>(User) ||
         isa<DebugValueInst>(User))
       continue;
+
+    if (BeginBorrowInst *beginBorrow = dyn_cast<BeginBorrowInst>(User)) {
+      if (isInInitSection) {
+        // This begin_borrow is used to get the element addresses for array
+        // initialization. This is happening between the allocate-uninitialized
+        // and the finalize-array intrinsic calls. We can igore this.
+        continue;
+      }
+      if (!recursivelyCollectUses(beginBorrow, isInInitSection))
+        return false;
+    }
 
     if (auto mdi = MarkDependenceInstruction(User)) {
       if (Def == mdi.getBase()) {
@@ -136,7 +150,7 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
 
     // Array value projection.
     if (auto *SEI = dyn_cast<StructExtractInst>(User)) {
-      if (!recursivelyCollectUses(SEI))
+      if (!recursivelyCollectUses(SEI, isInInitSection))
         return false;
       continue;
     }
@@ -151,7 +165,7 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
           CountCalls.insert(ArrayOp);
           break;
         case ArrayCallKind::kArrayFinalizeIntrinsic:
-          if (!recursivelyCollectUses(apply))
+          if (!recursivelyCollectUses(apply, /*isInInitSection=*/ false))
             return false;
           break;
         default:
