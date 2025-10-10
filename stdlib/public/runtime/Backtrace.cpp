@@ -20,6 +20,7 @@
 
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Backtrace.h"
+#include "swift/Runtime/Runtime.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Paths.h"
 #include "swift/Runtime/EnvironmentVariables.h"
@@ -78,6 +79,7 @@ extern "C" int csops(int, unsigned int, void *, size_t);
 #endif
 
 using namespace swift::runtime::backtrace;
+using namespace swift::runtime::mangling;
 
 namespace swift {
 namespace runtime {
@@ -992,92 +994,6 @@ _swift_backtrace_isThunkFunction(const char *mangledName) {
   swift::Demangle::Context ctx;
 
   return ctx.isThunkSymbol(mangledName);
-}
-
-// Try to demangle a symbol.
-SWIFT_RUNTIME_STDLIB_SPI char *
-_swift_runtime_demangle(const char *mangledName,
-                          size_t mangledNameLength,
-                          char *outputBuffer,
-                          size_t *outputBufferSize,
-                          uint32_t flags) {
-  if (flags > 1) {
-    swift::fatalError(0, "Only 'flags' value of '0' and '1' is currently supported.");
-  }
-  if (outputBuffer != nullptr && outputBufferSize == nullptr) {
-    swift::fatalError(0, "'outputBuffer' is passed but the size is 'nullptr'.");
-  }
-
-  llvm::StringRef name = llvm::StringRef(mangledName, mangledNameLength);
-
-  // You must provide buffer size if you're providing your own output buffer
-  if (outputBuffer && !outputBufferSize) {
-    return nullptr;
-  }
-
-  if (Demangle::isSwiftSymbol(name)) {
-    // Determine demangling/formatting options:
-    auto options = DemangleOptions();
-    if (flags == 1) {
-      // simplified display options, for backtraces
-      options = DemangleOptions::SimplifiedUIDemangleOptions();
-    }
-
-    auto result = Demangle::demangleSymbolAsString(name, options);
-    size_t bufferSize;
-
-    if (outputBufferSize) {
-      bufferSize = *outputBufferSize;
-      *outputBufferSize = result.length() + 1;
-    }
-
-    if (outputBuffer == nullptr) {
-      outputBuffer = (char *)::malloc(result.length() + 1);
-      bufferSize = result.length() + 1;
-    }
-
-    size_t toCopy = std::min(bufferSize - 1, result.length());
-    ::memcpy(outputBuffer, result.data(), toCopy);
-    outputBuffer[toCopy] = '\0';
-
-    return outputBuffer;
-#ifndef _WIN32
-  } else if (name.starts_with("_Z")) {
-    // Try C++; note that we don't want to force callers to use malloc() to
-    // allocate their buffer, which is a requirement for __cxa_demangle
-    // because it may call realloc() on the incoming pointer.  As a result,
-    // we never pass the caller's buffer to __cxa_demangle.
-    size_t resultLen;
-    int status = 0;
-    char *result = abi::__cxa_demangle(mangledName, nullptr, &resultLen, &status);
-
-    if (result) {
-      size_t bufferSize;
-
-      if (outputBufferSize) {
-        bufferSize = *outputBufferSize;
-        *outputBufferSize = resultLen;
-      }
-
-      if (outputBuffer == nullptr) {
-        return result;
-      }
-
-      size_t toCopy = std::min(bufferSize - 1, resultLen - 1);
-      ::memcpy(outputBuffer, result, toCopy);
-      outputBuffer[toCopy] = '\0';
-
-      free(result);
-
-      return outputBuffer;
-    }
-#else
-    // On Windows, the mangling is different.
-    // ###TODO: Call __unDName()
-#endif
-  }
-
-  return nullptr;
 }
 
 SWIFT_RUNTIME_STDLIB_SPI char *
