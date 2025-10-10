@@ -17,7 +17,7 @@ import tempfile
 import sys
 import traceback
 from multiprocessing import freeze_support
-from typing import Any, Dict, Optional, Set, List
+from typing import Any, Dict, Optional, Set, List, Union
 
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 from .runner_arguments import AdditionalSwiftSourcesArguments, UpdateArguments
@@ -340,8 +340,17 @@ def _is_any_repository_locked(pool_args: List[UpdateArguments]) -> Set[str]:
                 locked_repositories.add(repo_name)
     return locked_repositories
 
+def _move_llvm_project_to_first_index(pool_args: List[Union[UpdateArguments, AdditionalSwiftSourcesArguments]]):
+    llvm_project_idx = None
+    for i in range(len(pool_args)):
+        if pool_args[i].repo_name == "llvm-project":
+            llvm_project_idx = i
+            break
+    if llvm_project_idx is not None:
+        pool_args.insert(0, pool_args.pop(llvm_project_idx))
+
 def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_pr):
-    pool_args = []
+    pool_args: List[UpdateArguments] = []
     timestamp = get_timestamp_to_match(args.match_timestamp, args.source_root)
     for repo_name in config['repos'].keys():
         if repo_name in args.skip_repository_list:
@@ -384,6 +393,7 @@ def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_p
             f"'{repo_name}' is locked by git. Cannot update it."
             for repo_name in locked_repositories
         ]
+    _move_llvm_project_to_first_index(pool_args)
     return ParallelRunner(update_single_repository, pool_args, args.n_processes).run()
 
 
@@ -517,13 +527,16 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
 
     # Only use `ParallelRunner` when submodules are not used, since `.git` dir
     # can't be accessed concurrently.
-    if not use_submodules:
-      if not pool_args:
-          print("Not cloning any repositories.")
-          return
+    if use_submodules:
+        return
+    if not pool_args:
+        print("Not cloning any repositories.")
+        return
 
-      return ParallelRunner(
-          obtain_additional_swift_sources, pool_args, args.n_processes).run()
+    _move_llvm_project_to_first_index(pool_args)
+    return ParallelRunner(
+        obtain_additional_swift_sources, pool_args, args.n_processes
+    ).run()
 
 
 def dump_repo_hashes(args, config, branch_scheme_name='repro'):
