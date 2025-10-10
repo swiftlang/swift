@@ -41,6 +41,11 @@ ERROR(too_few_output_filenames,none,
 ERROR(no_input_files_for_mt,none,
       "no swift input files for multi-threaded compilation", ())
 
+ERROR(ir_profile_read_failed, none,
+      "error reading profile '%0': %1", (StringRef, StringRef))
+ERROR(ir_profile_invalid, none,
+      "invalid ir profile '%0'", (StringRef))
+
 ERROR(alignment_dynamic_type_layout_unsupported,none,
       "'@_alignment' is not supported on types with dynamic layout", ())
 ERROR(alignment_less_than_natural,none,
