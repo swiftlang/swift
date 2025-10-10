@@ -77,6 +77,15 @@ bool SILInliner::canInlineApplySite(FullApplySite apply) {
   if (auto BA = dyn_cast<BeginApplyInst>(apply))
     return canInlineBeginApply(BA);
 
+  if (apply.hasGuaranteedResult()) {
+    if (auto *callee = apply.getReferencedFunctionOrNull()) {
+      auto returnBB = callee->findReturnBB();
+      if (returnBB != callee->end() &&
+          isa<ReturnBorrowInst>(returnBB->getTerminator())) {
+        return false;
+      }
+    }
+  }
   return true;
 }
 
