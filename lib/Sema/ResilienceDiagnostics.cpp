@@ -162,7 +162,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
         ModuleDecl *importedVia = attributedImport.module.importedModule,
                    *sourceModule = D->getModuleContext();
         ctx.Diags.diagnose(loc, diag::module_api_import_aliases, D, importedVia,
-                           sourceModule, importedVia == sourceModule);
+                           sourceModule,
+                           importedVia->getTopLevelModule() == sourceModule);
       });
 
   auto ignoredDowngradeToWarning = DowngradeToWarning::No;
@@ -283,7 +284,8 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
           ModuleDecl *importedVia = attributedImport.module.importedModule,
                      *sourceModule = D->getModuleContext();
           ctx.Diags.diagnose(loc, diag::module_api_import, D, importedVia,
-                             sourceModule, importedVia == sourceModule,
+                             sourceModule,
+                             importedVia->getTopLevelModule() == sourceModule,
                              /*isImplicit*/ false);
         }
       });
@@ -426,7 +428,7 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
         ctx.Diags.diagnose(loc, diag::module_api_import_conformance,
                            rootConf->getType(), rootConf->getProtocol(),
                            importedVia, sourceModule,
-                           importedVia == sourceModule);
+                           importedVia->getTopLevelModule() == sourceModule);
       });
 
   auto originKind = getDisallowedOriginKind(ext, where);
