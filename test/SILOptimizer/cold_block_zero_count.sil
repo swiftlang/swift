@@ -1,0 +1,165 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-inline | %FileCheck %s --check-prefix=CHECK-CONSERVATIVE
+// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-inline -sil-zero-count-strategy=optimistic | %FileCheck %s --check-prefix=CHECK-OPTIMISTIC
+// Test that we handle blocks with zero execution counts gracefully with different strategies
+// This reproduces the division by zero bug in ColdBlockInfo::inferFromEdgeProfile
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-CONSERVATIVE-LABEL: sil @test_zero_count_block
+// CHECK-OPTIMISTIC-LABEL: sil @test_zero_count_block
+sil @test_zero_count_block : $@convention(thin) () -> () !function_entry_count(100) {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  // Both branches have zero counts - the block was instrumented but never executed
+  // This should not crash with division by zero, and behavior depends on strategy:
+  // - Conservative: skips inference, lets other heuristics decide
+  // - Optimistic: marks successors as cold (never executed = cold)
+  cond_br %0, bb1, bb2, !true_count(0), !false_count(0)
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-CONSERVATIVE-LABEL: sil @test_partial_zero_count
+// CHECK-OPTIMISTIC-LABEL: sil @test_partial_zero_count
+sil @test_partial_zero_count : $@convention(thin) () -> () !function_entry_count(100) {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  // One branch has zero, one has non-zero - should handle gracefully
+  cond_br %0, bb1, bb2, !true_count(0), !false_count(50)
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Function to inline into the test functions
+sil @callee : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 42
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  return %1 : $Int32
+}
+
+// CHECK-CONSERVATIVE-LABEL: sil @test_inline_with_zero_count
+// CHECK-OPTIMISTIC-LABEL: sil @test_inline_with_zero_count
+sil @test_inline_with_zero_count : $@convention(thin) () -> Int32 !function_entry_count(100) {
+bb0:
+  %0 = function_ref @callee : $@convention(thin) () -> Int32
+  %1 = integer_literal $Builtin.Int1, 0
+  // This block has zero execution count but contains a call
+  // The inliner should not crash when analyzing this
+  cond_br %1, bb1, bb2, !true_count(0), !false_count(100)
+
+bb1:
+  // This path never executes
+  %r1 = apply %0() : $@convention(thin) () -> Int32
+  br bb3(%r1 : $Int32)
+
+bb2:
+  %r2 = apply %0() : $@convention(thin) () -> Int32
+  br bb3(%r2 : $Int32)
+
+bb3(%result : $Int32):
+  return %result : $Int32
+}
+
+// Tests for missing profile data vs zero counts (new optimistic strategy)
+
+// CHECK-CONSERVATIVE-LABEL: sil @test_missing_with_nonzero
+// CHECK-OPTIMISTIC-LABEL: sil @test_missing_with_nonzero
+sil @test_missing_with_nonzero : $@convention(thin) () -> () !function_entry_count(100) {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  // One edge has missing data, one has non-zero count
+  // With optimistic strategy: missing should be treated as zero
+  // With conservative strategy: no inference (missing data = bail out)
+  // Note: In SIL, missing !true_count means no ProfileCounter, not ProfileCounter(0)
+  cond_br %0, bb1, bb2, !false_count(100)
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-CONSERVATIVE-LABEL: sil @test_both_missing
+// CHECK-OPTIMISTIC-LABEL: sil @test_both_missing
+sil @test_both_missing : $@convention(thin) () -> () !function_entry_count(100) {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  // Both edges have missing profile data
+  // Both strategies should skip inference (no evidence of profiling)
+  cond_br %0, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-CONSERVATIVE-LABEL: sil @test_missing_with_zero
+// CHECK-OPTIMISTIC-LABEL: sil @test_missing_with_zero
+sil @test_missing_with_zero : $@convention(thin) () -> () !function_entry_count(100) {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  // One edge missing, one edge explicitly zero
+  // Both strategies should be conservative (no non-zero evidence)
+  cond_br %0, bb1, bb2, !true_count(0)
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-CONSERVATIVE-LABEL: sil @test_zero_vs_missing
+// CHECK-OPTIMISTIC-LABEL: sil @test_zero_vs_missing
+sil @test_zero_vs_missing : $@convention(thin) () -> () !function_entry_count(100) {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  // Explicit zero count vs non-zero count
+  // Both strategies should handle this (zero is definite information)
+  cond_br %0, bb1, bb2, !true_count(0), !false_count(100)
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
