@@ -5,6 +5,7 @@
 // UNSUPPORTED: OS=windows-msvc
 
 // REQUIRES: executable_test
+// REQUIRES: std_span
 
 import StdlibUnittest
 #if !BRIDGING_HEADER

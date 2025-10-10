@@ -1,4 +1,5 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: std_span
 
 // RUN: rm -rf %t
 // RUN: split-file %s %t
