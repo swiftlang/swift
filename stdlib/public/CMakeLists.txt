@@ -264,22 +264,31 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND NOT SWIFT_WASI_SYSROOT_PATH)
   endif()
 endif()
 
-foreach(triple ${SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES})
-  if(triple STREQUAL "")
+foreach(triple_configuration ${SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES})
+  if(triple_configuration STREQUAL "")
     continue()
   endif()
 
+  # Line format: <triple>[@<path to SDK>]
+  string(REPLACE "@" ";" triple_configuration_list "${triple_configuration}")
+  list(GET triple_configuration_list 0 triple)
   string(REGEX REPLACE "-" ";" list "${triple}")
   list(GET list 0 arch)
   list(GET list 1 vendor)
   list(GET list 2 os)
-  string(REGEX REPLACE "[0-9]+(\\.[0-9]+)+" " " mod "${triple}")
+  string(REGEX REPLACE "[0-9]+(\\.[0-9]+)+" "" mod "${triple}")
 
   list(FILTER EMBEDDED_STDLIB_TARGET_TRIPLES EXCLUDE REGEX " ${mod} ")
 
   list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
     "${arch} ${mod} ${triple}"
   )
+
+  list(LENGTH triple_configuration_list triple_configuration_list_length)
+  if(triple_configuration_list_length GREATER_EQUAL 2)
+    list(GET triple_configuration_list 1 sdk_path)
+    set(EMBEDDED_STDLIB_SDK_FOR_${triple} "${sdk_path}")
+  endif()
 endforeach()
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
