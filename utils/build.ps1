@@ -4201,23 +4201,19 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-IndexStoreDB $HostPlatform
   Invoke-BuildStep Build-SourceKitLSP $HostPlatform
   Invoke-BuildStep Build-Inspect $HostPlatform
-}
 
-Install-HostToolchain
+  Install-HostToolchain
 
-if (-not $SkipBuild) {
   Invoke-BuildStep Build-mimalloc $HostPlatform
-}
 
-if (-not $SkipBuild -and $IncludeNoAsserts) {
-  Build-NoAssertsToolchain
-}
+  if ($IncludeNoAsserts) {
+    Build-NoAssertsToolchain
+  }
 
-if (-not $SkipBuild -and -not $IsCrossCompiling) {
-  Invoke-BuildStep Build-DocC $HostPlatform
-}
+  if (-not $IsCrossCompiling) {
+    Invoke-BuildStep Build-DocC $HostPlatform
+  }
 
-if (-not $SkipBuild) {
   Invoke-BuildStep Patch-mimalloc $HostPlatform
 }
 
