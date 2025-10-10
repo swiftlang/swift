@@ -2131,9 +2131,7 @@ public:
 
 enum class ConstraintSystemPhase {
   ConstraintGeneration,
-  Solving,
-  Diagnostics,
-  Finalization
+  Solving
 };
 
 /// Retrieve the closure type from the constraint system.
@@ -2693,18 +2691,7 @@ public:
     case ConstraintSystemPhase::Solving:
       // We can come back to constraint generation phase while
       // processing result builder body.
-      assert(newPhase == ConstraintSystemPhase::ConstraintGeneration ||
-             newPhase == ConstraintSystemPhase::Diagnostics ||
-             newPhase == ConstraintSystemPhase::Finalization);
-      break;
-
-    case ConstraintSystemPhase::Diagnostics:
-      assert(newPhase == ConstraintSystemPhase::Solving ||
-             newPhase == ConstraintSystemPhase::Finalization);
-      break;
-
-    case ConstraintSystemPhase::Finalization:
-      assert(newPhase == ConstraintSystemPhase::Diagnostics);
+      assert(newPhase == ConstraintSystemPhase::ConstraintGeneration);
       break;
     }
 #endif

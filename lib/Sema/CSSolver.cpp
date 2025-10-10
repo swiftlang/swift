@@ -1579,8 +1579,6 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
 
   setPhase(ConstraintSystemPhase::Solving);
 
-  SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
-
   // If constraint system failed while trying to
   // genenerate constraints, let's stop right here.
   if (failedConstraint)
