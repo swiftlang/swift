@@ -259,12 +259,14 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
 
     if (constraintTerm.back().getKind() == Symbol::Kind::Shape) {
       ASSERT(rule.getRHS().back().getKind() == Symbol::Kind::Shape);
+      llvm::dbgs() << "stripping off shape term\n";
       // Strip off the shape symbol from the constraint term.
       constraintTerm = MutableTerm(constraintTerm.begin(),
                                    constraintTerm.end() - 1);
     }
 
     if (constraintTerm.front().getKind() == Symbol::Kind::PackElement) {
+      llvm::dbgs() << "stripping off front PackELement\n";
       // Strip off the element symbol from the constraint term.
       constraintTerm = MutableTerm(constraintTerm.begin() + 1,
                                    constraintTerm.end());

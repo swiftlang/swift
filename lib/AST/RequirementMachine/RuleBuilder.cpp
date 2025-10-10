@@ -319,6 +319,7 @@ void RuleBuilder::addRequirement(const Requirement &req,
     // Add the [shape] symbol to both sides.
     subjectTerm.add(Symbol::forShape(Context));
     constraintTerm.add(Symbol::forShape(Context));
+    llvm::dbgs() << "rule building subject term and constraint term " << subjectTerm << " " << constraintTerm << "\n";
     break;
   }
 
@@ -331,7 +332,17 @@ void RuleBuilder::addRequirement(const Requirement &req,
     auto *proto = req.getProtocolDecl();
 
     constraintTerm = subjectTerm;
+    MutableTerm savedShapePattern;
+    if (constraintTerm.back().getKind() == Symbol::Kind::Shape) {
+      llvm::dbgs() << "Looking at the constraint in the paramter pack cases " << constraintTerm.back();
+      savedShapePattern = MutableTerm(constraintTerm.removeEnd());
+      llvm::dbgs() << " " << savedShapePattern.back() << "\n";
+    }
     constraintTerm.add(Symbol::forProtocol(proto, Context));
+    if (!savedShapePattern.empty()) {
+      constraintTerm.add(savedShapePattern.back());
+    }
+    llvm::dbgs() << "conformance " << subjectTerm << " " << constraintTerm << "\n";
     break;
   }
 
@@ -390,6 +401,8 @@ void RuleBuilder::addRequirement(const Requirement &req,
 
       constraintTerm = subjectTerm;
       constraintTerm.add(Symbol::forConcreteType(otherType, result, Context));
+      llvm::dbgs() << "rule building subject term and constraint term same type" << subjectTerm << " " << constraintTerm << "\n";
+
       break;
     }
 
@@ -407,10 +420,11 @@ void RuleBuilder::addRequirement(const Requirement &req,
         constraintTerm.prepend(Symbol::forPackElement(Context));
       }
     }
-
+    llvm::dbgs() << "rule building subject term and constraint term same type main " << subjectTerm << "\n " << constraintTerm << "\n";
     break;
   }
   }
+  llvm::dbgs() << "rule building subject term and constraint term end" << subjectTerm << " " << constraintTerm << "\n";
 
   RequirementRules.emplace_back(std::move(subjectTerm), std::move(constraintTerm));
 }
@@ -509,7 +523,6 @@ void RuleBuilder::collectPackShapeRules(ArrayRef<GenericTypeParamType *> generic
   if (Dump) {
     llvm::dbgs() << "adding shape rules\n";
   }
-
   if (!llvm::any_of(genericParams,
                     [](GenericTypeParamType *t) {
                       return t->isParameterPack();

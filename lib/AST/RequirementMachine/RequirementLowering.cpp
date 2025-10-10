@@ -447,6 +447,11 @@ static void desugarSameShapeRequirement(
                                   SmallVectorImpl<InverseRequirement> &inverses,
                                   SmallVectorImpl<RequirementError> &errors) {
   // For now, only allow shape requirements directly between pack types.
+  if (!req.getFirstType()->isParameterPackExpansion() ||
+      !req.getSecondType()->isParameterPackExpansion()) {
+    errors.push_back(RequirementError::forInvalidShapeRequirement(req, loc));
+    return;
+  }
   if (!req.getFirstType()->isParameterPack() ||
       !req.getSecondType()->isParameterPack()) {
     errors.push_back(RequirementError::forInvalidShapeRequirement(

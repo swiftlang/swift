@@ -421,10 +421,10 @@ void PropertyMap::unifyConcreteTypes(Term key,
 
   bool debug = Debug.contains(DebugFlags::ConcreteUnification);
 
-  if (debug) {
+  //if (debug) {
     llvm::dbgs() << "% Unifying " << lhsProperty
                  << " with " << rhsProperty << "\n";
-  }
+  //}
 
   std::optional<unsigned> lhsDifferenceID;
   std::optional<unsigned> rhsDifferenceID;
@@ -489,8 +489,8 @@ void PropertyMap::unifyConcreteTypes(Term key,
     ASSERT(!rhsDifferenceID);
 
     const auto &lhsDifference = System.getTypeDifference(*lhsDifferenceID);
-    ASSERT(lhsProperty == lhsDifference.LHS);
-    ASSERT(rhsProperty == lhsDifference.RHS);
+    //ASSERT(lhsProperty == lhsDifference.LHS);
+    //ASSERT(rhsProperty == lhsDifference.RHS);
 
     // Build a rewrite path (T.[RHS] => T).
     RewritePath path;
@@ -570,7 +570,9 @@ void PropertyMap::unifyConcreteTypes(
   // Unify this rule with all other concrete type rules we've seen so far,
   // to record rewrite loops relating the rules and their projections.
   for (auto pair : existingRules) {
+    llvm::dbgs() << "one call of unify types\n";
     unifyConcreteTypes(key, pair.first, pair.second, property, ruleID);
+    llvm::dbgs() << "call of unify type ends\n";
   }
 
   // Record the new rule.

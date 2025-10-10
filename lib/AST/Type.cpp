@@ -619,8 +619,9 @@ void TypeBase::getTypeVariables(
 Type TypeBase::getDependentMemberRoot() {
   Type t(this);
 
-  while (auto *dmt = t->getAs<DependentMemberType>())
+  while (auto *dmt = t->getAs<DependentMemberType>()) {
     t = dmt->getBase();
+  }
 
   return t;
 }
