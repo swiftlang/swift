@@ -406,6 +406,9 @@ public:
   /// Suppress @inline(always) attribute and emit @inline(__always) instead.
   bool SuppressInlineAlways = false;
 
+  /// Suppress printing of ~Sendable in inheritance and requirement lists.
+  bool SuppressTildeSendable = false;
+
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;
 

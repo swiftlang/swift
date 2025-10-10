@@ -85,6 +85,7 @@ namespace swift {
   struct ExternalSourceLocs;
   class CaptureListExpr;
   class DeclRefExpr;
+  class InverseTypeRepr;
   class LiteralExpr;
   class BraceStmt;
   class DeclAttributes;
@@ -1969,6 +1970,12 @@ public:
   /// index, resolved at the given stage, or `Type()` if resolution fails.
   Type getResolvedType(unsigned i, TypeResolutionStage stage =
                                        TypeResolutionStage::Interface) const;
+
+  /// If the given index corresponds to a "suppressed" entry, returns the
+  /// information associated with it, and `std::nullopt` otherwise.
+  std::optional<std::pair<Type, InverseTypeRepr *>> getAsSuppressed(
+      unsigned i,
+      TypeResolutionStage stage = TypeResolutionStage::Interface) const;
 
   /// Returns the underlying array of inherited type entries.
   ///

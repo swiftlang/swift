@@ -559,6 +559,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(InlineAlways, false)
 /// Allow use of 'Swift' (Swift runtime version) in @available attributes
 EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
 
+/// Allow use of `~Sendable`.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TildeSendable, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

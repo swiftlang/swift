@@ -450,6 +450,26 @@ static bool usesFeatureInlineAlways(Decl *decl) {
 
 UNINTERESTING_FEATURE(SwiftRuntimeAvailability)
 
+static bool usesFeatureTildeSendable(Decl *decl) {
+  auto *TD = dyn_cast<TypeDecl>(decl);
+  if (!TD)
+    return false;
+
+  return llvm::any_of(
+      TD->getInherited().getEntries(), [&decl](const auto &entry) {
+        if (!entry.isSuppressed())
+          return false;
+
+        auto T = entry.getType();
+        if (!T)
+          return false;
+
+        auto &C = decl->getASTContext();
+        return C.getProtocol(KnownProtocolKind::Sendable) == T->getAnyNominal();
+      });
+}
+
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
