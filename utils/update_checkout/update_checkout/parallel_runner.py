@@ -15,7 +15,7 @@ class MonitoredFunction:
         fn: Callable,
         running_tasks: ListProxy,
         updated_repos: ValueProxy,
-        lock: Lock
+        lock: Lock,
     ):
         self.fn = fn
         self.running_tasks = running_tasks
@@ -48,13 +48,7 @@ class ParallelRunner:
     ):
         self._monitor_polling_period = 0.1
         if n_processes == 0:
-            if sys.version_info.minor < 10:
-                # On Python < 3.10, https://bugs.python.org/issue46391 causes
-                # Pool.map and its variants to hang. Limiting the number of
-                # processes fixes the issue.
-                n_processes = int(cpu_count() * 1.25)
-            else:
-                n_processes = cpu_count() * 2
+            n_processes = ParallelRunner._max_processes()
         self._terminal_width = shutil.get_terminal_size().columns
         self._n_processes = n_processes
         self._pool_args = pool_args
@@ -106,7 +100,7 @@ class ParallelRunner:
             self._lock.release()
 
             if current_line != last_output:
-                truncated = (f"{self._output_prefix} [{updated_repos}/{self._nb_repos}] ({current_line})")
+                truncated = f"{self._output_prefix} [{updated_repos}/{self._nb_repos}] ({current_line})"
                 if len(truncated) > self._terminal_width:
                     ellipsis_marker = " ..."
                     truncated = (
@@ -147,3 +141,12 @@ class ParallelRunner:
                     print(r.stderr.decode())
         return fail_count
 
+    @staticmethod
+    def _max_processes() -> int:
+        if sys.version_info.minor < 10:
+            # On Python < 3.10, https://bugs.python.org/issue46391 causes
+            # Pool.map and its variants to hang. Limiting the number of
+            # processes fixes the issue.
+            return int(cpu_count() * 1.25)
+        else:
+            return cpu_count() * 2
