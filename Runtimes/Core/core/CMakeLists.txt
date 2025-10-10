@@ -89,6 +89,7 @@ add_library(swiftCore
   Identifiable.swift
   Indices.swift
   InlineArray.swift
+  _InlineArray.swift
   InputStream.swift
   IntegerParsing.swift
   Integers.swift
