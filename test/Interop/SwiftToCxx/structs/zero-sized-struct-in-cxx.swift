@@ -35,11 +35,11 @@ public func f() -> ZeroSizedStruct {
 public func g(x: ZeroSizedStruct) {
 }
 
-// CHECK: class ZeroSizedEnum { } SWIFT_UNAVAILABLE_MSG("'ZeroSizedEnum' is a zero sized value type, it cannot be exposed to C++ yet");
+// CHECK: namespace ZeroSizedEnum
 
-// CHECK: class ZeroSizedEnum2 { } SWIFT_UNAVAILABLE_MSG("'ZeroSizedEnum2' is a zero sized value type, it cannot be exposed to C++ yet");
+// CHECK: namespace ZeroSizedEnum2
 
-// CHECK: class ZeroSizedEnum3 { } SWIFT_UNAVAILABLE_MSG("'ZeroSizedEnum3' is a zero sized value type, it cannot be exposed to C++ yet");
+// CHECK: class ZeroSizedEnum3 { } SWIFT_UNAVAILABLE_MSG("enum 'ZeroSizedEnum3' can not yet be represented in C++ as one of its cases has multiple associated values");
 
 // CHECK: class ZeroSizedStruct { } SWIFT_UNAVAILABLE_MSG("'ZeroSizedStruct' is a zero sized value type, it cannot be exposed to C++ yet");
 

@@ -21,4 +21,7 @@ int main() {
 
   auto xx = makeAudioFileType();
   AudioFileType::SubType yy = xx.getCAF();
+  auto xxx = Empty::getInt();
+  Empty::NestedInEmpty *ptr = nullptr;
+  auto xxxxx = AuxConfig::Empty::getInt();
 }
