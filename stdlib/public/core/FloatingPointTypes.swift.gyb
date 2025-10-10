@@ -118,38 +118,30 @@ extension ${Self}: CustomDebugStringConvertible {
   /// This property has the same value as the `description` property, except
   /// that NaN values are printed in an extended format.
   public var debugDescription: String {
-    if #available(SwiftStdlib 6.2, *) {
-        var buffer = InlineArray<64, UTF8.CodeUnit>(repeating: 0x30)
-        var span = buffer.mutableSpan
-        let textRange = _Float${bits}ToASCII(value: self, buffer: &span)
-        let textStart = unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self) + textRange.lowerBound
-        let textLength = textRange.upperBound - textRange.lowerBound
+    var buffer = _InlineArray<64, UTF8.CodeUnit>(repeating: 0x30)
+    var span = buffer.mutableSpan
+    let textRange = _Float${bits}ToASCII(value: self, buffer: &span)
+    let textStart = unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self) + textRange.lowerBound
+    let textLength = textRange.upperBound - textRange.lowerBound
 
-        let textBuff = unsafe UnsafeBufferPointer<UTF8.CodeUnit>(_uncheckedStart: textStart,
-                                                                 count: textLength)
-        return unsafe String._fromASCII(textBuff)
-    } else {
-        fatalError()
-    }
+    let textBuff = unsafe UnsafeBufferPointer<UTF8.CodeUnit>(_uncheckedStart: textStart,
+                                                             count: textLength)
+    return unsafe String._fromASCII(textBuff)
   }
 }
 
 ${Availability(bits)}
 extension ${Self}: TextOutputStreamable {
-public func write<Target>(to target: inout Target) where Target: TextOutputStream {
-    if #available(SwiftStdlib 6.2, *) {
-        var buffer = InlineArray<64, UTF8.CodeUnit>(repeating: 0x30)
-        var span = buffer.mutableSpan
-        let textRange = _Float${bits}ToASCII(value: self, buffer: &span)
-        let textStart = unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self) + textRange.lowerBound
-        let textLength = textRange.upperBound - textRange.lowerBound
+  public func write<Target>(to target: inout Target) where Target: TextOutputStream {
+    var buffer = _InlineArray<64, UTF8.CodeUnit>(repeating: 0x30)
+    var span = buffer.mutableSpan
+    let textRange = _Float${bits}ToASCII(value: self, buffer: &span)
+    let textStart = unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self) + textRange.lowerBound
+    let textLength = textRange.upperBound - textRange.lowerBound
 
-        let textBuff = unsafe UnsafeBufferPointer<UTF8.CodeUnit>(_uncheckedStart: textStart,
-                                                                 count: textLength)
-        unsafe target._writeASCII(textBuff)
-    } else {
-        fatalError()
-    }
+    let textBuff = unsafe UnsafeBufferPointer<UTF8.CodeUnit>(_uncheckedStart: textStart,
+                                                             count: textLength)
+    unsafe target._writeASCII(textBuff)
   }
 }
 
