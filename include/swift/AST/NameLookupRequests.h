@@ -348,11 +348,44 @@ private:
                                        ExtensionDecl *ext) const;
 };
 
+/// The owning decl for a given custom attribute, or a DeclContext for a
+/// custom attribute in e.g a closure or inheritance clause.
+class CustomAttrOwner final {
+  llvm::PointerUnion<const Decl *, DeclContext *> Owner;
+
+public:
+  CustomAttrOwner() : Owner(nullptr) {}
+  CustomAttrOwner(const Decl *D) : Owner(D) {}
+  CustomAttrOwner(DeclContext *DC) : Owner(DC) {}
+
+  const Decl *getAsDecl() const {
+    return Owner.dyn_cast<const Decl *>();
+  }
+
+  DeclContext *getDeclContext() const;
+
+  friend bool operator==(const CustomAttrOwner &lhs,
+                         const CustomAttrOwner &rhs) {
+    return lhs.Owner == rhs.Owner;
+  }
+
+  friend bool operator!=(const CustomAttrOwner &lhs,
+                         const CustomAttrOwner &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend hash_code hash_value(const CustomAttrOwner &owner) {
+    return llvm::hash_value(owner.Owner);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const CustomAttrOwner &owner);
+
 /// Request the nominal type declaration to which the given custom
 /// attribute refers.
 class CustomAttrNominalRequest :
     public SimpleRequest<CustomAttrNominalRequest,
-                         NominalTypeDecl *(CustomAttr *, DeclContext *),
+                         NominalTypeDecl *(CustomAttr *, CustomAttrOwner),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -362,7 +395,7 @@ private:
 
   // Evaluation.
   NominalTypeDecl *
-  evaluate(Evaluator &evaluator, CustomAttr *attr, DeclContext *dc) const;
+  evaluate(Evaluator &evaluator, CustomAttr *attr, CustomAttrOwner owner) const;
 
 public:
   // Caching

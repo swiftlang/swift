@@ -32,6 +32,7 @@ namespace swift {
 
 class AbstractFunctionDecl;
 class ConstructorDecl;
+class CustomAttrOwner;
 class ActorIsolation;
 class AnyFunctionType;
 class ASTContext;
@@ -609,7 +610,7 @@ bool diagnoseSendabilityErrorBasedOn(
 /// and perform any necessary resolution and diagnostics, returning the
 /// global actor attribute and type it refers to (or \c std::nullopt).
 std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
-checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
+checkGlobalActorAttributes(SourceLoc loc, CustomAttrOwner owner,
                            ArrayRef<CustomAttr *> attrs);
 
 /// Get the explicit global actor specified for a closure.

@@ -311,16 +311,16 @@ VarDecl *GlobalActorInstanceRequest::evaluate(
 }
 
 std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
-swift::checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
+swift::checkGlobalActorAttributes(SourceLoc loc, CustomAttrOwner owner,
                                   ArrayRef<CustomAttr *> attrs) {
-  ASTContext &ctx = dc->getASTContext();
+  ASTContext &ctx = owner.getDeclContext()->getASTContext();
 
   CustomAttr *globalActorAttr = nullptr;
   NominalTypeDecl *globalActorNominal = nullptr;
   for (auto attr : attrs) {
     // Figure out which nominal declaration this custom attribute refers to.
     auto *nominal = evaluateOrDefault(ctx.evaluator,
-                                      CustomAttrNominalRequest{attr, dc},
+                                      CustomAttrNominalRequest{attr, owner},
                                       nullptr);
 
     if (!nominal)
@@ -352,11 +352,11 @@ std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 GlobalActorAttributeRequest::evaluate(
     Evaluator &evaluator,
     llvm::PointerUnion<Decl *, ClosureExpr *> subject) const {
-  DeclContext *dc = nullptr;
+  CustomAttrOwner owner;
   DeclAttributes *declAttrs = nullptr;
   SourceLoc loc;
   if (auto decl = subject.dyn_cast<Decl *>()) {
-    dc = decl->getDeclContext();
+    owner = decl;
     declAttrs = &decl->getAttrs();
     // HACK: `getLoc`, when querying the attr from a serialized decl,
     // depending on deserialization order, may launch into arbitrary
@@ -372,7 +372,7 @@ GlobalActorAttributeRequest::evaluate(
     loc = decl->getLoc(/* SerializedOK */ false);
   } else {
     auto closure = cast<ClosureExpr *>(subject);
-    dc = closure;
+    owner = closure;
     declAttrs = &closure->getAttrs();
     loc = closure->getLoc();
   }
@@ -385,7 +385,7 @@ GlobalActorAttributeRequest::evaluate(
   }
 
   // Look for a global actor attribute.
-  auto result = checkGlobalActorAttributes(loc, dc, attrs);
+  auto result = checkGlobalActorAttributes(loc, owner, attrs);
   if (!result)
     return std::nullopt;
 
