@@ -19,6 +19,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "clang/AST/Attr.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
@@ -71,6 +72,7 @@ namespace dependencies {
 }
 
 namespace swift {
+enum class ResultConvention : uint8_t;
 class ASTContext;
 class CompilerInvocation;
 class ClangImporterOptions;
@@ -777,6 +779,88 @@ bool isClangNamespace(const DeclContext *dc);
 /// specialized class templates are instead imported as unspecialized.
 bool isSymbolicCircularBase(const clang::CXXRecordDecl *templatedClass,
                             const clang::RecordDecl *base);
+
+/// Match a `[[swift_attr("...")]]` annotation on the given Clang decl.
+///
+/// \param decl The Clang declaration to inspect.
+/// \param patterns List of (attribute name, value) pairs.
+/// \returns The value for the first matching attribute, or `std::nullopt`.
+template <typename T>
+std::optional<T>
+matchSwiftAttr(const clang::Decl *decl,
+               llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  if (!decl || !decl->hasAttrs())
+    return std::nullopt;
+
+  for (const auto *attr : decl->getAttrs()) {
+    if (const auto *swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
+      for (const auto &p : patterns) {
+        if (swiftAttr->getAttribute() == p.first)
+          return p.second;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+/// Like `matchSwiftAttr`, but also searches C++ base classes.
+///
+/// \param decl The Clang declaration to inspect.
+/// \param patterns List of (attribute name, value) pairs.
+/// \returns The matched value from this decl or its bases, or `std::nullopt`.
+template <typename T>
+std::optional<T> matchSwiftAttrConsideringInheritance(
+    const clang::Decl *decl,
+    llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  if (!decl)
+    return std::nullopt;
+
+  if (auto match = matchSwiftAttr<T>(decl, patterns))
+    return match;
+
+  if (const auto *recordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
+    std::optional<T> result;
+    recordDecl->forallBases([&](const clang::CXXRecordDecl *base) -> bool {
+      if (auto baseMatch = matchSwiftAttr<T>(base, patterns)) {
+        result = baseMatch;
+        return false;
+      }
+
+      return true;
+    });
+
+    return result;
+  }
+
+  return std::nullopt;
+}
+
+/// Matches a `swift_attr("...")` on the record type pointed to by the given
+/// Clang type, searching base classes if it's a C++ class.
+///
+/// \param type A Clang pointer type.
+/// \param patterns List of attribute name-value pairs to match.
+/// \returns Matched value or std::nullopt.
+template <typename T>
+std::optional<T> matchSwiftAttrOnRecordPtr(
+    const clang::QualType &type,
+    llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  if (const auto *ptrType = type->getAs<clang::PointerType>()) {
+    if (const auto *recordDecl = ptrType->getPointeeType()->getAsRecordDecl()) {
+      return matchSwiftAttrConsideringInheritance<T>(recordDecl, patterns);
+    }
+  }
+  return std::nullopt;
+}
+
+/// Determines the C++ reference ownership convention for the return value
+/// using `SWIFT_RETURNS_(UN)RETAINED` on the API; falls back to
+/// `SWIFT_RETURNED_AS_(UN)RETAINED_BY_DEFAULT` on the pointee record type.
+///
+/// \param decl The Clang function or method declaration to inspect.
+/// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
+std::optional<ResultConvention>
+getCxxRefConventionWithAttrs(const clang::Decl *decl);
 } // namespace importer
 
 struct ClangInvocationFileMapping {
