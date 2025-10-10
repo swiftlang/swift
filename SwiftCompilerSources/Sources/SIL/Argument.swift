@@ -50,6 +50,10 @@ public class Argument : Value, Hashable {
 
   public var sourceLoc: SourceLoc? { findVarDecl()?.nameLoc }
 
+  public func replaceAllUsesWith(newArg: Argument) {
+    bridged.replaceAllUsesWith(newArg.bridged)
+  }
+
   public static func ==(lhs: Argument, rhs: Argument) -> Bool {
     lhs === rhs
   }
