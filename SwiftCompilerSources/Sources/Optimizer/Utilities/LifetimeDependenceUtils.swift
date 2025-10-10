@@ -862,7 +862,7 @@ extension LifetimeDependenceDefUseWalker {
     return walkDownUses(of: value, using: operand)
   }    
 
-  // copy_addr
+  // copy_addr %operand to %address; %_newAddr = mark_dependence %address on %operand
   mutating func loadedAddressUse(of operand: Operand, intoAddress address: Operand) -> WalkResult {
     if leafUse(of: operand) == .abortWalk {
       return .abortWalk
@@ -971,7 +971,29 @@ extension LifetimeDependenceDefUseWalker {
       break
     case .yield:
       return storeToYieldDependence(address: address, of: operand)
-    case .global, .class, .tail, .storeBorrow, .pointer, .index, .unidentified:
+    case let .pointer(p2a):
+      if !address.isEscapable, let base = p2a.isResultOfUnsafeAddressor() {
+        let selfValue = base.value
+        if selfValue.type.isAddress {
+          // Normally an unsafeMutableAddressor is mutating, so this is the common case (address-type
+          // 'selfValue'). Treat the store to this pointer-to-address projection just like any store to the local
+          // variable holding 'selfValue'.
+          return visitStoredUses(of: operand, into: selfValue)
+        }
+        // selfValue.type might not an be address:
+        // (1) mark_dependence on unsafeAddress is handled like a storedUse
+        // (2) nonmutating unsafeMutableAddress (e.g. UnsafeMutable[Buffer]Pointer).
+        // A nonmutating unsafeMutableAddress is only expected to happen for UnsafeMutable[Buffer]Pointer, in which case
+
+        // If selfValue is trivial (UnsafeMutable[Buffer]Pointer), its uses can be ignored.
+        if selfValue.type.isTrivial(in: selfValue.parentFunction) {
+          return .continueWalk
+        }
+        // Otherwise a store to indirect memory is conservatively escaping.
+        return escapingDependence(on: operand)
+      }
+      break
+    case .global, .class, .tail, .storeBorrow, .index, .unidentified:
       // An address produced by .storeBorrow should never be stored into.
       //
       // TODO: allow storing an immortal value into a global.
@@ -1045,7 +1067,7 @@ extension LifetimeDependenceDefUseWalker {
       }
     case .dependenceDest:
       // Simply a marker that indicates the start of an in-memory dependent value. If this was a mark_dependence, uses
-      // of its forwarded address has were visited by LocalVariableAccessWalker and recorded as separate local accesses.
+      // of its forwarded address were visited by LocalVariableAccessWalker and recorded as separate local accesses.
       return .continueWalk
     case .store, .storeBorrow:
       // A store does not use the previous in-memory value.

@@ -52,6 +52,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isConvertPointerToPointerArgument: Bool { bridged.isConvertPointerToPointerArgument() }
 
+  public var isAddressor: Bool { bridged.isAddressor() }
+
   public var specializationLevel: Int { bridged.specializationLevel() }
 
   public var isSpecialization: Bool { bridged.isSpecialization() }
