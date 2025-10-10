@@ -9,6 +9,8 @@ protocol P {}
 
 class C : P {}
 
+typealias Int = Builtin.Int64
+
 // TESTS FOR NORMAL BEHAVIOR:
 
 // (Name Mangling: Implicitly tested throughout the test suite)
@@ -45,20 +47,31 @@ class C : P {}
 // * no *concrete* pack arguments
 // * the caller or callee is non-OSSA
 
+// INDIVIDUAL PARAMETER TRANSFORMATION TESTS:
+//
+// There are currently 3 conventions for pack parameters: @pack_guaranteed,
+// @pack_owned and @pack_inout. Each member of an exploded pack parameter will
+// be mapped to a parameter that has a "direct" (@owned or unowned), @guaranteed
+// or indirect convention. We rely on the existing code to handle the ownership
+// and lifetimes of any indirect or @owned parameters, so there are only 3
+// different ways the pass needs to handle exploded pack elements. Accordingly,
+// this leads to 9 different cases for how a pack parameter may be transformed,
+// for which we have written 9 test cases:
+
 // Check that name mangling, parameter & result pack explosion, local pack allocation, cleanup and use work as expected.
-// CHECK-LABEL: sil shared [ossa] @$s24copy_pack_int_guaranteedTf8xx_n : $@convention(thin) (Int) -> Int {
-// CHECK: bb0(%0 : $Int):
-// CHECK-NEXT: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{Int}
-// CHECK-NEXT: [[IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Int}
-// CHECK-NEXT: [[ADDR:%[^,]+]] = alloc_stack $Int
+// CHECK-LABEL: sil shared [ossa] @$s24copy_pack_int_guaranteedTf8xx_n : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+// CHECK: bb0(%0 : $Builtin.Int64):
+// CHECK-NEXT: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{Builtin.Int64}
+// CHECK-NEXT: [[IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
+// CHECK-NEXT: [[ADDR:%[^,]+]] = alloc_stack $Builtin.Int64
 // CHECK-NEXT: store %0 to [trivial] [[ADDR]]
 // CHECK-NEXT: pack_element_set [[ADDR]] into [[IDX]] of [[IN_PACK]]
-// CHECK-NEXT: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{Int}
-// CHECK-NEXT: [[OUT_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Int}
-// CHECK-NEXT: [[OUT_ADDR:%[^,]+]] = alloc_stack $Int
-// CHECK: [[ORIG_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Int}
-// CHECK-NEXT: [[TO:%[^,]+]] = pack_element_get [[ORIG_IDX]] of [[OUT_PACK]] as $*Int
-// CHECK-NEXT: [[FROM:%[^,]+]] = pack_element_get [[ORIG_IDX]] of [[IN_PACK]] as $*Int
+// CHECK-NEXT: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{Builtin.Int64}
+// CHECK-NEXT: [[OUT_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
+// CHECK-NEXT: [[OUT_ADDR:%[^,]+]] = alloc_stack $Builtin.Int64
+// CHECK: [[ORIG_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
+// CHECK-NEXT: [[TO:%[^,]+]] = pack_element_get [[ORIG_IDX]] of [[OUT_PACK]] as $*Builtin.Int64
+// CHECK-NEXT: [[FROM:%[^,]+]] = pack_element_get [[ORIG_IDX]] of [[IN_PACK]] as $*Builtin.Int64
 // CHECK-NEXT: copy_addr [[FROM]] to [init] [[TO]]
 // CHECK: [[RESULT:%[^,]+]] = load [trivial] [[OUT_ADDR]]
 // CHECK-NEXT: dealloc_stack [[OUT_ADDR]]
@@ -79,16 +92,16 @@ bb0(%0 : $*Pack{Int}, %1 : $*Pack{Int}):
 
 // Check that parameters and results are correctly extracted from and written back to the former argument packs,
 // including any borrows of indirect parameters.
-// CHECK-LABEL: sil [ossa] @call_copy_pack_int_guaranteed : $@convention(thin) () -> Int {
-// CHECK: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{Int}
-// CHECK: [[ARG_STACK_LOC:%[^,]+]] = alloc_stack $Int
-// CHECK: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{Int}
-// CHECK: [[OUT_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Int}
-// CHECK-NEXT: [[IN_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Int}
-// CHECK-NEXT: [[ARG_ADDR:%[^,]+]] = pack_element_get [[IN_IDX]] of [[IN_PACK]] as $*Int
+// CHECK-LABEL: sil [ossa] @call_copy_pack_int_guaranteed : $@convention(thin) () -> Builtin.Int64 {
+// CHECK: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{Builtin.Int64}
+// CHECK: [[ARG_STACK_LOC:%[^,]+]] = alloc_stack $Builtin.Int64
+// CHECK: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{Builtin.Int64}
+// CHECK: [[OUT_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
+// CHECK-NEXT: [[IN_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
+// CHECK-NEXT: [[ARG_ADDR:%[^,]+]] = pack_element_get [[IN_IDX]] of [[IN_PACK]] as $*Builtin.Int64
 // CHECK-NEXT: [[ARG:%[^,]+]] = load [trivial] [[ARG_ADDR]]
-// CHECK: [[FN_REF:%[^,]+]] = function_ref @$s24copy_pack_int_guaranteedTf8xx_n : $@convention(thin) (Int) -> Int
-// CHECK-NEXT: [[RESULT:%[^,]+]] = apply [[FN_REF]]([[ARG]]) : $@convention(thin) (Int) -> Int
+// CHECK: [[FN_REF:%[^,]+]] = function_ref @$s24copy_pack_int_guaranteedTf8xx_n : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+// CHECK-NEXT: [[RESULT:%[^,]+]] = apply [[FN_REF]]([[ARG]]) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
 // CHECK-NEXT: [[RESULT_ADDR:%[^,]+]] = pack_element_get [[OUT_IDX]] of [[OUT_PACK]]
 // CHECK-NEXT: store [[RESULT]] to [trivial] [[RESULT_ADDR]]
 // CHECK: [[RETURN_VALUE:%[^,]+]] = load [trivial] [[ARG_STACK_LOC]]
@@ -103,8 +116,7 @@ bb0:
   %4 = alloc_pack $Pack{Int}
   %5 = alloc_stack $Int
   %6 = integer_literal $Builtin.Int64, 5
-  %7 = struct $Int (%6)
-  store %7 to [trivial] %5
+  store %6 to [trivial] %5
   pack_element_set %5 into %2 of %4
   %10 = function_ref @copy_pack_int_guaranteed : $@convention(thin) (@pack_guaranteed Pack{Int}) -> @pack_out Pack{Int}
   %11 = apply %10(%0, %4) : $@convention(thin) (@pack_guaranteed Pack{Int}) -> @pack_out Pack{Int}
@@ -117,19 +129,19 @@ bb0:
 }
 
 // As above, for an owned pack.
-// CHECK-LABEL: sil shared [ossa] @$s19copy_pack_int_ownedTf8xx_n : $@convention(thin) (Int) -> Int {
-// CHECK: bb0(%0 : $Int):
-// CHECK-NEXT: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{Int}
-// CHECK-NEXT: [[IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Int}
-// CHECK-NEXT: [[ADDR:%[^,]+]] = alloc_stack $Int
+// CHECK-LABEL: sil shared [ossa] @$s19copy_pack_int_ownedTf8xx_n : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+// CHECK: bb0(%0 : $Builtin.Int64):
+// CHECK-NEXT: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{Builtin.Int64}
+// CHECK-NEXT: [[IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
+// CHECK-NEXT: [[ADDR:%[^,]+]] = alloc_stack $Builtin.Int64
 // CHECK-NEXT: store %0 to [trivial] [[ADDR]]
 // CHECK-NEXT: pack_element_set [[ADDR]] into [[IDX]] of [[IN_PACK]]
-// CHECK-NEXT: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{Int}
-// CHECK-NEXT: [[OUT_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Int}
-// CHECK-NEXT: [[OUT_ADDR:%[^,]+]] = alloc_stack $Int
-// CHECK: [[ORIG_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Int}
-// CHECK-NEXT: [[TO:%[^,]+]] = pack_element_get [[ORIG_IDX]] of [[OUT_PACK]] as $*Int
-// CHECK-NEXT: [[FROM:%[^,]+]] = pack_element_get [[ORIG_IDX]] of [[IN_PACK]] as $*Int
+// CHECK-NEXT: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{Builtin.Int64}
+// CHECK-NEXT: [[OUT_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
+// CHECK-NEXT: [[OUT_ADDR:%[^,]+]] = alloc_stack $Builtin.Int64
+// CHECK: [[ORIG_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
+// CHECK-NEXT: [[TO:%[^,]+]] = pack_element_get [[ORIG_IDX]] of [[OUT_PACK]] as $*Builtin.Int64
+// CHECK-NEXT: [[FROM:%[^,]+]] = pack_element_get [[ORIG_IDX]] of [[IN_PACK]] as $*Builtin.Int64
 // CHECK-NEXT: copy_addr [[FROM]] to [init] [[TO]]
 // CHECK: [[RESULT:%[^,]+]] = load [trivial] [[OUT_ADDR]]
 // CHECK-NEXT: dealloc_stack [[OUT_ADDR]]
@@ -148,16 +160,16 @@ bb0(%0 : $*Pack{Int}, %1 : $*Pack{Int}):
   return %9
 }
 
-// CHECK-LABEL: sil [ossa] @call_copy_pack_int_owned : $@convention(thin) () -> Int {
-// CHECK: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{Int}
-// CHECK: [[ARG_STACK_LOC:%[^,]+]] = alloc_stack $Int
-// CHECK: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{Int}
-// CHECK: [[OUT_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Int}
-// CHECK-NEXT: [[IN_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Int}
-// CHECK-NEXT: [[ARG_ADDR:%[^,]+]] = pack_element_get [[IN_IDX]] of [[IN_PACK]] as $*Int
+// CHECK-LABEL: sil [ossa] @call_copy_pack_int_owned : $@convention(thin) () -> Builtin.Int64 {
+// CHECK: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{Builtin.Int64}
+// CHECK: [[ARG_STACK_LOC:%[^,]+]] = alloc_stack $Builtin.Int64
+// CHECK: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{Builtin.Int64}
+// CHECK: [[OUT_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
+// CHECK-NEXT: [[IN_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
+// CHECK-NEXT: [[ARG_ADDR:%[^,]+]] = pack_element_get [[IN_IDX]] of [[IN_PACK]] as $*Builtin.Int64
 // CHECK-NEXT: [[ARG:%[^,]+]] = load [trivial] [[ARG_ADDR]]
-// CHECK: [[FN_REF:%[^,]+]] = function_ref @$s19copy_pack_int_ownedTf8xx_n : $@convention(thin) (Int) -> Int
-// CHECK-NEXT: [[RESULT:%[^,]+]] = apply [[FN_REF]]([[ARG]]) : $@convention(thin) (Int) -> Int
+// CHECK: [[FN_REF:%[^,]+]] = function_ref @$s19copy_pack_int_ownedTf8xx_n : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+// CHECK-NEXT: [[RESULT:%[^,]+]] = apply [[FN_REF]]([[ARG]]) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
 // CHECK-NEXT: [[RESULT_ADDR:%[^,]+]] = pack_element_get [[OUT_IDX]] of [[OUT_PACK]]
 // CHECK-NEXT: store [[RESULT]] to [trivial] [[RESULT_ADDR]]
 // CHECK: [[RETURN_VALUE:%[^,]+]] = load [trivial] [[ARG_STACK_LOC]]
@@ -171,9 +183,8 @@ bb0:
   pack_element_set %1 into %2 of %0
   %4 = alloc_pack $Pack{Int}
   %5 = alloc_stack $Int
-  %6 = integer_literal $Builtin.Int64, 5
-  %7 = struct $Int (%6)
-  store %7 to [trivial] %5
+  %6 = integer_literal $Int, 5
+  store %6 to [trivial] %5
   pack_element_set %5 into %2 of %4
   %10 = function_ref @copy_pack_int_owned : $@convention(thin) (@pack_owned Pack{Int}) -> @pack_out Pack{Int}
   %11 = apply %10(%0, %4) : $@convention(thin) (@pack_owned Pack{Int}) -> @pack_out Pack{Int}
@@ -186,17 +197,17 @@ bb0:
 }
 
 // As above, for an inout pack.
-// CHECK-LABEL: sil shared [ossa] @$s19copy_pack_int_inoutTf8xx_n : $@convention(thin) (@inout Int) -> Int {
-// CHECK: bb0([[ADDR:%[^,]+]] : $*Int):
-// CHECK-NEXT: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{Int}
-// CHECK-NEXT: [[IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Int}
+// CHECK-LABEL: sil shared [ossa] @$s19copy_pack_int_inoutTf8xx_n : $@convention(thin) (@inout Builtin.Int64) -> Builtin.Int64 {
+// CHECK: bb0([[ADDR:%[^,]+]] : $*Builtin.Int64):
+// CHECK-NEXT: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{Builtin.Int64}
+// CHECK-NEXT: [[IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
 // CHECK-NEXT: pack_element_set [[ADDR]] into [[IDX]] of [[IN_PACK]]
-// CHECK-NEXT: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{Int}
-// CHECK-NEXT: [[OUT_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Int}
-// CHECK-NEXT: [[OUT_ADDR:%[^,]+]] = alloc_stack $Int
-// CHECK: [[ORIG_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Int}
-// CHECK-NEXT: [[TO:%[^,]+]] = pack_element_get [[ORIG_IDX]] of [[OUT_PACK]] as $*Int
-// CHECK-NEXT: [[FROM:%[^,]+]] = pack_element_get [[ORIG_IDX]] of [[IN_PACK]] as $*Int
+// CHECK-NEXT: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{Builtin.Int64}
+// CHECK-NEXT: [[OUT_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
+// CHECK-NEXT: [[OUT_ADDR:%[^,]+]] = alloc_stack $Builtin.Int64
+// CHECK: [[ORIG_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
+// CHECK-NEXT: [[TO:%[^,]+]] = pack_element_get [[ORIG_IDX]] of [[OUT_PACK]] as $*Builtin.Int64
+// CHECK-NEXT: [[FROM:%[^,]+]] = pack_element_get [[ORIG_IDX]] of [[IN_PACK]] as $*Builtin.Int64
 // CHECK-NEXT: copy_addr [[FROM]] to [init] [[TO]]
 // CHECK: [[RESULT:%[^,]+]] = load [trivial] [[OUT_ADDR]]
 // CHECK-NEXT: dealloc_stack [[OUT_ADDR]]
@@ -214,15 +225,15 @@ bb0(%0 : $*Pack{Int}, %1 : $*Pack{Int}):
   return %9
 }
 
-// CHECK-LABEL: sil [ossa] @call_copy_pack_int_inout : $@convention(thin) () -> Int {
-// CHECK: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{Int}
-// CHECK: [[ARG_STACK_LOC:%[^,]+]] = alloc_stack $Int
-// CHECK: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{Int}
-// CHECK: [[OUT_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Int}
-// CHECK-NEXT: [[IN_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Int}
-// CHECK-NEXT: [[ARG_ADDR:%[^,]+]] = pack_element_get [[IN_IDX]] of [[IN_PACK]] as $*Int
-// CHECK: [[FN_REF:%[^,]+]] = function_ref @$s19copy_pack_int_inoutTf8xx_n : $@convention(thin) (@inout Int) -> Int
-// CHECK-NEXT: [[RESULT:%[^,]+]] = apply [[FN_REF]]([[ARG_ADDR]]) : $@convention(thin) (@inout Int) -> Int
+// CHECK-LABEL: sil [ossa] @call_copy_pack_int_inout : $@convention(thin) () -> Builtin.Int64 {
+// CHECK: [[OUT_PACK:%[^,]+]] = alloc_pack $Pack{Builtin.Int64}
+// CHECK: [[ARG_STACK_LOC:%[^,]+]] = alloc_stack $Builtin.Int64
+// CHECK: [[IN_PACK:%[^,]+]] = alloc_pack $Pack{Builtin.Int64}
+// CHECK: [[OUT_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
+// CHECK-NEXT: [[IN_IDX:%[^,]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
+// CHECK-NEXT: [[ARG_ADDR:%[^,]+]] = pack_element_get [[IN_IDX]] of [[IN_PACK]] as $*Builtin.Int64
+// CHECK: [[FN_REF:%[^,]+]] = function_ref @$s19copy_pack_int_inoutTf8xx_n : $@convention(thin) (@inout Builtin.Int64) -> Builtin.Int64
+// CHECK-NEXT: [[RESULT:%[^,]+]] = apply [[FN_REF]]([[ARG_ADDR]]) : $@convention(thin) (@inout Builtin.Int64) -> Builtin.Int64
 // CHECK: [[RETURN_VALUE:%[^,]+]] = load [trivial] [[ARG_STACK_LOC]]
 // CHECK: return [[RETURN_VALUE]]
 // CHECK-LABEL: } // end sil function 'call_copy_pack_int_inout'
@@ -235,8 +246,7 @@ bb0:
   %4 = alloc_pack $Pack{Int}
   %5 = alloc_stack $Int
   %6 = integer_literal $Builtin.Int64, 5
-  %7 = struct $Int (%6)
-  store %7 to [trivial] %5
+  store %6 to [trivial] %5
   pack_element_set %5 into %2 of %4
   %10 = function_ref @copy_pack_int_inout : $@convention(thin) (@pack_inout Pack{Int}) -> @pack_out Pack{Int}
   %11 = apply %10(%0, %4) : $@convention(thin) (@pack_inout Pack{Int}) -> @pack_out Pack{Int}
@@ -303,7 +313,7 @@ bb0(%c : @owned $C):
 
 
 // Check that lifetimes are managed correctly for owned pack-exploded arguments.
-// The original code already manages lifetimes sufficiently, so no additions are necessary.
+// The original code already manages lifetimes sufficiently, so no additional retains, releases, borrows etc. are necessary.
 // CHECK-LABEL: sil shared [ossa] @$s23copy_pack_class_c_ownedTf8xx_n : $@convention(thin) (@owned C) -> @owned C {
 // CHECK: bb0(%0 : @owned $C):
 // CHECK: [[IN_ADDR:%[^,]+]] = alloc_stack $C
