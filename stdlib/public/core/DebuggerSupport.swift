@@ -328,6 +328,26 @@ public enum _DebuggerSupport {
 
     return target
   }
+
+  public static func stringForPrintObject(_ pointer: UnsafeRawPointer?, mangledTypeName: String) -> String {
+    guard let pointer else { return "invalid value pointer" }
+
+    guard let type =
+      unsafe _getTypeByMangledNameInContext(
+        mangledTypeName,
+        UInt(mangledTypeName.count),
+        genericContext: nil,
+        genericArguments: nil)
+      else {
+        return "invalid type \(mangledTypeName)"
+      }
+
+    func loadPointer<T>(type: T.Type) -> Any {
+      unsafe pointer.load(as: T.self)
+    }
+    let anyValue = _openExistential(type, do: loadPointer)
+    return stringForPrintObject(anyValue)
+  }
 }
 
 public func _stringForPrintObject(_ value: Any) -> String {
