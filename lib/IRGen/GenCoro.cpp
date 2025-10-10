@@ -21,6 +21,7 @@
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenCoro.h"
+#include "GenPointerAuth.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 
@@ -669,6 +670,17 @@ struct Allocator {
         return IGM.CoroDeallocateFnTy;
       }
     }
+
+    const PointerAuthSchema &getSchema(IRGenModule &IGM) {
+      switch (kind) {
+      case Flags:
+        llvm_unreachable("no schema");
+      case Field::Allocate:
+        return IGM.getOptions().PointerAuth.CoroAllocationFunction;
+      case Field::Deallocate:
+        return IGM.getOptions().PointerAuth.CoroDeallocationFunction;
+      }
+    }
   };
 
   llvm::Value *address;
@@ -713,6 +725,11 @@ struct Allocator {
 private:
   FunctionPointer getFunctionPointer(Field field) {
     llvm::Value *callee = getField(field);
+    if (auto &schema = field.getSchema(IGF.IGM)) {
+      auto info =
+          PointerAuthInfo::emit(IGF, schema, nullptr, PointerAuthEntity());
+      callee = emitPointerAuthAuth(IGF, callee, info);
+    }
     return FunctionPointer::createUnsigned(
         FunctionPointer::Kind::Function, callee,
         Signature(field.getFunctionType(IGF.IGM), {}, IGF.IGM.SwiftCC));
@@ -767,7 +784,7 @@ llvm::Constant *swift::irgen::getCoroDeallocFn(IRGenModule &IGM) {
       {IGM.CoroAllocatorPtrTy, IGM.Int8PtrTy},
       [isSwiftCoroCCAvailable](IRGenFunction &IGF) {
         auto parameters = IGF.collectParameters();
-        auto allocator = ::Allocator(parameters.claimNext(), IGF);
+        auto allocator = Allocator(parameters.claimNext(), IGF);
         auto *ptr = parameters.claimNext();
         if (isSwiftCoroCCAvailable) {
           // swiftcorocc is available, so if there's no allocator pointer,
@@ -825,8 +842,12 @@ static llvm::Constant *getAddrOfGlobalCoroAllocator(
         auto flags = CoroAllocatorFlags(kind);
         flags.setShouldDeallocateImmediately(shouldDeallocateImmediately);
         allocator.addInt32(flags.getOpaqueValue());
-        allocator.add(allocFn);
-        allocator.add(deallocFn);
+        allocator.addSignedPointer(
+            allocFn, IGM.getOptions().PointerAuth.CoroAllocationFunction,
+            PointerAuthEntity::Special::CoroAllocationFunction);
+        allocator.addSignedPointer(
+            deallocFn, IGM.getOptions().PointerAuth.CoroDeallocationFunction,
+            PointerAuthEntity::Special::CoroDeallocationFunction);
         return allocator.finishAndCreateFuture();
       },
       [&](llvm::GlobalVariable *var) { var->setConstant(true); });

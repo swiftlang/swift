@@ -990,6 +990,14 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
 
   opts.CoroPartialApplyCapture =
       PointerAuthSchema(nonABIDataKey, /*address*/ true, Discrimination::Decl);
+
+  opts.CoroAllocationFunction = PointerAuthSchema(
+      codeKey, /*address*/ false, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::CoroAllocationFunction);
+
+  opts.CoroDeallocationFunction = PointerAuthSchema(
+      codeKey, /*address*/ false, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::CoroDeallocationFunction);
 }
 
 std::unique_ptr<llvm::TargetMachine>
