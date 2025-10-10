@@ -1577,10 +1577,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   assert(solverState);
 
-  setPhase(ConstraintSystemPhase::Solving);
-
-  SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
-
   // If constraint system failed while trying to
   // genenerate constraints, let's stop right here.
   if (failedConstraint)
@@ -1803,8 +1799,8 @@ ConstraintSystem::filterDisjunction(
       // Early simplification of the "keypath dynamic member lookup" choice
       // is impossible because it requires constraints associated with
       // subscript index expression to be present.
-      if (Phase == ConstraintSystemPhase::ConstraintGeneration)
-        return SolutionKind::Unsolved;
+//      if (Phase == ConstraintSystemPhase::ConstraintGeneration)
+//        return SolutionKind::Unsolved;
 
       for (auto *currentChoice : disjunction->getNestedConstraints()) {
         if (currentChoice->isDisabled())
