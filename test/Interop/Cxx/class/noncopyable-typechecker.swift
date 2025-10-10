@@ -79,6 +79,42 @@ struct SWIFT_NONCOPYABLE NonCopyableNonMovable { // expected-note {{record 'NonC
     NonCopyableNonMovable(NonCopyableNonMovable&& other) = delete;
 };
 
+struct ImplicitCopyConstructor {
+    NonCopyable element;
+};
+
+template <typename T, typename P, typename R>
+struct TemplatedImplicitCopyConstructor {
+    T element;
+    P *pointer;
+    R &reference;
+};
+
+using NonCopyableT = TemplatedImplicitCopyConstructor<NonCopyable, int, int>;
+using NonCopyableP = TemplatedImplicitCopyConstructor<int, NonCopyable, int>;
+using NonCopyableR = TemplatedImplicitCopyConstructor<int, int, NonCopyable>;
+
+struct DefaultedCopyConstructor {
+    NonCopyable element;
+    DefaultedCopyConstructor(const DefaultedCopyConstructor&) = default;
+    DefaultedCopyConstructor(DefaultedCopyConstructor&&) = default;
+};
+
+template<typename T>
+struct TemplatedDefaultedCopyConstructor {
+    T element;
+    TemplatedDefaultedCopyConstructor(const TemplatedDefaultedCopyConstructor&) = default;
+    TemplatedDefaultedCopyConstructor(TemplatedDefaultedCopyConstructor&&) = default;
+};
+
+template<typename T>
+struct DerivedTemplatedDefaultedCopyConstructor : TemplatedDefaultedCopyConstructor<T> {};
+
+using CopyableDefaultedCopyConstructor = TemplatedDefaultedCopyConstructor<NonCopyableP>;
+using NonCopyableDefaultedCopyConstructor = TemplatedDefaultedCopyConstructor<NonCopyable>;
+using CopyableDerived = DerivedTemplatedDefaultedCopyConstructor<NonCopyableR>;
+using NonCopyableDerived = DerivedTemplatedDefaultedCopyConstructor<NonCopyable>;
+
 
 //--- test.swift
 import Test
@@ -128,4 +164,21 @@ func doubleAnnotation() {
 func missingLifetimeOperation() {
     let s = NonCopyableNonMovable() // expected-error {{cannot find 'NonCopyableNonMovable' in scope}}
     takeCopyable(s)
+}
+
+func implicitCopyConstructor(i: borrowing ImplicitCopyConstructor, t: borrowing NonCopyableT, p: borrowing NonCopyableP, r: borrowing NonCopyableR) {
+    takeCopyable(i) // expected-error {{global function 'takeCopyable' requires that 'ImplicitCopyConstructor' conform to 'Copyable'}}
+    takeCopyable(t) // expected-error {{global function 'takeCopyable' requires that 'NonCopyableT' (aka 'TemplatedImplicitCopyConstructor<NonCopyable, CInt, CInt>') conform to 'Copyable'}}
+    
+    // References and pointers to non-copyable types are still copyable
+    takeCopyable(p)
+    takeCopyable(r)
+}
+
+func defaultCopyConstructor(d: borrowing DefaultedCopyConstructor, d1: borrowing CopyableDefaultedCopyConstructor, d2: borrowing NonCopyableDefaultedCopyConstructor, d3: borrowing CopyableDerived, d4: borrowing NonCopyableDerived) {
+    takeCopyable(d) // expected-error {{global function 'takeCopyable' requires that 'DefaultedCopyConstructor' conform to 'Copyable'}}
+    takeCopyable(d1)
+    takeCopyable(d2) // expected-error {{global function 'takeCopyable' requires that 'NonCopyableDefaultedCopyConstructor' (aka 'TemplatedDefaultedCopyConstructor<NonCopyable>') conform to 'Copyable'}}
+    takeCopyable(d3)
+    takeCopyable(d4) // expected-error {{global function 'takeCopyable' requires that 'NonCopyableDerived' (aka 'DerivedTemplatedDefaultedCopyConstructor<NonCopyable>') conform to 'Copyable'}}
 }

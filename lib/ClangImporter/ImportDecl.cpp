@@ -185,6 +185,15 @@ bool importer::recordHasReferenceSemantics(
   return semanticsKind == CxxRecordSemanticsKind::Reference;
 }
 
+bool importer::recordHasMoveOnlySemantics(
+    const clang::RecordDecl *decl,
+    ClangImporter::Implementation *importerImpl) {
+  auto semanticsKind = evaluateOrDefault(
+      importerImpl->SwiftContext.evaluator,
+      CxxValueSemantics({decl->getTypeForDecl(), importerImpl}), {});
+  return semanticsKind == CxxValueSemanticsKind::MoveOnly;
+}
+
 bool importer::hasImmortalAttrs(const clang::RecordDecl *decl) {
   return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
@@ -2094,10 +2103,7 @@ namespace {
     }
 
     bool recordHasMoveOnlySemantics(const clang::RecordDecl *decl) {
-      auto semanticsKind = evaluateOrDefault(
-          Impl.SwiftContext.evaluator,
-          CxxValueSemantics({decl->getTypeForDecl(), &Impl}), {});
-      return semanticsKind == CxxValueSemanticsKind::MoveOnly;
+      return importer::recordHasMoveOnlySemantics(decl, &Impl);
     }
 
     void markReturnsUnsafeNonescapable(AbstractFunctionDecl *fd) {
@@ -2275,15 +2281,6 @@ namespace {
             decl, importer::convertClangAccess(decl->getAccess()), loc, name,
             loc, ArrayRef<InheritedEntry>(), nullptr, dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
-
-      if (recordHasMoveOnlySemantics(decl)) {
-        if (decl->isInStdNamespace() && decl->getName() == "promise") {
-          // Do not import std::promise.
-          return nullptr;
-        }
-        result->getAttrs().add(new (Impl.SwiftContext)
-                                   MoveOnlyAttr(/*Implicit=*/true));
-      }
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
       // solution would be to turn them into members and add conversion
@@ -2526,6 +2523,15 @@ namespace {
                                 !cxxRecordDecl->isAbstract() &&
                                 (!cxxRecordDecl->hasDefaultConstructor() ||
                                  cxxRecordDecl->ctors().empty());
+      }
+
+      if (recordHasMoveOnlySemantics(decl)) {
+        if (decl->isInStdNamespace() && decl->getName() == "promise") {
+          // Do not import std::promise.
+          return nullptr;
+        }
+        result->getAttrs().add(new (Impl.SwiftContext)
+                                   MoveOnlyAttr(/*Implicit=*/true));
       }
 
       // TODO: builtin "zeroInitializer" does not work with non-escapable
@@ -3127,11 +3133,10 @@ namespace {
         // instantiate its copy constructor.
         bool isExplicitlyNonCopyable = hasNonCopyableAttr(decl);
 
-        clang::CXXConstructorDecl *copyCtor = nullptr;
         clang::CXXConstructorDecl *moveCtor = nullptr;
         clang::CXXConstructorDecl *defaultCtor = nullptr;
         if (decl->needsImplicitCopyConstructor() && !isExplicitlyNonCopyable) {
-          copyCtor = clangSema.DeclareImplicitCopyConstructor(
+          clangSema.DeclareImplicitCopyConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
         }
         if (decl->needsImplicitMoveConstructor()) {
@@ -3152,10 +3157,7 @@ namespace {
                 // Note: we use "doesThisDeclarationHaveABody" here because
                 // that's what "DefineImplicitCopyConstructor" checks.
                 !declCtor->doesThisDeclarationHaveABody()) {
-              if (declCtor->isCopyConstructor()) {
-                if (!copyCtor && !isExplicitlyNonCopyable)
-                  copyCtor = declCtor;
-              } else if (declCtor->isMoveConstructor()) {
+              if (declCtor->isMoveConstructor()) {
                 if (!moveCtor)
                   moveCtor = declCtor;
               } else if (declCtor->isDefaultConstructor()) {
@@ -3164,11 +3166,6 @@ namespace {
               }
             }
           }
-        }
-        if (copyCtor && !isExplicitlyNonCopyable &&
-            !decl->isAnonymousStructOrUnion()) {
-          clangSema.DefineImplicitCopyConstructor(clang::SourceLocation(),
-                                                  copyCtor);
         }
         if (moveCtor && !decl->isAnonymousStructOrUnion()) {
           clangSema.DefineImplicitMoveConstructor(clang::SourceLocation(),
