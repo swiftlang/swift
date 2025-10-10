@@ -10,6 +10,7 @@
 // RUN: %target-run %t/swift-cxx-execution | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: std_span
 
 //--- header.h
 #include <cstdint>

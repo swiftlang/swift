@@ -5,6 +5,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: std_span
 
 //--- Inputs/module.modulemap
 module Test {

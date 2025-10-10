@@ -7,7 +7,7 @@
 
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_Lifetimes
-// REQUIRES: rdar161999174
+// REQUIRES: std_span
 
 #if !BRIDGING_HEADER
 import StdSpan
