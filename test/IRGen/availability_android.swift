@@ -3,10 +3,7 @@
 // CHECK-LABEL: define{{.*}}$s20availability_android0A5CheckyyF
 // CHECK: call swiftcc i1 @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
 
-import Swift
-
+@inlinable
 public func availabilityCheck() {
-  if #available(Android 28, *) {
-    print("test")
-  }
+  if #available(Android 28, *) {}
 }
