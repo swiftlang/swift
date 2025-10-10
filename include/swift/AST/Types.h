@@ -8132,13 +8132,7 @@ inline ASTContext &TypeBase::getASTContext() const {
 
 inline bool TypeBase::isBareErrorType() const {
   auto *errTy = dyn_cast<ErrorType>(this);
-  if (!errTy)
-    return false;
-
-  // FIXME: We shouldn't need to check for a recursive bare error type, we can
-  // remove this once we flatten them.
-  auto originalTy = errTy->getOriginalType();
-  return !originalTy || originalTy->isBareErrorType();
+  return errTy && !errTy->getOriginalType();
 }
 
 // TODO: This will become redundant once InOutType is removed.
