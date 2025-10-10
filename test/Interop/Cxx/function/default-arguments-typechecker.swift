@@ -71,3 +71,6 @@ let _ = ambiguous(1, 2)
 let _ = nonTrailing()
 let _ = nonTrailing(1)
 let _ = nonTrailing(1, 2)
+
+let _ = takesUnnamedParam()
+let _ = takesUnnamedParam(789)
