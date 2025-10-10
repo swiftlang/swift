@@ -122,6 +122,22 @@ public protocol ApplySite : Instruction {
   var unappliedArgumentCount: Int { get }
 }
 
+// lattice: no -> lifetime -> value
+public enum IsFullyAssigned {
+  case no
+  case lifetime
+  case value
+
+  var reassignsLifetime: Bool {
+    switch self {
+    case .no:
+      false
+    case .lifetime, .value:
+      true
+    }
+  }
+}
+
 extension ApplySite {
   public var callee: Value { operands[ApplyOperandConventions.calleeIndex].value }
 
@@ -258,6 +274,26 @@ extension ApplySite {
 
   public func parameterDependence(target: Operand, source: Operand) -> LifetimeDependenceConvention? {
     return operandConventions.parameterDependence(targetOperandIndex: target.index, sourceOperandIndex: source.index)
+  }
+
+  /// Returns .value if this apply fully assigns 'operand' (via @out).
+  ///
+  /// Returns .lifetime if this 'operand' is a non-Escapable inout argument and its lifetime is not propagated by the
+  /// call ('@lifetime(param: copy param)' is not present).
+  public func fullyAssigns(operand: Operand) -> IsFullyAssigned {
+    switch convention(of: operand) {
+    case .indirectOut:
+      return .value
+    case .indirectInout:
+      if let argIdx = calleeArgumentIndex(of: operand),
+         calleeArgumentConventions.parameterDependence(targetArgumentIndex: argIdx, sourceArgumentIndex: argIdx) == nil
+      {
+        return .lifetime
+      }
+      return .no
+    default:
+      return .no
+    }
   }
 
   public var yieldConventions: YieldConventions {
