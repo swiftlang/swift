@@ -160,7 +160,11 @@ public:
 private:
   Type OpenedType;
   Type ThrownErrorType;
-  size_t Count;
+  unsigned Count : 31;
+
+  /// A prepared overload for diagnostics is different than one without,
+  /// because of fixes and such.
+  unsigned ForDiagnostics : 1;
 
   size_t numTrailingObjects(OverloadToken<Change>) const {
     return Count;
@@ -168,9 +172,9 @@ private:
 
 public:
   PreparedOverload(Type openedType, Type thrownErrorType,
-                   ArrayRef<Change> changes)
+                   ArrayRef<Change> changes, bool forDiagnostics)
     : OpenedType(openedType), ThrownErrorType(thrownErrorType),
-      Count(changes.size()) {
+      Count(changes.size()), ForDiagnostics(forDiagnostics) {
     std::uninitialized_copy(changes.begin(), changes.end(),
                             getTrailingObjects());
   }
@@ -181,6 +185,10 @@ public:
 
   Type getThrownErrorType() const {
     return ThrownErrorType;
+  }
+
+  bool wasForDiagnostics() const {
+    return ForDiagnostics;
   }
 
   ArrayRef<Change> getChanges() const { return getTrailingObjects(Count); }

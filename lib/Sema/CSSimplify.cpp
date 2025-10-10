@@ -16837,16 +16837,24 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
     // FIXME: Transitional hack.
     bool enablePreparedOverloads = getASTContext().TypeCheckerOpts.SolverEnablePreparedOverloads;
+    bool forDiagnostics = inSalvageMode();
 
+    // Don't reuse prepared overloads from normal type checking in salvage(),
+    // since they will contain fixes and such.
     auto *preparedOverload = constraint.getPreparedOverload();
-    if (!preparedOverload) {
-      if (enablePreparedOverloads &&
-          constraint.getOverloadChoice().canBePrepared()) {
-        preparedOverload = prepareOverload(constraint.getOverloadChoice(),
-                                           constraint.getDeclContext(),
-                                           constraint.getLocator());
-        const_cast<Constraint &>(constraint).setPreparedOverload(preparedOverload);
-      }
+    if (preparedOverload &&
+        preparedOverload->wasForDiagnostics() != forDiagnostics) {
+      preparedOverload = nullptr;
+    }
+
+    if (!preparedOverload &&
+        enablePreparedOverloads &&
+        constraint.getOverloadChoice().canBePrepared()) {
+      preparedOverload = prepareOverload(constraint.getOverloadChoice(),
+                                         constraint.getDeclContext(),
+                                         constraint.getLocator(),
+                                         forDiagnostics);
+      const_cast<Constraint &>(constraint).setPreparedOverload(preparedOverload);
     }
 
     resolveOverload(constraint.getOverloadChoice(),

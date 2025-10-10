@@ -2887,7 +2887,8 @@ ConstraintSystem::prepareOverloadImpl(OverloadChoice choice,
 
 PreparedOverload *ConstraintSystem::prepareOverload(OverloadChoice choice,
                                                     DeclContext *useDC,
-                                                    ConstraintLocator *locator) {
+                                                    ConstraintLocator *locator,
+                                                    bool forDiagnostics) {
   ASSERT(!PreparingOverload);
   PreparingOverload = true;
 
@@ -2903,7 +2904,8 @@ PreparedOverload *ConstraintSystem::prepareOverload(OverloadChoice choice,
   auto size = PreparedOverload::totalSizeToAlloc<PreparedOverload::Change>(count);
   auto mem = Allocator.Allocate(size, alignof(PreparedOverload));
 
-  return new (mem) PreparedOverload(openedType, thrownErrorType, builder.Changes);
+  return new (mem) PreparedOverload(openedType, thrownErrorType, builder.Changes,
+                                    forDiagnostics);
 }
 
 void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC,

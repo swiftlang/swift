@@ -4876,7 +4876,8 @@ public:
   /// Build and allocate a prepared overload in the solver arena.
   PreparedOverload *prepareOverload(OverloadChoice choice,
                                     DeclContext *useDC,
-                                    ConstraintLocator *locator);
+                                    ConstraintLocator *locator,
+                                    bool forDiagnostics);
 
   /// Populate the prepared overload with all type variables and constraints
   /// that are to be introduced into the constraint system when this choice
