@@ -279,7 +279,7 @@ extension AccessBase {
     default:
       return nil
     }
-    return AddressInitializationWalker.findSingleInitializer(ofAddress: baseAddr, context: context)
+    return AddressInitializationWalker.findSingleInitializer(ofAddress: baseAddr, requireFullyAssigned: .value, context)
   }
 }
 
@@ -311,6 +311,7 @@ extension AccessBase {
 // modification of memory.
 struct AddressInitializationWalker: AddressDefUseWalker, AddressUseVisitor {
   let baseAddress: Value
+  let requireFullyAssigned: IsFullyAssigned
   let context: any Context
 
   var walkDownCache = WalkerCache<SmallProjectionPath>()
@@ -318,18 +319,21 @@ struct AddressInitializationWalker: AddressDefUseWalker, AddressUseVisitor {
   var isProjected = false
   var initializer: AccessBase.Initializer?
 
-  static func findSingleInitializer(ofAddress baseAddr: Value, context: some Context)
+  static func findSingleInitializer(ofAddress baseAddr: Value, requireFullyAssigned: IsFullyAssigned,
+                                    _ context: some Context)
     -> AccessBase.Initializer? {
 
-    var walker = AddressInitializationWalker(baseAddress: baseAddr, context)
+    var walker = AddressInitializationWalker(baseAddress: baseAddr, requireFullyAssigned, context)
     if walker.walkDownUses(ofAddress: baseAddr, path: SmallProjectionPath()) == .abortWalk {
       return nil
     }
     return walker.initializer
   }
 
-  private init(baseAddress: Value, _ context: some Context) {
+  private init(baseAddress: Value, _ requireFullyAssigned: IsFullyAssigned, _ context: some Context) {
+    assert(requireFullyAssigned != .no)
     self.baseAddress = baseAddress
+    self.requireFullyAssigned = requireFullyAssigned
     self.context = context
     if let arg = baseAddress as? FunctionArgument {
       assert(!arg.convention.isIndirectIn, "@in arguments cannot be initialized")
@@ -392,7 +396,15 @@ extension AddressInitializationWalker {
 
   mutating func appliedAddressUse(of operand: Operand, by apply: FullApplySite)
     -> WalkResult {
-    if operand.isAddressInitialization {
+    switch apply.fullyAssigns(operand: operand) {
+    case .no:
+      break
+    case .lifetime:
+      if requireFullyAssigned == .value  {
+        break
+      }
+      fallthrough
+    case .value:
       return setInitializer(instruction: operand.instruction)
     }
     guard let convention = apply.convention(of: operand) else {
