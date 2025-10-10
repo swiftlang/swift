@@ -123,6 +123,27 @@ public:
                       ctx.getProtocol(*kp));
       return Type();
     }
+
+    if (rpk == RepressibleProtocolKind::Sendable) {
+      if (!ctx.LangOpts.hasFeature(Feature::TildeSendable)) {
+        diagnoseInvalid(repr, repr.getLoc(),
+                        diag::tilde_sendable_requires_feature_flag);
+        return Type();
+      }
+    }
+
+    if (auto *TD = dyn_cast<const TypeDecl *>(decl)) {
+      if (!(isa<StructDecl>(TD) || isa<ClassDecl>(TD) || isa<EnumDecl>(TD))) {
+        diagnoseInvalid(repr, repr.getLoc(),
+                        diag::conformance_repression_only_on_struct_class_enum,
+                        ctx.getProtocol(*kp))
+            // Downgrade to a warning for `~BitwiseCopyable` because it was accepted
+            // in some incorrect positions before.
+            .warnUntilFutureSwiftVersionIf(kp == KnownProtocolKind::BitwiseCopyable);
+        return Type();
+      }
+    }
+
     if (auto *extension = dyn_cast<const ExtensionDecl *>(decl)) {
       diagnoseInvalid(repr, extension,
                       diag::suppress_inferrable_protocol_extension,

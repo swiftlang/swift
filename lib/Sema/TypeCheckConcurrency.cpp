@@ -1016,12 +1016,15 @@ static bool diagnoseSingleNonSendableType(
 
     if (type->is<FunctionType>()) {
       ctx.Diags.diagnose(loc, diag::nonsendable_function_type);
+    } else if (nominal &&
+               nominal->suppressesConformance(KnownProtocolKind::Sendable)) {
+      nominal->diagnose(diag::sendable_conformance_is_suppressed, nominal);
     } else if (nominal && nominal->getParentModule() == module) {
       // If the nominal type is in the current module, suggest adding
       // `Sendable` if it might make sense. Otherwise, just complain.
       if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
-        auto note = nominal->diagnose(
-            diag::add_nominal_sendable_conformance, nominal);
+        auto note =
+            nominal->diagnose(diag::add_nominal_sendable_conformance, nominal);
         addSendableFixIt(nominal, note, /*unchecked=*/false);
       } else {
         nominal->diagnose(diag::non_sendable_nominal, nominal);
@@ -1302,6 +1305,9 @@ inferSendableFromInstanceStorage(NominalTypeDecl *nominal,
     }
   }
 
+  if (nominal->suppressesConformance(KnownProtocolKind::Sendable))
+    return std::nullopt;
+
   class Visitor : public StorageVisitor {
   public:
     NominalTypeDecl *nominal;
@@ -1393,6 +1399,10 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
   if (!nominal->getFormalAccessScope(
         /*useDC=*/nullptr,
         /*treatUsableFromInlineAsPublic=*/true).isPublic())
+    return;
+
+  // If `Sendable` conformance is explicitly suppressed, do nothing.
+  if (nominal->suppressesConformance(KnownProtocolKind::Sendable))
     return;
 
   // If the conformance is explicitly stated, do nothing.
@@ -7173,6 +7183,14 @@ static bool checkSendableInstanceStorage(
     }
   }
 
+  if (nominal->suppressesConformance(KnownProtocolKind::Sendable)) {
+    auto *conformanceDecl = dc->getAsDecl() ? dc->getAsDecl() : nominal;
+    if (!isImplicitSendableCheck(check)) {
+      conformanceDecl->diagnose(diag::non_sendable_type_suppressed);
+    }
+    return true;
+  }
+
   // Stored properties of structs and classes must have
   // Sendable-conforming types.
   class Visitor: public StorageVisitor {
@@ -7497,6 +7515,10 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
     Evaluator &evaluator, NominalTypeDecl *nominal) {
   // Protocols never get implicit Sendable conformances.
   if (isa<ProtocolDecl>(nominal))
+    return nullptr;
+
+  // An explicit use `~Sendable` suppresses the conformance.
+  if (nominal->suppressesConformance(KnownProtocolKind::Sendable))
     return nullptr;
 
   // Actor types are always Sendable; they don't get it via this path.

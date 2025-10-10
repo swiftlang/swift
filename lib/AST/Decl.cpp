@@ -2034,6 +2034,20 @@ Type InheritedTypes::getResolvedType(unsigned i,
       .getInheritedTypeOrNull(getASTContext());
 }
 
+std::optional<std::pair<Type, InverseTypeRepr *>>
+InheritedTypes::getAsSuppressed(unsigned i, TypeResolutionStage stage) const {
+  ASTContext &ctx = isa<const ExtensionDecl *>(Decl)
+                        ? cast<const ExtensionDecl *>(Decl)->getASTContext()
+                        : cast<const TypeDecl *>(Decl)->getASTContext();
+  auto result =
+      evaluateOrDefault(ctx.evaluator, InheritedTypeRequest{Decl, i, stage},
+                        InheritedTypeResult::forDefault());
+  if (result != InheritedTypeResult::Kind::Suppressed)
+    return std::nullopt;
+
+  return result.getSuppressed();
+}
+
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              TypeRepr *extendedType,
                              ArrayRef<InheritedEntry> inherited,
