@@ -74,6 +74,6 @@ public func getArrayOfLocalCount() -> [NS.LocalCount] {
 // CHECK-NEXT:   %0 = call swiftcc %swift.metadata_response @"$sSo2NSO10LocalCountVMa"(i{{.*}} 0)
 // CHECK-NEXT:   %1 = extractvalue %swift.metadata_response %0, 0
 // CHECK-NEXT:   %2 = call swiftcc { ptr, ptr } @"$ss27_allocateUninitializedArrayySayxG_BptBwlF"(i{{.*}} 1, ptr %1)
-// CHECK:        %5 = call ptr @{{_ZN2NS10LocalCount6createEv|"\?create\@LocalCount\@NS\@\@SAPEAU12\@XZ"}}()
-// CHECK-NEXT:   call void @{{_Z8LCRetainPN2NS10LocalCountE|"\?LCRetain\@\@YAXPEAULocalCount\@NS\@\@\@Z"}}(ptr %5)
+// CHECK:        %6 = call ptr @{{_ZN2NS10LocalCount6createEv|"\?create\@LocalCount\@NS\@\@SAPEAU12\@XZ"}}()
+// CHECK-NEXT:   call void @{{_Z8LCRetainPN2NS10LocalCountE|"\?LCRetain\@\@YAXPEAULocalCount\@NS\@\@\@Z"}}(ptr %6)
 // CHECK:      }
