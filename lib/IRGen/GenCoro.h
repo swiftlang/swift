@@ -18,5 +18,9 @@ class IRGenModule;
 llvm::Constant *getCoroAllocFn(IRGenModule &IGM);
 llvm::Constant *getCoroDeallocFn(IRGenModule &IGM);
 
+llvm::Value *
+emitYieldOnce2CoroutineAllocator(IRGenFunction &IGF,
+                                 std::optional<CoroAllocatorKind> kind);
+
 } // end namespace irgen
 } // end namespace swift
