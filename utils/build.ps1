@@ -4008,115 +4008,6 @@ if (-not $SkipBuild) {
       SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Compilers);
     }
 
-  if ($Windows) {
-    foreach ($Build in $WindowsSDKBuilds) {
-      if ($IncludeDS2) {
-        Invoke-BuildStep Build-DS2 $Build
-      }
-
-      Invoke-BuildStep Build-ZLib $Build
-      Invoke-BuildStep Build-XML2 $Build
-      Invoke-BuildStep Build-CURL $Build
-    }
-
-    $SDKROOT = Get-SwiftSDK -OS Windows
-    foreach ($Build in $WindowsSDKBuilds) {
-      Invoke-BuildStep Build-SDK $Build
-
-      Get-ChildItem "${SDKROOT}\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
-        Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-        Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
-      }
-
-      Get-ChildItem "${SDKROOT}\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
-        Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-        Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\windows\$($Build.Architecture.LLVMName)\" | Out-Null
-      }
-
-      Copy-Directory "${SDKROOT}\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", "$ProductVersion", "usr"))"
-    }
-
-    Install-SDK $WindowsSDKBuilds
-    Write-SDKSettings Windows
-
-    foreach ($Build in $WindowsSDKBuilds) {
-      Invoke-BuildStep Build-XCTest $Build
-      Invoke-BuildStep Build-Testing $Build
-    }
-
-    Write-PlatformInfoPlist Windows
-
-    Invoke-BuildStep Build-PackageManagerRuntime $HostPlatform
-
-    # Copy static dependencies
-    foreach ($Build in $WindowsSDKBuilds) {
-      Copy-Item -ErrorAction Ignore -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.lib" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libcurl.lib" | Out-Null
-      Copy-Item -ErrorAction Ignore -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2s.lib" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libxml2s.lib" | Out-Null
-      Copy-Item -ErrorAction Ignore -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\zlib\zlibstatic.lib" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\zlibstatic.lib" | Out-Null
-    }
-  }
-
-  if ($Android) {
-    foreach ($Build in $AndroidSDKBuilds) {
-      if ($IncludeDS2) {
-        Invoke-BuildStep Build-DS2 $Build
-      }
-
-      Invoke-BuildStep Build-ZLib $Build
-      Invoke-BuildStep Build-XML2 $Build
-      Invoke-BuildStep Build-CURL $Build
-    }
-
-    $SDKROOT = Get-SwiftSDK Android
-    foreach ($Build in $AndroidSDKBuilds) {
-      Invoke-BuildStep Build-SDK $Build
-
-      Get-ChildItem "${SDKROOT}\usr\lib\swift\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
-        Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-        Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\android\$($Build.Architecture.LLVMName)\" | Out-Null
-      }
-
-      Get-ChildItem "${SDKROOT}\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
-        Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
-        Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\android\$($Build.Architecture.LLVMName)\" | Out-Null
-      }
-    }
-
-    Install-SDK $AndroidSDKBuilds
-    Write-SDKSettings Android
-
-    foreach ($Build in $AndroidSDKBuilds) {
-      Invoke-BuildStep Build-XCTest $Build
-      Invoke-BuildStep Build-Testing $Build
-    }
-
-    Write-PlatformInfoPlist Android
-
-    # Android swift-inspect only supports 64-bit platforms.
-    $AndroidSDKBuilds | Where-Object { @("arm64-v8a", "x86_64") -contains $_.Architecture.ABI } | ForEach-Object {
-      Invoke-BuildStep Build-Inspect $_
-    }
-
-    # Copy static dependencies
-    foreach ($Build in $AndroidSDKBuilds) {
-      Copy-Item -ErrorAction Ignore -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.a" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libcurl.a" | Out-Null
-      Copy-Item -ErrorAction Ignore -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2.a" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libxml2.a" | Out-Null
-      Copy-Item -ErrorAction Ignore -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\zlib\libz.a" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libz.a" | Out-Null
-    }
-  }
-
   # Build Macros for distribution
   Invoke-BuildStep Build-FoundationMacros $HostPlatform
   Invoke-BuildStep Build-TestingMacros $HostPlatform
@@ -4140,25 +4031,131 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-IndexStoreDB $HostPlatform
   Invoke-BuildStep Build-SourceKitLSP $HostPlatform
   Invoke-BuildStep Build-Inspect $HostPlatform
-}
 
-Install-HostToolchain
+  Install-HostToolchain
 
-if (-not $SkipBuild) {
   Invoke-BuildStep Build-mimalloc $HostPlatform
-}
 
-if (-not $SkipBuild -and $IncludeNoAsserts) {
-  Build-NoAssertsToolchain
-}
+  if ($IncludeNoAsserts) {
+    Build-NoAssertsToolchain
+  }
 
-if (-not $SkipBuild -and -not $IsCrossCompiling) {
-  Invoke-BuildStep Build-DocC $HostPlatform
-}
+  if (-not $IsCrossCompiling) {
+    Invoke-BuildStep Build-DocC $HostPlatform
+  }
 
-if (-not $SkipBuild) {
   Invoke-BuildStep Patch-mimalloc $HostPlatform
 }
+
+if ($Windows) {
+  foreach ($Build in $WindowsSDKBuilds) {
+    if ($IncludeDS2) {
+      Invoke-BuildStep Build-DS2 $Build
+    }
+
+    Invoke-BuildStep Build-ZLib $Build
+    Invoke-BuildStep Build-XML2 $Build
+    Invoke-BuildStep Build-CURL $Build
+  }
+
+  $SDKROOT = Get-SwiftSDK -OS Windows
+  foreach ($Build in $WindowsSDKBuilds) {
+    Invoke-BuildStep Build-SDK $Build
+
+    Get-ChildItem "${SDKROOT}\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+      Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+      Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
+    }
+
+    Get-ChildItem "${SDKROOT}\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+      Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+      Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\windows\$($Build.Architecture.LLVMName)\" | Out-Null
+    }
+
+    Copy-Directory "${SDKROOT}\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", "$ProductVersion", "usr"))"
+  }
+
+  Install-SDK $WindowsSDKBuilds
+  Write-SDKSettings Windows
+
+  foreach ($Build in $WindowsSDKBuilds) {
+    Invoke-BuildStep Build-XCTest $Build
+    Invoke-BuildStep Build-Testing $Build
+  }
+
+  Write-PlatformInfoPlist Windows
+
+  Invoke-BuildStep Build-PackageManagerRuntime $HostPlatform
+
+  # Copy static dependencies
+  foreach ($Build in $WindowsSDKBuilds) {
+    Copy-Item -ErrorAction Ignore -Force `
+      -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.lib" `
+      -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libcurl.lib" | Out-Null
+    Copy-Item -ErrorAction Ignore -Force `
+      -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2s.lib" `
+      -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libxml2s.lib" | Out-Null
+    Copy-Item -ErrorAction Ignore -Force `
+      -Path "${BinaryCache}\$($Build.Triple)\zlib\zlibstatic.lib" `
+      -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\zlibstatic.lib" | Out-Null
+  }
+}
+
+if ($Android) {
+  foreach ($Build in $AndroidSDKBuilds) {
+    if ($IncludeDS2) {
+      Invoke-BuildStep Build-DS2 $Build
+    }
+
+    Invoke-BuildStep Build-ZLib $Build
+    Invoke-BuildStep Build-XML2 $Build
+    Invoke-BuildStep Build-CURL $Build
+  }
+
+  $SDKROOT = Get-SwiftSDK Android
+  foreach ($Build in $AndroidSDKBuilds) {
+    Invoke-BuildStep Build-SDK $Build
+
+    Get-ChildItem "${SDKROOT}\usr\lib\swift\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
+      Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+      Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\android\$($Build.Architecture.LLVMName)\" | Out-Null
+    }
+
+    Get-ChildItem "${SDKROOT}\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
+      Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+      Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\android\$($Build.Architecture.LLVMName)\" | Out-Null
+    }
+  }
+
+  Install-SDK $AndroidSDKBuilds
+  Write-SDKSettings Android
+
+  foreach ($Build in $AndroidSDKBuilds) {
+    Invoke-BuildStep Build-XCTest $Build
+    Invoke-BuildStep Build-Testing $Build
+  }
+
+  Write-PlatformInfoPlist Android
+
+  # Android swift-inspect only supports 64-bit platforms.
+  $AndroidSDKBuilds | Where-Object { @("arm64-v8a", "x86_64") -contains $_.Architecture.ABI } | ForEach-Object {
+    Invoke-BuildStep Build-Inspect $_
+  }
+
+  # Copy static dependencies
+  foreach ($Build in $AndroidSDKBuilds) {
+    Copy-Item -ErrorAction Ignore -Force `
+      -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.a" `
+      -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libcurl.a" | Out-Null
+    Copy-Item -ErrorAction Ignore -Force `
+      -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2.a" `
+      -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libxml2.a" | Out-Null
+    Copy-Item -ErrorAction Ignore -Force `
+      -Path "${BinaryCache}\$($Build.Triple)\zlib\libz.a" `
+      -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libz.a" | Out-Null
+  }
+}
+
 
 if (-not $SkipPackaging) {
   Invoke-BuildStep Build-Installer $HostPlatform
