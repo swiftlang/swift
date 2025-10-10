@@ -38,6 +38,13 @@ char *_swift_backtrace_demangle(const char *rawName,
                                 char *outputBuffer,
                                 size_t *outputBufferSize);
 
+// Demangle the given raw name (supports Swift and C++)
+char *_swift_runtime_demangle(const char *rawName,
+                              size_t rawNameLength,
+                              char *outputBuffer,
+                              size_t *outputBufferSize,
+                              uint32_t flags);
+
 #ifdef __cplusplus
 }
 #endif
