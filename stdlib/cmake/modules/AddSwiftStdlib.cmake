@@ -2022,6 +2022,7 @@ function(add_swift_target_library name)
         SWIFT_COMPILE_FLAGS_WATCHOS
         SWIFT_COMPILE_FLAGS_XROS
         SWIFT_COMPILE_FLAGS_LINUX
+        SWIFT_COMPILE_FLAGS_ANDROID
         SWIFT_COMPILE_FLAGS_LINUX_STATIC
         SWIFT_MODULE_DEPENDS
         SWIFT_MODULE_DEPENDS_ANDROID
@@ -2250,6 +2251,9 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "LINUX")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
+    elseif(sdk STREQUAL "ANDROID")
+      list(APPEND swiftlib_module_depends_flattened
+           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_ANDROID})
     elseif(sdk STREQUAL "LINUX_STATIC")
       list(APPEND swiftlib_module_depends_flattened
           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX_STATIC})

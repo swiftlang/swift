@@ -10,10 +10,21 @@ if((SWIFT_BUILD_CLANG_OVERLAYS
 endif()
 
 if (SWIFT_INCLUDE_TESTS AND SWIFT_BUILD_DYNAMIC_STDLIB)
+  if(SWIFT_ANDROID_API_LEVEL)
+    # SWIFT_SDK_ANDROID_ARCHITECTURES can be a list (e.g., "armv7;aarch64").
+    # We only need one architecture to construct a representative target triple
+    # for the Swift availability checker. We'll pick the first one.
+    list(GET SWIFT_SDK_ANDROID_ARCHITECTURES 0 arch)
+
+    # Construct the full, versioned target triple.
+    set(ANDROID_VERSIONED_TARGET "${SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE}${SWIFT_ANDROID_API_LEVEL}")
+  endif()
+
   add_swift_target_library(swiftSwiftReflectionTest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
     SwiftReflectionTest.swift
     SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     SWIFT_COMPILE_FLAGS_LINUX -Xcc -D_GNU_SOURCE
+    SWIFT_COMPILE_FLAGS_ANDROID -target ${ANDROID_VERSIONED_TARGET}
     SWIFT_MODULE_DEPENDS_OSX ${swift_reflection_test_darwin_dependencies}
     SWIFT_MODULE_DEPENDS_IOS ${swift_reflection_test_darwin_dependencies}
     SWIFT_MODULE_DEPENDS_TVOS ${swift_reflection_test_darwin_dependencies}
