@@ -319,3 +319,31 @@ func _convertWindowsBoolToBool(_ b: WindowsBool) -> Bool {
   return b.boolValue
 }
 
+// GUID
+
+extension GUID {
+  @usableFromInline @_transparent
+  internal var uint128Value: UInt128 {
+    unsafe withUnsafeBytes(of: self) { buffer in
+      // GUID is 32-bit-aligned only, so use loadUnaligned().
+      unsafe buffer.baseAddress!.loadUnaligned(as: UInt128.self)
+    }
+  }
+}
+
+// These conformances are marked @retroactive because the GUID type nominally
+// comes from the _GUIDDef clang module rather than the WinSDK clang module.
+
+extension GUID: @retroactive Equatable {
+  @_transparent
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    lhs.uint128Value == rhs.uint128Value
+  }
+}
+
+extension GUID: @retroactive Hashable {
+  @_transparent
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(uint128Value)
+  }
+}
