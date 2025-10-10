@@ -110,6 +110,7 @@ class LibCurl(cmake_product.CMakeProduct):
         self.cmake_options.define('CURL_DISABLE_SMTP', 'YES')
         self.cmake_options.define('CURL_DISABLE_GOPHER', 'YES')
         self.cmake_options.define('CURL_ZLIB', 'YES')
+        self.cmake_options.define('CURL_BROTLI', 'YES')
         self.cmake_options.define('ENABLE_CURL_MANUAL', 'NO')
         self.cmake_options.define('ENABLE_UNIX_SOCKETS', 'NO')
         self.cmake_options.define('ENABLE_THREADED_RESOLVER', 'NO')
