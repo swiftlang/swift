@@ -10,9 +10,9 @@ func testName() {
 @available(SwiftStdlib 6.0, *)
 func taskExecutor() async {
   Task(name: "name", executorPreference: nil) { }
-  Task(name: "name", executorPreference: nil) { throw Boom() }
+  _ = Task(name: "name", executorPreference: nil) { throw Boom() }
 
-  Task.detached(name: "name", executorPreference: nil) { throw Boom() }
+  _ = Task.detached(name: "name", executorPreference: nil) { throw Boom() }
 
   await withTaskGroup(of: Void.self) { group in
     group.addTask(name: "name", executorPreference: nil) {
@@ -40,10 +40,10 @@ func taskExecutor() async {
 @available(SwiftStdlib 5.1, *)
 func backDeployedNames() async {
   Task(name: "name") { }
-  Task(name: "name") { throw Boom() }
+  _ = Task(name: "name") { throw Boom() }
 
   Task.detached(name: "name") { }
-  Task.detached(name: "name") { throw Boom() }
+  _ = Task.detached(name: "name") { throw Boom() }
 
   await withTaskGroup(of: Void.self) { group in
     group.addTask(name: "name") {
