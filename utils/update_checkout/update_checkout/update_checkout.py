@@ -801,6 +801,15 @@ repositories.
             "sockets will exceed the size limit. Falling back to verbose mode."
         )
         args.verbose = True
+    elif (
+        sys.version_info.minor < 10
+        and args.n_processes > ParallelRunner._max_processes()
+    ):
+        print(
+            "Falling back to verbose mode due to a Python 3.9 limitation. "
+            f"Lower `-j` below {ParallelRunner._max_processes()} to use non verbose mode."
+        )
+        args._verbose = True
 
     clone = args.clone
     clone_with_ssh = args.clone_with_ssh
