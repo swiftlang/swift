@@ -49,6 +49,7 @@ internal import BacktracingImpl.Runtime
 /// - Returns: A human readable demangled Swift symbol.
 /// - Warning: The demangled output is lossy is not not guaranteed to be stable across Swift versions.
 ///            Future versions of Swift may choose to print more (or less) information in the demangled format.
+// @_alwaysEmitIntoClient // FIXME: how to keep this usable by backtrace
 public func demangle(_ mangledName: String) -> String? {
   var length: size_t = 0
 
@@ -76,6 +77,37 @@ public func demangle(_ mangledName: String) -> String? {
   }
 }
 
+//@available(SwiftStdlib 6.3, *)
+//@lifetime(borrow mangledName)
+//public func demangle(_ mangledName: UTF8Span) -> String? {
+//  var length: size_t = 0
+//
+//  let demangledPtr =
+//    mangledName._withUnsafeBufferPointer { mangledNamePtr in
+//      _swift_runtime_demangle(
+//        mangledNamePtr.baseAddress, mangledName.count,
+//        nil, &length,
+//        /*flags=*/0)
+//    }
+//
+//  let demangledBufferPtr = UnsafeMutableBufferPointer(start: demangledPtr, count: length)
+//  let demangledOutput = OutputSpan(buffer: demangledPtr, initializedCount: length)
+//  let demangledSpan = UTF8Span(validating: demangledOutput.span)
+//
+//  guard let demangledPtr else {
+//    return nil
+//  }
+//  defer { free(demangledPtr) }
+//
+//  // length is the size of the buffer that was allocated, *not* the
+//  // length of the string.
+//  let stringLen = strlen(demangledPtr)
+//  guard stringLen > 0 else {
+//    return nil
+//  }
+//
+//  return String(copying: demangledSpan)
+//}
 
 /// Given a mangled Swift symbol, demangle it into a human readable format.
 ///
@@ -100,13 +132,14 @@ public func demangle(_ mangledName: String) -> String? {
 ///            of demangling.
 /// - Warning: The demangled output is lossy is not not guaranteed to be stable across Swift versions.
 ///            Future versions of Swift may choose to print more (or less) information in the demangled format.
+@available(SwiftStdlib 6.3, *)
 public func demangle(
   _ mangledNameBuffer: UnsafeBufferPointer<Int8>,
   into buffer: UnsafeMutableBufferPointer<Int8>
 ) -> DemanglingResult {
   var bufferSize = buffer.count
 
-   let demangledPtr = _swift_runtime_demangle(
+  let demangledPtr = _swift_runtime_demangle(
     /*mangledName=*/mangledNameBuffer.baseAddress,
     /*mangledNameLength=*/mangledNameBuffer.count - 1,
     /*outputBuffer=*/buffer.baseAddress,
@@ -127,6 +160,39 @@ public func demangle(
   // However if it's not equal, the result was truncated. Return the amount
   // needed to get a full demangle.
   return .truncated(bufferSize)
+}
+
+@available(SwiftStdlib 6.3, *)
+public func demangle(
+  _ mangledNameSpan: Span<UInt8>,
+  into buffer: inout MutableSpan<UInt8>
+) -> DemanglingResult {
+  var outputBufferSize = buffer.count
+
+  let demangledPtr =
+  mangledNameSpan.withUnsafeBufferPointer { mangledNameBuffer in
+      buffer.withUnsafeMutableBufferPointer { outputBuffer in
+        _swift_runtime_demangle(/*mangledName=*/mangledNameBuffer.baseAddress,
+          /*mangledNameLength=*/mangledNameBuffer.count,
+          /*outputBuffer=*/outputBuffer.baseAddress,
+          /*outputBufferSize=*/&outputBufferSize,
+          /*flags=*/0)
+      }
+    }
+
+  guard let demangledPtr else {
+    return .invalidSymbol
+  }
+
+  // If the buffer size is still equal to the buffer count, the demangle was
+  // successful.
+  if outputBufferSize <= buffer.count {
+    return .success
+  }
+
+  // However if it's not equal, the result was truncated. Return the amount
+  // needed to get a full demangle.
+  return .truncated(outputBufferSize)
 }
 
 /// Given a mangled Swift symbol, demangle it into a human readable format.
@@ -151,6 +217,7 @@ public func demangle(
 ///            of demangling.
 /// - Warning: The demangled output is lossy is not not guaranteed to be stable across Swift versions.
 ///            Future versions of Swift may choose to print more (or less) information in the demangled format.
+@available(SwiftStdlib 6.3, *)
 public func demangle(
   _ mangledName: String,
   into buffer: UnsafeMutableBufferPointer<Int8>
@@ -161,6 +228,7 @@ public func demangle(
 }
 
 /// Represents whether or not demangling of a symbol was successful.
+@available(SwiftStdlib 6.3, *)
 public enum DemanglingResult: Equatable {
   /// Demangling completed successfully.
   case success
