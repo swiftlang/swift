@@ -1,3 +1,9 @@
+module StdAny {
+  header "std-any.h"
+  requires cplusplus
+  export *
+}
+
 module StdNumeric {
   header "std-numeric.h"
   requires cplusplus
