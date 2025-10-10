@@ -34,6 +34,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
@@ -3572,7 +3573,7 @@ SILValue PullbackCloner::Implementation::getAdjointProjection(
       originalProjection->getDefiningInstruction());
   bool isAllocateUninitializedArrayIntrinsicElementAddress =
       ai && definingInst &&
-      (isa<PointerToAddressInst>(definingInst) ||
+      (isa<RefTailAddrInst>(definingInst) ||
        isa<IndexAddrInst>(definingInst));
   if (isAllocateUninitializedArrayIntrinsicElementAddress) {
     // Get the array element index of the result address.
@@ -3755,9 +3756,10 @@ void PullbackCloner::Implementation::
   //  %18 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
   //  %19 = apply %18<Float>(%17) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
   //  (%20, %21) = destructure_tuple %19
-  //  %22 = mark_dependence %21 on %20
-  //  %23 = pointer_to_address %22 to [strict] $*Float
-  //  store %0 to [trivial] %23
+  //  %22 = begin_borrow %20
+  //  %23 = struct_extract %22, #Array.arrayBuffer
+  //  %24 = ref_tail_addr %22
+  //  store %0 to [trivial] %24
   //  function_ref _finalizeUninitializedArray<A>(_:)
   //  %25 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
   //  %26 = apply %25<Float>(%20) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %27
@@ -3772,23 +3774,36 @@ void PullbackCloner::Implementation::
              << originalValue);
   auto arrayAdjoint = materializeAdjointDirect(arrayAdjointValue, loc);
   builder.setCurrentDebugScope(remapScope(dti->getDebugScope()));
-  for (auto use : dti->getResult(1)->getUses()) {
-    auto *mdi = dyn_cast<MarkDependenceInst>(use->getUser());
-    assert(mdi && "Expected mark_dependence user");
-    auto *ptai =
-        dyn_cast_or_null<PointerToAddressInst>(getSingleNonDebugUser(mdi));
-    assert(ptai && "Expected pointer_to_address user");
-    auto adjBuf = getAdjointBuffer(origBB, ptai);
-    auto *eltAdjBuf = getArrayAdjointElementBuffer(arrayAdjoint, 0, loc);
-    builder.emitInPlaceAdd(loc, adjBuf, eltAdjBuf);
-    for (auto use : ptai->getUses()) {
-      if (auto *iai = dyn_cast<IndexAddrInst>(use->getUser())) {
-        auto *ili = cast<IntegerLiteralInst>(iai->getIndex());
-        auto eltIndex = ili->getValue().getLimitedValue();
-        auto adjBuf = getAdjointBuffer(origBB, iai);
-        auto *eltAdjBuf =
-            getArrayAdjointElementBuffer(arrayAdjoint, eltIndex, loc);
-        builder.emitInPlaceAdd(loc, adjBuf, eltAdjBuf);
+
+  ValueWorklist worklist(dti->getResult(0));
+
+  while (SILValue v = worklist.pop()) {
+    for (auto use : v->getUses()) {
+      switch (use->getUser()->getKind()) {
+        case SILInstructionKind::UncheckedRefCastInst:
+        case SILInstructionKind::StructExtractInst:
+        case SILInstructionKind::BeginBorrowInst:
+          worklist.pushIfNotVisited(cast<SingleValueInstruction>(use->getUser()));
+          break;
+        case SILInstructionKind::RefTailAddrInst: {
+          auto *rta = cast<RefTailAddrInst>(use->getUser());
+          auto adjBuf = getAdjointBuffer(origBB, rta);
+          auto *eltAdjBuf = getArrayAdjointElementBuffer(arrayAdjoint, 0, loc);
+          builder.emitInPlaceAdd(loc, adjBuf, eltAdjBuf);
+          for (auto use : rta->getUses()) {
+            if (auto *iai = dyn_cast<IndexAddrInst>(use->getUser())) {
+              auto *ili = cast<IntegerLiteralInst>(iai->getIndex());
+              auto eltIndex = ili->getValue().getLimitedValue();
+              auto adjBuf = getAdjointBuffer(origBB, iai);
+              auto *eltAdjBuf =
+                  getArrayAdjointElementBuffer(arrayAdjoint, eltIndex, loc);
+              builder.emitInPlaceAdd(loc, adjBuf, eltAdjBuf);
+            }
+          }
+          break;
+        }
+        default:
+          break;
       }
     }
   }

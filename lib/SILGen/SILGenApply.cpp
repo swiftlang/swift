@@ -7058,7 +7058,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
 /// Allocate an uninitialized array of a given size, returning the array
 /// and a pointer to its uninitialized contents, which must be initialized
 /// before the array is valid.
-std::pair<ManagedValue, SILValue>
+ManagedValue
 SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
                                                  SILValue Length,
                                                  SILLocation Loc) {
@@ -7075,11 +7075,13 @@ SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
   SmallVector<ManagedValue, 2> resultElts;
   std::move(result).getAll(resultElts);
 
-  // Add a mark_dependence between the interior pointer and the array value
-  auto dependentValue = B.createMarkDependence(Loc, resultElts[1].getValue(),
-                                               resultElts[0].getValue(),
-                                               MarkDependenceKind::Escaping);
-  return {resultElts[0], dependentValue};
+  // The second result, which is the base element address, is not used. We extract
+  // it from the array (= the first result) directly to create a correct borrow scope.
+  // TODO: Consider adding a new intrinsic which only returns the array.
+  // Although the current intrinsic is inlined and the code for returning the
+  // second result is optimized away. So it doesn't make a performance difference.
+
+  return resultElts[0];
 }
 
 /// Deallocate an uninitialized array.
