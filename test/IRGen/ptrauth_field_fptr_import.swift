@@ -2,6 +2,9 @@
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=ios
 
+// rdar://162381284
+// XFAIL: CPU=arm64e && OS=ios
+
 import PointerAuth
 
 // CHECK: define hidden swiftcc i32 @"$s25ptrauth_field_fptr_import05test_B8_fn_reads5Int32VyF"() #0 {
