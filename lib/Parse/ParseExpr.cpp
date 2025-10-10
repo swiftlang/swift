@@ -2546,7 +2546,9 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         skipSingle();
     }
   };
-
+  
+  bool sawTopLevelArrowInLookahead = false;
+  
   // If we have a leading token that may be part of the closure signature, do a
   // speculative parse to validate it and look for 'in'.
   if (Tok.isAny(
@@ -2588,6 +2590,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
 
         // Parse the func-signature-result, if present.
         if (consumeIf(tok::arrow)) {
+          sawTopLevelArrowInLookahead = true;
           if (!canParseType())
             return makeParserSuccess();
 
@@ -2612,17 +2615,23 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
 
       // Parse the func-signature-result, if present.
       if (consumeIf(tok::arrow)) {
+        sawTopLevelArrowInLookahead = true;
         if (!canParseType())
           return makeParserSuccess();
-
+        
         consumeEffectsSpecifiers();
       }
     }
 
     // Parse the 'in' at the end.
-    if (Tok.isNot(tok::kw_in))
-      return makeParserSuccess();
+    if (Tok.isNot(tok::kw_in)) {
+      // Even if 'in' is missing, the presence of '->' makes this look
+      // like a closure signature. There's no other valid syntax that
+      // could legally contain '->' at this position.
+      if (!sawTopLevelArrowInLookahead)
+        return makeParserSuccess();
 
+    }
     // Okay, we have a closure signature.
   } else {
     // No closure signature.
