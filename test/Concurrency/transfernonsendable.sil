@@ -86,7 +86,6 @@ case some(T)
 }
 
 sil @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
-sil @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
 
 @MainActor
 struct MainActorIsolatedStruct {
@@ -194,8 +193,7 @@ bb0:
   hop_to_executor %0 : $Optional<Builtin.Executor>
   %12 = load [copy] %2 : $*NonSendableKlass
   destroy_value %12 : $NonSendableKlass
-  %14 = function_ref @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
-  %15 = apply %14(%8, %3) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %15 = builtin "finishAsyncLet"(%8, %3) : $()
   hop_to_executor %0 : $Optional<Builtin.Executor>
   %17 = builtin "endAsyncLetLifetime"(%8 : $Builtin.RawPointer) : $()
   dealloc_stack %2 : $*NonSendableKlass
@@ -353,8 +351,7 @@ bb0:
   %26 = function_ref @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
   %27 = apply %26(%15, %8) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
   %29 = load [trivial] %7 : $*Int
-  %30 = function_ref @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
-  %31 = apply %30(%15, %8) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %31 = builtin "finishAsyncLet"(%15, %8) : $()
   %33 = builtin "endAsyncLetLifetime"(%15 : $Builtin.RawPointer) : $()
   destroy_value %14 : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int>
   destroy_value %13 : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Int>
