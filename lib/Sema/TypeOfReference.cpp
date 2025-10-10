@@ -2811,7 +2811,8 @@ void ConstraintSystem::replayChanges(
       addConstraint(ConstraintKind::Bind,
                     change.Bind.FirstType,
                     change.Bind.SecondType,
-                    locator, /*isFavored=*/false);
+                    locator,
+                    /*isFavored=*/false);
       break;
 
     case PreparedOverload::Change::OpenedTypes: {
@@ -2890,7 +2891,7 @@ PreparedOverload *ConstraintSystem::prepareOverload(OverloadChoice choice,
   ASSERT(!PreparingOverload);
   PreparingOverload = true;
 
-  PreparedOverloadBuilder builder;
+  PreparedOverloadBuilder builder(locator);
   Type openedType;
   Type thrownErrorType;
   std::tie(openedType, thrownErrorType) = prepareOverloadImpl(

@@ -104,9 +104,10 @@ struct PreparedOverloadChange {
     /// For ChangeKind::AddedConstraint.
     Constraint *TheConstraint;
 
+    /// For ChangeKind::AddedBindConstraint.
     struct {
       TypeBase *FirstType;
-      TypeBase * SecondType;
+      TypeBase *SecondType;
     } Bind;
 
     /// For ChangeKind::OpenedTypes.
@@ -187,6 +188,10 @@ public:
 
 struct PreparedOverloadBuilder {
   SmallVector<PreparedOverload::Change, 8> Changes;
+  ConstraintLocator *Locator;
+
+  PreparedOverloadBuilder(ConstraintLocator *locator)
+    : Locator(locator) {}
 
   void addedTypeVariable(TypeVariableType *typeVar) {
     PreparedOverload::Change change;

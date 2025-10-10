@@ -16529,14 +16529,22 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
                                      PreparedOverloadBuilder *preparedOverload) {
   if (preparedOverload) {
     ASSERT(PreparingOverload);
-    if (kind == ConstraintKind::Bind) {
+
+    auto *locatorPtr = getConstraintLocator(locator);
+
+    // Fast path to save on memory usage.
+    if (kind == ConstraintKind::Bind &&
+        locatorPtr == preparedOverload->Locator) {
       ASSERT(!isFavored);
       preparedOverload->addedBindConstraint(first, second);
       return;
     }
-    auto c = Constraint::create(*this, kind, first, second,
-                                getConstraintLocator(locator));
-    if (isFavored) c->setFavored();
+
+    auto c = Constraint::create(*this, kind, first, second, locatorPtr);
+
+    if (isFavored)
+      c->setFavored();
+
     preparedOverload->addedConstraint(c);
     return;
   }
