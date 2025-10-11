@@ -2811,7 +2811,8 @@ void ConstraintSystem::replayChanges(
       addConstraint(ConstraintKind::Bind,
                     change.Bind.FirstType,
                     change.Bind.SecondType,
-                    locator, /*isFavored=*/false);
+                    locator,
+                    /*isFavored=*/false);
       break;
 
     case PreparedOverload::Change::OpenedTypes: {
@@ -2886,11 +2887,12 @@ ConstraintSystem::prepareOverloadImpl(OverloadChoice choice,
 
 PreparedOverload *ConstraintSystem::prepareOverload(OverloadChoice choice,
                                                     DeclContext *useDC,
-                                                    ConstraintLocator *locator) {
+                                                    ConstraintLocator *locator,
+                                                    bool forDiagnostics) {
   ASSERT(!PreparingOverload);
   PreparingOverload = true;
 
-  PreparedOverloadBuilder builder;
+  PreparedOverloadBuilder builder(locator);
   Type openedType;
   Type thrownErrorType;
   std::tie(openedType, thrownErrorType) = prepareOverloadImpl(
@@ -2902,7 +2904,8 @@ PreparedOverload *ConstraintSystem::prepareOverload(OverloadChoice choice,
   auto size = PreparedOverload::totalSizeToAlloc<PreparedOverload::Change>(count);
   auto mem = Allocator.Allocate(size, alignof(PreparedOverload));
 
-  return new (mem) PreparedOverload(openedType, thrownErrorType, builder.Changes);
+  return new (mem) PreparedOverload(openedType, thrownErrorType, builder.Changes,
+                                    forDiagnostics);
 }
 
 void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC,

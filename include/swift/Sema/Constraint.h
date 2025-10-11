@@ -883,11 +883,7 @@ public:
     return Overload.Prepared;
   }
 
-  void setPreparedOverload(PreparedOverload *preparedOverload) {
-    ASSERT(Kind == ConstraintKind::BindOverload);
-    ASSERT(!Overload.Prepared);
-    Overload.Prepared = preparedOverload;
-  }
+  void setPreparedOverload(PreparedOverload *preparedOverload);
 
   FunctionType *getAppliedFunctionType() const {
     assert(Kind == ConstraintKind::ApplicableFunction);

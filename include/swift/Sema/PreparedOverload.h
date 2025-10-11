@@ -104,9 +104,10 @@ struct PreparedOverloadChange {
     /// For ChangeKind::AddedConstraint.
     Constraint *TheConstraint;
 
+    /// For ChangeKind::AddedBindConstraint.
     struct {
       TypeBase *FirstType;
-      TypeBase * SecondType;
+      TypeBase *SecondType;
     } Bind;
 
     /// For ChangeKind::OpenedTypes.
@@ -159,7 +160,11 @@ public:
 private:
   Type OpenedType;
   Type ThrownErrorType;
-  size_t Count;
+  unsigned Count : 31;
+
+  /// A prepared overload for diagnostics is different than one without,
+  /// because of fixes and such.
+  unsigned ForDiagnostics : 1;
 
   size_t numTrailingObjects(OverloadToken<Change>) const {
     return Count;
@@ -167,9 +172,9 @@ private:
 
 public:
   PreparedOverload(Type openedType, Type thrownErrorType,
-                   ArrayRef<Change> changes)
+                   ArrayRef<Change> changes, bool forDiagnostics)
     : OpenedType(openedType), ThrownErrorType(thrownErrorType),
-      Count(changes.size()) {
+      Count(changes.size()), ForDiagnostics(forDiagnostics) {
     std::uninitialized_copy(changes.begin(), changes.end(),
                             getTrailingObjects());
   }
@@ -182,11 +187,19 @@ public:
     return ThrownErrorType;
   }
 
+  bool wasForDiagnostics() const {
+    return ForDiagnostics;
+  }
+
   ArrayRef<Change> getChanges() const { return getTrailingObjects(Count); }
 };
 
 struct PreparedOverloadBuilder {
   SmallVector<PreparedOverload::Change, 8> Changes;
+  ConstraintLocator *Locator;
+
+  PreparedOverloadBuilder(ConstraintLocator *locator)
+    : Locator(locator) {}
 
   void addedTypeVariable(TypeVariableType *typeVar) {
     PreparedOverload::Change change;
