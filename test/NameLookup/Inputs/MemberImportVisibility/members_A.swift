@@ -79,3 +79,9 @@ public protocol ProtocolInA {
 extension ProtocolInA {
   public func defaultedRequirementInA() { }
 }
+
+public struct EquatableInA: Equatable {
+  public static func ==(_: Self, _: Self) -> Bool {
+    false
+  }
+}
