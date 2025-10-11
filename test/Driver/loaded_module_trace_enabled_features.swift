@@ -12,6 +12,7 @@
 // RUN:   -emit-loaded-module-trace-path %t/swift5_and_features.trace.json \
 // RUN:   -enable-experimental-feature ParserValidation \
 // RUN:   -enable-upcoming-feature RegionBasedIsolation \
+// RUN:   -enable-library-evolution \
 // RUN:   -strict-memory-safety
 // RUN: %FileCheck -check-prefix=CHECK-SWIFT5-PLUS %s < %t/swift5_and_features.trace.json
 
@@ -50,6 +51,7 @@
 // CHECK-SWIFT5-PLUS: "arch":"{{[^"]*}}"
 // CHECK-SWIFT5-PLUS: "languageMode":"5"
 // CHECK-SWIFT5-PLUS: "enabledLanguageFeatures":[
+// CHECK-SWIFT5-PLUS: "LibraryEvolution",
 // CHECK-SWIFT5-PLUS: "NonfrozenEnumExhaustivity",
 // CHECK-SWIFT5-PLUS: "ParserValidation",
 // CHECK-SWIFT5-PLUS: "RegionBasedIsolation",
