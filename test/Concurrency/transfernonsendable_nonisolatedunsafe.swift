@@ -823,9 +823,9 @@ actor ActorContainingSendableStruct {
 }
 
 
-////////////////////
-// MARK: Closures //
-////////////////////
+////////////////////////////
+// MARK: Sending Closures //
+////////////////////////////
 
 func closureTests() async {
   func sendingClosure(_ x: sending () -> ()) {
@@ -1041,5 +1041,66 @@ func closureTests() async {
     sendingClosure(y) // expected-warning {{sending 'y' risks causing data races}}
     // expected-note @-1 {{'y' used after being passed as a 'sending' parameter}}
     sendingClosure(y) // expected-note {{access can happen concurrently}}
+  }
+}
+
+///////////////////////////////////////
+// MARK: Closure Capture Propagation //
+///////////////////////////////////////
+//
+// DISCUSSION: For tests that involve closure captures with nonisolated(unsafe)
+// and suppressing errors in the closure itself. Tests where the suppressed
+// error is outside the closure itself are in other places in the file.
+
+enum NonisolatedUnsafeCapture {
+  func testSimple() {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    let _ = {
+      await transferToMainDirect(x)
+      print(x)
+    }
+  }
+
+  func testAsyncLet() async {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    async let y: () = {
+      await transferToMainDirect(x)
+      await transferToMainDirect(x)
+    }()
+    _ = await y
+  }
+
+  func testIsolatedParamViaActor() async {
+    actor A {
+      let y = NonSendableKlass()
+      func test() {
+        nonisolated(unsafe) let x = y
+        _ = {
+          await transferToMainDirect(x)
+        }
+      }
+    }
+  }
+
+  func testExplicitIsolatedParam() async {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    _ = { (y: isolated CustomActorInstance) in
+      await transferToMainDirect(x)
+    }
+  }
+
+  func testIsolatedParamNonisolatedNonSending() async {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    let _: nonisolated(nonsending) () async -> () = {
+      await transferToMainDirect(x)
+      await transferToMainDirect(x)
+    }
+  }
+
+  func testGlobalActorIsolated() async {
+    nonisolated(unsafe) let x = NonSendableKlass()
+    _ = { @MainActor in
+      await transferToCustom(x)
+    }
   }
 }
