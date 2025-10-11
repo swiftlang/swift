@@ -612,6 +612,11 @@ ERROR(package_cmo_requires_library_evolution, none,
 WARNING(internal_bridging_header_without_library_evolution,none,
         "using internal bridging headers without library evolution can cause instability", ())
 
+ERROR(error_invalid_clang_header_access_level, none,
+      "invalid minimum clang header access level '%0'; chose from "
+      "'public'|'package'|'internal'",
+      (StringRef))
+
 ERROR(experimental_not_supported_in_production,none,
       "experimental feature '%0' cannot be enabled in production compiler",
       (StringRef))
