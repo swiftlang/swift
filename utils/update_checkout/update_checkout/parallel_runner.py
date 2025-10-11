@@ -46,11 +46,11 @@ class ParallelRunner:
         pool_args: List[Union[RunnerArguments, AdditionalSwiftSourcesArguments]],
         n_processes: int = 0,
     ):
-        self._monitor_polling_period = 0.1
         if n_processes == 0:
             n_processes = ParallelRunner._max_processes()
+        self._n_processes = min(n_processes, 16)
+        self._monitor_polling_period = 0.1
         self._terminal_width = shutil.get_terminal_size().columns
-        self._n_processes = n_processes
         self._pool_args = pool_args
         self._fn = fn
         self._pool = Pool(processes=self._n_processes)
