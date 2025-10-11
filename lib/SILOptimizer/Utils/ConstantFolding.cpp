@@ -779,6 +779,24 @@ static SILValue constantFoldBinary(BuiltinInst *BI, BuiltinValueKind ID,
   }
 }
 
+Type getIntegerType(ASTContext &Ctx, unsigned width, bool DstTySigned) {
+    if (DstTySigned) {
+      switch (width) {
+        case 8: return Ctx.getInt8Type();
+        case 16: return Ctx.getInt16Type();
+        case 32: return Ctx.getInt32Type();
+        case 64: return Ctx.getInt64Type();
+      }
+    } else {
+      switch (width) {
+        case 8: return  Ctx.getUInt8Type();
+        case 16: return Ctx.getUInt16Type();
+        case 32: return Ctx.getUInt32Type();
+        case 64: return Ctx.getUInt64Type();
+      }
+  }
+}
+
 static SILValue
 constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
                                        const BuiltinInfo &Builtin,
@@ -910,7 +928,7 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
       } else {
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diag::integer_literal_overflow_builtin_types,
-                 DstTySigned, DstTy, SrcAsString);
+                 DstTySigned, getIntegerType(M.getASTContext(), DstBitWidth, DstTySigned), SrcAsString);
       }
     } else {
       // Try to print user-visible types if they are available.
@@ -922,7 +940,8 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
       // Otherwise, print the Builtin Types.
       } else {
         // Since builtin types are sign-agnostic, print the signedness
-        // separately.
+        // separately
+
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diag::integer_conversion_overflow_builtin_types,
                  SrcTySigned, SrcTy, DstTySigned, DstTy);
