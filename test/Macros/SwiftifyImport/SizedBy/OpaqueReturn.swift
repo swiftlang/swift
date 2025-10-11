@@ -3,8 +3,9 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend %t/test.swift -typecheck -plugin-path %swift-plugin-dir -strict-memory-safety -verify
-// RUN: %target-swift-frontend %t/test.swift -typecheck -plugin-path %swift-plugin-dir -strict-memory-safety -dump-macro-expansions 2> %t/expansions.txt
-// RUN: diff %t/expansions.txt %t/expansions.txt.expected
+// RUN: %target-swift-frontend %t/test.swift -typecheck -plugin-path %swift-plugin-dir -strict-memory-safety -dump-macro-expansions 2> %t/tmp.txt
+// RUN: %FileCheck --dry-run --ignore-runtime-warnings > %t/expansions.txt < %t/tmp.txt
+// RUN: diff --strip-trailing-cr %t/expansions.txt %t/expansions.txt.expected
 
 //--- test.swift
 @_SwiftifyImport(.sizedBy(pointer: .return, size: "size"))
@@ -103,3 +104,4 @@ public func impNullableSpan(p: RawSpan) -> RawSpan {
                 }), byteCount: Int(size)), copying: ())
 }
 ------------------------------
+
