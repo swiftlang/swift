@@ -181,6 +181,7 @@ public func _float16ToStringImpl(
 // with "0" characters, e.g., via
 // `InlineArray<32,UTF8.CodeUnit>(repeating:0x30)`
 
+@available(SwiftStdlib 5.3, *)
 internal func _Float16ToASCII(
   value f: Float16,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
