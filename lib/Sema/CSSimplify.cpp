@@ -9057,7 +9057,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // parameter, then check if the counts are equal and solve.
     if (kind == ConstraintKind::LiteralConformsTo &&
         protocol == arrayLiteralProto &&
-        type->isInlineArray() &&
+        (type->isInlineArray() || type->is_InlineArray()) &&
         arrayLiteral) {
       auto iaTy = type->castTo<BoundGenericStructType>();
 

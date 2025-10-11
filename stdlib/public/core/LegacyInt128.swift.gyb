@@ -21,9 +21,11 @@ internal struct _${U}Int128 {
 
   /// The low part of the value.
   internal var low: Low
+  internal var _low: Low { low }
 
   /// The high part of the value.
   internal var high: High
+  internal var _high: High { high }
 
   /// Creates a new instance from the given tuple of high and low parts.
   ///
@@ -37,6 +39,11 @@ internal struct _${U}Int128 {
   internal init(high: High, low: Low) {
     self.low = low
     self.high = high
+  }
+
+  internal init(_low: Low, _high: High) {
+    self.low = _low
+    self.high = _high
   }
 
   internal init() {

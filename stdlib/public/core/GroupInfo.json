@@ -179,6 +179,7 @@
     "Floating": [
       "FloatingPoint.swift",
       "FloatingPointParsing.swift",
+      "FloatingPointToString.swift",
       "FloatingPointTypes.swift",
       "FloatingPointRandom.swift"],
     "Vector": [
@@ -274,7 +275,8 @@
     "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift",
     "EmbeddedPrint.swift",
-    "InlineArray.swift"
+    "InlineArray.swift",
+    "_InlineArray.swift"
   ],
   "Result": [
     "Result.swift"

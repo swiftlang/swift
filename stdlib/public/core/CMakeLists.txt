@@ -94,6 +94,7 @@ split_embedded_sources(
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
   EMBEDDED InlineArray.swift
+  EMBEDDED _InlineArray.swift
   EMBEDDED InputStream.swift
   EMBEDDED IntegerParsing.swift
   EMBEDDED Integers.swift
@@ -261,6 +262,7 @@ split_embedded_sources(
 
     NORMAL AtomicInt.swift.gyb
   EMBEDDED FloatingPointParsing.swift.gyb
+  EMBEDDED FloatingPointToString.swift
   EMBEDDED FloatingPointTypes.swift.gyb
   EMBEDDED IntegerTypes.swift.gyb
   EMBEDDED LegacyInt128.swift.gyb

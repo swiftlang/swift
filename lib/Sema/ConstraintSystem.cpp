@@ -1792,7 +1792,7 @@ struct TypeSimplifier {
           // Special case: When building slab literals, we go through the same
           // array literal machinery, so there will be a conversion constraint
           // for the element to ExpressibleByArrayLiteral.ArrayLiteralType.
-          if (lookupBaseType->isInlineArray()) {
+          if (lookupBaseType->isInlineArray() || lookupBaseType->is_InlineArray()) {
             auto &ctx = CS.getASTContext();
             auto arrayProto =
                 ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);

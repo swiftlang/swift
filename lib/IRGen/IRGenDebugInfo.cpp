@@ -1368,7 +1368,8 @@ private:
     // these can be reconstructed by substituting the "template parameters" in
     // the unspecialized type. We make an exception for inline arrays, because
     // DWARF has special support for arrays.
-    if (Type->isInlineArray() && !Type->hasTypeParameter() &&
+    if ((Type->isInlineArray() || Type->is_InlineArray()) &&
+	!Type->hasTypeParameter() &&
         !Type->hasPrimaryArchetype())
       // Create the substituted type.
       return createStructType(Type, Decl, Scope, File, Line, SizeInBits,

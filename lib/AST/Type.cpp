@@ -853,7 +853,7 @@ Type TypeBase::getArrayElementType() {
 }
 
 Type TypeBase::getInlineArrayElementType() {
-  if (!isInlineArray())
+  if (!isInlineArray() && !is_InlineArray())
     return Type();
 
   if (!is<BoundGenericStructType>())
