@@ -46,6 +46,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/Allocator.h"
@@ -1144,7 +1145,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
 void verificationFailure(const Twine &complaint,
               const SILInstruction *atInstruction,
               const SILArgument *atArgument,
-              const std::function<void()> &extraContext);
+              llvm::function_ref<void(llvm::raw_ostream &OS)> extraContext);
 
 inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
   switch (mod.getStage()) {

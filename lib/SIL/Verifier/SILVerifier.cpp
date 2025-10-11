@@ -98,7 +98,9 @@ extern llvm::cl::opt<bool> SILPrintDebugInfo;
 void swift::verificationFailure(const Twine &complaint,
               const SILInstruction *atInstruction,
               const SILArgument *atArgument,
-              const std::function<void()> &extraContext) {
+              llvm::function_ref<void(llvm::raw_ostream &out)> extraContext) {
+  llvm::raw_ostream &out = llvm::dbgs();
+
   const SILFunction *f = nullptr;
   StringRef funcName = "?";
   if (atInstruction) {
@@ -109,32 +111,32 @@ void swift::verificationFailure(const Twine &complaint,
     funcName = f->getName();
   }
   if (ContinueOnFailure) {
-    llvm::dbgs() << "Begin Error in function " << funcName << "\n";
+    out << "Begin Error in function " << funcName << "\n";
   }
 
-  llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
+  out << "SIL verification failed: " << complaint << "\n";
   if (extraContext)
-    extraContext();
+    extraContext(out);
 
   if (atInstruction) {
-    llvm::dbgs() << "Verifying instruction:\n";
-    atInstruction->printInContext(llvm::dbgs());
+    out << "Verifying instruction:\n";
+    atInstruction->printInContext(out);
   } else if (atArgument) {
-    llvm::dbgs() << "Verifying argument:\n";
-    atArgument->printInContext(llvm::dbgs());
+    out << "Verifying argument:\n";
+    atArgument->printInContext(out);
   }
   if (ContinueOnFailure) {
-    llvm::dbgs() << "End Error in function " << funcName << "\n";
+    out << "End Error in function " << funcName << "\n";
     return;
   }
 
   if (f) {
-    llvm::dbgs() << "In function:\n";
-    f->print(llvm::dbgs());
+    out << "In function:\n";
+    f->print(out);
     if (DumpModuleOnFailure) {
       // Don't do this by default because modules can be _very_ large.
-      llvm::dbgs() << "In module:\n";
-      f->getModule().print(llvm::dbgs());
+      out << "In module:\n";
+      f->getModule().print(out);
     }
   }
 
@@ -976,7 +978,8 @@ public:
   }
 
   void _require(bool condition, const Twine &complaint,
-                const std::function<void()> &extraContext = nullptr) {
+                llvm::function_ref<void(llvm::raw_ostream &)> extraContext
+                  = nullptr) {
     if (condition) return;
 
     verificationFailure(complaint, CurInstruction, CurArgument, extraContext);
@@ -1108,13 +1111,17 @@ public:
   /// Assert that two types are equal.
   void requireSameType(Type type1, Type type2, const Twine &complaint) {
     _require(type1->isEqual(type2), complaint,
-             [&] { llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n'; });
+             [&](llvm::raw_ostream &out) {
+      out << "  " << type1 << "\n  " << type2 << '\n';
+    });
   }
 
   /// Assert that two types are equal.
   void requireSameType(SILType type1, SILType type2, const Twine &complaint) {
     _require(type1 == type2, complaint,
-             [&] { llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n'; });
+             [&](llvm::raw_ostream &out) {
+      out << "  " << type1 << "\n  " << type2 << '\n';
+    });
   }
 
   SynthesisContext getSynthesisContext() {
@@ -1145,32 +1152,22 @@ public:
                                          CanSILFunctionType type2,
                                          const Twine &what,
                                          SILFunction &inFunction) {
-    auto complain = [=](const char *msg) -> std::function<void()> {
-      return [=]{
-        llvm::dbgs() << "  " << msg << '\n'
-                     << "  " << type1 << "\n  " << type2 << '\n';
-      };
-    };
-    auto complainBy = [=](std::function<void()> msg) -> std::function<void()> {
-      return [=]{
-        msg();
-        llvm::dbgs() << '\n';
-        llvm::dbgs() << "  " << type1 << "\n  " << type2 << '\n';
-      };
-    };
-
     // If we didn't have a failure, return.
     auto Result = type1->isABICompatibleWith(type2, inFunction);
     if (Result.isCompatible())
       return;
 
     if (!Result.hasPayload()) {
-      _require(false, what, complain(Result.getMessage().data()));
+      _require(false, what, [&](llvm::raw_ostream &out) {
+        out << "  " << Result.getMessage().data() << '\n'
+            << "  " << type1 << "\n  " << type2 << '\n';
+      });
     } else {
-      _require(false, what, complainBy([=] {
-                 llvm::dbgs() << " " << Result.getMessage().data()
-                              << ".\nParameter: " << Result.getPayload();
-               }));
+      _require(false, what, [&](llvm::raw_ostream &out) {
+        out << " " << Result.getMessage().data()
+            << ".\nParameter: " << Result.getPayload()
+            << "\n  " << type1 << "\n  " << type2 << '\n';
+      });
     }
   }
 
@@ -1196,7 +1193,7 @@ public:
   template <class T>
   T *requireValueKind(SILValue value, const Twine &what) {
     auto match = dyn_cast<T>(value);
-    _require(match != nullptr, what, [=] { llvm::dbgs() << value; });
+    _require(match != nullptr, what, [=](llvm::raw_ostream &out) { out << value; });
     return match;
   }
 
@@ -1893,14 +1890,15 @@ public:
 
     if (subs.getGenericSignature().getCanonicalSignature() !=
           fnTy->getInvocationGenericSignature().getCanonicalSignature()) {
-      llvm::dbgs() << "substitution map's generic signature: ";
-      subs.getGenericSignature()->print(llvm::dbgs());
-      llvm::dbgs() << "\n";
-      llvm::dbgs() << "callee's generic signature: ";
-      fnTy->getInvocationGenericSignature()->print(llvm::dbgs());
-      llvm::dbgs() << "\n";
-      require(false,
-              "Substitution map does not match callee in apply instruction");
+      _require(false, "Substitution map does not match callee in apply instruction",
+               [&](llvm::raw_ostream &out) {
+        out << "substitution map's generic signature: ";
+        subs.getGenericSignature()->print(out);
+        out << "\n";
+        out << "callee's generic signature: ";
+        fnTy->getInvocationGenericSignature()->print(out);
+        out << "\n";
+      });
     }
     // Apply the substitutions.
     return fnTy->substGenericArgs(F.getModule(), subs, F.getTypeExpansionContext());
@@ -6746,25 +6744,6 @@ public:
     }
   }
 
-  bool isUnreachableAlongAllPathsStartingAt(
-      SILBasicBlock *StartBlock, BasicBlockSet &Visited) {
-    if (isa<UnreachableInst>(StartBlock->getTerminator()))
-      return true;
-    else if (isa<ReturnInst>(StartBlock->getTerminator()))
-      return false;
-    else if (isa<ThrowInst>(StartBlock->getTerminator()) ||
-             isa<ThrowAddrInst>(StartBlock->getTerminator()))
-      return false;
-
-    // Recursively check all successors.
-    for (auto *SuccBB : StartBlock->getSuccessorBlocks())
-      if (!Visited.insert(SuccBB))
-        if (!isUnreachableAlongAllPathsStartingAt(SuccBB, Visited))
-          return false;
-
-    return true;
-  }
-
   void verifySILFunctionType(CanSILFunctionType FTy) {
     // Make sure that if FTy's calling convention implies that it must have a
     // self parameter.
@@ -6811,8 +6790,164 @@ public:
       std::set<SILInstruction*> ActiveOps;
 
       CFGState CFG = Normal;
-      
+
       GetAsyncContinuationInstBase *GotAsyncContinuation = nullptr;
+
+      BBState() = default;
+
+      // Clang (as of LLVM 22) does not elide the final move for this;
+      // see https://github.com/llvm/llvm-project/issues/34037. But
+      // GCC and MSVC do, and the clang issue will presumably get fixed
+      // eventually, and the move is not an outrageous cost to bear
+      // compared to actually copying it.
+      BBState(maybe_movable_ref<BBState> other)
+        : BBState(std::move(other).construct()) {}
+
+      void printStack(llvm::raw_ostream &out, StringRef label) const {
+        out << label << ": [";
+        if (!Stack.empty()) out << "\n";
+        for (auto allocation: Stack) {
+          allocation->print(out);
+        }
+        out << "]\n";
+      }
+
+      void printActiveOps(llvm::raw_ostream &out, StringRef label) const {
+        out << label << ": [";
+        if (!ActiveOps.empty()) out << "\n";
+        for (auto op: ActiveOps) {
+          op->print(out);
+        }
+        out << "]\n";
+      }
+
+      /// Given that we have two edges to the same block or dead-end region,
+      /// handle any potential mismatch between the states we were in on
+      /// those edges.
+      ///
+      /// For the most part, we don't allow mismatches and immediately report
+      /// them as errors. However, we do allow certain mismatches on edges
+      /// that enter dead-end regions,
+      /// in which case the states need to be conservatively merged.
+      ///
+      /// This state is the previously-recorded state of the block, which
+      /// is also what needs to be updated for the merge.
+      ///
+      /// Note that, when we have branches to a dead-end region, we merge
+      /// state across *all* branches into the region, not just to a single
+      /// block. The existence of multiple blocks in a dead-end region
+      /// implies that all of the blocks are in a loop. This means that
+      /// flow-sensitive states that were begun externally to the region
+      /// cannot possibly change within the region in any well-formed way,
+      /// which is why we can merge across all of them.
+      ///
+      /// For example, consider this function excerpt:
+      ///
+      ///   bb5:
+      ///     %alloc = alloc_stack $Int
+      ///     cond_br %cond1, bb6, bb100
+      ///   bb6:
+      ///     dealloc_stack %alloc
+      ///     cond_br %cond2, bb7, bb101
+      ///
+      /// Now suppose that the branches to bb100 and bb101 are branches
+      /// into the same dead-end region. We will conservatively merge the
+      /// BBState heading into this region by recognizing that there's
+      /// a stack mismatch and therefore clearing the stack (preventing
+      /// anything currently on the stack from being deallocated).
+      ///
+      /// One might think that this is problematic because, e.g.,
+      /// bb100 might deallocate %alloc before proceeding to bb101. But
+      /// for bb100 and bb101 to be in the *same* dead-end region, they
+      /// must be in a strongly-connected component, which means there
+      /// must be a path from bb101 back to bb100. That path cannot
+      /// possibly pass through %alloc again, or else bb5 would be a
+      /// branch *within* the region, not *into* it. So the loop from
+      /// bb100 -> bb101 -> ... -> bb100 repeatedly deallocates %alloc
+      /// and should be ill-formed.
+      ///
+      /// That's why it's okay (and necessary) to merge state across
+      /// all paths to the dead-end region.
+      void handleJoinPoint(const BBState &otherState, bool isDeadEndEdge,
+                           SILInstruction *term, SILBasicBlock *succBB) {
+        // A helper function for reporting a failure in the edge.
+
+        // Note that this doesn't always abort, e.g. when running under
+        // -verify-continue-on-failure. So if there's a mismatch, we do the
+        // conservative merge regardless of failure so that we're in a
+        // coherent state in the successor block.
+        auto fail = [&](StringRef complaint,
+                        llvm::function_ref<void(llvm::raw_ostream &out)> extra
+                          = nullptr) {
+          verificationFailure(complaint, term, nullptr,
+                              [&](llvm::raw_ostream &out) {
+            out << "Entering basic block ";
+            succBB->printID(out, /*newline*/ true);
+
+            if (extra) extra(out);
+          });
+        };
+
+        // These rules are required to hold unconditionally; there is
+        // no merge rule for dead-end edges.
+        if (CFG != otherState.CFG) {
+          fail("inconsistent coroutine states entering basic block");
+        }
+        if (GotAsyncContinuation != otherState.GotAsyncContinuation) {
+          fail("inconsistent active async continuations entering basic block");
+        }
+
+        // The stack normally has to agree exactly, but we allow stacks
+        // to disagree on different edges into a dead-end region.
+        // Intersecting the stacks would be wrong because we actually
+        // cannot safely allow anything to be popped in this state;
+        // instead, we simply clear the stack completely. This would
+        // allow us to incorrectly pass the function-exit condition,
+        // but we know we cannot reach an exit from succBB because it's
+        // dead-end.
+        if (Stack != otherState.Stack) {
+          if (!isDeadEndEdge) {
+            fail("inconsistent stack states entering basic block",
+                 [&](llvm::raw_ostream &out) {
+              otherState.printStack(out, "Current stack state");
+              printStack(out, "Recorded stack state");
+            });
+          }
+
+          Stack.clear();
+        }
+
+        // The set of active operations normally has to agree exactly,
+        // but we allow sets to diverge on different edges into a
+        // dead-end region.
+        if (ActiveOps != otherState.ActiveOps) {
+          if (!isDeadEndEdge) {
+            fail("inconsistent active-operations sets entering basic block",
+                 [&](llvm::raw_ostream &out) {
+              otherState.printActiveOps(out, "Current active operations");
+              printActiveOps(out, "Recorded active operations");
+            });
+          }
+
+          // Conservatively remove any operations that aren't also found
+          // in the other state's active set.
+          for (auto i = ActiveOps.begin(), e = ActiveOps.end(); i != e; ) {
+            if (otherState.ActiveOps.count(*i)) {
+              ++i;
+            } else {
+              i = ActiveOps.erase(i);
+            }
+          }
+        }
+      }
+    };
+
+    struct DeadEndRegionState {
+      BBState sharedState;
+      llvm::SmallPtrSet<SILBasicBlock *, 4> entryBlocks;
+
+      DeadEndRegionState(maybe_movable_ref<BBState> state)
+        : sharedState(std::move(state).construct()) {}
     };
   };
 
@@ -6827,16 +6962,28 @@ public:
     if (F->getASTContext().hadError())
       return;
 
+    // Compute which blocks are part of dead-end regions, and start tracking
+    // all of the edges to those regions.
+    DeadEndEdges deadEnds(F);
+    auto visitedDeadEndEdges = deadEnds.createVisitingSet();
+
+    using BBState = VerifyFlowSensitiveRulesDetails::BBState;
+    llvm::DenseMap<SILBasicBlock*, BBState> visitedBBs;
+
+    using DeadEndRegionState = VerifyFlowSensitiveRulesDetails::DeadEndRegionState;
+    SmallVector<std::optional<DeadEndRegionState>> deadEndRegionStates;
+    deadEndRegionStates.resize(deadEnds.getNumDeadEndRegions());
+
     // Do a traversal of the basic blocks.
     // Note that we intentionally don't verify these properties in blocks
     // that can't be reached from the entry block.
-    llvm::DenseMap<SILBasicBlock*, VerifyFlowSensitiveRulesDetails::BBState> visitedBBs;
     SmallVector<SILBasicBlock*, 16> Worklist;
     visitedBBs.try_emplace(&*F->begin());
     Worklist.push_back(&*F->begin());
     while (!Worklist.empty()) {
       SILBasicBlock *BB = Worklist.pop_back_val();
-      VerifyFlowSensitiveRulesDetails::BBState state = visitedBBs[BB];
+      BBState state = visitedBBs[BB];
+
       for (SILInstruction &i : *BB) {
         CurInstruction = &i;
 
@@ -6853,7 +7000,7 @@ public:
                     "cannot suspend async task while unawaited continuation is active");
           }
         }
-          
+
         if (i.isAllocatingStack()) {
           if (auto *BAI = dyn_cast<BeginApplyInst>(&i)) {
             state.Stack.push_back(BAI->getCalleeAllocationResult());
@@ -6868,16 +7015,18 @@ public:
           while (auto *mvi = dyn_cast<MoveValueInst>(op)) {
             op = mvi->getOperand();
           }
-          require(!state.Stack.empty(),
-                  "stack dealloc with empty stack");
-          if (op != state.Stack.back()) {
-            llvm::errs() << "Recent stack alloc: " << *state.Stack.back();
-            llvm::errs() << "Matching stack alloc: " << *op;
-            require(op == state.Stack.back(),
-                    "stack dealloc does not match most recent stack alloc");
-          }
-          state.Stack.pop_back();
 
+          if (!state.Stack.empty() && op == state.Stack.back()) {
+            state.Stack.pop_back();
+          } else {
+            verificationFailure("deallocating allocation that is not the top of the stack",
+                                &i, nullptr,
+                                [&](llvm::raw_ostream &out) {
+              state.printStack(out, "Current stack state");
+              out << "Stack allocation:\n" << *op;
+              // The deallocation is printed out as the focus of the failure.
+            });
+          }
         } else if (isa<BeginAccessInst>(i) || isa<BeginApplyInst>(i) ||
                    isa<StoreBorrowInst>(i)) {
           bool notAlreadyPresent = state.ActiveOps.insert(&i).second;
@@ -6939,6 +7088,84 @@ public:
           auto successors = term->getSuccessors();
           for (auto i : indices(successors)) {
             SILBasicBlock *succBB = successors[i].getBB();
+            auto succStateRef = move_if(state, i + 1 == successors.size());
+
+            // Some successors (currently just `yield`) have state
+            // transitions on the edges themselves. Fortunately,
+            // these successors all require their destination blocks
+            // to be uniquely referenced, so we never have to combine
+            // the state change with merging or consistency checking.
+
+
+            // Check whether this edge enters a dead-end region.
+            if (auto deadEndRegion = deadEnds.entersDeadEndRegion(BB, succBB)) {
+              // If so, record it in the visited set, which will tell us
+              // whether it's the last remaining edge to the region.
+              bool isLastDeadEndEdge = visitedDeadEndEdges.visitEdgeTo(succBB);
+
+              // Check for an existing shared state for the region.
+              auto &regionInfo = deadEndRegionStates[*deadEndRegion];
+
+              // If we don't have an existing shared state, and this is the
+              // last edge to the region, just fall through and process it
+              // like a normal edge.
+              if (!regionInfo && isLastDeadEndEdge) {
+                // This can only happen if there's exactly one edge to the
+                // block, so we will end up in the insertion success case below.
+                // Note that the state-changing terminators like `yield`
+                // always take this path: since this must be the unique edge
+                // to the successor, it must be in its own dead-end region.
+
+                // fall through to the main path
+
+              // Otherwise, we need to merge this into the shared state.
+              } else {
+                require(!isa<YieldInst>(term),
+                        "successor of 'yield' should not be encountered twice");
+
+                // Copy/move our current state into the shared state if it
+                // doesn't already exist.
+                if (!regionInfo) {
+                  regionInfo.emplace(std::move(succStateRef));
+
+                // Otherwise, merge our current state into the shared state.
+                } else {
+                  regionInfo->sharedState
+                    .handleJoinPoint(succStateRef.get(), /*dead end*/true,
+                                     term, succBB);
+                }
+
+                // Add the successor block to the state's set of entry blocks.
+                regionInfo->entryBlocks.insert(succBB);
+
+                // If this was the last branch to the region, act like we
+                // just saw the edges to each of its entry blocks.
+                if (isLastDeadEndEdge) {
+                  for (auto ebi = regionInfo->entryBlocks.begin(),
+                            ebe = regionInfo->entryBlocks.end(); ebi != ebe; ) {
+                    auto *regionEntryBB = *ebi++;
+
+                    // Copy/move the shared state to be the state for the
+                    // region entry block.
+                    auto insertResult =
+                      visitedBBs.try_emplace(regionEntryBB,
+                        move_if(regionInfo->sharedState, ebi == ebe));
+                    assert(insertResult.second &&
+                           "already visited edge to dead-end region!");
+                    (void) insertResult;
+
+                    // Add the region entry block to the worklist.
+                    Worklist.push_back(regionEntryBB);
+                  }
+                }
+
+                // Regardless, don't fall through to the main path.
+                continue;
+              }
+            }
+
+            // Okay, either this isn't an edge to a dead-end region or it
+            // was a unique edge to it.
 
             // Optimistically try to set our current state as the state
             // of the successor.  We can use a move on the final successor;
@@ -6946,30 +7173,33 @@ public:
             // happen, which is important because we'll still need it
             // to compare against the already-recorded state for the block.
             auto insertResult =
-              i + 1 == successors.size()
-                ? visitedBBs.try_emplace(succBB, std::move(state))
-                : visitedBBs.try_emplace(succBB, state);
+              visitedBBs.try_emplace(succBB, std::move(succStateRef));
 
-            // If the insertion was successful, add the successor to the
-            // worklist and continue.
+            // If the insertion was successful, we need to add the successor
+            // block to the worklist.
             if (insertResult.second) {
-              Worklist.push_back(succBB);
+              auto &insertedState = insertResult.first->second;
 
-              // If we're following a 'yield', update the CFG state:
+              // 'yield' has successor-specific state updates, so we do that
+              // now. 'yield' does not permit critical edges, so we don't
+              // have to worry about doing this in the case below where
+              // insertion failed.
               if (isa<YieldInst>(term)) {
                 // Enforce that the unwind logic is segregated in all stages.
                 if (i == 1) {
-                  insertResult.first->second.CFG = VerifyFlowSensitiveRulesDetails::YieldUnwind;
+                  insertedState.CFG = VerifyFlowSensitiveRulesDetails::YieldUnwind;
 
                 // We check the yield_once rule in the mandatory analyses,
                 // so we can't assert it yet in the raw stage.
                 } else if (F->getLoweredFunctionType()->getCoroutineKind()
                              == SILCoroutineKind::YieldOnce && 
                            F->getModule().getStage() != SILStage::Raw) {
-                  insertResult.first->second.CFG = VerifyFlowSensitiveRulesDetails::YieldOnceResume;
+                  insertedState.CFG = VerifyFlowSensitiveRulesDetails::YieldOnceResume;
                 }
               }
 
+              // Go ahead and add the block.
+              Worklist.push_back(succBB);
               continue;
             }
 
@@ -6978,30 +7208,23 @@ public:
             require(!isa<YieldInst>(term),
                     "successor of 'yield' should not be encountered twice");
 
-            // Check that the stack height is consistent coming from all entry
-            // points into this BB. We only care about consistency if there is
-            // a possible return from this function along the path starting at
-            // this successor bb.  (FIXME: Why? Infinite loops should still
-            // preserve consistency...)
-            auto isUnreachable = [&] {
-              BasicBlockSet visited(F);
-              return isUnreachableAlongAllPathsStartingAt(succBB, visited);
-            };
-            
-            const auto &foundState = insertResult.first->second;
-            require(state.Stack == foundState.Stack || isUnreachable(),
-                    "inconsistent stack heights entering basic block");
+            // Okay, we failed to insert. That means there's an existing
+            // state for the successor block. That existing state generally
+            // needs to match the current state, but certain rules are
+            // relaxed for branches that enter dead-end regions.
+            auto &foundState = insertResult.first->second;
 
-            require(state.ActiveOps == foundState.ActiveOps || isUnreachable(),
-                    "inconsistent active-operations sets entering basic block");
-            require(state.CFG == foundState.CFG,
-                    "inconsistent coroutine states entering basic block");
-            require(state.GotAsyncContinuation == foundState.GotAsyncContinuation,
-                    "inconsistent active async continuations entering basic block");
+            // Join the states into `foundState`. We can still validly use
+            // succStateRef here because the insertion didn't work.
+            foundState.handleJoinPoint(succStateRef.get(), /*dead-end*/false,
+                                       term, succBB);
           }
         }
       }
     }
+
+    assert(visitedDeadEndEdges.visitedAllEdges() &&
+           "didn't visit all edges");
   }
 
   void verifyBranches(const SILFunction *F) {
