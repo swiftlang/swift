@@ -330,7 +330,7 @@ public func _withUnprotectedUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
 /// cannot be used afterward.
 @_alwaysEmitIntoClient @_transparent
 public func withUnsafeTemporaryAllocation<
-  T: ~Copyable,R: ~Copyable,
+  T: ~Copyable, R: ~Copyable,
   E: Error
 >(
   of type: T.Type,
