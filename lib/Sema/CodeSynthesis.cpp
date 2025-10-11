@@ -1703,9 +1703,14 @@ SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
       ImplicitConstructorKind::DefaultDistributedActor :
       ImplicitConstructorKind::Default;
   if (auto ctor = createImplicitConstructor(decl, ctorKind, ctx)) {
+    if (auto isolation = decl->getDefaultActorIsolation()) {
+    /// Ensure the synthesized default initializer inherits the class's
+    /// default actor isolation (e.g., @MainActor) to avoid
+    /// override-isolation mismatches in subclasses.
+      ctor->setActorIsolation(isolation);
+    }
     // Add the constructor.
     decl->addMember(ctor);
-
     // Lazily synthesize an empty body for the default constructor.
     ctor->setBodySynthesizer(synthesizeSingleReturnFunctionBody);
     return ctor;
