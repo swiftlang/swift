@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DistributedDecl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
@@ -407,6 +408,21 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
               && "addFunctionAttributes() on ABI-only decl?");
     addFunctionAttributes(F, decl->getAttrs(), mod, getOrCreateDeclaration,
                           constant);
+  } else if (auto *ce = constant.getAbstractClosureExpr()) {
+    if (mod.getOptions().EnableGlobalAssemblyVision) {
+      F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
+    } else {
+      // Add the attribute to a closure if the enclosing method has it.
+      auto decl = ce->getParent()->getInnermostDeclarationDeclContext();
+      if (decl &&
+          decl->getAttrs().getAttribute(DeclAttrKind::EmitAssemblyVisionRemarks)) {
+        F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
+      }
+    }
+  } else {
+    if (mod.getOptions().EnableGlobalAssemblyVision) {
+      F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
+    }
   }
 
   return F;
