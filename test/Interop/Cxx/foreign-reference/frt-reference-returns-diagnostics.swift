@@ -1,7 +1,5 @@
 // RUN: rm -rf %t
-// RUN: %target-typecheck-verify-swift -I %S%{fs-sep}Inputs -cxx-interoperability-mode=default -enable-experimental-feature WarnUnannotatedReturnOfCxxFrt -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}frt-reference-returns.h
-
-// REQUIRES: swift_feature_WarnUnannotatedReturnOfCxxFrt
+// RUN: %target-typecheck-verify-swift -I %S%{fs-sep}Inputs -cxx-interoperability-mode=default -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}frt-reference-returns.h
 
 import FRTReferenceReturns
 
