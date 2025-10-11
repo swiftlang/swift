@@ -485,6 +485,38 @@ struct TestInoutUnsafePointerExclusivity {
 }
 
 // =============================================================================
+// Copied dependence on mutable values
+// =============================================================================
+
+@_lifetime(dest: copy source)
+func reassign<T: ~Escapable>(dest: inout T, source: T) {
+  dest = source
+}
+
+@_lifetime(span: borrow array)
+func testReassignToBorrowGood(span: inout Span<Int>, array: [Int]) {
+  reassign(dest: &span, source: array.span())
+}
+
+// Reassign from a local owned value
+@_lifetime(span: copy span)
+func testReassignToLocal(span: inout Span<Int>) { // expected-error{{lifetime-dependent variable 'span' escapes its scope}}
+  let array = [1, 2] // expected-note{{it depends on the lifetime of variable 'array'}}
+  reassign(dest: &span, source: array.span())
+} // expected-note{{this use causes the lifetime-dependent value to escape}}
+
+@_lifetime(span: copy span)
+func testReassignToConsuming(span: inout Span<Int>, array: consuming [Int]) { // expected-error{{lifetime-dependent variable 'span' escapes its}}
+  reassign(dest: &span, source: array.span()) // expected-note{{it depends on this scoped access to variable 'array'}}
+} // expected-note{{this use causes the lifetime-dependent value to escape}}
+
+@_lifetime(span: copy span)
+func testReassignToBorrowBad(span: inout Span<Int>, array: [Int]) { // expected-error{{lifetime-dependent variable 'span' escapes its scope}}
+  // expected-note@-1{{it depends on the lifetime of argument 'array'}}
+  reassign(dest: &span, source: array.span())
+} // expected-note{{this use causes the lifetime-dependent value to escape}}
+
+// =============================================================================
 // Scoped dependence on property access
 // =============================================================================
 
