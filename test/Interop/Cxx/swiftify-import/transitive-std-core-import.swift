@@ -6,7 +6,6 @@
 // RUN: %target-clangxx %S/../stdlib/Inputs/check-libcxx-version.cpp -o %t/check-libcxx-version
 // RUN: %target-codesign %t/check-libcxx-version
 
-// RUN: %target-run %t/check-libcxx-version || %empty-directory(%t)
 // RUN: %target-run %t/check-libcxx-version || split-file %s %t
 // RUN: %target-run %t/check-libcxx-version || %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift  -cxx-interoperability-mode=default -Xcc -std=c++20
 
