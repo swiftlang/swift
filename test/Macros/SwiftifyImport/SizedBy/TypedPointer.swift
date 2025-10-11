@@ -41,19 +41,19 @@ func mutReturnDependence(_ size: CInt, _ ptr: UnsafeMutablePointer<UInt8>) -> Un
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func constParam(_ ptr: UnsafeRawBufferPointer) {
-// CHECK-NEXT:     let size = CInt(exactly: unsafe ptr.count)!
+// CHECK-NEXT:     let size = CInt(exactly: ptr.count)!
 // CHECK-NEXT:     return unsafe constParam(ptr.baseAddress!.assumingMemoryBound(to: CChar.self), size)
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func mutParam(_ ptr: UnsafeMutableRawBufferPointer) {
-// CHECK-NEXT:     let size = CInt(exactly: unsafe ptr.count)!
+// CHECK-NEXT:     let size = CInt(exactly: ptr.count)!
 // CHECK-NEXT:     return unsafe mutParam(ptr.baseAddress!.assumingMemoryBound(to: UInt8.self), size)
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func exprParam(_ ptr: UnsafeMutableRawBufferPointer, _ size: CInt, _ count: CInt) {
-// CHECK-NEXT:     let _ptrCount = unsafe ptr.count
+// CHECK-NEXT:     let _ptrCount = ptr.count
 // CHECK-NEXT:     if _ptrCount != size * count {
 // CHECK-NEXT:       fatalError("bounds check failure in exprParam: expected \(size * count) but got \(_ptrCount)")
 // CHECK-NEXT:     }
