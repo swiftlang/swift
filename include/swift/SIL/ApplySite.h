@@ -645,12 +645,25 @@ public:
     return getSubstCalleeConv().getParamInfoForSILArg(calleeArgIndex);
   }
 
+  /// Returns true if \p op is the callee operand of this apply site
+  /// and not an argument operand.
+  ///
+  /// If this instruction is not a full apply site, this always returns false.
+  bool isCalleeOperand(const Operand &op) const;
+
+  /// Returns true if this is an 'out' parameter.
   bool isSending(const Operand &oper) const {
-    if (isIndirectErrorResultOperand(oper))
+    if (isIndirectErrorResultOperand(oper) || oper.isTypeDependent() ||
+        isCalleeOperand(oper))
       return false;
     if (isIndirectResultOperand(oper))
       return getSubstCalleeType()->hasSendingResult();
     return getArgumentParameterInfo(oper).hasOption(SILParameterInfo::Sending);
+  }
+
+  /// Returns true if this operand is an 'inout sending' parameter.
+  bool isInOutSending(const Operand &oper) const {
+    return isSending(oper) && getArgumentConvention(oper).isInoutConvention();
   }
 
   /// Return true if 'operand' is addressable after type substitution in the
@@ -1054,6 +1067,13 @@ inline bool ApplySite::isIndirectErrorResultOperand(const Operand &op) const {
   if (!fas)
     return false;
   return fas.isIndirectErrorResultOperand(op);
+}
+
+inline bool ApplySite::isCalleeOperand(const Operand &op) const {
+  auto fas = asFullApplySite();
+  if (!fas)
+    return false;
+  return fas.isCalleeOperand(op);
 }
 
 } // namespace swift
