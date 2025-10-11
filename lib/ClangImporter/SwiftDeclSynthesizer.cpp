@@ -2549,10 +2549,6 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
                                           const swift::Type &swiftParamTy,
                                           SourceLoc paramLoc) {
   assert(param->hasDefaultArg() && "must have a C++ default argument");
-  if (!param->getIdentifier())
-    // Work around an assertion failure in CXXNameMangler::mangleUnqualifiedName
-    // when mangling std::__fs::filesystem::path::format.
-    return nullptr;
 
   ASTContext &ctx = ImporterImpl.SwiftContext;
   clang::ASTContext &clangCtx = param->getASTContext();
