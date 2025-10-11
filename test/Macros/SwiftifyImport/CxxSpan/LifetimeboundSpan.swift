@@ -3,8 +3,7 @@
 
 // RUN: %target-swift-frontend %s -enable-experimental-cxx-interop -I %S/Inputs -Xcc -std=c++20 -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -verify -strict-memory-safety 2>&1 | %FileCheck --match-full-lines %s
 
-// FIXME swift-ci linux tests do not support std::span
-// UNSUPPORTED: OS=linux-gnu
+// REQUIRES: std_span
 
 import CxxStdlib
 import StdSpan

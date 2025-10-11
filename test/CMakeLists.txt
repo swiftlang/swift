@@ -370,6 +370,9 @@ if(NOT "${COVERAGE_DB}" STREQUAL "")
       COMMENT "Touching covering tests")
 endif()
 
+include(CheckIncludeFileCXX)
+check_include_file_cxx("span" HAVE_STD_SPAN)
+
 foreach(SDK ${SWIFT_SDKS})
   foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
     # macCatalyst needs to run two sets of tests: one with the normal macosx target triple

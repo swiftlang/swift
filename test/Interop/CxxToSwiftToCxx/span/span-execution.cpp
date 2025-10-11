@@ -10,10 +10,10 @@
 // RUN: %target-run %t/swift-cxx-execution | %FileCheck %s
 
 // REQUIRES: executable_test
-
-// REQUIRES: OS=macosx || rdar-161999258
+// REQUIRES: std_span
 
 //--- header.h
+#include <cstdint>
 #include <string>
 #include <span>
 

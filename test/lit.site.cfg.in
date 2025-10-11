@@ -182,3 +182,6 @@ if config.test_exec_root is None:
 lit_config.load_config(config, os.path.join(config.test_exec_root, "lit.swift-features.cfg"))
 lit_config.load_config(
     config, os.path.join(config.swift_src_root, "test", "lit.cfg"))
+
+if '@HAVE_STD_SPAN@' == '1':
+  config.available_features.add('std_span')
