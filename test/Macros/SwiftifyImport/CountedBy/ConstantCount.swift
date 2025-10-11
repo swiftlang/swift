@@ -55,7 +55,7 @@ func noescapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func plain(_ ptr: UnsafeBufferPointer<CInt>) {
-// CHECK-NEXT:     let _ptrCount = unsafe ptr.count
+// CHECK-NEXT:     let _ptrCount = ptr.count
 // CHECK-NEXT:     if _ptrCount != 37 {
 // CHECK-NEXT:       fatalError("bounds check failure in plain: expected \(37) but got \(_ptrCount)")
 // CHECK-NEXT:     }
@@ -73,7 +73,7 @@ func noescapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func mut(_ ptr: UnsafeMutableBufferPointer<CInt>) {
-// CHECK-NEXT:     let _ptrCount = unsafe ptr.count
+// CHECK-NEXT:     let _ptrCount = ptr.count
 // CHECK-NEXT:     if _ptrCount != 37 {
 // CHECK-NEXT:       fatalError("bounds check failure in mut: expected \(37) but got \(_ptrCount)")
 // CHECK-NEXT:     }
@@ -102,7 +102,7 @@ func noescapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func noescape(_ ptr: UnsafeBufferPointer<CInt>) -> UnsafePointer<CInt> {
-// CHECK-NEXT:     let _ptrCount = unsafe ptr.count
+// CHECK-NEXT:     let _ptrCount = ptr.count
 // CHECK-NEXT:     if _ptrCount != 37 {
 // CHECK-NEXT:       fatalError("bounds check failure in noescape: expected \(37) but got \(_ptrCount)")
 // CHECK-NEXT:     }
@@ -139,7 +139,7 @@ func noescapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePointer<
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func noescapeMut(_ ptr: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutablePointer<CInt> {
-// CHECK-NEXT:     let _ptrCount = unsafe ptr.count
+// CHECK-NEXT:     let _ptrCount = ptr.count
 // CHECK-NEXT:     if _ptrCount != 37 {
 // CHECK-NEXT:       fatalError("bounds check failure in noescapeMut: expected \(37) but got \(_ptrCount)")
 // CHECK-NEXT:     }

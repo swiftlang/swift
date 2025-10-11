@@ -5,7 +5,7 @@ func myFunc(_ ptr: UnsafePointer<CInt>, _ len: String) {
 // expected-note@-3 2{{in expansion of macro '_SwiftifyImport' on global function 'myFunc' here}}
 
 // expected-error@@__swiftmacro_4main6myFunc15_SwiftifyImportfMp_.swift:4:15{{no exact matches in call to initializer}}
-// expected-error@@__swiftmacro_4main6myFunc15_SwiftifyImportfMp_.swift:4:48{{cannot force unwrap value of non-optional type 'String'}}
+// expected-error@@__swiftmacro_4main6myFunc15_SwiftifyImportfMp_.swift:4:41{{cannot force unwrap value of non-optional type 'String'}}
 
 // REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t)
@@ -17,7 +17,7 @@ func myFunc(_ ptr: UnsafePointer<CInt>, _ len: String) {
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT:func myFunc(_ ptr: UnsafeBufferPointer<CInt>) {
-// CHECK-NEXT:    let len = String(exactly: unsafe ptr.count)!
+// CHECK-NEXT:    let len = String(exactly: ptr.count)!
 // CHECK-NEXT:    return unsafe myFunc(ptr.baseAddress!, len)
 // CHECK-NEXT:}
 // CHECK-NEXT:------------------------------

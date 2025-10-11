@@ -20,13 +20,13 @@ public func myFunc4(_: UnsafeMutablePointer<CInt>, _ len: CInt) {
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: public func myFunc(_ _myFunc_param0: UnsafeBufferPointer<CInt>) {
-// CHECK-NEXT:     let _myFunc_param1 = CInt(exactly: unsafe _myFunc_param0.count)!
+// CHECK-NEXT:     let _myFunc_param1 = CInt(exactly: _myFunc_param0.count)!
 // CHECK-NEXT:     return unsafe myFunc(_myFunc_param0.baseAddress!, _myFunc_param1)
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: public func myFunc2(_ _myFunc2_param0: UnsafeBufferPointer<CInt>, _ _myFunc2_param2: CInt) {
-// CHECK-NEXT:     let _myFunc2_param1 = CInt(exactly: unsafe _myFunc2_param0.count)!
+// CHECK-NEXT:     let _myFunc2_param1 = CInt(exactly: _myFunc2_param0.count)!
 // CHECK-NEXT:     return unsafe myFunc2(_myFunc2_param0.baseAddress!, _myFunc2_param1, _myFunc2_param2)
 // CHECK-NEXT: }
 
