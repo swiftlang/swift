@@ -1830,6 +1830,9 @@ public:
       case PlatformKind::Windows:
         plat = "windows";
         break;
+      case PlatformKind::Android:
+        plat = "android";
+        break;
       case PlatformKind::none:
         llvm_unreachable("handled above");
       }

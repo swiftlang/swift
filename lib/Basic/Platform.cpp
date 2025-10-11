@@ -301,6 +301,8 @@ llvm::VersionTuple swift::getVersionForTriple(const llvm::Triple &triple) {
     return triple.getOSVersion();
   } else if (triple.isOSWindows()) {
     return triple.getOSVersion();
+  } else if (triple.isAndroid()) {
+    return triple.getEnvironmentVersion();
   }
   return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
 }

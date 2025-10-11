@@ -2133,6 +2133,16 @@ FUNCTION(TSanInoutAccess, tsan, __tsan_external_write, C_CC, AlwaysAvailable,
          EFFECT(RuntimeEffect::NoEffect),
          UNKNOWN_MEMEFFECTS)
 
+// int32 __isOSVersionAtLeast(uint32_t major, uint32_t minor, uint32_t patch);
+// This a C builtin provided by compiler-rt.
+FUNCTION(OSVersionAtLeast, libgcc, __isOSVersionAtLeast,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int32Ty),
+         ARGS(Int32Ty, Int32Ty, Int32Ty),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::NoEffect),
+         UNKNOWN_MEMEFFECTS)
+
 // int32 __isPlatformVersionAtLeast(uint32_t platform, uint32_t major,
 //                                  uint32_t minor, uint32_t patch);
 // This a C builtin provided by compiler-rt.
