@@ -274,7 +274,12 @@
     "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift",
     "EmbeddedPrint.swift",
-    "InlineArray.swift"
+    "InlineArray.swift",
+    "Box.swift",
+    "Cell.swift",
+    "Borrow.swift",
+    "RefCell.swift",
+    "Inout.swift"
   ],
   "Result": [
     "Result.swift"

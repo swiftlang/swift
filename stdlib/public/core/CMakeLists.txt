@@ -45,11 +45,14 @@ split_embedded_sources(
   EMBEDDED BidirectionalCollection.swift
   EMBEDDED Bitset.swift
   EMBEDDED Bool.swift
+  EMBEDDED Borrow.swift
+  EMBEDDED Box.swift
     NORMAL BridgeObjectiveC.swift
   EMBEDDED BridgeStorage.swift
     NORMAL BridgingBuffer.swift
   EMBEDDED Builtin.swift
   EMBEDDED BuiltinMath.swift
+  EMBEDDED Cell.swift
   EMBEDDED Character.swift
     NORMAL CocoaArray.swift
     NORMAL Codable.swift
@@ -94,6 +97,7 @@ split_embedded_sources(
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
   EMBEDDED InlineArray.swift
+  EMBEDDED Inout.swift
   EMBEDDED InputStream.swift
   EMBEDDED IntegerParsing.swift
   EMBEDDED Integers.swift
@@ -133,6 +137,7 @@ split_embedded_sources(
   EMBEDDED RangeReplaceableCollection.swift
   EMBEDDED RangeSet.swift
   EMBEDDED RangeSetRanges.swift
+  EMBEDDED RefCell.swift
     NORMAL ReflectionMirror.swift
   EMBEDDED Repeat.swift
     NORMAL REPL.swift
@@ -345,6 +350,8 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "ValueGene
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableParameters")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableTypes")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AllowUnsafeAttribute")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "RawLayout")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "InoutLifetimeDependence")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
