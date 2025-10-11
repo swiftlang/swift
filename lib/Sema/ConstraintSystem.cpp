@@ -1808,10 +1808,8 @@ struct TypeSimplifier {
           // so the concrete dependent member type is considered a "hole" in
           // order to continue solving.
           auto memberTy = DependentMemberType::get(lookupBaseType, assocType);
-          if (CS.shouldAttemptFixes() &&
-              CS.getPhase() == ConstraintSystemPhase::Solving) {
+          if (CS.inSalvageMode())
             return PlaceholderType::get(CS.getASTContext(), memberTy);
-          }
 
           return memberTy;
         }
@@ -2097,8 +2095,6 @@ SolutionResult ConstraintSystem::salvage() {
   if (isDebugMode()) {
     llvm::errs() << "---Attempting to salvage and emit diagnostics---\n";
   }
-
-  setPhase(ConstraintSystemPhase::Diagnostics);
 
   // Attempt to solve again, capturing all states that come from our attempts to
   // select overloads or bind type variables.
@@ -4797,10 +4793,6 @@ void SyntacticElementTargetKey::dump(raw_ostream &OS) const {
 /// This is guaranteed to always emit an error message.
 ///
 void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
-  setPhase(ConstraintSystemPhase::Diagnostics);
-
-  SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
-
   auto &DE = getASTContext().Diags;
 
   // If constraint system is in invalid state always produce
