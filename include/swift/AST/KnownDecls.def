@@ -20,6 +20,7 @@
 #endif
 
 FUNC_DECL(ArrayForceCast, "_arrayForceCast")
+FUNC_DECL(ArrayWitnessCast, "_arrayWitnessCast")
 FUNC_DECL(ArrayConditionalCast, "_arrayConditionalCast")
 
 FUNC_DECL(DictionaryUpCast, "_dictionaryUpCast")
