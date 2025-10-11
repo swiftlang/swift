@@ -3012,7 +3012,8 @@ function Build-Dispatch([Hashtable] $Platform) {
     -Defines @{
       ENABLE_SWIFT = "YES";
       dispatch_INSTALL_ARCH_SUBDIR = "YES";
-    }
+      USE_PREBUILT_SDK = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "NO" } else { "YES" };
+  }
 }
 
 function Test-Dispatch {
@@ -3061,6 +3062,7 @@ function Build-Foundation([Hashtable] $Platform) {
       _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
       _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
       SwiftFoundation_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapFoundationMacros)\bin"
+      USE_PREBUILT_SDK = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "NO" } else { "YES" };
     }
 }
 
@@ -3813,6 +3815,9 @@ function Test-SourceKitLSP {
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Crypto)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform Crypto)\lib",
     "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform Crypto)\lib\libCCryptoBoringSSL.lib",
+    # swift-collections
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Collections)\swift",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform Collections)\lib",
     # swift-asn1
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform ASN1)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform ASN1)\lib",
