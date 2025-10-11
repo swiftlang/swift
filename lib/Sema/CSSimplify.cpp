@@ -16529,14 +16529,22 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
                                      PreparedOverloadBuilder *preparedOverload) {
   if (preparedOverload) {
     ASSERT(PreparingOverload);
-    if (kind == ConstraintKind::Bind) {
+
+    auto *locatorPtr = getConstraintLocator(locator);
+
+    // Fast path to save on memory usage.
+    if (kind == ConstraintKind::Bind &&
+        locatorPtr == preparedOverload->Locator) {
       ASSERT(!isFavored);
       preparedOverload->addedBindConstraint(first, second);
       return;
     }
-    auto c = Constraint::create(*this, kind, first, second,
-                                getConstraintLocator(locator));
-    if (isFavored) c->setFavored();
+
+    auto c = Constraint::create(*this, kind, first, second, locatorPtr);
+
+    if (isFavored)
+      c->setFavored();
+
     preparedOverload->addedConstraint(c);
     return;
   }
@@ -16829,16 +16837,24 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
     // FIXME: Transitional hack.
     bool enablePreparedOverloads = getASTContext().TypeCheckerOpts.SolverEnablePreparedOverloads;
+    bool forDiagnostics = inSalvageMode();
 
+    // Don't reuse prepared overloads from normal type checking in salvage(),
+    // since they will contain fixes and such.
     auto *preparedOverload = constraint.getPreparedOverload();
-    if (!preparedOverload) {
-      if (enablePreparedOverloads &&
-          constraint.getOverloadChoice().canBePrepared()) {
-        preparedOverload = prepareOverload(constraint.getOverloadChoice(),
-                                           constraint.getDeclContext(),
-                                           constraint.getLocator());
-        const_cast<Constraint &>(constraint).setPreparedOverload(preparedOverload);
-      }
+    if (preparedOverload &&
+        preparedOverload->wasForDiagnostics() != forDiagnostics) {
+      preparedOverload = nullptr;
+    }
+
+    if (!preparedOverload &&
+        enablePreparedOverloads &&
+        constraint.getOverloadChoice().canBePrepared()) {
+      preparedOverload = prepareOverload(constraint.getOverloadChoice(),
+                                         constraint.getDeclContext(),
+                                         constraint.getLocator(),
+                                         forDiagnostics);
+      const_cast<Constraint &>(constraint).setPreparedOverload(preparedOverload);
     }
 
     resolveOverload(constraint.getOverloadChoice(),
