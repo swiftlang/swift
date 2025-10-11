@@ -875,6 +875,8 @@ WARNING(sema_import_current_module_with_file,none,
         (StringRef, Identifier))
 ERROR(sema_opening_import,Fatal,
       "opening import file for module %0: %1", (Identifier, StringRef))
+NOTE(sema_module_aliased,none,
+     "module name '%0' is aliased to '%1'", (StringRef, StringRef))
 
 REMARK(serialization_skipped_invalid_decl,none,
        "serialization skipped invalid %kind0",
