@@ -251,6 +251,12 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Like PartialApplyCapture but for use with CoroFunctionPointer values.
   PointerAuthSchema CoroPartialApplyCapture;
+
+  /// Stored in a coro allocator struct, the function used to allocate memory.
+  PointerAuthSchema CoroAllocationFunction;
+
+  /// Stored in a coro allocator struct, the function used to deallocate memory.
+  PointerAuthSchema CoroDeallocationFunction;
 };
 
 enum class JITDebugArtifact : unsigned {
