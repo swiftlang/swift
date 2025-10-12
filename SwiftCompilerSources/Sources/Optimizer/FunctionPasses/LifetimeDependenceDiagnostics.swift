@@ -184,7 +184,8 @@ private struct DiagnoseDependence {
       if inoutArg == sourceArg {
         return .continueWalk
       }
-      if function.argumentConventions.getDependence(target: inoutArg.index, source: sourceArg.index) != nil {
+      if function.argumentConventions.parameterDependence(targetArgumentIndex: inoutArg.index,
+                                                          sourceArgumentIndex: sourceArg.index) != nil {
         // The inout result depends on a lifetime that is inherited or borrowed in the caller.
         log("  has dependent inout argument: \(inoutArg)")
         return .continueWalk
