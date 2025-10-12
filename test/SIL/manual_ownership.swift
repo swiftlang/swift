@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-sil -verify \
 // RUN:   -Werror SemanticCopies \
+// RUN:   -Werror DynamicExclusivity \
 // RUN:   -enable-experimental-feature ManualOwnership
 
 // REQUIRES: swift_feature_ManualOwnership
@@ -225,19 +226,19 @@ func reassignments_1_fixed_2() {
 
 @_manualOwnership
 public func basic_loop_trivial_values(_ t: Triangle, _ xs: [Triangle]) {
-  var p: Pair = t.a
+  var p: Pair = t.a // expected-error {{accessing 't.a' here may incur runtime exclusivity check, because it's a member of a reference type}}
   for x in xs { // expected-error {{independent copy of 'xs' is required}}
-    p = p.midpoint(x.a)
+    p = p.midpoint(x.a) // expected-error {{accessing 'x.a' here may incur runtime exclusivity check, because it's a member of a reference type}}
   }
-  t.a = p
+  t.a = p // expected-error {{accessing 't.a' here may incur runtime exclusivity check, because it's a member of a reference type}}
 }
 @_manualOwnership
 public func basic_loop_trivial_values_fixed(_ t: Triangle, _ xs: [Triangle]) {
-  var p: Pair = t.a
+  var p: Pair = t.a // expected-error {{accessing 't.a' here may incur runtime exclusivity check, because it's a member of a reference type}}
   for x in copy xs {
-    p = p.midpoint(x.a)
+    p = p.midpoint(x.a) // expected-error {{accessing 'x.a' here may incur runtime exclusivity check, because it's a member of a reference type}}
   }
-  t.a = p
+  t.a = p // expected-error {{accessing 't.a' here may incur runtime exclusivity check, because it's a member of a reference type}}
 }
 
 // FIXME: the only reason for so many copies below is because

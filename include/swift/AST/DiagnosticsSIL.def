@@ -433,6 +433,8 @@ ERROR(wrong_linkage_for_serialized_function,none,
       "function has wrong linkage to be called from %0", (StringRef))
 NOTE(performance_called_from,none,
       "called from here", ())
+
+// ManualOwnership diagnostics
 GROUPED_WARNING(manualownership_copy,SemanticCopies,none,
       "implicit 'copy' happens here; please report this vague diagnostic as a bug", ())
 GROUPED_WARNING(manualownership_copy_happened,SemanticCopies,none,
@@ -441,6 +443,10 @@ GROUPED_WARNING(manualownership_copy_demanded,SemanticCopies,none,
       "independent copy of %0 is required here; write 'copy' to acknowledge or 'consume' to elide", (Identifier))
 GROUPED_WARNING(manualownership_copy_captured,SemanticCopies,none,
       "closure capture of '%0' requires independent copy of it; write [%0 = copy %0] in the closure's capture list to acknowledge", (StringRef))
+GROUPED_WARNING(manualownership_exclusivity,DynamicExclusivity,none,
+      "exclusive access here will be checked at runtime", ())
+GROUPED_WARNING(manualownership_exclusivity_named,DynamicExclusivity,none,
+      "accessing %0 here may incur runtime exclusivity check%1", (Identifier, StringRef))
 
 // 'transparent' diagnostics
 ERROR(circular_transparent,none,
