@@ -1121,15 +1121,28 @@ extension LifetimeDependenceDefUseWalker {
     if apply.isCallee(operand: operand) {
       return leafUse(of: operand)
     }
+    // Find any copied dependence on this source operand, either targeting the result or an inout parameter. If the
+    // lifetime dependence is scoped, then we can ignore it because a mark_dependence [nonescaping] represents the
+    // dependence.
+    for targetOperand in apply.argumentOperands {
+      guard !targetOperand.value.isEscapable else {
+        continue
+      }
+      if let dep = apply.parameterDependence(target: targetOperand, source: operand),
+         !dep.isScoped {
+        let targetAddress = targetOperand.value
+        assert(targetAddress.type.isAddress, "a parameter dependence target must be 'inout'")
+        if dependentUse(of: operand, dependentAddress: targetAddress) == .abortWalk {
+          return .abortWalk
+        }
+      }
+    }
     if let dep = apply.resultDependence(on: operand),
        !dep.isScoped {
       // Operand is nonescapable and passed as a call argument. If the
       // result inherits its lifetime, then consider any nonescapable
       // result value to be a dependent use.
       //
-      // If the lifetime dependence is scoped, then we can ignore it
-      // because a mark_dependence [nonescaping] represents the
-      // dependence.
       if let result = apply.singleDirectResult, !result.isEscapable {
         if dependentUse(of: operand, dependentValue: result) == .abortWalk {
           return .abortWalk
