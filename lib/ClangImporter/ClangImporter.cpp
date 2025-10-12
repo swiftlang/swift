@@ -2844,13 +2844,19 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
     for (auto UI : implicitImportInfo.AdditionalUnloadedImports)
       Imported.insert(UI.module.getImportPath());
     assert(implicitImportInfo.AdditionalImports.empty());
+    const bool cxx = SwiftContext.LangOpts.EnableCXXInterop;
 
-    auto addImplicitImport = [&implicitImportInfo, &Imported,
+    auto addImplicitImport = [&implicitImportInfo, &Imported, cxx,
                               this](const clang::Module *M,
                                     bool guaranteedUnique) {
-      const bool cannotBeImported = llvm::any_of(M->Requirements, [](auto &Req) {
-        return !Req.RequiredState && Req.FeatureName == "swift";
-      });
+      const bool cannotBeImported =
+          llvm::any_of(M->Requirements, [cxx](auto &Req) {
+            if (Req.FeatureName == "swift")
+              return !Req.RequiredState;
+            if (Req.FeatureName == "cplusplus")
+              return Req.RequiredState != cxx;
+            return false;
+          });
       if (cannotBeImported) {
         return;
       }
