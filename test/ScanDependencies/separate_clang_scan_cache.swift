@@ -10,6 +10,6 @@
 // Ensure we the modules' output path is set to the module cache
 // CHECK-DEPS: "swift": "A"
 // CHECK-DEPS:            "swift": "A"
-// CHECK-DEPS:      "modulePath": "{{.*}}separate_clang_scan_cache.swift.tmp.module-cache{{/|\\\\}}A-{{.*}}.swiftmodule"
+// CHECK-DEPS:      "modulePath": "TMP_DIR.module-cache{{/|\\\\}}A-{{.*}}.swiftmodule"
 
 import A

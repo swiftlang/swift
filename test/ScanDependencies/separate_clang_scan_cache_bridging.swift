@@ -14,12 +14,12 @@
 // CHECK-DEPS:            "clang": "F"
 // CHECK-DEPS-NEXT:     },
 // CHECK-DEPS-NEXT:     {
-// CHECK-DEPS-NEXT:       "modulePath": "{{.*}}separate_clang_scan_cache_bridging.swift.tmp.module-cache{{/|\\\\}}F-{{.*}}.pcm"
+// CHECK-DEPS-NEXT:       "modulePath": "TMP_DIR.module-cache{{/|\\\\}}F-{{.*}}.pcm"
 
 // CHECK-DEPS:            "swift": "A"
 // CHECK-DEPS-NEXT:     },
 // CHECK-DEPS-NEXT:     {
-// CHECK-DEPS-NEXT:       "modulePath": "{{.*}}separate_clang_scan_cache_bridging.swift.tmp.module-cache{{/|\\\\}}A-{{.*}}.swiftmodule"
+// CHECK-DEPS-NEXT:       "modulePath": "TMP_DIR.module-cache{{/|\\\\}}A-{{.*}}.swiftmodule"
 
 
 
