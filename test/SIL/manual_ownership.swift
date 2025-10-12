@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-sil -verify \
+// RUN:   -Werror SemanticCopies \
 // RUN:   -enable-experimental-feature ManualOwnership
 
 // REQUIRES: swift_feature_ManualOwnership
