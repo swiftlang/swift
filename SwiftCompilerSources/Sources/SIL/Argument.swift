@@ -290,7 +290,7 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
   }
 
   public subscript(_ argumentIndex: Int) -> ArgumentConvention {
-    if let paramIdx = parameterIndex(for: argumentIndex) {
+    if let paramIdx = parameterIndex(ofArgumentIndex: argumentIndex) {
       return convention.parameters[paramIdx].convention
     }
     let resultInfo = convention.indirectSILResult(at: argumentIndex)
@@ -298,21 +298,21 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
   }
 
   public subscript(result argumentIndex: Int) -> ResultInfo? {
-    if parameterIndex(for: argumentIndex) != nil {
+    if parameterIndex(ofArgumentIndex: argumentIndex) != nil {
       return nil
     }
     return convention.indirectSILResult(at: argumentIndex)
   }
 
   public subscript(parameter argumentIndex: Int) -> ParameterInfo? {
-    guard let paramIdx = parameterIndex(for: argumentIndex) else {
+    guard let paramIdx = parameterIndex(ofArgumentIndex: argumentIndex) else {
       return nil
     }
     return convention.parameters[paramIdx]
   }
 
   public subscript(parameterDependencies targetArgumentIndex: Int) -> FunctionConvention.LifetimeDependencies? {
-    guard let targetParamIdx = parameterIndex(for: targetArgumentIndex) else {
+    guard let targetParamIdx = parameterIndex(ofArgumentIndex: targetArgumentIndex) else {
       return nil
     }
     return convention.parameterDependencies(for: targetParamIdx)
@@ -365,14 +365,14 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
 }
 
 extension ArgumentConventions {
-  private func parameterIndex(for argIdx: Int) -> Int? {
+  private func parameterIndex(ofArgumentIndex argIdx: Int) -> Int? {
     let firstParamIdx = firstParameterIndex  // bridging call
     return argIdx < firstParamIdx ? nil : argIdx - firstParamIdx
   }
 
   private func findDependence(source argumentIndex: Int, in dependencies: FunctionConvention.LifetimeDependencies?)
     -> LifetimeDependenceConvention? {
-    guard let paramIdx = parameterIndex(for: argumentIndex) else {
+    guard let paramIdx = parameterIndex(ofArgumentIndex: argumentIndex) else {
       return nil
     }
     return dependencies?[paramIdx]
