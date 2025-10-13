@@ -35,12 +35,15 @@ let package = Package(
                 .product(name: "SwiftParser", package: "swift-syntax"),
                 .product(name: "SwiftSyntax", package: "swift-syntax"),
                 .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
-                .product(name: "SwiftSyntaxMacro", package: "swift-syntax")
-			]
+                .product(name: "SwiftSyntaxMacros", package: "swift-syntax")
+			],
+			path: "Sources/SwiftMacros",
 		),
 		.target(
 			name: "SwiftifyImport",
-			dependencies: ["SwiftifyImportMacro"]
+			dependencies: ["SwiftifyImportMacro"],
+			path: "Sources/PublicCorePortal",
+			swiftSettings: [.enableExperimentalFeature("LifetimeDependence")],
 		)
 	]
 )
