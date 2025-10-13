@@ -2241,7 +2241,12 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
 
   // When a macro is not found for a custom attribute, it may be a non-macro.
   // So bail out to prevent diagnostics from the contraint system.
-  if (macroRef.getAttr()) {
+  if (auto *attr = macroRef.getAttr()) {
+    // If we already resolved this CustomAttr to a nominal, this isn't for a
+    // macro.
+    if (attr->getNominalDecl())
+      return ConcreteDeclRef();
+
     auto foundMacros = namelookup::lookupMacros(dc, macroRef.getModuleName(),
                                                 macroRef.getMacroName(), roles);
     if (foundMacros.empty())
