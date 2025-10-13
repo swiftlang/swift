@@ -365,10 +365,6 @@ public:
   /// formal evaluation scope.
   ManagedValue formalAccessCopy(SILGenFunction &SGF, SILLocation loc);
 
-  /// This is the same operation as 'copy', but works on +0 values that don't
-  /// have cleanups.  It returns a +1 value with one.
-  ManagedValue copyUnmanaged(SILGenFunction &SGF, SILLocation loc);
-
   /// This is the same operation as 'formalAccessCopy', but works on +0 values
   /// that don't have cleanups.  It returns a +1 value with one.
   ManagedValue formalAccessCopyUnmanaged(SILGenFunction &SGF, SILLocation loc);

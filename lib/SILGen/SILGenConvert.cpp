@@ -1049,7 +1049,7 @@ ManagedValue SILGenFunction::manageOpaqueValue(ManagedValue value,
   }
 
   // Otherwise, copy the value into a temporary.
-  return value.copyUnmanaged(*this, loc);
+  return value.copy(*this, loc);
 }
 
 ManagedValue SILGenFunction::emitAsOrig(SILLocation loc,
