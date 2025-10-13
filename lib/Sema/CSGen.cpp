@@ -2208,7 +2208,7 @@ namespace {
         if (contextualType->isArray())
           eltType = contextualType->getArrayElementType();
 
-        if (contextualType->isInlineArray())
+        if (contextualType->isInlineArray() || contextualType->is_InlineArray())
           eltType = contextualType->getInlineArrayElementType();
 
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
