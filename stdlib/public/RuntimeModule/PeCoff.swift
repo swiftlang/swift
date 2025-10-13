@@ -326,8 +326,8 @@ struct PeSection {
   var pointerToRawData: UInt32
   var pointerToRelocations: UInt32
   var pointerToLinenumbers: UInt32
-  var numberOfRelocations: UInt32
-  var numberOfLinenumbers: UInt32
+  var numberOfRelocations: UInt16
+  var numberOfLinenumbers: UInt16
   var characteristics: pe_section_characteristics
 }
 
@@ -468,8 +468,6 @@ final class PeCoffImage {
     // Now read the sections
     let sectionStart = optionalHeaderStart
       + Address(peHeader.SizeOfOptionalHeader)
-      + Address(Int(windowsHeader.NumberOfRvaAndSizes)
-                  * MemoryLayout<pe_data_directory_entry>.stride)
 
     var sections = try source.fetch(
       from: sectionStart,
@@ -484,7 +482,7 @@ final class PeCoffImage {
     var stringTable: PeCoffStringTable? = nil
     var functions: [PeFunction]? = nil
 
-    if source.isMappedImage && peHeader.PointerToSymbolTable != 0 {
+    if !source.isMappedImage && peHeader.PointerToSymbolTable != 0 {
       // For images loaded from disk, if we find there are symbols, we
       // should read them, and the corresponding string table
       symbols = try source.fetch(
@@ -596,10 +594,12 @@ final class PeCoffImage {
 
     self.functions = functions
 
+    // ###FIXME: This part isn't working correctly yet
     for section in sections {
       var theName = section.Name
-      var name = withUnsafeBytes(of: &theName) {
-        String(decoding: $0, as: UTF8.self)
+      var name = withUnsafeBytes(of: &theName) { buffer in
+        let len = strnlen(buffer.baseAddress!, buffer.count)
+        return String(decoding: buffer[0..<len], as: UTF8.self)
       }
 
       if name.hasPrefix("/") {
@@ -732,7 +732,7 @@ final class PeCoffImage {
       return source[base..<end]
     } else {
       let base = Address(section.pointerToRawData)
-      let end = base + Address(section.sizeOfRawData)
+      let end = base + Address(min(section.virtualSize, section.sizeOfRawData))
       return source[base..<end]
     }
   }
@@ -779,15 +779,19 @@ final class PeCoffImage {
 
   /// Look-up an address and find the corresponding function
   func lookupSymbol(
-    address absoluteAddress: Address
+    address relativeAddress: Address
   ) -> ImageSymbol? {
-    let address = absoluteAddress - self.imageBase
-
     // ###TODO: PDB support
+    let address = relativeAddress + Address(imageBase)
 
-    // If we have a function list (which means we had COFF symbols),
-    // use that, otherwise ask the DWARF reader for help.
-    if let functions {
+    if let function = dwarfReader?.lookupFunction(at: address) {
+      let offset = address - function.lowPC
+      return ImageSymbol(name: function.rawName,
+                         offset: Int(offset))
+    } else if let functions {
+      // If we don't have a DWARF reader, but we do have a function list,
+      // try looking in the function list.
+
       var min = 0, max = functions.count
       while min < max {
         let mid = min + (max - min) / 2
@@ -806,10 +810,6 @@ final class PeCoffImage {
           min = mid + 1
         }
       }
-    } else if let function = dwarfReader?.lookupFunction(at: address) {
-      let offset = address - function.lowPC
-      return ImageSymbol(name: function.rawName,
-                         offset: Int(offset))
     }
 
     return nil
@@ -832,6 +832,7 @@ extension PeCoffImage: DwarfSource {
     //
     // We intentionally choose to only support a small handful
     // of truncated sections here.
+
     switch section {
     case .debugAbbrev:
       if let abbrevs = getSection(".debug_abbrev") {

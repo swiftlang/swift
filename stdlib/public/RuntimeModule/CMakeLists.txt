@@ -131,6 +131,7 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     ${RUNTIME_COMPILE_FLAGS}
+    -g
     -parse-stdlib
 
   LINK_FLAGS
