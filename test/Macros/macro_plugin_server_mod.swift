@@ -64,6 +64,7 @@
 // CHECK-NEXT: <-(plugin:[[#PID3]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
 // CHECK-NEXT: ->(plugin:[[#PID3]]) {"expandFreestandingMacro":{"discriminator":"{{.*}}","lexicalContext":{{.*}},"macro":{"moduleName":"MacroDefinition","name":"stringify","typeName":"StringifyMacro"}{{.*}}
 // CHECK-NEXT: <-(plugin:[[#PID3]]) {"expandMacroResult":{"diagnostics":[],"expandedSource":"(1, \"1\")"}}
+// CHECK-NEXT: ->(plugin:[[#PID3]]) {{$}}
 
 //--- MacroDefinition.swift
 import SwiftSyntax
