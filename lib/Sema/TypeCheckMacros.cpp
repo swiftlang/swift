@@ -977,14 +977,14 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
     if (auto *expr = target.dyn_cast<Expr *>()) {
       ASSERT(isa<ClosureExpr>(expr));
 
-      auto *closure = cast<ClosureExpr>(expr);
       // A closure body macro expansion replaces the full source
-      // range of the closure body starting from `in` and ending right
-      // before the closing brace.
-      return Lexer::getCharSourceRangeFromSourceRange(
-          sourceMgr, SourceRange(Lexer::getLocForEndOfToken(
-                                     sourceMgr, closure->getInLoc()),
-                                 closure->getEndLoc()));
+      // range of the closure body's contents.
+      auto *closure = cast<ClosureExpr>(expr);
+      if (auto range = closure->getBody()->getContentRange())
+        return Lexer::getCharSourceRangeFromSourceRange(sourceMgr, range);
+
+      // If we have an empty body, just use the end loc.
+      return CharSourceRange(closure->getEndLoc(), 0);
     }
 
     // If the function has a body, that's what's being replaced.

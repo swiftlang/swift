@@ -2897,7 +2897,6 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         diagnose(Tok, diag::expected_closure_in)
           .fixItInsert(Tok.getLoc(), "in ");
       }
-      inLoc = Tok.getLoc();
     }
   }
 
