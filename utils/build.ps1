@@ -4215,6 +4215,7 @@ if (-not $SkipBuild) {
       }
 
       Invoke-BuildStep Build-ZLib $Build
+      Invoke-BuildStep Build-Brotli $Build
       Invoke-BuildStep Build-XML2 $Build
       Invoke-BuildStep Build-CURL $Build
     }
