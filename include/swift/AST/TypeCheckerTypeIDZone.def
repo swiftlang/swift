@@ -255,7 +255,7 @@ SWIFT_REQUEST(TypeChecker, EnumElementExprPatternRequest,
 SWIFT_REQUEST(TypeChecker, ResolvePatternRequest,
               Pattern *(Pattern *, DeclContext *, bool),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, OpaqueReadOwnershipRequest,
+SWIFT_REQUEST(TypeChecker, DirectOpaqueReadOwnershipRequest,
               OpaqueReadOwnership(AbstractStorageDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, OpaqueResultTypeRequest,
