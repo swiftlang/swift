@@ -24,9 +24,7 @@
 //
 // Phase 4: make sure we only compiled LeafModule and OtherModule one time:
 //
-// RUN: NUM_LEAF_MODULES=$(find %t/modulecache -type f -name 'LeafModule-*.swiftmodule' | wc -l)
-// RUN: NUM_OTHER_MODULES=$(find %t/modulecache -type f -name 'OtherModule-*.swiftmodule' | wc -l)
-// RUN: if [ ! $NUM_LEAF_MODULES -eq 1 ]; then echo "Should only be 1 LeafModule, found $NUM_LEAF_MODULES"; exit 1; fi
-// RUN: if [ ! $NUM_OTHER_MODULES -eq 1 ]; then echo "Should only be 1 OtherModule, found $NUM_OTHER_MODULES"; exit 1; fi
+// RUN: %find_files %t/modulecache 'LeafModule-*.swiftmodule' | %llvm_obj_root/bin/count 1
+// RUN: %find_files %t/modulecache 'OtherModule-*.swiftmodule' | %llvm_obj_root/bin/count 1
 import LeafModule
 import OtherModule
