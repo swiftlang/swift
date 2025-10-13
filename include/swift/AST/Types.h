@@ -7987,6 +7987,7 @@ public:
   Type getCountType() const { return countType; }
 
   CanType getReducedShape();
+  GenericTypeParamType *getRootGenericParam();
 
 public:
   void Profile(llvm::FoldingSetNodeID &ID) {

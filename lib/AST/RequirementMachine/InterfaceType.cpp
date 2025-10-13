@@ -175,10 +175,6 @@ MutableTerm RewriteContext::getMutableTermForType(CanType paramType,
         thisProto = proto;
         innermostAssocTypeWasResolved = true;
       }
-      if (paramType->getKind() == TypeKind::Pack) {
-        containsShape = true;
-        symbols.pop_back();
-      }
       symbols.push_back(Symbol::forAssociatedType(thisProto,
                                                   assocType->getName(),
                                                   *this));
@@ -205,9 +201,7 @@ MutableTerm RewriteContext::getMutableTermForType(CanType paramType,
 
   if (containsShape)
     symbols.push_back(Symbol::forShape(*this));
-  
-  llvm::dbgs() << MutableTerm(symbols);
-  
+
   return MutableTerm(symbols);
 }
 
@@ -394,7 +388,6 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
     
     result = DependentMemberType::get(result, assocType);
   }
-  llvm::dbgs() << "type for symbol range " << result << " from  " << MutableTerm(begin,end);
   return result;
 }
 
@@ -414,9 +407,14 @@ Type PropertyMap::getTypeForTerm(const MutableTerm &term,
 /// See RewriteSystemBuilder::getSubstitutionSchemaFromType().
 unsigned RewriteContext::getGenericParamIndex(Type type) {
   auto *paramTy = type->castTo<GenericTypeParamType>();
-  ASSERT(paramTy->getDepth() == 0);
-  return paramTy->getIndex();
+  return getGenericParamIndex(paramTy);
 }
+
+unsigned RewriteContext::getGenericParamIndex(GenericTypeParamType* type) {
+  ASSERT(type->getDepth() == 0);
+  return type->getIndex();
+}
+
 
 /// Computes the term corresponding to a member type access on a substitution.
 ///
@@ -441,11 +439,12 @@ RewriteContext::getRelativeTermForType(CanType typeWitness,
   unsigned index = getGenericParamIndex(typeWitness->getRootGenericParam());
 
   result = MutableTerm(substitutions[index]);
-  MutableTerm endInShape;
+  bool endInShape;
 
-  // If the substitution ends in a Shape, save it for the end of processing
-  if (result.isPackTerm()) {
-    endInShape = MutableTerm(result.removeEnd());
+  // If the substitution ends in a Shape, remove but remember
+  if (result.isShapeTerm()) {
+    result.removeEnd();
+    endInShape = true;
   }
   
   // If the substitution is a term consisting of a single protocol symbol
@@ -485,9 +484,15 @@ RewriteContext::getRelativeTermForType(CanType typeWitness,
   for (auto iter = symbols.rbegin(), end = symbols.rend(); iter != end; ++iter)
     result.add(*iter);
 
-  if (!endInShape.empty())
-    result.append(endInShape);
-  llvm::dbgs() << "result of relative term for type ", result.dump(llvm::dbgs());
+  if (endInShape)
+    result.add(Symbol::forShape(*this));
+
+  if (Debug.contains(DebugFlags::Add)) {
+    llvm::dbgs() << "relativeTermForType: ";
+    result.dump(llvm::dbgs());
+    llvm::dbgs() << "\n";
+  }
+
   return result;
 }
 
@@ -505,16 +510,14 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
   return schema.transformWithPosition(
       TypePosition::Invariant,
       [&](Type t, TypePosition pos) -> std::optional<Type> {
-        llvm::dbgs() << "\n transform with position in getTypeFromSubstSchema ", t.dump(llvm::dbgs());
 
-        // Consider if as in TypeDifference, there should be a different treatment for PackExpansionTypes here
         if (t->is<GenericTypeParamType>()) {
           auto index = RewriteContext::getGenericParamIndex(t);
           auto substitution = substitutions[index];
 
           bool isShapePosition = (pos == TypePosition::Shape);
-          auto shapeTerm = MutableTerm(substitution);
-          bool isShapeTerm = shapeTerm.isPackTerm();
+          auto shrinkableTerm = MutableTerm(substitution);
+          bool isShapeTerm = shrinkableTerm.isShapeTerm();
           if (isShapePosition != isShapeTerm) {
             ABORT([&](auto &out) {
               out << "Shape vs. type mixup\n\n";
@@ -531,10 +534,10 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
           }
 
           // Undo the thing where the count type of a PackExpansionType
-          // becomes a shape term.
+          // gains a shape kind.
           if (isShapeTerm) {
-            shapeTerm.removeEnd();
-            substitution = Term::get(shapeTerm, Context);
+            shrinkableTerm.removeEnd();
+            substitution = Term::get(shrinkableTerm, Context);
           }
 
           // Prepend the prefix of the lookup key to the substitution.
@@ -548,8 +551,8 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
             MutableTerm result(prefix);
             result.append(substitution);
             return getTypeForTerm(result, genericParams);
-          }
-        }
+          }}
+
 
         ASSERT(!t->isTypeParameter());
         return std::nullopt;
@@ -594,27 +597,26 @@ RewriteContext::getRelativeSubstitutionSchemaFromType(
           return std::nullopt;
         
         auto term = getRelativeTermForType(CanType(t), substitutions);
-        
-        llvm::dbgs() << "\n transform with position in getRelativeSubstitutionFromTYpe ", term.dump(llvm::dbgs());
-        
+
         unsigned index = result.size();
-        
+
         // PackExpansionType(pattern=T, count=U) becomes
         // PackExpansionType(pattern=τ_0_0, count=τ_0_1) with
         //
         // τ_0_0 := T
         // τ_0_1 := U.[shape]
         
-        // Turn a count type of PackExpansion type away from a shape term
+        // Make sure count type of PackExpansion are not shapes
+        // But patterns are packs
         if (pos == TypePosition::Shape) {
-          if (term.isPackTerm()) {
+          if (term.isShapeTerm()) {
             MutableTerm mutTerm(term);
             mutTerm.removeEnd();
             term = mutTerm;
           }
-          
           result.push_back(Term::get(term, *this));
-          return CanGenericTypeParamType::getPackType(/*depth=*/0, index, Context);
+          return CanGenericTypeParamType::getPackType(/*depth=*/0,
+                                                      index, Context);
         }
         
         result.push_back(Term::get(term, *this));

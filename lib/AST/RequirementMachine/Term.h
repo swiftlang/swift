@@ -76,8 +76,7 @@ public:
     return begin()->getRootProtocol();
   }
 
-  bool isPackTerm() {
-    if (size() == 0) return false;
+  bool isShapeTerm() {
     auto kind = back().getKind();
     return kind == Symbol::Kind::Shape;
   }
@@ -166,8 +165,7 @@ public:
     return begin()->getRootProtocol();
   }
   
-  bool isPackTerm() {
-    if (size() == 0) return false;
+  bool isShapeTerm() {
     auto kind = back().getKind();
     return kind == Symbol::Kind::Shape;
   }

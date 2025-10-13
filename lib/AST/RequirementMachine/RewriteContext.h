@@ -173,7 +173,11 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   static unsigned getGenericParamIndex(Type type);
+<<<<<<< HEAD
   static unsigned getGenericParamIndex(GenericTypeParamType* type, ArrayRef<Term> substitutions);
+=======
+  static unsigned getGenericParamIndex(GenericTypeParamType* type);
+>>>>>>> 0c4382c58ca (Expand support for PackExpansion type in requirements machine)
 
   MutableTerm getMutableTermForType(CanType paramType,
                                     const ProtocolDecl *proto);

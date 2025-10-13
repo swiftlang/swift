@@ -309,18 +309,37 @@ swift::rewriting::buildTypeDifference(
   auto nextSubstitution = [&](Term t) -> Type {
     unsigned index = resultSubstitutions.size();
     resultSubstitutions.push_back(t);
-    if (t.isPackTerm())
+    if (t.isShapeTerm())
       return GenericTypeParamType::getPack(0, index, astCtx);
     else
       return GenericTypeParamType::getType(/*depth=*/0, index, astCtx);
+  };
+
+  auto packRootType = [&](PackExpansionType* t) -> std::optional<GenericTypeParamType*> {
+    auto pattern = t->getPatternType();
+    while(pattern->is<PackExpansionType>()) {
+      pattern = pattern->getAs<PackExpansionType>()->getPatternType();
+    }
+    if (pattern->is<GenericTypeParamType>()) {
+      return pattern->getAs<GenericTypeParamType>();
+    } else return std::nullopt;
   };
 
   auto type = symbol.getConcreteType();
   auto substitutions = symbol.getSubstitutions();
   
   Type resultType = type.transformRec([&](Type t) -> std::optional<Type> {
-    if (t->is<GenericTypeParamType>()) {
-      unsigned index = RewriteContext::getGenericParamIndex(t);
+    if (ctx.getDebugOptions().contains(DebugFlags::Add)) {
+      llvm::dbgs() << "buildTypeDifference transformRec " << t << "\n";
+      llvm::dbgs() << "What type is t?" << t->is<GenericTypeParamType>() << " -< Generic " << t->is<PackExpansionType>() << " -< PackExpansion or other\n\n";
+    }
+    if (t->is<GenericTypeParamType>() || t->is<PackExpansionType>()) {
+
+      auto base = t->is<GenericTypeParamType>() ? t->getAs<GenericTypeParamType>() : packRootType(t->getAs<PackExpansionType>());
+      if (!base)
+        return std::nullopt;
+
+      unsigned index = RewriteContext::getGenericParamIndex(base.value());
 
       for (const auto &pair : sameTypes) {
         if (pair.first == index)
@@ -333,13 +352,13 @@ swift::rewriting::buildTypeDifference(
           auto concreteType = concreteSymbol.getConcreteType();
 
           return concreteType.transformRec([&](Type tWithin) -> std::optional<Type> {
-            if (tWithin->is<PackExpansionType>()) {
-              return nextSubstitution(substitutions[index]);
-            }
             if (tWithin->is<GenericTypeParamType>()) {
               unsigned indexWithin = RewriteContext::getGenericParamIndex(tWithin);
               Term substitution = concreteSymbol.getSubstitutions()[indexWithin];
               return nextSubstitution(substitution);
+            }
+            if (tWithin->is<PackExpansionType>()) {
+              return nextSubstitution(substitutions[index]);
             }
 
             // DependentMemberType with ErrorType base is OK.
@@ -376,7 +395,9 @@ swift::rewriting::buildTypeDifference(
     llvm_unreachable("Bad symbol kind");
   }();
 
-  llvm::dbgs() << "buildTypeDifference: baseTerm:  " << baseTerm << " resultSymbol: " << resultSymbol << " :symbol: " << symbol << "\\n";
+  if (ctx.getDebugOptions().contains(DebugFlags::Add)) {
+    llvm::dbgs() << "\n buildTypeDifference: \nbaseTerm: " << baseTerm << " \n resultSymbol: " << resultSymbol << " \n symbol: " << symbol << "\n";
+  }
   return {baseTerm, symbol, resultSymbol, sameTypes, concreteTypes};
 }
 

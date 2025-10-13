@@ -191,6 +191,28 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
       leftHasShape = true;
       break;
     }
+<<<<<<< HEAD
+=======
+  }
+  for (auto t= rhs.begin(); t !=rhs.end(); t++) {
+    if (t->getKind() == Symbol::Kind::Shape) {
+      rightHasShape = true;
+      break;
+    }
+  }
+  
+  if (leftHasShape || rightHasShape) {
+    if (leftHasShape && rightHasShape && !(lhs.back().getKind() == Symbol::Kind::Shape && rhs.back().getKind()==Symbol::Kind::Shape)) {
+      llvm::dbgs() << "# Adding rule " << lhs << " == " << rhs << "\n\n";
+      ASSERT(false);
+    } else if (leftHasShape != rightHasShape) {
+      llvm::dbgs() << "# Adding rule " << lhs << " == " << rhs << "\n\n";
+      ASSERT(false);
+    }
+  }
+  if (Debug.contains(DebugFlags::Add)) {
+    llvm::dbgs() << "# Adding rule " << lhs << " == " << rhs << "\n\n";
+>>>>>>> 0c4382c58ca (Expand support for PackExpansion type in requirements machine)
   }
   for (auto t= rhs.begin(); t !=rhs.end(); t++) {
     if (t->getKind() == Symbol::Kind::Shape) {
