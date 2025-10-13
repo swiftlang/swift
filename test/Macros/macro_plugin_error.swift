@@ -27,6 +27,7 @@
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"getCapabilityResult":{"capability":{"protocolVersion":1}}}
 // CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","lexicalContext":[{{.*}}],"macro":{"moduleName":"TestPlugin","name":"fooMacro","typeName":"FooMacro"},"macroRole":"expression","staticBuildConfiguration"{{.*}},"syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":11,"offset":[[#]]},"source":"#fooMacro(3)"}}}
 // CHECK-NEXT: <-(plugin:[[#PID2:]]) {"expandFreestandingMacroResult":{"diagnostics":[],"expandedSource":"3.description"}}
+// CHECK-NEXT: ->(plugin:[[#PID2:]]) {{$}}
 
 //--- test.swift
 @freestanding(expression) macro fooMacro(_: Any) -> String = #externalMacro(module: "TestPlugin", type: "FooMacro")
