@@ -115,6 +115,7 @@ extension Unicode.Scalar.Properties {
     static var isWhitespace                : Self { Self(1 &<< 45) }
     static var isXIDContinue               : Self { Self(1 &<< 46) }
     static var isXIDStart                  : Self { Self(1 &<< 47) }
+    static var isNFDQuickCheck             : Self { Self(1 &<< 48) }
   }
 }
 
@@ -738,6 +739,12 @@ extension Unicode.Scalar.Properties {
   @available(macOS 10.12.2, iOS 10.2, tvOS 10.1, watchOS 3.1.1, *)
   public var isEmojiModifierBase: Bool {
     _binaryProperties.contains(.isEmojiModifierBase)
+  }
+  
+  @_spi(_Unicode)
+  @available(SwiftStdlib 6.3, *)
+  public var _isNFDQuickCheck: Bool {
+    _binaryProperties.contains(.isNFDQuickCheck)
   }
 }
 
