@@ -3971,9 +3971,24 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
       parsedGenericParams->getRAngleLoc());
 }
 
+static bool shouldPreferPropertyWrapperOverMacro(CustomAttrOwner owner) {
+  // If we have a VarDecl in a local context, prefer to look for a property
+  // wrapper if one exists. This is necessary since we don' properly support
+  // peer declarations in local contexts, so want to use a property wrapper if
+  // one exists.
+  if (auto *D = dyn_cast_or_null<VarDecl>(owner.getAsDecl())) {
+    if (!isa<ParamDecl>(D) && D->getDeclContext()->isLocalContext())
+      return true;
+  }
+  return false;
+}
+
 NominalTypeDecl *
 CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
-                                   CustomAttr *attr, DeclContext *dc) const {
+                                   CustomAttr *attr,
+                                   CustomAttrOwner owner) const {
+  auto *dc = owner.getDeclContext();
+
   // Look for names at module scope, so we don't trigger name lookup for
   // nested scopes. At this point, we're looking to see whether there are
   // any suitable macros.
@@ -3982,7 +3997,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   auto macroName = (macro) ? macro->getNameRef() : DeclNameRef();
   auto macros = namelookup::lookupMacros(dc, moduleName, macroName,
                                          getAttachedMacroRoles());
-  if (!macros.empty())
+  auto shouldPreferPropWrapper = shouldPreferPropertyWrapperOverMacro(owner);
+  if (!macros.empty() && !shouldPreferPropWrapper)
     return nullptr;
 
   // Find the types referenced by the custom attribute.
@@ -4002,6 +4018,15 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   auto nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls.first,
                                             ResolveToNominalOptions(),
                                             modulesFound, anyObject);
+  if (shouldPreferPropWrapper) {
+    auto hasPropWrapper = llvm::any_of(nominals, [](NominalTypeDecl *NTD) {
+      return NTD->getAttrs().hasAttribute<PropertyWrapperAttr>();
+    });
+    if (!macros.empty() && !hasPropWrapper)
+      return nullptr;
+
+    ASSERT(macros.empty() && "now preferring property wrapper");
+  }
   if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front()))
     return nominals.front();
 
