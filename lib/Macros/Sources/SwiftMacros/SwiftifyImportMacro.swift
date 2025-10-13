@@ -882,7 +882,8 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   }
 
   func makeCount() -> ExprSyntax {
-    let unsafeKw = generateSpan ? "" : "unsafe "
+    // We shouldn't need this for any case, but UnsafeBufferPointer?.count is currently seen as unsafe
+    let unsafeKw = (generateSpan || !nullable) ? "" : "unsafe "
     if nullable {
       return ExprSyntax("\(raw: unsafeKw)\(name)?.\(raw: countLabel) ?? 0")
     }
