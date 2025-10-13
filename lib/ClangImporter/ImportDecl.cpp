@@ -9147,6 +9147,7 @@ public:
   llvm::raw_ostream &out;
   MacroDecl &SwiftifyImportDecl;
   bool firstParam = true;
+  llvm::StringMap<std::string> typeMapping;
   SwiftifyInfoPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext, llvm::raw_ostream &out, MacroDecl &SwiftifyImportDecl)
       : ctx(ctx), SwiftContext(SwiftContext), out(out), SwiftifyImportDecl(SwiftifyImportDecl) {
     out << "@_SwiftifyImport(";
@@ -9192,14 +9193,24 @@ public:
     out << ")";
   }
 
-  void printTypeMapping(const llvm::StringMap<std::string> &mapping) {
+  bool registerStdSpanTypeMapping(Type swiftType, const clang::QualType clangType) {
+    const auto *decl = clangType->getAsTagDecl();
+    if (decl && decl->isInStdNamespace() && decl->getName() == "span") {
+      typeMapping.insert(std::make_pair(
+          swiftType->getString(), swiftType->getDesugaredType()->getString()));
+      return true;
+    }
+    return false;
+  }
+
+  void printTypeMapping() {
     printSeparator();
     out << "typeMappings: [";
-    if (mapping.empty()) {
+    if (typeMapping.empty()) {
       out << ":]";
       return;
     }
-    llvm::interleaveComma(mapping, out, [&](const auto &entry) {
+    llvm::interleaveComma(typeMapping, out, [&](const auto &entry) {
       out << '"' << entry.getKey() << "\" : \"" << entry.getValue() << '"';
     });
     out << "]";
@@ -9517,19 +9528,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   bool attachMacro = false;
   {
     llvm::raw_svector_ostream out(MacroString);
-    llvm::StringMap<std::string> typeMapping;
 
-    auto registerStdSpanTypeMapping =
-        [&typeMapping](Type swiftType, const clang::QualType clangType) {
-          const auto *decl = clangType->getAsTagDecl();
-          if (decl && decl->isInStdNamespace() && decl->getName() == "span") {
-            typeMapping.insert(
-                std::make_pair(swiftType->getString(),
-                               swiftType->getDesugaredType()->getString()));
-            return true;
-          }
-          return false;
-        };
     SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl);
     Type swiftReturnTy;
     if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))
@@ -9538,7 +9537,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       swiftReturnTy = ctorDecl->getResultInterfaceType();
     else
       ABORT("Unexpected AbstractFunctionDecl subclass.");
-    bool returnIsStdSpan = registerStdSpanTypeMapping(
+    bool returnIsStdSpan = printer.registerStdSpanTypeMapping(
         swiftReturnTy, ClangDecl->getReturnType());
     auto *CAT = ClangDecl->getReturnType()->getAs<clang::CountAttributedType>();
     if (SwiftifiableCAT(getClangASTContext(), CAT, swiftReturnTy)) {
@@ -9596,8 +9595,8 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
                 << "' on parameter '" << *clangParam << "'\n");
         attachMacro = paramHasBoundsInfo = true;
       }
-      bool paramIsStdSpan = registerStdSpanTypeMapping(
-          swiftParamTy, clangParamTy);
+      bool paramIsStdSpan =
+          printer.registerStdSpanTypeMapping(swiftParamTy, clangParamTy);
       paramHasBoundsInfo |= paramIsStdSpan;
 
       bool paramHasLifetimeInfo = false;
@@ -9629,7 +9628,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       attachMacro = true;
     }
     printer.printAvailability();
-    printer.printTypeMapping(typeMapping);
+    printer.printTypeMapping();
   }
 
   if (attachMacro) {
