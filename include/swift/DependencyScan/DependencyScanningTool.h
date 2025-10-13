@@ -139,6 +139,10 @@ public:
       std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
           &initializationDiagnostics);
 
+  std::vector<clang::tooling::dependencies::
+                  DependencyScanningFilesystemSharedCache::OutOfDateEntry>
+  getFileSystemCacheOutOfDateEntries();
+
 private:
   /// Shared cache of module dependencies, re-used by individual full-scan queries
   /// during the lifetime of this Tool.
