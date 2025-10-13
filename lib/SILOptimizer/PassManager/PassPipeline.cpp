@@ -795,11 +795,6 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   // Do the second stack promotion on low-level SIL.
   P.addStackPromotion();
 
-  // Speculate virtual call targets.
-  if (P.getOptions().EnableSpeculativeDevirtualization) {
-    P.addSpeculativeDevirtualization();
-  }
-
   // There should be at least one SILCombine+SimplifyCFG between the
   // ClosureSpecializer, etc. and the last inliner. Cleaning up after these
   // passes can expose more inlining opportunities.

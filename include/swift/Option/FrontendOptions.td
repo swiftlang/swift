@@ -578,7 +578,7 @@ def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
 
 def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
-  HelpText<"Enable speculative devirtualization pass.">;
+  HelpText<"Deprecated, has no effect">;
 
 def enable_async_demotion : Flag<["-"], "enable-experimental-async-demotion">,
   HelpText<"Enables an optimization pass to demote async functions.">;

@@ -428,8 +428,6 @@ LEGACY_PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
 LEGACY_PASS(SimplifyCFG, "simplify-cfg",
      "SIL CFG Simplification")
-LEGACY_PASS(SpeculativeDevirtualization, "specdevirt",
-     "Speculative Devirtualization via Guarded Calls")
 LEGACY_PASS(SplitAllCriticalEdges, "split-critical-edges",
      "Split all Critical Edges in the SIL CFG")
 LEGACY_PASS(SplitNonCondBrCriticalEdges, "split-non-cond_br-critical-edges",
