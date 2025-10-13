@@ -1,5 +1,9 @@
 // RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s
 
+// Note: Windows uses internal linkage, which puts an extra step symbol before
+// _swift_dead_method_stub.
+// UNSUPPORTED: OS=windows-msvc
+
 // rdar://24121475
 //   Ideally, these wouldn't be in the v-table at all; but as long as they
 //   are, we need to emit symbols for them.

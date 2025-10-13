@@ -8,6 +8,10 @@
 
 // REQUIRES: concurrency
 
+// Note: Windows uses internal linkage, which puts an extra step symbol before
+// _swift_dead_method_stub.
+// UNSUPPORTED: OS=windows-msvc
+
 //--- A.swift
 open class C {
   private var i: [ObjectIdentifier:Any] = [:]
