@@ -23,7 +23,9 @@ import sys
 # this normalizes Windows paths to use backslashes, we have to replace them
 # back to forward slashes.
 def normalize_if_path(s):
-    if not os.path.exists(s):
+    # Check dirname for cases like a file named `%t.out.txt`
+    # There won't be a `%t` path, but we still want to match this path substring.
+    if not os.path.exists(s) and not os.path.exists(os.path.dirname(s)):
         return s
     if platform.system() == "Windows":
         return os.path.abspath(s).replace('\\', '/')
