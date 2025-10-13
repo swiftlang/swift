@@ -56,6 +56,13 @@ static llvm::cl::opt<bool> DecllessDebugValueUseSILDebugInfo(
         "write SIL test cases for this pass"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> DiagnoseCopyDestroyAddr(
+    "assemblyvisionremarkgen-diagnose-copy-destroy-addr", llvm::cl::Hidden,
+    llvm::cl::desc(
+        "Emit opt remarks for copy_addr, destroy_addr instructions"),
+    llvm::cl::init(true));
+
+
 //===----------------------------------------------------------------------===//
 //                           Value To Decl Inferrer
 //===----------------------------------------------------------------------===//
@@ -568,6 +575,9 @@ struct AssemblyVisionRemarkGeneratorInstructionVisitor
 
 void AssemblyVisionRemarkGeneratorInstructionVisitor::
     visitCopyAddrInst(CopyAddrInst *copy) {
+  if (!DiagnoseCopyDestroyAddr)
+    return;
+
   ORE.emit([&]() {
     using namespace OptRemark;
     SmallVector<Argument, 8> inferredArgs;
@@ -603,6 +613,9 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::
 
 void AssemblyVisionRemarkGeneratorInstructionVisitor::
     visitDestroyAddrInst(DestroyAddrInst *destroy) {
+  if (!DiagnoseCopyDestroyAddr)
+    return;
+
   ORE.emit([&]() {
     using namespace OptRemark;
     SmallVector<Argument, 8> inferredArgs;
