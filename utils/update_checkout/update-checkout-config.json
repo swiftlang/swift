@@ -54,6 +54,8 @@
             "remote": { "id": "swiftlang/swift-foundation" } },
         "swift-corelibs-libdispatch": {
             "remote": { "id": "swiftlang/swift-corelibs-libdispatch" } },
+        "swift-corelibs-blocksruntime": {
+            "remote": { "id": "swiftlang/swift-corelibs-blocksruntime" } },
         "swift-integration-tests": {
             "remote": { "id": "swiftlang/swift-integration-tests" } },
         "swift-xcode-playground-support": {
@@ -162,6 +164,7 @@
                 "swift-foundation-icu": "main",
                 "swift-foundation": "main",
                 "swift-corelibs-libdispatch": "main",
+                "swift-corelibs-blocksruntime": "main",
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
                 "ninja": "v1.13.1",
@@ -592,6 +595,7 @@
                 "swift-foundation-icu": "main",
                 "swift-foundation": "main",
                 "swift-corelibs-libdispatch": "main",
+                "swift-corelibs-blocksruntime": "main",
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
                 "ninja": "v1.13.1",
@@ -651,6 +655,7 @@
                 "swift-foundation-icu": "main",
                 "swift-foundation": "main",
                 "swift-corelibs-libdispatch": "main",
+                "swift-corelibs-blocksruntime": "main",
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
                 "ninja": "v1.13.1",
