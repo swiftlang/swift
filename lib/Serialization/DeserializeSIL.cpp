@@ -984,7 +984,9 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     assert(next.Kind == llvm::BitstreamEntry::Record);
 
     scratch.clear();
-    llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(next.ID, scratch);
+    StringRef blobData;
+    llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(next.ID, scratch,
+                                                              &blobData);
     if (!maybeKind)
       return maybeKind.takeError();
     unsigned kind = maybeKind.get();
@@ -1006,6 +1008,18 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
         }
         (void)error;
         assert(!error.first && "effects deserialization error");
+      }
+      continue;
+    }
+
+    if (kind == SIL_EXTRA_STRING) {
+      unsigned stringFlavor;
+      SILExtraStringLayout::readRecord(scratch, stringFlavor);
+
+      switch (static_cast<ExtraStringFlavor>(stringFlavor)) {
+      case ExtraStringFlavor::AsmName:
+        fn->setAsmName(blobData);
+        break;
       }
       continue;
     }
@@ -4080,8 +4094,10 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   DeclID dID;
   ModuleID parentModuleID;
   unsigned rawLinkage, serializedKind, IsDeclaration, IsLet, IsUsed;
+  unsigned numTrailingRecords;
   SILGlobalVarLayout::readRecord(scratch, rawLinkage, serializedKind,
-                                 IsDeclaration, IsLet, IsUsed, TyID, dID,
+                                 IsDeclaration, IsLet, IsUsed,
+                                 numTrailingRecords, TyID, dID,
                                  parentModuleID);
   if (TyID == 0) {
     LLVM_DEBUG(llvm::dbgs() << "SILGlobalVariable typeID is 0.\n");
@@ -4124,6 +4140,39 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
     Callback->didDeserialize(MF->getAssociatedModule(), v);
 
   scratch.clear();
+
+  // Read trailing reecords.
+  for (unsigned recordIdx = 0; recordIdx < numTrailingRecords; ++recordIdx) {
+    StringRef blobData;
+    llvm::Expected<llvm::BitstreamEntry> maybeNext =
+        SILCursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeNext)
+      return nullptr;
+    llvm::BitstreamEntry next = maybeNext.get();
+    assert(next.Kind == llvm::BitstreamEntry::Record);
+
+    scratch.clear();
+    llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(next.ID, scratch,
+                                                              &blobData);
+    if (!maybeKind)
+      return nullptr;
+    unsigned kind = maybeKind.get();
+
+    if (kind == SIL_EXTRA_STRING) {
+      unsigned stringFlavor;
+      SILExtraStringLayout::readRecord(scratch, stringFlavor);
+
+      switch (static_cast<ExtraStringFlavor>(stringFlavor)) {
+      case ExtraStringFlavor::AsmName:
+        v->setAsmName(blobData);
+        break;
+      }
+      continue;
+    }
+
+    return nullptr;
+  }
+
   maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry)
     MF->fatal(maybeEntry.takeError());

@@ -60,6 +60,10 @@ private:
   /// binary.  A pointer into the module's lookup table.
   StringRef Name;
 
+  /// The name that this variable should have when lowered to LLVM IR. If empty,
+  /// the mangled name of the variable will be used instead.
+  StringRef AsmName;
+
   /// The lowered type of the variable.
   SILType LoweredType;
   
@@ -150,7 +154,11 @@ public:
   }
 
   StringRef getName() const { return Name; }
-  
+
+  /// Return custom assembler name, otherwise empty.
+  StringRef asmName() const { return AsmName; }
+  void setAsmName(StringRef value) { AsmName = value; }
+
   void setDeclaration(bool isD) { IsDeclaration = isD; }
 
   /// True if this is a definition of the variable.
