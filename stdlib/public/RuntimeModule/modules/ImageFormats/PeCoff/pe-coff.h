@@ -364,8 +364,8 @@ struct pe_section {
   uint32_t                     PointerToRawData;
   uint32_t                     PointerToRelocations;
   uint32_t                     PointerToLinenumbers;
-  uint32_t                     NumberOfRelocations;
-  uint32_t                     NumberOfLinenumbers;
+  uint16_t                     NumberOfRelocations;
+  uint16_t                     NumberOfLinenumbers;
   pe_section_characteristics   Characteristics;
 };
 

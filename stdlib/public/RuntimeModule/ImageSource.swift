@@ -36,9 +36,9 @@ enum ImageSourceError: Error {
   #endif
 }
 
-struct ImageSource {
+struct ImageSource: CustomStringConvertible {
 
-  private class Storage {
+  private class Storage: CustomStringConvertible {
     /// Says how we allocated the buffer.
     private enum MemoryBufferKind {
       /// Currently empty
@@ -318,6 +318,15 @@ struct ImageSource {
       dest.copyMemory(from: toAppend)
       kind = .allocated(newCount)
     }
+
+    var description: String {
+      switch kind {
+        case .empty:
+          return "Empty Storage"
+        default:
+          return "Storage of type \(kind) of \(count) bytes with buffer \(String(describing: bytes))"
+      }
+    }
   }
 
   /// The storage holding the image data.
@@ -340,6 +349,10 @@ struct ImageSource {
 
   /// If this ImageSource knows its path, this will be non-nil.
   private(set) var path: String?
+
+  var description: String {
+    return "ImageSource(storage: \(storage), isMappedImage: \(isMappedImage), path: \(String(describing: path))"
+  }
 
   /// Private initialiser, not for general use
   private init(storage: Storage, isMappedImage: Bool, path: String?) {
