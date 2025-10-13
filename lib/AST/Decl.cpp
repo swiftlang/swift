@@ -442,6 +442,8 @@ void Decl::attachParsedAttrs(DeclAttributes attrs) {
     attr->setOriginalDeclaration(this);
   for (auto attr : attrs.getAttributes<ABIAttr, /*AllowInvalid=*/true>())
     recordABIAttr(attr);
+  for (auto *attr : attrs.getAttributes<CustomAttr>())
+    attr->setOwner(this);
 
   // @implementation requires an explicit @objc attribute, but
   // @_objcImplementation didn't. Insert one if necessary.
@@ -573,8 +575,7 @@ Type Decl::getResolvedCustomAttrType(CustomAttr *attr) const {
     return ty;
 
   auto dc = getDeclContext();
-  auto *nominal = evaluateOrDefault(
-      getASTContext().evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+  auto *nominal = attr->getNominalDecl();
   if (!nominal)
     return Type();
 
@@ -8703,11 +8704,7 @@ VarDecl::getAttachedPropertyWrapperTypeInfo(unsigned i) const {
     if (i >= attrs.size())
       return PropertyWrapperTypeInfo();
 
-    auto attr = attrs[i];
-    auto dc = getDeclContext();
-    ASTContext &ctx = getASTContext();
-    nominal = evaluateOrDefault(
-        ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+    nominal = attrs[i]->getNominalDecl();
   }
 
   if (!nominal)

@@ -3419,8 +3419,8 @@ void TypeAttrSet::diagnoseUnclaimed(TypeAttribute *attr,
 
 Type TypeResolver::resolveGlobalActor(SourceLoc loc, TypeResolutionOptions options,
                                       CustomAttr *&attr, TypeAttrSet &attrs) {
-  auto foundGlobalActor = checkGlobalActorAttributes(
-      loc, getDeclContext(), attrs.getCustomAttrs());
+  auto foundGlobalActor =
+      checkGlobalActorAttributes(loc, attrs.getCustomAttrs());
   if (!foundGlobalActor)
     return Type();
 

@@ -68,6 +68,7 @@ class GenericFunctionType;
 class LazyConformanceLoader;
 class LazyMemberLoader;
 class ModuleDecl;
+class NominalTypeDecl;
 class PatternBindingInitializer;
 class TrailingWhereClause;
 class TypeExpr;
@@ -2272,33 +2273,62 @@ public:
   }
 };
 
+/// The owning decl for a given custom attribute, or a DeclContext for a
+/// custom attribute in e.g a closure or inheritance clause.
+class CustomAttrOwner final {
+  llvm::PointerUnion<Decl *, DeclContext *> Owner;
+
+public:
+  CustomAttrOwner() : Owner(nullptr) {}
+  CustomAttrOwner(Decl *D) : Owner(D) {}
+  CustomAttrOwner(DeclContext *DC) : Owner(DC) {}
+
+  /// If the owner is a declaration, returns it, \c nullptr otherwise.
+  Decl *getAsDecl() const { return Owner.dyn_cast<Decl *>(); }
+
+  /// Retrieve the DeclContext for the CustomAttr.
+  DeclContext *getDeclContext() const;
+};
+
 /// Defines a custom attribute.
 class CustomAttr final : public DeclAttribute {
   TypeExpr *typeExpr;
   ArgumentList *argList;
+  CustomAttrOwner owner;
   CustomAttributeInitializer *initContext;
   Expr *semanticInit = nullptr;
 
   mutable unsigned isArgUnsafeBit : 1;
 
   CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
-             CustomAttributeInitializer *initContext, ArgumentList *argList,
-             bool implicit);
+             CustomAttrOwner owner, CustomAttributeInitializer *initContext,
+             ArgumentList *argList, bool implicit);
 
 public:
   static CustomAttr *create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
-                            bool implicit = false) {
-    return create(ctx, atLoc, type, /*initContext*/ nullptr,
+                            CustomAttrOwner owner, bool implicit = false) {
+    return create(ctx, atLoc, type, owner, /*initContext*/ nullptr,
                   /*argList*/ nullptr, implicit);
   }
 
   static CustomAttr *create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
+                            CustomAttrOwner owner,
                             CustomAttributeInitializer *initContext,
                             ArgumentList *argList, bool implicit = false);
 
   TypeExpr *getTypeExpr() const { return typeExpr; }
   TypeRepr *getTypeRepr() const;
   Type getType() const;
+
+  /// Retrieve the Decl or DeclContext owner for the attribute.
+  CustomAttrOwner getOwner() const { return owner; }
+  void setOwner(CustomAttrOwner newOwner) { owner = newOwner; }
+
+  ASTContext &getASTContext() const;
+
+  /// Retrieve the NominalTypeDecl the CustomAttr refers to, or \c nullptr if
+  /// it doesn't refer to one (which can be the case for e.g macro attrs).
+  NominalTypeDecl *getNominalDecl() const;
 
   /// Destructure an attribute's type repr for a macro reference.
   ///
@@ -2336,7 +2366,8 @@ public:
   CustomAttr *clone(ASTContext &ctx) const {
     assert(argList == nullptr &&
            "Cannot clone custom attribute with an argument list");
-    return create(ctx, AtLoc, getTypeExpr(), initContext, argList, isImplicit());
+    return create(ctx, AtLoc, getTypeExpr(), owner, initContext, argList,
+                  isImplicit());
   }
 
   bool canClone() const { return argList == nullptr; }

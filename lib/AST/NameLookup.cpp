@@ -3971,9 +3971,11 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
       parsedGenericParams->getRAngleLoc());
 }
 
-NominalTypeDecl *
-CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
-                                   CustomAttr *attr, DeclContext *dc) const {
+NominalTypeDecl *CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
+                                                    CustomAttr *attr) const {
+  auto owner = attr->getOwner();
+  auto *dc = owner.getDeclContext();
+
   // Look for names at module scope, so we don't trigger name lookup for
   // nested scopes. At this point, we're looking to see whether there are
   // any suitable macros.
