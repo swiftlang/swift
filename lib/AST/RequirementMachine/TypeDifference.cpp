@@ -159,11 +159,12 @@ namespace {
                   Type sugaredFirstType) {
       bool lhsAbstract = lhsType->isTypeParameter();
       bool rhsAbstract = rhsType->isTypeParameter();
+      
+      bool lhsAbstractPack = lhsAbstract && lhsType->isParameterPack();
+      bool rhsAbstractPack = rhsAbstract && rhsType->isParameterPack();
 
       if (lhsAbstract && rhsAbstract) {
-        // FIXME: same-element requirements
-        ASSERT(lhsType->isParameterPack() == rhsType->isParameterPack());
-
+        
         unsigned lhsIndex = RewriteContext::getGenericParamIndex(lhsType);
         unsigned rhsIndex = RewriteContext::getGenericParamIndex(rhsType);
 
@@ -183,6 +184,7 @@ namespace {
 
       if (lhsAbstract) {
         ASSERT(!rhsAbstract);
+
         unsigned lhsIndex = RewriteContext::getGenericParamIndex(lhsType);
 
         SmallVector<Term, 2> result;
@@ -307,12 +309,15 @@ swift::rewriting::buildTypeDifference(
   auto nextSubstitution = [&](Term t) -> Type {
     unsigned index = resultSubstitutions.size();
     resultSubstitutions.push_back(t);
-    return GenericTypeParamType::getType(/*depth=*/0, index, astCtx);
+    if (t.isPackTerm())
+      return GenericTypeParamType::getPack(0, index, astCtx);
+    else
+      return GenericTypeParamType::getType(/*depth=*/0, index, astCtx);
   };
 
   auto type = symbol.getConcreteType();
   auto substitutions = symbol.getSubstitutions();
-
+  
   Type resultType = type.transformRec([&](Type t) -> std::optional<Type> {
     if (t->is<GenericTypeParamType>()) {
       unsigned index = RewriteContext::getGenericParamIndex(t);
@@ -327,20 +332,22 @@ swift::rewriting::buildTypeDifference(
           auto concreteSymbol = pair.second;
           auto concreteType = concreteSymbol.getConcreteType();
 
-          return concreteType.transformRec([&](Type t) -> std::optional<Type> {
-            if (t->is<GenericTypeParamType>()) {
-              unsigned index = RewriteContext::getGenericParamIndex(t);
-              Term substitution = concreteSymbol.getSubstitutions()[index];
+          return concreteType.transformRec([&](Type tWithin) -> std::optional<Type> {
+            if (tWithin->is<PackExpansionType>()) {
+              return nextSubstitution(substitutions[index]);
+            }
+            if (tWithin->is<GenericTypeParamType>()) {
+              unsigned indexWithin = RewriteContext::getGenericParamIndex(tWithin);
+              Term substitution = concreteSymbol.getSubstitutions()[indexWithin];
               return nextSubstitution(substitution);
             }
 
             // DependentMemberType with ErrorType base is OK.
-            ASSERT(!t->isTypeParameter());
+            ASSERT(!tWithin->isTypeParameter());
             return std::nullopt;
           });
         }
       }
-
       return nextSubstitution(substitutions[index]);
     }
 
@@ -369,6 +376,7 @@ swift::rewriting::buildTypeDifference(
     llvm_unreachable("Bad symbol kind");
   }();
 
+  llvm::dbgs() << "buildTypeDifference: baseTerm:  " << baseTerm << " resultSymbol: " << resultSymbol << " :symbol: " << symbol << "\\n";
   return {baseTerm, symbol, resultSymbol, sameTypes, concreteTypes};
 }
 
@@ -462,6 +470,7 @@ bool RewriteSystem::computeTypeDifference(
   if (!isConflict) {
     // The meet operation should be commutative.
     if (lhsMeetRhs.RHS != rhsMeetLhs.RHS) {
+      llvm::dbgs() << lhsMeetRhs.RHS << " != " << rhsMeetLhs.RHS << "\n";
       ABORT([&](auto &out) {
         out << "Meet operation was not commutative:\n\n";
 
