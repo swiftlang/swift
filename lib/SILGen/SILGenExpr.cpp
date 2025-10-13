@@ -5223,7 +5223,7 @@ static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
 
 RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
   // Handle 'InlineArray' literals separately.
-  if (E->getType()->isInlineArray()) {
+  if (E->getType()->isInlineArray() || E->getType()->is_InlineArray()) {
     return emitInlineArrayLiteral(SGF, E, C);
   }
 
