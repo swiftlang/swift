@@ -288,33 +288,33 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
       // A valid term always begins with a generic parameter, protocol or
       // associated type symbol.
       switch (symbol.getKind()) {
-        case Symbol::Kind::GenericParam:
-          handleRoot(symbol.getGenericParam());
-          continue;
+      case Symbol::Kind::GenericParam:
+        handleRoot(symbol.getGenericParam());
+        continue;
           
-        case Symbol::Kind::Protocol:
-          handleRoot(ctx.getASTContext().TheSelfType);
-          continue;
+      case Symbol::Kind::Protocol:
+        handleRoot(ctx.getASTContext().TheSelfType);
+        continue;
           
-        case Symbol::Kind::AssociatedType:
-          handleRoot(ctx.getASTContext().TheSelfType);
+      case Symbol::Kind::AssociatedType:
+        handleRoot(ctx.getASTContext().TheSelfType);
           
-          // An associated type symbol at the root means we have a dependent
-          // member type rooted at Self; handle the associated type below.
-          break;
+        // An associated type symbol at the root means we have a dependent
+        // member type rooted at Self; handle the associated type below.
+        break;
           
-        case Symbol::Kind::PackElement:
-          continue;
+      case Symbol::Kind::PackElement:
+        continue;
           
-        case Symbol::Kind::Name:
-        case Symbol::Kind::Layout:
-        case Symbol::Kind::Superclass:
-        case Symbol::Kind::ConcreteType:
-        case Symbol::Kind::ConcreteConformance:
-        case Symbol::Kind::Shape:
-          ABORT([&](auto &out) {
-            out << "Invalid root symbol: " << MutableTerm(begin, end);
-          });
+      case Symbol::Kind::Name:
+      case Symbol::Kind::Layout:
+      case Symbol::Kind::Superclass:
+      case Symbol::Kind::ConcreteType:
+      case Symbol::Kind::ConcreteConformance:
+      case Symbol::Kind::Shape:
+        ABORT([&](auto &out) {
+          out << "Invalid root symbol: " << MutableTerm(begin, end);
+        });
       }
     }
     
