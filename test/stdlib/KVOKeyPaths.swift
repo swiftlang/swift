@@ -123,10 +123,6 @@ print("target removed")
 // Swift 5.1 and later libraries.
 if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
   print("-check-prefix=CHECK-51")
-} else {
-  print("-check-prefix=DONT-CHECK")
-  // Need at least one check, otherwise FileCheck will complain.
-  // DONT-CHECK: {{.}}
 }
 
 class Target2 : NSObject, NSKeyValueObservingCustomization {
