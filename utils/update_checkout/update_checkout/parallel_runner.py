@@ -113,7 +113,7 @@ class ParallelRunner:
 
             time.sleep(self._monitor_polling_period)
 
-        sys.stdout.write("\r" + " " * len(last_output) + "\r\n")
+        sys.stdout.write("\r" + " " * self._terminal_width + "\r")
         sys.stdout.flush()
 
     @staticmethod
