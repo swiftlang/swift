@@ -1191,6 +1191,29 @@ public:
     }
   };
 
+  struct InOutSendingParametersInSameRegionError {
+    const PartitionOp *op;
+    Element firstInoutSendingParam;
+    SmallVector<Element, 1> otherInOutSendingParams;
+
+    InOutSendingParametersInSameRegionError(
+        const PartitionOp &op, Element firstInoutSendingParam,
+        SmallVector<Element, 1> &&otherInOutSendingParams)
+        : op(&op), firstInoutSendingParam(firstInoutSendingParam),
+          otherInOutSendingParams(std::move(otherInOutSendingParams)) {}
+
+    InOutSendingParametersInSameRegionError(
+        InOutSendingParametersInSameRegionError &&other) = default;
+    InOutSendingParametersInSameRegionError &
+    operator=(InOutSendingParametersInSameRegionError &&other) = default;
+
+    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
+
+    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
+      print(llvm::dbgs(), valueMap);
+    }
+  };
+
   struct NonSendableIsolationCrossingResultError {
     const PartitionOp *op;
 
@@ -1406,6 +1429,42 @@ public:
     // multiple non-disconnected things, we would have bailed earlier in the
     // loop itself.
     return SILValue();
+  }
+
+  /// Given the region \p regionOfInOutSendingParam containing the 'inout
+  /// sending' parameter \p firstInOutSendingParam, see if that region contains
+  /// any other 'inout sending' parameters with greater element numbers than \p
+  /// firstInOutSendingParam. If so, place all of the found params into \p
+  /// foundInOutSendingParams and return true. Otherwise return false.
+  ///
+  /// DISCUSSION: The reason why we return all of the found 'inout sending'
+  /// params is at this point we do not know if any of the params have
+  /// diagnostic behavior reduction. It would not be correct if we returned the
+  /// first one and that had that its diagnostic should be ignored but later
+  /// ones did not.
+  ///
+  /// DISCUSSION: The reason why we only place in the elements that have element
+  /// numbers greater than \p firstInOutsendingParam is to ensure that we do not
+  /// emit diagnostics multiple times for the same variables, one for $VAR1,
+  /// $VAR2 and the second for $VAR2, $VAR1.
+  bool findOtherInOutSendingParameters(
+      Region regionOfInOutSendingParam, Element firstInOutSendingParam,
+      SmallVectorImpl<Element> &foundInOutSendingParams) const {
+    for (const auto &pair : p.range()) {
+      // Skip values that are not in the region or if the value is our
+      // firstInOutSendingParam.
+      if (pair.second != regionOfInOutSendingParam ||
+          pair.first <= firstInOutSendingParam)
+        continue;
+
+      auto *value = dyn_cast_or_null<SILFunctionArgument>(
+          getRepresentativeValue(pair.first).maybeGetValue());
+      if (!value || !value->isInOutSending())
+        continue;
+      foundInOutSendingParams.push_back(pair.first);
+    }
+
+    return foundInOutSendingParams.size();
   }
 
   bool isTaskIsolatedDerived(Element elt) const {
@@ -1722,13 +1781,23 @@ public:
         return;
       }
 
-      // Ok, we have a disconnected value. We could still be returning a
-      // disconnected value in the same region as an 'inout sending'
-      // parameter. We cannot allow that since the caller considers 'inout
-      // sending' values to be in their own region on function return. So it
-      // would assume that it could potentially send the value in the 'inout
-      // sending' parameter and the return value to different isolation
-      // domains... allowing for races.
+      // Ok, we have a disconnected value. First check if we have two 'inout
+      // sending' values in the same region. We want the two values to still be
+      // in different regions in the caller.
+      SmallVector<Element, 1> foundInOutSendingElts;
+      if (findOtherInOutSendingParameters(inoutSendingRegion, op.getOpArg1(),
+                                          foundInOutSendingElts)) {
+        handleError(InOutSendingParametersInSameRegionError(
+            op, op.getOpArg1(), std::move(foundInOutSendingElts)));
+        return;
+      }
+
+      // Finally We could still be returning a disconnected value in the same
+      // region as an 'inout sending' parameter. We cannot allow that since the
+      // caller considers 'inout sending' values to be in their own region on
+      // function return. So it would assume that it could potentially send the
+      // value in the 'inout sending' parameter and the return value to
+      // different isolation domains... allowing for races.
 
       // Even though we are disconnected, see if our SILFunction has an actor
       // isolation. In that case, we want to use that since the direct return
