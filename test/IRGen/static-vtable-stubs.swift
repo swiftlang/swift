@@ -20,7 +20,7 @@ open class C {
 // CHECK: @"$s1M1CC1i33_807E3D81CC6CDD898084F3279464DDF9LLSDySOypGvs" = hidden alias void (), ptr @_swift_dead_method_stub
 // CHECK: @"$s1M1CC1i33_807E3D81CC6CDD898084F3279464DDF9LLSDySOypGvM" = hidden alias void (), ptr @_swift_dead_method_stub
 
-// CHECK: define linkonce_odr hidden void @_swift_dead_method_stub()
+// CHECK: define {{(linkonce_odr )?}}hidden void @_swift_dead_method_stub()
 // CHECK: entry:
 // CHECK:   tail call void @swift_deletedMethodError()
 

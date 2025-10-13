@@ -10,6 +10,6 @@ class C {
 
 // CHECK: @"$s7zombies1CC1i33_{{.*}}vs" = hidden {{(dllexport )?}}alias void (), ptr @_swift_dead_method_stub
 
-// CHECK: define linkonce_odr hidden void @_swift_dead_method_stub
+// CHECK: define {{(linkonce_odr )?}}hidden void @_swift_dead_method_stub
 // CHECK: entry:
 // CHECK:  tail call void @swift_deletedMethodError()
