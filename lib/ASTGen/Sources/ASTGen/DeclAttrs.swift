@@ -2285,9 +2285,9 @@ extension ASTGenVisitor {
     }
 
     return .createParsed(
-      self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       type: type,
+      declContext: declContext,
       initContext: initContext.asNullable,
       argumentList: argList.asNullable
     )

@@ -2595,7 +2595,8 @@ static void applySolutionToClosurePropertyWrappers(ClosureExpr *closure,
       auto &context = wrappedValueVar->getASTContext();
       auto *typeExpr = TypeExpr::createImplicit(backingType, context);
       auto *attr =
-          CustomAttr::create(context, SourceLoc(), typeExpr, /*implicit=*/true);
+          CustomAttr::create(context, SourceLoc(), typeExpr,
+                             /*owner*/ wrappedValueVar, /*implicit=*/true);
       wrappedValueVar->getAttrs().add(attr);
     }
   }

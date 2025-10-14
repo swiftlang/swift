@@ -3053,16 +3053,26 @@ bool ImplementsAttr::isEquivalent(const ImplementsAttr *other,
           && getProtocol(DC) == other->getProtocol(DC);
 }
 
+DeclContext *CustomAttrOwner::getDeclContext() const {
+  ASSERT(!Owner.isNull());
+  if (auto *D = getAsDecl())
+    return D->getDeclContext();
+
+  return Owner.dyn_cast<DeclContext *>();
+}
+
 CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
+                       CustomAttrOwner owner,
                        CustomAttributeInitializer *initContext,
                        ArgumentList *argList, bool implicit)
     : DeclAttribute(DeclAttrKind::Custom, atLoc, range, implicit),
-      typeExpr(type), argList(argList), initContext(initContext) {
+      typeExpr(type), argList(argList), owner(owner), initContext(initContext) {
   assert(type);
   isArgUnsafeBit = false;
 }
 
 CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
+                               CustomAttrOwner owner,
                                CustomAttributeInitializer *initContext,
                                ArgumentList *argList, bool implicit) {
   assert(type);
@@ -3071,7 +3081,7 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
     range.End = argList->getEndLoc();
 
   return new (ctx)
-      CustomAttr(atLoc, range, type, initContext, argList, implicit);
+      CustomAttr(atLoc, range, type, owner, initContext, argList, implicit);
 }
 
 std::pair<UnqualifiedIdentTypeRepr *, DeclRefTypeRepr *>
@@ -3089,6 +3099,16 @@ CustomAttr::destructureMacroRef() {
     }
   }
   return {nullptr, nullptr};
+}
+
+ASTContext &CustomAttr::getASTContext() const {
+  return getOwner().getDeclContext()->getASTContext();
+}
+
+NominalTypeDecl *CustomAttr::getNominalDecl() const {
+  auto &eval = getASTContext().evaluator;
+  auto *mutThis = const_cast<CustomAttr *>(this);
+  return evaluateOrDefault(eval, CustomAttrNominalRequest{mutThis}, nullptr);
 }
 
 TypeRepr *CustomAttr::getTypeRepr() const { return typeExpr->getTypeRepr(); }

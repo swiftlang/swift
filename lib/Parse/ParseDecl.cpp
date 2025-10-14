@@ -4215,10 +4215,12 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(SourceLoc atLoc) {
            "Cannot parse a trailing closure here");
   }
 
-  // Form the attribute.
+  // Form the attribute. We set a DeclContext as the owner, which we'll change
+  // to the attached Decl if necessary when attaching the attributes.
   auto *TE = new (Context) TypeExpr(type.get());
-  auto *customAttr = CustomAttr::create(Context, atLoc, TE, initContext,
-                                        argList);
+  auto *customAttr =
+      CustomAttr::create(Context, atLoc, TE,
+                         /*owner*/ CurDeclContext, initContext, argList);
   if (status.hasCodeCompletion() && CodeCompletionCallbacks) {
     CodeCompletionCallbacks->setCompletingInAttribute(customAttr);
   }

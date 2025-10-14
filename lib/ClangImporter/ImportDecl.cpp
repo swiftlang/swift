@@ -8885,7 +8885,10 @@ void ClangImporter::Implementation::importNontrivialAttribute(
       SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
                                             decl->getAttrs().end());
       for (auto attr : attrs) {
-        MappedDecl->getAttrs().add(cached ? attr->clone(SwiftContext) : attr);
+        auto *newAttr = cached ? attr->clone(SwiftContext) : attr;
+        if (auto *CA = dyn_cast<CustomAttr>(newAttr))
+          CA->setOwner(MappedDecl);
+        MappedDecl->getAttrs().add(newAttr);
       }
     }
     break;
@@ -8933,7 +8936,8 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
 
         if (Type mainActorType = SwiftContext.getMainActorType()) {
           auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
-          auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
+          auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr,
+                                         /*owner*/ MappedDecl);
           MappedDecl->getAttrs().add(attr);
           seenMainActorAttr = swiftAttr;
         }
