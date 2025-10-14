@@ -2479,9 +2479,9 @@ function Build-Brotli([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\brotli `
     -Bin "$(Get-ProjectBinaryCache $Platform brotli)" `
-    -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -UseMSVCCompilers C `
+    -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
@@ -2572,6 +2572,17 @@ function Build-CURL([Hashtable] $Platform) {
       BUILD_SHARED_LIBS = "NO";
       BUILD_TESTING = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
+      BROTLI_INCLUDE_DIR = "$SourceCache\brotli\c\include";
+      BROTLICOMMON_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+        "$(Get-ProjectBinaryCache $Platform brotli)\brotlicommon.lib"
+      } else {
+        "$(Get-ProjectBinaryCache $Platform brotli)\libbrotlicommon.a"
+      };
+      BROTLIDEC_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+        "$(Get-ProjectBinaryCache $Platform brotli)\brotlidec.lib"
+      } else {
+        "$(Get-ProjectBinaryCache $Platform brotli)\libbrotlidec.a"
+      }
       BUILD_CURL_EXE = "NO";
       BUILD_LIBCURL_DOCS = "NO";
       BUILD_MISC_DOCS = "NO";
@@ -2656,7 +2667,6 @@ function Build-CURL([Hashtable] $Platform) {
       USE_WIN32_LDAP = "NO";
       ZLIB_ROOT = "$BinaryCache\$($Platform.Triple)\usr";
       ZLIB_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib";
-      BROTLI_DIR = "$BinaryCache\$($Platform.Triple)\usr";
     })
 }
 
@@ -3046,6 +3056,17 @@ function Build-Foundation([Hashtable] $Platform) {
       # FIXME(compnerd) - workaround ARM64 build failure when cross-compiling.
       CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      BROTLI_INCLUDE_DIR = "$SourceCache\brotli\c\include";
+      BROTLICOMMON_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+        "$(Get-ProjectBinaryCache $Platform brotli)\brotlicommon.lib"
+      } else {
+        "$(Get-ProjectBinaryCache $Platform brotli)\libbrotlicommon.a"
+      };
+      BROTLIDEC_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+        "$(Get-ProjectBinaryCache $Platform brotli)\brotlidec.lib"
+      } else {
+        "$(Get-ProjectBinaryCache $Platform brotli)\libbrotlidec.a"
+      }
       FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
       LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
@@ -3056,7 +3077,6 @@ function Build-Foundation([Hashtable] $Platform) {
       };
       ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
       dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
-      BROTLI_DIR = "$BinaryCache\$($Platform.Triple)\usr";
       _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
       _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
       _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
@@ -3081,7 +3101,7 @@ function Test-Foundation {
     $env:LIBXML_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
     $env:LIBXML_INCLUDE_PATH="$BinaryCache/$($Platform.Triple)/usr/include/libxml2"
     $env:ZLIB_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
-    $env:BROTLI_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
+    $env:BROTLI_LIBRARY_PATH="$(Get-ProjectBinaryCache $BuildPlatform brotli)"
     $env:CURL_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
     $env:CURL_INCLUDE_PATH="$BinaryCache/$($Platform.Triple)/usr/include"
     Build-SPMProject `
@@ -4196,15 +4216,12 @@ if (-not $SkipBuild) {
       if (-not $Build.LinkModes.Contains("static")) { continue }
 
       $SDKROOT = Get-SwiftSDK -OS $Build.OS -Identifier "$($Build.OS)Experimental"
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.lib" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libcurl.lib" | Out-Null
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2s.lib" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libxml2s.lib" | Out-Null
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\zlib\zlibstatic.lib" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\zlibstatic.lib" | Out-Null
+      $SwiftResourceDir = "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)"
+      Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\brotlicommon.lib" -Destination "${SwiftResourceDir}\brotlicommon.lib" | Out-Null
+      Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\brotlidec.lib" -Destination "${SwiftResourceDir}\brotlidec.lib" | Out-Null
+      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.lib" -Destination "${SwiftResourceDir}\libcurl.lib" | Out-Null
+      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2s.lib" -Destination "${SwiftResourceDir}\libxml2s.lib" | Out-Null
+      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\zlib\zlibstatic.lib" -Destination "${SwiftResourceDir}\zlibstatic.lib" | Out-Null
     }
   }
 
