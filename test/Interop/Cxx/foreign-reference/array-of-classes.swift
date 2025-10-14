@@ -61,7 +61,7 @@ func go() {
 
     var loopCount = 0 
     for it in y {
-// CHECK: RefType()
+// CHECK: {{RefType()|(Foreign Reference Type)}}
         print(it)
         loopCount += 1
     }
