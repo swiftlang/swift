@@ -303,10 +303,6 @@ extension ApplySite {
   public var hasGuaranteedResult: Bool {
     functionConvention.hasGuaranteedResult
   }
-
-  public var hasGuaranteedAddressResult: Bool {
-    functionConvention.hasGuaranteedAddressResult
-  }
 }
 
 extension ApplySite {
