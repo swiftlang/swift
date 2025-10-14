@@ -5,6 +5,9 @@
 
 // REQUIRES: swift_feature_SafeInteropWrappers
 
+// FIXME swift-ci linux tests do not support std::span
+// UNSUPPORTED: OS=linux-gnu, OS=linux-android, OS=linux-androideabi
+
 //--- Inputs/swiftify-non-public.h
 #pragma once
 
