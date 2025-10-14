@@ -2191,11 +2191,18 @@ void IRGenModule::emitVTableStubs() {
     
     if (!stub) {
       // Create a single stub function which calls swift_deletedMethodError().
+      // Use linkonce_odr hidden to merge these symbols, except on
+      // COFF where the linker cannot merge them.
+      bool canLinkOnce = !Module.getTargetTriple().isOSBinFormatCOFF();
+      auto linkage = canLinkOnce ? llvm::GlobalValue::LinkOnceODRLinkage
+                                 : llvm::GlobalValue::InternalLinkage;
       stub = llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
-                                    llvm::GlobalValue::InternalLinkage,
-                                    "_swift_dead_method_stub");
+                                    linkage, "_swift_dead_method_stub",
+                                    &Module);
+      ApplyIRLinkage(canLinkOnce ? IRLinkage::InternalLinkOnceODR
+                                 : IRLinkage::Internal)
+          .to(stub);
       stub->setAttributes(constructInitialAttributes());
-      Module.getFunctionList().push_back(stub);
       stub->setCallingConv(DefaultCC);
       auto *entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", stub);
       auto *errorFunc = getDeletedMethodErrorFn();
