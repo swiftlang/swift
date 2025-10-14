@@ -448,10 +448,10 @@ FUNCTION(BridgeObjectStrongRetainClient, Swift, swift_bridgeObjectRetainClient,
 // void *swift_bridgeObjectReleaseClient(void *ptr);
 FUNCTION(BridgeObjectStrongReleaseClient, Swift, swift_bridgeObjectReleaseClient,
          SwiftRR_CC, AlwaysAvailable,
-         RETURNS(BridgeObjectPtrTy),
+         RETURNS(VoidTy),
          ARGS(BridgeObjectPtrTy),
-         ATTRS(NoUnwind, FirstParamReturned),
-         EFFECT(RuntimeEffect::RefCounting),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating),
          UNKNOWN_MEMEFFECTS)
 
 // void *swift_nonatomic_bridgeObjectRetain(void *ptr);
