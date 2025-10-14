@@ -1,8 +1,8 @@
 // REQUIRES: objc_interop, OS=macosx
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/ModuleCache)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -swift-version 5
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -swift-version 5 -emit-api-descriptor-path %t/api.json
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -package-name MyModule -swift-version 5
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -package-name MyModule -swift-version 5 -emit-api-descriptor-path %t/api.json
 // RUN: %validate-json %t/api.json | %FileCheck %s
 
 import Foundation
@@ -19,6 +19,21 @@ public class Test : NSObject {
 public class Derived : Test {
   @objc public override func method1() {}
   public override func nonObjc() {}
+
+  private var _readOnly : Int
+  package init(readOnly: Int) {
+    _readOnly = readOnly
+  }
+  public package(set) var readOnly : Int {
+    get { _readOnly }
+    set { _readOnly = newValue }
+  }
+}
+
+// Member declarations inside a `public extension` are public implicitly
+public extension Derived {
+  func inheritlyPublic() {}
+  private func privateFunc() {}
 }
 
 // Not derived from NSObject. ObjC metadata is still emitted but not exported.
@@ -35,7 +50,7 @@ public class Test3 : NSObject {
 }
 
 @available(macOS 10.13, *)
-public func myFunction() -> Int {
+package func myFunction() -> Int {
   return 0
 }
 
@@ -45,6 +60,16 @@ public func myFunction1() {}
 @available(*, unavailable)
 public func myFunction2() {}
 
+package func packageFunction() {}
+
+internal func internalFunction() {}
+
+private func privateFunction() {}
+
+fileprivate func fileprivateFunction() {}
+
+func implicitInternalFunction() {}
+
 @available(macOS 10.13, *)
 public var myGlobalVar: Int = 42
 
@@ -52,7 +77,7 @@ public var myGlobalVar: Int = 42
 // CHECK-NEXT: "globals": [
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_$s8MyModule10myFunctionSiyF",
-// CHECK-NEXT:     "access": "public",
+// CHECK-NEXT:     "access": "private",
 // CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
 // CHECK-NEXT:     "linkage": "exported",
 // CHECK-NEXT:     "introduced": "10.13"
@@ -91,6 +116,12 @@ public var myGlobalVar: Int = 42
 // CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
 // CHECK-NEXT:     "linkage": "exported",
 // CHECK-NEXT:     "introduced": "10.13"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule15packageFunctionyyF",
+// CHECK-NEXT:     "access": "private",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported"
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_$s8MyModule4TestC7method1yyFTj",
@@ -316,6 +347,80 @@ public var myGlobalVar: Int = 42
 // CHECK-NEXT:     "linkage": "exported"
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedC15inheritlyPublicyyF",
+// CHECK-NEXT:     "access": "public",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedC8readOnlyACSi_tcfC",
+// CHECK-NEXT:     "access": "private",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedC8readOnlyACSi_tcfCTj",
+// CHECK-NEXT:     "access": "private",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedC8readOnlyACSi_tcfCTq",
+// CHECK-NEXT:     "access": "private",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedC8readOnlyACSi_tcfc",
+// CHECK-NEXT:     "access": "private",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedC8readOnlySivMTj",
+// CHECK-NEXT:     "access": "private",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.13"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedC8readOnlySivMTq",
+// CHECK-NEXT:     "access": "private",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.13"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedC8readOnlySivgTj",
+// CHECK-NEXT:     "access": "public",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedC8readOnlySivgTq",
+// CHECK-NEXT:     "access": "public",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedC8readOnlySivpMV",
+// CHECK-NEXT:     "access": "public",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedC8readOnlySivsTj",
+// CHECK-NEXT:     "access": "private",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedC8readOnlySivsTq",
+// CHECK-NEXT:     "access": "private",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_$s8MyModule7DerivedCACycfC",
 // CHECK-NEXT:     "access": "public",
 // CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
@@ -343,6 +448,13 @@ public var myGlobalVar: Int = 42
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_$s8MyModule7DerivedCMo",
+// CHECK-NEXT:     "access": "public",
+// CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.13"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule7DerivedCMu",
 // CHECK-NEXT:     "access": "public",
 // CHECK-NEXT:     "file": "SOURCE_DIR/test/APIJSON/apigen.swift",
 // CHECK-NEXT:     "linkage": "exported",
