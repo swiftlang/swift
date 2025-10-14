@@ -220,9 +220,6 @@ namespace irgen {
                               CanSILFunctionType coroutineType,
                               NativeCCEntryPointArgumentEmission &emission);
 
-  llvm::Value *
-  emitYieldOnce2CoroutineAllocator(IRGenFunction &IGF,
-                                   std::optional<CoroAllocatorKind> kind);
   StackAddress emitAllocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
                                                  llvm::Value *size);
   void emitDeallocYieldOnce2CoroutineFrame(IRGenFunction &IGF,

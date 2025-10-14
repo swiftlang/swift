@@ -23,14 +23,42 @@
 // CHECK-SAME:    i32 0
 // CHECK-SAME:  }>
 
+// CHECK-arm64e-LABEL: _swift_malloc.ptrauth = private constant {
+// CHECK-arm64e-SAME:    ptr @_swift_malloc,
+// CHECK-arm64e-SAME:    i32 0,
+// CHECK-arm64e-SAME:    i64 0,
+// CHECK-arm64e-SAME:    i64 24469 }
+// CHECK-arm64e-SAME:  section "llvm.ptrauth"
+// CHECK-arm64e-SAME:  align 8
+// CHECK-arm64e-LABEL: _swift_free.ptrauth = private constant {
+// CHECK-arm64e-SAME:    ptr @_swift_free,
+// CHECK-arm64e-SAME:    i32 0,
+// CHECK-arm64e-SAME:    i64 0,
+// CHECK-arm64e-SAME:    i64 40879 },
+// CHECK-arm64e-SAME:  section "llvm.ptrauth",
+// CHECK-arm64e-SAME:  align 8
 // CHECK-LABEL: _swift_coro_malloc_allocator = linkonce_odr hidden constant %swift.coro_allocator {
 // CHECK-SAME:       i32 258,
-// CHECK-SAME:       malloc,
+// CHECK-SAME:       malloc
 // CHECK-SAME:       free
 // CHECK-SAME:  }
+// CHECK-arm64e-LABEL: swift_task_alloc.ptrauth = private constant {
+// CHECK-arm64e-SAME:    ptr @swift_task_alloc,
+// CHECK-arm64e-SAME:    i32 0,
+// CHECK-arm64e-SAME:    i64 0,
+// CHECK-arm64e-SAME:    i64 24469 }
+// CHECK-arm64e-SAME:  section "llvm.ptrauth"
+// CHECK-arm64e-SAME:  align 8
+// CHECK-arm64e-LABEL: @swift_task_dealloc.ptrauth = private constant {
+// CHECK-arm64e-SAME:    ptr @swift_task_dealloc,
+// CHECK-arm64e-SAME:    i32 0,
+// CHECK-arm64e-SAME:    i64 0,
+// CHECK-arm64e-SAME:    i64 40879 },
+// CHECK-arm64e-SAME:  section "llvm.ptrauth",
+// CHECK-arm64e-SAME:  align 8
 // CHECK-LABEL: _swift_coro_async_allocator = linkonce_odr hidden constant %swift.coro_allocator {
 // CHECK-SAME:      i32 1,
-// CHECK-SAME:      swift_task_alloc,
+// CHECK-SAME:      swift_task_alloc
 // CHECK-SAME:      swift_task_dealloc
 // CHECK-SAME:  }
 
@@ -45,6 +73,9 @@
 // CHECK-SAME:        i32 0
 // CHECK-SAME:        i32 1
 // CHECK:         [[ALLOCATE_FN:%[^,]+]] = load ptr, ptr [[ALLOCATE_FN_PTR]]
+// CHECK-arm64e:  [[ALLOCATE_FN_BITS:%[^,]+]] = ptrtoint ptr [[ALLOCATE_FN]] to i64
+// CHECK-arm64e:  [[ALLOCATE_FN_BITS_AUTHED:%[^,]+]] = call i64 @llvm.ptrauth.auth(i64 [[ALLOCATE_FN_BITS]], i32 0, i64 24469)
+// CHECK-arm64e:  [[ALLOCATE_FN:%[^,]+]] = inttoptr i64 [[ALLOCATE_FN_BITS_AUTHED]]
 // CHECK:         [[ALLOCATION:%[^,]+]] = call swiftcc ptr [[ALLOCATE_FN]]([[INT]] [[SIZE]])
 // CHECK:         ret ptr [[ALLOCATION]]
 // CHECK:       }
@@ -73,6 +104,9 @@
 // CHECK-SAME:          i32 0
 // CHECK-SAME:          i32 2
 // CHECK:           [[DEALLOCATE_FN:%[^,]+]] = load ptr, ptr [[DEALLOCATE_FN_PTR]]
+// CHECK-arm64e:    [[DEALLOCATE_FN_BITS:%[^,]+]] = ptrtoint ptr [[DEALLOCATE_FN]] to i64
+// CHECK-arm64e:    [[DEALLOCATE_FN_BITS_AUTHED:%[^,]+]] = call i64 @llvm.ptrauth.auth(i64 [[DEALLOCATE_FN_BITS]], i32 0, i64 40879)
+// CHECK-arm64e:    [[DEALLOCATE_FN:%[^,]+]] = inttoptr i64 [[DEALLOCATE_FN_BITS_AUTHED]]
 // CHECK:           call swiftcc void [[DEALLOCATE_FN]](ptr [[ADDRESS]])
 // CHECK:         ret void
 // CHECK:       }
