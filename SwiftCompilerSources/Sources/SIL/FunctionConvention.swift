@@ -102,25 +102,20 @@ public struct FunctionConvention : CustomStringConvertible {
     if results.count != 1 {
       return false
     }
-    return results[0].convention == .guaranteed
-  }
-
-  public var hasGuaranteedAddressResult: Bool {
-    if results.count != 1 {
-      return false
+    if hasLoweredAddresses {
+      return results[0].convention == .guaranteed
     }
-    return results[0].convention == .guaranteedAddress
-  }
-
-  public var hasInoutResult: Bool {
-    if results.count != 1 {
-      return false
-    }
-    return results[0].convention == .inout
+    return results[0].convention == .guaranteed || results[0].convention == .guaranteedAddress
   }
 
   public var hasAddressResult: Bool {
-    return hasGuaranteedAddressResult || hasInoutResult
+    if results.count != 1 {
+      return false
+    }
+    if hasLoweredAddresses {
+      return results[0].convention == .guaranteedAddress || results[0].convention == .inout
+    }
+    return results[0].convention == .inout
   }
 
   public var description: String {

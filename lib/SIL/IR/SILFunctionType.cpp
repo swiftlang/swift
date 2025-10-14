@@ -182,11 +182,12 @@ SILFunctionType::getDirectFormalResultsType(SILModule &M,
                                             TypeExpansionContext context) {
   CanType type;
 
-  if (hasAddressResult()) {
+  if (hasAddressResult(SILModuleConventions(M).useLoweredAddresses())) {
     assert(getNumDirectFormalResults() == 1);
-      return SILType::getPrimitiveAddressType(
-          getSingleDirectFormalResult().getReturnValueType(M, this, context));
+    return SILType::getPrimitiveAddressType(
+        getSingleDirectFormalResult().getReturnValueType(M, this, context));
   }
+
   if (getNumDirectFormalResults() == 0) {
     type = getASTContext().TheEmptyTupleType;
   } else if (getNumDirectFormalResults() == 1) {

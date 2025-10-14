@@ -4960,20 +4960,20 @@ public:
     return getConvention() == ResultConvention::Pack;
   }
 
-  bool isGuaranteedAddressResult() const {
-    return getConvention() == ResultConvention::GuaranteedAddress;
-  }
-
-  bool isInoutResult() const {
+  bool isAddressResult(bool loweredAddresses) const {
+    if (loweredAddresses) {
+      return getConvention() == ResultConvention::GuaranteedAddress ||
+             getConvention() == ResultConvention::Inout;
+    }
     return getConvention() == ResultConvention::Inout;
   }
 
-  bool isAddressResult() const {
-    return isGuaranteedAddressResult() || isInoutResult();
-  }
-
-  bool isGuaranteedResult() const {
-    return getConvention() == ResultConvention::Guaranteed;
+  bool isGuaranteedResult(bool loweredAddresses) const {
+    if (loweredAddresses) {
+      return getConvention() == ResultConvention::Guaranteed;
+    }
+    return getConvention() == ResultConvention::Guaranteed ||
+           getConvention() == ResultConvention::GuaranteedAddress;
   }
 
   /// Transform this SILResultInfo by applying the user-provided
@@ -5416,29 +5416,18 @@ public:
     return hasErrorResult() && getErrorResult().isFormalIndirect();
   }
 
-  bool hasGuaranteedResult() const {
+  bool hasGuaranteedResult(bool loweredAddresses) const {
     if (getNumResults() != 1) {
       return false;
     }
-    return getResults()[0].isGuaranteedResult();
+    return getResults()[0].isGuaranteedResult(loweredAddresses);
   }
 
-  bool hasGuaranteedAddressResult() const {
+  bool hasAddressResult(bool loweredAddresses) const {
     if (getNumResults() != 1) {
       return false;
     }
-    return getResults()[0].isGuaranteedAddressResult();
-  }
-
-  bool hasInoutResult() const {
-    if (getNumResults() != 1) {
-      return false;
-    }
-    return getResults()[0].isInoutResult();
-  }
-
-  bool hasAddressResult() const {
-    return hasGuaranteedAddressResult() || hasInoutResult();
+    return getResults()[0].isAddressResult(loweredAddresses);
   }
 
   struct IndirectFormalResultFilter {

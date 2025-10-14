@@ -33,7 +33,7 @@ void SILGenFunction::prepareEpilog(
     // emits unreachable if there is no source level return.
     NeedsReturn = !(*directResultType)->isEqual(TupleType::getEmpty(getASTContext()));
     if (NeedsReturn) {
-      if (fnConv.hasGuaranteedAddressResult() || fnConv.hasGuaranteedResult()) {
+      if (fnConv.hasAddressResult() || fnConv.hasGuaranteedResult()) {
         // Do not explode tuples for borrow/mutate accessors
         SILType resultType =
             F.getLoweredType(F.mapTypeIntoContext(*directResultType));
@@ -63,13 +63,7 @@ void SILGenFunction::prepareEpilog(
                 worklist.push_back(ty.getTupleElementType(index));
               }
             } else {
-              if (fnConv.hasGuaranteedResult()) {
-                epilogBB->createPhiArgument(ty, OwnershipKind::Guaranteed);
-              } else if (fnConv.hasGuaranteedAddressResult()) {
-                epilogBB->createPhiArgument(ty, OwnershipKind::None);
-              } else {
-                epilogBB->createPhiArgument(ty, OwnershipKind::Owned);
-              }
+              epilogBB->createPhiArgument(ty, OwnershipKind::Owned);
             }
           }
         }

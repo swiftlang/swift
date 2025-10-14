@@ -210,7 +210,13 @@ bool ValueBase::isBorrowAccessorResult() const {
   auto *apply = dyn_cast_or_null<ApplyInst>(getDefiningInstruction());
   if (!apply)
     return false;
-  return apply->hasGuaranteedResult() || apply->hasGuaranteedAddressResult();
+  if (apply->getSubstCalleeConv().funcTy->getNumResults() != 1) {
+    return false;
+  }
+  auto resultConvention =
+      apply->getSubstCalleeConv().funcTy->getSingleResult().getConvention();
+  return resultConvention == ResultConvention::Guaranteed ||
+         resultConvention == ResultConvention::GuaranteedAddress;
 }
 
 bool ValueBase::hasDebugTrace() const {

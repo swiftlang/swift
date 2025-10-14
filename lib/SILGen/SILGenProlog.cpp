@@ -735,7 +735,7 @@ private:
           (ScopedDependencies.contains(pd) &&
            SGF.getTypeProperties(origType, substType)
                .isAddressableForDependencies()) ||
-          SGF.getFunction().getConventions().hasGuaranteedAddressResult() ||
+          SGF.getFunction().getConventions().hasAddressResult() ||
           SGF.getFunction().getConventions().hasGuaranteedResult();
       paramValue = argEmitter.handleParam(origType, substType, pd,
                                           isAddressable);
