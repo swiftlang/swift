@@ -615,13 +615,12 @@ static FunctionTest DeadEndEdgesTest("dead_end_edges", [](auto &function,
   auto visitingSet = edges.createVisitingSet(/*includeUnreachable*/ true);
 
   auto &out = llvm::outs();
+  SILPrintContext ctx(out);
   for (auto &srcBB : function) {
     for (auto *dstBB : srcBB.getSuccessorBlocks()) {
       if (auto regionIndex = edges.entersDeadEndRegion(&srcBB, dstBB)) {
-        srcBB.printID(out, false);
-        out << " -> ";
-        dstBB->printID(out, false);
-        out << " (region " << *regionIndex << "; ";
+        out << ctx.getID(&srcBB) << " -> " << ctx.getID(dstBB)
+            << " (region " << *regionIndex << "; ";
         if (visitingSet.visitEdgeTo(dstBB)) {
           out << "last edge)";
         } else {

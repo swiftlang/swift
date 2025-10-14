@@ -98,8 +98,9 @@ extern llvm::cl::opt<bool> SILPrintDebugInfo;
 void swift::verificationFailure(const Twine &complaint,
               const SILInstruction *atInstruction,
               const SILArgument *atArgument,
-              llvm::function_ref<void(llvm::raw_ostream &out)> extraContext) {
+              llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
   llvm::raw_ostream &out = llvm::dbgs();
+  SILPrintContext ctx(out);
 
   const SILFunction *f = nullptr;
   StringRef funcName = "?";
@@ -116,14 +117,14 @@ void swift::verificationFailure(const Twine &complaint,
 
   out << "SIL verification failed: " << complaint << "\n";
   if (extraContext)
-    extraContext(out);
+    extraContext(ctx);
 
   if (atInstruction) {
     out << "Verifying instruction:\n";
-    atInstruction->printInContext(out);
+    atInstruction->printInContext(ctx);
   } else if (atArgument) {
     out << "Verifying argument:\n";
-    atArgument->printInContext(out);
+    atArgument->printInContext(ctx);
   }
   if (ContinueOnFailure) {
     out << "End Error in function " << funcName << "\n";
@@ -978,7 +979,7 @@ public:
   }
 
   void _require(bool condition, const Twine &complaint,
-                llvm::function_ref<void(llvm::raw_ostream &)> extraContext
+                llvm::function_ref<void(SILPrintContext &)> extraContext
                   = nullptr) {
     if (condition) return;
 
@@ -1111,16 +1112,16 @@ public:
   /// Assert that two types are equal.
   void requireSameType(Type type1, Type type2, const Twine &complaint) {
     _require(type1->isEqual(type2), complaint,
-             [&](llvm::raw_ostream &out) {
-      out << "  " << type1 << "\n  " << type2 << '\n';
+             [&](SILPrintContext &ctx) {
+      ctx.OS() << "  " << type1 << "\n  " << type2 << '\n';
     });
   }
 
   /// Assert that two types are equal.
   void requireSameType(SILType type1, SILType type2, const Twine &complaint) {
     _require(type1 == type2, complaint,
-             [&](llvm::raw_ostream &out) {
-      out << "  " << type1 << "\n  " << type2 << '\n';
+             [&](SILPrintContext &ctx) {
+      ctx.OS() << "  " << type1 << "\n  " << type2 << '\n';
     });
   }
 
@@ -1158,15 +1159,15 @@ public:
       return;
 
     if (!Result.hasPayload()) {
-      _require(false, what, [&](llvm::raw_ostream &out) {
-        out << "  " << Result.getMessage().data() << '\n'
-            << "  " << type1 << "\n  " << type2 << '\n';
+      _require(false, what, [&](SILPrintContext &ctx) {
+        ctx.OS() << "  " << Result.getMessage().data() << '\n'
+                 << "  " << type1 << "\n  " << type2 << '\n';
       });
     } else {
-      _require(false, what, [&](llvm::raw_ostream &out) {
-        out << " " << Result.getMessage().data()
-            << ".\nParameter: " << Result.getPayload()
-            << "\n  " << type1 << "\n  " << type2 << '\n';
+      _require(false, what, [&](SILPrintContext &ctx) {
+        ctx.OS() << " " << Result.getMessage().data()
+                 << ".\nParameter: " << Result.getPayload()
+                 << "\n  " << type1 << "\n  " << type2 << '\n';
       });
     }
   }
@@ -1193,7 +1194,9 @@ public:
   template <class T>
   T *requireValueKind(SILValue value, const Twine &what) {
     auto match = dyn_cast<T>(value);
-    _require(match != nullptr, what, [=](llvm::raw_ostream &out) { out << value; });
+    _require(match != nullptr, what, [=](SILPrintContext &ctx) {
+      value->print(ctx);
+    });
     return match;
   }
 
@@ -1891,7 +1894,8 @@ public:
     if (subs.getGenericSignature().getCanonicalSignature() !=
           fnTy->getInvocationGenericSignature().getCanonicalSignature()) {
       _require(false, "Substitution map does not match callee in apply instruction",
-               [&](llvm::raw_ostream &out) {
+               [&](SILPrintContext &ctx) {
+        auto &out = ctx.OS();
         out << "substitution map's generic signature: ";
         subs.getGenericSignature()->print(out);
         out << "\n";
@@ -6803,22 +6807,22 @@ public:
       BBState(maybe_movable_ref<BBState> other)
         : BBState(std::move(other).construct()) {}
 
-      void printStack(llvm::raw_ostream &out, StringRef label) const {
-        out << label << ": [";
-        if (!Stack.empty()) out << "\n";
+      void printStack(SILPrintContext &ctx, StringRef label) const {
+        ctx.OS() << label << ": [";
+        if (!Stack.empty()) ctx.OS() << "\n";
         for (auto allocation: Stack) {
-          allocation->print(out);
+          allocation->print(ctx);
         }
-        out << "]\n";
+        ctx.OS() << "]\n";
       }
 
-      void printActiveOps(llvm::raw_ostream &out, StringRef label) const {
-        out << label << ": [";
-        if (!ActiveOps.empty()) out << "\n";
+      void printActiveOps(SILPrintContext &ctx, StringRef label) const {
+        ctx.OS() << label << ": [";
+        if (!ActiveOps.empty()) ctx.OS() << "\n";
         for (auto op: ActiveOps) {
-          op->print(out);
+          op->print(ctx);
         }
-        out << "]\n";
+        ctx.OS() << "]\n";
       }
 
       /// Given that we have two edges to the same block or dead-end region,
@@ -6877,14 +6881,13 @@ public:
         // conservative merge regardless of failure so that we're in a
         // coherent state in the successor block.
         auto fail = [&](StringRef complaint,
-                        llvm::function_ref<void(llvm::raw_ostream &out)> extra
+                        llvm::function_ref<void(SILPrintContext &out)> extra
                           = nullptr) {
           verificationFailure(complaint, term, nullptr,
-                              [&](llvm::raw_ostream &out) {
-            out << "Entering basic block ";
-            succBB->printID(out, /*newline*/ true);
+                              [&](SILPrintContext &ctx) {
+            ctx.OS() << "Entering basic block " << ctx.getID(succBB) << "\n";
 
-            if (extra) extra(out);
+            if (extra) extra(ctx);
           });
         };
 
@@ -6908,9 +6911,9 @@ public:
         if (Stack != otherState.Stack) {
           if (!isDeadEndEdge) {
             fail("inconsistent stack states entering basic block",
-                 [&](llvm::raw_ostream &out) {
-              otherState.printStack(out, "Current stack state");
-              printStack(out, "Recorded stack state");
+                 [&](SILPrintContext &ctx) {
+              otherState.printStack(ctx, "Current stack state");
+              printStack(ctx, "Recorded stack state");
             });
           }
 
@@ -6923,9 +6926,9 @@ public:
         if (ActiveOps != otherState.ActiveOps) {
           if (!isDeadEndEdge) {
             fail("inconsistent active-operations sets entering basic block",
-                 [&](llvm::raw_ostream &out) {
-              otherState.printActiveOps(out, "Current active operations");
-              printActiveOps(out, "Recorded active operations");
+                 [&](SILPrintContext &ctx) {
+              otherState.printActiveOps(ctx, "Current active operations");
+              printActiveOps(ctx, "Recorded active operations");
             });
           }
 
@@ -7021,9 +7024,9 @@ public:
           } else {
             verificationFailure("deallocating allocation that is not the top of the stack",
                                 &i, nullptr,
-                                [&](llvm::raw_ostream &out) {
-              state.printStack(out, "Current stack state");
-              out << "Stack allocation:\n" << *op;
+                                [&](SILPrintContext &ctx) {
+              state.printStack(ctx, "Current stack state");
+              ctx.OS() << "Stack allocation:\n" << *op;
               // The deallocation is printed out as the focus of the failure.
             });
           }
