@@ -10,7 +10,7 @@
 // RUN:   -swift-version 5 -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded
 
-// RUN: %target-swift-frontend -typecheck -verify %s -I %t \
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %s -I %t \
 // RUN:   -swift-version 5 -target arm64-apple-none-macho \
 // RUN:   -define-availability "availMacro:macOS 26.0, iOS 26.0" \
 // RUN:   -enable-experimental-feature Embedded
