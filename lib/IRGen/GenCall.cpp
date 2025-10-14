@@ -592,9 +592,8 @@ namespace {
     /// function type.
     void expandCoroutineContinuationType();
 
-    /// Initializes the result type for functions with @guaranteed_addr return
-    /// convention.
-    void expandGuaranteedAddressResult();
+    /// Initializes the result type for borrow and mutate accessors.
+    void expandAddressResult();
 
     // Expand the components for the async continuation entrypoint of the
     // function type (the function to be called on returning).
@@ -699,8 +698,8 @@ void SignatureExpansion::expandResult(
 
   auto fnConv = getSILFuncConventions();
 
-  if (fnConv.hasGuaranteedAddressResult()) {
-    return expandGuaranteedAddressResult();
+  if (fnConv.hasAddressResult()) {
+    return expandAddressResult();
   }
 
   // Disable the use of sret if we have multiple indirect results.
@@ -920,7 +919,7 @@ void SignatureExpansion::expandCoroutineContinuationParameters() {
   }
 }
 
-void SignatureExpansion::expandGuaranteedAddressResult() {
+void SignatureExpansion::expandAddressResult() {
   CanUseSRet = false;
   ResultIRType = IGM.PtrTy;
 }
@@ -3959,7 +3958,7 @@ void CallEmission::emitYieldsToExplosion(Explosion &out) {
   }
 }
 
-void CallEmission::emitGuaranteedAddressToExplosion(Explosion &out) {
+void CallEmission::emitAddressResultToExplosion(Explosion &out) {
   auto call = emitCallSite();
   out.add(call);
 }
@@ -3980,10 +3979,10 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
   SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
                                 IGF.getSILModule());
 
-  if (fnConv.hasGuaranteedAddressResult()) {
+  if (fnConv.hasAddressResult()) {
     assert(LastArgWritten == 0 &&
-           "@guaranteed_addr along with indirect result?");
-    emitGuaranteedAddressToExplosion(out);
+           "@guaranteed_addr/@inout along with indirect result?");
+    emitAddressResultToExplosion(out);
     return;
   }
 
@@ -6832,9 +6831,9 @@ void irgen::emitYieldOnceCoroutineResult(IRGenFunction &IGF, Explosion &result,
   }
 }
 
-void irgen::emitGuaranteedAddressResult(IRGenFunction &IGF, Explosion &result,
-                                        SILType funcResultType,
-                                        SILType returnResultType) {
+void irgen::emitAddressResult(IRGenFunction &IGF, Explosion &result,
+                              SILType funcResultType,
+                              SILType returnResultType) {
   assert(funcResultType == returnResultType);
   assert(funcResultType.isAddress());
   auto &Builder = IGF.Builder;

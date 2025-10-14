@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 967; // implicitactor cast
+const uint16_t SWIFTMODULE_VERSION_MINOR = 968; // @inout result convention
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -444,8 +444,9 @@ enum class ResultConvention : uint8_t {
   Pack,
   GuaranteedAddress,
   Guaranteed,
+  Inout
 };
-using ResultConventionField = BCFixed<3>;
+using ResultConventionField = BCFixed<4>;
 
 /// These IDs must \em not be renumbered or reordered without incrementing the
 /// module version.

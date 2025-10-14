@@ -723,7 +723,7 @@ SILValue SILGenFunction::emitUncheckedGuaranteedConversion(SILValue value) {
   return result;
 }
 
-bool SILGenFunction::emitGuaranteedReturn(
+bool SILGenFunction::emitBorrowOrMutateAccessorResult(
     SILLocation loc, Expr *ret, SmallVectorImpl<SILValue> &directResults) {
   auto *afd = cast<AbstractFunctionDecl>(FunctionDC->getAsDecl());
   assert(cast<AccessorDecl>(afd)->isBorrowAccessor() ||
@@ -869,7 +869,7 @@ bool SILGenFunction::emitGuaranteedReturn(
 void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                                     Expr *ret) {
   SmallVector<SILValue, 4> directResults;
-
+  auto *accessor = dyn_cast_or_null<AccessorDecl>(FunctionDC->getAsDecl());
   auto retTy = ret->getType()->getCanonicalType();
   
   AbstractionPattern origRetTy = TypeContext
@@ -895,8 +895,9 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
       Cleanups.forwardCleanup(cleanup);
     }
   } else if (F.getConventions().hasGuaranteedResult() ||
-             F.getConventions().hasGuaranteedAddressResult()) {
-    bool hasError = emitGuaranteedReturn(branchLoc, ret, directResults);
+             F.getConventions().hasAddressResult()) {
+    bool hasError =
+        emitBorrowOrMutateAccessorResult(branchLoc, ret, directResults);
     if (hasError) {
       return;
     }

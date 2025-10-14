@@ -689,6 +689,7 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
       return OwnershipKind::None;
     return OwnershipKind::Unowned;
   case ResultConvention::GuaranteedAddress:
+  case ResultConvention::Inout:
     return OwnershipKind::None;
   case ResultConvention::Guaranteed:
     return OwnershipKind::Guaranteed;

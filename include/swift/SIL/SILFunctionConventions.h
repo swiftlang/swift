@@ -334,6 +334,17 @@ public:
            ResultConvention::GuaranteedAddress;
   }
 
+  bool hasInoutResult() const {
+    if (funcTy->getNumResults() != 1) {
+      return false;
+    }
+    return funcTy->getResults()[0].getConvention() == ResultConvention::Inout;
+  }
+
+  bool hasAddressResult() const {
+    return hasGuaranteedAddressResult() || hasInoutResult();
+  }
+
   struct SILResultTypeFunc;
 
   // Gratuitous template parameter is to delay instantiating `mapped_iterator`
@@ -675,6 +686,7 @@ inline bool SILModuleConventions::isIndirectSILResult(SILResultInfo result,
   case ResultConvention::Autoreleased:
   case ResultConvention::GuaranteedAddress:
   case ResultConvention::Guaranteed:
+  case ResultConvention::Inout:
     return false;
   }
 
@@ -699,7 +711,7 @@ inline SILType
 SILModuleConventions::getSILResultInterfaceType(SILResultInfo result,
                                                 bool loweredAddresses) {
   return SILModuleConventions::isIndirectSILResult(result, loweredAddresses) ||
-                 result.isGuaranteedAddressResult()
+                 result.isAddressResult()
              ? SILType::getPrimitiveAddressType(result.getInterfaceType())
              : SILType::getPrimitiveObjectType(result.getInterfaceType());
 }
