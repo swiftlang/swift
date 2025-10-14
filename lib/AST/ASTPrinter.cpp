@@ -7917,7 +7917,7 @@ static StringRef getStringForResultConvention(ResultConvention conv) {
   case ResultConvention::Autoreleased: return "@autoreleased ";
   case ResultConvention::Pack: return "@pack_out ";
   case ResultConvention::GuaranteedAddress:
-    return "@guaranteed_addr ";
+    return "@guaranteed_address ";
   case ResultConvention::Guaranteed:
     return "@guaranteed ";
   case ResultConvention::Inout:

@@ -2293,7 +2293,7 @@ NodePointer Demangler::demangleImplResultConvention(Node::Kind ConvKind) {
     case 'a': attr = "@autoreleased"; break;
     case 'k': attr = "@pack_out"; break;
     case 'l':
-      attr = "@guaranteed_addr";
+      attr = "@guaranteed_address";
       break;
     case 'g':
       attr = "@guaranteed";

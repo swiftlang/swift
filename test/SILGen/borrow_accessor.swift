@@ -378,7 +378,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG2]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV1sAA1SVvz : $@convention(method) (@inout Wrapper) -> @guaranteed_addr S {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV1sAA1SVvz : $@convention(method) (@inout Wrapper) -> @guaranteed_address S {
 // CHECK:bb0([[REG0:%.*]] : $*Wrapper):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = struct_element_addr [[REG0]], #Wrapper._s
@@ -392,7 +392,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG2]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV1kAA5KlassCvz : $@convention(method) (@inout Wrapper) -> @guaranteed_addr Klass {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV1kAA5KlassCvz : $@convention(method) (@inout Wrapper) -> @guaranteed_address Klass {
 // CHECK:bb0([[REG0:%.*]] : $*Wrapper):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = struct_element_addr [[REG0]], #Wrapper._k
@@ -408,11 +408,11 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG4]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV14nested_borrow1AA5KlassCvz : $@convention(method) (@inout Wrapper) -> @guaranteed_addr Klass {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV14nested_borrow1AA5KlassCvz : $@convention(method) (@inout Wrapper) -> @guaranteed_address Klass {
 // CHECK:bb0([[REG0:%.*]] : $*Wrapper):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
-// CHECK:  [[REG2:%.*]] = function_ref @$s15borrow_accessor7WrapperV1sAA1SVvz : $@convention(method) (@inout Wrapper) -> @guaranteed_addr S
-// CHECK:  [[REG3:%.*]] = apply [[REG2]]([[REG0]]) : $@convention(method) (@inout Wrapper) -> @guaranteed_addr S
+// CHECK:  [[REG2:%.*]] = function_ref @$s15borrow_accessor7WrapperV1sAA1SVvz : $@convention(method) (@inout Wrapper) -> @guaranteed_address S
+// CHECK:  [[REG3:%.*]] = apply [[REG2]]([[REG0]]) : $@convention(method) (@inout Wrapper) -> @guaranteed_address S
 // CHECK:  [[REG4:%.*]] = struct_element_addr [[REG3]], #S._k
 // CHECK:  return [[REG4]]
 // CHECK: }
@@ -425,7 +425,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG3]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV14nested_borrow2AA5KlassCvz : $@convention(method) (@inout Wrapper) -> @guaranteed_addr Klass {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV14nested_borrow2AA5KlassCvz : $@convention(method) (@inout Wrapper) -> @guaranteed_address Klass {
 // CHECK:bb0([[REG0:%.*]] : $*Wrapper):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = struct_element_addr [[REG0]], #Wrapper._k
@@ -440,7 +440,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG4]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperVyAA5KlassCSiciz : $@convention(method) (Int, @inout Wrapper) -> @guaranteed_addr Klass {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperVyAA5KlassCSiciz : $@convention(method) (Int, @inout Wrapper) -> @guaranteed_address Klass {
 // CHECK:bb0([[REG0:%.*]] : $Int, [[REG1:%.*]] : $*Wrapper):
 // CHECK:  debug_value [[REG0]], let, name "index", argno 1
 // CHECK:  debug_value [[REG1]], var, name "self", argno 2, expr op_deref
@@ -460,26 +460,26 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG7]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV16nested_subscriptAA5KlassCvz : $@convention(method) (@inout Wrapper) -> @guaranteed_addr Klass {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor7WrapperV16nested_subscriptAA5KlassCvz : $@convention(method) (@inout Wrapper) -> @guaranteed_address Klass {
 // CHECK:bb0([[REG0:%.*]] : $*Wrapper):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = integer_literal $Builtin.IntLiteral, 0
 // CHECK:  [[REG3:%.*]] = metatype $@thin Int.Type
 // CHECK:  [[REG4:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:  [[REG5:%.*]] = apply [[REG4]]([[REG2]], [[REG3]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
-// CHECK:  [[REG6:%.*]] = function_ref @$s15borrow_accessor7WrapperVyAA5KlassCSiciz : $@convention(method) (Int, @inout Wrapper) -> @guaranteed_addr Klass
-// CHECK:  [[REG7:%.*]] = apply [[REG6]]([[REG5]], [[REG0]]) : $@convention(method) (Int, @inout Wrapper) -> @guaranteed_addr Klass
+// CHECK:  [[REG6:%.*]] = function_ref @$s15borrow_accessor7WrapperVyAA5KlassCSiciz : $@convention(method) (Int, @inout Wrapper) -> @guaranteed_address Klass
+// CHECK:  [[REG7:%.*]] = apply [[REG6]]([[REG5]], [[REG0]]) : $@convention(method) (Int, @inout Wrapper) -> @guaranteed_address Klass
 // CHECK:  return [[REG7]]
 // CHECK: }
 
-// CHECK: sil [ossa] @$s15borrow_accessor10GenWrapperV4propxvb : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil [ossa] @$s15borrow_accessor10GenWrapperV4propxvb : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_address T {
 // CHECK: bb0([[REG0:%.*]] : $*GenWrapper<T>):
 // CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
 // CHECK:   [[REG2:%.*]] = struct_element_addr [[REG0]], #GenWrapper._prop
 // CHECK:   return [[REG2]]
 // CHECK: }
 
-// CHECK: sil [ossa] @$s15borrow_accessor10GenWrapperV4propxvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil [ossa] @$s15borrow_accessor10GenWrapperV4propxvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @guaranteed_address T {
 // CHECK:bb0([[REG0:%.*]] : $*GenWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = struct_element_addr [[REG0]], #GenWrapper._prop
@@ -497,7 +497,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG5]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV1sAA1SVvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @guaranteed_addr S {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV1sAA1SVvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @guaranteed_address S {
 // CHECK:bb0([[REG0:%.*]] : $*GenWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = struct_element_addr [[REG0]], #GenWrapper._s
@@ -515,36 +515,36 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG5]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV1kAA5KlassCvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @guaranteed_addr Klass {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV1kAA5KlassCvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @guaranteed_address Klass {
 // CHECK:bb0([[REG0:%.*]] : $*GenWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = struct_element_addr [[REG0]], #GenWrapper._k
 // CHECK:  return [[REG2]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV12nested_prop1xvb : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV12nested_prop1xvb : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_address T {
 // CHECK: bb0([[REG0:%.*]] : $*GenWrapper<T>):
 // CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
 // CHECK:   [[REG2:%.*]] = struct_element_addr [[REG0]], #GenWrapper._w
-// CHECK:   [[REG3:%.*]] = function_ref @$s15borrow_accessor13SimpleWrapperV4propxvb : $@convention(method) <τ_0_0> (@in_guaranteed SimpleWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
-// CHECK:   [[REG4:%.*]] = apply [[REG3]]<T>([[REG2]]) : $@convention(method) <τ_0_0> (@in_guaranteed SimpleWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
+// CHECK:   [[REG3:%.*]] = function_ref @$s15borrow_accessor13SimpleWrapperV4propxvb : $@convention(method) <τ_0_0> (@in_guaranteed SimpleWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:   [[REG4:%.*]] = apply [[REG3]]<T>([[REG2]]) : $@convention(method) <τ_0_0> (@in_guaranteed SimpleWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
 // CHECK:   return [[REG4]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV12nested_prop1xvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV12nested_prop1xvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @guaranteed_address T {
 // CHECK:bb0([[REG0:%.*]] : $*GenWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = struct_element_addr [[REG0]], #GenWrapper._w
-// CHECK:  [[REG3:%.*]] = function_ref @$s15borrow_accessor13SimpleWrapperV4propxvz : $@convention(method) <τ_0_0> (@inout SimpleWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
-// CHECK:  [[REG4:%.*]] = apply [[REG3]]<T>([[REG2]]) : $@convention(method) <τ_0_0> (@inout SimpleWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
+// CHECK:  [[REG3:%.*]] = function_ref @$s15borrow_accessor13SimpleWrapperV4propxvz : $@convention(method) <τ_0_0> (@inout SimpleWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:  [[REG4:%.*]] = apply [[REG3]]<T>([[REG2]]) : $@convention(method) <τ_0_0> (@inout SimpleWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
 // CHECK:  return [[REG4]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV12nested_prop2xvb : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV12nested_prop2xvb : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_address T {
 // CHECK: bb0([[REG0:%.*]] : $*GenWrapper<T>):
 // CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
-// CHECK:   [[REG2:%.*]] = function_ref @$s15borrow_accessor10GenWrapperV4propxvb : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
-// CHECK:   [[REG3:%.*]] = apply [[REG2]]<T>([[REG0]]) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
+// CHECK:   [[REG2:%.*]] = function_ref @$s15borrow_accessor10GenWrapperV4propxvb : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:   [[REG3:%.*]] = apply [[REG2]]<T>([[REG0]]) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
 // CHECK:   return [[REG3]]
 // CHECK: }
 
@@ -561,12 +561,12 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG7]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV9nested_k1AA5KlassCvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @guaranteed_addr Klass {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV9nested_k1AA5KlassCvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @guaranteed_address Klass {
 // CHECK:bb0([[REG0:%.*]] : $*GenWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = struct_element_addr [[REG0]], #GenWrapper._s
-// CHECK:  [[REG3:%.*]] = function_ref @$s15borrow_accessor1SV1kAA5KlassCvz : $@convention(method) (@inout S) -> @guaranteed_addr Klass
-// CHECK:  [[REG4:%.*]] = apply [[REG3]]([[REG2]]) : $@convention(method) (@inout S) -> @guaranteed_addr Klass
+// CHECK:  [[REG3:%.*]] = function_ref @$s15borrow_accessor1SV1kAA5KlassCvz : $@convention(method) (@inout S) -> @guaranteed_address Klass
+// CHECK:  [[REG4:%.*]] = apply [[REG3]]([[REG2]]) : $@convention(method) (@inout S) -> @guaranteed_address Klass
 // CHECK:  return [[REG4]]
 // CHECK: }
 
@@ -580,17 +580,17 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG5]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV9nested_k2AA5KlassCvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @guaranteed_addr Klass {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV9nested_k2AA5KlassCvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @guaranteed_address Klass {
 // CHECK:bb0([[REG0:%.*]] : $*GenWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
-// CHECK:  [[REG2:%.*]] = function_ref @$s15borrow_accessor10GenWrapperV1sAA1SVvz : $@convention(method) <τ_0_0> (@inout GenWrapper<τ_0_0>) -> @guaranteed_addr S
-// CHECK:  [[REG3:%.*]] = apply [[REG2]]<T>([[REG0]]) : $@convention(method) <τ_0_0> (@inout GenWrapper<τ_0_0>) -> @guaranteed_addr S
-// CHECK:  [[REG4:%.*]] = function_ref @$s15borrow_accessor1SV1kAA5KlassCvz : $@convention(method) (@inout S) -> @guaranteed_addr Klass
-// CHECK:  [[REG5:%.*]] = apply [[REG4]]([[REG3]]) : $@convention(method) (@inout S) -> @guaranteed_addr Klass
+// CHECK:  [[REG2:%.*]] = function_ref @$s15borrow_accessor10GenWrapperV1sAA1SVvz : $@convention(method) <τ_0_0> (@inout GenWrapper<τ_0_0>) -> @guaranteed_address S
+// CHECK:  [[REG3:%.*]] = apply [[REG2]]<T>([[REG0]]) : $@convention(method) <τ_0_0> (@inout GenWrapper<τ_0_0>) -> @guaranteed_address S
+// CHECK:  [[REG4:%.*]] = function_ref @$s15borrow_accessor1SV1kAA5KlassCvz : $@convention(method) (@inout S) -> @guaranteed_address Klass
+// CHECK:  [[REG5:%.*]] = apply [[REG4]]([[REG3]]) : $@convention(method) (@inout S) -> @guaranteed_address Klass
 // CHECK:  return [[REG5]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperVyxSicib : $@convention(method) <T> (Int, @in_guaranteed GenWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperVyxSicib : $@convention(method) <T> (Int, @in_guaranteed GenWrapper<T>) -> @guaranteed_address T {
 // CHECK: bb0([[REG0:%.*]] : $Int, [[REG1:%.*]] : $*GenWrapper<T>):
 // CHECK:   debug_value [[REG0]], let, name "index", argno 1
 // CHECK:   debug_value [[REG1]], let, name "self", argno 2, expr op_deref
@@ -598,7 +598,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG4]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperVyxSiciz : $@convention(method) <T> (Int, @inout GenWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperVyxSiciz : $@convention(method) <T> (Int, @inout GenWrapper<T>) -> @guaranteed_address T {
 // CHECK:bb0([[REG0:%.*]] : $Int, [[REG1:%.*]] : $*GenWrapper<T>):
 // CHECK:  debug_value [[REG0]], let, name "index", argno 1
 // CHECK:  debug_value [[REG1]], var, name "self", argno 2, expr op_deref
@@ -606,31 +606,31 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:  return [[REG4]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV16nested_subscriptxvb : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV16nested_subscriptxvb : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_address T {
 // CHECK: bb0([[REG0:%.*]] : $*GenWrapper<T>):
 // CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
 // CHECK:   [[REG2:%.*]] = integer_literal $Builtin.IntLiteral, 0
 // CHECK:   [[REG3:%.*]] = metatype $@thin Int.Type
 // CHECK:   [[REG4:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:   [[REG5:%.*]] = apply [[REG4]]([[REG2]], [[REG3]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
-// CHECK:   [[REG6:%.*]] = function_ref @$s15borrow_accessor10GenWrapperVyxSicib : $@convention(method) <τ_0_0> (Int, @in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
-// CHECK:   [[REG7:%.*]] = apply [[REG6]]<T>([[REG5]], [[REG0]]) : $@convention(method) <τ_0_0> (Int, @in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
+// CHECK:   [[REG6:%.*]] = function_ref @$s15borrow_accessor10GenWrapperVyxSicib : $@convention(method) <τ_0_0> (Int, @in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:   [[REG7:%.*]] = apply [[REG6]]<T>([[REG5]], [[REG0]]) : $@convention(method) <τ_0_0> (Int, @in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
 // CHECK:   return [[REG7]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV16nested_subscriptxvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV16nested_subscriptxvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @guaranteed_address T {
 // CHECK:bb0([[REG0:%.*]] : $*GenWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = integer_literal $Builtin.IntLiteral, 0
 // CHECK:  [[REG3:%.*]] = metatype $@thin Int.Type
 // CHECK:  [[REG4:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:  [[REG5:%.*]] = apply [[REG4]]([[REG2]], [[REG3]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
-// CHECK:  [[REG6:%.*]] = function_ref @$s15borrow_accessor10GenWrapperVyxSiciz : $@convention(method) <τ_0_0> (Int, @inout GenWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
-// CHECK:  [[REG7:%.*]] = apply [[REG6]]<T>([[REG5]], [[REG0]]) : $@convention(method) <τ_0_0> (Int, @inout GenWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
+// CHECK:  [[REG6:%.*]] = function_ref @$s15borrow_accessor10GenWrapperVyxSiciz : $@convention(method) <τ_0_0> (Int, @inout GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:  [[REG7:%.*]] = apply [[REG6]]<T>([[REG5]], [[REG0]]) : $@convention(method) <τ_0_0> (Int, @inout GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
 // CHECK:  return [[REG7]]
 // CHECK: }
 
-// CHECK: sil [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE4propxvb : $@convention(method) <T where T : ~Copyable> (@in_guaranteed GenNCWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE4propxvb : $@convention(method) <T where T : ~Copyable> (@in_guaranteed GenNCWrapper<T>) -> @guaranteed_address T {
 // CHECK: bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
 // CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
 // CHECK:   [[REG2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG0]]
@@ -638,7 +638,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG3]]
 // CHECK: }
 
-// CHECK: sil [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE4propxvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE4propxvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_address T {
 // CHECK:bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[REG0]]
@@ -658,7 +658,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG6]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE2ncAA2NCVvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_addr NC {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE2ncAA2NCVvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_address NC {
 // CHECK:bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[REG0]]
@@ -678,7 +678,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG6]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE3ncwAA0D0Vvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_addr NCWrapper {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE3ncwAA0D0Vvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_address NCWrapper {
 // CHECK:bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[REG0]]
@@ -686,44 +686,44 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:  return [[REG3]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE12nested_prop1xvb : $@convention(method) <T where T : ~Copyable> (@in_guaranteed GenNCWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE12nested_prop1xvb : $@convention(method) <T where T : ~Copyable> (@in_guaranteed GenNCWrapper<T>) -> @guaranteed_address T {
 // CHECK: bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
 // CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
 // CHECK:   [[REG2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG0]]
 // CHECK:   [[REG3:%.*]] = struct_element_addr [[REG2]], #GenNCWrapper._w
-// CHECK:   [[REG4:%.*]] = function_ref @$s15borrow_accessor15SimpleNCWrapperVAARi_zrlE4propxvb : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed SimpleNCWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
-// CHECK:   [[REG5:%.*]] = apply [[REG4]]<T>([[REG3]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed SimpleNCWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
+// CHECK:   [[REG4:%.*]] = function_ref @$s15borrow_accessor15SimpleNCWrapperVAARi_zrlE4propxvb : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed SimpleNCWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:   [[REG5:%.*]] = apply [[REG4]]<T>([[REG3]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed SimpleNCWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
 // CHECK:   [[REG6:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG5]]
 // CHECK:   return [[REG6]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE12nested_prop1xvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE12nested_prop1xvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_address T {
 // CHECK:bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[REG0]]
 // CHECK:  [[REG3:%.*]] = struct_element_addr [[REG2]], #GenNCWrapper._w
-// CHECK:  [[REG4:%.*]] = function_ref @$s15borrow_accessor15SimpleNCWrapperVAARi_zrlE4propxvz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout SimpleNCWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
-// CHECK:  [[REG5:%.*]] = apply [[REG4]]<T>([[REG3]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout SimpleNCWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
+// CHECK:  [[REG4:%.*]] = function_ref @$s15borrow_accessor15SimpleNCWrapperVAARi_zrlE4propxvz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout SimpleNCWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:  [[REG5:%.*]] = apply [[REG4]]<T>([[REG3]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout SimpleNCWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
 // CHECK:  [[REG6:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG5]]
 // CHECK:  return [[REG6]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE12nested_prop2xvb : $@convention(method) <T where T : ~Copyable> (@in_guaranteed GenNCWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE12nested_prop2xvb : $@convention(method) <T where T : ~Copyable> (@in_guaranteed GenNCWrapper<T>) -> @guaranteed_address T {
 // CHECK:bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
 // CHECK:  debug_value [[REG0]], let, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG0]]
-// CHECK:  [[REG3:%.*]] = function_ref @$s15borrow_accessor12GenNCWrapperVAARi_zrlE4propxvb : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed GenNCWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
-// CHECK:  [[REG4:%.*]] = apply [[REG3]]<T>([[REG2]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed GenNCWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
+// CHECK:  [[REG3:%.*]] = function_ref @$s15borrow_accessor12GenNCWrapperVAARi_zrlE4propxvb : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed GenNCWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:  [[REG4:%.*]] = apply [[REG3]]<T>([[REG2]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed GenNCWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
 // CHECK:  [[REG5:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG4]]
 // CHECK:  return [[REG5]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE12nested_prop2xvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE12nested_prop2xvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_address T {
 // CHECK:bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[REG0]]
-// CHECK:  [[REG3:%.*]] = function_ref @$s15borrow_accessor12GenNCWrapperVAARi_zrlE4propxvz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout GenNCWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
-// CHECK:  [[REG4:%.*]] = apply [[REG3]]<T>([[REG2]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout GenNCWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
+// CHECK:  [[REG3:%.*]] = function_ref @$s15borrow_accessor12GenNCWrapperVAARi_zrlE4propxvz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout GenNCWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:  [[REG4:%.*]] = apply [[REG3]]<T>([[REG2]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout GenNCWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
 // CHECK:  [[REG5:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG4]]
 // CHECK:  return [[REG5]]
 // CHECK: }
@@ -747,13 +747,13 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG8]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE10nested_nc1AA2NCVvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_addr NC {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE10nested_nc1AA2NCVvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_address NC {
 // CHECK:bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[REG0]]
 // CHECK:  [[REG3:%.*]] = struct_element_addr [[REG2]], #GenNCWrapper._ncw
-// CHECK:  [[REG4:%.*]] = function_ref @$s15borrow_accessor9NCWrapperV2ncAA2NCVvz : $@convention(method) (@inout NCWrapper) -> @guaranteed_addr NC
-// CHECK:  [[REG5:%.*]] = apply [[REG4]]([[REG3]]) : $@convention(method) (@inout NCWrapper) -> @guaranteed_addr NC
+// CHECK:  [[REG4:%.*]] = function_ref @$s15borrow_accessor9NCWrapperV2ncAA2NCVvz : $@convention(method) (@inout NCWrapper) -> @guaranteed_address NC
+// CHECK:  [[REG5:%.*]] = apply [[REG4]]([[REG3]]) : $@convention(method) (@inout NCWrapper) -> @guaranteed_address NC
 // CHECK:  [[REG6:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG5]]
 // CHECK:  return [[REG6]]
 // CHECK: }
@@ -779,20 +779,20 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG9]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE10nested_nc2AA2NCVvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_addr NC {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE10nested_nc2AA2NCVvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_address NC {
 // CHECK:bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[REG0]]
-// CHECK:  [[REG3:%.*]] = function_ref @$s15borrow_accessor12GenNCWrapperVAARi_zrlE3ncwAA0D0Vvz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout GenNCWrapper<τ_0_0>) -> @guaranteed_addr NCWrapper
-// CHECK:  [[REG4:%.*]] = apply [[REG3]]<T>([[REG2]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout GenNCWrapper<τ_0_0>) -> @guaranteed_addr NCWrapper
+// CHECK:  [[REG3:%.*]] = function_ref @$s15borrow_accessor12GenNCWrapperVAARi_zrlE3ncwAA0D0Vvz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout GenNCWrapper<τ_0_0>) -> @guaranteed_address NCWrapper
+// CHECK:  [[REG4:%.*]] = apply [[REG3]]<T>([[REG2]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout GenNCWrapper<τ_0_0>) -> @guaranteed_address NCWrapper
 // CHECK:  [[REG5:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG4]]
-// CHECK:  [[REG6:%.*]] = function_ref @$s15borrow_accessor9NCWrapperV2ncAA2NCVvz : $@convention(method) (@inout NCWrapper) -> @guaranteed_addr NC
-// CHECK:  [[REG7:%.*]] = apply [[REG6]]([[REG5]]) : $@convention(method) (@inout NCWrapper) -> @guaranteed_addr NC
+// CHECK:  [[REG6:%.*]] = function_ref @$s15borrow_accessor9NCWrapperV2ncAA2NCVvz : $@convention(method) (@inout NCWrapper) -> @guaranteed_address NC
+// CHECK:  [[REG7:%.*]] = apply [[REG6]]([[REG5]]) : $@convention(method) (@inout NCWrapper) -> @guaranteed_address NC
 // CHECK:  [[REG8:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG7]]
 // CHECK:  return [[REG8]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlEyxSicib : $@convention(method) <T where T : ~Copyable> (Int, @in_guaranteed GenNCWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlEyxSicib : $@convention(method) <T where T : ~Copyable> (Int, @in_guaranteed GenNCWrapper<T>) -> @guaranteed_address T {
 // CHECK: bb0([[REG0:%.*]] : $Int, [[REG1:%.*]] : $*GenNCWrapper<T>):
 // CHECK:   debug_value [[REG0]], let, name "index", argno 1
 // CHECK:   debug_value [[REG1]], let, name "self", argno 2, expr op_deref
@@ -801,7 +801,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   return [[REG5]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlEyxSiciz : $@convention(method) <T where T : ~Copyable> (Int, @inout GenNCWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlEyxSiciz : $@convention(method) <T where T : ~Copyable> (Int, @inout GenNCWrapper<T>) -> @guaranteed_address T {
 // CHECK:bb0([[REG0:%.*]] : $Int, [[REG1:%.*]] : $*GenNCWrapper<T>):
 // CHECK:  debug_value [[REG0]], let, name "index", argno 1
 // CHECK:  debug_value [[REG1]], var, name "self", argno 2, expr op_deref
@@ -810,7 +810,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:  return [[REG5]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE16nested_subscriptxvb : $@convention(method) <T where T : ~Copyable> (@in_guaranteed GenNCWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE16nested_subscriptxvb : $@convention(method) <T where T : ~Copyable> (@in_guaranteed GenNCWrapper<T>) -> @guaranteed_address T {
 // CHECK: bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
 // CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
 // CHECK:   [[REG2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG0]]
@@ -818,13 +818,13 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:   [[REG4:%.*]] = metatype $@thin Int.Type
 // CHECK:   [[REG5:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:   [[REG6:%.*]] = apply [[REG5]]([[REG3]], [[REG4]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
-// CHECK:   [[REG7:%.*]] = function_ref @$s15borrow_accessor12GenNCWrapperVAARi_zrlEyxSicib : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @in_guaranteed GenNCWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
-// CHECK:   [[REG8:%.*]] = apply [[REG7]]<T>([[REG6]], [[REG2]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @in_guaranteed GenNCWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
+// CHECK:   [[REG7:%.*]] = function_ref @$s15borrow_accessor12GenNCWrapperVAARi_zrlEyxSicib : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @in_guaranteed GenNCWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:   [[REG8:%.*]] = apply [[REG7]]<T>([[REG6]], [[REG2]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @in_guaranteed GenNCWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
 // CHECK:   [[REG9:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG8]]
 // CHECK:   return [[REG9]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE16nested_subscriptxvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_addr T {
+// CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE16nested_subscriptxvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @guaranteed_address T {
 // CHECK:bb0([[REG0:%.*]] : $*GenNCWrapper<T>):
 // CHECK:  debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:  [[REG2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[REG0]]
@@ -832,8 +832,8 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:  [[REG4:%.*]] = metatype $@thin Int.Type
 // CHECK:  [[REG5:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:  [[REG6:%.*]] = apply [[REG5]]([[REG3]], [[REG4]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
-// CHECK:  [[REG7:%.*]] = function_ref @$s15borrow_accessor12GenNCWrapperVAARi_zrlEyxSiciz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @inout GenNCWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
-// CHECK:  [[REG8:%.*]] = apply [[REG7]]<T>([[REG6]], [[REG2]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @inout GenNCWrapper<τ_0_0>) -> @guaranteed_addr τ_0_0
+// CHECK:  [[REG7:%.*]] = function_ref @$s15borrow_accessor12GenNCWrapperVAARi_zrlEyxSiciz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @inout GenNCWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:  [[REG8:%.*]] = apply [[REG7]]<T>([[REG6]], [[REG2]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @inout GenNCWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
 // CHECK:  [[REG9:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG8]]
 // CHECK:  return [[REG9]]
 // CHECK: }

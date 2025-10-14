@@ -2232,7 +2232,7 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
                 .Case("@unowned_inner_pointer", 'u')
                 .Case("@autoreleased", 'a')
                 .Case("@pack_out", 'k')
-                .Case("@guaranteed_addr", 'l')
+                .Case("@guaranteed_address", 'l')
                 .Case("@guaranteed", 'g')
                 .Case("@inout", 'm')
                 .Default(0);

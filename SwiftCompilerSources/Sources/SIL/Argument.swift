@@ -489,7 +489,7 @@ public enum ArgumentConvention : CustomStringConvertible {
     case .pack:
       self = .packOut
     case .guaranteed, .guaranteedAddress, .inout:
-      fatalError("Result conventions @guaranteed, @guaranteed_addr and @inout are always returned directly")
+      fatalError("Result conventions @guaranteed, @guaranteed_address and @inout are always returned directly")
     }
   }
 
