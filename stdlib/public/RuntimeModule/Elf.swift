@@ -1831,6 +1831,8 @@ final class ElfImage<SomeElfTraits: ElfTraits>
                        offset: Int(relativeAddress - symbol.value))
   }
 
+  static var pathSeparator: String { "/" }
+
   func getDwarfSection(_ section: DwarfSection) -> ImageSource? {
     switch section {
       case .debugAbbrev: return getSection(".debug_abbrev")
