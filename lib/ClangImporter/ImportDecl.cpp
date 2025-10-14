@@ -9484,7 +9484,8 @@ static StringRef getAttributeName(const clang::CountAttributedType *CAT) {
 }
 
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
-  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
+  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers) ||
+      SwiftContext.ClangImporterOpts.DisableSafeInteropWrappers)
     return;
   auto ClangDecl =
       dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
