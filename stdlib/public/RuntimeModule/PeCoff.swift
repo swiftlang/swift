@@ -636,55 +636,58 @@ final class PeCoffImage {
 
     if dataDirectory.count > PeImageDirectoryEntry.debug.rawValue {
       let debugInfo = dataDirectory[PeImageDirectoryEntry.debug.rawValue]
-      var pos: Address
-      if source.isMappedImage {
-        pos = Address(debugInfo.VirtualAddress) + self.imageBase
-      } else {
-        pos = Address(filePointer(from: debugInfo.VirtualAddress)!)
-      }
 
-      let end = pos + Address(debugInfo.Size)
-      while pos < end {
-        let entry = try source.fetch(from: pos, as: pe_debug_directory.self)
-
-        pos += Address(MemoryLayout<pe_debug_directory>.size)
-
-        let dataPos: Address
+      if debugInfo.VirtualAddress != 0 && debugInfo.Size != 0 {
+        var pos: Address
         if source.isMappedImage {
-          dataPos = Address(entry.AddressOfRawData) + self.imageBase
+          pos = Address(debugInfo.VirtualAddress) + self.imageBase
         } else {
-          dataPos = Address(entry.PointerToRawData)
+          pos = Address(filePointer(from: debugInfo.VirtualAddress)!)
         }
 
-        let dataEnd = dataPos + Address(entry.SizeOfData)
-        let entrySource = source[dataPos..<dataEnd]
-        switch entry.Type {
-        case .PE_DEBUG_TYPE_CODEVIEW:
-          let magic = maybeSwap(try entrySource.fetch(from:0, as: UInt32.self))
-          if magic != CV_PDB70_MAGIC || entry.SizeOfData < 24 {
-            break
+        let end = pos + Address(debugInfo.Size)
+        while pos < end {
+          let entry = try source.fetch(from: pos, as: pe_debug_directory.self)
+
+          pos += Address(MemoryLayout<pe_debug_directory>.size)
+
+          let dataPos: Address
+          if source.isMappedImage {
+            dataPos = Address(entry.AddressOfRawData) + self.imageBase
+          } else {
+            dataPos = Address(entry.PointerToRawData)
           }
 
-          let uuid = try entrySource.fetch(from: 4,
-                                           count: 16,
-                                           as: UInt8.self)
-          let age = maybeSwap(try entrySource.fetch(from: 20,
-                                                    as: UInt32.self))
-          let pdbFile = try entrySource.fetchString(from: 24)!
+          let dataEnd = dataPos + Address(entry.SizeOfData)
+          let entrySource = source[dataPos..<dataEnd]
+          switch entry.Type {
+            case .PE_DEBUG_TYPE_CODEVIEW:
+              let magic = maybeSwap(try entrySource.fetch(from:0, as: UInt32.self))
+              if magic != CV_PDB70_MAGIC || entry.SizeOfData < 24 {
+                break
+              }
 
-          self.codeview = PeCodeview(uuid: uuid, age: age, pdbPath: pdbFile)
+              let uuid = try entrySource.fetch(from: 4,
+                                               count: 16,
+                                               as: UInt8.self)
+              let age = maybeSwap(try entrySource.fetch(from: 20,
+                                                        as: UInt32.self))
+              let pdbFile = try entrySource.fetchString(from: 24)!
 
-        case .PE_DEBUG_TYPE_REPRO:
-          if entry.SizeOfData > 4 {
-            let len = maybeSwap(try entrySource.fetch(from: 0, as: UInt32.self))
+              self.codeview = PeCodeview(uuid: uuid, age: age, pdbPath: pdbFile)
 
-            reproHash = try entrySource.fetch(from: 4,
-                                              count: Int(len),
-                                              as: UInt8.self)
+            case .PE_DEBUG_TYPE_REPRO:
+              if entry.SizeOfData > 4 {
+                let len = maybeSwap(try entrySource.fetch(from: 0, as: UInt32.self))
+
+                reproHash = try entrySource.fetch(from: 4,
+                                                  count: Int(len),
+                                                  as: UInt8.self)
+              }
+
+            default:
+              break
           }
-
-        default:
-          break
         }
       }
     }
@@ -765,9 +768,10 @@ final class PeCoffImage {
   typealias SourceLocation = SymbolicatedBacktrace.SourceLocation
 
   func sourceLocation(
-    for address: Address
+    for relativeAddress: Address
   ) throws -> SourceLocation? {
     // ###TODO: PDB support
+    let address = relativeAddress + Address(imageBase)
 
     guard let dwarfReader else {
       return nil
@@ -817,6 +821,8 @@ final class PeCoffImage {
 }
 
 extension PeCoffImage: DwarfSource {
+
+  static var pathSeparator: String { "\\" }
 
   func getDwarfSection(_ section: DwarfSection) -> ImageSource? {
     // If linked with `link.exe`, the DWARF section names get
