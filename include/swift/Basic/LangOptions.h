@@ -1148,6 +1148,10 @@ namespace swift {
     /// ones to apply.
     bool LoadVersionIndependentAPINotes = false;
 
+    /// Whether the importer should skip SafeInteropWrappers, even though the
+    /// feature is enabled.
+    bool DisableSafeInteropWrappers = false;
+
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.
     llvm::hash_code getPCHHashComponents() const {
