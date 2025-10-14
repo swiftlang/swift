@@ -501,6 +501,8 @@ enum DwarfSection {
 @available(Backtracing 6.2, *)
 protocol DwarfSource {
 
+  static var pathSeparator: String { get }
+
   func getDwarfSection(_ section: DwarfSection) -> ImageSource?
 
 }
@@ -1050,6 +1052,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       cursor.pos = nextOffset
 
       result.append(DwarfLineNumberInfo(
+                      pathSeparator: Source.pathSeparator,
                       baseOffset: baseOffset,
                       version: version,
                       addressSize: addressSize,
@@ -1706,15 +1709,42 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     _ fn: (FunctionInfo) -> ()
   ) throws {
     var name: String? = nil
+    var refAttrs = attributes
 
-    if let nameVal = attributes[.DW_AT_name],
+    if let specificationVal = refAttrs[.DW_AT_specification],
+       case let .reference(specification) = specificationVal {
+      var cursor = ImageSourceCursor(source: infoSection,
+                                     offset: specification)
+      let abbrev = try cursor.readULEB128()
+      if abbrev == 0 {
+        return
+      }
+
+      guard let abbrevInfo = unit.abbrevs[abbrev] else {
+        throw DwarfError.missingAbbrev(abbrev)
+      }
+
+      let tag = abbrevInfo.tag
+      if tag != .DW_TAG_subprogram {
+        return
+      }
+
+      refAttrs = try readDieAttributes(
+        at: &cursor,
+        unit: unit,
+        abbrevInfo: abbrevInfo,
+        shouldFetchIndirect: true
+      )
+    }
+
+    if let nameVal = refAttrs[.DW_AT_name],
        case let .string(theName) = nameVal {
       name = theName
     }
 
     let rawName: String
 
-    if let linkageNameVal = attributes[.DW_AT_linkage_name],
+    if let linkageNameVal = refAttrs[.DW_AT_linkage_name],
        case let .string(theRawName) = linkageNameVal {
       rawName = theRawName
     } else {
@@ -1981,6 +2011,8 @@ struct DwarfLineNumberState: CustomStringConvertible {
 struct DwarfLineNumberInfo {
   typealias Address = UInt64
 
+  var pathSeparator: String
+
   var baseOffset: Address
   var version: Int
   var addressSize: Int?
@@ -2005,7 +2037,7 @@ struct DwarfLineNumberInfo {
     }
 
     let info = files[index]
-    if info.path.hasPrefix("/") {
+    if info.path.hasPrefix(pathSeparator) {
       return info.path
     }
 
@@ -2017,7 +2049,7 @@ struct DwarfLineNumberInfo {
       dirName = "<unknown>"
     }
 
-    return "\(dirName)/\(info.path)"
+    return "\(dirName)\(pathSeparator)\(info.path)"
   }
 
   /// Execute the line number program, calling a closure for every line
