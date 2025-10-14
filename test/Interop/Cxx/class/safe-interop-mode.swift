@@ -64,9 +64,13 @@ View safeFunc(View v1 [[clang::noescape]], View v2 [[clang::lifetimebound]]);
 void unsafeFunc(View v1 [[clang::noescape]], View v2);
 
 class SharedObject {
+public:
+  View getView() const [[clang::lifetimebound]];
 private:
   int *p;
 } SWIFT_SHARED_REFERENCE(retainSharedObject, releaseSharedObject);
+
+View getViewFromSharedObject(SharedObject* p [[clang::lifetimebound]]);
 
 inline void retainSharedObject(SharedObject *) {}
 inline void releaseSharedObject(SharedObject *) {}
@@ -161,6 +165,10 @@ func useUnsafeLifetimeAnnotated(v: View) {
 func useSharedReference(frt: SharedObject, x: OwnedData) {
   let _ = frt
   x.takeSharedObject(frt)
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  let _ = frt.getView() // expected-note{{reference to unsafe instance method 'getView()'}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  let _ = getViewFromSharedObject(frt) // expected-note{{reference to unsafe global function 'getViewFromSharedObject'}}
 }
 
 @available(SwiftStdlib 5.8, *)
