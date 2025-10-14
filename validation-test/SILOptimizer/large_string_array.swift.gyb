@@ -4,6 +4,8 @@
 // https://github.com/apple/swift/issues/56816
 // UNSUPPORTED: OS=linux-gnu
 
+// REQUIRES: rdar162433770
+
 // The compiler should finish in less than 1 minute. To give some slack,
 // specify a timeout of 5 minutes.
 // If the compiler needs more than 5 minutes, there is probably a real problem.
