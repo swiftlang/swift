@@ -33,6 +33,6 @@ func test() {
   assert(mutated_sum == mutatedExpectedSum)
 }
 
-// CHECK: sil @$s25borrow_accessor_container9ContainerVAARi_zrlEyxSicib : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @guaranteed Container<τ_0_0>) -> @guaranteed_addr τ_0_0
-// CHECK: sil @$s25borrow_accessor_container9ContainerVAARi_zrlEyxSiciz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @inout Container<τ_0_0>) -> @guaranteed_addr τ_0_0
+// CHECK: sil @$s25borrow_accessor_container9ContainerVAARi_zrlEyxSicib : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @guaranteed Container<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK: sil @$s25borrow_accessor_container9ContainerVAARi_zrlEyxSiciz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @inout Container<τ_0_0>) -> @inout τ_0_0
 
