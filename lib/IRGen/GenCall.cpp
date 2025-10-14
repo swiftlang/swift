@@ -3981,7 +3981,7 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
 
   if (fnConv.hasAddressResult()) {
     assert(LastArgWritten == 0 &&
-           "@guaranteed_addr/@inout along with indirect result?");
+           "@guaranteed_address/@inout along with indirect result?");
     emitAddressResultToExplosion(out);
     return;
   }

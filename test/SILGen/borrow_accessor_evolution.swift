@@ -119,7 +119,7 @@ func test() {
   use(w1.nested2)
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s25borrow_accessor_evolution7WrapperV1sAA1SVvb : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed_addr S {
+// CHECK-LABEL: sil hidden [ossa] @$s25borrow_accessor_evolution7WrapperV1sAA1SVvb : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed_address S {
 // CHECK: bb0([[REG0:%.*]] : $*Wrapper):
 // CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
 // CHECK:   [[REG2:%.*]] = struct_element_addr [[REG0]], #Wrapper._s
@@ -177,7 +177,7 @@ func test() {
 // CHECK:   return [[REG7]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s25borrow_accessor_evolution3NCSV2ncAA2NCVvb : $@convention(method) (@in_guaranteed NCS) -> @guaranteed_addr NC {
+// CHECK: sil hidden [ossa] @$s25borrow_accessor_evolution3NCSV2ncAA2NCVvb : $@convention(method) (@in_guaranteed NCS) -> @guaranteed_address NC {
 // CHECK: bb0([[REG0:%.*]] : $*NCS):
 // CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
 // CHECK:   [[REG2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG0]]
@@ -185,7 +185,7 @@ func test() {
 // CHECK:   return [[REG3]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s25borrow_accessor_evolution9NCWrapperV2ncAA2NCVvb : $@convention(method) (@in_guaranteed NCWrapper) -> @guaranteed_addr NC {
+// CHECK: sil hidden [ossa] @$s25borrow_accessor_evolution9NCWrapperV2ncAA2NCVvb : $@convention(method) (@in_guaranteed NCWrapper) -> @guaranteed_address NC {
 // CHECK: bb0([[REG0:%.*]] : $*NCWrapper):
 // CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
 // CHECK:   [[REG2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG0]]
@@ -193,28 +193,28 @@ func test() {
 // CHECK:   return [[REG3]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s25borrow_accessor_evolution9NCWrapperV7nested1AA2NCVvb : $@convention(method) (@in_guaranteed NCWrapper) -> @guaranteed_addr NC {
+// CHECK: sil hidden [ossa] @$s25borrow_accessor_evolution9NCWrapperV7nested1AA2NCVvb : $@convention(method) (@in_guaranteed NCWrapper) -> @guaranteed_address NC {
 // CHECK: bb0([[REG0:%.*]] : $*NCWrapper):
 // CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
 // CHECK:   [[REG2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG0]]
 // CHECK:   [[REG3:%.*]] = struct_element_addr [[REG2]], #NCWrapper._s
-// CHECK:   [[REG4:%.*]] = function_ref @$s25borrow_accessor_evolution3NCSV2ncAA2NCVvb : $@convention(method) (@in_guaranteed NCS) -> @guaranteed_addr NC
-// CHECK:   [[REG5:%.*]] = apply [[REG4]]([[REG3]]) : $@convention(method) (@in_guaranteed NCS) -> @guaranteed_addr NC
+// CHECK:   [[REG4:%.*]] = function_ref @$s25borrow_accessor_evolution3NCSV2ncAA2NCVvb : $@convention(method) (@in_guaranteed NCS) -> @guaranteed_address NC
+// CHECK:   [[REG5:%.*]] = apply [[REG4]]([[REG3]]) : $@convention(method) (@in_guaranteed NCS) -> @guaranteed_address NC
 // CHECK:   [[REG6:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG5]]
 // CHECK:   return [[REG6]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s25borrow_accessor_evolution9NCWrapperV7nested2AA2NCVvb : $@convention(method) (@in_guaranteed NCWrapper) -> @guaranteed_addr NC {
+// CHECK: sil hidden [ossa] @$s25borrow_accessor_evolution9NCWrapperV7nested2AA2NCVvb : $@convention(method) (@in_guaranteed NCWrapper) -> @guaranteed_address NC {
 // CHECK: bb0([[REG0:%.*]] : $*NCWrapper):
 // CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
 // CHECK:   [[REG2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG0]]
-// CHECK:   [[REG3:%.*]] = function_ref @$s25borrow_accessor_evolution9NCWrapperV2ncAA2NCVvb : $@convention(method) (@in_guaranteed NCWrapper) -> @guaranteed_addr NC
-// CHECK:   [[REG4:%.*]] = apply [[REG3]]([[REG2]]) : $@convention(method) (@in_guaranteed NCWrapper) -> @guaranteed_addr NC
+// CHECK:   [[REG3:%.*]] = function_ref @$s25borrow_accessor_evolution9NCWrapperV2ncAA2NCVvb : $@convention(method) (@in_guaranteed NCWrapper) -> @guaranteed_address NC
+// CHECK:   [[REG4:%.*]] = apply [[REG3]]([[REG2]]) : $@convention(method) (@in_guaranteed NCWrapper) -> @guaranteed_address NC
 // CHECK:   [[REG5:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG4]]
 // CHECK:   return [[REG5]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s25borrow_accessor_evolution9NCWrapperVyAA2NCVSicib : $@convention(method) (Int, @in_guaranteed NCWrapper) -> @guaranteed_addr NC {
+// CHECK: sil hidden [ossa] @$s25borrow_accessor_evolution9NCWrapperVyAA2NCVSicib : $@convention(method) (Int, @in_guaranteed NCWrapper) -> @guaranteed_address NC {
 // CHECK: bb0([[REG0:%.*]] : $Int, [[REG1:%.*]] : $*NCWrapper):
 // CHECK:   debug_value [[REG0]], let, name "index", argno 1
 // CHECK:   debug_value [[REG1]], let, name "self", argno 2, expr op_deref
@@ -223,7 +223,7 @@ func test() {
 // CHECK:   return [[REG5]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s25borrow_accessor_evolution9NCWrapperV16nested_subscriptAA2NCVvb : $@convention(method) (@in_guaranteed NCWrapper) -> @guaranteed_addr NC {
+// CHECK: sil hidden [ossa] @$s25borrow_accessor_evolution9NCWrapperV16nested_subscriptAA2NCVvb : $@convention(method) (@in_guaranteed NCWrapper) -> @guaranteed_address NC {
 // CHECK: bb0([[REG0:%.*]] : $*NCWrapper):
 // CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
 // CHECK:   [[REG2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG0]]
@@ -231,8 +231,8 @@ func test() {
 // CHECK:   [[REG4:%.*]] = metatype $@thin Int.Type
 // CHECK:   [[REG5:%.*]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:   [[REG6:%.*]] = apply [[REG5]]([[REG3]], [[REG4]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
-// CHECK:   [[REG7:%.*]] = function_ref @$s25borrow_accessor_evolution9NCWrapperVyAA2NCVSicib : $@convention(method) (Int, @in_guaranteed NCWrapper) -> @guaranteed_addr NC
-// CHECK:   [[REG8:%.*]] = apply [[REG7]]([[REG6]], [[REG2]]) : $@convention(method) (Int, @in_guaranteed NCWrapper) -> @guaranteed_addr NC
+// CHECK:   [[REG7:%.*]] = function_ref @$s25borrow_accessor_evolution9NCWrapperVyAA2NCVSicib : $@convention(method) (Int, @in_guaranteed NCWrapper) -> @guaranteed_address NC
+// CHECK:   [[REG8:%.*]] = apply [[REG7]]([[REG6]], [[REG2]]) : $@convention(method) (Int, @in_guaranteed NCWrapper) -> @guaranteed_address NC
 // CHECK:   [[REG9:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG8]]
 // CHECK:   return [[REG9]]
 // CHECK: }

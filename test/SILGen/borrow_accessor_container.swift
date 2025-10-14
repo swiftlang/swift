@@ -33,7 +33,7 @@ public struct Container<Element: ~Copyable >: ~Copyable {
 
 extension Container: Copyable where Element: Copyable {}
 
-// CHECK: sil hidden [ossa] @$s25borrow_accessor_container9ContainerVAARi_zrlE5firstxvb : $@convention(method) <Element where Element : ~Copyable> (@guaranteed Container<Element>) -> @guaranteed_addr Element {
+// CHECK: sil hidden [ossa] @$s25borrow_accessor_container9ContainerVAARi_zrlE5firstxvb : $@convention(method) <Element where Element : ~Copyable> (@guaranteed Container<Element>) -> @guaranteed_address Element {
 // CHECK: bb0([[REG0:%.*]] : @guaranteed $Container<Element>):
 // CHECK:   [[REG1:%.*]] = copy_value [[REG0]]
 // CHECK:   [[REG2:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG1]]
@@ -63,7 +63,7 @@ extension Container: Copyable where Element: Copyable {}
 // CHECK:   return [[REG20]]
 // CHECK: }
 
-// CHECK: sil hidden [ossa] @$s25borrow_accessor_container9ContainerVAARi_zrlE5firstxvz : $@convention(method) <Element where Element : ~Copyable> (@inout Container<Element>) -> @guaranteed_addr Element {
+// CHECK: sil hidden [ossa] @$s25borrow_accessor_container9ContainerVAARi_zrlE5firstxvz : $@convention(method) <Element where Element : ~Copyable> (@inout Container<Element>) -> @guaranteed_address Element {
 // CHECK: bb0([[REG0:%.*]] : $*Container<Element>):
 // CHECK:   debug_value [[REG0]], var, name "self", argno 1, expr op_deref
 // CHECK:   [[REG2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[REG0]]
@@ -90,7 +90,7 @@ extension Container: Copyable where Element: Copyable {}
 // CHECK:   return [[REG19]]
 // CHECK: }
 
-// CHECK: sil [ossa] @$s25borrow_accessor_container9ContainerVAARi_zrlEyxSicib : $@convention(method) <Element where Element : ~Copyable> (Int, @guaranteed Container<Element>) -> @guaranteed_addr Element {
+// CHECK: sil [ossa] @$s25borrow_accessor_container9ContainerVAARi_zrlEyxSicib : $@convention(method) <Element where Element : ~Copyable> (Int, @guaranteed Container<Element>) -> @guaranteed_address Element {
 // CHECK: bb0([[REG0:%.*]] : $Int, [[REG1:%.*]] : @guaranteed $Container<Element>):
 // CHECK:   [[REG3:%.*]] = copy_value [[REG1]]
 // CHECK:   [[REG4:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG3]]
@@ -127,7 +127,7 @@ extension Container: Copyable where Element: Copyable {}
 // CHECK:   return [[REG32]]
 // CHECK: }
 
-// CHECK: sil [ossa] @$s25borrow_accessor_container9ContainerVAARi_zrlEyxSiciz : $@convention(method) <Element where Element : ~Copyable> (Int, @inout Container<Element>) -> @guaranteed_addr Element {
+// CHECK: sil [ossa] @$s25borrow_accessor_container9ContainerVAARi_zrlEyxSiciz : $@convention(method) <Element where Element : ~Copyable> (Int, @inout Container<Element>) -> @guaranteed_address Element {
 // CHECK: bb0([[REG0:%.*]] : $Int, [[REG1:%.*]] : $*Container<Element>):
 // CHECK:   debug_value [[REG0]], let, name "index", argno 1
 // CHECK:   debug_value [[REG1]], var, name "self", argno 2, expr op_deref
@@ -232,7 +232,7 @@ public struct CopyableContainer {
 // CHECK:   return [[REG32]]
 // CHECK: }
 
-// CHECK: sil [ossa] @$s25borrow_accessor_container17CopyableContainerVyAA5KlassCSiciz : $@convention(method) (Int, @inout CopyableContainer) -> @guaranteed_addr Klass {
+// CHECK: sil [ossa] @$s25borrow_accessor_container17CopyableContainerVyAA5KlassCSiciz : $@convention(method) (Int, @inout CopyableContainer) -> @guaranteed_address Klass {
 // CHECK: bb0([[REG0:%.*]] : $Int, [[REG1:%.*]] : $*CopyableContainer):
 // CHECK:   debug_value [[REG0]], let, name "index", argno 1
 // CHECK:   debug_value [[REG1]], var, name "self", argno 2, expr op_deref
@@ -338,7 +338,7 @@ public struct NonCopyableContainer : ~Copyable {
 // CHECK:   return [[REG36]]
 // CHECK: }
 
-// CHECK: sil [ossa] @$s25borrow_accessor_container20NonCopyableContainerVyAA2NCVSiciz : $@convention(method) (Int, @inout NonCopyableContainer) -> @guaranteed_addr NC {
+// CHECK: sil [ossa] @$s25borrow_accessor_container20NonCopyableContainerVyAA2NCVSiciz : $@convention(method) (Int, @inout NonCopyableContainer) -> @guaranteed_address NC {
 // CHECK: bb0([[REG0:%.*]] : $Int, [[REG1:%.*]] : $*NonCopyableContainer):
 // CHECK:   debug_value [[REG0]], let, name "index", argno 1
 // CHECK:   debug_value [[REG1]], var, name "self", argno 2, expr op_deref
