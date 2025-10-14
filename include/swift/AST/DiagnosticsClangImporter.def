@@ -351,11 +351,11 @@ NOTE(forward_declared_protocol_label, none,
 
 NOTE(forward_declared_interface_clashes_with_imported_objc_Swift_interface, none,
      "interface %0 is incomplete and cannot be imported as a stub; "
-     "its name conflicts with a %1 in module %2",
+     "its name conflicts with a %1 in module '%2'",
      (const clang::NamedDecl*, StringRef, StringRef))
 NOTE(forward_declared_protocol_clashes_with_imported_objc_Swift_protocol, none,
      "protocol %0 is incomplete and cannot be imported as a stub; "
-     "its name conflicts with a %1 in module %2",
+     "its name conflicts with a %1 in module '%2'",
      (const clang::NamedDecl*, StringRef, StringRef))
 
 GROUPED_WARNING(return_escapable_with_lifetimebound,  ClangDeclarationImport, none,
