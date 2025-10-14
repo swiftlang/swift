@@ -123,6 +123,10 @@ StringForPrintObjectTests.test("PointerWithMangledTypeName") {
   var val2 = StructWithMembersAndDescription()
   _expectStringForPrintObject(&val2, output: "Hello World\n")
 
+  var val3: StructWithMembers? = StructWithMembers()
+  _expectStringForPrintObject(&val3,
+    output: "▿ Optional<StructWithMembers>\n  ▿ some : StructWithMembers\n    - a : 1\n    - b : \"Hello World\"\n")
+
   let obj = ClassWithMembers()
   let pointer = unsafeBitCast(obj, to: UnsafeRawPointer.self)
   let mangledTypeName = _mangledTypeName(ClassWithMembers.self)
