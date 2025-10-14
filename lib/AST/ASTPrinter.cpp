@@ -7920,6 +7920,8 @@ static StringRef getStringForResultConvention(ResultConvention conv) {
     return "@guaranteed_addr ";
   case ResultConvention::Guaranteed:
     return "@guaranteed ";
+  case ResultConvention::Inout:
+    return "@inout ";
   }
   llvm_unreachable("bad result convention");
 }

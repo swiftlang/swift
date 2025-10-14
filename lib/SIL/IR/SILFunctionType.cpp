@@ -182,7 +182,7 @@ SILFunctionType::getDirectFormalResultsType(SILModule &M,
                                             TypeExpansionContext context) {
   CanType type;
 
-  if (hasGuaranteedAddressResult()) {
+  if (hasAddressResult()) {
     assert(getNumDirectFormalResults() == 1);
       return SILType::getPrimitiveAddressType(
           getSingleDirectFormalResult().getReturnValueType(M, this, context));
@@ -729,6 +729,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
       break;
     case ResultConvention::GuaranteedAddress:
     case ResultConvention::Guaranteed:
+    case ResultConvention::Inout:
       llvm_unreachable("borrow/mutate accessor not yet implemented");
     }
     return conv;
@@ -1079,7 +1080,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
       break;
     case ResultConvention::GuaranteedAddress:
     case ResultConvention::Guaranteed:
-      llvm_unreachable("borrow accessor is not yet implemented");
+    case ResultConvention::Inout:
+      llvm_unreachable("borrow/mutate accessor is not yet implemented");
     }
     return {result.getInterfaceType(), newConv};
   };
@@ -1473,7 +1475,7 @@ public:
         convention = ResultConvention::Guaranteed;
       }
     } else if (isMutateAccessor(constant)) {
-      convention = ResultConvention::GuaranteedAddress;
+      convention = ResultConvention::Inout;
     } else if (isFormallyReturnedIndirectly(origType, substType,
                                             substResultTLForConvention)) {
       convention = ResultConvention::Indirect;
@@ -1494,7 +1496,8 @@ public:
         case ResultConvention::GuaranteedAddress:
           llvm_unreachable(
               "Invalid case of ResultConvention::GuaranteedAddress");
-
+        case ResultConvention::Inout:
+          llvm_unreachable("Invalid case of ResultConvention::Inout");
         case ResultConvention::Autoreleased:
         case ResultConvention::Owned:
         case ResultConvention::Guaranteed:

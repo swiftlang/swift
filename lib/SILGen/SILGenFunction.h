@@ -2272,8 +2272,9 @@ public:
 
   void emitReturnExpr(SILLocation loc, Expr *ret);
 
-  bool emitGuaranteedReturn(SILLocation loc, Expr *ret,
-                            SmallVectorImpl<SILValue> &directResults);
+  bool
+  emitBorrowOrMutateAccessorResult(SILLocation loc, Expr *ret,
+                                   SmallVectorImpl<SILValue> &directResults);
 
   SILValue emitUncheckedGuaranteedConversion(SILValue value);
 

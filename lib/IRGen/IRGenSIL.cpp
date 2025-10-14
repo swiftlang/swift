@@ -2033,7 +2033,7 @@ static ArrayRef<SILArgument *> emitEntryPointIndirectReturn(
   SILType directResultType = IGF.CurSILFn->mapTypeIntoContext(
       fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
 
-  if (fnConv.hasGuaranteedAddressResult()) {
+  if (fnConv.hasAddressResult()) {
     return entry->getArguments();
   }
 
@@ -3939,7 +3939,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 
   // For a simple apply, just bind the apply result to the result of the call.
   if (auto apply = dyn_cast<ApplyInst>(i)) {
-    if (apply->hasGuaranteedAddressResult()) {
+    if (apply->hasAddressResult()) {
       setCorrespondingLoweredValues(apply->getResults(), result);
     } else {
       setLoweredExplosion(apply, result);
@@ -4460,13 +4460,13 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     return;
   }
 
-  if (conv.hasGuaranteedAddressResult()) {
+  if (conv.hasAddressResult()) {
     assert(IGF.CurSILFn->getLoweredFunctionType()->getLanguage() ==
            SILFunctionLanguage::Swift);
     auto funcResultType = IGF.CurSILFn->mapTypeIntoContext(
         conv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
 
-    emitGuaranteedAddressResult(IGF, result, funcResultType, resultTy);
+    emitAddressResult(IGF, result, funcResultType, resultTy);
     return;
   }
 

@@ -6230,7 +6230,8 @@ RValue SILGenFunction::emitApply(
       break;
     case ResultConvention::GuaranteedAddress:
     case ResultConvention::Guaranteed:
-      llvm_unreachable("borrow accessor is not yet implemented");
+    case ResultConvention::Inout:
+      llvm_unreachable("borrow/mutate accessor is not yet implemented");
       break;
     }
 

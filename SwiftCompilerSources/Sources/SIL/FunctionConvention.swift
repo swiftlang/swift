@@ -112,6 +112,17 @@ public struct FunctionConvention : CustomStringConvertible {
     return results[0].convention == .guaranteedAddress
   }
 
+  public var hasInoutResult: Bool {
+    if results.count != 1 {
+      return false
+    }
+    return results[0].convention == .inout
+  }
+
+  public var hasAddressResult: Bool {
+    return hasGuaranteedAddressResult || hasInoutResult
+  }
+
   public var description: String {
     var str = functionType.description
     for paramIdx in 0..<parameters.count {
@@ -147,7 +158,7 @@ public struct ResultInfo : CustomStringConvertible {
       return hasLoweredAddresses || type.isExistentialArchetypeWithError()
     case .pack:
       return true
-    case .owned, .unowned, .unownedInnerPointer, .autoreleased, .guaranteed, .guaranteedAddress:
+    case .owned, .unowned, .unownedInnerPointer, .autoreleased, .guaranteed, .guaranteedAddress, .inout:
       return false
     }
   }
@@ -373,12 +384,16 @@ public enum ResultConvention : CustomStringConvertible {
   case owned
 
   /// The caller is responsible for using the returned address within a valid
-  /// scope. This is valid only for borrow and mutate accessors.
+  /// scope. This is valid only for borrow accessors.
   case guaranteedAddress
 
   /// The caller is responsible for using the returned value within a valid
   /// scope. This is valid only for borrow accessors.
   case guaranteed
+
+  /// The caller is responsible for mutating the returned address within a valid
+  /// scope. This is valid only for mutate accessors.
+  case `inout`
 
   /// The caller is not responsible for destroying this return value.  Its type may be trivial, or it may simply be offered unsafely.  It is valid at the instant of the return, but further operations may invalidate it.
   case unowned
@@ -423,6 +438,8 @@ public enum ResultConvention : CustomStringConvertible {
       return "guaranteed"
     case .guaranteedAddress:
       return "guaranteedAddress"
+    case .inout:
+      return "inout"      
     }
   }
 }
@@ -456,6 +473,7 @@ extension ResultConvention {
       case .Pack:                self = .pack
       case .Guaranteed:          self = .guaranteed
       case .GuaranteedAddress:   self = .guaranteedAddress
+      case .Inout:               self = .inout
       default:
         fatalError("unsupported result convention")
     }

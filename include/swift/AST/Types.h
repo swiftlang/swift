@@ -4794,12 +4794,16 @@ enum class ResultConvention : uint8_t {
   Pack,
 
   /// The caller is responsible for using the returned address within a valid
-  /// scope. This is valid only for borrow and mutate accessors.
+  /// scope. This is valid only for borrow accessors.
   GuaranteedAddress,
 
   /// The caller is responsible for using the returned value within a valid
   /// scope. This is valid only for borrow accessors.
   Guaranteed,
+
+  /// The caller is responsible for mutating the returned address within a valid
+  /// scope. This is valid only for mutate accessors.
+  Inout,
 };
 
 // Does this result require indirect storage for the purpose of reabstraction?
@@ -4958,6 +4962,14 @@ public:
 
   bool isGuaranteedAddressResult() const {
     return getConvention() == ResultConvention::GuaranteedAddress;
+  }
+
+  bool isInoutResult() const {
+    return getConvention() == ResultConvention::Inout;
+  }
+
+  bool isAddressResult() const {
+    return isGuaranteedAddressResult() || isInoutResult();
   }
 
   bool isGuaranteedResult() const {
@@ -5416,6 +5428,17 @@ public:
       return false;
     }
     return getResults()[0].isGuaranteedAddressResult();
+  }
+
+  bool hasInoutResult() const {
+    if (getNumResults() != 1) {
+      return false;
+    }
+    return getResults()[0].isInoutResult();
+  }
+
+  bool hasAddressResult() const {
+    return hasGuaranteedAddressResult() || hasInoutResult();
   }
 
   struct IndirectFormalResultFilter {
