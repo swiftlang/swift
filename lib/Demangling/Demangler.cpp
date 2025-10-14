@@ -2292,6 +2292,15 @@ NodePointer Demangler::demangleImplResultConvention(Node::Kind ConvKind) {
     case 'u': attr = "@unowned_inner_pointer"; break;
     case 'a': attr = "@autoreleased"; break;
     case 'k': attr = "@pack_out"; break;
+    case 'l':
+      attr = "@guaranteed_addr";
+      break;
+    case 'g':
+      attr = "@guaranteed";
+      break;
+    case 'm':
+      attr = "@inout";
+      break;
     default:
       pushBack();
       return nullptr;

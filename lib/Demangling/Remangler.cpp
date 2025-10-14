@@ -2224,14 +2224,18 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
         Buffer << 'z';
         LLVM_FALLTHROUGH;
       case Node::Kind::ImplResult: {
-        char ConvCh = llvm::StringSwitch<char>(Child->getFirstChild()->getText())
-                        .Case("@out", 'r')
-                        .Case("@owned", 'o')
-                        .Case("@unowned", 'd')
-                        .Case("@unowned_inner_pointer", 'u')
-                        .Case("@autoreleased", 'a')
-                        .Case("@pack_out", 'k')
-                        .Default(0);
+        char ConvCh =
+            llvm::StringSwitch<char>(Child->getFirstChild()->getText())
+                .Case("@out", 'r')
+                .Case("@owned", 'o')
+                .Case("@unowned", 'd')
+                .Case("@unowned_inner_pointer", 'u')
+                .Case("@autoreleased", 'a')
+                .Case("@pack_out", 'k')
+                .Case("@guaranteed_addr", 'l')
+                .Case("@guaranteed", 'g')
+                .Case("@inout", 'm')
+                .Default(0);
         if (!ConvCh) {
           return MANGLING_ERROR(ManglingError::InvalidImplParameterConvention,
                                Child->getFirstChild());
