@@ -132,7 +132,8 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
       SWIFT_TASK_DEBUG_LOG("task %p waiting on task %p, completed immediately",
                            waitingTask, this);
       _swift_tsan_acquire(static_cast<Job *>(this));
-      if (contextInitialized) waitingTask->flagAsRunning();
+      // Continuting execution inline so we shouldn't have to reset priority here
+      if (contextInitialized) assert(waitingTask->flagAsRunning() == 0);
       // The task is done; we don't need to wait.
       return queueHead.getStatus();
 
@@ -1666,8 +1667,9 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
   // we try to tail-call.
   } while (false);
 #else
-  // Restore the running state of the task and resume it.
-  task->flagAsRunning();
+  // Restore the running state of the task and resume it. We are on the same
+  // thread as before so dispatch shouldn't pass us anything to restore
+  assert(task->flagAsRunning() == 0);
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 
   if (context->isExecutorSwitchForced())
