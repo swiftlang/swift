@@ -208,18 +208,22 @@ extension UnsafeCurrentTask {
 // ==== Runtime ---------------------------------------------------------------
 
 @available(SwiftStdlib 6.0, *)
+@usableFromInline
 @_silgen_name("swift_task_getPreferredTaskExecutor")
 internal func _getPreferredUnownedTaskExecutor() -> Builtin.Executor
 
+@usableFromInline
 typealias TaskExecutorPreferenceStatusRecord = UnsafeRawPointer
 
 @available(SwiftStdlib 6.0, *)
+@usableFromInline
 @_silgen_name("swift_task_pushTaskExecutorPreference")
 internal func _pushTaskExecutorPreference(_ executor: Builtin.Executor)
   -> TaskExecutorPreferenceStatusRecord
 
 @available(SwiftStdlib 6.0, *)
 @_silgen_name("swift_task_popTaskExecutorPreference")
+@usableFromInline
 internal func _popTaskExecutorPreference(
   record: TaskExecutorPreferenceStatusRecord
 )

@@ -889,8 +889,8 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @unsafe
+nonisolated(nonsending)
 public func withUnsafeContinuation<T>(
-  isolation: isolated (any Actor)? = #isolation,
   _ fn: (UnsafeContinuation<T, Never>) -> Void
 ) async -> sending T {
   return await Builtin.withUnsafeContinuation {
@@ -926,8 +926,8 @@ public func withUnsafeContinuation<T>(
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @unsafe
+nonisolated(nonsending)
 public func withUnsafeThrowingContinuation<T>(
-  isolation: isolated (any Actor)? = #isolation,
   _ fn: (UnsafeContinuation<T, Error>) -> Void
 ) async throws -> sending T {
   return try await Builtin.withUnsafeThrowingContinuation {
