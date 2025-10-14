@@ -440,13 +440,9 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
   llvm::TinyPtrVector<CustomAttr *> result;
 
   for (auto attr : var->getExpandedAttrs().getAttributes<CustomAttr>()) {
-    auto mutableAttr = const_cast<CustomAttr *>(attr);
-    // Figure out which nominal declaration this custom attribute refers to.
-    auto *nominal = evaluateOrDefault(
-      ctx.evaluator, CustomAttrNominalRequest{mutableAttr, dc}, nullptr);
-
     // If we didn't find a nominal type with a @propertyWrapper attribute,
     // skip this custom attribute.
+    auto *nominal = attr->getNominalDecl();
     if (!nominal || !nominal->getAttrs().hasAttribute<PropertyWrapperAttr>())
       continue;
 
@@ -454,7 +450,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
     // the semantic checking required.
     auto sourceFile = dc->getParentSourceFile();
     if (!sourceFile) {
-      result.push_back(mutableAttr);
+      result.push_back(attr);
       continue;
     }
       
@@ -545,7 +541,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       }
     }
 
-    result.push_back(mutableAttr);
+    result.push_back(attr);
   }
 
   // Attributes are stored in reverse order in the AST, but we want them in
