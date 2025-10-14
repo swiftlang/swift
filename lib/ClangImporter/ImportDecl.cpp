@@ -68,6 +68,7 @@
 #include "clang/AST/RecordLayout.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/StmtVisitor.h"
+#include "clang/AST/TemplateBase.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -2295,6 +2296,40 @@ namespace {
               Impl.importDecl(baseRecordDecl, getVersion());
             }
           }
+        }
+      }
+
+      if (const auto *ctsd =
+              dyn_cast<clang::ClassTemplateSpecializationDecl>(decl)) {
+        for (auto arg : ctsd->getTemplateArgs().asArray()) {
+          auto done = false;
+          auto checkUnsafe = [&](clang::TemplateArgument tyArg) {
+            if (tyArg.getKind() != clang::TemplateArgument::Type)
+              return;
+
+            auto safety =
+                evaluateOrDefault(Impl.SwiftContext.evaluator,
+                                  ClangTypeExplicitSafety({tyArg.getAsType()}),
+                                  ExplicitSafety::Unspecified);
+
+            if (safety == ExplicitSafety::Unsafe) {
+              result->getAttrs().add(new (Impl.SwiftContext)
+                                         UnsafeAttr(/*implicit=*/true));
+              done = true;
+            }
+          };
+
+          if (arg.getKind() == clang::TemplateArgument::Pack) {
+            for (auto pkArg : arg.getPackAsArray()) {
+              checkUnsafe(pkArg);
+              if (done)
+                break;
+            }
+          } else {
+            checkUnsafe(arg);
+          }
+          if (done)
+            break;
         }
       }
 

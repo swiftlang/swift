@@ -8641,6 +8641,51 @@ SourceLoc swift::extractNearestSourceLoc(SafeUseOfCxxDeclDescriptor desc) {
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
+                           ClangTypeExplicitSafetyDescriptor desc) {
+  out << "Checking if type '" << desc.type.getAsString()
+      << "' is explicitly safe.\n";
+}
+
+SourceLoc swift::extractNearestSourceLoc(ClangTypeExplicitSafetyDescriptor desc) {
+  return SourceLoc();
+}
+
+ExplicitSafety ClangTypeExplicitSafety::evaluate(
+    Evaluator &evaluator, ClangTypeExplicitSafetyDescriptor desc) const {
+  auto clangType = desc.type;
+
+  // Handle pointers.
+  auto pointeeType = clangType->getPointeeType();
+  if (!pointeeType.isNull()) {
+    // Function pointers are okay.
+    if (pointeeType->isFunctionType())
+      return ExplicitSafety::Safe;
+
+    // Pointers to record types are okay if they come in as foreign reference
+    // types.
+    if (auto *recordDecl = pointeeType->getAsRecordDecl()) {
+      if (hasImportAsRefAttr(recordDecl))
+        return ExplicitSafety::Safe;
+    }
+
+    // All other pointers are considered unsafe.
+    return ExplicitSafety::Unsafe;
+  }
+
+  // Handle records recursively.
+  if (auto recordDecl = clangType->getAsTagDecl()) {
+    // If we reached this point the types is not imported as a shared reference,
+    // so we don't need to check the bases whether they are shared references.
+    return evaluateOrDefault(evaluator,
+                             ClangDeclExplicitSafety({recordDecl, false}),
+                             ExplicitSafety::Unspecified);
+  }
+
+  // Everything else is safe.
+  return ExplicitSafety::Safe;
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
                            CxxDeclExplicitSafetyDescriptor desc) {
   out << "Checking if '";
   if (auto namedDecl = dyn_cast<clang::NamedDecl>(desc.decl))
@@ -8711,43 +8756,11 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
 
 /// Check whether the given Clang type involves an unsafe type.
 static bool hasUnsafeType(Evaluator &evaluator, clang::QualType clangType) {
-  // Handle pointers.
-  auto pointeeType = clangType->getPointeeType();
-  if (!pointeeType.isNull()) {
-    // Function pointers are okay.
-    if (pointeeType->isFunctionType())
-      return false;
-    
-    // Pointers to record types are okay if they come in as foreign reference
-    // types.
-    if (auto recordDecl = pointeeType->getAsRecordDecl()) {
-      if (hasImportAsRefAttr(recordDecl))
-        return false;
-    }
-    
-    // All other pointers are considered unsafe.
-    return true;
-  }
 
-  // Handle records recursively.
-  if (auto recordDecl = clangType->getAsTagDecl()) {
-    // If we reached this point the types is not imported as a shared reference,
-    // so we don't need to check the bases whether they are shared references.
-    auto safety = evaluateOrDefault(
-        evaluator, ClangDeclExplicitSafety({recordDecl, false}),
-        ExplicitSafety::Unspecified);
-    switch (safety) {
-      case ExplicitSafety::Unsafe:
-        return true;
-        
-      case ExplicitSafety::Safe:
-      case ExplicitSafety::Unspecified:
-        return false;        
-    }
-  }
-    
-  // Everything else is safe.
-  return false;
+  auto safety =
+      evaluateOrDefault(evaluator, ClangTypeExplicitSafety({clangType}),
+                        ExplicitSafety::Unspecified);
+  return safety == ExplicitSafety::Unsafe;
 }
 
 ExplicitSafety

@@ -78,6 +78,17 @@ struct OwnedData {
   void takeSharedObject(SharedObject *) const;
 };
 
+// A class template that throws away its type argument.
+//
+// If this template is instantiated with an unsafe type, it should be considered
+// unsafe even if that type is never used.
+template <typename> struct TTake {};
+
+using TTakeInt = TTake<int>;
+using TTakePtr = TTake<int *>;
+using TTakeSafeTuple = TTake<SafeTuple>;
+using TTakeUnsafeTuple = TTake<UnsafeTuple>;
+
 //--- test.swift
 
 import Test
@@ -166,4 +177,22 @@ func useSharedReference(frt: SharedObject, x: OwnedData) {
 @available(SwiftStdlib 5.8, *)
 func useSharedReference(frt: DerivedFromSharedObject) {
   let _ = frt
+}
+
+func useTTakeInt(x: TTakeInt) {
+  _ = x
+}
+
+func useTTakePtr(x: TTakePtr) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}
+
+func useTTakeSafeTuple(x: TTakeSafeTuple) {
+  _ = x
+}
+
+func useTTakeUnsafeTuple(x: TTakeUnsafeTuple) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
 }
