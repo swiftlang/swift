@@ -395,6 +395,10 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
       case Special::BlockCopyHelper:
       case Special::BlockDisposeHelper:
         llvm_unreachable("no known discriminator for these foreign entities");
+      case Special::CoroAllocationFunction:
+        return SpecialPointerAuthDiscriminators::CoroAllocationFunction;
+      case Special::CoroDeallocationFunction:
+        return SpecialPointerAuthDiscriminators::CoroDeallocationFunction;
       }
       llvm_unreachable("bad kind");
     };
