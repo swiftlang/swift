@@ -26,7 +26,7 @@ takeAFoo(foo)
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Foo' is incomplete
 // CHECK-NEXT: void takeAFoo(Foo *foo);
 // CHECK-NEXT:               ^
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Foo' is incomplete and cannot be imported as a stub; its name conflicts with a class in module CompleteSwiftTypes
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Foo' is incomplete and cannot be imported as a stub; its name conflicts with a class in module 'CompleteSwiftTypes'
 // CHECK-NEXT: @class Foo;
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Foo' forward declared here
@@ -46,7 +46,7 @@ _ = returnAFoo()
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Foo' is incomplete
 // CHECK-NEXT: Foo *returnAFoo();
 // CHECK-NEXT: ^
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Foo' is incomplete and cannot be imported as a stub; its name conflicts with a class in module CompleteSwiftTypes
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Foo' is incomplete and cannot be imported as a stub; its name conflicts with a class in module 'CompleteSwiftTypes'
 // CHECK-NEXT: @class Foo;
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Foo' forward declared here
@@ -66,7 +66,7 @@ takeABaz(bar)
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Baz' is incomplete
 // CHECK-NEXT: void takeABaz(Baz *baz);
 // CHECK-NEXT:               ^
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Baz' is incomplete and cannot be imported as a stub; its name conflicts with a class in module CompleteSwiftTypes
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Baz' is incomplete and cannot be imported as a stub; its name conflicts with a class in module 'CompleteSwiftTypes'
 // CHECK-NEXT: @class Baz;
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Baz' forward declared here
@@ -86,7 +86,7 @@ _ = returnABaz()
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Baz' is incomplete
 // CHECK-NEXT: Baz *returnABaz();
 // CHECK-NEXT: ^
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Baz' is incomplete and cannot be imported as a stub; its name conflicts with a class in module CompleteSwiftTypes
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Baz' is incomplete and cannot be imported as a stub; its name conflicts with a class in module 'CompleteSwiftTypes'
 // CHECK-NEXT: @class Baz;
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Baz' forward declared here
@@ -106,7 +106,7 @@ takeASubscript(corge)
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'subscript' is incomplete
 // CHECK-NEXT: void takeASubscript(subscript *param);
 // CHECK-NEXT:                     ^
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'subscript' is incomplete and cannot be imported as a stub; its name conflicts with a class in module CompleteSwiftTypes
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'subscript' is incomplete and cannot be imported as a stub; its name conflicts with a class in module 'CompleteSwiftTypes'
 // CHECK-NEXT: @class subscript;
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'subscript' forward declared here
@@ -126,7 +126,7 @@ _ = returnASubscript()
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'subscript' is incomplete
 // CHECK-NEXT: subscript* returnASubscript();
 // CHECK-NEXT: ^
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'subscript' is incomplete and cannot be imported as a stub; its name conflicts with a class in module CompleteSwiftTypes
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'subscript' is incomplete and cannot be imported as a stub; its name conflicts with a class in module 'CompleteSwiftTypes'
 // CHECK-NEXT: @class subscript;
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'subscript' forward declared here
@@ -146,7 +146,7 @@ _ = returnAProtocolFoo()
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'ProtocolFoo' is incomplete
 // CHECK-NEXT: id<ProtocolFoo> returnAProtocolFoo();
 // CHECK-NEXT: ^
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'ProtocolFoo' is incomplete and cannot be imported as a stub; its name conflicts with a protocol in module CompleteSwiftTypes
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'ProtocolFoo' is incomplete and cannot be imported as a stub; its name conflicts with a protocol in module 'CompleteSwiftTypes'
 // CHECK-NEXT: @protocol ProtocolFoo;
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'ProtocolFoo' forward declared here
@@ -166,7 +166,7 @@ _ = returnAProtocolBaz()
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'ProtocolBaz' is incomplete
 // CHECK-NEXT: id<ProtocolBaz> returnAProtocolBaz();
 // CHECK-NEXT: ^
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'ProtocolBaz' is incomplete and cannot be imported as a stub; its name conflicts with a protocol in module CompleteSwiftTypes
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'ProtocolBaz' is incomplete and cannot be imported as a stub; its name conflicts with a protocol in module 'CompleteSwiftTypes'
 // CHECK-NEXT: @protocol ProtocolBaz;
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'ProtocolBaz' forward declared here
