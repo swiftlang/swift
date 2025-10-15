@@ -68,8 +68,7 @@ import Swift
 /// not cancel tasks or resume continuations while holding that lock.
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
-nonisolated(nonsending)
-public func withTaskCancellationHandler<T>(
+nonisolated(nonsending) public func withTaskCancellationHandler<T>(
   operation: nonisolated(nonsending) () async throws -> T,
   onCancel handler: @Sendable () -> Void
 ) async rethrows -> T {

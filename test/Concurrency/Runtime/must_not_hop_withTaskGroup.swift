@@ -57,7 +57,39 @@ if #available(SwiftStdlib 6.0, *) {
 
 // CHECK: == Make: actor Foo
 // CHECK-NEXT: ---------------------------------------
-// TODO: all the other group kinds...
+
+// Hop onto the actor executor:
+// CHECK-NEXT: [executor][actor-executor] Enqueue (1)
+// CHECK-NEXT: actor.foo
+
+// CHECK-NEXT: actor.foo - withTaskGroup
+// CHECK-NEXT: nonisolated(nonsending) someFunc() async
+// CHECK-NEXT: actor.foo - withTaskGroup (after someFunc)
+// CHECK-NEXT: actor.foo - withTaskGroup done
+
+// CHECK-NEXT: actor.foo - withThrowingTaskGroup
+// CHECK-NEXT: nonisolated(nonsending) someFunc() async
+// CHECK-NEXT: actor.foo - withThrowingTaskGroup (after someFunc)
+// TODO: can we reduce the number of enqueues here?
+// CHECK-NEXT: [executor][actor-executor] Enqueue (2)
+// CHECK-NEXT: [executor][actor-executor] Enqueue (3)
+// CHECK-NEXT: [executor][actor-executor] Enqueue (4)
+// CHECK-NEXT: actor.foo - withThrowingTaskGroup done
+
+// CHECK-NEXT: actor.foo - withDiscardingTaskGroup
+// CHECK-NEXT: nonisolated(nonsending) someFunc() async
+// CHECK-NEXT: actor.foo - withDiscardingTaskGroup (after someFunc)
+// TODO: can we reduce the number of enqueues here?
+// CHECK-NEXT: [executor][actor-executor] Enqueue (5)
+// CHECK-NEXT: actor.foo - withDiscardingTaskGroup done
+
+// CHECK-NEXT: actor.foo - withThrowingDiscardingTaskGroup
+// CHECK-NEXT: nonisolated(nonsending) someFunc() async
+// CHECK-NEXT: actor.foo - withThrowingDiscardingTaskGroup (after someFunc)
+// TODO: can we reduce the number of enqueues here?
+// CHECK-NEXT: [executor][actor-executor] Enqueue (6)
+// CHECK-NEXT: [executor][actor-executor] Enqueue (7)
+// CHECK-NEXT: actor.foo - withThrowingDiscardingTaskGroup done
 
 // No more enqueues are expected afterwards
 // CHECK-NOT: [executor]
@@ -116,20 +148,35 @@ actor Foo {
   }
           
   func foo() async {
-//    print("actor.foo")
-//
-//    await withTaskGroup(of: Void.self) { group in
-//      print("actor.foo - withTaskExecutorPreference - withTaskGroup")
-//      try? await someFunc()
-//    }
-//    print("actor.foo - withTaskExecutorPreference - withTaskGroup done\n")
-//
-//    try! await withThrowingTaskGroup(of: Void.self) { group in
-//      print("actor.foo - withTaskExecutorPreference - withThrowingTaskGroup")
-//      try await someFunc()
-//    }
-//    print("actor.foo - withTaskExecutorPreference - withThrowingTaskGroup done\n")
-//    print("actor.foo done")
+    print("actor.foo")
+
+    await withTaskGroup(of: Void.self) { group in
+      print("actor.foo - withTaskGroup")
+      try? await someFunc()
+      print("actor.foo - withTaskGroup (after someFunc)")
+    }
+    print("actor.foo - withTaskGroup done")
+
+    try! await withThrowingTaskGroup(of: Void.self) { group in
+      print("actor.foo - withThrowingTaskGroup")
+      try await someFunc()
+      print("actor.foo - withThrowingTaskGroup (after someFunc)")
+    }
+    print("actor.foo - withThrowingTaskGroup done")
+
+    await withDiscardingTaskGroup { group in
+      print("actor.foo - withDiscardingTaskGroup")
+      try? await someFunc()
+      print("actor.foo - withDiscardingTaskGroup (after someFunc)")
+    }
+    print("actor.foo - withDiscardingTaskGroup done")
+
+    try! await withThrowingDiscardingTaskGroup { group in
+      print("actor.foo - withThrowingDiscardingTaskGroup")
+      try await someFunc()
+      print("actor.foo - withThrowingDiscardingTaskGroup (after someFunc)")
+    }
+    print("actor.foo - withThrowingDiscardingTaskGroup done")
   }
 }
 
