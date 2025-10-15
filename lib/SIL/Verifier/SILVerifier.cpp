@@ -2728,6 +2728,8 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
+    require(F.getModule().getStage() == SILStage::Raw || !LBI->isUnchecked(),
+            "load_borrow's unchecked bit is on");
   }
 
   void checkBeginBorrowInst(BeginBorrowInst *bbi) {
