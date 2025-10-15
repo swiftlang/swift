@@ -1020,6 +1020,9 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       case ExtraStringFlavor::AsmName:
         fn->setAsmName(blobData);
         break;
+      case ExtraStringFlavor::Section:
+        fn->setSection(blobData);
+        break;
       }
       continue;
     }
@@ -4166,6 +4169,9 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
       case ExtraStringFlavor::AsmName:
         v->setAsmName(blobData);
         break;
+      case ExtraStringFlavor::Section:
+        v->setSection(blobData);
+        break;
       }
       continue;
     }
@@ -4180,6 +4186,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   if (entry.Kind == llvm::BitstreamEntry::EndBlock)
     return v;
 
+  scratch.clear();
   maybeKind = SILCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeKind)
     MF->fatal(maybeKind.takeError());

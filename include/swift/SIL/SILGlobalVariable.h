@@ -64,6 +64,9 @@ private:
   /// the mangled name of the variable will be used instead.
   StringRef AsmName;
 
+  /// Name of a section if @_section attribute was used, otherwise empty.
+  StringRef Section;
+
   /// The lowered type of the variable.
   SILType LoweredType;
   
@@ -159,6 +162,10 @@ public:
   StringRef asmName() const { return AsmName; }
   void setAsmName(StringRef value) { AsmName = value; }
 
+  /// Return custom section name if @_section was used, otherwise empty
+  StringRef section() const { return Section; }
+  void setSection(StringRef value) { Section = value; }
+
   void setDeclaration(bool isD) { IsDeclaration = isD; }
 
   /// True if this is a definition of the variable.
@@ -239,15 +246,6 @@ public:
   bool markedAsUsed() const { return IsUsed; }
 
   void setMarkedAsUsed(bool used) { IsUsed = used; }
-
-  /// Returns a SectionAttr if this global variable has `@_section` attribute.
-  SectionAttr *getSectionAttr() const {
-    auto *V = getDecl();
-    if (!V)
-      return nullptr;
-
-    return V->getAttrs().getAttribute<SectionAttr>();
-  }
 
   /// Return whether this variable corresponds to a Clang node.
   bool hasClangNode() const;

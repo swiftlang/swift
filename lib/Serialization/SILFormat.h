@@ -84,6 +84,8 @@ enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
 enum class ExtraStringFlavor : uint8_t {
   /// asmname attributes
   AsmName,
+  /// section attribute
+  Section,
 };
 
 /// The record types within the "sil-index" block.

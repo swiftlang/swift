@@ -3783,6 +3783,9 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   if (!asmName().empty())
     OS << "[asmname \"" << asmName() << "\"] ";
 
+  if (!section().empty())
+    OS << "[section \"" << section() << "\"] ";
+
   printName(OS);
   OS << " : " << LoweredType;
 

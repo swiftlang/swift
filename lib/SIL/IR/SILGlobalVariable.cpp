@@ -91,7 +91,7 @@ bool SILGlobalVariable::isPossiblyUsedExternally() const {
   if (markedAsUsed())
     return true;
 
-  if (getSectionAttr())
+  if (!section().empty())
     return true;
 
   SILLinkage linkage = getLinkage();
@@ -151,7 +151,7 @@ SILInstruction *SILGlobalVariable::getStaticInitializerValue() {
 }
 
 bool SILGlobalVariable::mustBeInitializedStatically() const {
-  if (getSectionAttr())
+  if (!section().empty())
     return true;
 
   auto *decl = getDecl();  

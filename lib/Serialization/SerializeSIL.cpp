@@ -561,6 +561,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // count here.
   if (!F.asmName().empty())
     ++numTrailingRecords;
+  if (!F.section().empty())
+    ++numTrailingRecords;
 
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
@@ -600,6 +602,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // Each extra string emitted here needs to be reflected in the trailing
   // record count above.
   writeExtraStringIfNonEmpty(ExtraStringFlavor::AsmName, F.asmName());
+  writeExtraStringIfNonEmpty(ExtraStringFlavor::Section, F.section());
 
   if (NoBody)
     return;
@@ -3137,6 +3140,8 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
   // count here.
   if (!g.asmName().empty())
     ++numTrailingRecords;
+  if (!g.section().empty())
+    ++numTrailingRecords;
 
   SILGlobalVarLayout::emitRecord(Out, ScratchRecord,
                                  SILAbbrCodes[SILGlobalVarLayout::Code],
@@ -3149,6 +3154,7 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
                                  TyID, dID, parentModuleID);
 
   writeExtraStringIfNonEmpty(ExtraStringFlavor::AsmName, g.asmName());
+  writeExtraStringIfNonEmpty(ExtraStringFlavor::Section, g.section());
 
   // Don't emit the initializer instructions if not marked as "serialized".
   if (!g.isAnySerialized())

@@ -2,7 +2,7 @@
 
 import Swift
 
-// CHECK: @v1 = global
+// CHECK: @v1 = {{(dllexport )?}}{{(protected )?}}global
 sil_global [asmname "v1"] @$s4main13renamedGlobalSivp : $Int
 
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @f1()

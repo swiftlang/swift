@@ -7577,6 +7577,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
   SerializedKind_t isSerialized = IsNotSerialized;
   bool isMarkedAsUsed = false;
   StringRef asmName;
+  StringRef section;
   bool isLet = false;
 
   SILParser State(P);
@@ -7585,7 +7586,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, &isMarkedAsUsed, &asmName,
-                           nullptr, &isLet, nullptr, nullptr, nullptr, nullptr,
+                           &section, &isLet, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
@@ -7615,6 +7616,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
   GV->setLet(isLet);
   GV->setMarkedAsUsed(isMarkedAsUsed);
   GV->setAsmName(asmName);
+  GV->setSection(section);
 
   // Parse static initializer if exists.
   if (State.P.consumeIf(tok::equal) && State.P.consumeIf(tok::l_brace)) {
