@@ -3,7 +3,8 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Ext)) -module-name Ext -emit-module -emit-module-path %t/Ext.swiftmodule -I%t -L%t -lDef %S/Inputs/protocol-conformance-redundant-ext.swift
 // RUN: %target-build-swift -I%t -L%t -lDef -o %t/main %target-rpath(%t) %s
 // RUN: %target-codesign %t/main %t/%target-library-name(Def) %t/%target-library-name(Ext)
-// RUN: %target-run %t/main %t/%target-library-name(Def) %t/%target-library-name(Ext) 2> >(%FileCheck %s -check-prefix=CHECK-STDERR) | %FileCheck %s
+// RUN: %target-run %t/main %t/%target-library-name(Def) %t/%target-library-name(Ext) 2> %t/stderr.txt | %FileCheck %s
+// RUN: %FileCheck %s -check-prefix=CHECK-STDERR < %t/stderr.txt
 
 // REQUIRES: executable_test
 // XFAIL: OS=windows-msvc
