@@ -11465,22 +11465,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     if (result.actualBaseType)
       baseTy = result.actualBaseType;
 
-    // If only possible choice to refer to member is via keypath
-    // dynamic member dispatch, let's delay solving this constraint
-    // until constraint generation phase is complete, because
-    // subscript dispatch relies on presence of function application.
-    if (result.ViableCandidates.size() == 1) {
-      auto &choice = result.ViableCandidates.front();
-      if (Phase == ConstraintSystemPhase::ConstraintGeneration &&
-          choice.isKeyPathDynamicMemberLookup() &&
-          member.getBaseName().isSubscript()) {
-        // Let's move this constraint to the active
-        // list so it could be picked up right after
-        // constraint generation is done.
-        return formUnsolved(/*activate=*/true);
-      }
-    }
-
     generateOverloadConstraints(
         candidates, memberTy, result.ViableCandidates, useDC, locator,
         result.getFavoredIndex(), /*requiresFix=*/false,
