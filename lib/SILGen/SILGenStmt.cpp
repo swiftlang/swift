@@ -869,7 +869,6 @@ bool SILGenFunction::emitBorrowOrMutateAccessorResult(
 void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                                     Expr *ret) {
   SmallVector<SILValue, 4> directResults;
-  auto *accessor = dyn_cast_or_null<AccessorDecl>(FunctionDC->getAsDecl());
   auto retTy = ret->getType()->getCanonicalType();
   
   AbstractionPattern origRetTy = TypeContext
