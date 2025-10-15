@@ -159,9 +159,9 @@ foreach(sdk ${SWIFT_SDKS})
       target_sources(${target}
         PRIVATE get-cpu-context-${arch}.asm)
     else()
-      message(STATUS "Using get-cpu-context.s for target ${target}")
+      message(STATUS "Using get-cpu-context.S for target ${target}")
       target_sources(${target}
-        PRIVATE get-cpu-context.s)
+        PRIVATE get-cpu-context.S)
     endif()
   endforeach()
 
