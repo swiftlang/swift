@@ -17,6 +17,7 @@
 //       run we currently do not perform any transformation because ownership
 //       eliminator is run before. Disabled tests below rely on the second
 //       pass run performing transformation, so they currently fail.
+//       https://github.com/swiftlang/swift/issues/84920
 // TODO: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK1
 // TODO: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK2
 // TODO: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK3
