@@ -188,6 +188,9 @@ namespace swift {
     /// Swift runtime version to compile for.
     version::Version RuntimeVersion = version::Version::getCurrentLanguageVersion();
 
+    /// The minimum Swift runtime version that the progam can be deployed to.
+    version::Version MinSwiftRuntimeVersion;
+
     /// PackageDescription version to compile for.
     version::Version PackageDescriptionVersion;
 
@@ -1144,6 +1147,10 @@ namespace swift {
     /// in versioned attributes, where the importer must select the appropriate
     /// ones to apply.
     bool LoadVersionIndependentAPINotes = false;
+
+    /// Whether the importer should skip SafeInteropWrappers, even though the
+    /// feature is enabled.
+    bool DisableSafeInteropWrappers = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

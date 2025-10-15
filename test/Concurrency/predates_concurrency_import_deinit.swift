@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/StrictModule.swiftmodule -module-name StrictModule -swift-version 6 %S/Inputs/StrictModule.swift
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
 
-// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -verify-ignore-unrelated -strict-concurrency=complete
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

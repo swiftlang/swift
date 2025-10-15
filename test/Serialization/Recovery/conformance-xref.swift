@@ -20,7 +20,7 @@
 
 /// No errors when extended recovery is enabled.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -experimental-allow-module-with-compiler-errors -verify
+// RUN:   -experimental-allow-module-with-compiler-errors -verify -verify-ignore-unrelated
 
 /// Case 2: Remove a requirement from one lib, leave the other as stale and
 /// rebuild client. Error on the mismatch.
@@ -34,7 +34,7 @@
 
 /// No errors when extended recovery is enabled.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -experimental-allow-module-with-compiler-errors -verify
+// RUN:   -experimental-allow-module-with-compiler-errors -verify -verify-ignore-unrelated
 
 /// Combined case: Remove both the conformance and the requirement.
 /// Fail on the removed conformance only as it was first.

@@ -637,17 +637,14 @@ struct PatternBindingWithTwoVars2 { var x = y, y = 3 }
 // expected-error@-1 {{cannot use instance member 'y' within property initializer; property initializers run before 'self' is available}}
 
 struct PatternBindingWithTwoVars3 { var x = y, y = x }
-// expected-error@-1 {{circular reference}}
-// expected-note@-2 {{through reference here}}
-// expected-note@-3 {{through reference here}}
-// expected-note@-4 {{through reference here}}
-// expected-note@-5 {{through reference here}}
-// expected-note@-6 {{through reference here}}
+// expected-error@-1:41 {{circular reference}}
+// expected-note@-2:37 {{through reference here}}
+// expected-note@-3:48 {{through reference here}}
 
 // https://github.com/apple/swift/issues/51518
 do {
-  let closure1 = { closure2() } // expected-error {{circular reference}} expected-note {{through reference here}} expected-note {{through reference here}}
-  let closure2 = { closure1() } // expected-note {{through reference here}} expected-note {{through reference here}} expected-note {{through reference here}}
+  let closure1 = { closure2() } // expected-error {{circular reference}} expected-note {{through reference here}}
+  let closure2 = { closure1() } // expected-note {{through reference here}} expected-note {{through reference here}}
 }
 
 func color(with value: Int) -> Int {

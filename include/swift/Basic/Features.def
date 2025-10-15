@@ -424,6 +424,9 @@ EXPERIMENTAL_FEATURE(ThenStatements, false)
 /// Enable 'do' expressions.
 EXPERIMENTAL_FEATURE(DoExpressions, false)
 
+/// Enable 'for' expressions.
+EXPERIMENTAL_FEATURE(ForExpressions, false)
+
 /// Enable implicitly treating the last expression in a function, closure,
 /// and 'if'/'switch' expression as the result.
 EXPERIMENTAL_FEATURE(ImplicitLastExprResults, false)
@@ -495,10 +498,6 @@ EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 /// Import inherited non-public members when importing C++ classes.
 EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 
-/// Suppress the synthesis of static factory methods for C++ foreign reference
-/// types and importing them as Swift initializers.
-EXPERIMENTAL_FEATURE(SuppressCXXForeignReferenceTypeInitializers, true)
-
 /// Emit a warning when a C++ API returns a SWIFT_SHARED_REFERENCE type
 /// without being explicitly annotated with either SWIFT_RETURNS_RETAINED
 /// or SWIFT_RETURNS_UNRETAINED.
@@ -552,6 +551,12 @@ EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, false)
 
 /// Allow use of @inline(always) attribute
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(InlineAlways, false)
+
+/// Allow use of 'Swift' (Swift runtime version) in @available attributes
+EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
+
+/// Allow use of `~Sendable`.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TildeSendable, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

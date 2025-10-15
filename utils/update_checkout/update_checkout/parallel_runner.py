@@ -15,7 +15,7 @@ class MonitoredFunction:
         fn: Callable,
         running_tasks: ListProxy,
         updated_repos: ValueProxy,
-        lock: Lock
+        lock: Lock,
     ):
         self.fn = fn
         self.running_tasks = running_tasks
@@ -46,25 +46,28 @@ class ParallelRunner:
         pool_args: List[Union[RunnerArguments, AdditionalSwiftSourcesArguments]],
         n_processes: int = 0,
     ):
-        self._monitor_polling_period = 0.1
         if n_processes == 0:
-            n_processes = cpu_count() * 2
-        self._terminal_width = shutil.get_terminal_size().columns
+            # Limit the number of processes as the performance regresses after
+            # if the number is too high.
+            n_processes = min(cpu_count() * 2, 16)
         self._n_processes = n_processes
+        self._monitor_polling_period = 0.1
+        self._terminal_width = shutil.get_terminal_size().columns
         self._pool_args = pool_args
-        manager = Manager()
-        self._lock = manager.Lock()
-        self._running_tasks = manager.list()
-        self._updated_repos = manager.Value("i", 0)
         self._fn = fn
         self._pool = Pool(processes=self._n_processes)
-        self._verbose = pool_args[0].verbose
         self._output_prefix = pool_args[0].output_prefix
         self._nb_repos = len(pool_args)
         self._stop_event = Event()
-        self._monitored_fn = MonitoredFunction(
-            self._fn, self._running_tasks, self._updated_repos, self._lock
-        )
+        self._verbose = pool_args[0].verbose
+        if not self._verbose:
+            manager = Manager()
+            self._lock = manager.Lock()
+            self._running_tasks = manager.list()
+            self._updated_repos = manager.Value("i", 0)
+            self._monitored_fn = MonitoredFunction(
+                self._fn, self._running_tasks, self._updated_repos, self._lock
+            )
 
     def run(self) -> List[Any]:
         print(
@@ -99,7 +102,7 @@ class ParallelRunner:
             self._lock.release()
 
             if current_line != last_output:
-                truncated = (f"{self._output_prefix} [{updated_repos}/{self._nb_repos}] ({current_line})")
+                truncated = f"{self._output_prefix} [{updated_repos}/{self._nb_repos}] ({current_line})"
                 if len(truncated) > self._terminal_width:
                     ellipsis_marker = " ..."
                     truncated = (
@@ -139,4 +142,3 @@ class ParallelRunner:
                 if r.stderr:
                     print(r.stderr.decode())
         return fail_count
-

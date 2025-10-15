@@ -1156,16 +1156,21 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       getOrCreateRequirementEnvironment(reqEnvCache, dc, reqSig, proto,
                                         covariantSelf, conformance);
 
+  auto reqSubMap = reqEnvironment.getRequirementToWitnessThunkSubs();
+
+  Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
+  if (selfTy->hasError()) {
+    return RequirementMatch(witness, MatchKind::WitnessInvalid,
+                            witnessType, reqEnvironment,
+                            /*optionalAdjustments*/ {});
+  }
+
   // Set up the constraint system for matching.
   auto setup =
       [&]() -> std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type> {
     // Construct a constraint system to use to solve the equality between
     // the required type and the witness type.
     cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
-
-    auto reqSubMap = reqEnvironment.getRequirementToWitnessThunkSubs();
-
-    Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
 
     // Open up the type of the requirement.
     reqLocator =
@@ -5253,10 +5258,11 @@ diagnoseTypeWitnessAvailability(NormalProtocolConformance *conformance,
 
   switch (domain.getKind()) {
   case AvailabilityDomain::Kind::Universal:
-  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
   case AvailabilityDomain::Kind::PackageDescription:
   case AvailabilityDomain::Kind::Platform:
     break;
+  case AvailabilityDomain::Kind::SwiftRuntime:
   case AvailabilityDomain::Kind::Embedded:
   case AvailabilityDomain::Kind::Custom:
     shouldError = true;

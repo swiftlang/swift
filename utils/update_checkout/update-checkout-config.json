@@ -54,6 +54,8 @@
             "remote": { "id": "swiftlang/swift-foundation" } },
         "swift-corelibs-libdispatch": {
             "remote": { "id": "swiftlang/swift-corelibs-libdispatch" } },
+        "swift-corelibs-blocksruntime": {
+            "remote": { "id": "swiftlang/swift-corelibs-blocksruntime" } },
         "swift-integration-tests": {
             "remote": { "id": "swiftlang/swift-integration-tests" } },
         "swift-xcode-playground-support": {
@@ -118,6 +120,9 @@
         "zlib": {
           "remote": { "id": "madler/zlib" }
         },
+        "brotli": {
+          "remote": { "id": "google/brotli" }
+        },
         "mimalloc": {
           "remote": { "id": "microsoft/mimalloc" },
           "platforms": [ "Windows" ]
@@ -159,6 +164,7 @@
                 "swift-foundation-icu": "main",
                 "swift-foundation": "main",
                 "swift-corelibs-libdispatch": "main",
+                "swift-corelibs-blocksruntime": "main",
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
                 "ninja": "v1.13.1",
@@ -180,6 +186,7 @@
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
+                "brotli": "v1.1.0",
                 "mimalloc": "v3.0.3",
                 "swift-subprocess": "0.1"
             }
@@ -291,6 +298,7 @@
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
+                "brotli": "v1.1.0",
                 "mimalloc": "v3.0.1"
             }
         },
@@ -587,6 +595,7 @@
                 "swift-foundation-icu": "main",
                 "swift-foundation": "main",
                 "swift-corelibs-libdispatch": "main",
+                "swift-corelibs-blocksruntime": "main",
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
                 "ninja": "v1.13.1",
@@ -608,6 +617,7 @@
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
+                "brotli": "v1.1.0",
                 "mimalloc": "v3.0.3",
                 "swift-subprocess": "0.1"
             }
@@ -645,6 +655,7 @@
                 "swift-foundation-icu": "main",
                 "swift-foundation": "main",
                 "swift-corelibs-libdispatch": "main",
+                "swift-corelibs-blocksruntime": "main",
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
                 "ninja": "v1.13.1",
@@ -666,6 +677,7 @@
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
+                "brotli": "v1.1.0",
                 "mimalloc": "v3.0.3",
                 "swift-subprocess": "0.1"
             }

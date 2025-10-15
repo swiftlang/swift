@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -primary-file %S/Inputs/a.swift -emit-module-path %t/a.swiftmodule
 // RUN: %target-swift-frontend -emit-module -primary-file %S/Inputs/b.swift -emit-module-path %t/b.swiftmodule -I %t
 // "-verify-ignore-unknown" is for "<unknown>:0: note: 'init()' declared here"
-// RUN: %target-swift-frontend-typecheck -verify -verify-ignore-unknown -I %t %s
+// RUN: %target-swift-frontend-typecheck -verify -verify-ignore-unrelated -verify-ignore-unknown -I %t %s
 
 // https://github.com/apple/swift/issues/54969
 // Fix cross-module deserialization crash involving `@derivative` attribute.

@@ -1,3 +1,5 @@
+// REQUIRES: rdar162106619
+
 // REQUIRES: swift_feature_SafeInteropWrappers
 
 // RUN: %empty-directory(%t)

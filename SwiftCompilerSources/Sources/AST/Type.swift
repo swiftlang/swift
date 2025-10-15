@@ -173,14 +173,7 @@ extension TypeProperties {
   public var isDynamicSelf: Bool { rawType.bridged.isDynamicSelf()}
   public var isBox: Bool { rawType.bridged.isBox() }
 
-  /// True if this is the type which represents an integer literal used in a type position.
-  /// For example `N` in `struct T<let N: Int> {}`
-  public var isInteger: Bool { rawType.bridged.isInteger() }
-
   public var canBeClass: Type.TraitResult { rawType.bridged.canBeClass().result }
-
-  /// True if this the nominal type `Swift.Optional`.
-  public var isOptional: Bool { rawType.bridged.isOptional() }
 
   /// True if this type is a value type (struct/enum) that defines a `deinit`.
   public var isValueTypeWithDeinit: Bool {
@@ -188,6 +181,34 @@ extension TypeProperties {
       return true
     }
     return false
+  }
+
+  //===--------------------------------------------------------------------===//
+  //                      Checks for stdlib types
+  //===--------------------------------------------------------------------===//
+
+  /// True if this is the type which represents an integer literal used in a type position.
+  /// For example `N` in `struct T<let N: Int> {}`
+  public var isInteger: Bool { rawType.bridged.isInteger() }
+
+  /// True if this the nominal type `Swift.Optional`.
+  public var isOptional: Bool { rawType.bridged.isOptional() }
+
+  /// A non-nil result type implies isUnsafe[Raw][Mutable]Pointer. A raw
+  /// pointer has a `void` element type.
+  public var unsafePointerElementType: Type? {
+    Type(bridgedOrNil: rawType.bridged.getAnyPointerElementType())
+  }
+
+  public var isAnyUnsafePointer: Bool {
+    unsafePointerElementType != nil
+  }
+
+  public var isAnyUnsafeBufferPointer: Bool {
+    rawType.bridged.isUnsafeBufferPointerType()
+      || rawType.bridged.isUnsafeMutableBufferPointerType()
+      || rawType.bridged.isUnsafeRawBufferPointerType()
+      || rawType.bridged.isUnsafeMutableRawBufferPointerType()
   }
 
   //===--------------------------------------------------------------------===//

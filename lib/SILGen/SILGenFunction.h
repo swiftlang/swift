@@ -1899,11 +1899,10 @@ public:
   ManagedValue emitUndef(Type type);
   ManagedValue emitUndef(SILType type);
   RValue emitUndefRValue(SILLocation loc, Type type);
-  
-  std::pair<ManagedValue, SILValue>
-  emitUninitializedArrayAllocation(Type ArrayTy,
-                                   SILValue Length,
-                                   SILLocation Loc);
+
+  ManagedValue emitUninitializedArrayAllocation(Type ArrayTy,
+                                                SILValue Length,
+                                                SILLocation Loc);
 
   CleanupHandle enterDeallocateUninitializedArrayCleanup(SILValue array);
   void emitUninitializedArrayDeallocation(SILLocation loc, SILValue array);
@@ -2079,18 +2078,18 @@ public:
                                       SmallVectorImpl<ManagedValue> &yields,
                                       bool isOnSelfParameter);
 
-  ManagedValue emitBorrowAccessor(SILLocation loc, SILDeclRef accessor,
-                                  SubstitutionMap substitutions,
-                                  ArgumentSource &&selfValue, bool isSuper,
-                                  bool isDirectUse,
-                                  PreparedArguments &&subscriptIndices,
-                                  bool isOnSelfParameter);
+  ManagedValue emitBorrowMutateAccessor(SILLocation loc, SILDeclRef accessor,
+                                        SubstitutionMap substitutions,
+                                        ArgumentSource &&selfValue,
+                                        bool isSuper, bool isDirectUse,
+                                        PreparedArguments &&subscriptIndices,
+                                        bool isOnSelfParameter);
 
-  ManagedValue applyBorrowAccessor(SILLocation loc, ManagedValue fn,
-                                   bool canUnwind, SubstitutionMap subs,
-                                   ArrayRef<ManagedValue> args,
-                                   CanSILFunctionType substFnType,
-                                   ApplyOptions options);
+  ManagedValue applyBorrowMutateAccessor(SILLocation loc, ManagedValue fn,
+                                         bool canUnwind, SubstitutionMap subs,
+                                         ArrayRef<ManagedValue> args,
+                                         CanSILFunctionType substFnType,
+                                         ApplyOptions options);
 
   RValue emitApplyConversionFunction(SILLocation loc,
                                      Expr *funcExpr,
@@ -2400,9 +2399,8 @@ public:
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       CanSILFunctionType fnTy,
                                       ExecutorBreadcrumb prevExecutor,
-                                      SILResultInfo errorResult,
-                                      SILValue indirectErrorAddr,
-                                      bool isSuppressed);
+                                      TaggedUnion<SILValue, SILType> errorAddrOrType,
+                                      bool suppressErrorPath);
 
   /// Emit a dynamic member reference.
   RValue emitDynamicMemberRef(SILLocation loc, SILValue operand,

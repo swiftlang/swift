@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -D LIB %s -o %t/Lib.swiftmodule
-// RUN: %target-swift-frontend -I %t -typecheck %s -verify
+// RUN: %target-swift-frontend -I %t -typecheck %s -verify -verify-ignore-unrelated
 // REQUIRES: objc_interop
 
 #if LIB

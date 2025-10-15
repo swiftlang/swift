@@ -838,6 +838,12 @@ ASTContext::ASTContext(
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Id_##Name = getIdentifier(IdStr);
 #include "swift/AST/KnownIdentifiers.def"
 
+  Identifier stdlibOverlayNames[] = {
+    Id_Concurrency,
+    Id_StringProcessing
+  };
+  StdlibOverlayNames = AllocateCopy(stdlibOverlayNames);
+
   // Record the initial set of search paths.
   for (const auto &path : SearchPathOpts.getImportSearchPaths())
     getImpl().SearchPathsSet[path.Path] |= SearchPathKind::Import;
@@ -3612,15 +3618,11 @@ static Type replacingTypeVariablesAndPlaceholders(Type ty) {
 Type ErrorType::get(Type originalType) {
   // The original type is only used for printing/debugging, and we don't support
   // solver-allocated ErrorTypes. As such, fold any type variables and
-  // placeholders into bare ErrorTypes, which print as placeholders.
-  //
-  // FIXME: If the originalType is itself an ErrorType we ought to be flattening
-  // it, but that's currently load-bearing as it avoids crashing for recursive
-  // generic signatures such as in `0120-rdar34184392.swift`. To fix this we
-  // ought to change the evaluator to ensure the outer step of a request cycle
-  // returns the same default value as the inner step such that we don't end up
-  // with conflicting generic signatures on encountering a cycle.
+  // placeholders into ErrorTypes. If we have a top-level one, we can return
+  // that directly.
   originalType = replacingTypeVariablesAndPlaceholders(originalType);
+  if (isa<ErrorType>(originalType.getPointer()))
+    return originalType;
 
   ASSERT(originalType);
   ASSERT(!originalType->getRecursiveProperties().isSolverAllocated() &&
@@ -5725,7 +5727,8 @@ OpaqueTypeArchetypeType *OpaqueTypeArchetypeType::getNew(
   ASTContext &ctx = interfaceType->getASTContext();
   auto mem = ctx.Allocate(size, alignof(OpaqueTypeArchetypeType), arena);
   return ::new (mem)
-      OpaqueTypeArchetypeType(environment, properties, interfaceType,
+      OpaqueTypeArchetypeType(environment->isCanonical() ? &ctx : nullptr,
+                              environment, properties, interfaceType,
                               conformsTo, superclass, layout);
 }
 
@@ -5753,6 +5756,7 @@ CanTypeWrapper<ExistentialArchetypeType> ExistentialArchetypeType::getNew(
   void *mem = ctx.Allocate(size, alignof(ExistentialArchetypeType), arena);
 
   return CanExistentialArchetypeType(::new (mem) ExistentialArchetypeType(
+      environment->isCanonical() ? &ctx : nullptr,
       environment, interfaceType, conformsTo, superclass, layout,
       properties));
 }
@@ -6001,6 +6005,25 @@ GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
   return newSig;
 }
 
+GenericSignature
+GenericSignature::forInvalid(ArrayRef<GenericTypeParamType *> params) {
+  ASSERT(!params.empty());
+  auto &ctx = params.front()->getASTContext();
+
+  // Add same type requirements that make each of the generic parameters
+  // concrete error types. This helps avoid downstream diagnostics and is
+  // handled the same as if the user wrote e.g `<T where T == Undefined>`.
+  SmallVector<Requirement, 2> requirements;
+  for (auto *param : params) {
+    if (param->isValue())
+      continue;
+
+    requirements.emplace_back(RequirementKind::SameType, param,
+                              ErrorType::get(ctx));
+  }
+  return GenericSignature::get(params, requirements);
+}
+
 GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
   auto &ctx = signature->getASTContext();
 
@@ -6008,8 +6031,8 @@ GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
   unsigned numGenericParams = signature.getGenericParams().size();
   size_t bytes = totalSizeToAlloc<SubstitutionMap,
                                   OpaqueEnvironmentData,
-                                  OpenedExistentialEnvironmentData,
-                                  OpenedElementEnvironmentData, Type>(
+                                  ExistentialEnvironmentData,
+                                  ElementEnvironmentData, Type>(
       0, 0, 0, 0, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   return new (mem) GenericEnvironment(signature);
@@ -6019,11 +6042,6 @@ GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
 /// outer substitutions.
 GenericEnvironment *GenericEnvironment::forOpaqueType(
     OpaqueTypeDecl *opaque, SubstitutionMap subs) {
-  // TODO: We could attempt to preserve type sugar in the substitution map.
-  // Currently archetypes are assumed to be always canonical in many places,
-  // though, so doing so would require fixing those places.
-  subs = subs.getCanonical();
-
   auto &ctx = opaque->getASTContext();
 
   auto properties = ArchetypeType::archetypeProperties(
@@ -6038,9 +6056,9 @@ GenericEnvironment *GenericEnvironment::forOpaqueType(
     auto signature = opaque->getOpaqueInterfaceGenericSignature();
     unsigned numGenericParams = signature.getGenericParams().size();
     size_t bytes = totalSizeToAlloc<SubstitutionMap,
-                                  OpaqueEnvironmentData,
-                                    OpenedExistentialEnvironmentData,
-                                    OpenedElementEnvironmentData, Type>(
+                                    OpaqueEnvironmentData,
+                                    ExistentialEnvironmentData,
+                                    ElementEnvironmentData, Type>(
         1, 1, 0, 0, numGenericParams);
     void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment), arena);
     env = new (mem) GenericEnvironment(signature, opaque, subs);
@@ -6102,8 +6120,8 @@ GenericEnvironment::forOpenedExistential(
   unsigned numGenericParams = signature.getGenericParams().size();
   size_t bytes = totalSizeToAlloc<SubstitutionMap,
                                   OpaqueEnvironmentData,
-                                  OpenedExistentialEnvironmentData,
-                                  OpenedElementEnvironmentData, Type>(
+                                  ExistentialEnvironmentData,
+                                  ElementEnvironmentData, Type>(
       1, 0, 1, 0, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   auto *genericEnv =
@@ -6140,8 +6158,8 @@ GenericEnvironment::forOpenedElement(GenericSignature signature,
   unsigned numOpenedParams = signature.getInnermostGenericParams().size();
   size_t bytes = totalSizeToAlloc<SubstitutionMap,
                                   OpaqueEnvironmentData,
-                                  OpenedExistentialEnvironmentData,
-                                  OpenedElementEnvironmentData,
+                                  ExistentialEnvironmentData,
+                                  ElementEnvironmentData,
                                   Type>(
       1, 0, 0, 1, numGenericParams + numOpenedParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));

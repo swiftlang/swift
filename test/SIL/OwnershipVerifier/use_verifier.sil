@@ -828,30 +828,6 @@ bb5(%5 : @owned $ThreeDifferingPayloadEnum):
   return %5 : $ThreeDifferingPayloadEnum
 }
 
-sil [ossa] @enum_cases_with_trivial_unowned_cases_arg_into_phi : $@convention(thin) (Builtin.NativeObject) -> ThreeDifferingPayloadEnum {
-bb0(%0 : @unowned $Builtin.NativeObject):
-  cond_br undef, bb1, bb2
-
-bb1:
-  cond_br undef, bb3, bb4
-
-bb2:
-  %1 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nopayload!enumelt
-  br bb5(%1 : $ThreeDifferingPayloadEnum)
-
-bb3:
-  %2 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt, %0 : $Builtin.NativeObject
-  br bb5(%2 : $ThreeDifferingPayloadEnum)
-
-bb4:
-  %3 = integer_literal $Builtin.Int32, 0
-  %4 = enum $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt, %3 : $Builtin.Int32
-  br bb5(%4 : $ThreeDifferingPayloadEnum)
-
-bb5(%5 : @unowned $ThreeDifferingPayloadEnum):
-  return %5 : $ThreeDifferingPayloadEnum
-}
-
 sil [ossa] @enum_cases_with_trivial_guaranteed_cases_arg_into_phi : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned ThreeDifferingPayloadEnum {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   cond_br undef, bb1, bb2
@@ -1381,20 +1357,6 @@ bb3(%fUnknown : @owned $@callee_owned () -> ()):
   destroy_value %fUnknown : $@callee_owned () -> ()
   %9999 = tuple()
   return %9999 : $()
-}
-
-sil [ossa] @unowned_to_ref_is_unowned_instant_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.NativeObject {
-bb0(%0 : @guaranteed $Builtin.NativeObject):
-  %1 = ref_to_unowned %0 : $Builtin.NativeObject to $@sil_unowned Builtin.NativeObject
-  %2 = unowned_to_ref %1 : $@sil_unowned Builtin.NativeObject to $Builtin.NativeObject
-  return %2 : $Builtin.NativeObject
-}
-
-sil [ossa] @unmanaged_to_ref_is_unowned_instant_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.NativeObject {
-bb0(%0 : @guaranteed $Builtin.NativeObject):
-  %1 = ref_to_unmanaged %0 : $Builtin.NativeObject to $@sil_unmanaged Builtin.NativeObject
-  %2 = unmanaged_to_ref %1 : $@sil_unmanaged Builtin.NativeObject to $Builtin.NativeObject
-  return %2 : $Builtin.NativeObject
 }
 
 sil [ossa] @nontrivial_enum_unchecked_enum_data_trivial_payload_owned : $@convention(thin) (@owned ThreeDifferingPayloadEnum) -> Builtin.Int32 {

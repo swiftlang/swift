@@ -217,7 +217,7 @@ void EnumRawTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void EnumRawTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
+  diags.diagnose(decl, diag::through_decl_declared_here_with_kind, decl);
 }
 
 //----------------------------------------------------------------------------//
@@ -248,7 +248,7 @@ void ProtocolRequiresClassRequest::diagnoseCycle(DiagnosticEngine &diags) const 
 
 void ProtocolRequiresClassRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *proto = std::get<0>(getStorage());
-  diags.diagnose(proto, diag::decl_declared_here_with_kind, proto);
+  diags.diagnose(proto, diag::through_decl_declared_here_with_kind, proto);
 }
 
 std::optional<bool> ProtocolRequiresClassRequest::getCachedResult() const {
@@ -272,7 +272,7 @@ void ExistentialConformsToSelfRequest::diagnoseCycle(DiagnosticEngine &diags) co
 
 void ExistentialConformsToSelfRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *proto = std::get<0>(getStorage());
-  diags.diagnose(proto, diag::decl_declared_here_with_kind, proto);
+  diags.diagnose(proto, diag::through_decl_declared_here_with_kind, proto);
 }
 
 std::optional<bool> ExistentialConformsToSelfRequest::getCachedResult() const {
@@ -298,7 +298,7 @@ void HasSelfOrAssociatedTypeRequirementsRequest::diagnoseCycle(
 void HasSelfOrAssociatedTypeRequirementsRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   auto *proto = std::get<0>(getStorage());
-  diags.diagnose(proto, diag::decl_declared_here_with_kind, proto);
+  diags.diagnose(proto, diag::through_decl_declared_here_with_kind, proto);
 }
 
 std::optional<bool>
@@ -1448,7 +1448,7 @@ void HasCircularInheritedProtocolsRequest::diagnoseCycle(
 void HasCircularInheritedProtocolsRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
+  diags.diagnose(decl, diag::through_decl_declared_here_with_kind, decl);
 }
 
 //----------------------------------------------------------------------------//
@@ -1462,7 +1462,7 @@ void HasCircularRawValueRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void HasCircularRawValueRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
+  diags.diagnose(decl, diag::through_decl_declared_here_with_kind, decl);
 }
 
 //----------------------------------------------------------------------------//

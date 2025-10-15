@@ -22,25 +22,26 @@
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeTransform.h"
+#include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/PreparedOverload.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Statistic.h"
-#include "swift/Basic/Defer.h"
 
 using namespace swift;
 using namespace constraints;
 using namespace inference;
 
 #define DEBUG_TYPE "ConstraintSystem"
-
-
 
 Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
                                               Type parentTy,
@@ -1232,38 +1233,37 @@ ConstraintSystem::getTypeOfReferencePost(OverloadChoice choice,
   auto *value = choice.getDecl();
 
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
-    auto *openedFnType = openedType->castTo<FunctionType>();
-
     // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
     assert(func->isOperator() && "Lookup should only find operators");
 
     auto functionRefInfo = choice.getFunctionRefInfo();
 
-    auto origOpenedType = openedFnType;
+    auto origOpenedType = openedType;
     if (!isRequirementOrWitness(locator)) {
       unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
                                                functionRefInfo);
-      openedFnType = adjustFunctionTypeForConcurrency(
-          origOpenedType, /*baseType=*/Type(), func, useDC, numApplies,
-          /*isMainDispatchQueue=*/false, /*openGlobalActorType=*/true, locator);
+      openedType = adjustFunctionTypeForConcurrency(
+          origOpenedType->castTo<FunctionType>(), /*baseType=*/Type(),
+          func, useDC, numApplies, /*isMainDispatchQueue=*/false,
+          /*openGlobalActorType=*/true, locator);
     }
 
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type. Repeat the adjustment
     // for the original and adjusted types.
-    auto type = openedFnType;
-    if (openedFnType->hasDynamicSelfType()) {
-      auto params = openedFnType->getParams();
+    auto type = openedType;
+    if (openedType->hasDynamicSelfType()) {
+      auto params = openedType->castTo<FunctionType>()->getParams();
       assert(params.size() == 1);
       Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
-      type = openedFnType->replaceDynamicSelfType(selfTy)
+      type = openedType->replaceDynamicSelfType(selfTy)
           ->castTo<FunctionType>();
     }
 
     auto origType = origOpenedType;
     if (origOpenedType->hasDynamicSelfType()) {
-      auto params = origOpenedType->getParams();
+      auto params = origOpenedType->castTo<FunctionType>()->getParams();
       assert(params.size() == 1);
       Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
       origType = origOpenedType->replaceDynamicSelfType(selfTy)
@@ -1272,7 +1272,8 @@ ConstraintSystem::getTypeOfReferencePost(OverloadChoice choice,
 
     // The reference implicitly binds 'self'.
     return {origOpenedType, openedType,
-            origType->getResult(), type->getResult(), Type()};
+            origType->castTo<FunctionType>()->getResult(),
+            type->castTo<FunctionType>()->getResult(), Type()};
   }
 
   // Unqualified reference to a local or global function.
@@ -1646,11 +1647,12 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
                               PreparedOverloadBuilder *preparedOverload) {
   assert(!selfTy->is<ProtocolType>());
 
-  // Otherwise, use a subtype constraint for classes to cope with inheritance.
+  // Otherwise, use a subtype constraint for classes to cope with
+  // inheritance.
   if (selfTy->getClassOrBoundGenericClass()) {
     cs.addConstraint(ConstraintKind::Subtype, objectTy, selfTy,
-                     cs.getConstraintLocator(locator), /*isFavored=*/false,
-                     preparedOverload);
+                     cs.getConstraintLocator(locator),
+                     /*isFavored=*/false, preparedOverload);
     return;
   }
 
@@ -1949,6 +1951,29 @@ ConstraintSystem::getTypeOfMemberReferencePre(
   unsigned numRemovedArgumentLabels = getNumRemovedArgumentLabels(
       value, /*isCurriedInstanceReference*/ !hasAppliedSelf, functionRefInfo);
   openedType = openedType->removeArgumentLabels(numRemovedArgumentLabels);
+
+  // Adjust for C++ inline namespaces.
+  if (const auto *FT = openedType->getAs<FunctionType>()) {
+    auto openedParams = FT->getParams();
+    assert(openedParams.size() == 1);
+    auto param = openedParams.front();
+
+    Type selfObjTy = param.getPlainType();
+    bool wasMetaType = false;
+    if (param.getPlainType()->is<MetatypeType>()) {
+      selfObjTy = param.getPlainType()->getMetatypeInstanceType();
+      wasMetaType = true;
+    }
+    if (auto *objectTyNominal = baseObjTy->getAs<NominalType>()) {
+      if (auto *selfTyNominal = selfObjTy->getAs<NominalType>())
+        if (auto newSelfTy =
+                swift::stripInlineNamespaces(objectTyNominal, selfTyNominal))
+          openedType = FunctionType::get(
+              param.withType(wasMetaType ? Type(MetatypeType::get(newSelfTy))
+                                         : Type(newSelfTy)),
+              FT->getResult(), FT->getExtInfo());
+    }
+  }
 
   Type baseOpenedTy = baseObjTy;
 
@@ -2786,7 +2811,8 @@ void ConstraintSystem::replayChanges(
       addConstraint(ConstraintKind::Bind,
                     change.Bind.FirstType,
                     change.Bind.SecondType,
-                    locator, /*isFavored=*/false);
+                    locator,
+                    /*isFavored=*/false);
       break;
 
     case PreparedOverload::Change::OpenedTypes: {
@@ -2861,11 +2887,12 @@ ConstraintSystem::prepareOverloadImpl(OverloadChoice choice,
 
 PreparedOverload *ConstraintSystem::prepareOverload(OverloadChoice choice,
                                                     DeclContext *useDC,
-                                                    ConstraintLocator *locator) {
+                                                    ConstraintLocator *locator,
+                                                    bool forDiagnostics) {
   ASSERT(!PreparingOverload);
   PreparingOverload = true;
 
-  PreparedOverloadBuilder builder;
+  PreparedOverloadBuilder builder(locator);
   Type openedType;
   Type thrownErrorType;
   std::tie(openedType, thrownErrorType) = prepareOverloadImpl(
@@ -2877,7 +2904,8 @@ PreparedOverload *ConstraintSystem::prepareOverload(OverloadChoice choice,
   auto size = PreparedOverload::totalSizeToAlloc<PreparedOverload::Change>(count);
   auto mem = Allocator.Allocate(size, alignof(PreparedOverload));
 
-  return new (mem) PreparedOverload(openedType, thrownErrorType, builder.Changes);
+  return new (mem) PreparedOverload(openedType, thrownErrorType, builder.Changes,
+                                    forDiagnostics);
 }
 
 void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC,

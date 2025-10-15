@@ -1046,6 +1046,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // HadError = true;
   }
 
+  if (auto A = Args.getLastArg(OPT_min_swift_runtime_version)) {
+    if (auto vers = VersionParser::parseVersionString(A->getValue(),
+                                                      SourceLoc(), &Diags)) {
+      Opts.MinSwiftRuntimeVersion = *vers;
+    } else {
+      return true;
+    }
+  }
+
   if (auto A = Args.getLastArg(OPT_package_description_version)) {
     auto vers =
         VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
@@ -2166,6 +2175,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
 
   Opts.LoadVersionIndependentAPINotes |= Args.hasArg(OPT_version_independent_apinotes);
 
+  Opts.DisableSafeInteropWrappers |= FrontendOpts.ParseStdlib;
+
   if (FrontendOpts.DisableImplicitModules)
     Opts.DisableImplicitClangModules = true;
 
@@ -2576,6 +2587,20 @@ static bool isEmbedded(ArgList &args) {
   return false;
 }
 
+/// Identifier modules for which we should temporarily suppress the diagnostics
+/// for Embedded restrictions despite building in Embedded Swift.
+static bool temporarilySuppressEmbeddedRestrictionDiagnostics(ArgList &args) {
+  using namespace swift::options;
+
+  if (const Arg *arg = args.getLastArgNoClaim(OPT_module_name)) {
+    StringRef moduleName(arg->getValue());
+    if (moduleName == "Swift" || moduleName == "_Concurrency")
+      return true;
+  }
+
+  return false;
+}
+
 static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags) {
   // NOTE: This executes at the beginning of parsing the command line and cannot
@@ -2588,6 +2613,8 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_verify_apply_fixes))
     Opts.VerifyMode = DiagnosticOptions::VerifyAndApplyFixes;
   Opts.VerifyIgnoreUnknown |= Args.hasArg(OPT_verify_ignore_unknown);
+  Opts.VerifyIgnoreUnrelated |= Args.hasArg(OPT_verify_ignore_unrelated);
+  Opts.VerifyIgnoreMacroLocationNote |= Args.hasArg(OPT_verify_ignore_macro_note);
   Opts.SkipDiagnosticPasses |= Args.hasArg(OPT_disable_diagnostic_passes);
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);
@@ -2645,13 +2672,15 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
 
   // If the "embedded" flag was provided, enable the EmbeddedRestrictions
   // warning group. This group is opt-in in non-Embedded builds.
-  if (isEmbedded(Args)) {
+  if (isEmbedded(Args) && !Args.hasArg(OPT_suppress_warnings) &&
+      !temporarilySuppressEmbeddedRestrictionDiagnostics(Args)) {
     Opts.WarningsAsErrorsRules.push_back(
         WarningAsErrorRule(WarningAsErrorRule::Action::Disable,
                            "EmbeddedRestrictions"));
   }
 
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
+  Opts.SuppressNotes |= Args.hasArg(OPT_suppress_notes);
   Opts.SuppressRemarks |= Args.hasArg(OPT_suppress_remarks);
   for (const Arg *arg : Args.filtered(OPT_warning_treating_Group)) {
     Opts.WarningsAsErrorsRules.push_back([&] {
@@ -2731,6 +2760,9 @@ static void configureDiagnosticEngine(
   }
   if (Options.SuppressWarnings) {
     Diagnostics.setSuppressWarnings(true);
+  }
+  if (Options.SuppressNotes) {
+    Diagnostics.setSuppressNotes(true);
   }
   if (Options.SuppressRemarks) {
     Diagnostics.setSuppressRemarks(true);
@@ -3052,7 +3084,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
   Opts.EnableSILOpaqueValues = Args.hasFlag(
       OPT_enable_sil_opaque_values, OPT_disable_sil_opaque_values, false);
-  Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
   Opts.EnableAsyncDemotion |= Args.hasArg(OPT_enable_async_demotion);
   Opts.EnableThrowsPrediction = Args.hasFlag(
       OPT_enable_throws_prediction, OPT_disable_throws_prediction,
@@ -3225,9 +3256,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                    Opts.OSSAVerifyComplete);
 
   Opts.NoAllocations = Args.hasArg(OPT_no_allocations);
-
-  Opts.EnableExperimentalSwiftBasedClosureSpecialization =
-      Args.hasArg(OPT_enable_experimental_swift_based_closure_specialization);
 
   // If these optimizations are enabled never preserve functions for the
   // debugger.
@@ -3560,6 +3588,17 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   const Arg *ProfileSampleUse = Args.getLastArg(OPT_profile_sample_use);
   Opts.UseSampleProfile = ProfileSampleUse ? ProfileSampleUse->getValue() : "";
+
+  Opts.EnableIRProfileGen = Args.hasArg(OPT_ir_profile_generate) ||
+                            Args.hasArg(OPT_ir_profile_generate_EQ);
+  if (auto V = Args.getLastArgValue(OPT_ir_profile_generate_EQ); !V.empty())
+    Opts.InstrProfileOutput = V.str();
+  Opts.EnableCSIRProfileGen = Args.hasArg(OPT_cs_profile_generate) ||
+                              Args.hasArg(OPT_cs_profile_generate_EQ);
+  if (auto V = Args.getLastArgValue(OPT_cs_profile_generate_EQ); !V.empty())
+    Opts.InstrProfileOutput = V.str();
+  const Arg *IRProfileUse = Args.getLastArg(OPT_ir_profile_use);
+  Opts.UseIRProfile = IRProfileUse ? IRProfileUse->getValue() : "";
 
   Opts.DebugInfoForProfiling |= Args.hasArg(OPT_debug_info_for_profiling);
 

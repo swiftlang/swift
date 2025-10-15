@@ -21,6 +21,7 @@
 // REQUIRES: executable_test
 
 // REQUIRES: concurrency
+// REQUIRES: concurrency_runtime
 
 #include <assert.h>
 #include "actor.h"

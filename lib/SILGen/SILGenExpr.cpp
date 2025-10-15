@@ -1495,7 +1495,7 @@ RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
 RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
                                                   SGFContext C) {
   SILValue metaBase =
-    SGF.emitRValueAsSingleValue(E->getSubExpr()).getUnmanagedValue();
+      SGF.emitRValueAsSingleValue(E->getSubExpr()).getUnmanagedValue();
 
   // Metatype conversion casts in the AST might not be reflected as
   // such in the SIL type system, for example, a cast from DynamicSelf.Type
@@ -2515,6 +2515,17 @@ RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,
 
 RValue RValueEmitter::visitSingleValueStmtExpr(SingleValueStmtExpr *E,
                                                SGFContext C) {
+  if (E->getStmtKind() == SingleValueStmtExpr::Kind::For) {
+    auto *decl = E->getForExpressionPreamble()->ForAccumulatorDecl;
+    auto *binding = E->getForExpressionPreamble()->ForAccumulatorBinding;
+    SGF.visit(decl);
+    SGF.visit(binding);
+    SGF.emitStmt(E->getStmt());
+
+    return SGF.emitRValueForDecl(E, ConcreteDeclRef(decl), E->getType(),
+                                 AccessSemantics::Ordinary);
+  }
+
   auto emitStmt = [&]() {
     SGF.emitStmt(E->getStmt());
 
@@ -2626,19 +2637,54 @@ RValue RValueEmitter::visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E,
 }
 
 RValue RValueEmitter::visitUnreachableExpr(UnreachableExpr *E, SGFContext C) {
-  // Emit the expression, followed by an unreachable. To produce a value of
-  // arbitrary type, we emit a temporary allocation, with the use of the
-  // allocation in the unreachable block. The SILOptimizer will eliminate both
-  // the unreachable block and unused allocation.
+  // Emit the expression, followed by an unreachable.
   SGF.emitIgnoredExpr(E->getSubExpr());
-
-  auto &lowering = SGF.getTypeLowering(E->getType());
-  auto resultAddr = SGF.emitTemporaryAllocation(E, lowering.getLoweredType());
-
   SGF.B.createUnreachable(E);
+
+  // Continue code generation in a block with no predecessors.
+  // Whatever code is emitted here is guaranteed to be removed by SIL passes.
   SGF.B.emitBlock(SGF.createBasicBlock());
 
-  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(resultAddr));
+  // Since the type is uninhabited, use a SILUndef of so that we can return
+  // some sort of RValue from this API.
+  auto &lowering = SGF.getTypeLowering(E->getType());
+  auto loweredTy = lowering.getLoweredType();
+  auto undef = SILUndef::get(SGF.F, loweredTy);
+
+  // Create an alloc initialized with contents from the undefined addr type.
+  // It seems pack addresses do not satisfy isPlusOneOrTrivial, so we need an
+  // actual allocation.
+  if (loweredTy.isAddress()) {
+    auto resultAddr = SGF.emitTemporaryAllocation(E, loweredTy);
+    SGF.emitSemanticStore(E, undef, resultAddr, lowering, IsInitialization);
+    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(resultAddr));
+  }
+
+  // Otherwise, if it's not an address, just emit the undef value itself.
+  return RValue(SGF, E, ManagedValue::forRValueWithoutOwnership(undef));
+}
+
+static SILValue getArrayBuffer(SILValue array, SILGenFunction &SGF, SILLocation loc) {
+  SILValue v = array;
+  SILType storageType;
+  while (auto *sd = v->getType().getStructOrBoundGenericStruct()) {
+    ASSERT(sd->getStoredProperties().size() == 1 &&
+           "Array or its internal structs should have exactly one stored property");
+    auto *se = SGF.getBuilder().createStructExtract(loc, v, v->getType().getFieldDecl(0));
+    if (se->getType() == SILType::getBridgeObjectType(SGF.getASTContext())) {
+      auto bridgeObjTy = cast<BoundGenericStructType>(v->getType().getASTType());
+      CanType ct = CanType(bridgeObjTy->getGenericArgs()[0]);
+      storageType = SILType::getPrimitiveObjectType(ct);
+    }
+    v = se;
+  }
+
+  if (storageType) {
+    v = SGF.getBuilder().createUncheckedRefCast(loc, v, storageType);
+  }
+  ASSERT(v->getType().isReferenceCounted(&SGF.F) &&
+         "expected a reference-counted buffer in the Array data type");
+  return v;
 }
 
 VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
@@ -2652,12 +2698,7 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
   SILValue numEltsVal = SGF.B.createIntegerLiteral(loc,
                              SILType::getBuiltinWordType(SGF.getASTContext()),
                              numElements);
-  // The first result is the array value.
-  ManagedValue array;
-  // The second result is a RawPointer to the base address of the array.
-  SILValue basePtr;
-  std::tie(array, basePtr)
-    = SGF.emitUninitializedArrayAllocation(arrayTy, numEltsVal, loc);
+  ManagedValue array = SGF.emitUninitializedArrayAllocation(arrayTy, numEltsVal, loc);
 
   // Temporarily deactivate the main array cleanup.
   if (array.hasCleanup())
@@ -2667,13 +2708,15 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
   auto abortCleanup =
     SGF.enterDeallocateUninitializedArrayCleanup(array.getValue());
 
-  // Turn the pointer into an address.
-  basePtr = SGF.B.createPointerToAddress(
-    loc, basePtr, baseTL.getLoweredType().getAddressType(),
-    /*isStrict*/ true,
-    /*isInvariant*/ false);
+  auto borrowedArray = array.borrow(SGF, loc);
+  auto borrowCleanup = SGF.Cleanups.getTopCleanup();
 
-  return VarargsInfo(array, abortCleanup, basePtr, baseTL, baseAbstraction);
+  SILValue buffer = getArrayBuffer(borrowedArray.getValue(), SGF, loc);
+
+  SILType elementAddrTy = baseTL.getLoweredType().getAddressType();
+  SILValue baseAddr = SGF.getBuilder().createRefTailAddr(loc, buffer, elementAddrTy);
+
+  return VarargsInfo(array, borrowCleanup, abortCleanup, baseAddr, baseTL, baseAbstraction);
 }
 
 ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
@@ -2686,6 +2729,8 @@ ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
   auto array = varargs.getArray();
   if (array.hasCleanup())
     SGF.Cleanups.setCleanupState(array.getCleanup(), CleanupState::Active);
+
+  SGF.Cleanups.popAndEmitCleanup(varargs.getBorrowCleanup(), CleanupLocation(loc), NotForUnwind);
 
   // Array literals only need to be finalized, if the array is really allocated.
   // In case of zero elements, no allocation is done, but the empty-array
@@ -5178,7 +5223,7 @@ static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
 
 RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
   // Handle 'InlineArray' literals separately.
-  if (E->getType()->isInlineArray()) {
+  if (E->getType()->isInlineArray() || E->getType()->is_InlineArray()) {
     return emitInlineArrayLiteral(SGF, E, C);
   }
 

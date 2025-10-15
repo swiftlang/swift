@@ -24,7 +24,7 @@ takeAConflictingTypeName(qux)
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'ConflictingTypeName' is incomplete
 // CHECK-NEXT: void takeAConflictingTypeName(ConflictingTypeName *param);
 // CHECK-NEXT:                               ^
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'ConflictingTypeName' is incomplete and cannot be imported as a stub; its name conflicts with a class in module CompleteSwiftTypes
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'ConflictingTypeName' is incomplete and cannot be imported as a stub; its name conflicts with a class in module 'CompleteSwiftTypes'
 // CHECK-NEXT: @class ConflictingTypeName;
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'ConflictingTypeName' forward declared here
@@ -44,7 +44,7 @@ _ = returnAConflictingTypeName()
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'ConflictingTypeName' is incomplete
 // CHECK-NEXT: ConflictingTypeName *returnAConflictingTypeName();
 // CHECK-NEXT: ^
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'ConflictingTypeName' is incomplete and cannot be imported as a stub; its name conflicts with a class in module CompleteSwiftTypes
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'ConflictingTypeName' is incomplete and cannot be imported as a stub; its name conflicts with a class in module 'CompleteSwiftTypes'
 // CHECK-NEXT: @class ConflictingTypeName;
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'ConflictingTypeName' forward declared here
@@ -64,7 +64,7 @@ _ = returnAProtocolConflictingTypeName()
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'ProtocolConflictingTypeName' is incomplete
 // CHECK-NEXT: id<ProtocolConflictingTypeName> returnAProtocolConflictingTypeName();
 // CHECK-NEXT: ^
-// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'ProtocolConflictingTypeName' is incomplete and cannot be imported as a stub; its name conflicts with a protocol in module CompleteSwiftTypes
+// CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'ProtocolConflictingTypeName' is incomplete and cannot be imported as a stub; its name conflicts with a protocol in module 'CompleteSwiftTypes'
 // CHECK-NEXT: @protocol ProtocolConflictingTypeName;
 // CHECK-NEXT: ^
 // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: protocol 'ProtocolConflictingTypeName' forward declared here

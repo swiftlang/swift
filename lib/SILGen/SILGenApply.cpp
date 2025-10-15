@@ -2089,10 +2089,17 @@ static void emitRawApply(SILGenFunction &SGF,
     auto result = normalBB->createPhiArgument(resultType, OwnershipKind::Owned);
     rawResults.push_back(result);
 
+    // If the error is not passed indirectly, include the expected error type
+    // according to the SILFunctionConvention.
+    std::optional<TaggedUnion<SILValue, SILType>> errorAddrOrType;
+    if (indirectErrorAddr)
+        errorAddrOrType = indirectErrorAddr;
+    else
+      errorAddrOrType = substFnConv.getSILErrorType(SGF.getTypeExpansionContext());
+
     SILBasicBlock *errorBB =
       SGF.getTryApplyErrorDest(loc, substFnType, prevExecutor,
-                               substFnType->getErrorResult(),
-                               indirectErrorAddr,
+                                *errorAddrOrType,
                                options.contains(ApplyFlags::DoesNotThrow));
 
     options -= ApplyFlags::DoesNotThrow;
@@ -5225,7 +5232,7 @@ public:
 
   CleanupHandle applyCoroutine(SmallVectorImpl<ManagedValue> &yields);
 
-  ManagedValue applyBorrowAccessor();
+  ManagedValue applyBorrowMutateAccessor();
 
   RValue apply(SGFContext C = SGFContext()) {
     initialWritebackScope.verify();
@@ -5426,7 +5433,7 @@ CleanupHandle SILGenFunction::emitBeginApply(
   return endApplyHandle;
 }
 
-ManagedValue CallEmission::applyBorrowAccessor() {
+ManagedValue CallEmission::applyBorrowMutateAccessor() {
   auto origFormalType = callee.getOrigFormalType();
   // Get the callee type information.
   auto calleeTypeInfo = callee.getTypeInfo(SGF);
@@ -5453,14 +5460,14 @@ ManagedValue CallEmission::applyBorrowAccessor() {
             lookThroughMoveOnlyCheckerPattern(selfArgMV.getValue()));
   }
 
-  auto value = SGF.applyBorrowAccessor(uncurriedLoc.value(), fnValue, canUnwind,
-                                       callee.getSubstitutions(), uncurriedArgs,
-                                       calleeTypeInfo.substFnType, options);
+  auto value = SGF.applyBorrowMutateAccessor(
+      uncurriedLoc.value(), fnValue, canUnwind, callee.getSubstitutions(),
+      uncurriedArgs, calleeTypeInfo.substFnType, options);
 
   return value;
 }
 
-ManagedValue SILGenFunction::applyBorrowAccessor(
+ManagedValue SILGenFunction::applyBorrowMutateAccessor(
     SILLocation loc, ManagedValue fn, bool canUnwind, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, CanSILFunctionType substFnType,
     ApplyOptions options) {
@@ -5989,9 +5996,9 @@ RValue SILGenFunction::emitApply(
 
   SILValue indirectErrorAddr;
   if (substFnType->hasErrorResult()) {
-    auto errorResult = substFnType->getErrorResult();
-    if (errorResult.getConvention() == ResultConvention::Indirect) {
-      auto loweredErrorResultType = getSILType(errorResult, substFnType);
+    auto convention = silConv.getFunctionConventions(substFnType);
+    if (auto errorResult = convention.getIndirectErrorResult()) {
+      auto loweredErrorResultType = getSILType(*errorResult, substFnType);
       indirectErrorAddr = B.createAllocStack(loc, loweredErrorResultType);
       enterDeallocStackCleanup(indirectErrorAddr);
     }
@@ -6215,13 +6222,12 @@ RValue SILGenFunction::emitApply(
                                  B.getDefaultAtomicity());
         hasAlreadyLifetimeExtendedSelf = true;
       }
-      LLVM_FALLTHROUGH;
-
-    case ResultConvention::Unowned:
-      // Unretained. Retain the value.
       result = resultTL.emitCopyValue(B, loc, result);
       break;
 
+    case ResultConvention::Unowned:
+      // Handled in OwnershipModelEliminator.
+      break;
     case ResultConvention::GuaranteedAddress:
     case ResultConvention::Guaranteed:
       llvm_unreachable("borrow accessor is not yet implemented");
@@ -7052,7 +7058,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
 /// Allocate an uninitialized array of a given size, returning the array
 /// and a pointer to its uninitialized contents, which must be initialized
 /// before the array is valid.
-std::pair<ManagedValue, SILValue>
+ManagedValue
 SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
                                                  SILValue Length,
                                                  SILLocation Loc) {
@@ -7069,11 +7075,13 @@ SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
   SmallVector<ManagedValue, 2> resultElts;
   std::move(result).getAll(resultElts);
 
-  // Add a mark_dependence between the interior pointer and the array value
-  auto dependentValue = B.createMarkDependence(Loc, resultElts[1].getValue(),
-                                               resultElts[0].getValue(),
-                                               MarkDependenceKind::Escaping);
-  return {resultElts[0], dependentValue};
+  // The second result, which is the base element address, is not used. We extract
+  // it from the array (= the first result) directly to create a correct borrow scope.
+  // TODO: Consider adding a new intrinsic which only returns the array.
+  // Although the current intrinsic is inlined and the code for returning the
+  // second result is optimized away. So it doesn't make a performance difference.
+
+  return resultElts[0];
 }
 
 /// Deallocate an uninitialized array.
@@ -7888,7 +7896,7 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
   return endApplyHandle;
 }
 
-ManagedValue SILGenFunction::emitBorrowAccessor(
+ManagedValue SILGenFunction::emitBorrowMutateAccessor(
     SILLocation loc, SILDeclRef accessor, SubstitutionMap substitutions,
     ArgumentSource &&selfValue, bool isSuper, bool isDirectUse,
     PreparedArguments &&subscriptIndices, bool isOnSelfParameter) {
@@ -7913,7 +7921,7 @@ ManagedValue SILGenFunction::emitBorrowAccessor(
 
   emission.setCanUnwind(false);
 
-  return emission.applyBorrowAccessor();
+  return emission.applyBorrowMutateAccessor();
 }
 
 ManagedValue SILGenFunction::emitAsyncLetStart(

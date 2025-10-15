@@ -1,3 +1,5 @@
+// REQUIRES: rdar162106643
+
 // RUN: rm -rf %t
 // RUN: split-file %s %t
 

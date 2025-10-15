@@ -108,10 +108,6 @@ public:
   /// purposes.
   bool EnableOSSAOptimizations = true;
 
-  /// Controls whether to turn on speculative devirtualization.
-  /// It is turned off by default.
-  bool EnableSpeculativeDevirtualization = false;
-
   /// Controls whether to emit actor data-race checks.
   bool EnableActorDataRaceChecks = false;
 
@@ -302,10 +298,6 @@ public:
 
   /// Are we building in embedded Swift + -no-allocations?
   bool NoAllocations = false;
-
-  /// Should we use the experimental Swift based closure-specialization
-  /// optimization pass instead of the existing C++ one.
-  bool EnableExperimentalSwiftBasedClosureSpecialization = false;
 
   /// The name of the file to which the backend should save optimization
   /// records.

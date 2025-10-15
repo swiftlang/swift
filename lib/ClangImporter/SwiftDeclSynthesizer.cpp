@@ -219,6 +219,16 @@ bool SwiftDeclSynthesizer::isObjCBool(Type type) {
   return importTy->isObjCBool();
 }
 
+bool SwiftDeclSynthesizer::isUnicodeScalar(Type type) {
+  auto found = ImporterImpl.RawTypes.find(type->getAnyNominal());
+  if (found == ImporterImpl.RawTypes.end()) {
+    return false;
+  }
+
+  Type importTy = found->second;
+  return importTy->isUnicodeScalar();
+}
+
 ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
                                                 DeclContext *dc, Type type,
                                                 const clang::APValue &value,
@@ -2539,10 +2549,6 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
                                           const swift::Type &swiftParamTy,
                                           SourceLoc paramLoc) {
   assert(param->hasDefaultArg() && "must have a C++ default argument");
-  if (!param->getIdentifier())
-    // Work around an assertion failure in CXXNameMangler::mangleUnqualifiedName
-    // when mangling std::__fs::filesystem::path::format.
-    return nullptr;
 
   ASTContext &ctx = ImporterImpl.SwiftContext;
   clang::ASTContext &clangCtx = param->getASTContext();

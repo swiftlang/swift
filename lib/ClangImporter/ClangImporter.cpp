@@ -3199,13 +3199,13 @@ getClangOwningModule(ClangNode Node, const clang::ASTContext &ClangCtx) {
         originalDecl = pattern;
       }
     }
-    if (!originalDecl->hasOwningModule()) {
-      if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(D)) {
-        if (auto pattern = cxxRecordDecl->getTemplateInstantiationPattern()) {
-          // Class template instantiations sometimes don't have an owning Clang
-          // module, if the instantiation is not typedef-ed.
-          originalDecl = pattern;
-        }
+    if (auto classTemplateSpecDecl =
+            dyn_cast<clang::ClassTemplateSpecializationDecl>(D)) {
+      if (auto pattern =
+              classTemplateSpecDecl->getTemplateInstantiationPattern()) {
+        // Class template instantiations sometimes don't have an owning Clang
+        // module, if the instantiation is not typedef-ed.
+        originalDecl = pattern;
       }
     }
 
@@ -3433,7 +3433,7 @@ public:
 /// Translate a MacroDefinition to a ClangNode, either a ModuleMacro for
 /// a definition imported from a module or a MacroInfo for a macro defined
 /// locally.
-ClangNode getClangNodeForMacroDefinition(clang::MacroDefinition &M) {
+static ClangNode getClangNodeForMacroDefinition(clang::MacroDefinition &M) {
   if (!M.getModuleMacros().empty())
     return ClangNode(M.getModuleMacros().back()->getMacroInfo());
   if (auto *MD = M.getLocalDirective())
@@ -6262,8 +6262,8 @@ void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl* toDecl) {
     case DeclAttrKind::Custom: {
       CustomAttr *cAttr = cast<CustomAttr>(attr);
       attrs.add(CustomAttr::create(context, SourceLoc(), cAttr->getTypeExpr(),
-                                   cAttr->getInitContext(), cAttr->getArgs(),
-                                   true));
+                                   /*owner*/ toDecl, cAttr->getInitContext(),
+                                   cAttr->getArgs(), /*implicit*/ true));
       break;
     }
     case DeclAttrKind::DiscardableResult: {
@@ -7300,10 +7300,8 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
   // Instantiate a specialization of this template using the substitution map.
   auto *templateArgList = clang::TemplateArgumentList::CreateCopy(
       func->getASTContext(), templateSubst);
-  auto &sema = getClangInstance().getSema();
-  auto *spec = sema.InstantiateFunctionDeclaration(func, templateArgList,
-                                                   clang::SourceLocation());
-  if (!spec) {
+
+  auto diagnoseSubstFail = [&]() {
     std::string templateParams;
     llvm::raw_string_ostream templateParamsStream(templateParams);
     llvm::interleaveComma(templateArgList->asArray(), templateParamsStream,
@@ -7315,9 +7313,24 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
     Impl.diagnose(HeaderLoc(func->getBeginLoc()),
                   diag::unable_to_substitute_cxx_function_template,
                   getFuncName(), templateParams);
+  };
+
+  auto &sema = getClangInstance().getSema();
+  auto *spec = sema.InstantiateFunctionDeclaration(func, templateArgList,
+                                                   clang::SourceLocation());
+  if (!spec || spec->isInvalidDecl()) {
+    diagnoseSubstFail();
     return nullptr;
   }
+
   sema.InstantiateFunctionDefinition(clang::SourceLocation(), spec);
+  // Even if the declaration can be instantiated, the definition may contain
+  // a substitution failure that renders spec invalid as a side-effect.
+  if (spec->isInvalidDecl()) {
+    diagnoseSubstFail();
+    return nullptr;
+  }
+
   return spec;
 }
 
@@ -7714,6 +7727,12 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
   assert(isa<clang::FunctionTemplateDecl>(decl->getClangDecl()) &&
          "This API should only be used with function templates.");
 
+  // If we hit some instantiation failure and expect the compiler to imminently
+  // terminate (with an error), return some reasonable-looking placeholder value
+  // in the meantime because callers expect this function to return some
+  // non-empty ConcreteDeclRef.
+  auto failurePlaceholder = [&]() { return ConcreteDeclRef(decl); };
+
   auto *newFn =
       decl->getASTContext()
           .getClangModuleLoader()
@@ -7722,31 +7741,28 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
               const_cast<clang::FunctionTemplateDecl *>(
                   cast<clang::FunctionTemplateDecl>(decl->getClangDecl())),
               subst);
-  // We failed to specialize this function template. The compiler is going to
-  // exit soon. Return something valid in the meantime.
   if (!newFn)
-    return ConcreteDeclRef(decl);
+    return failurePlaceholder();
 
   auto [fnIt, inserted] =
       Impl.specializedFunctionTemplates.try_emplace(newFn, nullptr);
   if (!inserted)
     return ConcreteDeclRef(fnIt->second);
 
-  auto newDecl = cast_or_null<ValueDecl>(
-      decl->getASTContext().getClangModuleLoader()->importDeclDirectly(
-          newFn));
+  auto *newDecl = cast_or_null<ValueDecl>(
+      decl->getASTContext().getClangModuleLoader()->importDeclDirectly(newFn));
+  if (!newDecl)
+    return failurePlaceholder();
 
-  if (auto fn = dyn_cast<AbstractFunctionDecl>(newDecl)) {
+  if (auto *fn = dyn_cast<AbstractFunctionDecl>(newDecl)) {
     if (!subst.empty()) {
       newDecl = rewriteIntegerTypes(subst, decl, fn);
     }
   }
 
-  if (auto fn = dyn_cast<FuncDecl>(decl)) {
+  if (auto *fn = dyn_cast<FuncDecl>(decl)) {
     newDecl = addThunkForDependentTypes(fn, cast<FuncDecl>(newDecl));
-  }
 
-  if (auto fn = dyn_cast<FuncDecl>(decl)) {
     if (newFn->getNumParams() != fn->getParameters()->size()) {
       newDecl = generateThunkForExtraMetatypes(subst, fn,
                                                cast<FuncDecl>(newDecl));
@@ -9051,4 +9067,19 @@ swift::importer::getCxxRefConventionWithAttrs(const clang::Decl *decl) {
   }
 
   return std::nullopt;
+}
+
+NominalType *swift::stripInlineNamespaces(NominalType *outer,
+                                          NominalType *inner) {
+  if (!outer || !inner || inner == outer)
+    return nullptr;
+  auto CDInner = inner->getDecl()->getClangDecl();
+  while (inner && isa_and_nonnull<clang::NamespaceDecl>(CDInner) &&
+         cast<clang::NamespaceDecl>(CDInner)->isInline() &&
+         inner->getCanonicalType() != outer->getCanonicalType()) {
+    CDInner = cast<clang::Decl>(CDInner->getDeclContext());
+    inner = dyn_cast<NominalType>(inner->getParent().getPointer());
+  }
+
+  return inner;
 }

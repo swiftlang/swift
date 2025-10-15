@@ -923,16 +923,14 @@ static ValueDecl *getRefCountingOperation(ASTContext &ctx, Identifier id) {
 static ValueDecl *getLoadOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted,
-                                      _conformsTo(_typeparam(0), _copyable),
-                                      _conformsTo(_typeparam(0), _escapable)),
+                                      _conformsTo(_typeparam(0), _copyable)),
                             _parameters(_rawPointer),
                             _typeparam(0));
 }
 
 static ValueDecl *getTakeOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
-                            _generics(_unrestricted,
-                                      _conformsTo(_typeparam(0), _escapable)),
+                            _generics(_unrestricted),
                             _parameters(_rawPointer),
                             _typeparam(0));
 }

@@ -407,7 +407,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 15 };
+  enum { NumAFTExtInfoBits = 16 };
   enum { NumSILExtInfoBits = 14 };
 
   // clang-format off
@@ -444,8 +444,7 @@ protected:
     HasExtInfo : 1,
     HasClangTypeInfo : 1,
     HasThrownError : 1,
-    HasLifetimeDependencies : 1,
-    NumParams : 15
+    HasLifetimeDependencies : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
@@ -850,12 +849,11 @@ public:
   /// type variables referenced by this type.
   void getTypeVariables(SmallPtrSetImpl<TypeVariableType *> &typeVariables);
 
-private:
+public:
   /// If the receiver is a `DependentMemberType`, returns its root. Otherwise,
   /// returns the receiver.
   Type getDependentMemberRoot();
 
-public:
   /// Determine whether this type is a type parameter, which is either a
   /// GenericTypeParamType or a DependentMemberType.
   ///
@@ -1107,6 +1105,9 @@ public:
 
   /// Check if this is a std.string type from C++.
   bool isCxxString();
+
+  /// Check if this is the type Unicode.Scalar from the Swift standard library.
+  bool isUnicodeScalar();
 
   /// Check if this type is known to represent key paths.
   bool isKnownKeyPathType();
@@ -1668,9 +1669,10 @@ class ErrorType final : public TypeBase {
     return props;
   }
 
-  // The Error type is always canonical.
   ErrorType(ASTContext &C, Type originalType)
-      : TypeBase(TypeKind::Error, &C, getProperties(originalType)) {
+      : TypeBase(TypeKind::Error,
+                 (!originalType || originalType->isCanonical()) ? &C : nullptr,
+                 getProperties(originalType)) {
     if (originalType) {
       Bits.ErrorType.HasOriginalType = true;
       *reinterpret_cast<Type *>(this + 1) = originalType;
@@ -3349,7 +3351,8 @@ END_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
 /// represented at the binary level as a single function pointer.
 class AnyFunctionType : public TypeBase {
   const Type Output;
-  
+  uint16_t NumParams;
+
 public:
   using Representation = FunctionTypeRepresentation;
 
@@ -3610,8 +3613,8 @@ protected:
       Bits.AnyFunctionType.HasThrownError = false;
       Bits.AnyFunctionType.HasLifetimeDependencies = false;
     }
-    Bits.AnyFunctionType.NumParams = NumParams;
-    assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
+    this->NumParams = NumParams;
+    assert(this->NumParams == NumParams && "Params dropped!");
     
     if (Info && CONDITIONAL_ASSERT_enabled()) {
       unsigned maxLifetimeTarget = NumParams + 1;
@@ -3649,7 +3652,7 @@ public:
 
   Type getResult() const { return Output; }
   ArrayRef<Param> getParams() const;
-  unsigned getNumParams() const { return Bits.AnyFunctionType.NumParams; }
+  unsigned getNumParams() const { return NumParams; }
 
   GenericSignature getOptGenericSignature() const;
   
@@ -7005,7 +7008,7 @@ public:
   }
 protected:
   ArchetypeType(TypeKind Kind,
-                const ASTContext &C,
+                const ASTContext *C,
                 RecursiveTypeProperties properties,
                 Type InterfaceType,
                 ArrayRef<ProtocolDecl *> ConformsTo,
@@ -7084,7 +7087,8 @@ public:
   }
 
 private:
-  OpaqueTypeArchetypeType(GenericEnvironment *environment,
+  OpaqueTypeArchetypeType(const ASTContext *ctx,
+                          GenericEnvironment *environment,
                           RecursiveTypeProperties properties,
                           Type interfaceType,
                           ArrayRef<ProtocolDecl*> conformsTo,
@@ -7228,11 +7232,13 @@ public:
   }
   
 private:
-  ExistentialArchetypeType(GenericEnvironment *environment, Type interfaceType,
-                      ArrayRef<ProtocolDecl *> conformsTo,
-                      Type superclass,
-                      LayoutConstraint layout,
-                      RecursiveTypeProperties properties);
+  ExistentialArchetypeType(const ASTContext *ctx,
+                           GenericEnvironment *environment,
+                           Type interfaceType,
+                           ArrayRef<ProtocolDecl *> conformsTo,
+                           Type superclass,
+                           LayoutConstraint layout,
+                           RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(ExistentialArchetypeType, LocalArchetypeType)
 END_CAN_TYPE_WRAPPER(ExistentialArchetypeType, LocalArchetypeType)
@@ -7305,7 +7311,7 @@ public:
   }
   
 private:
-  ElementArchetypeType(const ASTContext &ctx,
+  ElementArchetypeType(const ASTContext *ctx,
                        GenericEnvironment *environment, Type interfaceType,
                        ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
                        LayoutConstraint layout);
@@ -8126,13 +8132,7 @@ inline ASTContext &TypeBase::getASTContext() const {
 
 inline bool TypeBase::isBareErrorType() const {
   auto *errTy = dyn_cast<ErrorType>(this);
-  if (!errTy)
-    return false;
-
-  // FIXME: We shouldn't need to check for a recursive bare error type, we can
-  // remove this once we flatten them.
-  auto originalTy = errTy->getOriginalType();
-  return !originalTy || originalTy->isBareErrorType();
+  return errTy && !errTy->getOriginalType();
 }
 
 // TODO: This will become redundant once InOutType is removed.

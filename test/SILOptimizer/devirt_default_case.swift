@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-frontend -enable-spec-devirt -O -module-name devirt_default_case -Xllvm -sil-print-types -emit-sil %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-NORMAL %s
-// RUN: %target-swift-frontend -enable-spec-devirt -O -module-name devirt_default_case -Xllvm -sil-print-types -emit-sil -enable-testing %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
+// RUN: %target-swift-frontend -O -module-name devirt_default_case -Xllvm -sil-print-types -emit-sil %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-NORMAL %s
+// RUN: %target-swift-frontend -O -module-name devirt_default_case -Xllvm -sil-print-types -emit-sil -enable-testing %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
 
 @_silgen_name("action")
 func action(_ n:Int) -> ()
@@ -42,9 +42,8 @@ private class Derived2 : Base2 {
 // Check that call to Base2.middle can be devirtualized
 //
 // CHECK-LABEL: sil @$s19devirt_default_case9callOuteryS2iF
-// CHECK: function_ref @$s19devirt_default_case5Base233_{{.*}}5inner
-// CHECK: function_ref @$s19devirt_default_case8Derived233_{{.*}}6middle
-// CHECK-NOT: class_method
+// This used to check speculative-devirtualization, which we don't have anymore.
+// CHECK: class_method
 // CHECK: } // end sil function '$s19devirt_default_case9callOuteryS2iF'
 public func callOuter(_ x: Int) -> Int {
 
@@ -68,9 +67,8 @@ class Base3 {
 // for testing.
 //
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @$s19devirt_default_case5Base3C5outeryyF : $@convention(method) (@guaranteed Base3) -> () {
-// CHECK: function_ref @$s19devirt_default_case5Base3C6middleyyF
-// CHECK: function_ref @$s19devirt_default_case8Derived333_{{.*}}6middle
-// CHECK-NORMAL-NOT: class_method
+// This used to check speculative-devirtualization, which we don't have anymore.
+// CHECK-NORMAL: class_method
 // CHECK-TESTABLE: class_method %0 : $Base3, #Base3.middle
 // CHECK: } // end sil function '$s19devirt_default_case5Base3C5outeryyF'
   @inline(never) func outer() {
@@ -112,9 +110,8 @@ public func testfoo3() -> Int {
 // Check that call to A3.f() can be devirtualized.
 //
 // CHECK-NORMAL: sil hidden [noinline] @$s19devirt_default_case3fooySiAA2A3CF
-// CHECK-NORMAL: function_ref @$s19devirt_default_case2B3C1fSiyFTf4d_n
-// CHECK-NORMAL: function_ref @$s19devirt_default_case2A3C1fSiyFTf4d_n
-// CHECK-NORMAL-NOT: class_method
+// This used to check speculative-devirtualization, which we don't have anymore.
+// CHECK-NORMAL: class_method
 // CHECK: } // end sil function '$s19devirt_default_case3fooySiAA2A3CF'
 
 class Base4 {
@@ -123,9 +120,8 @@ class Base4 {
 // Check that call to foo() can be devirtualized
 //
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @$s19devirt_default_case5Base4C4testyyF
-// CHECK: function_ref @$s19devirt_default_case5Base4C3fooyyFTf4d_n
-// CHECK: function_ref @$s19devirt_default_case8Derived4C3fooyyFTf4d_n
-// CHECK-NORMAL-NOT: class_method
+// This used to check speculative-devirtualization, which we don't have anymore.
+// CHECK-NORMAL: class_method
 // CHECK-TESTABLE: class_method %0 : $Base4, #Base4.foo
 // CHECK: } // end sil function '$s19devirt_default_case5Base4C4testyyF'
     foo() 
@@ -171,8 +167,7 @@ func check_static_class_devirt(_ c: C6) -> Int {
 // Check that C.bar() and D.bar() are devirtualized.
 //
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @$s19devirt_default_case019check_static_class_A0ySiAA2C6CF
-// CHECK: checked_cast_br [exact] C6 in %0 : $C6 to C6
-// CHECK: checked_cast_br [exact] C6 in %0 : $C6 to D6
+// This used to check speculative-devirtualization, which we don't have anymore.
 // CHECK: class_method
 // CHECK: } // end sil function '$s19devirt_default_case019check_static_class_A0ySiAA2C6CF'
   return c.bar() 

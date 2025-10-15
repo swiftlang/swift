@@ -1792,7 +1792,7 @@ struct TypeSimplifier {
           // Special case: When building slab literals, we go through the same
           // array literal machinery, so there will be a conversion constraint
           // for the element to ExpressibleByArrayLiteral.ArrayLiteralType.
-          if (lookupBaseType->isInlineArray()) {
+          if (lookupBaseType->isInlineArray() || lookupBaseType->is_InlineArray()) {
             auto &ctx = CS.getASTContext();
             auto arrayProto =
                 ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
@@ -1917,9 +1917,6 @@ static Type replacePlaceholderType(PlaceholderType *placeholder,
 
     return Type(gp);
   });
-  if (isa<TypeVariableType>(replacement.getPointer()))
-    return ErrorType::get(ctx);
-
   // For completion, we want to produce an archetype instead of an ErrorType
   // for a top-level generic parameter.
   // FIXME: This is pretty weird, we're producing a contextual type outside of
@@ -1930,8 +1927,8 @@ static Type replacePlaceholderType(PlaceholderType *placeholder,
       return GP->getDecl()->getInnermostDeclContext()->mapTypeIntoContext(GP);
   }
   // Return an ErrorType with the replacement as the original type. Note that
-  // if we failed to replace a type variable with a generic parameter in a
-  // dependent member, `ErrorType::get` will fold it away.
+  // if we failed to replace a type variable with a generic parameter,
+  // `ErrorType::get` will fold it away.
   return ErrorType::get(replacement);
 }
 
@@ -2100,8 +2097,6 @@ SolutionResult ConstraintSystem::salvage() {
   if (isDebugMode()) {
     llvm::errs() << "---Attempting to salvage and emit diagnostics---\n";
   }
-
-  setPhase(ConstraintSystemPhase::Diagnostics);
 
   // Attempt to solve again, capturing all states that come from our attempts to
   // select overloads or bind type variables.
@@ -4800,10 +4795,6 @@ void SyntacticElementTargetKey::dump(raw_ostream &OS) const {
 /// This is guaranteed to always emit an error message.
 ///
 void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
-  setPhase(ConstraintSystemPhase::Diagnostics);
-
-  SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
-
   auto &DE = getASTContext().Diags;
 
   // If constraint system is in invalid state always produce

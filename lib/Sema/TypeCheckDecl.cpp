@@ -2060,8 +2060,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       return TupleType::getEmpty(ctx);
 
     case AccessorKind::Mutate:
-      // TODO: Temporary result representation for mutate accessors.
-      return InOutType::get(storage->getValueInterfaceType());
+      return storage->getValueInterfaceType();
 
     // Addressor result types can get complicated because of the owner.
     case AccessorKind::Address:
@@ -2591,7 +2590,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         selfInfoBuilder =
             selfInfoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
-
+      auto *accessor = dyn_cast<AccessorDecl>(AFD);
+      if (accessor && accessor->isMutateAccessor()) {
+        selfInfoBuilder = selfInfoBuilder.withHasInOutResult();
+      }
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       auto selfInfo = selfInfoBuilder.build();
       if (sig) {

@@ -2191,11 +2191,18 @@ void IRGenModule::emitVTableStubs() {
     
     if (!stub) {
       // Create a single stub function which calls swift_deletedMethodError().
+      // Use linkonce_odr hidden to merge these symbols, except on
+      // COFF where the linker cannot merge them.
+      bool canLinkOnce = !Module.getTargetTriple().isOSBinFormatCOFF();
+      auto linkage = canLinkOnce ? llvm::GlobalValue::LinkOnceODRLinkage
+                                 : llvm::GlobalValue::InternalLinkage;
       stub = llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
-                                    llvm::GlobalValue::InternalLinkage,
-                                    "_swift_dead_method_stub");
+                                    linkage, "_swift_dead_method_stub",
+                                    &Module);
+      ApplyIRLinkage(canLinkOnce ? IRLinkage::InternalLinkOnceODR
+                                 : IRLinkage::Internal)
+          .to(stub);
       stub->setAttributes(constructInitialAttributes());
-      Module.getFunctionList().push_back(stub);
       stub->setCallingConv(DefaultCC);
       auto *entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", stub);
       auto *errorFunc = getDeletedMethodErrorFn();
@@ -2329,8 +2336,13 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
   case SILLinkage::Package: {
     auto linkage = llvm::GlobalValue::ExternalLinkage;
 
-    if (hasNonUniqueDefinition)
-      linkage = llvm::GlobalValue::WeakODRLinkage;
+    if (hasNonUniqueDefinition) {
+      // Keep Swift runtime functions around so IRGen can reference them.
+      if (SILFunction::isSwiftRuntimeFunction(name, nullptr))
+        linkage = llvm::GlobalValue::WeakODRLinkage;
+      else
+        linkage = llvm::GlobalValue::LinkOnceODRLinkage;
+    }
 
     return {linkage, PublicDefinitionVisibility,
             info.Internalize ? llvm::GlobalValue::DefaultStorageClass
@@ -2348,7 +2360,7 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
 
   case SILLinkage::Hidden:
     if (hasNonUniqueDefinition)
-      return RESULT(WeakODR, Hidden, Default);
+      return RESULT(LinkOnceODR, Hidden, Default);
 
     return RESULT(External, Hidden, Default);
 
@@ -6026,7 +6038,8 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
 llvm::Constant *
 IRGenModule::getAddrOfGlobalString(StringRef data, CStringSectionType type,
                                    bool willBeRelativelyAddressed) {
-  if (TargetInfo.OutputObjectFormat != llvm::Triple::MachO)
+  if (TargetInfo.OutputObjectFormat != llvm::Triple::MachO ||
+      willBeRelativelyAddressed)
     type = CStringSectionType::Default;
   StringRef sectionName;
   switch (type) {

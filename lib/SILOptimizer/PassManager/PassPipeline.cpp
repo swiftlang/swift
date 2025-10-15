@@ -643,11 +643,6 @@ static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
 static void addPrepareOptimizationsPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("PrepareOptimizationPasses");
 
-  // Verify AccessStorage once in OSSA before optimizing.
-#ifndef NDEBUG
-  P.addAccessPathVerification();
-#endif
-
   P.addForEachLoopUnroll();
   P.addSimplification();
   P.addAccessMarkerElimination();
@@ -789,20 +784,11 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   // take advantage of static dispatch.
   P.addConstantCapturePropagation();
 
-  // Specialize closure.
-  if (P.getOptions().EnableExperimentalSwiftBasedClosureSpecialization) {
-    P.addExperimentalSwiftBasedClosureSpecialization();
-  } else {
-    P.addClosureSpecializer();
-  }
+  // TODO: replace this with the new ClosureSpecialization pass once we have OSSA at this point in the pipeline
+  P.addClosureSpecializer();
 
   // Do the second stack promotion on low-level SIL.
   P.addStackPromotion();
-
-  // Speculate virtual call targets.
-  if (P.getOptions().EnableSpeculativeDevirtualization) {
-    P.addSpeculativeDevirtualization();
-  }
 
   // There should be at least one SILCombine+SimplifyCFG between the
   // ClosureSpecializer, etc. and the last inliner. Cleaning up after these
@@ -904,14 +890,6 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // addAccessEnforcementDom might provide potential for LICM:
   // A loop might have only one dynamic access now, i.e. hoistable
   P.addLoopInvariantCodeMotion();
-
-  // Verify AccessStorage once again after optimizing and lowering OSSA.
-#ifndef NDEBUG
-  // Temporarily disabled because it triggers a false alarm when building
-  // SwiftDocC on linux: rdar://141270464
-  // TODO: re-enable when the problem is fixed.
-  // P.addAccessPathVerification();
-#endif
 
   // Only has an effect if the -assume-single-thread option is specified.
   if (P.getOptions().AssumeSingleThreaded) {
@@ -1034,9 +1012,9 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   if (SILPrintFinalOSSAModule) {
     addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
   }
-  P.addOwnershipModelEliminator();
-
   P.addAutodiffClosureSpecialization();
+
+  P.addOwnershipModelEliminator();
 
   // After serialization run the function pass pipeline to iteratively lower
   // high-level constructs like @_semantics calls.

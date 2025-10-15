@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 6
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 6
 
 // rdar://85263844 - initializer 'init(_:)' requires the types be equivalent
 func rdar85263844(arr: [(q: String, a: Int)]) -> AnySequence<(question: String, answer: Int)> {

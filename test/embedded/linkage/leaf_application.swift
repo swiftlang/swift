@@ -21,11 +21,13 @@
 
 //--- Library.swift
 
+// LIBRARY-IR: @"$e7Library10PointClassCN" = linkonce_odr {{.*}}global
+
 // Never referenced.
-// LIBRARY-IR-NOT: @"$es23_swiftEmptyArrayStorageSi_S3itvp" = weak_odr {{(protected |dllexport )?}}global
+// LIBRARY-IR-NOT: @"$es23_swiftEmptyArrayStorageSi_S3itvp" = linkonce_odr {{(protected |dllexport )?}}global
 
 // Note: referenced by swift_allocEmptyBox.
-// LIBRARY-IR: @"$es16_emptyBoxStorageSi_Sitvp" = weak_odr {{(protected |dllexport )?}}global
+// LIBRARY-IR: @"$es16_emptyBoxStorageSi_Sitvp" = linkonce_odr {{(protected |dllexport )?}}global
 
 // LIBRARY-IR-NOT: define {{.*}}@"$e7Library5helloSaySiGyF"()
 public func hello() -> [Int] {
@@ -54,10 +56,43 @@ public func unnecessary() -> Int64 { 5 }
 @_neverEmitIntoClient
 public func unusedYetThere() -> Int64 { 5 }
 
+open class PointClass {
+  public var x, y: Int
+
+  public init(x: Int, y: Int) {
+    self.x = x
+    self.y = y
+  }
+
+  private func notUsed() { }
+}
+
+public protocol Reflectable: AnyObject {
+  func reflect()
+}
+
+// LIBRARY-IR: define linkonce_odr hidden swiftcc void @"$es4swapyyxz_xztlFSi_Tg5"
+// LIBRARY-IR: define linkonce_odr hidden swiftcc void @"$e7Library10PointClassCAA11ReflectableA2aDP7reflectyyFTW"
+
+extension PointClass: Reflectable {
+  public func reflect() {
+    swap(&x, &y)
+  }
+}
+
+// LIBRARY-IR: define {{.*}} @"$e7Library18createsExistentialAA11Reflectable_pyF"()
+@_neverEmitIntoClient
+public func createsExistential() -> any Reflectable {
+  return PointClass(x: 5, y: 5)
+}
+
 // LIBRARY-IR-NOT: define swiftcc
 // LIBRARY-IR-NOT: define hidden swiftcc
 
 // LIBRARY-IR-NOT: define {{.*}} @"$es27_allocateUninitializedArrayySayxG_BptBwlFSi_Tg5"
+
+
+// LIBRARY-IR: define linkonce_odr hidden void @_swift_dead_method_stub
 
 // LIBRARY-SIL: sil @$e7Library5helloSaySiGyF
 // LIBRARY-SIL: sil @$e7Library8getArraySaySiGyF : $@convention(thin) () -> @owned Array<Int> {

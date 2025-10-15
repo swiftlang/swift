@@ -54,6 +54,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isConvertPointerToPointerArgument: Bool { bridged.isConvertPointerToPointerArgument() }
 
+  public var isAddressor: Bool { bridged.isAddressor() }
+
   public var specializationLevel: Int { bridged.specializationLevel() }
 
   public var isSpecialization: Bool { bridged.isSpecialization() }
@@ -271,6 +273,18 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       return nil
     }
     return StringRef(bridged: bridged.getAccessorName()).string
+  }
+
+  public var isInitializer: Bool {
+    return bridged.isInitializer()
+  }
+
+  public var isDeinitializer: Bool {
+    return bridged.isDeinitializer()
+  }
+
+  public var isImplicit: Bool {
+    return bridged.isImplicit()
   }
 
   /// True, if the function runs with a swift 5.1 runtime.

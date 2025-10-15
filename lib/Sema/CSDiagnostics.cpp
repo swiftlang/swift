@@ -8189,6 +8189,20 @@ bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
   return false;
 }
 
+bool NonMetatypeDynamicTypeFailure::diagnoseAsError() {
+  auto instanceTy = getFromType();
+  auto metatypeTy = getToType();
+  if (instanceTy->isBareErrorType()) {
+    emitDiagnostic(diag::cannot_convert_typeof_to_non_metatype, metatypeTy)
+        .highlight(getSourceRange());
+  } else {
+    emitDiagnostic(diag::cannot_convert_metatype_to_non_metatype,
+                   MetatypeType::get(instanceTy), metatypeTy)
+        .highlight(getSourceRange());
+  }
+  return true;
+}
+
 bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
   auto *anchor = castToExpr(getAnchor());
   // Member reference could be wrapped into a number of parens

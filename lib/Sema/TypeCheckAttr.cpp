@@ -4619,9 +4619,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto dc = D->getDeclContext();
 
   // Figure out which nominal declaration this custom attribute refers to.
-  auto *nominal = evaluateOrDefault(
-    Ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
-
+  auto *nominal = attr->getNominalDecl();
   if (!nominal) {
     if (attr->isInvalid())
       return;
@@ -5195,7 +5193,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
     SourceLoc groupEndLoc;
     bool foundWildcard = false;
     bool hasValidSpecs = false;
-    bool allValidSpecsArePlatform = true;
+    bool wildcardRequiredInList = true;
     int groupAttrCount = 0;
     for (auto *groupedAttr = groupHead; groupedAttr != nullptr;
          groupedAttr = groupedAttr->getNextGroupedAvailableAttr()) {
@@ -5219,7 +5217,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
           foundWildcard) {
         // Only platform availability is allowed to be written groups with more
         // than one member.
-        if (!domain.isPlatform()) {
+        if (domain.mustBeSpecifiedAlone()) {
           diagnose(loc, diag::availability_must_occur_alone, domain,
                    domain.isVersioned());
           continue;
@@ -5234,11 +5232,11 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
       }
 
       hasValidSpecs = true;
-      if (!domain.isPlatform())
-        allValidSpecsArePlatform = false;
+      if (domain.mustBeSpecifiedAlone())
+        wildcardRequiredInList = false;
     }
 
-    if (!foundWildcard && hasValidSpecs && allValidSpecsArePlatform) {
+    if (!foundWildcard && hasValidSpecs && wildcardRequiredInList) {
       diagnose(groupEndLoc, diag::availability_query_wildcard_required)
           .fixItInsert(groupEndLoc, ", *");
     }
@@ -8780,19 +8778,10 @@ template <typename ATTR>
 static void forEachCustomAttribute(
     Decl *decl,
     llvm::function_ref<void(CustomAttr *attr, NominalTypeDecl *)> fn) {
-  auto &ctx = decl->getASTContext();
-
   for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
-    auto *mutableAttr = const_cast<CustomAttr *>(attr);
-
-    auto *nominal = evaluateOrDefault(
-        ctx.evaluator,
-        CustomAttrNominalRequest{mutableAttr, decl->getDeclContext()}, nullptr);
-    if (!nominal)
-      continue;
-
-    if (nominal->getAttrs().hasAttribute<ATTR>())
-      fn(mutableAttr, nominal);
+    auto *nominal = attr->getNominalDecl();
+    if (nominal && nominal->getAttrs().hasAttribute<ATTR>())
+      fn(attr, nominal);
   }
 }
 

@@ -978,7 +978,7 @@ static void printAvailableAttr(const Decl *D, const SemanticAvailableAttr &Attr,
   // attributes that are universally unavailable in Swift, we must print them
   // as universally unavailable instead.
   // FIXME: Reconsider this, it's a weird special case.
-  if (Domain.isSwiftLanguage() && Attr.isUnconditionallyUnavailable())
+  if (Domain.isSwiftLanguageMode() && Attr.isUnconditionallyUnavailable())
     Printer << "*";
   else
     Printer << Domain.getNameForAttributePrinting();
@@ -1020,7 +1020,8 @@ static void printAvailableAttr(const Decl *D, const SemanticAvailableAttr &Attr,
   if (!Attr.getMessage().empty()) {
     Printer << ", message: ";
     Printer.printEscapedStringLiteral(Attr.getMessage());
-  } else if (Domain.isSwiftLanguage() && Attr.isUnconditionallyUnavailable())
+  } else if (Domain.isSwiftLanguageMode() &&
+             Attr.isUnconditionallyUnavailable())
     Printer << ", message: \"Not available in Swift\"";
 }
 
@@ -2329,7 +2330,7 @@ AvailableAttr *AvailableAttr::createUnavailableInSwift(ASTContext &C,
                                                        StringRef Message,
                                                        StringRef Rename) {
   return new (C) AvailableAttr(
-      SourceLoc(), SourceRange(), AvailabilityDomain::forSwiftLanguage(),
+      SourceLoc(), SourceRange(), AvailabilityDomain::forSwiftLanguageMode(),
       SourceLoc(), Kind::Unavailable, Message, Rename,
       /*Introduced=*/{}, SourceRange(), /*Deprecated=*/{}, SourceRange(),
       /*Obsoleted=*/{}, SourceRange(),
@@ -2341,7 +2342,7 @@ AvailableAttr *AvailableAttr::createSwiftLanguageModeVersioned(
     ASTContext &C, StringRef Message, StringRef Rename,
     llvm::VersionTuple Introduced, llvm::VersionTuple Obsoleted) {
   return new (C) AvailableAttr(
-      SourceLoc(), SourceRange(), AvailabilityDomain::forSwiftLanguage(),
+      SourceLoc(), SourceRange(), AvailabilityDomain::forSwiftLanguageMode(),
       SourceLoc(), Kind::Default, Message, Rename, Introduced, SourceRange(),
       /*Deprecated=*/{}, SourceRange(), Obsoleted, SourceRange(),
       /*Implicit=*/false,
@@ -3052,16 +3053,26 @@ bool ImplementsAttr::isEquivalent(const ImplementsAttr *other,
           && getProtocol(DC) == other->getProtocol(DC);
 }
 
+DeclContext *CustomAttrOwner::getDeclContext() const {
+  ASSERT(!Owner.isNull());
+  if (auto *D = getAsDecl())
+    return D->getDeclContext();
+
+  return Owner.dyn_cast<DeclContext *>();
+}
+
 CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
+                       CustomAttrOwner owner,
                        CustomAttributeInitializer *initContext,
                        ArgumentList *argList, bool implicit)
     : DeclAttribute(DeclAttrKind::Custom, atLoc, range, implicit),
-      typeExpr(type), argList(argList), initContext(initContext) {
+      typeExpr(type), argList(argList), owner(owner), initContext(initContext) {
   assert(type);
   isArgUnsafeBit = false;
 }
 
 CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
+                               CustomAttrOwner owner,
                                CustomAttributeInitializer *initContext,
                                ArgumentList *argList, bool implicit) {
   assert(type);
@@ -3070,7 +3081,7 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
     range.End = argList->getEndLoc();
 
   return new (ctx)
-      CustomAttr(atLoc, range, type, initContext, argList, implicit);
+      CustomAttr(atLoc, range, type, owner, initContext, argList, implicit);
 }
 
 std::pair<UnqualifiedIdentTypeRepr *, DeclRefTypeRepr *>
@@ -3088,6 +3099,16 @@ CustomAttr::destructureMacroRef() {
     }
   }
   return {nullptr, nullptr};
+}
+
+ASTContext &CustomAttr::getASTContext() const {
+  return getOwner().getDeclContext()->getASTContext();
+}
+
+NominalTypeDecl *CustomAttr::getNominalDecl() const {
+  auto &eval = getASTContext().evaluator;
+  auto *mutThis = const_cast<CustomAttr *>(this);
+  return evaluateOrDefault(eval, CustomAttrNominalRequest{mutThis}, nullptr);
 }
 
 TypeRepr *CustomAttr::getTypeRepr() const { return typeExpr->getTypeRepr(); }

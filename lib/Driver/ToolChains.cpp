@@ -160,6 +160,16 @@ bool containsValue(
 
 }
 
+namespace swift::driver::toolchains {
+bool needsInstrProfileRuntime(const llvm::opt::ArgList &Args) {
+  return Args.hasArg(options::OPT_profile_generate) ||
+         Args.hasArg(options::OPT_cs_profile_generate) ||
+         Args.hasArg(options::OPT_cs_profile_generate_EQ) ||
+         Args.hasArg(options::OPT_ir_profile_generate) ||
+         Args.hasArg(options::OPT_ir_profile_generate_EQ);
+}
+} // namespace swift::driver::toolchains
+
 void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                       const CommandOutput &output,
                                       const ArgList &inputArgs,
@@ -323,6 +333,11 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_PackageCMO);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
+  inputArgs.AddLastArg(arguments, options::OPT_ir_profile_generate);
+  inputArgs.AddLastArg(arguments, options::OPT_ir_profile_generate_EQ);
+  inputArgs.AddLastArg(arguments, options::OPT_ir_profile_use);
+  inputArgs.AddLastArg(arguments, options::OPT_cs_profile_generate);
+  inputArgs.AddLastArg(arguments, options::OPT_cs_profile_generate_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
   inputArgs.AddAllArgs(arguments, options::OPT_warning_treating_Group);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
@@ -953,6 +968,12 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
   addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SwiftModuleSummaryFile,
                    "-emit-module-summary-path");
+
+  // Add extra output paths for SIL and LLVM IR
+  addOutputsOfType(arguments, Output, Args, file_types::TY_SIL,
+                   "-sil-output-path");
+  addOutputsOfType(arguments, Output, Args, file_types::TY_LLVM_IR,
+                   "-ir-output-path");
 }
 
 ToolChain::InvocationInfo
@@ -1236,6 +1257,12 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                    file_types::TY_ClangHeader, "-emit-objc-header-path");
   addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_TBD,
                    "-emit-tbd-path");
+
+  // Add extra output paths for SIL and LLVM IR
+  addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_SIL,
+                   "-sil-output-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::TY_LLVM_IR, "-ir-output-path");
 
   context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
   context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);

@@ -3430,6 +3430,18 @@ NodePointer Demangler::demangleFuncSpecParam(Node::Kind Kind) {
       return addChild(Param, createNode(
         Node::Kind::FunctionSignatureSpecializationParamKind,
         uint64_t(FunctionSigSpecializationParamKind::ClosureProp)));
+    case 'C': {
+      // Consumes an identifier and multiple type parameters.
+      // The parameters will be added later.
+      addChild(Param, createNode(
+        Node::Kind::FunctionSignatureSpecializationParamKind,
+        uint64_t(FunctionSigSpecializationParamKind::ClosurePropPreviousArg)));
+      int prevArgIdx = demangleNatural();
+      if (prevArgIdx < 0)
+        return nullptr;
+      return addChild(Param, createNode(
+         Node::Kind::FunctionSignatureSpecializationParamPayload, (Node::IndexType)prevArgIdx));
+    }
     case 'p': {
       for (;;) {
         switch (nextChar()) {

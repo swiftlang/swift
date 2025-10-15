@@ -420,6 +420,14 @@ public:
                                          substObjectType));
   }
 
+  /// MoveOnlyWrappedTypes need to have their inner types substituted
+  /// by these rules.
+  CanType visitSILMoveOnlyWrappedType(CanSILMoveOnlyWrappedType origType) {
+    CanType origInnerType = origType->getInnerType();
+    CanType substInnerType = visit(origInnerType);
+    return CanType(SILMoveOnlyWrappedType::get(substInnerType));
+  }
+
   /// Any other type would be a valid type in the AST. Just apply the
   /// substitution on the AST level and then lower that.
   CanType visitType(CanType origType) {

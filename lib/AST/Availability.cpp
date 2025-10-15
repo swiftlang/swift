@@ -640,6 +640,7 @@ computeDeclRuntimeAvailability(const Decl *decl) {
     if (!domain.isActive(ctx) && !isTargetDomain)
       continue;
 
+    // FIXME: [runtime availability] Update this?
     if (!domain.isRoot())
       continue;
 
@@ -855,7 +856,8 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
     return std::nullopt;
   }
 
-  if (domain->isSwiftLanguage() || domain->isPackageDescription()) {
+  if (domain->isSwiftLanguageMode() || domain->isPackageDescription() ||
+      domain->isSwiftRuntime()) {
     switch (attr->getKind()) {
     case AvailableAttr::Kind::Deprecated:
       diags.diagnose(attrLoc,

@@ -13,10 +13,11 @@ import json
 import os
 import platform
 import re
+import tempfile
 import sys
 import traceback
 from multiprocessing import freeze_support
-from typing import Any, Dict, Optional, Set, List
+from typing import Any, Dict, Optional, Set, List, Union
 
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 from .runner_arguments import AdditionalSwiftSourcesArguments, UpdateArguments
@@ -26,6 +27,29 @@ from swift_build_support.swift_build_support import shell
 
 SCRIPT_FILE = os.path.abspath(__file__)
 SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
+
+def is_unix_sock_path_too_long() -> bool:
+    """Check if the unix socket_path exceeds the 104 limit (108 on Linux).
+
+    The multiprocessing module creates a socket in the TEMPDIR folder. The
+    socket path should not exceed:
+        - 104 bytes on macOS
+        - 108 bytes on Linux (https://www.man7.org/linux/man-pages/man7/unix.7.html)
+
+    Returns:
+        bool: Whether the socket path exceeds the limit. Always False on Windows.
+    """
+
+    if os.name != "posix":
+        return False
+
+    MAX_UNIX_SOCKET_PATH = 104
+    # `tempfile.mktemp` is deprecated yet that's what the multiprocessing
+    # module uses internally: https://github.com/python/cpython/blob/c4e7d245d61ac4547ecf3362b28f64fc00aa88c0/Lib/multiprocessing/connection.py#L72
+    # Since we are not using the resulting file, it is safe to use this
+    # method.
+    sock_path = tempfile.mktemp(prefix="sock-", dir=tempfile.gettempdir())
+    return len(sock_path.encode("utf-8")) > MAX_UNIX_SOCKET_PATH
 
 def confirm_tag_in_repo(tag: str, repo_name: str) -> Optional[str]:
     """Confirm that a given tag exists in a git repository. This function
@@ -316,8 +340,17 @@ def _is_any_repository_locked(pool_args: List[UpdateArguments]) -> Set[str]:
                 locked_repositories.add(repo_name)
     return locked_repositories
 
+def _move_llvm_project_to_first_index(pool_args: List[Union[UpdateArguments, AdditionalSwiftSourcesArguments]]):
+    llvm_project_idx = None
+    for i in range(len(pool_args)):
+        if pool_args[i].repo_name == "llvm-project":
+            llvm_project_idx = i
+            break
+    if llvm_project_idx is not None:
+        pool_args.insert(0, pool_args.pop(llvm_project_idx))
+
 def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_pr):
-    pool_args = []
+    pool_args: List[UpdateArguments] = []
     timestamp = get_timestamp_to_match(args.match_timestamp, args.source_root)
     for repo_name in config['repos'].keys():
         if repo_name in args.skip_repository_list:
@@ -360,6 +393,7 @@ def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_p
             f"'{repo_name}' is locked by git. Cannot update it."
             for repo_name in locked_repositories
         ]
+    _move_llvm_project_to_first_index(pool_args)
     return ParallelRunner(update_single_repository, pool_args, args.n_processes).run()
 
 
@@ -493,13 +527,16 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
 
     # Only use `ParallelRunner` when submodules are not used, since `.git` dir
     # can't be accessed concurrently.
-    if not use_submodules:
-      if not pool_args:
-          print("Not cloning any repositories.")
-          return
+    if use_submodules:
+        return
+    if not pool_args:
+        print("Not cloning any repositories.")
+        return
 
-      return ParallelRunner(
-          obtain_additional_swift_sources, pool_args, args.n_processes).run()
+    _move_llvm_project_to_first_index(pool_args)
+    return ParallelRunner(
+        obtain_additional_swift_sources, pool_args, args.n_processes
+    ).run()
 
 
 def dump_repo_hashes(args, config, branch_scheme_name='repro'):
@@ -770,6 +807,20 @@ repositories.
             print("update-checkout usage error: --match-timestamp must "
                   "specify --scheme=foo")
             sys.exit(1)
+
+    if is_unix_sock_path_too_long():
+        if not args.dump_hashes and not args.dump_hashes_config:
+            # Do not print anything other than the json dump.
+            print(
+                f"TEMPDIR={tempfile.gettempdir()} is too long and multiprocessing "
+                "sockets will exceed the size limit. Falling back to verbose mode."
+            )
+        args.verbose = True
+    if sys.version_info.minor < 10:
+        if not args.dump_hashes and not args.dump_hashes_config:
+            # Do not print anything other than the json dump.
+            print("Falling back to verbose mode due to a Python 3.9 limitation.")
+        args.verbose = True
 
     clone = args.clone
     clone_with_ssh = args.clone_with_ssh

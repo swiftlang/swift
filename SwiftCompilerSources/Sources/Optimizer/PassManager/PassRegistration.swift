@@ -105,7 +105,7 @@ private func registerSwiftPasses() {
   registerPass(tempRValueElimination, { tempRValueElimination.run($0) })
   registerPass(mandatoryTempRValueElimination, { mandatoryTempRValueElimination.run($0) })
   registerPass(tempLValueElimination, { tempLValueElimination.run($0) })
-  registerPass(generalClosureSpecialization, { generalClosureSpecialization.run($0) })
+  registerPass(closureSpecialization, { closureSpecialization.run($0) })
   registerPass(autodiffClosureSpecialization, { autodiffClosureSpecialization.run($0) })
   registerPass(loopInvariantCodeMotionPass, { loopInvariantCodeMotionPass.run($0) })
 
@@ -115,6 +115,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(BuiltinInst.self,          { run(BuiltinInst.self, $0) })
   registerForSILCombine(FixLifetimeInst.self,      { run(FixLifetimeInst.self, $0) })
   registerForSILCombine(GlobalValueInst.self,      { run(GlobalValueInst.self, $0) })
+  registerForSILCombine(StructInst.self,           { run(StructInst.self, $0) })
   registerForSILCombine(StrongRetainInst.self,     { run(StrongRetainInst.self, $0) })
   registerForSILCombine(StrongReleaseInst.self,    { run(StrongReleaseInst.self, $0) })
   registerForSILCombine(RetainValueInst.self,      { run(RetainValueInst.self, $0) })

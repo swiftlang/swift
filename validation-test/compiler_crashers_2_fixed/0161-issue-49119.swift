@@ -13,5 +13,4 @@ extension Type: P where Param: P, Param.A == Type<Param> {
   // expected-error@-3 {{type 'Type<Param>' does not conform to protocol 'P'}}
   // expected-note@-4 {{add stubs for conformance}}
   typealias A = Param
-  // expected-note@-1 {{possibly intended match 'Type<Param>.A' (aka 'Param') does not conform to 'P'}}
 }

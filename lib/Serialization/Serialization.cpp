@@ -1795,7 +1795,7 @@ void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
   assert(GenericEnvironmentsToSerialize.hasRef(genericEnv));
 
   switch (genericEnv->getKind()) {
-  case GenericEnvironment::Kind::OpenedExistential: {
+  case GenericEnvironment::Kind::Existential: {
     auto kind = GenericEnvironmentKind::OpenedExistential;
     auto existentialTypeID = addTypeRef(genericEnv->getOpenedExistentialType());
     auto parentSigID = addGenericSignatureRef(genericEnv->getGenericSignature());
@@ -1809,7 +1809,7 @@ void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
     return;
   }
 
-  case GenericEnvironment::Kind::OpenedElement: {
+  case GenericEnvironment::Kind::Element: {
     auto kind = GenericEnvironmentKind::OpenedElement;
     auto shapeClassID = addTypeRef(genericEnv->getOpenedElementShapeClass());
     auto parentSigID = addGenericSignatureRef(genericEnv->getGenericSignature());
@@ -3132,8 +3132,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         switch (domain.getKind()) {
           case AvailabilityDomain::Kind::Universal:
             return AvailabilityDomainKind::Universal;
-          case AvailabilityDomain::Kind::SwiftLanguage:
-            return AvailabilityDomainKind::SwiftLanguage;
+          case AvailabilityDomain::Kind::SwiftLanguageMode:
+            return AvailabilityDomainKind::SwiftLanguageMode;
+          case AvailabilityDomain::Kind::SwiftRuntime:
+            return AvailabilityDomainKind::SwiftRuntime;
           case AvailabilityDomain::Kind::PackageDescription:
             return AvailabilityDomainKind::PackageDescription;
           case AvailabilityDomain::Kind::Embedded:

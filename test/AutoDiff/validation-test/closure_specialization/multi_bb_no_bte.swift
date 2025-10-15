@@ -16,6 +16,9 @@
 // RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK3
 // RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK4
 
+// TODO: re-enable this test once we have OSSA throughout the pipeline
+// XFAIL: *
+
 import DifferentiationUnittest
 import StdlibUnittest
 

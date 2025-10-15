@@ -58,6 +58,15 @@ func go() {
     y.append(x)
 // CHECK: 1
     print(y.count)
+
+    var loopCount = 0 
+    for it in y {
+// CHECK: {{RefType()|(Foreign Reference Type)}}
+        print(it)
+        loopCount += 1
+    }
+// CHECK: 1
+    print(loopCount)
 }
 
 go()

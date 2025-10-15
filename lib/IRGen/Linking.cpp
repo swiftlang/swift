@@ -1757,5 +1757,12 @@ bool LinkEntity::hasNonUniqueDefinition() const {
     return true;
   }
 
+  // Always treat witness tables as having non-unique definitions.
+  if (getKind() == Kind::ProtocolWitnessTable) {
+    if (auto context = getDeclContextForEmission())
+      if (context->getParentModule()->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+        return true;
+  }
+
   return false;
 }

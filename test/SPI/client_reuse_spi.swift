@@ -4,7 +4,7 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -emit-module %t/A.swift -module-name A -emit-module-path %t/A.swiftmodule
 // RUN: %target-swift-frontend -emit-module %t/B.swift -module-name B -emit-module-path %t/B.swiftmodule -I %t
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown %t/C.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -verify-ignore-unknown %t/C.swift -I %t
 
 //--- A.swift
 @_spi(A) public struct SecretStruct {

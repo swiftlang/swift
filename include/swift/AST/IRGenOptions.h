@@ -251,6 +251,12 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Like PartialApplyCapture but for use with CoroFunctionPointer values.
   PointerAuthSchema CoroPartialApplyCapture;
+
+  /// Stored in a coro allocator struct, the function used to allocate memory.
+  PointerAuthSchema CoroAllocationFunction;
+
+  /// Stored in a coro allocator struct, the function used to deallocate memory.
+  PointerAuthSchema CoroDeallocationFunction;
 };
 
 enum class JITDebugArtifact : unsigned {
@@ -548,9 +554,22 @@ public:
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
 
+  /// Path to the profdata file to be used for IR/CS-IR PGO, or the empty string.
+  std::string UseIRProfile = "";
+
   /// Path to the data file to be used for sampling-based PGO,
   /// or the empty string.
   std::string UseSampleProfile = "";
+
+  /// Name of the profile file to use as output for -ir-profile-generate,
+  /// and -cs-profile-generate, or the default string.
+  std::string InstrProfileOutput = "default_%m.profraw";
+
+  /// Whether to enable context-sensitive IR PGO generation.
+  bool EnableCSIRProfileGen = false;
+
+  /// Whether to enable IR level instrumentation.
+  bool EnableIRProfileGen = false;
 
   /// Controls whether DWARF discriminators are added to the IR.
   unsigned DebugInfoForProfiling : 1;

@@ -914,6 +914,7 @@ public:
   /// Pretty-print the value.
   void dump() const;
   void print(raw_ostream &OS) const;
+  void print(SILPrintContext &ctx) const;
 
   /// Pretty-print the value with DebugInfo.
   void dump(bool DebugInfo) const;
@@ -921,8 +922,9 @@ public:
   /// Pretty-print the value in context, preceded by its operands (if the
   /// value represents the result of an instruction) and followed by its
   /// users.
-  void dumpInContext() const;
   void printInContext(raw_ostream &OS) const;
+  void printInContext(SILPrintContext &ctx) const;
+  void dumpInContext() const;
 
   static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_SILInstruction &&

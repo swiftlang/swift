@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s -DCHECK_SCOPING
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated %s -DCHECK_SCOPING
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -module-name submodules
 // RUN: echo 'import submodules; let s = "\(x), \(y)"' | %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck - -I %t
 // RUN: echo 'import submodules; let s = "\(x), \(y)"' | not %target-swift-frontend -typecheck - -I %t 2>&1 | %FileCheck -check-prefix=MISSING %s

@@ -298,6 +298,13 @@ def language_mode : Separate<["-"], "language-mode">,
   MetaVarName<"<mode>">,
   Alias<swift_version>;
 
+def min_swift_runtime_version
+    : Separate<["-"], "min-swift-runtime-version">,
+      Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+      HelpText<"The minimum Swift runtime version "
+               "that will be available at runtime">,
+      MetaVarName<"<vers>">;
+
 def package_description_version: Separate<["-"], "package-description-version">,
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"The version number to be applied on the input for the PackageDescription availability kind">,
@@ -928,6 +935,10 @@ def Wwarning : Separate<["-"], "Wwarning">,
   Flags<[FrontendOption, HelpHidden]>,
   MetaVarName<"<diagnostic_group>">,
   HelpText<"Treat this warning group as warning">;
+
+def suppress_notes : Flag<["-"], "suppress-notes">,
+  Flags<[FrontendOption]>,
+  HelpText<"Suppress all notes">;
 
 def suppress_remarks : Flag<["-"], "suppress-remarks">,
   Flags<[FrontendOption]>,
@@ -1619,6 +1630,29 @@ def profile_sample_use : Joined<["-"], "profile-sample-use=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath, NewDriverOnlyOption]>,
   MetaVarName<"<profile data>">,
   HelpText<"Supply sampling-based profiling data from llvm-profdata to enable profile-guided optimization">;
+
+def cs_profile_generate : Flag<["-"], "cs-profile-generate">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Generate instrumented code to collect context sensitive execution counts into default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def cs_profile_generate_EQ : Joined<["-"], "cs-profile-generate=">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  MetaVarName<"<directory>">,
+  HelpText<"Generate instrumented code to collect context sensitive execution counts into <directory>/default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def ir_profile_generate: Flag<["-"], "ir-profile-generate">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Generate instrumented code to collect execution counts into default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def ir_profile_generate_EQ : Joined<["-"], "ir-profile-generate=">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  MetaVarName<"<directory>">,
+  HelpText<"Generate instrumented code to collect execution counts into <directory>/default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def ir_profile_use : CommaJoined<["-"], "ir-profile-use=">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
+  MetaVarName<"<profdata>">,
+  HelpText<"Supply an IR-level PGO profdata file to enable profile-guided optimization">;
 
 def embed_bitcode : Flag<["-"], "embed-bitcode">,
   Flags<[FrontendOption, NoInteractiveOption]>,

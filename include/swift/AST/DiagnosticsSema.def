@@ -359,6 +359,11 @@ ERROR(cannot_convert_return_type_to_anyobject,none,
 ERROR(cannot_convert_to_return_type_nil,none,
       "'nil' is incompatible with return type %0", (Type))
 
+ERROR(cannot_convert_metatype_to_non_metatype,none,
+      "cannot convert metatype %0 to non-metatype %1", (Type, Type))
+ERROR(cannot_convert_typeof_to_non_metatype,none,
+      "cannot convert 'type(of:)' metatype to non-metatype %0", (Type))
+
 ERROR(cannot_convert_thrown_type,none,
       "thrown expression type %0 %select{cannot be converted to error type %1|"
       "does not conform to 'Error'}2",
@@ -6981,6 +6986,12 @@ WARNING(availability_unsupported_version_number, none,
 WARNING(availability_invalid_version_number_for_domain, none,
         "'%0' is not a valid version number for %1",
         (llvm::VersionTuple, AvailabilityDomain))
+WARNING(availability_domain_renamed, none,
+        "%0 has been renamed to '%1'",
+        (Identifier, StringRef))
+ERROR(availability_domain_requires_feature, none,
+      "%0 requires '-enable-experimental-feature %1'",
+      (AvailabilityDomain, StringRef))
 
 WARNING(attr_availability_expected_deprecated_version, none,
        "expected version number with 'deprecated' in '%0' attribute for %1",
@@ -6991,9 +7002,6 @@ WARNING(attr_availability_cannot_be_used_for_domain, none,
 WARNING(attr_availability_expected_version_spec, none,
        "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
        "for %1", (const DeclAttribute, AvailabilityDomain))
-ERROR(attr_availability_requires_custom_availability, none,
-      "%0 requires '-enable-experimental-feature CustomAvailability'",
-      (AvailabilityDomain))
 ERROR(attr_availability_domain_access, none,
       "availability domain '%0' is "
       "%select{private|fileprivate|internal|package|%error|%error}1 "
@@ -8592,8 +8600,8 @@ ERROR(value_type_used_in_type_parameter,none,
       "cannot use value type %0 for generic argument %1", (Type, Type))
 ERROR(invalid_value_type_value_generic,none,
       "%0 is not a supported value type for %1", (Type, Type))
-ERROR(invalid_value_generic_conformance,none,
-      "value generic type %0 cannot conform to protocol %1", (Type, Type))
+ERROR(invalid_value_generic_constraint,none,
+      "cannot use type constraint with generic value parameter %0", (Type))
 ERROR(invalid_value_generic_same_type,none,
       "cannot constrain value parameter %0 to be type %1", (Type, Type))
 ERROR(integer_type_not_accepted,none,
@@ -8936,6 +8944,24 @@ ERROR(attr_inline_always_on_accessor,none,
       " is not final are not allowed", ())
 
 //===----------------------------------------------------------------------===//
+// MARK: `~Sendable`
+//===----------------------------------------------------------------------===//
+ERROR(tilde_sendable_requires_feature_flag,none,
+      "'~Sendable' requires -enable-experimental-feature TildeSendable",
+      ())
+
+NOTE(sendable_conformance_is_suppressed, none,
+     "%kind0 explicitly suppresses conformance to 'Sendable' protocol",
+     (const NominalTypeDecl *))
+
+ERROR(non_sendable_type_suppressed,none,
+      "cannot both conform to and suppress conformance to 'Sendable'", ())
+
+ERROR(conformance_repression_only_on_struct_class_enum,none,
+      "conformance to %0 can only be suppressed on structs, classes, and enums",
+      (const ProtocolDecl *))
+
+//===----------------------------------------------------------------------===//
 // MARK: Swift Performance hints
 //===----------------------------------------------------------------------===//
 
@@ -8945,6 +8971,30 @@ GROUPED_WARNING(perf_hint_function_returns_array,ReturnTypeImplicitCopy,DefaultI
 GROUPED_WARNING(perf_hint_closure_returns_array,ReturnTypeImplicitCopy,DefaultIgnore,
                 "Performance: closure returns a%select{ dictionary|n array}0, leading to implicit copies. "
                 "Consider using an 'inout' parameter instead.", (bool))
+
+GROUPED_WARNING(perf_hint_param_expects_existential,ExistentialType,DefaultIgnore,
+                "Performance: %0 expects an existential, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
+                (const ParamDecl*))
+GROUPED_WARNING(perf_hint_func_returns_existential,ExistentialType,DefaultIgnore,
+                "Performance: %0 returns an existential, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
+                (const FuncDecl*))
+GROUPED_WARNING(perf_hint_closure_returns_existential,ExistentialType,DefaultIgnore,
+                "Performance: closure returns an existential, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.", ())
+GROUPED_WARNING(perf_hint_var_uses_existential,ExistentialType,DefaultIgnore,
+                "Performance: %0 uses an existential, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
+                (const VarDecl *))
+GROUPED_WARNING(perf_hint_any_pattern_uses_existential,ExistentialType,DefaultIgnore,
+                "Performance: declaration uses an existential, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
+                ())
+GROUPED_WARNING(perf_hint_typealias_uses_existential,ExistentialType,DefaultIgnore,
+                "Performance: %0 aliases an existential type, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
+                (const TypeAliasDecl *))
 
 ERROR(unsafe_self_dependent_result_attr_on_invalid_decl,none,
       "invalid use of @_unsafeSelfDependentResult", ())

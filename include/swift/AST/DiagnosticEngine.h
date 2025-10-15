@@ -48,6 +48,8 @@ namespace swift {
   class FuncDecl;
   class SourceManager;
   class SourceFile;
+  class ParamDecl;
+  class AnyPattern;
 
   /// Enumeration describing all of possible diagnostics.
   ///
@@ -216,6 +218,9 @@ namespace swift {
     SourceLoc getLoc() const { return Loc; }
     const class Decl *getDecl() const { return Decl; }
     DiagnosticBehavior getBehaviorLimit() const { return BehaviorLimit; }
+
+    /// Retrieve the stored SourceLoc, or the location of the stored Decl.
+    SourceLoc getLocOrDeclLoc() const;
 
     void setLoc(SourceLoc loc) { Loc = loc; }
     void setIsChildNote(bool isChildNote) { IsChildNote = isChildNote; }
@@ -616,6 +621,9 @@ namespace swift {
 
     /// Don't emit any warnings
     bool suppressWarnings = false;
+
+    /// Don't emit any notes
+    bool suppressNotes = false;
     
     /// Don't emit any remarks
     bool suppressRemarks = false;
@@ -663,6 +671,10 @@ namespace swift {
     void setSuppressWarnings(bool val) { suppressWarnings = val; }
     bool getSuppressWarnings() const { return suppressWarnings; }
     
+    /// Whether to skip emitting notes
+    void setSuppressNotes(bool val) { suppressNotes = val; }
+    bool getSuppressNotes() const { return suppressNotes; }
+
     /// Whether to skip emitting remarks
     void setSuppressRemarks(bool val) { suppressRemarks = val; }
     bool getSuppressRemarks() const { return suppressRemarks; }
@@ -708,6 +720,7 @@ namespace swift {
     void swap(DiagnosticState &other) {
       std::swap(showDiagnosticsAfterFatalError, other.showDiagnosticsAfterFatalError);
       std::swap(suppressWarnings, other.suppressWarnings);
+      std::swap(suppressNotes, other.suppressNotes);
       std::swap(suppressRemarks, other.suppressRemarks);
       std::swap(warningsAsErrors, other.warningsAsErrors);
       std::swap(fatalErrorOccurred, other.fatalErrorOccurred);
@@ -902,6 +915,12 @@ namespace swift {
     void setSuppressWarnings(bool val) { state.setSuppressWarnings(val); }
     bool getSuppressWarnings() const {
       return state.getSuppressWarnings();
+    }
+
+    /// Whether to skip emitting notes
+    void setSuppressNotes(bool val) { state.setSuppressNotes(val); }
+    bool getSuppressNotes() const {
+      return state.getSuppressNotes();
     }
 
     /// Whether to skip emitting remarks
@@ -1458,6 +1477,13 @@ namespace swift {
 
     /// Retrieve the underlying engine which will receive the diagnostics.
     DiagnosticEngine &getUnderlyingDiags() const { return UnderlyingEngine; }
+
+    /// Iterates over each captured diagnostic, running a lambda with it.
+    void forEach(llvm::function_ref<void(const Diagnostic &)> body) const;
+
+    /// Filters the queued diagnostics, dropping any where the predicate
+    /// returns \c false.
+    void filter(llvm::function_ref<bool(const Diagnostic &)> predicate);
 
     /// Clear this queue and erase all diagnostics recorded.
     void clear() {

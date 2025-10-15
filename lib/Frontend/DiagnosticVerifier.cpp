@@ -400,6 +400,49 @@ bool DiagnosticVerifier::verifyUnknown(
     auto diag = SM.GetMessage({}, llvm::SourceMgr::DK_Error, Message, {}, {});
     printDiagnostic(diag);
   }
+
+  if (HadError) {
+    auto NoteMessage = "use '-verify-ignore-unknown' to "
+                       "ignore diagnostics at this location";
+    auto noteDiag =
+        SM.GetMessage({}, llvm::SourceMgr::DK_Note, NoteMessage, {}, {});
+    printDiagnostic(noteDiag);
+  }
+  return HadError;
+}
+
+bool DiagnosticVerifier::verifyUnrelated(
+    std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const {
+  bool HadError = false;
+  for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
+    SourceLoc Loc = CapturedDiagnostics[i].Loc;
+    if (!Loc.isValid())
+      // checked by verifyUnknown
+      continue;
+
+    HadError = true;
+    std::string Message =
+        ("unexpected " +
+         getDiagKindString(CapturedDiagnostics[i].Classification) +
+         " produced: " + CapturedDiagnostics[i].Message)
+            .str();
+
+    auto diag = SM.GetMessage(Loc, llvm::SourceMgr::DK_Error, Message, {}, {});
+    printDiagnostic(diag);
+
+    auto FileName = SM.getIdentifierForBuffer(SM.findBufferContainingLoc(Loc));
+    auto noteDiag =
+        SM.GetMessage(Loc, llvm::SourceMgr::DK_Note,
+                      ("file '" + FileName +
+                       "' is not parsed for 'expected' statements. Use "
+                       "'-verify-additional-file " +
+                       FileName +
+                       "' to enable, or '-verify-ignore-unrelated' to "
+                       "ignore diagnostics in this file"),
+                      {}, {});
+    printDiagnostic(noteDiag);
+  }
+
   return HadError;
 }
 
@@ -1459,6 +1502,8 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
   // because there's no reason to verify them.
   if (Info.ID == diag::verify_encountered_fatal.ID)
     return;
+  if (IgnoreMacroLocationNote && Info.ID == diag::in_macro_expansion.ID)
+    return;
   SmallVector<CapturedFixItInfo, 2> fixIts;
   for (const auto &fixIt : Info.FixIts) {
     fixIts.emplace_back(SM, fixIt);
@@ -1517,6 +1562,11 @@ bool DiagnosticVerifier::finishProcessing() {
     bool HadError = verifyUnknown(CapturedDiagnostics);
     Result.HadError |= HadError;
     // For <unknown>, all errors are unexpected.
+    Result.HadUnexpectedDiag |= HadError;
+  }
+  if (!IgnoreUnrelated) {
+    bool HadError = verifyUnrelated(CapturedDiagnostics);
+    Result.HadError |= HadError;
     Result.HadUnexpectedDiag |= HadError;
   }
 

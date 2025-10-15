@@ -3285,6 +3285,12 @@ suppressingFeatureLifetimes(PrintOptions &options,
   action();
 }
 
+static void suppressingFeatureTildeSendable(PrintOptions &options,
+                                            llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressTildeSendable, true);
+  action();
+}
+
 namespace {
 struct ExcludeAttrRAII {
   std::vector<AnyAttrKind> &ExcludeAttrList;
@@ -3302,7 +3308,7 @@ struct ExcludeAttrRAII {
     ExcludeAttrList.resize(OriginalExcludeAttrCount);
   }
 };
-}
+} // namespace
 
 static void
 suppressingFeatureCoroutineAccessors(PrintOptions &options,
@@ -3634,16 +3640,6 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 
   if (ShouldPrint) {
     Printer << " = ";
-    // FIXME: An inferred associated type witness type alias may reference
-    // an opaque type, but OpaqueTypeArchetypes are always canonicalized
-    // so lose type sugar for generic params. Bind the generic signature so
-    // we can map params back into the generic signature and print them
-    // correctly.
-    //
-    // Remove this when we have a way to represent non-canonical archetypes
-    // preserving sugar.
-    PrintOptions::OverrideScope scope(Options);
-    OVERRIDE_PRINT_OPTION(scope, GenericSig, decl->getGenericSignature().getPointer());
     printTypeLoc(TypeLoc(decl->getUnderlyingTypeRepr(), Ty));
     printDeclGenericRequirements(decl);
   }
@@ -7500,11 +7496,6 @@ public:
       if (auto existential = constraint->getAs<ExistentialType>())
         constraint = existential->getConstraintType();
 
-      // Opaque archetype substitutions are always canonical, so re-sugar the
-      // constraint type using the owning declaration's generic parameter names.
-      if (genericSig)
-        constraint = genericSig->getSugaredType(constraint);
-
       visit(constraint);
       return;
     }
@@ -8232,9 +8223,19 @@ swift::getInheritedForPrinting(
       }
     }
 
-    if (options.SuppressConformanceSuppression &&
-        inherited.getEntry(i).isSuppressed()) {
-      continue;
+    if (inherited.getEntry(i).isSuppressed()) {
+      // All `~<<Protocol>>` inheritances are suppressed.
+      if (options.SuppressConformanceSuppression)
+        continue;
+
+      if (options.SuppressTildeSendable) {
+        if (auto type = inherited.getAsSuppressed(i)->first) {
+          auto *sendable =
+              decl->getASTContext().getProtocol(KnownProtocolKind::Sendable);
+          if (sendable && sendable == type->getAnyNominal())
+            continue;
+        }
+      }
     }
 
     Results.push_back(inherited.getEntry(i));

@@ -729,6 +729,16 @@ private:
     if (!DC)
       return TheCU;
 
+    auto createContext = [&](NominalTypeDecl &NTD) {
+      GenericContextScope scope(
+          IGM, NTD.getGenericSignature().getCanonicalSignature());
+
+      auto Ty = NTD.getDeclaredInterfaceType();
+      // Create a Forward-declared type.
+      auto DbgTy = DebugTypeInfo::getForwardDecl(Ty);
+      return getOrCreateType(DbgTy);
+    };
+
     if (isa<FuncDecl>(DC))
       if (auto *Decl = IGM.getSILModule().lookUpFunction(SILDeclRef(
               cast<AbstractFunctionDecl>(DC), SILDeclRef::Kind::Func)))
@@ -742,7 +752,6 @@ private:
 
     // We don't model these in DWARF.
     case DeclContextKind::Initializer:
-    case DeclContextKind::ExtensionDecl:
     case DeclContextKind::SubscriptDecl:
     case DeclContextKind::EnumElementDecl:
     case DeclContextKind::TopLevelCodeDecl:
@@ -761,16 +770,17 @@ private:
       return getOrCreateContext(DC->getParent());
     case DeclContextKind::MacroDecl:
       return getOrCreateContext(DC->getParent());
+    case DeclContextKind::ExtensionDecl: {
+      auto *ED = cast<ExtensionDecl>(DC);
+      if (auto *NTD = ED->getExtendedNominal())
+        return createContext(*NTD);
+      return getOrCreateContext(DC->getParent());
+    }
     case DeclContextKind::GenericTypeDecl: {
-      // The generic signature of this nominal type has no relation to the current
-      // function's generic signature.
+      // The generic signature of this nominal type has no relation to the
+      // current function's generic signature.
       auto *NTD = cast<NominalTypeDecl>(DC);
-      GenericContextScope scope(IGM, NTD->getGenericSignature().getCanonicalSignature());
-
-      auto Ty = NTD->getDeclaredInterfaceType();
-      // Create a Forward-declared type.
-      auto DbgTy = DebugTypeInfo::getForwardDecl(Ty);
-      return getOrCreateType(DbgTy);
+      return createContext(*NTD);
     }
     }
     return TheCU;
@@ -1358,7 +1368,8 @@ private:
     // these can be reconstructed by substituting the "template parameters" in
     // the unspecialized type. We make an exception for inline arrays, because
     // DWARF has special support for arrays.
-    if (Type->isInlineArray() && !Type->hasTypeParameter() &&
+    if ((Type->isInlineArray() || Type->is_InlineArray()) &&
+	!Type->hasTypeParameter() &&
         !Type->hasPrimaryArchetype())
       // Create the substituted type.
       return createStructType(Type, Decl, Scope, File, Line, SizeInBits,
@@ -2684,8 +2695,9 @@ private:
       // declarations may not have a unique ID to avoid a forward declaration
       // winning over a full definition.
       auto *FwdDecl = DBuilder.createReplaceableCompositeType(
-          llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, 0, 0,
-          llvm::dwarf::DW_LANG_Swift);
+          llvm::dwarf::DW_TAG_structure_type, Name, Scope, 0, 0,
+          llvm::dwarf::DW_LANG_Swift, 0, 0, llvm::DINode::FlagFwdDecl,
+          MangledName);
       FwdDeclTypes.emplace_back(
           std::piecewise_construct, std::make_tuple(MangledName),
           std::make_tuple(static_cast<llvm::Metadata *>(FwdDecl)));

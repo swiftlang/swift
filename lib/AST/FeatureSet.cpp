@@ -116,6 +116,7 @@ UNINTERESTING_FEATURE(RegionBasedIsolation)
 UNINTERESTING_FEATURE(PlaygroundExtendedCallbacks)
 UNINTERESTING_FEATURE(ThenStatements)
 UNINTERESTING_FEATURE(DoExpressions)
+UNINTERESTING_FEATURE(ForExpressions)
 UNINTERESTING_FEATURE(ImplicitLastExprResults)
 UNINTERESTING_FEATURE(RawLayout)
 UNINTERESTING_FEATURE(Embedded)
@@ -331,7 +332,6 @@ UNINTERESTING_FEATURE(LibraryEvolution)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
-UNINTERESTING_FEATURE(SuppressCXXForeignReferenceTypeInitializers)
 UNINTERESTING_FEATURE(WarnUnannotatedReturnOfCxxFrt)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
@@ -446,6 +446,28 @@ static bool usesFeatureInlineAlways(Decl *decl) {
   }
   return false;
 }
+
+UNINTERESTING_FEATURE(SwiftRuntimeAvailability)
+
+static bool usesFeatureTildeSendable(Decl *decl) {
+  auto *TD = dyn_cast<TypeDecl>(decl);
+  if (!TD)
+    return false;
+
+  return llvm::any_of(
+      TD->getInherited().getEntries(), [&decl](const auto &entry) {
+        if (!entry.isSuppressed())
+          return false;
+
+        auto T = entry.getType();
+        if (!T)
+          return false;
+
+        auto &C = decl->getASTContext();
+        return C.getProtocol(KnownProtocolKind::Sendable) == T->getAnyNominal();
+      });
+}
+
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

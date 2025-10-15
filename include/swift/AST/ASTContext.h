@@ -1293,6 +1293,10 @@ public:
     return const_cast<ASTContext *>(this)->getStdlibModule(false);
   }
 
+  /// Names of underscored modules whose contents, if imported, should be
+  /// treated as separately-imported overlays of the standard library module.
+  ArrayRef<Identifier> StdlibOverlayNames;
+
   /// Insert an externally-sourced module into the set of known loaded modules
   /// in this context.
   void addLoadedModule(ModuleDecl *M);

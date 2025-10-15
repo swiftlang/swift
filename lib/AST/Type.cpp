@@ -853,7 +853,7 @@ Type TypeBase::getArrayElementType() {
 }
 
 Type TypeBase::getInlineArrayElementType() {
-  if (!isInlineArray())
+  if (!isInlineArray() && !is_InlineArray())
     return Type();
 
   if (!is<BoundGenericStructType>())
@@ -1305,6 +1305,25 @@ bool TypeBase::isCxxString() {
   auto &ctx = nominal->getASTContext();
   return clangDecl->isInStdNamespace() && clangDecl->getIdentifier() &&
          ctx.Id_basic_string.is(clangDecl->getName());
+}
+
+bool TypeBase::isUnicodeScalar() {
+  if (!is<StructType>())
+    return false;
+  const auto *structType = castTo<StructType>();
+  if (!structType->getDecl()->getName().is("Scalar"))
+    return false;
+
+  Type parent = structType->getParent();
+  if (!parent->is<EnumType>())
+    return false;
+  const auto enumDecl = parent->castTo<EnumType>()->getDecl();
+  if (!enumDecl->getName().is("Unicode"))
+    return false;
+  const auto *parentDC = enumDecl->getDeclContext();
+  if (!parentDC->isModuleScopeContext() && parentDC->getParentModule()->isStdlibModule())
+    return false;
+  return true;
 }
 
 bool TypeBase::isKnownKeyPathType() {
@@ -1765,7 +1784,6 @@ CanType TypeBase::computeCanonicalType() {
 #define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::Error:
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
   case TypeKind::BuiltinTuple:
@@ -1778,6 +1796,14 @@ CanType TypeBase::computeCanonicalType() {
     break;
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+
+  case TypeKind::Error: {
+    auto errTy = cast<ErrorType>(this);
+    auto originalTy = errTy->getOriginalType();
+    ASSERT(originalTy && "The bare ErrorType singleton is already canonical");
+    Result = ErrorType::get(originalTy->getCanonicalType()).getPointer();
+    break;
+  }
 
   case TypeKind::Enum:
   case TypeKind::Struct:
@@ -1997,6 +2023,14 @@ CanType TypeBase::computeCanonicalType() {
     Result = ErrorUnionType::get(ctx, newTerms).getPointer();
     break;
   }
+  case TypeKind::OpaqueTypeArchetype: {
+    auto *AT = cast<OpaqueTypeArchetypeType>(this);
+    Result = OpaqueTypeArchetypeType::get(
+        AT->getDecl(), AT->getInterfaceType(),
+        AT->getSubstitutions().getCanonical())
+          ->castTo<OpaqueTypeArchetypeType>();
+    break;
+  }
   case TypeKind::Integer: {
     auto intTy = cast<IntegerType>(this);
     APInt value = intTy->getValue();
@@ -2203,7 +2237,10 @@ GenericTypeParamType::GenericTypeParamType(GenericTypeParamDecl *param,
   Weight = 0;
   Index = param->getIndex();
   ParamKind = param->getParamKind();
-  ValueType = param->getValueType();
+  // Note we intentionally don't compute `ValueType` here since that could
+  // trigger a request cycle with the interface type computation of the
+  // GenericTypeParamDecl. Instead, `getValueType` forwards the query to the
+  // decl.
 }
 
 GenericTypeParamType::GenericTypeParamType(Identifier name,
@@ -3656,13 +3693,13 @@ int TupleType::getNamedElementId(Identifier I) const {
 }
 
 ArchetypeType::ArchetypeType(TypeKind Kind,
-                             const ASTContext &Ctx,
+                             const ASTContext *Ctx,
                              RecursiveTypeProperties properties,
                              Type InterfaceType,
                              ArrayRef<ProtocolDecl *> ConformsTo,
                              Type Superclass, LayoutConstraint Layout,
                              GenericEnvironment *Environment)
-  : SubstitutableType(Kind, &Ctx, properties),
+  : SubstitutableType(Kind, Ctx, properties),
     InterfaceType(InterfaceType),
     Environment(Environment)
 {
@@ -3796,7 +3833,7 @@ PrimaryArchetypeType::PrimaryArchetypeType(const ASTContext &Ctx,
                                      ArrayRef<ProtocolDecl *> ConformsTo,
                                      Type Superclass, LayoutConstraint Layout,
                                      RecursiveTypeProperties Properties)
-  : ArchetypeType(TypeKind::PrimaryArchetype, Ctx, Properties,
+  : ArchetypeType(TypeKind::PrimaryArchetype, &Ctx, Properties,
                   InterfaceType, ConformsTo, Superclass, Layout, GenericEnv)
 {
   assert(!InterfaceType->isParameterPack());
@@ -3832,12 +3869,13 @@ PrimaryArchetypeType::getNew(const ASTContext &Ctx,
 }
 
 OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(
+    const ASTContext *ctx,
     GenericEnvironment *environment,
     RecursiveTypeProperties properties,
     Type interfaceType,
     ArrayRef<ProtocolDecl*> conformsTo,
     Type superclass, LayoutConstraint layout)
-  : ArchetypeType(TypeKind::OpaqueTypeArchetype, interfaceType->getASTContext(),
+  : ArchetypeType(TypeKind::OpaqueTypeArchetype, ctx,
                   properties, interfaceType, conformsTo, superclass, layout,
                   environment)
 {
@@ -3853,11 +3891,10 @@ SubstitutionMap OpaqueTypeArchetypeType::getSubstitutions() const {
 }
 
 ExistentialArchetypeType::ExistentialArchetypeType(
-    GenericEnvironment *environment, Type interfaceType,
+    const ASTContext *ctx, GenericEnvironment *environment, Type interfaceType,
     ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
     LayoutConstraint layout, RecursiveTypeProperties properties)
-  : LocalArchetypeType(TypeKind::ExistentialArchetype,
-                       interfaceType->getASTContext(), properties,
+  : LocalArchetypeType(TypeKind::ExistentialArchetype, ctx, properties,
                        interfaceType, conformsTo, superclass, layout,
                        environment)
 {
@@ -3869,7 +3906,7 @@ PackArchetypeType::PackArchetypeType(
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
     LayoutConstraint Layout, PackShape Shape,
     RecursiveTypeProperties Properties)
-  : ArchetypeType(TypeKind::PackArchetype, Ctx, Properties,
+  : ArchetypeType(TypeKind::PackArchetype, &Ctx, Properties,
                     InterfaceType, ConformsTo, Superclass, Layout, GenericEnv) {
   assert(InterfaceType->isParameterPack());
   *getTrailingObjects<PackShape>() = Shape;
@@ -3921,7 +3958,7 @@ CanType PackArchetypeType::getReducedShape() {
 }
 
 ElementArchetypeType::ElementArchetypeType(
-    const ASTContext &Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
+    const ASTContext *Ctx, GenericEnvironment *GenericEnv, Type InterfaceType,
     ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
     LayoutConstraint Layout)
     : LocalArchetypeType(TypeKind::ElementArchetype, Ctx,
@@ -3947,7 +3984,8 @@ CanTypeWrapper<ElementArchetypeType> ElementArchetypeType::getNew(
       alignof(ElementArchetypeType), arena);
 
   return CanElementArchetypeType(::new (mem) ElementArchetypeType(
-      ctx, environment, interfaceType, conformsTo, superclass, layout));
+      environment->isCanonical() ? &ctx : nullptr,
+      environment, interfaceType, conformsTo, superclass, layout));
 }
 
 UUID ElementArchetypeType::getOpenedElementID() const {
@@ -4409,6 +4447,12 @@ bool Type::findIf(llvm::function_ref<bool(Type)> pred) const {
 }
 
 TypeTraitResult TypeBase::canBeClass() {
+  // Foreign reference types are represented as Swift classes in the AST,
+  // however, they use custom retain/release operations, and therefore aren't
+  // AnyObjects.
+  if (isForeignReferenceType())
+    return TypeTraitResult::IsNot;
+
   // Any bridgeable object type can be a class.
   if (isBridgeableObjectType())
     return TypeTraitResult::Is;

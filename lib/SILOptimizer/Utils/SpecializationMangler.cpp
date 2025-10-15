@@ -44,77 +44,71 @@ FunctionSignatureSpecializationMangler::FunctionSignatureSpecializationMangler(A
   for (unsigned i = 0, e = F->getConventions().getNumSILArguments(); i != e;
        ++i) {
     (void)i;
-    OrigArgs.push_back(
-        {ArgumentModifierIntBase(ArgumentModifier::Unmodified), nullptr});
+    OrigArgs.push_back(ArgumentModifier::Unmodified);
   }
   ReturnValue = ReturnValueModifierIntBase(ReturnValueModifier::Unmodified);
 }
 
 void FunctionSignatureSpecializationMangler::setArgumentDead(
     unsigned OrigArgIdx) {
-  OrigArgs[OrigArgIdx].first |= ArgumentModifierIntBase(ArgumentModifier::Dead);
+  OrigArgs[OrigArgIdx].append(ArgumentModifier::Dead);
 }
 
 void FunctionSignatureSpecializationMangler::setArgumentClosureProp(
-    unsigned OrigArgIdx, PartialApplyInst *PAI) {
+    unsigned OrigArgIdx, SILInstruction *closure) {
+  ASSERT(isa<PartialApplyInst>(closure) || isa<ThinToThickFunctionInst>(closure));
   auto &Info = OrigArgs[OrigArgIdx];
-  Info.first = ArgumentModifierIntBase(ArgumentModifier::ClosureProp);
-  Info.second = PAI;
+  Info.kind = ArgumentModifier::ClosureProp;
+  Info.inst = closure;
 }
 
-void FunctionSignatureSpecializationMangler::setArgumentClosureProp(
-    unsigned OrigArgIdx, ThinToThickFunctionInst *TTTFI) {
+void FunctionSignatureSpecializationMangler::setArgumentClosurePropPreviousArg(
+    unsigned OrigArgIdx, unsigned otherArgIdx) {
   auto &Info = OrigArgs[OrigArgIdx];
-  Info.first = ArgumentModifierIntBase(ArgumentModifier::ClosureProp);
-  Info.second = TTTFI;
+  Info.kind = ArgumentModifier::ClosurePropPreviousArg;
+  Info.otherArgIdx = otherArgIdx;
 }
 
 void FunctionSignatureSpecializationMangler::setArgumentConstantProp(
     unsigned OrigArgIdx, SILInstruction *constInst) {
   auto &Info = OrigArgs[OrigArgIdx];
-  Info.first = ArgumentModifierIntBase(ArgumentModifier::ConstantProp);
-  Info.second = constInst;
+  Info.kind = ArgumentModifier::ConstantProp;
+  Info.inst = constInst;
 }
 
 void FunctionSignatureSpecializationMangler::setArgumentOwnedToGuaranteed(
     unsigned OrigArgIdx) {
-  OrigArgs[OrigArgIdx].first |=
-      ArgumentModifierIntBase(ArgumentModifier::OwnedToGuaranteed);
+  OrigArgs[OrigArgIdx].append(ArgumentModifier::OwnedToGuaranteed);
 }
 
 void FunctionSignatureSpecializationMangler::setArgumentSROA(
     unsigned OrigArgIdx) {
-  OrigArgs[OrigArgIdx].first |= ArgumentModifierIntBase(ArgumentModifier::SROA);
+  OrigArgs[OrigArgIdx].append(ArgumentModifier::SROA);
 }
 
 void FunctionSignatureSpecializationMangler::setArgumentGuaranteedToOwned(
     unsigned OrigArgIdx) {
-  OrigArgs[OrigArgIdx].first |=
-      ArgumentModifierIntBase(ArgumentModifier::GuaranteedToOwned);
+  OrigArgs[OrigArgIdx].append(ArgumentModifier::GuaranteedToOwned);
 }
 
 void FunctionSignatureSpecializationMangler::setArgumentExistentialToGeneric(
     unsigned OrigArgIdx) {
-  OrigArgs[OrigArgIdx].first |=
-      ArgumentModifierIntBase(ArgumentModifier::ExistentialToGeneric);
+  OrigArgs[OrigArgIdx].append(ArgumentModifier::ExistentialToGeneric);
 }
 
 void FunctionSignatureSpecializationMangler::setArgumentBoxToValue(
     unsigned OrigArgIdx) {
-  OrigArgs[OrigArgIdx].first =
-      ArgumentModifierIntBase(ArgumentModifier::BoxToValue);
+  OrigArgs[OrigArgIdx].kind = ArgumentModifier::BoxToValue;
 }
 
 void FunctionSignatureSpecializationMangler::setArgumentBoxToStack(
     unsigned OrigArgIdx) {
-  OrigArgs[OrigArgIdx].first =
-      ArgumentModifierIntBase(ArgumentModifier::BoxToStack);
+  OrigArgs[OrigArgIdx].kind = ArgumentModifier::BoxToStack;
 }
 
 void FunctionSignatureSpecializationMangler::setArgumentInOutToOut(
     unsigned OrigArgIdx) {
-  OrigArgs[OrigArgIdx].first =
-      ArgumentModifierIntBase(ArgumentModifier::InOutToOut);
+  OrigArgs[OrigArgIdx].kind = ArgumentModifier::InOutToOut;
 }
 
 void
@@ -270,41 +264,44 @@ FunctionSignatureSpecializationMangler::mangleClosureProp(SILInstruction *Inst) 
   }
 }
 
-void FunctionSignatureSpecializationMangler::mangleArgument(
-    ArgumentModifierIntBase ArgMod, NullablePtr<SILInstruction> Inst) {
-  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::ConstantProp)) {
+void FunctionSignatureSpecializationMangler::mangleArgument(ArgInfo argInfo) {
+  switch (argInfo.kind) {
+  case ArgumentModifier::ConstantProp:
     // Append the prefix for constant propagation 'p'.
     ArgOpBuffer << 'p';
-    mangleConstantProp(Inst.get());
+    mangleConstantProp(argInfo.inst);
     return;
-  }
 
-  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::ClosureProp)) {
-    mangleClosureProp(Inst.get());
+  case ArgumentModifier::ClosureProp:
+    mangleClosureProp(argInfo.inst);
     return;
-  }
 
-  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::Unmodified)) {
+  case ArgumentModifier::Unmodified:
     ArgOpBuffer << 'n';
     return;
-  }
 
-  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::BoxToValue)) {
+  case ArgumentModifier::BoxToValue:
     ArgOpBuffer << 'i';
     return;
-  }
 
-  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::BoxToStack)) {
+  case ArgumentModifier::BoxToStack:
     ArgOpBuffer << 's';
     return;
-  }
 
-  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::InOutToOut)) {
+  case ArgumentModifier::InOutToOut:
     ArgOpBuffer << 'r';
     return;
+
+  case ArgumentModifier::ClosurePropPreviousArg:
+    ArgOpBuffer << 'C' << argInfo.otherArgIdx;
+    return;
+
+  default:
+    break;
   }
 
   bool hasSomeMod = false;
+  ArgumentModifierIntBase ArgMod = ArgumentModifierIntBase(argInfo.kind);
   if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::ExistentialToGeneric)) {
     ArgOpBuffer << 'e';
     hasSomeMod = true;
@@ -356,10 +353,7 @@ std::string FunctionSignatureSpecializationMangler::mangle() {
   beginMangling();
 
   for (unsigned i : indices(OrigArgs)) {
-    ArgumentModifierIntBase ArgMod;
-    NullablePtr<SILInstruction> Inst;
-    std::tie(ArgMod, Inst) = OrigArgs[i];
-    mangleArgument(ArgMod, Inst);
+    mangleArgument(OrigArgs[i]);
   }
   ArgOpBuffer << '_';
   mangleReturnValue(ReturnValue);

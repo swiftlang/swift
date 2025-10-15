@@ -31,15 +31,16 @@ class TypeLowering;
 /// Information about a varargs emission.
 class VarargsInfo {
   ManagedValue Array;
+  CleanupHandle borrowCleanup;
   CleanupHandle AbortCleanup;
   SILValue BaseAddress;
   AbstractionPattern BasePattern;
   const TypeLowering &BaseTL;
 public:
-  VarargsInfo(ManagedValue array, CleanupHandle abortCleanup,
+  VarargsInfo(ManagedValue array, CleanupHandle borrowCleanup, CleanupHandle abortCleanup,
               SILValue baseAddress, const TypeLowering &baseTL,
               AbstractionPattern basePattern)
-    : Array(array), AbortCleanup(abortCleanup),
+    : Array(array), borrowCleanup(borrowCleanup), AbortCleanup(abortCleanup),
       BaseAddress(baseAddress), BasePattern(basePattern), BaseTL(baseTL) {}
 
   /// Return the array value.  emitEndVarargs() is really the only
@@ -47,6 +48,9 @@ public:
   ManagedValue getArray() const {
     return Array;
   }
+
+  CleanupHandle getBorrowCleanup() const { return borrowCleanup; }
+
   CleanupHandle getAbortCleanup() const { return AbortCleanup; }
 
   /// An address of the lowered type.

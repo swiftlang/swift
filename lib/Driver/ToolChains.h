@@ -25,6 +25,11 @@ class DiagnosticEngine;
 namespace driver {
 namespace toolchains {
 
+/// True if any *generation* mode of instrumentation-based profile is enabled.
+///
+/// This is used to determine if the profiler runtime should be linked.
+bool needsInstrProfileRuntime(const llvm::opt::ArgList &Args);
+
 class LLVM_LIBRARY_VISIBILITY Darwin : public ToolChain {
 protected:
 

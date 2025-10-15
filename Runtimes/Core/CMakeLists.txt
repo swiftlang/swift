@@ -21,13 +21,9 @@
 
 # TODO:
 # Platform support:
-#   - Work on/Verify cross-compiling
-#   - Work on/Verify Windows and Linux native builds
+#   - Work on/Verify Linux native builds
 # Embedded
 #   -- -Xfrontend -emit-empty-object-file
-# Catalyst Support
-#   -- Will need shadow invocations to generate swiftmodules for Swift parts
-# Install *.abi.json, swiftdoc, and swiftsourceinfo
 
 cmake_minimum_required(VERSION 3.29)
 # TODO before requiring CMake 4.1 or later

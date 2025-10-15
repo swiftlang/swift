@@ -3474,8 +3474,12 @@ public:
       ctx.Diags.diagnose(SourceLoc(), diagId, decl, MF.getAssociatedModule());
     }
 
-    if (DAttrs)
+    if (DAttrs) {
       decl->getAttrs().setRawAttributeChain(DAttrs);
+      // Wire up the correct owner for any CustomAttrs we deserialized.
+      for (auto *CA : decl->getAttrs().getAttributes<CustomAttr>())
+        CA->setOwner(decl);
+    }
 
     if (auto value = dyn_cast<ValueDecl>(decl)) {
       if (!privateDiscriminator.empty())
@@ -5811,8 +5815,10 @@ decodeDomainKind(uint8_t kind) {
   switch (kind) {
     case static_cast<uint8_t>(AvailabilityDomainKind::Universal):
       return AvailabilityDomainKind::Universal;
-    case static_cast<uint8_t>(AvailabilityDomainKind::SwiftLanguage):
-      return AvailabilityDomainKind::SwiftLanguage;
+    case static_cast<uint8_t>(AvailabilityDomainKind::SwiftLanguageMode):
+      return AvailabilityDomainKind::SwiftLanguageMode;
+    case static_cast<uint8_t>(AvailabilityDomainKind::SwiftRuntime):
+      return AvailabilityDomainKind::SwiftRuntime;
     case static_cast<uint8_t>(AvailabilityDomainKind::PackageDescription):
       return AvailabilityDomainKind::PackageDescription;
     case static_cast<uint8_t>(AvailabilityDomainKind::Embedded):
@@ -5832,8 +5838,10 @@ decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
   switch (domainKind) {
   case AvailabilityDomainKind::Universal:
     return AvailabilityDomain::forUniversal();
-  case AvailabilityDomainKind::SwiftLanguage:
-    return AvailabilityDomain::forSwiftLanguage();
+  case AvailabilityDomainKind::SwiftLanguageMode:
+    return AvailabilityDomain::forSwiftLanguageMode();
+  case AvailabilityDomainKind::SwiftRuntime:
+    return AvailabilityDomain::forSwiftRuntime();
   case AvailabilityDomainKind::PackageDescription:
     return AvailabilityDomain::forPackageDescription();
   case AvailabilityDomainKind::Embedded:
@@ -5961,8 +5969,10 @@ llvm::Error DeclDeserializer::deserializeCustomAttrs() {
     } else if (!deserialized.get() && MF.allowCompilerErrors()) {
       // Serialized an invalid attribute, just skip it when allowing errors
     } else {
+      // Note that the owner will be set in DeclDeserializer's destructor.
       auto *TE = TypeExpr::createImplicit(deserialized.get(), ctx);
-      auto custom = CustomAttr::create(ctx, SourceLoc(), TE, isImplicit);
+      auto custom = CustomAttr::create(ctx, SourceLoc(), TE, CustomAttrOwner(),
+                                       isImplicit);
       custom->setArgIsUnsafe(isArgUnsafe);
       AddAttribute(custom);
     }
