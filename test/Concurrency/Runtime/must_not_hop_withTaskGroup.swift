@@ -1,0 +1,130 @@
+// RUN: %target-run-simple-swift( -O -target %target-swift-5.1-abi-triple %import-libdispatch) | %FileCheck %s --dump-input=always
+// REQUIRES: concurrency
+// REQUIRES: executable_test
+
+// REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: freestanding
+// REQUIRES: libdispatch
+// REQUIRES: synchronization
+
+import Synchronization
+
+if #available(SwiftStdlib 6.0, *) {
+  print("=== foo() async")
+  print("---------------------------------------")
+  await foo()
+}
+
+// CHECK: === foo() async
+// CHECK-NEXT: ---------------------------------------
+// We hop to the task executor:
+// CHECK-NEXT: [executor][task-executor] Enqueue (1)
+
+// CHECK-NEXT: foo - withTaskExecutorPreference
+// CHECK-NEXT: foo - withTaskExecutorPreference - withTaskGroup
+// CHECK-NEXT: nonisolated(nonsending) someFunc() async
+// CHECK-NEXT: foo - withTaskExecutorPreference - withTaskGroup (after someFunc)
+// CHECK-NEXT: foo - withTaskExecutorPreference - withTaskGroup done
+// CHECK-NEXT: [executor][task-executor] Enqueue (2)
+
+// CHECK: foo - withTaskExecutorPreference done
+
+// CHECK: == Make: actor Foo
+// CHECK-NEXT: ---------------------------------------
+// TODO: all the other group kinds...
+
+// No more enqueues are expected afterwards
+// CHECK-NOT: Executor
+
+nonisolated(nonsending) func someFunc() async throws {
+  print("nonisolated(nonsending) someFunc() async")
+}
+
+@available(SwiftStdlib 6.0, *)
+@concurrent
+func foo() async {
+  await withTaskExecutorPreference(AssertExactEnqueueCountExecutor(expectedEnqueueCount: 8, name: "task-executor")) {
+    print("foo - withTaskExecutorPreference")
+
+    await withTaskGroup(of: Void.self) { group in 
+      print("foo - withTaskExecutorPreference - withTaskGroup")
+      try? await someFunc()
+      print("foo - withTaskExecutorPreference - withTaskGroup (after someFunc)")
+    }
+    print("foo - withTaskExecutorPreference - withTaskGroup done")
+  }
+  print("foo - withTaskExecutorPreference done")
+
+//  await withTaskExecutorPreference(AssertExactEnqueueCountExecutor(expectedEnqueueCount: 8, name: "task-executor")) {
+//    print("foo - withTaskExecutorPreference")
+//
+//    try! await withThrowingTaskGroup(of: Void.self) { group in
+//      print("foo - withTaskExecutorPreference - withThrowingTaskGroup")
+//      try await someFunc()
+//    }
+//    print("foo - withTaskExecutorPreference - withThrowingTaskGroup done\n")
+//  }
+//  print("foo - withTaskExecutorPreference done")
+
+  print("== Make: actor Foo")
+  print("---------------------------------------")
+  await Foo().foo()
+}
+
+@available(SwiftStdlib 6.0, *)
+actor Foo {
+  let exec = AssertExactEnqueueCountExecutor(expectedEnqueueCount: 8, name: "actor-executor")
+        
+  nonisolated var unownedExecutor: UnownedSerialExecutor {
+    self.exec.asUnownedSerialExecutor()
+  }
+          
+  func foo() async {
+//    print("actor.foo")
+//
+//    await withTaskGroup(of: Void.self) { group in
+//      print("actor.foo - withTaskExecutorPreference - withTaskGroup")
+//      try? await someFunc()
+//    }
+//    print("actor.foo - withTaskExecutorPreference - withTaskGroup done\n")
+//
+//    try! await withThrowingTaskGroup(of: Void.self) { group in
+//      print("actor.foo - withTaskExecutorPreference - withThrowingTaskGroup")
+//      try await someFunc()
+//    }
+//    print("actor.foo - withTaskExecutorPreference - withThrowingTaskGroup done\n")
+//    print("actor.foo done")
+  }
+}
+
+@available(SwiftStdlib 6.0, *)
+final class AssertExactEnqueueCountExecutor: TaskExecutor, SerialExecutor {
+  let expectedEnqueueCount: Int
+  let enqueueCount: Atomic<Int>
+
+  let name: String
+
+  init(expectedEnqueueCount: Int, name: String) {
+    self.expectedEnqueueCount = expectedEnqueueCount
+    self.enqueueCount = .init(0)
+    self.name = name
+  }
+
+  public func enqueue(_ job: consuming ExecutorJob) {
+    let newEnqueueValue = self.enqueueCount.add(1, ordering: .relaxed).newValue
+    if newEnqueueValue > self.expectedEnqueueCount {
+      fatalError("Got unexpected enqueue (\(newEnqueueValue)), in: \(self.name)")
+    }
+    print("[executor][\(self.name)] Enqueue (\(newEnqueueValue))")
+    job.runSynchronously(
+      isolatedTo: self.asUnownedSerialExecutor(),
+      taskExecutor: self.asUnownedTaskExecutor())
+  }
+
+  public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
+    UnownedSerialExecutor(ordinary: self)
+  }
+}
+
+print("done") // CHECK: done

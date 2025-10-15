@@ -45,50 +45,63 @@ if #available(SwiftStdlib 6.0, *) {
 }
 
 // CHECK: === foo() async
-// CHECK: ---------------------------------------
+// CHECK-NEXT: ---------------------------------------
 // We hop to the task executor:
-// CHECK: Executor(task-executor): enqueue (1)
+// CHECK-NEXT: Executor(task-executor): enqueue (1)
 
-// CHECK: foo - withTaskExecutorPreference
+// CHECK-NEXT: foo - withTaskExecutorPreference
 
 // CHECK: foo - withTaskExecutorPreference - withCheckedContinuation
-// CHECK: foo - withTaskExecutorPreference - withCheckedContinuation done
+// CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedContinuation done
 
 // CHECK: foo - withTaskExecutorPreference - withUnsafeContinuation
-// CHECK: foo - withTaskExecutorPreference - withUnsafeContinuation done
+// CHECK-NEXT: foo - withTaskExecutorPreference - withUnsafeContinuation done
 
 // CHECK: foo - withTaskExecutorPreference - withCheckedThrowingContinuation
-// CHECK: foo - withTaskExecutorPreference - withCheckedThrowingContinuation done
+// CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedThrowingContinuation done
 
 // CHECK: foo - withTaskExecutorPreference - withUnsafeThrowingContinuation
-// CHECK: foo - withTaskExecutorPreference - withUnsafeThrowingContinuation done
+// CHECK-NEXT: foo - withTaskExecutorPreference - withUnsafeThrowingContinuation done
+
+// CHECK: foo - withTaskExecutorPreference - TL.withValue
+// CHECK-NEXT: foo - withTaskExecutorPreference - TL.withValue done
+
+// CHECK: foo - withTaskExecutorPreference - TL.withValue throwing
+// CHECK-NEXT: foo - withTaskExecutorPreference - TL.withValue throwing done
 
 // By checking that this is the second enqueue here,
 // we check that there was no stray enqueues between with... invocations:
-// CHECK: Executor(task-executor): enqueue (2)
+// CHECK-NEXT: Executor(task-executor): enqueue (2)
 
-// CHECK: foo - withTaskExecutorPreference done
+// CHECK-NEXT: foo - withTaskExecutorPreference done
 
-// CHECK: == Make: actor Foo
-// CHECK: ---------------------------------------
-// CHECK: Executor(actor-executor): enqueue (1)
-// CHECK: actor.foo
+// CHECK-NEXT: == Make: actor Foo
+// CHECK-NEXT: ---------------------------------------
+// CHECK-NEXT: Executor(actor-executor): enqueue (1)
+// CHECK-NEXT: actor.foo
 
 // CHECK: actor.foo - withCheckedContinuation
-// CHECK: actor.foo - withCheckedContinuation done
+// CHECK-NEXT: actor.foo - withCheckedContinuation done
 
 // CHECK: actor.foo - withUnsafeContinuation
-// CHECK: actor.foo - withUnsafeContinuation done
+// CHECK-NEXT: actor.foo - withUnsafeContinuation done
 
 // CHECK: actor.foo - withCheckedThrowingContinuation
-// CHECK: actor.foo - withCheckedThrowingContinuation done
+// CHECK-NEXT: actor.foo - withCheckedThrowingContinuation done
 
 // CHECK: actor.foo - withUnsafeThrowingContinuation
-// CHECK: actor.foo - withUnsafeThrowingContinuation done
-// CHECK: actor.foo done
+// CHECK-NEXT: actor.foo - withUnsafeThrowingContinuation done
+// CHECK-NEXT: actor.foo done
 
 // No more enqueues are expected afterwards
 // CHECK-NOT: Executor
+
+@TaskLocal
+let myTaskLocal: String = ""
+
+nonisolated(nonsending) func someFunc() async throws {
+  print("nonisolated(nonsending) someFunc() async")
+}
 
 @available(SwiftStdlib 6.0, *)
 @concurrent
@@ -118,6 +131,18 @@ func foo() async {
       cont.resume()
     }
     print("foo - withTaskExecutorPreference - withUnsafeThrowingContinuation done\n")
+
+    await $myTaskLocal.withValue("value") {
+      print("foo - withTaskExecutorPreference - TL.withValue")
+      try? await someFunc()
+    }
+    print("foo - withTaskExecutorPreference - TL.withValue done\n")
+
+    try! await $myTaskLocal.withValue("value") {
+      print("foo - withTaskExecutorPreference - TL.withValue throwing")
+      try await someFunc()
+    }
+    print("foo - withTaskExecutorPreference - TL.withValue throwing done\n")
   }
   print("foo - withTaskExecutorPreference done")
 
