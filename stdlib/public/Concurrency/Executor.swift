@@ -591,7 +591,7 @@ public protocol MainExecutor: RunLoopExecutor, SerialExecutor {
 
 /// An ExecutorFactory is used to create the default main and task
 /// executors.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.2, *)
 public protocol ExecutorFactory {
   #if os(WASI) || !$Embedded
   /// Constructs and returns the main executor, which is started implicitly
@@ -604,7 +604,7 @@ public protocol ExecutorFactory {
   static var defaultExecutor: any TaskExecutor { get }
 }
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.2, *)
 typealias DefaultExecutorFactory = PlatformExecutorFactory
 
 @available(StdlibDeploymentTarget 6.2, *)
