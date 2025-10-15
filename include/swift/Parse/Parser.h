@@ -1820,6 +1820,23 @@ public:
   void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
                                   bool isAttr = false);
 
+  /// If a \c module-selector is present, returns a true value (specifically,
+  /// 1 or 2 depending on how many tokens should be consumed to skip it).
+  unsigned isAtModuleSelector();
+
+  /// Attempts to parse a \c module-selector if one is present.
+  ///
+  /// \verbatim
+  ///   module-selector: identifier '::'
+  /// \endverbatim
+  ///
+  /// \return \c None if no selector is present or a selector is present but
+  ///         is not allowed; an instance with an empty \c Identifier if a
+  ///         selector is present but has no valid identifier; an instance with
+  ///         a valid \c Identifier if a selector is present and includes a
+  ///         module name.
+  std::optional<Located<Identifier>> parseModuleSelector();
+
   enum class DeclNameFlag : uint8_t {
     /// If passed, operator basenames are allowed.
     AllowOperators = 1 << 0,
@@ -1831,6 +1848,9 @@ public:
     /// If passed, 'deinit' and 'subscript' should be parsed as special names,
     /// not ordinary identifiers.
     AllowKeywordsUsingSpecialNames = AllowKeywords | 1 << 2,
+
+    /// If passed, module selectors are not permitted on this declaration name.
+    ModuleSelectorUnsupported = 1 << 3,
 
     /// If passed, compound names with argument lists are allowed, unless they
     /// have empty argument lists.
@@ -1876,7 +1896,8 @@ public:
       SourceLoc &rightAngleLoc, ArgumentList *&argList, bool isExprBasic,
       DiagRef diag);
 
-  ParserResult<Expr> parseExprIdentifier(bool allowKeyword);
+  ParserResult<Expr> parseExprIdentifier(bool allowKeyword,
+                                         bool allowModuleSelector = true);
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);
 
