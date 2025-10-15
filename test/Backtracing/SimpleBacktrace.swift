@@ -5,7 +5,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: backtracing
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
