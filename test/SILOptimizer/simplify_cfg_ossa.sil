@@ -1944,6 +1944,24 @@ bb3:
   return %t : $()
 }
 
+// CHECK-LABEL: sil [ossa] @insert_compensating_destroy_in_switch_enum_destination_block :
+// CHECK:       bb0(%0 : @owned $Optional<AnyObject>):
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'insert_compensating_destroy_in_switch_enum_destination_block'
+sil [ossa] @insert_compensating_destroy_in_switch_enum_destination_block : $@convention(thin) (@owned Optional<AnyObject>) -> () {
+bb0(%0 : @owned $Optional<AnyObject>):
+  switch_enum %0, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
+
+bb1:
+  %15 = tuple ()
+  return %15
+
+bb2(%4 : @owned $AnyObject):
+  destroy_value %4
+  unreachable
+}
+
 // CHECK-LABEL: sil [ossa] @replace_phi_arg_with_borrowed_from_use :
 // CHECK:       bb3([[R:%.*]] : @reborrow $B):
 // CHECK:       bb6([[G:%.*]] : @guaranteed $E):
