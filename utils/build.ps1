@@ -195,7 +195,7 @@ param
   [string] $AndroidSDKVersionDefault = "Android",
 
   # Windows SDK Options
-  [switch] $Windows = $true,
+  [switch] $Windows = $false,
   [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
   [string] $WinSDKVersion = "",
   [string[]] $WindowsSDKArchitectures = @("X64","X86","Arm64"),
