@@ -4322,7 +4322,7 @@ if (-not $SkipBuild -and $IncludeNoAsserts) {
   Build-NoAssertsToolchain
 }
 
-if (-not $SkipBuild -and -not $IsCrossCompiling) {
+if (-not $SkipBuild) {
   Invoke-BuildStep Build-DocC $HostPlatform
 }
 
