@@ -228,7 +228,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
                            .ExplicitModulesOutputPath),
       sdkModuleOutputPath(workerCompilerInvocation->getFrontendOptions()
                               .ExplicitSDKModulesOutputPath),
-      CAS(CAS), ActionCache(ActionCache) {
+      CAS(CAS), ActionCache(ActionCache), PrefixMapper(Mapper) {
   // Instantiate a worker-specific diagnostic engine and copy over
   // the scanner's diagnostic consumers (expected to be thread-safe).
   workerDiagnosticEngine = std::make_unique<DiagnosticEngine>(ScanASTContext.SourceMgr);
