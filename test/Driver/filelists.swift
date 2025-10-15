@@ -69,8 +69,8 @@
 // RUN: ls %t/tmp-crash/sources-* %t/tmp-crash/outputs-*
 
 
-// RUN: cd %t && env PATH="%t/bin/:$PATH" %swiftc_driver_plain -driver-use-frontend-path %S/Inputs/filelists/check-filelist-abc.py -emit-library ./a.swift ./b.swift ./c.swift -module-name main -target x86_64-apple-macosx10.9 -driver-filelist-threshold=0 -output-file-map=%S/Inputs/filelists/output.json 2>&1 | %FileCheck -check-prefix=CHECK-LINK %s
-// RUN: cd %t && env PATH="%t/bin/:$PATH" %swiftc_driver_plain -driver-use-frontend-path %S/Inputs/filelists/check-filelist-abc.py -emit-library ./a.swift ./b.swift ./c.swift -module-name main -target x86_64-apple-macosx10.9 -driver-filelist-threshold=0 -output-file-map=%S/Inputs/filelists/output.json -whole-module-optimization -num-threads 1 2>&1 | %FileCheck -check-prefix=CHECK-LINK %s
+// RUN: cd %t && %swiftc_driver_plain -driver-use-frontend-path %S/Inputs/filelists/check-filelist-abc.py -emit-library -tools-directory %t/bin ./a.swift ./b.swift ./c.swift -module-name main -target x86_64-apple-macosx10.9 -driver-filelist-threshold=0 -output-file-map=%S/Inputs/filelists/output.json 2>&1 | %FileCheck -check-prefix=CHECK-LINK %s
+// RUN: cd %t && %swiftc_driver_plain -driver-use-frontend-path %S/Inputs/filelists/check-filelist-abc.py -emit-library -tools-directory %t/bin ./a.swift ./b.swift ./c.swift -module-name main -target x86_64-apple-macosx10.9 -driver-filelist-threshold=0 -output-file-map=%S/Inputs/filelists/output.json -whole-module-optimization -num-threads 1 2>&1 | %FileCheck -check-prefix=CHECK-LINK %s
 
 // CHECK-LINK: Handled link
 
