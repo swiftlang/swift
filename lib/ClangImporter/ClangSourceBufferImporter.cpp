@@ -52,7 +52,14 @@ SourceLoc ClangSourceBufferImporter::resolveSourceLocation(
                                        buffer.getBufferIdentifier(),
                                        /*RequiresNullTerminator=*/true)
     };
-    mirrorID = swiftSourceManager.addNewSourceBuffer(std::move(mirrorBuffer));
+    // The same underlying file can exist as multiple clang file IDs. E.g. as
+    // part of the its own module, and then later loaded as an import in another
+    // module.
+    auto IDOpt = swiftSourceManager.getIDForBufferIdentifier(buffer.getBufferIdentifier());
+    if (IDOpt.has_value())
+      mirrorID = IDOpt.value();
+    else
+      mirrorID = swiftSourceManager.addNewSourceBuffer(std::move(mirrorBuffer));
     mirroredBuffers[buffer.getBufferStart()] = mirrorID;
   }
   loc = swiftSourceManager.getLocForOffset(mirrorID, decomposedLoc.second);
