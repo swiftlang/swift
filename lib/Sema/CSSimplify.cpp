@@ -7104,8 +7104,11 @@ static bool isDependentMemberTypeWithBaseThatContainsUnresolvedPackExpansions(
   if (!type->is<DependentMemberType>())
     return false;
 
-  auto baseTy = cs.getFixedTypeRecursive(type->getDependentMemberRoot(),
-                                         /*wantRValue=*/true);
+  // FIXME: It's really unfortunate we need to use `simplifyType` here since
+  // this is called from `matchTypes`. We need to completely simplify the type
+  // though since pack expansions can be present in fixed types for nested
+  // type vars.
+  auto baseTy = cs.simplifyType(type->getDependentMemberRoot());
   llvm::SmallPtrSet<TypeVariableType *, 2> typeVars;
   baseTy->getTypeVariables(typeVars);
   return llvm::any_of(typeVars, [](const TypeVariableType *typeVar) {

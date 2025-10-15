@@ -833,3 +833,23 @@ func test_dependent_members() {
     return Variadic.f(c1, c2) // Ok
   }
 }
+
+protocol P2 {
+  associatedtype X
+}
+
+extension P2 {
+  func foo() where X == Bool {}
+  func foo() where X == String {}
+}
+
+do {
+  struct S<each E>: P2 {
+    typealias X = String
+    init(_ fn: () -> (repeat each E)) {}
+  }
+
+  func foo(_ x: Int) {
+    S { x }.foo() // Make sure we can pick the right 'foo' here.
+  }
+}
