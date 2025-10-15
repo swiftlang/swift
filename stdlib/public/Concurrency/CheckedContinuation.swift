@@ -292,8 +292,7 @@ extension CheckedContinuation {
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
-nonisolated(nonsending)
-public func withCheckedContinuation<T>(
+nonisolated(nonsending) public func withCheckedContinuation<T>(
   function: String = #function,
   _ body: (CheckedContinuation<T, Never>) -> Void
 ) async -> sending T {
@@ -354,8 +353,7 @@ public func withCheckedContinuation<T>(
 @inlinable
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
-nonisolated(nonsending)
-public func withCheckedThrowingContinuation<T>(
+nonisolated(nonsending) public func withCheckedThrowingContinuation<T>(
   function: String = #function,
   _ body: (CheckedContinuation<T, Error>) -> Void
 ) async throws -> sending T {
