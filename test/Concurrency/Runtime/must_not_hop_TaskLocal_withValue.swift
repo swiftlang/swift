@@ -12,20 +12,20 @@ import Synchronization
 
 @available(SwiftStdlib 6.0, *)
 final class AssertExactEnqueueCountExecutor: SerialExecutor {
-  let expectedEnqueueCount: Int
+  let maxEnqueues: Int
   let enqueueCount: Atomic<Int>
 
   let name: String
   
-  init(expectedEnqueueCount: Int, name: String) {
-    self.expectedEnqueueCount = expectedEnqueueCount
+  init(maxEnqueues: Int, name: String) {
+    self.maxEnqueues = maxEnqueues
     self.enqueueCount = .init(0)
     self.name = name
   }
 
   public func enqueue(_ job: consuming ExecutorJob) {
     let newEnqueueValue = self.enqueueCount.add(1, ordering: .relaxed).newValue
-    if newEnqueueValue > self.expectedEnqueueCount {
+    if newEnqueueValue > self.maxEnqueues {
       fatalError("Got unexpected enqueue (\(newEnqueueValue)), in: \(self.name)")
     }
     print("[executor][\(self.name)] Enqueue (\(newEnqueueValue))")
@@ -67,23 +67,23 @@ if #available(SwiftStdlib 6.0, *) {
 
 // CHECK: == Make: actor Foo
 // CHECK-NEXT: ---------------------------------------
-// CHECK-NEXT: Executor(actor-executor): enqueue (1)
+// CHECK-NEXT: [executor][actor-executor] Enqueue (1)
 // CHECK-NEXT: actor.foo
 
 // CHECK: actor.foo - withTaskExecutorPreference - TL.withValue
 // CHECK-NEXT: nonisolated(nonsending) someFunc() async
 // TODO: could we eliminate this hop-back?
-// CHECK-NEXT: Executor(actor-executor): enqueue (2)
+// CHECK-NEXT: [executor][actor-executor] Enqueue (2)
 // CHECK-NEXT: actor.foo - withTaskExecutorPreference - TL.withValue done
 
 // CHECK: actor.foo - withTaskExecutorPreference - TL.withValue throwing
 // CHECK-NEXT: nonisolated(nonsending) someFunc() async
 // TODO: could we eliminate this hop-back?
-// CHECK-NEXT: Executor(actor-executor): enqueue (3)
+// CHECK-NEXT: [executor][actor-executor] Enqueue (3)
 // CHECK-NEXT: actor.foo - withTaskExecutorPreference - TL.withValue throwing done
 
 // No more enqueues are expected afterwards
-// CHECK-NOT: Executor
+// CHECK-NOT: [executor]
 
 @TaskLocal
 let myTaskLocal: String = ""
