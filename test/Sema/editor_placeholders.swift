@@ -40,3 +40,8 @@ func test_ambiguity_with_placeholders(pairs: [(rank: Int, count: Int)]) -> Bool 
 
 let unboundInPlaceholder1: Array<Never> = <#T##Array#> // expected-error{{editor placeholder in source file}}
 let unboundInPlaceholder2: Array<Never> = foo(<#T##t: Array##Array<Never>#>) // expected-error{{editor placeholder in source file}}
+
+// Make sure this doesn't crash:
+<#T##(Result) -> Void#> // expected-error {{editor placeholder in source file}}
+// expected-error@-1 {{generic parameter 'Success' could not be inferred}}
+// expected-error@-2 {{generic parameter 'Failure' could not be inferred}}
