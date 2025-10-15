@@ -575,58 +575,47 @@ std::error_code ImplicitSerializedModuleLoader::findModuleFilesInDirectory(
   return std::error_code();
 }
 
-void SerializedModuleLoaderBase::identifyArchitectureVariants(
-    ASTContext &Ctx, const SerializedModuleBaseName &absoluteBaseName,
-    std::vector<std::string> &incompatibleArchModules) {
+bool ImplicitSerializedModuleLoader::maybeDiagnoseTargetMismatch(
+    SourceLoc sourceLocation, StringRef moduleName,
+    const SerializedModuleBaseName &absoluteBaseName,
+    bool isCanImportLookup) {
   llvm::vfs::FileSystem &fs = *Ctx.SourceMgr.getFileSystem();
+
+  // Get the last component of the base name, which is the target-specific one.
+  auto target = llvm::sys::path::filename(absoluteBaseName.baseName);
 
   // Strip off the last component to get the .swiftmodule folder.
   auto dir = absoluteBaseName.baseName;
   llvm::sys::path::remove_filename(dir);
 
   std::error_code errorCode;
+  std::string foundArchs;
   for (llvm::vfs::directory_iterator directoryIterator =
            fs.dir_begin(dir, errorCode), endIterator;
        directoryIterator != endIterator;
        directoryIterator.increment(errorCode)) {
     if (errorCode)
-      continue;
+      return false;
     StringRef filePath = directoryIterator->path();
     StringRef extension = llvm::sys::path::extension(filePath);
     if (file_types::lookupTypeForExtension(extension) ==
           file_types::TY_SwiftModuleFile) {
-      incompatibleArchModules.push_back(filePath.str());
+      if (!foundArchs.empty())
+        foundArchs += ", ";
+      foundArchs += llvm::sys::path::stem(filePath).str();
     }
   }
-}
 
-bool ImplicitSerializedModuleLoader::handlePossibleTargetMismatch(
-    SourceLoc sourceLocation, StringRef moduleName,
-    const SerializedModuleBaseName &absoluteBaseName,
-    bool isCanImportLookup) {
-  std::string foundArchs;
-  std::vector<std::string> foundIncompatibleArchModules;
-  identifyArchitectureVariants(Ctx, absoluteBaseName,
-                               foundIncompatibleArchModules);
-
-  // Maybe this swiftmodule directory only contains swiftinterfaces, or
-  // maybe something else is going on. Regardless, we shouldn't emit a
-  // possibly incorrect diagnostic.
-  if (foundIncompatibleArchModules.empty())
+  if (foundArchs.empty()) {
+    // Maybe this swiftmodule directory only contains swiftinterfaces, or
+    // maybe something else is going on. Regardless, we shouldn't emit a
+    // possibly incorrect diagnostic.
     return false;
-
-  // Generate combined list of discovered architectures
-  // for the diagnostic
-  for (const auto &modulePath : foundIncompatibleArchModules) {
-    if (!foundArchs.empty())
-      foundArchs += ", ";
-    foundArchs += llvm::sys::path::stem(modulePath).str();
   }
 
   Ctx.Diags
-      .diagnose(sourceLocation, diag::sema_no_import_target, moduleName,
-                llvm::sys::path::filename(absoluteBaseName.baseName),
-                foundArchs, absoluteBaseName.baseName)
+      .diagnose(sourceLocation, diag::sema_no_import_target, moduleName, target,
+                foundArchs, dir)
       .limitBehaviorIf(isCanImportLookup, DiagnosticBehavior::Warning);
   return !isCanImportLookup;
 }
@@ -791,8 +780,8 @@ bool SerializedModuleLoaderBase::findModule(
     // We can only get here if all targetFileNamePairs failed with
     // 'std::errc::no_such_file_or_directory'.
     if (firstAbsoluteBaseName &&
-        handlePossibleTargetMismatch(moduleID.Loc, moduleName,
-                                     *firstAbsoluteBaseName, isCanImportLookup))
+        maybeDiagnoseTargetMismatch(moduleID.Loc, moduleName,
+                                    *firstAbsoluteBaseName, isCanImportLookup))
       return SearchResult::Error;
 
     return SearchResult::NotFound;

@@ -107,21 +107,6 @@ bool SwiftModuleScanner::canImportModule(
       path, loc, versionInfo, isTestableDependencyLookup);
 }
 
-bool SwiftModuleScanner::handlePossibleTargetMismatch(
-    SourceLoc sourceLocation, StringRef moduleName,
-    const SerializedModuleBaseName &absoluteBaseName,
-    bool isCanImportLookup) {
-  std::vector<std::string> foundIncompatibleArchModules;
-  identifyArchitectureVariants(Ctx, absoluteBaseName,
-                               foundIncompatibleArchModules);
-
-  for (const auto &modulePath : foundIncompatibleArchModules)
-    incompatibleCandidates.push_back({modulePath,
-                                      "invalid architecture"});
-
-  return false;
-}
-
 static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,
                                                       StringRef moduleName,
                                                       StringRef interfacePath) {

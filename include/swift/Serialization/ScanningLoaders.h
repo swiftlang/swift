@@ -70,12 +70,6 @@ private:
                        ModuleVersionInfo *versionInfo,
                        bool isTestableImport) override;
 
-  bool handlePossibleTargetMismatch(
-      SourceLoc sourceLocation,
-      StringRef moduleName,
-      const SerializedModuleBaseName &BaseName,
-      bool isCanImportLookup) override;
-
   virtual void collectVisibleTopLevelModuleNames(
       SmallVectorImpl<Identifier> &names) const override {
     llvm_unreachable("Not used");
