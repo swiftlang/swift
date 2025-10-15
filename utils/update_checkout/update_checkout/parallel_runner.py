@@ -46,11 +46,13 @@ class ParallelRunner:
         pool_args: List[Union[RunnerArguments, AdditionalSwiftSourcesArguments]],
         n_processes: int = 0,
     ):
-        self._monitor_polling_period = 0.1
         if n_processes == 0:
-            n_processes = ParallelRunner._max_processes()
-        self._terminal_width = shutil.get_terminal_size().columns
+            # Limit the number of processes as the performance regresses after
+            # if the number is too high.
+            n_processes = min(cpu_count() * 2, 16)
         self._n_processes = n_processes
+        self._monitor_polling_period = 0.1
+        self._terminal_width = shutil.get_terminal_size().columns
         self._pool_args = pool_args
         self._fn = fn
         self._pool = Pool(processes=self._n_processes)
@@ -140,13 +142,3 @@ class ParallelRunner:
                 if r.stderr:
                     print(r.stderr.decode())
         return fail_count
-
-    @staticmethod
-    def _max_processes() -> int:
-        if sys.version_info.minor < 10:
-            # On Python < 3.10, https://bugs.python.org/issue46391 causes
-            # Pool.map and its variants to hang. Limiting the number of
-            # processes fixes the issue.
-            return int(cpu_count() * 1.25)
-        else:
-            return cpu_count() * 2

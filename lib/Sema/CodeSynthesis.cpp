@@ -268,8 +268,8 @@ static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
   // Attach a result builder attribute if needed.
   if (resultBuilderType) {
     auto typeExpr = TypeExpr::createImplicit(resultBuilderType, ctx);
-    auto attr =
-        CustomAttr::create(ctx, SourceLoc(), typeExpr, /*implicit=*/true);
+    auto attr = CustomAttr::create(ctx, SourceLoc(), typeExpr, /*owner*/ arg,
+                                   /*implicit=*/true);
     arg->getAttrs().add(attr);
   }
 

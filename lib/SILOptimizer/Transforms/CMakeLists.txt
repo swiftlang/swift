@@ -31,6 +31,5 @@ target_sources(swiftSILOptimizer PRIVATE
   DestroyAddrHoisting.cpp
   SimplifyCFG.cpp
   Sink.cpp
-  SpeculativeDevirtualizer.cpp
   StringOptimization.cpp)
 

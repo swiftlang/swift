@@ -3474,8 +3474,12 @@ public:
       ctx.Diags.diagnose(SourceLoc(), diagId, decl, MF.getAssociatedModule());
     }
 
-    if (DAttrs)
+    if (DAttrs) {
       decl->getAttrs().setRawAttributeChain(DAttrs);
+      // Wire up the correct owner for any CustomAttrs we deserialized.
+      for (auto *CA : decl->getAttrs().getAttributes<CustomAttr>())
+        CA->setOwner(decl);
+    }
 
     if (auto value = dyn_cast<ValueDecl>(decl)) {
       if (!privateDiscriminator.empty())
@@ -5965,8 +5969,10 @@ llvm::Error DeclDeserializer::deserializeCustomAttrs() {
     } else if (!deserialized.get() && MF.allowCompilerErrors()) {
       // Serialized an invalid attribute, just skip it when allowing errors
     } else {
+      // Note that the owner will be set in DeclDeserializer's destructor.
       auto *TE = TypeExpr::createImplicit(deserialized.get(), ctx);
-      auto custom = CustomAttr::create(ctx, SourceLoc(), TE, isImplicit);
+      auto custom = CustomAttr::create(ctx, SourceLoc(), TE, CustomAttrOwner(),
+                                       isImplicit);
       custom->setArgIsUnsafe(isArgUnsafe);
       AddAttribute(custom);
     }

@@ -1145,7 +1145,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
 void verificationFailure(const Twine &complaint,
               const SILInstruction *atInstruction,
               const SILArgument *atArgument,
-              llvm::function_ref<void(llvm::raw_ostream &OS)> extraContext);
+              llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
 
 inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
   switch (mod.getStage()) {

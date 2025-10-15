@@ -311,18 +311,17 @@ VarDecl *GlobalActorInstanceRequest::evaluate(
 }
 
 std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
-swift::checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
-                                  ArrayRef<CustomAttr *> attrs) {
-  ASTContext &ctx = dc->getASTContext();
+swift::checkGlobalActorAttributes(SourceLoc loc, ArrayRef<CustomAttr *> attrs) {
+  if (attrs.empty())
+    return std::nullopt;
+
+  auto &ctx = attrs[0]->getASTContext();
 
   CustomAttr *globalActorAttr = nullptr;
   NominalTypeDecl *globalActorNominal = nullptr;
   for (auto attr : attrs) {
     // Figure out which nominal declaration this custom attribute refers to.
-    auto *nominal = evaluateOrDefault(ctx.evaluator,
-                                      CustomAttrNominalRequest{attr, dc},
-                                      nullptr);
-
+    auto *nominal = attr->getNominalDecl();
     if (!nominal)
       continue;
 
@@ -352,11 +351,9 @@ std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 GlobalActorAttributeRequest::evaluate(
     Evaluator &evaluator,
     llvm::PointerUnion<Decl *, ClosureExpr *> subject) const {
-  DeclContext *dc = nullptr;
   DeclAttributes *declAttrs = nullptr;
   SourceLoc loc;
   if (auto decl = subject.dyn_cast<Decl *>()) {
-    dc = decl->getDeclContext();
     declAttrs = &decl->getAttrs();
     // HACK: `getLoc`, when querying the attr from a serialized decl,
     // depending on deserialization order, may launch into arbitrary
@@ -372,7 +369,6 @@ GlobalActorAttributeRequest::evaluate(
     loc = decl->getLoc(/* SerializedOK */ false);
   } else {
     auto closure = cast<ClosureExpr *>(subject);
-    dc = closure;
     declAttrs = &closure->getAttrs();
     loc = closure->getLoc();
   }
@@ -385,7 +381,7 @@ GlobalActorAttributeRequest::evaluate(
   }
 
   // Look for a global actor attribute.
-  auto result = checkGlobalActorAttributes(loc, dc, attrs);
+  auto result = checkGlobalActorAttributes(loc, attrs);
   if (!result)
     return std::nullopt;
 
@@ -6088,8 +6084,8 @@ static void addAttributesForActorIsolation(ValueDecl *value,
   }
   case ActorIsolation::GlobalActor: {
     auto typeExpr = TypeExpr::createImplicit(isolation.getGlobalActor(), ctx);
-    auto attr =
-        CustomAttr::create(ctx, SourceLoc(), typeExpr, /*implicit=*/true);
+    auto attr = CustomAttr::create(ctx, SourceLoc(), typeExpr, /*owner*/ value,
+                                   /*implicit=*/true);
     value->getAttrs().add(attr);
 
     if (isolation.preconcurrency() &&

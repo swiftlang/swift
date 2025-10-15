@@ -179,6 +179,8 @@ def verify_ignore_unknown: Flag<["-"], "verify-ignore-unknown">,
   HelpText<"Allow diagnostics for '<unknown>' location in verify mode">;
 def verify_ignore_unrelated: Flag<["-"], "verify-ignore-unrelated">,
   HelpText<"Allow diagnostics in files outside those with expected diagnostics in verify mode">;
+def verify_ignore_macro_note: Flag<["-"], "verify-ignore-macro-note">,
+  HelpText<"Skip verifying notes about macro location">;
 def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
   MetaVarName<"<module-name>">,
   HelpText<"Verify the generic signatures in the given module">;
@@ -578,7 +580,7 @@ def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
 
 def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
-  HelpText<"Enable speculative devirtualization pass.">;
+  HelpText<"Deprecated, has no effect">;
 
 def enable_async_demotion : Flag<["-"], "enable-experimental-async-demotion">,
   HelpText<"Enables an optimization pass to demote async functions.">;

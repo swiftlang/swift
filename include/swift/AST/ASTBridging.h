@@ -852,10 +852,11 @@ BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                BridgedStringRef cName,
                                                bool underscored);
 
-SWIFT_NAME(
-    "BridgedCustomAttr.createParsed(_:atLoc:type:initContext:argumentList:)")
+SWIFT_NAME("BridgedCustomAttr.createParsed(atLoc:type:declContext:initContext:"
+           "argumentList:)")
 BridgedCustomAttr BridgedCustomAttr_createParsed(
-    BridgedASTContext cContext, swift::SourceLoc atLoc, BridgedTypeRepr cType,
+    swift::SourceLoc atLoc, BridgedTypeRepr cType,
+    BridgedDeclContext cDeclContext,
     BridgedNullableCustomAttributeInitializer cInitContext,
     BridgedNullableArgumentList cArgumentList);
 

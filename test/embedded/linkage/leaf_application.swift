@@ -56,13 +56,15 @@ public func unnecessary() -> Int64 { 5 }
 @_neverEmitIntoClient
 public func unusedYetThere() -> Int64 { 5 }
 
-public class PointClass {
+open class PointClass {
   public var x, y: Int
 
   public init(x: Int, y: Int) {
     self.x = x
     self.y = y
   }
+
+  private func notUsed() { }
 }
 
 public protocol Reflectable: AnyObject {
@@ -88,6 +90,9 @@ public func createsExistential() -> any Reflectable {
 // LIBRARY-IR-NOT: define hidden swiftcc
 
 // LIBRARY-IR-NOT: define {{.*}} @"$es27_allocateUninitializedArrayySayxG_BptBwlFSi_Tg5"
+
+
+// LIBRARY-IR: define linkonce_odr hidden void @_swift_dead_method_stub
 
 // LIBRARY-SIL: sil @$e7Library5helloSaySiGyF
 // LIBRARY-SIL: sil @$e7Library8getArraySaySiGyF : $@convention(thin) () -> @owned Array<Int> {

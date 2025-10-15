@@ -350,10 +350,10 @@ private:
 
 /// Request the nominal type declaration to which the given custom
 /// attribute refers.
-class CustomAttrNominalRequest :
-    public SimpleRequest<CustomAttrNominalRequest,
-                         NominalTypeDecl *(CustomAttr *, DeclContext *),
-                         RequestFlags::Cached> {
+class CustomAttrNominalRequest
+    : public SimpleRequest<CustomAttrNominalRequest,
+                           NominalTypeDecl *(CustomAttr *),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -361,8 +361,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  NominalTypeDecl *
-  evaluate(Evaluator &evaluator, CustomAttr *attr, DeclContext *dc) const;
+  NominalTypeDecl *evaluate(Evaluator &evaluator, CustomAttr *attr) const;
 
 public:
   // Caching

@@ -487,7 +487,7 @@ public:
   bool dumpPrecompiledModule(StringRef modulePath, StringRef outputPath);
 
   bool runPreprocessor(StringRef inputPath, StringRef outputPath);
-  const clang::Module *getClangOwningModule(ClangNode Node) const;
+  const clang::Module *getClangOwningModule(ClangNode Node) const override;
   bool hasTypedef(const clang::Decl *typeDecl) const;
 
   void verifyAllModules() override;

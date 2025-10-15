@@ -16,6 +16,12 @@ module StdVector {
   export *
 }
 
+module StdVectorNoCPlusPlusRequirement {
+  header "std-vector-no-cplusplus-requirement.h"
+  // NO requires cplusplus
+  export *
+}
+
 module StdSpan {
   header "std-span.h"
   requires cplusplus

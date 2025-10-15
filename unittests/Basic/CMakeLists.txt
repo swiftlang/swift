@@ -37,6 +37,7 @@ add_swift_unittest(SwiftBasicTests
   StringExtrasTest.cpp
   SuccessorMapTest.cpp
   TaggedUnionTest.cpp
+  TaskQueueTest.cpp
   ThreadSafeRefCntPointerTest.cpp
   TransformRangeTest.cpp
   TypeLookupError.cpp

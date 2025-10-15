@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name devirt_covariant_return -Xllvm -sil-full-demangle -enable-spec-devirt -O -Xllvm -disable-sil-cm-rr-cm=0   -Xllvm -sil-inline-generics=false -primary-file %s -Xllvm -sil-print-types -emit-sil -sil-inline-threshold 1000 -Xllvm -sil-disable-pass=ObjectOutliner -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -module-name devirt_covariant_return -Xllvm -sil-full-demangle -O -Xllvm -disable-sil-cm-rr-cm=0   -Xllvm -sil-inline-generics=false -primary-file %s -Xllvm -sil-print-types -emit-sil -sil-inline-threshold 1000 -Xllvm -sil-disable-pass=ObjectOutliner -sil-verify-all | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -12,7 +12,6 @@
 
 // CHECK-LABEL: sil hidden @$s23devirt_covariant_return6driveryyF : $@convention(thin) () -> () {
 // CHECK: bb0
-// CHECK-NOT: alloc_ref
 // CHECK: function_ref @unknown1a : $@convention(thin) () -> ()
 // CHECK: apply
 // CHECK: function_ref @defenestrate : $@convention(thin) () -> ()
@@ -112,8 +111,7 @@ public class Bear {
   // Check that devirtualizer can handle convenience initializers, which have covariant optional
   // return types.
   // CHECK-LABEL: sil @$s23devirt_covariant_return4BearC{{[_0-9a-zA-Z]*}}fC
-  // CHECK: checked_cast_br [exact] @thick Bear.Type in %{{.*}} : $@thick Bear.Type to @thick GummyBear.Type
-  // CHECK: upcast %{{.*}} : $Optional<GummyBear> to $Optional<Bear>
+  // This used to check speculative-devirtualization, which we don't have anymore.
   // CHECK: }
   public convenience init?(delegateFailure: Bool, failAfter: Bool) {
     self.init(fail: delegateFailure)
@@ -193,11 +191,7 @@ func driver1(_ c: C1) -> Int32 {
 // gets properly unwrapped into a Payload object and then further
 // devirtualized.
 // CHECK-LABEL: sil hidden [noinline] @$s23devirt_covariant_return7driver3ys5Int32VAA1CCF
-// CHECK: bb{{[0-9]+}}(%{{[0-9]+}} : $C2):
-// CHECK-NOT: bb{{.*}}:
-// check that for C2, we convert the non-optional result into an optional and then cast.
-// CHECK: enum $Optional
-// CHECK-NEXT: upcast
+// This used to check speculative-devirtualization, which we don't have anymore.
 // CHECK: return
 @inline(never)
 func driver3(_ c: C) -> Int32 {
@@ -235,12 +229,7 @@ public class D2: D1 {
 // that D2.foo() is inlined thanks to this.
 // CHECK-LABEL: sil hidden [noinline] @$s23devirt_covariant_return7driver2ys5Int32VAA2D2CF
 // CHECK-NOT: class_method
-// CHECK: checked_cast_br [exact] D2 in
-// CHECK: bb2
-// CHECK: global_addr
-// CHECK: load
-// CHECK: ref_element_addr
-// CHECK: bb3
+// This used to check speculative-devirtualization, which we don't have anymore.
 // CHECK: class_method
 // CHECK: }
 @inline(never)
@@ -279,9 +268,7 @@ class EEE : CCC {
 // Check that c.foo() is devirtualized, because the optimizer can handle the casting the return type
 // correctly, i.e. it can cast (BBB, BBB) into (AAA, AAA)
 // CHECK-LABEL: sil hidden [noinline] @$s23devirt_covariant_return37testDevirtOfMethodReturningTupleTypes_1bAA2AAC_AEtAA3CCCC_AA2BBCtF
-// CHECK: checked_cast_br [exact] CCC in %{{.*}} : $CCC to CCC
-// CHECK: checked_cast_br [exact] CCC in %{{.*}} : $CCC to DDD
-// CHECK: checked_cast_br [exact] CCC in %{{.*}} : $CCC to EEE
+// This used to check speculative-devirtualization, which we don't have anymore.
 // CHECK: class_method
 // CHECK: }
 @inline(never)
@@ -319,11 +306,7 @@ class DDDD : CCCC {
 // Check devirtualization of methods with optional results, where
 // optional results need to be casted.
 // CHECK-LABEL: sil [noinline] @{{.*}}testOverridingMethodWithOptionalResult
-// CHECK: checked_cast_br [exact] F in %{{.*}} : $F to F
-// CHECK: checked_cast_br [exact] F in %{{.*}} : $F to G
-// CHECK: switch_enum
-// CHECK: checked_cast_br [exact] F in %{{.*}} : $F to H
-// CHECK: switch_enum
+// This used to check speculative-devirtualization, which we don't have anymore.
 @inline(never)
 public func testOverridingMethodWithOptionalResult(_ f: F) -> (F?, Int)? {
   return f.foo()

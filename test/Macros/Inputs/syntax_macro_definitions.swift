@@ -2725,6 +2725,24 @@ struct ThrowCancellationMacro: BodyMacro {
   }
 }
 
+struct EmptyBodyMacro: BodyMacro {
+  static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    []
+  }
+
+  static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor closure: ClosureExprSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    []
+  }
+}
+
 @_spi(ExperimentalLanguageFeature)
 public struct TracedPreambleMacro: PreambleMacro {
   public static func expansion(

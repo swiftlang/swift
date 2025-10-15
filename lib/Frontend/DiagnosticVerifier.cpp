@@ -1502,6 +1502,8 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
   // because there's no reason to verify them.
   if (Info.ID == diag::verify_encountered_fatal.ID)
     return;
+  if (IgnoreMacroLocationNote && Info.ID == diag::in_macro_expansion.ID)
+    return;
   SmallVector<CapturedFixItInfo, 2> fixIts;
   for (const auto &fixIt : Info.FixIts) {
     fixIts.emplace_back(SM, fixIt);

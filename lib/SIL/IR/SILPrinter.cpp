@@ -3372,6 +3372,9 @@ void SILNode::dump() const {
 
 void SILNode::print(raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
+  print(Ctx);
+}
+void SILNode::print(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).print(this);
 }
 
@@ -3391,6 +3394,9 @@ void SingleValueInstruction::dump() const {
 
 void SILInstruction::print(raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
+  print(Ctx);
+}
+void SILInstruction::print(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).print(this);
 }
 
@@ -3413,7 +3419,9 @@ void SILBasicBlock::dump(bool DebugInfo) const {
 /// Pretty-print the SILBasicBlock to the designated stream.
 void SILBasicBlock::print(raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
-
+  print(Ctx);
+}
+void SILBasicBlock::print(SILPrintContext &Ctx) const {
   // Print the debug scope (and compute if we didn't do it already).
   auto &SM = this->getParent()->getModule().getASTContext().SourceMgr;
   for (auto &I : *this) {
@@ -3421,10 +3429,6 @@ void SILBasicBlock::print(raw_ostream &OS) const {
     P.printDebugScope(I.getDebugScope(), SM);
   }
 
-  SILPrinter(Ctx).print(this);
-}
-
-void SILBasicBlock::print(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).print(this);
 }
 
@@ -4234,6 +4238,9 @@ void SILNode::dumpInContext() const {
 }
 void SILNode::printInContext(llvm::raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
+  printInContext(Ctx);
+}
+void SILNode::printInContext(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).printInContext(this);
 }
 
@@ -4242,6 +4249,9 @@ void SILInstruction::dumpInContext() const {
 }
 void SILInstruction::printInContext(llvm::raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
+  printInContext(Ctx);
+}
+void SILInstruction::printInContext(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).printInContext(asSILNode());
 }
 

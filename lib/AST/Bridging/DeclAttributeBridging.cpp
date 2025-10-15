@@ -197,12 +197,15 @@ BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
 }
 
 BridgedCustomAttr BridgedCustomAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedTypeRepr cType,
+    SourceLoc atLoc, BridgedTypeRepr cType, BridgedDeclContext cDeclContext,
     BridgedNullableCustomAttributeInitializer cInitContext,
     BridgedNullableArgumentList cArgumentList) {
-  ASTContext &context = cContext.unbridged();
+  DeclContext *DC = cDeclContext.unbridged();
+  ASTContext &context = DC->getASTContext();
+  // Note we set a DeclContext as the owner, which we'll change to the attached
+  // Decl if necessary when attaching the attributes.
   return CustomAttr::create(
-      context, atLoc, new (context) TypeExpr(cType.unbridged()),
+      context, atLoc, new (context) TypeExpr(cType.unbridged()), /*owner*/ DC,
       cInitContext.unbridged(), cArgumentList.unbridged());
 }
 

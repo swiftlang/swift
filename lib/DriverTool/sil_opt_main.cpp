@@ -297,10 +297,6 @@ struct SILOptOptions {
                     llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
 
   llvm::cl::opt<bool>
-  EnableSpeculativeDevirtualization = llvm::cl::opt<bool>("enable-spec-devirt",
-                    llvm::cl::desc("Enable Speculative Devirtualization pass."));
-
-  llvm::cl::opt<bool>
   EnableAsyncDemotion = llvm::cl::opt<bool>("enable-async-demotion",
                     llvm::cl::desc("Enables an optimization pass to demote async functions."));
 
@@ -891,7 +887,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EmitVerboseSIL |= options.EmitVerboseSIL;
   SILOpts.EmitSortedSIL |= options.EmitSortedSIL;
 
-  SILOpts.EnableSpeculativeDevirtualization = options.EnableSpeculativeDevirtualization;
   SILOpts.EnableAsyncDemotion = options.EnableAsyncDemotion;
   SILOpts.EnableThrowsPrediction = options.EnableThrowsPrediction;
   SILOpts.EnableNoReturnCold = options.EnableNoReturnCold;

@@ -2,6 +2,7 @@
 // XFAIL: OS=linux-androideabi
 
 import StdVector
+import StdVectorNoCPlusPlusRequirement
 import CxxStdlib
 
 func takeCopyable<T: Copyable>(_ x: T) {} 
@@ -19,4 +20,12 @@ takeCxxVector(vecNC)
 let vecPointer = VectorOfPointer()
 takeCopyable(vecPointer)
 takeCxxVector(vecPointer)
+// CHECK-NOT: error
+
+// Make sure that a specialization of std::vector that is declared in a Clang
+// module which does not declare 'requires cplusplus' is still conformed to
+// CxxVector.
+let vecFloat = VectorOfFloat()
+takeCopyable(vecFloat)
+takeCxxVector(vecFloat)
 // CHECK-NOT: error

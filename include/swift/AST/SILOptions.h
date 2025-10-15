@@ -108,10 +108,6 @@ public:
   /// purposes.
   bool EnableOSSAOptimizations = true;
 
-  /// Controls whether to turn on speculative devirtualization.
-  /// It is turned off by default.
-  bool EnableSpeculativeDevirtualization = false;
-
   /// Controls whether to emit actor data-race checks.
   bool EnableActorDataRaceChecks = false;
 

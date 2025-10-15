@@ -809,20 +809,18 @@ repositories.
             sys.exit(1)
 
     if is_unix_sock_path_too_long():
-        print(
-            f"TEMPDIR={tempfile.gettempdir()} is too long and multiprocessing "
-            "sockets will exceed the size limit. Falling back to verbose mode."
-        )
+        if not args.dump_hashes and not args.dump_hashes_config:
+            # Do not print anything other than the json dump.
+            print(
+                f"TEMPDIR={tempfile.gettempdir()} is too long and multiprocessing "
+                "sockets will exceed the size limit. Falling back to verbose mode."
+            )
         args.verbose = True
-    elif (
-        sys.version_info.minor < 10
-        and args.n_processes > ParallelRunner._max_processes()
-    ):
-        print(
-            "Falling back to verbose mode due to a Python 3.9 limitation. "
-            f"Lower `-j` below {ParallelRunner._max_processes()} to use non verbose mode."
-        )
-        args._verbose = True
+    if sys.version_info.minor < 10:
+        if not args.dump_hashes and not args.dump_hashes_config:
+            # Do not print anything other than the json dump.
+            print("Falling back to verbose mode due to a Python 3.9 limitation.")
+        args.verbose = True
 
     clone = args.clone
     clone_with_ssh = args.clone_with_ssh

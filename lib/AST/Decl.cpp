@@ -442,6 +442,8 @@ void Decl::attachParsedAttrs(DeclAttributes attrs) {
     attr->setOriginalDeclaration(this);
   for (auto attr : attrs.getAttributes<ABIAttr, /*AllowInvalid=*/true>())
     recordABIAttr(attr);
+  for (auto *attr : attrs.getAttributes<CustomAttr>())
+    attr->setOwner(this);
 
   // @implementation requires an explicit @objc attribute, but
   // @_objcImplementation didn't. Insert one if necessary.
@@ -573,8 +575,7 @@ Type Decl::getResolvedCustomAttrType(CustomAttr *attr) const {
     return ty;
 
   auto dc = getDeclContext();
-  auto *nominal = evaluateOrDefault(
-      getASTContext().evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+  auto *nominal = attr->getNominalDecl();
   if (!nominal)
     return Type();
 
@@ -931,16 +932,18 @@ static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
   if (!ctx.LangOpts.EnableCXXInterop)
     return nullptr;
 
+  auto clangImporter = ctx.getClangModuleLoader();
+  ASSERT(clangImporter && "ClangImporter required");
+
   // When we clone members for base classes the cloned members have no
   // corresponding Clang nodes. Look up the original imported declaration to
   // figure out what Clang module does the cloned member originate from.
   bool isClonedMember = false;
   if (auto VD = dyn_cast<ValueDecl>(decl))
-    if (auto loader = ctx.getClangModuleLoader())
-      if (auto original = loader->getOriginalForClonedMember(VD)) {
-        isClonedMember = true;
-        decl = original;
-      }
+    if (auto original = clangImporter->getOriginalForClonedMember(VD)) {
+      isClonedMember = true;
+      decl = original;
+    }
 
   if (!decl->hasClangNode())
     return nullptr;
@@ -955,7 +958,7 @@ static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
     return nullptr;
   }
 
-  auto clangModule = decl->getClangDecl()->getOwningModule();
+  auto clangModule = clangImporter->getClangOwningModule(decl->getClangDecl());
   if (!clangModule)
     return nullptr;
 
@@ -963,7 +966,7 @@ static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
   // a single top-level module.
   clangModule = clangModule->getTopLevelModule();
 
-  return ctx.getClangModuleLoader()->getWrapperForModule(clangModule);
+  return clangImporter->getWrapperForModule(clangModule);
 }
 
 ModuleDecl *Decl::getModuleContextForNameLookup() const {
@@ -8703,11 +8706,7 @@ VarDecl::getAttachedPropertyWrapperTypeInfo(unsigned i) const {
     if (i >= attrs.size())
       return PropertyWrapperTypeInfo();
 
-    auto attr = attrs[i];
-    auto dc = getDeclContext();
-    ASTContext &ctx = getASTContext();
-    nominal = evaluateOrDefault(
-        ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+    nominal = attrs[i]->getNominalDecl();
   }
 
   if (!nominal)

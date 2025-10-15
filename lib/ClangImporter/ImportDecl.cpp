@@ -63,6 +63,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjCCommon.h"
+#include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/PrettyPrinter.h"
 #include "clang/AST/RecordLayout.h"
@@ -2597,34 +2598,30 @@ namespace {
           result->addMember(ctor);
         }
       } else {
-        if (!Impl.SwiftContext.LangOpts.hasFeature(
-                Feature::SuppressCXXForeignReferenceTypeInitializers)) {
-          assert(
-              isa<ClassDecl>(result) &&
-              "Expected result to be a ClassDecl as it cannot be a StructDecl");
-          // When we add full support for C foreign reference types then we
-          // should synthesize static factories for them as well
-          if (auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
-            bool hasUserProvidedStaticFactory = llvm::any_of(
-                cxxRecordDecl->methods(),
-                [](const clang::CXXMethodDecl *method) {
-                  return method->isStatic() &&
-                         llvm::any_of(
-                             method->specific_attrs<clang::SwiftNameAttr>(),
-                             [](const auto *attr) {
-                               return attr->getName().starts_with("init(");
-                             });
-                });
-            if (!hasUserProvidedStaticFactory) {
-              auto generatedCxxMethodDecls =
-                  synthesizer.synthesizeStaticFactoryForCXXForeignRef(
-                      cxxRecordDecl);
-              for (auto *methodDecl : generatedCxxMethodDecls) {
-                if (Decl *importedInitDecl =
-                        Impl.SwiftContext.getClangModuleLoader()
-                            ->importDeclDirectly(methodDecl))
-                  result->addMember(importedInitDecl);
-              }
+        assert(
+            isa<ClassDecl>(result) &&
+            "Expected result to be a ClassDecl as it cannot be a StructDecl");
+        // When we add full support for C foreign reference types then we
+        // should synthesize static factories for them as well
+        if (auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+          bool hasUserProvidedStaticFactory = llvm::any_of(
+              cxxRecordDecl->methods(), [](const clang::CXXMethodDecl *method) {
+                return method->isStatic() &&
+                       llvm::any_of(
+                           method->specific_attrs<clang::SwiftNameAttr>(),
+                           [](const auto *attr) {
+                             return attr->getName().starts_with("init(");
+                           });
+              });
+          if (!hasUserProvidedStaticFactory) {
+            auto generatedCxxMethodDecls =
+                synthesizer.synthesizeStaticFactoryForCXXForeignRef(
+                    cxxRecordDecl);
+            for (auto *methodDecl : generatedCxxMethodDecls) {
+              if (Decl *importedInitDecl =
+                      Impl.SwiftContext.getClangModuleLoader()
+                          ->importDeclDirectly(methodDecl))
+                result->addMember(importedInitDecl);
             }
           }
         }
@@ -4194,6 +4191,20 @@ namespace {
       return false;
     }
 
+    static bool canTypeMutateBuffer(clang::QualType ty) {
+      // FIXME: better way to detect if a type can mutate the underlying buffer.
+      if (const auto *rd = ty->getAsRecordDecl()) {
+        if (rd->isInStdNamespace() && rd->getName() == "span")
+          return !cast<clang::ClassTemplateSpecializationDecl>(rd)
+                      ->getTemplateArgs()
+                      .get(0)
+                      .getAsType()
+                      .isConstQualified();
+      }
+      // Conservatively assume most types can mutate the underlying buffer.
+      return true;
+    }
+
     void addLifetimeDependencies(const clang::FunctionDecl *decl,
                                  AbstractFunctionDecl *result) {
       if (decl->getTemplatedKind() == clang::FunctionDecl::TK_FunctionTemplate)
@@ -4205,11 +4216,22 @@ namespace {
           !isa<clang::CXXMethodDecl, clang::ObjCMethodDecl>(decl))
         return;
 
+      bool hasSkippedLifetimeAnnotation = false;
       auto isEscapable = [this](clang::QualType ty) {
         return evaluateOrDefault(
                    Impl.SwiftContext.evaluator,
                    ClangTypeEscapability({ty.getTypePtr(), &Impl}),
                    CxxEscapability::Unknown) != CxxEscapability::NonEscapable;
+      };
+      auto importedAsClass = [this](clang::QualType ty, bool forSelf) {
+        if (!forSelf) {
+          if (ty->getPointeeType().isNull())
+            return false;
+          ty = ty->getPointeeType();
+        }
+        if (const auto *rd = ty->getAsRecordDecl())
+          return recordHasReferenceSemantics(rd);
+        return false;
       };
 
       auto swiftParams = result->getParameters();
@@ -4237,6 +4259,7 @@ namespace {
       }
 
       auto retType = decl->getReturnType();
+      bool retMayMutateBuffer = canTypeMutateBuffer(retType);
       auto warnForEscapableReturnType = [&] {
         if (isEscapableAnnotatedType(retType.getTypePtr())) {
           Impl.addImportDiagnostic(
@@ -4252,8 +4275,11 @@ namespace {
       SmallBitVector scopedLifetimeParamIndicesForReturn(dependencyVecSize);
       SmallBitVector paramHasAnnotation(dependencyVecSize);
       std::map<unsigned, SmallBitVector> inheritedArgDependences;
-      auto processLifetimeBound = [&](unsigned idx, clang::QualType ty) {
+      auto processLifetimeBound = [&](unsigned idx, clang::QualType ty,
+                                      bool forSelf = false) {
         warnForEscapableReturnType();
+        if (retMayMutateBuffer && importedAsClass(ty, forSelf))
+          hasSkippedLifetimeAnnotation = true;
         paramHasAnnotation[idx] = true;
         if (isEscapable(ty))
           scopedLifetimeParamIndicesForReturn[idx] = true;
@@ -4302,7 +4328,8 @@ namespace {
       if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(decl))
         processLifetimeBound(
             result->getSelfIndex(),
-            cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType());
+            cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType(),
+            /*forSelf=*/true);
       if (auto attr =
               getImplicitObjectParamAnnotation<clang::LifetimeCaptureByAttr>(
                   decl))
@@ -4352,16 +4379,21 @@ namespace {
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
       }
 
-      for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
-        if (isEscapable(param->getType()))
-          continue;
-        if (param->hasAttr<clang::NoEscapeAttr>() || paramHasAnnotation[idx])
-          continue;
-        // We have a nonescapable parameter that does not have its lifetime
-        // annotated nor is it marked noescape.
+      if (hasSkippedLifetimeAnnotation) {
         auto attr = new (ASTContext) UnsafeAttr(/*implicit=*/true);
         result->getAttrs().add(attr);
-        break;
+      } else {
+        for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
+          if (isEscapable(param->getType()))
+            continue;
+          if (param->hasAttr<clang::NoEscapeAttr>() || paramHasAnnotation[idx])
+            continue;
+          // We have a nonescapable parameter that does not have its lifetime
+          // annotated nor is it marked noescape.
+          auto attr = new (ASTContext) UnsafeAttr(/*implicit=*/true);
+          result->getAttrs().add(attr);
+          break;
+        }
       }
 
       Impl.diagnoseTargetDirectly(decl);
@@ -8885,7 +8917,10 @@ void ClangImporter::Implementation::importNontrivialAttribute(
       SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
                                             decl->getAttrs().end());
       for (auto attr : attrs) {
-        MappedDecl->getAttrs().add(cached ? attr->clone(SwiftContext) : attr);
+        auto *newAttr = cached ? attr->clone(SwiftContext) : attr;
+        if (auto *CA = dyn_cast<CustomAttr>(newAttr))
+          CA->setOwner(MappedDecl);
+        MappedDecl->getAttrs().add(newAttr);
       }
     }
     break;
@@ -8933,7 +8968,8 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
 
         if (Type mainActorType = SwiftContext.getMainActorType()) {
           auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
-          auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
+          auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr,
+                                         /*owner*/ MappedDecl);
           MappedDecl->getAttrs().add(attr);
           seenMainActorAttr = swiftAttr;
         }
@@ -9495,7 +9531,8 @@ static StringRef getAttributeName(const clang::CountAttributedType *CAT) {
 }
 
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
-  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
+  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers) ||
+      SwiftContext.ClangImporterOpts.DisableSafeInteropWrappers)
     return;
   auto ClangDecl =
       dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
@@ -9545,13 +9582,22 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       SIW_DBG("  Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
       attachMacro = true;
     }
+    auto requiresExclusiveClassDependency = [](ParamDecl *fromParam,
+                                               clang::QualType toType) {
+      return fromParam->getInterfaceType()->isAnyClassReferenceType() &&
+             SwiftDeclConverter::canTypeMutateBuffer(toType);
+    };
     bool returnHasLifetimeInfo = false;
     if (SwiftDeclConverter::getImplicitObjectParamAnnotation<
             clang::LifetimeBoundAttr>(ClangDecl)) {
       SIW_DBG("  Found lifetimebound attribute on implicit 'this'\n");
-      printer.printLifetimeboundReturn(SwiftifyInfoPrinter::SELF_PARAM_INDEX,
-                                       true);
-      returnHasLifetimeInfo = true;
+      if (!requiresExclusiveClassDependency(
+              MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true),
+              ClangDecl->getReturnType())) {
+        printer.printLifetimeboundReturn(SwiftifyInfoPrinter::SELF_PARAM_INDEX,
+                                         true);
+        returnHasLifetimeInfo = true;
+      }
     }
 
     bool isClangInstanceMethod =
@@ -9608,14 +9654,18 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       if (clangParam->hasAttr<clang::LifetimeBoundAttr>()) {
         SIW_DBG("  Found lifetimebound attribute on parameter '"
                         << *clangParam << "'\n");
-        // If this parameter has bounds info we will tranform it into a Span,
-        // so then it will no longer be Escapable.
-        bool willBeEscapable = swiftParamTy->isEscapable() &&
-            (!paramHasBoundsInfo ||
-             mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX);
-        printer.printLifetimeboundReturn(mappedIndex, willBeEscapable);
-        paramHasLifetimeInfo = true;
-        returnHasLifetimeInfo = true;
+        if (!requiresExclusiveClassDependency(swiftParam,
+                                              ClangDecl->getReturnType())) {
+          // If this parameter has bounds info we will tranform it into a Span,
+          // so then it will no longer be Escapable.
+          bool willBeEscapable =
+              swiftParamTy->isEscapable() &&
+              (!paramHasBoundsInfo ||
+               mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX);
+          printer.printLifetimeboundReturn(mappedIndex, willBeEscapable);
+          paramHasLifetimeInfo = true;
+          returnHasLifetimeInfo = true;
+        }
       }
       if (paramIsStdSpan && paramHasLifetimeInfo) {
         SIW_DBG("  Found both std::span and lifetime info "

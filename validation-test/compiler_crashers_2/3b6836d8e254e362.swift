@@ -1,4 +1,4 @@
-// {"signature":"(anonymous namespace)::Traversal::doIt(swift::Expr*)"}
+// {"kind":"typecheck","signature":"(anonymous namespace)::ExprRewriter::visitDeclRefExpr(swift::DeclRefExpr*)"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 {
   for b 0 ..< 10 {
