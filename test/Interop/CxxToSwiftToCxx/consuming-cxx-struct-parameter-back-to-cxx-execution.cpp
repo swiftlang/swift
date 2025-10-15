@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend %t/use-cxx-types.swift -module-name UseCxx -typecheck -verify -emit-clang-header-path %t/UseCxx.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -disable-availability-checking
+// RUN: %target-swift-frontend %t%{fs-sep}use-cxx-types.swift -module-name UseCxx -typecheck -verify -verify-additional-file %t%{fs-sep}header.h -emit-clang-header-path %t%{fs-sep}UseCxx.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -disable-availability-checking
 
-// RUN: %target-interop-build-clangxx -std=c++20 -c %t/use-swift-cxx-types.cpp -I %t -o %t/swift-cxx-execution.o
-// RUN: %target-interop-build-swift %t/use-cxx-types.swift -o %t/swift-cxx-execution -Xlinker %t/swift-cxx-execution.o -module-name UseCxx -Xfrontend -entry-point-function-name -Xfrontend swiftMain -I %t -O -Xfrontend -disable-availability-checking
+// RUN: %target-interop-build-clangxx -std=c++20 -c %t%{fs-sep}use-swift-cxx-types.cpp -I %t -o %t%{fs-sep}swift-cxx-execution.o
+// RUN: %target-interop-build-swift %t%{fs-sep}use-cxx-types.swift -o %t%{fs-sep}swift-cxx-execution -Xlinker %t%{fs-sep}swift-cxx-execution.o -module-name UseCxx -Xfrontend -entry-point-function-name -Xfrontend swiftMain -I %t -O -Xfrontend -disable-availability-checking
 
-// RUN: %target-codesign %t/swift-cxx-execution
-// RUN: %target-run %t/swift-cxx-execution | %FileCheck %s
+// RUN: %target-codesign %t%{fs-sep}swift-cxx-execution
+// RUN: %target-run %t%{fs-sep}swift-cxx-execution | %FileCheck %s
 
 // REQUIRES: executable_test
 
@@ -63,7 +63,7 @@ __attribute__((swift_attr("release:releaseShared")));
 inline void retainShared(SharedFRT *r) { puts("retainShared"); }
 inline void releaseShared(SharedFRT *r) { puts("releaseShared"); }
 
-inline SharedFRT* createSharedFRT() { return new SharedFRT(); }
+inline SharedFRT* createSharedFRT() { return new SharedFRT(); } // expected-note {{'createSharedFRT()' is defined here}}
 
 //--- module.modulemap
 module CxxTest {
@@ -109,7 +109,7 @@ public func returnSharedFRT(_ x : SharedFRT) -> SharedFRT {
 }
 
 public func returnSharedFRT2() -> SharedFRT {
-  return createSharedFRT()
+  return createSharedFRT() // expected-warning {{cannot infer the ownership of the returned value, annotate 'createSharedFRT()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
 }
 
 public struct ValueWrapper {
