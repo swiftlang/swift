@@ -118,7 +118,7 @@ extension ASTGenVisitor {
       let attrKind: swift.DeclAttrKind?
       do {
         let bridgedOptional = BridgedOptionalDeclAttrKind(from: attrName.bridged)
-        attrKind = if bridgedOptional.hasValue {
+        attrKind = if identTy.moduleSelector == nil && bridgedOptional.hasValue {
           bridgedOptional.value
         } else {
           nil
@@ -471,7 +471,8 @@ extension ASTGenVisitor {
     let features = args.compactMap(in: self) { arg -> Identifier? in
       guard arg.label == nil,
             let declNameExpr = arg.expression.as(DeclReferenceExprSyntax.self),
-            declNameExpr.argumentNames == nil
+            declNameExpr.argumentNames == nil,
+            declNameExpr.moduleSelector == nil
       else {
         // TODO: Diagnose.
         return nil
@@ -1048,6 +1049,10 @@ extension ASTGenVisitor {
       return nil
     }
 
+    if arg.declName.moduleSelector != nil {
+      // TODO: Diagnose; module selector is meaningless at this position.
+    }
+
     let type = self.generate(type: arg.type)
     let member = self.generateDeclNameRef(declReferenceExpr: arg.declName)
 
@@ -1127,7 +1132,8 @@ extension ASTGenVisitor {
     let loc = self.generateSourceLoc(descriptorExpr)
     if
       let declRefExpr = descriptorExpr.as(DeclReferenceExprSyntax.self),
-      declRefExpr.argumentNames == nil
+      declRefExpr.argumentNames == nil,
+      declRefExpr.moduleSelector == nil
     {
       return generateLifetimeDescriptor(
         nameToken: declRefExpr.baseName,
@@ -1218,7 +1224,10 @@ extension ASTGenVisitor {
     if node.argumentNames != nil {
       // TODO: Diagnose
     }
-    guard node.argumentNames == nil else {
+    if node.moduleSelector != nil {
+      // TODO: Diagnose
+    }
+    guard node.argumentNames == nil && node.moduleSelector == nil else {
       return nil
     }
     switch node.baseName.rawText {
@@ -1278,7 +1287,11 @@ extension ASTGenVisitor {
       if let arg = arg.as(DeclReferenceExprSyntax.self) {
         name = self.generateDeclNameRef(declReferenceExpr: arg).name
       } else if arg.is(DiscardAssignmentExprSyntax.self) {
-        name = BridgedDeclNameRef.createParsed(.init(self.ctx.getIdentifier("_")))
+        name = BridgedDeclNameRef.createParsed(
+          self.ctx,
+          moduleSelector: nil,
+          baseName: .init(self.ctx.getIdentifier("_"))
+        )
       } else {
         // TODO: Diagnose
         fatalError("expected name")
@@ -2099,7 +2112,8 @@ extension ASTGenVisitor {
         func generatePropertyName(expr node: ExprSyntax) -> Identifier? {
           guard
             let node = node.as(DeclReferenceExprSyntax.self),
-            node.argumentNames == nil
+            node.argumentNames == nil,
+            node.moduleSelector == nil
           else {
             // TODO: Diagnose.
             return nil
@@ -2190,11 +2204,12 @@ extension ASTGenVisitor {
     // FIXME: Should be normal LabeledExprListSyntax arguments.
     // FIXME: Error handling
     let type: BridgedTypeRepr? = self.generateSingleAttrOption(attribute: node, { token in
-      let nameLoc = self.generateIdentifierAndSourceLoc(token)
+      // FIXME: Module selector?
+      let nameRef = self.generateDeclNameRef(moduleSelector: nil, baseName: token)
       return BridgedUnqualifiedIdentTypeRepr.createParsed(
         self.ctx,
-        loc: nameLoc.sourceLoc,
-        name: nameLoc.identifier
+        name: nameRef.name,
+        loc: nameRef.loc
       ).asTypeRepr
     })
     guard let type else {
@@ -2364,7 +2379,7 @@ extension ASTGenVisitor {
     _ valueGeneratorFunction: (TokenSyntax) -> R?
   ) -> R? {
     return generateConsumingAttrOption(args: &args, label: nil) {
-      if let declRefExpr = $0.as(DeclReferenceExprSyntax.self), declRefExpr.argumentNames == nil {
+      if let declRefExpr = $0.as(DeclReferenceExprSyntax.self), declRefExpr.argumentNames == nil, declRefExpr.moduleSelector == nil {
         return valueGeneratorFunction(declRefExpr.baseName)
       } else if let discardExpr = $0.as(DiscardAssignmentExprSyntax.self) {
         return valueGeneratorFunction(discardExpr.wildcard)
