@@ -35,7 +35,7 @@ if #available(SwiftStdlib 6.0, *) {
 // TODO: all the other group kinds...
 
 // No more enqueues are expected afterwards
-// CHECK-NOT: Executor
+// CHECK-NOT: [executor]
 
 nonisolated(nonsending) func someFunc() async throws {
   print("nonisolated(nonsending) someFunc() async")
@@ -44,7 +44,7 @@ nonisolated(nonsending) func someFunc() async throws {
 @available(SwiftStdlib 6.0, *)
 @concurrent
 func foo() async {
-  await withTaskExecutorPreference(AssertExactEnqueueCountExecutor(expectedEnqueueCount: 8, name: "task-executor")) {
+  await withTaskExecutorPreference(AssertExactEnqueueCountExecutor(maxEnqueues: 8, name: "task-executor")) {
     print("foo - withTaskExecutorPreference")
 
     await withTaskGroup(of: Void.self) { group in 
@@ -56,7 +56,7 @@ func foo() async {
   }
   print("foo - withTaskExecutorPreference done")
 
-//  await withTaskExecutorPreference(AssertExactEnqueueCountExecutor(expectedEnqueueCount: 8, name: "task-executor")) {
+//  await withTaskExecutorPreference(AssertExactEnqueueCountExecutor(maxEnqueues: 8, name: "task-executor")) {
 //    print("foo - withTaskExecutorPreference")
 //
 //    try! await withThrowingTaskGroup(of: Void.self) { group in
@@ -74,7 +74,7 @@ func foo() async {
 
 @available(SwiftStdlib 6.0, *)
 actor Foo {
-  let exec = AssertExactEnqueueCountExecutor(expectedEnqueueCount: 8, name: "actor-executor")
+  let exec = AssertExactEnqueueCountExecutor(maxEnqueues: 8, name: "actor-executor")
         
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     self.exec.asUnownedSerialExecutor()
@@ -100,20 +100,20 @@ actor Foo {
 
 @available(SwiftStdlib 6.0, *)
 final class AssertExactEnqueueCountExecutor: TaskExecutor, SerialExecutor {
-  let expectedEnqueueCount: Int
+  let maxEnqueues: Int
   let enqueueCount: Atomic<Int>
 
   let name: String
 
-  init(expectedEnqueueCount: Int, name: String) {
-    self.expectedEnqueueCount = expectedEnqueueCount
+  init(maxEnqueues: Int, name: String) {
+    self.maxEnqueues = maxEnqueues
     self.enqueueCount = .init(0)
     self.name = name
   }
 
   public func enqueue(_ job: consuming ExecutorJob) {
     let newEnqueueValue = self.enqueueCount.add(1, ordering: .relaxed).newValue
-    if newEnqueueValue > self.expectedEnqueueCount {
+    if newEnqueueValue > self.maxEnqueues {
       fatalError("Got unexpected enqueue (\(newEnqueueValue)), in: \(self.name)")
     }
     print("[executor][\(self.name)] Enqueue (\(newEnqueueValue))")
