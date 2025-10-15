@@ -36,9 +36,9 @@
 // RUN:   -emit-module -o %t/test.swiftmodule /^test/test.swift -cache-replay-prefix-map /^test %t 2>&1 | %FileCheck %s --check-prefix REMAP
 
 // BRIDGE: /^test/objc.h:3:2: warning: warning in bridging header
-// BRIDGE-REMAP: BUILD_DIR{{.*}}{{/|\\}}objc.h:3:2: warning: warning in bridging header
+// BRIDGE-REMAP: TMP_DIR{{/|\\}}objc.h:3:2: warning: warning in bridging header
 // CHECK: /^test/test.swift:1:10: warning: this is a warning
-// REMAP: BUILD_DIR{{.*}}{{/|\\}}test.swift:1:10: warning: this is a warning
+// REMAP: TMP_DIR{{/|\\}}test.swift:1:10: warning: this is a warning
 
 //--- test.swift
 #warning("this is a warning")
