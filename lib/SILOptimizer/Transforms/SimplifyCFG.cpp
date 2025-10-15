@@ -1791,7 +1791,11 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
   }
 
   if (Dest->args_empty()) {
-    SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest);
+    SILBuilderWithScope builder(SEI);
+    if (SEI->getOperand()->getOwnershipKind() == OwnershipKind::Owned) {
+      builder.createDestroyValue(SEI->getLoc(), SEI->getOperand());
+    }
+    builder.createBranch(SEI->getLoc(), Dest);
 
     addToWorklist(SEI->getParent());
     addToWorklist(Dest);
