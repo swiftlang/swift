@@ -8766,7 +8766,6 @@ static bool hasUnsafeType(Evaluator &evaluator, clang::QualType clangType) {
 ExplicitSafety
 ClangDeclExplicitSafety::evaluate(Evaluator &evaluator,
                                   CxxDeclExplicitSafetyDescriptor desc) const {
-  // FIXME: Somewhat duplicative with importAsUnsafe.
   // FIXME: Also similar to hasPointerInSubobjects
   // FIXME: should probably also subsume IsSafeUseOfCxxDecl
   
