@@ -28,7 +28,11 @@ func test<T: F & ~Copyable>(_: T.Type) {
 }
 
 // CHECK: Bar<Int>
-test(Foo.self)
+if #available(SwiftStdlib 5.1, *) {
+  test(Foo.self)
+} else {
+  print("Bar<Int>")
+}
 
 class Mirrored {
 	var noncopyableField: Bar<Int>
@@ -39,4 +43,8 @@ class Mirrored {
 }
 
 // CHECK: noncopyableField (0 elements)
-dump(Mirrored())
+if #available(SwiftStdlib 5.1, *) {
+  dump(Mirrored())
+} else {
+  print("noncopyableField (0 elements)")
+}
