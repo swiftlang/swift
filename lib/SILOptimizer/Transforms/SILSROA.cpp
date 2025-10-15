@@ -175,9 +175,15 @@ bool SROAMemoryUseAnalyzer::analyze() {
       continue;
     }
 
-    if (isa<DeallocStackInst>(User)) {
+    if (isa<DeallocStackInst>(User) || isa<DestroyAddrInst>(User) ) {
       // We can ignore the dealloc_stack.
       continue;
+    }
+
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(User)) {
+      if (mdi->getBase() == Operand->get()) {
+        continue;
+      }
     }
     
     // Otherwise we do not understand this instruction, so bail.
@@ -288,10 +294,29 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     // up allocas, we also chop up the relevant dealloc stack insts.
     if (auto *DSI = dyn_cast<DeallocStackInst>(User)) {
       LLVM_DEBUG(llvm::dbgs() << "        Found DeallocStackInst!\n");
-      // Create the allocations in reverse order.
+      // Create the deallocations in reverse order.
       for (auto *NewAI : llvm::reverse(NewAllocations))
         B.createDeallocStack(DSI->getLoc(), SILValue(NewAI));
       ToRemove.push_back(DSI);
+    }
+    if (auto *DAI = dyn_cast<DestroyAddrInst>(User)) {
+      LLVM_DEBUG(llvm::dbgs() << "        Found DestroyAddrInst!\n");
+      for (auto *NewAI : NewAllocations) {
+        auto &srcTL = B.getTypeLowering(NewAI->getType());
+        srcTL.emitDestroyAddress(B, DAI->getLoc(), SILValue(NewAI));
+      }
+      ToRemove.push_back(DAI);
+    }
+    if (auto *origMDI = dyn_cast<MarkDependenceInst>(User)) {
+      LLVM_DEBUG(llvm::dbgs() << "        Found MarkDependenceInst!\n");
+      auto value = origMDI->getValue();
+      for (auto *NewAI : NewAllocations) {
+        auto *newMdi = B.createMarkDependence(origMDI->getLoc(), value,
+                                              NewAI, origMDI->dependenceKind());
+        value = newMdi;
+      }
+      origMDI->replaceAllUsesWith(value);
+      ToRemove.push_back(origMDI);
     }
   }
 
@@ -324,7 +349,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     ToRemove.push_back(DVI);
   }
 
-  // Remove the old DeallocStackInst/DebugValueInst instructions.
+  // Remove the old instructions.
   for (auto *DSI : ToRemove) {
       DSI->eraseFromParent();
   }
