@@ -2598,34 +2598,30 @@ namespace {
           result->addMember(ctor);
         }
       } else {
-        if (!Impl.SwiftContext.LangOpts.hasFeature(
-                Feature::SuppressCXXForeignReferenceTypeInitializers)) {
-          assert(
-              isa<ClassDecl>(result) &&
-              "Expected result to be a ClassDecl as it cannot be a StructDecl");
-          // When we add full support for C foreign reference types then we
-          // should synthesize static factories for them as well
-          if (auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
-            bool hasUserProvidedStaticFactory = llvm::any_of(
-                cxxRecordDecl->methods(),
-                [](const clang::CXXMethodDecl *method) {
-                  return method->isStatic() &&
-                         llvm::any_of(
-                             method->specific_attrs<clang::SwiftNameAttr>(),
-                             [](const auto *attr) {
-                               return attr->getName().starts_with("init(");
-                             });
-                });
-            if (!hasUserProvidedStaticFactory) {
-              auto generatedCxxMethodDecls =
-                  synthesizer.synthesizeStaticFactoryForCXXForeignRef(
-                      cxxRecordDecl);
-              for (auto *methodDecl : generatedCxxMethodDecls) {
-                if (Decl *importedInitDecl =
-                        Impl.SwiftContext.getClangModuleLoader()
-                            ->importDeclDirectly(methodDecl))
-                  result->addMember(importedInitDecl);
-              }
+        assert(
+            isa<ClassDecl>(result) &&
+            "Expected result to be a ClassDecl as it cannot be a StructDecl");
+        // When we add full support for C foreign reference types then we
+        // should synthesize static factories for them as well
+        if (auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+          bool hasUserProvidedStaticFactory = llvm::any_of(
+              cxxRecordDecl->methods(), [](const clang::CXXMethodDecl *method) {
+                return method->isStatic() &&
+                       llvm::any_of(
+                           method->specific_attrs<clang::SwiftNameAttr>(),
+                           [](const auto *attr) {
+                             return attr->getName().starts_with("init(");
+                           });
+              });
+          if (!hasUserProvidedStaticFactory) {
+            auto generatedCxxMethodDecls =
+                synthesizer.synthesizeStaticFactoryForCXXForeignRef(
+                    cxxRecordDecl);
+            for (auto *methodDecl : generatedCxxMethodDecls) {
+              if (Decl *importedInitDecl =
+                      Impl.SwiftContext.getClangModuleLoader()
+                          ->importDeclDirectly(methodDecl))
+                result->addMember(importedInitDecl);
             }
           }
         }
