@@ -944,7 +944,6 @@ namespace {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
     DeclContext *CurDC;
-    ConstraintSystemPhase CurrPhase;
 
     /// A map from each UnresolvedMemberExpr to the respective (implicit) base
     /// found during our walk.
@@ -1253,13 +1252,7 @@ namespace {
 
   public:
     ConstraintGenerator(ConstraintSystem &CS, DeclContext *DC)
-        : CS(CS), CurDC(DC ? DC : CS.DC), CurrPhase(CS.getPhase()) {
-      // Although constraint system is initialized in `constraint
-      // generation` phase, we have to set it here manually because e.g.
-      // result builders could generate constraints for its body
-      // in the middle of the solving.
-      CS.setPhase(ConstraintSystemPhase::ConstraintGeneration);
-
+        : CS(CS), CurDC(DC ? DC : CS.DC) {
       // Pick up the saved stack of pack expansions so we can continue
       // to handle pack element references inside the closure body.
       if (auto *ACE = dyn_cast<AbstractClosureExpr>(CurDC)) {
@@ -1267,9 +1260,7 @@ namespace {
       }
     }
 
-    virtual ~ConstraintGenerator() {
-      CS.setPhase(CurrPhase);
-    }
+    virtual ~ConstraintGenerator() = default;
 
     ConstraintSystem &getConstraintSystem() const { return CS; }
 
