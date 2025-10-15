@@ -19,8 +19,10 @@ func test_ifaddrs_introduced_in_24() {
 }
 
 func test_getentropy_introduced_in_28() {
+    // expected-note@-1 {{add '@available' attribute to enclosing global function}}
+
     var buffer: [UInt8] = .init(repeating: 0, count: 16)
-    getentropy(&buffer, buffer.count)
+    _ = getentropy(&buffer, buffer.count)
     // expected-error@-1 {{'getentropy' is only available in Android 28 or newer}}
     // expected-note@-2 {{add 'if #available' version check}}
 }
