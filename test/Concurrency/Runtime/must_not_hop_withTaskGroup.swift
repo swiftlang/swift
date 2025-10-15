@@ -37,9 +37,23 @@ if #available(SwiftStdlib 6.0, *) {
 // CHECK-NEXT: [executor][task-executor] Enqueue (4)
 // CHECK-NEXT: foo - withTaskExecutorPreference - withThrowingTaskGroup done
 
-// CHECK-NEXT: [executor][task-executor] Enqueue (2)
+// CHECK-NEXT: foo - withTaskExecutorPreference - withDiscardingTaskGroup
+// CHECK-NEXT: nonisolated(nonsending) someFunc() async
+// CHECK-NEXT: foo - withTaskExecutorPreference - withDiscardingTaskGroup (after someFunc)
+// TODO: can we reduce the number of enqueues here?
+// CHECK-NEXT: [executor][task-executor] Enqueue (5)
+// CHECK-NEXT: foo - withTaskExecutorPreference - withDiscardingTaskGroup done
 
-// CHECK: foo - withTaskExecutorPreference done
+// CHECK-NEXT: foo - withTaskExecutorPreference - withThrowingDiscardingTaskGroup
+// CHECK-NEXT: nonisolated(nonsending) someFunc() async
+// CHECK-NEXT: foo - withTaskExecutorPreference - withThrowingDiscardingTaskGroup (after someFunc)
+// TODO: can we reduce the number of enqueues here?
+// CHECK-NEXT: [executor][task-executor] Enqueue (6)
+// CHECK-NEXT: [executor][task-executor] Enqueue (7)
+// CHECK-NEXT: foo - withTaskExecutorPreference - withThrowingDiscardingTaskGroup done
+
+// CHECK-NEXT: [executor][task-executor] Enqueue (8)
+// CHECK-NEXT: foo - withTaskExecutorPreference done
 
 // CHECK: == Make: actor Foo
 // CHECK-NEXT: ---------------------------------------
