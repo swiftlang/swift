@@ -142,7 +142,7 @@ static ValueDecl *lookupOperator(NominalTypeDecl *decl, Identifier id,
 
   // If no member operator was found, look for out-of-class definitions in the
   // same module.
-  auto module = decl->getModuleContext();
+  auto module = decl->getModuleContextForNameLookup();
   SmallVector<ValueDecl *> nonMemberResults;
   module->lookupValue(id, NLKind::UnqualifiedLookup, nonMemberResults);
   for (const auto &nonMember : nonMemberResults) {
@@ -273,8 +273,17 @@ instantiateTemplatedOperator(ClangImporter::Implementation &impl,
                                           best)) {
   case clang::OR_Success: {
     if (auto clangCallee = best->Function) {
-      auto lookupTable = impl.findLookupTable(classDecl);
-      addEntryToLookupTable(*lookupTable, clangCallee, impl.getNameImporter());
+      // Declarations inside of a C++ namespace are added into two lookup
+      // tables: one for the __ObjC module, one for the actual owning Clang
+      // module of the decl. This is a hack that is meant to address the case
+      // when a namespace spans across multiple Clang modules. Mimic that
+      // behavior for the operator that we just instantiated.
+      auto lookupTable1 = impl.findLookupTable(classDecl);
+      addEntryToLookupTable(*lookupTable1, clangCallee, impl.getNameImporter());
+      auto owningModule = impl.getClangOwningModule(classDecl);
+      auto lookupTable2 = impl.findLookupTable(owningModule);
+      if (lookupTable1 != lookupTable2)
+        addEntryToLookupTable(*lookupTable2, clangCallee, impl.getNameImporter());
       return clangCallee;
     }
     break;
@@ -377,8 +386,13 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
   equalEqualDecl->setBody(equalEqualBody);
 
   impl.synthesizedAndAlwaysVisibleDecls.insert(equalEqualDecl);
-  auto lookupTable = impl.findLookupTable(classDecl);
-  addEntryToLookupTable(*lookupTable, equalEqualDecl, impl.getNameImporter());
+  auto lookupTable1 = impl.findLookupTable(classDecl);
+  addEntryToLookupTable(*lookupTable1, equalEqualDecl, impl.getNameImporter());
+  auto owningModule = impl.getClangOwningModule(classDecl);
+  auto lookupTable2 = impl.findLookupTable(owningModule);
+  if (lookupTable1 != lookupTable2)
+    addEntryToLookupTable(*lookupTable2, equalEqualDecl,
+                          impl.getNameImporter());
   return true;
 }
 
