@@ -154,6 +154,10 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
           ctx.Diags.diagnose(conformanceLoc,
                              diag::invertible_conformance_other_source_file,
                              getInvertibleProtocolKindName(ip), nominalDecl);
+
+          // Skip further work to avoid asking for stored properties of
+          // resilient types.
+          return;
         }
       }
 
