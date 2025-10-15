@@ -208,8 +208,7 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
 @backDeployed(before: SwiftStdlib 6.0)
 #endif
 @inlinable
-nonisolated(nonsending)
-public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
+nonisolated(nonsending) public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
   returning returnType: GroupResult.Type = GroupResult.self,
   body: nonisolated(nonsending) (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult

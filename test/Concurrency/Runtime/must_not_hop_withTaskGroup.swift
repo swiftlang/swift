@@ -22,10 +22,21 @@ if #available(SwiftStdlib 6.0, *) {
 // CHECK-NEXT: [executor][task-executor] Enqueue (1)
 
 // CHECK-NEXT: foo - withTaskExecutorPreference
+
 // CHECK-NEXT: foo - withTaskExecutorPreference - withTaskGroup
 // CHECK-NEXT: nonisolated(nonsending) someFunc() async
 // CHECK-NEXT: foo - withTaskExecutorPreference - withTaskGroup (after someFunc)
 // CHECK-NEXT: foo - withTaskExecutorPreference - withTaskGroup done
+
+// CHECK-NEXT: foo - withTaskExecutorPreference - withThrowingTaskGroup
+// CHECK-NEXT: nonisolated(nonsending) someFunc() async
+// CHECK-NEXT: foo - withTaskExecutorPreference - withThrowingTaskGroup (after someFunc)
+// TODO: can we reduce the number of enqueues here?
+// CHECK-NEXT: [executor][task-executor] Enqueue (2)
+// CHECK-NEXT: [executor][task-executor] Enqueue (3)
+// CHECK-NEXT: [executor][task-executor] Enqueue (4)
+// CHECK-NEXT: foo - withTaskExecutorPreference - withThrowingTaskGroup done
+
 // CHECK-NEXT: [executor][task-executor] Enqueue (2)
 
 // CHECK: foo - withTaskExecutorPreference done
@@ -53,19 +64,29 @@ func foo() async {
       print("foo - withTaskExecutorPreference - withTaskGroup (after someFunc)")
     }
     print("foo - withTaskExecutorPreference - withTaskGroup done")
+
+    try! await withThrowingTaskGroup(of: Void.self) { group in
+      print("foo - withTaskExecutorPreference - withThrowingTaskGroup")
+      try await someFunc()
+      print("foo - withTaskExecutorPreference - withThrowingTaskGroup (after someFunc)")
+    }
+    print("foo - withTaskExecutorPreference - withThrowingTaskGroup done")
+
+    await withDiscardingTaskGroup { group in
+      print("foo - withTaskExecutorPreference - withDiscardingTaskGroup")
+      try? await someFunc()
+      print("foo - withTaskExecutorPreference - withDiscardingTaskGroup (after someFunc)")
+    }
+    print("foo - withTaskExecutorPreference - withDiscardingTaskGroup done")
+
+    try! await withThrowingDiscardingTaskGroup { group in
+      print("foo - withTaskExecutorPreference - withThrowingDiscardingTaskGroup")
+      try await someFunc()
+      print("foo - withTaskExecutorPreference - withThrowingDiscardingTaskGroup (after someFunc)")
+    }
+    print("foo - withTaskExecutorPreference - withThrowingDiscardingTaskGroup done")
   }
   print("foo - withTaskExecutorPreference done")
-
-//  await withTaskExecutorPreference(AssertExactEnqueueCountExecutor(maxEnqueues: 8, name: "task-executor")) {
-//    print("foo - withTaskExecutorPreference")
-//
-//    try! await withThrowingTaskGroup(of: Void.self) { group in
-//      print("foo - withTaskExecutorPreference - withThrowingTaskGroup")
-//      try await someFunc()
-//    }
-//    print("foo - withTaskExecutorPreference - withThrowingTaskGroup done\n")
-//  }
-//  print("foo - withTaskExecutorPreference done")
 
   print("== Make: actor Foo")
   print("---------------------------------------")
