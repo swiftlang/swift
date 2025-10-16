@@ -5238,17 +5238,21 @@ getConcurrencyDiagnosticBehaviorLimitRec(
     // merging our fields if we have a struct.
     if (auto *structDecl = dyn_cast<StructDecl>(nomDecl)) {
       std::optional<DiagnosticBehavior> diagnosticBehavior;
-      auto substMap = type->getContextSubstitutionMap();
-      for (auto storedProperty : structDecl->getStoredProperties()) {
-        auto lhs = diagnosticBehavior.value_or(DiagnosticBehavior::Unspecified);
-        auto astType = storedProperty->getInterfaceType().subst(substMap);
-        auto rhs = getConcurrencyDiagnosticBehaviorLimitRec(astType, declCtx,
-                                                            visited);
-        auto result = lhs.merge(rhs.value_or(DiagnosticBehavior::Unspecified));
-        if (result != DiagnosticBehavior::Unspecified)
-          diagnosticBehavior = result;
+
+      if (!nomDecl->isResilient(declCtx->getParentModule(),
+                          ResilienceExpansion::Maximal)) {
+        auto substMap = type->getContextSubstitutionMap();
+        for (auto storedProperty : structDecl->getStoredProperties()) {
+          auto lhs = diagnosticBehavior.value_or(DiagnosticBehavior::Unspecified);
+          auto astType = storedProperty->getInterfaceType().subst(substMap);
+          auto rhs = getConcurrencyDiagnosticBehaviorLimitRec(astType, declCtx,
+                                                              visited);
+          auto result = lhs.merge(rhs.value_or(DiagnosticBehavior::Unspecified));
+          if (result != DiagnosticBehavior::Unspecified)
+            diagnosticBehavior = result;
+        }
+        return diagnosticBehavior;
       }
-      return diagnosticBehavior;
     }
   }
 
