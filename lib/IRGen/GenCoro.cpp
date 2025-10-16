@@ -846,6 +846,57 @@ llvm::Constant *swift::irgen::getCoroDeallocFn(IRGenModule &IGM) {
       });
 }
 
+using GetAllocFunctionPointer = FunctionPointer (IRGenModule::*)();
+
+static llvm::Constant *
+getAddrOfSwiftCoroAllocThunk(StringRef name, GetAllocFunctionPointer getAlloc,
+                             IRGenModule &IGM) {
+  auto *ty = IGM.CoroAllocateFnTy;
+  return IGM.getOrCreateHelperFunction(
+      name, ty->getReturnType(), ty->params(),
+      [getAlloc](IRGenFunction &IGF) {
+        auto parameters = IGF.collectParameters();
+        parameters.claimNext(); // allocator
+        auto *size = parameters.claimNext();
+        auto alloc = (IGF.IGM.*getAlloc)();
+        auto *call = IGF.Builder.CreateCall(alloc, {size});
+        IGF.Builder.CreateRet(call);
+      },
+      /*setIsNoInline=*/true, /*forPrologue=*/false,
+      /*isPerformanceConstraint=*/false,
+      /*optionalLinkage=*/nullptr,
+      /*specialCallingConv=*/std::nullopt,
+      /*transformAttributes=*/
+      [&IGM](llvm::AttributeList &attrs) {
+        IGM.addSwiftCoroAttributes(attrs, 0);
+      });
+}
+
+using GetDeallocFunctionPointer = FunctionPointer (IRGenModule::*)();
+
+static llvm::Constant *getAddrOfSwiftCoroDeallocThunk(
+    StringRef name, GetDeallocFunctionPointer getDealloc, IRGenModule &IGM) {
+  auto *ty = IGM.CoroDeallocateFnTy;
+  return IGM.getOrCreateHelperFunction(
+      name, ty->getReturnType(), ty->params(),
+      [getDealloc](IRGenFunction &IGF) {
+        auto parameters = IGF.collectParameters();
+        parameters.claimNext(); // allocator
+        auto *ptr = parameters.claimNext();
+        auto dealloc = (IGF.IGM.*getDealloc)();
+        IGF.Builder.CreateCall(dealloc, {ptr});
+        IGF.Builder.CreateRetVoid();
+      },
+      /*setIsNoInline=*/true, /*forPrologue=*/false,
+      /*isPerformanceConstraint=*/false,
+      /*optionalLinkage=*/nullptr,
+      /*specialCallingConv=*/std::nullopt,
+      /*transformAttributes=*/
+      [&IGM](llvm::AttributeList &attrs) {
+        IGM.addSwiftCoroAttributes(attrs, 0);
+      });
+}
+
 static llvm::Constant *getAddrOfGlobalCoroAllocator(
     IRGenModule &IGM, CoroAllocatorKind kind, bool shouldDeallocateImmediately,
     llvm::Constant *allocFn, llvm::Constant *deallocFn) {
@@ -870,47 +921,13 @@ static llvm::Constant *getAddrOfGlobalCoroAllocator(
 }
 
 static llvm::Constant *getAddrOfSwiftCoroMalloc(IRGenModule &IGM) {
-  auto *ty = IGM.CoroAllocateFnTy;
-  return IGM.getOrCreateHelperFunction(
-      "_swift_coro_malloc", ty->getReturnType(), ty->params(),
-      [](IRGenFunction &IGF) {
-        auto parameters = IGF.collectParameters();
-        parameters.claimNext(); // allocator
-        auto *size = parameters.claimNext();
-        auto alloc = IGF.IGM.getMallocFunctionPointer();
-        auto *call = IGF.Builder.CreateCall(alloc, {size});
-        IGF.Builder.CreateRet(call);
-      },
-      /*setIsNoInline=*/true, /*forPrologue=*/false,
-      /*isPerformanceConstraint=*/false,
-      /*optionalLinkage=*/nullptr,
-      /*specialCallingConv=*/std::nullopt,
-      /*transformAttributes=*/
-      [&IGM](llvm::AttributeList &attrs) {
-        IGM.addSwiftCoroAttributes(attrs, 0);
-      });
+  return getAddrOfSwiftCoroAllocThunk(
+      "_swift_coro_malloc", &IRGenModule::getMallocFunctionPointer, IGM);
 }
 
 static llvm::Constant *getAddrOfSwiftCoroFree(IRGenModule &IGM) {
-  auto *ty = IGM.CoroDeallocateFnTy;
-  return IGM.getOrCreateHelperFunction(
-      "_swift_coro_free", ty->getReturnType(), ty->params(),
-      [](IRGenFunction &IGF) {
-        auto parameters = IGF.collectParameters();
-        parameters.claimNext(); // allocator
-        auto *ptr = parameters.claimNext();
-        auto dealloc = IGF.IGM.getFreeFunctionPointer();
-        IGF.Builder.CreateCall(dealloc, {ptr});
-        IGF.Builder.CreateRetVoid();
-      },
-      /*setIsNoInline=*/true, /*forPrologue=*/false,
-      /*isPerformanceConstraint=*/false,
-      /*optionalLinkage=*/nullptr,
-      /*specialCallingConv=*/std::nullopt,
-      /*transformAttributes=*/
-      [&IGM](llvm::AttributeList &attrs) {
-        IGM.addSwiftCoroAttributes(attrs, 0);
-      });
+  return getAddrOfSwiftCoroDeallocThunk(
+      "_swift_coro_free", &IRGenModule::getFreeFunctionPointer, IGM);
 }
 
 llvm::Constant *IRGenModule::getAddrOfGlobalCoroMallocAllocator() {
@@ -921,47 +938,14 @@ llvm::Constant *IRGenModule::getAddrOfGlobalCoroMallocAllocator() {
 }
 
 static llvm::Constant *getAddrOfSwiftCoroTaskAlloc(IRGenModule &IGM) {
-  auto *ty = IGM.CoroAllocateFnTy;
-  return IGM.getOrCreateHelperFunction(
-      "_swift_coro_task_alloc", ty->getReturnType(), ty->params(),
-      [](IRGenFunction &IGF) {
-        auto parameters = IGF.collectParameters();
-        parameters.claimNext(); // allocator
-        auto *size = parameters.claimNext();
-        auto alloc = IGF.IGM.getTaskAllocFunctionPointer();
-        auto *call = IGF.Builder.CreateCall(alloc, {size});
-        IGF.Builder.CreateRet(call);
-      },
-      /*setIsNoInline=*/true, /*forPrologue=*/false,
-      /*isPerformanceConstraint=*/false,
-      /*optionalLinkage=*/nullptr,
-      /*specialCallingConv=*/std::nullopt,
-      /*transformAttributes=*/
-      [&IGM](llvm::AttributeList &attrs) {
-        IGM.addSwiftCoroAttributes(attrs, 0);
-      });
+  return getAddrOfSwiftCoroAllocThunk(
+      "_swift_coro_task_alloc", &IRGenModule::getTaskAllocFunctionPointer, IGM);
 }
 
 static llvm::Constant *getAddrOfSwiftCoroTaskDealloc(IRGenModule &IGM) {
-  auto *ty = IGM.CoroDeallocateFnTy;
-  return IGM.getOrCreateHelperFunction(
-      "_swift_coro_task_dealloc", ty->getReturnType(), ty->params(),
-      [](IRGenFunction &IGF) {
-        auto parameters = IGF.collectParameters();
-        parameters.claimNext(); // allocator
-        auto *ptr = parameters.claimNext();
-        auto dealloc = IGF.IGM.getTaskDeallocFunctionPointer();
-        IGF.Builder.CreateCall(dealloc, {ptr});
-        IGF.Builder.CreateRetVoid();
-      },
-      /*setIsNoInline=*/true, /*forPrologue=*/false,
-      /*isPerformanceConstraint=*/false,
-      /*optionalLinkage=*/nullptr,
-      /*specialCallingConv=*/std::nullopt,
-      /*transformAttributes=*/
-      [&IGM](llvm::AttributeList &attrs) {
-        IGM.addSwiftCoroAttributes(attrs, 0);
-      });
+  return getAddrOfSwiftCoroDeallocThunk(
+      "_swift_coro_task_dealloc", &IRGenModule::getTaskDeallocFunctionPointer,
+      IGM);
 }
 
 llvm::Constant *IRGenModule::getAddrOfGlobalCoroAsyncTaskAllocator() {
