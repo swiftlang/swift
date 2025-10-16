@@ -5479,6 +5479,13 @@ ManagedValue SILGenFunction::applyBorrowMutateAccessor(
   assert(rawResults.size() == 1);
   auto rawResult = rawResults[0];
 
+  if (fn.getFunction()->getConventions().hasGuaranteedResult()) {
+    auto selfArg = args.back().getValue();
+    if (isa<LoadBorrowInst>(selfArg)) {
+      rawResult = B.createUncheckedOwnership(loc, rawResult);
+    }
+  }
+
   if (rawResult->getType().isMoveOnly()) {
     if (rawResult->getType().isAddress()) {
       auto result = B.createMarkUnresolvedNonCopyableValueInst(
