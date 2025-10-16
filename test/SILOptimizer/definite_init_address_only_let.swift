@@ -39,3 +39,13 @@ func quz<T>(a: Bool, t: T) {
     return
   }
 }
+
+// https://github.com/swiftlang/swift/issues/84909
+
+func uninit_closure_reference() {
+  func passthrough(_ a: () -> Any) -> Any { a() }
+
+  let initMe = passthrough { initMe }
+  // expected-error @-1 {{constant 'initMe' used before being initialized}}
+  // expected-note @-2 {{defined here}}
+}
