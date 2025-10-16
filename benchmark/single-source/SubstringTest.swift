@@ -30,6 +30,7 @@ public let benchmarks = [
   BenchmarkInfo(name: "SubstringFromLongString2", runFunction: run_SubstringFromLongString, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringFromLongStringGeneric2", runFunction: run_SubstringFromLongStringGeneric, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringTrimmingASCIIWhitespace", runFunction: run_SubstringTrimmingASCIIWhitespace, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "SubstringIdentical", runFunction: run_SubstringIdentical, tags: [.validation, .String]),
 ]
 
 // A string that doesn't fit in small string storage and doesn't fit in Latin-1
@@ -332,3 +333,11 @@ public func run _LessSubstringSubstringGenericStringProtocol(_ n: Int) {
   }
 }
 */
+
+@inline(never)
+public func run_SubstringIdentical(_ n: Int) {
+  let (a, b) = (ss1, ss1)
+  for _ in 1...n*500 {
+    blackHole(a.isTriviallyIdentical(to: b))
+  }
+}
