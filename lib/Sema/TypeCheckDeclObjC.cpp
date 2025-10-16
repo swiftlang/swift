@@ -846,7 +846,7 @@ bool swift::isRepresentableInLanguage(
   }
 
   // Check that @objc functions can't have typed throw.
-  if (AFD->hasThrows()) {
+  if (!AFD->getDeclContext()->isInSwiftinterface() && AFD->hasThrows()) {
     Type thrownType = AFD->getThrownInterfaceType();
     // TODO: only `throws(Error)` is allowed.
     // Throwing `any MyError` that confronts `Error` is not implemented yet.
