@@ -228,6 +228,7 @@ void BridgedLangOptions_enumerateBuildConfigurationEntries(
 
       case PlatformConditionKind::Endianness:
       case PlatformConditionKind::PointerBitWidth:
+      case PlatformConditionKind::ObjectFileFormat:
       case PlatformConditionKind::CanImport:
       case PlatformConditionKind::HasAtomicBitWidth:
         // Handled separately.
