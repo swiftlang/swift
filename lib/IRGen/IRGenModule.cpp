@@ -781,8 +781,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   CoroAllocatorTy = createStructType(*this, "swift.coro_allocator",
                                      {
                                          Int32Ty, // CoroAllocator.Flags
-                                         PtrTy,
-                                         PtrTy,
+                                         PtrTy, // allocate
+                                         PtrTy, // deallocate
                                      });
   SwiftImplicitActorType =
       createStructType(*this, "swift.implicit_isolated_actor_type",
