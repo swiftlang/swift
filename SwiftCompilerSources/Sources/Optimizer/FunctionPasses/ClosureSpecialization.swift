@@ -166,16 +166,7 @@ let autodiffClosureSpecialization = FunctionPass(name: "autodiff-closure-special
     var changed = false
     for inst in function.instructions {
       if let partialApply = inst as? PartialApplyInst,
-         partialApply.isPullbackInResultOfAutodiffVJP,
-         // Calling `cloneRecursively` from `SpecializationInfo.cloneClosures`
-         // requires the pullback having ownership info. Otherwise, the cloner
-         // uses `recordFoldedValue` instead of `recordClonedInstruction`, and
-         // `postProcess` hook is not called, which leads to an assertion
-         // failure in `BridgedClonerImpl::cloneInst`.
-         // TODO: investigate why the assertion fails only on Linux. See
-         // * https://github.com/swiftlang/swift/pull/84800#issuecomment-3398200989
-         // * https://github.com/swiftlang/swift/issues/84955
-         partialApply.referencedFunction?.hasOwnership == true
+         partialApply.isPullbackInResultOfAutodiffVJP
       {
         if trySpecialize(apply: partialApply, context) {
           changed = true
@@ -232,6 +223,13 @@ private func trySpecialize(apply: ApplySite, _ context: FunctionPassContext) -> 
 private func isCalleeSpecializable(of apply: ApplySite) -> Bool {
   if let callee = apply.referencedFunction,
      callee.isDefinition,
+
+     // Calling `cloneRecursively` from `SpecializationInfo.cloneClosures`
+     // requires the callee having ownership info. Otherwise, the cloner
+     // uses `recordFoldedValue` instead of `recordClonedInstruction`, and
+     // `postProcess` hook is not called, which leads to an assertion
+     // failure in `BridgedClonerImpl::cloneInst`.
+     callee.hasOwnership,
 
      // We don't support generic functions (yet)
      !apply.hasSubstitutions,
