@@ -172,7 +172,6 @@ KNOWN_SETTINGS=(
     ## Skip cleaning build directories ...
     skip-clean-libdispatch                        "0"               "skip cleaning the libdispatch build"
     skip-clean-foundation                         "0"               "skip cleaning the foundation build"
-    skip-clean-system                             "0"               "skip cleaning the system build"
     skip-clean-xctest                             "0"               "skip cleaning the xctest build"
 
     ## Test Options
@@ -302,7 +301,6 @@ KNOWN_SETTINGS=(
 
 components=(
   foundation
-  system
   libcxx
   libdispatch
   libxml2
@@ -1236,7 +1234,6 @@ FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 FOUNDATION_MACROS_SOURCE_DIR="${WORKSPACE}/swift-foundation/Sources/FoundationMacros"
 FOUNDATION_SWIFTFOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-foundation"
 FOUNDATION_SWIFTFOUNDATIONICU_SOURCE_DIR="${WORKSPACE}/swift-foundation-icu"
-SYSTEM_SOURCE_DIR="${WORKSPACE}/swift-system"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/runtimes"
@@ -1250,8 +1247,6 @@ SWIFT_SYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 [[ "${SKIP_BUILD_LLDB}" ]] || PRODUCTS+=(lldb)
 [[ "${SKIP_BUILD_LIBDISPATCH}" ]] || PRODUCTS+=(libdispatch)
 [[ "${SKIP_BUILD_STATIC_LIBDISPATCH}" ]] || PRODUCTS+=(libdispatch_static)
-# Foundation depends on System, so System must be added prior
-[[ "${SKIP_BUILD_SYSTEM}" ]] || PRODUCTS+=(system)
 # llbuild and XCTest depend on Foundation, so Foundation must
 # be added to the list of build products first.
 [[ "${SKIP_BUILD_FOUNDATION}" ]] || PRODUCTS+=(foundation_macros)
@@ -2102,8 +2097,6 @@ for host in "${ALL_HOSTS[@]}"; do
                   cmake_cache="Apple-lldb-Linux.cmake"
                 fi
 
-                ### TODO: does the below need adjustment for system?
-
                 # Options to find the just-built libddispatch and Foundation.
                 if [[ "$(uname -s)" == "Darwin" || "${SKIP_BUILD_FOUNDATION}" ]] ; then
                     DOTEST_EXTRA=""
@@ -2222,14 +2215,12 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLIT_EXECUTABLE:PATH="${LLVM_SOURCE_DIR}/utils/lit/lit.py"
                     -DFILECHECK_EXECUTABLE:PATH="$(build_directory_bin ${LOCAL_HOST} llvm)/FileCheck"
                     -DSWIFTC_EXECUTABLE:PATH=${SWIFTC_BIN}
-                    -DSYSTEM_BUILD_DIR:PATH="$(build_directory ${host} system)"
                     -DFOUNDATION_BUILD_DIR:PATH="$(build_directory ${host} foundation)"
                     -DLIBDISPATCH_BUILD_DIR:PATH="$(build_directory ${host} libdispatch)"
                     -DLIBDISPATCH_SOURCE_DIR:PATH="${LIBDISPATCH_SOURCE_DIR}"
 
                     -Ddispatch_DIR:PATH=$(build_directory ${host} libdispatch)/cmake/modules
                     -DFoundation_DIR:PATH=$(build_directory ${host} foundation)/cmake/modules
-                    -DSystem_DIR:PATH=$(build_directory ${host} system)/cmake/modules
                 )
 
                 if [[ $(is_cross_tools_host ${host}) ]] ; then
@@ -2273,7 +2264,6 @@ for host in "${ALL_HOSTS[@]}"; do
             xctest)
                 XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
                 FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
-                SYSTEM_BUILD_DIR=$(build_directory ${host} system)
                 SWIFT_BUILD_DIR=$(build_directory ${host} swift)
 
                 if [[ "${SKIP_CLEAN_XCTEST}" == "0" ]]
@@ -2303,7 +2293,6 @@ for host in "${ALL_HOSTS[@]}"; do
                       --swiftc="${SWIFTC_BIN}" \
                       --build-dir="${XCTEST_BUILD_DIR}" \
                       --foundation-build-dir="${FOUNDATION_BUILD_DIR}" \
-                      --system-build-dir="${SYSTEM_BUILD_DIR}" \
                       --swift-build-dir="${SWIFT_BUILD_DIR}" \
                       $LIBDISPATCH_BUILD_ARGS \
                       $XCTEST_BUILD_ARGS
@@ -2324,13 +2313,11 @@ for host in "${ALL_HOSTS[@]}"; do
 
                     -Ddispatch_DIR=$(build_directory ${host} libdispatch)/cmake/modules
                     -DFoundation_DIR=$(build_directory ${host} foundation)/cmake/modules
-                    -DSystem_DIR=$(build_directory ${host} system)/cmake/modules
                     -DLLVM_DIR=$(build_directory ${host} llvm)/lib/cmake/llvm
 
                     -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE:PATH=${LIBDISPATCH_SOURCE_DIR}
                     -DXCTEST_PATH_TO_LIBDISPATCH_BUILD:PATH=$(build_directory ${host} libdispatch)
                     -DXCTEST_PATH_TO_FOUNDATION_BUILD:PATH=${FOUNDATION_BUILD_DIR}
-                    -DXCTEST_PATH_TO_SYSTEM_BUILD:PATH=${SYSTEM_BUILD_DIR}
                     -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
                     -DCMAKE_PREFIX_PATH:PATH=$(build_directory ${host} llvm)
 
@@ -2490,60 +2477,6 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_C_FLAGS="$(swift_c_flags ${host}) $(maybe_lfts ${host})"
                 )
 
-                if [[ $(is_cross_tools_host ${host}) ]] ; then
-                    cmake_options+=("${SWIFT_TARGET_CMAKE_OPTIONS[@]}")
-
-                    # Foundation looks for the libXML2 and libcurl libraries
-                    # using find_package(), so search for them in
-                    # CROSS_COMPILE_DEPS_PATH using the CMake process for doing
-                    # so, see the linked CMake docs for more info:
-                    #
-                    # https://cmake.org/cmake/help/latest/command/find_package.html
-                    cmake_options+=(
-                        -DCMAKE_FIND_ROOT_PATH:PATH="${CROSS_COMPILE_DEPS_PATH}"
-                    )
-                fi
-                ;;
-            system)
-                # The configuration script requires knowing about XCTest's
-                # location for building and running the tests. Note that XCTest
-                # is not yet built at this point.
-                XCTEST_BUILD_DIR=$(build_directory ${host} xctest)
-
-                if [[ ${host} == "macosx"* ]]; then
-                    echo "Skipping System on OS X -- System is part of the OS on this platform"
-                    continue
-                fi
-
-                if [[ "${SKIP_CLEAN_SYSTEM}" == "0" ]]
-                then
-                  # The Swift project might have been changed, but CMake might
-                  # not be aware and will not rebuild.
-                  echo "Cleaning the System build directory"
-                  call rm -rf "${build_dir}"
-                fi
-
-                cmake_options=(
-                  ${cmake_options[@]}
-                  -DCMAKE_BUILD_TYPE:STRING=${FOUNDATION_BUILD_TYPE}
-                  -DCMAKE_C_COMPILER:PATH=${CLANG_BIN}/clang
-                  -DCMAKE_CXX_COMPILER:PATH=${CLANG_BIN}/clang++
-                  -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
-                  -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
-                  -DCMAKE_Swift_FLAGS:STRING="$(common_swift_flags)"
-                  -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
-                  -D_System_SourceDIR=${SYSTEM_SOURCE_DIR}
-
-                  # NOTE(compnerd) we disable tests because XCTest is not ready
-                  # yet, but we will reconfigure when the time comes.
-                  -DENABLE_TESTING:BOOL=NO
-
-                  ### TODO: Do we want a static system?
-                  #-DBUILD_SHARED_LIBS=$([[ ${product} == foundation_static ]] && echo "NO" || echo "YES")
-                  -DCMAKE_C_FLAGS="$(swift_c_flags ${host}) $(maybe_lfts ${host})"
-                )
-
-                ### TODO: does the below apply to system?
                 if [[ $(is_cross_tools_host ${host}) ]] ; then
                     cmake_options+=("${SWIFT_TARGET_CMAKE_OPTIONS[@]}")
 
@@ -2819,7 +2752,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
                 esac
                 ;;
-            foundation|foundation_static|foundation_macros|system)
+            foundation|foundation_static|foundation_macros)
               continue
             ;;
             libdispatch)
@@ -2983,19 +2916,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     exit 1
                   ;;
                 esac
-
-
-
-                ;;
-            system) ### TODO: static system?
-                if [[ ${host} == "macosx"* ]]; then
-                    echo "Skipping System on OS X -- System does not build for this platform"
-                    continue
-                fi
-
-                if [[ -z "${INSTALL_SYSTEM}" ]] ; then
-                    continue
-                fi
 
                 ;;
             foundation|foundation_static|foundation_macros)

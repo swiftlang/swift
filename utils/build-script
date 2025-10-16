@@ -334,7 +334,7 @@ def apply_default_arguments(toolchain, args):
     # On Linux, we must ensure that it is built manually.
     if (args.build_foundation and
             platform.system() != "Darwin"):
-        args.build_system = True
+        args.build_swift_system = True
         args.build_libdispatch = True
 
     if args.build_subdir is None:

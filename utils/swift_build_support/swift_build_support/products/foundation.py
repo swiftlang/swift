@@ -18,7 +18,7 @@ from . import libxml2
 from . import llvm
 from . import product
 from . import swift
-from . import system
+from . import swiftsystem
 from . import zlib
 
 
@@ -53,7 +53,7 @@ class Foundation(product.Product):
                 llvm.LLVM,
                 libcxx.LibCXX,
                 swift.Swift,
-                system.System,
+                swiftsystem.SwiftSystem,
                 libdispatch.LibDispatch,
                 libxml2.LibXML2,
                 zlib.Zlib,

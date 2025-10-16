@@ -13,7 +13,7 @@
 import os
 
 from . import product
-from . import system
+from . import swiftsystem
 from . import swift
 from . import swiftpm
 from . import swiftsyntax
@@ -21,7 +21,7 @@ from . import xctest
 from .. import shell
 
 
-class SystemTests(product.Product):
+class SwiftSystemTests(product.Product):
     @classmethod
     def is_build_script_impl_product(cls):
         return False
@@ -48,7 +48,7 @@ class SystemTests(product.Product):
         return self.args.test_system
 
     def configuration(self):
-        if self.args.system_tests_build_variant in ['Release', 'RelWithDebInfo']:
+        if self.args.swift_system_tests_build_variant in ['Release', 'RelWithDebInfo']:
             return 'release'
         else:
             return 'debug'
@@ -83,7 +83,7 @@ class SystemTests(product.Product):
     @classmethod
     def get_dependencies(cls):
         return [swift.Swift,
-                system.System,
+                system.SwiftSystem,
                 xctest.XCTest,
                 llbuild.LLBuild,
                 swiftpm.SwiftPM]

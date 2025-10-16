@@ -102,7 +102,8 @@ class BuildScriptInvocation(object):
             "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
             "--lldb-build-type", args.lldb_build_variant,
             "--foundation-build-type", args.foundation_build_variant,
-            "--system-build-type", args.system_build_variant,
+# TODO: Do I have the option here?
+#            "--swift-system-build-type", args.swift_system_build_variant,
             "--libdispatch-build-type", args.libdispatch_build_variant,
             "--xctest-build-type", args.build_variant,
             "--llbuild-build-type", args.build_variant,
@@ -279,7 +280,7 @@ class BuildScriptInvocation(object):
             (args.build_llvm, "llvm"),
             (args.build_swift, "swift"),
             (args.build_foundation, "foundation"),
-            (args.build_system, "system"),
+#            (args.build_swift_system, "swift-system"),
             (args.build_xctest, "xctest"),
             (args.build_lldb, "lldb"),
             (args.build_llbuild, "llbuild"),
@@ -668,8 +669,6 @@ class BuildScriptInvocation(object):
         # build as part of build-script-impl but that we should eventually move
         # onto build-script products.
         builder.begin_impl_pipeline(should_run_epilogue_operations=True)
-        builder.add_impl_product(products.System,
-                                 is_enabled=self.args.build_system)
         builder.add_impl_product(products.Foundation,
                                  is_enabled=self.args.build_foundation)
         builder.add_impl_product(products.XCTest,
@@ -684,6 +683,9 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_wasmstdlib)
         builder.add_product(products.WasmLLVMRuntimeLibs,
                             is_enabled=self.args.build_wasmstdlib)
+
+        builder.add_product(products.SwiftSystem,
+                            is_enabled=self.args.build_swift_system)
 
         builder.add_product(products.SwiftTestingMacros,
                             is_enabled=self.args.build_swift_testing_macros)
@@ -703,8 +705,8 @@ class BuildScriptInvocation(object):
         builder.add_product(products.WasmSwiftSDK,
                             is_enabled=self.args.build_wasmstdlib)
 
-        builder.add_product(products.SystemTests,
-                            is_enabled=self.args.build_system)
+        builder.add_product(products.SwiftSystemTests,
+                            is_enabled=self.args.build_swift_system)
         builder.add_product(products.SwiftFoundationTests,
                             is_enabled=self.args.build_foundation)
         builder.add_product(products.FoundationTests,

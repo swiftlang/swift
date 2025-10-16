@@ -91,11 +91,11 @@ def _apply_default_arguments(args):
     if args.lldb_build_with_xcode is None:
         args.lldb_build_with_xcode = '0'
 
-    if args.system_build_variant is None:
-        args.system_build_variant = args.build_variant
+    if args.swift_system_build_variant is None:
+        args.swift_system_build_variant = args.build_variant
 
-    if args.system_tests_build_variant is None:
-        args.system_tests_build_variant = args.build_variant
+    if args.swift_system_tests_build_variant is None:
+        args.swift_system_tests_build_variant = args.build_variant
 
     if args.foundation_build_variant is None:
         args.foundation_build_variant = args.build_variant
@@ -894,8 +894,10 @@ def create_argument_parser():
     option('--foundation', toggle_true('build_foundation'),
            help='build foundation')
 
-    option('--system', toggle_true('build_system'),
-           help='build system')
+    option('--swift-system', toggle_true('build_swift_system'),
+           help='build Swift system')
+    option('--install-swift-system', toggle_true('install_swift_system'),
+           help='install Swift System')
 
     option('--libdispatch', toggle_true('build_libdispatch'),
            help='build libdispatch')
@@ -1025,11 +1027,11 @@ def create_argument_parser():
            help='build the Foundation tests in a certain variant '
                 '(Debug builds much faster)')
 
-    option('--debug-system', store('system_build_variant'),
+    option('--debug-swift-system', store('swift_system_build_variant'),
            const='Debug',
            help='build the Debug variant of System')
 
-    option('--system-tests-build-type', store('system_tests_build_variant'),
+    option('--swift-system-tests-build-type', store('swift_system_tests_build_variant'),
            choices=['Debug', 'Release'],
            default=None,
            help='build the System tests in a certain variant '
