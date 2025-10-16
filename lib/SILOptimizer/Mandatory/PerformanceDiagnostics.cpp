@@ -730,7 +730,7 @@ private:
             "global inst", &g);
 
         auto *decl = g.getDecl();
-        if (g.getSectionAttr()) {
+        if (!g.section().empty()) {
           module->getASTContext().Diags.diagnose(
             g.getDecl()->getLoc(), diag::bad_attr_on_non_const_global,
             "@_section");

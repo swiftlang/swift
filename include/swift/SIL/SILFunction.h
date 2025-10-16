@@ -320,6 +320,11 @@ private:
   /// The function's remaining set of specialize attributes.
   std::vector<SILSpecializeAttr*> SpecializeAttrSet;
 
+  /// The name that this function should have when it is lowered to LLVM IR.
+  ///
+  /// If empty, use the SIL function's name directly.
+  StringRef AsmName;
+
   /// Name of a section if @_section attribute was used, otherwise empty.
   StringRef Section;
 
@@ -1422,6 +1427,10 @@ public:
   /// Return whether this function has attribute @_used on it
   bool markedAsUsed() const { return MarkedAsUsed; }
   void setMarkedAsUsed(bool value) { MarkedAsUsed = value; }
+
+  /// Return custom assembler name, otherwise empty.
+  StringRef asmName() const { return AsmName; }
+  void setAsmName(StringRef value) { AsmName = value; }
 
   /// Return custom section name if @_section was used, otherwise empty
   StringRef section() const { return Section; }
