@@ -120,6 +120,7 @@ private func registerSILClasses() {
   register(MoveOnlyWrapperToCopyableBoxInst.self)
   register(CopyableToMoveOnlyWrapperAddrInst.self)
   register(MoveOnlyWrapperToCopyableAddrInst.self)
+  register(UncheckedOwnershipInst.self) 
   register(ObjectInst.self)
   register(VectorInst.self)
   register(VectorBaseAddrInst.self)

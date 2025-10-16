@@ -1447,6 +1447,8 @@ final public class CopyableToMoveOnlyWrapperAddrInst
 final public class MoveOnlyWrapperToCopyableAddrInst
   : SingleValueInstruction, UnaryInstruction {}
 
+final public class UncheckedOwnershipInst: SingleValueInstruction, UnaryInstruction {}
+
 final public class ObjectInst : SingleValueInstruction {
   public var baseOperands: OperandArray {
     operands[0..<bridged.ObjectInst_getNumBaseElements()]

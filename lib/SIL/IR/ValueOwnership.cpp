@@ -323,6 +323,7 @@ FORWARDING_OWNERSHIP_INST(MarkUnresolvedReferenceBinding)
 FORWARDING_OWNERSHIP_INST(MoveOnlyWrapperToCopyableValue)
 FORWARDING_OWNERSHIP_INST(CopyableToMoveOnlyWrapperValue)
 FORWARDING_OWNERSHIP_INST(MoveOnlyWrapperToCopyableBox)
+FORWARDING_OWNERSHIP_INST(UncheckedOwnership)
 #undef FORWARDING_OWNERSHIP_INST
 
 ValueOwnershipKind

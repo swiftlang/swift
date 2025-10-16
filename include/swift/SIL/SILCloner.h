@@ -2248,6 +2248,19 @@ void SILCloner<ImplClass>::visitCopyableToMoveOnlyWrapperValueInst(
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitUncheckedOwnershipInst(
+    UncheckedOwnershipInst *uoi) {
+  getBuilder().setCurrentDebugScope(getOpScope(uoi->getDebugScope()));
+  if (!getBuilder().hasOwnership()) {
+    return recordFoldedValue(uoi, getOpValue(uoi->getOperand()));
+  }
+
+  recordClonedInstruction(
+      uoi, getBuilder().createUncheckedOwnership(
+               getOpLocation(uoi->getLoc()), getOpValue(uoi->getOperand())));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitReleaseValueInst(ReleaseValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(

@@ -3852,6 +3852,15 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::UncheckedOwnershipInst: {
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createUncheckedOwnership(InstLoc, Val);
+    break;
+  }
+
   case SILInstructionKind::LoadInst: {
     std::optional<LoadOwnershipQualifier> Qualifier;
     SourceLoc AddrLoc;

@@ -9553,6 +9553,17 @@ class MoveOnlyWrapperToCopyableAddrInst
   }
 };
 
+class UncheckedOwnershipInst final
+    : public UnaryInstructionBase<SILInstructionKind::UncheckedOwnershipInst,
+                                  OwnershipForwardingSingleValueInstruction> {
+  friend class SILBuilder;
+
+  UncheckedOwnershipInst(SILDebugLocation DebugLoc, SILValue operand,
+                         ValueOwnershipKind forwardingOwnershipKind)
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType(),
+                             forwardingOwnershipKind) {}
+};
+
 /// Given an object reference, return true iff it is non-nil and refers
 /// to a native swift object with strong reference count of 1.
 class IsUniqueInst
@@ -11696,6 +11707,7 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::BorrowedFromInst:
   case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
+  case SILInstructionKind::UncheckedOwnershipInst:
     return true;
   default:
     return false;
