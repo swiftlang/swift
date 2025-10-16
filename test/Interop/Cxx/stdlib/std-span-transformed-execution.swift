@@ -1,5 +1,8 @@
 // RUN: %target-run-simple-swift(-plugin-path %swift-plugin-dir -I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -swift-version 6 -Xfrontend -disable-availability-checking -Xcc -std=c++20 -enable-experimental-feature LifetimeDependence -enable-experimental-feature SafeInteropWrappers)
 
+// FIXME swift-ci linux tests do not support std::span
+// UNSUPPORTED: OS=linux-gnu
+
 // TODO: test failed in Windows PR testing: rdar://144384453
 // UNSUPPORTED: OS=windows-msvc
 

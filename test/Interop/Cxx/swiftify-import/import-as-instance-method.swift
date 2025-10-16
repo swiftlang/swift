@@ -6,6 +6,9 @@
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift  -cxx-interoperability-mode=default -Xcc -std=c++20 -verify -verify-additional-file %t/Inputs/instance.h -DVERIFY
 // RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift -cxx-interoperability-mode=default -Xcc -std=c++20 -dump-macro-expansions 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace --implicit-check-not __swiftmacro
 
+// FIXME swift-ci linux tests do not support std::span
+// UNSUPPORTED: OS=linux-gnu, OS=linux-android, OS=linux-androideabi
+
 //--- test.swift
 import Instance
 
