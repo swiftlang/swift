@@ -4,6 +4,6 @@
 // REQUIRES: OS=macosx
 
 @_cdecl("posix_memalign")
-func posix_memalign(_ resultPtr:UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ :Int, _ :Int) -> Int32 { // expected-error {{function has wrong linkage to be called from}}
+func posix_memalign(_ resultPtr:UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ :Int, _ :Int) -> Int32 { // okay: @_extern(c) declaration is separate
   return 0
 }
