@@ -930,13 +930,17 @@ TypeVarRefCollector::walkToStmtPre(Stmt *stmt) {
   // we're generating constraints for the closure itself, since we'll connect
   // the conjunction to the closure type variable itself.
   if (auto *CE = dyn_cast<ClosureExpr>(DC)) {
-    if (isa<ReturnStmt>(stmt) && DCDepth == 0 &&
-        !Locator->directlyAt<ClosureExpr>()) {
-      SmallPtrSet<TypeVariableType *, 4> typeVars;
-      CS.getClosureType(CE)->getResult()->getTypeVariables(typeVars);
-      TypeVars.insert(typeVars.begin(), typeVars.end());
+    if (isa<ReturnStmt>(stmt) && DCDepth == 0) {
+      if (!Locator->directlyAt<ClosureExpr>()) {
+        SmallPtrSet<TypeVariableType *, 4> typeVars;
+        CS.getClosureType(CE)->getResult()->getTypeVariables(typeVars);
+        TypeVars.insert(typeVars.begin(), typeVars.end());
+      } else {
+        Returns.push_back(cast<ReturnStmt>(stmt));
+      }
     }
   }
+
   return Action::Continue(stmt);
 }
 
@@ -3170,7 +3174,7 @@ namespace {
       if (!OuterExpansions.empty())
         CS.setCapturedExpansions(closure, OuterExpansions);
 
-      CS.setClosure(closure, {inferredType});
+      CS.setClosure(closure, {inferredType, refCollector.getReturns()});
       return closureType;
     }
 
@@ -4314,7 +4318,7 @@ namespace {
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         FunctionType *closureTy =
             inferClosureType(closure, /*allowResultBindToHole=*/true);
-        CS.setClosure(closure, {closureTy});
+        CS.setClosure(closure, {closureTy, /*returns=*/{}});
         CS.setType(closure, closureTy);
       } else {
         TypeVariableType *exprType = CS.createTypeVariable(

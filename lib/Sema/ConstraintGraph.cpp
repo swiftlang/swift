@@ -870,7 +870,7 @@ bool ConstraintGraph::contractEdges() {
 
   SmallVector<Constraint *, 16> constraints;
   for (const auto &[closure, info] : CS.Closures) {
-    for (const auto &param : info.Type->getParams()) {
+    for (const auto &param : info.getType()->getParams()) {
       auto paramTy = param.getPlainType()->getAs<TypeVariableType>();
       if (!paramTy)
         continue;
