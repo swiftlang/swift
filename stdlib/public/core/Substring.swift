@@ -1420,7 +1420,7 @@ extension Substring {
   /// identical.
   ///
   /// - Performance: O(1)
-  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 6.3, *)
   public func isTriviallyIdentical(to other: Self) -> Bool {
     self._wholeGuts.rawBits == other._wholeGuts.rawBits &&
     self._offsetRange == other._offsetRange
