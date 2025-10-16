@@ -65,6 +65,8 @@ sil [ossa] @guaranteed_user_with_result : $@convention(thin) (@guaranteed Klass)
 sil [ossa] @inguaranteed_user_without_result_NTS : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> ()
 sil [ossa] @inguaranteed_user_without_result_MOS : $@convention(thin) (@in_guaranteed MOS) -> ()
 
+sil [ossa] @consuming_indirect_arg : $@convention(thin) (@in Klass) -> ()
+
 sil [ossa] @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> () {
 bb0(%0 : $*Klass):
   %9999 = tuple()
@@ -1641,5 +1643,35 @@ bb0(%0 : @owned $Klass):
   destroy_addr %2
   dealloc_stack %2
   return %4
+}
+
+// CHECK-LABEL: sil [ossa] @take_and_consuming_arg :
+// CHECK-NOT:     alloc_stack
+// CHECK:         apply {{%[0-9]+}}(%0)
+// CHECK-LABEL: } // end sil function 'take_and_consuming_arg'
+sil [ossa] @take_and_consuming_arg : $@convention(thin) (@in Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = alloc_stack $Klass
+  copy_addr [take] %0 to [init] %1
+  %3 = function_ref @consuming_indirect_arg : $@convention(thin) (@in Klass) -> ()
+  %4 = apply %3(%1) : $@convention(thin) (@in Klass) -> ()
+  dealloc_stack %1 : $*Klass
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_and_consuming_arg :
+// CHECK:         alloc_stack
+// CHECK-NEXT:    copy_addr
+// CHECK-LABEL: } // end sil function 'copy_and_consuming_arg'
+sil [ossa] @copy_and_consuming_arg : $@convention(thin) (@inout Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = alloc_stack $Klass
+  copy_addr %0 to [init] %1
+  %3 = function_ref @consuming_indirect_arg : $@convention(thin) (@in Klass) -> ()
+  %4 = apply %3(%1) : $@convention(thin) (@in Klass) -> ()
+  dealloc_stack %1 : $*Klass
+  %9 = tuple ()
+  return %9 : $()
 }
 

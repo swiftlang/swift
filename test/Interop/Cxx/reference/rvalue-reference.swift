@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Onone) | %FileCheck -check-prefix=CHECK-DASH-ONONE %s
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xllvm -sil-disable-pass=mandatory-temp-rvalue-elimination -Xfrontend -enable-experimental-cxx-interop -Onone) | %FileCheck -check-prefix=CHECK-DASH-ONONE %s
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -O) | %FileCheck -check-prefix=CHECK-DASH-O %s
 //
 // REQUIRES: executable_test
