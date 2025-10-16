@@ -83,7 +83,7 @@ private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ cont
     removeDestroys(of: allocStack, context)
   }
 
-  allocStack.uses.ignoreUses(ofType: DeallocStackInst.self).replaceAll(with: copy.sourceAddress, context)
+  allocStack.uses.ignore(usersOfType: DeallocStackInst.self).replaceAll(with: copy.sourceAddress, context)
 
   if keepDebugInfo {
     Builder(before: copy, context).createDebugStep()
@@ -247,7 +247,7 @@ private extension AllocStackInst {
     var liferange = InstructionRange(begin: self, context)
     defer { liferange.deinitialize() }
 
-    liferange.insert(contentsOf: uses.ignoreUses(ofType: DeallocStackInst.self).lazy.map { $0.instruction })
+    liferange.insert(contentsOf: uses.ignore(usersOfType: DeallocStackInst.self).lazy.map { $0.instruction })
 
     for use in uses {
       switch use.instruction {
