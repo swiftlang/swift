@@ -436,12 +436,14 @@ SwiftDependencyTracker::SwiftDependencyTracker(
     auto status = (*file)->status();
     if (!status)
       return;
-    auto fileRef = (*file)->getObjectRefForContent();
-    if (!fileRef)
+
+    auto casFile = dyn_cast<llvm::cas::CASBackedFile>(*file);
+    if (!casFile)
       return;
 
+    auto fileRef = casFile->getObjectRefForContent();
     std::string realPath = Mapper ? Mapper->mapToString(path) : path.str();
-    CommonFiles.try_emplace(realPath, **fileRef, (size_t)status->getSize());
+    CommonFiles.try_emplace(realPath, fileRef, (size_t)status->getSize());
   };
 
   // Add SDKSetting file.
@@ -493,12 +495,13 @@ void SwiftDependencyTracker::trackFile(const Twine &path) {
   auto status = (*file)->status();
   if (!status)
     return;
-  auto fileRef = (*file)->getObjectRefForContent();
-  if (!fileRef)
+  auto CASFile = dyn_cast<llvm::cas::CASBackedFile>(*file);
+  if (!CASFile)
     return;
+  auto fileRef = CASFile->getObjectRefForContent();
   std::string realPath =
       Mapper ? Mapper->mapToString(path.str()) : path.str();
-  TrackedFiles.try_emplace(realPath, **fileRef, (size_t)status->getSize());
+  TrackedFiles.try_emplace(realPath, fileRef, (size_t)status->getSize());
 }
 
 llvm::Expected<llvm::cas::ObjectProxy>
@@ -557,8 +560,9 @@ ModuleDependencyScanner::ModuleDependencyScanner(
   }
 
   if (CAS)
-    CacheFS = llvm::cas::createCASProvidingFileSystem(
-        CAS, ScanASTContext.SourceMgr.getFileSystem());
+    CacheFS = cast<llvm::cas::CASBackedFileSystem>(
+        llvm::cas::createCASProvidingFileSystem(
+            CAS, ScanASTContext.SourceMgr.getFileSystem()));
 
   // TODO: Make num threads configurable
   for (size_t i = 0; i < NumThreads; ++i)
