@@ -2650,7 +2650,7 @@ static bool allowSymbolLinkageMarkers(ASTContext &ctx, Decl *D) {
   if (!decl)
     return false;
 
-  auto *macroDecl = decl->getResolvedMacro(macroAttr);
+  auto *macroDecl = macroAttr->getResolvedMacro();
   if (!macroDecl)
     return false;
 
@@ -4625,7 +4625,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       return;
 
     // Try resolving an attached macro attribute.
-    if (auto *macro = D->getResolvedMacro(attr)) {
+    if (auto *macro = attr->getResolvedMacro()) {
       for (auto *roleAttr : macro->getAttrs().getAttributes<MacroRoleAttr>()) {
         auto role = roleAttr->getMacroRole();
         if (isInvalidAttachedMacro(role, D)) {
@@ -8583,13 +8583,7 @@ public:
       return; // it's OK
     }
 
-    auto declRef = evaluateOrDefault(
-      ctx.evaluator,
-      ResolveMacroRequest{attr, closure},
-      ConcreteDeclRef());
-
-    auto *decl = declRef.getDecl();
-    if (auto *macro = dyn_cast_or_null<MacroDecl>(decl)) {
+    if (auto *macro = attr->getResolvedMacro()) {
       if (macro->getMacroRoles().contains(MacroRole::Body)) {
         if (!ctx.LangOpts.hasFeature(Feature::ClosureBodyMacro)) {
           ctx.Diags.diagnose(

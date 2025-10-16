@@ -67,6 +67,7 @@ class CustomAttributeInitializer;
 class GenericFunctionType;
 class LazyConformanceLoader;
 class LazyMemberLoader;
+class MacroDecl;
 class ModuleDecl;
 class NominalTypeDecl;
 class PatternBindingInitializer;
@@ -2338,6 +2339,10 @@ public:
   /// Retrieve the NominalTypeDecl the CustomAttr refers to, or \c nullptr if
   /// it doesn't refer to one (which can be the case for e.g macro attrs).
   NominalTypeDecl *getNominalDecl() const;
+
+  /// Retrieve the resolved macro for the CustomAttr, or \c nullptr if the
+  /// attribute does not refer to a macro.
+  MacroDecl *getResolvedMacro() const;
 
   /// Destructure an attribute's type repr for a macro reference.
   ///

@@ -4193,12 +4193,9 @@ void TypeChecker::checkParameterList(ParameterList *params,
 std::optional<unsigned>
 ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
                                           MacroExpansionDecl *MED) const {
-  auto &ctx = MED->getASTContext();
-  auto *dc = MED->getDeclContext();
-
   // Resolve macro candidates.
-  auto macro = evaluateOrDefault(ctx.evaluator, ResolveMacroRequest{MED, dc},
-                                 ConcreteDeclRef());
+  auto macro =
+      evaluateOrDefault(evaluator, ResolveMacroRequest{MED}, ConcreteDeclRef());
   if (!macro)
     return std::nullopt;
   MED->setMacroRef(macro);

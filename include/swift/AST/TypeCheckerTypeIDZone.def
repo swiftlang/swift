@@ -400,7 +400,7 @@ SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
               evaluator::SideEffect(NominalTypeDecl *, ImplicitMemberAction),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveMacroRequest,
-              ConcreteDeclRef(UnresolvedMacroReference, const Decl *),
+              ConcreteDeclRef(UnresolvedMacroReference),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveMacroConformances,
               ArrayRef<Type>(const MacroRoleAttr *, const Decl *),

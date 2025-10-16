@@ -2204,17 +2204,6 @@ void ClosureExpr::setExplicitResultType(Type ty) {
       ->setType(MetatypeType::get(ty));
 }
 
-MacroDecl *
-ClosureExpr::getResolvedMacro(CustomAttr *customAttr) {
-  auto &ctx = getASTContext();
-  auto declRef = evaluateOrDefault(
-      ctx.evaluator,
-      ResolveMacroRequest{customAttr, this},
-      ConcreteDeclRef());
-
-  return dyn_cast_or_null<MacroDecl>(declRef.getDecl());
-}
-
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
 
 void AutoClosureExpr::setBody(Expr *E) {

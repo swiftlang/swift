@@ -2333,6 +2333,14 @@ ArgumentList *UnresolvedMacroReference::getArgs() const {
   llvm_unreachable("Unhandled case");
 }
 
+DeclContext *UnresolvedMacroReference::getDeclContext() const {
+  if (auto *expansion = pointer.dyn_cast<FreestandingMacroExpansion *>())
+    return expansion->getDeclContext();
+  if (auto *attr = pointer.dyn_cast<CustomAttr *>())
+    return attr->getOwner().getDeclContext();
+  llvm_unreachable("Unhandled case");
+}
+
 MacroRoles UnresolvedMacroReference::getMacroRoles() const {
   if (isa<FreestandingMacroExpansion *>(pointer))
     return getFreestandingMacroRoles();

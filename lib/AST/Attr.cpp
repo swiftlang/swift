@@ -841,7 +841,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     // a macro.
     if (Options.SuppressExpandedMacros) {
       if (auto customAttr = dyn_cast<CustomAttr>(DA)) {
-        if (D->getResolvedMacro(const_cast<CustomAttr *>(customAttr)))
+        if (customAttr->getResolvedMacro())
           continue;
       }
     }
@@ -3160,6 +3160,16 @@ NominalTypeDecl *CustomAttr::getNominalDecl() const {
   auto &eval = getASTContext().evaluator;
   auto *mutThis = const_cast<CustomAttr *>(this);
   return evaluateOrDefault(eval, CustomAttrNominalRequest{mutThis}, nullptr);
+}
+
+MacroDecl *CustomAttr::getResolvedMacro() const {
+  auto &eval = getASTContext().evaluator;
+  auto *mutThis = const_cast<CustomAttr *>(this);
+
+  auto declRef =
+      evaluateOrDefault(eval, ResolveMacroRequest{mutThis}, ConcreteDeclRef());
+
+  return dyn_cast_or_null<MacroDecl>(declRef.getDecl());
 }
 
 TypeRepr *CustomAttr::getTypeRepr() const { return typeExpr->getTypeRepr(); }

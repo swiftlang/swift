@@ -17,7 +17,7 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/TypeCheckRequests.h" // for ResolveMacroRequest
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
