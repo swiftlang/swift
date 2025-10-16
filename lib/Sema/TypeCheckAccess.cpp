@@ -2768,7 +2768,7 @@ void swift::recordRequiredImportAccessLevelForDecl(const ValueDecl *decl,
                    *sourceModule = decl->getModuleContext();
         dc->getASTContext().Diags.diagnose(
             diagLoc, diag::module_api_import, decl, importedVia, sourceModule,
-            importedVia == sourceModule, loc.isInvalid());
+            importedVia->getTopLevelModule() == sourceModule, loc.isInvalid());
       });
 }
 
