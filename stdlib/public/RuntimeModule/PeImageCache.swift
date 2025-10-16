@@ -1,4 +1,4 @@
-//===--- ElfImageCache.swift - ELF support for Swift ----------------------===//
+//===--- PeImageCache.swift - PE-COFF support for Swift -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Provides a per-thread Elf image cache that improves efficiency when
-// taking multiple backtraces by avoiding loading ELF images multiple times.
+// Provides a per-thread PE-COFF image cache that improves efficiency when
+// taking multiple backtraces by avoiding loading PE-COFF images multiple times.
 //
 //===----------------------------------------------------------------------===//
 
@@ -30,38 +30,24 @@ internal import Musl
 /// Provides a per-thread image cache for ELF image processing.  This means
 /// if you take multiple backtraces from a thread, you won't load the same
 /// image multiple times.
-final class ElfImageCache {
-  var elf32: [String: Elf32Image] = [:]
-  var elf64: [String: Elf64Image] = [:]
+final class PeImageCache {
+  var cache: [String: PeCoffImage] = [:]
 
   func purge() {
-    elf32 = [:]
-    elf64 = [:]
+    cache = [:]
   }
 
-  enum Result {
-    case elf32Image(Elf32Image)
-    case elf64Image(Elf64Image)
-  }
-  func lookup(path: String?) -> Result? {
+  func lookup(path: String?) -> PeCoffImage? {
     guard let path = path else {
       return nil
     }
-    if let image = elf32[path] {
-      return .elf32Image(image)
+    if let image = cache[path] {
+      return image
     }
-    if let image = elf64[path] {
-      return .elf64Image(image)
-    }
-    if let source = try? ImageSource(path: path) {
-      if let elfImage = try? Elf32Image(source: source) {
-        elf32[path] = elfImage
-        return .elf32Image(elfImage)
-      }
-      if let elfImage = try? Elf64Image(source: source) {
-        elf64[path] = elfImage
-        return .elf64Image(elfImage)
-      }
+    if let source = try? ImageSource(path: path),
+       let image = try? PeCoffImage(source: source) {
+      cache[path] = image
+      return image
     }
     return nil
   }
@@ -70,7 +56,7 @@ final class ElfImageCache {
   private static var dwTlsIndex: DWORD = {
     let dwNdx = TlsAlloc()
     if dwNdx == TLS_OUT_OF_INDEXES {
-      fatalError("Unable to allocate TSD for ElfImageCache")
+      fatalError("Unable to allocate TSD for PeImageCache")
     }
     return dwNdx
   }()
@@ -80,34 +66,34 @@ final class ElfImageCache {
     let err = pthread_key_create(
       &theKey,
       { rawPtr in
-        let ptr = Unmanaged<ElfImageCache>.fromOpaque(
+        let ptr = Unmanaged<PeImageCache>.fromOpaque(
           notMutable(notOptional(rawPtr))
         )
         ptr.release()
       }
     )
     if err != 0 {
-      fatalError("Unable to create TSD key for ElfImageCache")
+      fatalError("Unable to create TSD key for PeImageCache")
     }
     return theKey
   }()
   #endif
 
-  static var threadLocal: ElfImageCache {
+  static var threadLocal: PeImageCache {
     #if os(Windows)
     guard let rawPtr = TlsGetValue(dwTlsIndex) else {
-      let cache = Unmanaged<ElfImageCache>.passRetained(ElfImageCache())
+      let cache = Unmanaged<PeImageCache>.passRetained(PeImageCache())
       TlsSetValue(dwTlsIndex, cache.toOpaque())
       return cache.takeUnretainedValue()
     }
     #else
     guard let rawPtr = pthread_getspecific(key) else {
-      let cache = Unmanaged<ElfImageCache>.passRetained(ElfImageCache())
+      let cache = Unmanaged<PeImageCache>.passRetained(PeImageCache())
       pthread_setspecific(key, cache.toOpaque())
       return cache.takeUnretainedValue()
     }
     #endif
-    let cache = Unmanaged<ElfImageCache>.fromOpaque(rawPtr)
+    let cache = Unmanaged<PeImageCache>.fromOpaque(rawPtr)
     return cache.takeUnretainedValue()
   }
 }

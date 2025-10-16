@@ -7,7 +7,7 @@
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: executable_test
 // REQUIRES: backtracing
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 import Runtime
 
