@@ -56,9 +56,11 @@ public:
                                 setShouldDeallocateImmediately)
 };
 
+struct CoroAllocator;
+
 using CoroAllocation = void *;
-using CoroAllocateFn = CoroAllocation (*)(size_t);
-using CoroDealllocateFn = void (*)(CoroAllocation);
+using CoroAllocateFn = CoroAllocation (*)(CoroAllocator *, size_t);
+using CoroDealllocateFn = void (*)(CoroAllocator *, CoroAllocation);
 
 struct CoroAllocator {
   CoroAllocatorFlags flags;
