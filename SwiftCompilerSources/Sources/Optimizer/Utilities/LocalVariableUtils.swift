@@ -158,7 +158,7 @@ struct LocalVariableAccess: CustomStringConvertible {
       str += "deadEnd"
     }
     if let inst = instruction {
-      str += "\(inst)"
+      str += ", \(inst)"
     }
     return str
   }
@@ -249,6 +249,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
 
   var description: String {
     return "assign: \(_isFullyAssigned == nil ? "unknown" : String(describing: _isFullyAssigned!)), "
+      + "hasEscaped: \(hasEscaped == nil ?  "unknown" : String(describing: hasEscaped!)), "
       + "\(access)"
   }
 
