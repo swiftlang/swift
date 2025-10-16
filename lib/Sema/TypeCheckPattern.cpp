@@ -845,11 +845,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     HandlePlaceholderTypeReprFn placeholderHandler = nullptr;
     OpenPackElementFn packElementOpener = nullptr;
     if (pattern.allowsInference()) {
-      unboundTyOpener = [](auto unboundTy) {
-        // FIXME: Don't let unbound generic types escape type resolution.
-        // For now, just return the unbound generic type.
-        return unboundTy;
-      };
+      unboundTyOpener = TypeResolution::defaultUnboundTypeOpener;
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
       placeholderHandler = PlaceholderType::get;
@@ -913,11 +909,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
       HandlePlaceholderTypeReprFn placeholderHandler = nullptr;
       OpenPackElementFn packElementOpener = nullptr;
       if (pattern.allowsInference()) {
-        unboundTyOpener = [](auto unboundTy) {
-          // FIXME: Don't let unbound generic types escape type resolution.
-          // For now, just return the unbound generic type.
-          return unboundTy;
-        };
+        unboundTyOpener = TypeResolution::defaultUnboundTypeOpener;
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
         placeholderHandler = PlaceholderType::get;
