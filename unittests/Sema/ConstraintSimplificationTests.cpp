@@ -106,7 +106,7 @@ TEST_F(SemaTest, TestClosureInferenceFromOptionalContext) {
   auto defaultTy = FunctionType::get({FunctionType::Param(paramTy, paramName)},
                                      resultTy, extInfo);
 
-  cs.setClosureType(closure, defaultTy);
+  cs.setClosure(closure, {defaultTy});
 
   auto *closureTy = cs.createTypeVariable(closureLoc, /*options=*/0);
   cs.setType(closure, closureTy);
@@ -191,7 +191,7 @@ TEST_F(SemaTest, TestInitializerUseDCIsSetCorrectlyInClosure) {
   auto defaultTy = FunctionType::get({FunctionType::Param(paramTy, paramName)},
                                      resultTy, extInfo);
 
-  cs.setClosureType(closure, defaultTy);
+  cs.setClosure(closure, {defaultTy});
 
   auto *closureTy = cs.createTypeVariable(closureLoc, /*options=*/0);
   cs.setType(closure, closureTy);

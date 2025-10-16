@@ -2148,6 +2148,11 @@ struct ClosureIsolatedByPreconcurrency {
   bool operator()(const ClosureExpr *expr) const;
 };
 
+/// Describes a closure that is being processed by the constraint solver.
+struct ClosureInfo {
+  FunctionType *Type;
+};
+
 /// Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -2267,7 +2272,7 @@ private:
   ///
   /// This is a MapVector because contractEdges() iterates over it and
   /// may depend on order.
-  llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
+  llvm::MapVector<const ClosureExpr *, ClosureInfo> Closures;
 
   /// Maps closures and local functions to the pack expansion expressions they
   /// capture.
@@ -2988,20 +2993,20 @@ public:
     return result->second;
   }
 
-  void setClosureType(const ClosureExpr *closure, FunctionType *type) {
+  void setClosure(const ClosureExpr *closure, ClosureInfo &&info) {
     ASSERT(closure);
-    ASSERT(type);
-    bool inserted = ClosureTypes.insert({closure, type}).second;
+    ASSERT(info.Type);
+    bool inserted = Closures.insert({closure, std::move(info)}).second;
     ASSERT(inserted);
 
     if (solverState) {
-      recordChange(SolverTrail::Change::RecordedClosureType(
-        const_cast<ClosureExpr *>(closure)));
+      recordChange(SolverTrail::Change::RecordedClosure(
+          const_cast<ClosureExpr *>(closure)));
     }
   }
 
-  void removeClosureType(const ClosureExpr *closure) {
-    bool erased = ClosureTypes.erase(closure);
+  void removeClosure(const ClosureExpr *closure) {
+    bool erased = Closures.erase(closure);
     ASSERT(erased);
   }
 
@@ -3012,9 +3017,9 @@ public:
   }
 
   FunctionType *getClosureTypeIfAvailable(const ClosureExpr *closure) const {
-    auto result = ClosureTypes.find(closure);
-    if (result != ClosureTypes.end())
-      return result->second;
+    auto result = Closures.find(closure);
+    if (result != Closures.end())
+      return result->second.Type;
     return nullptr;
   }
 

@@ -3170,7 +3170,7 @@ namespace {
       if (!OuterExpansions.empty())
         CS.setCapturedExpansions(closure, OuterExpansions);
 
-      CS.setClosureType(closure, inferredType);
+      CS.setClosure(closure, {inferredType});
       return closureType;
     }
 
@@ -4314,7 +4314,7 @@ namespace {
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         FunctionType *closureTy =
             inferClosureType(closure, /*allowResultBindToHole=*/true);
-        CS.setClosureType(closure, closureTy);
+        CS.setClosure(closure, {closureTy});
         CS.setType(closure, closureTy);
       } else {
         TypeVariableType *exprType = CS.createTypeVariable(
