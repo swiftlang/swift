@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated -I %S/Inputs/custom-modules %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated -I %S/Inputs/custom-modules -application-extension %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated -I %S/Inputs/custom-modules -application-extension-library %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated -I %S/Inputs/custom-modules -application-extension %s -verify-additional-prefix extension-
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated -I %S/Inputs/custom-modules -application-extension-library %s -verify-additional-prefix extension-
 
 // REQUIRES: OS=ios
 // UNSUPPORTED: OS=maccatalyst
@@ -31,9 +31,9 @@ func deprecatedOnMacCatalystButNotIOS() { }
 func maccatalyst_tests() {
   deprecatedOnMacCatalystButNotIOS() // no-warning
 
-  availableOnIOSButUnavailableOniOSAppExtension() // no-error
+  availableOnIOSButUnavailableOniOSAppExtension() // expected-extension-error {{'availableOnIOSButUnavailableOniOSAppExtension()' is unavailable in application extensions for iOS}}
   availableOnIOSAppExtensionButUnavailableOnmacCatalystAppExtension() // no-error
 
-  availableOnIOSButDeprecatedOniOSAppExtension() // no-warning
+  availableOnIOSButDeprecatedOniOSAppExtension() // expected-extension-warning {{'availableOnIOSButDeprecatedOniOSAppExtension()' was deprecated in application extensions for iOS 9.0}}
   availableOnIOSAppExtensionButDeprecatedOnmacCatalystAppExtension() // no-warning
 }
