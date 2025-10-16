@@ -22,7 +22,8 @@ class UpdateArguments(RunnerArguments):
 
 @dataclass
 class AdditionalSwiftSourcesArguments(RunnerArguments):
-    args: RunnerArguments
+    args: Any
+    "Arguments passed during CLI invocation." # TODO: Properly type this.
     repo_info: str
     repo_branch: str
     remote: str
