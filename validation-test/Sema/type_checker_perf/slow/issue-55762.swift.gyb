@@ -1,4 +1,4 @@
-// RUN: %scale-test --invert-result --begin 1 --end 5 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// RUN: %scale-test --invert-result --begin 1 --end 7 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
 // REQUIRES: asserts, no_asan
 
 // https://github.com/swiftlang/swift/issues/55762
