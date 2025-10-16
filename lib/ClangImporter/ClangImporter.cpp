@@ -3839,11 +3839,10 @@ ImportDecl *swift::createImportDecl(ASTContext &Ctx,
                                 ImportKind::Module, SourceLoc(),
                                 importPath.get(), ClangN);
   if (Ctx.ClangImporterOpts.BridgingHeaderIsInternal) {
-    ID->getAttrs().add(
-        new (Ctx) AccessControlAttr(SourceLoc(), SourceRange(),
-                                    AccessLevel::Internal, /*implicit=*/true));
+    ID->addAttribute(new (Ctx) AccessControlAttr(
+        SourceLoc(), SourceRange(), AccessLevel::Internal, /*implicit=*/true));
   } else if (IsExported) {
-    ID->getAttrs().add(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+    ID->addAttribute(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
   }
   return ID;
 }
@@ -6263,39 +6262,39 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
 
 // Clone attributes that have been imported from Clang.
 void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl* toDecl) {
-  ASTContext& context = fromDecl->getASTContext();
-  DeclAttributes& attrs = toDecl->getAttrs();
+  ASTContext &context = fromDecl->getASTContext();
   for (auto attr : fromDecl->getAttrs()) {
     switch (attr->getKind()) {
     case DeclAttrKind::Available: {
-      attrs.add(cast<AvailableAttr>(attr)->clone(context, true));
+      toDecl->addAttribute(cast<AvailableAttr>(attr)->clone(context, true));
       break;
     }
     case DeclAttrKind::Custom: {
       CustomAttr *cAttr = cast<CustomAttr>(attr);
-      attrs.add(CustomAttr::create(context, SourceLoc(), cAttr->getTypeExpr(),
-                                   /*owner*/ toDecl, cAttr->getInitContext(),
-                                   cAttr->getArgs(), /*implicit*/ true));
+      toDecl->addAttribute(
+          CustomAttr::create(context, SourceLoc(), cAttr->getTypeExpr(),
+                             /*owner*/ toDecl, cAttr->getInitContext(),
+                             cAttr->getArgs(), /*implicit*/ true));
       break;
     }
     case DeclAttrKind::DiscardableResult: {
-      attrs.add(new (context) DiscardableResultAttr(true));
+      toDecl->addAttribute(new (context) DiscardableResultAttr(true));
       break;
     }
     case DeclAttrKind::Effects: {
-      attrs.add(cast<EffectsAttr>(attr)->clone(context));
+      toDecl->addAttribute(cast<EffectsAttr>(attr)->clone(context));
       break;
     }
     case DeclAttrKind::Final: {
-      attrs.add(new (context) FinalAttr(true));
+      toDecl->addAttribute(new (context) FinalAttr(true));
       break;
     }
     case DeclAttrKind::Transparent: {
-      attrs.add(new (context) TransparentAttr(true));
+      toDecl->addAttribute(new (context) TransparentAttr(true));
       break;
     }
     case DeclAttrKind::WarnUnqualifiedAccess: {
-      attrs.add(new (context) WarnUnqualifiedAccessAttr(true));
+      toDecl->addAttribute(new (context) WarnUnqualifiedAccessAttr(true));
       break;
     }
     default:
@@ -7598,8 +7597,8 @@ static ValueDecl *addThunkForDependentTypes(FuncDecl *oldDecl,
   newFnDecl->setBodySynthesizer(synthesizeDependentTypeThunkParamForwarding, newDecl);
   newFnDecl->setSelfAccessKind(newDecl->getSelfAccessKind());
   if (newDecl->isStatic()) newFnDecl->setStatic();
-  newFnDecl->getAttrs().add(
-      new (newDecl->getASTContext()) TransparentAttr(/*IsImplicit=*/true));
+  newFnDecl->addAttribute(new (newDecl->getASTContext())
+                              TransparentAttr(/*IsImplicit=*/true));
   return newFnDecl;
 }
 
@@ -7725,8 +7724,8 @@ static ValueDecl *generateThunkForExtraMetatypes(SubstitutionMap subst,
   thunk->setBodySynthesizer(synthesizeForwardingThunkBody, newDecl);
   thunk->setSelfAccessKind(newDecl->getSelfAccessKind());
   if (newDecl->isStatic()) thunk->setStatic();
-  thunk->getAttrs().add(
-      new (newDecl->getASTContext()) TransparentAttr(/*IsImplicit=*/true));
+  thunk->addAttribute(new (newDecl->getASTContext())
+                          TransparentAttr(/*IsImplicit=*/true));
 
   return thunk;
 }
@@ -8998,7 +8997,7 @@ void ClangInheritanceInfo::setUnavailableIfNecessary(
     msg = "this base member is not accessible because of private inheritance";
 
   if (msg)
-    clonedDecl->getAttrs().add(AvailableAttr::createUniversallyUnavailable(
+    clonedDecl->addAttribute(AvailableAttr::createUniversallyUnavailable(
         clonedDecl->getASTContext(), msg));
 }
 

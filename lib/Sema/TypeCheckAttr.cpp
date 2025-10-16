@@ -1531,7 +1531,7 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
     newAttr->setImplicit(attr->isImplicit());
     newAttr->setNameImplicit(attr->isNameImplicit());
     newAttr->setAddedByAccessNote(attr->getAddedByAccessNote());
-    D->getAttrs().add(newAttr);
+    D->addAttribute(newAttr);
 
     D->getAttrs().removeAttribute(attr);
     attr->setInvalid();
@@ -2650,7 +2650,7 @@ static bool allowSymbolLinkageMarkers(ASTContext &ctx, Decl *D) {
   if (!decl)
     return false;
 
-  auto *macroDecl = decl->getResolvedMacro(macroAttr);
+  auto *macroDecl = macroAttr->getResolvedMacro();
   if (!macroDecl)
     return false;
 
@@ -4625,7 +4625,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       return;
 
     // Try resolving an attached macro attribute.
-    if (auto *macro = D->getResolvedMacro(attr)) {
+    if (auto *macro = attr->getResolvedMacro()) {
       for (auto *roleAttr : macro->getAttrs().getAttributes<MacroRoleAttr>()) {
         auto role = roleAttr->getMacroRole();
         if (isInvalidAttachedMacro(role, D)) {
@@ -5762,7 +5762,7 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
   if (!D->getAttrs().hasAttribute<DynamicAttr>() &&
       !D->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
     auto attr = new (D->getASTContext()) DynamicAttr(/*implicit=*/true);
-    D->getAttrs().add(attr);
+    D->addAttribute(attr);
   }
 }
 
@@ -6835,7 +6835,7 @@ resolveDifferentiableAccessors(DifferentiableAttr *attr,
       ad, /*implicit*/ true, attr->AtLoc, attr->getRange(),
       attr->getDifferentiabilityKind(), resolvedDiffParamIndices,
       attr->getDerivativeGenericSignature());
-    ad->getAttrs().add(newAttr);
+    ad->addAttribute(newAttr);
 
     if (!typecheckDifferentiableAttrforDecl(ad, attr,
                                             resolvedDiffParamIndices))
@@ -8583,13 +8583,7 @@ public:
       return; // it's OK
     }
 
-    auto declRef = evaluateOrDefault(
-      ctx.evaluator,
-      ResolveMacroRequest{attr, closure},
-      ConcreteDeclRef());
-
-    auto *decl = declRef.getDecl();
-    if (auto *macro = dyn_cast_or_null<MacroDecl>(decl)) {
+    if (auto *macro = attr->getResolvedMacro()) {
       if (macro->getMacroRoles().contains(MacroRole::Body)) {
         if (!ctx.LangOpts.hasFeature(Feature::ClosureBodyMacro)) {
           ctx.Diags.diagnose(

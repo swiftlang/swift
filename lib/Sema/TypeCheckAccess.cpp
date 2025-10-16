@@ -2267,14 +2267,14 @@ public:
   }
 
   void checkAttachedMacros(const Decl *D) {
-    for (auto customAttrC : D->getExpandedAttrs().getAttributes<CustomAttr>()) {
-      auto customAttr = const_cast<CustomAttr *>(customAttrC);
-      auto *macroDecl = D->getResolvedMacro(customAttr);
-      if (macroDecl) {
-        diagnoseDeclAvailability(macroDecl,
-                                 customAttr->getTypeRepr()->getSourceRange(),
-                                 nullptr, Where, std::nullopt);
-      }
+    for (auto *customAttr : D->getExpandedAttrs().getAttributes<CustomAttr>()) {
+      auto *macroDecl = customAttr->getResolvedMacro();
+      if (!macroDecl)
+        continue;
+
+      diagnoseDeclAvailability(macroDecl,
+                               customAttr->getTypeRepr()->getSourceRange(),
+                               nullptr, Where, std::nullopt);
     }
   }
 
