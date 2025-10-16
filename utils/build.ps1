@@ -1240,6 +1240,56 @@ function Get-Dependencies {
       Expand-ZipFile syft-$SyftVersion.zip $BinaryCache syft-$SyftVersion
     }
 
+    function Install-PIPIfNeeded {
+      try {
+        Invoke-Program -Silent "$(Get-PythonExecutable)" -m pip
+      } catch {
+        Write-Output "Installing pip ..."
+        Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m ensurepip -U --default-pip
+      } finally {
+        Write-Host -ForegroundColor DarkGreen "✔ " -NoNewline
+        Write-Host "pip"
+      }
+    }
+
+    function Test-PythonModuleInstalled([string] $ModuleName) {
+      Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import $ModuleName" -ErrorAction SilentlyContinue
+    }
+
+    function Install-PythonModule([string] $ModuleName) {
+      if (Test-PythonModuleInstalled $ModuleName) {
+        Write-Host -ForegroundColor DarkGreen "✔ " -NoNewline
+        Write-Host "$ModuleName"
+        return
+      }
+
+      $TempRequirementsTxt = New-TemporaryFile
+
+      $Module = $PythonModules[$ModuleName]
+      Write-Output "$ModuleName==$($Module.Version) --hash=`"sha256:$($Module.SHA256)`"" >> $TempRequirementsTxt
+      foreach ($Module in $Module.Dependencies) {
+        $Dependency = $PythonModules[$Module]
+        "$Module==$($Dependency.Version) --hash=`"sha256:$($Dependency.SHA256)`"" | Out-File -FilePath $TempRequirementsTxt -Append -Encoding UTF8
+      }
+
+      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --no-binary==:all: --disable-pip-version-check
+
+      Write-Host -ForegroundColor DarkGreen "✔ " -NoNewline
+      Write-Host "$ModuleName"
+    }
+
+    function Install-PythonModules {
+      Install-PIPIfNeeded
+      Install-PythonModule "packaging"  # For building LLVM 18+
+      Install-PythonModule "setuptools" # Required for SWIG support
+      if ($Test -contains "lldb") {
+        Install-PythonModule "psutil"   # Required for testing LLDB
+      }
+    }
+
+    # Ensure Python modules that are required as host build tools
+    Install-PythonModules
+
     if ($SkipBuild -and $SkipPackaging) { return }
 
     $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
@@ -1292,59 +1342,10 @@ function Get-Dependencies {
       }
     }
 
-    function Install-PIPIfNeeded() {
-      try {
-        Invoke-Program -Silent "$(Get-PythonExecutable)" -m pip
-      } catch {
-        Write-Output "Installing pip ..."
-        Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m ensurepip -U --default-pip
-      } finally {
-        Write-Output "pip installed."
-      }
-    }
-
-    function Test-PythonModuleInstalled([string] $ModuleName) {
-      try {
-        Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import $ModuleName"
-        return $true;
-      } catch {
-        return $false;
-      }
-    }
-
-    function Install-PythonModule([string] $ModuleName) {
-      if (Test-PythonModuleInstalled $ModuleName) {
-        Write-Output "$ModuleName already installed."
-        return;
-      }
-      $TempRequirementsTxt = New-TemporaryFile
-      $Module = $PythonModules[$ModuleName]
-      $Dependencies = $Module["Dependencies"]
-      Write-Output "$ModuleName==$($Module.Version) --hash=`"sha256:$($Module.SHA256)`"" >> $TempRequirementsTxt
-      for ($i = 0; $i -lt $Dependencies.Length; $i++) {
-        $Dependency = $PythonModules[$Dependencies[$i]]
-        Write-Output "$($Dependencies[$i])==$($Dependency.Version) --hash=`"sha256:$($Dependency.SHA256)`"" >> $TempRequirementsTxt
-      }
-      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --no-binary==:all: --disable-pip-version-check
-      Write-Output "$ModuleName installed."
-    }
-
-    function Install-PythonModules() {
-      Install-PIPIfNeeded
-      Install-PythonModule "packaging" # For building LLVM 18+
-      Install-PythonModule "setuptools" # Required for SWIG support
-      if ($Test -contains "lldb") {
-        Install-PythonModule "psutil" # Required for testing LLDB
-      }
-    }
-
     Install-Python $HostArchName
     if ($IsCrossCompiling) {
       Install-Python $BuildArchName
     }
-
-    # Ensure Python modules that are required as host build tools
-    Install-PythonModules
 
     if ($Android) {
       $NDK = Get-AndroidNDK
