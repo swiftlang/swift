@@ -224,12 +224,11 @@ public struct CopyableContainer {
 // CHECK:   [[REG27:%.*]] = begin_access [read] [unsafe] [[REG26]]
 // CHECK:   [[REG28:%.*]] = struct_element_addr [[REG27]], #S._k
 // CHECK:   [[REG29:%.*]] = load_borrow [[REG28]]
-// CHECK:   [[REG31:%.*]] = unchecked_ownership_conversion [[REG29]], @guaranteed to @unowned
-// CHECK:   [[REG32:%.*]] = unchecked_ownership_conversion [[REG31]], @unowned to @guaranteed
+// CHECK:   [[REG31:%.*]] = unchecked_ownership [[REG29]]
 // CHECK:   end_access [[REG27]]
 // CHECK:   end_borrow [[REG29]]
 // CHECK:   dealloc_stack [[REG4]]
-// CHECK:   return [[REG32]]
+// CHECK:   return [[REG31]]
 // CHECK: }
 
 // CHECK: sil [ossa] @$s25borrow_accessor_container17CopyableContainerVyAA5KlassCSiciz : $@convention(method) (Int, @inout CopyableContainer) -> @inout Klass {
@@ -329,13 +328,12 @@ public struct NonCopyableContainer : ~Copyable {
 // CHECK:   [[REG31:%.*]] = begin_access [read] [unsafe] [[REG30]]
 // CHECK:   [[REG32:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG31]]
 // CHECK:   [[REG33:%.*]] = load_borrow [[REG32]]
-// CHECK:   [[REG35:%.*]] = unchecked_ownership_conversion [[REG33]], @guaranteed to @unowned
-// CHECK:   [[REG36:%.*]] = unchecked_ownership_conversion [[REG35]], @unowned to @guaranteed
+// CHECK:   [[REG35:%.*]] = unchecked_ownership [[REG33]]
 // CHECK:   end_access [[REG31]]
 // CHECK:   end_borrow [[REG33]]
 // CHECK:   dealloc_stack [[REG6]]
 // CHECK:   destroy_value [[REG4]]
-// CHECK:   return [[REG36]]
+// CHECK:   return [[REG35]]
 // CHECK: }
 
 // CHECK: sil [ossa] @$s25borrow_accessor_container20NonCopyableContainerVyAA2NCVSiciz : $@convention(method) (Int, @inout NonCopyableContainer) -> @inout NC {
