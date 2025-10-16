@@ -6711,6 +6711,11 @@ public:
             "Result and operand must have the same type, today.");
   }
 
+  void checkUncheckedOwnershipInst(UncheckedOwnershipInst *uoi) {
+    require(F.getModule().getStage() == SILStage::Raw,
+            "unchecked_ownership is valid only in raw SIL");
+  }
+
   void checkAllocPackMetadataInst(AllocPackMetadataInst *apmi) {
     require(apmi->getIntroducer()->mayRequirePackMetadata(*apmi->getFunction()),
             "Introduces instruction of kind which cannot emit on-stack pack "
