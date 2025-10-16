@@ -8167,6 +8167,14 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
   bool IsFirstAccessor = true;
   bool hasEffectfulGet = false;
   accessors.LBLoc = consumeToken(tok::l_brace);
+
+  // Skip accessor-block disambiguation attribute if exist.
+  if (Tok.is(tok::at_sign) &&
+      peekToken().isContextualKeyword("_accessorBlock")) {
+    consumeToken(tok::at_sign);
+    consumeToken();
+  }
+
   while (!Tok.isAny(tok::r_brace, tok::eof)) {
     // Parse introducer if possible.
     DeclAttributes Attributes;
