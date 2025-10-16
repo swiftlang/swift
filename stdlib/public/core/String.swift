@@ -1146,7 +1146,7 @@ extension String {
   /// identical.
   ///
   /// - Performance: O(1)
-  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 6.3, *)
   public func isTriviallyIdentical(to other: Self) -> Bool {
     self._guts.rawBits == other._guts.rawBits
   }
