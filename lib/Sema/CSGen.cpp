@@ -4642,7 +4642,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   if (isAsync) {
     auto *nonisolated =
         NonisolatedAttr::createImplicit(ctx, NonIsolatedModifier::Unsafe);
-    makeIteratorVar->getAttrs().add(nonisolated);
+    makeIteratorVar->addAttribute(nonisolated);
   }
 
   // First, let's form a call from sequence to `.makeIterator()` and save

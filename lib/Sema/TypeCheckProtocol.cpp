@@ -450,7 +450,7 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         if (!insertion.second) {
           newAttr->setInvalid();
         } else {
-          witness->getAttrs().add(newAttr);
+          witness->addAttribute(newAttr);
           success = true;
           // Register derivative function configuration.
           auto *resultIndices =
@@ -6499,8 +6499,8 @@ static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl) {
   }
 
   // Infer @_staticInitializeObjCMetadata.
-  classDecl->getAttrs().add(
-            new (ctx) StaticInitializeObjCMetadataAttr(/*implicit=*/true));
+  classDecl->addAttribute(
+      new (ctx) StaticInitializeObjCMetadataAttr(/*implicit=*/true));
 }
 
 static void

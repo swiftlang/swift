@@ -2588,8 +2588,8 @@ public:
           // across module generation, as required for TBDGen.
           if (var->supportsInitialization() &&
               !var->getAttrs().hasAttribute<HasInitialValueAttr>()) {
-            var->getAttrs().add(new (Ctx)
-                                    HasInitialValueAttr(/*IsImplicit=*/true));
+            var->addAttribute(new (Ctx)
+                                  HasInitialValueAttr(/*IsImplicit=*/true));
           }
 
           // If we fail to check the bound inout introducer, mark the variable
@@ -3930,7 +3930,7 @@ public:
             } else {
               CD->diagnose(diag::required_initializer_override_wrong_keyword)
                   .fixItReplace(attr->getLocation(), "required");
-              CD->getAttrs().add(new (Ctx) RequiredAttr(/*IsImplicit=*/true));
+              CD->addAttribute(new (Ctx) RequiredAttr(/*IsImplicit=*/true));
             }
 
             auto *reqInit =
@@ -3972,7 +3972,7 @@ public:
         auto *reqInit = findNonImplicitRequiredInit(CD->getOverriddenDecl());
         reqInit->diagnose(diag::overridden_required_initializer_here);
 
-        CD->getAttrs().add(new (Ctx) RequiredAttr(/*IsImplicit=*/true));
+        CD->addAttribute(new (Ctx) RequiredAttr(/*IsImplicit=*/true));
       }
     }
 
@@ -4193,12 +4193,9 @@ void TypeChecker::checkParameterList(ParameterList *params,
 std::optional<unsigned>
 ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
                                           MacroExpansionDecl *MED) const {
-  auto &ctx = MED->getASTContext();
-  auto *dc = MED->getDeclContext();
-
   // Resolve macro candidates.
-  auto macro = evaluateOrDefault(ctx.evaluator, ResolveMacroRequest{MED, dc},
-                                 ConcreteDeclRef());
+  auto macro =
+      evaluateOrDefault(evaluator, ResolveMacroRequest{MED}, ConcreteDeclRef());
   if (!macro)
     return std::nullopt;
   MED->setMacroRef(macro);

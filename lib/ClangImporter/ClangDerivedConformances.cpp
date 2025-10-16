@@ -1348,7 +1348,7 @@ void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
 
   auto attr = AvailableAttr::createUniversallyDeprecated(
       importedConstructor->getASTContext(), "use 'init(_:)' instead.", "");
-  importedConstructor->getAttrs().add(attr);
+  importedConstructor->addAttribute(attr);
 
   decl->addMember(importedConstructor);
 

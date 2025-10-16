@@ -3149,9 +3149,9 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
   }
 
   if (!isa<ParamDecl>(var))
-    var->getAttrs().add(
-        new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(), SourceRange(),
-                                             /*Implicit=*/true));
+    var->addAttribute(new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(),
+                                                           SourceRange(),
+                                                           /*Implicit=*/true));
   return property;
 }
 
@@ -3904,8 +3904,8 @@ void HasStorageRequest::cacheResult(bool hasStorage) const {
 
     if (hasStorage && !abiOnly &&
           !varDecl->getAttrs().hasAttribute<HasStorageAttr>())
-      varDecl->getAttrs().add(new (varDecl->getASTContext())
-                              HasStorageAttr(/*isImplicit=*/true));
+      varDecl->addAttribute(new (varDecl->getASTContext())
+                                HasStorageAttr(/*isImplicit=*/true));
   }
 }
 

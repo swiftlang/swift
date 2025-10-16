@@ -436,15 +436,6 @@ DeclAttributes Decl::getSemanticAttrs() const {
 void Decl::attachParsedAttrs(DeclAttributes attrs) {
   ASSERT(getAttrs().isEmpty() && "attaching when there are already attrs?");
 
-  for (auto *attr : attrs.getAttributes<DifferentiableAttr>())
-    attr->setOriginalDeclaration(this);
-  for (auto *attr : attrs.getAttributes<DerivativeAttr>())
-    attr->setOriginalDeclaration(this);
-  for (auto attr : attrs.getAttributes<ABIAttr, /*AllowInvalid=*/true>())
-    recordABIAttr(attr);
-  for (auto *attr : attrs.getAttributes<CustomAttr>())
-    attr->setOwner(this);
-
   // @implementation requires an explicit @objc attribute, but
   // @_objcImplementation didn't. Insert one if necessary.
   auto implAttr = attrs.getAttribute<ObjCImplementationAttr>();
@@ -457,6 +448,9 @@ void Decl::attachParsedAttrs(DeclAttributes attrs) {
                                       /*isNameImplicit=*/false);
     attrs.add(objcAttr);
   }
+
+  for (auto attr : attrs)
+    attr->attachToDecl(this);
 
   getAttrs() = attrs;
 }
@@ -518,26 +512,13 @@ void Decl::visitAuxiliaryDecls(
 
 void Decl::forEachAttachedMacro(MacroRole role,
                                 MacroCallback macroCallback) const {
-  for (auto customAttrConst : getExpandedAttrs().getAttributes<CustomAttr>()) {
-    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
-    auto *macroDecl = getResolvedMacro(customAttr);
-
-    if (!macroDecl)
-      continue;
-
-    if (!macroDecl->getMacroRoles().contains(role))
+  for (auto *customAttr : getExpandedAttrs().getAttributes<CustomAttr>()) {
+    auto *macroDecl = customAttr->getResolvedMacro();
+    if (!macroDecl || !macroDecl->getMacroRoles().contains(role))
       continue;
 
     macroCallback(customAttr, macroDecl);
   }
-}
-
-MacroDecl *Decl::getResolvedMacro(CustomAttr *customAttr) const {
-  auto declRef = evaluateOrDefault(
-      getASTContext().evaluator,
-      ResolveMacroRequest{customAttr, getDeclContext()}, ConcreteDeclRef());
-
-  return dyn_cast_or_null<MacroDecl>(declRef.getDecl());
 }
 
 unsigned Decl::getAttachedMacroDiscriminator(DeclBaseName macroName,
@@ -4740,33 +4721,6 @@ void ValueDecl::setRenamedDecl(const AvailableAttr *attr,
                                                 std::move(renameDecl));
 }
 
-void Decl::recordABIAttr(ABIAttr *attr) {
-  Decl *owner = this;
-
-  // The ABIAttr on a VarDecl ought to point to its PBD.
-  if (auto VD = dyn_cast<VarDecl>(owner)) {
-    if (auto PBD = VD->getParentPatternBinding()) {
-      owner = PBD;
-    }
-  }
-
-  auto record = [&](Decl *decl) {
-    auto &evaluator = owner->getASTContext().evaluator;
-    DeclABIRoleInfoRequest(decl).recordABIOnly(evaluator, owner);
-  };
-
-  if (auto abiPBD = dyn_cast<PatternBindingDecl>(attr->abiDecl)) {
-    // Add to *every* VarDecl in the ABI PBD, even ones that don't properly
-    // match anything in the API PBD.
-    for (auto i : range(abiPBD->getNumPatternEntries())) {
-      abiPBD->getPattern(i)->forEachVariable(record);
-    }
-    return;
-  }
-
-  record(attr->abiDecl);
-}
-
 void DeclABIRoleInfoRequest::recordABIOnly(Evaluator &evaluator,
                                            Decl *counterpart) {
   if (evaluator.hasCachedResult(*this))
@@ -5612,7 +5566,7 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
                                               this)) {
     auto &ctx = getASTContext();
     auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
-    getAttrs().add(clonedAttr);
+    addAttribute(clonedAttr);
   }
 }
 
@@ -9297,7 +9251,7 @@ void ParamDecl::setNonEphemeralIfPossible() {
 
   if (!getAttrs().hasAttribute<NonEphemeralAttr>()) {
     auto &ctx = getASTContext();
-    getAttrs().add(new (ctx) NonEphemeralAttr(/*IsImplicit*/ true));
+    addAttribute(new (ctx) NonEphemeralAttr(/*IsImplicit*/ true));
   }
 }
 
@@ -12541,27 +12495,22 @@ void MissingDecl::forEachMacroExpandedDecl(MacroExpandedDeclCallback callback) {
   auto macroRef = unexpandedMacro.macroRef;
   auto *baseDecl = unexpandedMacro.baseDecl;
 
-  // If the macro itself is a macro expansion expression, it should come with
-  // a top-level code declaration that we can use for resolution. For such
-  // cases, resolve the macro to determine whether it is a declaration or
-  // code-item macro, meaning that it can produce declarations. In such cases,
-  // expand the macro and use its substituted declaration (a MacroExpansionDecl)
-  // instead.
+  // If the macro itself is a macro expansion expression, resolve it to
+  // determine whether it is a declaration or code-item macro, meaning that it
+  // can produce declarations. In such cases, expand the macro and use its
+  // substituted declaration (a MacroExpansionDecl) instead.
   if (auto freestanding = macroRef.dyn_cast<FreestandingMacroExpansion *>()) {
     if (auto expr = dyn_cast<MacroExpansionExpr>(freestanding)) {
       bool replacedWithDecl = false;
-      if (auto tlcd = dyn_cast_or_null<TopLevelCodeDecl>(baseDecl)) {
-        ASTContext &ctx = tlcd->getASTContext();
-        if (auto macro = evaluateOrDefault(
-                ctx.evaluator,
-                ResolveMacroRequest{macroRef, tlcd->getDeclContext()},
-                nullptr)) {
+      if (isa_and_nonnull<TopLevelCodeDecl>(baseDecl)) {
+        auto &eval = getASTContext().evaluator;
+        if (auto macro = evaluateOrDefault(eval, ResolveMacroRequest{macroRef},
+                                           nullptr)) {
           auto macroDecl = cast<MacroDecl>(macro.getDecl());
           auto roles = macroDecl->getMacroRoles();
           if (roles.contains(MacroRole::Declaration) ||
               roles.contains(MacroRole::CodeItem)) {
-            (void)evaluateOrDefault(ctx.evaluator,
-                                    ExpandMacroExpansionExprRequest{expr},
+            (void)evaluateOrDefault(eval, ExpandMacroExpansionExprRequest{expr},
                                     std::nullopt);
             if (auto substituted = expr->getSubstituteDecl()) {
               macroRef = substituted;

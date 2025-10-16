@@ -331,7 +331,8 @@ void IsFinalRequest::cacheResult(bool value) const {
 
   // Add an attribute for printing
   if (value && !decl->getAttrs().hasAttribute<FinalAttr>())
-    decl->getAttrs().add(new (decl->getASTContext()) FinalAttr(/*Implicit=*/true));
+    decl->addAttribute(new (decl->getASTContext())
+                           FinalAttr(/*Implicit=*/true));
 }
 
 //----------------------------------------------------------------------------//
@@ -353,7 +354,8 @@ void IsDynamicRequest::cacheResult(bool value) const {
   // Add an attribute for printing
   if (value && !decl->getAttrs().hasAttribute<DynamicAttr>() &&
         ABIRoleInfo(decl).providesAPI())
-    decl->getAttrs().add(new (decl->getASTContext()) DynamicAttr(/*Implicit=*/true));
+    decl->addAttribute(new (decl->getASTContext())
+                           DynamicAttr(/*Implicit=*/true));
 }
 
 //----------------------------------------------------------------------------//
@@ -867,10 +869,9 @@ void IsAccessorTransparentRequest::cacheResult(bool value) const {
 
   // For interface printing, API diff, etc.
   if (value) {
-    auto &attrs = accessor->getAttrs();
-    if (!attrs.hasAttribute<TransparentAttr>()) {
+    if (!accessor->getAttrs().hasAttribute<TransparentAttr>()) {
       auto &ctx = accessor->getASTContext();
-      attrs.add(new (ctx) TransparentAttr(/*IsImplicit=*/true));
+      accessor->addAttribute(new (ctx) TransparentAttr(/*IsImplicit=*/true));
     }
   }
 }
@@ -2329,6 +2330,14 @@ ArgumentList *UnresolvedMacroReference::getArgs() const {
     return expansion->getArgs();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>())
     return attr->getArgs();
+  llvm_unreachable("Unhandled case");
+}
+
+DeclContext *UnresolvedMacroReference::getDeclContext() const {
+  if (auto *expansion = pointer.dyn_cast<FreestandingMacroExpansion *>())
+    return expansion->getDeclContext();
+  if (auto *attr = pointer.dyn_cast<CustomAttr *>())
+    return attr->getOwner().getDeclContext();
   llvm_unreachable("Unhandled case");
 }
 
