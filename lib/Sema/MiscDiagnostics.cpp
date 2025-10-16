@@ -5223,7 +5223,8 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
   // restriction, macros would need to either be expanded when printed in
   // swiftinterfaces or be parsable as macros by module clients.
   auto fragileKind = DC->getFragileFunctionKind();
-  if (fragileKind.kind != FragileFunctionKind::None) {
+  if (fragileKind.kind != FragileFunctionKind::None &&
+      fragileKind.kind != FragileFunctionKind::EmbeddedAlwaysEmitIntoClient) {
     for (auto availSpec : info->getQueries()) {
       if (availSpec->getMacroLoc().isValid()) {
         diags.diagnose(availSpec->getMacroLoc(),
