@@ -2102,6 +2102,19 @@ void ModuleDependencyIssueReporter::diagnoseFailureOnOnlyIncompatibleCandidates(
   if (candidates.empty())
     return;
 
+  // FIXME: There are known cases where clients are relying on
+  // loading the underlying Clang module in the presence of a Swift
+  // module which is lacking the required target-specific variant,
+  // such as MacCatalyst. Eventually, we should pursue making this
+  // an error as well.
+  if (llvm::all_of(candidates, [](auto &incompatibleCandidate) {
+        return incompatibleCandidate.incompatibilityReason ==
+            SwiftModuleScannerQueryResult::BUILT_FOR_INCOMPATIBLE_TARGET;
+      })) {
+    warnOnIncompatibleCandidates(moduleImport.importIdentifier, candidates);
+    return;
+  }
+
   diagnoseModuleNotFoundFailure(moduleImport, cache, dependencyOf,
                                 /* resolvingSerializedSearchPath */ std::nullopt,
                                 candidates);
