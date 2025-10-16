@@ -1034,7 +1034,7 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
     // immutable at this point.
     auto &ctx = decl->getASTContext();
     auto *attr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
-    decl->getAttrs().add(attr);
+    decl->addAttribute(attr);
 
     if (everything) {
       // The following does _not_ apply to the Package CMO as

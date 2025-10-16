@@ -4546,8 +4546,8 @@ namespace {
 
         // Add the @Sendable attribute implicitly, so we don't diagnose
         // again.
-        const_cast<FuncDecl *>(func)->getAttrs().add(
-            new (ctx) SendableAttr(true));
+        const_cast<FuncDecl *>(func)->addAttribute(new (ctx)
+                                                       SendableAttr(true));
         return true;
       }
 
@@ -6070,13 +6070,13 @@ static void addAttributesForActorIsolation(ValueDecl *value,
   ASTContext &ctx = value->getASTContext();
   switch (isolation) {
   case ActorIsolation::CallerIsolationInheriting:
-    value->getAttrs().add(new (ctx) NonisolatedAttr(
+    value->addAttribute(new (ctx) NonisolatedAttr(
         /*atLoc=*/{}, /*range=*/{}, NonIsolatedModifier::NonSending,
         /*implicit=*/true));
     break;
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe: {
-    value->getAttrs().add(NonisolatedAttr::createImplicit(
+    value->addAttribute(NonisolatedAttr::createImplicit(
         ctx, isolation == ActorIsolation::NonisolatedUnsafe
                  ? NonIsolatedModifier::Unsafe
                  : NonIsolatedModifier::None));
@@ -6086,12 +6086,12 @@ static void addAttributesForActorIsolation(ValueDecl *value,
     auto typeExpr = TypeExpr::createImplicit(isolation.getGlobalActor(), ctx);
     auto attr = CustomAttr::create(ctx, SourceLoc(), typeExpr, /*owner*/ value,
                                    /*implicit=*/true);
-    value->getAttrs().add(attr);
+    value->addAttribute(attr);
 
     if (isolation.preconcurrency() &&
         !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
       auto preconcurrency = new (ctx) PreconcurrencyAttr(/*isImplicit*/ true);
-      value->getAttrs().add(preconcurrency);
+      value->addAttribute(preconcurrency);
     }
     break;
   }
@@ -6410,7 +6410,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
     auto preconcurrency =
         new (ctx) PreconcurrencyAttr(/*isImplicit*/true);
-    value->getAttrs().add(preconcurrency);
+    value->addAttribute(preconcurrency);
   }
 
   // Check if we inferred CallerIsolationInheriting from our isolation attr, but
@@ -6425,7 +6425,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     // Replace `nonisolated` with `nonisolated(nonsending)`
     if (!nonisolated || !nonisolated->isNonSending()) {
       value->getAttrs().removeAttribute(nonisolated);
-      value->getAttrs().add(NonisolatedAttr::createImplicit(
+      value->addAttribute(NonisolatedAttr::createImplicit(
           ctx, NonIsolatedModifier::NonSending));
     }
   }
@@ -7492,7 +7492,7 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
           SourceRange(), available.getObsoleted().value_or(noVersion),
           SourceRange(),
           /*Implicit=*/true, available.getParsedAttr()->isSPI());
-      ext->getAttrs().add(attr);
+      ext->addAttribute(attr);
       anyPlatformSpecificAttrs = true;
     }
 
@@ -7503,7 +7503,7 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
 
   // Add the blanket "unavailable".
 
-  ext->getAttrs().add(
+  ext->addAttribute(
       AvailableAttr::createUniversallyUnavailable(ctx, /*Message=*/""));
 }
 

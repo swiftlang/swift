@@ -1377,8 +1377,8 @@ CaptureListEntry CaptureListEntry::createParsed(
       new (Ctx) VarDecl(/*isStatic==*/false, introducer, nameLoc, name, DC);
 
   if (ownershipKind != ReferenceOwnership::Strong)
-    VD->getAttrs().add(
-        new (Ctx) ReferenceOwnershipAttr(ownershipRange, ownershipKind));
+    VD->addAttribute(new (Ctx)
+                         ReferenceOwnershipAttr(ownershipRange, ownershipKind));
 
   auto *pattern = NamedPattern::createImplicit(Ctx, VD);
 

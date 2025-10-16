@@ -1967,7 +1967,7 @@ swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
     SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
                                           decl->getAttrs().end());
     for (auto *attr : attrs) {
-      member->getAttrs().add(attr);
+      member->addAttribute(attr);
     }
   }
 

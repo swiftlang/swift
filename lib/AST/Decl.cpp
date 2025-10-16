@@ -5579,7 +5579,7 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
                                               this)) {
     auto &ctx = getASTContext();
     auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
-    getAttrs().add(clonedAttr);
+    addAttribute(clonedAttr);
   }
 }
 
@@ -9264,7 +9264,7 @@ void ParamDecl::setNonEphemeralIfPossible() {
 
   if (!getAttrs().hasAttribute<NonEphemeralAttr>()) {
     auto &ctx = getASTContext();
-    getAttrs().add(new (ctx) NonEphemeralAttr(/*IsImplicit*/ true));
+    addAttribute(new (ctx) NonEphemeralAttr(/*IsImplicit*/ true));
   }
 }
 

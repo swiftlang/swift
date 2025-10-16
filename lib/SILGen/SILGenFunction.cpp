@@ -1544,7 +1544,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
         {}, /*async*/ false, /*throws*/ false, /*thrownType*/Type(), {},
         emptyParams,
         getASTContext().getNeverType(), moduleDecl);
-    drainQueueFuncDecl->getAttrs().add(new (getASTContext()) SILGenNameAttr(
+    drainQueueFuncDecl->addAttribute(new (getASTContext()) SILGenNameAttr(
         "swift_task_asyncMainDrainQueue", /*raw*/ false, /*implicit*/ true));
   }
 

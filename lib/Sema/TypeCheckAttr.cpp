@@ -1531,7 +1531,7 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
     newAttr->setImplicit(attr->isImplicit());
     newAttr->setNameImplicit(attr->isNameImplicit());
     newAttr->setAddedByAccessNote(attr->getAddedByAccessNote());
-    D->getAttrs().add(newAttr);
+    D->addAttribute(newAttr);
 
     D->getAttrs().removeAttribute(attr);
     attr->setInvalid();
@@ -5762,7 +5762,7 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
   if (!D->getAttrs().hasAttribute<DynamicAttr>() &&
       !D->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
     auto attr = new (D->getASTContext()) DynamicAttr(/*implicit=*/true);
-    D->getAttrs().add(attr);
+    D->addAttribute(attr);
   }
 }
 
@@ -6835,7 +6835,7 @@ resolveDifferentiableAccessors(DifferentiableAttr *attr,
       ad, /*implicit*/ true, attr->AtLoc, attr->getRange(),
       attr->getDifferentiabilityKind(), resolvedDiffParamIndices,
       attr->getDerivativeGenericSignature());
-    ad->getAttrs().add(newAttr);
+    ad->addAttribute(newAttr);
 
     if (!typecheckDifferentiableAttrforDecl(ad, attr,
                                             resolvedDiffParamIndices))

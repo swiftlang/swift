@@ -4493,9 +4493,9 @@ public:
                                     std::move(op));
 
           if (isa<PrefixOperatorDecl>(op))
-            fn->getAttrs().add(new (ctx) PrefixAttr(/*implicit*/false));
+            fn->addAttribute(new (ctx) PrefixAttr(/*implicit*/ false));
           else if (isa<PostfixOperatorDecl>(op))
-            fn->getAttrs().add(new (ctx) PostfixAttr(/*implicit*/false));
+            fn->addAttribute(new (ctx) PostfixAttr(/*implicit*/ false));
           // Note that an explicit 'infix' is not required.
         }
         // Otherwise, unknown associated decl kind.
