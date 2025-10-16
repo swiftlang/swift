@@ -2322,7 +2322,7 @@ public:
 
   /// Retrieve the Decl or DeclContext owner for the attribute.
   CustomAttrOwner getOwner() const { return owner; }
-  void setOwner(CustomAttrOwner newOwner) { owner = newOwner; }
+  void setOwner(CustomAttrOwner newOwner);
 
   ASTContext &getASTContext() const;
 

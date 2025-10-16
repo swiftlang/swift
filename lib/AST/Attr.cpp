@@ -3084,6 +3084,16 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
       CustomAttr(atLoc, range, type, owner, initContext, argList, implicit);
 }
 
+void CustomAttr::setOwner(CustomAttrOwner newOwner) {
+  // Prefer to set the parent PatternBindingDecl as the owner for a VarDecl,
+  // this ensures we can handle PBDs with multiple vars.
+  if (auto *VD = dyn_cast_or_null<VarDecl>(newOwner.getAsDecl())) {
+    if (auto *PBD = VD->getParentPatternBinding())
+      newOwner = PBD;
+  }
+  owner = newOwner;
+}
+
 std::pair<UnqualifiedIdentTypeRepr *, DeclRefTypeRepr *>
 CustomAttr::destructureMacroRef() {
   TypeRepr *typeRepr = getTypeRepr();
