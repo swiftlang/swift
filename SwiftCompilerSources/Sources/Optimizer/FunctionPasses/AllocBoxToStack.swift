@@ -363,7 +363,7 @@ private func createAllocStack(for allocBox: AllocBoxInst, flags: Flags, _ contex
                                      isLexical: flags.isLexical,
                                      isFromVarDecl: flags.isFromVarDecl)
   let stackLocation: Value
-  if let mu = allocBox.uses.getSingleUser(ofType: MarkUninitializedInst.self) {
+  if let mu = allocBox.uses.singleUser(ofType: MarkUninitializedInst.self) {
     stackLocation = builder.createMarkUninitialized(value: asi, kind: mu.kind)
   } else {
     stackLocation = asi
@@ -484,7 +484,7 @@ private func hoistMarkUnresolvedInsts(stackAddress: Value,
     builder = Builder(atBeginOf: stackAddress.parentBlock, context)
   }
   let mu = builder.createMarkUnresolvedNonCopyableValue(value: stackAddress, checkKind: checkKind,  isStrict: false)
-  stackAddress.uses.ignore(user: mu).ignoreDebugUses.ignoreUses(ofType: DeallocStackInst.self)
+  stackAddress.uses.ignore(user: mu).ignoreDebugUses.ignore(usersOfType: DeallocStackInst.self)
     .replaceAll(with: mu, context)
 }
 
