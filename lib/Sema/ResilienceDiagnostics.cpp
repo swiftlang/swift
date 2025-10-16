@@ -97,6 +97,14 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
     return false;
   }
 
+  // Embedded functions can reference non-public decls as they are visible
+  // to clients. Still report references to decls imported non-publicly
+  // to enforce access-level on imports.
+  ImportAccessLevel problematicImport = D->getImportAccessFrom(DC);
+  if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient &&
+      !problematicImport)
+    return false;
+
   DowngradeToWarning downgradeToWarning = DowngradeToWarning::No;
 
   // Swift 4.2 did not perform any checks for type aliases.
@@ -127,7 +135,6 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
   Context.Diags.diagnose(D, diag::resilience_decl_declared_here, D);
 
-  ImportAccessLevel problematicImport = D->getImportAccessFrom(DC);
   if (problematicImport.has_value() &&
       problematicImport->accessLevel < D->getFormalAccess()) {
     Context.Diags.diagnose(problematicImport->importLoc,
