@@ -619,6 +619,9 @@ public:
                                      DeclAttrKind kind, SourceLoc atLoc,
                                      SourceLoc attrLoc);
 
+  /// Attaches the attribute to the given declaration.
+  void attachToDecl(Decl *D);
+
   /// Create a copy of this attribute.
   DeclAttribute *clone(ASTContext &ctx) const;
 
@@ -629,6 +632,11 @@ public:
   /// would have the same effect on \p attachedTo were they attached to it. A
   /// clone should always be equivalent to the original.
   bool isEquivalent(const DeclAttribute *other, Decl *attachedTo) const;
+
+private:
+  void attachToDeclImpl(Decl *D) {
+    // Most attributes don't need any custom logic for this.
+  }
 };
 
 #define UNIMPLEMENTED_CLONE(AttrType)    \
@@ -2292,6 +2300,8 @@ public:
 
 /// Defines a custom attribute.
 class CustomAttr final : public DeclAttribute {
+  friend class DeclAttribute;
+
   TypeExpr *typeExpr;
   ArgumentList *argList;
   CustomAttrOwner owner;
@@ -2322,7 +2332,6 @@ public:
 
   /// Retrieve the Decl or DeclContext owner for the attribute.
   CustomAttrOwner getOwner() const { return owner; }
-  void setOwner(CustomAttrOwner newOwner);
 
   ASTContext &getASTContext() const;
 
@@ -2377,10 +2386,11 @@ public:
   void printCustomAttr(ASTPrinter &Printer, const PrintOptions &Options) const;
 
 private:
+  void attachToDeclImpl(Decl *D);
+
   friend class CustomAttrNominalRequest;
   void resetTypeInformation(TypeExpr *repr);
 
-private:
   friend class CustomAttrTypeRequest;
   void setType(Type ty);
 };
@@ -2517,6 +2527,7 @@ class DifferentiableAttr final
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
   friend class DifferentiableAttributeTypeCheckRequest;
+  friend class DeclAttribute;
 
   /// The declaration on which the `@differentiable` attribute is declared.
   /// May not be a valid declaration for `@differentiable` attributes.
@@ -2576,11 +2587,9 @@ public:
 
   Decl *getOriginalDeclaration() const { return OriginalDeclaration; }
 
-  /// Sets the original declaration on which this attribute is declared.
-  /// Should only be used by parsing and deserialization.
-  void setOriginalDeclaration(Decl *originalDeclaration);
-
 private:
+  void attachToDeclImpl(Decl *D);
+
   /// Returns true if the given `@differentiable` attribute has been
   /// type-checked.
   bool hasBeenTypeChecked() const;
@@ -2695,6 +2704,7 @@ class DerivativeAttr final
       private llvm::TrailingObjects<DerivativeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
   friend class DerivativeAttrOriginalDeclRequest;
+  friend class DeclAttribute;
 
   /// The declaration on which the `@derivative` attribute is declared.
   /// May not be a valid declaration for `@derivative` attributes.
@@ -2755,10 +2765,6 @@ public:
 
   Decl *getOriginalDeclaration() const { return OriginalDeclaration; }
 
-  /// Sets the original declaration on which this attribute is declared.
-  /// Should only be used by parsing and deserialization.
-  void setOriginalDeclaration(Decl *originalDeclaration);
-
   TypeRepr *getBaseTypeRepr() const { return BaseTypeRepr; }
   DeclNameRefWithLoc getOriginalFunctionName() const {
     return OriginalFunctionName;
@@ -2803,6 +2809,9 @@ public:
     // Not properly implemented (very complex and not currently needed)
     return false;
   }
+
+private:
+  void attachToDeclImpl(Decl *D);
 };
 
 /// The `@transpose(of:)` attribute registers a function as a transpose of
@@ -3538,6 +3547,8 @@ public:
 
 /// Defines the @abi attribute.
 class ABIAttr : public DeclAttribute {
+  friend class DeclAttribute;
+
 public:
   ABIAttr(Decl *abiDecl, SourceLoc AtLoc, SourceRange Range, bool Implicit)
       : DeclAttribute(DeclAttrKind::ABI, AtLoc, Range, Implicit),
@@ -3564,6 +3575,9 @@ public:
     // Unsupported: tricky to implement and unneeded.
     return true;
   }
+
+private:
+  void attachToDeclImpl(Decl *D);
 };
 
 /// Defines a @nonexhaustive attribute.

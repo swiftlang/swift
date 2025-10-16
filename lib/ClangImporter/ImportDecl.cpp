@@ -8926,7 +8926,7 @@ void ClangImporter::Implementation::importNontrivialAttribute(
       for (auto attr : attrs) {
         auto *newAttr = cached ? attr->clone(SwiftContext) : attr;
         if (auto *CA = dyn_cast<CustomAttr>(newAttr))
-          CA->setOwner(MappedDecl);
+          CA->attachToDecl(MappedDecl);
         MappedDecl->getAttrs().add(newAttr);
       }
     }

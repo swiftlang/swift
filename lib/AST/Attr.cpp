@@ -349,6 +349,16 @@ bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) 
   llvm_unreachable("bad DeclKind");
 }
 
+void DeclAttribute::attachToDecl(Decl *D) {
+  ASSERT(D);
+  switch (getKind()) {
+#define DECL_ATTR(_, CLASS, ...)                                               \
+  case DeclAttrKind::CLASS:                                                    \
+    return static_cast<CLASS##Attr *>(this)->attachToDeclImpl(D);
+#include "swift/AST/DeclAttr.def"
+  }
+}
+
 // Ensure that every DeclAttribute subclass implements its own CloneAttr.
 static void checkDeclAttributeClones() {
 #define DECL_ATTR(_,CLASS,...) \
@@ -2460,6 +2470,35 @@ OriginallyDefinedInAttr *OriginallyDefinedInAttr::clone(ASTContext &C,
       ManglingModuleName, LinkerModuleName, Platform, MovedVersion, implicit);
 }
 
+void ABIAttr::attachToDeclImpl(Decl *D) {
+  // Register the relationship between `D` and `abiDecl`. This is necessary for
+  // `ABIRoleInfo::ABIRoleInfo()` to determine that `abiDecl` is ABI-only and
+  // locate its API counterpart.
+  Decl *owner = D;
+
+  // The ABIAttr on a VarDecl ought to point to its PBD.
+  if (auto VD = dyn_cast<VarDecl>(owner)) {
+    if (auto PBD = VD->getParentPatternBinding())
+      owner = PBD;
+  }
+
+  auto record = [&](Decl *decl) {
+    auto &evaluator = owner->getASTContext().evaluator;
+    DeclABIRoleInfoRequest(decl).recordABIOnly(evaluator, owner);
+  };
+
+  if (auto abiPBD = dyn_cast<PatternBindingDecl>(abiDecl)) {
+    // Add to *every* VarDecl in the ABI PBD, even ones that don't properly
+    // match anything in the API PBD.
+    for (auto i : range(abiPBD->getNumPatternEntries())) {
+      abiPBD->getPattern(i)->forEachVariable(record);
+    }
+    return;
+  }
+
+  record(abiDecl);
+}
+
 bool AvailableAttr::isUnconditionallyUnavailable() const {
   switch (getKind()) {
   case Kind::Default:
@@ -2820,9 +2859,10 @@ DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
                                       derivativeGenSig);
 }
 
-void DifferentiableAttr::setOriginalDeclaration(Decl *originalDeclaration) {
-  assert(originalDeclaration && "Original declaration must be non-null");
-  assert(!OriginalDeclaration &&
+void DifferentiableAttr::attachToDeclImpl(Decl *originalDeclaration) {
+  // FIXME: This doesn't properly handle PatternBindingDecls with multiple
+  // VarDecls.
+  assert(!OriginalDeclaration || OriginalDeclaration == originalDeclaration &&
          "Original declaration cannot have already been set");
   OriginalDeclaration = originalDeclaration;
 }
@@ -2930,9 +2970,10 @@ void DerivativeAttr::setOriginalFunctionResolver(
   ResolverContextData = resolverContextData;
 }
 
-void DerivativeAttr::setOriginalDeclaration(Decl *originalDeclaration) {
-  assert(originalDeclaration && "Original declaration must be non-null");
-  assert(!OriginalDeclaration &&
+void DerivativeAttr::attachToDeclImpl(Decl *originalDeclaration) {
+  // FIXME: This doesn't properly handle PatternBindingDecls with multiple
+  // VarDecls.
+  assert(!OriginalDeclaration || OriginalDeclaration == originalDeclaration &&
          "Original declaration cannot have already been set");
   OriginalDeclaration = originalDeclaration;
 }
@@ -3084,14 +3125,14 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeExpr *type,
       CustomAttr(atLoc, range, type, owner, initContext, argList, implicit);
 }
 
-void CustomAttr::setOwner(CustomAttrOwner newOwner) {
+void CustomAttr::attachToDeclImpl(Decl *D) {
   // Prefer to set the parent PatternBindingDecl as the owner for a VarDecl,
   // this ensures we can handle PBDs with multiple vars.
-  if (auto *VD = dyn_cast_or_null<VarDecl>(newOwner.getAsDecl())) {
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (auto *PBD = VD->getParentPatternBinding())
-      newOwner = PBD;
+      D = PBD;
   }
-  owner = newOwner;
+  owner = D;
 }
 
 std::pair<UnqualifiedIdentTypeRepr *, DeclRefTypeRepr *>
