@@ -1186,6 +1186,12 @@ public:
       DiagnosticEngine &diags,
       BridgeClangDependencyCallback bridgeClangModule);
 
+  /// Record Clang module dependency.
+  void recordClangDependency(
+      const clang::tooling::dependencies::ModuleDeps &dependency,
+      DiagnosticEngine &diags,
+      BridgeClangDependencyCallback bridgeClangModule);
+
   /// Update stored dependencies for the given module.
   void updateDependency(ModuleDependencyID moduleID,
                         ModuleDependencyInfo dependencyInfo);

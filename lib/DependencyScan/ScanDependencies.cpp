@@ -1380,7 +1380,7 @@ performModuleScanImpl(
   }
 
   auto scanner = ModuleDependencyScanner(
-      service, instance->getInvocation(), instance->getSILOptions(),
+      service, cache, instance->getInvocation(), instance->getSILOptions(),
       instance->getASTContext(), *instance->getDependencyTracker(),
       instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
       instance->getDiags(),
@@ -1396,7 +1396,7 @@ performModuleScanImpl(
                                                instance->getMainModule()));
 
   // Perform the full module scan starting at the main module.
-  auto allModules = scanner.performDependencyScan(mainModuleID, cache);
+  auto allModules = scanner.performDependencyScan(mainModuleID);
   if (diagnoseCycle(*instance, cache, mainModuleID))
     return std::make_error_code(std::errc::not_supported);
 
@@ -1432,7 +1432,7 @@ static llvm::ErrorOr<swiftscan_import_set_t> performModulePrescanImpl(
     DepScanInMemoryDiagnosticCollector *diagnosticCollector) {
   // Setup the scanner
   auto scanner = ModuleDependencyScanner(
-      service, instance->getInvocation(), instance->getSILOptions(),
+      service, cache, instance->getInvocation(), instance->getSILOptions(),
       instance->getASTContext(), *instance->getDependencyTracker(),
       instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
       instance->getDiags(),
