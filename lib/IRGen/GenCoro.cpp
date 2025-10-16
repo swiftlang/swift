@@ -625,9 +625,12 @@ struct Allocator {
       Allocate = 1,
       Deallocate = 2,
     };
+    constexpr static std::array<Field, 3> allFields() {
+      return {Field::Flags, Field::Allocate, Field::Deallocate};
+    }
     Kind kind;
-    Field(Kind kind) : kind(kind) {}
-    operator Kind() { return kind; }
+    constexpr Field(Kind kind) : kind(kind) {}
+    constexpr operator Kind() { return kind; }
 
     llvm::Type *getType(IRGenModule &IGM) {
       switch (kind) {
@@ -657,6 +660,16 @@ struct Allocator {
         return "allocate_fn";
       case Field::Deallocate:
         return "deallocate_fn";
+      }
+    }
+
+    bool isFunctionPointer() {
+      switch (kind) {
+      case Flags:
+        return false;
+      case Field::Allocate:
+      case Field::Deallocate:
+        return true;
       }
     }
 
@@ -693,7 +706,40 @@ struct Allocator {
         return IGM.getOptions().PointerAuth.CoroDeallocationFunction;
       }
     }
+
+    const PointerAuthEntity getEntity(IRGenModule &IGM) {
+      switch (kind) {
+      case Flags:
+        llvm_unreachable("no entity");
+      case Field::Allocate:
+        return PointerAuthEntity::Special::CoroAllocationFunction;
+      case Field::Deallocate:
+        return PointerAuthEntity::Special::CoroDeallocationFunction;
+      }
+    }
   };
+
+  static void visitFields(llvm::function_ref<void(Field)> visitor) {
+    for (auto field : Field::allFields()) {
+      visitor(field);
+    }
+  }
+
+  static ConstantInitFuture
+  buildStruct(ConstantInitBuilder &builder, IRGenModule &IGM,
+              llvm::function_ref<llvm::Constant *(Field)> valueForField) {
+    auto allocator = builder.beginStruct(IGM.CoroAllocatorTy);
+    visitFields([&](auto field) {
+      auto *value = valueForField(field);
+      if (!field.isFunctionPointer()) {
+        allocator.add(value);
+        return;
+      }
+      allocator.addSignedPointer(value, field.getSchema(IGM),
+                                 field.getEntity(IGM));
+    });
+    return allocator.finishAndCreateFuture();
+  }
 
   llvm::Value *address;
   IRGenFunction &IGF;
@@ -904,17 +950,22 @@ static llvm::Constant *getAddrOfGlobalCoroAllocator(
   auto taskAllocator = IGM.getOrCreateLazyGlobalVariable(
       entity,
       [&](ConstantInitBuilder &builder) -> ConstantInitFuture {
-        auto allocator = builder.beginStruct(IGM.CoroAllocatorTy);
-        auto flags = CoroAllocatorFlags(kind);
-        flags.setShouldDeallocateImmediately(shouldDeallocateImmediately);
-        allocator.addInt32(flags.getOpaqueValue());
-        allocator.addSignedPointer(
-            allocFn, IGM.getOptions().PointerAuth.CoroAllocationFunction,
-            PointerAuthEntity::Special::CoroAllocationFunction);
-        allocator.addSignedPointer(
-            deallocFn, IGM.getOptions().PointerAuth.CoroDeallocationFunction,
-            PointerAuthEntity::Special::CoroDeallocationFunction);
-        return allocator.finishAndCreateFuture();
+        return Allocator::buildStruct(
+            builder, IGM, [&](auto field) -> llvm::Constant * {
+              switch (field) {
+              case Allocator::Field::Flags: {
+                auto flags = CoroAllocatorFlags(kind);
+                flags.setShouldDeallocateImmediately(
+                    shouldDeallocateImmediately);
+                return llvm::ConstantInt::get(IGM.Int32Ty,
+                                              flags.getOpaqueValue());
+              }
+              case Allocator::Field::Allocate:
+                return allocFn;
+              case Allocator::Field::Deallocate:
+                return deallocFn;
+              }
+            });
       },
       [&](llvm::GlobalVariable *var) { var->setConstant(true); });
   return taskAllocator;
