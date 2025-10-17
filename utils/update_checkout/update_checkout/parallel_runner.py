@@ -1,9 +1,10 @@
 from multiprocessing.managers import ListProxy, ValueProxy
 import sys
-from multiprocessing import Pool, cpu_count, Manager
+from multiprocessing import cpu_count, Manager
 import time
 from typing import Callable, List, Any, Union
 from threading import Lock, Thread, Event
+from concurrent.futures import ThreadPoolExecutor
 import shutil
 
 from .runner_arguments import RunnerArguments, AdditionalSwiftSourcesArguments
@@ -44,18 +45,17 @@ class ParallelRunner:
         self,
         fn: Callable,
         pool_args: List[Union[RunnerArguments, AdditionalSwiftSourcesArguments]],
-        n_processes: int = 0,
+        n_threads: int = 0,
     ):
-        if n_processes == 0:
-            # Limit the number of processes as the performance regresses after
-            # if the number is too high.
-            n_processes = min(cpu_count() * 2, 16)
-        self._n_processes = n_processes
+        if n_threads == 0:
+            # Limit the number of threads as the performance regresses if the
+            # number is too high.
+            n_threads = min(cpu_count() * 2, 16)
+        self._n_threads = n_threads
         self._monitor_polling_period = 0.1
         self._terminal_width = shutil.get_terminal_size().columns
         self._pool_args = pool_args
         self._fn = fn
-        self._pool = Pool(processes=self._n_processes)
         self._output_prefix = pool_args[0].output_prefix
         self._nb_repos = len(pool_args)
         self._stop_event = Event()
@@ -70,24 +70,15 @@ class ParallelRunner:
             )
 
     def run(self) -> List[Any]:
-        print(
-            "Running ``%s`` with up to %d processes."
-            % (self._fn.__name__, self._n_processes)
-        )
+        print(f"Running ``{self._fn.__name__}`` with up to {self._n_threads} processes.")
         if self._verbose:
-            results = self._pool.map_async(
-                func=self._fn, iterable=self._pool_args
-            ).get(timeout=1800)
-            self._pool.close()
-            self._pool.join()
+            with ThreadPoolExecutor(max_workers=self._n_threads) as pool:
+                results = list(pool.map(self._fn, self._pool_args, timeout=1800))
         else:
             monitor_thread = Thread(target=self._monitor, daemon=True)
             monitor_thread.start()
-            results = self._pool.map_async(
-                func=self._monitored_fn, iterable=self._pool_args
-            ).get(timeout=1800)
-            self._pool.close()
-            self._pool.join()
+            with ThreadPoolExecutor(max_workers=self._n_threads) as pool:
+                results = list(pool.map(self._monitored_fn, self._pool_args, timeout=1800))
             self._stop_event.set()
             monitor_thread.join()
         return results
@@ -131,14 +122,18 @@ class ParallelRunner:
         if results is None:
             return 0
         for r in results:
-            if r is not None:
-                if fail_count == 0:
-                    print("======%s FAILURES======" % op)
-                fail_count += 1
-                if isinstance(r, str):
-                    print(r)
-                    continue
-                print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
-                if r.stderr:
-                    print(r.stderr.decode())
+            if r is None:
+                continue
+            if fail_count == 0:
+                print("======%s FAILURES======" % op)
+            fail_count += 1
+            if isinstance(r, str):
+                print(r)
+                continue
+            if not hasattr(r, "repo_path"):
+                # TODO: create a proper Exception class with these attributes
+                continue
+            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
+            if r.stderr:
+                print(r.stderr.decode())
         return fail_count

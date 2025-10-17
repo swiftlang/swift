@@ -100,8 +100,10 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   case swift::SILLinkage::Public:
   case swift::SILLinkage::PublicNonABI:
     // Branching trace enums shall not be resilient.
-    branchingTraceDecl->getAttrs().add(new (astCtx) FrozenAttr(/*implicit*/ true));
-    branchingTraceDecl->getAttrs().add(new (astCtx) UsableFromInlineAttr(/*Implicit*/ true));
+    branchingTraceDecl->addAttribute(new (astCtx)
+                                         FrozenAttr(/*implicit*/ true));
+    branchingTraceDecl->addAttribute(
+        new (astCtx) UsableFromInlineAttr(/*Implicit*/ true));
     LLVM_FALLTHROUGH;
   case swift::SILLinkage::Hidden:
   case swift::SILLinkage::Shared:

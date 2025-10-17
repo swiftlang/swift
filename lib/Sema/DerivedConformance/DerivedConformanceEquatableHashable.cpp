@@ -394,7 +394,8 @@ deriveEquatable_eq(
   eqDecl->setUserAccessible(false);
   eqDecl->setSynthesized();
   if (isDerivedEnumEquals) {
-    eqDecl->getAttrs().add(new (C) SemanticsAttr("derived_enum_equals", SourceLoc(), SourceRange(), /*Implicit=*/true));
+    eqDecl->addAttribute(new (C) SemanticsAttr(
+        "derived_enum_equals", SourceLoc(), SourceRange(), /*Implicit=*/true));
   }
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
@@ -403,9 +404,8 @@ deriveEquatable_eq(
     SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
     auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
                                    argumentLabels);
-    eqDecl->getAttrs().add(ImplementsAttr::create(parentDC,
-                                                  equatableProto,
-                                                  equalsDeclName));
+    eqDecl->addAttribute(
+        ImplementsAttr::create(parentDC, equatableProto, equalsDeclName));
   }
 
   if (!C.getEqualIntDecl()) {
@@ -540,7 +540,7 @@ deriveHashable_hashInto(
   // The derived hash(into:) for an actor must be non-isolated.
   if (!addNonIsolatedToSynthesized(derived, hashDecl) &&
       derived.Nominal->isActor())
-    hashDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
+    hashDecl->addAttribute(NonisolatedAttr::createImplicit(C));
 
   derived.addMembersToConformanceContext({hashDecl});
 
@@ -879,7 +879,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   // The derived hashValue of an actor must be nonisolated.
   if (!addNonIsolatedToSynthesized(derived, hashValueDecl) &&
       derived.Nominal->isActor())
-    hashValueDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
+    hashValueDecl->addAttribute(NonisolatedAttr::createImplicit(C));
 
   Pattern *hashValuePat =
       NamedPattern::createImplicit(C, hashValueDecl, intType);

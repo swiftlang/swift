@@ -50,7 +50,7 @@ public protocol Clock<Duration>: Sendable {
   /// - at instant:  The time at which we would like it to run.
   /// - tolerance:   The ideal maximum delay we are willing to tolerate.
   ///
-  @available(StdlibDeploymentTarget 6.2, *)
+  @available(StdlibDeploymentTarget 6.3, *)
   func run(_ job: consuming ExecutorJob,
            at instant: Instant, tolerance: Duration?)
 
@@ -70,7 +70,7 @@ public protocol Clock<Duration>: Sendable {
   /// - at instant:  The time at which we would like it to run.
   /// - tolerance:   The ideal maximum delay we are willing to tolerate.
   ///
-  @available(StdlibDeploymentTarget 6.2, *)
+  @available(StdlibDeploymentTarget 6.3, *)
   func enqueue(_ job: consuming ExecutorJob,
                on executor: some Executor,
                at instant: Instant, tolerance: Duration?)
@@ -81,7 +81,7 @@ public protocol Clock<Duration>: Sendable {
 extension Clock {
   // The default implementation works by creating a trampoline and calling
   // the run() method.
-  @available(StdlibDeploymentTarget 6.2, *)
+  @available(StdlibDeploymentTarget 6.3, *)
   public func enqueue(_ job: consuming ExecutorJob,
                       on executor: some Executor,
                       at instant: Instant, tolerance: Duration?) {
@@ -91,7 +91,7 @@ extension Clock {
 
   // Clocks that do not implement run will fatalError() if you try to use
   // them with an executor that does not understand them.
-  @available(StdlibDeploymentTarget 6.2, *)
+  @available(StdlibDeploymentTarget 6.3, *)
   public func run(_ job: consuming ExecutorJob,
                   at instant: Instant, tolerance: Duration?) {
     fatalError("\(Self.self) does not implement run(_:at:tolerance:).")

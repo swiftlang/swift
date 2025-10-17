@@ -66,6 +66,13 @@ TypeSubElementCount::TypeSubElementCount(SILType type, SILModule &mod,
   }
 
   if (auto *structDecl = getFullyReferenceableStruct(type)) {
+    // A resilient struct has 1 element.
+    if (structDecl->isResilient(mod.getSwiftModule(),
+                                ResilienceExpansion::Maximal)) {
+      number = 1;
+      return;
+    }
+
     unsigned numElements = 0;
     for (auto *fieldDecl : structDecl->getStoredProperties())
       numElements += TypeSubElementCount(

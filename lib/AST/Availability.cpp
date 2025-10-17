@@ -201,13 +201,11 @@ void AvailabilityInference::applyInferredAvailableAttrs(
     } while (D);
   }
 
-  DeclAttributes &Attrs = ToDecl->getAttrs();
-
   // Create an availability attribute for each observed platform and add
   // to ToDecl.
   for (auto &Pair : Inferred) {
     if (auto Attr = createAvailableAttr(Pair.first, Pair.second, Context))
-      Attrs.add(Attr);
+      ToDecl->addAttribute(Attr);
   }
 }
 

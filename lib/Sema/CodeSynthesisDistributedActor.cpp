@@ -110,11 +110,10 @@ static VarDecl *addImplicitDistributedActorIDProperty(
       nominal);
 
   // mark as nonisolated, allowing access to it from everywhere
-  propDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
+  propDecl->addAttribute(NonisolatedAttr::createImplicit(C));
   // mark as @_compilerInitialized, since we synthesize the initializing
   // assignment during SILGen.
-  propDecl->getAttrs().add(
-      new (C) CompilerInitializedAttr(/*IsImplicit=*/true));
+  propDecl->addAttribute(new (C) CompilerInitializedAttr(/*IsImplicit=*/true));
 
   // IMPORTANT: The `id` MUST be the first field of any distributed actor,
   // because when we allocate remote proxy instances, we don't allocate memory
@@ -160,7 +159,7 @@ static VarDecl *addImplicitDistributedActorActorSystemProperty(
       nominal);
 
   // mark as nonisolated, allowing access to it from everywhere
-  propDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
+  propDecl->addAttribute(NonisolatedAttr::createImplicit(C));
 
   auto idProperty = nominal->getDistributedActorIDProperty();
   // If the id was not yet synthesized, we need to ensure that eventually
@@ -223,7 +222,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
          "Distributed function must be part of distributed actor");
 
   auto selfDecl = thunk->getImplicitSelfDecl();
-  selfDecl->getAttrs().add(new (C) KnownToBeLocalAttr(implicit));
+  selfDecl->addAttribute(new (C) KnownToBeLocalAttr(implicit));
 
   // === return type
   Type returnTy = func->getResultInterfaceType();
@@ -730,18 +729,18 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
   thunk->setSynthesized(true);
 
   if (isa<ClassDecl>(DC))
-    thunk->getAttrs().add(new (C) FinalAttr(/*isImplicit=*/true));
+    thunk->addAttribute(new (C) FinalAttr(/*isImplicit=*/true));
 
   thunk->setGenericSignature(baseSignature);
   thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
 
   thunk->setSynthesized(true);
   thunk->setDistributedThunk(true);
-  thunk->getAttrs().add(NonisolatedAttr::createImplicit(C));
+  thunk->addAttribute(NonisolatedAttr::createImplicit(C));
   // TODO(distributed): It would be nicer to make distributed thunks nonisolated(nonsending) instead;
   //                    this way we would not hop off the caller when calling system.remoteCall;
   //                    it'd need new ABI and the remoteCall also to become nonisolated(nonsending)
-  thunk->getAttrs().add(new (C) ConcurrentAttr(/*IsImplicit=*/true));
+  thunk->addAttribute(new (C) ConcurrentAttr(/*IsImplicit=*/true));
 
   return thunk;
 }

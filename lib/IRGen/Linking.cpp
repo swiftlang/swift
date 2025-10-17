@@ -408,6 +408,10 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
   }
 
   case Kind::SILFunction: {
+    auto asmName = getSILFunction()->asmName();
+    if (!asmName.empty())
+      return asmName.str();
+
     std::string Result(getSILFunction()->getName());
     if (isDynamicallyReplaceable()) {
       Result.append("TI");
@@ -465,8 +469,13 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
     return Result;
   }
 
-  case Kind::SILGlobalVariable:
+  case Kind::SILGlobalVariable: {
+    auto asmName = getSILGlobalVariable()->asmName();
+    if (!asmName.empty())
+      return asmName.str();
+
     return getSILGlobalVariable()->getName().str();
+  }
 
   case Kind::ReadOnlyGlobalObject:
     return getSILGlobalVariable()->getName().str() + "r";

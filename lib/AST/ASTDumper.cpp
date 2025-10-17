@@ -5172,12 +5172,8 @@ public:
     } else if (isTypeChecked()) {
       // If the type is null, it might be a macro reference. Try that if we're
       // dumping the fully type-checked AST.
-      auto macroRef =
-          evaluateOrDefault(const_cast<ASTContext *>(Ctx)->evaluator,
-                            ResolveMacroRequest{Attr, DC}, ConcreteDeclRef());
-      if (macroRef) {
+      if (auto macroRef = Attr->getResolvedMacro())
         printDeclRefField(macroRef, Label::always("macro"));
-      }
     }
     if (!Writer.isParsable()) {
       // The type has the semantic information we want for parsable outputs, so

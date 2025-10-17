@@ -468,8 +468,8 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
       ConstantGetterBodyContextData(valueExpr, convertKind).getOpaqueValue());
 
   // Mark the function transparent so that we inline it away completely.
-  func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  var->getAttrs().add(NonisolatedAttr::createImplicit(C));
+  func->addAttribute(new (C) TransparentAttr(/*implicit*/ true));
+  var->addAttribute(NonisolatedAttr::createImplicit(C));
 
   // Set the function up as the getter.
   ImporterImpl.makeComputed(var, func, nullptr);
@@ -544,7 +544,7 @@ SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
   constructor->copyFormalAccessFrom(structDecl);
 
   // Mark the constructor transparent so that we inline it away completely.
-  constructor->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));
+  constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
 
   constructor->setBodySynthesizer(synthesizeStructDefaultConstructorBody,
                                   structDecl);
@@ -674,7 +674,7 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
   constructor->copyFormalAccessFrom(structDecl);
 
   // Make the constructor transparent so we inline it away completely.
-  constructor->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));
+  constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
 
   if (wantBody) {
     auto memberMemory =
@@ -980,13 +980,13 @@ SwiftDeclSynthesizer::makeUnionFieldAccessors(
       makeFieldGetterDecl(ImporterImpl, importedUnionDecl, importedFieldDecl);
   getterDecl->setBodySynthesizer(synthesizeUnionFieldGetterBody,
                                  importedFieldDecl);
-  getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
+  getterDecl->addAttribute(new (C) TransparentAttr(/*implicit*/ true));
 
   auto setterDecl =
       makeFieldSetterDecl(ImporterImpl, importedUnionDecl, importedFieldDecl);
   setterDecl->setBodySynthesizer(synthesizeUnionFieldSetterBody,
                                  importedFieldDecl);
-  setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
+  setterDecl->addAttribute(new (C) TransparentAttr(/*implicit*/ true));
 
   ImporterImpl.makeComputed(importedFieldDecl, getterDecl, setterDecl);
   return {getterDecl, setterDecl};
@@ -1216,11 +1216,11 @@ SwiftDeclSynthesizer::makeIndirectFieldAccessors(
 
   auto getterDecl =
       makeFieldGetterDecl(ImporterImpl, importedStructDecl, importedFieldDecl);
-  getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
+  getterDecl->addAttribute(new (C) TransparentAttr(/*implicit*/ true));
 
   auto setterDecl =
       makeFieldSetterDecl(ImporterImpl, importedStructDecl, importedFieldDecl);
-  setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
+  setterDecl->addAttribute(new (C) TransparentAttr(/*implicit*/ true));
 
   ImporterImpl.makeComputed(importedFieldDecl, getterDecl, setterDecl);
 
@@ -1486,7 +1486,7 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptGetterDecl(
   thunk->setAccess(getOverridableAccessLevel(dc));
 
   if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>())
-    thunk->getAttrs().add(objcAttr->clone(C));
+    thunk->addAttribute(objcAttr->clone(C));
   thunk->setIsObjC(getter->isObjC());
   thunk->setIsDynamic(getter->isDynamic());
   // FIXME: Should we record thunks?
@@ -1530,7 +1530,7 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptSetterDecl(
   thunk->setAccess(getOverridableAccessLevel(dc));
 
   if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>())
-    thunk->getAttrs().add(objcAttr->clone(C));
+    thunk->addAttribute(objcAttr->clone(C));
   thunk->setIsObjC(setter->isObjC());
   thunk->setIsDynamic(setter->isDynamic());
 
@@ -2304,7 +2304,7 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
   // If this is a unary prefix operator (e.g. `!`), add a `prefix` attribute.
   size_t numParams = operatorMethod->getParameters()->size();
   if (numParams == 0 || (operatorMethod->isStatic() && numParams == 1)) {
-    topLevelStaticFuncDecl->getAttrs().add(new (ctx) PrefixAttr(SourceLoc()));
+    topLevelStaticFuncDecl->addAttribute(new (ctx) PrefixAttr(SourceLoc()));
   }
 
   return topLevelStaticFuncDecl;
@@ -2575,8 +2575,8 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
       ImporterImpl.ImportedHeaderUnit);
   funcDecl->setBodySynthesizer(synthesizeDefaultArgumentBody, (void *)param);
   funcDecl->setAccess(AccessLevel::Public);
-  funcDecl->getAttrs().add(new (ctx)
-                               AlwaysEmitIntoClientAttr(/*IsImplicit=*/true));
+  funcDecl->addAttribute(new (ctx)
+                             AlwaysEmitIntoClientAttr(/*IsImplicit=*/true));
   // At this point, the parameter/return types of funcDecl might not be imported
   // into Swift completely, meaning that their protocol conformances might not
   // be populated yet. Prevent LifetimeDependenceInfoRequest from prematurely
@@ -2866,9 +2866,8 @@ synthesizeAvailabilityDomainPredicateBody(AbstractFunctionDecl *afd,
 /// Mark the given declaration as always deprecated for the given reason.
 static void markDeprecated(Decl *decl, llvm::Twine message) {
   ASTContext &ctx = decl->getASTContext();
-  decl->getAttrs().add(
-      AvailableAttr::createUniversallyDeprecated(
-        ctx, ctx.AllocateCopy(message.str())));
+  decl->addAttribute(AvailableAttr::createUniversallyDeprecated(
+      ctx, ctx.AllocateCopy(message.str())));
 }
 
 static bool copyConstructorIsDefaulted(const clang::CXXRecordDecl *decl) {
@@ -3128,8 +3127,8 @@ FuncDecl *SwiftDeclSynthesizer::makeAvailabilityDomainPredicate(
   funcDecl->setBodySynthesizer(synthesizeAvailabilityDomainPredicateBody,
                                (void *)var);
   funcDecl->setAccess(AccessLevel::Public);
-  funcDecl->getAttrs().add(new (ctx)
-                               AlwaysEmitIntoClientAttr(/*IsImplicit=*/true));
+  funcDecl->addAttribute(new (ctx)
+                             AlwaysEmitIntoClientAttr(/*IsImplicit=*/true));
 
   ImporterImpl.availabilityDomainPredicates[var] = funcDecl;
 

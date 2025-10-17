@@ -369,9 +369,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::ExtensionMacroExpansion:
   case GeneratedSourceInfo::PreambleMacroExpansion:
   case GeneratedSourceInfo::BodyMacroExpansion: {
-    auto decl = cast<Decl *>(ASTNode::getFromOpaqueValue(Info.astNode));
-    auto attr = Info.attachedMacroCustomAttr;
-    if (auto *macroDecl = decl->getResolvedMacro(attr)) {
+    if (auto *macroDecl = Info.attachedMacroCustomAttr->getResolvedMacro()) {
       Result.ExpansionLoc = RegularLocation(macroDecl);
       Result.Name = macroDecl->getBaseName().userFacingName();
       Result.Freestanding = true;
@@ -1544,7 +1542,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
         {}, /*async*/ false, /*throws*/ false, /*thrownType*/Type(), {},
         emptyParams,
         getASTContext().getNeverType(), moduleDecl);
-    drainQueueFuncDecl->getAttrs().add(new (getASTContext()) SILGenNameAttr(
+    drainQueueFuncDecl->addAttribute(new (getASTContext()) SILGenNameAttr(
         "swift_task_asyncMainDrainQueue", /*raw*/ false, /*implicit*/ true));
   }
 

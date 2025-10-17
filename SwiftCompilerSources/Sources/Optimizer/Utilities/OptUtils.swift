@@ -432,7 +432,7 @@ extension Instruction {
       case .USubOver:
         // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
         // This pattern appears in UTF8 String literal construction.
-        if let tei = bi.uses.getSingleUser(ofType: TupleExtractInst.self),
+        if let tei = bi.uses.singleUser(ofType: TupleExtractInst.self),
            tei.isResultOfOffsetSubtract {
           return true
         }
@@ -446,7 +446,7 @@ extension Instruction {
       // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
       // This pattern appears in UTF8 String literal construction.
       if tei.isResultOfOffsetSubtract,
-         let bi = tei.uses.getSingleUser(ofType: BuiltinInst.self),
+         let bi = tei.uses.singleUser(ofType: BuiltinInst.self),
          bi.id == .StringObjectOr {
         return true
       }

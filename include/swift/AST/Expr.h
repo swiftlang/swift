@@ -4471,10 +4471,6 @@ public:
     return ExplicitResultTypeAndBodyState.getPointer()->getTypeRepr();
   }
 
-  /// Returns the resolved macro for the given custom attribute
-  /// attached to this closure expression.
-  MacroDecl *getResolvedMacro(CustomAttr *customAttr);
-
   /// Determine whether the closure has a single expression for its
   /// body.
   ///

@@ -8,7 +8,7 @@
 /// --------Main module
 // CHECK-LABEL: "modulePath": "deps.swiftmodule",
 // CHECK-NEXT: "sourceFiles": [
-// CHECK-NEXT: cxx-overlay-source-lookup.swift
+// CHECK-NEXT: client.swift
 // CHECK-NEXT: ],
 // CHECK: "directDependencies": [
 // CHECK-DAG: "swift": "Swift"

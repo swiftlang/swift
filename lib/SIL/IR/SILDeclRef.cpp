@@ -1428,11 +1428,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         return NameA->Name.str();
       }
 
-    if (auto *ExternA = ExternAttr::find(getDecl()->getAttrs(), ExternKind::C)) {
-      assert(isa<FuncDecl>(getDecl()) && "non-FuncDecl with @_extern should be rejected by typechecker");
-      return ExternA->getCName(cast<FuncDecl>(getDecl())).str();
-    }
-
     // Use a given cdecl name for native-to-foreign thunks.
     if (getDecl()->getAttrs().hasAttribute<CDeclAttr>())
       if (isNativeToForeignThunk()) {

@@ -2865,8 +2865,8 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       addUsedGlobal(gvar);
     else if (var->shouldBePreservedForDebugger() && forDefinition) 
       addUsedGlobal(gvar);
-    if (auto *sectionAttr = var->getSectionAttr())
-      gvar->setSection(sectionAttr->Name);
+    if (!var->section().empty())
+      gvar->setSection(var->section());
   }
   if (forDefinition && !gvar->hasInitializer()) {
     if (initVal) {

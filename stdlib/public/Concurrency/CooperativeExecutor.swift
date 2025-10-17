@@ -244,7 +244,7 @@ final class CooperativeExecutor: Executor, @unchecked Sendable {
 }
 
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 extension CooperativeExecutor: SchedulingExecutor {
 
   public var asScheduling: (any SchedulingExecutor)? {

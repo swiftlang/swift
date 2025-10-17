@@ -743,8 +743,7 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
       if (expansionDecl->getMacroRef().getDecl() == macro)
         return true;
     } else if (auto *macroAttr = sourceFile->getAttachedMacroAttribute()) {
-      auto *decl = expansion.dyn_cast<Decl *>();
-      auto *macroDecl = decl->getResolvedMacro(macroAttr);
+      auto *macroDecl = macroAttr->getResolvedMacro();
       if (!macroDecl)
         return false;
 
@@ -1967,7 +1966,7 @@ swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
     SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
                                           decl->getAttrs().end());
     for (auto *attr : attrs) {
-      member->getAttrs().add(attr);
+      member->addAttribute(attr);
     }
   }
 
@@ -2074,11 +2073,9 @@ ArrayRef<unsigned>
 ExpandExtensionMacros::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *nominal) const {
   SmallVector<unsigned, 2> bufferIDs;
-  for (auto customAttrConst :
-       nominal->getExpandedAttrs().getAttributes<CustomAttr>()) {
-    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
-    auto *macro = nominal->getResolvedMacro(customAttr);
-
+  auto expandedAttrs = nominal->getExpandedAttrs();
+  for (auto *customAttr : expandedAttrs.getAttributes<CustomAttr>()) {
+    auto *macro = customAttr->getResolvedMacro();
     if (!macro)
       continue;
 
@@ -2226,9 +2223,11 @@ static bool diagnoseArbitraryGlobalNames(DeclContext *dc,
   return isInvalid;
 }
 
-ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
-                                              UnresolvedMacroReference macroRef,
-                                              DeclContext *dc) const {
+ConcreteDeclRef
+ResolveMacroRequest::evaluate(Evaluator &evaluator,
+                              UnresolvedMacroReference macroRef) const {
+  auto *dc = macroRef.getDeclContext();
+
   // Macro expressions and declarations have their own stored macro
   // reference. Use it if it's there.
   if (auto *expansion = macroRef.getFreestanding()) {

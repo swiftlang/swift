@@ -153,7 +153,7 @@ static void maybeMarkAsInlinable(DerivedConformance &derived,
     if (auto *attr = afd->getAttrs().getAttribute<UsableFromInlineAttr>())
       attr->setInvalid();
     if (access.isPublic())
-      afd->getAttrs().add(new (C) InlinableAttr(/*implicit*/false));
+      afd->addAttribute(new (C) InlinableAttr(/*implicit*/ false));
   }
 }
 

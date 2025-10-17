@@ -1388,7 +1388,7 @@ static void invalidateOverrideAttribute(ValueDecl *decl) {
   auto overrideAttr = decl->getAttrs().getAttribute<OverrideAttr>(true);
   if (!overrideAttr) {
     overrideAttr = new (decl->getASTContext()) OverrideAttr(true);
-    decl->getAttrs().add(overrideAttr);
+    decl->addAttribute(overrideAttr);
   }
 
   overrideAttr->setInvalid();

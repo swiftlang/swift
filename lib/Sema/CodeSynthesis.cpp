@@ -270,7 +270,7 @@ static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
     auto typeExpr = TypeExpr::createImplicit(resultBuilderType, ctx);
     auto attr = CustomAttr::create(ctx, SourceLoc(), typeExpr, /*owner*/ arg,
                                    /*implicit=*/true);
-    arg->getAttrs().add(attr);
+    arg->addAttribute(attr);
   }
 
   maybeAddMemberwiseDefaultArg(arg, var, ctx);
@@ -442,7 +442,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   // 'override' attribute.
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     if (classDecl->getSuperclass())
-      ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/true));
+      ctor->addAttribute(new (ctx) OverrideAttr(/*IsImplicit=*/true));
   }
 
   return ctor;
@@ -589,7 +589,7 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
     if (superclassCtor->getAttrs().hasAttribute<InlinableAttr>()) {
       // Inherit the @inlinable attribute.
       auto *clonedAttr = new (ctx) InlinableAttr(/*implicit=*/true);
-      ctor->getAttrs().add(clonedAttr);
+      ctor->addAttribute(clonedAttr);
     } else if (superclassCtor->getAttrs().hasAttribute<InlineAttr>() &&
                superclassCtor->getAttrs().getAttribute<InlineAttr>()->getKind()
                == InlineKind::Always) {
@@ -597,24 +597,24 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
       auto *clonedAttr = new (ctx) InlineAttr(SourceLoc(), SourceRange(),
                                               InlineKind::Always,
                                               /*implicit=*/true);
-      ctor->getAttrs().add(clonedAttr);
+      ctor->addAttribute(clonedAttr);
     } else if (access == AccessLevel::Internal && !superclassCtor->isDynamic()){
       // Inherit the @usableFromInline attribute.
       auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
-      ctor->getAttrs().add(clonedAttr);
+      ctor->addAttribute(clonedAttr);
     }
   }
 
   // Inherit the @discardableResult attribute.
   if (superclassCtor->getAttrs().hasAttribute<DiscardableResultAttr>()) {
     auto *clonedAttr = new (ctx) DiscardableResultAttr(/*implicit=*/true);
-    ctor->getAttrs().add(clonedAttr);
+    ctor->addAttribute(clonedAttr);
   }
 
   // Inherit the rethrows attribute.
   if (superclassCtor->getAttrs().hasAttribute<RethrowsAttr>()) {
     auto *clonedAttr = new (ctx) RethrowsAttr(/*implicit=*/true);
-    ctor->getAttrs().add(clonedAttr);
+    ctor->addAttribute(clonedAttr);
   }
 
   // If the superclass has its own availability, make sure the synthesized
@@ -637,9 +637,9 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
   ctor->setOverriddenDecl(superclassCtor);
 
   if (superclassCtor->isRequired())
-    ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/false));
+    ctor->addAttribute(new (ctx) RequiredAttr(/*IsImplicit=*/false));
   else
-    ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/false));
+    ctor->addAttribute(new (ctx) OverrideAttr(/*IsImplicit=*/false));
 
   // If the superclass constructor is @objc but the subclass constructor is
   // not representable in Objective-C, add @nonobjc implicitly.
@@ -648,7 +648,7 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
   if (superclassCtor->isObjC() &&
       !isRepresentableInLanguage(ctor, ObjCReason::MemberOfObjCSubclass,
                                  asyncConvention, errorConvention))
-    ctor->getAttrs().add(new (ctx) NonObjCAttr(/*isImplicit=*/true));
+    ctor->addAttribute(new (ctx) NonObjCAttr(/*isImplicit=*/true));
 }
 
 static std::pair<BraceStmt *, bool>
@@ -1790,7 +1790,7 @@ bool swift::addNonIsolatedToSynthesized(NominalTypeDecl *nominal,
     return false;
 
   ASTContext &ctx = nominal->getASTContext();
-  value->getAttrs().add(NonisolatedAttr::createImplicit(ctx));
+  value->addAttribute(NonisolatedAttr::createImplicit(ctx));
   return true;
 }
 
@@ -1803,5 +1803,5 @@ void swift::applyInferredSPIAccessControlAttr(Decl *decl,
 
   auto spiAttr =
       SPIAccessControlAttr::create(ctx, SourceLoc(), SourceRange(), spiGroups);
-  decl->getAttrs().add(spiAttr);
+  decl->addAttribute(spiAttr);
 }

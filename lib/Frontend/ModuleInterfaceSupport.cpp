@@ -804,7 +804,7 @@ public:
     // the order in which previous implementations printed these attributes.
     for (auto attr = clonedAttrs.rbegin(), end = clonedAttrs.rend();
          attr != end; ++attr) {
-      extension->getAttrs().add(const_cast<DeclAttribute *>(*attr));
+      extension->addAttribute(const_cast<DeclAttribute *>(*attr));
     }
 
     ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},

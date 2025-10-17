@@ -511,7 +511,7 @@ static FuncDecl *getBuiltinGenericFunction(
   func->setAccess(AccessLevel::Public);
   func->setGenericSignature(Sig);
   if (Throws == BuiltinThrowsKind::Rethrows)
-    func->getAttrs().add(new (Context) RethrowsAttr(/*ThrowsLoc*/ SourceLoc()));
+    func->addAttribute(new (Context) RethrowsAttr(/*ThrowsLoc*/ SourceLoc()));
 
   return func;
 }
@@ -1010,7 +1010,7 @@ static ValueDecl *getBindMemoryOperation(ASTContext &ctx, Identifier id) {
                                                 _word,
                                                 _metatype(_typeparam(0))),
                                     _word);
-  fd->getAttrs().add(new (ctx) DiscardableResultAttr(/*implicit*/true));
+  fd->addAttribute(new (ctx) DiscardableResultAttr(/*implicit*/ true));
   return fd;
 }
 
@@ -1019,7 +1019,7 @@ static ValueDecl *getRebindMemoryOperation(ASTContext &ctx, Identifier id) {
                                     _parameters(_rawPointer,
                                                 _word),
                                     _word);
-  fd->getAttrs().add(new (ctx) DiscardableResultAttr(/*implicit*/true));
+  fd->addAttribute(new (ctx) DiscardableResultAttr(/*implicit*/ true));
   return fd;
 }
 

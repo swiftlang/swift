@@ -292,7 +292,7 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
     if (needsImplementsAttr) {
       auto attr = ImplementsAttr::create(
           dc, assocType->getProtocol(), assocType->getName());
-      aliasDecl->getAttrs().add(attr);
+      aliasDecl->addAttribute(attr);
     }
 
     // Inject the typealias into the nominal decl that conforms to the protocol.
@@ -331,7 +331,7 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
     aliasDecl->setAccess(requiredAccess);
     if (requiredAccessScope.second) {
       auto *attr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
-      aliasDecl->getAttrs().add(attr);
+      aliasDecl->addAttribute(attr);
     }
 
     // Construct the availability of the type witnesses based on the

@@ -233,7 +233,7 @@ private func rewritePartialApply(_ partialApply: PartialApplyInst, withSpecializ
   // leave the key path itself out of the dependency chain, and introduce dependencies on those
   // operands instead, so that the key path object itself can be made dead.
   for md in newClosure.uses.users(ofType: MarkDependenceInst.self) {
-    if md.base.uses.getSingleUser(ofType: PartialApplyInst.self) == partialApply {
+    if md.base.uses.singleUser(ofType: PartialApplyInst.self) == partialApply {
       md.replace(with: newClosure, context)
     }
   }

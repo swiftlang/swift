@@ -162,6 +162,11 @@ bool SILType::isEmpty(const SILFunction &F) const {
     // Also, a struct is empty if it either has no fields or if all fields are
     // empty.
     SILModule &module = F.getModule();
+    if (structDecl->isResilient(module.getSwiftModule(),
+                                F.getResilienceExpansion())) {
+      return false;
+    }
+
     TypeExpansionContext typeEx = F.getTypeExpansionContext();
     for (VarDecl *field : structDecl->getStoredProperties()) {
       if (!getFieldType(field, module, typeEx).isEmpty(F))

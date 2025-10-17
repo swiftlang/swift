@@ -1657,7 +1657,11 @@ public:
 
       require(lhs == rhs ||
               (lhs.isAddress() && lhs.getObjectType() == rhs) ||
-              (DebugVarTy.isAddress() && lhs == rhs.getObjectType()),
+              (DebugVarTy.isAddress() && lhs == rhs.getObjectType()) ||
+
+              // When cloning SIL (e.g. in LoopUnroll) local archetypes are uniqued
+              // and therefore distinct in cloned instructions.
+              (lhs.hasLocalArchetype() && rhs.hasLocalArchetype()),
               "Two variables with different type but same scope!");
     }
 

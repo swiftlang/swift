@@ -422,8 +422,8 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
                         SourceLoc(), alias, DC);
   V->setAccess(swift::AccessLevel::Public);
   V->setInterfaceType(Ty.getType());
-  V->getAttrs().add(new (Ctx) TransparentAttr(/*Implicit*/true));
-  V->getAttrs().add(new (Ctx) InlineAttr(InlineKind::AlwaysUnderscored));
+  V->addAttribute(new (Ctx) TransparentAttr(/*Implicit*/ true));
+  V->addAttribute(new (Ctx) InlineAttr(InlineKind::AlwaysUnderscored));
 
   /* Accessor */
   swift::AccessorDecl *G = nullptr;

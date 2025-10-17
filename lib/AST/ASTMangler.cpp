@@ -5000,7 +5000,7 @@ void ASTMangler::appendMacroExpansionContext(
     outerExpansionLoc = decl->getLoc();
     outerExpansionDC = decl->getDeclContext();
 
-    if (auto *macroDecl = decl->getResolvedMacro(attr))
+    if (auto *macroDecl = attr->getResolvedMacro())
       baseName = macroDecl->getBaseName();
     else
       baseName = Context.getIdentifier("__unknown_macro__");
@@ -5264,7 +5264,6 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
   // We don't mangle the declaration itself because doing so requires semantic
   // information (e.g., its interface type), which introduces cyclic
   // dependencies.
-  const Decl *attachedTo = decl;
   Identifier attachedToName;
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
     auto storage = accessor->getStorage();
@@ -5294,12 +5293,6 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
     }
 
     appendDeclWithName(storage, attachedToName);
-
-    // For member attribute macros, the attribute is attached to the enclosing
-    // declaration.
-    if (role == MacroRole::MemberAttribute) {
-      attachedTo = storage->getDeclContext()->getAsDecl();
-    }
   } else if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
     // Mangle the name, replacing special names with their user-facing names.
     auto name = valueDecl->getName().getBaseName();
@@ -5311,12 +5304,6 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
     }
 
     appendDeclWithName(valueDecl, attachedToName);
-
-    // For member attribute macros, the attribute is attached to the enclosing
-    // declaration.
-    if (role == MacroRole::MemberAttribute) {
-      attachedTo = decl->getDeclContext()->getAsDecl();
-    }
   } else {
     appendContext(decl->getDeclContext(), nullBase, "");
     appendIdentifier("_");
@@ -5324,7 +5311,7 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
 
   // Determine the name of the macro.
   DeclBaseName macroName;
-  if (auto *macroDecl = attachedTo->getResolvedMacro(attr)) {
+  if (auto *macroDecl = attr->getResolvedMacro()) {
     macroName = macroDecl->getName().getBaseName();
   } else {
     macroName = decl->getASTContext().getIdentifier("__unknown_macro__");

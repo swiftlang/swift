@@ -1377,8 +1377,8 @@ CaptureListEntry CaptureListEntry::createParsed(
       new (Ctx) VarDecl(/*isStatic==*/false, introducer, nameLoc, name, DC);
 
   if (ownershipKind != ReferenceOwnership::Strong)
-    VD->getAttrs().add(
-        new (Ctx) ReferenceOwnershipAttr(ownershipRange, ownershipKind));
+    VD->addAttribute(new (Ctx)
+                         ReferenceOwnershipAttr(ownershipRange, ownershipKind));
 
   auto *pattern = NamedPattern::createImplicit(Ctx, VD);
 
@@ -2202,17 +2202,6 @@ void ClosureExpr::setExplicitResultType(Type ty) {
   assert(ty && !ty->hasTypeVariable() && !ty->hasPlaceholder());
   ExplicitResultTypeAndBodyState.getPointer()
       ->setType(MetatypeType::get(ty));
-}
-
-MacroDecl *
-ClosureExpr::getResolvedMacro(CustomAttr *customAttr) {
-  auto &ctx = getASTContext();
-  auto declRef = evaluateOrDefault(
-      ctx.evaluator,
-      ResolveMacroRequest{customAttr, this},
-      ConcreteDeclRef());
-
-  return dyn_cast_or_null<MacroDecl>(declRef.getDecl());
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)

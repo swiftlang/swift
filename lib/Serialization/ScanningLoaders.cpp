@@ -117,7 +117,7 @@ bool SwiftModuleScanner::handlePossibleTargetMismatch(
 
   for (const auto &modulePath : foundIncompatibleArchModules)
     incompatibleCandidates.push_back({modulePath,
-                                      "invalid architecture"});
+      SwiftModuleScannerQueryResult::BUILT_FOR_INCOMPATIBLE_TARGET});
 
   return false;
 }

@@ -1,0 +1,13 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
+
+import Swift
+
+// CHECK: @v1 = {{(dllexport )?}}{{(protected )?}}global
+sil_global [asmname "v1"] @$s4main13renamedGlobalSivp : $Int
+
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @f1()
+sil [asmname "f1"] @$s4main15renamedFunctionyyF : $@convention(thin) () -> () {
+  %0 = tuple ()
+  return %0
+}
+

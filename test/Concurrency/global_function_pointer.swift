@@ -24,7 +24,7 @@ public func callAsync() async {
   await asyncFunc()
 }
 
-// CHECK-SIL-LABEL: sil_global @$s23global_function_pointer5gfptryyYacvp : $@async @callee_guaranteed () -> () = {
+// CHECK-SIL-LABEL: sil_global [section "__DATA,__mysection"] @$s23global_function_pointer5gfptryyYacvp : $@async @callee_guaranteed () -> () = {
 // CHECK-SIL:         %0 = function_ref @$s23global_function_pointer9callAsyncyyYaF : $@convention(thin) @async () -> ()
 // CHECK-SIL-NEXT:    %initval = thin_to_thick_function %0 : $@convention(thin) @async () -> () to $@async @callee_guaranteed () -> ()
 // CHECK-SIL-NEXT:  }
