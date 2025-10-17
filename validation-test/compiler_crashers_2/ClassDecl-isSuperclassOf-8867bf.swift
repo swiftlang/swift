@@ -1,4 +1,4 @@
-// {"signature":"swift::ClassDecl::isSuperclassOf(swift::ClassDecl const*) const"}
+// {"kind":"typecheck","signature":"swift::ClassDecl::isSuperclassOf(swift::ClassDecl const*) const"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 class a {
   typealias b = <#type#>
