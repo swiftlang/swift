@@ -8010,7 +8010,7 @@ ERROR(expected_macro_expansion_expr,PointsToFirstBadToken,
 ERROR(expected_macro_expansion_decls,PointsToFirstBadToken,
       "expected macro expansion to produce a declaration", ())
 ERROR(macro_undefined,PointsToFirstBadToken,
-      "no macro named %0", (DeclName))
+      "no macro named %0", (DeclNameRef))
 ERROR(external_macro_not_found,none,
       "external macro implementation type '%0.%1' could not be found for "
       "macro %2; %3", (StringRef, StringRef, DeclName, StringRef))
