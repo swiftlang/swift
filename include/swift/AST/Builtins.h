@@ -77,7 +77,7 @@ enum class OverloadedBuiltinKind : uint8_t {
 };
 
 /// BuiltinValueKind - The set of (possibly overloaded) builtin functions.
-enum class BuiltinValueKind {
+enum class BuiltinValueKind : unsigned {
   None = 0,
 #define BUILTIN(Id, Name, Attrs) Id,
 #include "swift/AST/Builtins.def"

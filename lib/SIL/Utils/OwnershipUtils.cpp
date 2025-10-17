@@ -734,9 +734,7 @@ bool BorrowingOperand::visitScopeEndingUses(
     bool dead = true;
     for (auto *use : user->getUses()) {
       dead = false;
-      auto builtinUser = dyn_cast<BuiltinInst>(use->getUser());
-      if (!builtinUser
-          || builtinUser->getBuiltinKind() != BuiltinValueKind::EndAsyncLetLifetime)
+      if (!isBuiltinInst(use->getUser(), BuiltinValueKind::EndAsyncLetLifetime))
         continue;
 
       if (!visitScopeEnd(use)) {
