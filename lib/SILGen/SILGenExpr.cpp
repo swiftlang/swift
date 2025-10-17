@@ -996,6 +996,9 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   // If the referenced decl isn't a VarDecl, it should be a constant of some
   // sort.
   SILDeclRef silDeclRef(decl);
+  if (ExternAttr::find(decl->getAttrs(), ExternKind::C))
+    silDeclRef = silDeclRef.asForeign();
+
   assert(silDeclRef.getParameterListCount() == 1);
   auto substType = cast<AnyFunctionType>(refType);
   auto typeContext = getFunctionTypeInfo(substType);

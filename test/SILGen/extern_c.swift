@@ -27,6 +27,10 @@ func withoutCName() -> Int
 @_extern(c, "default_arg")
 func defaultArg(_ x: Int = 42)
 
+func callMe(body: (Int) -> Int) -> Int {
+  return body(17)
+}
+
 func main() {
   // CHECK-DAG: [[F1:%.+]] = function_ref @$s8extern_c9withCNameyS2iFTo : $@convention(c) (Int) -> Int
   // CHECK-DAG: [[F2:%.+]] = function_ref @$s8extern_c12takeCFuncPtryyS2iXCFTo : $@convention(c) (@convention(c) (Int) -> Int) -> ()
@@ -46,6 +50,14 @@ func main() {
   // CHECK-DAG: [[F7:%.+]] = function_ref @$s8extern_c10defaultArgyySiFTo : $@convention(c) (Int) -> ()
   // CHECK-DAG: apply [[F7]]([[DEFAULT_V]]) : $@convention(c) (Int) -> ()
   defaultArg()
+
+  // CHECK-DAG: [[CREF:%[0-9]+]] = function_ref @$s8extern_c16publicVisibilityyS2iFTo : $@convention(c) (Int) -> Int
+  // CHECK-DAG: [[THUNK:%[0-9]+]] = function_ref @$sS2iIetCyd_S2iIegyd_TR : $@convention(thin) (Int, @convention(c) (Int) -> Int) -> Int
+  // CHECK-DAG: [[APPLIED:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK]]([[CREF]]) : $@convention(thin) (Int, @convention(c) (Int) -> Int) -> Int
+  // CHECK-DAG: [[NOESCAPE_APPLIED:%[0-9]+]] = convert_escape_to_noescape [not_guaranteed] [[APPLIED]] to $@noescape @callee_guaranteed (Int) -> Int
+  // CHECK-DAG: [[CALL_ME:%[0-9]+]] = function_ref @$s8extern_c6callMe4bodyS3iXE_tF
+  // CHECK-DAG: apply [[CALL_ME]]([[NOESCAPE_APPLIED]]) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Int) -> Int) -> Int
+  _ = callMe(body: publicVisibility)
 }
 
 main()
