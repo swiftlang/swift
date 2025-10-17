@@ -454,7 +454,9 @@ extension DistributedActorSystem {
     }
 
     if let genericEnv = unsafe genericEnv {
+      print("[execute] genericEnv was set")
       let subs = try invocationDecoder.decodeGenericSubstitutions()
+      print("[execute] decodeGenericSubstitutions = \(subs)")
       if subs.isEmpty {
         throw ExecuteDistributedTargetError(
           message: "Cannot call generic method without generic argument substitutions",
@@ -462,6 +464,7 @@ extension DistributedActorSystem {
       }
 
       unsafe substitutionsBuffer = .allocate(capacity: subs.count)
+      print("[execute] Expected generic substitutions count: \(subs.count)")
 
       for (offset, substitution) in subs.enumerated() {
         let element = unsafe substitutionsBuffer?.advanced(by: offset)
@@ -475,6 +478,8 @@ extension DistributedActorSystem {
           message: "Generic substitutions \(subs) do not satisfy generic requirements of \(target) (\(targetName))",
           errorCode: .invalidGenericSubstitutions)
       }
+    } else {
+      print("[execute] no generic env")
     }
 
     let paramCount =
@@ -483,12 +488,18 @@ extension DistributedActorSystem {
           targetNameUTF8.baseAddress!,
           UInt(targetNameUTF8.endIndex))
       }
+    print("[execute] parameter count:\(paramCount)")
 
     guard paramCount >= 0 else {
+      let errorMessage =
+        switch paramCount {
+        case -1: "Cannot extract function type"
+        default: "Number of children was negative"
+        }
       throw ExecuteDistributedTargetError(
         message: """
                  Failed to decode distributed invocation target expected parameter count,
-                 error code: \(paramCount)
+                 error: \(paramCount) \(errorMessage)
                  mangled name: \(targetName)
                  """,
         errorCode: .invalidParameterCount)
@@ -502,19 +513,29 @@ extension DistributedActorSystem {
 
     // Demangle and write all parameter types into the prepared buffer
     let decodedNum = unsafe targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-      unsafe __getParameterTypeInfo(
+      print("[execute] get parameter type info")
+      return unsafe __getParameterTypeInfo(
         targetNameUTF8.baseAddress!,
         UInt(targetNameUTF8.endIndex),
         genericEnv,
         substitutionsBuffer,
         argumentTypesBuffer.baseAddress!._rawValue, Int(paramCount))
     }
+    print("[execute] decoded parameter types num:\(decodedNum) (expected:\(paramCount))")
 
     // Fail if the decoded parameter types count seems off and fishy
     guard decodedNum == paramCount else {
+      let errorMessage =
+        switch (decodedNum) {
+        case -1: "Cannot extract function type"
+        case -2: "Count of parameter list not equal to expected types list count"
+        case -3: "type info is invalid!"
+        default: "unknown error"
+        }
       throw ExecuteDistributedTargetError(
         message: """
-                 Failed to decode the expected number of params of distributed invocation target, error code: \(decodedNum)
+                 Failed to decode the expected number of params of distributed invocation target
+                 error: \(decodedNum) \(errorMessage)
                  decoded: \(decodedNum), expected params: \(paramCount)
                  mangled name: \(targetName)
                  """,
