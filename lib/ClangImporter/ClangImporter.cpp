@@ -8782,7 +8782,7 @@ ClangDeclExplicitSafety::evaluate(Evaluator &evaluator,
   
   // Explicitly unsafe.
   auto decl = desc.decl;
-  if (hasUnsafeAPIAttr(decl) || hasSwiftAttribute(decl, "unsafe"))
+  if (hasSwiftAttribute(decl, "unsafe"))
     return ExplicitSafety::Unsafe;
   
   // Explicitly safe.
