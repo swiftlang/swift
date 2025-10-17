@@ -549,14 +549,14 @@ private:
     // action cache. We just use the CASID of the binary module itself as key.
     auto Ref = CASFS.getObjectRefForFileContent(path);
     if (!Ref) {
-      instance.getDiags().diagnose(SourceLoc(), diag::error_cas_file_ref, path);
+      instance.getDiags().diagnose(SourceLoc(), diag::error_cas_file_ref, path,
+                                   toString(Ref.takeError()));
       return true;
     }
-    assert(*Ref && "Binary module should be loaded into CASFS already");
-    depInfo.updateModuleCacheKey(CAS.getID(**Ref).toString());
+    depInfo.updateModuleCacheKey(CAS.getID(*Ref).toString());
 
     swift::cas::CompileJobCacheResult::Builder Builder;
-    Builder.addOutput(file_types::ID::TY_SwiftModuleFile, **Ref);
+    Builder.addOutput(file_types::ID::TY_SwiftModuleFile, *Ref);
     auto Result = Builder.build(CAS);
     if (!Result) {
       instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
@@ -564,7 +564,7 @@ private:
                                    toString(Result.takeError()));
       return true;
     }
-    if (auto E = instance.getActionCache().put(CAS.getID(**Ref),
+    if (auto E = instance.getActionCache().put(CAS.getID(*Ref),
                                                CAS.getID(*Result))) {
       instance.getDiags().diagnose(
           SourceLoc(), diag::error_cas,
