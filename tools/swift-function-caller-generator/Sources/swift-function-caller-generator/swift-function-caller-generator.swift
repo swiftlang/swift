@@ -1,3 +1,21 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2025 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+// This utility takes a Swift interface and outputs a Swift file calling every
+// function in that Swift interface. This is useful for testing purposes, to
+// trigger imports of all declarations in clang modules.
+
+// Usage: swift-function-caller-generator <module-name> <swiftinterface-path>
+
 import SwiftParser
 import SwiftSyntax
 import SwiftSyntaxMacros
@@ -25,7 +43,7 @@ class SwiftMacroTestGen: SyntaxVisitor {
       exit(1)
     }
     if CommandLine.argc < 3 {
-      printError("missing module name (passed 1 argument, expected 2)")
+      printError("missing file name (passed 1 argument, expected 2)")
       exit(1)
     }
     let contents = read(file: CommandLine.arguments[2])
@@ -111,30 +129,6 @@ class TypeAliasReplacer: SyntaxRewriter {
     }
     return TypeSyntax(node)
   }
-}
-
-func read(file path: String) -> String {
-  guard let f = fopen(path, "r") else {
-    printError("could not open file \(path)")
-    exit(1)
-  }
-  if fseek(f, 0, SEEK_END) != 0 {
-    printError("could not read file \(path)")
-    exit(1)
-  }
-  let len = Int(ftell(f))
-  if len < 0 {
-    printError("could not read size of file \(path)")
-    exit(1)
-  }
-  rewind(f)
-  let contents = String(
-    unsafeUninitializedCapacity: len,
-    initializingUTF8With: { stringBuffer in
-      fread(UnsafeMutableRawPointer(stringBuffer.baseAddress!), 1, len, f)
-    })
-  fclose(f)
-  return contents
 }
 
 func createBody(_ f: FunctionDeclSyntax, selfParam: TokenSyntax?) -> CodeBlockSyntax {
@@ -311,6 +305,32 @@ extension AttributeListSyntax.Element {
   }
 }
 
+// MARK: I/O utils
+// These call libc functions to avoid dealing with Foundation on non-Apple platforms
 func printError(_ s: String) {
   fputs("error: \(s)\n", stderr)
+}
+
+func read(file path: String) -> String {
+  guard let f = fopen(path, "r") else {
+    printError("could not open file \(path)")
+    exit(1)
+  }
+  if fseek(f, 0, SEEK_END) != 0 {
+    printError("could not read file \(path)")
+    exit(1)
+  }
+  let len = Int(ftell(f))
+  if len < 0 {
+    printError("could not read size of file \(path)")
+    exit(1)
+  }
+  rewind(f)
+  let contents = String(
+    unsafeUninitializedCapacity: len,
+    initializingUTF8With: { stringBuffer in
+      fread(UnsafeMutableRawPointer(stringBuffer.baseAddress!), 1, len, f)
+    })
+  fclose(f)
+  return contents
 }
