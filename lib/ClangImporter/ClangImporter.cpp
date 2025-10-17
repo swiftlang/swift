@@ -1015,7 +1015,8 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
 
   // Note: Reusing the file manager is safe; this is a component that's already
   // reused when building PCM files for the module cache.
-  CI.createSourceManager(Impl.Instance->getFileManager());
+  CI.setFileManager(&Impl.Instance->getFileManager());
+  CI.createSourceManager(CI.getFileManager());
   auto &clangSrcMgr = CI.getSourceManager();
   auto FID = clangSrcMgr.createFileID(
                         std::make_unique<ZeroFilledMemoryBuffer>(1, "<main>"));
