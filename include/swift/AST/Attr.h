@@ -3107,7 +3107,7 @@ public:
   StringRef getCName(const FuncDecl *forDecl) const;
 
   /// Find an ExternAttr with the given kind in the given DeclAttributes.
-  static ExternAttr *find(DeclAttributes &attrs, ExternKind kind);
+  static const ExternAttr *find(const DeclAttributes &attrs, ExternKind kind);
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Extern;
