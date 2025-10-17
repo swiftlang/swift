@@ -8,7 +8,6 @@
 // * Whether X::foo finds foos in X's re-exports
 // * Whether we handle access paths correctly
 // * Interaction with ClangImporter
-// * Key paths
 // * Key path dynamic member lookup
 // * Custom type attributes (and coverage of type attrs generally is sparse)
 //
@@ -56,6 +55,9 @@ extension A: @retroactive Swift::Equatable {
     self.main::myNegate()
 
     Swift::fatalError()
+
+    _ = \ModuleSelectorTestingKit::A.magnitude
+    _ = \A.ModuleSelectorTestingKit::magnitude
 
     _ = #ModuleSelectorTestingKit::ExprMacro
   }
@@ -135,6 +137,13 @@ extension B: @retroactive main::Equatable {
     main::fatalError()
     // expected-error@-1 {{'fatalError' is not imported through module 'main'}}
     // expected-note@-2 {{did you mean module 'Swift'?}} {{5-9=Swift}}
+
+    _ = \main::A.magnitude
+    // expected-error@-1 {{'A' is not imported through module 'main'}}
+    // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{10-14=ModuleSelectorTestingKit}}
+    _ = \A.main::magnitude
+    // expected-error@-1 {{'magnitude' is not imported through module 'main'}}
+    // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{none}}
 
     _ = #main::ExprMacro
     // expected-error@-1 {{no macro named 'main::ExprMacro'}}
@@ -216,6 +225,9 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
     // expected-error@-1 {{'fatalError' is not imported through module 'ModuleSelectorTestingKit'}}
     // expected-note@-2 {{did you mean module 'Swift'?}} {{5-29=Swift}}
 
+    _ = \ModuleSelectorTestingKit::A.magnitude
+    _ = \A.ModuleSelectorTestingKit::magnitude
+
     _ = #ModuleSelectorTestingKit::ExprMacro
   }
 
@@ -283,6 +295,13 @@ extension D: @retroactive Swift::Equatable {
     // expected-note@-2 {{did you mean module 'main'?}} {{10-15=main}}
 
     Swift::fatalError()
+
+    _ = \Swift::A.magnitude
+    // expected-error@-1 {{'A' is not imported through module 'Swift'}}
+    // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{10-15=ModuleSelectorTestingKit}}
+    _ = \A.Swift::magnitude
+    // expected-error@-1 {{'magnitude' is not imported through module 'Swift'}}
+    // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{none}}
 
     _ = #Swift::ExprMacro
     // expected-error@-1 {{no macro named 'Swift::ExprMacro'}}
