@@ -2564,6 +2564,12 @@ bool ModuleDecl::getRequiredBystandersIfCrossImportOverlay(
   return false;
 }
 
+Identifier ModuleDecl::getNameForModuleSelector() {
+  if (auto declaring = getDeclaringModuleIfCrossImportOverlay())
+    return declaring->getName();
+  return this->getName();
+}
+
 bool ModuleDecl::isClangHeaderImportModule() const {
   auto importer = getASTContext().getClangModuleLoader();
   if (!importer)
