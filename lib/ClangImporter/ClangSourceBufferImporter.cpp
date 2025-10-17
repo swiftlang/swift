@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangSourceBufferImporter.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "clang/Basic/SourceManager.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -47,18 +48,19 @@ SourceLoc ClangSourceBufferImporter::resolveSourceLocation(
   if (mirrorIter != mirroredBuffers.end()) {
     mirrorID = mirrorIter->second;
   } else {
+    StringRef bufIdent = buffer.getBufferIdentifier();
     std::unique_ptr<llvm::MemoryBuffer> mirrorBuffer{
-      llvm::MemoryBuffer::getMemBuffer(buffer.getBuffer(),
-                                       buffer.getBufferIdentifier(),
-                                       /*RequiresNullTerminator=*/true)
-    };
+        llvm::MemoryBuffer::getMemBuffer(buffer.getBuffer(), bufIdent,
+                                         /*RequiresNullTerminator=*/true)};
     // The same underlying file can exist as multiple clang file IDs. E.g. as
     // part of the its own module, and then later loaded as an import in another
-    // module.
-    auto IDOpt = swiftSourceManager.getIDForBufferIdentifier(buffer.getBufferIdentifier());
-    if (IDOpt.has_value())
+    // module. Don't deduplicate files like "<module-imports>" that have
+    // different contents in different modules, despite the same name.
+    auto IDOpt = swiftSourceManager.getIDForBufferIdentifier(bufIdent);
+    if (IDOpt.has_value() && clangSrcMgr.getFileEntryForID(clangFileID)) {
+      CONDITIONAL_ASSERT(llvm::sys::fs::exists(bufIdent));
       mirrorID = IDOpt.value();
-    else
+    } else
       mirrorID = swiftSourceManager.addNewSourceBuffer(std::move(mirrorBuffer));
     mirroredBuffers[buffer.getBufferStart()] = mirrorID;
   }
