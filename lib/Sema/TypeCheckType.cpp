@@ -3958,8 +3958,9 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     }
 
     // Validate the presence of ownership for a noncopyable parameter.
+    // FIXME: This won't diagnose if the type contains unbound generics.
     if (inStage(TypeResolutionStage::Interface)
-        && !ty->hasUnboundGenericType()) {
+        && !ty->hasUnboundGenericType() && !ty->hasTypeVariable()) {
       diagnoseMissingOwnership(ownership, eltTypeRepr, ty, resolution);
 
       // @_staticExclusiveOnly types cannot be passed as 'inout' in function
@@ -5709,6 +5710,7 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
   }
 
   // do not allow move-only types as the element of a vararg
+  // FIXME: This does not correctly handle type variables and unbound generics.
   if (inStage(TypeResolutionStage::Interface)) {
     auto contextTy = GenericEnvironment::mapTypeIntoContext(
         resolution.getGenericSignature().getGenericEnvironment(), element);
@@ -5895,6 +5897,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     // Track the presence of a noncopyable field for diagnostic purposes only.
     // We don't need to re-diagnose if a tuple contains another tuple, though,
     // since we should've diagnosed the inner tuple already.
+    // FIXME: This won't diagnose if the type contains unbound generics
     if (!ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples) &&
         !options.contains(TypeResolutionFlags::SILMode) &&
         inStage(TypeResolutionStage::Interface) &&
