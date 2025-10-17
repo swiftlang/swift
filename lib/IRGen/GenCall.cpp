@@ -5269,7 +5269,7 @@ StackAddress irgen::emitAllocCoroStaticFrame(IRGenFunction &IGF,
   //       respectively.
   auto retval =
       IGF.emitDynamicAlloca(IGF.IGM.Int8Ty, size, Alignment(MaximumAlignment),
-                            /*allowTaskAlloc*/ true, "caller-coro-frame");
+                            AllowsTaskAlloc, "caller-coro-frame");
   IGF.Builder.CreateLifetimeStart(retval.getAddress(),
                                   Size(-1) /*dynamic size*/);
   return retval;

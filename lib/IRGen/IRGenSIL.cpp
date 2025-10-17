@@ -3721,8 +3721,8 @@ static void emitBuiltinStackAlloc(IRGenSILFunction &IGF,
     return;
   }
 
-  auto stackAddress = IGF.emitDynamicAlloca(IGF.IGM.Int8Ty, size, align,
-                                            false, "temp_alloc");
+  auto stackAddress = IGF.emitDynamicAlloca(
+      IGF.IGM.Int8Ty, size, align, DoesNotAllowTaskAlloc, "temp_alloc");
   IGF.setLoweredStackAddress(i, stackAddress);
 }
 

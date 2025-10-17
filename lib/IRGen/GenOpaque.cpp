@@ -559,13 +559,14 @@ irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
 StackAddress IRGenFunction::emitDynamicAlloca(SILType T,
                                               const llvm::Twine &name) {
   llvm::Value *size = emitLoadOfSize(*this, T);
-  return emitDynamicAlloca(IGM.Int8Ty, size, Alignment(16), true, name);
+  return emitDynamicAlloca(IGM.Int8Ty, size, Alignment(16), AllowsTaskAlloc,
+                           name);
 }
 
 StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
                                               llvm::Value *arraySize,
                                               Alignment align,
-                                              bool allowTaskAlloc,
+                                              AllowsTaskAlloc_t allowTaskAlloc,
                                               const llvm::Twine &name) {
   // Async functions call task alloc.
   if (allowTaskAlloc && isAsync()) {
