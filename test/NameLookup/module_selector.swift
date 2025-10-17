@@ -12,7 +12,6 @@
 // * Key paths
 // * Key path dynamic member lookup
 // * Custom type attributes (and coverage of type attrs generally is sparse)
-// * Macros
 //
 // It also might not cover all combinations of name lookup paths and inputs.
 
@@ -56,6 +55,8 @@ extension A: @retroactive Swift::Equatable {
     self.main::myNegate()
 
     Swift::fatalError()
+
+    _ = #ModuleSelectorTestingKit::ExprMacro
   }
 
   // FIXME: Can we test @convention(witness_method:)?
@@ -117,7 +118,13 @@ extension B: @retroactive main::Equatable {
 
     main::fatalError()
     // FIXME improve: expected-error@-1 {{cannot find 'main::fatalError' in scope}}
+
+    _ = #main::ExprMacro
+    // expected-error@-1 {{no macro named 'main::ExprMacro'}}
   }
+
+  @main::PeerMacro func thingy() {}
+  // expected-error@-1 {{unknown attribute 'main::PeerMacro'}}
 
   // FIXME: Can we test @convention(witness_method:)?
 }
@@ -174,7 +181,12 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
 
     ModuleSelectorTestingKit::fatalError()
     // FIXME improve: expected-error@-1 {{cannot find 'ModuleSelectorTestingKit::fatalError' in scope}}
+
+    _ = #ModuleSelectorTestingKit::ExprMacro
   }
+
+  @ModuleSelectorTestingKit::PeerMacro func thingy() {}
+  // expected-error@-1 {{external macro implementation type 'Fnord.PeerMacro' could not be found for macro 'PeerMacro()'; plugin for module 'Fnord' not found}}
 
   // FIXME: Can we test @convention(witness_method:)?
 }
@@ -229,7 +241,13 @@ extension D: @retroactive Swift::Equatable {
     // FIXME improve: expected-error@-1 {{value of type 'D' has no member 'Swift::myNegate'}}
 
     Swift::fatalError()
+
+    _ = #Swift::ExprMacro
+    // expected-error@-1 {{no macro named 'Swift::ExprMacro'}}
   }
+
+  @Swift::PeerMacro func thingy() {}
+  // expected-error@-1 {{unknown attribute 'Swift::PeerMacro'}}
 
   // FIXME: Can we test @convention(witness_method:)?
 }
@@ -247,25 +265,25 @@ struct AvailableUser {
   @available(macOS 10.15, *) var use1: String { "foo" }
 
   @main::available() var use2
-  // FIXME improve: expected-error@-1 {{unknown attribute 'available'}}
+  // FIXME improve: expected-error@-1 {{unknown attribute 'main::available'}}
   // FIXME suppress: expected-error@-2 {{type annotation missing in pattern}}
 
   @ModuleSelectorTestingKit::available() var use4
   // no-error
 
   @Swift::available() var use5
-  // FIXME improve: expected-error@-1 {{unknown attribute 'available'}}
+  // FIXME improve: expected-error@-1 {{unknown attribute 'Swift::available'}}
   // FIXME suppress: expected-error@-2 {{type annotation missing in pattern}}
 }
 
 func builderUser2(@main::MyBuilder fn: () -> Void) {}
-// FIXME improve: expected-error@-1 {{unknown attribute 'MyBuilder'}}
+// FIXME improve: expected-error@-1 {{unknown attribute 'main::MyBuilder'}}
 
 func builderUser3(@ModuleSelectorTestingKit::MyBuilder fn: () -> Void) {}
 // no-error
 
 func builderUser4(@Swift::MyBuilder fn: () -> Void) {}
-// FIXME improve: expected-error@-1 {{unknown attribute 'MyBuilder'}}
+// FIXME improve: expected-error@-1 {{unknown attribute 'Swift::MyBuilder'}}
 
 // Error cases
 
