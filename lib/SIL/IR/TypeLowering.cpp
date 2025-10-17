@@ -2398,7 +2398,7 @@ namespace {
                                   AbstractionPattern origType,
                                   IsTypeExpansionSensitive_t isSensitive) {
       auto silType = SILType::getPrimitiveObjectType(type);
-      auto properties = SILTypeProperties();
+      auto properties = RecursiveProperties();
       properties.setTypeExpansionSensitive(isSensitive);
       properties.setNonTrivial();
       properties.setLexical(IsLexical);
