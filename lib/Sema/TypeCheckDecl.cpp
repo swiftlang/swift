@@ -2565,6 +2565,11 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
           infoBuilder = infoBuilder.withSendingResult();
       }
 
+      if (ExternAttr::find(D->getAttrs(), ExternKind::C)) {
+        infoBuilder = infoBuilder.withRepresentation(
+          FunctionTypeRepresentation::CFunctionPointer);
+      }
+
       // Lifetime dependencies only apply to the outer function type.
       if (!hasSelf && lifetimeDependenceInfo.has_value()) {
         infoBuilder =
