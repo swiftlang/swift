@@ -4,6 +4,10 @@
 // This test makes sure that we can properly fold the mask for the witness table
 // when we have a #isolation.
 
+// PLEASE READ THIS! On 6.2, we do not eliminate hops for
+// nonisolated(nonsending) to be conservative. So we have to pattern match
+// differently than on main!
+
 // REQUIRES: concurrency
 // REQUIRES: CODEGENERATOR=AArch64
 // REQUIRES: PTRSIZE=64
@@ -22,11 +26,21 @@ func implicitParam(_ x: (any Actor)? = #isolation) {
 
 // #isolation via direct usage
 //
-// TBI: define swifttailcc void @"$s18isolation_macro_ir46nonisolatedNonsendingUsePoundIsolationDirectlyyyYaF"(ptr swiftasync %0, i64 %1, i64 [[SECOND_WORD:%.*]])
+// TBI: define internal swifttailcc void @"$s18isolation_macro_ir46nonisolatedNonsendingUsePoundIsolationDirectlyyyYaFTY0_"(ptr swiftasync [[ASYNC_CONTEXT:%.*]])
+// TBI: [[ASYNC_FRAME_PTR:%.*]] = getelementptr inbounds i8, ptr [[ASYNC_CONTEXT]], i32 16
+// TBI: [[SECOND_WORD_ADDR:%.*]] = getelementptr inbounds %"{{.*}}.Frame", ptr [[ASYNC_FRAME_PTR]], i32 0, i32 3
+// TBI: [[SECOND_WORD:%.*]] = load i64, ptr [[SECOND_WORD_ADDR]]
+// TBI: [[FIRST_WORD_ADDR:%.*]] = getelementptr inbounds %"{{.*}}.Frame", ptr [[ASYNC_FRAME_PTR]], i32 0, i32 2
+// TBI: [[FIRST_WORD:%.*]] = load i64, ptr [[FIRST_WORD_ADDR]]
 // TBI: [[MASKED_SECOND_WORD:%.*]] = and i64 [[SECOND_WORD]], -3458764513820540929
-// TBI: call swiftcc void @"$s18isolation_macro_ir8useActor3isoyScA_pSg_tF"(i64 %1, i64 [[MASKED_SECOND_WORD]])
+// TBI: call swiftcc void @"$s18isolation_macro_ir8useActor3isoyScA_pSg_tF"(i64 [[FIRST_WORD]], i64 [[MASKED_SECOND_WORD]])
 
-// NO-TBI: define swifttailcc void @"$s18isolation_macro_ir46nonisolatedNonsendingUsePoundIsolationDirectlyyyYaF"(ptr swiftasync %0, i64 [[FIRST_WORD:%.*]], i64 [[SECOND_WORD:%.*]])
+// NO-TBI: define internal swifttailcc void @"$s18isolation_macro_ir46nonisolatedNonsendingUsePoundIsolationDirectlyyyYaFTY0_"(ptr swiftasync [[ASYNC_CONTEXT:%.*]])
+// NO-TBI: [[ASYNC_FRAME_PTR:%.*]] = getelementptr inbounds i8, ptr [[ASYNC_CONTEXT]], i32 16
+// NO-TBI: [[SECOND_WORD_ADDR:%.*]] = getelementptr inbounds %"{{.*}}.Frame", ptr [[ASYNC_FRAME_PTR]], i32 0, i32 3
+// NO-TBI: [[SECOND_WORD:%.*]] = load i64, ptr [[SECOND_WORD_ADDR]]
+// NO-TBI: [[FIRST_WORD_ADDR:%.*]] = getelementptr inbounds %"{{.*}}.Frame", ptr [[ASYNC_FRAME_PTR]], i32 0, i32 2
+// NO-TBI: [[FIRST_WORD:%.*]] = load i64, ptr [[FIRST_WORD_ADDR]]
 // NO-TBI: [[MASKED_SECOND_WORD:%.*]] = and i64 [[SECOND_WORD]], -4
 // NO-TBI: call swiftcc void @"$s18isolation_macro_ir8useActor3isoyScA_pSg_tF"(i64 [[FIRST_WORD]], i64 [[MASKED_SECOND_WORD]])
 
@@ -37,13 +51,23 @@ public nonisolated(nonsending) func nonisolatedNonsendingUsePoundIsolationDirect
 
 // #isolation via default arg
 //
-// TBI: define swifttailcc void @"$s18isolation_macro_ir45nonisolatedNonsendingPoundIsolationDefaultArgyyYaF"(ptr swiftasync {{%.*}}, i64 {{%.*}}, i64 [[WORD_2:%.*]])
-// TBI: [[MASKED_WORD_2:%.*]] = and i64 [[WORD_2]], -3458764513820540929
-// TBI: call swiftcc void @"$s18isolation_macro_ir13implicitParamyyScA_pSgF"(i64 {{%.*}}, i64 [[MASKED_WORD_2]])
+// TBI: define internal swifttailcc void @"$s18isolation_macro_ir45nonisolatedNonsendingPoundIsolationDefaultArgyyYaFTY0_"(ptr swiftasync [[ASYNC_CONTEXT:%.*]])
+// TBI: [[ASYNC_FRAME_PTR:%.*]] = getelementptr inbounds i8, ptr [[ASYNC_CONTEXT]], i32 16
+// TBI: [[SECOND_WORD_ADDR:%.*]] = getelementptr inbounds %"{{.*}}.Frame", ptr [[ASYNC_FRAME_PTR]], i32 0, i32 2
+// TBI: [[SECOND_WORD:%.*]] = load i64, ptr [[SECOND_WORD_ADDR]]
+// TBI: [[FIRST_WORD_ADDR:%.*]] = getelementptr inbounds %"{{.*}}.Frame", ptr [[ASYNC_FRAME_PTR]], i32 0, i32 1
+// TBI: [[FIRST_WORD:%.*]] = load i64, ptr [[FIRST_WORD_ADDR]]
+// TBI: [[MASKED_SECOND_WORD:%.*]] = and i64 [[SECOND_WORD]], -3458764513820540929
+// TBI: call swiftcc void @"$s18isolation_macro_ir13implicitParamyyScA_pSgF"(i64 [[FIRST_WORD]], i64 [[MASKED_SECOND_WORD]])
 
-// NO-TBI: define swifttailcc void @"$s18isolation_macro_ir45nonisolatedNonsendingPoundIsolationDefaultArgyyYaF"(ptr swiftasync %0, i64 [[WORD_1:%.*]], i64 [[WORD_2:%.*]])
-// NO-TBI: [[MASKED_WORD_2:%.*]] = and i64 [[WORD_2]], -4
-// NO-TBI: call swiftcc void @"$s18isolation_macro_ir13implicitParamyyScA_pSgF"(i64 {{%.*}}, i64 [[MASKED_WORD_2]])
+// NO-TBI: define internal swifttailcc void @"$s18isolation_macro_ir45nonisolatedNonsendingPoundIsolationDefaultArgyyYaFTY0_"(ptr swiftasync [[ASYNC_CONTEXT:%.*]])
+// NO-TBI: [[ASYNC_FRAME_PTR:%.*]] = getelementptr inbounds i8, ptr [[ASYNC_CONTEXT]], i32 16
+// NO-TBI: [[SECOND_WORD_ADDR:%.*]] = getelementptr inbounds %"{{.*}}.Frame", ptr [[ASYNC_FRAME_PTR]], i32 0, i32 2
+// NO-TBI: [[SECOND_WORD:%.*]] = load i64, ptr [[SECOND_WORD_ADDR]]
+// NO-TBI: [[FIRST_WORD_ADDR:%.*]] = getelementptr inbounds %"{{.*}}.Frame", ptr [[ASYNC_FRAME_PTR]], i32 0, i32 1
+// NO-TBI: [[FIRST_WORD:%.*]] = load i64, ptr [[FIRST_WORD_ADDR]]
+// NO-TBI: [[MASKED_SECOND_WORD:%.*]] = and i64 [[SECOND_WORD]], -4
+// NO-TBI: call swiftcc void @"$s18isolation_macro_ir13implicitParamyyScA_pSgF"(i64 [[FIRST_WORD]], i64 [[MASKED_SECOND_WORD]])
 public nonisolated(nonsending) func nonisolatedNonsendingPoundIsolationDefaultArg() async {
   implicitParam()
 }
@@ -52,13 +76,23 @@ public nonisolated(nonsending) func nonisolatedNonsendingPoundIsolationDefaultAr
 public nonisolated(nonsending) func calleeFunction() async {
 }
 
-// TBI: define swifttailcc void @"$s18isolation_macro_ir14callerFunctionyyYaF"(ptr swiftasync %0, i64 %1, i64 [[WORD_2:%.*]])
-// TBI: [[MASKED_WORD_2:%.*]] = and i64 [[WORD_2]], -3458764513820540929
-// TBI: musttail call swifttailcc void @"$s18isolation_macro_ir14calleeFunctionyyYaF"(ptr swiftasync {{%.*}}, i64 {{%.*}}, i64 [[MASKED_WORD_2]])
+// TBI: define internal swifttailcc void @"$s18isolation_macro_ir14callerFunctionyyYaFTY0_"(ptr swiftasync [[ASYNC_CONTEXT:%.*]])
+// TBI: [[ASYNC_FRAME_PTR:%.*]] = getelementptr inbounds i8, ptr [[ASYNC_CONTEXT]], i32 16
+// TBI: [[SECOND_WORD_ADDR:%.*]] = getelementptr inbounds %"{{.*}}.Frame", ptr [[ASYNC_FRAME_PTR]], i32 0, i32 2
+// TBI: [[SECOND_WORD:%.*]] = load i64, ptr [[SECOND_WORD_ADDR]]
+// TBI: [[MASKED_SECOND_WORD:%.*]] = and i64 [[SECOND_WORD]], -3458764513820540929
+// TBI: [[FIRST_WORD_ADDR:%.*]] = getelementptr inbounds %"{{.*}}.Frame", ptr [[ASYNC_FRAME_PTR]], i32 0, i32 1
+// TBI: [[FIRST_WORD:%.*]] = load i64, ptr [[FIRST_WORD_ADDR]]
+// TBI: musttail call swifttailcc void @"$s18isolation_macro_ir14calleeFunctionyyYaF"(ptr swiftasync {{%.*}}, i64 [[FIRST_WORD]], i64 [[MASKED_SECOND_WORD]])
 
-// NO-TBI: define swifttailcc void @"$s18isolation_macro_ir14callerFunctionyyYaF"(ptr swiftasync %0, i64 %1, i64 [[WORD:%.*]])
-// NO-TBI: [[MASKED_WORD:%.*]] = and i64 [[WORD]], -4
-// NO-TBI: musttail call swifttailcc void @"$s18isolation_macro_ir14calleeFunctionyyYaF"(ptr swiftasync {{%.*}}, i64 {{%.*}}, i64 [[MASKED_WORD]])
+// NO-TBI: define internal swifttailcc void @"$s18isolation_macro_ir14callerFunctionyyYaFTY0_"(ptr swiftasync [[ASYNC_CONTEXT:%.*]])
+// NO-TBI: [[ASYNC_FRAME_PTR:%.*]] = getelementptr inbounds i8, ptr [[ASYNC_CONTEXT]], i32 16
+// NO-TBI: [[SECOND_WORD_ADDR:%.*]] = getelementptr inbounds %"{{.*}}.Frame", ptr [[ASYNC_FRAME_PTR]], i32 0, i32 2
+// NO-TBI: [[SECOND_WORD:%.*]] = load i64, ptr [[SECOND_WORD_ADDR]]
+// NO-TBI: [[MASKED_SECOND_WORD:%.*]] = and i64 [[SECOND_WORD]], -4
+// NO-TBI: [[FIRST_WORD_ADDR:%.*]] = getelementptr inbounds %"{{.*}}.Frame", ptr [[ASYNC_FRAME_PTR]], i32 0, i32 1
+// NO-TBI: [[FIRST_WORD:%.*]] = load i64, ptr [[FIRST_WORD_ADDR]]
+// NO-TBI: musttail call swifttailcc void @"$s18isolation_macro_ir14calleeFunctionyyYaF"(ptr swiftasync {{%.*}}, i64 [[FIRST_WORD]], i64 [[MASKED_SECOND_WORD]])
 @inline(never)
 public nonisolated(nonsending) func callerFunction() async {
   await calleeFunction()
