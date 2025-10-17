@@ -187,6 +187,11 @@ bool TypeBase::isRootParameterPack() {
          t->castTo<GenericTypeParamType>()->isParameterPack();
 }
 
+bool TypeBase::isParameterPackExpansion() {
+  Type t(this);
+  return t->getKind() == TypeKind::PackExpansion;
+}
+
 PackType *TypeBase::getPackSubstitutionAsPackType() {
   if (auto pack = getAs<PackType>()) {
     return pack;
