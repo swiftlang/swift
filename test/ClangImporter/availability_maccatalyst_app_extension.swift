@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target %target-cpu-apple-ios13.1-macabi -application-extension -typecheck -verify -I %S/Inputs/custom-modules %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target %target-cpu-apple-ios13.1-macabi -application-extension -typecheck -verify -verify-ignore-unrelated -I %S/Inputs/custom-modules %s
 
 // REQUIRES: maccatalyst_support
 
