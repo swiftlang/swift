@@ -1,3 +1,6 @@
+// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
+
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift -emit-module %s -enable-experimental-feature Lifetimes -enable-experimental-feature LifetimeDependence -o %t/%target-library-name(Test) -module-name Test -emit-library
