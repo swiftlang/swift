@@ -356,6 +356,7 @@ namespace {
     IMPL(BuiltinPackIndex, Trivial)
     IMPL(BuiltinNativeObject, Reference)
     IMPL(BuiltinBridgeObject, Reference)
+    IMPL(BuiltinImplicitActor, Reference)
     IMPL(BuiltinVector, Trivial)
     IMPL(SILToken, Trivial)
     IMPL(AnyMetatype, Trivial)
@@ -2390,6 +2391,19 @@ namespace {
       auto silType = SILType::getPrimitiveAddressType(type);
       return new (TC)
           UnsafeValueBufferTypeLowering(silType, Expansion, isSensitive);
+    }
+
+    TypeLowering *
+    visitBuiltinImplicitActorType(CanBuiltinImplicitActorType type,
+                                  AbstractionPattern origType,
+                                  IsTypeExpansionSensitive_t isSensitive) {
+      auto silType = SILType::getPrimitiveObjectType(type);
+      auto properties = RecursiveProperties();
+      properties.setTypeExpansionSensitive(isSensitive);
+      properties.setNonTrivial();
+      properties.setLexical(IsLexical);
+      return new (TC)
+          MiscNontrivialTypeLowering(silType, properties, Expansion);
     }
 
     TypeLowering *visitPackType(CanPackType packType,

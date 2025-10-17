@@ -2755,6 +2755,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createDestructureStruct(Loc, Operand);
     break;
   }
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst: {
+    assert(RecordKind == SIL_ONE_OPERAND);
+    auto Ty = MF->getType(TyID);
+    ResultInst = Builder.createImplicitActorToOpaqueIsolationCast(
+        Loc, getLocalValue(Builder.maybeGetFunction(), ValID,
+                           getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    break;
+  }
   case SILInstructionKind::UncheckedOwnershipConversionInst: {
     auto Ty = MF->getType(TyID);
     auto ResultKind = decodeValueOwnership(Attr);

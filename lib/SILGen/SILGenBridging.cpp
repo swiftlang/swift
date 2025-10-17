@@ -1667,23 +1667,22 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       isolatedParameter && isolatedParameter->hasOption(SILParameterInfo::ImplicitLeading)) {
     assert(F.isAsync() && "Can only be async");
     assert(isolation && "No isolation?!");
-    switch (isolation->getKind()) {
-    case ActorIsolation::Unspecified:
-    case ActorIsolation::Nonisolated:
-    case ActorIsolation::NonisolatedUnsafe:
-    case ActorIsolation::CallerIsolationInheriting:
-      args.push_back(emitNonIsolatedIsolation(loc).getValue());
-      break;
-    case ActorIsolation::ActorInstance:
-      llvm::report_fatal_error("Should never see this");
-      break;
-    case ActorIsolation::GlobalActor:
-      args.push_back(emitLoadGlobalActorExecutor(isolation->getGlobalActor()));
-      break;
-    case ActorIsolation::Erased:
-      llvm::report_fatal_error("Should never see this");
-      break;
-    }
+    auto value = [&]() -> SILValue {
+      switch (isolation->getKind()) {
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
+      case ActorIsolation::CallerIsolationInheriting:
+        return emitNonIsolatedIsolation(loc).getValue();
+      case ActorIsolation::ActorInstance:
+        llvm::report_fatal_error("Should never see this");
+      case ActorIsolation::GlobalActor:
+        return emitLoadGlobalActorExecutor(isolation->getGlobalActor());
+      case ActorIsolation::Erased:
+        llvm::report_fatal_error("Should never see this");
+      }
+    }();
+    args.push_back(B.convertToImplicitActor(loc, value));
   }
 
   // Bridge the arguments.

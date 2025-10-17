@@ -1086,10 +1086,10 @@ public:
             what + " must be Optional<Builtin.Executor>");
   }
 
-  /// Require the operand to be an object of some type that conforms to
-  /// Actor or DistributedActor.
-  void requireAnyActorType(SILValue value, bool allowOptional,
-                           bool allowExecutor, const Twine &what) {
+  /// Require the operand to be an object of some type that can be used to hop
+  /// since we can extract an executor from it.
+  void canExtractExecutorFrom(SILValue value, bool allowOptional,
+                              bool allowExecutor, const Twine &what) {
     auto type = value->getType();
     require(type.isObject(), what + " must be an object type");
 
@@ -1100,7 +1100,7 @@ public:
     }
     if (allowExecutor && isa<BuiltinExecutorType>(actorType))
       return;
-    require(actorType->isAnyActorType(),
+    require(actorType->canBeIsolatedTo(),
             what + " must be some kind of actor type");
   }
 
@@ -2839,6 +2839,25 @@ public:
             "cannot convert ownership of an address");
     require(uoci->getType() == uoci->getOperand()->getType(),
             "converting ownership does not affect the type");
+  }
+
+  void checkImplicitActorToOpaqueIsolationCastInst(
+      ImplicitActorToOpaqueIsolationCastInst *igi) {
+    if (F.hasOwnership()) {
+      require(igi->getValue()->getOwnershipKind() == OwnershipKind::Guaranteed,
+              "implicitactor_to_optionalactor_cast's operand should have "
+              "guaranteed ownership");
+      require(igi->getOwnershipKind() == OwnershipKind::Guaranteed,
+              "result value should have guaranteed ownership");
+    }
+
+    require(igi->getValue()->getType() ==
+                SILType::getBuiltinImplicitActorType(
+                    igi->getFunction()->getASTContext()),
+            "operand should be an implicit actor type");
+    require(igi->getType() == SILType::getOpaqueIsolationType(
+                                  igi->getFunction()->getASTContext()),
+            "result must be Optional<any Actor>");
   }
 
   template <class AI>
@@ -5839,20 +5858,20 @@ public:
       requireOptionalExecutorType(executor,
                                   "hop_to_executor operand in lowered SIL");
     } else {
-      requireAnyActorType(executor,
-                          /*allow optional*/ true,
-                          /*allow executor*/ true,
-                          "hop_to_executor operand");
+      canExtractExecutorFrom(executor,
+                             /*allow optional*/ true,
+                             /*allow executor*/ true,
+                             "hop_to_executor operand");
     }
   }
 
   void checkExtractExecutorInst(ExtractExecutorInst *EEI) {
     requireObjectType(BuiltinExecutorType, EEI,
                       "extract_executor result");
-    requireAnyActorType(EEI->getExpectedExecutor(),
-                        /*allow optional*/ false,
-                        /*allow executor*/ false,
-                        "extract_executor operand");
+    canExtractExecutorFrom(EEI->getExpectedExecutor(),
+                           /*allow optional*/ false,
+                           /*allow executor*/ false,
+                           "extract_executor operand");
     if (EEI->getModule().getStage() == SILStage::Lowered) {
       require(false,
               "extract_executor instruction should have been lowered away");
@@ -7264,7 +7283,7 @@ public:
         auto *actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
         auto *distributedProtocol =
             ctx.getProtocol(KnownProtocolKind::DistributedActor);
-        require(argType->isAnyActorType() ||
+        require(argType->canBeIsolatedTo() ||
                     genericSig->requiresProtocol(argType, actorProtocol) ||
                     genericSig->requiresProtocol(argType, distributedProtocol),
                 "Only any actor types can be isolated");

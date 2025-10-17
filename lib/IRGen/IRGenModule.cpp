@@ -840,6 +840,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                                          CoroDeallocateFnTy->getPointerTo(),
                                      });
   CoroAllocatorPtrTy = CoroAllocatorTy->getPointerTo();
+  SwiftImplicitActorType =
+      createStructType(*this, "swift.implicit_isolated_actor_type",
+                       {
+                           IntPtrTy, // ref counted pointer
+                           IntPtrTy, // witness table pointer
+                       });
 }
 
 IRGenModule::~IRGenModule() {

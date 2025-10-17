@@ -1459,6 +1459,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       auto loc = cast<LocatableType>(tybase);
       return appendType(loc->getSinglyDesugaredType(), sig, forDecl);
     }
+    case TypeKind::BuiltinImplicitActor:
+      return appendOperator("BA");
     case TypeKind::BuiltinFixedArray: {
       auto bfa = cast<BuiltinFixedArrayType>(tybase);
       appendType(bfa->getSize(), sig, forDecl);

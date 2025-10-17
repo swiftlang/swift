@@ -4582,6 +4582,8 @@ int main(int argc, char *argv[]) {
     InitInvok.computeCXXStdlibOptions();
   }
 
+  InitInvok.computeAArch64TBIOptions();
+
   if (!options::InProcessPluginServerPath.empty()) {
     InitInvok.getSearchPathOptions().InProcessPluginServerPath =
         options::InProcessPluginServerPath;

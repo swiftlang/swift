@@ -380,6 +380,13 @@ setBridgingHeaderFromFrontendOptions(ClangImporterOptions &ImporterOpts,
       FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
 }
 
+void CompilerInvocation::computeAArch64TBIOptions() {
+  auto &LLVMArgs = getFrontendOptions().LLVMArgs;
+  auto aarch64_use_tbi =
+      std::find(LLVMArgs.begin(), LLVMArgs.end(), "-aarch64-use-tbi");
+  IRGenOpts.HasAArch64TBI = aarch64_use_tbi != LLVMArgs.end();
+}
+
 void CompilerInvocation::computeCXXStdlibOptions() {
   // The MSVC driver in Clang is not aware of the C++ stdlib, and currently
   // always assumes libstdc++, which is incorrect: the Microsoft stdlib is
@@ -4118,6 +4125,8 @@ bool CompilerInvocation::parseArgs(
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
   setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
   computeCXXStdlibOptions();
+  computeAArch64TBIOptions();
+
   if (LangOpts.hasFeature(Feature::Embedded)) {
     IRGenOpts.InternalizeAtLink = true;
     IRGenOpts.DisableLegacyTypeInfo = true;
