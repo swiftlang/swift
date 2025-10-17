@@ -23,7 +23,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Strings.h"
-#include "clang/Lex/HeaderSearchOptions.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Path.h"
 using namespace swift;
@@ -780,18 +779,16 @@ void ModuleDependenciesCache::recordDependency(
 }
 
 void ModuleDependenciesCache::recordClangDependencies(
-    const clang::tooling::dependencies::ModuleDepsGraph &dependencies,
-    DiagnosticEngine &diags,
-    BridgeClangDependencyCallback bridgeClangModule) {
+    ModuleDependencyVector dependencies, DiagnosticEngine &diags) {
   for (const auto &dep : dependencies) {
-    auto depID =
-        ModuleDependencyID{dep.ID.ModuleName, ModuleDependencyKind::Clang};
-    if (hasDependency(depID)) {
+    ASSERT(dep.first.Kind == ModuleDependencyKind::Clang);
+    auto newClangModuleDetails = dep.second.getAsClangModule();
+    if (hasDependency(dep.first)) {
       auto priorClangModuleDetails =
-          findKnownDependency(depID).getAsClangModule();
-      DEBUG_ASSERT(priorClangModuleDetails);
+          findKnownDependency(dep.first).getAsClangModule();
+      DEBUG_ASSERT(priorClangModuleDetails && newClangModuleDetails);
       auto priorContextHash = priorClangModuleDetails->contextHash;
-      auto newContextHash = dep.ID.ContextHash;
+      auto newContextHash = newClangModuleDetails->contextHash;
       if (priorContextHash != newContextHash) {
         // This situation means that within the same scanning action, Clang
         // Dependency Scanner has produced two different variants of the same
@@ -802,9 +799,8 @@ void ModuleDependenciesCache::recordClangDependencies(
         //
         // Emit a failure diagnostic here that is hopefully more actionable
         // for the time being.
-        diags.diagnose(SourceLoc(),
-                           diag::dependency_scan_unexpected_variant,
-                           dep.ID.ModuleName);
+        diags.diagnose(SourceLoc(), diag::dependency_scan_unexpected_variant,
+                       dep.first.ModuleName);
         diags.diagnose(
             SourceLoc(),
             diag::dependency_scan_unexpected_variant_context_hash_note,
@@ -812,13 +808,13 @@ void ModuleDependenciesCache::recordClangDependencies(
         diags.diagnose(
             SourceLoc(),
             diag::dependency_scan_unexpected_variant_module_map_note,
-            priorClangModuleDetails->moduleMapFile, dep.ClangModuleMapFile);
+            priorClangModuleDetails->moduleMapFile,
+            newClangModuleDetails->moduleMapFile);
 
-        auto newClangModuleDetails = bridgeClangModule(dep).getAsClangModule();
         auto diagnoseExtraCommandLineFlags =
             [&diags](const ClangModuleDependencyStorage *checkModuleDetails,
-                   const ClangModuleDependencyStorage *baseModuleDetails,
-                   bool isNewlyDiscovered) -> void {
+                     const ClangModuleDependencyStorage *baseModuleDetails,
+                     bool isNewlyDiscovered) -> void {
           std::unordered_set<std::string> baseCommandLineSet(
               baseModuleDetails->buildCommandLine.begin(),
               baseModuleDetails->buildCommandLine.end());
@@ -835,8 +831,9 @@ void ModuleDependenciesCache::recordClangDependencies(
                                       priorClangModuleDetails, false);
       }
     } else {
-      recordDependency(dep.ID.ModuleName, bridgeClangModule(dep));
-      addSeenClangModule(dep.ID);
+      recordDependency(dep.first.ModuleName, dep.second);
+      addSeenClangModule(clang::tooling::dependencies::ModuleID{
+        dep.first.ModuleName, newClangModuleDetails->contextHash});
     }
   }
 }
