@@ -331,6 +331,7 @@ class ModuleSelectorCorrection {
 public:
   ModuleSelectorCorrection(const LookupResult &candidates);
   ModuleSelectorCorrection(const LookupTypeResult &candidates);
+  ModuleSelectorCorrection(const SmallVectorImpl<constraints::OverloadChoice> &candidates);
 
   /// Emit an error and warnings if there were any candidates.
   ///

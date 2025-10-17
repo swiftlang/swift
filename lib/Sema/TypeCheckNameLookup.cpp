@@ -1188,6 +1188,15 @@ ModuleSelectorCorrection(const LookupTypeResult &candidates) {
   }
 }
 
+ModuleSelectorCorrection::
+ModuleSelectorCorrection(const SmallVectorImpl<constraints::OverloadChoice> &candidates) {
+  for (auto result : candidates) {
+    auto owningModule = result.getDecl()->getModuleContext();
+    candidateModules.insert(
+      { owningModule->getNameForModuleSelector(), CandidateKind::ContextFree });
+  }
+}
+
 bool ModuleSelectorCorrection::diagnose(ASTContext &ctx,
                                         DeclNameLoc nameLoc,
                                         DeclNameRef originalName) const {
