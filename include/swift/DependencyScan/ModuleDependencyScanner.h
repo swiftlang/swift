@@ -17,6 +17,7 @@
 #include "swift/Serialization/ScanningLoaders.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "llvm/CAS/CASReference.h"
+#include "llvm/CAS/CASFileSystem.h"
 #include "llvm/Support/ThreadPool.h"
 
 namespace swift {
@@ -249,7 +250,7 @@ public:
     return *CAS;
   }
 
-  llvm::vfs::FileSystem &getSharedCachingFS() const {
+  llvm::cas::CASBackedFileSystem &getSharedCachingFS() const {
     assert(CacheFS && "Expect CacheFS available");
     return *CacheFS;
   }
@@ -358,7 +359,7 @@ private:
   /// File prefix mapper.
   std::unique_ptr<llvm::PrefixMapper> PrefixMapper;
   /// CAS file system for loading file content.
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> CacheFS;
+  llvm::IntrusiveRefCntPtr<llvm::cas::CASBackedFileSystem> CacheFS;
   /// Protect worker access.
   std::mutex WorkersLock;
   /// Count of filesystem queries performed
