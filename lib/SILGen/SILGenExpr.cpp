@@ -477,9 +477,8 @@ namespace {
     RValue visitCollectionUpcastConversionExpr(
              CollectionUpcastConversionExpr *E,
              SGFContext C);
-    ManagedValue
-    emitConversionClosure(CollectionUpcastConversionExpr::ConversionPair pair,
-                          SGFContext C, FuncDecl *castFunc, unsigned argIndex);
+    ClosureExpr *synthesizeConversionClosure(
+        CollectionUpcastConversionExpr::ConversionPair pair);
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
     RValue visitPackExpansionExpr(PackExpansionExpr *E, SGFContext C);
     RValue visitPackElementExpr(PackElementExpr *E, SGFContext C);
@@ -1536,14 +1535,10 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
   return RValue(SGF, E, ManagedValue::forObjectRValueWithoutOwnership(upcast));
 }
 
-RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
-                                                FuncDecl *fn,
-                                                CanType fromCollection,
-                                                CanType toCollection,
-                                                ManagedValue mv,
-                                                ManagedValue keyConversion,
-                                                ManagedValue valueConversion,
-                                                SGFContext C) {
+RValue SILGenFunction::emitCollectionConversion(
+    SILLocation loc, FuncDecl *fn, CanType fromCollection, CanType toCollection,
+    ManagedValue mv, ClosureExpr *keyConversion, ClosureExpr *valueConversion,
+    SGFContext C) {
   SmallVector<Type, 4> replacementTypes;
 
   auto fromArgs = cast<BoundGenericType>(fromCollection)->getGenericArgs();
@@ -1560,12 +1555,29 @@ RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
                          LookUpConformanceInModule());
 
   SmallVector<ManagedValue, 3> args = { mv };
-  if (keyConversion.isValid()) {
-    args.push_back(keyConversion);
-  }
+  unsigned argIndex = 1;
+  for (ClosureExpr *closure : {keyConversion, valueConversion}) {
+    if (!closure) {
+      continue;
+    }
 
-  if (valueConversion.isValid()) {
-    args.push_back(valueConversion);
+    CanType origParamType = fn->getParameters()
+                                ->get(argIndex)
+                                ->getInterfaceType()
+                                ->getCanonicalType();
+    CanType substParamType = origParamType.subst(subMap)->getCanonicalType();
+
+    // Ensure that the closure has the appropriate type.
+    AbstractionPattern origParam(
+        fn->getGenericSignature().getCanonicalSignature(), origParamType);
+
+    auto paramConversion = Conversion::getSubstToOrig(
+        origParam, substParamType, getLoweredType(closure->getType()),
+        getLoweredType(origParam, substParamType));
+
+    auto value = emitConvertedRValue(closure, paramConversion);
+    args.push_back(value);
+    argIndex++;
   }
 
   return emitApplyOfLibraryIntrinsic(loc, fn, subMap, args, C);
@@ -1648,13 +1660,12 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
 
   // Get the intrinsic function.
   FuncDecl *fn = nullptr;
-  ManagedValue keyConversion;
-  ManagedValue valueConversion;
+  ClosureExpr *keyConversion = nullptr;
+  ClosureExpr *valueConversion = nullptr;
   if (fromCollection->isArray()) {
     if (needsCustomConversion(E->getValueConversion())) {
       fn = SGF.SGM.getArrayWitnessCast(loc);
-      valueConversion =
-          emitConversionClosure(E->getValueConversion(), C, fn, 1);
+      valueConversion = synthesizeConversionClosure(E->getValueConversion());
     } else {
       fn = SGF.SGM.getArrayForceCast(loc);
     }
@@ -1662,16 +1673,15 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
     if (needsCustomConversion(E->getKeyConversion()) ||
         needsCustomConversion(E->getValueConversion())) {
       fn = SGF.SGM.getDictionaryWitnessCast(loc);
-      keyConversion = emitConversionClosure(E->getKeyConversion(), C, fn, 1);
-      valueConversion =
-          emitConversionClosure(E->getValueConversion(), C, fn, 2);
+      keyConversion = synthesizeConversionClosure(E->getKeyConversion());
+      valueConversion = synthesizeConversionClosure(E->getValueConversion());
+    } else {
+      fn = SGF.SGM.getDictionaryUpCast(loc);
     }
-    fn = SGF.SGM.getDictionaryUpCast(loc);
   } else if (fromCollection->isSet()) {
     if (needsCustomConversion(E->getValueConversion())) {
       fn = SGF.SGM.getSetWitnessCast(loc);
-      valueConversion =
-          emitConversionClosure(E->getValueConversion(), C, fn, 1);
+      valueConversion = synthesizeConversionClosure(E->getValueConversion());
     } else {
       fn = SGF.SGM.getSetUpCast(loc);
     }
@@ -1679,8 +1689,8 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
     llvm_unreachable("unsupported collection upcast kind");
   }
 
-  return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection,
-                                      mv, keyConversion, valueConversion, C);
+  return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection, mv,
+                                      keyConversion, valueConversion, C);
 }
 
 namespace {
@@ -1776,9 +1786,8 @@ public:
 };
 } // namespace
 
-ManagedValue RValueEmitter::emitConversionClosure(
-    CollectionUpcastConversionExpr::ConversionPair pair, SGFContext C,
-    FuncDecl *castFunc, unsigned argIndex) {
+ClosureExpr *RValueEmitter::synthesizeConversionClosure(
+    CollectionUpcastConversionExpr::ConversionPair pair) {
   ASTContext &Context = SGF.getASTContext();
   DeclContext *declContext = SGF.FunctionDC;
 
@@ -1811,8 +1820,9 @@ ManagedValue RValueEmitter::emitConversionClosure(
   closure->setParameterList(params);
 
   ConversionClosureEmitter emitter(Context, pair.OrigValue, param);
-  Expr *body = emitter.visit(pair.Conversion);
-  ASTNode bodyNode(body);
+  Expr *result = emitter.visit(pair.Conversion);
+  auto *RS = ReturnStmt::createImplicit(Context, result);
+  ASTNode bodyNode(RS);
   auto *BS = BraceStmt::createImplicit(Context, ArrayRef(bodyNode));
   closure->setBody(BS);
 
@@ -1830,27 +1840,7 @@ ManagedValue RValueEmitter::emitConversionClosure(
   closure->setDiscriminator(discriminator++);
   Context.setMaxAssignedDiscriminator(declContext, discriminator);
 
-  Type replacementTypes[] = {pair.OrigValue->getType(),
-                             pair.Conversion->getType()};
-  auto subs =
-      SubstitutionMap::get(castFunc->getGenericSignature(), replacementTypes,
-                           LookUpConformanceInModule());
-
-  CanType origParamType = castFunc->getParameters()
-                              ->get(argIndex)
-                              ->getInterfaceType()
-                              ->getCanonicalType();
-  CanType substParamType = origParamType.subst(subs)->getCanonicalType();
-
-  // Ensure that the closure has the appropriate type.
-  AbstractionPattern origParam(
-      castFunc->getGenericSignature().getCanonicalSignature(), origParamType);
-
-  auto conversion = Conversion::getSubstToOrig(
-      origParam, substParamType, SGF.getLoweredType(closure->getType()),
-      SGF.getLoweredType(origParam, substParamType));
-
-  return SGF.emitConvertedRValue(closure, conversion);
+  return closure;
 }
 
 RValue
