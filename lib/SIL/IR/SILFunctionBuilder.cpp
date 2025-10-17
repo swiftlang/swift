@@ -126,6 +126,12 @@ void SILFunctionBuilder::addFunctionAttributes(
         F->setEffectsKind(effectsAttr->getKind());
       }
     }
+
+    if (constant.isFunc() && constant.hasFuncDecl()) {
+      auto func = constant.getFuncDecl();
+      if (auto *EA = ExternAttr::find(Attrs, ExternKind::C))
+        F->setAsmName(EA->getCName(func));
+    }
   }
 
   if (!customEffects.empty()) {
