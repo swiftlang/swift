@@ -64,6 +64,12 @@ module StdStringView {
   export *
 }
 
+module StdStack {
+  header "std-stack.h"
+  requires cplusplus
+  export *
+}
+
 module StdPair {
   header "std-pair.h"
   requires cplusplus
