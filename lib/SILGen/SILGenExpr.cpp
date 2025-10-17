@@ -1659,9 +1659,22 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
       fn = SGF.SGM.getArrayForceCast(loc);
     }
   } else if (fromCollection->isDictionary()) {
+    if (needsCustomConversion(E->getKeyConversion()) ||
+        needsCustomConversion(E->getValueConversion())) {
+      fn = SGF.SGM.getDictionaryWitnessCast(loc);
+      keyConversion = emitConversionClosure(E->getKeyConversion(), C, fn, 1);
+      valueConversion =
+          emitConversionClosure(E->getValueConversion(), C, fn, 2);
+    }
     fn = SGF.SGM.getDictionaryUpCast(loc);
   } else if (fromCollection->isSet()) {
-    fn = SGF.SGM.getSetUpCast(loc);
+    if (needsCustomConversion(E->getValueConversion())) {
+      fn = SGF.SGM.getSetWitnessCast(loc);
+      valueConversion =
+          emitConversionClosure(E->getValueConversion(), C, fn, 1);
+    } else {
+      fn = SGF.SGM.getSetUpCast(loc);
+    }
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
