@@ -99,16 +99,6 @@ static bool shouldYieldThread() {
 
 namespace {
 
-/// An extremely silly class which exists to make pointer
-/// default-initialization constexpr.
-template <class T> struct Pointer {
-  T *Value;
-  constexpr Pointer() : Value(nullptr) {}
-  constexpr Pointer(T *value) : Value(value) {}
-  operator T *() const { return Value; }
-  T *operator->() const { return Value; }
-};
-
 /// A class which encapsulates the information we track about
 /// the current thread and active executor.
 class ExecutorTrackingInfo {
@@ -123,7 +113,7 @@ class ExecutorTrackingInfo {
   /// the right executor. It would make sense for that to be a
   /// separate thread-local variable (or whatever is most efficient
   /// on the target platform).
-  static SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
+  static SWIFT_THREAD_LOCAL_TYPE(TLSPointer<ExecutorTrackingInfo>,
                                  tls_key::concurrency_executor_tracking_info)
       ActiveInfoInThread;
 
@@ -200,7 +190,7 @@ public:
 class ActiveTask {
   /// A thread-local variable pointing to the active tracking
   /// information about the current thread, if any.
-  static SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>,
+  static SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>,
                                  tls_key::concurrency_task) Value;
 
 public:
@@ -212,10 +202,10 @@ public:
 };
 
 /// Define the thread-locals.
-SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>, tls_key::concurrency_task)
+SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>, tls_key::concurrency_task)
 ActiveTask::Value;
 
-SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
+SWIFT_THREAD_LOCAL_TYPE(TLSPointer<ExecutorTrackingInfo>,
                         tls_key::concurrency_executor_tracking_info)
 ExecutorTrackingInfo::ActiveInfoInThread;
 

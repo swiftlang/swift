@@ -12,6 +12,7 @@
 
 #include "SwiftTLSContext.h"
 
+#include "swift/Runtime/Heap.h"
 #include "swift/Threading/Once.h"
 #include "swift/Threading/ThreadLocalStorage.h"
 

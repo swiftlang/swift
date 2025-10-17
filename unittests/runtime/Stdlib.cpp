@@ -528,3 +528,8 @@ const long long $ss5NeverOMn[1] = {0};
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const long long $ss5ErrorMp[1] = {0};
+
+// Exclusivity debug printing.
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift_dumpTrackedAccesses(void) {}
