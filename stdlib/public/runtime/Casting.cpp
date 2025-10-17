@@ -49,6 +49,11 @@
 #include <stddef.h>
 #endif
 
+#ifdef __APPLE__
+#include <execinfo.h>
+#include <stdio.h>
+#endif
+
 using namespace swift;
 using namespace swift::hashable_support;
 using namespace metadataimpl;
@@ -385,6 +390,19 @@ SWIFT_NORETURN SWIFT_NOINLINE void
 swift::swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
                                 const void *targetType, const char *targetName,
                                 const char *message) {
+  #ifdef __APPLE__
+  fprintf(stderr, "**** CAST FAILED ****");
+
+  void *addrs[256];
+  int count = backtrace(addrs, 256);
+
+  char **symbols = backtrace_symbols(addrs, count);
+
+  for (int n = 0; n < count; ++n) {
+    fprintf(stderr, "%d %p: %s\n", n, addrs[n], symbols[n]);
+  }
+  #endif
+
   swift::fatalError(/* flags = */ 0,
                     "Could not cast value of type '%s' (%p) to '%s' (%p)%s%s\n",
                     sourceName, sourceType, 
