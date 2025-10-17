@@ -72,6 +72,67 @@ namespace {
   };
 } // end anonymous namespace
 
+static bool addStructDebugValueIfAppropriate(DebugValueInst *debugInst,
+                                             SILValue value) {
+  auto getDebugVariable = debugInst->getVarInfo();
+  if (!getDebugVariable) {
+    return false;
+  }
+
+  auto debugVariable = std::move(*getDebugVariable);
+
+  // We want to refer to the struct itself, so remove the Fragment operator.
+  // If there is no Fragment operator, we cannot adapt this debug value to refer
+  // to the struct.
+  //
+  // If there are more debug info expressions, the struct fragments have other
+  // context associated with them, which we cannot safely ignore.
+  const auto numElements = debugVariable.DIExpr.getNumElements();
+  if (numElements != 2 ||
+      debugVariable.DIExpr.getElement(numElements - 2).getAsOperator() !=
+          SILDIExprOperator::Fragment) {
+    return false;
+  }
+
+  auto *variableDeclaration = dyn_cast<VarDecl>(
+      debugVariable.DIExpr.getElement(numElements - 1).getAsDecl());
+  if (variableDeclaration == nullptr) {
+    return false;
+  }
+
+  // Remove the last 2 elements of the DI Expression. Drop the whole
+  // expression if there are only two.
+  debugVariable = debugVariable.withoutDIExpr();
+  // The type is no longer needed, since the DIExpr was removed
+  debugVariable.Type = std::nullopt;
+
+  SILBuilder Builder(debugInst, debugInst->getDebugScope());
+  Builder.createDebugValue(debugInst->getLoc(), value, debugVariable);
+
+  return true;
+}
+
+static void extractStructFragmentDebugInfo(StructInst *SI, SILValue value) {
+
+  // Salvage debug info associated with the extract instructions. They all
+  // extract from the same struct, so if any have debug info marking them as a
+  // fragment of a variable of the struct type, the original struct is the value
+  // of the whole variable.
+  for (unsigned i = 0, e = SI->getNumOperands(); i < e; ++i) {
+    auto *Ex = dyn_cast<StructExtractInst>(SI->getOperand(i));
+    if (!Ex)
+      continue;
+
+    for (auto *user : Ex->getUsers()) {
+      auto *debugValue = dyn_cast<DebugValueInst>(user);
+      if (debugValue != nullptr &&
+          addStructDebugValueIfAppropriate(debugValue, value)) {
+        return;
+      }
+    }
+  }
+}
+
 SILValue InstSimplifier::visitStructInst(StructInst *SI) {
   // Ignore empty structs.
   if (SI->getNumOperands() < 1)
@@ -101,7 +162,10 @@ SILValue InstSimplifier::visitStructInst(StructInst *SI) {
         return SILValue();
     }
 
-    return Ex0->getOperand();
+    auto value = Ex0->getOperand();
+    extractStructFragmentDebugInfo(SI, value);
+
+    return value;
   }
 
   return SILValue();
