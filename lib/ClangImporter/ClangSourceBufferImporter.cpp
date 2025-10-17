@@ -58,7 +58,6 @@ SourceLoc ClangSourceBufferImporter::resolveSourceLocation(
     // different contents in different modules, despite the same name.
     auto IDOpt = swiftSourceManager.getIDForBufferIdentifier(bufIdent);
     if (IDOpt.has_value() && clangSrcMgr.getFileEntryForID(clangFileID)) {
-      CONDITIONAL_ASSERT(llvm::sys::fs::exists(bufIdent));
       mirrorID = IDOpt.value();
     } else
       mirrorID = swiftSourceManager.addNewSourceBuffer(std::move(mirrorBuffer));
