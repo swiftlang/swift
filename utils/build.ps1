@@ -1121,6 +1121,16 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
 
 function Get-Dependencies {
   Record-OperationTime $BuildPlatform "Get-Dependencies" {
+    function Write-Success([string] $Description) {
+      $HeavyCheckMark = @{
+        Object = [Char]0x2714
+        ForegroundColor = 'DarkGreen'
+        NoNewLine = $true
+      }
+      Write-Host @HeavyCheckMark
+      Write-Host " $Description"
+    }
+
     Write-Host "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies ..." -ForegroundColor Cyan
     $ProgressPreference = "SilentlyContinue"
 
@@ -1171,7 +1181,7 @@ function Get-Dependencies {
 
       $Destination = if ($CreateExtractPath) { $Destination } else { $BinaryCache }
 
-      Write-Output "Extracting '$ZipFileName' ..."
+      # Write-Output "Extracting '$ZipFileName' ..."
       New-Item -ItemType Directory -ErrorAction Ignore -Path $BinaryCache | Out-Null
       Expand-Archive -Path $Source -DestinationPath $Destination -Force
     }
@@ -1191,12 +1201,12 @@ function Get-Dependencies {
           $ExtractedLastWriteTime = (Get-Item $Destination).LastWriteTime
           # Compare the last write times
           if ($TarLastWriteTime -le $ExtractedLastWriteTime) {
-              Write-Output "'$SourceName' is already extracted and up to date."
+              # Write-Output "'$SourceName' is already extracted and up to date."
               return
           }
       }
 
-      Write-Output "Extracting '$Source' ..."
+      # Write-Output "Extracting '$Source' ..."
       New-Item -ItemType Directory -ErrorAction Ignore -Path $Destination | Out-Null
       tar -xvf $Source -C $Destination | Out-Null
     }
@@ -1217,12 +1227,12 @@ function Get-Dependencies {
           $installerWriteTime = (Get-Item $source).LastWriteTime
           $extractedWriteTime = (Get-Item $destination).LastWriteTime
           if ($installerWriteTime -le $extractedWriteTime) {
-              Write-Output "'$InstallerExeName' is already extracted and up to date."
+              # Write-Output "'$InstallerExeName' is already extracted and up to date."
               return
           }
       }
 
-      Write-Output "Extracting '$InstallerExeName' ..."
+      # Write-Output "Extracting '$InstallerExeName' ..."
 
       # The new runtime MSI is built to expand files into the immediate directory. So, setup the installation location.
       New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin | Out-Null
@@ -1238,17 +1248,14 @@ function Get-Dependencies {
       $syft = Get-Syft
       DownloadAndVerify $syft.URL "$BinaryCache\syft-$SyftVersion.zip" $syft.SHA256
       Expand-ZipFile syft-$SyftVersion.zip $BinaryCache syft-$SyftVersion
+      Write-Success "syft $SyftVersion"
     }
 
     if ($SkipBuild -and $SkipPackaging) { return }
 
-    $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
-    if ($ToBatch) {
-      Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies..."
-    }
-
     DownloadAndVerify $WiX.URL "$BinaryCache\WiX-$($WiX.Version).zip" $WiX.SHA256
     Expand-ZipFile WiX-$($WiX.Version).zip $BinaryCache WiX-$($WiX.Version)
+    Write-Success "WiX $($WiX.Version)"
 
     if ($SkipBuild) { return }
 
@@ -1261,6 +1268,7 @@ function Get-Dependencies {
       } else {
         Expand-ZipFile sccache-$SCCacheVersion.$FileExtension $BinaryCache sccache-$SCCacheVersion
       }
+      Write-Success "sccache $SCCacheVersion"
     }
 
     DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
@@ -1271,11 +1279,13 @@ function Get-Dependencies {
       $GnuWin32MakeHash = "fb66a02b530f7466f6222ce53c0b602c5288e601547a034e4156a512dd895ee7"
       DownloadAndVerify $GnuWin32MakeURL "$BinaryCache\GnuWin32Make-4.4.1.zip" $GnuWin32MakeHash
       Expand-ZipFile GnuWin32Make-4.4.1.zip $BinaryCache GnuWin32Make-4.4.1
+      Write-Success "GNUWin32 make 4.4.1"
     }
 
     # TODO(compnerd) stamp/validate that we need to re-extract
     New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
     Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain.TrimStart("swift-").TrimEnd("-a-windows10")
+    Write-Success "Swift Toolchain $PinnedVersion"
 
     function Get-KnownPython([string] $ArchName) {
       if (-not $KnownPythons.ContainsKey($PythonVersion)) {
@@ -1289,6 +1299,7 @@ function Get-Dependencies {
       DownloadAndVerify $Python.URL "$BinaryCache\Python$ArchName-$PythonVersion.zip" $Python.SHA256
       if (-not $ToBatch) {
         Expand-ZipFile Python$ArchName-$PythonVersion.zip "$BinaryCache" Python$ArchName-$PythonVersion
+        Write-Success "$ArchName Python $PythonVersion"
       }
     }
 
@@ -1296,10 +1307,11 @@ function Get-Dependencies {
       try {
         Invoke-Program -Silent "$(Get-PythonExecutable)" -m pip
       } catch {
-        Write-Output "Installing pip ..."
+        # Write-Output "Installing pip ..."
         Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m ensurepip -U --default-pip
       } finally {
-        Write-Output "pip installed."
+        # Write-Output "pip installed."
+        Write-Success "pip"
       }
     }
 
@@ -1314,7 +1326,7 @@ function Get-Dependencies {
 
     function Install-PythonModule([string] $ModuleName) {
       if (Test-PythonModuleInstalled $ModuleName) {
-        Write-Output "$ModuleName already installed."
+        # Write-Output "$ModuleName already installed."
         return;
       }
       $TempRequirementsTxt = New-TemporaryFile
@@ -1326,7 +1338,8 @@ function Get-Dependencies {
         Write-Output "$($Dependencies[$i])==$($Dependency.Version) --hash=`"sha256:$($Dependency.SHA256)`"" >> $TempRequirementsTxt
       }
       Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --no-binary==:all: --disable-pip-version-check
-      Write-Output "$ModuleName installed."
+      # Write-Output "$ModuleName installed."
+      Write-Success $ModuleName
     }
 
     function Install-PythonModules() {
@@ -1350,6 +1363,7 @@ function Get-Dependencies {
       $NDK = Get-AndroidNDK
       DownloadAndVerify $NDK.URL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDK.SHA256
       Expand-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
+      Write-Success "Android NDK $AndroidNDKVersion"
     }
 
     if ($IncludeDS2) {
@@ -1359,6 +1373,7 @@ function Get-Dependencies {
       DownloadAndVerify $WinFlexBisonURL "$BinaryCache\win_flex_bison-$WinFlexBisonVersion.zip" $WinFlexBisonHash
 
       Expand-ZipFile -ZipFileName "win_flex_bison-$WinFlexBisonVersion.zip" -BinaryCache $BinaryCache -ExtractPath "win_flex_bison"
+      Write-Success "flex/bison $WinFlexBisonVersion"
     }
 
     if ($WinSDKVersion) {
