@@ -930,14 +930,15 @@ TypeVarRefCollector::walkToStmtPre(Stmt *stmt) {
   // we're generating constraints for the closure itself, since we'll connect
   // the conjunction to the closure type variable itself.
   if (auto *CE = dyn_cast<ClosureExpr>(DC)) {
-    if (isa<ReturnStmt>(stmt) && DCDepth == 0) {
-      if (!Locator->directlyAt<ClosureExpr>()) {
+    if (isa<ReturnStmt>(stmt)) {
+      if (DCDepth == 0 && !Locator->directlyAt<ClosureExpr>()) {
         SmallPtrSet<TypeVariableType *, 4> typeVars;
         CS.getClosureType(CE)->getResult()->getTypeVariables(typeVars);
         TypeVars.insert(typeVars.begin(), typeVars.end());
-      } else {
-        Returns.push_back(cast<ReturnStmt>(stmt));
       }
+
+      if (Locator->directlyAt<ClosureExpr>() && DCDepth == 1)
+        Returns.push_back(cast<ReturnStmt>(stmt));
     }
   }
 
@@ -4080,8 +4081,15 @@ namespace {
         }
       } else {
         for (auto *element : expr->getElements()) {
-          elements.emplace_back(CS.getType(element),
-                                CS.getConstraintLocator(element));
+          auto contextualTypePurpose = CS.getContextualTypePurpose(element);
+
+          elements.emplace_back(
+              CS.getType(element),
+              contextualTypePurpose == CTP_Unused
+                  ? CS.getConstraintLocator(element)
+                  : CS.getConstraintLocator(
+                        element,
+                        LocatorPathElt::ContextualType(contextualTypePurpose)));
         }
       }
 

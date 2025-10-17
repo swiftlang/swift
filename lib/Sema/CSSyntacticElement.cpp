@@ -1197,6 +1197,11 @@ private:
       }
     }
 
+    NullablePtr<ClosureInfo> closureInfo;
+    if (auto closure = context.getAsClosureExpr()) {
+      closureInfo = cs.getClosureInfo(closure.get());
+    }
+
     for (auto element : braceStmt->getElements()) {
       if (cs.isForCodeCompletion() &&
           !cs.containsIDEInspectionTarget(element)) {
@@ -1241,11 +1246,42 @@ private:
         isDiscarded = !contextInfo || contextInfo->purpose == CTP_Unused;
       }
 
+      // Skip all of the return statements, they are going to be
+      // handled at the end by a type-join expression.
+      if (closureInfo) {
+        auto *R = getAsStmt<ReturnStmt>(element);
+        if (R && !closureInfo.get()->solveReturnIndividually(R))
+          continue;
+      }
+
       elements.push_back(makeElement(
           element,
           cs.getConstraintLocator(locator,
                                   LocatorPathElt::SyntacticElement(element)),
           contextInfo.value_or(ContextualTypeInfo()), isDiscarded));
+    }
+
+    if (locator->directlyAt<ClosureExpr>()) {
+      auto *info = closureInfo.get();
+
+      if (info->hasMultipleReturns()) {
+        SmallVector<Expr *, 4> resultExprs;
+        for (auto *R : info->getReturns()) {
+          // TODO: This would have to become a check which would
+          //       use the type of the return as an element in the type-join.
+          assert(!info->solveReturnIndividually(R));
+
+          auto target = createTargetForReturn(R);
+          resultExprs.push_back(target.getAsExpr());
+        }
+
+        ASTNode join = TypeJoinExpr::create(
+            cs.getASTContext(), info->getType()->getResult(), resultExprs);
+
+        elements.push_back(makeElement(join, locator,
+                                       /*contextualTypeInfo=*/{},
+                                       /*isDiscarded=*/true));
+      }
     }
 
     createConjunction(elements, locator);
@@ -1260,30 +1296,11 @@ private:
       cs.recordImpliedResult(result, kind);
     }
 
-    Expr *resultExpr;
-    if (returnStmt->hasResult()) {
-      resultExpr = returnStmt->getResult();
-      assert(resultExpr && "non-empty result without expression?");
-    } else {
-      // If this is simplify `return`, let's create an empty tuple
-      // which is also useful if contextual turns out to be e.g. `Void?`.
-      // Also, attach return stmt source location so if there is a contextual
-      // mismatch we can produce a diagnostic in a valid source location.
-      resultExpr = getVoidExpr(cs.getASTContext(), returnStmt->getEndLoc());
-    }
-
-    auto contextualResultInfo = getContextualResultInfoFor(returnStmt);
-
-    SyntacticElementTarget target(resultExpr, context.getAsDeclContext(),
-                                  contextualResultInfo, /*isDiscarded=*/false);
-
+    auto target = createTargetForReturn(returnStmt);
     if (cs.generateConstraints(target)) {
       hadError = true;
       return;
     }
-
-    cs.setContextualInfo(target.getAsExpr(), contextualResultInfo);
-    cs.setTargetFor(returnStmt, target);
   }
 
   void visitThenStmt(ThenStmt *thenStmt) {
@@ -1436,6 +1453,30 @@ private:
     }
 
     return false;
+  }
+
+  SyntacticElementTarget createTargetForReturn(ReturnStmt *returnStmt) {
+    Expr *resultExpr;
+    if (returnStmt->hasResult()) {
+      resultExpr = returnStmt->getResult();
+      assert(resultExpr && "non-empty result without expression?");
+    } else {
+      // If this is simplify `return`, let's create an empty tuple
+      // which is also useful if contextual turns out to be e.g. `Void?`.
+      // Also, attach return stmt source location so if there is a contextual
+      // mismatch we can produce a diagnostic in a valid source location.
+      resultExpr = getVoidExpr(cs.getASTContext(), returnStmt->getEndLoc());
+    }
+
+    auto contextualResultInfo = getContextualResultInfoFor(returnStmt);
+
+    SyntacticElementTarget target(resultExpr, context.getAsDeclContext(),
+                                  contextualResultInfo, /*isDiscarded=*/false);
+
+    cs.setContextualInfo(target.getAsExpr(), contextualResultInfo);
+    cs.setTargetFor(returnStmt, target);
+
+    return target;
   }
 };
 }
