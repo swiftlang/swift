@@ -5,7 +5,7 @@
 // RUN: %target-swift-emit-module-interface(%t/Test.swiftinterface) %s -enable-experimental-feature Lifetimes -enable-experimental-feature LifetimeDependence
 // RUN: %swift-function-caller-generator Test %t/Test.swiftinterface > %t/out.swift
 
-// RUN: %target-swift-frontend -typecheck -verify %t/out.swift -I %t
+// RUN: %target-swift-frontend-verify -typecheck -strict-memory-safety %t/out.swift -I %t
 
 func foo(x: Int) -> Int {
   return x
