@@ -196,6 +196,7 @@ do {
   do {
     // FIXME: Because B?.Type to A?.Type upcast is not supported.
     var types = SwiftTypePair(
+      // expected-note@+2 {{member 'covariant9()' refrences '${type}', which cannot be resolved on type 'any P'}}
       // expected-error@+1 {{member 'covariant9()' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
       typeOf: exist.covariant9(),
       type2: SwiftType<(${upper_bound})?.Type>.self
@@ -452,40 +453,74 @@ do {
   let exist: any P
 
   exist.contravariant1(0) // expected-error {{member 'contravariant1' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariant1' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariant2(0) // expected-error {{member 'contravariant2' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariant2' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariant3(0) // expected-error {{member 'contravariant3' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariant3' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariant4(0) // expected-error {{member 'contravariant4' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariant4' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariant5(0) // expected-error {{member 'contravariant5' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariant5' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariant6(0) // expected-error {{member 'contravariant6' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariant6' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariant7() // expected-error {{member 'contravariant7' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariant7' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariant8() // expected-error {{member 'contravariant8' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariant8' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariant9(0) // expected-error {{member 'contravariant9' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariant9' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariant10() // expected-error {{member 'contravariant10' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariant10' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariant11(0) // expected-error {{member 'contravariant11' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariant11' refrences '${type}', which cannot be resolved on type 'any P'}}
 
   exist.contravariantProp1 // expected-error {{member 'contravariantProp1' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariantProp1' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariantProp2 // expected-error {{member 'contravariantProp2' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariantProp2' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariantProp3 // expected-error {{member 'contravariantProp3' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariantProp3' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariantProp4 // expected-error {{member 'contravariantProp4' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariantProp4' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariantProp5 // expected-error {{member 'contravariantProp5' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariantProp5' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariantProp6 // expected-error {{member 'contravariantProp6' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariantProp6' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariantProp7 // expected-error {{member 'contravariantProp7' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariantProp7' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariantProp8 // expected-error {{member 'contravariantProp8' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariantProp8' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariantProp9 // expected-error {{member 'contravariantProp9' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariantProp9' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariantProp10 // expected-error {{member 'contravariantProp10' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariantProp10' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.contravariantProp11 // expected-error {{member 'contravariantProp11' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'contravariantProp11' refrences '${type}', which cannot be resolved on type 'any P'}}
 
   exist[contravariantSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[contravariantSubscript2: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[contravariantSubscript3: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
+  
   exist[contravariantSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[contravariantSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[contravariantSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[contravariantSubscript7: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[contravariantSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[contravariantSubscript9: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[contravariantSubscript10: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[contravariantSubscript11: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
 }
 
 // Invariant references.
@@ -538,16 +573,27 @@ do {
   let exist: any P
 
   exist.invariant1(0) // expected-error {{member 'invariant1' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariant1' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.invariant2(0) // expected-error {{member 'invariant2' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariant2' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.invariant3(0) // expected-error {{member 'invariant3' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariant3' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.invariant4(0) // expected-error {{member 'invariant4' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariant4' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.invariant5() // expected-error {{member 'invariant5' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariant5' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.invariant6() // expected-error {{member 'invariant6' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariant6' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.invariant7(0) // expected-error {{member 'invariant7' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariant7' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.invariant8(0) // expected-error {{member 'invariant8' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariant8' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.invariant9(0) // expected-error {{member 'invariant9' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariant9' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.invariant10(0) // expected-error {{member 'invariant10' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariant10' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist.invariant11() // expected-error {{member 'invariant11' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariant11' refrences '${type}', which cannot be resolved on type 'any P'}}
   do {
     var types = SwiftTypePair(typeOf: exist.invariant12(), type2: SwiftType<any Sequence>.self)
     types.assertTypesAreEqual()
@@ -558,32 +604,55 @@ do {
   }
   do {
     // FIXME: Because (any P<X>).Type to (any P).Type upcast is not supported.
+    // expected-note@+2 {{member 'invariant14()' refrences '${type}', which cannot be resolved on type 'any P'}}
     // expected-error@+1 {{member 'invariant14()' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
     var types = SwiftTypePair(typeOf: exist.invariant14(), type2: SwiftType<(any Sequence).Type>.self)
     types.assertTypesAreEqual()
   }
   exist.invariant15() // expected-error {{member 'invariant15' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariant15' refrences '${type}', which cannot be resolved on type 'any P'}}
 
   exist.invariantProp1 // expected-error {{member 'invariantProp1' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariantProp1' refrences '${type}', which cannot be resolved on type 'any P'}}ad}}
   exist.invariantProp2 // expected-error {{member 'invariantProp2' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariantProp2' refrences '${type}', which cannot be resolved on type 'any P'}}ad}}
   exist.invariantProp3 // expected-error {{member 'invariantProp3' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariantProp3' refrences '${type}', which cannot be resolved on type 'any P'}}ad}}
   exist.invariantProp4 // expected-error {{member 'invariantProp4' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariantProp4' refrences '${type}', which cannot be resolved on type 'any P'}}ad}}
   exist.invariantProp5 // expected-error {{member 'invariantProp5' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariantProp5' refrences '${type}', which cannot be resolved on type 'any P'}}ad}}
   exist.invariantProp6 // expected-error {{member 'invariantProp6' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariantProp6' refrences '${type}', which cannot be resolved on type 'any P'}}ad}}
   exist.invariantProp7 // expected-error {{member 'invariantProp7' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariantProp7' refrences '${type}', which cannot be resolved on type 'any P'}}ad}}
   exist.invariantProp8 // expected-error {{member 'invariantProp8' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariantProp8' refrences '${type}', which cannot be resolved on type 'any P'}}ad}}
   exist.invariantProp9 // expected-error {{member 'invariantProp9' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariantProp9' refrences '${type}', which cannot be resolved on type 'any P'}}ad}}
   exist.invariantProp10 // expected-error {{member 'invariantProp10' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariantProp10' refrences '${type}', which cannot be resolved on type 'any P'}}ad}}
   exist.invariantProp11 // expected-error {{member 'invariantProp11' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariantProp11' refrences '${type}', which cannot be resolved on type 'any P'}}ad}}
   exist.invariantProp15 // expected-error {{member 'invariantProp15' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariantProp15' refrences '${type}', which cannot be resolved on type 'any P'}}ad}}
 
   exist[invariantSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[invariantSubscript2: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[invariantSubscript3: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[invariantSubscript4: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[invariantSubscript5: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[invariantSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[invariantSubscript7: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[invariantSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
   exist[invariantSubscript15: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences '${type}', which cannot be resolved on type 'any P'}}
 }
