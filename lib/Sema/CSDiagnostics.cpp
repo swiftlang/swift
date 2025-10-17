@@ -6321,10 +6321,7 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
 
   if (baseExpr) {
     auto *locator = getConstraintLocator(baseExpr, ConstraintLocator::Member);
-    const auto &solution = getSolution();
-    if (llvm::any_of(solution.Fixes, [&locator](const ConstraintFix *fix) {
-          return fix->getLocator() == locator;
-        }))
+    if (hasFixFor(getSolution(), locator))
       return false;
   }
 
@@ -6341,6 +6338,54 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
   }
 
   emitDiagnosticAt(Member, diag::decl_declared_here, Member);
+  return true;
+}
+
+bool MemberFromWrongModuleFailure::diagnoseAsError() {
+  auto anchor = getRawAnchor();
+  // Let's try to avoid over-diagnosing chains of wrong-module
+  // members e.g.:
+  //
+  // struct A {
+  //   struct B {
+  //     struct C {}
+  //   }
+  // }
+  //
+  // _ = A.Other::B.Other::C()
+  Expr *baseExpr = nullptr;
+  DeclNameLoc nameLoc;
+  if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
+    baseExpr = UDE->getBase();
+    nameLoc = UDE->getNameLoc();
+  } else if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor)) {
+    nameLoc = UME->getNameLoc();
+  } else if (auto *SE = getAsExpr<SubscriptExpr>(anchor)) {
+    baseExpr = SE->getBase();
+  } else if (auto *call = getAsExpr<CallExpr>(anchor)) {
+    baseExpr = call->getFn();
+  }
+
+  if (baseExpr) {
+    auto *locator = getConstraintLocator(baseExpr, ConstraintLocator::Member);
+    if (hasFixFor(getSolution(), locator))
+      return false;
+  }
+
+  auto modSelLoc = nameLoc.getModuleSelectorLoc();
+  auto loc = nameLoc.isValid() ? nameLoc.getStartLoc() : ::getLoc(anchor);
+
+  emitDiagnosticAt(loc, diag::wrong_module_selector, Member->getName(),
+                   Name.getModuleSelector());
+
+  Identifier actualModuleName = Member->getModuleContext()->getName();
+  ASSERT(actualModuleName != Name.getModuleSelector() &&
+         "Module selector failure on member in same module?");
+  emitDiagnosticAt(loc, diag::note_change_module_selector, actualModuleName)
+      .fixItReplace(modSelLoc, actualModuleName.str());
+
+  emitDiagnosticAt(Member, diag::decl_declared_here, Member);
+
   return true;
 }
 
