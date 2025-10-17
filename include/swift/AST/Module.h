@@ -481,6 +481,11 @@ public:
   void getDeclaredCrossImportBystanders(
       SmallVectorImpl<Identifier> &bystanderNames);
 
+  /// Returns the name that should be used for this module in a module
+  /// selector. For separately-imported overlays, this will be the declaring
+  /// module's name.
+  Identifier getNameForModuleSelector();
+
   /// Retrieve the ABI name of the module, which is used for metadata and
   /// mangling.
   Identifier getABIName() const;

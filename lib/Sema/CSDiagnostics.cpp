@@ -6378,7 +6378,8 @@ bool MemberFromWrongModuleFailure::diagnoseAsError() {
   emitDiagnosticAt(loc, diag::wrong_module_selector, Member->getName(),
                    Name.getModuleSelector());
 
-  Identifier actualModuleName = Member->getModuleContext()->getName();
+  Identifier actualModuleName =
+      Member->getModuleContext()->getNameForModuleSelector();
   ASSERT(actualModuleName != Name.getModuleSelector() &&
          "Module selector failure on member in same module?");
   emitDiagnosticAt(loc, diag::note_change_module_selector, actualModuleName)

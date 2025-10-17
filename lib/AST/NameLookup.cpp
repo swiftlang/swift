@@ -372,27 +372,33 @@ bool swift::removeOutOfModuleDecls(SmallVectorImpl<ValueDecl*> &decls,
   // FIXME: Should we look this up relative to dc?
   // We'd need a new ResolutionKind.
   // FIXME: How can we diagnose this?
-  ModuleDecl *visibleFrom = ctx.getLoadedModule(moduleSelector);
-  if (!visibleFrom && moduleSelector == ctx.TheBuiltinModule->getName())
-    visibleFrom = ctx.TheBuiltinModule;
-  if (!visibleFrom) {
+  ModuleDecl *visibleFromRoot = ctx.getLoadedModule(moduleSelector);
+  if (!visibleFromRoot && moduleSelector == ctx.TheBuiltinModule->getName())
+    visibleFromRoot = ctx.TheBuiltinModule;
+  if (!visibleFromRoot) {
     LLVM_DEBUG(llvm::dbgs() << "no module " << moduleSelector << "\n");
     bool clearedAny = !decls.empty();
     decls.clear();
     return clearedAny;
   }
 
+  SmallVector<ModuleDecl *, 4> visibleFrom;
+  dc->getSeparatelyImportedOverlays(visibleFromRoot, visibleFrom);
+  if (visibleFrom.empty())
+    visibleFrom.push_back(visibleFromRoot);
+
   size_t initialCount = decls.size();
   decls.erase(
     std::remove_if(decls.begin(), decls.end(), [&](ValueDecl *decl) -> bool {
-      bool inScope = ctx.getImportCache().isImportedBy(decl->getModuleContext(),
-                                                       visibleFrom);
+      bool inScope = llvm::any_of(visibleFrom, [&](ModuleDecl *visibleFromMod) {
+        return ctx.getImportCache().isImportedBy(decl->getModuleContext(),
+                                                 visibleFromMod);
+      });
 
       LLVM_DEBUG(decl->dumpRef(llvm::dbgs()));
       LLVM_DEBUG(llvm::dbgs() << ": " << decl->getModuleContext()->getName()
                               << (inScope ? " is " : " is NOT ")
-                              << "selected by " << visibleFrom->getName()
-                              << "\n");
+                              << "selected by " << moduleSelector << "\n");
 
       return !inScope;
     }),

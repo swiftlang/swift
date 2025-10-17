@@ -1176,7 +1176,7 @@ ModuleSelectorCorrection(const LookupResult &candidates) {
 
     auto owningModule = decl->getModuleContext();
     candidateModules.insert(
-      { owningModule->getName(), kind });
+      { owningModule->getNameForModuleSelector(), kind });
   }
 }
 
@@ -1187,7 +1187,7 @@ ModuleSelectorCorrection(const LookupTypeResult &candidates) {
   for (auto result : candidates) {
     auto owningModule = result.Member->getModuleContext();
     candidateModules.insert(
-      { owningModule->getName(), CandidateKind::ContextFree });
+      { owningModule->getNameForModuleSelector(), CandidateKind::ContextFree });
   }
 }
 
