@@ -452,20 +452,6 @@ SwiftDependencyTracker::SwiftDependencyTracker(
                           "SDKSettings.json");
   addCommonFile(SDKSettingPath);
 
-  // Add Legacy layout file.
-  const std::vector<std::string> AllSupportedArches = {
-      "arm64", "arm64e", "x86_64", "i386",
-      "armv7", "armv7s", "armv7k", "arm64_32"};
-
-  for (auto RuntimeLibPath : SearchPathOpts.RuntimeLibraryPaths) {
-    std::error_code EC;
-    for (auto &Arch : AllSupportedArches) {
-      SmallString<256> LayoutFile(RuntimeLibPath);
-      llvm::sys::path::append(LayoutFile, "layouts-" + Arch + ".yaml");
-      addCommonFile(LayoutFile);
-    }
-  }
-
   // Add VFSOverlay file.
   for (auto &Overlay: SearchPathOpts.VFSOverlayFiles)
     addCommonFile(Overlay);
@@ -488,20 +474,21 @@ void SwiftDependencyTracker::startTracking(bool includeCommonDeps) {
   }
 }
 
-void SwiftDependencyTracker::trackFile(const Twine &path) {
+bool SwiftDependencyTracker::trackFile(const Twine &path) {
   auto file = FS->openFileForRead(path);
   if (!file)
-    return;
+    return false;
   auto status = (*file)->status();
   if (!status)
-    return;
+    return false;
   auto CASFile = dyn_cast<llvm::cas::CASBackedFile>(*file);
   if (!CASFile)
-    return;
+    return false;
   auto fileRef = CASFile->getObjectRefForContent();
   std::string realPath =
       Mapper ? Mapper->mapToString(path.str()) : path.str();
   TrackedFiles.try_emplace(realPath, fileRef, (size_t)status->getSize());
+  return true;
 }
 
 llvm::Expected<llvm::cas::ObjectProxy>
