@@ -26,29 +26,37 @@
 /// the shorthand `[count of Element]`.
 ///
 ///     let a: InlineArray<3, Int> = [1, 2, 3]
-///     // With type inference:
 ///     let b: InlineArray<_, Int> = [1, 2, 3]
 ///     let c: InlineArray<3, _>   = [1, 2, 3]
 ///     let d: InlineArray         = [1, 2, 3]
-///     // With shorthand (and, optionally, type inference):
+///     
 ///     let e: [3 of Int]          = [1, 2, 3]
 ///     let f: [_ of Int]          = [1, 2, 3]
 ///     let g: [3 of _]            = [1, 2, 3]
 ///     let h: [_ of _]            = [1, 2, 3]
 ///
+/// You can also use one of the type's initializers to create a new value
+/// programmatically.
+///
 /// Accessing Elements
 /// ------------------
 ///
 /// Just as with `Array`, you can read and modify an element in an
-/// `InlineArray` using a subscript. Unless you use the `unchecked` subscript,
-/// any index you provide is subject to bounds checking; if invalid, it will
-/// trigger a runtime error in your program.
+/// `InlineArray` using a subscript. Unless you use the memory-unsafe
+/// `unchecked` subscript, any index you provide is subject to bounds checking;
+/// if invalid, it will trigger a runtime error in your program.
 ///
 ///     var values: [3 of Double] = [1, 1.5, 2]
 ///     print(values[0])  // Prints "1.0"
 ///     values[1] -= 0.25
 ///     print(values[1])  // Prints "1.25"
 ///     values[3] = 42.0  // Fatal error: Index out of bounds
+///
+/// You can use the `indices` property to iterate over all elements in order.
+///
+///     for index in values.indices {
+///         print(values[index])
+///     }
 ///
 /// Working with Noncopyable Elements
 /// ---------------------------------
@@ -61,30 +69,28 @@
 /// Memory Layout
 /// -------------
 ///
-/// If an `InlineArray` is a stored property of a class, then it will be
-/// allocated on the heap along with the other stored properties of the class.
-/// Otherwise, in general, an `InlineArray` will be allocated on the stack.
+/// An `InlineArray` stores its elements contiguously. If an `InlineArray` is a
+/// stored property of a class, then it will be allocated on the heap along with
+/// the other stored properties of the class. Otherwise, in general, an
+/// `InlineArray` will be allocated on the stack.
 ///
-/// Elements in an `InlineArray` are stored contiguously, and the memory layout
-/// can be easily determined:
-///
-/// A *nonempty* `InlineArray`'s size and stride are both found by multiplying
+/// A *non-empty* `InlineArray`'s size and stride are both found by multiplying
 /// the `count` of elements by the `Element`'s stride. Its alignment is equal to
 /// the `Element`'s alignment.
 ///
-///     struct S {
+///     struct Record {
 ///         let x: UInt32
 ///         let y: Bool
 ///     }
-///     MemoryLayout<S>.size               // 5
-///     MemoryLayout<S>.stride             // 8
-///     MemoryLayout<S>.alignment          // 4
-///     MemoryLayout<[3 of S]>.size        // 24
-///     MemoryLayout<[3 of S]>.stride      // 24
-///     MemoryLayout<[3 of S]>.alignment   // 4
-///     MemoryLayout<(S, S, S)>.size       // 21
-///     MemoryLayout<(S, S, S)>.stride     // 24
-///     MemoryLayout<(S, S, S)>.alignment  // 4
+///     MemoryLayout<Record>.size                 // 5
+///     MemoryLayout<Record>.stride               // 8
+///     MemoryLayout<Record>.alignment            // 4
+///     MemoryLayout<[2 of Record]>.size          // 16
+///     MemoryLayout<[2 of Record]>.stride        // 16
+///     MemoryLayout<[2 of Record]>.alignment     // 4
+///     MemoryLayout<(Record, Record)>.size       // 13
+///     MemoryLayout<(Record, Record)>.stride     // 16
+///     MemoryLayout<(Record, Record)>.alignment  // 4
 ///
 /// An *empty* `InlineArray`'s size is zero. Its stride and alignment are both
 /// one byte.
@@ -251,7 +257,7 @@ extension InlineArray where Element: ~Copyable {
   /// count of the array, to initialize every element by passing the closure
   /// the index of the current element being initialized.
   ///
-  ///     InlineArray<4, Int> { 1 << $0 }  //-> [1, 2, 4, 8]
+  ///     [4 of Int] { $0 * 2 }  // [0, 2, 4, 6]
   ///
   /// The closure is allowed to throw an error at any point during
   /// initialization at which point the array will stop initialization,
@@ -290,7 +296,7 @@ extension InlineArray where Element: ~Copyable {
   /// count of the array, to initialize every element by passing the closure an
   /// immutable borrow reference to the preceding element.
   ///
-  ///     InlineArray<4, Int>(first: 1) { $0 << 1 }  //-> [1, 2, 4, 8]
+  ///     [4 of Int](first: 1) { $0 * 2 }  // [1, 2, 4, 8]
   ///
   /// The closure is allowed to throw an error at any point during
   /// initialization at which point the array will stop initialization,
