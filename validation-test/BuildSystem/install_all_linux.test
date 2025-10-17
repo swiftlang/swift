@@ -8,7 +8,6 @@
 # CHECK-DAG: --- Installing cmark ---
 # CHECK-DAG: --- Installing swift ---
 # CHECK-DAG: --- Installing llvm ---
-# CHECK-DAG: --- Installing llbuild ---
 # CHECK-DAG: --- Installing foundation ---
 # CHECK-DAG: --- Installing libdispatch ---
 # CHECK-DAG: --- Installing swiftpm ---
