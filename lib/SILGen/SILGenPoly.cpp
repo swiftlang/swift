@@ -647,9 +647,10 @@ ManagedValue Transform::transform(ManagedValue v,
         llvm::report_fatal_error("unsupported collection upcast kind");
       }
 
-      return SGF.emitCollectionConversion(Loc, fn, inputSubstType,
-                                          outputSubstType, v, ManagedValue(), ManagedValue(), ctxt)
-                .getScalarValue();
+      return SGF
+          .emitCollectionConversion(Loc, fn, inputSubstType, outputSubstType, v,
+                                    nullptr, nullptr, ctxt)
+          .getScalarValue();
     }
   }
 
