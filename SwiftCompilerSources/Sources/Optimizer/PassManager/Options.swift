@@ -44,6 +44,10 @@ struct Options {
     hasFeature(.Embedded)
   }
 
+  var enableEmbeddedSwiftExistentials: Bool {
+      hasFeature(.EmbeddedExistentials)
+  }
+
   var enableMergeableTraps: Bool {
     _bridged.enableMergeableTraps()
   }

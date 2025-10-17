@@ -558,6 +558,9 @@ EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
 /// Allow use of `~Sendable`.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TildeSendable, false)
 
+/// Allow use of protocol typed values in Embedded mode (`Any` and friends)
+EXPERIMENTAL_FEATURE(EmbeddedExistentials, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
