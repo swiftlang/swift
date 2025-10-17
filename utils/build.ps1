@@ -813,7 +813,7 @@ function Invoke-BuildStep {
           $NextArg = $RemainingArgs[$RemainingArgs.IndexOf($Arg) + 1]
           if ($NextArg -is [string] -and !$NextArg.StartsWith('-')) {
             $SplatArgs[$ParamName] = $NextArg
-            $Enumerator.MoveNext() # Skip NextArg
+            $Enumerator.MoveNext() | Out-Null # Skip NextArg
             continue
           }
         }
