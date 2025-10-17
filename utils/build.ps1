@@ -4293,15 +4293,12 @@ if (-not $SkipBuild) {
       if (-not $Build.LinkModes.Contains("static")) { continue }
 
       $SDKROOT = Get-SwiftSDK -OS $Build.OS -Identifier "$($Build.OS)Experimental"
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.a" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libcurl.a" | Out-Null
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2.a" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libxml2.a" | Out-Null
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\zlib\libz.a" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libz.a" | Out-Null
+      $SwiftResourceDir = "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)"
+      Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\libbrotlicommon.a" -Destination "${SwiftResourceDir}\libbrotlicommon.a" | Out-Null
+      Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\libbrotlidec.a" -Destination "${SwiftResourceDir}\libbrotlidec.a" | Out-Null
+      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.a" -Destination "${SwiftResourceDir}\libcurl.a" | Out-Null
+      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2.a" -Destination "${SwiftResourceDir}\libxml2.a" | Out-Null
+      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\zlib\libz.a" -Destination "${SwiftResourceDir}\libz.a" | Out-Null
     }
   }
 
