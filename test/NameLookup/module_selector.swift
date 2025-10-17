@@ -148,7 +148,8 @@ extension B: @retroactive main::Equatable {
     // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{none}}
 
     _ = #main::ExprMacro
-    // expected-error@-1 {{no macro named 'main::ExprMacro'}}
+    // expected-error@-1 {{'ExprMacro' is not imported through module 'main'}}
+    // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{10-14=ModuleSelectorTestingKit}}
   }
 
   @main::PeerMacro func thingy() {}
@@ -307,7 +308,8 @@ extension D: @retroactive Swift::Equatable {
     // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{none}}
 
     _ = #Swift::ExprMacro
-    // expected-error@-1 {{no macro named 'Swift::ExprMacro'}}
+    // expected-error@-1 {{'ExprMacro' is not imported through module 'Swift'}}
+    // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{10-15=ModuleSelectorTestingKit}}
   }
 
   @Swift::PeerMacro func thingy() {}
@@ -330,25 +332,29 @@ struct AvailableUser {
   @available(macOS 10.15, *) var use1: String { "foo" }
 
   @main::available() var use2
-  // FIXME improve: expected-error@-1 {{unknown attribute 'main::available'}}
-  // FIXME suppress: expected-error@-2 {{type annotation missing in pattern}}
+  // expected-error@-1 {{'available' is not imported through module 'main'}}
+  // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{4-8=ModuleSelectorTestingKit}}
+  // FIXME suppress: expected-error@-3 {{type annotation missing in pattern}}
 
   @ModuleSelectorTestingKit::available() var use4
   // no-error
 
   @Swift::available() var use5
-  // FIXME improve: expected-error@-1 {{unknown attribute 'Swift::available'}}
-  // FIXME suppress: expected-error@-2 {{type annotation missing in pattern}}
+  // expected-error@-1 {{'available' is not imported through module 'Swift'}}
+  // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{4-9=ModuleSelectorTestingKit}}
+  // FIXME suppress: expected-error@-3 {{type annotation missing in pattern}}
 }
 
 func builderUser2(@main::MyBuilder fn: () -> Void) {}
-// FIXME improve: expected-error@-1 {{unknown attribute 'main::MyBuilder'}}
+// expected-error@-1 {{'MyBuilder' is not imported through module 'main'}}
+// expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{20-24=ModuleSelectorTestingKit}}
 
 func builderUser3(@ModuleSelectorTestingKit::MyBuilder fn: () -> Void) {}
 // no-error
 
 func builderUser4(@Swift::MyBuilder fn: () -> Void) {}
-// FIXME improve: expected-error@-1 {{unknown attribute 'Swift::MyBuilder'}}
+// expected-error@-1 {{'MyBuilder' is not imported through module 'Swift'}}
+// expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{20-25=ModuleSelectorTestingKit}}
 
 // Error cases
 

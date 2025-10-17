@@ -4148,6 +4148,16 @@ namespace {
       auto macros = lookupMacros(moduleIdent, macroIdent, functionRefInfo,
                                  expr->getMacroRoles());
       if (macros.empty()) {
+        // Try removing a module selector if present.
+        if (macroIdent.hasModuleSelector()) {
+          auto anyMacroIdent = DeclNameRef(macroIdent.getFullName());
+          ModuleSelectorCorrection correction(
+            lookupMacros(moduleIdent, anyMacroIdent, functionRefInfo,
+                         expr->getMacroRoles()));
+          if (correction.diagnose(ctx, expr->getMacroNameLoc(), macroIdent))
+            return Type();
+        }
+
         ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
                            macroIdent)
             .highlight(expr->getMacroNameLoc().getSourceRange());
