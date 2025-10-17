@@ -220,7 +220,8 @@ struct AliasAnalysis {
          is StrongCopyUnmanagedValueInst,
          is StrongCopyWeakValueInst,
          is BeginBorrowInst,
-         is BeginCOWMutationInst:
+         is BeginCOWMutationInst,
+         is DebugStepInst:
       return .noEffects
 
     case let load as LoadInst:
