@@ -110,6 +110,7 @@ enum class BridgedResultConvention {
   Pack,
   GuaranteedAddress,
   Guaranteed,
+  Inout
 };
 
 struct BridgedResultInfo {

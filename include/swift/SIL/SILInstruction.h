@@ -3154,8 +3154,9 @@ public:
   bool hasGuaranteedResult() const {
     return getSubstCalleeConv().hasGuaranteedResult();
   }
-  bool hasGuaranteedAddressResult() const {
-    return getSubstCalleeConv().hasGuaranteedAddressResult();
+
+  bool hasAddressResult() const {
+    return getSubstCalleeConv().hasAddressResult();
   }
 };
 

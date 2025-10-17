@@ -922,6 +922,9 @@ mangled in to disambiguate.
   RESULT-CONVENTION ::= 'u'                  // unowned inner pointer
   RESULT-CONVENTION ::= 'a'                  // auto-released
   RESULT-CONVENTION ::= 'k'                  // pack
+  RESULT-CONVENTION ::= 'l'                  // guaranteed address
+  RESULT-CONVENTION ::= 'g'                  // guaranteed
+  RESULT-CONVENTION ::= 'm'                  // inout
 
   RESULT-DIFFERENTIABILITY ::= 'w'            // @noDerivative
 

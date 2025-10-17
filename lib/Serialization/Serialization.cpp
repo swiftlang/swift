@@ -5526,6 +5526,7 @@ static uint8_t getRawStableResultConvention(swift::ResultConvention rc) {
   SIMPLE_CASE(ResultConvention, Pack)
   SIMPLE_CASE(ResultConvention, GuaranteedAddress)
   SIMPLE_CASE(ResultConvention, Guaranteed)
+  SIMPLE_CASE(ResultConvention, Inout)
   }
   llvm_unreachable("bad result convention kind");
 }
