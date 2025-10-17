@@ -129,8 +129,8 @@ extension B: @retroactive main::Equatable {
       // expected-error@-3 {{cannot infer contextual base in reference to member 'main::min'}}
 
       self = B.main::init(value: .min)
-      // FIXME improve: expected-error@-1 {{'B' cannot be constructed because it has no accessible initializers}}
-      // expected-error@-2 {{cannot infer contextual base in reference to member 'min'}}
+      // expected-error@-1 {{'init(value:)' is not imported through module 'main'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{16-20=ModuleSelectorTestingKit}}
     }
 
     self.main::myNegate()
@@ -183,7 +183,7 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
   @_dynamicReplacement(for: ModuleSelectorTestingKit::negate())
 
   mutating func myNegate() {
-  // expected-note@-1 {{did you mean 'myNegate'?}}
+  // expected-note@-1 {{'myNegate()' declared here}}
 
     let fn: (ModuleSelectorTestingKit::Int, ModuleSelectorTestingKit::Int) -> ModuleSelectorTestingKit::Int =
     // expected-error@-1 3{{'Int' is not imported through module 'ModuleSelectorTestingKit'}}
@@ -213,13 +213,15 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
     }
     else {
       self = ModuleSelectorTestingKit::C(value: .ModuleSelectorTestingKit::min)
-      // FIXME improve: expected-error@-1 {{type 'Int' has no member 'ModuleSelectorTestingKit::min'}}
+      // expected-error@-1 {{'min' is not imported through module 'ModuleSelectorTestingKit'}}
+      // expected-note@-2 {{did you mean module 'Swift'?}} {{50-74=Swift}}
 
       self = C.ModuleSelectorTestingKit::init(value: .min)
     }
 
     self.ModuleSelectorTestingKit::myNegate()
-    // FIXME improve: expected-error@-1 {{value of type 'C' has no member 'ModuleSelectorTestingKit::myNegate'}}
+    // expected-error@-1 {{'myNegate()' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-2 {{did you mean module 'main'?}} {{10-34=main}}
 
     ModuleSelectorTestingKit::fatalError()
     // expected-error@-1 {{'fatalError' is not imported through module 'ModuleSelectorTestingKit'}}
@@ -261,7 +263,7 @@ extension D: @retroactive Swift::Equatable {
   // FIXME improve: expected-error@-1 {{replaced function 'Swift::negate()' could not be found}}
 
   mutating func myNegate() {
-    // expected-note@-1 {{did you mean 'myNegate'?}}
+  // expected-note@-1 {{'myNegate()' declared here}}
 
     let fn: (Swift::Int, Swift::Int) -> Swift::Int =
       (Swift::+)
@@ -285,12 +287,13 @@ extension D: @retroactive Swift::Equatable {
       // expected-error@-3 {{cannot infer contextual base in reference to member 'Swift::min'}}
 
       self = D.Swift::init(value: .min)
-      // FIXME improve: expected-error@-1 {{'D' cannot be constructed because it has no accessible initializers}}
-      // expected-error@-2 {{cannot infer contextual base in reference to member 'min'}}
+      // expected-error@-1 {{'init(value:)' is not imported through module 'Swift'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{16-21=ModuleSelectorTestingKit}}
     }
 
     self.Swift::myNegate()
-    // FIXME improve: expected-error@-1 {{value of type 'D' has no member 'Swift::myNegate'}}
+    // expected-error@-1 {{'myNegate()' is not imported through module 'Swift'}}
+    // expected-note@-2 {{did you mean module 'main'?}} {{10-15=main}}
 
     Swift::fatalError()
 
@@ -392,8 +395,8 @@ func badModuleNames() {
   // expected-note@-2 {{did you mean module 'Swift'?}} {{3-20=Swift}}
 
   _ = "foo".NonexistentModule::count
-  // FIXME improve: expected-error@-1 {{value of type 'String' has no member 'NonexistentModule::count'}}
-  // FIXME: expected-EVENTUALLY-note@-2 {{did you mean module 'Swift'?}} {{13-30=Swift}}
+  // expected-error@-1 {{'count' is not imported through module 'NonexistentModule'}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{13-30=Swift}}
 
   let x: NonexistentModule::MyType = NonexistentModule::MyType()
   // expected-error@-1 {{cannot find type 'NonexistentModule::MyType' in scope}}
