@@ -49,3 +49,21 @@ print(h)
 let i: Any = (any A & B & ~Copyable).self
 // CHECK: any A & B<Self: ~Swift.Copyable>
 print(i)
+
+@inline(never)
+func test() -> Bool {
+  return [].first == nil
+}
+
+// CHECK: true
+print(test())
+
+let j: [any (~Copyable & ~Escapable).Type] = []
+
+// CHECK: Array<any Any<Self: ~Swift.Copyable, Self: ~Swift.Escapable>.Type>
+print(type(of: j))
+
+let k: [(any ~Copyable & ~Escapable).Type] = []
+
+// CHECK: Array<(any Any<Self: ~Swift.Copyable, Self: ~Swift.Escapable>).Type>
+print(type(of: k))
