@@ -1440,7 +1440,7 @@ namespace {
         if (!protocol)
           return Type();
 
-        auto macroIdent = ctx.getIdentifier(kind);
+        auto macroIdent = DeclNameRef(ctx.getIdentifier(kind));
         auto macros = lookupMacros(Identifier(), macroIdent,
                                    FunctionRefInfo::unappliedBaseName(),
                                    MacroRole::Expression);
@@ -4111,12 +4111,12 @@ namespace {
 
     /// Lookup all macros with the given macro name.
     SmallVector<OverloadChoice, 1> lookupMacros(DeclName moduleName,
-                                                DeclName macroName,
+                                                DeclNameRef macroName,
                                                 FunctionRefInfo functionRefInfo,
                                                 MacroRoles roles) {
       SmallVector<OverloadChoice, 1> choices;
       auto results = namelookup::lookupMacros(CurDC, DeclNameRef(moduleName),
-                                              DeclNameRef(macroName), roles);
+                                              macroName, roles);
       for (const auto &result : results) {
         // Ignore invalid results. This matches the OverloadedDeclRefExpr
         // logic.
@@ -4143,7 +4143,7 @@ namespace {
 
       // Look up the macros with this name.
       auto moduleIdent = expr->getModuleName().getBaseName();
-      auto macroIdent = expr->getMacroName().getBaseName();
+      auto macroIdent = expr->getMacroName().withoutArgumentLabels(ctx);
       FunctionRefInfo functionRefInfo = FunctionRefInfo::singleBaseNameApply();
       auto macros = lookupMacros(moduleIdent, macroIdent, functionRefInfo,
                                  expr->getMacroRoles());
