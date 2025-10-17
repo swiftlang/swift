@@ -221,7 +221,11 @@ SourceLoc BraceStmt::getEndLoc() const {
 
 SourceLoc BraceStmt::getContentStartLoc() const {
   for (auto elt : getElements()) {
-    if (auto loc = elt.getStartLoc()) {
+    if (auto *D = elt.dyn_cast<Decl *>()) {
+      // FIXME: This should really be the default behavior of Decl::getStartLoc.
+      if (auto range = D->getSourceRangeIncludingAttrs())
+        return range.Start;
+    } else if (auto loc = elt.getStartLoc()) {
       return loc;
     }
   }
