@@ -8,7 +8,6 @@
 // * Whether X::foo finds foos in X's re-exports
 // * Whether we handle access paths correctly
 // * Interaction with ClangImporter
-// * Cross-import overlays
 // * Key path dynamic member lookup
 // * Custom type attributes (and coverage of type attrs generally is sparse)
 //
@@ -107,7 +106,6 @@ extension B: @retroactive main::Equatable {
       (main::+)
       // expected-error@-1 {{'+' is not imported through module 'main'}}
       // expected-note@-2 {{did you mean module 'Swift'?}} {{8-12=Swift}}
-      // expected-note@-3 {{did you mean module '_Concurrency'?}} {{8-12=_Concurrency}} FIXME: Accept and suggest 'Swift::' instead?
 
     let magnitude: Int.main::Magnitude = main::magnitude
     // expected-error@-1 {{'Magnitude' is not imported through module 'main'}}
@@ -195,7 +193,6 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
       (ModuleSelectorTestingKit::+)
       // expected-error@-1 {{'+' is not imported through module 'ModuleSelectorTestingKit'}}
       // expected-note@-2 {{did you mean module 'Swift'?}} {{8-32=Swift}}
-      // expected-note@-3 {{did you mean module '_Concurrency'?}} {{8-32=_Concurrency}} FIXME: Accept and suggest 'Swift::' instead?
 
     let magnitude: Int.ModuleSelectorTestingKit::Magnitude = ModuleSelectorTestingKit::magnitude
     // expected-error@-1 {{'Magnitude' is not imported through module 'ModuleSelectorTestingKit'}}
@@ -416,4 +413,18 @@ func badModuleNames() {
 
 func builtinModuleLookups(_ int: Builtin::Int64) -> Builtin::Int64 {
   return Builtin::int_bswap_Int64(int)
+}
+
+func concurrencyModuleLookups(
+  _: any Swift::Clock,
+  _: any _Concurrency::Clock,
+  _: any ModuleSelectorTestingKit::Clock
+  // expected-error@-1 {{'Clock' is not imported through module 'ModuleSelectorTestingKit'}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{10-34=Swift}}
+) async {
+  await Swift::withTaskCancellationHandler {} onCancel: {}
+  await _Concurrency::withTaskCancellationHandler {} onCancel: {}
+  await ModuleSelectorTestingKit::withTaskCancellationHandler {} onCancel: {}
+  // expected-error@-1 {{'withTaskCancellationHandler' is not imported through module 'ModuleSelectorTestingKit'}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{9-33=Swift}}
 }
