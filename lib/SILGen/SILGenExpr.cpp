@@ -477,7 +477,9 @@ namespace {
     RValue visitCollectionUpcastConversionExpr(
              CollectionUpcastConversionExpr *E,
              SGFContext C);
-    ManagedValue emitConversionClosure(CollectionUpcastConversionExpr::ConversionPair pair, SGFContext C);
+    ManagedValue
+    emitConversionClosure(CollectionUpcastConversionExpr::ConversionPair pair,
+                          SGFContext C, FuncDecl *castFunc, unsigned argIndex);
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
     RValue visitPackExpansionExpr(PackExpansionExpr *E, SGFContext C);
     RValue visitPackElementExpr(PackElementExpr *E, SGFContext C);
@@ -1651,7 +1653,8 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   if (fromCollection->isArray()) {
     if (needsCustomConversion(E->getValueConversion())) {
       fn = SGF.SGM.getArrayWitnessCast(loc);
-      valueConversion = emitConversionClosure(E->getValueConversion(), C);
+      valueConversion =
+          emitConversionClosure(E->getValueConversion(), C, fn, 1);
     } else {
       fn = SGF.SGM.getArrayForceCast(loc);
     }
@@ -1760,7 +1763,9 @@ public:
 };
 } // namespace
 
-ManagedValue RValueEmitter::emitConversionClosure(CollectionUpcastConversionExpr::ConversionPair pair, SGFContext C) {
+ManagedValue RValueEmitter::emitConversionClosure(
+    CollectionUpcastConversionExpr::ConversionPair pair, SGFContext C,
+    FuncDecl *castFunc, unsigned argIndex) {
   ASTContext &Context = SGF.getASTContext();
   DeclContext *declContext = SGF.FunctionDC;
 
@@ -1812,8 +1817,27 @@ ManagedValue RValueEmitter::emitConversionClosure(CollectionUpcastConversionExpr
   closure->setDiscriminator(discriminator++);
   Context.setMaxAssignedDiscriminator(declContext, discriminator);
 
-  RValue result = visitAbstractClosureExpr(closure, C);
-  return std::move(result).getScalarValue();
+  Type replacementTypes[] = {pair.OrigValue->getType(),
+                             pair.Conversion->getType()};
+  auto subs =
+      SubstitutionMap::get(castFunc->getGenericSignature(), replacementTypes,
+                           LookUpConformanceInModule());
+
+  CanType origParamType = castFunc->getParameters()
+                              ->get(argIndex)
+                              ->getInterfaceType()
+                              ->getCanonicalType();
+  CanType substParamType = origParamType.subst(subs)->getCanonicalType();
+
+  // Ensure that the closure has the appropriate type.
+  AbstractionPattern origParam(
+      castFunc->getGenericSignature().getCanonicalSignature(), origParamType);
+
+  auto conversion = Conversion::getSubstToOrig(
+      origParam, substParamType, SGF.getLoweredType(closure->getType()),
+      SGF.getLoweredType(origParam, substParamType));
+
+  return SGF.emitConvertedRValue(closure, conversion);
 }
 
 RValue
