@@ -39,23 +39,41 @@ enum CoreFoundation {
 
   static let CFRunLoopRun: @convention(c) () -> () =
     symbol("CFRunLoopRun")
+  static let CFRunLoopRunInMode:
+    @convention(c) (AnyObject, Double, CBool) -> Int32 =
+    symbol("CFRunLoopRunInMode")
   static let CFRunLoopGetMain: @convention(c) () -> OpaquePointer =
     unsafe symbol("CFRunLoopGetMain")
   static let CFRunLoopStop: @convention(c) (OpaquePointer) -> () =
     unsafe symbol("CFRunLoopStop")
+
+  private static let _kCFRunLoopCommonModes: UnsafePointer<AnyObject> =
+    unsafe symbol("kCFRunLoopCommonModes")
+  static var kCFRunLoopCommonModes: AnyObject {
+    return unsafe _kCFRunLoopCommonModes.pointee
+  }
 }
 
 // .. Main Executor ............................................................
 
 /// A CFRunLoop-based main executor (Apple platforms only)
 @available(StdlibDeploymentTarget 6.2, *)
-final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
+final class CFMainExecutor: DispatchMainExecutor, RunLoopExecutor,
+                            @unchecked Sendable {
 
   override public func run() throws {
     CoreFoundation.CFRunLoopRun()
   }
 
-  override public func stop() {
+  public func runUntil(_ condition: () -> Bool) throws {
+    while !condition() {
+      CoreFoundation.CFRunLoopRunInMode(CoreFoundation.kCFRunLoopCommonModes,
+                                        0,
+                                        false)
+    }
+  }
+
+  public func stop() {
     unsafe CoreFoundation.CFRunLoopStop(CoreFoundation.CFRunLoopGetMain())
   }
 
