@@ -536,6 +536,14 @@ bool BridgedASTType::isBox() const {
   return unbridged()->is<swift::SILBoxType>();
 }
 
+bool BridgedASTType::isPack() const {
+  return unbridged()->is<swift::PackType>();
+}
+
+bool BridgedASTType::isSILPack() const {
+  return unbridged()->is<swift::SILPackType>();
+}
+
 BridgedASTType BridgedASTType::getBuiltinVectorElementType() const {
   return {unbridged()->castTo<swift::BuiltinVectorType>()->getElementType().getPointer()};
 }
@@ -636,7 +644,15 @@ BridgedASTType BridgedASTType::subst(BridgedSubstitutionMap substMap) const {
 
 BridgedConformance BridgedASTType::checkConformance(BridgedDeclObj proto) const {
   return swift::checkConformance(unbridged(), proto.getAs<swift::ProtocolDecl>(), /*allowMissing=*/ false);
-}  
+}
+
+bool BridgedASTType::containsSILPackExpansionType() const {
+  return unbridged()->castTo<swift::SILPackType>()->containsPackExpansionType();
+}
+
+bool BridgedASTType::isSILPackElementAddress() const {
+  return unbridged()->castTo<swift::SILPackType>()->isElementAddress();
+}
 
 static_assert((int)BridgedASTType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);
 static_assert((int)BridgedASTType::TraitResult::CanBe == (int)swift::TypeTraitResult::CanBe);

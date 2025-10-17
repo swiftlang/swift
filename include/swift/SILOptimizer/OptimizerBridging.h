@@ -200,6 +200,8 @@ struct BridgedPassContext {
                                                 BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithBoxToStackPromotedArgs(BridgedArrayRef bridgedPromotedArgIndices,
                                                       BridgedFunction bridgedOriginalFunction) const;
+  BridgedOwnedString mangleWithExplodedPackArgs(BridgedArrayRef bridgedPackArgs,
+                                                BridgedFunction applySiteCallee) const;
 
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   BRIDGED_INLINE bool eliminateDeadAllocations(BridgedFunction f) const;
@@ -269,6 +271,8 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BridgedFunction createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
                                                         const BridgedParameterInfo * _Nullable specializedBridgedParams,
                                                         SwiftInt paramCount,
+                                                        const BridgedResultInfo *_Nullable specializedBridgedResults,
+                                                        SwiftInt resultCount,
                                                         BridgedFunction bridgedOriginal,
                                                         bool makeThin,
                                                         bool makeBare,
