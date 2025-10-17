@@ -40,3 +40,6 @@ public struct available {
 public struct MyBuilder {
   public static func buildBlock()
 }
+
+@freestanding(expression) public macro ExprMacro() -> String = #file
+@attached(peer) public macro PeerMacro() = #externalMacro(module: "Fnord", type: "PeerMacro")

@@ -1495,8 +1495,11 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
   if (parentType.isNull()) {
     // Tailored diagnostic for custom attributes.
     if (resolution.getOptions().is(TypeResolverContext::CustomAttr)) {
-      diags.diagnose(repr->getNameLoc(), diag::unknown_attr_name,
-                     repr->getNameRef().getBaseIdentifier().str());
+      SmallString<64> scratch;
+      llvm::raw_svector_ostream scratchOS(scratch);
+      repr->getNameRef().printPretty(scratchOS);
+
+      diags.diagnose(repr->getNameLoc(), diag::unknown_attr_name, scratch);
 
       return ErrorType::get(ctx);
     }
@@ -5171,9 +5174,13 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       // Tailored diagnostic for custom attributes.
       if (options.is(TypeResolverContext::CustomAttr)) {
+        SmallString<64> scratch;
+        llvm::raw_svector_ostream scratchOS(scratch);
+        repr->getNameRef().printPretty(scratchOS);
+
         auto &ctx = resolution.getASTContext();
         ctx.Diags.diagnose(repr->getNameLoc(), diag::unknown_attr_name,
-                           repr->getNameRef().getBaseIdentifier().str());
+                           scratch);
 
         return ErrorType::get(ctx);
       }
