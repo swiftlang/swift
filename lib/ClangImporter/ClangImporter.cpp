@@ -8292,6 +8292,9 @@ static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
 }
 
 static bool hasDestroyTypeOperations(const clang::CXXRecordDecl *decl) {
+  if (decl->hasSimpleDestructor())
+    return true;
+
   if (auto dtor = decl->getDestructor()) {
     if (dtor->isDeleted() || dtor->isIneligibleOrNotSelected() ||
         dtor->getAccess() != clang::AS_public) {
