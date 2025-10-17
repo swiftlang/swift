@@ -56,9 +56,9 @@ import Swift
 extension Task where Failure == ${FAILURE_TYPE} {
 
   % if IS_DETACHED:
-  /// Create and immediately start running a new task in the context of the calling thread/task.
-  % else:
   /// Create and immediately start running a new detached task in the context of the calling thread/task.
+  % else:
+  /// Create and immediately start running a new task in the context of the calling thread/task.
   % end # IS_DETACHED
   ///
   /// This function _starts_ the created task on the calling context.
