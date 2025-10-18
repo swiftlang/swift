@@ -220,6 +220,9 @@ struct FragileFunctionKind {
   friend bool operator==(FragileFunctionKind lhs, FragileFunctionKind rhs) {
     return lhs.kind == rhs.kind;
   }
+  friend bool operator!=(FragileFunctionKind lhs, FragileFunctionKind rhs) {
+    return lhs.kind != rhs.kind;
+  }
 
   /// Casts to `unsigned` for diagnostic %selects.
   unsigned getSelector() { return static_cast<unsigned>(kind); }
