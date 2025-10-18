@@ -1160,8 +1160,23 @@ ModuleSelectorCorrection(const LookupResult &candidates) {
   // emit a bunch of duplicates.
   for (auto result : candidates) {
     ValueDecl * decl = result.getValueDecl();
+
+    CandidateKind kind;
+    if (!result.getDeclContext()) {
+      if (decl->getDeclContext()->isLocalContext())
+        kind = CandidateKind::Local;
+      else
+        kind = CandidateKind::ContextFree;
+    } else {
+      if (result.getDeclContext()->isTypeContext())
+        kind = CandidateKind::MemberViaContext;
+      else // found through result.getDeclContext()'s implicit `self`
+        kind = CandidateKind::MemberViaSelf;
+    }
+
     auto owningModule = decl->getModuleContext();
-    candidateModules.insert(owningModule->getName());
+    candidateModules.insert(
+      { owningModule->getName(), kind });
   }
 }
 
@@ -1171,7 +1186,8 @@ ModuleSelectorCorrection(const LookupTypeResult &candidates) {
   // emit a bunch of duplicates.
   for (auto result : candidates) {
     auto owningModule = result.Member->getModuleContext();
-    candidateModules.insert(owningModule->getName());
+    candidateModules.insert(
+      { owningModule->getName(), CandidateKind::ContextFree });
   }
 }
 
@@ -1187,10 +1203,47 @@ bool ModuleSelectorCorrection::diagnose(ASTContext &ctx,
 
   SourceLoc moduleSelectorLoc = nameLoc.getModuleSelectorLoc();
 
-  for (auto moduleName : candidateModules) {
-    ctx.Diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
-                       moduleName)
-        .fixItReplace(moduleSelectorLoc, moduleName.str());
+  for (auto pair : candidateModules) {
+    Identifier moduleName = pair.first;
+    switch (pair.second) {
+    case CandidateKind::ContextFree:
+      ctx.Diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
+                         moduleName)
+          .fixItReplace(moduleSelectorLoc, moduleName.str());
+      break;
+
+    case CandidateKind::MemberViaSelf: {
+      SmallString<64> replacement("self.");
+      if (moduleName != originalName.getModuleSelector()) {
+        // The module selector specified the wrong module; replace it.
+        replacement += moduleName.str();
+
+        ctx.Diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
+                           moduleName)
+            .fixItReplace(moduleSelectorLoc, replacement);
+      } else {
+        // The module selector specified the right module, but we need to
+        // make the `self.` explicit.
+        ctx.Diags.diagnose(moduleSelectorLoc,
+                           diag::note_add_explicit_self_with_module_selector)
+            .fixItInsert(moduleSelectorLoc, replacement);
+      }
+      break;
+    }
+    case CandidateKind::MemberViaContext:
+      // FIXME: If we had more info here, we could construct a reference
+      //        to the outer type in question.
+      ctx.Diags.diagnose(moduleSelectorLoc,
+                         diag::note_remove_module_selector_outer_type)
+          .fixItRemoveChars(moduleSelectorLoc, nameLoc.getBaseNameLoc());
+      break;
+
+    case CandidateKind::Local:
+      ctx.Diags.diagnose(moduleSelectorLoc,
+                         diag::note_remove_module_selector_local_decl)
+          .fixItRemoveChars(moduleSelectorLoc, nameLoc.getBaseNameLoc());
+      break;
+    }
   }
 
   return true;

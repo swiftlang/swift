@@ -312,7 +312,20 @@ public:
 /// there are any results, the \c diagnose() method will emit an error and a
 /// set of fix-it notes.
 class ModuleSelectorCorrection {
-  using CandidateModule = Identifier;
+  enum class CandidateKind {
+    /// A declaration that is found without depending on context.
+    /// Usually either a top-level type or a member with an explicit base type.
+    ContextFree,
+    /// A member declaration accessed via implicit \c self .
+    MemberViaSelf,
+    /// A member declaration not accessed via implicit \c self (usually a static
+    /// member of an enclosing type).
+    MemberViaContext,
+    /// A local declaration.
+    Local
+  };
+
+  using CandidateModule = std::pair<Identifier, CandidateKind>;
   SmallSetVector<CandidateModule, 4> candidateModules;
 
 public:
