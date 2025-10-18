@@ -308,7 +308,7 @@ public var force_yield_once_convention : () {
 // CHECK-SAME:        _swift_coro_malloc_allocator
 // CHECK-SAME:    )
 // CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
-// CHECK:         call void @llvm.coro.alloca.free(token [[ALLOCATION]])
+// CHECK:         call void @llvm.coro.alloca.free.frame(token [[ALLOCATION]])
 // CHECK:       }
   @_silgen_name("increment_irm_yield_once")
   _modify {
@@ -338,8 +338,8 @@ public var force_yield_once_2_convention : () {
 //           :            i32 1
 //           :        )
 // CHECK-64:      [[SIZE_64:%[^,]+]] = zext i32 {{%[^,]+}} to i64
-// CHECK-64:      [[ALLOCATION:%[^,]+]] = call token @llvm.coro.alloca.alloc.i64(i64 [[SIZE_64]], i32 16)
-// CHECK-32:      [[ALLOCATION:%[^,]+]] = call token @llvm.coro.alloca.alloc.i32(i32 {{%[^,]+}}, i32 16)
+// CHECK-64:      [[ALLOCATION:%[^,]+]] = call token @llvm.coro.alloca.alloc.frame.i64(i64 [[SIZE_64]], i32 16)
+// CHECK-32:      [[ALLOCATION:%[^,]+]] = call token @llvm.coro.alloca.alloc.frame.i32(i32 {{%[^,]+}}, i32 16)
 // CHECK:         [[FRAME:%[^,]+]] = call ptr @llvm.coro.alloca.get(token [[ALLOCATION]])
 // CHECK:         call void @llvm.lifetime.start.p0(i64 -1, ptr [[FRAME]])
 // CHECK:         [[RAMP:%[^,]+]] = call ptr @llvm.coro.prepare.retcon(ptr @"$s19coroutine_accessors1SV3irmSivx")
@@ -357,7 +357,7 @@ public var force_yield_once_2_convention : () {
 // CHECK-SAME:        [[ALLOCATOR]]
 // CHECK-SAME:    )
 // CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
-// CHECK:         call void @llvm.coro.alloca.free(token [[ALLOCATION]])
+// CHECK:         call void @llvm.coro.alloca.free.frame(token [[ALLOCATION]])
 // CHECK:       }
   @_silgen_name("increment_irm_yield_once_2")
   modify {
