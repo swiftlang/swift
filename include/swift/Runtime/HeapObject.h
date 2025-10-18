@@ -137,6 +137,7 @@ HeapObject* swift_allocEmptyBox();
 /// It may also prove worthwhile to have this use a custom CC
 /// which preserves a larger set of registers.
 SWIFT_RUNTIME_EXPORT
+SWIFT_REFCOUNT_CC
 HeapObject *swift_retain(HeapObject *object);
 
 SWIFT_RUNTIME_EXPORT
@@ -173,6 +174,7 @@ bool swift_isDeallocating(HeapObject *object);
 ///      - maybe a variant that can assume a non-null object
 /// It's unlikely that a custom CC would be beneficial here.
 SWIFT_RUNTIME_EXPORT
+SWIFT_REFCOUNT_CC
 void swift_release(HeapObject *object);
 
 SWIFT_RUNTIME_EXPORT
