@@ -1017,7 +1017,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   // reused when building PCM files for the module cache.
   CI.setVirtualFileSystem(Impl.Instance->getVirtualFileSystemPtr());
   CI.setFileManager(&Impl.Instance->getFileManager());
-  CI.createSourceManager(CI.getFileManager());
+  CI.createSourceManager();
   auto &clangSrcMgr = CI.getSourceManager();
   auto FID = clangSrcMgr.createFileID(
                         std::make_unique<ZeroFilledMemoryBuffer>(1, "<main>"));
@@ -1921,7 +1921,7 @@ std::string ClangImporter::getBridgingHeaderContents(
       Impl.Instance->getVirtualFileSystemPtr());
   rewriteInstance.setFileManager(&Impl.Instance->getFileManager());
   rewriteInstance.createDiagnostics(new clang::IgnoringDiagConsumer);
-  rewriteInstance.createSourceManager(rewriteInstance.getFileManager());
+  rewriteInstance.createSourceManager();
   rewriteInstance.setTarget(&Impl.Instance->getTarget());
 
   std::string result;
@@ -2027,7 +2027,7 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
   clonedInstance->setFileManager(&Impl.Instance->getFileManager());
   clonedInstance->createDiagnostics(&Impl.Instance->getDiagnosticClient(),
                                     /*ShouldOwnClient=*/false);
-  clonedInstance->createSourceManager(clonedInstance->getFileManager());
+  clonedInstance->createSourceManager();
   clonedInstance->setTarget(&Impl.Instance->getTarget());
   clonedInstance->setOutputBackend(Impl.SwiftContext.OutputBackend);
 
