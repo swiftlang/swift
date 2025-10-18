@@ -34,7 +34,7 @@ class DeprecatedClass { }
 
 func functionWithDeprecatedParameter(p: DeprecatedClass) { } // expected-warning{{'DeprecatedClass' was deprecated in Android 28.0: Use BetterClass instead}}
 
-@available(tvOS, introduced: 7.0, deprecated: 29,
+@available(Android, introduced: 7.0, deprecated: 29,
               message: "Use BetterClass instead")
 class DeprecatedClassIn29_0 { }
 
