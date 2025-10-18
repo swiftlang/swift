@@ -31,6 +31,41 @@ func checkHasContiguousStorageSubstring(_ x: Substring.UTF8View) {
   expectTrue(hasStorage)
 }
 
+fileprivate func slices(
+  _ s: String,
+  from: Int,
+  to: Int
+) -> (
+  Substring,
+  Substring,
+  Substring
+) {
+  let s1 = s[s.index(s.startIndex, offsetBy: from) ..<
+    s.index(s.startIndex, offsetBy: to)]
+  let s2 = s1[s1.startIndex..<s1.endIndex]
+  let s3 = s2[s1.startIndex..<s1.endIndex]
+  return (s1, s2, s3)
+}
+
+fileprivate func allNotEmpty(
+  _ s: Substring...
+) -> Bool {
+  s.allSatisfy { $0.isEmpty == false }
+}
+
+fileprivate func allEqual(
+  _ s: Substring...
+) -> Bool {
+  for i in 0..<s.count {
+    for j in (i + 1)..<s.count {
+      if s[i] != s[j] {
+        return false
+      }
+    }
+  }
+  return true
+}
+
 SubstringTests.test("Equality") {
   let s = "abcdefg"
   let s1 = s[s.index(s.startIndex, offsetBy: 2) ..<
@@ -280,6 +315,103 @@ SubstringTests.test("Substring.base") {
     expectEqual(str, str[idx...].base)
     expectEqual(str, str[...idx].base)
   }
+}
+
+SubstringTests.test("isTriviallyIdentical(to:) small ascii") {
+  let (a1, a2, a3) = slices("Hello", from: 2, to: 4)
+  let (b1, b2, b3) = slices("Hello", from: 2, to: 4)
+
+  precondition(allNotEmpty(a1, a2, a3, b1, b2, b3))
+  precondition(allEqual(a1, a2, a3, b1, b2, b3))
+
+  expectTrue(a1.isTriviallyIdentical(to: a1))
+  expectTrue(a1.isTriviallyIdentical(to: a2))
+  expectTrue(a1.isTriviallyIdentical(to: a3))
+  expectTrue(a1.isTriviallyIdentical(to: b1))
+  expectTrue(a1.isTriviallyIdentical(to: b2))
+  expectTrue(a1.isTriviallyIdentical(to: b3))
+
+  expectTrue(a2.isTriviallyIdentical(to: a1))
+  expectTrue(a2.isTriviallyIdentical(to: a2))
+  expectTrue(a2.isTriviallyIdentical(to: a3))
+  expectTrue(a2.isTriviallyIdentical(to: b1))
+  expectTrue(a2.isTriviallyIdentical(to: b2))
+  expectTrue(a2.isTriviallyIdentical(to: b3))
+
+  expectTrue(a3.isTriviallyIdentical(to: a1))
+  expectTrue(a3.isTriviallyIdentical(to: a2))
+  expectTrue(a3.isTriviallyIdentical(to: a3))
+  expectTrue(a3.isTriviallyIdentical(to: b1))
+  expectTrue(a3.isTriviallyIdentical(to: b2))
+  expectTrue(a3.isTriviallyIdentical(to: b3))
+}
+
+SubstringTests.test("isTriviallyIdentical(to:) small unicode") {
+  let (a1, a2, a3) = slices("Hello Cafe\u{301}", from: 2, to: 4)
+  let (b1, b2, b3) = slices("Hello Cafe\u{301}", from: 2, to: 4)
+  let (c1, c2, c3) = slices("Hello Café", from: 2, to: 4)
+
+  precondition(allNotEmpty(a1, a2, a3, b1, b2, b3, c1, c2, c3))
+  precondition(allEqual(a1, a2, a3, b1, b2, b3, c1, c2, c3))
+
+  expectTrue(a1.isTriviallyIdentical(to: a1))
+  expectTrue(a1.isTriviallyIdentical(to: a2))
+  expectTrue(a1.isTriviallyIdentical(to: a3))
+  expectTrue(a1.isTriviallyIdentical(to: b1))
+  expectTrue(a1.isTriviallyIdentical(to: b2))
+  expectTrue(a1.isTriviallyIdentical(to: b3))
+  expectFalse(a1.isTriviallyIdentical(to: c1))
+  expectFalse(a1.isTriviallyIdentical(to: c2))
+  expectFalse(a1.isTriviallyIdentical(to: c3))
+
+  expectTrue(a2.isTriviallyIdentical(to: a1))
+  expectTrue(a2.isTriviallyIdentical(to: a2))
+  expectTrue(a2.isTriviallyIdentical(to: a3))
+  expectTrue(a2.isTriviallyIdentical(to: b1))
+  expectTrue(a2.isTriviallyIdentical(to: b2))
+  expectTrue(a2.isTriviallyIdentical(to: b3))
+  expectFalse(a2.isTriviallyIdentical(to: c1))
+  expectFalse(a2.isTriviallyIdentical(to: c2))
+  expectFalse(a2.isTriviallyIdentical(to: c3))
+
+  expectTrue(a3.isTriviallyIdentical(to: a1))
+  expectTrue(a3.isTriviallyIdentical(to: a2))
+  expectTrue(a3.isTriviallyIdentical(to: a3))
+  expectTrue(a3.isTriviallyIdentical(to: b1))
+  expectTrue(a3.isTriviallyIdentical(to: b2))
+  expectTrue(a3.isTriviallyIdentical(to: b3))
+  expectFalse(a3.isTriviallyIdentical(to: c1))
+  expectFalse(a3.isTriviallyIdentical(to: c2))
+  expectFalse(a3.isTriviallyIdentical(to: c3))
+}
+
+SubstringTests.test("isTriviallyIdentical(to:) large ascii") {
+  let (a1, a2, a3) = slices(String(repeating: "Hello", count: 1000), from: 2, to: 4)
+  let (b1, b2, b3) = slices(String(repeating: "Hello", count: 1000), from: 2, to: 4)
+
+  precondition(allNotEmpty(a1, a2, a3, b1, b2, b3))
+  precondition(allEqual(a1, a2, a3, b1, b2, b3))
+
+  expectTrue(a1.isTriviallyIdentical(to: a1))
+  expectTrue(a1.isTriviallyIdentical(to: a2))
+  expectTrue(a1.isTriviallyIdentical(to: a3))
+  expectFalse(a1.isTriviallyIdentical(to: b1))
+  expectFalse(a1.isTriviallyIdentical(to: b2))
+  expectFalse(a1.isTriviallyIdentical(to: b3))
+
+  expectTrue(a2.isTriviallyIdentical(to: a1))
+  expectTrue(a2.isTriviallyIdentical(to: a2))
+  expectTrue(a2.isTriviallyIdentical(to: a3))
+  expectFalse(a2.isTriviallyIdentical(to: b1))
+  expectFalse(a2.isTriviallyIdentical(to: b2))
+  expectFalse(a2.isTriviallyIdentical(to: b3))
+
+  expectTrue(a3.isTriviallyIdentical(to: a1))
+  expectTrue(a3.isTriviallyIdentical(to: a2))
+  expectTrue(a3.isTriviallyIdentical(to: a3))
+  expectFalse(a3.isTriviallyIdentical(to: b1))
+  expectFalse(a3.isTriviallyIdentical(to: b2))
+  expectFalse(a3.isTriviallyIdentical(to: b3))
 }
 
 runAllTests()
