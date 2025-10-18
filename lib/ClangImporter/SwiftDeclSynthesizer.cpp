@@ -546,6 +546,8 @@ SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
   // Mark the constructor transparent so that we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
 
+  constructor->setSynthesized();
+
   constructor->setBodySynthesizer(synthesizeStructDefaultConstructorBody,
                                   structDecl);
 
@@ -675,6 +677,8 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
 
   // Make the constructor transparent so we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
+
+  constructor->setSynthesized();
 
   if (wantBody) {
     auto memberMemory =
@@ -1318,6 +1322,7 @@ SwiftDeclSynthesizer::makeEnumRawValueConstructor(EnumDecl *enumDecl) {
                               /*ThrownType=*/TypeLoc(), paramPL,
                               /*GenericParams=*/nullptr, enumDecl);
   ctorDecl->setImplicit();
+  ctorDecl->setSynthesized();
   ctorDecl->copyFormalAccessFrom(enumDecl);
   ctorDecl->setBodySynthesizer(synthesizeEnumRawValueConstructorBody, enumDecl);
   return ctorDecl;
