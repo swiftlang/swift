@@ -1,10 +1,10 @@
-// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-experimental-feature ModuleSelector -parse -verify-additional-prefix legacy-
-// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-experimental-feature ModuleSelector -parse -verify-additional-prefix new- -enable-experimental-feature ParserASTGen
+// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -parse -verify-additional-prefix legacy-
+// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -parse -verify-additional-prefix new- -enable-experimental-feature ParserASTGen
 
 // Make sure the lack of the experimental flag disables the feature:
 // RUN: not %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs 2>/dev/null
 
-// REQUIRES: swift_feature_ModuleSelector, swift_feature_ParserASTGen
+// REQUIRES: swift_feature_ParserASTGen
 
 // ModuleSelectorImports
 import struct ModuleSelectorTestingKit::A

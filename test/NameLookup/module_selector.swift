@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-builtin-module -enable-experimental-feature ModuleSelector
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-builtin-module -enable-experimental-feature ModuleSelector -enable-experimental-feature ParserASTGen
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-builtin-module
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-builtin-module -enable-experimental-feature ParserASTGen
 
-// REQUIRES: swift_feature_ModuleSelector, swift_feature_ParserASTGen
+// REQUIRES: swift_feature_ParserASTGen
 
 // FIXME: This test doesn't really cover:
 //
