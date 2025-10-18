@@ -20,7 +20,7 @@ SwiftToClangInteropContext::SwiftToClangInteropContext(
     ModuleDecl &mod, const IRGenOptions &irGenOpts)
     : mod(mod), irGenOpts(irGenOpts) {}
 
-SwiftToClangInteropContext::~SwiftToClangInteropContext() {}
+SwiftToClangInteropContext::~SwiftToClangInteropContext() = default;
 
 IRABIDetailsProvider &SwiftToClangInteropContext::getIrABIDetails() {
   if (!irABIDetails)
