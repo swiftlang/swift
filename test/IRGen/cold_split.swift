@@ -1,22 +1,28 @@
 // RUN: %target-swift-frontend %s -module-name=test -emit-assembly \
 // RUN:   -enable-throws-prediction -O -enable-split-cold-code \
+// RUN:   -Xllvm -inline-threshold=50 \
 // RUN:       | %FileCheck --check-prefix CHECK-ENABLED %s
 
 //// Test disabling just the pass doesn't yield a split.
 // RUN: %target-swift-frontend %s -module-name=test -emit-assembly \
+// RUN:   -Xllvm -inline-threshold=50 \
 // RUN:   -enable-throws-prediction -O -disable-split-cold-code \
 // RUN:       | %FileCheck --check-prefix CHECK-DISABLED %s
 
 //// Test using -Osize doesn't yield a split.
 // RUN: %target-swift-frontend %s -module-name=test -emit-assembly \
+// RUN:   -Xllvm -inline-threshold=50 \
 // RUN:   -enable-throws-prediction -Osize -enable-split-cold-code \
 // RUN:       | %FileCheck --check-prefix CHECK-DISABLED %s
 
 //// Test disabling optimization entirely doesn't yield a split.
 // RUN: %target-swift-frontend %s -module-name=test -emit-assembly \
+// RUN:   -Xllvm -inline-threshold=50 \
 // RUN:   -enable-throws-prediction -enable-split-cold-code \
 // RUN:       | %FileCheck --check-prefix CHECK-DISABLED %s
 
+// Note: Using a higher inline threshold will cause the function that would be
+// cold-hot split to be inlined.
 
 // CHECK-ENABLED: cold
 
