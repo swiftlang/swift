@@ -40,6 +40,19 @@ struct ModuleInterfaceOptions {
   /// with types sharing a name with a module.
   bool AliasModuleNames = false;
 
+  enum class ModuleSelectorUsage : uint8_t {
+    /// Print a module interface that doesn't use any module selectors.
+    Never,
+    /// Print a module interface that always uses module selectors.
+    Always,
+    /// Print a module interface with a \c #if feature test that uses module
+    /// selectors if the compiler supports them.
+    Conditional,
+  };
+
+  /// Should we emit module selectors into the module interface?
+  ModuleSelectorUsage UseModuleSelectors = ModuleSelectorUsage::Never;
+
   /// See \ref FrontendOptions.PrintFullConvention.
   /// [TODO: Clang-type-plumbing] This check should go away.
   bool PrintFullConvention = false;
