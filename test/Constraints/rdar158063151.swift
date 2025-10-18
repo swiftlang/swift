@@ -8,9 +8,8 @@ struct Value: Equatable, ExpressibleByNilLiteral {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13rdar1580631514test1vyAA5ValueV_tF : $@convention(thin) (Value) -> ()
-// function_ref static Value.__derived_struct_equals(_:_:)
-// CHECK: [[EQUALS_REF:%.*]] = function_ref @$s13rdar1580631515ValueV23__derived_struct_equalsySbAC_ACtFZ
-// CHECK-NEXT: apply [[EQUALS_REF]](%0, {{.*}})
+// CHECK: [[EQUALS_REF:%.*]] = witness_method $Value, #Equatable."==" : <Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool
+// CHECK-NEXT: apply [[EQUALS_REF]]<Value>({{.*}})
 func test(v: Value) {
   _ = v == nil
 }

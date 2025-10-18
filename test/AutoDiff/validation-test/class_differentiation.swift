@@ -2,6 +2,9 @@
 // NOTE: Verify whether forward-mode differentiation crashes. It currently does.
 // RUN: not --crash %target-swift-frontend -enable-experimental-forward-mode-differentiation -emit-sil %s
 // REQUIRES: executable_test
+/* Temporary disabled until https://github.com/swiftlang/swift/issues/84840 is fixed
+   We cannot use `Tracked<T>` :( */
+// XFAIL: *
 
 import StdlibUnittest
 import DifferentiationUnittest
