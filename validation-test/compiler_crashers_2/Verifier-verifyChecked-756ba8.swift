@@ -1,4 +1,4 @@
-// {"signature":"(anonymous namespace)::Verifier::verifyChecked(swift::Type)"}
+// {"kind":"typecheck","signature":"(anonymous namespace)::Verifier::verifyChecked(swift::Type)"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 class a < b {
   d {
