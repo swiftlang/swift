@@ -2060,3 +2060,6 @@ final public class MergeIsolationRegionInst : Instruction {
 
 final public class IgnoredUseInst : Instruction, UnaryInstruction {
 }
+
+final public class ImplicitActorToOpaqueIsolationCastInst
+  : SingleValueInstruction, UnaryInstruction {}

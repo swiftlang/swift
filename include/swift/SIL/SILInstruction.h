@@ -8789,6 +8789,18 @@ public:
   }
 };
 
+class ImplicitActorToOpaqueIsolationCastInst final
+    : public UnaryInstructionBase<
+          SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst,
+          OwnershipForwardingSingleValueInstruction> {
+  friend SILBuilder;
+
+  ImplicitActorToOpaqueIsolationCastInst(SILDebugLocation loc, SILValue value);
+
+public:
+  SILValue getValue() const { return getOperand(); }
+};
+
 enum class MarkDependenceKind {
   Unresolved, Escaping, NonEscaping
 };
@@ -11653,6 +11665,7 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::FunctionExtractIsolationInst:
   case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::BorrowedFromInst:
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
     return true;
   default:
     return false;

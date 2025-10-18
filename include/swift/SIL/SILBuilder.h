@@ -1330,6 +1330,17 @@ public:
         forwardingOwnershipKind));
   }
 
+  /// Create an unchecked_value_cast when Ownership SSA is enabled and
+  /// unchecked_bitwise_cast otherwise.
+  ///
+  /// Intended to be used in utility code that needs to support both Ownership
+  /// SSA and non-Ownership SSA code.
+  SILValue emitUncheckedValueCast(SILLocation loc, SILValue op, SILType ty) {
+    if (hasOwnership())
+      return createUncheckedValueCast(loc, op, ty);
+    return createUncheckedBitwiseCast(loc, op, ty);
+  }
+
   RefToBridgeObjectInst *createRefToBridgeObject(SILLocation Loc, SILValue Ref,
                                                  SILValue Bits) {
     return createRefToBridgeObject(Loc, Ref, Bits, Ref->getOwnershipKind());
@@ -2334,6 +2345,19 @@ public:
         getSILDebugLocation(Loc), Operand, Kind));
   }
 
+  SILValue emitUncheckedOwnershipConversion(SILLocation Loc, SILValue Operand,
+                                            ValueOwnershipKind Kind) {
+    if (!hasOwnership())
+      return Operand;
+    return createUncheckedOwnershipConversion(Loc, Operand, Kind);
+  }
+
+  ImplicitActorToOpaqueIsolationCastInst *
+  createImplicitActorToOpaqueIsolationCast(SILLocation Loc, SILValue Value) {
+    return insert(new (getModule()) ImplicitActorToOpaqueIsolationCastInst(
+        getSILDebugLocation(Loc), Value));
+  }
+
   FixLifetimeInst *createFixLifetime(SILLocation Loc, SILValue Operand) {
     return insert(new (getModule())
                       FixLifetimeInst(getSILDebugLocation(Loc), Operand));
@@ -2351,6 +2375,18 @@ public:
                                            MarkDependenceKind dependenceKind) {
     return createMarkDependence(Loc, value, base, value->getOwnershipKind(),
                                 dependenceKind);
+  }
+
+  /// Emit a mark_dependence instruction placing the kind only if ownership is
+  /// set in the current function.
+  ///
+  /// This is intended to be used in code that is generic over Ownership SSA and
+  /// non-Ownership SSA code.
+  SILValue emitMarkDependence(SILLocation Loc, SILValue value, SILValue base,
+                              MarkDependenceKind dependenceKind) {
+    return createMarkDependence(Loc, value, base, value->getOwnershipKind(),
+                                hasOwnership() ? dependenceKind
+                                               : MarkDependenceKind::Escaping);
   }
 
   MarkDependenceInst *

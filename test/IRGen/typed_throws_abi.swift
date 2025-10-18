@@ -3107,7 +3107,7 @@ func callNonMatching_f1(_ b: Bool) -> (Int, Float, Bool, Float) {
 // CHECK: [[SUCCESS]]:
 // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi20nonMatching_f0_asyncySf_SftSbYaAA7OneWordVYKF{{.*}}", ptr {{%.*}}, ptr {{%.*}}, float 1.000000e+00, float 2.000000e+00, i64 undef, ptr null)
 // CHECK:   unreachable
-// CHECK: 18:
+// CHECK: [[ERROR]]:
 // CHECK:   [[ERROR_X:%.*]] = call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
 // CHECK:   [[ERROR_RET:%.*]] = insertvalue { float, float, i64 } undef, i64 [[ERROR_X]], 2
 // CHECK:   [[ERROR_RET0:%.*]] = extractvalue { float, float, i64 } [[ERROR_RET]], 0
