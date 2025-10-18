@@ -1143,3 +1143,13 @@ Removed: _$sSS10_wordIndex6beforeSS0B0VAD_tF
 // Internal info exposed for swift-inspect.
 Added: __swift_debug_allocationPoolSize
 Added: __swift_debug_metadataAllocatorPageSize
+
+// SE-0489 Better debugDescription for EncodingError and DecodingError
+Added: _$ss13DecodingErrorO16debugDescriptionSSvg
+Added: _$ss13DecodingErrorO16debugDescriptionSSvpMV
+Added: _$ss13DecodingErrorOs28CustomDebugStringConvertiblesMc
+Added: _$ss13DecodingErrorOs28CustomDebugStringConvertiblesWP
+Added: _$ss13EncodingErrorO16debugDescriptionSSvg
+Added: _$ss13EncodingErrorO16debugDescriptionSSvpMV
+Added: _$ss13EncodingErrorOs28CustomDebugStringConvertiblesMc
+Added: _$ss13EncodingErrorOs28CustomDebugStringConvertiblesWP
