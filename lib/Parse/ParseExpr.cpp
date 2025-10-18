@@ -1127,6 +1127,10 @@ bool Parser::isStartOfGetSetAccessor() {
   // Eat the "{".
   consumeToken(tok::l_brace);
 
+  // '@_accessorBlock' is a builtin disambiguation marker.
+  if (peekToken().isContextualKeyword("_accessorBlock"))
+    return true;
+
   // Eat attributes, if present.
   while (consumeIf(tok::at_sign)) {
     if (!consumeIf(tok::identifier))

@@ -367,6 +367,11 @@ extension ASTGenVisitor {
         break
 
       case .none:
+        // '@_accessorBlock' is a parser only disambiguation marker, ignore.
+        if attrName == "_accessorBlock" {
+          return
+        }
+
         // Fall back to CustomAttr.
         break
       }
