@@ -145,7 +145,11 @@ public:
                          const CompilerInvocation &CI);
   
   void startTracking(bool includeCommonDeps = true);
-  void trackFile(const Twine &path);
+
+  /// Track a file with path.
+  /// \returns true if the file is tracked, false if the file doesn't exist.
+  bool trackFile(const Twine &path);
+
   llvm::Expected<llvm::cas::ObjectProxy> createTreeFromDependencies();
   
 private:
