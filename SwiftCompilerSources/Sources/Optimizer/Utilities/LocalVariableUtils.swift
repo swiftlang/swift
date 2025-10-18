@@ -21,6 +21,12 @@
 ///
 /// 3. Stored properties in heap objects or global variables. These are always formally accessed.
 ///
+/// Pass dependencies:
+///
+/// AccessEnforcementSelection must run first to correctly determine which non-esacping closure captures may have
+/// escaped prior to the closure invocation. Any access to an inout_aliasable argument that may have escaped in the
+/// caller will be marked [dynamic].
+///
 //===----------------------------------------------------------------------===//
 
 import SIL
@@ -287,6 +293,9 @@ struct LocalVariableAccessMap: Collection, CustomStringConvertible {
 
   var isBoxed: Bool { allocation is AllocBoxInst }
 
+  // If 'mayAlias' is true (@inout_aliasable), then this variable may have escaped before entering the current
+  // function. 'walkAccesses' determines whether this allocation is considered to have escaped on entry by checked for
+  // the existienced of begin_access [dynamic].
   var mayAlias: Bool {
     if let arg = allocation as? FunctionArgument, arg.convention == .indirectInoutAliasable {
       return true
@@ -324,17 +333,25 @@ struct LocalVariableAccessMap: Collection, CustomStringConvertible {
     if walker.walkDown(allocation: allocation) == .abortWalk {
       return .abortWalk
     }
+    var escapedOnEntry = false
     for localAccess in walker.accessStack {
       let info = LocalVariableAccessInfo(localAccess: localAccess)
-      if mayAlias {
-        // Local allocations can only escape prior to assignment if they are boxed or inout_aliasable.
-        info.hasEscaped = true
-      } else if !isBoxed {
+      // inout_aliasable "allocation" has escaped on entry if any begin_access [dynamic] is present.
+      if mayAlias, info.access.kind == .beginAccess,
+         (localAccess.instruction as! BeginAccessInst).enforcement == .dynamic {
+        escapedOnEntry = true
+      }
+      if !isBoxed {
         // Boxed allocation requires reachability to determine whether the box escaped prior to assignment.
         info.hasEscaped = info.isEscape
       }
       accessMap[localAccess.instruction!] = info
       accessList.append(info)
+    }
+    if escapedOnEntry {
+      for accessInfo in accessList {
+        accessInfo.hasEscaped = true
+      }
     }
     return .continueWalk
   }
