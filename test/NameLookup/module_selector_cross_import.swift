@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-experimental-feature ModuleSelector -enable-cross-import-overlays
-// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-experimental-feature ModuleSelector -enable-experimental-feature ParserASTGen -enable-cross-import-overlays
+// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-cross-import-overlays
+// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-experimental-feature ParserASTGen -enable-cross-import-overlays
 
-// REQUIRES: swift_feature_ModuleSelector, swift_feature_ParserASTGen
+// REQUIRES: swift_feature_ParserASTGen
 
 import ModuleSelectorTestingKit
 import ctypes

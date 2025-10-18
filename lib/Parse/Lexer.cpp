@@ -2768,7 +2768,7 @@ void Lexer::lexImpl() {
   case '\\': return formToken(tok::backslash, TokStart);
 
   case ':':
-    if (CurPtr[0] == ':' && LangOpts.hasFeature(Feature::ModuleSelector)) {
+    if (CurPtr[0] == ':') {
       CurPtr++;
       return formToken(tok::colon_colon, TokStart);
     }
@@ -2882,7 +2882,6 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
   // Use fake language options; language options only affect validity
   // and the exact token produced.
   LangOptions FakeLangOpts;
-  FakeLangOpts.enableFeature(Feature::ModuleSelector);
 
   // Here we return comments as tokens because either the caller skipped
   // comments and normally we won't be at the beginning of a comment token
