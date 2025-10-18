@@ -1217,6 +1217,18 @@ extension Unsafe${Mutable}RawBufferPointer {
 % end
 }
 
+extension Unsafe${Mutable}RawBufferPointer {
+  /// Returns a Boolean value indicating whether two instances refer to the same
+  /// memory region.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  @safe
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    unsafe (self._position == other._position) && (self._end == other._end)
+  }
+}
+
 @_unavailableInEmbedded
 extension Unsafe${Mutable}RawBufferPointer: CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
