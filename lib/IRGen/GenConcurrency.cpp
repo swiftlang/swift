@@ -879,3 +879,139 @@ irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
   newContext = IGF.Builder.CreateBitCast(newContext, IGF.IGM.Int8PtrTy);
   return { newTask, newContext };
 }
+
+namespace {
+
+/// A TypeInfo implementation for Builtin.ImplicitActor.
+class ImplicitActorTypeInfo final
+    : public ScalarPairTypeInfo<ImplicitActorTypeInfo, LoadableTypeInfo> {
+
+public:
+  ImplicitActorTypeInfo(llvm::StructType *storageType, Size size,
+                        Alignment align, SpareBitVector &&spareBits)
+      : ScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
+                           IsNotTriviallyDestroyable, IsCopyable, IsFixedSize,
+                           IsABIAccessible) {}
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
+                                        bool useStructLayouts) const override {
+    if (!useStructLayouts) {
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+    }
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(
+        *this, T, ScalarKind::NativeStrongReference);
+  }
+
+  static Size getFirstElementSize(IRGenModule &IGM) {
+    return IGM.getPointerSize();
+  }
+
+  static StringRef getFirstElementLabel() { return ".actor"; }
+
+  static bool isFirstElementTrivial() { return false; }
+
+  void emitRetainFirstElement(
+      IRGenFunction &IGF, llvm::Value *data,
+      std::optional<Atomicity> atomicity = std::nullopt) const {
+    if (!atomicity)
+      atomicity = IGF.getDefaultAtomicity();
+    IGF.emitNativeStrongRetain(data, *atomicity);
+  }
+
+  void emitReleaseFirstElement(
+      IRGenFunction &IGF, llvm::Value *data,
+      std::optional<Atomicity> atomicity = std::nullopt) const {
+    if (!atomicity)
+      atomicity = IGF.getDefaultAtomicity();
+    IGF.emitNativeStrongRelease(data, *atomicity);
+  }
+
+  void emitAssignFirstElement(IRGenFunction &IGF, llvm::Value *data,
+                              Address address) const {
+    IGF.emitNativeStrongAssign(data, address);
+  }
+
+  static Size getSecondElementOffset(IRGenModule &IGM) {
+    return IGM.getPointerSize();
+  }
+  static Size getSecondElementSize(IRGenModule &IGM) {
+    return IGM.getPointerSize();
+  }
+  static StringRef getSecondElementLabel() { return ".witness_table_pointer"; }
+  bool isSecondElementTrivial() const { return true; }
+
+  void emitRetainSecondElement(
+      IRGenFunction &IGF, llvm::Value *data,
+      std::optional<Atomicity> atomicity = std::nullopt) const {}
+  void emitReleaseSecondElement(
+      IRGenFunction &IGF, llvm::Value *data,
+      std::optional<Atomicity> atomicity = std::nullopt) const {}
+  void emitAssignSecondElement(IRGenFunction &IGF, llvm::Value *context,
+                               Address dataAddr) const {
+    IGF.Builder.CreateStore(context, dataAddr);
+  }
+
+  bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+    return false;
+  }
+  PointerInfo getPointerInfo(IRGenModule &IGM) const {
+    return PointerInfo::forHeapObject(IGM);
+  }
+  unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+    return 0;
+  }
+  APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,
+                                     unsigned index) const override {
+
+    llvm_unreachable("no extra inhabitants");
+  }
+  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
+                                       SILType T,
+                                       bool isOutlined) const override {
+    llvm_unreachable("no extra inhabitants");
+  }
+  void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                            Address dest, SILType T,
+                            bool isOutlined) const override {
+    llvm_unreachable("no extra inhabitants");
+  }
+};
+
+} // end anonymous namespace
+
+const LoadableTypeInfo &IRGenModule::getImplicitActorTypeInfo() {
+  return Types.getImplicitActorTypeInfo();
+}
+
+const LoadableTypeInfo &TypeConverter::getImplicitActorTypeInfo() {
+  if (ImplicitActorTI)
+    return *ImplicitActorTI;
+
+  auto ty = IGM.SwiftImplicitActorType;
+
+  // No spare bits
+  SpareBitVector spareBits;
+  spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
+  spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
+
+  ImplicitActorTI = new ImplicitActorTypeInfo(ty, IGM.getPointerSize() * 2,
+                                              IGM.getPointerAlignment(),
+                                              std::move(spareBits));
+  ImplicitActorTI->NextConverted = FirstType;
+  FirstType = ImplicitActorTI;
+  return *ImplicitActorTI;
+}
+
+llvm::Value *irgen::clearImplicitIsolatedActorBits(IRGenFunction &IGF,
+                                                   llvm::Value *value) {
+  auto *cast = IGF.Builder.CreateBitOrPointerCast(value, IGF.IGM.IntPtrTy);
+  // When TBI is enabled, we use the bottom two bits of the upper nibble of the
+  // TBI bit, implying a mask of 0xCFFFFFFFFFFFFFFF. If TBI is disabled, then we
+  // mask the bottom two tagged pointer bits.
+  auto *bitMask =
+      IGF.getOptions().HasAArch64TBI
+          ? llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0xCFFFFFFFFFFFFFFFull)
+          : llvm::ConstantInt::get(IGF.IGM.IntPtrTy, -4);
+  auto *result = IGF.Builder.CreateAnd(cast, bitMask);
+  return IGF.Builder.CreateBitOrPointerCast(result, value->getType());
+}
