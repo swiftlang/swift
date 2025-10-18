@@ -560,8 +560,7 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
       }
     }
 
-    DeclName lookupName(context, Name.getBaseName(), lookupLabels);
-    LookupName = DeclNameRef(lookupName);
+    LookupName = Name.withArgumentLabels(context, lookupLabels);
   }
 
   LookupResult Lookup;
@@ -571,8 +570,7 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
 
   // First, look for a local binding in scope.
   if (Loc.isValid() && !Name.isOperator()) {
-    ASTScope::lookupLocalDecls(DC->getParentSourceFile(),
-                               LookupName.getFullName(), Loc,
+    ASTScope::lookupLocalDecls(DC->getParentSourceFile(), LookupName, Loc,
                                /*stopAfterInnermostBraceStmt=*/false,
                                ResultValues);
     for (auto *localDecl : ResultValues) {
@@ -622,6 +620,18 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
   }
 
   if (!Lookup) {
+    // Is there an incorrect module selector?
+    if (Name.hasModuleSelector()) {
+      auto anyModuleName = DeclNameRef(LookupName.getFullName());
+      ModuleSelectorCorrection correction(
+        TypeChecker::lookupUnqualified(DC, anyModuleName, Loc, lookupOptions));
+
+      if (correction.diagnose(Context, UDRE->getNameLoc(), LookupName)) {
+        // FIXME: Can we recover by assuming the first/best result is correct?
+        return errorResult();
+      }
+    }
+
     // For the purpose of diagnosing inaccessible results, try the lookup again
     // but ignore access control.
     NameLookupOptions relookupOptions = lookupOptions;
@@ -2177,8 +2187,9 @@ VarDecl *PreCheckTarget::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
 
   // Do an actual lookup for 'self' in case it shows up in a capture list.
   auto *methodSelf = methodContext->getImplicitSelfDecl();
-  auto *lookupSelf = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
-                                                     Ctx.Id_self, Loc);
+  auto *lookupSelf = ASTScope::lookupSingleLocalDecl(
+                                   DC->getParentSourceFile(),
+                                   DeclNameRef::createSelf(Ctx), Loc);
   if (lookupSelf && lookupSelf != methodSelf) {
     // FIXME: This is the wrong diagnostic for if someone manually declares a
     // variable named 'self' using backticks.
@@ -2642,7 +2653,9 @@ void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
           if (isa<ParenExpr>(expr) || isa<TupleExpr>(expr)) {
             DE.diagnose(expr->getLoc(),
                         diag::expr_string_interpolation_outside_string);
-          } else {
+          } else if (!isa<ErrorExpr>(expr)) {
+            // If we have an `ErrorExpr`, we've probably already emitted a
+            // diagnostic explaining it.
             DE.diagnose(expr->getLoc(),
                         diag::expr_swift_keypath_invalid_component);
           }

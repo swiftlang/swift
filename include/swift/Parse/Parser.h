@@ -1817,8 +1817,11 @@ public:
   /// \param loc The location of the label (empty if it doesn't exist)
   /// \param isAttr True if this is an argument label for an attribute (allows, but deprecates, use of
   ///               \c '=' instead of \c ':').
+  /// \param splittingColonColon True if \c :: tokens should be treated as two
+  ///                           adjacent colons.
   void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
-                                  bool isAttr = false);
+                                  bool isAttr = false,
+                                  bool splittingColonColon = false);
 
   /// If a \c module-selector is present, returns a true value (specifically,
   /// 1 or 2 depending on how many tokens should be consumed to skip it).

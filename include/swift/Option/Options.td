@@ -736,6 +736,12 @@ def emit_variant_package_module_interface_path :
   MetaVarName<"<path>">,
   HelpText<"Output package module interface file for the target variant to <path>">;
 
+def module_interface_qualification :
+  Separate<["-"], "module-interface-qualification">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  MetaVarName<"<none|alias|selector|conditional>">,
+  HelpText<"Specifies feature to emit into module interfaces to avoid name collisions (values: 'none' (default), 'alias' (use module aliases), 'selector' (use module selectors), 'conditional' (use module selectors with a feature guard)).">;
+
 def verify_emitted_module_interface :
   Flag<["-"], "verify-emitted-module-interface">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,

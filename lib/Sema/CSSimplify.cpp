@@ -8627,6 +8627,9 @@ ConstraintSystem::simplifyConstructionConstraint(
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
   addValueMemberConstraint(MetatypeType::get(valueType, getASTContext()),
+                           // OK: simplifyConstructionConstraint() is only used
+                           // for `T(...)` init calls, not `T.init(...)` calls,
+                           // so there's no module selector on `init`.
                            DeclNameRef::createConstructor(),
                            memberType,
                            useDC, functionRefInfo,
@@ -10286,8 +10289,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // high.
     if (auto *args = getArgumentList(memberLocator)) {
       SmallVector<Identifier, 4> scratch;
-      memberName.getFullName() = DeclName(ctx, memberName.getBaseName(),
-                                          args->getArgumentLabels(scratch));
+      memberName = memberName.withArgumentLabels(
+                                  ctx, args->getArgumentLabels(scratch));
     }
   }
 
@@ -10306,8 +10309,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       }
     }
 
-    DeclName unprefixedName(context, memberName.getBaseName(), lookupLabels);
-    lookupName = DeclNameRef(unprefixedName);
+    lookupName = lookupName.withArgumentLabels(context, lookupLabels);
   }
 
   // Look for members within the base.
@@ -10952,8 +10954,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   }
 
   // If we have no viable or unviable candidates, and we're generating,
-  // diagnostics, rerun the query with inaccessible members included, so we can
-  // include them in the unviable candidates list.
+  // diagnostics, rerun the query with various excluded members included, so we
+  // can include them in the unviable candidates list.
   if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
       includeInaccessibleMembers) {
     NameLookupOptions lookupOptions =
@@ -10962,7 +10964,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // Local function that looks up additional candidates using the given lookup
     // options, recording the results as unviable candidates.
     auto lookupUnviable =
-        [&](NameLookupOptions lookupOptions,
+        [&](DeclNameRef memberName,
+            NameLookupOptions lookupOptions,
             MemberLookupResult::UnviableReason reason) -> bool {
       auto lookup = TypeChecker::lookupMember(DC, instanceTy, memberName,
                                               memberLoc, lookupOptions);
@@ -10986,9 +10989,20 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       return !lookup.empty();
     };
 
+    // Look for members that were excluded because of a module selector.
+    if (memberName.hasModuleSelector()) {
+      DeclNameRef unqualifiedMemberName{memberName.getFullName()};
+
+      if (lookupUnviable(unqualifiedMemberName,
+                         lookupOptions,
+                         MemberLookupResult::UR_WrongModule))
+        return result;
+    }
+
     // Ignore access control so we get candidates that might have been missed
     // before.
-    if (lookupUnviable(lookupOptions | NameLookupFlags::IgnoreAccessControl,
+    if (lookupUnviable(memberName,
+                       lookupOptions | NameLookupFlags::IgnoreAccessControl,
                        MemberLookupResult::UR_Inaccessible))
       return result;
   }
@@ -11188,6 +11202,11 @@ static ConstraintFix *fixMemberRef(
                        cs, baseTy, choice.getDecl(), memberName, locator)
                  : nullptr;
     }
+
+    case MemberLookupResult::UR_WrongModule:
+      assert(choice.isDecl());
+      return AllowMemberFromWrongModule::create(cs, baseTy, choice.getDecl(),
+                                                memberName, locator);
 
     case MemberLookupResult::UR_Inaccessible:
       assert(choice.isDecl());
@@ -16173,6 +16192,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInvalidInitRef:
   case FixKind::AllowClosureParameterDestructuring:
   case FixKind::AllowInaccessibleMember:
+  case FixKind::AllowMemberFromWrongModule:
   case FixKind::AllowAnyObjectKeyPathRoot:
   case FixKind::AllowMultiArgFuncKeyPathMismatch:
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
