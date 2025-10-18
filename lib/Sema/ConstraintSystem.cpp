@@ -1808,10 +1808,8 @@ struct TypeSimplifier {
           // so the concrete dependent member type is considered a "hole" in
           // order to continue solving.
           auto memberTy = DependentMemberType::get(lookupBaseType, assocType);
-          if (CS.shouldAttemptFixes() &&
-              CS.getPhase() == ConstraintSystemPhase::Solving) {
+          if (CS.inSalvageMode())
             return PlaceholderType::get(CS.getASTContext(), memberTy);
-          }
 
           return memberTy;
         }
