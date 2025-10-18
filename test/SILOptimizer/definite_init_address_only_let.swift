@@ -48,4 +48,25 @@ func uninit_closure_reference() {
   let initMe = passthrough { initMe }
   // expected-error @-1 {{constant 'initMe' used before being initialized}}
   // expected-note @-2 {{defined here}}
+
+  let inline = { () -> Any in inline }()
+  // expected-error @-1 {{constant 'inline' used before being initialized}}
+  // expected-note @-2 {{defined here}}
+
+  // these should not regress
+  func castAny(_ a: Any) {
+    let directUncond = a as! Int
+    _ = directUncond
+
+    let directCond = a as? Int
+    _ = directCond
+
+    let twoPhaseUncond: Int
+    twoPhaseUncond = a as! Int
+    _ = twoPhaseUncond
+
+    let twoPhasCond: Int?
+    twoPhasCond = a as? Int
+    _ = twoPhasCond
+  }
 }

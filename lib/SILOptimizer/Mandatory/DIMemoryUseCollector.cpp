@@ -823,6 +823,27 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
+    if (false || (isa<UnconditionalCheckedCastAddrInst>(User) ||
+                  isa<CheckedCastAddrBranchInst>(User))) {
+      LLVM_DEBUG({
+        llvm::dbgs() << "JQ: DI found unchecked addr cast:\n"
+        << Op;
+      });
+
+      DIUseKind Kind;
+      Kind = DIUseKind::Initialization;
+//      if (Op->getOperandNumber() == 0)
+//        Kind = DIUseKind::Load;
+//      else
+//        Kind = InStructSubElement ? DIUseKind::PartialStore
+//                                  : DIUseKind::Initialization;
+
+      // TODO: what about enum sub elt? do we need to even special case things here?
+
+      addElementUses(BaseEltNo, PointeeType, User, Kind);
+      continue;
+    }
+
     // Look through mark_unresolved_non_copyable_value. To us, it is not
     // interesting.
     if (auto *mmi = dyn_cast<MarkUnresolvedNonCopyableValueInst>(User)) {

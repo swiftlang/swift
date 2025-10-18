@@ -590,6 +590,16 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     break;
   }
 
+  LLVM_DEBUG({
+    llvm::dbgs() << "JQ: emit captures running\n";
+    for (auto capture : captureInfo.getCaptures()) {
+      llvm::dbgs() << "  cap: '" << capture.getDecl()->getName() << "'\n";
+    }
+    llvm::dbgs()
+      << "  canGuarantee: '" << canGuarantee << "'\n"
+      << "  capCanEscape: '" << captureCanEscape << "'\n";
+  });
+
   auto expansion = getTypeExpansionContext();
 
   for (auto capture : captureInfo.getCaptures()) {
@@ -609,6 +619,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     if (capture.isOpaqueValue() || capture.isPackElement()) {
       capturedArgs.push_back(
           emitRValueAsSingleValue(capture.getExpr()).ensurePlusOne(*this, loc));
+      LLVM_DEBUG(llvm::dbgs() << "JQ: cap emit early ret: opaque || pack\n");
       continue;
     }
 
@@ -631,6 +642,52 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     auto type = FunctionDC->mapTypeIntoContext(interfaceType);
     auto valueType = FunctionDC->mapTypeIntoContext(
       interfaceType->getReferenceStorageReferent());
+
+    LLVM_DEBUG(
+    {
+      llvm::dbgs() << "=== DEBUG: VarLocs contents for capture of '"
+      << vd->getBaseIdentifier() << "' ===\n";
+      llvm::dbgs() << "Total entries in VarLocs: " << VarLocs.size() << "\n";
+
+      for (auto &entry : VarLocs) {
+        auto *var = entry.first;
+        auto &loc = entry.second;
+
+        llvm::dbgs() << "  - Variable: " << var->getBaseIdentifier() << "\n";
+        //      llvm::errs() << "    Type: " << var->getType() << "\n";
+        llvm::dbgs() << "    Value type: " << loc.value->getType() << "\n";
+        llvm::dbgs() << "    Value kind: ";
+
+        if (isa<SILUndef>(loc.value)) {
+          llvm::dbgs() << "SILUndef (UNINITIALIZED)\n";
+        } else if (isa<SILArgument>(loc.value)) {
+          llvm::dbgs() << "SILArgument\n";
+        } else if (isa<AllocStackInst>(loc.value)) {
+          llvm::dbgs() << "AllocStackInst\n";
+        } else if (isa<AllocBoxInst>(loc.value)) {
+          llvm::dbgs() << "AllocBoxInst\n";
+        } else {
+          llvm::dbgs() << "some other inst\n";
+        }
+
+        if (loc.box) {
+          llvm::dbgs() << "    Has box: yes\n";
+        }
+
+        llvm::dbgs() << "\n";
+      }
+
+      llvm::dbgs() << "Looking for variable: " << vd->getBaseIdentifier() << "\n";
+      auto found = VarLocs.find(vd);
+      if (found == VarLocs.end()) {
+        llvm::dbgs() << "  Result: NOT FOUND in VarLocs\n";
+      } else {
+        llvm::dbgs() << "  Result: FOUND in VarLocs\n";
+        llvm::dbgs() << "  Value is undef: "
+        << (isa<SILUndef>(found->second.value) ? "YES" : "NO") << "\n";
+      }
+      llvm::dbgs() << "===================================\n\n";
+    });
 
     //
     // If we haven't emitted the captured value yet, we're forming a closure
@@ -695,6 +752,12 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     // expansion context without opaque archetype substitution.
     auto getAddressValue = [&](SILValue entryValue, bool forceCopy,
                                bool forLValue) -> SILValue {
+      LLVM_DEBUG({
+        llvm::dbgs() << "JQ: get addr value, force copy: " << forceCopy
+          << ", for lval: " << forLValue << "\n";
+        entryValue->getDefiningInstruction()->print(llvm::dbgs());
+      });
+
       if (!SGM.M.useLoweredAddresses() && !forLValue && !isPack) {
         // In opaque values mode, addresses aren't used except by lvalues.
         auto &lowering = getTypeLowering(entryValue->getType());
@@ -774,6 +837,11 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
     auto &Entry = found->second;
     auto val = Entry.value;
+
+    LLVM_DEBUG({
+      auto capKind = SGM.Types.getDeclCaptureKind(capture, expansion);
+      llvm::dbgs() << "JQ: cap kind:: " << (unsigned)capKind << "\n";
+    });
 
     switch (SGM.Types.getDeclCaptureKind(capture, expansion)) {
     case CaptureKind::Constant: {
@@ -855,6 +923,12 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         }
         capturedArgs.push_back(ManagedValue::forOwnedAddressRValue(
             addr, CleanupHandle::invalid()));
+
+//        LLVM_DEBUG({
+//          llvm::dbgs() << "JQ: adding escape to mark for: \n";
+//          val->getDefiningInstruction()->print(llvm::dbgs());
+//        });
+//        escapesToMark.push_back(val);
       }
       break;
     }
