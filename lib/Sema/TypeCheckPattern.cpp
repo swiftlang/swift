@@ -1591,8 +1591,9 @@ Pattern *TypeChecker::coercePatternToType(
             parentTy->getAnyNominal() == type->getAnyNominal()) {
           enumTy = type;
         } else {
-          diags.diagnose(EEP->getLoc(), diag::ambiguous_enum_pattern_type,
-                         parentTy, type);
+          if (!type->hasError())
+            diags.diagnose(EEP->getLoc(), diag::ambiguous_enum_pattern_type,
+                           parentTy, type);
           return nullptr;
         }
       }
@@ -1698,15 +1699,17 @@ Pattern *TypeChecker::coercePatternToType(
     Type elementType = type->getOptionalObjectType();
 
     if (elementType.isNull()) {
-      auto diagID = diag::optional_element_pattern_not_valid_type;
-      SourceLoc loc = OP->getQuestionLoc();
-      // Produce tailored diagnostic for if/let and other conditions.
-      if (OP->isImplicit()) {
-        diagID = diag::condition_optional_element_pattern_not_valid_type;
-        loc = OP->getLoc();
-      }
+      if (!type->hasError()) {
+        auto diagID = diag::optional_element_pattern_not_valid_type;
+        SourceLoc loc = OP->getQuestionLoc();
+        // Produce tailored diagnostic for if/let and other conditions.
+        if (OP->isImplicit()) {
+          diagID = diag::condition_optional_element_pattern_not_valid_type;
+          loc = OP->getLoc();
+        }
 
-      diags.diagnose(loc, diagID, type);
+        diags.diagnose(loc, diagID, type);
+      }
       return nullptr;
     }
 
