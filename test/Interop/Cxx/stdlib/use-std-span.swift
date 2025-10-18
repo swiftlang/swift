@@ -1,5 +1,3 @@
-// REQUIRES: rdar162106580
-
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20)
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG)
 
@@ -7,6 +5,7 @@
 // UNSUPPORTED: OS=windows-msvc
 
 // REQUIRES: executable_test
+// REQUIRES: std_span
 
 import StdlibUnittest
 #if !BRIDGING_HEADER
