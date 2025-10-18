@@ -620,6 +620,18 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
   }
 
   if (!Lookup) {
+    // Is there an incorrect module selector?
+    if (Name.hasModuleSelector()) {
+      auto anyModuleName = DeclNameRef(LookupName.getFullName());
+      ModuleSelectorCorrection correction(
+        TypeChecker::lookupUnqualified(DC, anyModuleName, Loc, lookupOptions));
+
+      if (correction.diagnose(Context, UDRE->getNameLoc(), LookupName)) {
+        // FIXME: Can we recover by assuming the first/best result is correct?
+        return errorResult();
+      }
+    }
+
     // For the purpose of diagnosing inaccessible results, try the lookup again
     // but ignore access control.
     NameLookupOptions relookupOptions = lookupOptions;

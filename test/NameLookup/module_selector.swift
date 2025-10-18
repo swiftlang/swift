@@ -87,7 +87,8 @@ extension B: @retroactive main::Equatable {
     // expected-error@-4 {{'Bool' is not imported through module 'main'}}
     // expected-note@-5 {{did you mean module 'Swift'?}} {{56-60=Swift}}
     main::fatalError()
-    // FIXME improve: expected-error@-1 {{cannot find 'main::fatalError' in scope}}
+    // expected-error@-1 {{'fatalError' is not imported through module 'main'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{5-9=Swift}}
   }
 
   // FIXME: Add tests with autodiff @_differentiable(jvp:vjp:) and
@@ -103,7 +104,9 @@ extension B: @retroactive main::Equatable {
     // expected-note@-3 {{did you mean module 'Swift'?}} {{25-29=Swift}}
     // expected-note@-4 {{did you mean module 'Swift'?}} {{39-43=Swift}}
       (main::+)
-      // FIXME improve: expected-error@-1 {{cannot find operator 'main::+' in scope}}
+      // expected-error@-1 {{'+' is not imported through module 'main'}}
+      // expected-note@-2 {{did you mean module 'Swift'?}} {{8-12=Swift}}
+      // expected-note@-3 {{did you mean module '_Concurrency'?}} {{8-12=_Concurrency}} FIXME: Accept and suggest 'Swift::' instead?
 
     let magnitude: Int.main::Magnitude = main::magnitude
     // expected-error@-1 {{'Magnitude' is not imported through module 'main'}}
@@ -112,15 +115,18 @@ extension B: @retroactive main::Equatable {
     _ = (fn, magnitude)
 
     if main::Bool.main::random() {
-      // FIXME improve: expected-error@-1 {{cannot find 'main::Bool' in scope}}
+      // expected-error@-1 {{'Bool' is not imported through module 'main'}}
+      // expected-note@-2 {{did you mean module 'Swift'?}} {{8-12=Swift}}
 
       main::negate()
-      // FIXME improve: expected-error@-1 {{cannot find 'main::negate' in scope}}
+      // expected-error@-1 {{'negate' is not imported through module 'main'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{7-11=self.ModuleSelectorTestingKit}}
     }
     else {
       self = main::B(value: .main::min)
-      // FIXME improve: expected-error@-1 {{cannot find 'main::B' in scope}}
-      // expected-error@-2 {{cannot infer contextual base in reference to member 'main::min'}}
+      // expected-error@-1 {{'B' is not imported through module 'main'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{14-18=ModuleSelectorTestingKit}}
+      // expected-error@-3 {{cannot infer contextual base in reference to member 'main::min'}}
 
       self = B.main::init(value: .min)
       // FIXME improve: expected-error@-1 {{'B' cannot be constructed because it has no accessible initializers}}
@@ -130,13 +136,15 @@ extension B: @retroactive main::Equatable {
     self.main::myNegate()
 
     main::fatalError()
-    // FIXME improve: expected-error@-1 {{cannot find 'main::fatalError' in scope}}
+    // expected-error@-1 {{'fatalError' is not imported through module 'main'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{5-9=Swift}}
 
     _ = \main::A.magnitude
     // expected-error@-1 {{'A' is not imported through module 'main'}}
     // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{10-14=ModuleSelectorTestingKit}}
     _ = \A.main::magnitude
-    // FIXME improve: expected-error@-1 {{value of type 'A' has no member 'main::magnitude'}}
+    // expected-error@-1 {{'magnitude' is not imported through module 'main'}}
+    // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{none}}
 
     _ = #main::ExprMacro
     // expected-error@-1 {{no macro named 'main::ExprMacro'}}
@@ -165,7 +173,8 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
     // expected-note@-2 {{did you mean module 'Swift'?}} {{96-120=Swift}}
 
     ModuleSelectorTestingKit::fatalError()
-    // FIXME improve: expected-error@-1 {{cannot find 'ModuleSelectorTestingKit::fatalError' in scope}}
+    // expected-error@-1 {{'fatalError' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{5-29=Swift}}
   }
 
   // FIXME: Add tests with autodiff @_differentiable(jvp:vjp:) and
@@ -174,26 +183,33 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
   @_dynamicReplacement(for: ModuleSelectorTestingKit::negate())
 
   mutating func myNegate() {
+  // expected-note@-1 {{did you mean 'myNegate'?}}
+
     let fn: (ModuleSelectorTestingKit::Int, ModuleSelectorTestingKit::Int) -> ModuleSelectorTestingKit::Int =
     // expected-error@-1 3{{'Int' is not imported through module 'ModuleSelectorTestingKit'}}
     // expected-note@-2 {{did you mean module 'Swift'?}} {{14-38=Swift}}
     // expected-note@-3 {{did you mean module 'Swift'?}} {{45-69=Swift}}
     // expected-note@-4 {{did you mean module 'Swift'?}} {{79-103=Swift}}
       (ModuleSelectorTestingKit::+)
-      // FIXME improve: expected-error@-1 {{cannot find operator 'ModuleSelectorTestingKit::+' in scope}}
+      // expected-error@-1 {{'+' is not imported through module 'ModuleSelectorTestingKit'}}
+      // expected-note@-2 {{did you mean module 'Swift'?}} {{8-32=Swift}}
+      // expected-note@-3 {{did you mean module '_Concurrency'?}} {{8-32=_Concurrency}} FIXME: Accept and suggest 'Swift::' instead?
 
     let magnitude: Int.ModuleSelectorTestingKit::Magnitude = ModuleSelectorTestingKit::magnitude
     // expected-error@-1 {{'Magnitude' is not imported through module 'ModuleSelectorTestingKit'}}
     // expected-note@-2 {{did you mean module 'Swift'?}} {{24-48=Swift}}
-    // FIXME improve: expected-error@-3 {{cannot find 'ModuleSelectorTestingKit::magnitude' in scope}}
+    // expected-error@-3 {{'magnitude' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-4 {{did you mean the local declaration?}} {{62-88=}}
 
     _ = (fn, magnitude)
 
     if ModuleSelectorTestingKit::Bool.ModuleSelectorTestingKit::random() {
-    // FIXME improve: expected-error@-1 {{cannot find 'ModuleSelectorTestingKit::Bool' in scope}}
+    // expected-error@-1 {{'Bool' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{8-32=Swift}}
 
       ModuleSelectorTestingKit::negate()
-      // expected-error@-1 {{cannot find 'ModuleSelectorTestingKit::negate' in scope}}
+      // expected-error@-1 {{'negate' is not imported through module 'ModuleSelectorTestingKit'}}
+      // expected-note@-2 {{did you mean the member of 'self'?}} {{7-7=self.}}
     }
     else {
       self = ModuleSelectorTestingKit::C(value: .ModuleSelectorTestingKit::min)
@@ -206,7 +222,8 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
     // FIXME improve: expected-error@-1 {{value of type 'C' has no member 'ModuleSelectorTestingKit::myNegate'}}
 
     ModuleSelectorTestingKit::fatalError()
-    // FIXME improve: expected-error@-1 {{cannot find 'ModuleSelectorTestingKit::fatalError' in scope}}
+    // expected-error@-1 {{'fatalError' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{5-29=Swift}}
 
     _ = \ModuleSelectorTestingKit::A.magnitude
     _ = \A.ModuleSelectorTestingKit::magnitude
@@ -244,24 +261,28 @@ extension D: @retroactive Swift::Equatable {
   // FIXME improve: expected-error@-1 {{replaced function 'Swift::negate()' could not be found}}
 
   mutating func myNegate() {
+    // expected-note@-1 {{did you mean 'myNegate'?}}
 
     let fn: (Swift::Int, Swift::Int) -> Swift::Int =
       (Swift::+)
 
     let magnitude: Int.Swift::Magnitude = Swift::magnitude
-    // expected-error@-1 {{cannot find 'Swift::magnitude' in scope}}
+    // expected-error@-1 {{'magnitude' is not imported through module 'Swift'}}
+    // expected-note@-2 {{did you mean the local declaration?}} {{43-50=}}
 
     _ = (fn, magnitude)
 
     if Swift::Bool.Swift::random() {
 
       Swift::negate()
-      // FIXME improve: expected-error@-1 {{cannot find 'Swift::negate' in scope}}
+      // expected-error@-1 {{'negate' is not imported through module 'Swift'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{7-12=self.ModuleSelectorTestingKit}}
     }
     else {
       self = Swift::D(value: .Swift::min)
-      // FIXME improve: expected-error@-1 {{cannot find 'Swift::D' in scope}}
-      // expected-error@-2 {{cannot infer contextual base in reference to member 'Swift::min'}}
+      // expected-error@-1 {{'D' is not imported through module 'Swift'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{14-19=ModuleSelectorTestingKit}}
+      // expected-error@-3 {{cannot infer contextual base in reference to member 'Swift::min'}}
 
       self = D.Swift::init(value: .min)
       // FIXME improve: expected-error@-1 {{'D' cannot be constructed because it has no accessible initializers}}
@@ -277,7 +298,8 @@ extension D: @retroactive Swift::Equatable {
     // expected-error@-1 {{'A' is not imported through module 'Swift'}}
     // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{10-15=ModuleSelectorTestingKit}}
     _ = \A.Swift::magnitude
-    // FIXME improve: expected-error@-1 {{value of type 'A' has no member 'Swift::magnitude'}}
+    // expected-error@-1 {{'magnitude' is not imported through module 'Swift'}}
+    // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{none}}
 
     _ = #Swift::ExprMacro
     // expected-error@-1 {{no macro named 'Swift::ExprMacro'}}
@@ -293,7 +315,8 @@ let mog: Never = fatalError()
 
 func localVarsCantBeAccessedByModuleSelector() {
   let mag: Int.Swift::Magnitude = main::mag
-  // expected-error@-1 {{cannot find 'main::mag' in scope}}
+  // expected-error@-1 {{'mag' is not imported through module 'main'}}
+  // expected-note@-2 {{did you mean the local declaration?}} {{35-41=}}
 
   let mog: Never = main::mog
 }
@@ -332,7 +355,8 @@ func decl1(
   label p3: @escaping () -> A
 ) {
   switch Optional(main::p2) {
-  // expected-error@-1 {{cannot find 'main::p2' in scope}}
+  // expected-error@-1 {{'p2' is not imported through module 'main'}}
+  // expected-note@-2 {{did you mean the local declaration?}} {{19-25=}}
   case Optional.some(let decl1i):
     break
   case .none:
@@ -340,7 +364,8 @@ func decl1(
   }
 
   switch Optional(main::p2) {
-  // expected-error@-1 {{cannot find 'main::p2' in scope}}
+  // expected-error@-1 {{'p2' is not imported through module 'main'}}
+  // expected-note@-2 {{did you mean the local declaration?}} {{19-25=}}
   case let Optional.some(decl1j):
     break
   case .none:
@@ -348,7 +373,8 @@ func decl1(
   }
 
   switch Optional(main::p2) {
-  // expected-error@-1 {{cannot find 'main::p2' in scope}}
+  // expected-error@-1 {{'p2' is not imported through module 'main'}}
+  // expected-note@-2 {{did you mean the local declaration?}} {{19-25=}}
  case let decl1k?:
     break
   case .none:
@@ -362,7 +388,8 @@ typealias decl5 = main::Bool
 
 func badModuleNames() {
   NonexistentModule::print()
-  // expected-error@-1 {{cannot find 'NonexistentModule::print' in scope}}
+  // expected-error@-1 {{'print' is not imported through module 'NonexistentModule'}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{3-20=Swift}}
 
   _ = "foo".NonexistentModule::count
   // FIXME improve: expected-error@-1 {{value of type 'String' has no member 'NonexistentModule::count'}}
