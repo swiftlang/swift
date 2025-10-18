@@ -747,13 +747,16 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   }
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
-    let call = try base.buildFunctionCall(pointerArgs)
+    var call = try base.buildFunctionCall(pointerArgs)
     let startLabel =
       if generateSpan {
         "_unsafeStart"
       } else {
         "start"
       }
+    if peelOptionalType(oldType).canRepresentBasicType(type: OpaquePointer.self) {
+      call = ExprSyntax("UnsafeRawPointer(\(call))")
+    }
     var cast = try newType
     var expr: ExprSyntax
     if nullable {
