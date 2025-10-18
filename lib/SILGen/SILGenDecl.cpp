@@ -781,7 +781,6 @@ public:
     // There are four cases we need to handle here: parameters, initialized (or
     // bound) decls, uninitialized ones, and async let declarations.
     bool needsTemporaryBuffer;
-    bool isUninitialized = false;
 
     assert(!isa<ParamDecl>(vd)
            && "should not bind function params on this path");
@@ -790,14 +789,12 @@ public:
       // If this is a let-value without an initializer, then we need a temporary
       // buffer.  DI will make sure it is only assigned to once.
       needsTemporaryBuffer = true;
-      isUninitialized = true;
     } else if (vd->isAsyncLet()) {
       // If this is an async let, treat it like a let-value without an
       // initializer. The initializer runs concurrently in a child task,
       // and value will be initialized at the point the variable in the
       // async let is used.
       needsTemporaryBuffer = true;
-      isUninitialized = true;
     } else {
       // If this is a let with an initializer or bound value, we only need a
       // buffer if the type is address only or is noncopyable.
@@ -824,8 +821,11 @@ public:
       address = SGF.emitTemporaryAllocation(vd, lowering->getLoweredType(),
                                             DoesNotHaveDynamicLifetime,
                                             isLexical, IsFromVarDecl);
-      if (isUninitialized)
-        address = SGF.B.createMarkUninitializedVar(vd, address);
+
+      // Ensure DI always checks this to avoid cases where an address-only
+      // value is referenced in a closure that is part of its initializer.
+      address = SGF.B.createMarkUninitializedVar(vd, address);
+
       DestroyCleanup = SGF.enterDormantTemporaryCleanup(address, *lowering);
       SGF.VarLocs[vd] = SILGenFunction::VarLoc(address,
                                                SILAccessEnforcement::Unknown);
