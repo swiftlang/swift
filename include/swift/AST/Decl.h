@@ -1070,6 +1070,10 @@ public:
   std::optional<ObjCSelector>
   getExplicitObjCName(bool allowInvalid = false) const;
 
+  /// Whether this declaration is exposed to C and does not expose a Swift
+  /// counterpart.
+  bool hasOnlyCEntryPoint() const;
+
   /// True if this declaration provides an implementation for an imported
   /// Objective-C declaration. This implies various restrictions and special
   /// behaviors for it and, if it's an extension, its members.

@@ -3282,8 +3282,8 @@ StringRef ExternAttr::getCName(const FuncDecl *D) const {
   return D->getBaseIdentifier().str();
 }
 
-ExternAttr *ExternAttr::find(DeclAttributes &attrs, ExternKind kind) {
-  for (DeclAttribute *attr : attrs) {
+const ExternAttr *ExternAttr::find(const DeclAttributes &attrs, ExternKind kind) {
+  for (const DeclAttribute *attr : attrs) {
     if (auto *externAttr = dyn_cast<ExternAttr>(attr)) {
       if (externAttr->getExternKind() == kind)
         return externAttr;

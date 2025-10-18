@@ -4895,8 +4895,18 @@ getAbstractionPatternForConstant(TypeConverter &converter, ASTContext &ctx,
     return AbstractionPattern(fnType);
 
   const clang::Decl *clangDecl = bridgedFn->getClangDecl();
-  if (!clangDecl)
+  if (!clangDecl) {
+    // If this function only has a C entrypoint, create a Clang type to
+    // use when referencing it.
+    if (bridgedFn->hasOnlyCEntryPoint()) {
+      auto clangType = ctx.getClangFunctionType(
+          fnType->getParams(), fnType->getResult(),
+          FunctionTypeRepresentation::CFunctionPointer);
+      return AbstractionPattern(fnType, clangType);
+    }
+
     return AbstractionPattern(fnType);
+  }
 
   // Don't implicitly turn non-optional results to optional if
   // we're going to apply a foreign error convention that checks

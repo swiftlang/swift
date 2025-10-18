@@ -51,12 +51,11 @@ func main() {
   // CHECK-DAG: apply [[F7]]([[DEFAULT_V]]) : $@convention(c) (Int) -> ()
   defaultArg()
 
-  // CHECK-DAG: [[CREF:%[0-9]+]] = function_ref @$s8extern_c16publicVisibilityyS2iFTo : $@convention(c) (Int) -> Int
-  // CHECK-DAG: [[THUNK:%[0-9]+]] = function_ref @$sS2iIetCyd_S2iIegyd_TR : $@convention(thin) (Int, @convention(c) (Int) -> Int) -> Int
-  // CHECK-DAG: [[APPLIED:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK]]([[CREF]]) : $@convention(thin) (Int, @convention(c) (Int) -> Int) -> Int
-  // CHECK-DAG: [[NOESCAPE_APPLIED:%[0-9]+]] = convert_escape_to_noescape [not_guaranteed] [[APPLIED]] to $@noescape @callee_guaranteed (Int) -> Int
+  // CHECK-DAG: [[CREF:%[0-9]+]] = function_ref @$s8extern_c16publicVisibilityyS2iFTO : $@convention(thin) (Int) -> Int
+  // CHECK-DAG: [[THICK_CREF:%[0-9]+]] = thin_to_thick_function [[CREF]] to $@callee_guaranteed (Int) -> Int
+  // CHECK-DAG: [[NOESCAPE_CREF:%[0-9]+]] = convert_escape_to_noescape [not_guaranteed] [[THICK_CREF]] to $@noescape @callee_guaranteed (Int) -> Int
   // CHECK-DAG: [[CALL_ME:%[0-9]+]] = function_ref @$s8extern_c6callMe4bodyS3iXE_tF
-  // CHECK-DAG: apply [[CALL_ME]]([[NOESCAPE_APPLIED]]) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Int) -> Int) -> Int
+  // CHECK-DAG: apply [[CALL_ME]]([[NOESCAPE_CREF]]) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Int) -> Int) -> Int
   _ = callMe(body: publicVisibility)
 }
 

@@ -89,6 +89,11 @@ bool swift::requiresForeignToNativeThunk(ValueDecl *vd) {
     if (proto->isObjC())
       return true;
 
+  // If there is only a C entrypoint from a Swift function, we will need
+  // foreign-to-native thunks to deal with them.
+  if (vd->hasOnlyCEntryPoint())
+    return true;
+
   if (auto fd = dyn_cast<FuncDecl>(vd))
     return fd->hasClangNode();
 
@@ -111,7 +116,7 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   if (vd->hasClangNode())
     return true;
 
-  if (ExternAttr::find(vd->getAttrs(), ExternKind::C))
+  if (vd->hasOnlyCEntryPoint())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(vd)) {
@@ -131,7 +136,9 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
                        bool isRuntimeAccessible,
                        SILDeclRef::BackDeploymentKind backDeploymentKind,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
-    : loc(vd), kind(kind), isForeign(isForeign), distributedThunk(isDistributedThunk),
+    : loc(vd), kind(kind),
+      isForeign(isForeign),
+      distributedThunk(isDistributedThunk),
       isKnownToBeLocal(isKnownToBeLocal),
       isRuntimeAccessible(isRuntimeAccessible),
       backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
@@ -470,7 +477,8 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     // Native-to-foreign thunks for methods are always just private, since
     // they're anchored by Objective-C metadata.
     auto &attrs = fn->getAttrs();
-    if (constant.isNativeToForeignThunk() && !attrs.hasAttribute<CDeclAttr>()) {
+    if (constant.isNativeToForeignThunk() &&
+        !(attrs.hasAttribute<CDeclAttr>() && !fn->hasOnlyCEntryPoint())) {
       auto isTopLevel = fn->getDeclContext()->isModuleScopeContext();
       return isTopLevel ? Limit::OnDemand : Limit::Private;
     }
@@ -1268,6 +1276,10 @@ bool SILDeclRef::isNativeToForeignThunk() const {
     if (getDecl()->getAttrs().hasAttribute<ExternAttr>())
       return false;
 
+    // No thunk is required if the decl directly exposes a C entry point.
+    if (getDecl()->hasOnlyCEntryPoint())
+      return false;
+
     // Only certain kinds of SILDeclRef can expose native-to-foreign thunks.
     return kind == Kind::Func || kind == Kind::Initializer ||
            kind == Kind::Deallocator;
@@ -1433,7 +1445,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
     // Use a given cdecl name for native-to-foreign thunks.
     if (getDecl()->getAttrs().hasAttribute<CDeclAttr>())
-      if (isNativeToForeignThunk()) {
+      if (isNativeToForeignThunk() || isForeign) {
         // If this is an @implementation @_cdecl, mangle it like the clang
         // function it implements.
         if (auto objcInterface = getDecl()->getImplementedObjCDecl()) {

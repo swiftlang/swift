@@ -2256,6 +2256,20 @@ ExtensionDecl::isAddingConformanceToInvertible() const {
   return std::nullopt;
 }
 
+bool Decl::hasOnlyCEntryPoint() const {
+  if (ExternAttr::find(getAttrs(), ExternKind::C))
+    return true;
+
+  if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>()) {
+    // The @c syntax only provides C entrypoints, not Swift ones. The historical
+    // @_cdecl introduces both Swift and C entrypoints.
+    if (!cdeclAttr->Underscored)
+      return true;
+  }
+
+  return false;
+}
+
 bool Decl::isObjCImplementation() const {
   return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
 }
