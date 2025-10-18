@@ -1,12 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/inputs)
 // RUN: %empty-directory(%t/test-sdk)
-// RUN: %empty-directory(%t/test-sdk/usr/lib/swift)
+// RUN: %empty-directory(%t/test-sdk/usr/lib/swift/%target-sdk-name)
 // RUN: %empty-directory(%t/test-sdk/usr/lib/Foo.swiftmodule)
 // RUN: %empty-directory(%t/test-sdk/usr/lib/Bar.swiftmodule)
 // RUN: %empty-directory(%t/test-sdk/usr/lib/_Foo_Bar.swiftmodule)
 // RUN: %empty-directory(%t/test-sdk/usr/lib/Foo.swiftcrossimport)
-// RUN: cp -r %platform-module-dir/Swift.swiftmodule %t/test-sdk/usr/lib/swift/Swift.swiftmodule
+// RUN: cp -r %test-resource-dir/shims %t/test-sdk/usr/lib/swift
+// RUN: cp -r %platform-module-dir/Swift{,OnoneSupport}.swiftmodule %t/test-sdk/usr/lib/swift/%target-sdk-name/
 
 // RUN: split-file %s %t
 
