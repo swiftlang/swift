@@ -1195,6 +1195,12 @@ ERROR(wrong_module_selector,none,
       "%0 is not imported through module %1", (DeclName, Identifier))
 NOTE(note_change_module_selector,none,
      "did you mean module %0?", (Identifier))
+NOTE(note_remove_module_selector_local_decl,none,
+     "did you mean the local declaration?", ())
+NOTE(note_remove_module_selector_outer_type,none,
+     "did you mean an outer type member?", ())
+NOTE(note_add_explicit_self_with_module_selector,none,
+     "did you mean the member of 'self'?", ())
 NOTE(note_typo_candidate_implicit_member,none,
      "did you mean the implicitly-synthesized %kindbase0?", (const ValueDecl *))
 NOTE(note_remapped_type,none,
