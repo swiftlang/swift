@@ -1158,6 +1158,18 @@ namespace {
       if (addedTypeVars)
         addedTypeVars->push_back(memberTy);
 
+      SmallVector<AnyFunctionType::Param, 8> params;
+      getMatchingParams(argList, params);
+
+      // Add the constraint that the index expression's type be convertible
+      // to the input type of the subscript operator.
+      // We add this as an unsolved constraint before adding the member
+      // constraint since some member constraints such as key-path dynamic
+      // member require the applicable function constraint to be available.
+      CS.addUnsolvedConstraint(Constraint::createApplicableFunction(
+          CS, FunctionType::get(params, outputTy), memberTy,
+          /*trailingClosureMatching=*/std::nullopt, CurDC, fnLocator));
+
       // FIXME: synthesizeMaterializeForSet() wants to statically dispatch to
       // a known subscript here. This might be cleaner if we split off a new
       // UnresolvedSubscriptExpr from SubscriptExpr.
@@ -1172,15 +1184,6 @@ namespace {
                                     FunctionRefInfo::doubleBaseNameApply(),
                                     /*outerAlternatives=*/{}, memberLocator);
       }
-
-      SmallVector<AnyFunctionType::Param, 8> params;
-      getMatchingParams(argList, params);
-
-      // Add the constraint that the index expression's type be convertible
-      // to the input type of the subscript operator.
-      CS.addApplicationConstraint(FunctionType::get(params, outputTy), memberTy,
-                                  /*trailingClosureMatching=*/std::nullopt,
-                                  CurDC, fnLocator);
 
       if (CS.performanceHacksEnabled()) {
         Type fixedOutputType =
