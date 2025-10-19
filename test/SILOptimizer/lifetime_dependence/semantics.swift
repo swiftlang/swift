@@ -74,6 +74,10 @@ struct MutableSpan<T>: ~Escapable, ~Copyable {
   }
 }
 
+extension MutableSpan {
+  mutating func update() {}
+}
+
 extension Array {
   @_lifetime(borrow self)
   borrowing func span() -> Span<Element> {
@@ -515,6 +519,68 @@ func testReassignToBorrowBad(span: inout Span<Int>, array: [Int]) { // expected-
   // expected-note@-1{{it depends on the lifetime of argument 'array'}}
   reassign(dest: &span, source: array.span())
 } // expected-note{{this use causes the lifetime-dependent value to escape}}
+
+// =============================================================================
+// Copied dependence on mutable captures
+// =============================================================================
+
+func runClosure(_ body: ()->()) {}
+
+func testNoEscapeClosureCaptureMutation(spanArg: consuming MutableSpan<Int>) {
+  var spanCapture = spanArg
+  runClosure {
+    spanCapture.update()
+  }
+  _ = spanCapture
+}
+
+func testNoEscapeClosureCaptureMutationDirect(spanArg: consuming MutableSpan<Int>) {
+  var spanCapture = spanArg;
+  {
+    spanCapture.update()
+  }()
+  _ = spanCapture
+}
+
+func testNoEscapClosureCaptureUnsupported(spanArg: Span<Int>, array: consuming [Int]) {
+  var spanCapture = spanArg // expected-error{{lifetime-dependent variable 'spanCapture' escapes its scope}}
+  // expected-note@-2{{it depends on a closure capture; this is not yet supported}}
+  _ = spanCapture;
+  runClosure {
+    spanCapture = array.span()
+  } // expected-note{{this use causes the lifetime-dependent value to escape}}
+}
+
+func testNoEscapClosureCaptureUnsupportedDirect(spanArg: Span<Int>, array: consuming [Int]) {
+  var spanCapture = spanArg // expected-error{{lifetime-dependent variable 'spanCapture' escapes its scope}}
+  // expected-note@-2{{it depends on a closure capture; this is not yet supported}}
+  _ = spanCapture;
+  {
+    spanCapture = array.span()
+  }() // expected-note{{this use causes the lifetime-dependent value to escape}}
+}
+
+// 'spanBox' escapes to 'closure' before it is captured by 'escapedSpan'. The 'inout_aliasable' capture is considered
+// escaping because the closure contains a 'begin_access [dynamic]'.
+func testNoEscapClosureCaptureHasEscaped(spanArg: Span<Int>, array: consuming [Int]) {
+  // expected-error@-1{{lifetime-dependent variable 'spanArg' escapes its scope}}
+  // expected-note@-2{{it depends on the lifetime of argument 'spanArg'}}
+  // expected-note@-3{{it depends on a closure capture; this is not yet supported}}
+  var spanBox = spanArg // expected-error{{lifetime-dependent variable 'spanBox' escapes its scope}}
+  // expected-note@-1{{it depends on a closure capture; this is not yet supported}}
+  // expected-note@-2{{this use causes the lifetime-dependent value to escape}}
+  let closure = { spanBox } // expected-note{{this use causes the lifetime-dependent value to escape}}
+
+  let escapedSpan = {
+    spanBox = array.span() // expected-error{{lifetime-dependent value escapes its scope}}
+    // expected-note@-1{{this use causes the lifetime-dependent value to escape}}
+    return closure() // expected-error{{lifetime-dependent value escapes its scope}}
+    // expected-note@-1{{it depends on the lifetime of this parent value}}
+    // expected-note@-2{{this use causes the lifetime-dependent value to escape}}
+  }()
+  _ = consume array
+  _ = escapedSpan
+}
 
 // =============================================================================
 // Scoped dependence on property access

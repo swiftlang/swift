@@ -409,3 +409,23 @@ func returnTempBorrow() -> Borrow<Int> {
 func test(inline: InlineInt) {
   inline.span.withUnsafeBytes { _ = $0 }
 }
+
+// =============================================================================
+// Closures
+// =============================================================================
+
+/// Test an autoclosure that invokes a mutable method where `Self: ~Escapable`.
+/// The @inout_aliasable argument has an implicit @_lifetime(capture: copy capture),
+/// and no begin_access [dynamic] is present in the closure.
+extension MutableSpan {
+  @_lifetime(self: copy self)
+  public mutating func canUpdate() -> Bool { return true }
+
+  @_lifetime(self: copy self)
+  public mutating func testAutoclosure(z: Bool) -> Bool {
+    if z && canUpdate() {
+      return true
+    }
+    return false
+  }
+}
