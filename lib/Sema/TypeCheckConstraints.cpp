@@ -117,19 +117,11 @@ bool TypeVariableType::Implementation::isTapType() const {
 }
 
 bool TypeVariableType::Implementation::isClosureParameterType() const {
-  if (!(locator && locator->getAnchor()))
-    return false;
-
-  return isExpr<ClosureExpr>(locator->getAnchor()) &&
-         locator->isLastElement<LocatorPathElt::TupleElement>();
+  return locator && locator->isClosureParameterType();
 }
 
 bool TypeVariableType::Implementation::isClosureResultType() const {
-  if (!(locator && locator->getAnchor()))
-    return false;
-
-  return isExpr<ClosureExpr>(locator->getAnchor()) &&
-         locator->isLastElement<LocatorPathElt::ClosureResult>();
+  return locator && locator->isClosureResultType();
 }
 
 bool TypeVariableType::Implementation::isKeyPathType() const {
