@@ -13651,15 +13651,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
   // a fix, let's propagate holes to the "input" type. Doing so
   // provides more information to upcoming argument and result matching.
   if (shouldAttemptFixes()) {
-    if (auto *typeVar = type2->getAs<TypeVariableType>()) {
+    Type underlyingType = desugar2->getMetatypeInstanceType();
+    if (auto *typeVar = underlyingType->getAs<TypeVariableType>()) {
       auto *locator = typeVar->getImpl().getLocator();
       if (hasFixFor(locator)) {
         recordAnyTypeVarAsPotentialHole(func1);
       }
-    }
-    Type underlyingType = desugar2;
-    while (auto *MT = underlyingType->getAs<AnyMetatypeType>()) {
-      underlyingType = MT->getInstanceType();
     }
     underlyingType =
         getFixedTypeRecursive(underlyingType, flags, /*wantRValue=*/true);
