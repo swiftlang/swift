@@ -318,6 +318,14 @@ enum TypeVariableOptions {
 
   /// Whether the type variable can be bound only to a pack expansion type.
   TVO_PackExpansion = 0x40,
+
+  /// Whether the hole for this type variable origates from a different
+  /// type variable in its equivalence class.
+  /// FIXME: This is an unfortunate hack due to the fact that choosing a
+  /// different representative changes binding order and regresses a bunch of
+  /// test cases. Once binding order is made more resilient we ought to be able
+  /// to remove this.
+  TVO_NonRepresentativeHole = 0x80,
 };
 
 enum class KeyPathMutability : uint8_t {
@@ -396,6 +404,12 @@ public:
 
   /// Whether this type variable can bind only to PackExpansionType.
   bool isPackExpansion() const { return getRawOptions() & TVO_PackExpansion; }
+
+  /// Whether the hole for this type variable origates from a different
+  /// type variable in its equivalence class.
+  bool isNonRepresentativeHole() const {
+    return getRawOptions() & TVO_NonRepresentativeHole;
+  }
 
   /// Whether this type variable prefers a subtype binding over a supertype
   /// binding.
@@ -565,28 +579,40 @@ public:
       otherRep->getImpl().recordBinding(*trail);
     otherRep->getImpl().ParentOrFixed = getTypeVariable();
 
+    auto &bits = getTypeVariable()->Bits.TypeVariableType;
+
     if (canBindToLValue() && !otherRep->getImpl().canBindToLValue()) {
       if (trail)
         recordBinding(*trail);
-      getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToLValue;
+      bits.Options &= ~TVO_CanBindToLValue;
     }
 
     if (canBindToInOut() && !otherRep->getImpl().canBindToInOut()) {
       if (trail)
         recordBinding(*trail);
-      getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToInOut;
+      bits.Options &= ~TVO_CanBindToInOut;
     }
 
     if (canBindToNoEscape() && !otherRep->getImpl().canBindToNoEscape()) {
       if (trail)
         recordBinding(*trail);
-      getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToNoEscape;
+      bits.Options &= ~TVO_CanBindToNoEscape;
     }
 
     if (canBindToPack() && !otherRep->getImpl().canBindToPack()) {
       if (trail)
         recordBinding(*trail);
-      getTypeVariable()->Bits.TypeVariableType.Options &= ~TVO_CanBindToPack;
+      bits.Options &= ~TVO_CanBindToPack;
+    }
+
+    // If we're merging a non-hole with a hole, add the flag to allow binding
+    // to a hole. This type variable then becomes a "non-representative" hole,
+    // which is an unfortunate hack necessary to preserve binding order. See
+    // the comment on `TVO_NonRepresentativeHole` for more info.
+    if (!canBindToHole() && otherRep->getImpl().canBindToHole()) {
+      if (trail)
+        recordBinding(*trail);
+      bits.Options |= (TVO_CanBindToHole | TVO_NonRepresentativeHole);
     }
   }
 
@@ -701,6 +727,7 @@ private:
     ENTRY(TVO_PrefersSubtypeBinding, "");
     ENTRY(TVO_CanBindToPack, "pack");
     ENTRY(TVO_PackExpansion, "pack expansion");
+    ENTRY(TVO_NonRepresentativeHole, "non-rep hole");
     }
   #undef ENTRY
   }
@@ -3418,6 +3445,14 @@ public:
   ConstraintLocator *
   getImplicitValueConversionLocator(ConstraintLocatorBuilder root,
                                     ConversionRestrictionKind restriction);
+
+  /// Retrieve the type variable that represents the originating hole in the
+  /// equivalence class for a given type variable.
+  TypeVariableType *getHoleTypeVar(TypeVariableType *tv);
+
+  /// Retrieve the locator for the hole that represents the originating hole in
+  /// the equivalence class for a given type variable.
+  ConstraintLocator *getHoleLocator(TypeVariableType *tv);
 
   /// Lookup and return parent associated with given expression.
   Expr *getParentExpr(Expr *expr) {

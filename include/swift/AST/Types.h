@@ -454,11 +454,11 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+28,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 8+26,
     /// Type variable options.
-    Options : 7,
+    Options : 8,
     /// The unique number assigned to this type variable.
-    ID : 27
+    ID : 26
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ErrorUnionType, TypeBase, 32,
