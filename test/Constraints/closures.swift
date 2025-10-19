@@ -1362,7 +1362,7 @@ do {
     }
   }
 
-  test { // expected-error {{invalid conversion from throwing function of type '(Int) throws -> Void' to non-throwing function type '(Int) -> Void'}}
+  test { // expected-error {{invalid conversion from throwing function of type '(Int) throws -> _' to non-throwing function type '(Int) -> Void'}}
     try $0.missing // expected-error {{value of type 'Int' has no member 'missing'}}
   }
 }
