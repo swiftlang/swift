@@ -115,11 +115,11 @@ func f_45262(block: () -> (), other: () -> Int) {
 
 struct S {
   init<T>(_ x: T, _ y: T) {} // expected-note {{generic parameters are always considered '@escaping'}}
-  subscript<T>() -> (T, T) -> Void { { _, _ in } }
+  subscript<T>() -> (T, T) -> Void { { _, _ in } } // expected-note {{generic parameters are always considered '@escaping'}}
 
-  init(fn: () -> Int) { // expected-note {{parameter 'fn' is implicitly non-escaping}}
+  init(fn: () -> Int) {
     self.init({ 0 }, fn) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
-    _ = self[]({ 0 }, fn) // expected-error {{passing non-escaping parameter 'fn' to function expecting an '@escaping' closure}}
+    _ = self[]({ 0 }, fn) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
   }
 }
 

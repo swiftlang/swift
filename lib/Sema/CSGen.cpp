@@ -1162,12 +1162,27 @@ namespace {
 
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
-      // We add this as an unsolved constraint before adding the member
-      // constraint since some member constraints such as key-path dynamic
-      // member require the applicable function constraint to be available.
-      CS.addUnsolvedConstraint(Constraint::createApplicableFunction(
-          CS, FunctionType::get(params, outputTy), memberTy,
-          /*trailingClosureMatching=*/std::nullopt, CurDC, fnLocator));
+      auto addApplicableFn = [&]() {
+        CS.addApplicationConstraint(
+            FunctionType::get(params, outputTy), memberTy,
+            /*trailingClosureMatching=*/std::nullopt, CurDC, fnLocator);
+      };
+
+      // If we have a dynamic member base we need to add the applicable function
+      // first since solving the member constraint requires the constraint to be
+      // available since it may retire it. We can't yet do this in the general
+      // case since the simplifying of the applicable fn in CSGen is currently
+      // load-bearing for existential opening.
+      // FIXME: Once existential opening is no longer sensitive to solving
+      // order, we ought to be able to just always record the applicable fn as
+      // an unsolved constraint before the member.
+      auto hasDynamicMemberLookup = CS.simplifyType(baseTy)
+                                        ->getRValueType()
+                                        ->getMetatypeInstanceType()
+                                        ->eraseDynamicSelfType()
+                                        ->hasDynamicMemberLookupAttribute();
+      if (hasDynamicMemberLookup)
+        addApplicableFn();
 
       // FIXME: synthesizeMaterializeForSet() wants to statically dispatch to
       // a known subscript here. This might be cleaner if we split off a new
@@ -1183,6 +1198,11 @@ namespace {
                                     FunctionRefInfo::doubleBaseNameApply(),
                                     /*outerAlternatives=*/{}, memberLocator);
       }
+
+      // If we don't have a dynamic member, we add the application after the
+      // member, see the above comment.
+      if (!hasDynamicMemberLookup)
+        addApplicableFn();
 
       if (CS.performanceHacksEnabled()) {
         Type fixedOutputType =
