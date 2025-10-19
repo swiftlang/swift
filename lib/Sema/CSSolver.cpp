@@ -1577,8 +1577,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   assert(solverState);
 
-  setPhase(ConstraintSystemPhase::Solving);
-
   // If constraint system failed while trying to
   // genenerate constraints, let's stop right here.
   if (failedConstraint)
