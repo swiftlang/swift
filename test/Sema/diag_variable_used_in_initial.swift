@@ -58,3 +58,36 @@ func localContext() {
     }
   }
 }
+
+// https://github.com/swiftlang/swift/issues/84909
+
+func uninit_closure_reference() {
+  func passthrough(_ a: () -> Any) -> Any { a() }
+
+  let initMe = passthrough { initMe }
+  // expected-error @-1 {{use of local variable 'initMe' before its declaration}}
+  // expected-note @-2 {{default value declared here}}
+
+  let inline = // expected-note {{default value declared here}}
+  {
+    () -> Any in
+    inline // expected-error {{use of local variable 'inline' before its declaration}}
+  }()
+
+  // these should not regress
+  func castAny(_ a: Any) {
+    let directUncond = a as! Int
+    _ = directUncond
+
+    let directCond = a as? Int
+    _ = directCond
+
+    let twoPhaseUncond: Int
+    twoPhaseUncond = a as! Int
+    _ = twoPhaseUncond
+
+    let twoPhaseCond: Int?
+    twoPhaseCond = a as? Int
+    _ = twoPhaseCond
+  }
+}

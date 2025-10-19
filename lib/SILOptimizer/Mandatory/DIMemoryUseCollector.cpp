@@ -823,7 +823,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    if (false || (isa<UnconditionalCheckedCastAddrInst>(User) ||
+    if (false && (isa<UnconditionalCheckedCastAddrInst>(User) ||
                   isa<CheckedCastAddrBranchInst>(User))) {
       LLVM_DEBUG({
         llvm::dbgs() << "JQ: DI found unchecked addr cast:\n"

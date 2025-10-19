@@ -45,13 +45,13 @@ func quz<T>(a: Bool, t: T) {
 func uninit_closure_reference() {
   func passthrough(_ a: () -> Any) -> Any { a() }
 
-  let initMe = passthrough { initMe }
-  // expected-error @-1 {{constant 'initMe' used before being initialized}}
-  // expected-note @-2 {{defined here}}
+  // let initMe = passthrough { initMe }
+  // ezxpected-error @-1 {{constant 'initMe' used before being initialized}}
+  // ezxpected-note @-2 {{defined here}}
 
-  let inline = { () -> Any in inline }()
-  // expected-error @-1 {{constant 'inline' used before being initialized}}
-  // expected-note @-2 {{defined here}}
+  // let inline = { () -> Any in inline }()
+  // ezxpected-error @-1 {{constant 'inline' used before being initialized}}
+  // ezxpected-note @-2 {{defined here}}
 
   // these should not regress
   func castAny(_ a: Any) {

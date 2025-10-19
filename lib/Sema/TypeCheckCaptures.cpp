@@ -289,6 +289,27 @@ public:
     return Action::SkipChildren(PEE);
   }
 
+  bool isExprContainedIn(Expr *inner, Expr *outer) {
+    class ContainmentChecker : public ASTWalker {
+      Expr *target;
+    public:
+      bool found = false;
+      ContainmentChecker(Expr *target) : target(target) {}
+
+      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+        if (E == target) {
+          found = true;
+          return Action::Stop();
+        }
+        return Action::Continue(E);
+      }
+    };
+
+    ContainmentChecker checker(inner);
+    outer->walk(checker);
+    return checker.found;
+  }
+
   PreWalkResult<Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
     auto *D = DRE->getDecl();
 
@@ -299,6 +320,41 @@ public:
     // algorithm's ignorance of TapExpr. We should fix that.
     if (D->getBaseName() == Context.Id_dollarInterpolation)
       return Action::SkipNode(DRE);
+
+    auto isCapturingFromOwnInitializer = [&]() -> bool {
+//      return false;
+
+      // assume synthesized code is okay?
+      if (D->isImplicit() || DRE->isImplicit())
+        return false;
+
+      auto *var = dyn_cast<VarDecl>(D);
+      if (!var) {
+        return false;
+      }
+
+      auto *pbd = var->getParentPatternBinding();
+      if (!pbd) {
+        return false;
+      }
+
+      unsigned index = pbd->getPatternEntryIndexForVarDecl(var);
+      auto *initExpr = pbd->getInit(index);
+      if (!initExpr) {
+        return false;
+      }
+
+      auto loc = DRE->getLoc();
+      if (!loc.isValid())
+        return false;
+
+      auto srcRange = initExpr->getSourceRange();
+      if (!srcRange.isValid())
+        return false;
+
+//      return isExprContainedIn(DRE, initExpr);
+      return initExpr->getSourceRange().contains(DRE->getLoc());
+    };
 
     // DC is the DeclContext where D was defined
     // CurDC is the DeclContext where D was referenced
@@ -320,6 +376,14 @@ public:
     // Don't "capture" type definitions at all.
     if (isa<TypeDecl>(D))
       return Action::SkipNode(DRE);
+
+    if (isCapturingFromOwnInitializer()) {
+      Context.Diags.diagnose(DRE->getLoc(),
+                             diag::use_local_before_declaration
+                            ,DRE->getDecl()->createNameRef());
+      Context.Diags.diagnose(DRE->getDecl()->getLoc(), diag::default_value_declared_here);
+      return Action::SkipNode(DRE);
+    }
 
     // A local reference is not a capture.
     if (CurDC == DC || isa<TopLevelCodeDecl>(CurDC))
@@ -388,6 +452,14 @@ public:
     // so this is not a capture.
     if (TmpDC == nullptr)
       return Action::SkipNode(DRE);
+
+//    if (isCapturingFromOwnInitializer()) {
+//      Context.Diags.diagnose(DRE->getLoc(),
+//                             diag::use_local_before_declaration
+//                            ,DRE->getDecl()->createNameRef());
+//      Context.Diags.diagnose(DRE->getDecl()->getLoc(), diag::default_value_declared_here);
+//      return Action::SkipNode(DRE);
+//    }
 
     // Only capture var decls at global scope.  Other things can be captured
     // if they are local.

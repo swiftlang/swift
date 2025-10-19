@@ -839,7 +839,7 @@ public:
 
       // Ensure DI always checks this to avoid cases where an address-only
       // value is referenced in a closure that is part of its initializer.
-      if (true || isUninitialized)
+      if (false || isUninitialized)
         address = SGF.B.createMarkUninitializedVar(vd, address);
 
       DestroyCleanup = SGF.enterDormantTemporaryCleanup(address, *lowering);
