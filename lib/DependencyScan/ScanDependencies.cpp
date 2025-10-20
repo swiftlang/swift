@@ -471,6 +471,27 @@ private:
                      [this](const auto &entry) {
                        tracker->trackFile(entry.second.LibraryPath);
                      });
+      StringRef readLegacyTypeInfoPath =
+          instance.getInvocation().getIRGenOptions().ReadLegacyTypeInfoPath;
+      if (!readLegacyTypeInfoPath.empty()) {
+        // If legacy layout is specifed, just need to track that file.
+        if (tracker->trackFile(readLegacyTypeInfoPath))
+          commandline.push_back("-read-legacy-type-info-path=" +
+                                scanner.remapPath(readLegacyTypeInfoPath));
+      } else {
+        // Otherwise, search RuntimeLibrary Path for implicit legacy layout.
+        // Search logic need to match IRGen/GenType.cpp.
+        const auto &triple = instance.getInvocation().getLangOptions().Target;
+        auto archName = swift::getMajorArchitectureName(triple);
+        SmallString<256> legacyLayoutPath(instance.getInvocation()
+                                              .getSearchPathOptions()
+                                              .RuntimeLibraryPaths[0]);
+        llvm::sys::path::append(legacyLayoutPath,
+                                "layouts-" + archName + ".yaml");
+        if (tracker->trackFile(legacyLayoutPath))
+          commandline.push_back("-read-legacy-type-info-path=" +
+                                scanner.remapPath(legacyLayoutPath));
+      }
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return diagnoseCASFSCreationError(root.takeError());
