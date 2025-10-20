@@ -77,7 +77,8 @@ private extension Instruction {
          is StoreBorrowInst,
          is MarkDependenceInst,
          is MarkDependenceAddrInst,
-         is DebugValueInst:
+         is DebugValueInst,
+         is DebugStepInst:
       return true
     default:
       return false
