@@ -255,7 +255,7 @@ private struct CollectedEffects {
       addEffects(.destroy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
 
     case is ReturnInst:
-      if inst.parentFunction.convention.hasGuaranteedAddressResult {
+      if inst.parentFunction.convention.hasAddressResult {
         addEffects(.read, to: inst.operands[0].value)
       }
 
