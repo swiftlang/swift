@@ -9,6 +9,5 @@ set(CMAKE_Swift_COMPILER_TARGET "arm64-apple-bridgeos${CMAKE_OSX_DEPLOYMENT_TARG
 set(SwiftDistributed_ARCH_SUBDIR arm64 CACHE STRING "")
 set(SwiftDistributed_PLATFORM_SUBDIR freestanding CACHE STRING "")
 set(CMAKE_BUILD_TYPE MinSizeRel CACHE STRING "")
-set(SwiftDistributed_SINGLE_THREADED_MODE YES CACHE BOOL "")
 
 include("${CMAKE_CURRENT_LIST_DIR}/apple-common.cmake")
