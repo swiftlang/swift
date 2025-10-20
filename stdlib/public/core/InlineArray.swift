@@ -257,7 +257,7 @@ extension InlineArray where Element: ~Copyable {
   /// count of the array, to initialize every element by passing the closure
   /// the index of the current element being initialized.
   ///
-  ///     [4 of Int] { $0 * 2 }  // [0, 2, 4, 6]
+  ///     InlineArray<4, Int> { $0 * 2 }  // [0, 2, 4, 6]
   ///
   /// The closure is allowed to throw an error at any point during
   /// initialization at which point the array will stop initialization,
@@ -296,7 +296,7 @@ extension InlineArray where Element: ~Copyable {
   /// count of the array, to initialize every element by passing the closure an
   /// immutable borrow reference to the preceding element.
   ///
-  ///     [4 of Int](first: 1) { $0 * 2 }  // [1, 2, 4, 8]
+  ///     InlineArray<4, Int>(first: 1) { $0 * 2 }  // [1, 2, 4, 8]
   ///
   /// The closure is allowed to throw an error at any point during
   /// initialization at which point the array will stop initialization,
