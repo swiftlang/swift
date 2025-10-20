@@ -40,10 +40,6 @@ public var benchmarks: [BenchmarkInfo] {
       runFunction: run_StringHasSuffixUnicode,
       tags: [.validation, .api, .String],
       legacyFactor: 1000),
-    BenchmarkInfo(
-      name: "StringIdentical",
-      runFunction: run_StringIdentical,
-      tags: [.validation, .api, .String]),
   ]
 
   if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
@@ -52,6 +48,14 @@ public var benchmarks: [BenchmarkInfo] {
         name: "StringIterateWords",
         runFunction: run_iterateWords,
         tags: [.validation, .String]))
+  }
+  
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *) {
+    result.append(
+      BenchmarkInfo(
+        name: "StringIdentical",
+        runFunction: run_StringIdentical,
+        tags: [.validation, .api, .String]))
   }
   return result
 }
@@ -1681,6 +1685,7 @@ public func run_iterateWords(_ n: Int) {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 public func run_StringIdentical(_ n: Int) {
   let str1 = "The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. "
   let str2 = str1

@@ -317,9 +317,21 @@ SubstringTests.test("Substring.base") {
   }
 }
 
-SubstringTests.test("isTriviallyIdentical(to:) small ascii") {
-  let (a1, a2, a3) = slices("Hello", from: 2, to: 4)
-  let (b1, b2, b3) = slices("Hello", from: 2, to: 4)
+SubstringTests.test("isTriviallyIdentical(to:) small ascii")
+.skip(.custom(
+  { if #available(SwiftStdlib 6.3, *) { false } else { true } },
+  reason: "Requires Swift 6.3's standard library"
+))
+.code {
+  guard #available(SwiftStdlib 6.3, *) else { return }
+
+  let a = "Hello"
+  let b = "Hello"
+
+  precondition(a == b)
+
+  let (a1, a2, a3) = slices(a, from: 2, to: 4)
+  let (b1, b2, b3) = slices(b, from: 2, to: 4)
 
   precondition(allNotEmpty(a1, a2, a3, b1, b2, b3))
   precondition(allEqual(a1, a2, a3, b1, b2, b3))
@@ -346,10 +358,24 @@ SubstringTests.test("isTriviallyIdentical(to:) small ascii") {
   expectTrue(a3.isTriviallyIdentical(to: b3))
 }
 
-SubstringTests.test("isTriviallyIdentical(to:) small unicode") {
-  let (a1, a2, a3) = slices("Hello Cafe\u{301}", from: 2, to: 4)
-  let (b1, b2, b3) = slices("Hello Cafe\u{301}", from: 2, to: 4)
-  let (c1, c2, c3) = slices("Hello Café", from: 2, to: 4)
+SubstringTests.test("isTriviallyIdentical(to:) small unicode")
+.skip(.custom(
+  { if #available(SwiftStdlib 6.3, *) { false } else { true } },
+  reason: "Requires Swift 6.3's standard library"
+))
+.code {
+  guard #available(SwiftStdlib 6.3, *) else { return }
+
+  let a = "Cafe\u{301}"
+  let b = "Cafe\u{301}"
+  let c = "Café"
+
+  precondition(a == b)
+  precondition(b == c)
+
+  let (a1, a2, a3) = slices(a, from: 2, to: 4)
+  let (b1, b2, b3) = slices(b, from: 2, to: 4)
+  let (c1, c2, c3) = slices(c, from: 2, to: 4)
 
   precondition(allNotEmpty(a1, a2, a3, b1, b2, b3, c1, c2, c3))
   precondition(allEqual(a1, a2, a3, b1, b2, b3, c1, c2, c3))
@@ -385,9 +411,21 @@ SubstringTests.test("isTriviallyIdentical(to:) small unicode") {
   expectFalse(a3.isTriviallyIdentical(to: c3))
 }
 
-SubstringTests.test("isTriviallyIdentical(to:) large ascii") {
-  let (a1, a2, a3) = slices(String(repeating: "Hello", count: 1000), from: 2, to: 4)
-  let (b1, b2, b3) = slices(String(repeating: "Hello", count: 1000), from: 2, to: 4)
+SubstringTests.test("isTriviallyIdentical(to:) large ascii")
+.skip(.custom(
+  { if #available(SwiftStdlib 6.3, *) { false } else { true } },
+  reason: "Requires Swift 6.3's standard library"
+))
+.code {
+  guard #available(SwiftStdlib 6.3, *) else { return }
+  
+  let a = String(repeating: "foo", count: 1000)
+  let b = String(repeating: "foo", count: 1000)
+
+  precondition(a == b)
+
+  let (a1, a2, a3) = slices(a, from: 2, to: 4)
+  let (b1, b2, b3) = slices(b, from: 2, to: 4)
 
   precondition(allNotEmpty(a1, a2, a3, b1, b2, b3))
   precondition(allEqual(a1, a2, a3, b1, b2, b3))
