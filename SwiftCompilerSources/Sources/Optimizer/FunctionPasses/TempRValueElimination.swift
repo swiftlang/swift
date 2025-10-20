@@ -160,7 +160,11 @@ private func getRemovableAllocStackDestination(
   //   %x = load %allocStack   // looks like a load, but is a `load [take]`
   //   strong_release %x
   // ```
-  guard copy.parentFunction.hasOwnership || allocStack.isDestroyedOnAllPaths(context) else {
+  guard copy.parentFunction.hasOwnership ||
+        allocStack.isDestroyedOnAllPaths(context) ||
+        // We can easily remove a dead alloc_stack
+        allocStack.uses.ignore(user: copy).ignore(usersOfType: DeallocStackInst.self).isEmpty
+  else {
     return nil
   }
 
