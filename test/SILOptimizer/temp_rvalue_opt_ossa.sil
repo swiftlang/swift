@@ -96,6 +96,7 @@ sil_global @globalString : $String
 // CHECK:   [[V1:%.*]] = load [trivial] [[A1]] : $*Builtin.Int64
 // CHECK-NOT: alloc_stack
 // CHECK-NOT: copy_addr
+// CHECK:   debug_value %1
 // CHECK:   [[A2:%.*]] = struct_element_addr %1 : $*GS<B>, #GS._value
 // CHECK:   [[V2:%.*]] = load [trivial] [[A2]] : $*Builtin.Int64
 // CHECK:   %{{.*}} = builtin "cmp_slt_Int64"([[V1]] : $Builtin.Int64, [[V2]] : $Builtin.Int64) : $Builtin.Int1
@@ -109,6 +110,7 @@ bb0(%0 : $*GS<B>, %1 : $*GS<B>):
   %3 = load [trivial] %2 : $*Builtin.Int64
   %4 = alloc_stack $GS<B>
   copy_addr %1 to [init] %4 : $*GS<B>
+  debug_value %4, let, name "x"
   %6 = struct_element_addr %4 : $*GS<B>, #GS._value
   %7 = load [trivial] %6 : $*Builtin.Int64
   %8 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1

@@ -547,6 +547,9 @@ private struct UseCollector : AddressDefUseWalker {
       uses.insert(copyFromStack)
       return .continueWalk
 
+    case is DebugValueInst:
+      return .continueWalk
+
     default:
       return .abortWalk
     }
