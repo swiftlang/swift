@@ -2859,14 +2859,8 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
     return false;
 
   auto contextualFix = contextualFixes.front();
-  if (!std::all_of(contextualFixes.begin() + 1, contextualFixes.end(),
-                   [&contextualFix](FixInContext fix) {
-                     return fix.second->getLocator() ==
-                            contextualFix.second->getLocator();
-                   }))
-    return false;
-
   auto fixLocator = contextualFix.second->getLocator();
+
   auto contextualAnchor = fixLocator->getAnchor();
   auto *AE = getAsExpr<ApplyExpr>(contextualAnchor);
   // All contextual failures anchored on the same function call.
@@ -2874,17 +2868,39 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
     return false;
 
   auto fnLocator = cs.getConstraintLocator(AE->getSemanticFn());
-  auto overload = contextualFix.first->getOverloadChoiceIfAvailable(fnLocator);
-  if (!overload)
-    return false;
 
-  auto applyFnType = overload->adjustedOpenedType->castTo<FunctionType>();
-  auto resultTypeVar = applyFnType->getResult()->getAs<TypeVariableType>();
+  auto getResultTypeVar = [&](FixInContext contextualFix) -> TypeVariableType * {
+    auto overload = contextualFix.first->getOverloadChoiceIfAvailable(fnLocator);
+    if (!overload)
+      return nullptr;
+
+    auto applyFnType = overload->adjustedOpenedType->castTo<FunctionType>();
+    return applyFnType->getResult()->getAs<TypeVariableType>();
+  };
+
+  auto resultTypeVar = getResultTypeVar(contextualFix);
   if (!resultTypeVar)
     return false;
 
   auto *GP = resultTypeVar->getImpl().getGenericParameter();
   if (!GP)
+    return false;
+
+  if (!std::all_of(contextualFixes.begin() + 1, contextualFixes.end(),
+                   [&](FixInContext fix) {
+                     if (fix.second->getLocator() != fixLocator)
+                       return false;
+
+                     auto resultTypeVar = getResultTypeVar(fix);
+
+                     if (!resultTypeVar)
+                       return false;
+
+                     if (resultTypeVar->getImpl().getGenericParameter() != GP)
+                       return false;
+
+                     return true;
+                   }))
     return false;
 
   auto applyLoc =
@@ -2903,6 +2919,11 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
       continue;
 
     auto argParamMatch = argMatching->second.parameterBindings[i];
+
+    // FIXME: We're just looking at the first solution's overload here,
+    // is that correct?
+    auto overload = contextualFix.first->getOverloadChoiceIfAvailable(fnLocator);
+    auto applyFnType = overload->adjustedOpenedType->castTo<FunctionType>();
     auto param = applyFnType->getParams()[argParamMatch.front()];
     auto paramFnType = param.getPlainType()->getAs<FunctionType>();
     if (!paramFnType)
@@ -2922,8 +2943,15 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
   // from all the closure contextual fix/solutions and if there are more than
   // one fixed type diagnose it.
   swift::SmallSetVector<Type, 4> genericParamInferredTypes;
-  for (auto &fix : contextualFixes)
+  for (auto &fix : contextualFixes) {
+    auto resultTypeVar = getResultTypeVar(fix);
     genericParamInferredTypes.insert(fix.first->getFixedType(resultTypeVar));
+  }
+
+  for (auto &fix : allFixes) {
+    auto resultTypeVar = getResultTypeVar(fix);
+    genericParamInferredTypes.insert(fix.first->getFixedType(resultTypeVar));
+  }
 
   if (llvm::all_of(allFixes, [&](FixInContext fix) {
         auto fixLocator = fix.second->getLocator();
