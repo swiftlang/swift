@@ -1,6 +1,7 @@
-// RUN: rm -rf %t
-// RUN: %target-swift-frontend -typecheck -verify -I %S%{fs-sep}Inputs  %s -cxx-interoperability-mode=upcoming-swift -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}inheritance.h -Xcc -Wno-return-type -Xcc -Wno-inaccessible-base
-
+// RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default \
+// RUN:   -Xcc -Wno-return-type -Xcc -Wno-inaccessible-base \
+// RUN:   -I %S%{fs-sep}Inputs %s \
+// RUN:   -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}inheritance.h
 
 import Inheritance
 

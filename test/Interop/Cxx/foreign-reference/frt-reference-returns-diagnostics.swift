@@ -1,5 +1,6 @@
-// RUN: rm -rf %t
-// RUN: %target-typecheck-verify-swift -I %S%{fs-sep}Inputs -cxx-interoperability-mode=default -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}frt-reference-returns.h
+// RUN: %target-typecheck-verify-swift -cxx-interoperability-mode=default \
+// RUN:   -I %S%{fs-sep}Inputs \
+// RUN:   -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}frt-reference-returns.h
 
 import FRTReferenceReturns
 
