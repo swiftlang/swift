@@ -118,6 +118,9 @@ class Serializer : public SerializerBase {
 
   bool hadImplementationOnlyImport = false;
 
+  /// Current decl being serialized.
+  const Decl* crossReferencedDecl = nullptr;
+
   /// Helper for serializing entities in the AST block object graph.
   ///
   /// Keeps track of assigning IDs to newly-seen entities, and collecting

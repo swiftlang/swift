@@ -756,6 +756,16 @@ IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC,
   if (M->isClangHeaderImportModule())
     return OBJC_HEADER_MODULE_ID;
 
+  // Reject references to hidden dependencies.
+  if (getASTContext().LangOpts.hasFeature(
+          Feature::CheckImplementationOnlyStrict) &&
+      !allowCompilerErrors() &&
+      this->M->isImportedImplementationOnly(M, /*assumeImported=*/false)) {
+    getASTContext().Diags.diagnose(SourceLoc(),
+        diag::serialization_xref_to_hidden_dependency,
+        M, crossReferencedDecl);
+  }
+
   auto exportedModuleName = file->getExportedModuleName();
   assert(!exportedModuleName.empty());
   auto moduleID = M->getASTContext().getIdentifier(exportedModuleName);
@@ -2451,6 +2461,8 @@ void Serializer::writeCrossReference(const Decl *D) {
   using namespace decls_block;
 
   unsigned abbrCode;
+
+  llvm::SaveAndRestore<const Decl *> SaveDecl(crossReferencedDecl, D);
 
   if (auto op = dyn_cast<OperatorDecl>(D)) {
     writeCrossReference(op->getDeclContext(), 1);
@@ -5397,8 +5409,7 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
 
     // Skip non-public @export(interface) functions.
     auto FD = dyn_cast<AbstractFunctionDecl>(D);
-    if (FD &&
-        FD->getAttrs().hasAttribute<NeverEmitIntoClientAttr>() &&
+    if (FD && FD->isNeverEmittedIntoClient() &&
         !FD->getFormalAccessScope(/*useDC*/nullptr,
           /*treatUsableFromInlineAsPublic*/true).isPublicOrPackage())
       return;
