@@ -1662,7 +1662,7 @@ function Build-CMakeProject {
           }
 
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER $SWIFTC
-          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Platform)
+          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
 
           # TODO(compnerd): remove this once we have the early swift-driver
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
@@ -1793,7 +1793,7 @@ function Build-CMakeProject {
             Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath  "swiftc.exe"
           }
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER $SWIFTC
-          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Platform)
+          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
 
           # TODO(compnerd) remove this once we have the early swift-driver
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
@@ -2947,7 +2947,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_Swift_COMPILER_TARGET = $Platform.Triple;
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
