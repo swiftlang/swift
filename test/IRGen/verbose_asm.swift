@@ -8,5 +8,5 @@ func simpleFunction() -> Int {
     return 42
 }
 
-// VERBOSE: {{;|#}} -- {{Begin|End}} function
-// NO-VERBOSE-NOT: {{;|#}} -- {{Begin|End}} function
+// VERBOSE: {{;|#|//|@}} -- {{Begin|End}} function
+// NO-VERBOSE-NOT: {{;|#|//|@}} -- {{Begin|End}} function
