@@ -14,11 +14,9 @@
 // RUN: %target-swift-frontend -scan-dependencies -module-name test -o %t/test.json %s -enable-deterministic-check 2>&1 | %FileCheck %s --check-prefix=DEPSCAN_OUTPUT
 /// TODO: Implicit module build use a different compiler instance so it doesn't support checking yet.
 // RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t/test.swiftinterface %s -O -enable-deterministic-check 2>&1 | %FileCheck %s --check-prefix=INTERFACE_OUTPUT
+
 /// Hit cache and not emit the second time.
-// RUN: rm %t/test.swiftmodule
-// RUN: not %target-swift-frontend -compile-module-from-interface %t/test.swiftinterface -explicit-interface-module-build -o %t/test.swiftmodule -enable-deterministic-check 2>&1 | %FileCheck --check-prefix=MODULE_MISMATCH %s
-/// Force swiftmodule generation.
-// RUN: %target-swift-frontend -compile-module-from-interface %t/test.swiftinterface -explicit-interface-module-build -o %t/test.swiftmodule -enable-deterministic-check -always-compile-output-files 2>&1 | %FileCheck --check-prefix=MODULE_OUTPUT %s
+// RUN: %target-swift-frontend -compile-module-from-interface %t/test.swiftinterface -explicit-interface-module-build -o %t/test.swiftmodule -enable-deterministic-check 2>&1 | %FileCheck --check-prefix=MODULE_OUTPUT %s
 
 // RUN: %target-swift-frontend -emit-pcm -module-name UserClangModule -o %t/test.pcm %S/Inputs/dependencies/module.modulemap -enable-deterministic-check 2>&1 | %FileCheck %s --check-prefix=PCM_OUTPUT
 
@@ -34,7 +32,6 @@
 // OBJECT_MISMATCH: error: output file '{{.*}}{{/|\\}}test.o' is missing from second compilation for deterministic check
 // DEPSCAN_OUTPUT: remark: produced matching output file '{{.*}}{{/|\\}}test.json'
 // INTERFACE_OUTPUT: remark: produced matching output file '{{.*}}{{/|\\}}test.swiftinterface'
-// MODULE_MISMATCH: error: output file '{{.*}}{{/|\\}}test.swiftmodule' is missing from second compilation for deterministic check
 // PCM_OUTPUT: remark: produced matching output file '{{.*}}{{/|\\}}test.pcm'
 
 public var x = 1

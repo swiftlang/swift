@@ -1478,8 +1478,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableMacroLoadingRemarks = Args.hasArg(OPT_remark_macro_loading);
   Opts.EnableIndexingSystemModuleRemarks = Args.hasArg(OPT_remark_indexing_system_module);
 
-  Opts.EnableSkipExplicitInterfaceModuleBuildRemarks = Args.hasArg(OPT_remark_skip_explicit_interface_build);
-
   if (Args.hasArg(OPT_experimental_skip_non_exportable_decls)) {
     // Only allow -experimental-skip-non-exportable-decls if either library
     // evolution is enabled (in which case the module's ABI is independent of
