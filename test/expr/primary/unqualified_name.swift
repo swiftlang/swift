@@ -1,5 +1,8 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
 
+// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-experimental-feature ModuleSelector
+// REQUIRES: swift_feature_ModuleSelector
+
 func f0(_ x: Int, y: Int, z: Int) { }
 func f1(_ x: Int, while: Int) { }
 func f2(_ x: Int, `let` _: Int) { }
