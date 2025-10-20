@@ -1186,8 +1186,7 @@ func f_56996() {
   _ = \Int.byteSwapped.init() // expected-error {{static member 'init()' cannot be used on instance of type 'Int'}}
   _ = \Int // expected-error {{key path must have at least one component}}
   _ = \Int? // expected-error {{key path must have at least one component}}
-  _ = \Int. // expected-error {{invalid component of Swift key path}}
-  // expected-error@-1 {{expected member name following '.'}}
+  _ = \Int. // expected-error {{expected member name following '.'}}
 }
 
 // https://github.com/apple/swift/issues/55805
