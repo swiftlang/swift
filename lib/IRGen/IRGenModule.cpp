@@ -1726,7 +1726,7 @@ void IRGenModule::addLinkLibraries() {
         LinkLibrary{"objc", LibraryKind::Library, /*static=*/false});
 
   if (TargetInfo.HasSwiftClientRRLibrary &&
-      !getOptions().DisableClientRetainRelease)
+      getOptions().EnableClientRetainRelease)
     registerLinkLibrary(LinkLibrary{"swiftClientRetainRelease",
                                     LibraryKind::Library, /*static=*/true});
 

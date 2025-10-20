@@ -542,8 +542,8 @@ public:
   // Whether to emit mergeable or non-mergeable traps.
   unsigned MergeableTraps : 1;
 
-  /// Disable the use of swift_retain/releaseClient functions.
-  unsigned DisableClientRetainRelease : 1;
+  /// Enable the use of swift_retain/releaseClient functions.
+  unsigned EnableClientRetainRelease : 1;
 
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
@@ -656,7 +656,7 @@ public:
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(true),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
         UseCoroCCX8664(false), UseCoroCCArm64(false), MergeableTraps(false),
-        DisableClientRetainRelease(false),
+        EnableClientRetainRelease(true),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
