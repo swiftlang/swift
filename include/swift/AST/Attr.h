@@ -23,6 +23,7 @@
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclNameLoc.h"
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LifetimeDependence.h"
@@ -3634,6 +3635,40 @@ public:
 
   bool isEquivalent(const NonexhaustiveAttr *other, Decl *attachedTo) const {
     return getMode() == other->getMode();
+  }
+};
+
+class WarnAttr : public DeclAttribute {
+public:
+  enum class Behavior : uint8_t { Error, Warning, Ignored };
+
+  WarnAttr(DiagGroupID DiagnosticGroupID, Behavior Behavior,
+           std::optional<StringRef> Reason, SourceLoc AtLoc, SourceRange Range,
+           bool Implicit)
+      : DeclAttribute(DeclAttrKind::Warn, AtLoc, Range, Implicit),
+        DiagnosticBehavior(Behavior), DiagnosticGroupID(DiagnosticGroupID),
+        Reason(Reason) {}
+
+  WarnAttr(DiagGroupID DiagnosticGroupID, Behavior Behavior, bool Implicit)
+      : WarnAttr(DiagnosticGroupID, Behavior, std::nullopt, SourceLoc(),
+                 SourceRange(), Implicit) {}
+
+  Behavior DiagnosticBehavior;
+  DiagGroupID DiagnosticGroupID;
+  const std::optional<StringRef> Reason;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Warn;
+  }
+
+  WarnAttr *clone(ASTContext &ctx) const {
+    return new (ctx) WarnAttr(DiagnosticGroupID, DiagnosticBehavior, Reason,
+                              AtLoc, Range, isImplicit());
+  }
+
+  bool isEquivalent(const WarnAttr *other,
+                    Decl *attachedTo) const {
+    return Reason == other->Reason;
   }
 };
 

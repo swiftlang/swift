@@ -309,6 +309,10 @@ static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureSourceWarningControl(Decl *decl) {
+  return decl->getAttrs().hasAttribute<WarnAttr>();
+}
+
 static bool usesFeatureCompileTimeValues(Decl *decl) {
   return decl->getAttrs().hasAttribute<ConstValAttr>() ||
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
