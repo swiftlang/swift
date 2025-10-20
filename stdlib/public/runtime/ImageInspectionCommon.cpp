@@ -28,67 +28,15 @@
 #include "swift/Runtime/Concurrent.h"
 
 #include <algorithm>
-#include <atomic>
 #include <cstdlib>
 
 namespace swift {
-
-static Lazy<ConcurrentReadableArray<swift::MetadataSections *>> registered;
-
-/// Adjust the \c baseAddress field of a metadata sections structure.
-///
-/// \param sections A pointer to a valid \c swift::MetadataSections structure.
-///
-/// This function should be called at least once before the structure or its
-/// address is passed to code outside this file to ensure that the structure's
-/// \c baseAddress field correctly points to the base address of the image it
-/// is describing.
-static void fixupMetadataSectionBaseAddress(swift::MetadataSections *sections) {
-  bool fixupNeeded = false;
-
-#if defined(__ELF__)
-  // If the base address was set but the image is an ELF image, it is going to
-  // be __dso_handle which is not the value we expect (Dl_info::dli_fbase), so
-  // we need to fix it up.
-  fixupNeeded = true;
-#elif !defined(__MACH__)
-  // For non-ELF, non-Apple platforms, if the base address is nullptr, it
-  // implies that this image was built against an older version of the runtime
-  // that did not capture any value for the base address.
-  auto oldBaseAddress = sections->baseAddress.load(std::memory_order_relaxed);
-  if (!oldBaseAddress) {
-    fixupNeeded = true;
-  }
-#endif
-
-  if (fixupNeeded) {
-    // We need to fix up the base address. We'll need a known-good address in
-    // the same image: `sections` itself will work nicely.
-    auto symbolInfo = SymbolInfo::lookup(sections);
-    if (symbolInfo.has_value() && symbolInfo->getBaseAddress()) {
-        sections->baseAddress.store(symbolInfo->getBaseAddress(),
-                                    std::memory_order_relaxed);
-    }
-  }
-}
+  static Lazy<ConcurrentReadableArray<swift::MetadataSections *>> registered;
 }
 
 SWIFT_RUNTIME_EXPORT
 void swift_addNewDSOImage(swift::MetadataSections *sections) {
-#if 0
-  // Ensure the base address of the sections structure is correct.
-  //
-  // Currently disabled because none of the registration functions below
-  // actually do anything with the baseAddress field. Instead,
-  // swift_enumerateAllMetadataSections() is called by other individual
-  // functions, lower in this file, that yield metadata section pointers.
-  //
-  // If one of these registration functions starts needing the baseAddress
-  // field, this call should be enabled and the calls elsewhere in the file can
-  // be removed.
-  swift::fixupMetadataSectionBaseAddress(sections);
-#endif
-  auto baseAddress = sections->baseAddress.load(std::memory_order_relaxed);
+  auto baseAddress = sections->baseAddress;
 
   const auto &protocols_section = sections->swift5_protocols;
   const void *protocols = reinterpret_cast<void *>(protocols_section.start);
@@ -144,9 +92,6 @@ void swift_enumerateAllMetadataSections(
 ) {
   auto snapshot = swift::registered->snapshot();
   for (swift::MetadataSections *sections : snapshot) {
-    // Ensure the base address is fixed up before yielding the pointer.
-    swift::fixupMetadataSectionBaseAddress(sections);
-
     // Yield the pointer and (if the callback returns false) break the loop.
     if (!(* body)(sections, context)) {
       return;
@@ -180,11 +125,6 @@ const swift::MetadataSections *swift_getMetadataSection(size_t index) {
     result = snapshot[index];
   }
 
-  if (result) {
-    // Ensure the base address is fixed up before returning it.
-    swift::fixupMetadataSectionBaseAddress(result);
-  }
-
   return result;
 }
 
@@ -197,22 +137,6 @@ swift_getMetadataSectionName(const swift::MetadataSections *section) {
     }
   }
   return "";
-}
-
-SWIFT_RUNTIME_EXPORT
-void swift_getMetadataSectionBaseAddress(const swift::MetadataSections *section,
-                                         void const **out_actual,
-                                         void const **out_expected) {
-  if (auto info = swift::SymbolInfo::lookup(section)) {
-    *out_actual = info->getBaseAddress();
-  } else {
-    *out_actual = nullptr;
-  }
-
-  // fixupMetadataSectionBaseAddress() was already called by
-  // swift_getMetadataSection(), presumably on the same thread, so we don't need
-  // to call it again here.
-  *out_expected = section->baseAddress.load(std::memory_order_relaxed);
 }
 
 SWIFT_RUNTIME_EXPORT

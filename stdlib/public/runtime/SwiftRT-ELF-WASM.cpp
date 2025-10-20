@@ -19,11 +19,11 @@
 #include <new>
 
 #if defined(__ELF__)
-extern "C" const char __dso_handle[];
+extern "C" const char __ehdr_start[];
 #elif defined(__wasm__)
 // NOTE: Multi images in a single process is not yet
 // stabilized in WebAssembly toolchain outside of Emscripten.
-static constexpr const void *__dso_handle = nullptr;
+static constexpr const void *__ehdr_start = nullptr;
 #endif
 
 #if SWIFT_ENABLE_BACKTRACING
@@ -94,7 +94,7 @@ static void swift_image_constructor() {
 
   ::new (&sections) swift::MetadataSections {
       swift::CurrentSectionMetadataVersion,
-      { __dso_handle },
+      { __ehdr_start },
 
       nullptr,
       nullptr,

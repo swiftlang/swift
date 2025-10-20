@@ -17,13 +17,6 @@ internal func _getMetadataSectionName(
   _ metadata_section: UnsafeRawPointer
 ) -> UnsafePointer<CChar>
 
-@_silgen_name("swift_getMetadataSectionBaseAddress")
-internal func _getMetadataSectionBaseAddress(
-  _ metadata_section: UnsafeRawPointer,
-  _ outActual: UnsafeMutablePointer<UnsafeRawPointer?>,
-  _ outExpected: UnsafeMutablePointer<UnsafeRawPointer?>
-) -> Void
-
 do {
   let sectionCount = _getMetadataSectionCount()
   expectGT(sectionCount, 0)
@@ -35,17 +28,6 @@ do {
       fatalError("Section \(i) failed to resolve.")
     }
     let name = String(cString: _getMetadataSectionName(section))
-
-    var actual: UnsafeRawPointer? = nil
-    var expected: UnsafeRawPointer? = nil
-    _getMetadataSectionBaseAddress(section, &actual, &expected)
-    expectEqual(
-      actual, expected,
-      """
-      Section \(name) was expected at \(String(describing: expected)) but was
-      found at \(String(describing: actual)) instead.
-      """
-    )
 
     expectFalse(sections.contains(section), "Section \(name) was found twice!")
     sections.insert(section)
