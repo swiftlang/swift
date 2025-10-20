@@ -2250,6 +2250,9 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "LINUX")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
+    elseif(sdk STREQUAL "ANDROID")
+      list(APPEND swiftlib_module_depends_flattened
+           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_ANDROID})
     elseif(sdk STREQUAL "LINUX_STATIC")
       list(APPEND swiftlib_module_depends_flattened
           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX_STATIC})
@@ -2539,6 +2542,11 @@ function(add_swift_target_library name)
         list(APPEND swiftlib_link_flags_all "-Wl,-soname,lib${name}.so")
         # Ensure compatibility with Android 15+ devices using 16KB memory pages.
         list(APPEND swiftlib_link_flags_all "-Wl,-z,max-page-size=16384")
+      endif()
+
+      # This is a Android-specific hack till we transition the stdlib fully to versioned triples.
+      if(sdk STREQUAL "ANDROID" AND name STREQUAL "swiftSwiftReflectionTest")
+        list(APPEND swiftlib_swift_compile_flags_all "-target" "${SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE}${SWIFT_ANDROID_API_LEVEL}")
       endif()
 
       if (SWIFTLIB_BACK_DEPLOYMENT_LIBRARY)
