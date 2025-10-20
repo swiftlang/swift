@@ -1,12 +1,14 @@
-// REQUIRES: rdar162106580
-
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20)
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xcc -std=c++20 -Xcc -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG)
 
 // TODO: test failed in Windows PR testing: rdar://144384453
 // UNSUPPORTED: OS=windows-msvc
 
+// TODO: test failed in macOS PR testing but passes locally: rdar://163049442
+// UNSUPPORTED: OS=macosx
+
 // REQUIRES: executable_test
+// REQUIRES: std_span
 
 import StdlibUnittest
 #if !BRIDGING_HEADER

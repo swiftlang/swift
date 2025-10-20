@@ -20,6 +20,7 @@
 #include "PrintSwiftToClangCoreScaffold.h"
 #include "SwiftToClangInteropContext.h"
 
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -1151,16 +1152,21 @@ public:
 };
 } // end anonymous namespace
 
-static AccessLevel getRequiredAccess(const ModuleDecl &M) {
+static AccessLevel getRequiredAccess(const ModuleDecl &M,
+                                     std::optional<AccessLevel> minAccess) {
+  if (minAccess)
+    return *minAccess;
   return M.isExternallyConsumed() ? AccessLevel::Public : AccessLevel::Internal;
 }
 
 void swift::printModuleContentsAsObjC(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-    ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
+    ModuleDecl &M, SwiftToClangInteropContext &interopContext,
+    std::optional<AccessLevel> minAccess) {
   llvm::raw_null_ostream prologueOS;
   llvm::StringSet<> exposedModules;
-  ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
+  ModuleWriter(os, prologueOS, imports, M, interopContext,
+               getRequiredAccess(M, minAccess),
                /*requiresExposedAttribute=*/false, exposedModules,
                OutputLanguageMode::ObjC)
       .write();
@@ -1168,10 +1174,12 @@ void swift::printModuleContentsAsObjC(
 
 void swift::printModuleContentsAsC(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-    ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
+    ModuleDecl &M, SwiftToClangInteropContext &interopContext,
+    std::optional<AccessLevel> minAccess) {
   llvm::raw_null_ostream prologueOS;
   llvm::StringSet<> exposedModules;
-  ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
+  ModuleWriter(os, prologueOS, imports, M, interopContext,
+               getRequiredAccess(M, minAccess),
                /*requiresExposedAttribute=*/false, exposedModules,
                OutputLanguageMode::C)
       .write();
@@ -1179,7 +1187,8 @@ void swift::printModuleContentsAsC(
 
 EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     raw_ostream &os, ModuleDecl &M, SwiftToClangInteropContext &interopContext,
-    bool requiresExposedAttribute, llvm::StringSet<> &exposedModules) {
+    AccessLevel minAccess, bool requiresExposedAttribute,
+    llvm::StringSet<> &exposedModules) {
   std::string moduleContentsBuf;
   llvm::raw_string_ostream moduleOS{moduleContentsBuf};
   std::string modulePrologueBuf;
@@ -1197,8 +1206,8 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
 
   // FIXME: Use getRequiredAccess once @expose is supported.
   ModuleWriter writer(moduleOS, prologueOS, info.imports, M, interopContext,
-                      AccessLevel::Public, requiresExposedAttribute,
-                      exposedModules, OutputLanguageMode::Cxx);
+                      minAccess, requiresExposedAttribute, exposedModules,
+                      OutputLanguageMode::Cxx);
   writer.write();
   info.dependsOnStandardLibrary = writer.isStdlibRequired();
   if (M.isStdlibModule()) {
