@@ -1195,7 +1195,9 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     // compiler can be more efficient to compute swift cache key without having
     // the knowledge about clang command-line options.
     if (ctx.CASOpts.EnableCaching || ctx.CASOpts.ImportModuleFromCAS) {
-      CI->getCASOpts() = ctx.CASOpts.CASOpts;
+      CI->getCASOpts().CASPath = ctx.CASOpts.Config.CASPath;
+      CI->getCASOpts().PluginPath = ctx.CASOpts.Config.PluginPath;
+      CI->getCASOpts().PluginOptions = ctx.CASOpts.Config.PluginOptions;
       // When clangImporter is used to compile (generate .pcm or .pch), need to
       // inherit the include tree from swift args (last one wins) and clear the
       // input file.
