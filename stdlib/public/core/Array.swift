@@ -2198,6 +2198,6 @@ extension Array {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public func isTriviallyIdentical(to other: Self) -> Bool {
-    self._buffer.identity == other._buffer.identity
+    unsafe self._buffer.identity == other._buffer.identity
   }
 }

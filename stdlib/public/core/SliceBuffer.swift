@@ -511,3 +511,20 @@ extension _SliceBuffer {
     return ContiguousArray(_buffer: result)
   }
 }
+
+extension _SliceBuffer {
+  @_alwaysEmitIntoClient
+  internal func isTriviallyIdentical(to other: Self) -> Bool {
+    guard
+      // FIXME: use builtin == function
+      // self.owner == other.owner,
+      unsafe unsafeBitCast(self.owner, to: Int.self) == unsafeBitCast(other.owner, to: Int.self),
+      unsafe (self.subscriptBaseAddress == other.subscriptBaseAddress),
+      self.startIndex == other.startIndex,
+      self.endIndexAndFlags == other.endIndexAndFlags
+    else {
+      return false
+    }
+    return true
+  }
+}
