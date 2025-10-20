@@ -1,4 +1,4 @@
-// {"kind":"emit-silgen","original":"be1cdd08","signature":"swift::verificationFailure(llvm::Twine const&, swift::SILInstruction const*, swift::SILArgument const*, std::__1::function<void ()> const&)"}
+// {"kind":"emit-silgen","original":"be1cdd08","signature":"swift::verificationFailure(llvm::Twine const&, swift::SILInstruction const*, swift::SILArgument const*, llvm::function_ref<void (swift::SILPrintContext&)>)"}
 // RUN: not --crash %target-swift-frontend -emit-silgen %s
 // REQUIRES: OS=macosx
 import Foundation
