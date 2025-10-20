@@ -1015,7 +1015,8 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
 
   // Note: Reusing the file manager is safe; this is a component that's already
   // reused when building PCM files for the module cache.
-  CI.setVirtualFileSystem(Impl.Instance->getVirtualFileSystemPtr());
+  CI.setVirtualFileSystem(
+      Impl.Instance->getFileManager().getVirtualFileSystemPtr());
   CI.setFileManager(&Impl.Instance->getFileManager());
   CI.createSourceManager();
   auto &clangSrcMgr = CI.getSourceManager();
@@ -1918,7 +1919,7 @@ std::string ClangImporter::getBridgingHeaderContents(
       std::move(invocation), Impl.Instance->getPCHContainerOperations(),
       &Impl.Instance->getModuleCache());
   rewriteInstance.setVirtualFileSystem(
-      Impl.Instance->getVirtualFileSystemPtr());
+      Impl.Instance->getFileManager().getVirtualFileSystemPtr());
   rewriteInstance.setFileManager(&Impl.Instance->getFileManager());
   rewriteInstance.createDiagnostics(new clang::IgnoringDiagConsumer);
   rewriteInstance.createSourceManager();
@@ -2023,7 +2024,7 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
       std::move(invocation), Impl.Instance->getPCHContainerOperations(),
       &Impl.Instance->getModuleCache());
   clonedInstance->setVirtualFileSystem(
-      Impl.Instance->getVirtualFileSystemPtr());
+      Impl.Instance->getFileManager().getVirtualFileSystemPtr());
   clonedInstance->setFileManager(&Impl.Instance->getFileManager());
   clonedInstance->createDiagnostics(&Impl.Instance->getDiagnosticClient(),
                                     /*ShouldOwnClient=*/false);
