@@ -363,3 +363,18 @@ do {
   func testSomeMarkerProto<T: SomeMarkerProto>(_: T) {}
   testSomeMarkerProto(.answer())
 }
+
+// Make sure we diagnose something for instance properties as well
+extension P {
+  var instanceProp: S { S() }
+}
+
+extension P where Self == S {
+  var instanceProp2: S { S() }
+}
+
+test(.instanceProp)
+// expected-error@-1 {{instance member 'instanceProp' cannot be used on type 'P'}}
+test(.instanceProp2)
+// expected-error@-1 {{instance member 'instanceProp2' cannot be used on type 'P'}}
+// expected-error@-2 {{property 'instanceProp2' requires the types 'Self' and 'S' be equivalent}}
