@@ -6452,7 +6452,7 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
       if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx)) {
         SourceLoc diagnosticLoc = func->getLoc();
         if (diagnosticLoc.isInvalid() && func->getClangDecl()) {
-          // Fixme: Remove the diagnosticLoc once the source locations of the
+          // FIXME: Remove the diagnosticLoc once the source locations of the
           // objc method declarations are imported correctly.
           diagnosticLoc = Ctx.getClangModuleLoader()->importSourceLocation(
               ND->getLocation());
