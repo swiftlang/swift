@@ -2195,7 +2195,7 @@ extension Array {
   /// compare equal with `==`, but not all equal arrays are considered
   /// identical.
   ///
-  /// - Performance: O(1)
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public func isTriviallyIdentical(to other: Self) -> Bool {
     self._buffer.identity == other._buffer.identity
