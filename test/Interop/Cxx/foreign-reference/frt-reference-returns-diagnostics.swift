@@ -6,11 +6,11 @@ import FRTReferenceReturns
 
 func testNoAnnotations() {
   let _ = NoAnnotations.getRefCountedByRef()
-  // expected-warning@-1 {{cannot infer the ownership of the returned value, annotate 'getRefCountedByRef()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
+  // expected-warning@-1 {{cannot infer ownership of foreign reference value returned by 'getRefCountedByRef()'}}
   let _ = NoAnnotations.createRefCountedByRef()
-  // expected-warning@-1 {{cannot infer the ownership of the returned value, annotate 'createRefCountedByRef()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
+  // expected-warning@-1 {{cannot infer ownership of foreign reference value returned by 'createRefCountedByRef()'}}
   let _ = NoAnnotations.copyRefCountedByRef()
-  // expected-warning@-1 {{cannot infer the ownership of the returned value, annotate 'copyRefCountedByRef()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
+  // expected-warning@-1 {{cannot infer ownership of foreign reference value returned by 'copyRefCountedByRef()'}}
 }
 
 func testAPIAnnotations() {

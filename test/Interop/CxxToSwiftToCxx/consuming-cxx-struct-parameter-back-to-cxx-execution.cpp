@@ -63,7 +63,7 @@ __attribute__((swift_attr("release:releaseShared")));
 inline void retainShared(SharedFRT *r) { puts("retainShared"); }
 inline void releaseShared(SharedFRT *r) { puts("releaseShared"); }
 
-inline SharedFRT* createSharedFRT() { return new SharedFRT(); } // expected-note {{'createSharedFRT()' is defined here}}
+inline SharedFRT* createSharedFRT() { return new SharedFRT(); } // expected-note {{annotate 'createSharedFRT()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
 
 //--- module.modulemap
 module CxxTest {
@@ -109,7 +109,7 @@ public func returnSharedFRT(_ x : SharedFRT) -> SharedFRT {
 }
 
 public func returnSharedFRT2() -> SharedFRT {
-  return createSharedFRT() // expected-warning {{cannot infer the ownership of the returned value, annotate 'createSharedFRT()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
+  return createSharedFRT() // expected-warning {{cannot infer ownership of foreign reference value returned by 'createSharedFRT()'}}
 }
 
 public struct ValueWrapper {

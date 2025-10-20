@@ -1,44 +1,48 @@
-# C++ Foreign Reference Type warnings (CxxForeignReferenceType)
+# Foreign reference types (ForeignReferenceType)
 
-Warnings related to C++ APIs returning foreign reference types that lack proper ownership annotations.
+Warnings related to foreign reference types imported from C and C++.
 
 ## Overview
 
-When importing C++ types marked with `SWIFT_SHARED_REFERENCE` into Swift, the compiler needs to understand the ownership semantics of functions returning these types. Without explicit annotations, the compiler cannot determine whether the returned object should be retained or not, which can lead to memory management issues.
+Swift imports C and C++ types annotated with `SWIFT_SHARED_REFERENCE` as
+*foreign reference types* (FRTs). Their memory is managed in a similar manner to
+native Swift classes: the compiler automatically inserts calls to retain and
+release operations that maintain an FRT's reference count.
 
-## The Warning
+When a Swift program calls a foreign function returning an FRT, the compiler
+relies on ownership convention annotations to determine whether it needs to
+insert a retain call on behalf of the Swift program:
 
-The compiler emits a warning when it encounters a C++ function or Objective-C method that:
-1. Returns a type marked with `SWIFT_SHARED_REFERENCE` (foreign reference type)
-2. Lacks either `SWIFT_RETURNS_RETAINED` or `SWIFT_RETURNS_UNRETAINED` annotation
+- `SWIFT_RETURNS_RETAINED` means the FRT is returned as an owned object (+1 reference count)
+- `SWIFT_RETURNS_UNRETAINED` means the FRT is returned as an unowned object (+0 reference count)
 
-Example warning:
+Without these annotations, the compiler can generate code with a superfluous or
+missing retain call that leads to memory leaks and errors, so it emits the
+following warning:
+
 ```
-warning: cannot infer the ownership of the returned value, annotate 'functionName()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED
+warning: cannot infer ownership of foreign reference value returned by 'returnsFRT()'
 ```
 
-## How to Fix
+## Fixing the warning
 
-### For C++ Functions
-
-Add the appropriate annotation to your C++ function declaration:
+To address these warnings, you should add the appropriate annotation to your
+C or C++ function declaration:
 
 ```cpp
-// If the function returns a retained value
+// Returns a retained (+1) object
 SWIFT_RETURNS_RETAINED MyFRT* createObject();
 
-// If the function returns an unretained value
+// Returns an unretained (+0) object
 SWIFT_RETURNS_UNRETAINED MyFRT* getExistingObject();
 ```
 
-### For Objective-C Methods
-
-Similarly, annotate your Objective-C methods:
+Objective-C and Objective-C++ methods can be similarly annotated:
 
 ```objc
-// Retained value
+// Returns a retained (+1) object
 - (MyFRT *)createObject SWIFT_RETURNS_RETAINED;
 
-// Unretained value
+// Returns an unretained (+0) object
 - (MyFRT *)getExistingObject SWIFT_RETURNS_UNRETAINED;
 ```

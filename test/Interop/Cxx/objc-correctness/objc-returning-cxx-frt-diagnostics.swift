@@ -10,5 +10,6 @@ import CxxForeignRef
 func testObjCMethods() {
     _ = Bridge.objCMethodReturningFRTBothAnnotations()
     _ = Bridge.objCMethodReturningNonCxxFrtAnannotated()
-    _ = Bridge.objCMethodReturningFRTUnannotated() // expected-warning {{cannot infer the ownership of the returned value, annotate 'objCMethodReturningFRTUnannotated()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
+    _ = Bridge.objCMethodReturningFRTUnannotated()
+    // expected-warning@-1 {{cannot infer ownership of foreign reference value returned by 'objCMethodReturningFRTUnannotated()'}}
 }
