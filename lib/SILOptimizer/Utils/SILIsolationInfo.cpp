@@ -426,6 +426,61 @@ static bool isPartialApplyNonisolatedUnsafe(PartialApplyInst *pai) {
   return foundOneNonIsolatedUnsafe;
 }
 
+/// Return the SILIsolationInfo for a class field.
+///
+/// \arg queriedValue the actual value that SILIsolationInfo::get was called
+/// upon. This is used for IsolationHistory.
+///
+/// \arg classValue this is the actual underlying class value that we are
+/// extracting a field out of. As an example this is the base passed to
+/// ref_element_addr or class_method.
+///
+/// \arg field the actual AST field that we discovered we are querying. This
+/// could be the field of the ref_element_addr or an accessor decl extracted
+/// from a SILDeclRef of a class_method.
+static SILIsolationInfo computeIsolationForClassField(SILValue queriedValue,
+                                                      SILValue classValue,
+                                                      ValueDecl *field) {
+  auto varIsolation = swift::getActorIsolation(field);
+
+  // If we have a global actor isolated field, then we know that we override
+  // the actual isolation of the actor or global actor isolated class with
+  // some other form of isolation. In such a case, we need to use that
+  // isolation instead.
+  if (varIsolation.isGlobalActor()) {
+    assert(!varIsolation.isNonisolatedUnsafe() &&
+           "Cannot apply both nonisolated(unsafe) and a global actor attribute "
+           "to the same declaration");
+    return SILIsolationInfo::getGlobalActorIsolated(
+        queriedValue, varIsolation.getGlobalActor());
+  }
+
+  if (auto instance = ActorInstance::getForValue(classValue)) {
+    if (auto *fArg = llvm::dyn_cast_or_null<SILFunctionArgument>(
+            instance.maybeGetValue())) {
+      if (auto info =
+              SILIsolationInfo::getActorInstanceIsolated(queriedValue, fArg))
+        return info.withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+    }
+  }
+
+  auto *nomDecl = classValue->getType().getNominalOrBoundGenericNominal();
+
+  if (nomDecl->isAnyActor())
+    return SILIsolationInfo::getActorInstanceIsolated(queriedValue, classValue,
+                                                      nomDecl)
+        .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+
+  if (auto isolation = swift::getActorIsolation(nomDecl);
+      isolation && isolation.isGlobalActor()) {
+    return SILIsolationInfo::getGlobalActorIsolated(queriedValue,
+                                                    isolation.getGlobalActor())
+        .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+  }
+
+  return SILIsolationInfo::getDisconnected(varIsolation.isNonisolatedUnsafe());
+}
+
 SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (auto fas = FullApplySite::isa(inst)) {
     // Before we do anything, see if we have a sending result. In such a case,
@@ -594,48 +649,10 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
       return SILIsolationInfo::getDisconnected(partialApplyIsNonIsolatedUnsafe);
   }
 
-  // See if the memory base is a ref_element_addr from an address. If so, add
-  // the actor derived flag.
-  //
-  // This is important so we properly handle setters.
+  // See if the memory base is a ref_element_addr from an address.
   if (auto *rei = dyn_cast<RefElementAddrInst>(inst)) {
-    auto varIsolation = swift::getActorIsolation(rei->getField());
-
-    // If we have a global actor isolated field, then we know that we override
-    // the actual isolation of the actor or global actor isolated class with
-    // some other form of isolation. In such a case, we need to use that
-    // isolation instead.
-    if (varIsolation.isGlobalActor()) {
-      return SILIsolationInfo::getGlobalActorIsolated(
-                 rei, varIsolation.getGlobalActor())
-          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
-    }
-
-    if (auto instance = ActorInstance::getForValue(rei->getOperand())) {
-      if (auto *fArg = llvm::dyn_cast_or_null<SILFunctionArgument>(
-              instance.maybeGetValue())) {
-        if (auto info = SILIsolationInfo::getActorInstanceIsolated(rei, fArg))
-          return info.withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
-      }
-    }
-
-    auto *nomDecl =
-        rei->getOperand()->getType().getNominalOrBoundGenericNominal();
-
-    if (nomDecl->isAnyActor())
-      return SILIsolationInfo::getActorInstanceIsolated(rei, rei->getOperand(),
-                                                        nomDecl)
-          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
-
-    if (auto isolation = swift::getActorIsolation(nomDecl);
-        isolation && isolation.isGlobalActor()) {
-      return SILIsolationInfo::getGlobalActorIsolated(
-                 rei, isolation.getGlobalActor())
-          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
-    }
-
-    return SILIsolationInfo::getDisconnected(
-        varIsolation.isNonisolatedUnsafe());
+    return computeIsolationForClassField(rei, rei->getOperand(),
+                                         rei->getField());
   }
 
   // Check if we have a global_addr inst.
