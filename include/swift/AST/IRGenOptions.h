@@ -656,7 +656,7 @@ public:
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(true),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
         UseCoroCCX8664(false), UseCoroCCArm64(false), MergeableTraps(false),
-        EnableClientRetainRelease(true),
+        EnableClientRetainRelease(false),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
