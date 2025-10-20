@@ -6527,6 +6527,7 @@ class TypeVarRefCollector : public ASTWalker {
   llvm::SmallVector<ReturnStmt *, 4> Returns;
 
   unsigned DCDepth = 0;
+  unsigned SVEDepth = 0;
 
 public:
   TypeVarRefCollector(ConstraintSystem &cs, DeclContext *dc,

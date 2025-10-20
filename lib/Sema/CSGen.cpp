@@ -885,6 +885,9 @@ TypeVarRefCollector::walkToExprPre(Expr *expr) {
   if (isa<ClosureExpr>(expr))
     DCDepth += 1;
 
+  if (isa<SingleValueStmtExpr>(expr))
+    SVEDepth += 1;
+
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
     inferTypeVars(DRE->getDecl());
 
@@ -914,8 +917,15 @@ TypeVarRefCollector::walkToExprPre(Expr *expr) {
 
 ASTWalker::PostWalkResult<Expr *>
 TypeVarRefCollector::walkToExprPost(Expr *expr) {
-  if (isa<ClosureExpr>(expr))
+  if (isa<ClosureExpr>(expr)) {
+    ASSERT(DCDepth > 0);
     DCDepth -= 1;
+  }
+
+  if (isa<SingleValueStmtExpr>(expr)) {
+    ASSERT(SVEDepth > 0);
+    SVEDepth -= 1;
+  }
 
   return Action::Continue(expr);
 }
@@ -930,15 +940,18 @@ TypeVarRefCollector::walkToStmtPre(Stmt *stmt) {
   // we're generating constraints for the closure itself, since we'll connect
   // the conjunction to the closure type variable itself.
   if (auto *CE = dyn_cast<ClosureExpr>(DC)) {
-    if (isa<ReturnStmt>(stmt)) {
+    if (auto *R = dyn_cast<ReturnStmt>(stmt)) {
       if (DCDepth == 0 && !Locator->directlyAt<ClosureExpr>()) {
         SmallPtrSet<TypeVariableType *, 4> typeVars;
         CS.getClosureType(CE)->getResult()->getTypeVariables(typeVars);
         TypeVars.insert(typeVars.begin(), typeVars.end());
       }
 
-      if (Locator->directlyAt<ClosureExpr>() && DCDepth == 1)
-        Returns.push_back(cast<ReturnStmt>(stmt));
+      // It's invalid to use `return` inside of a single-value expression,
+      // so we need to skip them and any other statement that doesn't
+      // belong to the current closure.
+      if (Locator->directlyAt<ClosureExpr>() && DCDepth == 1 && SVEDepth == 0)
+        Returns.push_back(R);
     }
   }
 
