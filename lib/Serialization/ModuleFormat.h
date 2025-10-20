@@ -2319,6 +2319,11 @@ namespace decls_block {
     TypeIDField                       // result type
   >;
 
+  using WarnDeclAttrLayout = BCRecordLayout<
+    Warn_DECL_ATTR,
+    BCFixed<1> // implicit flag
+  >;
+
   using ForeignAsyncConventionLayout = BCRecordLayout<
     FOREIGN_ASYNC_CONVENTION,
     TypeIDField, // completion handler type

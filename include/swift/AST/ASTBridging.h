@@ -1090,6 +1090,21 @@ BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
                                                    swift::SourceRange range,
                                                    swift::Identifier name);
 
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedWarningGroupBehavior {
+  WarningGroupBehaviorError,
+  WarningGroupBehaviorWarning,
+  WarningGroupBehaviorIgnored,
+};
+
+SWIFT_NAME("BridgedWarnAttr.createParsed(_:atLoc:range:diagGroupName:behavior:reason:)")
+BridgedWarnAttr
+BridgedWarnAttr_createParsed(BridgedASTContext cContext,
+                             swift::SourceLoc atLoc,
+                             swift::SourceRange range,
+                             swift::Identifier diagGroupName,
+                             BridgedWarningGroupBehavior behavior,
+                             BridgedStringRef reason);
+
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedNonSendableKind {
   BridgedNonSendableKindSpecific,
   BridgedNonSendableKindAssumed,

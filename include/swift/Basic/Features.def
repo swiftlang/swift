@@ -553,6 +553,9 @@ EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, false)
 /// Allow use of @inline(always) attribute
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(InlineAlways, false)
 
+/// Enable source-level warning control with `@warn`
+EXPERIMENTAL_FEATURE(SourceWarningControl, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
