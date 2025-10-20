@@ -25,6 +25,7 @@
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -1323,6 +1324,22 @@ public:
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_no_deinit,
                            nominalType)
+            .fixItRemove(DS->getSourceRange());
+        diagnosed = true;
+      // if the type is public and not frozen, then the method must not be
+      // inlinable.
+      } else if (auto fragileKind = fn->getFragileFunctionKind();
+                 !nominalDecl->getAttrs().hasAttribute<FrozenAttr>()
+                 && fragileKind != FragileFunctionKind{FragileFunctionKind::None}) {
+        ctx.Diags.diagnose(DS->getDiscardLoc(),
+                           // Code in ABI stable SDKs has already used the `@inlinable`
+                           // attribute on functions using `discard self`.
+                           // Phase this in as a warning until those APIs
+                           // can be updated.
+                           fragileKind == FragileFunctionKind{FragileFunctionKind::Inlinable}
+                             ? diag::discard_in_inlinable_method_warning
+                             : diag::discard_in_inlinable_method,
+                           fragileKind.getSelector(), nominalType)
             .fixItRemove(DS->getSourceRange());
         diagnosed = true;
       } else {

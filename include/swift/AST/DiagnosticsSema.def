@@ -5343,12 +5343,27 @@ GROUPED_ERROR(opaque_type_unsupported_availability,OpaqueTypeInference,none,
 //------------------------------------------------------------------------------
 // MARK: Discard Statement
 //------------------------------------------------------------------------------
+#define FRAGILE_FUNC_KIND \
+  "%select{a '@_transparent' function|" \
+  "an '@inlinable' function|" \
+  "an '@_alwaysEmitIntoClient' function|" \
+  "a default argument value|" \
+  "a property initializer in a '@frozen' type|" \
+  "a '@backDeployed' function|" \
+  "an embedded function not marked '@_neverEmitIntoClient'}"
+
 ERROR(discard_wrong_context_decl,none,
       "'discard' statement cannot appear in %kindonly0",
       (const Decl *))
 ERROR(discard_no_deinit,none,
       "'discard' has no effect for type %0 unless it has a deinitializer",
       (Type))
+ERROR(discard_in_inlinable_method,none,
+      "'discard' statement cannot be used in " FRAGILE_FUNC_KIND "0 inside of type %1, which is not '@frozen'",
+      (unsigned, Type))
+WARNING(discard_in_inlinable_method_warning,none,
+        "'discard' statement cannot be used in " FRAGILE_FUNC_KIND "0 inside of type %1, which is not '@frozen'; this will become an error",
+        (unsigned, Type))
 ERROR(discard_wrong_context_closure,none,
       "'discard' statement cannot appear in closure",
       ())
@@ -7305,15 +7320,6 @@ WARNING(inlinable_implies_usable_from_inline,none,
 
 ERROR(usable_from_inline_attr_in_protocol,none,
       "'@usableFromInline' attribute cannot be used in protocols", ())
-
-#define FRAGILE_FUNC_KIND \
-  "%select{a '@_transparent' function|" \
-  "an '@inlinable' function|" \
-  "an '@_alwaysEmitIntoClient' function|" \
-  "a default argument value|" \
-  "a property initializer in a '@frozen' type|" \
-  "a '@backDeployed' function|" \
-  "an embedded function not marked '@_neverEmitIntoClient'}"
 
 ERROR(local_type_in_inlinable_function,
       none, "type %0 cannot be nested inside " FRAGILE_FUNC_KIND "1",
