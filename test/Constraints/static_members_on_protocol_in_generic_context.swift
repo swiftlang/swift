@@ -177,7 +177,7 @@ test_combo(.genericFn(42)) // expected-error {{global function 'test_combo' requ
 
 extension P { // expected-note 13 {{missing same-type requirement on 'Self'}} {{12-12= where Self == <#Type#>}}
   static func generic<T>(_: T) -> T { fatalError() }
-  static func genericWithReqs<T: Collection, Q>(_: T) -> Q where T.Element == Q { // expected-note {{required by static method 'genericWithReqs' where 'T' = '()'}}
+  static func genericWithReqs<T: Collection, Q>(_: T) -> Q where T.Element == Q { // expected-note 3 {{required by static method 'genericWithReqs' where 'T' = '()'}}
     fatalError()
   }
 }
@@ -246,7 +246,9 @@ test(.genericWithReqs([S()])) // expected-error {{contextual member reference to
 test(.genericWithReqs([42]))
 // expected-error@-1 {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
 test(.genericWithReqs(()))
-// expected-error@-1 {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
+// expected-error@-1 {{type '()' cannot conform to 'Collection'}}
+// expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+// expected-error@-3 {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
 
 test_combo(.doesntExist) // expected-error {{reference to member 'doesntExist' cannot be resolved without a contextual type}}
 test_combo(.doesnt.exist()) // expected-error {{reference to member 'doesnt' cannot be resolved without a contextual type}}
@@ -262,7 +264,9 @@ test_combo(.genericWithReqs([S()])) // expected-error {{contextual member refere
 test_combo(.genericWithReqs([42]))
 // expected-error@-1 {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
 test_combo(.genericWithReqs(()))
-// expected-error@-1 {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
+// expected-error@-1 {{type '()' cannot conform to 'Collection'}}
+// expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+// expected-error@-3 {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
 
 protocol TestWithAssoc {
   associatedtype U
