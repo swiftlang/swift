@@ -356,6 +356,24 @@ SubstringTests.test("isTriviallyIdentical(to:) small ascii")
   expectTrue(a3.isTriviallyIdentical(to: b1))
   expectTrue(a3.isTriviallyIdentical(to: b2))
   expectTrue(a3.isTriviallyIdentical(to: b3))
+
+  let c = "Hello"
+
+  precondition(b == c)
+
+  let (c1, c2, c3) = slices(c, from: 1, to: 3)
+
+  expectFalse(a1.isTriviallyIdentical(to: c1))
+  expectFalse(a1.isTriviallyIdentical(to: c2))
+  expectFalse(a1.isTriviallyIdentical(to: c3))
+
+  expectFalse(a2.isTriviallyIdentical(to: c1))
+  expectFalse(a2.isTriviallyIdentical(to: c2))
+  expectFalse(a2.isTriviallyIdentical(to: c3))
+
+  expectFalse(a3.isTriviallyIdentical(to: c1))
+  expectFalse(a3.isTriviallyIdentical(to: c2))
+  expectFalse(a3.isTriviallyIdentical(to: c3))
 }
 
 SubstringTests.test("isTriviallyIdentical(to:) small unicode")
@@ -418,7 +436,7 @@ SubstringTests.test("isTriviallyIdentical(to:) large ascii")
 ))
 .code {
   guard #available(SwiftStdlib 6.3, *) else { return }
-  
+
   let a = String(repeating: "foo", count: 1000)
   let b = String(repeating: "foo", count: 1000)
 
