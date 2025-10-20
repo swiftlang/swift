@@ -5303,7 +5303,8 @@ void ResultPlanner::execute(SmallVectorImpl<SILValue> &innerDirectResultStack,
       return SGF.emitManagedCopy(Loc, resultValue, resultTL);
     case ResultConvention::GuaranteedAddress:
     case ResultConvention::Guaranteed:
-      llvm_unreachable("borrow accessor not yet implemented");
+    case ResultConvention::Inout:
+      llvm_unreachable("borrow/mutate accessor is not yet implemented");
     }
     llvm_unreachable("bad result convention!");
   };
