@@ -1674,7 +1674,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
           -DSwiftCore_ENABLE_CONCURRENCY=${build_concurrency}
-          -DSwiftCore_MODULE_CACHE_PATH=${SWIFT_MODULE_CACHE_PATH})
+          -DSwiftCore_MODULE_CACHE_PATH=${SWIFT_MODULE_CACHE_PATH}-runtimes-core)
       if(NOT ${CMAKE_CROSSCOMPILING})
         add_dependencies("${stdlib_target}-core" swift-frontend)
       endif()
@@ -1702,7 +1702,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=TRUE
-          -DSwiftOverlay_MODULE_CACHE_PATH=${SWIFT_MODULE_CACHE_PATH})
+          -DSwiftOverlay_MODULE_CACHE_PATH=${SWIFT_MODULE_CACHE_PATH}-runtimes-overlay)
 
       ExternalProject_Add("${stdlib_target}-Supplemental"
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Supplemental"
@@ -1727,7 +1727,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=TRUE
-          -DSwiftSupplemental_MODULE_CACHE_PATH=${SWIFT_MODULE_CACHE_PATH})
+          -DSwiftSupplemental_MODULE_CACHE_PATH=${SWIFT_MODULE_CACHE_PATH}-runtimes-supplemental)
     endforeach()
   endforeach()
 endif()
