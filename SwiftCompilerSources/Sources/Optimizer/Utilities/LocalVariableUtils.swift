@@ -180,12 +180,12 @@ class LocalVariableAccessInfo: CustomStringConvertible {
     case .beginAccess:
       switch (localAccess.instruction as! BeginAccessInst).accessKind {
       case .read, .deinit:
-        _isFullyAssigned = .no
+        self._isFullyAssigned = .no
       case .`init`, .modify:
         break // lazily compute full assignment
       }
     case .load, .dependenceSource, .dependenceDest:
-      _isFullyAssigned = .no
+      self._isFullyAssigned = .no
     case .store, .storeBorrow:
       if let store = localAccess.instruction as? StoringInstruction {
         self._isFullyAssigned = LocalVariableAccessInfo.isBase(address: store.destination) ? .value : .no
@@ -196,20 +196,22 @@ class LocalVariableAccessInfo: CustomStringConvertible {
     case .apply:
       // This logic is consistent with AddressInitializationWalker.appliedAddressUse()
       let apply = localAccess.instruction as! FullApplySite
-      if let convention = apply.convention(of: localAccess.operand!) {
-        if convention.isIndirectOut {
-          self._isFullyAssigned = .value
-        }
-        if convention.isInout {
-          self._isFullyAssigned = apply.fullyAssigns(operand: localAccess.operand!)
-        }
+      guard let convention = apply.convention(of: localAccess.operand!) else {
+        self._isFullyAssigned = .no
+        break
       }
-      _isFullyAssigned = .no
+      if convention.isIndirectOut {
+        self._isFullyAssigned = .value
+      } else if convention.isInout {
+        self._isFullyAssigned = apply.fullyAssigns(operand: localAccess.operand!)
+      } else {
+        self._isFullyAssigned = .no
+      }
     case .escape:
-      _isFullyAssigned = .no
+      self._isFullyAssigned = .no
       self.hasEscaped = true
     case .inoutYield:
-      _isFullyAssigned = .no
+      self._isFullyAssigned = .no
     case .incomingArgument, .outgoingArgument, .deadEnd:
       fatalError("Function arguments are never mapped to LocalVariableAccessInfo")
     }
@@ -222,7 +224,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
   var isEscape: Bool { access.isEscape }
 
   /// Is this access a full assignment such that none of the variable's components are reachable from a previous
-  /// access.
+  /// access? Only returns '.value' if this access does not read the incoming value.
   func isFullyAssigned(_ context: Context) -> IsFullyAssigned {
     if let cached = _isFullyAssigned {
       return cached
@@ -232,7 +234,8 @@ class LocalVariableAccessInfo: CustomStringConvertible {
     }
     assert(isModify)
     let beginAccess = access.instruction as! BeginAccessInst
-    if AddressInitializationWalker.findSingleInitializer(ofAddress: beginAccess, requireFullyAssigned: .value, context)
+    if AddressInitializationWalker.findSingleInitializer(ofAddress: beginAccess, requireFullyAssigned: .value,
+                                                         allowRead: false, context)
          != nil {
       _isFullyAssigned = .value
     } else if AddressInitializationWalker.findSingleInitializer(ofAddress: beginAccess,
@@ -956,7 +959,7 @@ extension LocalVariableReachableAccess {
       currentEffect = mode.getForwardEffect(BlockEffect(for: accessInfo, accessMap.context)).meet(currentEffect)
       switch currentEffect! {
       case .assign:
-        if mode == .livenessUses {
+        if mode == .livenessUses || accessInfo.isFullyAssigned(context) != .value {
           accessStack.push(accessInfo.access)
         }
         return currentEffect
