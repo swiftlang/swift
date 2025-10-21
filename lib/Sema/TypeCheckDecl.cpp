@@ -2255,11 +2255,7 @@ static Type validateParameterType(ParamDecl *decl) {
   if (isa<AbstractClosureExpr>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::ClosureExpr);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    unboundTyOpener = [](auto unboundTy) {
-      // FIXME: Don't let unbound generic types escape type resolution.
-      // For now, just return the unbound generic type.
-      return unboundTy;
-    };
+    unboundTyOpener = TypeResolution::defaultUnboundTypeOpener;
     // FIXME: Don't let placeholder types escape type resolution. For now, just
     // return the placeholder type, which we open in `inferClosureType`.
     placeholderOpener = PlaceholderType::get;
