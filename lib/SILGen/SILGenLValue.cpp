@@ -26,6 +26,7 @@
 #include "SILGen.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -3072,15 +3073,16 @@ public:
 
   static bool isNonCopyableBaseBorrow(SILGenFunction &SGF, Expr *e,
                                       LValueOptions options) {
-    if (auto *m = dyn_cast<MemberRefExpr>(e)) {
+    if (LookupExpr *le;
+        (le = dyn_cast<MemberRefExpr>(e)) || (le = dyn_cast<SubscriptExpr>(e))) {
       // If our m is a pure noncopyable type or our base is, we need to perform
       // a noncopyable base borrow.
       //
       // DISCUSSION: We can have a noncopyable member_ref_expr with a copyable
       // base if the noncopyable member_ref_expr is from a computed method. In
       // such a case, we want to ensure that we wrap things the right way.
-      if (m->getType()->isNoncopyable() ||
-          m->getBase()->getType()->isNoncopyable()) {
+      if (le->getType()->isNoncopyable() ||
+          le->getBase()->getType()->isNoncopyable()) {
         return true;
       }
 
@@ -3140,18 +3142,17 @@ public:
     return SGL.visitRec(e, accessKind, options, Orig);
   }
 
-  LValue visitMemberRefExpr(MemberRefExpr *e, SGFAccessKind accessKind,
-                            LValueOptions options) {
-    // If we have a member_ref_expr, we create a component that will when we
-    // evaluate the lvalue,
-    VarDecl *var = cast<VarDecl>(e->getMember().getDecl());
-
+  LValue getLookupExprBaseLValue(LookupExpr *e, AccessSemantics accessSemantics,
+                                 SGFAccessKind accessKind,
+                                 LValueOptions options,
+                                 AccessStrategy &strategy) {
+    auto storage = cast<AbstractStorageDecl>(e->getMember().getDecl());
+    
     assert(!e->getType()->is<LValueType>());
 
     auto pair = std::make_pair<>(e->getSourceRange(), SGF.FunctionDC);
 
-    auto accessSemantics = e->getAccessSemantics();
-    AccessStrategy strategy = var->getAccessStrategy(
+    strategy = storage->getAccessStrategy(
         accessSemantics, getFormalAccessKind(accessKind),
         SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(), pair,
         /*useOldABI=*/false);
@@ -3168,21 +3169,54 @@ public:
       orig = AbstractionPattern::getOpaque();
     }
 
-    LValue lv = visit(
+    return visit(
         e->getBase(),
-        getBaseAccessKind(SGF.SGM, var, accessKind, strategy, baseFormalType,
+        getBaseAccessKind(SGF.SGM, storage, accessKind, strategy, baseFormalType,
                           /*for borrow*/ true),
         getBaseOptions(options, strategy, addressable));
+  }
+
+  LValue visitSubscriptExpr(SubscriptExpr *e, SGFAccessKind accessKind,
+                            LValueOptions options) {
+    AccessStrategy strategy = AccessStrategy::getStorage();
+    LValue lv = getLookupExprBaseLValue(e, e->getAccessSemantics(),
+                                        accessKind, options,
+                                        strategy);
+    auto subs = e->getMember().getSubstitutions();
+
+    auto subscript = cast<SubscriptDecl>(e->getMember().getDecl());
+
+    auto storageCanType = SGF.prepareStorageType(subscript, subs);
+    auto indices = SGF.prepareIndices(e, storageCanType, strategy, e->getArgs());
+  
+    lv.addMemberSubscriptComponent(SGF, e, subscript, subs,
+                                   options, e->isSuper(), accessKind, strategy,
+                                   getSubstFormalRValueType(e),
+                                   std::move(indices),
+                                   e->getArgs());
+    return lv;
+  }
+
+  LValue visitMemberRefExpr(MemberRefExpr *e, SGFAccessKind accessKind,
+                            LValueOptions options) {
+    AccessStrategy strategy = AccessStrategy::getStorage();
+    LValue lv = getLookupExprBaseLValue(e, e->getAccessSemantics(),
+                                        accessKind, options,
+                                        strategy);
+    
+    auto var = cast<VarDecl>(e->getMember().getDecl());
+
     std::optional<ActorIsolation> actorIso;
     if (e->isImplicitlyAsync())
       actorIso = getActorIsolation(var);
-    lv.addMemberVarComponent(SGF, e, var, e->getMember().getSubstitutions(),
+
+    lv.addMemberVarComponent(SGF, e, var,
+                             e->getMember().getSubstitutions(),
                              options, e->isSuper(), accessKind, strategy,
-                             formalRValueType,
+                             getSubstFormalRValueType(e),
                              false /*is on self parameter*/, actorIso);
 
     SGF.SGM.noteMemberRefExpr(e);
-
     return lv;
   }
 
