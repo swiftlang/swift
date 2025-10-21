@@ -335,6 +335,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
   case DisallowedOriginKind::SPIImported:
   case DisallowedOriginKind::SPILocal:
   case DisallowedOriginKind::FragileCxxAPI:
+  case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
     break;
   }
 

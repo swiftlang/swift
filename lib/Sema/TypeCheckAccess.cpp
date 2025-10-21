@@ -2163,6 +2163,14 @@ swift::getDisallowedOriginKind(const Decl *decl,
           Feature::AssumeResilientCxxTypes))
     return DisallowedOriginKind::FragileCxxAPI;
 
+  if (isa<StructDecl>(decl) || isa<EnumDecl>(decl)) {
+    if (decl->getASTContext().LangOpts.hasFeature(
+            Feature::CheckImplementationOnly) &&
+        decl->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
+      return DisallowedOriginKind::ImplementationOnlyMemoryLayout;
+    }
+  }
+
   // Report non-public import last as it can be ignored by the caller.
   // See \c diagnoseValueDeclRefExportability.
   auto importSource = decl->getImportAccessFrom(where.getDeclContext());
