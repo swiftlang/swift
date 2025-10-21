@@ -131,6 +131,10 @@ Func withThrowingTaskGroup(of:returning:body:) has parameter 2 type change from 
 Func withTaskGroup(of:returning:body:) has been renamed to Func withTaskGroup(of:returning:isolation:body:)
 Func withTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.TaskGroup<A>) async -> B) async -> B' to '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: (inout Swift.TaskGroup<A>) async -> B) async -> B'
 
+// withCheckedContinuation now is using nonisolated(nonsending)
+Func withCheckedContinuation(function:_:) has been renamed to Func _unsafeInheritExecutor_withCheckedContinuation(function:_:)
+Func withCheckedContinuation(function:_:) has mangled name changing from '_Concurrency.withCheckedContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A' to '_Concurrency._unsafeInheritExecutor_withCheckedContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A'
+
 Func pthread_main_np() is a new API without '@available'
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
