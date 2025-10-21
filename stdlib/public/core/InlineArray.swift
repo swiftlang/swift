@@ -20,7 +20,7 @@
 /// Initializing a Value
 /// --------------------
 ///
-/// When initializing a new `InlineArray` value, you'll need to initialize all
+/// When initializing a new `InlineArray` value, you initialize all
 /// of its elements. You can use an array literal just as with `Array`, rely on
 /// type inference for the `count` and `Element` type, and spell the type with
 /// the shorthand `[count of Element]`.
