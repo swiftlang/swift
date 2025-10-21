@@ -323,12 +323,12 @@ enum I60954 {
   // expected-error@+1{{operator implementation without matching operator declaration}}
   func ?= (pattern: I60954?, version: Self) { // expected-error{{operator '?=' declared in type 'I60954' must be 'static'}}
     // expected-error@+2{{operator is not a known binary operator}}
-    // expected-error@+1{{initializer 'init(_:)' requires that 'I60954' conform to 'StringProtocol'}}
+    // expected-error@+1{{contextual member reference to initializer 'init(_:)' requires 'Self' constraint in the protocol extension}}
     pattern ?= .init(version) // expected-error{{value of optional type 'I60954?' must be unwrapped to a value of type 'I60954'}}
     // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
     // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
   }
-  init?<S>(_ string: S) where S: StringProtocol {} // expected-note{{where 'S' = 'I60954'}}
+  init?<S>(_ string: S) where S: StringProtocol {}
 }
 
 infix operator <<<>>> : DefaultPrecedence

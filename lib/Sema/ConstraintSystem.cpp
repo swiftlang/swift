@@ -2924,8 +2924,10 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
   // from all the closure contextual fix/solutions and if there are more than
   // one fixed type diagnose it.
   swift::SmallSetVector<Type, 4> genericParamInferredTypes;
-  for (auto &fix : contextualFixes)
-    genericParamInferredTypes.insert(fix.first->getFixedType(resultTypeVar));
+  for (auto &fix : contextualFixes) {
+    if (fix.first->hasFixedType(resultTypeVar))
+      genericParamInferredTypes.insert(fix.first->getFixedType(resultTypeVar));
+  }
 
   if (llvm::all_of(allFixes, [&](FixInContext fix) {
         auto fixLocator = fix.second->getLocator();
