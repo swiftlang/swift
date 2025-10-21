@@ -112,7 +112,6 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
     : Stage(SILStage::Raw), loweredAddresses(!Options.EnableSILOpaqueValues),
       indexTrieRoot(new IndexTrieNode()), Options(Options),
       irgenOptions(irgenOptions), serialized(false),
-      regDeserializationNotificationHandlerForNonTransparentFuncOME(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),
       hasAccessMarkerHandler(false),
       prespecializedFunctionDeclsImported(false), SerializeSILAction(),
@@ -121,7 +120,7 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
   if (auto *file = context.dyn_cast<FileUnit *>()) {
     AssociatedDeclContext = file;
   } else {
-    AssociatedDeclContext = context.get<ModuleDecl *>();
+    AssociatedDeclContext = cast<ModuleDecl *>(context);
   }
   TheSwiftModule = AssociatedDeclContext->getParentModule();
 
@@ -431,6 +430,10 @@ void SILModule::updateFunctionLinkage(SILFunction *F) {
 
 bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, Mode).processFunction(F);
+}
+
+bool SILModule::linkWitnessTable(ProtocolConformance *PC, SILModule::LinkingMode Mode) {
+  return SILLinkerVisitor(*this, Mode).processConformance(ProtocolConformanceRef(PC));
 }
 
 bool SILModule::hasFunction(StringRef Name) {
@@ -801,7 +804,10 @@ unsigned SILModule::getFieldIndex(NominalTypeDecl *decl, VarDecl *field) {
   if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
     for (auto *superDecl = classDecl->getSuperclassDecl(); superDecl != nullptr;
          superDecl = superDecl->getSuperclassDecl()) {
-      index += superDecl->getStoredProperties().size();
+      if (!superDecl->isResilient(getSwiftModule(),
+                                  ResilienceExpansion::Maximal)) {
+        index += superDecl->getStoredProperties().size();
+      }
     }
   }
   for (VarDecl *property : decl->getStoredProperties()) {
@@ -885,8 +891,8 @@ void SILModule::notifyMovedInstruction(SILInstruction *inst,
 bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
   const auto &IntrinsicInfo = getIntrinsicInfo(Name);
   if (IntrinsicInfo.ID != llvm::Intrinsic::not_intrinsic) {
-    return IntrinsicInfo.getOrCreateAttributes(getASTContext())
-        .hasFnAttr(llvm::Attribute::NoReturn);
+    return IntrinsicInfo.getOrCreateFnAttributes(getASTContext())
+        .hasAttribute(llvm::Attribute::NoReturn);
   }
   const auto &BuiltinInfo = getBuiltinInfo(Name);
   switch (BuiltinInfo.ID) {

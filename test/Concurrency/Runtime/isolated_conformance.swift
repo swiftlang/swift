@@ -1,15 +1,11 @@
 // RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple) | %FileCheck %s
+// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)  | %FileCheck %s
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
-
-// FIXME: WebAssembly doesn't currently have a good way to install the
-// "isCurrentGlobalActor" hook on which this checking depends. Disable
-// the test for the moment.
-// UNSUPPORTED: wasm
-// UNSUPPORTED: CPU=wasm32
 
 protocol P {
   func f()
@@ -208,6 +204,10 @@ await Task.detached { @SomeGlobalActor in
 print("Testing a separate task off the main actor")
 await Task.detached {
   if #available(SwiftStdlib 6.2, *) {
+    // Skip tests on platforms that use the same executor for the main
+    // actor and the global concurrent executor.
+    guard Task.defaultExecutor !== MainActor.executor else { return }
+
     precondition(!tryCastToP(mc))
     precondition(!tryCastToP(wrappedMC))
 

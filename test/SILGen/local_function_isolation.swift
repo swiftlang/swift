@@ -71,7 +71,7 @@ actor GenericActor<K> {
 // Make sure defer doesn't capture anything.
 actor DeferInsideInitActor {
   init(foo: ()) async throws {
-    // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation20DeferInsideInitActorC3fooACyt_tYaKcfc6$deferL_yyF : $@convention(thin) (@sil_isolated @guaranteed DeferInsideInitActor) -> () {
+    // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation20DeferInsideInitActorC3fooACyt_tYaKcfc6$deferL_yyF : $@convention(thin) () -> () {
     defer {}
     self.init()
   }

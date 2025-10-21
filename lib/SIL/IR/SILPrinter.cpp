@@ -95,6 +95,11 @@ llvm::cl::opt<bool> SILPrintGenericSpecializationInfo(
     llvm::cl::desc("Include generic specialization"
                    "information info in SIL output"));
 
+llvm::cl::opt<bool> SILPrintFunctionIsolationInfo(
+    "sil-print-function-isolation-info", llvm::cl::init(false),
+    llvm::cl::desc("Print out isolation info on functions in a manner that SIL "
+                   "understands [e.x.: not in comments]"));
+
 static std::string demangleSymbol(StringRef Name) {
   if (SILFullDemangle)
     return Demangle::demangleSymbolAsString(Name);
@@ -390,6 +395,12 @@ void SILDeclRef::print(raw_ostream &OS) const {
     case AccessorKind::Modify2:
       OS << "!modify2";
       break;
+    case AccessorKind::Borrow:
+      OS << "!borrow";
+      break;
+    case AccessorKind::Mutate:
+      OS << "!mutate";
+      break;
     }
     break;
   }
@@ -435,6 +446,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
     break;
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     OS << "!backinginit";
+    break;
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
+    OS << "!wrappedfieldinitaccessor";
     break;
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     OS << "!projectedvalueinit";
@@ -1201,7 +1215,7 @@ public:
       if (auto *F = DS->Parent.dyn_cast<SILFunction *>())
         *this << "@" << F->getName() << " : $" << F->getLoweredFunctionType();
       else {
-        auto *PS = DS->Parent.get<const SILDebugScope *>();
+        auto *PS = cast<const SILDebugScope *>(DS->Parent);
         *this << Ctx.getScopeID(PS);
       }
       if (auto *CS = DS->InlinedCallSite)
@@ -1962,27 +1976,6 @@ public:
     *this << getIDAndType(AI->getDest());
   }
 
-  void visitAssignByWrapperInst(AssignByWrapperInst *AI) {
-    *this << getIDAndType(AI->getSrc()) << " to ";
-    switch (AI->getMode()) {
-    case AssignByWrapperInst::Unknown:
-      break;
-    case AssignByWrapperInst::Initialization:
-      *this << "[init] ";
-      break;
-    case AssignByWrapperInst::Assign:
-      *this << "[assign] ";
-      break;
-    case AssignByWrapperInst::AssignWrappedValue:
-      *this << "[assign_wrapped_value] ";
-      break;
-    }
-
-    *this << getIDAndType(AI->getDest())
-          << ", init " << getIDAndType(AI->getInitializer())
-          << ", set " << getIDAndType(AI->getSetter());
-  }
-
   void visitAssignOrInitInst(AssignOrInitInst *AI) {
     switch (AI->getMode()) {
     case AssignOrInitInst::Unknown:
@@ -2003,10 +1996,15 @@ public:
     }
 
     *this << "#";
-    printFullContext(AI->getProperty()->getDeclContext(), PrintState.OS);
-    *this << AI->getPropertyName();
+    auto declContext = AI->getProperty()->getDeclContext();
 
-    *this << ", self " << getIDAndType(AI->getSelf());
+    if (!declContext->isLocalContext()) {
+      printFullContext(declContext, PrintState.OS);
+      *this << AI->getPropertyName() << ", self ";
+    } else {
+      *this << AI->getPropertyName() << ", local ";
+    }
+    *this << getIDAndType(AI->getSelfOrLocalOperand());
     *this << ", value " << getIDAndType(AI->getSrc());
     *this << ", init " << getIDAndType(AI->getInitializer())
           << ", set " << getIDAndType(AI->getSetter());
@@ -2160,6 +2158,11 @@ public:
     *this << getIDAndType(UOCI->getOperand()) << ", "
           << "@" << UOCI->getOperand()->getOwnershipKind() << " to "
           << "@" << UOCI->getConversionOwnershipKind();
+  }
+
+  void visitImplicitActorToOpaqueIsolationCastInst(
+      ImplicitActorToOpaqueIsolationCastInst *inst) {
+    *this << getIDAndType(inst->getValue());
   }
 
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
@@ -3374,6 +3377,9 @@ void SILNode::dump() const {
 
 void SILNode::print(raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
+  print(Ctx);
+}
+void SILNode::print(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).print(this);
 }
 
@@ -3393,6 +3399,9 @@ void SingleValueInstruction::dump() const {
 
 void SILInstruction::print(raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
+  print(Ctx);
+}
+void SILInstruction::print(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).print(this);
 }
 
@@ -3415,7 +3424,9 @@ void SILBasicBlock::dump(bool DebugInfo) const {
 /// Pretty-print the SILBasicBlock to the designated stream.
 void SILBasicBlock::print(raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
-
+  print(Ctx);
+}
+void SILBasicBlock::print(SILPrintContext &Ctx) const {
   // Print the debug scope (and compute if we didn't do it already).
   auto &SM = this->getParent()->getModule().getASTContext().SourceMgr;
   for (auto &I : *this) {
@@ -3423,10 +3434,6 @@ void SILBasicBlock::print(raw_ostream &OS) const {
     P.printDebugScope(I.getDebugScope(), SM);
   }
 
-  SILPrinter(Ctx).print(this);
-}
-
-void SILBasicBlock::print(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).print(this);
 }
 
@@ -3630,8 +3637,18 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[available " << availability.getVersionString() << "] ";
   }
 
+  // This is here only for testing purposes.
+  if (SILPrintFunctionIsolationInfo) {
+    if (auto isolation = getActorIsolation()) {
+      OS << "[isolation \"";
+      isolation->printForSIL(OS);
+      OS << "\"] ";
+    }
+  }
+
   switch (getInlineStrategy()) {
     case NoInline: OS << "[noinline] "; break;
+    case HeuristicAlwaysInline: OS << "[heuristic_always_inline] "; break;
     case AlwaysInline: OS << "[always_inline] "; break;
     case InlineDefault: break;
   }
@@ -3651,6 +3668,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     case PerformanceConstraints::NoRuntime:      OS << "[no_runtime] "; break;
     case PerformanceConstraints::NoExistentials: OS << "[no_existentials] "; break;
     case PerformanceConstraints::NoObjCBridging: OS << "[no_objc_bridging] "; break;
+    case PerformanceConstraints::ManualOwnership: OS << "[manual_ownership] "; break;
   }
 
   if (isPerformanceConstraint())
@@ -3695,6 +3713,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
 
   if (!section().empty())
     OS << "[section \"" << section() << "\"] ";
+
+  if (!asmName().empty())
+    OS << "[asmname \"" << asmName() << "\"] ";
 
   // TODO: Handle clang node owners which don't have a name.
   if (hasClangNode() && getClangNodeOwner()->hasName()) {
@@ -3760,6 +3781,15 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
 
   if (isLet())
     OS << "[let] ";
+
+  if (markedAsUsed())
+    OS << "[used] ";
+
+  if (!asmName().empty())
+    OS << "[asmname \"" << asmName() << "\"] ";
+
+  if (!section().empty())
+    OS << "[section \"" << section() << "\"] ";
 
   printName(OS);
   OS << " : " << LoweredType;
@@ -4222,6 +4252,9 @@ void SILNode::dumpInContext() const {
 }
 void SILNode::printInContext(llvm::raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
+  printInContext(Ctx);
+}
+void SILNode::printInContext(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).printInContext(this);
 }
 
@@ -4230,6 +4263,9 @@ void SILInstruction::dumpInContext() const {
 }
 void SILInstruction::printInContext(llvm::raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
+  printInContext(Ctx);
+}
+void SILInstruction::printInContext(SILPrintContext &Ctx) const {
   SILPrinter(Ctx).printInContext(asSILNode());
 }
 

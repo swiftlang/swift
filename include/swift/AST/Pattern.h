@@ -349,10 +349,10 @@ public:
   }
 
   MutableArrayRef<TuplePatternElt> getElements() {
-    return {getTrailingObjects<TuplePatternElt>(), getNumElements()};
+    return getTrailingObjects(getNumElements());
   }
   ArrayRef<TuplePatternElt> getElements() const {
-    return {getTrailingObjects<TuplePatternElt>(), getNumElements()};
+    return getTrailingObjects(getNumElements());
   }
 
   const TuplePatternElt &getElement(unsigned i) const {return getElements()[i];}
@@ -617,10 +617,10 @@ public:
   }
 
   Expr *getUnresolvedOriginalExpr() const {
-    return ElementDeclOrUnresolvedOriginalExpr.get<Expr*>();
+    return cast<Expr *>(ElementDeclOrUnresolvedOriginalExpr);
   }
   bool hasUnresolvedOriginalExpr() const {
-    return ElementDeclOrUnresolvedOriginalExpr.is<Expr*>();
+    return isa<Expr *>(ElementDeclOrUnresolvedOriginalExpr);
   }
   void setUnresolvedOriginalExpr(Expr *e) {
     ElementDeclOrUnresolvedOriginalExpr = e;

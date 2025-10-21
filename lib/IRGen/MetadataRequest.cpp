@@ -750,7 +750,7 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
             theDecl, genericArgs.Types, NotForDefinition);
 
     response = IGF.emitGenericTypeMetadataAccessFunctionCall(
-        accessor, genericArgs.Values, request);
+        accessor, genericArgs.Values, request, genericArgs.hasPacks);
   }
 
   IGF.setScopedLocalTypeMetadata(theType, response);
@@ -1499,13 +1499,11 @@ emitFunctionTypeMetadataParams(IRGenFunction &IGF,
       flagsArr.addInt32(paramFlags.getIntValue());
     }
   } else {
-    auto parametersPtr =
-        llvm::ConstantPointerNull::get(
-          IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+    auto parametersPtr = llvm::ConstantPointerNull::get(IGF.IGM.PtrTy);
     arguments.push_back(parametersPtr);
   }
 
-  auto *Int32Ptr = IGF.IGM.Int32Ty->getPointerTo();
+  auto *Int32Ptr = IGF.IGM.PtrTy;
   if (flags.hasParameterFlags()) {
     auto *flagsVar = flagsArr.finishAndCreateGlobal(
         "parameter-flags", IGF.IGM.getPointerAlignment(),
@@ -1542,8 +1540,7 @@ emitDynamicFunctionTypeMetadataParams(IRGenFunction &IGF,
 
     arguments.push_back(info.paramFlags.getAddress().getAddress());
   } else {
-    arguments.push_back(llvm::ConstantPointerNull::get(
-        IGF.IGM.Int32Ty->getPointerTo()));
+    arguments.push_back(llvm::ConstantPointerNull::get(IGF.IGM.PtrTy));
   }
 
   return info;
@@ -1802,6 +1799,11 @@ namespace {
       return emitDirectMetadataRef(type);
     }
 
+    MetadataResponse visitBuiltinImplicitActor(CanBuiltinImplicitActorType type,
+                                               DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
     MetadataResponse
     visitBuiltinBridgeObjectType(CanBuiltinBridgeObjectType type,
                                  DynamicMetadataRequest request) {
@@ -1835,6 +1837,12 @@ namespace {
     MetadataResponse
     visitBuiltinExecutorType(CanBuiltinExecutorType type,
                              DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinImplicitActorType(CanBuiltinImplicitActorType type,
+                                  DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
     }
 
@@ -2329,9 +2337,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM, llvm::Function *accessor,
 
   // For in-place initialization, drill to the first element of the cache.
   case CacheStrategy::SingletonInitialization:
-    cacheVariable =
-      llvm::ConstantExpr::getBitCast(cacheVariable,
-                                     IGM.TypeMetadataPtrTy->getPointerTo());
+    cacheVariable = llvm::ConstantExpr::getBitCast(cacheVariable, IGM.PtrTy);
     break;
 
   case CacheStrategy::Lazy:
@@ -2467,11 +2473,9 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM, llvm::Function *accessor,
   IGF.Builder.CreateRet(ret);
 }
 
-MetadataResponse
-IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
-                                              llvm::Function *accessFunction,
-                                              ArrayRef<llvm::Value *> args,
-                                              DynamicMetadataRequest request) {
+MetadataResponse IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
+    llvm::Function *accessFunction, ArrayRef<llvm::Value *> args,
+    DynamicMetadataRequest request, bool hasPacks) {
 
   SmallVector<llvm::Value *, 8> callArgs;
 
@@ -2495,7 +2499,7 @@ IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
                                  accessFunction, callArgs);
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
-  call->setMemoryEffects(allocatedArgsBuffer
+  call->setMemoryEffects(hasPacks || allocatedArgsBuffer
                              ? llvm::MemoryEffects::inaccessibleOrArgMemOnly()
                              : llvm::MemoryEffects::none());
 
@@ -2630,7 +2634,7 @@ MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
               IGM.Int8PtrTy,                  // arg 1
               IGM.Int8PtrTy,                  // arg 2
               IGM.TypeContextDescriptorPtrTy, // type context descriptor
-              IGM.OnceTy->getPointerTo()      // token pointer
+              IGM.PtrTy                       // token pointer
           },
           generateThunkFn,
           /*noinline*/ true));
@@ -3199,8 +3203,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     // Therefore, we can perform a completely naked load here.
     // FIXME: Technically should be "consume", but that introduces barriers
     // in the current LLVM ARM backend.
-    auto cacheWordAddr = subIGF.Builder.CreateBitCast(cache,
-                                                 IGM.Int64Ty->getPointerTo());
+    auto cacheWordAddr = subIGF.Builder.CreateBitCast(cache, IGM.PtrTy);
     auto load = subIGF.Builder.CreateLoad(
         Address(cacheWordAddr, IGM.Int64Ty, Alignment(8)));
     // Make this barrier explicit when building for TSan to avoid false positives.
@@ -3598,8 +3601,8 @@ IRGenFunction::emitTypeMetadataRefForLayout(SILType ty,
 
 llvm::Value *IRGenFunction::emitValueGenericRef(CanType type) {
   if (auto integer = type->getAs<IntegerType>()) {
-    return llvm::ConstantInt::get(IGM.SizeTy,
-                    integer->getValue().zextOrTrunc(IGM.SizeTy->getBitWidth()));
+    auto value = integer->getValue().sextOrTrunc(IGM.SizeTy->getBitWidth());
+    return llvm::ConstantInt::get(IGM.SizeTy, value);
   }
 
   return tryGetLocalTypeData(type, LocalTypeDataKind::forValue());
@@ -3621,8 +3624,8 @@ namespace {
   ///   valid recursive types bottom out in fixed-sized types like classes
   ///   or pointers.)
   class EmitTypeLayoutRef
-    : public CanTypeVisitor<EmitTypeLayoutRef, llvm::Value *,
-                            DynamicMetadataRequest> {
+    : public CanTypeVisitor_AnyNominal<EmitTypeLayoutRef, llvm::Value *,
+                                       DynamicMetadataRequest> {
   private:
     IRGenFunction &IGF;
   public:
@@ -3761,10 +3764,9 @@ namespace {
       llvm_unreachable("Not a valid MetatypeRepresentation.");
     }
 
-    llvm::Value *visitAnyClassType(ClassDecl *classDecl,
+    llvm::Value *visitAnyClassType(CanType type, ClassDecl *classDecl,
                                    DynamicMetadataRequest request) {
       // All class types have the same layout.
-      auto type = classDecl->getDeclaredType()->getCanonicalType();
       switch (type->getReferenceCounting()) {
       case ReferenceCounting::Native:
         return emitFromValueWitnessTable(IGF.IGM.Context.TheNativeObjectType);
@@ -3783,16 +3785,6 @@ namespace {
       }
 
       llvm_unreachable("Not a valid ReferenceCounting.");
-    }
-
-    llvm::Value *visitClassType(CanClassType type,
-                                DynamicMetadataRequest request) {
-      return visitAnyClassType(type->getClassOrBoundGenericClass(), request);
-    }
-
-    llvm::Value *visitBoundGenericClassType(CanBoundGenericClassType type,
-                                            DynamicMetadataRequest request) {
-      return visitAnyClassType(type->getClassOrBoundGenericClass(), request);
     }
 
     llvm::Value *visitPackType(CanPackType type,
@@ -3888,8 +3880,7 @@ namespace {
         }
 
         // Ignore the offsets.
-        auto offsetsPtr =
-          llvm::ConstantPointerNull::get(IGF.IGM.Int32Ty->getPointerTo());
+        auto offsetsPtr = llvm::ConstantPointerNull::get(IGF.IGM.PtrTy);
 
         // Flags.
         auto flags = TupleTypeFlags().withNumElements(type->getNumElements());

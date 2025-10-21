@@ -13,8 +13,10 @@
 #ifndef SWIFT_AST_ACCESSOR_KIND_H
 #define SWIFT_AST_ACCESSOR_KIND_H
 
-/// This header is included in a bridging header. Be *very* careful with what
-/// you include here! See include caveats in `ASTBridging.h`.
+/// `AccessorKind.h` is imported into Swift. Be *very* careful with what you
+/// include here and keep these includes minimal!
+///
+/// See include guidelines and caveats in `BasicBridging.h`.
 #include "swift/Basic/SwiftBridging.h"
 
 namespace swift {

@@ -12,6 +12,6 @@ func testFoo() {
     // CHECK: [[@LINE+1]]:7 | instance-method/Swift | hash(into:) | s:14swift_ide_test9CustomFooV4hash4intoys6HasherVz_tF | {{.*}}Ref
     f.hash(into: &hasher)
     hasher.finalize()
-    // CHECK: [[@LINE+1]]:11 | static-method/Swift | __derived_struct_equals(_:_:) | s:14swift_ide_test9CustomFooV23__derived_struct_equalsySbAC_ACtFZ | {{.*}}Ref
+    // CHECK: [[@LINE+1]]:11 | static-method/infix-operator/Swift | ==(_:_:) | s:SQ2eeoiySbx_xtFZ | {{.*}}Ref
     _ = f == CustomFoo(a: 0, b: "b")
 }

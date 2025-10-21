@@ -29,9 +29,9 @@
 #include "llvm/IR/CallingConv.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
-#include "llvm/Transforms/Instrumentation.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/VersionTuple.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Instrumentation.h"
 #include <optional>
 #include <string>
 #include <tuple>
@@ -251,6 +251,12 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Like PartialApplyCapture but for use with CoroFunctionPointer values.
   PointerAuthSchema CoroPartialApplyCapture;
+
+  /// Stored in a coro allocator struct, the function used to allocate memory.
+  PointerAuthSchema CoroAllocationFunction;
+
+  /// Stored in a coro allocator struct, the function used to deallocate memory.
+  PointerAuthSchema CoroDeallocationFunction;
 };
 
 enum class JITDebugArtifact : unsigned {
@@ -498,8 +504,6 @@ public:
   /// Internalize symbols (static library) - do not export any public symbols.
   unsigned InternalizeSymbols : 1;
 
-  unsigned MergeableSymbols : 1;
-
   /// Emit a section with references to class_ro_t* in generic class patterns.
   unsigned EmitGenericRODatas : 1;
 
@@ -550,9 +554,22 @@ public:
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
 
+  /// Path to the profdata file to be used for IR/CS-IR PGO, or the empty string.
+  std::string UseIRProfile = "";
+
   /// Path to the data file to be used for sampling-based PGO,
   /// or the empty string.
   std::string UseSampleProfile = "";
+
+  /// Name of the profile file to use as output for -ir-profile-generate,
+  /// and -cs-profile-generate, or the default string.
+  std::string InstrProfileOutput = "default_%m.profraw";
+
+  /// Whether to enable context-sensitive IR PGO generation.
+  bool EnableCSIRProfileGen = false;
+
+  /// Whether to enable IR level instrumentation.
+  bool EnableIRProfileGen = false;
 
   /// Controls whether DWARF discriminators are added to the IR.
   unsigned DebugInfoForProfiling : 1;
@@ -607,6 +624,12 @@ public:
   /// Paths to the pass plugins registered via -load-pass-plugin.
   std::vector<std::string> LLVMPassPlugins;
 
+  /// Set to true if we support AArch64TBI.
+  bool HasAArch64TBI = false;
+
+  /// Generate verbose assembly output with comments.
+  bool VerboseAsm = true;
+
   IRGenOptions()
       : OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
         Verify(true), VerifyEach(false), OptMode(OptimizationMode::NotSet),
@@ -643,22 +666,21 @@ public:
         DisableStandardSubstitutionsInReflectionMangling(false),
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
-        AnnotateCondFailMessage(false),
-        InternalizeAtLink(false), InternalizeSymbols(false),
-        MergeableSymbols(false), EmitGenericRODatas(true),
+        AnnotateCondFailMessage(false), InternalizeAtLink(false),
+        InternalizeSymbols(false), EmitGenericRODatas(true),
         NoPreallocatedInstantiationCaches(false),
         DisableReadonlyStaticObjects(false), CollocatedMetadataFunctions(false),
         ColocateTypeDescriptors(true), UseRelativeProtocolWitnessTables(false),
         UseFragileResilientProtocolWitnesses(false), EnableHotColdSplit(false),
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(true),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
-        UseCoroCCX8664(false), UseCoroCCArm64(false),
-        MergeableTraps(false),
+        UseCoroCCX8664(false), UseCoroCCArm64(false), MergeableTraps(false),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
-        CASObjMode(llvm::CASBackendMode::Native) {
+        CASObjMode(llvm::CASBackendMode::Native), HasAArch64TBI(false),
+        VerboseAsm(true) {
     DisableRoundTripDebugTypes = !CONDITIONAL_ASSERT_enabled();
   }
 

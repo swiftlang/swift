@@ -21,7 +21,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -582,8 +581,7 @@ namespace {
     void addGenericParameters() {
       GenericSignature sig = asImpl().getGenericSignature();
       auto metadata =
-        irgen::addGenericParameters(IGM, B,
-                                    asImpl().getGenericSignature(),
+        irgen::addGenericParameters(IGM, B, sig,
                                     /*implicit=*/false);
       assert(metadata.NumParams == metadata.NumParamsEmitted &&
              "We can't use implicit GenericParamDescriptors here");
@@ -847,8 +845,8 @@ namespace {
       IRGenMangler mangler(IGM.Context);
       auto mangledName = mangler.mangleAnonymousDescriptorName(Name);
       auto mangledNameConstant =
-        IGM.getAddrOfGlobalString(mangledName,
-                                  /*willBeRelativelyAddressed*/ true);
+          IGM.getAddrOfGlobalString(mangledName, CStringSectionType::Default,
+                                    /*willBeRelativelyAddressed*/ true);
       B.addRelativeAddress(mangledNameConstant);
     }
 
@@ -1279,6 +1277,7 @@ namespace {
       llvm::Constant *global = nullptr;
       if (!AssociatedTypeNames.empty()) {
         global = IGM.getAddrOfGlobalString(AssociatedTypeNames,
+                                           CStringSectionType::Default,
                                            /*willBeRelativelyAddressed=*/true);
       }
       B.addRelativeAddressOrNull(global);
@@ -1517,9 +1516,10 @@ namespace {
         name.pop_back();
         assert(name.back() == '\0');
       }
-      
-      auto nameStr = IGM.getAddrOfGlobalString(name,
-                                               /*willBeRelativelyAddressed*/ true);
+
+      auto nameStr =
+          IGM.getAddrOfGlobalString(name, CStringSectionType::Default,
+                                    /*willBeRelativelyAddressed*/ true);
       B.addRelativeAddress(nameStr);
     }
       
@@ -2704,30 +2704,30 @@ namespace {
 
             // Emit a #available condition check, if it's `false` -
             // jump to the next conditionally available type.
-            auto conditions = underlyingTy->getAvailability();
+            auto queries = underlyingTy->getAvailabilityQueries();
 
             SmallVector<llvm::BasicBlock *, 4> conditionBlocks;
-            for (unsigned condIndex : indices(conditions)) {
+            for (unsigned queryIndex : indices(queries)) {
               // cond-<type_idx>-<cond_index>
               conditionBlocks.push_back(IGF.createBasicBlock(
-                  "cond-" + llvm::utostr(i) + "-" + llvm::utostr(condIndex)));
+                  "cond-" + llvm::utostr(i) + "-" + llvm::utostr(queryIndex)));
             }
 
             // Jump to the first condition.
             IGF.Builder.CreateBr(conditionBlocks.front());
 
-            for (unsigned condIndex : indices(conditions)) {
-              const auto &condition = conditions[condIndex];
+            for (unsigned queryIndex : indices(queries)) {
+              const auto &query = queries[queryIndex];
 
-              assert(condition.first.hasLowerEndpoint());
+              assert(query.getPrimaryArgument());
 
-              bool isUnavailability = condition.second;
-              auto version = condition.first.getLowerEndpoint();
+              bool isUnavailability = query.isUnavailability();
+              auto version = query.getPrimaryArgument().value();
               auto *major = getInt32Constant(version.getMajor());
               auto *minor = getInt32Constant(version.getMinor());
               auto *patch = getInt32Constant(version.getSubminor());
 
-              IGF.Builder.emitBlock(conditionBlocks[condIndex]);
+              IGF.Builder.emitBlock(conditionBlocks[queryIndex]);
 
               auto isAtLeast =
                   IGF.emitTargetOSVersionAtLeastCall(major, minor, patch);
@@ -2742,9 +2742,9 @@ namespace {
                     IGF.Builder.CreateXor(success, IGF.Builder.getIntN(1, -1));
               }
 
-              auto nextCondOrRet = condIndex == conditions.size() - 1
+              auto nextCondOrRet = queryIndex == queries.size() - 1
                                        ? returnTypeBB
-                                       : conditionBlocks[condIndex + 1];
+                                       : conditionBlocks[queryIndex + 1];
 
               IGF.Builder.CreateCondBr(success, nextCondOrRet,
                                        conditionalTypes[i + 1]);
@@ -2761,8 +2761,8 @@ namespace {
           IGF.Builder.emitBlock(conditionalTypes.back());
           auto universal = substitutionSet.back();
 
-          assert(universal->getAvailability().size() == 1 &&
-                 universal->getAvailability()[0].first.isAll());
+          assert(universal->getAvailabilityQueries().size() == 1 &&
+                 universal->getAvailabilityQueries()[0].isConstant());
 
           IGF.Builder.CreateRet(
               getResultValue(IGF, genericEnv, universal->getSubstitutions()));
@@ -2995,8 +2995,9 @@ void irgen::emitLazyMetadataAccessor(IRGenModule &IGM,
   if (IGM.getOptions().optimizeForSize())
     accessor->addFnAttr(llvm::Attribute::NoInline);
 
-  bool isReadNone = (genericArgs.Types.size() <=
-                     NumDirectGenericTypeMetadataAccessFunctionArgs);
+  bool isReadNone =
+      !genericArgs.hasPacks && (genericArgs.Types.size() <=
+                                NumDirectGenericTypeMetadataAccessFunctionArgs);
 
   emitCacheAccessFunction(
       IGM, accessor, /*cache*/ nullptr, /*cache type*/ nullptr,
@@ -3376,9 +3377,9 @@ static void emitInitializeRawLayoutOldOld(IRGenFunction &IGF, SILType likeType,
   // This is the list of field type layouts that we're going to pass to the init
   // function. This will only ever hold 1 field which is the temporary one we're
   // going to build up from our like type's layout.
-  auto fieldLayouts = IGF.createAlloca(
-                          llvm::ArrayType::get(IGM.TypeLayoutTy->getPointerTo(), 1),
-                          IGM.getPointerAlignment(), "fieldLayouts");
+  auto fieldLayouts =
+      IGF.createAlloca(llvm::ArrayType::get(IGM.PtrTy, 1),
+                       IGM.getPointerAlignment(), "fieldLayouts");
   IGF.Builder.CreateLifetimeStart(fieldLayouts, IGM.getPointerSize());
 
   // We're going to pretend that this is our field offset vector for the init to
@@ -5808,8 +5809,12 @@ namespace {
         return false;
       }
 
-      if (IGM.Context.LangOpts.hasFeature(Feature::LayoutStringValueWitnessesInstantiation) &&
-          IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
+      auto &TI = IGM.getTypeInfo(getLoweredType());
+
+      if (IGM.Context.LangOpts.hasFeature(
+              Feature::LayoutStringValueWitnessesInstantiation) &&
+          IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation &&
+          TI.isCopyable(ResilienceExpansion::Maximal)) {
         return !!getLayoutString() || needsSingletonMetadataInitialization(IGM, Target);
       }
 
@@ -6285,9 +6290,11 @@ namespace {
     }
 
     bool hasInstantiatedLayoutString() {
+      auto &TI = IGM.getTypeInfo(getLoweredType());
       if (IGM.Context.LangOpts.hasFeature(
               Feature::LayoutStringValueWitnessesInstantiation) &&
-          IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
+          IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation &&
+          TI.isCopyable(ResilienceExpansion::Maximal)) {
         return needsSingletonMetadataInitialization(IGM, Target);
       }
 
@@ -6770,7 +6777,8 @@ namespace {
         return;
       }
 
-      // Emit a reference to the superclass.
+      // Emit a reference to the superclass. This should be abstract for now,
+      // but transitively completing the class will complete it.
       auto superclass = IGF.emitAbstractTypeMetadataRef(
                           getSuperclassForMetadata(IGM, Target));
 
@@ -6880,7 +6888,7 @@ namespace {
 
     void emitInitializeMetadata(IRGenFunction &IGF, llvm::Value *metadata,
                                 MetadataDependencyCollector *collector) {
-      llvm_unreachable("Not implemented for foreign reference types.");
+      // Foreign reference types do not currently require extra metadata.
     }
 
     // Visitor methods.
@@ -6934,7 +6942,13 @@ namespace {
     }
 
     void addValueWitnessTable() {
-      auto vwtPointer = emitValueWitnessTable(/*relative*/ false).getValue();
+      llvm::Constant* vwtPointer = nullptr;
+      if (auto cd = Target->getClangDecl())
+        if (auto rd = dyn_cast<clang::RecordDecl>(cd))
+          if (rd->isAnonymousStructOrUnion())
+            vwtPointer = llvm::Constant::getNullValue(IGM.WitnessTablePtrTy);
+      if (!vwtPointer)
+        vwtPointer = emitValueWitnessTable(/*relative*/ false).getValue();
       B.addSignedPointer(vwtPointer,
                          IGM.getOptions().PointerAuth.ValueWitnessTable,
                          PointerAuthEntity());

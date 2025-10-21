@@ -52,6 +52,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isConvertPointerToPointerArgument: Bool { bridged.isConvertPointerToPointerArgument() }
 
+  public var isAddressor: Bool { bridged.isAddressor() }
+
   public var specializationLevel: Int { bridged.specializationLevel() }
 
   public var isSpecialization: Bool { bridged.isSpecialization() }
@@ -60,16 +62,19 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var hasLoweredAddresses: Bool { bridged.hasLoweredAddresses() }
 
-  /// The lowered function type in the expansion context of self.
+  public var loweredFunctionType: CanonicalType {
+    CanonicalType(bridged: bridged.getLoweredFunctionType())
+  }
+
+  /// The lowered function type, with opaque archetypes erased.
   ///
-  /// Always expanding a function type means that the opaque result types
-  /// have the correct generic signature. For example:
+  /// For example:
   ///    @substituted <τ_0_0> () -> @out τ_0_0 for <some P>
   /// is lowered to this inside its module:
   ///    @substituted <τ_0_0> () -> @out τ_0_0 for <ActualResultType>
   /// and this outside its module
   ///    @substituted <τ_0_0> () -> @out τ_0_0 for <some P>
-  public var loweredFunctionType: CanonicalType {
+  public var loweredFunctionTypeInContext: CanonicalType {
     CanonicalType(bridged: bridged.getLoweredFunctionTypeInContext())
   }
 
@@ -93,6 +98,11 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var blocks : BasicBlockList { BasicBlockList(first: bridged.getFirstBlock().block) }
 
   public var entryBlock: BasicBlock { blocks.first! }
+
+  public func appendNewBlock(_ context: some MutatingContext) -> BasicBlock {
+    context.notifyBranchesChanged()
+    return context._bridged.appendBlock(bridged).block
+  }
 
   public var arguments: LazyMapSequence<ArgumentArray, FunctionArgument> {
     entryBlock.arguments.lazy.map { $0 as! FunctionArgument }
@@ -242,12 +252,33 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       fatalError()
     }
   }
+  public func set(thunkKind: ThunkKind, _ context: some MutatingContext) {
+    context.notifyEffectsChanged()
+    switch thunkKind {
+    case .noThunk:                 bridged.setThunk(.IsNotThunk)
+    case .thunk:                   bridged.setThunk(.IsThunk)
+    case .reabstractionThunk:      bridged.setThunk(.IsReabstractionThunk)
+    case .signatureOptimizedThunk: bridged.setThunk(.IsSignatureOptimizedThunk)
+    }
+  }
 
   public var accessorKindName: String? {
     guard bridged.isAccessor() else {
       return nil
     }
     return StringRef(bridged: bridged.getAccessorName()).string
+  }
+
+  public var isInitializer: Bool {
+    return bridged.isInitializer()
+  }
+
+  public var isDeinitializer: Bool {
+    return bridged.isDeinitializer()
+  }
+
+  public var isImplicit: Bool {
+    return bridged.isImplicit()
   }
 
   /// True, if the function runs with a swift 5.1 runtime.
@@ -259,6 +290,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var needsStackProtection: Bool {
     bridged.needsStackProtection()
+  }
+  public func set(needStackProtection: Bool, _ context: some MutatingContext) {
+    context.notifyEffectsChanged()
+    bridged.setNeedStackProtection(needStackProtection)
   }
 
   public var isDeinitBarrier: Bool {
@@ -272,6 +307,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case noRuntime
     case noExistentials
     case noObjCRuntime
+    case manualOwnership
   }
 
   public var performanceConstraints: PerformanceConstraints {
@@ -282,13 +318,19 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       case .NoRuntime: return .noRuntime
       case .NoExistentials: return .noExistentials
       case .NoObjCBridging: return .noObjCRuntime
+      case .ManualOwnership: return .manualOwnership
       default: fatalError("unknown performance constraint")
     }
+  }
+  public func set(isPerformanceConstraint: Bool, _ context: some MutatingContext) {
+    context.notifyEffectsChanged()
+    bridged.setIsPerformanceConstraint(isPerformanceConstraint)
   }
 
   public enum InlineStrategy {
     case automatic
     case never
+    case heuristicAlways
     case always
   }
 
@@ -296,7 +338,22 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     switch bridged.getInlineStrategy() {
       case .InlineDefault: return .automatic
       case .NoInline: return .never
+      case .HeuristicAlwaysInline: return .heuristicAlways
       case .AlwaysInline: return .always
+      default:
+        fatalError()
+    }
+  }
+
+  public enum ABILanguage {
+    case C
+    case Swift
+  }
+
+  public var abi: ABILanguage {
+    switch bridged.getSILFunctionLanguage() {
+      case .C:     return .C
+      case .Swift: return .Swift
       default:
         fatalError()
     }
@@ -332,7 +389,7 @@ public func != (lhs: Function, rhs: Function) -> Bool { lhs !== rhs }
 // Function conventions.
 extension Function {
   public var convention: FunctionConvention {
-    FunctionConvention(for: loweredFunctionType, in: self)
+    FunctionConvention(for: loweredFunctionTypeInContext, in: self)
   }
 
   public var argumentConventions: ArgumentConventions {
@@ -460,8 +517,8 @@ extension Function {
     }
   }
 
-  // Only to be called by PassContext
-  public func _modifyEffects(_ body: (inout FunctionEffects) -> ()) {
+  public func modifyEffects(_ context: some MutatingContext, _ body: (inout FunctionEffects) -> ()) {
+    context.notifyEffectsChanged()
     body(&effects)
   }
 }

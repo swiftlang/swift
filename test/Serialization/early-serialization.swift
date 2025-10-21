@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -O -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib -emit-module %s -o %t/Swift.swiftmodule -enable-ossa-modules
+// RUN: %target-swift-frontend -emit-module -O -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib -emit-module %s -o %t/Swift.swiftmodule
 // RUN: %target-sil-opt -enable-sil-verify-all %t/Swift.swiftmodule -emit-sorted-sil -o - | %FileCheck %s
 
 // Test that early serialization works as expected:

@@ -126,8 +126,7 @@ namespace swift {
   /// Resolve imports for a source file generated to adapt a given
   /// Clang module.
   void performImportResolutionForClangMacroBuffer(
-    SourceFile &SF, ModuleDecl *clangModule
-  );
+      SourceFile &SF, ModuleDecl *explicitOriginModule);
 
   /// Once type-checking is complete, this instruments code with calls to an
   /// intrinsic that record the expected values of local variables so they can
@@ -251,9 +250,10 @@ namespace swift {
   GeneratedModule
   performIRGeneration(ModuleDecl *M, const IRGenOptions &Opts,
                       const TBDGenOptions &TBDOpts,
-                      std::unique_ptr<SILModule> SILMod,
-                      StringRef ModuleName, const PrimarySpecificPaths &PSPs,
+                      std::unique_ptr<SILModule> SILMod, StringRef ModuleName,
+                      const PrimarySpecificPaths &PSPs,
                       ArrayRef<std::string> parallelOutputFilenames,
+                      ArrayRef<std::string> parallelIROutputFilenames,
                       llvm::GlobalVariable **outModuleHash = nullptr);
 
   /// Turn the given Swift file into LLVM IR and return the generated module.

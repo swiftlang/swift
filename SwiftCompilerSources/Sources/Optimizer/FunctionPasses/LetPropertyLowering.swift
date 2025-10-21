@@ -122,6 +122,8 @@ private func insertEndInitInstructions(
       use.set(to: ssaUpdater.getValue(atEndOf: use.instruction.parentBlock), context)
     }
   }
+  // This peephole optimization is required to avoid ownership errors.
+  replacePhisWithIncomingValues(phis: ssaUpdater.insertedPhis, context)
 }
 
 private func constructLetInitRegion(

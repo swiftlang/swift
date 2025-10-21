@@ -41,6 +41,8 @@ SILValue stripCastsWithoutMarkDependence(SILValue V);
 /// begin_borrow instructions.
 SILValue lookThroughOwnershipInsts(SILValue v);
 
+SILValue lookThroughMoveOnlyCheckerPattern(SILValue value);
+
 /// Reverse of lookThroughOwnershipInsts.
 ///
 /// Return true if \p visitor returned true for all uses.
@@ -157,10 +159,6 @@ bool isInstrumentation(SILInstruction *Instruction);
 /// Check that this is a partial apply of a reabstraction thunk and return the
 /// argument of the partial apply if it is.
 SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
-
-/// Returns true if \p PAI is only used by an assign_by_wrapper instruction as
-/// init or set function.
-bool onlyUsedByAssignByWrapper(PartialApplyInst *PAI);
 
 /// Returns true if \p PAI is only used by an \c assign_or_init
 /// instruction as init or set function.

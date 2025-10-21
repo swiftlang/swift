@@ -1288,6 +1288,10 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
                                                    getLocator());
     return failure.diagnose(asNote);
   }
+  case RefKind::TypeReference: {
+    InvalidTypeRefInKeyPath failure(solution, Member, getLocator());
+    return failure.diagnose(asNote);
+  }
   }
   llvm_unreachable("covered switch");
 }
@@ -1384,6 +1388,11 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
   // Referencing initializers in key path is not currently allowed.
   if (isa<ConstructorDecl>(member))
     return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::Initializer,
+                                            member, locator);
+
+  // Referencing types in key path is not currently allowed.
+  if (isa<TypeDecl>(member))
+    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::TypeReference,
                                             member, locator);
 
   return nullptr;
@@ -1787,7 +1796,10 @@ bool IgnoreAssignmentDestinationType::diagnoseForAmbiguity(
   if (!overload)
     return false;
 
-  auto memberName = overload->choice.getName().getBaseName();
+  auto declName = overload->choice.getName();
+  if (!declName)
+    return false;
+
   auto destType = solution.getType(assignment->getDest());
 
   auto &DE = cs.getASTContext().Diags;
@@ -1795,7 +1807,7 @@ bool IgnoreAssignmentDestinationType::diagnoseForAmbiguity(
   // for cases like this instead of using "contextual" one.
   DE.diagnose(assignment->getSrc()->getLoc(),
               diag::no_candidates_match_result_type,
-              memberName.userFacingName(),
+              declName.getBaseName().userFacingName(),
               solution.simplifyType(destType)->getRValueType());
 
   for (auto &entry : commonFixes) {
@@ -1811,6 +1823,21 @@ IgnoreAssignmentDestinationType::create(ConstraintSystem &cs, Type sourceTy,
                                         ConstraintLocator *locator) {
   return new (cs.getAllocator())
       IgnoreAssignmentDestinationType(cs, sourceTy, destTy, locator);
+}
+
+IgnoreNonMetatypeDynamicType *
+IgnoreNonMetatypeDynamicType::create(ConstraintSystem &cs, Type instanceTy,
+                                     Type metatypeTy,
+                                     ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreNonMetatypeDynamicType(cs, instanceTy, metatypeTy, locator);
+}
+
+bool IgnoreNonMetatypeDynamicType::diagnose(const Solution &solution,
+                                            bool asNote) const {
+  NonMetatypeDynamicTypeFailure failure(solution, getFromType(), getToType(),
+                                        getLocator());
+  return failure.diagnose(asNote);
 }
 
 bool AllowInOutConversion::diagnose(const Solution &solution,
@@ -2178,7 +2205,10 @@ AllowKeyPathWithoutComponents::create(ConstraintSystem &cs,
 
 bool IgnoreInvalidResultBuilderBody::diagnose(const Solution &solution,
                                               bool asNote) const {
-  return true; // Already diagnosed by `matchResultBuilder`.
+  // This should already be diagnosed by `matchResultBuilder`, emit a fallback
+  // diagnostic if not.
+  FallbackDiagnostic diag(solution, getLocator());
+  return diag.diagnose(asNote);
 }
 
 IgnoreInvalidResultBuilderBody *
@@ -2189,7 +2219,10 @@ IgnoreInvalidResultBuilderBody::create(ConstraintSystem &cs,
 
 bool IgnoreInvalidASTNode::diagnose(const Solution &solution,
                                     bool asNote) const {
-  return true; // Already diagnosed by the producer of ErrorExpr or ErrorType.
+  // This should already be diagnosed by the producer of ErrorExpr or ErrorType,
+  // emit a fallback diagnostic if not.
+  FallbackDiagnostic diag(solution, getLocator());
+  return diag.diagnose(asNote);
 }
 
 IgnoreInvalidASTNode *IgnoreInvalidASTNode::create(ConstraintSystem &cs,
@@ -2793,6 +2826,18 @@ bool AllowInlineArrayLiteralCountMismatch::diagnose(const Solution &solution,
                                                     bool asNote) const {
   IncorrectInlineArrayLiteralCount failure(solution, lhsCount, rhsCount,
                                            getLocator());
+  return failure.diagnose(asNote);
+}
+
+TooManyDynamicMemberLookups *
+TooManyDynamicMemberLookups::create(ConstraintSystem &cs, DeclNameRef name,
+                                    ConstraintLocator *locator) {
+  return new (cs.getAllocator()) TooManyDynamicMemberLookups(cs, name, locator);
+}
+
+bool TooManyDynamicMemberLookups::diagnose(const Solution &solution,
+                                           bool asNote) const {
+  TooManyDynamicMemberLookupsFailure failure(solution, Name, getLocator());
   return failure.diagnose(asNote);
 }
 

@@ -100,7 +100,7 @@ PluginLoader::getPluginMap() {
   std::optional<llvm::PrefixMapper> mapper;
   if (!PathRemap.empty()) {
     SmallVector<llvm::MappedPrefix, 4> prefixes;
-    llvm::MappedPrefix::transformJoinedIfValid(PathRemap, prefixes);
+    llvm::MappedPrefix::transformPairs(PathRemap, prefixes);
     mapper.emplace();
     mapper->addRange(prefixes);
     mapper->sort();

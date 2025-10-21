@@ -289,7 +289,6 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::EndUnpairedAccessInst:
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::AssignInst:
-  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::AssignOrInitInst:
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::DebugValueInst:
@@ -336,6 +335,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::TuplePackElementAddrInst:
   case SILInstructionKind::TypeValueInst:
   case SILInstructionKind::IgnoredUseInst:
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
     // Handle by operand and result check.
     break;
 

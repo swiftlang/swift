@@ -51,11 +51,6 @@ LangOptions::LangOptions() {
   disableFeature(Feature::ExtensionMacros);
 #endif
 
-  // Note: Introduce default-on language options here.
-  enableFeature(Feature::NoncopyableGenerics);
-  enableFeature(Feature::BorrowingSwitch);
-  enableFeature(Feature::MoveOnlyPartialConsumption);
-
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
   if (DefaultOn) \
@@ -257,6 +252,9 @@ LangOptions::getPlatformConditionValue(PlatformConditionKind Kind) const {
 
 bool LangOptions::
 checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
+  // Note: BridgedASTContext_enumerateBuildConfigurationEntries has a redundant
+  // copy of these special cases.
+
   // Check a special case that "macOS" is an alias of "OSX".
   if (Kind == PlatformConditionKind::OS && Value == "macOS")
     return checkPlatformCondition(Kind, "OSX");

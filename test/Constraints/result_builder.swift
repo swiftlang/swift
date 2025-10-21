@@ -1424,11 +1424,16 @@ extension TestLeadingDot where Self == NoopImpl {
 struct NoopImpl : TestLeadingDot {
 }
 
+@available(SwiftStdlib 5.1, *)
 func testLeadingDotSyntax(v: Int) {
   let x: some TestLeadingDot = .test {
     v
   }
 }
 
-testLeadingDotSyntax(v: -42)
+if #available(SwiftStdlib 5.1, *) {
+  testLeadingDotSyntax(v: -42)
+} else {
+  print("buildBlock: -42") // Fallback for the back deployment bots
+}
 // CHECK: buildBlock: -42

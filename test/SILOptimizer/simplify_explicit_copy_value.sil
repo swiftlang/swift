@@ -1,0 +1,21 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=explicit_copy_value | %FileCheck %s --check-prefix=CHECK-ONONE --check-prefix=CHECK
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=explicit_copy_value | %FileCheck %s --check-prefix=CHECK-O --check-prefix=CHECK
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+// CHECK-LABEL: sil [ossa] @simplify_explicit_copy_value :
+// CHECK-O:       %1 = copy_value %0
+// CHECK-ONONE:   %1 = explicit_copy_value %0
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'simplify_explicit_copy_value'
+sil [ossa] @simplify_explicit_copy_value : $@convention(thin) (@guaranteed String) -> @owned String {
+bb0(%0 : @guaranteed $String):
+  %1 = explicit_copy_value %0
+  return %1
+}
+

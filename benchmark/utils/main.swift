@@ -117,6 +117,7 @@ import LuhnAlgoLazy
 import MapReduce
 import Memset
 import MirrorTest
+import Monoids
 import MonteCarloE
 import MonteCarloPi
 import NaiveRangeReplaceableCollectionConformance
@@ -185,7 +186,6 @@ import SortIntPyramids
 import SortLargeExistentials
 import SortLettersInPlace
 import SortStrings
-import StackPromo
 import StaticArray
 import StrComplexWalk
 import StrToInt
@@ -317,6 +317,7 @@ register(LuhnAlgoLazy.benchmarks)
 register(MapReduce.benchmarks)
 register(Memset.benchmarks)
 register(MirrorTest.benchmarks)
+register(Monoids.benchmarks)
 register(MonteCarloE.benchmarks)
 register(MonteCarloPi.benchmarks)
 register(NaiveRangeReplaceableCollectionConformance.benchmarks)
@@ -386,7 +387,6 @@ register(SortIntPyramids.benchmarks)
 register(SortLargeExistentials.benchmarks)
 register(SortLettersInPlace.benchmarks)
 register(SortStrings.benchmarks)
-register(StackPromo.benchmarks)
 register(StaticArray.benchmarks)
 register(StrComplexWalk.benchmarks)
 register(StrToInt.benchmarks)
@@ -419,4 +419,4 @@ register(Walsh.benchmarks)
 register(WordCount.benchmarks)
 register(XorLoop.benchmarks)
 
-main()
+await main()

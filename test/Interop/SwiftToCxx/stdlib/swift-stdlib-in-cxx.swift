@@ -81,9 +81,6 @@
 // CHECK:  }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK String &operator =(const String &other) noexcept {
 // CHECK:  }
-// CHECK-NEXT:  SWIFT_INLINE_THUNK String &operator =(String &&other) = delete;
-// CHECK-NEXT:  SWIFT_INLINE_PRIVATE_HELPER String(String &&) noexcept {
-// CHECK: }
 // CHECK-NEXT:  static SWIFT_INLINE_THUNK String init() SWIFT_SYMBOL({{.*}});
 // CHECK:  SWIFT_INLINE_THUNK void append(const String& other)
 // CHECK:  SWIFT_INLINE_THUNK __StringNested::UTF8View getUtf8() const SWIFT_SYMBOL({{.*}});
@@ -118,7 +115,7 @@
 // CHECK-NEXT: private:
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) UTF8View final {
-// CHECK: SWIFT_INLINE_PRIVATE_HELPER UTF8View(UTF8View &&) noexcept {
+// CHECK: SWIFT_INLINE_THUNK UTF8View &operator =(const UTF8View &other) noexcept {
 // CHECK: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK __StringNested::Index getStartIndex() const SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:   SWIFT_INLINE_THUNK __StringNested::Index getEndIndex() const SWIFT_SYMBOL({{.*}});

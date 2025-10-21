@@ -17,8 +17,10 @@
 #ifndef SWIFT_ATTRKIND_H
 #define SWIFT_ATTRKIND_H
 
-/// This header is included in a bridging header. Be *very* careful with what
-/// you include here! See include caveats in `ASTBridging.h`.
+/// `AttrKind.h` is imported into Swift. Be *very* careful with what you
+/// include here and keep these includes minimal!
+///
+/// See include guidelines and caveats in `BasicBridging.h`.
 #include "swift/Basic/SwiftBridging.h"
 #include <stdint.h>
 
@@ -77,7 +79,8 @@ llvm::StringRef getAccessLevelSpelling(AccessLevel value);
 
 enum class ENUM_EXTENSIBILITY_ATTR(closed) InlineKind : uint8_t {
   Never SWIFT_NAME("never") = 0,
-  Always SWIFT_NAME("always") = 1,
+  AlwaysUnderscored SWIFT_NAME("alwaysUnderscored") = 1,
+  Always SWIFT_NAME("always") = 2,
   Last_InlineKind = Always
 };
 
@@ -97,6 +100,7 @@ enum class ENUM_EXTENSIBILITY_ATTR(closed) EffectsKind : uint8_t {
 /// This enum represents the possible values of the @_expose attribute.
 enum class ENUM_EXTENSIBILITY_ATTR(closed) ExposureKind : uint8_t {
   Cxx SWIFT_NAME("cxx"),
+  NotCxx SWIFT_NAME("notcxx"),
   Wasm SWIFT_NAME("wasm"),
   Last_ExposureKind = Wasm
 };
@@ -134,6 +138,12 @@ enum class ENUM_EXTENSIBILITY_ATTR(closed)
       Always SWIFT_NAME("always"),
       Last_InheritActorContextKind = Always
     };
+
+enum class ENUM_EXTENSIBILITY_ATTR(closed) NonexhaustiveMode : uint8_t {
+  Error SWIFT_NAME("error") = 0,
+  Warning SWIFT_NAME("warning") = 1,
+  Last_NonexhaustiveMode = Warning
+};
 
 enum class ENUM_EXTENSIBILITY_ATTR(closed) DeclAttrKind : unsigned {
 #define DECL_ATTR(_, CLASS, ...) CLASS,

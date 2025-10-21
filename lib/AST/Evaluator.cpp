@@ -17,8 +17,9 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/TypeCheckRequests.h" // for ResolveMacroRequest
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceManager.h"
@@ -123,17 +124,44 @@ void Evaluator::diagnoseCycle(const ActiveRequest &request) {
     OS << "\n";
   }
 
-  request.diagnoseCycle(diags);
+  // Perform some filtering to avoid emitting duplicate 'through reference here'
+  // notes.
+  DiagnosticQueue cycleDiags(diags, /*emitOnDestruction*/ true);
+  SWIFT_DEFER {
+    auto isDefaultStepNote = [](const Diagnostic &diag) -> bool {
+      return diag.getID() == diag::circular_reference_through.ID;
+    };
+    // First populate seen locs for everything except default step notes. If
+    // we have a diagnostic or custom note at a given location we want to prefer
+    // that over the default step note.
+    llvm::DenseSet<SourceLoc> seenLocs;
+    cycleDiags.forEach([&](const Diagnostic &diag) {
+      if (isDefaultStepNote(diag))
+        return;
+
+      if (auto loc = diag.getLocOrDeclLoc())
+        seenLocs.insert(loc);
+    });
+    // Then we can filter out unnecessary default step notes.
+    cycleDiags.filter([&](const Diagnostic &diag) -> bool {
+      if (!isDefaultStepNote(diag))
+        return true;
+
+      auto loc = diag.getLocOrDeclLoc();
+      return loc && seenLocs.insert(loc).second;
+    });
+  };
+
+  request.diagnoseCycle(cycleDiags.getDiags());
+
   for (const auto &step : llvm::reverse(activeRequests)) {
-    if (step == request) return;
-
-    // Reporting the lifetime dependence location generates a redundant
-    // diagnostic.
-    if (step.getAs<LifetimeDependenceInfoRequest>()) {
-      continue;
+    if (step == request) {
+      // Note that we diagnosed a cycle for the outermost step to ensure it
+      // also returns a cyclic result.
+      diagnosedActiveCycles.insert(step);
+      return;
     }
-
-    step.noteCycleStep(diags);
+    step.noteCycleStep(cycleDiags.getDiags());
   }
 
   llvm_unreachable("Diagnosed a cycle but it wasn't represented in the stack");

@@ -27,4 +27,9 @@ target_link_libraries(swiftFrontendTool PRIVATE
     swiftSILOptimizer
     swiftThreading)
 
+if (SWIFT_BUILD_SWIFT_SYNTAX)
+  target_link_libraries(swiftFrontendTool PRIVATE
+    swiftASTGen)
+endif()
+
 set_swift_llvm_is_available(swiftFrontendTool)

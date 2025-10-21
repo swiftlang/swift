@@ -25,6 +25,7 @@
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -126,7 +127,7 @@ namespace {
       // The ASTWalker doesn't walk the case body variables, contextualize them
       // ourselves.
       if (auto *CS = dyn_cast<CaseStmt>(S)) {
-        for (auto *CaseVar : CS->getCaseBodyVariablesOrEmptyArray())
+        for (auto *CaseVar : CS->getCaseBodyVariables())
           CaseVar->setDeclContext(ParentDC);
       }
       // A few statements store DeclContexts, update them.
@@ -341,7 +342,7 @@ namespace {
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (auto caseStmt = dyn_cast<CaseStmt>(S)) {
-        for (auto var : caseStmt->getCaseBodyVariablesOrEmptyArray())
+        for (auto var : caseStmt->getCaseBodyVariables())
           setLocalDiscriminator(var);
       }
       return Action::Continue(S);
@@ -810,6 +811,37 @@ ConcreteDeclRef TypeChecker::getReferencedDeclForHasSymbolCondition(Expr *E) {
   return ConcreteDeclRef();
 }
 
+static bool typeCheckAvailableStmtConditionElement(StmtConditionElement &elt,
+                                                   bool &isFalseable,
+                                                   DeclContext *dc) {
+  auto info = elt.getAvailability();
+  if (info->isInvalid()) {
+    isFalseable = true;
+    return false;
+  }
+
+  auto &diags = dc->getASTContext().Diags;
+  bool isConditionAlwaysTrue = false;
+
+  if (auto query = info->getAvailabilityQuery()) {
+    auto domain = query->getDomain();
+    if (query->isConstant() && domain.isPermanentlyAlwaysEnabled()) {
+      isConditionAlwaysTrue = *query->getConstantResult();
+
+      diags
+        .diagnose(elt.getStartLoc(),
+                  diag::availability_query_useless_always_true, domain,
+                  isConditionAlwaysTrue)
+        .highlight(elt.getSourceRange());
+    }
+  }
+
+  if (!isConditionAlwaysTrue)
+    isFalseable = true;
+
+  return false;
+}
+
 static bool typeCheckHasSymbolStmtConditionElement(StmtConditionElement &elt,
                                                    DeclContext *dc) {
   auto Info = elt.getHasSymbolInfo();
@@ -874,10 +906,6 @@ typeCheckPatternBindingStmtConditionElement(StmtConditionElement &elt,
   // provide type information.
   auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
   Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-  if (patternType->hasError()) {
-    typeCheckPatternFailed();
-    return true;
-  }
 
   // If the pattern didn't get a type, it's because we ran into some
   // unknown types along the way. We'll need to check the initializer.
@@ -895,8 +923,7 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
                                                 DeclContext *dc) {
   switch (elt.getKind()) {
   case StmtConditionElement::CK_Availability:
-    isFalsable = true;
-    return false;
+    return typeCheckAvailableStmtConditionElement(elt, isFalsable, dc);
   case StmtConditionElement::CK_HasSymbol:
     isFalsable = true;
     return typeCheckHasSymbolStmtConditionElement(elt, dc);
@@ -924,8 +951,9 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
         TypeChecker::typeCheckStmtConditionElement(elt, hadAnyFalsable, dc);
   }
 
-  // If the binding is not refutable, and there *is* an else, reject it as
-  // unreachable.
+  // If none of the statement's conditions can be false, diagnose.
+  // FIXME: Also diagnose if none of the statements conditions can be true.
+  // FIXME: Offer a fix-it to remove the unreachable code.
   if (!hadAnyFalsable && !hadError) {
     auto &diags = dc->getASTContext().Diags;
     Diag<> msg = diag::invalid_diagnostic;
@@ -970,7 +998,7 @@ bool swift::checkFallthroughStmt(FallthroughStmt *FS) {
   // decls. So if we match against the case body var decls,
   // transitively we will match all of the other case label items in
   // the fallthrough destination as well.
-  auto previousVars = previousBlock->getCaseBodyVariablesOrEmptyArray();
+  auto previousVars = previousBlock->getCaseBodyVariables();
   for (auto *expected : vars) {
     bool matched = false;
     if (!expected->hasName())
@@ -1075,7 +1103,7 @@ public:
     assert(TheFunc && "Should have bailed from pre-check if this is None");
 
     Type ResultTy = TheFunc->getBodyResultType();
-    if (!ResultTy || ResultTy->hasError())
+    if (!ResultTy)
       return nullptr;
 
     if (!RS->hasResult()) {
@@ -1085,12 +1113,33 @@ public:
       return RS;
     }
 
+    auto *accessor = TheFunc->getAccessorDecl();
+    auto *exprToCheck = RS->getResult();
+    InOutExpr *inout = nullptr;
+
+    if (accessor && accessor->isMutateAccessor()) {
+      // Check that the returned expression is a &.
+      if ((inout = dyn_cast<InOutExpr>(exprToCheck))) {
+        ResultTy = InOutType::get(ResultTy);
+      } else {
+        getASTContext()
+            .Diags
+            .diagnose(exprToCheck->getLoc(), diag::missing_address_of_return)
+            .highlight(exprToCheck->getSourceRange());
+        inout = new (getASTContext()) InOutExpr(
+            exprToCheck->getStartLoc(), exprToCheck, Type(), /*implicit*/ true);
+      }
+    }
     using namespace constraints;
-    auto target = SyntacticElementTarget::forReturn(RS, ResultTy, DC);
+    auto target =
+        SyntacticElementTarget::forReturn(RS, exprToCheck, ResultTy, DC);
     auto resultTarget = TypeChecker::typeCheckTarget(target);
     if (resultTarget) {
       RS->setResult(resultTarget->getAsExpr());
     } else {
+      // Update the expression even if type-checking failed as e.g pre-checking
+      // may have folded a sequence expr.
+      RS->setResult(target.getAsExpr());
       tryDiagnoseUnnecessaryCastOverOptionSet(getASTContext(), RS->getResult(),
                                               ResultTy);
     }
@@ -1265,7 +1314,7 @@ public:
           fn->mapTypeIntoContext(nominalDecl->getDeclaredInterfaceType());
 
       // must be noncopyable
-      if (!nominalType->isNoncopyable()) {
+      if (nominalType->isCopyable()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_wrong_context_copyable);
         diagnosed = true;
@@ -1275,6 +1324,22 @@ public:
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_no_deinit,
                            nominalType)
+            .fixItRemove(DS->getSourceRange());
+        diagnosed = true;
+      // if the type is public and not frozen, then the method must not be
+      // inlinable.
+      } else if (auto fragileKind = fn->getFragileFunctionKind();
+                 !nominalDecl->getAttrs().hasAttribute<FrozenAttr>()
+                 && fragileKind != FragileFunctionKind{FragileFunctionKind::None}) {
+        ctx.Diags.diagnose(DS->getDiscardLoc(),
+                           // Code in ABI stable SDKs has already used the `@inlinable`
+                           // attribute on functions using `discard self`.
+                           // Phase this in as a warning until those APIs
+                           // can be updated.
+                           fragileKind == FragileFunctionKind{FragileFunctionKind::Inlinable}
+                             ? diag::discard_in_inlinable_method_warning
+                             : diag::discard_in_inlinable_method,
+                           fragileKind.getSelector(), nominalType)
             .fixItRemove(DS->getSourceRange());
         diagnosed = true;
       } else {
@@ -1433,7 +1498,15 @@ public:
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    TypeChecker::typeCheckForEachPreamble(DC, S);
+    // If we're performing IDE inspection, we also want to skip the where
+    // clause if we're leaving the body unchecked.
+    // FIXME: This is a hack to avoid cycles through NamingPatternRequest when
+    // doing lazy type-checking, we ought to fix the request to be granular in
+    // the type-checking work it kicks.
+    bool skipWhere = LeaveBraceStmtBodyUnchecked &&
+      Ctx.SourceMgr.hasIDEInspectionTargetBuffer();
+
+    TypeChecker::typeCheckForEachPreamble(DC, S, skipWhere);
 
     // Type-check the body of the loop.
     auto sourceFile = DC->getParentSourceFile();
@@ -1578,9 +1651,7 @@ public:
 
     // First pass: check all of the bindings.
     for (auto *caseBlock : make_range(casesBegin, casesEnd)) {
-      // Bind all of the pattern variables together so we can follow the
-      // "parent" pointers later on.
-      bindSwitchCasePatternVars(DC, caseBlock);
+      diagnoseCaseVarMutabilityMismatch(DC, caseBlock);
 
       auto caseLabelItemArray = caseBlock->getMutableCaseLabelItems();
       for (auto &labelItem : caseLabelItemArray) {
@@ -1597,7 +1668,7 @@ public:
       }
 
       // Setup the types of our case body var decls.
-      for (auto *expected : caseBlock->getCaseBodyVariablesOrEmptyArray()) {
+      for (auto *expected : caseBlock->getCaseBodyVariables()) {
         assert(expected->hasName());
         auto prev = expected->getParentVarDecl();
         if (prev->hasInterfaceType())
@@ -1883,7 +1954,26 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
                     : valueE;
 
     if (auto *Fn = dyn_cast<ApplyExpr>(expr)) {
-      if (auto *calledValue = Fn->getCalledValue()) {
+      /// Some concurrency-related things may have intermediate conversions that
+      /// we want to look through, e.g.
+      ///
+      /// ```swift
+      /// @discardableResult
+      /// @MainActor
+      /// func foo() -> () -> Void {
+      ///   return {}
+      /// }
+      ///
+      /// @MainActor
+      /// func test() {
+      ///   foo()
+      ///   // ^ return value implicitly wapped in a `@Sendable` conversion
+      /// }
+      /// ```
+      /// Attempt to look through function conversions when resolving the
+      /// called value.
+      if (auto *calledValue =
+              Fn->getCalledValue(/*skipFunctionConversions=*/true)) {
         if (auto *FD = dyn_cast<AbstractFunctionDecl>(calledValue)) {
           if (FD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
             isDiscardable = true;
@@ -2649,18 +2739,28 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   // function, we unfortunately need to type-check everything since we need to
   // apply the solution.
   // FIXME: We ought to see if we can do better in that case.
-  if (auto *CE = DC->getInnermostClosureForCaptures()) {
-    if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
-      swift::typeCheckASTNodeAtLoc(
-          TypeCheckASTNodeAtLocContext::declContext(CE->getParent()),
-          CE->getLoc());
+  //
+  // We don't need to do this for unattached nodes since we already would have
+  // type-checked the surrounding context, and unattached nodes cannot be
+  // typechecked via DeclContext since they aren't actually part of the AST.
+  if (!typeCheckCtx.isForUnattachedNode()) {
+    if (auto *CE = DC->getInnermostClosureForCaptures()) {
+      // Walk up to the parent-most closure.
+      while (auto *parent = dyn_cast_or_null<ClosureExpr>(CE->getParent()))
+        CE = parent;
 
-      // If the context itself is a ClosureExpr, we should have type-checked
-      // the completion expression now. If it's a nested local declaration,
-      // fall through to type-check the AST node now that we've type-checked
-      // the surrounding closure.
-      if (isa<ClosureExpr>(DC))
-        return false;
+      if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
+        swift::typeCheckASTNodeAtLoc(
+            TypeCheckASTNodeAtLocContext::declContext(CE->getParent()),
+            CE->getLoc());
+
+        // If the context itself is a ClosureExpr, we should have type-checked
+        // the completion expression now. If it's a nested local declaration,
+        // fall through to type-check the AST node now that we've type-checked
+        // the surrounding closure.
+        if (isa<ClosureExpr>(DC))
+          return false;
+      }
     }
   }
 
@@ -3167,6 +3267,12 @@ IsSingleValueStmtRequest::evaluate(Evaluator &eval, const Stmt *S,
     return areBranchesValidForSingleValueStmt(ctx, DCS,
                                               DCS->getBranches(scratch));
   }
+  if (auto *FS = dyn_cast<ForEachStmt>(S)) {
+    if (!ctx.LangOpts.hasFeature(Feature::ForExpressions))
+      return IsSingleValueStmtResult::unhandledStmt();
+
+    return areBranchesValidForSingleValueStmt(ctx, FS, FS->getBody());
+  }
   return IsSingleValueStmtResult::unhandledStmt();
 }
 
@@ -3206,7 +3312,8 @@ void swift::checkUnknownAttrRestrictions(
   }
 }
 
-void swift::bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *caseStmt) {
+void swift::diagnoseCaseVarMutabilityMismatch(DeclContext *dc,
+                                              CaseStmt *caseStmt) {
   llvm::SmallDenseMap<Identifier, std::pair<VarDecl *, bool>, 4> latestVars;
   auto recordVar = [&](Pattern *pattern, VarDecl *var) {
     if (!var->hasName())
@@ -3216,16 +3323,10 @@ void swift::bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *caseStmt) {
     // parent of this new variable.
     auto &entry = latestVars[var->getName()];
     if (entry.first) {
-      assert(!var->getParentVarDecl() ||
-             var->getParentVarDecl() == entry.first);
-      var->setParentVarDecl(entry.first);
-
       // Check for a mutability mismatch.
-      if (pattern && entry.second != var->isLet()) {
+      if (entry.second != var->isLet()) {
         // Find the original declaration.
-        auto initialCaseVarDecl = entry.first;
-        while (auto parentVar = initialCaseVarDecl->getParentVarDecl())
-          initialCaseVarDecl = parentVar;
+        auto initialCaseVarDecl = entry.first->getCanonicalVarDecl();
 
         auto diag = var->diagnose(diag::mutability_mismatch_multiple_pattern_list,
                                   var->isLet(), initialCaseVarDecl->isLet());
@@ -3236,10 +3337,10 @@ void swift::bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *caseStmt) {
             if (VP->getSingleVar() == var)
               foundVP = VP;
         });
-        if (foundVP)
+        if (foundVP) {
           diag.fixItReplace(foundVP->getLoc(),
                             initialCaseVarDecl->isLet() ? "let" : "var");
-
+        }
         var->setInvalid();
         initialCaseVarDecl->setInvalid();
       }
@@ -3251,8 +3352,6 @@ void swift::bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *caseStmt) {
     entry.first = var;
   };
 
-  // Wire up the parent var decls for each variable that occurs within
-  // the patterns of each case item. in source order.
   for (auto &caseItem : caseStmt->getMutableCaseLabelItems()) {
     // Resolve the pattern.
     auto *pattern = caseItem.getPattern();
@@ -3267,11 +3366,6 @@ void swift::bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *caseStmt) {
     pattern->forEachVariable( [&](VarDecl *var) {
       recordVar(pattern, var);
     });
-  }
-
-  // Wire up the case body variables to the latest patterns.
-  for (auto bodyVar : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
-    recordVar(nullptr, bodyVar);
   }
 }
 

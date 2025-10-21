@@ -408,8 +408,7 @@ bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
       [](const FieldInfo &lhs, const FieldInfo &rhs) {
         return lhs.TI.getNumExtraInhabitants() < rhs.TI.getNumExtraInhabitants();
       });
-    auto fieldAddress = remote::RemoteAddress(address.getAddressData()
-                                              + mostCapaciousField->Offset);
+    auto fieldAddress = address + mostCapaciousField->Offset;
     return mostCapaciousField->TI.readExtraInhabitantIndex(
       reader, fieldAddress, extraInhabitantIndex);
   }
@@ -1154,6 +1153,7 @@ class ExistentialTypeInfoBuilder {
   TypeConverter &TC;
   std::vector<const TypeRef *> Protocols;
   const TypeRef *Superclass = nullptr;
+  remote::RemoteAbsolutePointer Shape;
   ExistentialTypeRepresentation Representation;
   ReferenceCounting Refcounting;
   bool ObjC;
@@ -1319,6 +1319,24 @@ public:
 
   void addAnyObject() {
     Representation = ExistentialTypeRepresentation::Class;
+  }
+
+  void addShape(const ProtocolCompositionTypeRef *Protocol,
+                ExtendedExistentialTypeShapeFlags Flags) {
+    switch (Flags.getSpecialKind()) {
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::Class:
+      Representation = ExistentialTypeRepresentation::Class;
+      break;
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::Metatype:
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::ExplicitLayout:
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::None:
+      Representation = ExistentialTypeRepresentation::Opaque;
+      break;
+    }
+
+    if (Protocol)
+      for (auto *Protocol : Protocol->getProtocols())
+        addProtocol(Protocol);
   }
 
   const TypeInfo *build(remote::TypeInfoProvider *ExternalTypeInfo) {
@@ -1780,6 +1798,11 @@ public:
     return true;
   }
 
+  bool visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
+    return true;
+  }
+
   bool
   visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     return true;
@@ -1920,6 +1943,11 @@ public:
 
   MetatypeRepresentation
   visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
     return MetatypeRepresentation::Thin;
   }
 
@@ -2296,8 +2324,9 @@ class LowerType
     if (auto N = dyn_cast<NominalTypeRef>(TR)) {
       Demangler Dem;
       auto Node = N->getDemangling(Dem);
-      if (Node->getKind() == Node::Kind::Type && Node->getNumChildren() == 1) {
-	auto Alias = Node->getChild(0);
+      if (Node && Node->getKind() == Node::Kind::Type &&
+          Node->getNumChildren() == 1) {
+        auto Alias = Node->getChild(0);
 	if (Alias->getKind() == Node::Kind::TypeAlias && Alias->getNumChildren() == 2) {
 	  auto Module = Alias->getChild(0);
 	  auto Name = Alias->getChild(1);
@@ -2518,6 +2547,13 @@ public:
     }
 
     return builder.buildMetatype(ExternalTypeInfo);
+  }
+
+  const TypeInfo *visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
+    ExistentialTypeInfoBuilder builder(TC);
+    builder.addShape(SEET->getProtocol(), SEET->getFlags());
+    return builder.build(ExternalTypeInfo);
   }
 
   const TypeInfo *

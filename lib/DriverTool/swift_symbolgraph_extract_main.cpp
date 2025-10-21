@@ -83,8 +83,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   if (auto *A = ParsedArgs.getLastArg(OPT_target)) {
     Target = llvm::Triple(A->getValue());
   } else {
-    Diags.diagnose(SourceLoc(), diag::error_option_required, "-target");
-    return EXIT_FAILURE;
+    Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
   }
 
   std::string OutputDir;
@@ -141,7 +140,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   Invocation.getLangOptions().EnableObjCInterop = Target.isOSDarwin();
   Invocation.getLangOptions().DebuggerSupport = true;
 
-  Invocation.getFrontendOptions().EnableLibraryEvolution = true;
+  Invocation.getLangOptions().enableFeature(Feature::LibraryEvolution);
 
   std::string ModuleCachePath = "";
   if (auto *A = ParsedArgs.getLastArg(OPT_module_cache_path)) {

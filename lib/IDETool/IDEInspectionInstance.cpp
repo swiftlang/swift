@@ -213,8 +213,10 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
 
   // Check the invalidation first. Otherwise, in case no 'CacheCI' exists yet,
   // the flag will remain 'true' even after 'CachedCI' is populated.
-  if (CachedCIShouldBeInvalidated.exchange(false))
+  if (CachedCIShouldBeInvalidated.exchange(false)) {
+    CachedCI = nullptr;
     return false;
+  }
   if (!CachedCI)
     return false;
   if (CachedReuseCount >= Opts.MaxASTReuseCount)
@@ -427,7 +429,6 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
     // re-use imported modules.
     auto *newSF = &newM->getMainSourceFile();
     performImportResolution(*newSF);
-    bindExtensions(*newM);
 
     traceDC = newM;
 #ifndef NDEBUG
@@ -516,7 +517,7 @@ void IDEInspectionInstance::performNewOperation(
     CI->getASTContext().CancellationFlag = CancellationFlag;
     registerIDERequestFunctions(CI->getASTContext().evaluator);
 
-    CI->performParseAndResolveImportsOnly();
+    performImportResolution(CI->getMainModule());
 
     bool DidFindIDEInspectionTarget = CI->getIDEInspectionFile()
                                         ->getDelayedParserState()
@@ -822,6 +823,71 @@ void swift::ide::IDEInspectionInstance::conformingMethodList(
 
               performIDEInspectionSecondPass(
                   *Result.CI->getIDEInspectionFile(), *callbacksFactory);
+              if (!Consumer.HandleResultsCalled) {
+                // If we didn't receive a handleResult call from the second
+                // pass, we didn't receive any results. To make sure Callback
+                // gets called exactly once, call it manually with no results
+                // here.
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
+              }
+            },
+            Callback);
+      });
+}
+
+void swift::ide::IDEInspectionInstance::signatureHelp(
+    swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
+    DiagnosticConsumer *DiagC,
+    std::shared_ptr<std::atomic<bool>> CancellationFlag,
+    llvm::function_ref<void(CancellableResult<SignatureHelpResults>)>
+        Callback) {
+  using ResultType = CancellableResult<SignatureHelpResults>;
+
+  struct ConsumerToCallbackAdapter : public swift::ide::SignatureHelpConsumer {
+    bool ReusingASTContext;
+    std::shared_ptr<std::atomic<bool>> CancellationFlag;
+    llvm::function_ref<void(ResultType)> Callback;
+    bool HandleResultsCalled = false;
+
+    ConsumerToCallbackAdapter(
+        bool ReusingASTContext,
+        std::shared_ptr<std::atomic<bool>> CancellationFlag,
+        llvm::function_ref<void(ResultType)> Callback)
+        : ReusingASTContext(ReusingASTContext),
+          CancellationFlag(CancellationFlag), Callback(Callback) {}
+
+    void handleResult(const SignatureHelpResult &result) override {
+      HandleResultsCalled = true;
+      if (CancellationFlag &&
+          CancellationFlag->load(std::memory_order_relaxed)) {
+        Callback(ResultType::cancelled());
+      } else {
+        Callback(ResultType::success({&result, ReusingASTContext}));
+      }
+    }
+  };
+
+  performOperation(
+      Invocation, Args, FileSystem, ideInspectionTargetBuffer, Offset, DiagC,
+      CancellationFlag,
+      [&](CancellableResult<IDEInspectionInstanceResult> CIResult) {
+        CIResult.mapAsync<SignatureHelpResults>(
+            [&CancellationFlag](auto &Result, auto DeliverTransformed) {
+              ConsumerToCallbackAdapter Consumer(
+                  Result.DidReuseAST, CancellationFlag, DeliverTransformed);
+              std::unique_ptr<IDEInspectionCallbacksFactory> callbacksFactory(
+                  ide::makeSignatureHelpCallbacksFactory(Consumer));
+
+              if (!Result.DidFindIDEInspectionTarget) {
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
+              }
+
+              performIDEInspectionSecondPass(*Result.CI->getIDEInspectionFile(),
+                                             *callbacksFactory);
               if (!Consumer.HandleResultsCalled) {
                 // If we didn't receive a handleResult call from the second
                 // pass, we didn't receive any results. To make sure Callback

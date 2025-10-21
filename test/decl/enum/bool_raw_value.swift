@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 extension Bool: @retroactive ExpressibleByIntegerLiteral {
 	public init(integerLiteral value: Int) {
 		self = value != 0

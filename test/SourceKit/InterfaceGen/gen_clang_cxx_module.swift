@@ -1,7 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %sourcekitd-test -req=interface-gen -module CxxModule -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import -I %t/Inputs -target %target-triple %clang-importer-sdk-nosource | %FileCheck %s
+// The interface should fail to generate with C++ interop disabled:
+// RUN: not %sourcekitd-test -req=interface-gen -module CxxModule -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import -I %t/Inputs -target %target-triple %clang-importer-sdk-nosource
+
+// With C++ interop enabled, it should succeed:
 // RUN: %sourcekitd-test -req=interface-gen -module CxxModule -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import -cxx-interoperability-mode=default -I %t/Inputs -target %target-triple %clang-importer-sdk-nosource | %FileCheck %s
 
 

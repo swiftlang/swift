@@ -210,7 +210,8 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
 
   // If the destination type is known to have a Swift-compatible
   // implementation, use the most specific entrypoint.
-  if (destClass && destClass->hasKnownSwiftImplementation()) {
+  if ((destClass && destClass->hasKnownSwiftImplementation()) ||
+      IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
     metadataRef = IGF.emitTypeMetadataRef(toType);
 
     switch (mode) {
@@ -1008,7 +1009,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
                                        IGF.IGM.getPointerAlignment(),
                                        "castSrc");
         IGF.Builder.CreateStore(metatypeVal, src);
-        llvm::PointerType *destPtrType = IGF.IGM.getStoragePointerType(targetLoweredType);
+        llvm::PointerType *destPtrType = IGF.IGM.PtrTy;
         Address dest = IGF.createAlloca(destPtrType,
                                         IGF.IGM.getPointerAlignment(),
                                         "castDest");

@@ -50,7 +50,7 @@ public struct NoncopyableImplicitAccessors : ~Copyable & ~Escapable {
     @_lifetime(borrow self)
     get { ne }
 
-    @_lifetime(&self)
+    @_lifetime(self: copy newValue)
     set {
       ne = newValue
     }

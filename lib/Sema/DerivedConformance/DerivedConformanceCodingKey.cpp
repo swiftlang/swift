@@ -222,10 +222,8 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
       auto *returnStmt = ReturnStmt::createImplicit(C, caseValue);
       auto *caseBody = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                          SourceLoc());
-      cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                       labelItem, SourceLoc(), SourceLoc(),
-                                       caseBody,
-                                       /*case body var decls*/ std::nullopt));
+      cases.push_back(CaseStmt::createImplicit(C, CaseParentKind::Switch,
+                                               labelItem, caseBody));
     }
 
     auto *selfRef = DerivedConformance::createSelfDeclRef(strValDecl);
@@ -292,9 +290,8 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
 
     auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(assignment),
                                    SourceLoc());
-    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                     labelItem, SourceLoc(), SourceLoc(), body,
-                                     /*case body var decls*/ std::nullopt));
+    cases.push_back(
+        CaseStmt::createImplicit(C, CaseParentKind::Switch, labelItem, body));
   }
 
   auto *anyPat = AnyPattern::createImplicit(C);
@@ -303,10 +300,8 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
   auto *dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
   auto *dfltBody = BraceStmt::create(C, SourceLoc(), ASTNode(dfltReturnStmt),
                                      SourceLoc());
-  cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                   dfltLabelItem, SourceLoc(), SourceLoc(),
-                                   dfltBody,
-                                   /*case body var decls*/ std::nullopt));
+  cases.push_back(CaseStmt::createImplicit(C, CaseParentKind::Switch,
+                                           dfltLabelItem, dfltBody));
 
   auto *stringValueDecl = initDecl->getParameters()->get(0);
   auto *stringValueRef = new (C) DeclRefExpr(stringValueDecl, DeclNameLoc(),

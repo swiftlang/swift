@@ -288,7 +288,7 @@ static bool isTypeMetadataForLayoutAccessible(SILModule &M, SILType type) {
 bool SILModule::isTypeABIAccessible(SILType type,
                                     TypeExpansionContext forExpansion) {
   // Fixed-ABI types can have value operations done without metadata.
-  if (Types.getTypeLowering(type, forExpansion).isFixedABI())
+  if (Types.getTypeProperties(type, forExpansion).isFixedABI())
     return true;
 
   assert(!type.is<ReferenceStorageType>() &&
@@ -319,7 +319,7 @@ getKeyPathSupportingGenericSignature(Type ty, GenericSignature contextSig) {
   
   // If the type is already unconditionally Copyable and Escapable, we don't
   // need any further requirements.
-  if (!ty->isNoncopyable() && ty->isEscapable()) {
+  if (ty->isCopyable() && ty->isEscapable()) {
     return contextSig;
   }
   

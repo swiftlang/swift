@@ -356,7 +356,7 @@ extension Array {
   }
 
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
-  @inlinable
+  @_alwaysEmitIntoClient
   @_semantics("array.make_mutable")
   @_effects(notEscaping self.**)
   internal mutating func _makeMutableAndUniqueUnchecked() {
@@ -1509,15 +1509,36 @@ extension Array {
 }
 
 extension Array {
-  /// Implementation for Array(unsafeUninitializedCapacity:initializingWith:)
+#if !$Embedded
+  /// Implementation preserved (for ABI reasons) for:
+  /// Array(unsafeUninitializedCapacity:initializingWith:)
   /// and ContiguousArray(unsafeUninitializedCapacity:initializingWith:)
-  @inlinable
+  /*@_spi(SwiftStdlibLegacyABI)*/ @available(swift, obsoleted: 1)
+  @inlinable // inlinable is necessary for prespecialization
   internal init(
     _unsafeUninitializedCapacity: Int,
     initializingWith initializer: (
       _ buffer: inout UnsafeMutableBufferPointer<Element>,
       _ initializedCount: inout Int) throws -> Void
   ) rethrows {
+    try unsafe self.init(
+      _unsafeUninitializedCapacity: _unsafeUninitializedCapacity,
+      initializingWithTypedThrowsInitializer: initializer
+    )
+  }
+#endif
+
+  /// Implementation for:
+  /// Array(unsafeUninitializedCapacity:initializingWith:)
+  /// and ContiguousArray(unsafeUninitializedCapacity:initializingWith:)
+  @_alwaysEmitIntoClient
+  internal init<E: Error>(
+    _unsafeUninitializedCapacity: Int,
+    initializingWithTypedThrowsInitializer initializer: (
+      _ buffer: inout UnsafeMutableBufferPointer<Element>,
+      _ initializedCount: inout Int
+    ) throws(E) -> Void
+  ) throws(E) {
     var firstElementAddress: UnsafeMutablePointer<Element>
     unsafe (self, firstElementAddress) =
       unsafe Array._allocateUninitialized(_unsafeUninitializedCapacity)
@@ -1528,8 +1549,9 @@ extension Array {
     defer {
       // Update self.count even if initializer throws an error.
       _precondition(
-        initializedCount <= _unsafeUninitializedCapacity,
-        "Initialized count set to greater than specified capacity."
+        UInt(truncatingIfNeeded: initializedCount) <=
+        UInt(truncatingIfNeeded: _unsafeUninitializedCapacity),
+        "Initialized count must be in 0 ... _unsafeUninitializedCapacity."
       )
       unsafe _precondition(
         buffer.baseAddress == firstElementAddress,
@@ -1567,22 +1589,24 @@ extension Array {
   ///         which begins as zero. Set `initializedCount` to the number of
   ///         elements you initialize.
   @_alwaysEmitIntoClient @inlinable
-  public init(
+  public init<E: Error>(
     unsafeUninitializedCapacity: Int,
     initializingWith initializer: (
       _ buffer: inout UnsafeMutableBufferPointer<Element>,
-      _ initializedCount: inout Int) throws -> Void
-  ) rethrows {
+      _ initializedCount: inout Int
+    ) throws(E) -> Void
+  ) throws(E) {
     self = try unsafe Array(
       _unsafeUninitializedCapacity: unsafeUninitializedCapacity,
-      initializingWith: initializer)
+      initializingWithTypedThrowsInitializer: initializer
+    )
   }
 
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
-  @_disfavoredOverload
-  func withUnsafeBufferPointer<R>(
+  internal func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     return try unsafe _buffer.withUnsafeBufferPointer(body)

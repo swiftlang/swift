@@ -28,7 +28,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -1281,6 +1280,9 @@ static llvm::Value *emitWitnessTableAccessorCall(
 
   // Emit the source metadata if we haven't yet.
   if (!*srcMetadataCache) {
+    // Witness table accesses only require abstract type metadata; this
+    // is so that we can create the witness tables without introducing
+    // cycle problems.
     *srcMetadataCache = IGF.emitAbstractTypeMetadataRef(conformingType);
   }
 
@@ -3445,6 +3447,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
       return MetadataResponse::forComplete(associatedWTable);
     }
 
+    // Witness table lookups only require abstract metadata.
     auto *sourceMetadata =
         IGF.emitAbstractTypeMetadataRef(sourceType);
 
@@ -3512,6 +3515,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
         associatedMetadata = response.getMetadata();
       } else {
         // Ok, fall back to realizing the (possibly concrete) type.
+        // Witness table lookups only require abstract metadata.
         associatedMetadata =
           IGF.emitAbstractTypeMetadataRef(sourceKey.Type);
       }
@@ -4413,7 +4417,7 @@ static FunctionPointer emitRelativeProtocolWitnessTableAccess(IRGenFunction &IGF
     helperFn->getFunctionType(), helperFn, {wtable});
   call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
-  auto fn = IGF.Builder.CreateBitCast(call, signature.getType()->getPointerTo());
+  auto fn = IGF.Builder.CreateBitCast(call, IGM.PtrTy);
   return FunctionPointer::createUnsigned(fnType, fn, signature, true);
 }
 
@@ -4443,8 +4447,7 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   auto fnType = IGF.IGM.getSILTypes().getConstantFunctionType(
       IGF.IGM.getMaximalTypeExpansionContext(), member);
   Signature signature = IGF.IGM.getSignature(fnType);
-  witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr,
-                                           signature.getType()->getPointerTo());
+  witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr, IGF.IGM.PtrTy);
 
   auto &schema = fnType->isAsync()
                      ? IGF.getOptions().PointerAuth.AsyncProtocolWitnesses

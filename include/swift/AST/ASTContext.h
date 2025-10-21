@@ -801,6 +801,9 @@ public:
   // Swift._stdlib_isOSVersionAtLeastOrVariantVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastOrVariantVersionAtLeast() const;
 
+  /// Retrieve the declaration of Swift._isSwiftRuntimeVersionAtLeast.
+  FuncDecl *getIsSwiftRuntimeVersionAtLeast() const;
+
   /// Look for the declaration with the given name within the
   /// passed in module.
   void lookupInModule(ModuleDecl *M, StringRef name,
@@ -909,7 +912,7 @@ public:
   AvailabilityRange getSwiftAvailability(unsigned major, unsigned minor) const;
 
   // For each feature defined in FeatureAvailability, define two functions;
-  // the latter, with the suffix RuntimeAvailabilty, is for use with
+  // the latter, with the suffix RuntimeAvailability, is for use with
   // AvailabilityRange::forRuntimeTarget(), and only looks at the Swift
   // runtime version.
 #define FEATURE(N, V)                                                          \
@@ -1044,7 +1047,6 @@ public:
 
   // Builtin type and simple types that are used frequently.
   const CanType TheErrorType;             /// This is the ErrorType singleton.
-  const CanType TheUnresolvedType;        /// This is the UnresolvedType singleton.
   const CanType TheEmptyTupleType;        /// This is '()', aka Void
   const CanType TheEmptyPackType;
   const CanType TheAnyType;               /// This is 'Any', the empty protocol composition
@@ -1293,6 +1295,10 @@ public:
   ModuleDecl *getStdlibModule() const {
     return const_cast<ASTContext *>(this)->getStdlibModule(false);
   }
+
+  /// Names of underscored modules whose contents, if imported, should be
+  /// treated as separately-imported overlays of the standard library module.
+  ArrayRef<Identifier> StdlibOverlayNames;
 
   /// Insert an externally-sourced module into the set of known loaded modules
   /// in this context.
@@ -1625,6 +1631,10 @@ public:
   /// then this returns the universal domain (`*`).
   AvailabilityDomain getTargetAvailabilityDomain() const;
 };
+
+inline SourceLoc extractNearestSourceLoc(const ASTContext *ctx) {
+  return SourceLoc();
+}
 
 } // end namespace swift
 

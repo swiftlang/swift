@@ -1059,7 +1059,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
         Builder.getBuilderContext(), /*noUndef*/ true);
   } else {
     auto loadQual = !func->hasOwnership() ? LoadOwnershipQualifier::Unqualified
-                    : DataAddrInst->getOperand()->getType().isTrivial(*func)
+                    : DataAddrInst->getType().isTrivial(*func)
                         ? LoadOwnershipQualifier::Trivial
                         : LoadOwnershipQualifier::Take;
     enumValue =
@@ -1118,11 +1118,16 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
     return nullptr;
 
   bool onlyLoads = true;
+  bool anyLoadCopies = false;
   bool onlyDestroys = true;
   for (auto U : getNonDebugUses(tedai)) {
     // Check if it is load. If it is not a load, bail...
     if (!isa<LoadInst>(U->getUser()) && !isa<LoadBorrowInst>(U->getUser()))
       onlyLoads = false;
+
+    if (auto *li = dyn_cast<LoadInst>(U->getUser()))
+      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
+        anyLoadCopies = true;
 
     // If we have a load_borrow, perform an additional check that we do not have
     // any reborrow uses. We do not handle reborrows in this optimization.
@@ -1141,6 +1146,10 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
   }
 
   if (onlyDestroys) {
+    // Destroying whole non-copyable enums with a deinit would wrongly trigger calling its deinit.
+    if (tedai->getOperand()->getType().isValueTypeWithDeinit())
+      return nullptr;
+
     // The unchecked_take_enum_data_addr is dead: remove it and replace all
     // destroys with a destroy of its operand.
     while (!tedai->use_empty()) {
@@ -1164,6 +1173,11 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
   // address only. So we *could* have a loadable payload resulting from the
   // TEDAI without the TEDAI being loadable itself.
   if (tedai->getOperand()->getType().isAddressOnly(*tedai->getFunction()))
+    return nullptr;
+
+  // If the enum is noncopyable and any loads cause copies, the transformation
+  // would be illegal because it would introduce a copy of the noncopyable enum.
+  if (tedai->getOperand()->getType().isMoveOnly() && anyLoadCopies)
     return nullptr;
 
   // Grab the EnumAddr.

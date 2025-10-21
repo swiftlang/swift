@@ -36,14 +36,6 @@
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "type": "abi-baseline-json",
 // CHECK-NEXT:         "path": "{{.*[\\/]}}parseable_output_emit_module.swift.tmp.abi.json"
-// CHECK-NEXT:       },
-// CHECK-NEXT:       {
-// CHECK-NEXT:        "type": "yaml-opt-record",
-// CHECK-NEXT:        "path": "parseable_output_emit_module.opt.yaml"
-// CHECK-NEXT:       },
-// CHECK-NEXT:       {
-// CHECK-NEXT:        "type": "bitstream-opt-record",
-// CHECK-NEXT:        "path": "parseable_output_emit_module.opt.bitstream"
 // CHECK-NEXT:       }
 // CHECK-NEXT:     ],
 // CHECK-NEXT:     "pid": [[PID:[0-9]*]]

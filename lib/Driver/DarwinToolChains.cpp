@@ -42,6 +42,7 @@
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
+using namespace swift::driver::toolchains;
 
 std::string
 toolchains::Darwin::findProgramRelativeToSwiftImpl(StringRef name) const {
@@ -186,7 +187,7 @@ static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
     // included with an open-source toolchain.
     const char *args[] = {"-toolchain", "default", "-f", "clang", nullptr};
     sys::TaskQueue queue;
-    queue.addTask(xcrunPath->c_str(), args, /*Env=*/std::nullopt,
+    queue.addTask(xcrunPath->c_str(), args, /*Env=*/{},
                   /*Context=*/nullptr,
                   /*SeparateErrors=*/true);
     queue.execute(nullptr,
@@ -366,6 +367,8 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
       runtimeCompatibilityVersion = llvm::VersionTuple(5, 8);
     } else if (value == "6.0") {
       runtimeCompatibilityVersion = llvm::VersionTuple(6, 0);
+    } else if (value == "6.2") {
+      runtimeCompatibilityVersion = llvm::VersionTuple(6, 2);
     } else if (value == "none") {
       runtimeCompatibilityVersion = std::nullopt;
     } else {
@@ -470,7 +473,7 @@ void
 toolchains::Darwin::addProfileGenerationArgs(ArgStringList &Arguments,
                                              const JobContext &context) const {
   const llvm::Triple &Triple = getTriple();
-  if (context.Args.hasArg(options::OPT_profile_generate)) {
+  if (needsInstrProfileRuntime(context.Args)) {
     SmallString<128> LibProfile;
     getClangLibraryPath(context.Args, LibProfile);
 

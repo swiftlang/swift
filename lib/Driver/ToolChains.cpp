@@ -160,6 +160,16 @@ bool containsValue(
 
 }
 
+namespace swift::driver::toolchains {
+bool needsInstrProfileRuntime(const llvm::opt::ArgList &Args) {
+  return Args.hasArg(options::OPT_profile_generate) ||
+         Args.hasArg(options::OPT_cs_profile_generate) ||
+         Args.hasArg(options::OPT_cs_profile_generate_EQ) ||
+         Args.hasArg(options::OPT_ir_profile_generate) ||
+         Args.hasArg(options::OPT_ir_profile_generate_EQ);
+}
+} // namespace swift::driver::toolchains
+
 void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                       const CommandOutput &output,
                                       const ArgList &inputArgs,
@@ -323,6 +333,11 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_PackageCMO);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
+  inputArgs.AddLastArg(arguments, options::OPT_ir_profile_generate);
+  inputArgs.AddLastArg(arguments, options::OPT_ir_profile_generate_EQ);
+  inputArgs.AddLastArg(arguments, options::OPT_ir_profile_use);
+  inputArgs.AddLastArg(arguments, options::OPT_cs_profile_generate);
+  inputArgs.AddLastArg(arguments, options::OPT_cs_profile_generate_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
   inputArgs.AddAllArgs(arguments, options::OPT_warning_treating_Group);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
@@ -522,19 +537,28 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
   addRuntimeLibraryFlags(context.OI, Arguments);
 
-  // Pass along an -import-objc-header arg, replacing the argument with the name
-  // of any input PCH to the current action if one is present.
-  if (context.Args.hasArgNoClaim(options::OPT_import_objc_header)) {
+  // Pass along an -(internal-)?import-bridging-header arg, replacing the
+  // argument with the name of any input PCH to the current action if one is
+  // present.
+  if (context.Args.hasArgNoClaim(options::OPT_import_bridging_header,
+                                 options::OPT_internal_import_bridging_header)) {
     bool ForwardAsIs = true;
     bool bridgingPCHIsEnabled =
         context.Args.hasFlag(options::OPT_enable_bridging_pch,
                              options::OPT_disable_bridging_pch, true);
     bool usePersistentPCH = bridgingPCHIsEnabled &&
                             context.Args.hasArg(options::OPT_pch_output_dir);
+    bool isInternalImport = context.Args.getLastArgNoClaim(
+        options::OPT_import_bridging_header,
+        options::OPT_internal_import_bridging_header)
+      ->getOption().getID() == options::OPT_internal_import_bridging_header;
     if (!usePersistentPCH) {
       for (auto *IJ : context.Inputs) {
         if (!IJ->getOutput().getAnyOutputForType(file_types::TY_PCH).empty()) {
-          Arguments.push_back("-import-objc-header");
+          if (isInternalImport)
+            Arguments.push_back("-internal-import-bridging-header");
+          else
+            Arguments.push_back("-import-bridging-header");
           addInputsOfType(Arguments, context.Inputs, context.Args,
                           file_types::TY_PCH);
           ForwardAsIs = false;
@@ -543,7 +567,8 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       }
     }
     if (ForwardAsIs) {
-      context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
+      context.Args.AddLastArg(Arguments, options::OPT_import_bridging_header,
+                              options::OPT_internal_import_bridging_header);
     }
     if (usePersistentPCH) {
       context.Args.AddLastArg(Arguments, options::OPT_pch_output_dir);
@@ -706,6 +731,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   context.Args.AddLastArg(Arguments, options::OPT_emit_extension_block_symbols,
                           options::OPT_omit_extension_block_symbols);
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_minimum_access_level);
+  context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_skip_synthesized_members);
+  context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_skip_inherited_docs);
+  context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_pretty_print);
 
   return II;
 }
@@ -940,6 +968,12 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
   addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SwiftModuleSummaryFile,
                    "-emit-module-summary-path");
+
+  // Add extra output paths for SIL and LLVM IR
+  addOutputsOfType(arguments, Output, Args, file_types::TY_SIL,
+                   "-sil-output-path");
+  addOutputsOfType(arguments, Output, Args, file_types::TY_LLVM_IR,
+                   "-ir-output-path");
 }
 
 ToolChain::InvocationInfo
@@ -969,7 +1003,8 @@ ToolChain::constructInvocation(const InterpretJobAction &job,
   addCommonFrontendArgs(context.OI, context.Output, context.Args, Arguments);
   addRuntimeLibraryFlags(context.OI, Arguments);
 
-  context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
+  context.Args.AddLastArg(Arguments, options::OPT_import_bridging_header,
+                          options::OPT_internal_import_bridging_header);
 
   context.Args.AddLastArg(Arguments, options::OPT_parse_sil);
 
@@ -1223,6 +1258,12 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_TBD,
                    "-emit-tbd-path");
 
+  // Add extra output paths for SIL and LLVM IR
+  addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_SIL,
+                   "-sil-output-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::TY_LLVM_IR, "-ir-output-path");
+
   context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
   context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
   context.Args.AddLastArg(Arguments, options::OPT_include_spi_symbols);
@@ -1230,7 +1271,8 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                           options::OPT_omit_extension_block_symbols);
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_minimum_access_level);
 
-  context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
+  context.Args.AddLastArg(Arguments, options::OPT_import_bridging_header,
+                          options::OPT_internal_import_bridging_header);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
@@ -1273,7 +1315,8 @@ ToolChain::constructInvocation(const VerifyModuleInterfaceJobAction &job,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
 
-  context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
+  context.Args.AddLastArg(Arguments, options::OPT_import_bridging_header,
+                          options::OPT_internal_import_bridging_header);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
@@ -1339,7 +1382,8 @@ ToolChain::constructInvocation(const REPLJobAction &job,
   addCommonFrontendArgs(context.OI, context.Output, context.Args, FrontendArgs);
   addRuntimeLibraryFlags(context.OI, FrontendArgs);
 
-  context.Args.AddLastArg(FrontendArgs, options::OPT_import_objc_header);
+  context.Args.AddLastArg(FrontendArgs, options::OPT_import_bridging_header,
+                          options::OPT_internal_import_bridging_header);
   context.Args.addAllArgs(FrontendArgs,
                           {options::OPT_framework, options::OPT_L});
   ToolChain::addLinkedLibArgs(context.Args, FrontendArgs);

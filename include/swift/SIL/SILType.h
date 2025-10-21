@@ -20,6 +20,7 @@
 
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/Lifetime.h"
 #include "llvm/ADT/Hashing.h"
@@ -109,7 +110,7 @@ private:
   SILType(CanType ty, SILValueCategory category)
       : value(ty.getPointer(), unsigned(category)) {
     if (!ty) return;
-    assert(ty->isLegalSILType() &&
+    ASSERT(ty->isLegalSILType() &&
            "constructing SILType with type that should have been "
            "eliminated by SIL lowering");
   }
@@ -266,6 +267,8 @@ public:
 
   bool isBuiltinBridgeObject() const { return is<BuiltinBridgeObjectType>(); }
 
+  bool isBuiltinImplicitActor() const { return is<BuiltinImplicitActorType>(); }
+
   SILType getBuiltinVectorElementType() const {
     auto vector = castTo<BuiltinVectorType>();
     return getPrimitiveObjectType(vector.getElementType());
@@ -419,6 +422,9 @@ public:
   
   /// Returns true if the referenced type is guaranteed to have a
   /// single-retainable-pointer representation.
+  /// This does not include C++ imported `SWIFT_SHARED_REFERENCE` classes.
+  /// They act as Swift classes but are not compatible with Swift's
+  /// retain/release runtime functions.
   bool hasRetainablePointerRepresentation() const {
     return getASTType()->hasRetainablePointerRepresentation();
   }
@@ -754,6 +760,13 @@ public:
   SILType subst(SILModule &M, SubstitutionMap subs,
                 TypeExpansionContext context) const;
 
+  /// Strip concurrency annotations from the representation type.
+  SILType stripConcurrency(bool recursive, bool dropGlobalActor) {
+    auto strippedASTTy = getASTType()->stripConcurrency(recursive, dropGlobalActor);
+    return SILType::getPrimitiveType(strippedASTTy->getCanonicalType(),
+                                     getCategory());
+  }
+
   /// Return true if this type references a "ref" type that has a single pointer
   /// representation. Class existentials do not always qualify.
   bool isHeapObjectReferenceType() const;
@@ -950,6 +963,13 @@ public:
   /// Returns true if this type is an actor or a distributed actor.
   bool isAnyActor() const { return getASTType()->isAnyActorType(); }
 
+  /// Is this a type whose value is a value that a function can use in an
+  /// isolated parameter position. This could be a type that actually conforms
+  /// to AnyActor or it could be a type like any Actor, Optional<any Actor> or
+  /// Builtin.ImplicitActor that do not conform to Actor but from which we can
+  /// derive a value that conforms to the Actor protocol.
+  bool canBeIsolatedTo() const { return getASTType()->canBeIsolatedTo(); }
+
   /// Returns true if this function conforms to the Sendable protocol.
   ///
   /// NOTE: For diagnostics this is not always the correct thing to check since
@@ -1015,8 +1035,28 @@ public:
   /// Return '()'
   static SILType getEmptyTupleType(const ASTContext &C);
 
+  /// Return (elementTypes) with control of category.
+  static SILType getTupleType(const ASTContext &ctx,
+                              ArrayRef<SILType> elementTypes,
+                              SILValueCategory category);
+
+  /// Return $(elementTypes)
+  static SILType getTupleObjectType(const ASTContext &ctx,
+                                    ArrayRef<SILType> elementTypes) {
+    return getTupleType(ctx, elementTypes, SILValueCategory::Object);
+  }
+
+  /// Return $*(elementTypes)
+  static SILType getTupleAddressType(const ASTContext &ctx,
+                                     ArrayRef<SILType> elementTypes) {
+    return getTupleType(ctx, elementTypes, SILValueCategory::Address);
+  }
+
   /// Get the type for opaque actor isolation values.
   static SILType getOpaqueIsolationType(const ASTContext &C);
+
+  /// Return Builtin.ImplicitActor.
+  static SILType getBuiltinImplicitActorType(const ASTContext &ctx);
 
   //
   // Utilities for treating SILType as a pointer-like type.

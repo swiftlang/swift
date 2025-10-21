@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -swift-version 5 -enable-implicit-dynamic %S/Inputs/dynamicReplacementA.swift -o %t -module-name A
 // RUN: %target-swift-frontend -emit-module -swift-version 5 -enable-implicit-dynamic -c %S/Inputs/dynamicReplacementB.swift -o %t -I %t -module-name B
 // RUN: %target-swift-frontend -emit-module -swift-version 5 -enable-implicit-dynamic -c %S/Inputs/dynamicReplacementC.swift -o %t -I %t -module-name C
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-implicit-dynamic  -I %t
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 5 -enable-implicit-dynamic  -I %t
 import A
 import B
 import C

@@ -9,13 +9,16 @@ if(POLICY CMP0157 AND CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
   cmake_policy(SET CMP0157 OLD)
 endif()
 
-if($ENV{BUILD_NUMBER})
-  math(EXPR BUILD_NUMBER "$ENV{BUILD_NUMBER} % 65535")
-  set(BUILD_NUMBER ".${BUILD_NUMBER}")
-endif()
+list(APPEND CMAKE_MODULE_PATH
+  "${CMAKE_SOURCE_DIR}/../cmake/modules"
+  "${CMAKE_SOURCE_DIR}/../../cmake/modules")
+
+include(LanguageVersions)
+include(SwiftProjectVersion)
 project(SwiftSynchronization
   LANGUAGES Swift
-  VERSION 6.1.0${BUILD_NUMBER})
+  VERSION ${SWIFT_RUNTIME_VERSION})
+
 # FIXME(compnerd) this is a workaround for `GNUInstallDirs` which cannot be used
 # with a pure Swift project.
 enable_language(C)
@@ -25,8 +28,6 @@ if(NOT PROJECT_IS_TOP_LEVEL)
 endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE YES)
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/../cmake/modules")
 
 set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../../"
@@ -40,6 +41,7 @@ set(${PROJECT_NAME}_VENDOR_MODULE_DIR "${CMAKE_SOURCE_DIR}/../cmake/modules/vend
   CACHE FILEPATH "Location for private build system extension")
 
 find_package(SwiftCore REQUIRED)
+find_package(SwiftOverlay)
 
 include(GNUInstallDirs)
 
@@ -89,8 +91,20 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
+  "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+
+# LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
+# LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
+# LNK4217: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj' in function 'function'
+#
+# We cannot selectively filter the linker warnings as we do not use the MSVC
+# frontned and `clang-cl` (and `clang`) currently do not support `/WX:nnnn`. As
+# a compromise, treat all linker warnings as errors.
+add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
+# Ensure all symbols are fully resolved on Linux
+add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 gyb_expand(Atomics/AtomicIntegers.swift.gyb Atomics/AtomicIntegers.swift)
 gyb_expand(Atomics/AtomicStorage.swift.gyb Atomics/AtomicStorage.swift)
@@ -111,7 +125,8 @@ add_library(swiftSynchronization
 
 # Determine Mutex definition
 if(${PROJECT_NAME}_SINGLE_THREADED_MODE)
-  target_sources(swiftSynchronization PRIVATE Mutex/MutexUnavailable.swift)
+  target_sources(swiftSynchronization PRIVATE
+    Mutex/MutexUnavailable.swift)
 else()
   target_sources(swiftSynchronization PRIVATE
     Mutex/Mutex.swift
@@ -126,7 +141,48 @@ set_target_properties(swiftSynchronization PROPERTIES
 
 target_link_libraries(swiftSynchronization PRIVATE
   swiftCore
-  $<$<PLATFORM_ID:Darwin>:swiftDarwin>)
+  $<$<PLATFORM_ID:Android>:swiftAndroid>
+  $<$<PLATFORM_ID:Darwin>:swiftDarwin>
+  $<$<PLATFORM_ID:Windows>:ClangModules>)
+
+if(WIN32 AND CMAKE_SYSTEM_PROCESSOR STREQUAL i686)
+  # FIXME(#83765) `-whole-module-optimization` should not be needed. However,
+  # without this, we will not properly optimize. On Windows i686 in particular,
+  # we observe the formation of `__atomic_load` calls rather than the expected
+  # native sequence.
+  cmake_policy(GET CMP0157 _PolicyCMP0157)
+  if(_PolicyCMP0157 STREQUAL NEW)
+    set_target_properties(swiftSynchronization PROPERTIES
+      Swift_COMPILATION_MODE wholemodule)
+  else()
+    target_compile_options(swiftSynchronization PRIVATE
+      $<$<COMPILE_LANGUAGE:Swift>:-whole-module-optimization>)
+  endif()
+
+  # WMO requires the early-swift-driver to be usable, which is not yet ready on
+  # Windows. Workaround this by creating an empty stub for swiftCore, removing
+  # the import library from the command line, and adding the library search path
+  # associated with it. Due to the autolink, we will still link against the
+  # library from the correct location but will also use an empty file for the
+  # additional input allowing us to perform the WMO.
+  if(CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
+    get_target_property(_swiftCore_IMPORTED_IMPLIB_RELEASE swiftCore
+      IMPORTED_IMPLIB_RELEASE)
+    if(_swiftCore_IMPORTED_IMPLIB_RELEASE)
+      # Compute the library directory to allow us to find the import library by
+      # name.
+      get_filename_component(_swiftCore_IMPORTED_IMPLIB_RELEASE_DIRNAME
+        ${_swiftCore_IMPORTED_IMPLIB_RELEASE} DIRECTORY)
+      # Create a (empty) stub library
+      file(TOUCH "${CMAKE_CURRENT_BINARY_DIR}/swiftCoreStub.lib")
+      # Replace the import library with a stub to bypass the driver and frontend.
+      # Add the library search path to allow linking via autolinking.
+      set_target_properties(swiftCore PROPERTIES
+        IMPORTED_IMPLIB_RELEASE "${CMAKE_CURRENT_BINARY_DIR}/swiftCoreStub.lib"
+        INTERFACE_LINK_DIRECTORIES ${_swiftCore_IMPORTED_IMPLIB_RELEASE_DIRNAME})
+    endif()
+  endif()
+endif()
 
 install(TARGETS swiftSynchronization
   EXPORT SwiftSynchronizationTargets
@@ -138,7 +194,7 @@ emit_swift_interface(swiftSynchronization)
 install_swift_interface(swiftSynchronization)
 
 # Configure plist creation for Darwin platforms.
-generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftSynchronization)
+generate_plist(swiftSynchronization "${CMAKE_PROJECT_VERSION}" swiftSynchronization)
 embed_manifest(swiftSynchronization)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swiftSynchronization.cmake" OPTIONAL)

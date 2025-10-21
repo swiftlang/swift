@@ -251,6 +251,8 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver,
     llvm_unreachable("not used for this platform");
   case swift::PlatformKind::Windows:
     llvm_unreachable("not used for this platform");
+  case swift::PlatformKind::Android:
+    llvm_unreachable("not used for this platform");
   case swift::PlatformKind::iOS:
   case swift::PlatformKind::iOSApplicationExtension:
     if (target && target->isMacCatalystEnvironment())
@@ -686,6 +688,18 @@ void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
 class APIGenRecorder final : public APIRecorder {
   static bool isSPI(const Decl *decl) {
     assert(decl);
+
+    if (auto value = dyn_cast<ValueDecl>(decl)) {
+      auto accessScope =
+          value->getFormalAccessScope(/*useDC=*/nullptr,
+                                      /*treatUsableFromInlineAsPublic=*/true);
+      // Only declarations with a public access scope (`public` or `open`)
+      // can be APIs. Exported declarations with other access scopes (`package`)
+      // should be SPI.
+      if (!accessScope.isPublic())
+        return true;
+    }
+
     return decl->isSPI() || decl->isAvailableAsSPI();
   }
 

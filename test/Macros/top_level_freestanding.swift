@@ -12,10 +12,6 @@
 
 // RUN: %target-typecheck-verify-swift -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -DIMPORT_MACRO_LIBRARY -swift-version 5  %S/Inputs/top_level_freestanding_other.swift -I %t
 
-// Check diagnostic buffer names
-// RUN: not %target-swift-frontend -typecheck -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5 %s %S/Inputs/top_level_freestanding_other.swift -diagnostic-style llvm 2> %t.diags
-// RUN: %FileCheck -check-prefix DIAG_BUFFERS %s < %t.diags
-
 // Execution testing
 // RUN: %target-build-swift -g -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) %s %S/Inputs/top_level_freestanding_other.swift -o %t/main -module-name MacroUser -swift-version 5
 // RUN: %target-codesign %t/main
@@ -60,7 +56,7 @@ func lookupGlobalFreestandingExpansion() {
 
 #anonymousTypes(public: true) { "hello" }
 
-// CHECK-SIL: sil @$s9MacroUser03$s9A115User0033top_level_freestandingswift_DbGHjfMX60_0_33_082AE7CFEFA6960C804A9FE7366EB5A0Ll14anonymousTypesfMf_4namefMu_C5helloSSyF
+// CHECK-SIL: sil @$s9MacroUser03$s9A115User0033top_level_freestandingswift_DbGHjfMX56_0_33_082AE7CFEFA6960C804A9FE7366EB5A0Ll14anonymousTypesfMf_4namefMu_C5helloSSyF
 
 @main
 struct Main {
@@ -94,8 +90,6 @@ func testArbitraryAtGlobal() {
 }
 #endif
 
-// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser0039top_level_freestanding_otherswift_jrGEmfMX12_17_33_7FDB3F9D78D0279543373AD342C3C331Ll9stringifyfMf1{{.*}}: warning: 'deprecated()' is deprecated
-// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser0039top_level_freestanding_otherswift_jrGEmfMX16_17_33_7FDB3F9D78D0279543373AD342C3C331Ll9stringifyfMf2{{.*}}: warning: 'deprecated()' is deprecated
 
 #varValue
 
@@ -107,15 +101,31 @@ func testGlobalVariable() {
 
 // expected-note @+1 6 {{in expansion of macro 'anonymousTypes' here}}
 #anonymousTypes(causeErrors: true) { "foo" }
-// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser0033top_level_freestandingswift_DbGHjfMX108_0_33_082AE7CFEFA6960C804A9FE7366EB5A0Ll14anonymousTypesfMf0_{{.*}}: warning: use of protocol 'Equatable' as a type must be written 'any Equatable'
-// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser00142___swiftmacro_9MacroUser0033top_level_freestandingswift_DbGHjfMX108_0_33_082AE7CFEFA6960C804A9FE7366EB5A0Ll14anonymousTypesfMf0_swift_DAIABdjIbfMX23_2_33_082AE7CFEFA6960C804A9FE7366EB5A0Ll27introduceTypeCheckingErrorsfMf_{{.*}}: warning: use of protocol 'Hashable' as a type must be written 'any Hashable'
-
+/*
+expected-expansion@-2:1 {{
+  expected-warning@23:8{{same-type requirement makes generic parameter 'T' non-generic; this is an error in the Swift 6 language mode}}
+  expected-note@23:135{{'T' previously declared here}}
+  expected-warning@23:149{{use of protocol 'Equatable' as a type must be written 'any Equatable'; this will be an error in a future Swift language mode}}
+  expected-note@24:3 3{{in expansion of macro 'introduceTypeCheckingErrors' here}}
+  expected-expansion@24:3 {{
+    expected-warning@2:10{{same-type requirement makes generic parameter 'T' non-generic; this is an error in the Swift 6 language mode}}
+    expected-warning@2:259{{generic parameter 'T' shadows generic parameter from outer scope with the same name; this is an error in the Swift 6 language mode}}
+    expected-warning@2:273{{use of protocol 'Hashable' as a type must be written 'any Hashable'; this will be an error in a future Swift language mode}}
+  }}
+}}
+*/
 // expected-note @+1 2 {{in expansion of macro 'anonymousTypes' here}}
 #anonymousTypes { () -> String in
   // expected-warning @+1 {{use of protocol 'Equatable' as a type must be written 'any Equatable'}}
   _ = 0 as Equatable
   return "foo"
 }
+/*
+expected-expansion@-6:1{{
+  expected-warning@5:16{{use of protocol 'Equatable' as a type must be written 'any Equatable'; this will be an error in a future Swift language mode}}
+  expected-warning@20:16{{use of protocol 'Equatable' as a type must be written 'any Equatable'; this will be an error in a future Swift language mode}}
+}}
+*/
 
 #endif
 
@@ -165,3 +175,4 @@ func testFunctionCallWithInoutParam() {
   #functionCallWithTwoInoutParams(&a, &b)
   #functionCallWithInoutParamPlusOthers(string: "", double: 1.0, &a)
 }
+

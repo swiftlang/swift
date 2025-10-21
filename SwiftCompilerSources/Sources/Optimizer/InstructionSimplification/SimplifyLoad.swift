@@ -75,7 +75,7 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
        index < stringLiteral.value.count {
 
       let builder = Builder(before: self, context)
-      let charLiteral = builder.createIntegerLiteral(Int(stringLiteral.value[index]), type: type)
+      let charLiteral = builder.createIntegerLiteral(stringLiteral.value[index], type: type)
       uses.replaceAll(with: charLiteral, context)
       context.erase(instruction: self)
       return true
@@ -104,10 +104,10 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
     if !globalInitVal.canBeCopied(into: parentFunction, context) {
       return false
     }
-    var cloner = StaticInitCloner(cloneBefore: self, context)
+    var cloner = Cloner(cloneBefore: self, context)
     defer { cloner.deinitialize() }
 
-    let initVal = cloner.clone(globalInitVal)
+    let initVal = cloner.cloneRecursively(globalInitValue: globalInitVal)
 
     uses.replaceAll(with: initVal, context)
     // Also erases a builtin "once" on which the global_addr depends on. This is fine
@@ -323,7 +323,7 @@ private extension Value {
         return false
       }
       if let fri = value as? FunctionRefInst {
-        if function.isAnySerialized, 
+        if function.isAnySerialized,
            !fri.referencedFunction.hasValidLinkageForFragileRef(function.serializedKind)
         {
           return false
@@ -447,4 +447,3 @@ private func getGlobalInitialization(
   }
   return nil
 }
-

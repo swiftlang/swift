@@ -47,8 +47,7 @@ class WasmKit(product.Product):
         return False
 
     def should_install(self, host_target):
-        # Currently, it's only used for testing stdlib.
-        return True
+        return self.args.install_wasmkit
 
     def install(self, host_target):
         """
@@ -61,21 +60,27 @@ class WasmKit(product.Product):
 
     def build(self, host_target):
         bin_path = run_swift_build(host_target, self, 'wasmkit-cli')
-        print("Built wasmkit-cli at: " + bin_path)
+        print("Built wasmkit-cli at: " + bin_path, flush=True)
         # Copy the built binary to ./bin
         dest_bin_path = self.__class__.cli_file_path(self.build_dir)
-        print("Copying wasmkit-cli to: " + dest_bin_path)
+        print("Copying wasmkit-cli to: " + dest_bin_path, flush=True)
         os.makedirs(os.path.dirname(dest_bin_path), exist_ok=True)
         shutil.copy(bin_path, dest_bin_path)
 
     @classmethod
     def cli_file_path(cls, build_dir):
-        return os.path.join(build_dir, 'bin', 'wasmkit-cli')
+        return os.path.join(build_dir, 'bin', 'wasmkit')
 
 
 def run_swift_build(host_target, product, swiftpm_package_product_name, set_installation_rpath=False):
-    # Building with the freshly-built SwiftPM
     swift_build = os.path.join(product.install_toolchain_path(host_target), "bin", "swift-build")
+
+    if not os.path.exists(swift_build) or product.args.build_runtime_with_host_compiler:
+        print(
+            f"WARNING: build-script's {os.path.basename(__file__)} is running local development code path, "
+            "don't use these build artifacts for deployment!"
+        )
+        swift_build = product.toolchain.swift_build
 
     if host_target.startswith('macos'):
         # Universal binary on macOS

@@ -197,48 +197,45 @@ void AvailabilityInference::applyInferredAvailableAttrs(
 
       // Walk up the enclosing declaration hierarchy to make sure we aren't
       // missing any inherited attributes.
-      D = AvailabilityInference::parentDeclForInferredAvailability(D);
+      D = D->parentDeclForAvailability();
     } while (D);
   }
-
-  DeclAttributes &Attrs = ToDecl->getAttrs();
 
   // Create an availability attribute for each observed platform and add
   // to ToDecl.
   for (auto &Pair : Inferred) {
     if (auto Attr = createAvailableAttr(Pair.first, Pair.second, Context))
-      Attrs.add(Attr);
+      ToDecl->addAttribute(Attr);
   }
 }
 
 /// Returns the decl that should be considered the parent decl of the given decl
 /// when looking for inherited availability annotations.
-const Decl *
-AvailabilityInference::parentDeclForInferredAvailability(const Decl *D) {
-  if (auto *AD = dyn_cast<AccessorDecl>(D))
+const Decl *Decl::parentDeclForAvailability() const {
+  if (auto *AD = dyn_cast<AccessorDecl>(this))
     return AD->getStorage();
 
-  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+  if (auto *ED = dyn_cast<ExtensionDecl>(this)) {
     if (auto *NTD = ED->getExtendedNominal())
       return NTD;
   }
 
-  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(this)) {
     if (PBD->getNumPatternEntries() < 1)
       return nullptr;
 
     return PBD->getAnchoringVarDecl(0);
   }
 
-  if (auto *OTD = dyn_cast<OpaqueTypeDecl>(D))
+  if (auto *OTD = dyn_cast<OpaqueTypeDecl>(this))
     return OTD->getNamingDecl();
 
   // Clang decls may be inaccurately parented rdar://53956555
-  if (D->hasClangNode())
+  if (hasClangNode())
     return nullptr;
 
   // Availability is inherited from the enclosing context.
-  return D->getDeclContext()->getInnermostDeclarationDeclContext();
+  return getDeclContext()->getInnermostDeclarationDeclContext();
 }
 
 /// Returns true if the introduced version in \p newAttr should be used instead
@@ -365,12 +362,12 @@ bool AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
     const BackDeployedAttr *attr, const ASTContext &ctx,
     AvailabilityDomain &domain, llvm::VersionTuple &platformVer) {
   bool hasRemap = false;
-  auto remappedDomain = AvailabilityDomain::forPlatform(attr->Platform)
-                            .getRemappedDomain(ctx, hasRemap);
+  auto remappedDomain =
+      attr->getAvailabilityDomain().getRemappedDomain(ctx, hasRemap);
   if (!hasRemap)
     return false;
 
-  auto beforeVersion = attr->Version;
+  auto beforeVersion = attr->getVersion();
   auto potentiallyRemappedIntroducedVersion =
       getRemappedIntroducedVersionForFallbackPlatform(ctx, beforeVersion);
   if (potentiallyRemappedIntroducedVersion.has_value()) {
@@ -408,7 +405,10 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D) {
 }
 
 bool Decl::isAvailableAsSPI() const {
-  return AvailabilityInference::isAvailableAsSPI(this);
+  if (auto attr = getAvailableAttrForPlatformIntroduction())
+    return attr->isSPI();
+
+  return false;
 }
 
 SemanticAvailableAttributes
@@ -572,27 +572,6 @@ getRootTargetDomains(const ASTContext &ctx) {
   return domains;
 }
 
-static bool constraintIndicatesRuntimeUnavailability(
-    const AvailabilityConstraint &constraint, const ASTContext &ctx) {
-  std::optional<CustomAvailabilityDomain::Kind> customDomainKind;
-  if (auto customDomain = constraint.getDomain().getCustomDomain())
-    customDomainKind = customDomain->getKind();
-
-  switch (constraint.getReason()) {
-  case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
-    if (customDomainKind)
-      return customDomainKind == CustomAvailabilityDomain::Kind::Enabled;
-    return true;
-  case AvailabilityConstraint::Reason::Obsoleted:
-  case AvailabilityConstraint::Reason::UnavailableForDeployment:
-    return false;
-  case AvailabilityConstraint::Reason::PotentiallyUnavailable:
-    if (customDomainKind)
-      return customDomainKind == CustomAvailabilityDomain::Kind::Disabled;
-    return false;
-  }
-}
-
 /// Returns true if a decl that is unavailable in the given domain must still be
 /// emitted to preserve load time ABI compatibility.
 static bool
@@ -631,10 +610,7 @@ computeDeclRuntimeAvailability(const Decl *decl) {
 
   // First, collect the unavailable domains from the constraints.
   llvm::SmallVector<AvailabilityDomain, 8> unavailableDomains;
-  for (auto constraint : constraints) {
-    if (constraintIndicatesRuntimeUnavailability(constraint, ctx))
-      unavailableDomains.push_back(constraint.getDomain());
-  }
+  getRuntimeUnavailableDomains(constraints, unavailableDomains, ctx);
 
   // Check whether there are any available attributes that would make the
   // decl available in descendants of the unavailable domains.
@@ -645,6 +621,10 @@ computeDeclRuntimeAvailability(const Decl *decl) {
       continue;
 
     llvm::erase_if(unavailableDomains, [domain](auto unavailableDomain) {
+      // Unavailability in '*' cannot be superseded by an @available attribute
+      // for a more specific availability domain.
+      if (unavailableDomain.isUniversal())
+        return false;
       return unavailableDomain.contains(domain);
     });
   }
@@ -658,6 +638,7 @@ computeDeclRuntimeAvailability(const Decl *decl) {
     if (!domain.isActive(ctx) && !isTargetDomain)
       continue;
 
+    // FIXME: [runtime availability] Update this?
     if (!domain.isRoot())
       continue;
 
@@ -696,10 +677,8 @@ DeclRuntimeAvailability
 DeclRuntimeAvailabilityRequest::evaluate(Evaluator &evaluator,
                                          const Decl *decl) const {
   auto inherited = DeclRuntimeAvailability::PotentiallyAvailable;
-  if (auto *parent =
-          AvailabilityInference::parentDeclForInferredAvailability(decl)) {
+  if (auto *parent = decl->parentDeclForAvailability())
     inherited = getDeclRuntimeAvailability(parent);
-  }
 
   // If the inherited runtime availability is already maximally unavailable
   // then skip computing unavailability for this declaration.
@@ -785,8 +764,7 @@ Decl::getAvailableAttrForPlatformIntroduction(bool checkExtension) const {
   if (!checkExtension)
     return std::nullopt;
 
-  if (auto parent =
-          AvailabilityInference::parentDeclForInferredAvailability(this)) {
+  if (auto parent = parentDeclForAvailability()) {
     if (auto *ED = dyn_cast<ExtensionDecl>(parent)) {
       if (auto attr = getDeclAvailableAttrForPlatformIntroduction(ED))
         return attr;
@@ -802,13 +780,6 @@ AvailabilityRange AvailabilityInference::availableRange(const Decl *D) {
         .value_or(AvailabilityRange::alwaysAvailable());
 
   return AvailabilityRange::alwaysAvailable();
-}
-
-bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
-  if (auto attr = D->getAvailableAttrForPlatformIntroduction())
-    return attr->isSPI();
-
-  return false;
 }
 
 std::optional<SemanticAvailableAttr>
@@ -883,7 +854,8 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
     return std::nullopt;
   }
 
-  if (domain->isSwiftLanguage() || domain->isPackageDescription()) {
+  if (domain->isSwiftLanguageMode() || domain->isPackageDescription() ||
+      domain->isSwiftRuntime()) {
     switch (attr->getKind()) {
     case AvailableAttr::Kind::Deprecated:
       diags.diagnose(attrLoc,
@@ -933,6 +905,9 @@ SemanticAvailableAttr::getIntroducedDomainAndRange(
     const ASTContext &Ctx) const {
   auto *attr = getParsedAttr();
   auto domain = getDomain();
+
+  if (domain.isUniversal())
+    return std::nullopt;
 
   if (!attr->getRawIntroduced().has_value()) {
     // For versioned domains, an "introduced:" version is always required to
@@ -1006,13 +981,18 @@ std::optional<llvm::VersionTuple> SemanticAvailableAttr::getObsoleted() const {
 std::optional<AvailabilityDomainAndRange>
 SemanticAvailableAttr::getObsoletedDomainAndRange(const ASTContext &Ctx) const {
   auto *attr = getParsedAttr();
+  AvailabilityDomain domain = getDomain();
 
-  // Obsoletion always requires a version.
-  if (!attr->getRawObsoleted().has_value())
+  if (!attr->getRawObsoleted().has_value()) {
+    // An "unavailable" attribute effectively means obsolete in all versions.
+    if (attr->isUnconditionallyUnavailable())
+      return AvailabilityDomainAndRange(domain.getRemappedDomain(Ctx),
+                                        AvailabilityRange::alwaysAvailable());
+
     return std::nullopt;
+  }
 
   llvm::VersionTuple obsoletedVersion = getObsoleted().value();
-  AvailabilityDomain domain = getDomain();
   llvm::VersionTuple remappedVersion;
   if (AvailabilityInference::updateObsoletedAvailabilityDomainForFallback(
           *this, Ctx, domain, remappedVersion))

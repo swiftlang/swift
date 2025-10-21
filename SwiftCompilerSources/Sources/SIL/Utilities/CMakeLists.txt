@@ -8,8 +8,15 @@
 
 swift_compiler_sources(SIL
   AccessUtils.swift
+  BorrowUtils.swift
+  Cloner.swift
+  ForwardingUtils.swift
+  PhiUpdater.swift
   SequenceUtilities.swift
   SmallProjectionPath.swift
+  SSAUpdater.swift
+  Test.swift
   WalkUtils.swift
+  Verifier.swift
 )
 

@@ -62,7 +62,7 @@ ERROR(pound_diagnostic_expected_string,none,
       "expected string literal in %select{#warning|#error}0 directive",(bool))
 ERROR(pound_diagnostic_expected,none,
       "expected '%0' in %select{#warning|#error}1 directive",(StringRef,bool))
-ERROR(pound_diagnostic_expected_parens,none,
+ERROR(pound_diagnostic_expected_parens,PointsToFirstBadToken,
       "%select{#warning|#error}0 directive requires parentheses",(bool))
 ERROR(pound_diagnostic_interpolation,none,
       "string interpolation is not allowed in %select{#warning|#error}0 directives",(bool))
@@ -92,6 +92,17 @@ ERROR(forbidden_interpolated_string,none,
       "%0 cannot be an interpolated string literal", (StringRef))
 ERROR(forbidden_extended_escaping_string,none,
       "%0 cannot be an extended escaping string literal", (StringRef))
+
+ERROR(expected_identifier_in_module_selector,none,
+      "expected module name in module selector", ())
+ERROR(expected_identifier_after_module_selector,none,
+      "expected identifier after module selector", ())
+NOTE(extra_whitespace_module_selector,none,
+     "remove extraneous whitespace after '::'", ())
+ERROR(module_selector_submodule_not_allowed,none,
+      "module selector cannot specify a submodule", ())
+NOTE(replace_module_selector_with_member_lookup,none,
+     "replace '::' with '.'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Lexer diagnostics
@@ -303,6 +314,10 @@ ERROR(missing_reading_accessor,none,
       "%select{variable|subscript}0 with %1 must also have "
       "a getter, addressor, or 'read' accessor",
       (unsigned, StringRef))
+ERROR(missing_borrow_accessor,none,
+      "%select{variable|subscript}0 with %1 must also have "
+      "a 'borrow' accessor, getter, addressor or 'read' accessor",
+      (unsigned, StringRef))
 ERROR(observing_accessor_conflicts_with_accessor,none,
       "%select{'willSet'|'didSet'}0 cannot be provided together with %1",
       (unsigned, StringRef))
@@ -312,6 +327,9 @@ ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
 ERROR(accessor_requires_coroutine_accessors,none,
       "%0 is only valid when experimental feature coroutine accessors is enabled",
+      (StringRef))
+ERROR(accessor_requires_borrow_and_mutate_accessors,none,
+      "%0 requires '-enable-experimental-feature BorrowAndMutateAccessors'",
       (StringRef))
 
 // Import
@@ -614,6 +632,12 @@ ERROR(sil_operand_has_incorrect_moveonlywrapped,none,
 ERROR(sil_operand_not_ref_storage_address,none,
       "%0 operand of '%1' must have address of %2 type",
       (StringRef, StringRef, ReferenceOwnership))
+ERROR(sil_operand_has_wrong_ownership_kind,none,
+      "operand has ownership kind %0 but ownership kind %1 was expected",
+      (StringRef, StringRef))
+ERROR(sil_operand_has_incompatible_ownership_kind,none,
+      "operand has ownership kind %0 but ownership kind compatible with %1 was expected",
+      (StringRef, StringRef))
 ERROR(sil_integer_literal_not_integer_type,none,
       "integer_literal instruction requires a 'Builtin.Int<n>' type", ())
 ERROR(sil_integer_literal_not_well_formed,none,

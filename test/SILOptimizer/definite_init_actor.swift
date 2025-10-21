@@ -10,6 +10,7 @@
 
 func neverReturn() -> Never { fatalError("quit!") }
 func arbitraryAsync() async {}
+func makeIntOrThrow() throws -> Int { return 0 }
 
 actor BoringActor {
 
@@ -78,7 +79,7 @@ actor BoringActor {
     // CHECK:    bb0([[SELF:%[0-9]+]] : $SingleVarActor):
     //   TODO: We should be able to eliminate this by reasoning that the stores
     //     are to local memory.
-    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK-NEXT:  hop_to_executor [[GENERIC_EXECUTOR]]
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
     // CHECK:       store {{%[0-9]+}} to [[ACCESS:%[0-9]+]]
@@ -95,7 +96,7 @@ actor BoringActor {
     // CHECK:   bb0({{%[0-9]+}} : $Int, [[SELF:%[0-9]+]] : $SingleVarActor):
     //   TODO: We should be able to eliminate this by reasoning that the stores
     //     are to local memory.
-    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK-NEXT:  hop_to_executor [[GENERIC_EXECUTOR]]
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
     // CHECK:       [[MYVAR_REF:%[0-9]+]] = ref_element_addr [[EI]] : $SingleVarActor, #SingleVarActor.myVar
@@ -117,7 +118,7 @@ actor BoringActor {
 
     //   TODO: We should be able to eliminate this by reasoning that the stores
     //     are to local memory.
-    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK-NEXT:  hop_to_executor [[GENERIC_EXECUTOR]]
 
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
@@ -149,7 +150,7 @@ actor BoringActor {
 
    //   TODO: We should be able to eliminate this by reasoning that the stores
    //     are to local memory.
-   // CHECK:   [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+   // CHECK:   [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
    // CHECK:   hop_to_executor [[GENERIC_EXECUTOR]]
 
    // CHECK:   cond_br {{%[0-9]+}}, [[SUCCESS_BB:bb[0-9]+]], {{bb[0-9]+}}
@@ -169,7 +170,7 @@ actor BoringActor {
    // CHECK:         [[SELF_ALLOC:%[0-9]+]] = alloc_stack [lexical] [var_decl] $SingleVarActor, let, name "self"
 
    //   Initial hop to the generic executor.
-   // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+   // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
    // CHECK-NEXT:  hop_to_executor [[GENERIC_EXECUTOR]]
 
    //   Hop immediately after the call to the synchronous init.
@@ -218,7 +219,7 @@ actor DefaultInit {
     // CHECK:   bb0([[SELF:%[0-9]+]] : $DefaultInit):
     //   Initial hop to the generic executor.
     //   TODO: This should be easy to remove.
-    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK-NEXT:  hop_to_executor [[GENERIC_EXECUTOR]]
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
     // CHECK:       store {{%[0-9]+}} to {{%[0-9]+}} : $*ActingError<Int>
@@ -230,7 +231,7 @@ actor DefaultInit {
     // CHECK:   bb0({{%[0-9]+}} : $Bool, [[SELF:%[0-9]+]] : $DefaultInit):
     //   Initial hop to the generic executor.
     //   TODO: This should be fairly easy to remove.
-    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK-NEXT:  hop_to_executor [[GENERIC_EXECUTOR]]
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
     // CHECK:       store {{%[0-9]+}} to {{%[0-9]+}} : $*ActingError<Int>
@@ -252,7 +253,7 @@ actor MultiVarActor {
     // CHECK:   bb0({{%[0-9]+}} : $Bool, [[SELF:%[0-9]+]] : $MultiVarActor):
     //   Initial hop to the generic executor.
     //   TODO: This should be easy to remove.
-    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK-NEXT:  hop_to_executor [[GENERIC_EXECUTOR]]
     // CHECK:       [[EI:%.*]] = end_init_let_ref [[SELF]]
     // CHECK:       [[REF:%[0-9]+]] = ref_element_addr [[EI]] : $MultiVarActor, #MultiVarActor.firstVar
@@ -270,7 +271,7 @@ actor MultiVarActor {
     // CHECK-LABEL: sil hidden @$s4test13MultiVarActorC10noSuccCaseACSb_tYacfc : $@convention(method) @async (Bool, @sil_isolated @owned MultiVarActor) -> @owned MultiVarActor {
     //   Initial hop to the generic executor.
     //   TODO: This should be easy to remove.
-    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK-NEXT:  hop_to_executor [[GENERIC_EXECUTOR]]
 
     // CHECK:       store {{%[0-9]+}} to [[A1:%[0-9]+]] : $*Int
@@ -292,7 +293,7 @@ actor MultiVarActor {
     // CHECK-LABEL: sil hidden @$s4test13MultiVarActorC10noPredCaseACSb_tYacfc : $@convention(method) @async (Bool, @sil_isolated @owned MultiVarActor) -> @owned MultiVarActor {
     //   Initial hop to the generic executor.
     //   TODO: This should be easy to remove.
-    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK-NEXT:  hop_to_executor [[GENERIC_EXECUTOR]]
 
     // CHECK:       store {{%[0-9]+}} to [[ACCESS:%[0-9]+]] : $*Int
@@ -315,7 +316,7 @@ actor MultiVarActor {
     //   TODO: We should be able to remove this hop by proving that all the
     //     stores before return are local.  We don't really care about invalid
     //     code, of course, but it should fall out.
-    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK-NEXT:  hop_to_executor [[GENERIC_EXECUTOR]]
     init?(doesNotFullyInit1: Bool) async {
         firstVar = 1
@@ -323,7 +324,7 @@ actor MultiVarActor {
     }
 
     // CHECK-LABEL: sil hidden @$s4test13MultiVarActorC17doesNotFullyInit2ACSb_tYacfc
-    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK-NEXT:  hop_to_executor [[GENERIC_EXECUTOR]]
     init(doesNotFullyInit2: Bool) async {
         firstVar = 1
@@ -331,7 +332,7 @@ actor MultiVarActor {
     }
 
     // CHECK-LABEL: sil hidden @$s4test13MultiVarActorC17doesNotFullyInit3ACSb_tYaKcfc
-    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK-NEXT:  hop_to_executor [[GENERIC_EXECUTOR]]
     init(doesNotFullyInit3: Bool) async throws {
         firstVar = 1
@@ -339,7 +340,7 @@ actor MultiVarActor {
     }
 
     // CHECK-LABEL: sil hidden @$s4test13MultiVarActorC17doesNotFullyInit4ACSgSb_tYacfc
-    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:       [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK-NEXT:  hop_to_executor [[GENERIC_EXECUTOR]]
     init?(doesNotFullyInit4: Bool) async {
         firstVar = 1
@@ -357,7 +358,7 @@ actor TaskMaster {
     // CHECK-LABEL: @$s4test10TaskMasterCACyYacfc : $@convention(method) @async (@sil_isolated @owned TaskMaster) -> @owned TaskMaster {
     //   Initial hop to the generic executor.
     //   TODO: This should be easy to remove.
-    // CHECK:           [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:           [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK-NEXT:      hop_to_executor [[GENERIC_EXECUTOR]]
 
     // CHECK:           [[ELM:%[0-9]+]] = ref_element_addr [[SELF:%[0-9]+]] : $TaskMaster, #TaskMaster.task
@@ -381,7 +382,7 @@ actor SomeActor {
     // CHECK-LABEL: sil hidden @$s4test9SomeActorCACyYacfc : $@convention(method) @async (@sil_isolated @owned SomeActor) -> @owned SomeActor {
     //   Initial hop to the generic executor.
     //   TODO: This should be easy to remove.
-    // CHECK:           [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+    // CHECK:           [[GENERIC_EXECUTOR:%.*]] = enum $Optional<any Actor>, #Optional.none
     // CHECK-NEXT:      hop_to_executor [[GENERIC_EXECUTOR]]
 
     // CHECK-NOT:       begin_access
@@ -396,9 +397,46 @@ actor Ahmad {
   
   // CHECK-LABEL: sil hidden @$s4test5AhmadCACyYacfc : $@convention(method) @async (@owned Ahmad) -> @owned Ahmad {
   // CHECK:         bb0{{.*}}:
-  // CHECK-NEXT:      [[GENERIC:%[0-9]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  // CHECK-NEXT:      [[GENERIC:%[0-9]+]] = enum $Optional<any Actor>, #Optional.none!enumelt
   // CHECK-NEXT:      hop_to_executor [[GENERIC]]
   // CHECK:           store {{%[0-9]+}} to {{%[0-9]+}} : $*Int
   // CHECK: } // end sil function '$s4test5AhmadCACyYacfc'
   nonisolated init() async {}
+}
+
+// This should not complain about needing self in the defer prior to it being
+// fully initialized.
+actor Customer {
+  var x: Int
+  var y: Int
+
+  // CHECK-LABEL: sil hidden @$s4test8CustomerCACyYaKcfc :
+  init() async throws {
+    // CHECK:      [[GENERIC:%[0-9]+]] = enum $Optional<any Actor>, #Optional.none!enumelt
+    // CHECK-NEXT: hop_to_executor [[GENERIC]]
+    // CHECK:      [[SELF:%.*]] = end_init_let_ref %0 : $Customer
+
+    defer { print("I have a complaint") }
+
+    // CHECK:       try_apply {{.*}}, error [[FAIL1:bb[0-9]+]]
+    self.x = try makeIntOrThrow()
+
+    // CHECK:       try_apply {{.*}}, error [[FAIL2:bb[0-9]+]]
+    // CHECK:       hop_to_executor [[SELF]] : $Customer
+    self.y = try makeIntOrThrow()
+
+    // CHECK:      [[DEFER:%.*]] = function_ref @$s4test8CustomerCACyYaKcfc6$deferL_yyF :
+    // CHECK-NEXT: apply [[DEFER]]()
+    // CHECK-NEXT: return [[SELF]] : $Customer
+
+    // CHECK:    [[FAIL1]]({{%.*}} : $any Error):
+    // CHECK-NEXT: // function_ref
+    // CHECK-NEXT: [[DEFER:%.*]] = function_ref @$s4test8CustomerCACyYaKcfc6$deferL_yyF :
+    // CHECK-NEXT: apply [[DEFER]]()
+
+    // CHECK:    [[FAIL2]]({{%.*}} : $any Error):
+    // CHECK-NEXT: // function_ref
+    // CHECK-NEXT: [[DEFER:%.*]] = function_ref @$s4test8CustomerCACyYaKcfc6$deferL_yyF :
+    // CHECK-NEXT: apply [[DEFER]]()
+  }
 }

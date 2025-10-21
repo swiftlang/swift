@@ -110,6 +110,20 @@ private func analyze(dependence: LifetimeDependence, _ context: FunctionPassCont
     }
   }
 
+  // Check for immortal dependence.
+  switch dependence.scope {
+  case .global:
+    log("Immortal global dependence.")
+    return true
+  case let .unknown(value):
+    if value.type.isVoid {
+      log("Immortal void dependence.")
+      return true
+    }
+  default:
+    break
+  }
+
   // Compute this dependence scope.
   var range = dependence.computeRange(context)
   defer { range?.deinitialize() }
@@ -145,7 +159,7 @@ private struct DiagnoseDependence {
   /// Check that this use is inside the dependence scope.
   func checkInScope(operand: Operand) -> WalkResult {
     if let range, !range.inclusiveRangeContains(operand.instruction) {
-      log("  out-of-range: \(operand.instruction)")
+      log("  out-of-range error: \(operand.instruction)")
       reportError(operand: operand, diagID: .lifetime_outside_scope_use)
       return .abortWalk
     }
@@ -154,7 +168,7 @@ private struct DiagnoseDependence {
   }
 
   func reportEscaping(operand: Operand) {
-    log("  escaping: \(operand.instruction)")
+    log("  escaping error: \(operand.instruction)")
     reportError(operand: operand, diagID: .lifetime_outside_scope_escape)
   }
 
@@ -200,6 +214,9 @@ private struct DiagnoseDependence {
       return .continueWalk
     }
     // Check for immortal lifetime.
+    //
+    // FIXME: remove this immortal check. It should be redundant with the earlier check that bypasses dependence
+    // diagnostics.
     switch dependence.scope {
     case .global:
       return .continueWalk
@@ -267,6 +284,7 @@ private struct DiagnoseDependence {
         diagnose(sourceLoc, .lifetime_value_outside_thunk, thunkSelect, function.name)
       }
     }
+    diagnoseImplicitFunction()
     reportScope()
     // Identify the use point.
     if let userSourceLoc = operand.instruction.location.sourceLoc {
@@ -304,6 +322,23 @@ private struct DiagnoseDependence {
       } else {
         diagnose(parentLoc, .lifetime_outside_scope_value)
       }
+    }
+  }
+
+  func diagnoseImplicitFunction() {
+    guard let funcLoc = function.location.sourceLoc else {
+      return
+    }
+    if let kindName = {
+         if function.isInitializer {
+           return "init"
+         }
+         if function.isDeinitializer {
+           return "deinit"
+         }
+         return function.accessorKindName
+       }() {
+      diagnose(funcLoc, .implicit_function_note, kindName)
     }
   }
 }

@@ -29,7 +29,7 @@ public struct Atomic<Value: AtomicRepresentable>: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   var _rawAddress: Builtin.RawPointer {
-    Builtin.unprotectedAddressOfBorrow(self)
+    Builtin.addressOfRawLayout(self)
   }
 
   /// Initializes a value of this atomic with the given initial value.

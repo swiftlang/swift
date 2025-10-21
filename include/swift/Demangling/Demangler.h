@@ -249,6 +249,12 @@ public:
   /// Creates a node of kind \p K with an \p Index payload.
   NodePointer createNode(Node::Kind K, Node::IndexType Index);
 
+  /// Creates a node of kind \p K with a \p RemoteAddress payload.
+  ///
+  /// These nodes are created and consumed by the reflection library.
+  NodePointer createNode(Node::Kind K, uint64_t RemoteAddress,
+                         uint8_t AddressSpace);
+
   /// Creates a node of kind \p K with a \p Text payload.
   ///
   /// The \p Text string must be already allocated with the Factory and therefore

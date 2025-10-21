@@ -78,15 +78,14 @@ public struct DiagnosticEngine {
                        at position: SourceLoc?,
                        highlight: CharSourceRange? = nil,
                        fixIts: [DiagnosticFixIt] = []) {
-
-    let bridgedSourceLoc: BridgedSourceLoc = position.bridged
-    let highlightStart: BridgedSourceLoc
+    let bridgedSourceLoc = position.bridgedLocation
+    let highlightStart: swift.SourceLoc
     let highlightLength: UInt32
     if let highlight = highlight {
       highlightStart = highlight.start.bridged
       highlightLength = highlight.byteLength
     } else {
-      highlightStart = BridgedSourceLoc()
+      highlightStart = .init()
       highlightLength = 0
     }
     var bridgedArgs: [BridgedDiagnosticArgument] = []

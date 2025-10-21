@@ -1188,6 +1188,11 @@ ManglingError Remangler::manglePropertyWrapperBackingInitializer(
   return mangleSimpleEntity(node, 'I', "P", ctx, depth + 1);
 }
 
+ManglingError Remangler::manglePropertyWrappedFieldInitAccessor(
+    Node *node, EntityContext &ctx, unsigned depth) {
+  return mangleSimpleEntity(node, 'I', "F", ctx, depth + 1);
+}
+
 ManglingError Remangler::manglePropertyWrapperInitFromProjectedValue(
     Node *node, EntityContext &ctx, unsigned depth) {
   return mangleSimpleEntity(node, 'I', "W", ctx, depth + 1);
@@ -3150,5 +3155,15 @@ ManglingError Remangler::mangleNegativeInteger(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleDependentGenericParamValueMarker(Node *node,
                                                                 unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::mangleBorrowAccessor(Node *node, EntityContext &ctx,
+                                              unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::mangleMutateAccessor(Node *node, EntityContext &ctx,
+                                              unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }

@@ -423,6 +423,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(ObjCExistentialMetatypeToObjectInst, objc_existential_metatype_to_object,
                       SingleValueInstruction, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ImplicitActorToOpaqueIsolationCastInst, implicitactor_to_opaqueisolation_cast,
+                      SingleValueInstruction, None, DoesNotRelease)
     // unconditional_checked_cast_inst is only MayRead to prevent a subsequent
     // release of the cast's source from being hoisted above the cast:
     // retain X
@@ -836,8 +838,6 @@ NON_VALUE_INST(EndUnpairedAccessInst, end_unpaired_access,
 NON_VALUE_INST(StoreInst, store,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(AssignInst, assign,
-               SILInstruction, MayWrite, DoesNotRelease)
-NON_VALUE_INST(AssignByWrapperInst, assign_by_wrapper,
                SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(AssignOrInitInst, assign_or_init,
                SILInstruction, MayWrite, DoesNotRelease)

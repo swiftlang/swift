@@ -117,23 +117,32 @@ bool swift::tripleRequiresRPathForSwiftLibrariesInOS(
     // macOS versions before 10.14.4 don't have Swift in the OS
     // (the linker still uses an rpath-based install name until 10.15).
     // macOS versions before 12.0 don't have _Concurrency in the OS.
-    return triple.isMacOSXVersionLT(12, 0);
+    // macOS versions before 26.0 don't have Span in stdlib.
+    return triple.isMacOSXVersionLT(26, 0);
   }
 
   if (triple.isiOS()) {
     // iOS versions before 12.2 don't have Swift in the OS.
     // iOS versions before 15.0 don't have _Concurrency in the OS.
-    return triple.isOSVersionLT(15, 0);
+    // iOS versions before 26.0 don't have Span in stdlib.
+    return triple.isOSVersionLT(26, 0);
   }
 
   if (triple.isWatchOS()) {
     // watchOS versions before 5.2 don't have Swift in the OS.
     // watchOS versions before 8.0 don't have _Concurrency in the OS.
-    return triple.isOSVersionLT(8, 0);
+    // watchOS versions before 26.0 don't have Span in stdlib.
+    return triple.isOSVersionLT(26, 0);
+  }
+
+  if (triple.isTvOS()) {
+    // tvOS versions before 26.0 don't have Span in stdlib.
+    return triple.isOSVersionLT(26, 0);
   }
 
   if (triple.isXROS()) {
-    return triple.isOSVersionLT(1, 0);
+    // visionOS versions before 26.0 don't have Span in stdlib.
+    return triple.isOSVersionLT(26, 0);
   }
 
   // Other platforms don't have Swift installed as part of the OS by default.
@@ -273,9 +282,29 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return "none";
   case llvm::Triple::UEFI:
   case llvm::Triple::LiteOS:
+  case llvm::Triple::Managarm:
     llvm_unreachable("unsupported OS");
   }
   llvm_unreachable("unsupported OS");
+}
+
+llvm::VersionTuple swift::getVersionForTriple(const llvm::Triple &triple) {
+  if (triple.isMacOSX()) {
+    llvm::VersionTuple OSVersion;
+    triple.getMacOSXVersion(OSVersion);
+    return OSVersion;
+  } else if (triple.isiOS()) {
+    return triple.getiOSVersion();
+  } else if (triple.isWatchOS()) {
+    return triple.getOSVersion();
+  } else if (triple.isXROS()) {
+    return triple.getOSVersion();
+  } else if (triple.isOSWindows()) {
+    return triple.getOSVersion();
+  } else if (triple.isAndroid()) {
+    return triple.getEnvironmentVersion();
+  }
+  return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
 }
 
 StringRef swift::getMajorArchitectureName(const llvm::Triple &Triple) {

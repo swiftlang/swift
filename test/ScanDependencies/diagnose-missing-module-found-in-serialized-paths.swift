@@ -9,8 +9,8 @@
 // RUN: %target-swift-frontend -scan-dependencies -o %t/deps.json %t/client.swift -I %t/deps -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import &> %t/output.txt
 // RUN: cat %t/output.txt | %FileCheck %s
 
-// CHECK: error: Compilation search paths unable to resolve module dependency: 'C'
-// CHECK: note: 'C' can be found using a search path that was specified when building module 'B' ('{{.*}}moreDeps'). This search path was not explicitly specified on the current compilation.
+// CHECK: error: compilation search paths unable to resolve module dependency: 'C'
+// CHECK: note: 'C' can be found using a search path that was specified when building module 'B' ('{{.*}}moreDeps'). This search path was not explicitly specified on the current compilation
 // CHECK: note: a dependency of Swift module 'B': '{{.*}}B.swiftmodule'
 // CHECK: note: a dependency of main module 'deps'
 

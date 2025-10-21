@@ -35,7 +35,6 @@
 // RUN:   -enable-experimental-move-only
 
 // REQUIRES: concurrency
-// REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_Extern
@@ -100,8 +99,8 @@ func fn(_: Int) {}
 @_disallowFeatureSuppression(NoncopyableGenerics) public struct LoudlyNC<T: ~Copyable> {}
 
 @_cdecl("c_function_name") func cdeclUnderscore(x: Int) {}
-@cdecl(c_function_name_official) func cdecl(x: Int) {}
-@cdecl func cdeclDefault() {}
+@c(c_function_name_official) func cdecl(x: Int) {}
+@c func cdeclDefault() {}
 
 struct StaticProperties {
   dynamic var property: Int { return 1 }

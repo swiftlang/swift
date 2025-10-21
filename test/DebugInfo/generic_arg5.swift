@@ -12,7 +12,7 @@ public func foo<Type>(_ values : [S<Type>])
   // CHECK-SAME:       ![[ARG:[0-9]+]],
   // CHECK-SAME:       !DIExpression(DW_OP_deref)
   // CHECK: store ptr %1, ptr %[[ALLOCA]], align
-  // CHECK-DAG: ![[TYP:[0-9]+]] = !DICompositeType({{.*}}, name: "$s12generic_arg51SVyxGD"
+  // CHECK-DAG: ![[TYP:[0-9]+]] = !DICompositeType({{.*}}, identifier: "$s12generic_arg51SVyxGD"
   // The argument is a by-ref struct and thus needs to be dereferenced.
   // CHECK-DAG: ![[ARG]] = !DILocalVariable(name: "arg", arg: 1,{{.*}}line: [[@LINE+6]],{{.*}} type: ![[LET_TYP:[0-9]+]])
   // CHECK-DAG: ![[LET_TYP]] = !DIDerivedType(tag: DW_TAG_const_type,{{.*}} baseType: ![[TYP_CONTAINER:[0-9]+]])

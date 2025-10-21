@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -33,15 +33,15 @@ fileprivate func emitDiagnosticParts(
   // Map severity
   let bridgedSeverity = severity.bridged
 
-  func bridgedSourceLoc(at position: AbsolutePosition) -> BridgedSourceLoc {
-    return BridgedSourceLoc(at: position.advanced(by: offset), in: sourceFileBuffer)
+  func sourceLoc(at position: AbsolutePosition) -> SourceLoc {
+    return SourceLoc(at: position.advanced(by: offset), in: sourceFileBuffer)
   }
 
   // Emit the diagnostic
   var mutableMessage = message
   let diag = mutableMessage.withBridgedString { bridgedMessage in
     BridgedDiagnostic(
-      at: bridgedSourceLoc(at: position),
+      at: sourceLoc(at: position),
       message: bridgedMessage,
       severity: bridgedSeverity,
       engine: diagnosticEngine
@@ -51,8 +51,8 @@ fileprivate func emitDiagnosticParts(
   // Emit highlights
   for highlight in highlights {
     diag.highlight(
-      start: bridgedSourceLoc(at: highlight.positionAfterSkippingLeadingTrivia),
-      end: bridgedSourceLoc(at: highlight.endPositionBeforeTrailingTrivia)
+      start: sourceLoc(at: highlight.positionAfterSkippingLeadingTrivia),
+      end: sourceLoc(at: highlight.endPositionBeforeTrailingTrivia)
     )
   }
 
@@ -61,8 +61,8 @@ fileprivate func emitDiagnosticParts(
     var newText: String = edit.replacement
     newText.withBridgedString { bridgedMessage in
       diag.fixItReplace(
-        start: bridgedSourceLoc(at: edit.range.lowerBound),
-        end: bridgedSourceLoc(at: edit.range.upperBound),
+        start: sourceLoc(at: edit.range.lowerBound),
+        end: sourceLoc(at: edit.range.upperBound),
         replacement: bridgedMessage
       )
     }
@@ -250,10 +250,10 @@ public func addQueuedDiagnostic(
   perFrontendDiagnosticStatePtr: UnsafeMutableRawPointer,
   text: BridgedStringRef,
   severity: swift.DiagnosticKind,
-  cLoc: BridgedSourceLoc,
+  loc: SourceLoc,
   categoryName: BridgedStringRef,
   documentationPath: BridgedStringRef,
-  highlightRangesPtr: UnsafePointer<BridgedCharSourceRange>?,
+  highlightRangesPtr: UnsafePointer<CharSourceRange>?,
   numHighlightRanges: Int,
   fixItsUntyped: BridgedArrayRef
 ) {
@@ -265,7 +265,7 @@ public func addQueuedDiagnostic(
     to: PerFrontendDiagnosticState.self
   )
 
-  guard let rawPosition = cLoc.getOpaquePointerValue() else {
+  guard let rawPosition = loc.raw else {
     return
   }
 
@@ -307,7 +307,7 @@ public func addQueuedDiagnostic(
 
   // Map the highlights.
   var highlights: [Syntax] = []
-  let highlightRanges = UnsafeBufferPointer<BridgedCharSourceRange>(
+  let highlightRanges = UnsafeBufferPointer<CharSourceRange>(
     start: highlightRangesPtr,
     count: numHighlightRanges
   )
@@ -315,9 +315,7 @@ public func addQueuedDiagnostic(
     let range = highlightRanges[index]
 
     // Make sure both the start and the end land within this source file.
-    guard let start = range.start.getOpaquePointerValue(),
-      let end = range.start.advanced(by: range.byteLength).getOpaquePointerValue()
-    else {
+    guard let start = range.start.raw, let end = range.end.raw else {
       continue
     }
 
@@ -386,9 +384,7 @@ public func addQueuedDiagnostic(
   let fixItChanges: [FixIt.Change] = fixItsUntyped.withElements(ofType: BridgedFixIt.self) { fixIts in
     fixIts.compactMap { fixIt in
       guard let startPos = sourceFile.position(of: fixIt.replacementRange.start),
-            let endPos = sourceFile.position(
-              of: fixIt.replacementRange.start.advanced(
-                by: fixIt.replacementRange.byteLength)) else {
+            let endPos = sourceFile.position(of: fixIt.replacementRange.end) else {
         return nil
       }
 

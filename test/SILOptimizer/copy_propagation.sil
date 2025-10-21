@@ -1094,3 +1094,58 @@ bb0:
   return %3
 }
 
+class Klass {}
+
+public struct Wrapper {
+  var _k: Klass
+  var i: Int
+}
+
+sil @get_wrapper : $@convention(thin) () -> @owned Wrapper
+sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+sil [ossa] [noinline] @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
+bb0(%0 : @guaranteed $Wrapper):
+  %2 = struct_extract %0, #Wrapper._k
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrow_accessor_opt1 :
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function 'test_borrow_accessor_opt1'
+sil [ossa] @test_borrow_accessor_opt1 : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %copy = copy_value %0
+  %1 = begin_borrow %copy
+  %2 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %4 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %1
+  destroy_value %copy
+  destroy_value %0
+  %6 = tuple ()
+  return %6
+}
+
+// SemanticArcOpts removes the copy_value in this test
+// CHECK-LABEL: sil [ossa] @test_borrow_accessor_opt2 :
+// TODO-CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function 'test_borrow_accessor_opt2'
+sil [ossa] @test_borrow_accessor_opt2 : $@convention(thin) () -> () {
+bb0:
+  %1 = function_ref @get_wrapper : $@convention(thin) () -> @owned Wrapper
+  %2 = apply %1() : $@convention(thin) () -> @owned Wrapper
+  %3 = begin_borrow %2
+  %4 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %copy = copy_value %5
+  %6 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %6(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %copy
+  end_borrow %3
+  destroy_value %2
+  %10 = tuple ()
+  return %10
+}
+

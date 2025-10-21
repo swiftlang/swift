@@ -15,12 +15,8 @@
 #include "swift/SILOptimizer/Analysis/RegionAnalysis.h"
 
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/PackConformance.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -274,56 +270,6 @@ struct AddressBaseComputingVisitor
 
 } // namespace
 
-/// Determine the isolation of conformances that could be introduced by a cast from sourceType to
-/// destType.
-///
-///
-static SILIsolationInfo getIsolationForCastConformances(
-    SILValue value, CanType sourceType, CanType destType) {
-  // If the enclosing function is @concurrent, then a cast cannot pick up
-  // any isolated conformances because it's not on any actor.
-  auto function = value->getFunction();
-  auto functionIsolation = function->getActorIsolation();
-  if (functionIsolation && functionIsolation->isNonisolated())
-    return {};
-
-  auto sendableMetatype =
-    sourceType->getASTContext().getProtocol(KnownProtocolKind::SendableMetatype);
-  if (!sendableMetatype)
-    return {};
-
-  if (!destType.isAnyExistentialType())
-    return {};
-
-  const auto &destLayout = destType.getExistentialLayout();
-  for (auto proto : destLayout.getProtocols()) {
-    // If the source type already conforms to the protocol, we won't be looking
-    // it up dynamically.
-    if (!lookupConformance(sourceType, proto, /*allowMissing=*/false).isInvalid())
-      continue;
-
-    // If the protocol inherits SendableMetatype, it can't have isolated
-    // conformances.
-    if (proto->inheritsFrom(sendableMetatype))
-      continue;
-
-    // The cast can produce a conformance with the same isolation as this
-    // function is dynamically executing. If that's known (i.e., because we're
-    // on a global actor), the value is isolated to that global actor.
-    // Otherwise, it's task-isolated.
-    if (functionIsolation && functionIsolation->isGlobalActor()) {
-      return SILIsolationInfo::getGlobalActorIsolated(
-          value, functionIsolation->getGlobalActor());
-    }
-
-    // Consider the cast to be task-isolated, because the runtime could find
-    // a conformance that is isolated to the current context.
-    return SILIsolationInfo::getTaskIsolated(value);
-  }
-
-  return {};
-}
-
 /// Classify an instructions as look through when we are looking through
 /// values. We assert that all instructions that are CONSTANT_TRANSLATION
 /// LookThrough to make sure they stay in sync.
@@ -382,16 +328,15 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::BeginBorrowInst:
     // Look through if it isn't from a var decl.
     return !cast<BeginBorrowInst>(inst)->isFromVarDecl();
+  case SILInstructionKind::InitExistentialValueInst:
+    return !SILIsolationInfo::getConformanceIsolation(inst);
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto cast = SILDynamicCastInst::getAs(inst);
     assert(cast);
 
     // If this cast introduces isolation due to conformances, we cannot look
     // through it to the source.
-    if (!getIsolationForCastConformances(
-            llvm::cast<UnconditionalCheckedCastInst>(inst),
-            cast.getSourceFormalType(), cast.getTargetFormalType())
-              .isDisconnected())
+    if (SILIsolationInfo::getConformanceIsolation(inst))
       return false;
 
     if (cast.isRCIdentityPreserving())
@@ -1778,9 +1723,13 @@ struct PartitionOpBuilder {
         PartitionOp::Send(lookupValueID(representative), op));
   }
 
-  void addUndoSend(SILValue representative, SILInstruction *unsendingInst) {
+  void addUndoSend(TrackableValue value, SILInstruction *unsendingInst) {
+    if (value.isSendable())
+      return;
+
+    auto representative = value.getRepresentative().getValue();
     assert(valueHasID(representative) &&
-           "value should already have been encountered");
+           "sent value should already have been encountered");
 
     currentInstPartitionOps->emplace_back(
         PartitionOp::UndoSend(lookupValueID(representative), unsendingInst));
@@ -2228,13 +2177,6 @@ private:
     return valueMap.lookupValueID(value);
   }
 
-  /// Determine the isolation of a set of conformances.
-  ///
-  /// This function identifies potentially-isolated conformances that might affect the isolation of the given
-  /// value.
-  SILIsolationInfo getIsolationFromConformances(
-      SILValue value, ArrayRef<ProtocolConformanceRef> conformances);
-
 public:
   /// Return the partition consisting of all function arguments.
   ///
@@ -2442,7 +2384,7 @@ public:
 
     // If we didn't find a partial_apply, then we must have had a
     // thin_to_thick_function meaning we did not capture anything.
-    if (source->is<ThinToThickFunctionInst *>())
+    if (isa<ThinToThickFunctionInst *>(source.value()))
       return;
 
     // If our partial_apply was Sendable, then Sema should have checked that
@@ -2450,7 +2392,7 @@ public:
     // error earlier.
     assert(bool(source.value()) &&
            "AsyncLet Get should always have a derivable partial_apply");
-    auto *pai = source->get<PartialApplyInst *>();
+    auto *pai = cast<PartialApplyInst *>(source.value());
     if (pai->getFunctionType()->isSendable())
       return;
 
@@ -2492,7 +2434,7 @@ public:
                 }))
           continue;
 
-        builder.addUndoSend(trackedArgValue.getRepresentative().getValue(), ai);
+        builder.addUndoSend(trackedArgValue, ai);
       }
     }
   }
@@ -2629,59 +2571,52 @@ public:
     // gather our non-sending parameters.
     SmallVector<Operand *, 8> nonSendingParameters;
     SmallVector<Operand *, 8> sendingIndirectResults;
-    if (fas.getNumArguments()) {
-      // NOTE: We want to process indirect parameters as if they are
-      // parameters... so we process them in nonSendingParameters.
-      for (auto &op : fas.getOperandsWithoutSelf()) {
-        // If op is the callee operand, skip it.
-        if (fas.isCalleeOperand(op))
+
+    // NOTE: We want to process indirect parameters as if they are
+    // parameters... so we process them in nonSendingParameters.
+    for (auto &op : fas->getAllOperands()) {
+      // If op is the callee operand or type dependent operand, skip it.
+      if (op.isTypeDependent())
+        continue;
+
+      if (fas.isCalleeOperand(op)) {
+        if (auto calleeResult = tryToTrackValue(op.get())) {
+          builder.addRequire(*calleeResult);
+        }
+        continue;
+      }
+
+      // If our parameter is not sending, just add it to the non-sending
+      // parameters array and continue.
+      if (!fas.isSending(op)) {
+        nonSendingParameters.push_back(&op);
+        continue;
+      }
+
+      // Otherwise, first handle indirect result operands.
+      if (fas.isIndirectResultOperand(op)) {
+        sendingIndirectResults.push_back(&op);
+        continue;
+      }
+
+      // Attempt to lookup the value we are passing as sending. We want to
+      // require/send value if it is non-Sendable and require its base if it
+      // is non-Sendable as well.
+      if (auto lookupResult = tryToTrackValue(op.get())) {
+        builder.addRequire(*lookupResult);
+        builder.addSend(lookupResult->value, &op);
+      }
+    }
+
+    SWIFT_DEFER {
+      for (auto &op : fas->getAllOperands()) {
+        if (!fas.isInOutSending(op))
           continue;
-
-        if (fas.isSending(op)) {
-          if (fas.isIndirectResultOperand(op)) {
-            sendingIndirectResults.push_back(&op);
-            continue;
-          }
-
-          // Attempt to lookup the value we are passing as sending. We want to
-          // require/send value if it is non-Sendable and require its base if it
-          // is non-Sendable as well.
-          if (auto lookupResult = tryToTrackValue(op.get())) {
-            builder.addRequire(*lookupResult);
-            builder.addSend(lookupResult->value, &op);
-          }
-        } else {
-          nonSendingParameters.push_back(&op);
+        if (auto lookupResult = tryToTrackValue(op.get())) {
+          builder.addUndoSend(lookupResult->value, op.getUser());
         }
       }
-    }
-
-    // If our self parameter was sending, send it. Otherwise, just
-    // stick it in the non self operand values array and run multiassign on
-    // it.
-    if (fas.hasSelfArgument()) {
-      auto &selfOperand = fas.getSelfArgumentOperand();
-      if (fas.getArgumentParameterInfo(selfOperand)
-              .hasOption(SILParameterInfo::Sending)) {
-        if (auto lookupResult = tryToTrackValue(selfOperand.get())) {
-          builder.addRequire(*lookupResult);
-          builder.addSend(lookupResult->value, &selfOperand);
-        }
-      } else {
-        nonSendingParameters.push_back(&selfOperand);
-      }
-    }
-
-    // Require our callee operand if it is non-Sendable.
-    //
-    // DISCUSSION: Even though we do not include our callee operand in the same
-    // region as our operands/results, we still need to require that it is live
-    // at the point of application. Otherwise, we will not emit errors if the
-    // closure before this function application is already in the same region as
-    // a sent value. In such a case, the function application must error.
-    if (auto calleeResult = tryToTrackValue(fas.getCallee())) {
-      builder.addRequire(*calleeResult);
-    }
+    };
 
     SmallVector<SILValue, 8> applyResults;
     getApplyResults(*fas, applyResults);
@@ -2750,35 +2685,76 @@ public:
 
   /// Handles the semantics for SIL applies that cross isolation.
   ///
-  /// Semantically this causes all arguments of the applysite to be sent.
+  /// Semantically we are attempting to implement the following:
+  ///
+  /// * Step 1: Require all non-sending parameters and then send those
+  ///   parameters. We perform all of the requires first and the sends second
+  ///   since all of the parameters are getting sent to the same isolation
+  ///   domains and become part of the same region in our callee. So in a
+  ///   certain sense, we are performing a require over the entire merge of the
+  ///   parameter regions and then send each constituant part of the region
+  ///   without requiring again so we do not emit use-after-send diagnostics.
+  ///
+  /// * Step 2: Require/Send each of the sending parameters one by one. This
+  ///   includes both 'sending' and 'inout sending' parameters. We purposely
+  ///   interleave the require/send operations to ensure that if one passes a
+  ///   value twice to different 'sending' or 'inout sending' parameters, we
+  ///   will emit an error.
+  ///
+  /// * Step 3: Unsend each of the unsending parameters. Since our caller
+  ///   ensures that 'inout sending' parameters are disconnected on return and
+  ///   are in different regions from all other parameters, we can just simply
+  ///   unsend the parameter so we can use it again later.
   void translateIsolationCrossingSILApply(FullApplySite applySite) {
-    // Require all operands first before we emit a send.
-    for (auto op : applySite.getArguments()) {
-      if (auto lookupResult = tryToTrackValue(op)) {
+    SmallVector<TrackableValue, 8> inoutSendingParams;
+
+    // First go through and require all of our operands that are not 'sending'
+    for (auto &op : applySite.getArgumentOperands()) {
+      if (applySite.isSending(op))
+        continue;
+      if (auto lookupResult = tryToTrackValue(op.get()))
         builder.addRequire(*lookupResult);
-      }
     }
 
-    auto handleSILOperands = [&](MutableArrayRef<Operand> operands) {
-      for (auto &op : operands) {
-        if (auto lookupResult = tryToTrackValue(op.get())) {
-          builder.addSend(lookupResult->value, &op);
-        }
+    // Then go through our operands again and send all of our non-sending
+    // parameters. We do not interleave these sends with our requires since we
+    // are considering these values to be merged into the same region. We could
+    // also merge them in the caller but there is no point in doing so
+    // semantically since the values cannot be used again locally.
+    for (auto &op : applySite.getOperandsWithoutIndirectResults()) {
+      if (applySite.isSending(op))
+        continue;
+      if (auto lookupResult = tryToTrackValue(op.get())) {
+        builder.addSend(lookupResult->value, &op);
       }
     };
 
-    auto handleSILSelf = [&](Operand *self) {
-      if (auto lookupResult = tryToTrackValue(self->get())) {
-        builder.addSend(lookupResult->value, self);
+    // Then go through our 'sending' params and require/send each in sequence.
+    //
+    // We do this interleaved so that if a value is passed to multiple 'sending'
+    // parameters, we emit errors.
+    for (auto &op : applySite.getOperandsWithoutIndirectResults()) {
+      if (!applySite.isSending(op))
+        continue;
+      auto lookupResult = tryToTrackValue(op.get());
+      if (!lookupResult)
+        continue;
+      builder.addRequire(*lookupResult);
+      builder.addSend(lookupResult->value, &op);
+    }
+
+    // Now use a SWIFT_DEFER so that when the function is done executing, we
+    // unsend 'inout sending' params.
+    SWIFT_DEFER {
+      for (auto &op : applySite.getOperandsWithoutIndirectResults()) {
+        if (!applySite.isInOutSending(op))
+          continue;
+        auto lookupResult = tryToTrackValue(op.get());
+        if (!lookupResult)
+          continue;
+        builder.addUndoSend(lookupResult->value, *applySite);
       }
     };
-
-    if (applySite.hasSelfArgument()) {
-      handleSILOperands(applySite.getOperandsWithoutIndirectResultsOrSelf());
-      handleSILSelf(&applySite.getSelfArgumentOperand());
-    } else {
-      handleSILOperands(applySite.getOperandsWithoutIndirectResults());
-    }
 
     // Create a new assign fresh for each one of our values and unless our
     // return value is sending, emit an extra error bit on the results that are
@@ -3207,7 +3183,8 @@ public:
 
     case TranslationSemantics::Assign:
       return translateSILMultiAssign(
-          inst->getResults(), makeOperandRefRange(inst->getAllOperands()));
+          inst->getResults(), makeOperandRefRange(inst->getAllOperands()),
+          SILIsolationInfo::getConformanceIsolation(inst));
 
     case TranslationSemantics::Require:
       for (auto op : inst->getOperandValues())
@@ -3224,7 +3201,8 @@ public:
     case TranslationSemantics::Store:
       return translateSILStore(
           &inst->getAllOperands()[CopyLikeInstruction::Dest],
-          &inst->getAllOperands()[CopyLikeInstruction::Src]);
+          &inst->getAllOperands()[CopyLikeInstruction::Src],
+          SILIsolationInfo::getConformanceIsolation(inst));
 
     case TranslationSemantics::Special:
       return;
@@ -3235,7 +3213,8 @@ public:
     case TranslationSemantics::TerminatorPhi: {
       TermArgSources sources;
       sources.init(inst);
-      return translateSILPhi(sources);
+      return translateSILPhi(
+          sources, SILIsolationInfo::getConformanceIsolation(inst));
     }
 
     case TranslationSemantics::Asserting:
@@ -3448,6 +3427,8 @@ CONSTANT_TRANSLATION(CopyBlockInst, Assign)
 CONSTANT_TRANSLATION(CopyBlockWithoutEscapingInst, Assign)
 CONSTANT_TRANSLATION(IndexAddrInst, Assign)
 CONSTANT_TRANSLATION(InitBlockStorageHeaderInst, Assign)
+CONSTANT_TRANSLATION(InitExistentialAddrInst, Assign)
+CONSTANT_TRANSLATION(InitExistentialRefInst, Assign)
 CONSTANT_TRANSLATION(OpenExistentialBoxInst, Assign)
 CONSTANT_TRANSLATION(OpenExistentialRefInst, Assign)
 CONSTANT_TRANSLATION(TailAddrInst, Assign)
@@ -3457,6 +3438,7 @@ CONSTANT_TRANSLATION(UncheckedAddrCastInst, Assign)
 CONSTANT_TRANSLATION(UncheckedOwnershipConversionInst, Assign)
 CONSTANT_TRANSLATION(IndexRawPointerInst, Assign)
 CONSTANT_TRANSLATION(MarkDependenceAddrInst, Assign)
+CONSTANT_TRANSLATION(ImplicitActorToOpaqueIsolationCastInst, Assign)
 
 CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Assign)
 CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Assign)
@@ -3536,6 +3518,7 @@ CONSTANT_TRANSLATION(StoreInst, Store)
 CONSTANT_TRANSLATION(StoreWeakInst, Store)
 CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
 CONSTANT_TRANSLATION(UncheckedRefCastAddrInst, Store)
+CONSTANT_TRANSLATION(UnconditionalCheckedCastAddrInst, Store)
 CONSTANT_TRANSLATION(StoreUnownedInst, Store)
 
 //===---
@@ -3610,6 +3593,7 @@ CONSTANT_TRANSLATION(YieldInst, Require)
 // Terminators that act as phis.
 CONSTANT_TRANSLATION(BranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(CondBranchInst, TerminatorPhi)
+CONSTANT_TRANSLATION(CheckedCastBranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
 
 // Function exiting terminators.
@@ -3712,7 +3696,6 @@ CONSTANT_TRANSLATION(DeallocPackMetadataInst, Asserting)
 // All of these instructions should be removed by DI which runs before us in the
 // pass pipeline.
 CONSTANT_TRANSLATION(AssignInst, Asserting)
-CONSTANT_TRANSLATION(AssignByWrapperInst, Asserting)
 CONSTANT_TRANSLATION(AssignOrInitInst, Asserting)
 
 // We should never hit this since it can only appear as a final instruction in a
@@ -4011,34 +3994,16 @@ PartitionOpTranslator::visitPointerToAddressInst(PointerToAddressInst *ptai) {
 
 TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
     UnconditionalCheckedCastInst *ucci) {
-  auto isolation = getIsolationForCastConformances(
-      ucci, ucci->getSourceFormalType(), ucci->getTargetFormalType());
+  auto isolation = SILIsolationInfo::getConformanceIsolation(ucci);
 
-  if (isolation.isDisconnected() &&
+  if (!isolation &&
       SILDynamicCastInst(ucci).isRCIdentityPreserving()) {
     assert(isStaticallyLookThroughInst(ucci) && "Out of sync");
     return TranslationSemantics::LookThrough;
   }
 
   assert(!isStaticallyLookThroughInst(ucci) && "Out of sync");
-  translateSILMultiAssign(
-      ucci->getResults(), makeOperandRefRange(ucci->getAllOperands()),
-      isolation);
-  return TranslationSemantics::Special;
-}
-
-TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastAddrInst(
-    UnconditionalCheckedCastAddrInst *uccai) {
-  auto isolation = getIsolationForCastConformances(
-      uccai->getAllOperands()[CopyLikeInstruction::Dest].get(),
-      uccai->getSourceFormalType(), uccai->getTargetFormalType());
-
-  translateSILStore(
-      &uccai->getAllOperands()[CopyLikeInstruction::Dest],
-      &uccai->getAllOperands()[CopyLikeInstruction::Src],
-      isolation);
-
-  return TranslationSemantics::Special;
+  return TranslationSemantics::Assign;
 }
 
 // RefElementAddrInst is not considered to be a lookThrough since we want to
@@ -4127,112 +4092,17 @@ PartitionOpTranslator::visitPartialApplyInst(PartialApplyInst *pai) {
   return TranslationSemantics::Special;
 }
 
-SILIsolationInfo
-PartitionOpTranslator::getIsolationFromConformances(
-    SILValue value, ArrayRef<ProtocolConformanceRef> conformances) {
-  for (auto conformance: conformances) {
-    // If the conformance is a pack, recurse.
-    if (conformance.isPack()) {
-      auto pack = conformance.getPack();
-      for (auto innerConformance : pack->getPatternConformances()) {
-        auto isolation = getIsolationFromConformances(value, innerConformance);
-        if (isolation)
-          return isolation;
-      }
-
-      continue;
-    }
-
-    // If a concrete conformance is global-actor-isolated, then the resulting
-    // value must be.
-    if (conformance.isConcrete()) {
-      auto isolation = conformance.getConcrete()->getIsolation();
-      if (isolation.isGlobalActor()) {
-        return SILIsolationInfo::getGlobalActorIsolated(
-            value, isolation.getGlobalActor());
-      }
-
-      continue;
-    }
-
-    // If an abstract conformance is for a non-SendableMetatype-conforming
-    // type, the resulting value is task-isolated.
-    if (conformance.isAbstract()) {
-      auto sendableMetatype =
-        conformance.getType()->getASTContext()
-          .getProtocol(KnownProtocolKind::SendableMetatype);
-      if (sendableMetatype &&
-          lookupConformance(conformance.getType(), sendableMetatype,
-                            /*allowMissing=*/false).isInvalid()) {
-        return SILIsolationInfo::getTaskIsolated(value);
-      }
-    }
-  }
-
-  return {};
-}
-
-TranslationSemantics
-PartitionOpTranslator::visitInitExistentialAddrInst(InitExistentialAddrInst *ieai) {
-  auto conformanceIsolationInfo = getIsolationFromConformances(
-      ieai->getResult(0), ieai->getConformances());
-
-  translateSILMultiAssign(ieai->getResults(),
-                          makeOperandRefRange(ieai->getAllOperands()),
-                          conformanceIsolationInfo);
-
-  return TranslationSemantics::Special;
-}
-
-TranslationSemantics
-PartitionOpTranslator::visitInitExistentialRefInst(InitExistentialRefInst *ieri) {
-  auto conformanceIsolationInfo = getIsolationFromConformances(
-      ieri->getResult(0), ieri->getConformances());
-
-  translateSILMultiAssign(ieri->getResults(),
-                          makeOperandRefRange(ieri->getAllOperands()),
-                          conformanceIsolationInfo);
-
-  return TranslationSemantics::Special;
-}
-
 TranslationSemantics
 PartitionOpTranslator::visitInitExistentialValueInst(InitExistentialValueInst *ievi) {
-  auto conformanceIsolationInfo = getIsolationFromConformances(
-      ievi->getResult(0), ievi->getConformances());
+  if (isStaticallyLookThroughInst(ievi))
+    return TranslationSemantics::LookThrough;
 
-  translateSILMultiAssign(ievi->getResults(),
-                          makeOperandRefRange(ievi->getAllOperands()),
-                          conformanceIsolationInfo);
-
-  return TranslationSemantics::Special;
-}
-
-TranslationSemantics
-PartitionOpTranslator::visitCheckedCastBranchInst(CheckedCastBranchInst *ccbi) {
-  // Consider whether the value produced by the cast might be task-isolated.
-  auto resultValue = ccbi->getSuccessBB()->getArgument(0);
-  auto conformanceIsolation = getIsolationForCastConformances(
-      resultValue,
-      ccbi->getSourceFormalType(),
-      ccbi->getTargetFormalType());
-  TermArgSources sources;
-  sources.init(static_cast<SILInstruction *>(ccbi));
-  translateSILPhi(sources, conformanceIsolation);
-
-  return TranslationSemantics::Special;
+  return TranslationSemantics::Assign;
 }
 
 TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
     CheckedCastAddrBranchInst *ccabi) {
   assert(ccabi->getSuccessBB()->getNumArguments() <= 1);
-
-  // Consider whether the value written into by the cast might be task-isolated.
-  auto resultValue = ccabi->getAllOperands().back().get();
-  auto conformanceIsolation = getIsolationForCastConformances(
-      resultValue,
-      ccabi->getSourceFormalType(),
-      ccabi->getTargetFormalType());
 
   // checked_cast_addr_br does not have any arguments in its resulting
   // block. We should just use a multi-assign on its operands.
@@ -4243,7 +4113,7 @@ TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
   // but still correct.
   translateSILMultiAssign(ArrayRef<SILValue>(),
                           makeOperandRefRange(ccabi->getAllOperands()),
-                          conformanceIsolation);
+                          SILIsolationInfo::getConformanceIsolation(ccabi));
   return TranslationSemantics::Special;
 }
 
@@ -4283,7 +4153,10 @@ bool BlockPartitionState::recomputeExitFromEntry(
     }
 
     std::optional<Element> getElement(SILValue value) const {
-      return translator.getValueMap().getTrackableValue(value).value.getID();
+      auto trackableValue = translator.getValueMap().getTrackableValue(value);
+      if (trackableValue.value.isSendable())
+        return {};
+      return trackableValue.value.getID();
     }
 
     SILValue getRepresentative(SILValue value) const {

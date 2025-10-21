@@ -144,7 +144,8 @@ static void validateLegacyUnsupportedArgs(DiagnosticEngine &diags,
 
 static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
                                        const ArgList &args) {
-  if (!args.hasArgNoClaim(options::OPT_import_objc_header))
+  if (!args.hasArgNoClaim(options::OPT_import_bridging_header,
+                          options::OPT_internal_import_bridging_header))
     return;
 
   if (args.hasArgNoClaim(options::OPT_import_underlying_module))
@@ -175,19 +176,92 @@ static void validateWarningControlArgs(DiagnosticEngine &diags,
   }
 }
 
+/// Validates only *generate* profiling flags and their mutual conflicts.
+static void validateProfilingGenerateArgs(DiagnosticEngine &diags,
+                                          const ArgList &args) {
+  const Arg *ProfileGenerate = args.getLastArg(options::OPT_profile_generate);
+  const Arg *IRProfileGenerate =
+      args.getLastArg(options::OPT_ir_profile_generate);
+  const Arg *CSProfileGenerate =
+      args.getLastArg(options::OPT_cs_profile_generate);
+  const Arg *CSProfileGenerateEQ =
+      args.getLastArg(options::OPT_cs_profile_generate_EQ);
+  const Arg *IRProfileGenerateEQ =
+      args.getLastArg(options::OPT_ir_profile_generate_EQ);
+
+  // If both CS Profile forms were specified, report a clear conflict.
+  if (CSProfileGenerate && CSProfileGenerateEQ) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-cs-profile-generate", "-cs-profile-generate=");
+    CSProfileGenerateEQ = nullptr;
+  }
+  // If both IR Profile forms were specified, report a clear conflict.
+  if (IRProfileGenerate && IRProfileGenerateEQ) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate", "-ir-profile-generate=");
+    IRProfileGenerateEQ = nullptr;
+  }
+
+  llvm::SmallVector<std::pair<const Arg *, const char *>, 3> gens;
+  if (ProfileGenerate)
+    gens.push_back({ProfileGenerate, "-profile-generate"});
+  if (IRProfileGenerate)
+    gens.push_back({IRProfileGenerate, "-ir-profile-generate"});
+  if (IRProfileGenerateEQ)
+    gens.push_back({IRProfileGenerateEQ, "-ir-profile-generate="});
+  if (CSProfileGenerate)
+    gens.push_back({CSProfileGenerate, "-cs-profile-generate"});
+  else if (CSProfileGenerateEQ)
+    gens.push_back({CSProfileGenerateEQ, "-cs-profile-generate="});
+
+  // Emit pairwise conflicts if more than one generate-mode was selected
+  for (size_t i = 0; i + 1 < gens.size(); ++i) {
+    for (size_t j = i + 1; j < gens.size(); ++j) {
+      diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                     gens[i].second, gens[j].second);
+    }
+  }
+}
+
 static void validateProfilingArgs(DiagnosticEngine &diags,
                                   const ArgList &args) {
+  validateProfilingGenerateArgs(diags, args);
   const Arg *ProfileGenerate = args.getLastArg(options::OPT_profile_generate);
   const Arg *ProfileUse = args.getLastArg(options::OPT_profile_use);
+  const Arg *IRProfileGenerate =
+      args.getLastArg(options::OPT_ir_profile_generate);
+  const Arg *IRProfileGenerateEQ =
+      args.getLastArg(options::OPT_ir_profile_generate_EQ);
+  const Arg *IRProfileUse = args.getLastArg(options::OPT_ir_profile_use);
   if (ProfileGenerate && ProfileUse) {
     diags.diagnose(SourceLoc(), diag::error_conflicting_options,
                    "-profile-generate", "-profile-use");
   }
-
+  if (ProfileGenerate && IRProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-profile-generate", "-ir-profile-use");
+  }
+  if (IRProfileGenerate && ProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate", "-profile-use");
+  }
+  if (IRProfileGenerate && IRProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate", "-ir-profile-use");
+  }
+  if (IRProfileGenerateEQ && ProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate=", "-profile-use");
+  }
+  if (IRProfileGenerateEQ && IRProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate=", "-ir-profile-use");
+  }
   // Check if the profdata is missing
-  if (ProfileUse && !llvm::sys::fs::exists(ProfileUse->getValue())) {
-    diags.diagnose(SourceLoc(), diag::error_profile_missing,
-                   ProfileUse->getValue());
+  for (const Arg *use : {ProfileUse, IRProfileUse}) {
+    if (use && !llvm::sys::fs::exists(use->getValue())) {
+      diags.diagnose(SourceLoc(), diag::error_profile_missing, use->getValue());
+    }
   }
 }
 
@@ -1521,7 +1595,9 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     if (Args.hasFlag(options::OPT_enable_bridging_pch,
                      options::OPT_disable_bridging_pch,
                      true)) {
-      if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
+      if (Arg *A = Args.getLastArg(
+              options::OPT_import_bridging_header,
+              options::OPT_internal_import_bridging_header)) {
         StringRef Value = A->getValue();
         auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
         if (Ty == file_types::TY_ClangHeader) {
@@ -1982,6 +2058,27 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
     return false;
   }
 
+  if (Args.hasArg(options::OPT_print_static_build_config)) {
+    SmallVector<const char *, 5> commandLine;
+    commandLine.push_back("-frontend");
+    commandLine.push_back("-print-static-build-config");
+
+    std::string executable = getSwiftProgramPath();
+
+    // FIXME(https://github.com/apple/swift/issues/54554): This bypasses
+    // mechanisms like -v and -###.
+    sys::TaskQueue queue;
+    queue.addTask(executable.c_str(), commandLine);
+    queue.execute(nullptr,
+                  [](sys::ProcessId PID, int returnCode, StringRef output,
+                     StringRef errors, sys::TaskProcessInformation ProcInfo,
+                     void *unused) -> sys::TaskFinishedResponse {
+                    llvm::outs() << output;
+                    llvm::errs() << errors;
+                    return sys::TaskFinishedResponse::ContinueExecution;
+                  });
+    return false;
+  }
   return true;
 }
 

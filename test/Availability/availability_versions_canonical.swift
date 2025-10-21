@@ -94,6 +94,11 @@ func useUnderPoundAvailable() {
   }
 
   if #available(macOS 17.0, iOS 20.0, watchOS 13.0, tvOS 20.0, visionOS 4.0, *) {
+    // expected-warning@-1 {{'17.0' is not a valid version number for macOS}}
+    // expected-warning@-2 {{'20.0' is not a valid version number for iOS}}
+    // expected-warning@-3 {{'13.0' is not a valid version number for watchOS}}
+    // expected-warning@-4 {{'20.0' is not a valid version number for tvOS}}
+    // expected-warning@-5 {{'4.0' is not a valid version number for visionOS}}
     introducedInVersionsMappingTo27_0()
     introducedIn27_0()
   }

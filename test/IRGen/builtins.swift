@@ -646,6 +646,13 @@ func assumeNonNegative_test2(_ x: Builtin.Word) -> Builtin.Word {
   return Builtin.assumeNonNegative_Word(return_word(x))
 }
 
+// CHECK-LABEL: define hidden {{.*}}@"$s8builtins23assumeNonNegative_test3yBwBwF"
+func assumeNonNegative_test3(_ x: Builtin.Word) -> Builtin.Word {
+  // CHECK: [[C:%.*]] = icmp sge i{{[0-9]+}} %0, 0
+  // CHECK: call void @llvm.assume(i1 [[C]])
+  return Builtin.assumeNonNegative_Word(x)
+}
+
 struct Empty {}
 struct Pair { var i: Int, b: Bool }
 

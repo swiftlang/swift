@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil \
+// RUN: %target-swift-frontend -primary-file %s -parse-as-library -emit-sil \
 // RUN:   -o /dev/null \
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
@@ -121,6 +121,23 @@ struct TestDeinitCallsAddressor: ~Copyable, ~Escapable {
   }
 }
 
+struct NCBuffer: ~Copyable {
+  fileprivate let buffer: UnsafeMutableRawBufferPointer
+
+  public init() {
+    let ptr = UnsafeMutableRawPointer.init(bitPattern: 0)
+    self.buffer = UnsafeMutableRawBufferPointer(start: ptr, count: 0)
+  }
+
+  public var bytes: Span<UInt8> {
+    @_lifetime(borrow self)
+    borrowing get {
+      let span: Span<UInt8> = Span(_bytes: self.buffer.bytes)
+      return span
+    }
+  }
+}
+
 // Test a borrowed dependency on an address
 @_lifetime(immortal)
 public func testGenericDep<T: ~Escapable>(type: T.Type) -> T {
@@ -152,7 +169,7 @@ public struct NoncopyableImplicitAccessors : ~Copyable & ~Escapable {
     @_lifetime(borrow self)
     get { ne }
 
-    @_lifetime(&self)
+    @_lifetime(self: copy newValue)
     set {
       ne = newValue
     }
@@ -189,6 +206,19 @@ func testClosureCapture1(_ a: HasMethods) {
     // future-note  @-3{{this use causes the lifetime-dependent value to escape}}
     }
    */
+}
+
+public struct InlineInt: BitwiseCopyable {
+  var val: UInt64
+
+  var span: RawSpan {
+    @_addressableSelf
+    @_lifetime(borrow self) borrowing get {
+      let buf = UnsafeRawBufferPointer(start: UnsafeRawPointer(Builtin.addressOfBorrow(val)), count: 1)
+      let span = RawSpan(_unsafeBytes: buf)
+      return unsafe _overrideLifetime(span, borrowing: val)
+    }
+  }
 }
 
 // =============================================================================
@@ -286,4 +316,96 @@ func mutableSpanMayThrow(_: borrowing MutableSpan<Int>) throws {}
 func testSpanMayThrow(buffer: inout [Int]) {
   let bufferSpan = buffer.mutableSpan
   try! mutableSpanMayThrow(bufferSpan)
+}
+
+// =============================================================================
+// inout
+// =============================================================================
+
+@available(Span 0.1, *)
+func inoutToImmortal(_ s: inout RawSpan) {
+  let tmp = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(start: nil, count: 0))
+  s = _overrideLifetime(tmp, borrowing: ())
+}
+
+// =============================================================================
+// addressable dependencies
+// =============================================================================
+
+@available(Span 0.1, *)
+var values: InlineArray<_, Int> = [0, 1, 2]
+
+@available(Span 0.1, *)
+func getValues() -> InlineArray<3, Int> { values }
+
+// Test a trivial global variable used by addressableForDependencies (InlineArray.span). This either requires a direct address
+// to the global or it requires extension of the local stack allocation by LifetimeDependenceScopeFixup.
+//
+// rdar://159680262 ([nonescapable] diagnose dependence on a temporary copy of a global array)
+@available(Span 0.1, *)
+func readGlobalSpan() -> Int {
+  let span = values.span
+  return span[3]
+}
+
+// Test a trivial global variable used by addressableForDependencies (InlineArray.span).
+//
+// TODO: This will no longer be an error when SILGen passes a direct address to the global instead of a temporary stack
+// allocation: rdar://151320168 ([nonescapable] support immortal span over global array)
+@available(Span 0.1, *)
+@_lifetime(immortal)
+func returnGlobalSpan() -> Span<Int> {
+  let span = values.span // expected-error{{lifetime-dependent variable 'span' escapes its scope}}
+  // expected-note@-1{{it depends on this scoped access to variable 'values'}}
+  return span // expected-note{{this use causes the lifetime-dependent value to escape}}
+}
+
+// Test a trivial temporary stack allocation used by addressableForDependencies
+// (InlineArray.span). LifetimeDependenceScopeFixup needs to extend the local stack allocation.
+@available(Span 0.1, *)
+func readTempSpan() -> Int {
+  let span = getValues().span
+  return span[3]
+}
+
+// Test a trivial temporary stack allocation used by addressableForDependencies (InlineArray.span). This illegally
+// returns an address into a temporary.
+@available(Span 0.1, *)
+@_lifetime(immortal)
+func returnTempSpan() -> Span<Int> {
+  let span = getValues().span // expected-error{{lifetime-dependent variable 'span' escapes its scope}}
+  // expected-note@-1{{it depends on the lifetime of this parent value}}
+  return span // expected-note{{this use causes the lifetime-dependent value to escape}}
+}
+
+// Test a trivial temporary stack allocation used by an addressable parameter
+// (Borrow.init). LifetimeDependenceScopeFixup needs to extend the local stack allocation.
+@available(Span 0.1, *)
+func readTempBorrow() -> Int {
+  let borrow = Borrow(3)
+  return borrow[]
+}
+
+// Test a trivial temporary stack allocation used by an addressable parameter (Borrow.init). This illegally returns an
+// address into a temporary.
+@available(Span 0.1, *)
+@_lifetime(immortal)
+func returnTempBorrow() -> Borrow<Int> {
+  let span = Borrow(3) // expected-error{{lifetime-dependent variable 'span' escapes its scope}}
+  // expected-note@-1{{it depends on the lifetime of this parent value}}
+  return span // expected-note{{this use causes the lifetime-dependent value to escape}}
+}
+
+// Test dependence on the temporary stack address of a trivial value. computeAddressableRange must extend the lifetime
+// of 'inline' into the unreachable.
+//
+// This test requires InlineInt to be a trivial value defined in this module so that inline.span generates:
+//
+//     %temp = alloc_stack
+//     store %arg to [trivial] temp
+//     apply %get_span(%temp)
+//
+// If we use InlineArray instead, we get a store_borrow, which is a completely different situation.
+func test(inline: InlineInt) {
+  inline.span.withUnsafeBytes { _ = $0 }
 }

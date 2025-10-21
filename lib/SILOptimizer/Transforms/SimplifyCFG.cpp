@@ -304,7 +304,8 @@ static SILValue createValueForEdge(SILInstruction *UserInst,
 
   if (auto *CBI = dyn_cast<CondBranchInst>(DominatingTerminator))
     return Builder.createIntegerLiteral(
-        CBI->getLoc(), CBI->getCondition()->getType(), EdgeIdx == 0 ? -1 : 0);
+        CBI->getLoc(), CBI->getCondition()->getType(), EdgeIdx == 0 ? -1 : 0,
+        /*treatAsSigned=*/true);
 
   auto *SEI = cast<SwitchEnumInst>(DominatingTerminator);
   auto *DstBlock = SEI->getSuccessors()[EdgeIdx].getBB();
@@ -1480,7 +1481,8 @@ static SILValue invertExpectAndApplyTo(SILBuilder &Builder,
   if (!IL)
     return V;
   SILValue NegatedExpectedValue = Builder.createIntegerLiteral(
-      IL->getLoc(), Args[1]->getType(), IL->getValue() == 0 ? -1 : 0);
+      IL->getLoc(), Args[1]->getType(), IL->getValue() == 0 ? -1 : 0,
+      /*treatAsSigned=*/true);
   return Builder.createBuiltin(BI->getLoc(), BI->getName(), BI->getType(), {},
                                {V, NegatedExpectedValue});
 }
@@ -1791,7 +1793,12 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
   }
 
   if (Dest->args_empty()) {
-    SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest);
+    SILBuilderWithScope builder(SEI);
+    if (SEI->getOperand()->getOwnershipKind() == OwnershipKind::Owned) {
+      // Note that a `destroy_value` would be wrong for non-copyable enums with deinits.
+      builder.createEndLifetime(SEI->getLoc(), SEI->getOperand());
+    }
+    builder.createBranch(SEI->getLoc(), Dest);
 
     addToWorklist(SEI->getParent());
     addToWorklist(Dest);

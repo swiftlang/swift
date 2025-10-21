@@ -84,8 +84,9 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(CaseStmt, Stmt, 32,
+  SWIFT_INLINE_BITFIELD_FULL(CaseStmt, Stmt, 16+32,
     : NumPadBits,
+    NumCaseBodyVars : 16,
     NumPatterns : 32
   );
 
@@ -214,15 +215,19 @@ public:
 
   /// The elements contained within the BraceStmt.
   MutableArrayRef<ASTNode> getElements() {
-    return {getTrailingObjects<ASTNode>(), static_cast<size_t>(Bits.BraceStmt.NumElements)};
+    return getTrailingObjects(static_cast<size_t>(Bits.BraceStmt.NumElements));
   }
 
   /// The elements contained within the BraceStmt (const version).
   ArrayRef<ASTNode> getElements() const {
-    return {getTrailingObjects<ASTNode>(), static_cast<size_t>(Bits.BraceStmt.NumElements)};
+    return getTrailingObjects(static_cast<size_t>(Bits.BraceStmt.NumElements));
   }
 
   ASTNode findAsyncNode();
+
+  /// Whether the body contains an explicit `return` statement. This computation
+  /// is cached.
+  bool hasExplicitReturnStmt(ASTContext &ctx) const;
 
   /// If this brace contains a single ASTNode, or a \c #if that has a single active
   /// element, returns it. This will always be the last element of the brace.
@@ -332,10 +337,10 @@ public:
   SourceLoc getEndLoc() const;
 
   ArrayRef<Expr*> getYields() const {
-    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.YieldStmt.NumYields)};
+    return getTrailingObjects(static_cast<size_t>(Bits.YieldStmt.NumYields));
   }
   MutableArrayRef<Expr*> getMutableYields() {
-    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.YieldStmt.NumYields)};
+    return getTrailingObjects(static_cast<size_t>(Bits.YieldStmt.NumYields));
   }
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Yield; }
@@ -500,7 +505,7 @@ class alignas(8) PoundAvailableInfo final :
     Flags.isInvalid = false;
     Flags.isUnavailability = isUnavailability;
     std::uninitialized_copy(queries.begin(), queries.end(),
-                            getTrailingObjects<AvailabilitySpec *>());
+                            getTrailingObjects());
   }
 
 public:
@@ -514,7 +519,7 @@ public:
   void setInvalid() { Flags.isInvalid = true; }
 
   ArrayRef<AvailabilitySpec *> getQueries() const {
-    return llvm::ArrayRef(getTrailingObjects<AvailabilitySpec *>(), NumQueries);
+    return getTrailingObjects(NumQueries);
   }
 
   /// Returns an iterator for the statement's type-checked availability specs.
@@ -626,13 +631,13 @@ public:
   };
 
   ConditionKind getKind() const {
-    if (Condition.is<Expr *>())
+    if (isa<Expr *>(Condition))
       return CK_Boolean;
-    if (Condition.is<ConditionalPatternBindingInfo *>())
+    if (isa<ConditionalPatternBindingInfo *>(Condition))
       return CK_PatternBinding;
-    if (Condition.is<PoundAvailableInfo *>())
+    if (isa<PoundAvailableInfo *>(Condition))
       return CK_Availability;
-    if (Condition.is<PoundHasSymbolInfo *>())
+    if (isa<PoundHasSymbolInfo *>(Condition))
       return CK_HasSymbol;
     return CK_Boolean;
   }
@@ -642,7 +647,7 @@ public:
 
   Expr *getBoolean() const {
     assert(getKind() == CK_Boolean && "Not a condition");
-    return Condition.get<Expr *>();
+    return cast<Expr *>(Condition);
   }
   void setBoolean(Expr *E) {
     assert(getKind() == CK_Boolean && "Not a condition");
@@ -656,7 +661,7 @@ public:
 
   ConditionalPatternBindingInfo *getPatternBinding() const {
     assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
-    return Condition.get<ConditionalPatternBindingInfo *>();
+    return cast<ConditionalPatternBindingInfo *>(Condition);
   }
 
   SourceLoc getIntroducerLoc() const {
@@ -690,7 +695,7 @@ public:
   // Availability Accessors
   PoundAvailableInfo *getAvailability() const {
     assert(getKind() == CK_Availability && "Not an #available condition");
-    return Condition.get<PoundAvailableInfo *>();
+    return cast<PoundAvailableInfo *>(Condition);
   }
 
   void setAvailability(PoundAvailableInfo *Info) {
@@ -701,7 +706,7 @@ public:
   // #_hasSymbol Accessors
   PoundHasSymbolInfo *getHasSymbolInfo() const {
     assert(getKind() == CK_HasSymbol && "Not a #_hasSymbol condition");
-    return Condition.get<PoundHasSymbolInfo *>();
+    return cast<PoundHasSymbolInfo *>(Condition);
   }
 
   void setHasSymbolInfo(PoundHasSymbolInfo *Info) {
@@ -713,7 +718,12 @@ public:
   /// or `let self = self` condition.
   ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
   ///    RHS of the self condition references a var defined in a capture list.
-  bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false) const;
+  ///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
+  ///    the self condition is a `LoadExpr`.
+  /// TODO: Remove `requireLoadExpr` after full-on of the ImmutableWeakCaptures
+  /// feature
+  bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false,
+                   bool requireLoadExpr = false) const;
 
   SourceLoc getStartLoc() const;
   SourceLoc getEndLoc() const;
@@ -822,7 +832,8 @@ public:
   /// or `let self = self` condition.
   ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
   ///    RHS of the self condition references a var defined in a capture list.
-  bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false) const;
+  bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false,
+                   bool requireLoadExpr = false) const;
 
   static bool classof(const Stmt *S) {
     return S->getKind() >= StmtKind::First_LabeledConditionalStmt &&
@@ -1204,8 +1215,8 @@ enum CaseParentKind { Switch, DoCatch };
 ///
 class CaseStmt final
     : public Stmt,
-      private llvm::TrailingObjects<CaseStmt, FallthroughStmt *,
-                                    CaseLabelItem> {
+      private llvm::TrailingObjects<CaseStmt, FallthroughStmt *, CaseLabelItem,
+                                    VarDecl *> {
   friend TrailingObjects;
 
   Stmt *ParentStmt = nullptr;
@@ -1216,14 +1227,16 @@ class CaseStmt final
 
   llvm::PointerIntPair<BraceStmt *, 1, bool> BodyAndHasFallthrough;
 
-  std::optional<MutableArrayRef<VarDecl *>> CaseBodyVariables;
-
   CaseStmt(CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
            ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
            SourceLoc ItemTerminatorLoc, BraceStmt *Body,
-           std::optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
-           std::optional<bool> Implicit,
+           ArrayRef<VarDecl *> CaseBodyVariables, std::optional<bool> Implicit,
            NullablePtr<FallthroughStmt> fallthroughStmt);
+
+  MutableArrayRef<VarDecl *> getCaseBodyVariablesBuffer() {
+    return {getTrailingObjects<VarDecl *>(),
+            static_cast<size_t>(Bits.CaseStmt.NumCaseBodyVars)};
+  }
 
 public:
   /// Create a parsed 'case'/'default' for 'switch' statement.
@@ -1239,12 +1252,16 @@ public:
                                        BraceStmt *Body);
 
   static CaseStmt *
+  createImplicit(ASTContext &ctx, CaseParentKind parentKind,
+                 ArrayRef<CaseLabelItem> caseLabelItems, BraceStmt *body,
+                 NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
+
+  static CaseStmt *
   create(ASTContext &C, CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
          ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
          SourceLoc ItemTerminatorLoc, BraceStmt *Body,
-         std::optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
-         std::optional<bool> Implicit = std::nullopt,
-         NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
+         ArrayRef<VarDecl *> CaseBodyVariables, std::optional<bool> Implicit,
+         NullablePtr<FallthroughStmt> fallthroughStmt);
 
   CaseParentKind getParentKind() const { return ParentKind; }
 
@@ -1287,7 +1304,7 @@ public:
   void setBody(BraceStmt *body) { BodyAndHasFallthrough.setPointer(body); }
 
   /// True if the case block declares any patterns with local variable bindings.
-  bool hasBoundDecls() const { return CaseBodyVariables.has_value(); }
+  bool hasCaseBodyVariables() const { return !getCaseBodyVariables().empty(); }
 
   /// Get the source location of the 'case', 'default', or 'catch' of the first
   /// label.
@@ -1339,38 +1356,8 @@ public:
   }
 
   /// Return an ArrayRef containing the case body variables of this CaseStmt.
-  ///
-  /// Asserts if case body variables was not explicitly initialized. In contexts
-  /// where one wants a non-asserting version, \see
-  /// getCaseBodyVariablesOrEmptyArray.
   ArrayRef<VarDecl *> getCaseBodyVariables() const {
-    ArrayRef<VarDecl *> a = *CaseBodyVariables;
-    return a;
-  }
-
-  bool hasCaseBodyVariables() const { return CaseBodyVariables.has_value(); }
-
-  /// Return an MutableArrayRef containing the case body variables of this
-  /// CaseStmt.
-  ///
-  /// Asserts if case body variables was not explicitly initialized. In contexts
-  /// where one wants a non-asserting version, \see
-  /// getCaseBodyVariablesOrEmptyArray.
-  MutableArrayRef<VarDecl *> getCaseBodyVariables() {
-    return *CaseBodyVariables;
-  }
-
-  ArrayRef<VarDecl *> getCaseBodyVariablesOrEmptyArray() const {
-    if (!CaseBodyVariables)
-      return ArrayRef<VarDecl *>();
-    ArrayRef<VarDecl *> a = *CaseBodyVariables;
-    return a;
-  }
-
-  MutableArrayRef<VarDecl *> getCaseBodyVariablesOrEmptyArray() {
-    if (!CaseBodyVariables)
-      return MutableArrayRef<VarDecl *>();
-    return *CaseBodyVariables;
+    return const_cast<CaseStmt *>(this)->getCaseBodyVariablesBuffer();
   }
 
   /// Find the next case statement within the same 'switch' or 'do-catch',
@@ -1444,8 +1431,7 @@ public:
 
   /// Get the list of case clauses.
   ArrayRef<CaseStmt *> getCases() const {
-    return {getTrailingObjects<CaseStmt *>(),
-            static_cast<size_t>(Bits.SwitchStmt.CaseCount)};
+    return getTrailingObjects(static_cast<size_t>(Bits.SwitchStmt.CaseCount));
   }
 
   /// Retrieve the complete set of branches for this switch statement.
@@ -1485,7 +1471,7 @@ class DoCatchStmt final
         Body(body) {
     Bits.DoCatchStmt.NumCatches = catches.size();
     std::uninitialized_copy(catches.begin(), catches.end(),
-                            getTrailingObjects<CaseStmt *>());
+                            getTrailingObjects());
     for (auto *catchStmt : getCatches())
       catchStmt->setParentStmt(this);
   }
@@ -1519,10 +1505,10 @@ public:
   void setBody(Stmt *s) { Body = s; }
 
   ArrayRef<CaseStmt *> getCatches() const {
-    return {getTrailingObjects<CaseStmt *>(), static_cast<size_t>(Bits.DoCatchStmt.NumCatches)};
+    return getTrailingObjects(static_cast<size_t>(Bits.DoCatchStmt.NumCatches));
   }
   MutableArrayRef<CaseStmt *> getMutableCatches() {
-    return {getTrailingObjects<CaseStmt *>(), static_cast<size_t>(Bits.DoCatchStmt.NumCatches)};
+    return getTrailingObjects(static_cast<size_t>(Bits.DoCatchStmt.NumCatches));
   }
 
   /// Retrieve the complete set of branches for this do-catch statement.

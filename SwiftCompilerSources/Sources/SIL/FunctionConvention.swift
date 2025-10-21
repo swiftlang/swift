@@ -98,6 +98,26 @@ public struct FunctionConvention : CustomStringConvertible {
     return SILFunctionType_getLifetimeDependencies(functionType.bridged).count() != 0
   }
 
+  public var hasGuaranteedResult: Bool {
+    if results.count != 1 {
+      return false
+    }
+    if hasLoweredAddresses {
+      return results[0].convention == .guaranteed
+    }
+    return results[0].convention == .guaranteed || results[0].convention == .guaranteedAddress
+  }
+
+  public var hasAddressResult: Bool {
+    if results.count != 1 {
+      return false
+    }
+    if hasLoweredAddresses {
+      return results[0].convention == .guaranteedAddress || results[0].convention == .inout
+    }
+    return results[0].convention == .inout
+  }
+
   public var description: String {
     var str = functionType.description
     for paramIdx in 0..<parameters.count {
@@ -133,7 +153,7 @@ public struct ResultInfo : CustomStringConvertible {
       return hasLoweredAddresses || type.isExistentialArchetypeWithError()
     case .pack:
       return true
-    case .owned, .unowned, .unownedInnerPointer, .autoreleased:
+    case .owned, .unowned, .unownedInnerPointer, .autoreleased, .guaranteed, .guaranteedAddress, .inout:
       return false
     }
   }
@@ -358,6 +378,18 @@ public enum ResultConvention : CustomStringConvertible {
   /// The caller is responsible for destroying this return value.  Its type is non-trivial.
   case owned
 
+  /// The caller is responsible for using the returned address within a valid
+  /// scope. This is valid only for borrow accessors.
+  case guaranteedAddress
+
+  /// The caller is responsible for using the returned value within a valid
+  /// scope. This is valid only for borrow accessors.
+  case guaranteed
+
+  /// The caller is responsible for mutating the returned address within a valid
+  /// scope. This is valid only for mutate accessors.
+  case `inout`
+
   /// The caller is not responsible for destroying this return value.  Its type may be trivial, or it may simply be offered unsafely.  It is valid at the instant of the return, but further operations may invalidate it.
   case unowned
 
@@ -397,6 +429,12 @@ public enum ResultConvention : CustomStringConvertible {
       return "autoreleased"
     case .pack:
       return "pack"
+    case .guaranteed:
+      return "guaranteed"
+    case .guaranteedAddress:
+      return "guaranteedAddress"
+    case .inout:
+      return "inout"      
     }
   }
 }
@@ -409,8 +447,11 @@ extension ResultInfo {
     self.convention = ResultConvention(bridged: bridged.convention)
     self.hasLoweredAddresses = hasLoweredAddresses
   }
-  init(bridged: OptionalBridgedResultInfo, hasLoweredAddresses: Bool) {
-    self.type = BridgedASTType(type: bridged.type!)
+  init?(bridged: OptionalBridgedResultInfo, hasLoweredAddresses: Bool) {
+    guard let t = bridged.type else {
+      return nil
+    }
+    self.type = BridgedASTType(type: t)
     self.convention = ResultConvention(bridged: bridged.convention)
     self.hasLoweredAddresses = hasLoweredAddresses
   }
@@ -425,6 +466,9 @@ extension ResultConvention {
       case .UnownedInnerPointer: self = .unownedInnerPointer
       case .Autoreleased:        self = .autoreleased
       case .Pack:                self = .pack
+      case .Guaranteed:          self = .guaranteed
+      case .GuaranteedAddress:   self = .guaranteedAddress
+      case .Inout:               self = .inout
       default:
         fatalError("unsupported result convention")
     }

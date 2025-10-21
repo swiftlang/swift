@@ -177,6 +177,25 @@ public:
   }
 };
 
+/// Determine whether the given generic nominal that involves inverse
+/// requirements (e.g., Optional, Span) is always available for demangling
+/// purposes.
+static bool nominalIsAlwaysAvailableForDemangling(const NominalTypeDecl *nom) {
+  // Only consider standard library types for this.
+  if (!nom->getModuleContext()->isStdlibModule())
+    return false;
+
+  // If there's an @_originallyDefined(in:) attribute, then the nominal is
+  // not always available for demangling.
+  for (auto attr: nom->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
+    if (!attr->isInvalid() && attr->isActivePlatform(nom->getASTContext()))
+      return false;
+  }
+
+  // Everything else is available.
+  return true;
+}
+
 std::optional<llvm::VersionTuple>
 getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   enum VersionRequirement {
@@ -185,9 +204,10 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     Swift_5_5,
     Swift_6_0,
     Swift_6_1,
+    Swift_6_2,
 
     // Short-circuit if we find this requirement.
-    Latest = Swift_6_1
+    Latest = Swift_6_2
   };
 
   VersionRequirement latestRequirement = None;
@@ -203,6 +223,11 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     if (auto fn = dyn_cast<AnyFunctionType>(t)) {
       auto isolation = fn->getIsolation();
       auto sendingResult = fn->hasSendingResult();
+
+      // The mangling for nonisolated(nonsending) function types was introduced
+      // in Swift 6.2.
+      if (isolation.isNonIsolatedCaller())
+        return addRequirement(Swift_6_2);
 
       // The Swift 6.1 runtime fixes a bug preventing successful demangling
       // when @isolated(any) or global actor isolation is combined with a
@@ -246,16 +271,16 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     /// signature uses NoncopyableGenerics. Since inverses are mangled into
     /// symbols, a Swift 6.0+ runtime is generally needed to demangle them.
     ///
-    /// We make an exception for types in the stdlib, like Optional, since the
-    /// runtime should still be able to demangle them, based on the availability
-    /// of the type.
+    /// We make an exception for some types in the stdlib, like Optional, since
+    /// the runtime should still be able to demangle them, based on the
+    /// availability of the type.
     if (auto nominalTy = dyn_cast<NominalOrBoundGenericNominalType>(t)) {
       auto *nom = nominalTy->getDecl();
       if (auto sig = nom->getGenericSignature()) {
         SmallVector<InverseRequirement, 2> inverses;
         SmallVector<Requirement, 2> reqs;
         sig->getRequirementsWithInverses(reqs, inverses);
-        if (!inverses.empty() && !nom->getModuleContext()->isStdlibModule()) {
+        if (!inverses.empty() && !nominalIsAlwaysAvailableForDemangling(nom)) {
           return addRequirement(Swift_6_0);
         }
       }
@@ -271,6 +296,7 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   });
 
   switch (latestRequirement) {
+  case Swift_6_2: return llvm::VersionTuple(6, 2);
   case Swift_6_1: return llvm::VersionTuple(6, 1);
   case Swift_6_0: return llvm::VersionTuple(6, 0);
   case Swift_5_5: return llvm::VersionTuple(5, 5);
@@ -289,13 +315,12 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
 // where completing the metadata during demangling might cause cyclic
 // dependencies.
 static std::pair<llvm::Constant *, unsigned>
-getTypeRefByFunction(IRGenModule &IGM,
-                     CanGenericSignature sig,
-                     CanType t) {
+getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
+                     MangledTypeRefRole role) {
   IRGenMangler mangler(IGM.Context);
   std::string symbolName =
     mangler.mangleSymbolNameForMangledMetadataAccessorString(
-                                                   "get_type_metadata", sig, t);
+                                                   "get_type_metadata", sig, t, role);
   auto constant = IGM.getAddrOfStringForMetadataRef(symbolName, /*align*/2,
                                                     /*low bit*/false,
     [&](ConstantInitBuilder &B) {
@@ -326,9 +351,22 @@ getTypeRefByFunction(IRGenModule &IGM,
           ? genericEnv->mapTypeIntoContext(t)->getCanonicalType()
           : t;
 
-        // If a type is noncopyable, lie about the resolved type unless the
-        // runtime is sufficiently aware of noncopyable types.
-        if (substT->isNoncopyable()) {
+        // If a type is noncopyable, lie about the resolved type to reflection
+        // APIs unless the runtime is sufficiently aware of noncopyable types.
+        bool shouldHideNoncopyableTypeFromOldRuntimes;
+        switch (role) {
+        case MangledTypeRefRole::Metadata:
+        case MangledTypeRefRole::DefaultAssociatedTypeWitness:
+        case MangledTypeRefRole::FlatUnique:
+          shouldHideNoncopyableTypeFromOldRuntimes = false;
+          break;
+        case MangledTypeRefRole::FieldMetadata:
+        case MangledTypeRefRole::Reflection:
+          shouldHideNoncopyableTypeFromOldRuntimes = true;
+          break;
+        }
+        if (shouldHideNoncopyableTypeFromOldRuntimes
+            && substT->isNoncopyable()) {
           // Darwin-based platforms have ABI stability, and we want binaries
           // that use noncopyable types nongenerically today to be forward
           // compatible with a future OS runtime that supports noncopyable
@@ -407,7 +445,11 @@ getTypeRefByFunction(IRGenModule &IGM,
       // Form the mangled name with its relative reference.
       auto S = B.beginStruct();
       S.setPacked(true);
-      S.add(llvm::ConstantInt::get(IGM.Int8Ty, 255));
+      if (role == MangledTypeRefRole::DefaultAssociatedTypeWitness) {
+        S.add(llvm::ConstantInt::get(
+            IGM.Int8Ty,
+            ProtocolRequirementFlags::AssociatedTypeInProtocolContextByte));
+      }
       S.add(llvm::ConstantInt::get(IGM.Int8Ty, 9));
       S.addCompactFunctionReference(accessor);
 
@@ -487,7 +529,7 @@ getTypeRefImpl(IRGenModule &IGM,
     // the field will be artificially hidden to reflectors.
     if (isAlwaysNoncopyable) {
       IGM.IRGen.noteUseOfTypeMetadata(type);
-      return getTypeRefByFunction(IGM, sig, type);
+      return getTypeRefByFunction(IGM, sig, type, role);
     }
   }
   LLVM_FALLTHROUGH;
@@ -498,12 +540,12 @@ getTypeRefImpl(IRGenModule &IGM,
     // ensuring that we can always reconstruct type metadata from a mangled name
     // in-process.
     IGM.IRGen.noteUseOfTypeMetadata(type);
-    
+
     // If the minimum deployment target's runtime demangler wouldn't understand
     // this mangled name, then fall back to generating a "mangled name" with a
     // symbolic reference with a callback function.
     if (mangledNameIsUnknownToDeployTarget(IGM, type)) {
-      return getTypeRefByFunction(IGM, sig, type);
+      return getTypeRefByFunction(IGM, sig, type, role);
     }
 
     break;
@@ -1667,6 +1709,9 @@ llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
 llvm::Constant *
 IRGenModule::getAddrOfBoxDescriptor(SILType BoxedType,
                                     CanGenericSignature genericSig) {
+  if (BoxedType.hasLocalArchetype())
+    return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
+
   if (IRGen.Opts.ReflectionMetadata != ReflectionMetadataMode::Runtime)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 

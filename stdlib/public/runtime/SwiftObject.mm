@@ -438,7 +438,13 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
     // Legacy behavior: Don't proxy to Swift Hashable or Equatable
     return NO; // We know the ids are different
   }
-
+  if (isObjCTaggedPointer(other)) {
+    // Swift class types cannot be tagged, and a Swift Equatable conformance
+    // cannot validly be called for an object of a different type, so this can
+    // only be incorrect if someone has an Equatable that's invalid in an
+    // extremely specific way (unsafeBitCasting `other` to an unrelated type)
+    return NO;
+  }
 
   // Get Swift type for self and other
   auto selfMetadata = _swift_getClassOfAllocated(self);

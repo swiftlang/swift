@@ -36,6 +36,7 @@
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
+#include "swift/IDE/SignatureHelpFormatter.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -310,6 +311,11 @@ static sourcekitd_response_t conformingMethodList(
     std::optional<RequestDict> optionsDict, ArrayRef<const char *> Args,
     ArrayRef<const char *> ExpectedTypes, std::optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken);
+
+static sourcekitd_response_t
+signatureHelp(StringRef PrimaryFilePath, int64_t Offset,
+              ArrayRef<const char *> Args, std::optional<VFSOptions> vfsOptions,
+              SourceKitCancellationToken CancellationToken);
 
 static sourcekitd_response_t editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                                         SKEditorConsumerOptions Opts,
@@ -1472,6 +1478,35 @@ handleRequestConformingMethodList(const RequestDict &Req,
   });
 }
 
+static void
+handleRequestSignatureHelp(const RequestDict &Req,
+                           SourceKitCancellationToken CancellationToken,
+                           ResponseReceiver Rec) {
+  handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
+    std::optional<VFSOptions> vfsOptions = getVFSOptions(Req);
+    std::optional<StringRef> PrimaryFilePath =
+        getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
+      return;
+
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+    if (!InputBufferName.empty())
+      return Rec(createErrorRequestInvalid(
+          "'key.primary_file' and 'key.sourcefile' can't be different"));
+
+    SmallVector<const char *, 8> Args;
+    if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
+      return;
+
+    int64_t Offset;
+    if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
+      return Rec(createErrorRequestInvalid("missing 'key.offset'"));
+
+    return Rec(signatureHelp(*PrimaryFilePath, Offset, Args,
+                             std::move(vfsOptions), CancellationToken));
+  });
+}
+
 static void handleRequestIndex(const RequestDict &Req,
                                SourceKitCancellationToken CancellationToken,
                                ResponseReceiver Rec) {
@@ -1510,6 +1545,10 @@ getIndexStoreOpts(const RequestDict &Req, ResponseReceiver Rec) {
 
   if (auto IncludeLocals = Req.getOptionalInt64(KeyIncludeLocals)) {
     Opts.IncludeLocals = IncludeLocals.value() > 0;
+  }
+  
+  if (auto Compress = Req.getOptionalInt64(KeyCompress)) {
+    Opts.Compress = Compress.value() > 0;
   }
 
   if (auto IgnoreClangModules = Req.getOptionalInt64(KeyIgnoreClangModules)) {
@@ -2232,6 +2271,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   HANDLE_REQUEST(RequestCodeCompleteUpdate, handleRequestCodeCompleteUpdate)
   HANDLE_REQUEST(RequestTypeContextInfo, handleRequestTypeContextInfo)
   HANDLE_REQUEST(RequestConformingMethodList, handleRequestConformingMethodList)
+  HANDLE_REQUEST(RequestSignatureHelp, handleRequestSignatureHelp)
 
   HANDLE_REQUEST(RequestIndex, handleRequestIndex)
   HANDLE_REQUEST(RequestIndexToStore, handleRequestIndexToStore)
@@ -3589,6 +3629,86 @@ static sourcekitd_response_t conformingMethodList(
 }
 
 //===----------------------------------------------------------------------===//
+// Signature Help
+//===----------------------------------------------------------------------===//
+
+static sourcekitd_response_t
+signatureHelp(StringRef PrimaryFilePath, int64_t Offset,
+              ArrayRef<const char *> Args, std::optional<VFSOptions> vfsOptions,
+              SourceKitCancellationToken CancellationToken) {
+  ResponseBuilder RespBuilder;
+
+  class Consumer : public SignatureHelpConsumer {
+    ResponseBuilder::Dictionary SKResult;
+    std::optional<std::string> ErrorDescription;
+    bool WasCancelled = false;
+
+  public:
+    Consumer(ResponseBuilder Builder) : SKResult(Builder.getDictionary()) {}
+
+    void
+    handleResult(const swift::ide::FormattedSignatureHelp &Result) override {
+      SKResult.set(KeyActiveSignature, Result.ActiveSignature);
+
+      auto Signatures = SKResult.setArray(KeySignatures);
+
+      for (auto Signature : Result.Signatures) {
+        auto SignatureElem = Signatures.appendDictionary();
+
+        SignatureElem.set(KeyName, Signature.Text);
+
+        if (auto ActiveParam = Signature.ActiveParam)
+          SignatureElem.set(KeyActiveParameter, ActiveParam.value());
+
+        if (!Signature.DocComment.empty())
+          SignatureElem.set(KeyDocComment, Signature.DocComment);
+
+        auto Params = SignatureElem.setArray(KeyParameters);
+
+        for (auto Param : Signature.Params) {
+          auto ParamElem = Params.appendDictionary();
+
+          if (!Param.Name.empty())
+            ParamElem.set(KeyName, Param.Name);
+
+          ParamElem.set(KeyNameOffset, Param.Offset);
+          ParamElem.set(KeyNameLength, Param.Length);
+        }
+      }
+    }
+
+    void setReusingASTContext(bool flag) override {
+      if (flag)
+        SKResult.setBool(KeyReusingASTContext, flag);
+    }
+
+    void failed(StringRef ErrDescription) override {
+      ErrorDescription = ErrDescription.str();
+    }
+
+    void cancelled() override { WasCancelled = true; }
+
+    bool wasCancelled() const { return WasCancelled; }
+    bool isError() const { return ErrorDescription.has_value(); }
+    const char *getErrorDescription() const {
+      return ErrorDescription->c_str();
+    }
+  } Consumer(RespBuilder);
+
+  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+  Lang.getSignatureHelp(PrimaryFilePath, Offset, Args, CancellationToken,
+                        Consumer, std::move(vfsOptions));
+
+  if (Consumer.wasCancelled()) {
+    return createErrorRequestCancelled();
+  }
+  if (Consumer.isError()) {
+    return createErrorRequestFailed(Consumer.getErrorDescription());
+  }
+  return RespBuilder.createResponse();
+}
+
+//===----------------------------------------------------------------------===//
 // Editor
 //===----------------------------------------------------------------------===//
 
@@ -4053,12 +4173,16 @@ fillDictionaryForDiagnosticInfo(ResponseBuilder::Dictionary Elem,
   UIdent SeverityUID;
   static UIdent UIDKindDiagWarning(KindDiagWarning.str());
   static UIdent UIDKindDiagError(KindDiagError.str());
+  static UIdent UIDKindDiagRemark(KindDiagRemark.str());
   switch (Info.Severity) {
   case DiagnosticSeverityKind::Warning:
     SeverityUID = UIDKindDiagWarning;
     break;
   case DiagnosticSeverityKind::Error:
     SeverityUID = UIDKindDiagError;
+    break;
+  case DiagnosticSeverityKind::Remark:
+    SeverityUID = UIDKindDiagRemark;
     break;
   }
 

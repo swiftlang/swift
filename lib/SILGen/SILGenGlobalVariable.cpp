@@ -74,6 +74,9 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
       M, silLinkage, IsNotSerialized, mangledName, silTy, std::nullopt, gDecl);
   silGlobal->setDeclaration(!forDef);
 
+  if (auto sectionAttr = gDecl->getAttrs().getAttribute<SectionAttr>())
+    silGlobal->setSection(sectionAttr->Name);
+
   return silGlobal;
 }
 
@@ -231,8 +234,6 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   auto onceSILTy
     = SILType::getPrimitiveObjectType(onceTy->getCanonicalType());
 
-  // TODO: include the module in the onceToken's name mangling.
-  // Then we can make it fragile.
   auto onceToken = SILGlobalVariable::create(M, SILLinkage::Private,
                                              IsNotSerialized,
                                              onceTokenBuffer, onceSILTy);

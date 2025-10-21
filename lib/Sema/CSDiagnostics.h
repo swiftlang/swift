@@ -210,6 +210,15 @@ protected:
                                  llvm::SmallVectorImpl<char> &scratch) const;
 };
 
+/// Emits a fallback diagnostic message if no other error has been emitted.
+class FallbackDiagnostic final : public FailureDiagnostic {
+public:
+  FallbackDiagnostic(const Solution &solution, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Base class for all of the diagnostics related to generic requirement
 /// failures, provides common information like failed requirement,
 /// declaration where such requirement comes from, etc.
@@ -726,7 +735,7 @@ protected:
 
   /// Try to add a fix-it to conform the decl context (if it's a type) to the
   /// protocol
-  bool tryProtocolConformanceFixIt(InFlightDiagnostic &diagnostic) const;
+  bool tryProtocolConformanceFixIt() const;
 
 private:
   Type resolve(Type rawType) const {
@@ -1707,9 +1716,10 @@ public:
   KeyPathSubscriptIndexHashableFailure(const Solution &solution, Type type,
                                        ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), NonConformingType(type) {
-    assert((locator->isResultOfKeyPathDynamicMemberLookup() ||
-            locator->isKeyPathSubscriptComponent()) ||
-           locator->isKeyPathMemberComponent());
+    assert(locator->isResultOfKeyPathDynamicMemberLookup() ||
+           locator->isKeyPathSubscriptComponent() ||
+           locator->isKeyPathMemberComponent() ||
+           locator->isKeyPathApplyComponent());
   }
 
   SourceLoc getLoc() const override;
@@ -1884,6 +1894,27 @@ public:
                                          ConstraintLocator *locator)
       : InvalidMemberRefInKeyPath(solution, member, locator) {
     assert(isa<FuncDecl>(member));
+  }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference a type as a key path component
+/// e.g.
+///
+/// ```swift
+/// struct S {
+///   enum Q {}
+/// }
+///
+/// _ = \S.Type.Q
+/// ```
+class InvalidTypeRefInKeyPath final : public InvalidMemberRefInKeyPath {
+public:
+  InvalidTypeRefInKeyPath(const Solution &solution, ValueDecl *member,
+                          ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, member, locator) {
+    assert(isa<TypeDecl>(member));
   }
 
   bool diagnoseAsError() override;
@@ -2395,6 +2426,15 @@ public:
 
 private:
   bool diagnoseMissingConformance() const;
+};
+
+class NonMetatypeDynamicTypeFailure final : public ContextualFailure {
+public:
+  NonMetatypeDynamicTypeFailure(const Solution &solution, Type instanceTy,
+                                Type metatypeTy, ConstraintLocator *locator)
+      : ContextualFailure(solution, instanceTy, metatypeTy, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 class MissingContextualBaseInMemberRefFailure final : public FailureDiagnostic {
@@ -3306,6 +3346,17 @@ public:
                             Type rhsCount, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), lhsCount(resolveType(lhsCount)),
         rhsCount(resolveType(rhsCount)) {}
+
+  bool diagnoseAsError() override;
+};
+
+class TooManyDynamicMemberLookupsFailure final : public FailureDiagnostic {
+  DeclNameRef Name;
+
+public:
+  TooManyDynamicMemberLookupsFailure(const Solution &solution, DeclNameRef name,
+                                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), Name(name) {}
 
   bool diagnoseAsError() override;
 };

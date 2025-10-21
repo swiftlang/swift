@@ -17,6 +17,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DistributedDecl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
@@ -61,7 +62,8 @@ void SILFunctionBuilder::addFunctionAttributes(
   // function as force emitting all optremarks including assembly vision
   // remarks. This allows us to emit the assembly vision remarks without needing
   // to change any of the underlying optremark mechanisms.
-  if (Attrs.getAttribute(DeclAttrKind::EmitAssemblyVisionRemarks))
+  if (Attrs.getAttribute(DeclAttrKind::EmitAssemblyVisionRemarks) ||
+      M.getOptions().EnableGlobalAssemblyVision)
     F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
 
   // Propagate @_specialize.
@@ -124,6 +126,12 @@ void SILFunctionBuilder::addFunctionAttributes(
         F->setEffectsKind(effectsAttr->getKind());
       }
     }
+
+    if (constant.isFunc() && constant.hasFuncDecl()) {
+      auto func = constant.getFuncDecl();
+      if (auto *EA = ExternAttr::find(Attrs, ExternKind::C))
+        F->setAsmName(EA->getCName(func));
+    }
   }
 
   if (!customEffects.empty()) {
@@ -169,7 +177,7 @@ void SILFunctionBuilder::addFunctionAttributes(
   for (auto *EA : Attrs.getAttributes<ExposeAttr>()) {
     bool shouldExportDecl = true;
     if (Attrs.hasAttribute<CDeclAttr>()) {
-      // If the function is marked with @cdecl, expose only C compatible
+      // If the function is marked with @c, expose only C compatible
       // thunk function.
       shouldExportDecl = constant.isNativeToForeignThunk();
     }
@@ -202,6 +210,8 @@ void SILFunctionBuilder::addFunctionAttributes(
     F->setPerfConstraints(PerformanceConstraints::NoExistentials);
   } else if (Attrs.hasAttribute<NoObjCBridgingAttr>()) {
     F->setPerfConstraints(PerformanceConstraints::NoObjCBridging);
+  } else if (Attrs.hasAttribute<ManualOwnershipAttr>()) {
+    F->setPerfConstraints(PerformanceConstraints::ManualOwnership);
   }
 
   if (Attrs.hasAttribute<LexicalLifetimesAttr>()) {
@@ -334,6 +344,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   Inline_t inlineStrategy = InlineDefault;
   if (constant.isNoinline())
     inlineStrategy = NoInline;
+  else if (constant.isUnderscoredAlwaysInline())
+    inlineStrategy = HeuristicAlwaysInline;
   else if (constant.isAlwaysInline())
     inlineStrategy = AlwaysInline;
 
@@ -402,6 +414,21 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
               && "addFunctionAttributes() on ABI-only decl?");
     addFunctionAttributes(F, decl->getAttrs(), mod, getOrCreateDeclaration,
                           constant);
+  } else if (auto *ce = constant.getAbstractClosureExpr()) {
+    if (mod.getOptions().EnableGlobalAssemblyVision) {
+      F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
+    } else {
+      // Add the attribute to a closure if the enclosing method has it.
+      auto decl = ce->getParent()->getInnermostDeclarationDeclContext();
+      if (decl &&
+          decl->getAttrs().getAttribute(DeclAttrKind::EmitAssemblyVisionRemarks)) {
+        F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
+      }
+    }
+  } else {
+    if (mod.getOptions().EnableGlobalAssemblyVision) {
+      F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
+    }
   }
 
   return F;

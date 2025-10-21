@@ -267,7 +267,7 @@ public:
 /// Request the nominal declaration extended by a given extension declaration.
 class ExtendedNominalRequest
     : public SimpleRequest<
-          ExtendedNominalRequest, NominalTypeDecl *(ExtensionDecl *, bool),
+          ExtendedNominalRequest, NominalTypeDecl *(const ExtensionDecl *),
           RequestFlags::SeparatelyCached | RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -276,8 +276,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  NominalTypeDecl * evaluate(Evaluator &evaluator, ExtensionDecl *ext,
-                             bool excludeMacroExpansions) const;
+  NominalTypeDecl * evaluate(Evaluator &evaluator, const ExtensionDecl *ext) const;
 
 public:
   // Separate caching.
@@ -351,10 +350,10 @@ private:
 
 /// Request the nominal type declaration to which the given custom
 /// attribute refers.
-class CustomAttrNominalRequest :
-    public SimpleRequest<CustomAttrNominalRequest,
-                         NominalTypeDecl *(CustomAttr *, DeclContext *),
-                         RequestFlags::Cached> {
+class CustomAttrNominalRequest
+    : public SimpleRequest<CustomAttrNominalRequest,
+                           NominalTypeDecl *(CustomAttr *),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -362,8 +361,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  NominalTypeDecl *
-  evaluate(Evaluator &evaluator, CustomAttr *attr, DeclContext *dc) const;
+  NominalTypeDecl *evaluate(Evaluator &evaluator, CustomAttr *attr) const;
 
 public:
   // Caching
@@ -651,7 +649,7 @@ public:
   DeclContext *getDC() const {
     if (auto *module = getModule())
       return module;
-    return fileOrModule.get<FileUnit *>();
+    return cast<FileUnit *>(fileOrModule);
   }
 
   friend llvm::hash_code hash_value(const OperatorLookupDescriptor &desc) {

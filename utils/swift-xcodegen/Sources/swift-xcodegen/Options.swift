@@ -242,10 +242,13 @@ struct MiscOptions: ParsableArguments {
     """)
   var projectRootDir: AnyPath?
 
-  @Option(help: """
-    The output directory to write the Xcode project to. Defaults to the project
-    root directory.
-    """)
+  @Option(
+    name: .shortAndLong,
+    help: """
+      The output directory to write the Xcode project to. Defaults to the
+      project root directory.
+      """
+  )
   var outputDir: AnyPath?
 
   @Option(help: "The log level verbosity (default: info)")

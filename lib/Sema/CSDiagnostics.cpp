@@ -96,42 +96,12 @@ Type FailureDiagnostic::getRawType(ASTNode node) const {
 
 Type FailureDiagnostic::resolveType(Type rawType, bool reconstituteSugar,
                                     bool wantRValue) const {
-  rawType = rawType.transformRec([&](Type type) -> std::optional<Type> {
-    if (auto *typeVar = type->getAs<TypeVariableType>()) {
-      auto resolvedType = S.simplifyType(typeVar);
+  rawType = S.simplifyType(rawType);
 
-      if (!resolvedType->hasUnresolvedType())
-        return resolvedType;
-
-      // If type variable was simplified to an unresolved pack expansion
-      // type, let's examine its original pattern type because it could
-      // contain type variables replaceable with their generic parameter
-      // types.
-      if (auto *expansion = resolvedType->getAs<PackExpansionType>()) {
-        auto *locator = typeVar->getImpl().getLocator();
-        auto *openedExpansionTy =
-            locator->castLastElementTo<LocatorPathElt::PackExpansionType>()
-                .getOpenedType();
-        auto patternType = resolveType(openedExpansionTy->getPatternType());
-        return PackExpansionType::get(patternType, expansion->getCountType());
-      }
-
-      Type GP = typeVar->getImpl().getGenericParameter();
-      return resolvedType->is<UnresolvedType>() && GP
-          ? ErrorType::get(GP)
-          : resolvedType;
-    }
-
-    if (type->hasElementArchetype()) {
-      auto *env = getDC()->getGenericEnvironmentOfContext();
-      return env->mapElementTypeIntoPackContext(type);
-    }
-
-    if (type->isPlaceholder())
-      return Type(type->getASTContext().TheUnresolvedType);
-
-    return std::nullopt;
-  });
+  if (rawType->hasElementArchetype()) {
+    auto *env = getDC()->getGenericEnvironmentOfContext();
+    rawType = env->mapElementTypeIntoPackContext(rawType);
+  }
 
   if (reconstituteSugar)
     rawType = rawType->reconstituteSugar(/*recursive*/ true);
@@ -183,7 +153,7 @@ StringRef FailureDiagnostic::getEditorPlaceholder(
     llvm::SmallVectorImpl<char> &scratch) const {
   llvm::raw_svector_ostream OS(scratch);
   OS << "<#";
-  if (!ty || ty->is<UnresolvedType>()) {
+  if (!ty || ty->isBareErrorType()) {
     OS << description;
   } else {
     OS << "T##";
@@ -234,6 +204,11 @@ Type FailureDiagnostic::restoreGenericParameters(
 bool FailureDiagnostic::conformsToKnownProtocol(
     Type type, KnownProtocolKind protocol) const {
   return TypeChecker::conformsToKnownProtocol(type, protocol);
+}
+
+bool FallbackDiagnostic::diagnoseAsError() {
+  getConstraintSystem().maybeProduceFallbackDiagnostic(getLoc());
+  return true;
 }
 
 Type RequirementFailure::getOwnerType() const {
@@ -396,6 +371,22 @@ ValueDecl *RequirementFailure::getDeclRef() const {
 
       return decl;
     }
+  }
+
+  if (auto *closure = getAsExpr<ClosureExpr>(getRawAnchor())) {
+    if (auto argElt =
+            getLocator()->getFirstElementAs<LocatorPathElt::TupleElement>()) {
+      auto *param = (*closure->getParameters())[argElt->getIndex()];
+      return getAffectedDeclFromType(getType(param));
+    }
+  }
+
+  // If this is a key path to function conversion, the requirements come
+  // from a key path type implicitly formed by the solver.
+  if (isExpr<KeyPathExpr>(getRawAnchor()) &&
+      getLocator()->isFirstElement<LocatorPathElt::KeyPathType>() &&
+      getOwnerType()->is<FunctionType>()) {
+    return getASTContext().getKeyPathDecl();
   }
 
   return getAffectedDeclFromType(getOwnerType());
@@ -640,7 +631,7 @@ bool MissingConformanceFailure::diagnoseAsError() {
           auto path = fix->getLocator()->getPath();
           SourceRange range;
           simplifyLocator(anchor, path, range);
-          if (anchor && anchor.is<Expr *>())
+          if (anchor && isa<Expr *>(anchor))
             anchors.insert(getAsExpr(anchor));
         }
       }
@@ -671,15 +662,17 @@ bool MissingConformanceFailure::diagnoseAsError() {
     };
 
     // Limit this to `Equatable` and `Comparable` protocols for now.
-    auto *protocol = getRHS()->castTo<ProtocolType>()->getDecl();
-    if (isEnumWithAssociatedValues(getLHS()) &&
-        (protocol->isSpecificProtocol(KnownProtocolKind::Equatable) ||
-         protocol->isSpecificProtocol(KnownProtocolKind::Comparable))) {
-      if (RequirementFailure::diagnoseAsError()) {
-        auto opName = getOperatorName(expr);
-        emitDiagnostic(diag::no_binary_op_overload_for_enum_with_payload,
-                       opName->str());
-        return true;
+    if (auto *protocolTy = getRHS()->getAs<ProtocolType>()) {
+      auto *protocol = protocolTy->getDecl();
+      if (isEnumWithAssociatedValues(getLHS()) &&
+          (protocol->isSpecificProtocol(KnownProtocolKind::Equatable) ||
+           protocol->isSpecificProtocol(KnownProtocolKind::Comparable))) {
+        if (RequirementFailure::diagnoseAsError()) {
+          auto opName = getOperatorName(expr);
+          emitDiagnostic(diag::no_binary_op_overload_for_enum_with_payload,
+                         opName->str());
+          return true;
+        }
       }
     }
   }
@@ -869,7 +862,6 @@ GenericArgumentsMismatchFailure::getDiagnosticFor(
 
   case CTP_CaseStmt:
   case CTP_ThrowStmt:
-  case CTP_ForEachStmt:
   case CTP_ForEachSequence:
   case CTP_ComposedPropertyWrapper:
   case CTP_Unused:
@@ -1913,7 +1905,6 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
                                                       "#default value#"
                                                       "> }");
         }
-        diag.flush();
 
         offerDefaultValueUnwrapFixIt(varDecl->getDeclContext(), initializer);
         offerForceUnwrapFixIt(initializer);
@@ -2241,7 +2232,7 @@ bool AssignmentFailure::diagnoseAsError() {
 
       auto type = getType(immutableExpr);
 
-      if (isKnownKeyPathType(type))
+      if (type->isKnownKeyPathType())
         message += " is read-only";
       else if (VD->isCaptureList())
         message += " is an immutable capture";
@@ -2444,9 +2435,10 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
       const auto &declRef = SE->getDecl();
       if (auto *subscript =
               dyn_cast_or_null<SubscriptDecl>(declRef.getDecl())) {
-        if (isImmutable(subscript))
-          return {expr, OverloadChoice(getType(SE->getBase()), subscript,
-                                       FunctionRefInfo::doubleBaseNameApply())};
+        if (isImmutable(subscript)) {
+          return {expr, OverloadChoice::getDecl(getType(SE->getBase()), subscript,
+                                                FunctionRefInfo::doubleBaseNameApply())};
+        }
       }
     }
 
@@ -2501,8 +2493,8 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     // If the member isn't settable, then it is the problem: return it.
     if (auto member = dyn_cast<AbstractStorageDecl>(MRE->getMember().getDecl()))
       if (isImmutable(member))
-        return {expr, OverloadChoice(getType(MRE->getBase()), member,
-                                     FunctionRefInfo::singleBaseNameApply())};
+        return {expr, OverloadChoice::getDecl(getType(MRE->getBase()), member,
+                                              FunctionRefInfo::singleBaseNameApply())};
 
     // If we weren't able to resolve a member or if it is mutable, then the
     // problem must be with the base, recurse.
@@ -2522,8 +2514,8 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
   }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
-    return {expr, OverloadChoice(Type(), DRE->getDecl(),
-                                 FunctionRefInfo::unappliedBaseName())};
+    return {expr, OverloadChoice::getDecl(DRE->getDecl(),
+                                          FunctionRefInfo::unappliedBaseName())};
 
   // Look through x!
   if (auto *FVE = dyn_cast<ForceValueExpr>(expr))
@@ -2773,7 +2765,7 @@ bool ContextualFailure::diagnoseAsError() {
       }
     }
 
-    if (CTP == CTP_ForEachStmt || CTP == CTP_ForEachSequence) {
+    if (CTP == CTP_ForEachSequence) {
       if (fromType->isAnyExistentialType()) {
         Type constraintType = fromType;
         if (auto existential = constraintType->getAs<ExistentialType>())
@@ -2831,10 +2823,7 @@ bool ContextualFailure::diagnoseAsError() {
     auto params = fnType->getParams();
 
     ParameterListInfo info(
-        params, choice,
-        hasAppliedSelf(overload->choice, [&solution](Type type) {
-          return solution.simplifyType(type);
-        }));
+        params, choice, hasAppliedSelf(solution, overload->choice));
     auto numMissingArgs = llvm::count_if(
         indices(params), [&info](const unsigned paramIdx) -> bool {
           return !info.hasDefaultArgument(paramIdx);
@@ -2975,7 +2964,6 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_CaseStmt:
   case CTP_ThrowStmt:
   case CTP_DiscardStmt:
-  case CTP_ForEachStmt:
   case CTP_ForEachSequence:
   case CTP_YieldByReference:
   case CTP_WrappedProperty:
@@ -3143,7 +3131,7 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
   if (tryIntegerCastFixIts(diagnostic))
     return;
 
-  if (tryProtocolConformanceFixIt(diagnostic))
+  if (tryProtocolConformanceFixIt())
     return;
 
   if (tryTypeCoercionFixIt(diagnostic))
@@ -3514,8 +3502,7 @@ bool ContextualFailure::tryTypeCoercionFixIt(
   return false;
 }
 
-bool ContextualFailure::tryProtocolConformanceFixIt(
-    InFlightDiagnostic &diagnostic) const {
+bool ContextualFailure::tryProtocolConformanceFixIt() const {
   auto innermostTyCtx = getDC()->getInnermostTypeContext();
   if (!innermostTyCtx)
     return false;
@@ -3548,8 +3535,6 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
                           unwrappedToType->isExistentialType();
   if (!shouldOfferFixIt)
     return false;
-
-  diagnostic.flush();
 
   // Let's build a list of protocols that the context does not conform to.
   SmallVector<std::string, 8> missingProtoTypeStrings;
@@ -3766,7 +3751,6 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
     return diag::cannot_match_value_with_pattern;
 
   case CTP_ThrowStmt:
-  case CTP_ForEachStmt:
   case CTP_ForEachSequence:
   case CTP_ComposedPropertyWrapper:
   case CTP_Unused:
@@ -4083,7 +4067,6 @@ bool SubscriptMisuseFailure::diagnoseAsError() {
   } else {
     diag.fixItReplace(SourceRange(memberExpr->getDotLoc(), memberExpr->getLoc()), "[<#index#>]");
   }
-  diag.flush();
 
   if (auto overload = getOverloadChoiceIfAvailable(locator)) {
     emitDiagnosticAt(overload->choice.getDecl(), diag::kind_declared_here,
@@ -4789,6 +4772,8 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
     case AccessorKind::Modify2:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
       PD = SD->getIndices()->get(idx);
       break;
     }
@@ -4862,7 +4847,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
   auto anchor = getAnchor();
 
-  if (!anchor.is<Expr *>())
+  if (!isa<Expr *>(anchor))
     return false;
 
   Expr *expr = findParentExpr(castToExpr(anchor));
@@ -5348,8 +5333,6 @@ bool MissingArgumentsFailure::diagnoseAsError() {
     diag.fixItInsertAfter(getRawAnchor().getEndLoc(), fixIt.str());
   }
 
-  diag.flush();
-
   if (auto selectedOverload = getCalleeOverloadChoiceIfAvailable(locator)) {
     if (auto *decl = selectedOverload->choice.getDeclOrNull()) {
       emitDiagnosticAt(decl, diag::decl_declared_here, decl);
@@ -5668,7 +5651,7 @@ bool MissingArgumentsFailure::diagnoseMissingResultBuilderElement() const {
   auto fixIt = getEditorPlaceholder("result", paramType, scratch);
   auto fixItLoc = call->getStartLoc();
 
-  if (paramType->is<UnresolvedType>()) {
+  if (paramType->isBareErrorType()) {
     emitDiagnostic(diag::result_builder_missing_element,
                    resultBuilder->getName())
         .fixItInsertAfter(fixItLoc, fixIt);
@@ -5716,8 +5699,6 @@ bool MissingArgumentsFailure::diagnoseInvalidTupleDestructuring() const {
   if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
     diagnostic.fixItRemove(TE->getLParenLoc()).fixItRemove(TE->getRParenLoc());
   }
-
-  diagnostic.flush();
 
   // Add a note which points to the overload choice location.
   emitDiagnosticAt(decl, diag::decl_declared_here, decl);
@@ -5793,7 +5774,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
   auto argType = solution.simplifyType(solution.getType(unaryArg));
   auto paramType = fnType->getParams()[1].getPlainType();
 
-  if (isExpr<ClosureExpr>(unaryArg) && argType->is<UnresolvedType>()) {
+  if (isExpr<ClosureExpr>(unaryArg) && argType->is<ErrorType>()) {
     auto unwrappedParamTy = paramType->lookThroughAllOptionalTypes();
     if (unwrappedParamTy->is<FunctionType>() || unwrappedParamTy->isAny())
       return true;
@@ -5947,7 +5928,7 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
     };
 
     auto isValidType = [](Type resultType) -> bool {
-      return resultType && !resultType->hasUnresolvedType() &&
+      return resultType && !resultType->hasError() &&
              !resultType->hasTypeVariable();
     };
 
@@ -5961,7 +5942,7 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
         nameOS << "<#Result#>";
     }
 
-    if (auto stmt = bodyStmts.front().get<Stmt *>()) {
+    if (auto *stmt = cast<Stmt *>(bodyStmts.front())) {
       // If the body is a single expression with implicit return.
       if (isa<ReturnStmt>(stmt) && stmt->isImplicit()) {
         // And there is non-void expected result type,
@@ -6118,8 +6099,6 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
         return true;
       }
     }
-
-    diag.flush();
 
     // If all of the parameters are anonymous, let's point out references
     // to make it explicit where parameters are used in complex closure body,
@@ -6398,7 +6377,8 @@ SourceLoc KeyPathSubscriptIndexHashableFailure::getLoc() const {
   auto *locator = getLocator();
 
   if (locator->isKeyPathSubscriptComponent() ||
-      locator->isKeyPathMemberComponent()) {
+      locator->isKeyPathMemberComponent() ||
+      locator->isKeyPathApplyComponent()) {
     auto *KPE = castToExpr<KeyPathExpr>(getAnchor());
     if (auto kpElt = locator->findFirst<LocatorPathElt::KeyPathComponent>())
       return KPE->getComponents()[kpElt->getIndex()].getLoc();
@@ -6410,7 +6390,7 @@ SourceLoc KeyPathSubscriptIndexHashableFailure::getLoc() const {
 bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
   auto *locator = getLocator();
   emitDiagnostic(diag::expr_keypath_arg_or_index_not_hashable,
-                 !locator->isKeyPathMemberComponent(),
+                 !locator->isKeyPathApplyComponent(),
                  resolveType(NonConformingType));
   return true;
 }
@@ -6482,6 +6462,12 @@ bool InvalidMutatingMethodRefInKeyPath::diagnoseAsError() {
 
 bool InvalidAsyncOrThrowsMethodRefInKeyPath::diagnoseAsError() {
   emitDiagnostic(diag::effectful_keypath_component, getMember(),
+                 isForKeyPathDynamicMemberLookup());
+  return true;
+}
+
+bool InvalidTypeRefInKeyPath::diagnoseAsError() {
+  emitDiagnostic(diag::expr_keypath_type_ref, getMember(),
                  isForKeyPathDynamicMemberLookup());
   return true;
 }
@@ -6602,9 +6588,8 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     // If this is a conversion failure related to binding of `for-each`
     // statement it has to be diagnosed as pattern match if there are
     // holes present in the contextual type.
-    if ((purpose == ContextualTypePurpose::CTP_ForEachStmt ||
-         purpose == ContextualTypePurpose::CTP_ForEachSequence) &&
-        contextualType->hasUnresolvedType()) {
+    if (purpose == ContextualTypePurpose::CTP_ForEachSequence &&
+        contextualType->hasError()) {
       auto diagnostic = emitDiagnostic(
           (contextualType->is<TupleType>() && !eltType->is<TupleType>())
               ? diag::cannot_match_expr_tuple_pattern_with_nontuple_value
@@ -6856,7 +6841,7 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
     return;
 
   auto *GTD = dyn_cast<GenericTypeDecl>(paramDC);
-  if (!GTD || anchor.is<Expr *>())
+  if (!GTD || isa<Expr *>(anchor))
     return;
 
   auto getParamDecl =
@@ -6996,7 +6981,7 @@ SourceLoc SkipUnhandledConstructInResultBuilderFailure::getLoc() const {
   if (auto stmt = unhandled.dyn_cast<Stmt *>())
     return stmt->getStartLoc();
 
-  return unhandled.get<Decl *>()->getLoc();
+  return cast<Decl *>(unhandled)->getLoc();
 }
 
 /// Determine whether the given "if" chain has a missing "else".
@@ -7472,10 +7457,10 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 
   // Unresolved key path argument requires a tailored diagnostic
   // that doesn't mention a fallback type - `KeyPath<_, _>`.
-  if (argType->isKeyPath() && !isKnownKeyPathType(paramType)) {
+  if (argType->isKeyPath() && !paramType->isKnownKeyPathType()) {
     auto keyPathTy = argType->castTo<BoundGenericType>();
     auto rootTy = keyPathTy->getGenericArgs()[0];
-    if (rootTy->is<UnresolvedType>()) {
+    if (rootTy->isBareErrorType()) {
       emitDiagnostic(diag::cannot_convert_unresolved_key_path_argument_value,
                      paramType);
       return true;
@@ -7612,7 +7597,7 @@ bool ArgumentMismatchFailure::diagnosePatternMatchingMismatch() const {
   auto rhsType = getType(rhsExpr);
 
   auto diagnostic =
-      lhsType->is<UnresolvedType>()
+      lhsType->isBareErrorType()
           ? emitDiagnostic(
                 diag::cannot_match_unresolved_expr_pattern_with_value, rhsType)
           : emitDiagnostic(diag::cannot_match_expr_pattern_with_value, lhsType,
@@ -7837,7 +7822,7 @@ bool ArgumentMismatchFailure::diagnoseKeyPathAsFunctionResultMismatch() const {
   auto argType = getFromType();
   auto paramType = getToType();
 
-  if (!isKnownKeyPathType(argType))
+  if (!argType->isKnownKeyPathType())
     return false;
 
   auto kpType = argType->castTo<BoundGenericType>();
@@ -8204,6 +8189,20 @@ bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
   return false;
 }
 
+bool NonMetatypeDynamicTypeFailure::diagnoseAsError() {
+  auto instanceTy = getFromType();
+  auto metatypeTy = getToType();
+  if (instanceTy->isBareErrorType()) {
+    emitDiagnostic(diag::cannot_convert_typeof_to_non_metatype, metatypeTy)
+        .highlight(getSourceRange());
+  } else {
+    emitDiagnostic(diag::cannot_convert_metatype_to_non_metatype,
+                   MetatypeType::get(instanceTy), metatypeTy)
+        .highlight(getSourceRange());
+  }
+  return true;
+}
+
 bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
   auto *anchor = castToExpr(getAnchor());
   // Member reference could be wrapped into a number of parens
@@ -8271,7 +8270,7 @@ bool UnableToInferClosureParameterType::diagnoseAsError() {
       if (parentExpr) {
         // Missing or invalid member reference in call.
         if (auto *AE = dyn_cast<ApplyExpr>(parentExpr)) {
-          if (getType(AE->getFn())->is<UnresolvedType>())
+          if (getType(AE->getFn())->is<ErrorType>())
             return false;
         }
 
@@ -8614,8 +8613,6 @@ void MissingRawRepresentableInitFailure::fixIt(
           .fixItInsert(range.Start, rawReprObjType->getString() + "(rawValue: ")
           .fixItInsertAfter(range.End, ")");
     } else if (valueObjType) {
-      diagnostic.flush();
-
       std::string fixItBefore = RawReprType->getString() + "(rawValue: ";
       std::string fixItAfter;
 
@@ -9262,9 +9259,10 @@ bool NoopCheckedCast::diagnoseForcedCastExpr() const {
   }
 
   if (fromType->isEqual(toType)) {
-    auto castTypeRepr = expr->getCastTypeRepr();
-    emitDiagnostic(diag::forced_downcast_noop, toType)
-        .fixItRemove(SourceRange(diagLoc, castTypeRepr->getSourceRange().End));
+    auto diag = emitDiagnostic(diag::forced_downcast_noop, toType);
+    if (auto castTypeRepr = expr->getCastTypeRepr()) {
+      diag.fixItRemove(SourceRange(diagLoc, castTypeRepr->getSourceRange().End));
+    }
 
   } else {
     emitDiagnostic(diag::forced_downcast_coercion, fromType, toType)
@@ -9626,6 +9624,12 @@ bool InvalidTypeAsKeyPathSubscriptIndex::diagnoseAsError() {
 
 bool IncorrectInlineArrayLiteralCount::diagnoseAsError() {
   emitDiagnostic(diag::inlinearray_literal_incorrect_count, lhsCount, rhsCount);
+  return true;
+}
+
+bool TooManyDynamicMemberLookupsFailure::diagnoseAsError() {
+  emitDiagnostic(diag::too_many_dynamic_member_lookups, Name)
+      .highlight(getSourceRange());
   return true;
 }
 

@@ -17,7 +17,7 @@ import Cxx
 // CHECK-LABEL: } // end sil function '$sSo3stdO3__1O0065vectorCUnsignedIntstd__1allocatorCUnsignedInt_dDGIrdqahddCJdFaAjaV3Cxx0B8SequenceSCAgHP13__beginUnsafe11RawIteratorQzyFTW'
 // CHECK-LABEL: sil {{.*}}[ossa] @$sSo3stdO{{(3__1O)?}}0047___wrap_iterUnsafePointerCUnsignedInt_heCInnaEgaVSQSCSQ2eeoiySbx_xtFZTW : {{.*}} {
 // CHECK:       bb0([[LHS:%[^,]+]] : $std.__1.__wrap_iter<UnsafePointer<CUnsignedInt>>, [[RHS:%[^,]+]] :
-// CHECK:         [[CALLEE:%[^,]+]] = function_ref @$sSo2eeoiySbSo3stdO{{(3__1O)?}}0047___wrap_iterUnsafePointerCUnsignedInt_heCInnaEgaV_AGtFTO
+// CHECK:         [[CALLEE:%[^,]+]] = function_ref @_ZNSt3__1eqB8ne{{.*}}IPKjEEbRKNS_11__wrap_iterIT_EES7_
 // CHECK:         [[EQUAL:%[^,]+]] = apply [[CALLEE]]([[LHS]], [[RHS]])
 // CHECK:         return [[EQUAL]]
 // CHECK-LABEL: } // end sil function '$sSo3stdO{{(3__1O)?}}0047___wrap_iterUnsafePointerCUnsignedInt_heCInnaEgaVSQSCSQ2eeoiySbx_xtFZTW'

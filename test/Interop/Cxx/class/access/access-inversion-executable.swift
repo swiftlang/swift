@@ -28,7 +28,7 @@ AccessInversionTestSuite.test("usePrivateRec") {
 }
 
 AccessInversionTestSuite.test("usePrivateEnum") {
-    let e = Leaky.AliasToPrivateEnum(rawValue: 0)!
+    let e = Leaky.AliasToPrivateEnum(rawValue: 0)
     expectEqual(e.rawValue, 0)
 }
 

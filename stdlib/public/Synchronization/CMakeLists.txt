@@ -80,6 +80,13 @@ set(SWIFT_SYNCHRONIZATION_WINDOWS_SOURCES
   Mutex/WindowsImpl.swift
 )
 
+# OpenBSD sources
+
+set(SWIFT_SYNCHRONIZATION_OPENBSD_SOURCES
+  Mutex/Mutex.swift
+  Mutex/OpenBSDImpl.swift
+)
+
 set(SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS
   ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   "-enable-builtin-module"
@@ -89,7 +96,7 @@ set(SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS
   "-strict-memory-safety"
 )
 
-add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IMPORTS_NON_OSSA 
+add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${SWIFT_SYNCHRONIZATION_SOURCES}
 
   GYB_SOURCES
@@ -115,6 +122,8 @@ add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES
     ${SWIFT_SYNCHRONIZATION_WINDOWS_SOURCES}
   SWIFT_SOURCES_DEPENDS_FREEBSD
     ${SWIFT_SYNCHRONIZATION_FREEBSD_SOURCES}
+  SWIFT_SOURCES_DEPENDS_OPENBSD
+    ${SWIFT_SYNCHRONIZATION_OPENBSD_SOURCES}
   SWIFT_SOURCES_DEPENDS_FREESTANDING
     Mutex/MutexUnavailable.swift
 
@@ -139,6 +148,8 @@ add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES
   SWIFT_MODULE_DEPENDS_WINDOWS
     WinSDK
   SWIFT_MODULE_DEPENDS_FREEBSD
+    Glibc
+  SWIFT_MODULE_DEPENDS_OPENBSD
     Glibc
 
   SWIFT_COMPILE_FLAGS
@@ -178,6 +189,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
+    if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
+      set(SWIFT_SDK_embedded_ARCH_${arch}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
+    endif()
     add_swift_target_library_single(
       embedded-synchronization-${mod}
       swiftSynchronization

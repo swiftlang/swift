@@ -43,6 +43,28 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
   return var;
 }
 
+ModuleDecl *SILGlobalVariable::getParentModule() const {
+  return ParentModule ? ParentModule : getModule().getSwiftModule();
+}
+
+static bool isGlobalLet(SILModule &mod, VarDecl *decl, SILType type) {
+  if (!decl)
+    return false;
+
+  if (!decl->isLet())
+    return false;
+
+  // Raw-layout storage may be mutated even for let-variables. Therefore don't
+  // treat such variables as `let` in SIL.
+  auto teCtxt = TypeExpansionContext::maximal(mod.getSwiftModule(),
+                                              mod.isWholeModule());
+  auto typeProps = mod.Types.getTypeProperties(type, teCtxt);
+  if (typeProps.isOrContainsRawLayout())
+    return false;
+
+  return true;
+}
+
 SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
                                      SerializedKind_t serializedKind,
                                      StringRef Name, SILType LoweredType,
@@ -53,7 +75,8 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
       Linkage(unsigned(Linkage)), HasLocation(Loc.has_value()), VDecl(Decl) {
   setSerializedKind(serializedKind);
   IsDeclaration = isAvailableExternally(Linkage);
-  setLet(Decl ? Decl->isLet() : false);
+  setLet(isGlobalLet(Module, Decl, LoweredType));
+  setMarkedAsUsed(Decl && Decl->getAttrs().hasAttribute<UsedAttr>());
   Module.silGlobals.push_back(this);
 }
 
@@ -65,8 +88,33 @@ bool SILGlobalVariable::isPossiblyUsedExternally() const {
   if (shouldBePreservedForDebugger())
     return true;
 
+  if (markedAsUsed())
+    return true;
+
+  if (!section().empty())
+    return true;
+
   SILLinkage linkage = getLinkage();
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
+}
+
+bool SILGlobalVariable::hasNonUniqueDefinition() const {
+  // Non-uniqueness is a property of the Embedded linkage model.
+  auto &ctx = getModule().getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  // If this is for a declaration, ask it.
+  if (auto decl = getDecl()) {
+    return SILDeclRef::declHasNonUniqueDefinition(decl);
+  }
+
+  // If this variable is from a different module than the one we are emitting
+  // code for, then it must have a non-unique definition.
+  if (getParentModule() != getModule().getSwiftModule())
+    return true;
+
+  return false;
 }
 
 bool SILGlobalVariable::shouldBePreservedForDebugger() const {
@@ -103,7 +151,7 @@ SILInstruction *SILGlobalVariable::getStaticInitializerValue() {
 }
 
 bool SILGlobalVariable::mustBeInitializedStatically() const {
-  if (getSectionAttr())
+  if (!section().empty())
     return true;
 
   auto *decl = getDecl();  

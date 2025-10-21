@@ -22,6 +22,7 @@ module std {
   header "algorithm"
   header "bitset"
   header "complex"
+  header "cstddef"
   header "deque"
   header "exception"
   header "fstream"

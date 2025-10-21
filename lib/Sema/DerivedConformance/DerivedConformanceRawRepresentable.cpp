@@ -129,9 +129,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
     auto body = BraceStmt::create(C, SourceLoc(),
                                   ASTNode(returnStmt), SourceLoc());
 
-    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                     labelItem, SourceLoc(), SourceLoc(), body,
-                                     /*case body var decls*/ std::nullopt));
+    cases.push_back(
+        CaseStmt::createImplicit(C, CaseParentKind::Switch, labelItem, body));
   }
 
   auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
@@ -154,7 +153,7 @@ static void maybeMarkAsInlinable(DerivedConformance &derived,
     if (auto *attr = afd->getAttrs().getAttribute<UsableFromInlineAttr>())
       attr->setInvalid();
     if (access.isPublic())
-      afd->getAttrs().add(new (C) InlinableAttr(/*implicit*/false));
+      afd->addAttribute(new (C) InlinableAttr(/*implicit*/ false));
   }
 }
 
@@ -218,8 +217,7 @@ struct RuntimeVersionCheck {
     // This won't be filled in by TypeCheckAvailability because we have
     // invalid SourceLocs in this area of the AST.
     availableInfo->setAvailabilityQuery(AvailabilityQuery::dynamic(
-        domain, /*isUnavailable=*/false, AvailabilityRange(getVersionRange()),
-        std::nullopt));
+        domain, AvailabilityRange(getVersionRange()), std::nullopt));
 
     // earlyReturnBody = "{ return nil }"
     auto earlyReturn = new (C) FailStmt(SourceLoc(), SourceLoc());
@@ -364,10 +362,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
                                   stmts, SourceLoc());
 
     // cases.append("case \(litPat): \(body)")
-    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                     CaseLabelItem(litPat), SourceLoc(),
-                                     SourceLoc(), body,
-                                     /*case body var decls*/ std::nullopt));
+    cases.push_back(CaseStmt::createImplicit(C, CaseParentKind::Switch,
+                                             CaseLabelItem(litPat), body));
     ++Idx;
   }
 
@@ -377,10 +373,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   auto dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
   auto dfltBody = BraceStmt::create(C, SourceLoc(),
                                     ASTNode(dfltReturnStmt), SourceLoc());
-  cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                   dfltLabelItem, SourceLoc(), SourceLoc(),
-                                   dfltBody,
-                                   /*case body var decls*/ std::nullopt));
+  cases.push_back(CaseStmt::createImplicit(C, CaseParentKind::Switch,
+                                           dfltLabelItem, dfltBody));
 
   auto rawDecl = initDecl->getParameters()->get(0);
   auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);

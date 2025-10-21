@@ -36,7 +36,7 @@
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server
 
 // RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %target-swift-frontend \
-// RUN:   -typecheck -verify \
+// RUN:   -typecheck -verify -verify-ignore-unrelated \
 // RUN:   -I %t \
 // RUN:   -swift-version 5 \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \
@@ -64,6 +64,7 @@
 // CHECK-NEXT: <-(plugin:[[#PID3]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
 // CHECK-NEXT: ->(plugin:[[#PID3]]) {"expandFreestandingMacro":{"discriminator":"{{.*}}","lexicalContext":{{.*}},"macro":{"moduleName":"MacroDefinition","name":"stringify","typeName":"StringifyMacro"}{{.*}}
 // CHECK-NEXT: <-(plugin:[[#PID3]]) {"expandMacroResult":{"diagnostics":[],"expandedSource":"(1, \"1\")"}}
+// CHECK-NEXT: ->(plugin:[[#PID3]]) {{$}}
 
 //--- MacroDefinition.swift
 import SwiftSyntax

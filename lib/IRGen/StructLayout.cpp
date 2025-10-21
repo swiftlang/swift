@@ -291,8 +291,7 @@ llvm::Constant *StructLayout::emitAlignMask(IRGenModule &IGM) const {
 Address StructLayout::emitCastTo(IRGenFunction &IGF,
                                  llvm::Value *ptr,
                                  const llvm::Twine &name) const {
-  llvm::Value *addr =
-    IGF.Builder.CreateBitCast(ptr, getType()->getPointerTo(), name);
+  llvm::Value *addr = IGF.Builder.CreateBitCast(ptr, IGF.IGM.PtrTy, name);
   return Address(addr, getType(), getAlignment());
 }
 
@@ -590,10 +589,17 @@ unsigned irgen::getNumFields(const NominalTypeDecl *target) {
 }
 
 bool irgen::isExportableField(Field field) {
-  if (field.getKind() == Field::Kind::Var &&
-      field.getVarDecl()->getClangDecl() &&
-      field.getVarDecl()->getFormalAccess() == AccessLevel::Private)
-    return false;
+  if (field.getKind() == Field::Kind::Var) {
+    if (field.getVarDecl()->getClangDecl() &&
+        field.getVarDecl()->getFormalAccess() == AccessLevel::Private)
+      return false;
+    // We should not be able to refer to anonymous types.
+    if (const auto *vd = dyn_cast_or_null<clang::ValueDecl>(
+            field.getVarDecl()->getClangDecl()))
+      if (const auto *rd = vd->getType()->getAsRecordDecl())
+        if (rd->isAnonymousStructOrUnion())
+          return false;
+  }
   // All other fields are exportable
   return true;
 }

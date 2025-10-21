@@ -1665,3 +1665,22 @@ bb0(%0 : $Int):
   dealloc_stack %1
   return %11
 }
+
+
+sil hidden [ossa] @$s_custom_not_demangable_name : $@convention(thin) <T> (@thick T.Type) -> () {
+bb0(%0 : $@thick T.Type):
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @call_custom_name :
+// CHECK:         function_ref @$s29$s_custom_not_demangable_nameSi_Ttg5 : $@convention(thin) () -> ()
+// CHECK:       } // end sil function 'call_custom_name'
+sil [ossa] @call_custom_name : $@convention(thin) () -> () {
+bb0:
+  %2 = function_ref @$s_custom_not_demangable_name : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> ()
+  %3 = metatype $@thick Int.Type
+  %4 = apply %2<Int>(%3) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}

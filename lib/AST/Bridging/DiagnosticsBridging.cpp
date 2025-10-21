@@ -39,19 +39,17 @@ const swift::DiagnosticInfo::FixIt &unbridge(const BridgedDiagnosticFixIt &fixit
   return *reinterpret_cast<const swift::DiagnosticInfo::FixIt *>(&fixit.storage);
 }
 
-BridgedDiagnosticFixIt::BridgedDiagnosticFixIt(BridgedSourceLoc start,
-                                               uint32_t length,
+BridgedDiagnosticFixIt::BridgedDiagnosticFixIt(SourceLoc start, uint32_t length,
                                                BridgedStringRef text) {
-  DiagnosticInfo::FixIt fixit(
-          CharSourceRange(start.unbridged(), length), text.unbridged(),
-          llvm::ArrayRef<DiagnosticArgument>());
+  DiagnosticInfo::FixIt fixit(CharSourceRange(start, length), text.unbridged(),
+                              llvm::ArrayRef<DiagnosticArgument>());
   *reinterpret_cast<swift::DiagnosticInfo::FixIt *>(&storage) = fixit;
 }
 
 void BridgedDiagnosticEngine_diagnose(
-    BridgedDiagnosticEngine bridgedEngine, BridgedSourceLoc loc, DiagID diagID,
+    BridgedDiagnosticEngine bridgedEngine, SourceLoc loc, DiagID diagID,
     BridgedArrayRef /*BridgedDiagnosticArgument*/ bridgedArguments,
-    BridgedSourceLoc highlightStart, uint32_t hightlightLength,
+    SourceLoc highlightStart, uint32_t hightlightLength,
     BridgedArrayRef /*BridgedDiagnosticFixIt*/ bridgedFixIts) {
   auto *D = bridgedEngine.unbridged();
 
@@ -59,12 +57,11 @@ void BridgedDiagnosticEngine_diagnose(
   for (auto arg : bridgedArguments.unbridged<BridgedDiagnosticArgument>()) {
     arguments.push_back(arg.unbridged());
   }
-  auto inflight = D->diagnose(loc.unbridged(), diagID, arguments);
+  auto inflight = D->diagnose(loc, diagID, arguments);
 
   // Add highlight.
-  if (highlightStart.unbridged().isValid()) {
-    CharSourceRange highlight(highlightStart.unbridged(),
-                              (unsigned)hightlightLength);
+  if (highlightStart.isValid()) {
+    CharSourceRange highlight(highlightStart, (unsigned)hightlightLength);
     inflight.highlightChars(highlight.getStart(), highlight.getEnd());
   }
 
@@ -77,12 +74,12 @@ void BridgedDiagnosticEngine_diagnose(
   }
 }
 
-BridgedSourceLoc BridgedDiagnostic_getLocationFromExternalSource(
-    BridgedDiagnosticEngine bridgedEngine, BridgedStringRef path,
-    SwiftInt line, SwiftInt column) {
+SourceLoc BridgedDiagnostic_getLocationFromExternalSource(
+    BridgedDiagnosticEngine bridgedEngine, BridgedStringRef path, SwiftInt line,
+    SwiftInt column) {
   auto *d = bridgedEngine.unbridged();
   auto loc = d->SourceMgr.getLocFromExternalSource(path.unbridged(), line, column);
-  return BridgedSourceLoc(loc.getOpaquePointerValue());
+  return loc;
 }
 
 bool BridgedDiagnosticEngine_hadAnyError(
@@ -114,15 +111,13 @@ struct BridgedDiagnostic::Impl {
   }
 };
 
-BridgedDiagnostic BridgedDiagnostic_create(BridgedSourceLoc cLoc,
+BridgedDiagnostic BridgedDiagnostic_create(SourceLoc loc,
                                            BridgedStringRef cText,
                                            DiagnosticKind severity,
                                            BridgedDiagnosticEngine cDiags) {
   StringRef origText = cText.unbridged();
   BridgedDiagnostic::Impl::Allocator alloc;
   StringRef text = origText.copy(alloc);
-
-  SourceLoc loc = cLoc.unbridged();
 
   Diag<StringRef> diagID;
   switch (severity) {
@@ -145,25 +140,16 @@ BridgedDiagnostic BridgedDiagnostic_create(BridgedSourceLoc cLoc,
 }
 
 /// Highlight a source range as part of the diagnostic.
-void BridgedDiagnostic_highlight(BridgedDiagnostic cDiag,
-                                 BridgedSourceLoc cStartLoc,
-                                 BridgedSourceLoc cEndLoc) {
-  SourceLoc startLoc = cStartLoc.unbridged();
-  SourceLoc endLoc = cEndLoc.unbridged();
-
+void BridgedDiagnostic_highlight(BridgedDiagnostic cDiag, SourceLoc startLoc,
+                                 SourceLoc endLoc) {
   BridgedDiagnostic::Impl *diag = cDiag.unbridged();
   diag->inFlight.highlightChars(startLoc, endLoc);
 }
 
 /// Add a Fix-It to replace a source range as part of the diagnostic.
-void BridgedDiagnostic_fixItReplace(BridgedDiagnostic cDiag,
-                                    BridgedSourceLoc cStartLoc,
-                                    BridgedSourceLoc cEndLoc,
+void BridgedDiagnostic_fixItReplace(BridgedDiagnostic cDiag, SourceLoc startLoc,
+                                    SourceLoc endLoc,
                                     BridgedStringRef cReplaceText) {
-
-  SourceLoc startLoc = cStartLoc.unbridged();
-  SourceLoc endLoc = cEndLoc.unbridged();
-
   StringRef origReplaceText = cReplaceText.unbridged();
   BridgedDiagnostic::Impl::Allocator alloc;
   StringRef replaceText = origReplaceText.copy(alloc);

@@ -3406,7 +3406,7 @@ DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
     if (auto typeDecl = decl.dyn_cast<const TypeDecl *>())
       dc = typeDecl->getInnermostDeclContext();
     else
-      dc = (DeclContext *)decl.get<const ExtensionDecl *>();
+      dc = (DeclContext *)cast<const ExtensionDecl *>(decl);
 
     // If looking at a protocol's inheritance list,
     // do not look at protocol members to avoid circularity.
@@ -3583,20 +3583,19 @@ ProtocolRequirementsRequest::evaluate(Evaluator &evaluator,
   return PD->getASTContext().AllocateCopy(requirements);
 }
 
-NominalTypeDecl *
-ExtendedNominalRequest::evaluate(Evaluator &evaluator,
-                                 ExtensionDecl *ext,
-                                 bool excludeMacroExpansions) const {
-  auto typeRepr = ext->getExtendedTypeRepr();
+NominalTypeDecl *ExtensionDecl::computeExtendedNominal(
+    bool excludeMacroExpansions) const {
+  auto typeRepr = getExtendedTypeRepr();
   if (!typeRepr) {
     // We must've seen 'extension { ... }' during parsing.
     return nullptr;
   }
 
-  ASTContext &ctx = ext->getASTContext();
+  ASTContext &ctx = getASTContext();
+  auto &evaluator = ctx.evaluator;
   auto options = defaultDirectlyReferencedTypeLookupOptions;
 
-  if (ext->isInSpecializeExtensionContext()) {
+  if (isInSpecializeExtensionContext()) {
     options |= DirectlyReferencedTypeLookupFlags::AllowUsableFromInline;
   }
 
@@ -3605,7 +3604,7 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   }
 
   DirectlyReferencedTypeDecls referenced = directReferencesForTypeRepr(
-      evaluator, ctx, typeRepr, ext->getParent(), options);
+      evaluator, ctx, typeRepr, getParent(), options);
 
   // If there were no results, expand the lookup to include members that are
   // inaccessible due to missing imports. The missing imports will be diagnosed
@@ -3615,7 +3614,7 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
                               /*allowMigration=*/true)) {
     options |= DirectlyReferencedTypeLookupFlags::IgnoreMissingImports;
     referenced = directReferencesForTypeRepr(evaluator, ctx, typeRepr,
-                                             ext->getParent(), options);
+                                             getParent(), options);
   }
 
   // Resolve those type declarations to nominal type declarations.
@@ -3631,7 +3630,24 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   if (nominalTypes.empty())
     return nullptr;
 
-  return nominalTypes[0];
+  auto *result = nominalTypes[0];
+
+  // Tuple extensions are experimental, if the feature isn't enabled let's not
+  // bind this extension at all. This fixes a bunch of crashers that we don't
+  // yet properly handle with the feature enabled.
+  if (isa<BuiltinTupleDecl>(result) &&
+      !ctx.LangOpts.hasFeature(Feature::TupleConformances)) {
+    return nullptr;
+  }
+
+  return result;
+}
+
+NominalTypeDecl *
+ExtendedNominalRequest::evaluate(Evaluator &evaluator,
+                                 const ExtensionDecl *ext) const {
+  ASSERT(ext->canNeverBeBound() && "Should have been bound by bindExtensions");
+  return ext->computeExtendedNominal();
 }
 
 /// Whether there are only associated types in the set of declarations.
@@ -3955,18 +3971,36 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
       parsedGenericParams->getRAngleLoc());
 }
 
-NominalTypeDecl *
-CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
-                                   CustomAttr *attr, DeclContext *dc) const {
+static bool shouldPreferPropertyWrapperOverMacro(CustomAttrOwner owner) {
+  // If we have a VarDecl in a local context, prefer to use a property wrapper
+  // if one exists. This is necessary since we don't properly support peer
+  // declarations in local contexts, so want to use a property wrapper if one
+  // exists.
+  if (auto *D = owner.getAsDecl()) {
+    if ((isa<VarDecl>(D) || isa<PatternBindingDecl>(D)) &&
+        D->getDeclContext()->isLocalContext()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+NominalTypeDecl *CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
+                                                    CustomAttr *attr) const {
+  auto owner = attr->getOwner();
+  auto *dc = owner.getDeclContext();
+
   // Look for names at module scope, so we don't trigger name lookup for
   // nested scopes. At this point, we're looking to see whether there are
-  // any suitable macros.
+  // any suitable macros. If we're preferring property wrappers we wait to see
+  // if any property wrappers are in scope before returning.
   auto [module, macro] = attr->destructureMacroRef();
   auto moduleName = (module) ? module->getNameRef() : DeclNameRef();
   auto macroName = (macro) ? macro->getNameRef() : DeclNameRef();
   auto macros = namelookup::lookupMacros(dc, moduleName, macroName,
                                          getAttachedMacroRoles());
-  if (!macros.empty())
+  auto shouldPreferPropWrapper = shouldPreferPropertyWrapperOverMacro(owner);
+  if (!macros.empty() && !shouldPreferPropWrapper)
     return nullptr;
 
   // Find the types referenced by the custom attribute.
@@ -3986,6 +4020,15 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   auto nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls.first,
                                             ResolveToNominalOptions(),
                                             modulesFound, anyObject);
+  // If we're preferring property wrappers and found a suitable match, continue.
+  // Otherwise we can bail and resolve as a macro.
+  if (shouldPreferPropWrapper) {
+    auto hasPropWrapper = llvm::any_of(nominals, [](NominalTypeDecl *NTD) {
+      return NTD->getAttrs().hasAttribute<PropertyWrapperAttr>();
+    });
+    if (!macros.empty() && !hasPropWrapper)
+      return nullptr;
+  }
   if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front()))
     return nominals.front();
 

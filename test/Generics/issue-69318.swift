@@ -15,6 +15,7 @@ public protocol ChildlessView: View where NodeChildren == EmptyViewGraphNodeChil
 // expected-error@-1 {{circular reference}}
 
 public struct EmptyViewGraphNodeChildren<ParentView: ChildlessView>: ViewGraphNodeChildren {}
-// expected-note@-1 3{{through reference here}}
-// expected-error@-2 {{type 'EmptyViewGraphNodeChildren<ParentView>' does not conform to protocol 'ViewGraphNodeChildren'}}
-// expected-note@-3 {{add stubs for conformance}}
+// expected-note@-1:15 {{through reference here}}
+// expected-note@-2:70 {{through reference here}}
+// expected-error@-3 {{type 'EmptyViewGraphNodeChildren<ParentView>' does not conform to protocol 'ViewGraphNodeChildren'}}
+// expected-note@-4 {{add stubs for conformance}}

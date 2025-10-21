@@ -13,70 +13,45 @@ import json
 import os
 import platform
 import re
+import tempfile
 import sys
 import traceback
-from multiprocessing import Lock, Pool, cpu_count, freeze_support
-from typing import Optional
+from multiprocessing import freeze_support
+from typing import Any, Dict, Optional, Set, List, Union
 
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
-
-from swift_build_support.swift_build_support import shell
+from .git_command import Git
+from .runner_arguments import AdditionalSwiftSourcesArguments, UpdateArguments
+from .parallel_runner import ParallelRunner
 
 
 SCRIPT_FILE = os.path.abspath(__file__)
 SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
 
+def is_unix_sock_path_too_long() -> bool:
+    """Check if the unix socket_path exceeds the 104 limit (108 on Linux).
 
-def child_init(lck):
-    global lock
-    lock = lck
+    The multiprocessing module creates a socket in the TEMPDIR folder. The
+    socket path should not exceed:
+        - 104 bytes on macOS
+        - 108 bytes on Linux (https://www.man7.org/linux/man-pages/man7/unix.7.html)
 
-
-def run_parallel(fn, pool_args, n_processes=0):
-    """Function used to run a given closure in parallel.
-
-    NOTE: This function was originally located in the shell module of
-    swift_build_support and should eventually be replaced with a better
-    parallel implementation.
+    Returns:
+        bool: Whether the socket path exceeds the limit. Always False on Windows.
     """
 
-    if n_processes == 0:
-        n_processes = cpu_count() * 2
+    if os.name != "posix":
+        return False
 
-    lk = Lock()
-    print("Running ``%s`` with up to %d processes." %
-          (fn.__name__, n_processes))
-    pool = Pool(processes=n_processes, initializer=child_init, initargs=(lk,))
-    results = pool.map_async(func=fn, iterable=pool_args).get(999999)
-    pool.close()
-    pool.join()
-    return results
+    MAX_UNIX_SOCKET_PATH = 104
+    # `tempfile.mktemp` is deprecated yet that's what the multiprocessing
+    # module uses internally: https://github.com/python/cpython/blob/c4e7d245d61ac4547ecf3362b28f64fc00aa88c0/Lib/multiprocessing/connection.py#L72
+    # Since we are not using the resulting file, it is safe to use this
+    # method.
+    sock_path = tempfile.mktemp(prefix="sock-", dir=tempfile.gettempdir())
+    return len(sock_path.encode("utf-8")) > MAX_UNIX_SOCKET_PATH
 
-
-def check_parallel_results(results, op):
-    """Function used to check the results of run_parallel.
-
-    NOTE: This function was originally located in the shell module of
-    swift_build_support and should eventually be replaced with a better
-    parallel implementation.
-    """
-
-    fail_count = 0
-    if results is None:
-        return 0
-    for r in results:
-        if r is not None:
-            if fail_count == 0:
-                print("======%s FAILURES======" % op)
-            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
-            fail_count += 1
-            if r.stderr:
-                print(r.stderr)
-    return fail_count
-
-
-def confirm_tag_in_repo(tag, repo_name) -> Optional[str]:
-    # type: (str, str) -> str | None
+def confirm_tag_in_repo(repo_path: str, tag: str, repo_name: str) -> Optional[str]:
     """Confirm that a given tag exists in a git repository. This function
     assumes that the repository is already a current working directory before
     it's called.
@@ -90,8 +65,9 @@ def confirm_tag_in_repo(tag, repo_name) -> Optional[str]:
         exist.
     """
 
-    tag_exists = shell.capture(['git', 'ls-remote', '--tags',
-                                'origin', tag], echo=False)
+    tag_exists = Git.capture(
+        repo_path, ["ls-remote", "--tags", "origin", tag], echo=False
+    )
     if not tag_exists:
         print("Tag '" + tag + "' does not exist for '" +
               repo_name + "', just updating regularly")
@@ -99,17 +75,16 @@ def confirm_tag_in_repo(tag, repo_name) -> Optional[str]:
     return tag
 
 
-def find_rev_by_timestamp(timestamp, repo_name, refspec):
+def find_rev_by_timestamp(repo_path: str, timestamp: str, repo_name: str, refspec: str) -> str:
     refspec_exists = True
     try:
-        shell.run(["git", "rev-parse", "--verify", refspec])
+        Git.run(repo_path, ["rev-parse", "--verify", refspec])
     except Exception:
         refspec_exists = False
-    args = ["git", "log", "-1", "--format=%H", "--first-parent",
-            '--before=' + timestamp]
+    args = ["log", "-1", "--format=%H", "--first-parent", "--before=" + timestamp]
     if refspec_exists:
         args.append(refspec)
-    rev = shell.capture(args).strip()
+    rev = Git.capture(repo_path, args).strip()
     if rev:
         return rev
     else:
@@ -117,12 +92,13 @@ def find_rev_by_timestamp(timestamp, repo_name, refspec):
                            (repo_name, timestamp))
 
 
-def get_branch_for_repo(config, repo_name, scheme_name, scheme_map,
+def get_branch_for_repo(repo_path, config, repo_name, scheme_name, scheme_map,
                         cross_repos_pr):
     """Infer, fetch, and return a branch corresponding to a given PR, otherwise
     return a branch found in the config for this repository name.
 
     Args:
+        repo_path (str): path to the repository
         config (Dict[str, Any]): deserialized `update-checkout-config.json`
         repo_name (str): name of the repository for checking out the branch
         scheme_name (str): name of the scheme to look up in the config
@@ -144,152 +120,175 @@ def get_branch_for_repo(config, repo_name, scheme_name, scheme_map,
             cross_repo = True
             pr_id = cross_repos_pr[remote_repo_id]
             repo_branch = "ci_pr_{0}".format(pr_id)
-            shell.run(["git", "checkout", scheme_branch],
-                      echo=True)
-            shell.capture(["git", "branch", "-D", repo_branch],
-                          echo=True, allow_non_zero_exit=True)
-            shell.run(["git", "fetch", "origin",
-                       "pull/{0}/merge:{1}"
-                       .format(pr_id, repo_branch), "--tags"], echo=True)
+            Git.run(repo_path, ["checkout", scheme_branch], echo=True)
+            Git.capture(repo_path, ["branch", "-D", repo_branch], echo=True, allow_non_zero_exit=True)
+            Git.run(repo_path, ["fetch", "origin", "pull/{0}/merge:{1}".format(pr_id, repo_branch), "--tags"], echo=True)
     return repo_branch, cross_repo
 
 
-def update_single_repository(pool_args):
-    source_root, config, repo_name, scheme_name, scheme_map, tag, timestamp, \
-        reset_to_remote, should_clean, should_stash, cross_repos_pr = pool_args
-    repo_path = os.path.join(source_root, repo_name)
+def update_single_repository(pool_args: UpdateArguments):
+    verbose = pool_args.verbose
+    repo_name = pool_args.repo_name
+
+    repo_path = os.path.join(pool_args.source_root, repo_name)
     if not os.path.isdir(repo_path) or os.path.islink(repo_path):
         return
 
     try:
         prefix = "[{0}] ".format(os.path.basename(repo_path)).ljust(40)
-        print(prefix + "Updating '" + repo_path + "'")
+        if verbose:
+            print(prefix + "Updating '" + repo_path + "'")
 
-        with shell.pushd(repo_path, dry_run=False, echo=False):
-            cross_repo = False
-            checkout_target = None
-            if tag:
-                checkout_target = confirm_tag_in_repo(tag, repo_name)
-            elif scheme_name:
-                checkout_target, cross_repo = get_branch_for_repo(
-                    config, repo_name, scheme_name, scheme_map, cross_repos_pr)
-                if timestamp:
-                    checkout_target = find_rev_by_timestamp(timestamp,
-                                                            repo_name,
-                                                            checkout_target)
+        cross_repo = False
+        checkout_target = None
+        if pool_args.tag:
+            checkout_target = confirm_tag_in_repo(
+                repo_path, pool_args.tag, repo_name
+            )
+        elif pool_args.scheme_name:
+            checkout_target, cross_repo = get_branch_for_repo(
+                repo_path,
+                pool_args.config,
+                repo_name,
+                pool_args.scheme_name,
+                pool_args.scheme_map,
+                pool_args.cross_repos_pr,
+            )
+            if pool_args.timestamp:
+                checkout_target = find_rev_by_timestamp(
+                    repo_path, pool_args.timestamp, repo_name, checkout_target
+                )
 
-            # The '--clean' and '--stash' options
-            # 1. clear the index and working tree ('--stash' stashes those
-            #   changes rather than discarding them)
-            # 2. delete ignored files
-            # 3. abort an ongoing rebase
-            if should_clean or should_stash:
+        # The '--clean' and '--stash' options
+        # 1. clear the index and working tree ('--stash' stashes those
+        #   changes rather than discarding them)
+        # 2. delete ignored files
+        # 3. abort an ongoing rebase
+        if pool_args.clean or pool_args.stash:
 
-                def run_for_repo_and_each_submodule_rec(cmd):
-                    shell.run(cmd, echo=True, prefix=prefix)
-                    shell.run(
-                        ["git", "submodule", "foreach", "--recursive"] + cmd,
-                        echo=True,
-                        prefix=prefix,
-                    )
+            def run_for_repo_and_each_submodule_rec(args: List[str]):
+                Git.run(repo_path, args, echo=verbose, prefix=prefix)
+                Git.run(
+                    repo_path,
+                    ["submodule", "foreach", "--recursive", "git"] + args,
+                    echo=verbose,
+                    prefix=prefix,
+                )
 
-                if should_stash:
-                    # Stash tracked and untracked changes.
-                    run_for_repo_and_each_submodule_rec(["git", "stash", "-u"])
-                elif should_clean:
-                    # Delete tracked changes.
-                    run_for_repo_and_each_submodule_rec(
-                        ["git", "reset", "--hard", "HEAD"]
-                    )
+            if pool_args.clean:
+                # Stash tracked and untracked changes.
+                run_for_repo_and_each_submodule_rec(["stash", "-u"])
+            elif pool_args.stash:
+                # Delete tracked changes.
+                run_for_repo_and_each_submodule_rec(
+                    ["reset", "--hard", "HEAD"]
+                )
 
-                # Delete untracked changes and ignored files.
-                run_for_repo_and_each_submodule_rec(["git", "clean", "-fdx"])
-                del run_for_repo_and_each_submodule_rec
+            # Delete untracked changes and ignored files.
+            run_for_repo_and_each_submodule_rec(["clean", "-fdx"])
+            del run_for_repo_and_each_submodule_rec
 
-                # It is possible to reset --hard and still be mid-rebase.
-                try:
-                    shell.run(['git', 'rebase', '--abort'],
-                              echo=True, prefix=prefix)
-                except Exception:
-                    pass
-
-            if checkout_target:
-                shell.run(['git', 'status', '--porcelain', '-uno'],
-                          echo=False)
-
-                # Some of the projects switch branches/tags when they
-                # are updated. Local checkout might not have that tag/branch
-                # fetched yet, so let's attempt to fetch before attempting
-                # checkout.
-                try:
-                    shell.run(['git', 'rev-parse', '--verify', checkout_target])
-                except Exception:
-                    shell.run(["git", "fetch", "--recurse-submodules=yes",
-                               "--tags"],
-                              echo=True, prefix=prefix)
-
-                try:
-                    shell.run(['git', 'checkout', checkout_target],
-                              echo=True, prefix=prefix)
-                except Exception as originalException:
-                    try:
-                        result = shell.run(['git', 'rev-parse', checkout_target])
-                        revision = result[0].strip()
-                        shell.run(['git', 'checkout', revision],
-                                  echo=True, prefix=prefix)
-                    except Exception:
-                        raise originalException
-
-            # It's important that we checkout, fetch, and rebase, in order.
-            # .git/FETCH_HEAD updates the not-for-merge attributes based on
-            # which branch was checked out during the fetch.
-            shell.run(["git", "fetch", "--recurse-submodules=yes", "--tags"],
-                      echo=True, prefix=prefix)
-
-            # If we were asked to reset to the specified branch, do the hard
-            # reset and return.
-            if checkout_target and reset_to_remote and not cross_repo:
-                full_target = full_target_name('origin', checkout_target)
-                shell.run(['git', 'reset', '--hard', full_target],
-                          echo=True, prefix=prefix)
-                return
-
-            # Query whether we have a "detached HEAD", which will mean that
-            # we previously checked out a tag rather than a branch.
-            detached_head = False
+            # It is possible to reset --hard and still be mid-rebase.
             try:
-                # This git command returns error code 1 if HEAD is detached.
-                # Otherwise there was some other error, and we need to handle
-                # it like other command errors.
-                shell.run(["git", "symbolic-ref", "-q", "HEAD"], echo=False)
-            except Exception as e:
-                if e.ret == 1:
-                    detached_head = True
-                else:
-                    raise  # Pass this error up the chain.
+                Git.run(repo_path, ['rebase', '--abort'], echo=verbose, prefix=prefix)
+            except Exception:
+                pass
 
-            # If we have a detached HEAD in this repository, we don't want
-            # to rebase. With a detached HEAD, the fetch will have marked
-            # all the branches in FETCH_HEAD as not-for-merge, and the
-            # "git rebase FETCH_HEAD" will try to rebase the tree from the
-            # default branch's current head, making a mess.
+        if checkout_target:
+            Git.run(repo_path, ['status', '--porcelain', '-uno'], echo=False)
 
-            # Prior to Git 2.6, this is the way to do a "git pull
-            # --rebase" that respects rebase.autostash.  See
-            # http://stackoverflow.com/a/30209750/125349
-            if not cross_repo and not detached_head:
-                shell.run(["git", "rebase", "FETCH_HEAD"],
-                          echo=True, prefix=prefix)
-            elif detached_head:
-                print(prefix +
-                      "Detached HEAD; probably checked out a tag. No need "
-                      "to rebase.")
+            # Some of the projects switch branches/tags when they
+            # are updated. Local checkout might not have that tag/branch
+            # fetched yet, so let's attempt to fetch before attempting
+            # checkout.
+            try:
+                Git.run(
+                    repo_path, ["rev-parse", "--verify", checkout_target], echo=verbose
+                )
+            except Exception:
+                Git.run(
+                    repo_path,
+                    ["fetch", "--recurse-submodules=yes", "--tags"],
+                    echo=verbose,
+                    prefix=prefix,
+                )
 
-            shell.run(["git", "submodule", "update", "--recursive"],
-                      echo=True, prefix=prefix)
+            try:
+                Git.run(
+                    repo_path,
+                    ["checkout", checkout_target],
+                    echo=verbose,
+                    prefix=prefix,
+                )
+            except Exception:
+                try:
+                    result = Git.run(repo_path, ["rev-parse", checkout_target])
+                    revision = result[0].strip()
+                    Git.run(
+                        repo_path, ["checkout", revision], echo=verbose, prefix=prefix
+                    )
+                except Exception:
+                    raise
+
+        # It's important that we checkout, fetch, and rebase, in order.
+        # .git/FETCH_HEAD updates the not-for-merge attributes based on
+        # which branch was checked out during the fetch.
+        Git.run(
+            repo_path,
+            ["fetch", "--recurse-submodules=yes", "--tags"],
+            echo=verbose,
+            prefix=prefix,
+        )
+
+        # If we were asked to reset to the specified branch, do the hard
+        # reset and return.
+        if checkout_target and pool_args.reset_to_remote and not cross_repo:
+            full_target = full_target_name(repo_path, "origin", checkout_target)
+            Git.run(
+                repo_path, ["reset", "--hard", full_target], echo=verbose, prefix=prefix
+            )
+            return
+
+        # Query whether we have a "detached HEAD", which will mean that
+        # we previously checked out a tag rather than a branch.
+        detached_head = False
+        try:
+            # This git command returns error code 1 if HEAD is detached.
+            # Otherwise there was some other error, and we need to handle
+            # it like other command errors.
+            Git.run(repo_path, ["symbolic-ref", "-q", "HEAD"], echo=False)
+        except Exception as e:
+            if e.ret == 1:
+                detached_head = True
+            else:
+                raise  # Pass this error up the chain.
+
+        # If we have a detached HEAD in this repository, we don't want
+        # to rebase. With a detached HEAD, the fetch will have marked
+        # all the branches in FETCH_HEAD as not-for-merge, and the
+        # "git rebase FETCH_HEAD" will try to rebase the tree from the
+        # default branch's current head, making a mess.
+
+        # Prior to Git 2.6, this is the way to do a "git pull
+        # --rebase" that respects rebase.autostash.  See
+        # http://stackoverflow.com/a/30209750/125349
+        if not cross_repo and not detached_head:
+            Git.run(repo_path, ["rebase", "FETCH_HEAD"], echo=verbose, prefix=prefix)
+        elif detached_head and verbose:
+            print(prefix +
+                    "Detached HEAD; probably checked out a tag. No need "
+                    "to rebase.")
+
+        Git.run(
+            repo_path,
+            ["submodule", "update", "--recursive"],
+            echo=verbose,
+            prefix=prefix,
+        )
     except Exception:
         (type, value, tb) = sys.exc_info()
-        print('Error on repo "%s": %s' % (repo_path, traceback.format_exc()))
+        if verbose:
+            print('Error on repo "%s": %s' % (repo_path, traceback.format_exc()))
         return value
 
 
@@ -309,10 +308,10 @@ def get_timestamp_to_match(match_timestamp, source_root):
     """
     if not match_timestamp:
         return None
-    with shell.pushd(os.path.join(source_root, "swift"),
-                     dry_run=False, echo=False):
-        return shell.capture(["git", "log", "-1", "--format=%cI"],
-                             echo=False).strip()
+    swift_repo_path = os.path.join(source_root, "swift")
+    return Git.capture(
+        swift_repo_path, ["log", "-1", "--format=%cI"], echo=False
+    ).strip()
 
 
 def get_scheme_map(config, scheme_name):
@@ -337,9 +336,42 @@ def get_scheme_map(config, scheme_name):
 
     return None
 
+def _is_any_repository_locked(pool_args: List[UpdateArguments]) -> Set[str]:
+    """Returns the set of locked repositories.
+
+    A repository is considered to be locked if its .git directory contains a
+    file ending in ".lock".
+
+    Args:
+        pool_args (List[Any]): List of arguments passed to the
+        `update_single_repository` function.
+
+    Returns:
+        Set[str]: The names of the locked repositories if any.
+    """
+
+    repos = [(x.source_root, x.repo_name) for x in pool_args]
+    locked_repositories = set()
+    for source_root, repo_name in repos:
+        dot_git_path = os.path.join(source_root, repo_name, ".git")
+        if not os.path.exists(dot_git_path) or not os.path.isdir(dot_git_path):
+            continue
+        for file in os.listdir(dot_git_path):
+            if file.endswith(".lock"):
+                locked_repositories.add(repo_name)
+    return locked_repositories
+
+def _move_llvm_project_to_first_index(pool_args: List[Union[UpdateArguments, AdditionalSwiftSourcesArguments]]):
+    llvm_project_idx = None
+    for i in range(len(pool_args)):
+        if pool_args[i].repo_name == "llvm-project":
+            llvm_project_idx = i
+            break
+    if llvm_project_idx is not None:
+        pool_args.insert(0, pool_args.pop(llvm_project_idx))
 
 def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_pr):
-    pool_args = []
+    pool_args: List[UpdateArguments] = []
     timestamp = get_timestamp_to_match(args.match_timestamp, args.source_root)
     for repo_name in config['repos'].keys():
         if repo_name in args.skip_repository_list:
@@ -359,62 +391,77 @@ def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_p
                 )
             continue
 
-        my_args = [args.source_root, config,
-                   repo_name,
-                   scheme_name,
-                   scheme_map,
-                   args.tag,
-                   timestamp,
-                   args.reset_to_remote,
-                   args.clean,
-                   args.stash,
-                   cross_repos_pr]
+        my_args = UpdateArguments(
+            source_root=args.source_root,
+            config=config,
+            repo_name=repo_name,
+            scheme_name=scheme_name,
+            scheme_map=scheme_map,
+            tag=args.tag,
+            timestamp=timestamp,
+            reset_to_remote=args.reset_to_remote,
+            clean=args.clean,
+            stash=args.stash,
+            cross_repos_pr=cross_repos_pr,
+            output_prefix="Updating",
+            verbose=args.verbose,
+        )
         pool_args.append(my_args)
 
-    return run_parallel(update_single_repository, pool_args, args.n_processes)
+    locked_repositories: set[str] = _is_any_repository_locked(pool_args)
+    if len(locked_repositories) > 0:
+        return [
+            f"'{repo_name}' is locked by git. Cannot update it."
+            for repo_name in locked_repositories
+        ]
+    _move_llvm_project_to_first_index(pool_args)
+    return ParallelRunner(update_single_repository, pool_args, args.n_processes).run()
 
 
-def obtain_additional_swift_sources(pool_args):
-    (args, repo_name, repo_info, repo_branch, remote, with_ssh, scheme_name,
-     skip_history, skip_tags, skip_repository_list, use_submodules) = pool_args
+def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
+    args = pool_args.args
+    repo_name = pool_args.repo_name
+    repo_branch = pool_args.repo_branch
+    verbose = pool_args.verbose
+    skip_tags = pool_args.skip_tags
+    remote = pool_args.remote
 
     env = dict(os.environ)
     env.update({'GIT_TERMINAL_PROMPT': '0'})
 
-    with shell.pushd(args.source_root, dry_run=False, echo=False):
+    if verbose:
+        print("Cloning '" + pool_args.repo_name + "'")
 
-        print("Cloning '" + repo_name + "'")
+    if pool_args.skip_history:
+        Git.run(None, ['clone', '--recursive', '--depth', '1',
+                    '--branch', repo_branch, remote, repo_name] +
+                    (['--no-tags'] if skip_tags else []),
+                    cwd=args.source_root,
+                    env=env,
+                    echo=verbose)
+    elif pool_args.use_submodules:
+        Git.run(None, ['submodule', 'add', remote, repo_name] +
+                    (['--no-tags'] if skip_tags else []),
+                    cwd=args.source_root,
+                    env=env,
+                    echo=verbose)
+    else:
+        Git.run(None, ['clone', '--recursive', remote, repo_name] +
+                    (['--no-tags'] if skip_tags else []),
+                    cwd=args.source_root,
+                    env=env,
+                    echo=verbose)
 
-        if skip_history:
-            shell.run(['git', 'clone', '--recursive', '--depth', '1',
-                       '--branch', repo_branch, remote, repo_name] +
-                      (['--no-tags'] if skip_tags else []),
-                      env=env,
-                      echo=True)
-        elif use_submodules:
-            shell.run(['git', 'submodule', 'add', remote, repo_name] +
-                      (['--no-tags'] if skip_tags else []),
-                      env=env,
-                      echo=True)
-        else:
-            shell.run(['git', 'clone', '--recursive', remote, repo_name] +
-                      (['--no-tags'] if skip_tags else []),
-                      env=env,
-                      echo=True)
-        if scheme_name:
-            src_path = os.path.join(args.source_root, repo_name, ".git")
-            shell.run(['git', '--git-dir',
-                       src_path, '--work-tree',
-                       os.path.join(args.source_root, repo_name),
-                       'checkout', repo_branch],
-                      env=env,
-                      echo=False)
-    with shell.pushd(os.path.join(args.source_root, repo_name),
-                     dry_run=False, echo=False):
-        shell.run(["git", "submodule",
-                   "update", "--recursive"],
-                  env=env,
-                  echo=False)
+    repo_path = os.path.join(args.source_root, repo_name)
+    if pool_args.scheme_name:
+        src_path = os.path.join(repo_path, ".git")
+        Git.run(
+            None,
+            ["--git-dir", src_path, "--work-tree", repo_path, "checkout", repo_branch],
+            env=env,
+            echo=False,
+        )
+    Git.run(repo_path, ["submodule", "update", "--recursive"], env=env, echo=False)
 
 
 def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
@@ -422,79 +469,93 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
                                         skip_repository_list, use_submodules):
 
     pool_args = []
-    with shell.pushd(args.source_root, dry_run=False, echo=False):
-        for repo_name, repo_info in config['repos'].items():
-            if repo_name in skip_repository_list:
-                print("Skipping clone of '" + repo_name + "', requested by "
-                      "user")
-                continue
+    for repo_name, repo_info in config['repos'].items():
+        repo_path = os.path.join(args.source_root, repo_name)
+        if repo_name in skip_repository_list:
+            print("Skipping clone of '" + repo_name + "', requested by "
+                    "user")
+            continue
 
-            if use_submodules:
-              repo_exists = False
-              submodules_status = shell.capture(['git', 'submodule', 'status'],
-                                                echo=False)
-              if submodules_status:
+        if use_submodules:
+            repo_exists = False
+            submodules_status = Git.capture(repo_path, ['submodule', 'status'],
+                                            echo=False)
+            if submodules_status:
                 for line in submodules_status.splitlines():
-                  if line[0].endswith(repo_name):
-                    repo_exists = True
-                    break
+                    if line[0].endswith(repo_name):
+                        repo_exists = True
+                        break
 
+        else:
+            repo_exists = os.path.isdir(os.path.join(repo_path, ".git"))
+
+        if repo_exists:
+            print("Skipping clone of '" + repo_name + "', directory "
+                    "already exists")
+            continue
+
+        # If we have a url override, use that url instead of
+        # interpolating.
+        remote_repo_info = repo_info['remote']
+        if 'url' in remote_repo_info:
+            remote = remote_repo_info['url']
+        else:
+            remote_repo_id = remote_repo_info['id']
+            if with_ssh is True or 'https-clone-pattern' not in config:
+                remote = config['ssh-clone-pattern'] % remote_repo_id
             else:
-              repo_exists = os.path.isdir(os.path.join(repo_name, ".git"))
+                remote = config['https-clone-pattern'] % remote_repo_id
 
-            if repo_exists:
-                print("Skipping clone of '" + repo_name + "', directory "
-                      "already exists")
-                continue
-
-            # If we have a url override, use that url instead of
-            # interpolating.
-            remote_repo_info = repo_info['remote']
-            if 'url' in remote_repo_info:
-                remote = remote_repo_info['url']
+        repo_branch = None
+        repo_not_in_scheme = False
+        if scheme_name:
+            for v in config['branch-schemes'].values():
+                if scheme_name not in v['aliases']:
+                    continue
+                # If repo is not specified in the scheme, skip cloning it.
+                if repo_name not in v['repos']:
+                    repo_not_in_scheme = True
+                    continue
+                repo_branch = v['repos'][repo_name]
+                break
             else:
-                remote_repo_id = remote_repo_info['id']
-                if with_ssh is True or 'https-clone-pattern' not in config:
-                    remote = config['ssh-clone-pattern'] % remote_repo_id
-                else:
-                    remote = config['https-clone-pattern'] % remote_repo_id
+                repo_branch = scheme_name
+        if repo_not_in_scheme:
+            continue
 
-            repo_branch = None
-            repo_not_in_scheme = False
-            if scheme_name:
-                for v in config['branch-schemes'].values():
-                    if scheme_name not in v['aliases']:
-                        continue
-                    # If repo is not specified in the scheme, skip cloning it.
-                    if repo_name not in v['repos']:
-                        repo_not_in_scheme = True
-                        continue
-                    repo_branch = v['repos'][repo_name]
-                    break
-                else:
-                    repo_branch = scheme_name
-            if repo_not_in_scheme:
-                continue
+        new_args = AdditionalSwiftSourcesArguments(
+            args=args,
+            repo_name=repo_name,
+            repo_info=repo_info,
+            repo_branch=repo_branch,
+            remote=remote,
+            with_ssh=with_ssh,
+            scheme_name=scheme_name,
+            skip_history=skip_history,
+            skip_tags=skip_tags,
+            skip_repository_list=skip_repository_list,
+            use_submodules=use_submodules,
+            output_prefix="Cloning",
+            verbose=args.verbose,
+        )
 
+        if use_submodules:
+            obtain_additional_swift_sources(new_args)
+        else:
+            pool_args.append(new_args)
 
-            new_args = [args, repo_name, repo_info, repo_branch, remote,
-                              with_ssh, scheme_name, skip_history, skip_tags,
-                              skip_repository_list, use_submodules]
-
-            if use_submodules:
-              obtain_additional_swift_sources(new_args)
-            else:
-              pool_args.append(new_args)
-
-    # Only use `run_parallel` when submodules are not used, since `.git` dir
+    # Only use `ParallelRunner` when submodules are not used, since `.git` dir
     # can't be accessed concurrently.
-    if not use_submodules:
-      if not pool_args:
-          print("Not cloning any repositories.")
-          return
+    if use_submodules:
+        return
+    if not pool_args:
+        print("Not cloning any repositories.")
+        return
 
-      return run_parallel(
-          obtain_additional_swift_sources, pool_args, args.n_processes)
+    _move_llvm_project_to_first_index(pool_args)
+    return ParallelRunner(
+        obtain_additional_swift_sources, pool_args, args.n_processes
+    ).run()
 
 
 def dump_repo_hashes(args, config, branch_scheme_name='repro'):
@@ -516,15 +577,12 @@ def dump_repo_hashes(args, config, branch_scheme_name='repro'):
 
 def repo_hashes(args, config):
     repos = {}
-    for repo_name, repo_info in sorted(config['repos'].items(),
-                                       key=lambda x: x[0]):
+    for repo_name, _ in sorted(config['repos'].items(), key=lambda x: x[0]):
         repo_path = os.path.join(args.source_root, repo_name)
         if os.path.exists(repo_path):
-            with shell.pushd(repo_path, dry_run=False, echo=False):
-                h = shell.capture(["git", "rev-parse", "HEAD"],
-                                  echo=False).strip()
+            h = Git.capture(repo_path, ["rev-parse", "HEAD"], echo=False).strip()
         else:
-            h = 'skip'
+            h = "skip"
         repos[repo_name] = str(h)
     return repos
 
@@ -536,7 +594,41 @@ def print_repo_hashes(args, config):
         print("{:<35}: {:<35}".format(repo_name, repo_hash))
 
 
-def validate_config(config):
+def merge_no_duplicates(a: dict, b: dict) -> dict:
+    result = {**a}
+    for key, value in b.items():
+        if key in a:
+            raise ValueError(f"Duplicate scheme {key}")
+
+        result[key] = value
+    return result
+
+
+def merge_config(config: dict, new_config: dict) -> dict:
+    """
+    Merge two configs, with a 'last-wins' strategy.
+
+    The branch-schemes are rejected if they define duplicate schemes.
+    """
+
+    result = {**config}
+    for key, value in new_config.items():
+        if key == "branch-schemes":
+            # We reject duplicates here since this is the most conservative
+            # behavior, so it can be relaxed in the future.
+            # TODO: Another semantics might be nicer, define that as it is needed.
+            result[key] = merge_no_duplicates(config.get(key, {}), value)
+        elif key == "repos":
+            # The "repos" object is last-wins on a key-by-key basis
+            result[key] = {**config.get(key, {}), **value}
+        else:
+            # Anything else is just last-wins
+            result[key] = value
+
+    return result
+
+
+def validate_config(config: Dict[str, Any]):
     # Make sure that our branch-names are unique.
     scheme_names = config['branch-schemes'].keys()
     if len(scheme_names) != len(set(scheme_names)):
@@ -563,13 +655,12 @@ def validate_config(config):
                 seen[alias] = scheme_name
 
 
-def full_target_name(repository, target):
-    tag = shell.capture(["git", "tag", "-l", target], echo=False).strip()
+def full_target_name(repo_path, repository, target):
+    tag = Git.capture(repo_path, ["tag", "-l", target], echo=False).strip()
     if tag == target:
         return tag
 
-    branch = shell.capture(["git", "branch", "--list", target],
-                           echo=False).strip().replace("* ", "")
+    branch = Git.capture(repo_path, ["branch", "--list", target], echo=False).strip().replace("* ", "")
     if branch == target:
         name = "%s/%s" % (repository, target)
         return name
@@ -669,9 +760,12 @@ repositories.
     )
     parser.add_argument(
         "--config",
-        default=os.path.join(SCRIPT_DIR, os.pardir,
-                             "update-checkout-config.json"),
-        help="Configuration file to use")
+        help="""The configuration file to use. Can be specified multiple times,
+        each config will be merged together with a 'last-wins' strategy.
+        Overwriting branch-schemes is not allowed.""",
+        action="append",
+        default=[],
+        dest="configs")
     parser.add_argument(
         "--github-comment",
         help="""Check out related pull requests referenced in the given
@@ -711,6 +805,10 @@ repositories.
         "--use-submodules",
         help="Checkout repositories as git submodules.",
         action='store_true')
+    parser.add_argument(
+        "-v", "--verbose",
+        help="Increases the script's verbosity.",
+        action='store_true')
     args = parser.parse_args()
 
     if not args.scheme:
@@ -725,6 +823,20 @@ repositories.
                   "specify --scheme=foo")
             sys.exit(1)
 
+    if is_unix_sock_path_too_long():
+        if not args.dump_hashes and not args.dump_hashes_config:
+            # Do not print anything other than the json dump.
+            print(
+                f"TEMPDIR={tempfile.gettempdir()} is too long and multiprocessing "
+                "sockets will exceed the size limit. Falling back to verbose mode."
+            )
+        args.verbose = True
+    if sys.version_info.minor < 10:
+        if not args.dump_hashes and not args.dump_hashes_config:
+            # Do not print anything other than the json dump.
+            print("Falling back to verbose mode due to a Python 3.9 limitation.")
+        args.verbose = True
+
     clone = args.clone
     clone_with_ssh = args.clone_with_ssh
     skip_history = args.skip_history
@@ -734,8 +846,15 @@ repositories.
     all_repos = args.all_repositories
     use_submodules = args.use_submodules
 
-    with open(args.config) as f:
-        config = json.load(f)
+    # Set the default config path if none are specified
+    if not args.configs:
+        default_path = os.path.join(SCRIPT_DIR, os.pardir,
+                                    "update-checkout-config.json")
+        args.configs.append(default_path)
+    config = {}
+    for config_path in args.configs:
+        with open(config_path) as f:
+            config = merge_config(config, json.load(f))
     validate_config(config)
 
     cross_repos_pr = {}
@@ -771,22 +890,24 @@ repositories.
 
     swift_repo_path = os.path.join(args.source_root, 'swift')
     if 'swift' not in skip_repo_list and os.path.exists(swift_repo_path):
-        with shell.pushd(swift_repo_path, dry_run=False, echo=True):
-            # Check if `swift` repo itself needs to switch to a cross-repo branch.
-            branch_name, cross_repo = get_branch_for_repo(config, 'swift',
-                                                          scheme_name,
-                                                          scheme_map,
-                                                          cross_repos_pr)
+        # Check if `swift` repo itself needs to switch to a cross-repo branch.
+        branch_name, cross_repo = get_branch_for_repo(swift_repo_path, config, 'swift',
+                                                        scheme_name,
+                                                        scheme_map,
+                                                        cross_repos_pr)
 
-            if cross_repo:
-                shell.run(['git', 'checkout', branch_name], echo=True,
-                          prefix="[swift] ")
+        if cross_repo:
+            Git.run(
+                swift_repo_path, ["checkout", branch_name], echo=True, prefix="[swift] "
+            )
 
-                # Re-read the config after checkout.
-                with open(args.config) as f:
-                    config = json.load(f)
-                validate_config(config)
-                scheme_map = get_scheme_map(config, scheme_name)
+            # Re-read the config after checkout.
+            config = {}
+            for config_path in args.configs:
+                with open(config_path) as f:
+                    config = merge_config(config, json.load(f))
+            validate_config(config)
+            scheme_map = get_scheme_map(config, scheme_name)
 
     if args.dump_hashes:
         dump_repo_hashes(args, config)
@@ -807,8 +928,8 @@ repositories.
     update_results = update_all_repositories(args, config, scheme_name,
                                              scheme_map, cross_repos_pr)
     fail_count = 0
-    fail_count += check_parallel_results(clone_results, "CLONE")
-    fail_count += check_parallel_results(update_results, "UPDATE")
+    fail_count += ParallelRunner.check_results(clone_results, "CLONE")
+    fail_count += ParallelRunner.check_results(update_results, "UPDATE")
     if fail_count > 0:
         print("update-checkout failed, fix errors and try again")
     else:

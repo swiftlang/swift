@@ -42,6 +42,7 @@ class BasicBlockBitfield;
 class NodeBitfield;
 class OperandBitfield;
 class CalleeCache;
+class SILTypeProperties;
 class SILUndef;
 
 namespace Lowering {
@@ -51,7 +52,7 @@ class AbstractionPattern;
 
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
-enum Inline_t { InlineDefault, NoInline, AlwaysInline };
+enum Inline_t { InlineDefault, NoInline, HeuristicAlwaysInline, AlwaysInline };
 enum IsThunk_t {
   IsNotThunk,
   IsThunk,
@@ -92,7 +93,8 @@ enum class PerformanceConstraints : uint8_t {
   NoLocks = 2,
   NoRuntime = 3,
   NoExistentials = 4,
-  NoObjCBridging = 5
+  NoObjCBridging = 5,
+  ManualOwnership = 6,
 };
 
 class SILSpecializeAttr final {
@@ -235,6 +237,8 @@ private:
   /// The lowered type of the function.
   CanSILFunctionType LoweredType;
 
+  CanSILFunctionType LoweredTypeInContext;
+
   /// The context archetypes of the function.
   GenericEnvironment *GenericEnv = nullptr;
 
@@ -315,6 +319,11 @@ private:
 
   /// The function's remaining set of specialize attributes.
   std::vector<SILSpecializeAttr*> SpecializeAttrSet;
+
+  /// The name that this function should have when it is lowered to LLVM IR.
+  ///
+  /// If empty, use the SIL function's name directly.
+  StringRef AsmName;
 
   /// Name of a section if @_section attribute was used, otherwise empty.
   StringRef Section;
@@ -571,6 +580,9 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType;
   }
+
+  CanSILFunctionType getLoweredFunctionTypeInContext() const;
+
   CanSILFunctionType
   getLoweredFunctionTypeInContext(TypeExpansionContext context) const;
 
@@ -657,6 +669,10 @@ public:
   void setEntryCount(ProfileCounter Count) { EntryCount = Count; }
 
   bool isNoReturnFunction(TypeExpansionContext context) const;
+
+  /// True if this function should have a non-unique definition based on the
+  /// embedded linkage model.
+  bool hasNonUniqueDefinition() const;
 
   /// Unsafely rewrite the lowered type of this function.
   ///
@@ -784,10 +800,17 @@ public:
     return TypeExpansionContext(*this);
   }
 
+  SILTypeProperties getTypeProperties(Lowering::AbstractionPattern orig,
+                                      Type subst) const;
+  SILTypeProperties getTypeProperties(Type subst) const;
+  SILTypeProperties getTypeProperties(SILType type) const;
+
   const Lowering::TypeLowering &
-  getTypeLowering(Lowering::AbstractionPattern orig, Type subst);
+  getTypeLowering(Lowering::AbstractionPattern orig, Type subst) const;
 
   const Lowering::TypeLowering &getTypeLowering(Type t) const;
+
+  const Lowering::TypeLowering &getTypeLowering(SILType type) const;
 
   SILType getLoweredType(Lowering::AbstractionPattern orig, Type subst) const;
 
@@ -800,8 +823,6 @@ public:
   SILType getLoweredLoadableType(Type t) const;
 
   SILType getLoweredType(SILType t) const;
-
-  const Lowering::TypeLowering &getTypeLowering(SILType type) const;
 
   bool isTypeABIAccessible(SILType type) const;
 
@@ -909,6 +930,14 @@ public:
   bool isAvailableExternally() const {
     return swift::isAvailableExternally(getLinkage());
   }
+
+  /// Helper method that determines whether this SILFunction is a Swift runtime
+  /// function, such as swift_retain.
+  bool isSwiftRuntimeFunction() const;
+
+  /// Helper method that determines whether a function with the given name and
+  /// parent module is a Swift runtime function such as swift_retain.
+  static bool isSwiftRuntimeFunction(StringRef name, const ModuleDecl *module);
 
   /// Helper method which returns true if the linkage of the SILFunction
   /// indicates that the object's definition might be required outside the
@@ -1318,7 +1347,7 @@ public:
                              SubstitutionMap forwardingSubs) {
     GenericEnv = env;
     CapturedEnvs = capturedEnvs;
-    ForwardingSubMap = forwardingSubs;
+    ForwardingSubMap = forwardingSubs.getCanonical();
   }
 
   /// Retrieve the generic signature from the generic environment of this
@@ -1399,6 +1428,10 @@ public:
   bool markedAsUsed() const { return MarkedAsUsed; }
   void setMarkedAsUsed(bool value) { MarkedAsUsed = value; }
 
+  /// Return custom assembler name, otherwise empty.
+  StringRef asmName() const { return AsmName; }
+  void setAsmName(StringRef value) { AsmName = value; }
+
   /// Return custom section name if @_section was used, otherwise empty
   StringRef section() const { return Section; }
   void setSection(StringRef value) { Section = value; }
@@ -1461,6 +1494,10 @@ public:
 
   std::optional<ActorIsolation> getActorIsolation() const {
     return actorIsolation;
+  }
+
+  bool isNonisolatedNonsending() const {
+    return actorIsolation && actorIsolation->isCallerIsolationInheriting();
   }
 
   /// Return the source file that this SILFunction belongs to if it exists.
@@ -1674,7 +1711,8 @@ public:
   }
 
   /// Verifies the lifetime of memory locations in the function.
-  void verifyMemoryLifetime(CalleeCache *calleeCache);
+  void verifyMemoryLifetime(CalleeCache *calleeCache,
+                            DeadEndBlocks *deadEndBlocks);
 
   /// Verifies ownership of the function.
   /// Since we don't have complete lifetimes everywhere, computes DeadEndBlocks

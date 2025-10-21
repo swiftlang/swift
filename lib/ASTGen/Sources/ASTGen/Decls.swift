@@ -67,6 +67,9 @@ extension ASTGenVisitor {
       return self.generate(subscriptDecl: node).asDecl
     case .typeAliasDecl(let node):
       return self.generate(typeAliasDecl: node)?.asDecl
+    case .unexpectedCodeDecl:
+      // Ignore unexpected code.
+      return nil
     case .variableDecl(let node):
       return self.generate(variableDecl: node)
     case .usingDecl(let node):
@@ -74,7 +77,7 @@ extension ASTGenVisitor {
     }
   }
 
-  func generateIdentifierDeclNameAndLoc(_ node: TokenSyntax) -> (identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc)? {
+  func generateIdentifierDeclNameAndLoc(_ node: TokenSyntax) -> (identifier: Identifier, sourceLoc: SourceLoc)? {
     guard node.presence == .present else {
       return nil
     }
@@ -396,10 +399,10 @@ extension ASTGenVisitor {
     case .`init`:
       return .Init
     case .read:
-      precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'read' accessor should only be parsed with 'CoroutineAccessors' feature")
+      precondition(ctx.langOpts.hasFeature(.CoroutineAccessors), "(compiler bug) 'read' accessor should only be parsed with 'CoroutineAccessors' feature")
       return .read
     case .modify:
-      precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'modify' accessor should only be parsed with 'CoroutineAccessors' feature")
+      precondition(ctx.langOpts.hasFeature(.CoroutineAccessors), "(compiler bug) 'modify' accessor should only be parsed with 'CoroutineAccessors' feature")
       return .modify
     default:
       self.diagnose(.unknownAccessorSpecifier(specifier))
@@ -499,7 +502,15 @@ extension ASTGenVisitor {
     }
   }
 
-  func generate(patternBinding binding: PatternBindingSyntax, attrs: DeclAttributesResult, topLevelDecl: BridgedTopLevelCodeDecl?) -> BridgedPatternBindingEntry {
+  func generate(patternBinding binding: PatternBindingSyntax, attrs: DeclAttributesResult, topLevelDecl: BridgedTopLevelCodeDecl?) -> BridgedPatternBindingEntry? {
+    if binding.pattern.is(MissingPatternSyntax.self) {
+      // The availability checker requires declarations to have valid SourceLocs, but MissingPatternSyntax lowers to
+      // an implicit AnyPattern with invalid SourceLocs. A top-level MissingPatternSyntax could therefore cause us to
+      // construct an invalid AST. Drop the whole binding instead.
+      // No need to diagnose; SwiftParser should have already diagnosed the `MissingPatternSyntax`.
+      return nil
+    }
+
     let pattern = generate(pattern: binding.pattern)
 
     let equalLoc = generateSourceLoc(binding.initializer?.equal)
@@ -535,14 +546,17 @@ extension ASTGenVisitor {
     )
   }
 
-  private func generateBindingEntries(for node: VariableDeclSyntax, attrs: DeclAttributesResult, topLevelDecl: BridgedTopLevelCodeDecl?) -> BridgedArrayRef {
+  private func generateBindingEntries(for node: VariableDeclSyntax, attrs: DeclAttributesResult, topLevelDecl: BridgedTopLevelCodeDecl?) -> BridgedArrayRef? {
     var propagatedType: BridgedTypeRepr?
     var entries: [BridgedPatternBindingEntry] = []
 
     // Generate the bindings in reverse, keeping track of the TypeRepr to
     // propagate to earlier patterns if needed.
     for binding in node.bindings.reversed() {
-      var entry = self.generate(patternBinding: binding, attrs: attrs, topLevelDecl: topLevelDecl)
+      guard var entry = self.generate(patternBinding: binding, attrs: attrs, topLevelDecl: topLevelDecl) else {
+        // Missing pattern. Drop this binding.
+        continue
+      }
 
       // We can potentially propagate a type annotation back if we don't have an initializer, and are a bare NamedPattern.
       let canPropagateType = binding.initializer == nil && binding.pattern.is(IdentifierPatternSyntax.self)
@@ -572,10 +586,17 @@ extension ASTGenVisitor {
       }
       entries.append(entry)
     }
+
+    if entries.isEmpty {
+      // A VariableDeclSyntax is syntactically required to have at least one binding, so this can only happen if all
+      // of the bindings had missing patterns.
+      return nil
+    }
+
     return entries.reversed().bridgedArray(in: self)
   }
 
-  func generate(variableDecl node: VariableDeclSyntax) -> BridgedDecl {
+  func generate(variableDecl node: VariableDeclSyntax) -> BridgedDecl? {
     let attrs = self.generateDeclAttributes(node, allowStatic: true)
     let introducer: BridgedVarDeclIntroducer
     switch node.bindingSpecifier.rawText {
@@ -596,6 +617,12 @@ extension ASTGenVisitor {
       topLevelDecl = nil
     }
 
+    guard let entries = self.generateBindingEntries(for: node, attrs: attrs, topLevelDecl: topLevelDecl) else {
+      // No bindings with valid SourceLocs. A PatternBindingDecl generated from this would have an invalid SourceRange,
+      // violating availability checker invariants. Drop the PBD instead.
+      return nil
+    }
+
     let decl = BridgedPatternBindingDecl.createParsed(
       self.ctx,
       declContext: topLevelDecl?.asDeclContext ?? self.declContext,
@@ -604,7 +631,7 @@ extension ASTGenVisitor {
       staticSpelling: attrs.staticSpelling,
       introducerLoc: self.generateSourceLoc(node.bindingSpecifier),
       introducer: introducer,
-      entries: self.generateBindingEntries(for: node, attrs: attrs, topLevelDecl: topLevelDecl)
+      entries: entries
     )
     if let topLevelDecl {
       let range = self.generateImplicitBraceRange(node)
@@ -669,9 +696,9 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   struct GeneratedFunctionSignature {
     var parameterList: BridgedParameterList
-    var asyncLoc: BridgedSourceLoc
+    var asyncLoc: SourceLoc
     var isReasync: Bool
-    var throwsLoc: BridgedSourceLoc
+    var throwsLoc: SourceLoc
     var isRethrows: Bool
     var thrownType: BridgedTypeRepr?
     var returnType: BridgedTypeRepr?
@@ -706,7 +733,7 @@ extension ASTGenVisitor {
     }
     let signature = self.generate(
       functionSignature: node.signature,
-      for: name.isOperator ? .operator : .function
+      for: name.isOperator() ? .operator : .function
     )
 
     let decl = BridgedFuncDecl.createParsed(

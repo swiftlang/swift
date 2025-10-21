@@ -308,7 +308,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
 
       // We also might establish some synthesized members because we
       // extended an external type.
-      if (ExtendedNominal->getModuleContext() != &M) {
+      if (!areModulesEqual(ExtendedNominal->getModuleContext(), &M)) {
         ExtendedSG->recordConformanceSynthesizedMemberRelationships(Source);
       }
     }
@@ -341,10 +341,13 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
   // symbol, regardless of which class it's actually appearing on. To prevent
   // multiple of these symbols colliding with each other, treat them as
   // synthesized symbols and use their parent type as the base type.
-  if (VD->isImplicit() && VD->hasClangNode() &&
-      VD->getClangNode().getAsDecl()) {
-    if (const auto *Parent =
-            dyn_cast_or_null<NominalTypeDecl>(VD->getDeclContext())) {
+  if (VD->isImplicit() && VD->getClangDecl()) {
+    const NominalTypeDecl *Parent = dyn_cast_or_null<NominalTypeDecl>(VD->getDeclContext());
+    if (!Parent) {
+      if (const auto *ParentExt = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext()))
+        Parent = ParentExt->getExtendedNominal();
+    }
+    if (Parent) {
       SG->recordNode(Symbol(SG, VD, Parent));
       return true;
     }

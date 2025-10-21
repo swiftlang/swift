@@ -1,5 +1,4 @@
 // RUN: %target-swift-emit-irgen %s -I %S/Inputs -cxx-interoperability-mode=default -Xcc -fignore-exceptions -disable-availability-checking | %FileCheck %s
-// XFAIL: OS=windows-msvc
 
 import ReferenceCounted
 
@@ -13,6 +12,19 @@ public func getLocalCount() -> NS.LocalCount {
 // CHECK-NEXT: entry:
 // CHECK:        %0 = call ptr @{{_ZN2NS10LocalCount6createEv|"\?create\@LocalCount\@NS\@\@SAPEAU12\@XZ"}}()
 // CHECK-NEXT:   call void @{{_Z8LCRetainPN2NS10LocalCountE|"\?LCRetain\@\@YAXPEAULocalCount\@NS\@\@\@Z"}}(ptr %0)
+// CHECK:        ret ptr %0
+// CHECK-NEXT: }
+
+
+public func useRetainReleaseOpsReturningRefCount() -> HasOpsReturningRefCount {
+    let result = HasOpsReturningRefCount.create()
+    return result
+}
+
+// CHECK:      define {{.*}}swiftcc ptr @"$s4main36useRetainReleaseOpsReturningRefCountSo03HasefgH0VyF"()
+// CHECK-NEXT: entry:
+// CHECK:        %0 = call ptr @{{_ZN23HasOpsReturningRefCount6createEv|"\?create\@HasOpsReturningRefCount\@\@SAPEAU1\@XZ"}}()
+// CHECK:        %1 = call i32 @{{_Z8RCRetainP23HasOpsReturningRefCount|"\?RCRetain\@\@YAIPEAUHasOpsReturningRefCount\@\@\@Z"}}(ptr %0)
 // CHECK:        ret ptr %0
 // CHECK-NEXT: }
 
@@ -62,6 +74,6 @@ public func getArrayOfLocalCount() -> [NS.LocalCount] {
 // CHECK-NEXT:   %0 = call swiftcc %swift.metadata_response @"$sSo2NSO10LocalCountVMa"(i{{.*}} 0)
 // CHECK-NEXT:   %1 = extractvalue %swift.metadata_response %0, 0
 // CHECK-NEXT:   %2 = call swiftcc { ptr, ptr } @"$ss27_allocateUninitializedArrayySayxG_BptBwlF"(i{{.*}} 1, ptr %1)
-// CHECK:        %5 = call ptr @{{_ZN2NS10LocalCount6createEv|"\?create\@LocalCount\@NS\@\@SAPEAU12\@XZ"}}()
-// CHECK-NEXT:   call void @{{_Z8LCRetainPN2NS10LocalCountE|"\?LCRetain\@\@YAXPEAULocalCount\@NS\@\@\@Z"}}(ptr %5)
+// CHECK:        %6 = call ptr @{{_ZN2NS10LocalCount6createEv|"\?create\@LocalCount\@NS\@\@SAPEAU12\@XZ"}}()
+// CHECK-NEXT:   call void @{{_Z8LCRetainPN2NS10LocalCountE|"\?LCRetain\@\@YAXPEAULocalCount\@NS\@\@\@Z"}}(ptr %6)
 // CHECK:      }

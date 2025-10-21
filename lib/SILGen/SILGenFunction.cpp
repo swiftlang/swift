@@ -192,6 +192,8 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
+    return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::IVarInitializer:
@@ -334,7 +336,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
       Result.ExpansionLoc = RegularLocation(expr);
       Result.Name = mangler.mangleMacroExpansion(expr);
     } else {
-      auto decl = cast<MacroExpansionDecl>(parent.get<Decl *>());
+      auto decl = cast<MacroExpansionDecl>(cast<Decl *>(parent));
       Result.ExpansionLoc = RegularLocation(decl);
       Result.Name = mangler.mangleMacroExpansion(decl);
     }
@@ -350,7 +352,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::DeclarationMacroExpansion: 
   case GeneratedSourceInfo::CodeItemMacroExpansion: {
     auto expansion = cast<MacroExpansionDecl>(
-        ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>());
+        cast<Decl *>(ASTNode::getFromOpaqueValue(Info.astNode)));
     Result.ExpansionLoc = RegularLocation(expansion);
     Result.Name = mangler.mangleMacroExpansion(expansion);
     Result.Freestanding = true;
@@ -367,9 +369,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::ExtensionMacroExpansion:
   case GeneratedSourceInfo::PreambleMacroExpansion:
   case GeneratedSourceInfo::BodyMacroExpansion: {
-    auto decl = ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>();
-    auto attr = Info.attachedMacroCustomAttr;
-    if (auto *macroDecl = decl->getResolvedMacro(attr)) {
+    if (auto *macroDecl = Info.attachedMacroCustomAttr->getResolvedMacro()) {
       Result.ExpansionLoc = RegularLocation(macroDecl);
       Result.Name = macroDecl->getBaseName().userFacingName();
       Result.Freestanding = true;
@@ -1542,7 +1542,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
         {}, /*async*/ false, /*throws*/ false, /*thrownType*/Type(), {},
         emptyParams,
         getASTContext().getNeverType(), moduleDecl);
-    drainQueueFuncDecl->getAttrs().add(new (getASTContext()) SILGenNameAttr(
+    drainQueueFuncDecl->addAttribute(new (getASTContext()) SILGenNameAttr(
         "swift_task_asyncMainDrainQueue", /*raw*/ false, /*implicit*/ true));
   }
 
@@ -1746,7 +1746,7 @@ void SILGenFunction::emitGeneratorFunction(
   mergeCleanupBlocks();
 }
 
-std::unique_ptr<Initialization> SILGenFunction::getSingleValueStmtInit(Expr *E) {
+InitializationPtr SILGenFunction::getSingleValueStmtInit(Expr *E) {
   if (SingleValueStmtInitStack.empty())
     return nullptr;
 
@@ -1756,7 +1756,7 @@ std::unique_ptr<Initialization> SILGenFunction::getSingleValueStmtInit(Expr *E) 
     return nullptr;
   
   auto resultAddr = SingleValueStmtInitStack.back().InitializationBuffer;
-  return std::make_unique<KnownAddressInitialization>(resultAddr);
+  return make_possibly_unique<KnownAddressInitialization>(resultAddr);
 }
 
 void SILGenFunction::emitProfilerIncrement(ASTNode Node) {
@@ -1929,11 +1929,6 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
 
   auto initTy = initFRef->getType().castTo<SILFunctionType>();
 
-  // If there are substitutions we need to emit partial apply to
-  // apply substitutions to the init accessor reference type.
-  initTy = initTy->substGenericArgs(SGM.M, substitutions,
-                                    getTypeExpansionContext());
-
   // Emit partial apply with self metatype argument to produce a substituted
   // init accessor reference.
   auto selfTy = selfValue.getType().getASTType();
@@ -1947,8 +1942,9 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
     selfMetatype = B.createMetatype(loc, getLoweredType(metatypeTy));
   }
 
-  auto expectedSelfTy = initAccessor->getDeclContext()->getSelfInterfaceType()
-      .subst(substitutions);
+  auto expectedSelfTy =
+      initAccessor->getDeclContext()->getSelfInterfaceType().subst(
+          substitutions);
 
   // This should only happen in the invalid case where we attempt to initialize
   // superclass storage from a subclass initializer. However, we shouldn't
@@ -1958,6 +1954,14 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
     selfMetatype = B.createUpcast(loc, selfMetatype,
                              getLoweredType(MetatypeType::get(expectedSelfTy)));
   }
+
+  if (auto invocationSig = initTy->getInvocationGenericSignature()) {
+    if (invocationSig->areAllParamsConcrete())
+      substitutions = SubstitutionMap();
+  } else {
+    substitutions = SubstitutionMap();
+  }
+
   PartialApplyInst *initPAI =
       B.createPartialApply(loc, initFRef, substitutions, selfMetatype,
                            ParameterConvention::Direct_Guaranteed,
@@ -2003,4 +2007,18 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   B.createAssignOrInit(loc, field, selfRef.getValue(),
                        newValue.forward(*this), initFRef, setterFRef,
                        AssignOrInitInst::Unknown);
+}
+
+SILGenFunction::AddressableBuffer *
+SILGenFunction::getAddressableBufferInfo(ValueDecl *vd) {
+  do {
+    auto &found = AddressableBuffers[vd];
+
+    if (auto orig = found.stateOrAlias
+                      .dyn_cast<VarDecl*>()) {
+      vd = orig;
+      continue;
+    }
+    return &found;
+  } while (true);
 }

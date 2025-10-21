@@ -20,6 +20,7 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/PreparedOverload.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
@@ -245,14 +246,15 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
   *getTrailingObjects<DeclContext *>() = useDC;
 }
 
-Constraint::Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
+Constraint::Constraint(Type type, OverloadChoice choice,
+                       DeclContext *useDC,
                        ConstraintFix *fix, ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(ConstraintKind::BindOverload), NumTypeVariables(typeVars.size()),
       HasFix(fix != nullptr), HasDeclContext(true), HasRestriction(false),
       IsActive(false), IsDisabled(bool(fix)), IsDisabledForPerformance(false),
       RememberChoice(false), IsFavored(false), IsIsolated(false),
-      Overload{type}, Locator(locator) {
+      Overload{type, /*preparedOverload=*/nullptr}, Locator(locator) {
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
   if (fix)
     *getTrailingObjects<ConstraintFix *>() = fix;
@@ -337,8 +339,7 @@ ProtocolDecl *Constraint::getProtocol() const {
 void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
                        unsigned indent, bool skipLocator) const {
   // Print all type variables as $T0 instead of _ here.
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
 
   if (Kind == ConstraintKind::Disjunction ||
       Kind == ConstraintKind::Conjunction) {
@@ -394,7 +395,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
     if (auto patternBindingElt =
             locator
                 ->getLastElementAs<LocatorPathElt::PatternBindingElement>()) {
-      auto *patternBinding = cast<PatternBindingDecl>(element.get<Decl *>());
+      auto *patternBinding = cast<PatternBindingDecl>(cast<Decl *>(element));
       Out << "pattern binding element @ ";
       Out << patternBindingElt->getIndex() << " : ";
       Out << '\n';
@@ -783,7 +784,7 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
   assert((kind != ConstraintKind::ConformsTo &&
           kind != ConstraintKind::NonisolatedConformsTo &&
           kind != ConstraintKind::TransitivelyConformsTo) ||
-         second->isExistentialType());
+         second->isAnyExistentialType());
 
   // Literal protocol conformances expect a protocol.
   assert((kind != ConstraintKind::LiteralConformsTo) ||
@@ -893,7 +894,7 @@ Constraint *Constraint::createValueWitness(
 }
 
 Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type, 
-                                           OverloadChoice choice, 
+                                           OverloadChoice choice,
                                            DeclContext *useDC,
                                            ConstraintFix *fix,
                                            ConstraintLocator *locator) {
@@ -912,7 +913,8 @@ Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type,
       typeVars.size(), fix ? 1 : 0, /*hasDeclContext=*/1,
       /*hasContextualTypeInfo=*/0, /*hasOverloadChoice=*/1);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(type, choice, useDC, fix, locator, typeVars);
+  return new (mem) Constraint(type, choice, useDC,
+                              fix, locator, typeVars);
 }
 
 Constraint *Constraint::createRestricted(ConstraintSystem &cs, 
@@ -1140,4 +1142,19 @@ Constraint::getTrailingClosureMatching() const {
 void *Constraint::operator new(size_t bytes, ConstraintSystem& cs,
                                size_t alignment) {
   return ::operator new (bytes, cs, alignment);
+}
+
+// FIXME: Perhaps we should store the Constraint -> PreparedOverload mapping
+// in a SolverStep or something? Mutating Constraint feels wrong.
+
+void Constraint::setPreparedOverload(PreparedOverload *preparedOverload) {
+  ASSERT(Kind == ConstraintKind::BindOverload);
+
+  // We can only set a prepared overload at most once in normal
+  // type checking, and then once in salvage.
+  ASSERT(!Overload.Prepared ||
+         (!Overload.Prepared->wasForDiagnostics() &&
+          preparedOverload->wasForDiagnostics()));
+
+  Overload.Prepared = preparedOverload;
 }

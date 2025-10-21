@@ -24,6 +24,8 @@ swift_compiler_sources(Optimizer
   SimplifyDebugStep.swift
   SimplifyDestroyValue.swift
   SimplifyDestructure.swift
+  SimplifyEndCOWMutationAddr.swift
+  SimplifyExplicitCopy.swift
   SimplifyFixLifetime.swift
   SimplifyGlobalValue.swift
   SimplifyInitEnumDataAddr.swift
@@ -36,6 +38,7 @@ swift_compiler_sources(Optimizer
   SimplifyRefCasts.swift
   SimplifyRetainReleaseValue.swift
   SimplifyStrongRetainRelease.swift
+  SimplifyStruct.swift
   SimplifyStructExtract.swift
   SimplifySwitchEnum.swift
   SimplifyTuple.swift

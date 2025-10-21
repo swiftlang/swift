@@ -26,3 +26,36 @@ module CommentsClang {
     header "comments.h"
     export *
 }
+module ClangIncludesModule {
+    header "clang-includes.h"
+    export *
+}
+module ClangIncludesNoExportModule {
+    header "clang-includes.h"
+}
+
+// TransitiveModules/
+module ModuleA {
+    header "TransitiveModules/module-a.h"
+    export *
+}
+module ModuleB {
+    header "TransitiveModules/module-b.h"
+}
+module ModuleOuter {
+    module ModuleC {
+        header "TransitiveModules/module-c.h"
+        export *
+    }
+    explicit module ModuleD {
+         header "TransitiveModules/module-d.h"
+         export *
+    }
+}
+module ModuleDeep {
+    module ModuleDeepNested {
+        module ModuleDeepNestedNested {
+            header "TransitiveModules/module-e.h"
+        }
+    }
+}

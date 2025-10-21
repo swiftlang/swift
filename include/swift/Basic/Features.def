@@ -246,30 +246,36 @@ BASELINE_LANGUAGE_FEATURE(BitwiseCopyable, 426, "BitwiseCopyable protocol")
 BASELINE_LANGUAGE_FEATURE(NoncopyableGenerics, 427, "Noncopyable generics")
 BASELINE_LANGUAGE_FEATURE(NoncopyableGenerics2, 427, "Noncopyable generics alias")
 BASELINE_LANGUAGE_FEATURE(ConformanceSuppression, 426, "Suppressible inferred conformances")
-SUPPRESSIBLE_LANGUAGE_FEATURE(BitwiseCopyable2, 426, "BitwiseCopyable feature")
+BASELINE_LANGUAGE_FEATURE(BitwiseCopyable2, 426, "BitwiseCopyable feature")
 BASELINE_LANGUAGE_FEATURE(BodyMacros, 415, "Function body macros")
-SUPPRESSIBLE_LANGUAGE_FEATURE(SendingArgsAndResults, 430, "Sending arg and results")
+LANGUAGE_FEATURE(SendingArgsAndResults, 430, "Sending arg and results")
 BASELINE_LANGUAGE_FEATURE(BorrowingSwitch, 432, "Noncopyable type pattern matching")
-CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedAny, 431, "@isolated(any) function types")
+BASELINE_LANGUAGE_FEATURE(IsolatedAny, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(IsolatedAny2, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
-LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
-LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, 0, "Builtin.emplace typed throws")
-SUPPRESSIBLE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
-LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)")
+BASELINE_LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
+BASELINE_LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, 0, "Builtin.emplace typed throws")
+BASELINE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
+BASELINE_LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)")
 LANGUAGE_FEATURE(RawIdentifiers, 451, "Raw identifiers")
 LANGUAGE_FEATURE(SendableCompletionHandlers, 463, "Objective-C completion handler parameters are imported as @Sendable")
 LANGUAGE_FEATURE(AsyncExecutionBehaviorAttributes, 0, "@concurrent and nonisolated(nonsending)")
 LANGUAGE_FEATURE(IsolatedConformances, 407, "Global-actor isolated conformances")
-LANGUAGE_FEATURE(ValueGenericsNameLookup, 452, "Value generics appearing as static members for namelookup")
+BASELINE_LANGUAGE_FEATURE(ValueGenericsNameLookup, 452, "Value generics appearing as static members for namelookup")
 LANGUAGE_FEATURE(GeneralizedIsSameMetaTypeBuiltin, 465, "Builtin.is_same_metatype with support for noncopyable/nonescapable types")
 SUPPRESSIBLE_LANGUAGE_FEATURE(ABIAttributeSE0479, 479, "@abi attribute on functions, initializers, properties, and subscripts")
 LANGUAGE_FEATURE(AlwaysInheritActorContext, 472, "@_inheritActorContext(always)")
 LANGUAGE_FEATURE(BuiltinSelect, 0, "Builtin.select")
 LANGUAGE_FEATURE(BuiltinInterleave, 0, "Builtin.interleave and Builtin.deinterleave")
 LANGUAGE_FEATURE(BuiltinVectorsExternC, 0, "Extern C support for Builtin vector types")
-LANGUAGE_FEATURE(AddressOfProperty, 0, "Builtin.unprotectedAddressOf properties")
+LANGUAGE_FEATURE(AddressOfProperty2, 0, "Builtin.unprotectedAddressOf properties")
 LANGUAGE_FEATURE(NonescapableAccessorOnTrivial, 0, "Support UnsafeMutablePointer.mutableSpan")
+BASELINE_LANGUAGE_FEATURE(LayoutPrespecialization, 0, "Layout pre-specialization")
+BASELINE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
+LANGUAGE_FEATURE(InlineArrayTypeSugar, 483, "Type sugar for InlineArray")
+LANGUAGE_FEATURE(LifetimeDependenceMutableAccessors, 0, "Support mutable accessors returning ~Escapable results")
+LANGUAGE_FEATURE(InoutLifetimeDependence, 0, "Support @_lifetime(&)")
+SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -294,12 +300,15 @@ UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
 MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
 MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, 7)
+UPCOMING_FEATURE(ImmutableWeakCaptures, 481, 7)
 
 // Optional language features / modes
 
 /// Diagnose uses of language constructs and APIs that can violate memory
 /// safety.
 MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(StrictMemorySafety, 458, "Strict memory safety")
+
+OPTIONAL_LANGUAGE_FEATURE(LibraryEvolution, 0, "Library evolution")
 
 // Experimental features
 
@@ -317,6 +326,12 @@ EXPERIMENTAL_FEATURE(KeyPathWithMethodMembers, false)
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
 
+// Whether to emit an Embedded Swift module with "deferred" code generation,
+// meaning that the only code that will be emitted into the object file is
+// code that was marked as "never emit into client". For everything else,
+// Swift still store the SIL and emit it into the client only when used.
+EXPERIMENTAL_FEATURE(DeferredCodeGen, true)
+
 // Whether to compile scripts lazily in immediate mode
 EXPERIMENTAL_FEATURE(LazyImmediate, false)
 
@@ -331,9 +346,11 @@ EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
 EXPERIMENTAL_FEATURE(MoveOnlyPartialReinitialization, true)
 EXPERIMENTAL_FEATURE(ConsumeSelfInDeinit, true)
 
-EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
-
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
+
+/// Disable the special behavior of of explicit 'nonisolated' vs. being
+/// implicitly nonisolated.
+EXPERIMENTAL_FEATURE(NoExplicitNonIsolated, true)
 
 /// Enables a module to allow non resilient access from other
 /// modules within a package if built from source.
@@ -407,6 +424,9 @@ EXPERIMENTAL_FEATURE(ThenStatements, false)
 /// Enable 'do' expressions.
 EXPERIMENTAL_FEATURE(DoExpressions, false)
 
+/// Enable 'for' expressions.
+EXPERIMENTAL_FEATURE(ForExpressions, false)
+
 /// Enable implicitly treating the last expression in a function, closure,
 /// and 'if'/'switch' expression as the result.
 EXPERIMENTAL_FEATURE(ImplicitLastExprResults, false)
@@ -429,12 +449,11 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 /// Enable returning non-escapable types from functions.
 EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 
-/// Enable inout lifetime dependence - @lifetime(&arg)
-EXPERIMENTAL_FEATURE(InoutLifetimeDependence, true)
-EXPERIMENTAL_FEATURE(LifetimeDependenceMutableAccessors, true)
-
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
+
+/// Enable the `@_manualOwnership` attribute.
+EXPERIMENTAL_FEATURE(ManualOwnership, false)
 
 /// Enable the @extractConstantsFromMembers attribute.
 EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
@@ -479,12 +498,10 @@ EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 /// Import inherited non-public members when importing C++ classes.
 EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 
-/// Synthesize static factory methods for C++ foreign reference types and import
-/// them as Swift initializers.
-EXPERIMENTAL_FEATURE(SuppressCXXForeignReferenceTypeInitializers, true)
-
-// Isolated deinit
-SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
+/// Emit a warning when a C++ API returns a SWIFT_SHARED_REFERENCE type
+/// without being explicitly annotated with either SWIFT_RETURNS_RETAINED
+/// or SWIFT_RETURNS_UNRETAINED.
+EXPERIMENTAL_FEATURE(WarnUnannotatedReturnOfCxxFrt, true)
 
 /// modify/read single-yield coroutines
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
@@ -501,9 +518,6 @@ EXPERIMENTAL_FEATURE(CustomAvailability, true)
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 
-/// Enable syntax sugar type '[3 of Int]' for Inline Array
-EXPERIMENTAL_FEATURE(InlineArrayTypeSugar, false)
-
 /// Allow declaration of compile-time values
 EXPERIMENTAL_FEATURE(CompileTimeValues, true)
 
@@ -516,11 +530,8 @@ EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)
 /// Allow declarations of Swift runtime symbols using @_silgen_name.
 EXPERIMENTAL_FEATURE(AllowRuntimeSymbolDeclarations, true)
 
-/// Allow use of `@cdecl`
+/// Allow use of `@c`
 EXPERIMENTAL_FEATURE(CDecl, false)
-
-/// Allow use of `@extensible` on public enums
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExtensibleAttribute, false)
 
 /// Allow use of `Module::name` syntax
 EXPERIMENTAL_FEATURE(ModuleSelector, false)
@@ -532,12 +543,20 @@ EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
 /// Enable @_lifetime attribute
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 
-/// Disable @MainActor inference when the primary definition of a type conforms
-/// to SendableMetatype (or Sendable).
-EXPERIMENTAL_FEATURE(SendableProhibitsMainActorInference, true)
-
 /// Allow macro based aliases to be imported into Swift
 EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
+
+/// Enable borrow/mutate accessors
+EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, false)
+
+/// Allow use of @inline(always) attribute
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(InlineAlways, false)
+
+/// Allow use of 'Swift' (Swift runtime version) in @available attributes
+EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
+
+/// Allow use of `~Sendable`.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TildeSendable, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

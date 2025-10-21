@@ -115,7 +115,6 @@ static bool isGenericParameter(TypeVariableType *TypeVar) {
 bool PotentialBinding::isViableForJoin() const {
   return Kind == AllowedBindingKind::Supertypes &&
          !BindingType->hasLValueType() &&
-         !BindingType->hasUnresolvedType() &&
          !BindingType->hasTypeVariable() &&
          !BindingType->hasPlaceholder() &&
          !BindingType->hasUnboundGenericType() &&
@@ -513,7 +512,7 @@ void BindingSet::inferTransitiveBindings() {
           auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
 
           Type inferredRootTy;
-          if (isKnownKeyPathType(bindingTy)) {
+          if (bindingTy->isKnownKeyPathType()) {
             // AnyKeyPath doesn't have a root type.
             if (bindingTy->isAnyKeyPath())
               continue;
@@ -721,13 +720,15 @@ bool BindingSet::finalize(bool transitive) {
       if (isValid && !capability)
         return false;
 
+      bool isContextualTypeReadOnly = false;
       // If the key path is sufficiently resolved we can add inferred binding
       // to the set.
       SmallSetVector<PotentialBinding, 4> updatedBindings;
       for (const auto &binding : Bindings) {
         auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
 
-        assert(isKnownKeyPathType(bindingTy) || bindingTy->is<FunctionType>());
+        assert(bindingTy->isKnownKeyPathType() ||
+               bindingTy->is<FunctionType>());
 
         // Functions don't have capability so we can simply add them.
         if (auto *fnType = bindingTy->getAs<FunctionType>()) {
@@ -740,19 +741,30 @@ bool BindingSet::finalize(bool transitive) {
           }
 
           updatedBindings.insert(binding.withType(fnType));
+          isContextualTypeReadOnly = true;
+        } else if (!(bindingTy->isWritableKeyPath() ||
+                     bindingTy->isReferenceWritableKeyPath())) {
+          isContextualTypeReadOnly = true;
         }
       }
 
       // Note that even though key path literal maybe be invalid it's
       // still the best course of action to use contextual function type
       // bindings because they allow to propagate type information from
-      // the key path into the context, so key path bindings are addded
+      // the key path into the context, so key path bindings are added
       // only if there is absolutely no other choice.
       if (updatedBindings.empty()) {
         auto rootTy = CS.getKeyPathRootType(keyPath);
 
         // A valid key path literal.
         if (capability) {
+          // Capability inference always results in a maximum mutability
+          // but if context is read-only it can be downgraded to avoid
+          // conversions.
+          if (isContextualTypeReadOnly)
+            capability =
+                std::make_pair(KeyPathMutability::ReadOnly, capability->second);
+
           // Note that the binding is formed using root & value
           // type variables produced during constraint generation
           // because at this point root is already known (otherwise
@@ -1694,7 +1706,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
       if (type->isExistentialType()) {
         auto layout = type->getExistentialLayout();
         if (auto superclass = layout.explicitSuperclass) {
-          if (isKnownKeyPathType(superclass)) {
+          if (superclass->isKnownKeyPathType()) {
             type = superclass;
             objectTy = superclass;
           }
@@ -1702,7 +1714,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
       }
     }
 
-    if (!(isKnownKeyPathType(objectTy) || objectTy->is<AnyFunctionType>()))
+    if (!(objectTy->isKnownKeyPathType() || objectTy->is<AnyFunctionType>()))
       return std::nullopt;
   }
 
@@ -2174,13 +2186,8 @@ void PotentialBindings::reset() {
   AssociatedCodeCompletionToken = ASTNode();
 }
 
-void PotentialBindings::dump(ConstraintSystem &cs,
-                             TypeVariableType *typeVar,
-                             llvm::raw_ostream &out,
-                             unsigned indent) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
-
+void PotentialBindings::dump(ConstraintSystem &cs, TypeVariableType *typeVar,
+                             llvm::raw_ostream &out, unsigned indent) const {
   out << "Potential bindings for ";
   typeVar->getImpl().print(out);
   out << "\n";
@@ -2202,16 +2209,17 @@ void PotentialBindings::dump(ConstraintSystem &cs,
                [](auto lhs, auto rhs) {
                    return lhs.first->getID() < rhs.first->getID();
                });
-    interleave(adjacentVars,
-               [&](std::pair<TypeVariableType *, Constraint *> pair) {
-                 out << pair.first->getString(PO);
-                 if (pair.first->getImpl().getFixedType(/*record=*/nullptr))
-                   out << " (fixed)";
-                 out << " via ";
-                 pair.second->print(out, &cs.getASTContext().SourceMgr, indent,
-                                    /*skipLocator=*/true);
-               },
-               [&out]() { out << ", "; });
+    interleave(
+        adjacentVars,
+        [&](std::pair<TypeVariableType *, Constraint *> pair) {
+          out << pair.first->getString(PrintOptions::forDebugging());
+          if (pair.first->getImpl().getFixedType(/*record=*/nullptr))
+            out << " (fixed)";
+          out << " via ";
+          pair.second->print(out, &cs.getASTContext().SourceMgr, indent,
+                             /*skipLocator=*/true);
+        },
+        [&out]() { out << ", "; });
     out << "] ";
   }
 }
@@ -2295,8 +2303,7 @@ static std::string getCollectionLiteralAsString(KnownProtocolKind KPK) {
 }
 
 void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
 
   if (auto typeVar = getTypeVariable()) {
     typeVar->getImpl().print(out);
@@ -2681,8 +2688,11 @@ bool TypeVarBindingProducer::computeNext() {
       // let's have it try `Void` as well because there is an
       // implicit conversion `() -> T` to `() -> Void` and this
       // helps to avoid creating a thunk to support it.
+      // Avoid doing this is we already have a hole binding since
+      // introducing Void will just cause local solution ambiguities.
       if (getLocator()->isLastElement<LocatorPathElt::ClosureResult>() &&
-          binding.Kind == AllowedBindingKind::Supertypes) {
+          binding.Kind == AllowedBindingKind::Supertypes &&
+          !binding.BindingType->isPlaceholder()) {
         auto voidType = CS.getASTContext().TheEmptyTupleType;
         addNewBinding(binding.withSameSource(voidType, BindingKind::Exact));
       }
@@ -2988,8 +2998,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
   if (result.isFailure()) {
     if (cs.isDebugMode()) {
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
+      PrintOptions PO = PrintOptions::forDebugging();
 
       llvm::errs().indent(cs.solverState->getCurrentIndent())
           << "(failed to establish binding " << TypeVar->getString(PO)

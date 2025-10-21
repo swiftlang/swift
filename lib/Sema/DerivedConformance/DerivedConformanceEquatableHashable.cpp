@@ -193,23 +193,6 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto *rhsElemPat = EnumElementPattern::createImplicit(
         enumType, elt, rhsSubpattern, /*DC*/ eqDecl);
 
-    auto hasBoundDecls = !lhsPayloadVars.empty();
-    std::optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
-    if (hasBoundDecls) {
-      // We allocated a direct copy of our lhs var decls for the case
-      // body.
-      auto copy = C.Allocate<VarDecl *>(lhsPayloadVars.size());
-      for (unsigned i : indices(lhsPayloadVars)) {
-        auto *vOld = lhsPayloadVars[i];
-        auto *vNew = new (C) VarDecl(
-            /*IsStatic*/ false, vOld->getIntroducer(),
-            vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-        vNew->setImplicit();
-        copy[i] = vNew;
-      }
-      caseBodyVarDecls.emplace(copy);
-    }
-
     // case (.<elt>(let l0, let l1, ...), .<elt>(let r0, let r1, ...))
     auto caseTuplePattern = TuplePattern::createImplicit(C, {
       TuplePatternElt(lhsElemPat), TuplePatternElt(rhsElemPat) });
@@ -244,9 +227,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
 
     auto body = BraceStmt::create(C, SourceLoc(), statementsInCase,
                                   SourceLoc());
-    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                     labelItem, SourceLoc(), SourceLoc(), body,
-                                     caseBodyVarDecls));
+    cases.push_back(
+        CaseStmt::createImplicit(C, CaseParentKind::Switch, labelItem, body));
   }
 
   // default: result = false
@@ -261,10 +243,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto *returnStmt = ReturnStmt::createImplicit(C, falseExpr);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                   SourceLoc());
-    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                     defaultItem, SourceLoc(), SourceLoc(),
-                                     body,
-                                     /*case body var decls*/ std::nullopt));
+    cases.push_back(
+        CaseStmt::createImplicit(C, CaseParentKind::Switch, defaultItem, body));
   }
 
   // switch (a, b) { <case statements> }
@@ -414,7 +394,8 @@ deriveEquatable_eq(
   eqDecl->setUserAccessible(false);
   eqDecl->setSynthesized();
   if (isDerivedEnumEquals) {
-    eqDecl->getAttrs().add(new (C) SemanticsAttr("derived_enum_equals", SourceLoc(), SourceRange(), /*Implicit=*/true));
+    eqDecl->addAttribute(new (C) SemanticsAttr(
+        "derived_enum_equals", SourceLoc(), SourceRange(), /*Implicit=*/true));
   }
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
@@ -423,9 +404,8 @@ deriveEquatable_eq(
     SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
     auto equalsDeclName = DeclName(C, DeclBaseName(C.Id_EqualsOperator),
                                    argumentLabels);
-    eqDecl->getAttrs().add(ImplementsAttr::create(parentDC,
-                                                  equatableProto,
-                                                  equalsDeclName));
+    eqDecl->addAttribute(
+        ImplementsAttr::create(parentDC, equatableProto, equalsDeclName));
   }
 
   if (!C.getEqualIntDecl()) {
@@ -560,7 +540,7 @@ deriveHashable_hashInto(
   // The derived hash(into:) for an actor must be non-isolated.
   if (!addNonIsolatedToSynthesized(derived, hashDecl) &&
       derived.Nominal->isActor())
-    hashDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
+    hashDecl->addAttribute(NonisolatedAttr::createImplicit(C));
 
   derived.addMembersToConformanceContext({hashDecl});
 
@@ -735,26 +715,9 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
       statements.emplace_back(ASTNode(combineExpr));
     }
 
-    auto hasBoundDecls = !payloadVars.empty();
-    std::optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
-    if (hasBoundDecls) {
-      auto copy = C.Allocate<VarDecl *>(payloadVars.size());
-      for (unsigned i : indices(payloadVars)) {
-        auto *vOld = payloadVars[i];
-        auto *vNew = new (C) VarDecl(
-            /*IsStatic*/ false, vOld->getIntroducer(),
-            vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
-        vNew->setImplicit();
-        copy[i] = vNew;
-      }
-      caseBodyVarDecls.emplace(copy);
-    }
-
     auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                     labelItem, SourceLoc(), SourceLoc(), body,
-                                     caseBodyVarDecls,
-                                     /*implicit*/ true));
+    cases.push_back(
+        CaseStmt::createImplicit(C, CaseParentKind::Switch, labelItem, body));
   }
 
   // generate: switch enumVar { }
@@ -916,7 +879,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   // The derived hashValue of an actor must be nonisolated.
   if (!addNonIsolatedToSynthesized(derived, hashValueDecl) &&
       derived.Nominal->isActor())
-    hashValueDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
+    hashValueDecl->addAttribute(NonisolatedAttr::createImplicit(C));
 
   Pattern *hashValuePat =
       NamedPattern::createImplicit(C, hashValueDecl, intType);

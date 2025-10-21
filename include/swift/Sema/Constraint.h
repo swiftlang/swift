@@ -49,6 +49,7 @@ namespace constraints {
 class ConstraintFix;
 class ConstraintLocator;
 class ConstraintSystem;
+class PreparedOverload;
 enum class TrailingClosureMatching;
 
 /// Describes the kind of constraint placed on one or more types.
@@ -437,6 +438,9 @@ class Constraint final : public llvm::ilist_node<Constraint>,
     struct {
       /// The first type.
       Type First;
+
+      /// The prepared overload, if any.
+      PreparedOverload *Prepared;
     } Overload;
 
     struct {
@@ -490,7 +494,8 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new overload-binding constraint, which might have a fix.
-  Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
+  Constraint(Type type, OverloadChoice choice,
+             DeclContext *useDC,
              ConstraintFix *fix, ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
@@ -870,6 +875,15 @@ public:
     ASSERT(Kind == ConstraintKind::BindOverload);
     return *getTrailingObjects<OverloadChoice>();
   }
+
+  /// Retrieve the prepared overload choice for an overload-binding
+  /// constraint.
+  PreparedOverload *getPreparedOverload() const {
+    ASSERT(Kind == ConstraintKind::BindOverload);
+    return Overload.Prepared;
+  }
+
+  void setPreparedOverload(PreparedOverload *preparedOverload);
 
   FunctionType *getAppliedFunctionType() const {
     assert(Kind == ConstraintKind::ApplicableFunction);

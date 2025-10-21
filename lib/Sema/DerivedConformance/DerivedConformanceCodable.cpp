@@ -155,18 +155,6 @@ addImplicitCodingKeys(NominalTypeDecl *target,
   enumDecl->setSynthesized();
   enumDecl->setAccess(AccessLevel::Private);
 
-  if (!C.LangOpts.hasFeature(Feature::SendableProhibitsMainActorInference)) {
-    switch (C.LangOpts.DefaultIsolationBehavior) {
-    case DefaultIsolation::MainActor:
-      enumDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
-      break;
-
-    case DefaultIsolation::Nonisolated:
-      // Nothing to do.
-      break;
-    }
-  }
-
   // For classes which inherit from something Encodable or Decodable, we
   // provide case `super` as the first key (to be used in encoding super).
   auto *classDecl = dyn_cast<ClassDecl>(target);
@@ -772,10 +760,20 @@ lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
   llvm_unreachable("Should have found at least 1 var decl");
 }
 
-static TryExpr *createEncodeCall(ASTContext &C, Type codingKeysType,
-                                 EnumElementDecl *codingKey,
-                                 Expr *containerExpr, Expr *varExpr,
-                                 bool useIfPresentVariant) {
+/// If strict memory safety checking is enabled, wrap the expression in an
+/// implicit "unsafe".
+static Expr *wrapInUnsafeIfNeeded(ASTContext &ctx, Expr *expr) {
+  if (ctx.LangOpts.hasFeature(Feature::StrictMemorySafety,
+                              /*allowMigration=*/true))
+    return UnsafeExpr::createImplicit(ctx, expr->getStartLoc(), expr);
+
+  return expr;
+}
+
+static Expr *createEncodeCall(ASTContext &C, Type codingKeysType,
+                              EnumElementDecl *codingKey,
+                              Expr *containerExpr, Expr *varExpr,
+                              bool useIfPresentVariant) {
   // CodingKeys.x
   auto *metaTyRef = TypeExpr::createImplicit(codingKeysType, C);
   auto *keyExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(), codingKey,
@@ -794,7 +792,7 @@ static TryExpr *createEncodeCall(ASTContext &C, Type codingKeysType,
   // try container.encode(x, forKey: CodingKeys.x)
   auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
                                   /*Implicit=*/true);
-  return tryExpr;
+  return wrapInUnsafeIfNeeded(C, tryExpr);
 }
 
 /// Synthesizes the body for `func encode(to encoder: Encoder) throws`.
@@ -929,7 +927,7 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
     // try super.encode(to: container.superEncoder())
     auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
                                     /*Implicit=*/true);
-    statements.push_back(tryExpr);
+    statements.push_back(wrapInUnsafeIfNeeded(C, tryExpr));
   }
 
   auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
@@ -948,27 +946,10 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
     // .<elt>(let a0, let a1, ...)
     SmallVector<VarDecl *, 3> payloadVars;
     Pattern *subpattern = nullptr;
-    std::optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
 
     if (createSubpattern) {
       subpattern = DerivedConformance::enumElementPayloadSubpattern(
           elt, 'a', DC, payloadVars, /* useLabels */ true);
-
-      auto hasBoundDecls = !payloadVars.empty();
-      if (hasBoundDecls) {
-        // We allocated a direct copy of our var decls for the case
-        // body.
-        auto copy = C.Allocate<VarDecl *>(payloadVars.size());
-        for (unsigned i : indices(payloadVars)) {
-          auto *vOld = payloadVars[i];
-          auto *vNew = new (C) VarDecl(
-              /*IsStatic*/ false, vOld->getIntroducer(), vOld->getNameLoc(),
-              vOld->getName(), vOld->getDeclContext());
-          vNew->setImplicit();
-          copy[i] = vNew;
-        }
-        caseBodyVarDecls.emplace(copy);
-      }
     }
 
     // CodingKeys.x
@@ -987,11 +968,8 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
                                                      subpattern, DC);
 
       auto labelItem = CaseLabelItem(pat);
-      auto stmt =
-          CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(), labelItem,
-                           SourceLoc(), SourceLoc(), caseBody,
-                           /*case body vardecls*/
-                           createSubpattern ? caseBodyVarDecls : std::nullopt);
+      auto stmt = CaseStmt::createImplicit(C, CaseParentKind::Switch, labelItem,
+                                           caseBody);
       cases.push_back(stmt);
     }
   }
@@ -1112,8 +1090,10 @@ deriveBodyEncodable_enum_encode(AbstractFunctionDecl *encodeDecl, void *) {
 
   // generate: switch self { }
   auto enumRef =
-      new (C) DeclRefExpr(ConcreteDeclRef(selfRef), DeclNameLoc(),
-                          /*implicit*/ true, AccessSemantics::Ordinary);
+      wrapInUnsafeIfNeeded(
+        C,
+        new (C) DeclRefExpr(ConcreteDeclRef(selfRef), DeclNameLoc(),
+                            /*implicit*/ true, AccessSemantics::Ordinary));
   auto switchStmt = createEnumSwitch(
       C, funcDC, enumRef, enumDecl, codingKeysEnum,
       /*createSubpattern*/ true,
@@ -1263,7 +1243,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   if (superclassConformsTo(dyn_cast<ClassDecl>(derived.Nominal),
                            KnownProtocolKind::Encodable)) {
     auto *attr = new (C) OverrideAttr(/*IsImplicit=*/true);
-    encodeDecl->getAttrs().add(attr);
+    encodeDecl->addAttribute(attr);
   }
 
   addNonIsolatedToSynthesized(derived, encodeDecl);
@@ -1276,11 +1256,11 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   return encodeDecl;
 }
 
-static TryExpr *createDecodeCall(ASTContext &C, Type resultType,
-                                 Type codingKeysType,
-                                 EnumElementDecl *codingKey,
-                                 Expr *containerExpr,
-                                 bool useIfPresentVariant) {
+static Expr *createDecodeCall(ASTContext &C, Type resultType,
+                              Type codingKeysType,
+                              EnumElementDecl *codingKey,
+                              Expr *containerExpr,
+                              bool useIfPresentVariant) {
   auto methodName = useIfPresentVariant ? C.Id_decodeIfPresent : C.Id_decode;
 
   // Type.self
@@ -1470,7 +1450,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
                                                         varDecl->getName());
       auto *assignExpr = new (C) AssignExpr(varExpr, SourceLoc(), tryExpr,
                                             /*Implicit=*/true);
-      statements.push_back(assignExpr);
+      statements.push_back(wrapInUnsafeIfNeeded(C, assignExpr));
     }
   }
 
@@ -1506,7 +1486,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
         // try super.init(from: container.superDecoder())
         auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
                                         /*Implicit=*/true);
-        statements.push_back(tryExpr);
+        statements.push_back(wrapInUnsafeIfNeeded(C, tryExpr));
       } else {
         // The explicit constructor name is a compound name taking no arguments.
         DeclName initName(C, DeclBaseName::createConstructor(),
@@ -1538,7 +1518,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
           callExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
                                      /*Implicit=*/true);
 
-        statements.push_back(callExpr);
+        statements.push_back(wrapInUnsafeIfNeeded(C, callExpr));
       }
     }
   }
@@ -1827,7 +1807,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
                 new (C) AssignExpr(selfRef, SourceLoc(), selfCaseExpr,
                                    /*Implicit=*/true);
 
-            caseStatements.push_back(assignExpr);
+            caseStatements.push_back(wrapInUnsafeIfNeeded(C, assignExpr));
           } else {
             // Foo.bar(x:)
             SmallVector<Identifier, 3> scratch;
@@ -1845,7 +1825,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
                 new (C) AssignExpr(selfRef, SourceLoc(), caseCallExpr,
                                    /*Implicit=*/true);
 
-            caseStatements.push_back(assignExpr);
+            caseStatements.push_back(wrapInUnsafeIfNeeded(C, assignExpr));
           }
 
           auto body =
@@ -1914,7 +1894,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   // This constructor should be marked as `required` for non-final classes.
   if (classDecl && !classDecl->isSemanticallyFinal()) {
     auto *reqAttr = new (C) RequiredAttr(/*IsImplicit=*/true);
-    initDecl->getAttrs().add(reqAttr);
+    initDecl->addAttribute(reqAttr);
   }
 
   addNonIsolatedToSynthesized(derived, initDecl);

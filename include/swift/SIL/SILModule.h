@@ -46,6 +46,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/Allocator.h"
@@ -394,10 +395,6 @@ private:
   bool parsedAsSerializedSIL;
 
   /// Set if we have registered a deserialization notification handler for
-  /// lowering ownership in non transparent functions.
-  /// This gets set in NonTransparent OwnershipModelEliminator pass.
-  bool regDeserializationNotificationHandlerForNonTransparentFuncOME;
-  /// Set if we have registered a deserialization notification handler for
   /// lowering ownership in transparent functions.
   /// This gets set in OwnershipModelEliminator pass.
   bool regDeserializationNotificationHandlerForAllFuncOME;
@@ -449,14 +446,8 @@ public:
     deserializationNotificationHandlers.erase(handler);
   }
 
-  bool hasRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME() {
-    return regDeserializationNotificationHandlerForNonTransparentFuncOME;
-  }
   bool hasRegisteredDeserializationNotificationHandlerForAllFuncOME() {
     return regDeserializationNotificationHandlerForAllFuncOME;
-  }
-  void setRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME() {
-    regDeserializationNotificationHandlerForNonTransparentFuncOME = true;
   }
   void setRegisteredDeserializationNotificationHandlerForAllFuncOME() {
     regDeserializationNotificationHandlerForAllFuncOME = true;
@@ -867,6 +858,11 @@ public:
   /// Returns true if linking succeeded, false otherwise.
   bool linkFunction(SILFunction *F, LinkingMode LinkMode);
 
+  /// Attempt to deserialize witness table for protocol conformance \p PC.
+  ///
+  /// Returns true if linking succeeded, false otherwise.
+  bool linkWitnessTable(ProtocolConformance *PC, LinkingMode LinkMode);
+
   /// Check if a given function exists in any of the modules.
   /// i.e. it can be linked by linkFunction.
   bool hasFunction(StringRef Name);
@@ -1149,7 +1145,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
 void verificationFailure(const Twine &complaint,
               const SILInstruction *atInstruction,
               const SILArgument *atArgument,
-              const std::function<void()> &extraContext);
+              llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
 
 inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
   switch (mod.getStage()) {

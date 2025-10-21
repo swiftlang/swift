@@ -23,6 +23,9 @@
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {
+class ASTContext;
+class FuncDecl;
+
 /// Represents the information needed to evaluate an `#if available` query
 /// (either at runtime or compile-time).
 class AvailabilityQuery final {
@@ -43,31 +46,48 @@ class AvailabilityQuery final {
   bool unavailable;
 
   AvailabilityQuery(AvailabilityDomain domain, ResultKind kind,
-                    bool isUnavailable,
                     const std::optional<AvailabilityRange> &primaryRange,
-                    const std::optional<AvailabilityRange> &variantRange)
-      : domain(domain), primaryRange(primaryRange), variantRange(variantRange),
-        kind(kind), unavailable(isUnavailable) {};
+                    const std::optional<AvailabilityRange> &variantRange);
 
 public:
   /// Returns an `AvailabilityQuery` for a query that evaluates to true or
   /// false at compile-time.
-  static AvailabilityQuery constant(AvailabilityDomain domain,
-                                    bool isUnavailable, bool value) {
+  static AvailabilityQuery constant(AvailabilityDomain domain, bool value) {
     return AvailabilityQuery(
         domain, value ? ResultKind::ConstTrue : ResultKind::ConstFalse,
-        isUnavailable, std::nullopt, std::nullopt);
+        std::nullopt, std::nullopt);
+  }
+
+  /// Returns an `AvailabilityQuery` for a query that evaluates to true or
+  /// false at compile-time in the universal availability domain.
+  static AvailabilityQuery universallyConstant(bool value) {
+    return AvailabilityQuery(AvailabilityDomain::forUniversal(),
+                             value ? ResultKind::ConstTrue
+                                   : ResultKind::ConstFalse,
+                             std::nullopt, std::nullopt);
   }
 
   /// Returns an `AvailabilityQuery` for a query that must be evaluated at
   /// runtime with the given arguments, which may be zero, one, or two version
   /// tuples that should be passed to the query function.
   static AvailabilityQuery
-  dynamic(AvailabilityDomain domain, bool isUnavailable,
+  dynamic(AvailabilityDomain domain,
           const std::optional<AvailabilityRange> &primaryRange,
           const std::optional<AvailabilityRange> &variantRange) {
-    return AvailabilityQuery(domain, ResultKind::Dynamic, isUnavailable,
-                             primaryRange, variantRange);
+    return AvailabilityQuery(domain, ResultKind::Dynamic, primaryRange,
+                             variantRange);
+  }
+
+  /// Returns a copy of the `AvailabilityQuery` that has been modified to
+  /// represent an `if #unavailable` query if `isUnavailability` is true, or an
+  /// `if #available` query otherwise.
+  AvailabilityQuery asUnavailable(bool isUnavailability) const {
+    if (isUnavailability != unavailable) {
+      AvailabilityQuery copy = *this;
+      copy.unavailable = isUnavailability;
+      return copy;
+    }
+    return *this;
   }
 
   /// Returns the domain that the query applies to.
@@ -121,6 +141,14 @@ public:
       return std::nullopt;
     return variantRange->getRawMinimumVersion();
   }
+
+  /// Returns the `FuncDecl *` that should be invoked at runtime to evaluate
+  /// the query, and populates `arguments` with the arguments to invoke it with
+  /// (the integer components of the version tuples that are being tested). If
+  /// the query does not have a dynamic result, returns `nullptr`.
+  FuncDecl *
+  getDynamicQueryDeclAndArguments(llvm::SmallVectorImpl<unsigned> &arguments,
+                                  ASTContext &ctx) const;
 };
 
 } // end namespace swift

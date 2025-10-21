@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -115,8 +115,11 @@ operator<<(raw_ostream &os, const std::optional<CopyPropagationOption> option) {
     case CopyPropagationOption::RequestedPassesOnly:
       os << "requested-passes-only";
       break;
-    case CopyPropagationOption::On:
-      os << "on";
+    case CopyPropagationOption::Optimizing:
+      os << "optimizing";
+      break;
+    case CopyPropagationOption::Always:
+      os << "always";
       break;
     }
   } else {
@@ -135,24 +138,27 @@ public:
   // parse - Return true on error.
   bool parse(Option &O, StringRef ArgName, StringRef Arg,
              std::optional<CopyPropagationOption> &Value) {
-    if (Arg == "" || Arg == "true" || Arg == "TRUE" || Arg == "True" ||
-        Arg == "1") {
-      Value = CopyPropagationOption::On;
+    if (Arg.compare_insensitive("always")) {
+      Value = CopyPropagationOption::Always;
       return false;
     }
-    if (Arg == "false" || Arg == "FALSE" || Arg == "False" || Arg == "0") {
+    if (Arg.compare_insensitive("optimizing")) {
+      Value = CopyPropagationOption::Optimizing;
+      return false;
+    }
+    if (Arg.compare_insensitive("false") || Arg.compare_insensitive("off") ||
+        Arg == "0") {
       Value = CopyPropagationOption::Off;
       return false;
     }
-    if (Arg == "requested-passes-only" || Arg == "REQUESTED-PASSES-ONLY" ||
-        Arg == "Requested-Passes-Only") {
+    if (Arg.compare_insensitive("requested-passes-only")) {
       Value = CopyPropagationOption::RequestedPassesOnly;
       return false;
     }
 
     return O.error("'" + Arg +
-                   "' is invalid for CopyPropagationOption! Try true, false, "
-                   "or requested-passes-only.");
+                   "' is invalid for CopyPropagationOption!"
+                   " Try always, optimizing, or requested-passes-only.");
   }
 
   void initialize() {}
@@ -291,10 +297,6 @@ struct SILOptOptions {
                     llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
 
   llvm::cl::opt<bool>
-  EnableSpeculativeDevirtualization = llvm::cl::opt<bool>("enable-spec-devirt",
-                    llvm::cl::desc("Enable Speculative Devirtualization pass."));
-
-  llvm::cl::opt<bool>
   EnableAsyncDemotion = llvm::cl::opt<bool>("enable-async-demotion",
                     llvm::cl::desc("Enables an optimization pass to demote async functions."));
 
@@ -309,12 +311,6 @@ struct SILOptOptions {
   llvm::cl::opt<bool>
   EnableMoveInoutStackProtection = llvm::cl::opt<bool>("enable-move-inout-stack-protector",
                     llvm::cl::desc("Enable the stack protector by moving values to temporaries."));
-
-  llvm::cl::opt<bool> EnableOSSAModules = llvm::cl::opt<bool>(
-      "enable-ossa-modules", llvm::cl::init(true),
-      llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
-                     "this is disabled we do not serialize in OSSA "
-                     "form when optimizing."));
 
   cl::opt<EnforceExclusivityMode>
     EnforceExclusivity = cl::opt<EnforceExclusivityMode>(
@@ -664,7 +660,6 @@ getASTOverrideKind(const SILOptOptions &options) {
 
 int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   INITIALIZE_LLVM();
-  llvm::setBugReportMsg(SWIFT_CRASH_BUG_REPORT_MESSAGE  "\n");
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   SILOptOptions options;
@@ -705,8 +700,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     Invocation.setTargetTriple(options.Target);
   if (!options.ResourceDir.empty())
     Invocation.setRuntimeResourcePath(options.ResourceDir);
-  Invocation.getFrontendOptions().EnableLibraryEvolution
-    = options.EnableLibraryEvolution;
+  if (options.EnableLibraryEvolution)
+    Invocation.getLangOptions().enableFeature(Feature::LibraryEvolution);
   Invocation.getFrontendOptions().StrictImplicitModuleContext
     = options.StrictImplicitModuleContext;
 
@@ -795,8 +790,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     options.EnableObjCInterop ? true :
     options.DisableObjCInterop ? false : llvm::Triple(options.Target).isOSDarwin();
 
-  Invocation.getLangOptions().enableFeature(Feature::LayoutPrespecialization);
-
   Invocation.getLangOptions().OptimizationRemarkPassedPattern =
       createOptRemarkRegex(options.PassRemarksPassed);
   Invocation.getLangOptions().OptimizationRemarkMissedPattern =
@@ -815,6 +808,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;
+
+  Invocation.computeAArch64TBIOptions();
 
   // Enable strict concurrency if we have the feature specified or if it was
   // specified via a command line option to sil-opt.
@@ -892,12 +887,10 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EmitVerboseSIL |= options.EmitVerboseSIL;
   SILOpts.EmitSortedSIL |= options.EmitSortedSIL;
 
-  SILOpts.EnableSpeculativeDevirtualization = options.EnableSpeculativeDevirtualization;
   SILOpts.EnableAsyncDemotion = options.EnableAsyncDemotion;
   SILOpts.EnableThrowsPrediction = options.EnableThrowsPrediction;
   SILOpts.EnableNoReturnCold = options.EnableNoReturnCold;
   SILOpts.IgnoreAlwaysInline = options.IgnoreAlwaysInline;
-  SILOpts.EnableOSSAModules = options.EnableOSSAModules;
   SILOpts.EnableSILOpaqueValues = options.EnableSILOpaqueValues;
   SILOpts.OSSACompleteLifetimes = options.EnableOSSACompleteLifetimes;
   SILOpts.OSSAVerifyComplete = options.EnableOSSAVerifyComplete;
@@ -908,7 +901,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   // Unless overridden below, enabling copy propagation means enabling lexical
   // lifetimes.
-  if (SILOpts.CopyPropagation == CopyPropagationOption::On)
+  if (SILOpts.CopyPropagation >= CopyPropagationOption::Optimizing)
     SILOpts.LexicalLifetimes = LexicalLifetimesOption::On;
 
   // Unless overridden below, disable copy propagation means disabling lexical
@@ -1083,7 +1076,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     serializationOpts.OutputPath = OutputFile;
     serializationOpts.SerializeAllSIL = options.EmitSIB;
     serializationOpts.IsSIB = options.EmitSIB;
-    serializationOpts.IsOSSA = SILOpts.EnableOSSAModules;
 
     symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
 

@@ -489,7 +489,7 @@ public:
       }
     }
 
-    addFunction(SILDeclRef(AFD));
+    addFunction(SILDeclRef(AFD).asForeign(AFD->hasOnlyCEntryPoint()));
 
     ASSERT(ABIRoleInfo(AFD).providesAPI()
               && "SILSymbolVisitorImpl visiting ABI-only decl?");
@@ -499,10 +499,12 @@ public:
       Visitor.addDynamicFunction(AFD, *dynKind);
     }
 
-    if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
-      // A @_cdecl("...") function has an extra symbol, with the name from the
-      // attribute.
-      addFunction(SILDeclRef(AFD).asForeign());
+    if (auto cdeclAttr = AFD->getAttrs().getAttribute<CDeclAttr>()) {
+      if (cdeclAttr->Underscored) {
+        // A @_cdecl("...") function has an extra symbol, with the name from the
+        // attribute.
+        addFunction(SILDeclRef(AFD).asForeign());
+      }
     }
 
     if (auto distributedThunk = AFD->getDistributedThunk()) {
@@ -621,6 +623,8 @@ public:
       if (initInfo.hasInitFromWrappedValue() && !VD->isStatic()) {
         addFunction(SILDeclRef(
             VD, SILDeclRef::Kind::PropertyWrapperBackingInitializer));
+        addFunction(
+            SILDeclRef(VD, SILDeclRef::Kind::PropertyWrappedFieldInitAccessor));
       }
     }
     visitAbstractStorageDecl(VD);

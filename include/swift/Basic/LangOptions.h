@@ -22,6 +22,7 @@
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Version.h"
 #include "swift/Config.h"
@@ -67,22 +68,24 @@ namespace swift {
     Complete,
   };
 
-  /// Access or distribution level of a library.
+  /// Intended distribution level of a module.
+  ///
+  /// Ordered from more private to more public.
   enum class LibraryLevel : uint8_t {
-    /// Application Programming Interface that is publicly distributed so
-    /// public decls are really public and only @_spi decls are SPI.
-    API,
+    /// This isn't a library or the library distribution intent is unknown.
+    Other,
 
-    /// System Programming Interface that has restricted distribution
-    /// all decls in the module are considered to be SPI including public ones.
-    SPI,
-
-    /// Internal Programming Interface that is not distributed and only usable
-    /// from within a project.
+    /// Internal Programming Interface: the module is not distributed and
+    /// only usable from within its project.
     IPI,
 
-    /// The library has some other undefined distribution.
-    Other
+    /// System Programming Interface: the module has restricted distribution,
+    /// all public decls in the module are considered to be SPI.
+    SPI,
+
+    /// Application Programming Interface: the module is distributed publicly,
+    /// public decls are really public and only @_spi decls are SPI.
+    API,
   };
 
   enum class AccessNoteDiagnosticBehavior : uint8_t {
@@ -184,6 +187,9 @@ namespace swift {
 
     /// Swift runtime version to compile for.
     version::Version RuntimeVersion = version::Version::getCurrentLanguageVersion();
+
+    /// The minimum Swift runtime version that the progam can be deployed to.
+    version::Version MinSwiftRuntimeVersion;
 
     /// PackageDescription version to compile for.
     version::Version PackageDescriptionVersion;
@@ -355,8 +361,6 @@ namespace swift {
       return CXXStdlib == PlatformDefaultCXXStdlib;
     }
 
-    bool CForeignReferenceTypes = false;
-
     /// Imports getters and setters as computed properties.
     bool CxxInteropGettersSettersAsProperties = false;
 
@@ -494,6 +498,9 @@ namespace swift {
     std::shared_ptr<llvm::Regex> OptimizationRemarkPassedPattern;
     std::shared_ptr<llvm::Regex> OptimizationRemarkMissedPattern;
 
+    /// The path to load access notes from.
+    std::string AccessNotesPath;
+
     /// How should we emit diagnostics about access notes?
     AccessNoteDiagnosticBehavior AccessNoteBehavior =
         AccessNoteDiagnosticBehavior::RemarkOnFailureOrSuccess;
@@ -614,6 +621,14 @@ namespace swift {
     /// rewrite system.
     bool EnableRequirementMachineOpaqueArchetypes = false;
 
+    /// Maximum nesting depth for type substitution operations, to prevent
+    /// runaway recursion.
+    unsigned MaxSubstitutionDepth = 500;
+
+    /// Maximum step count for type substitution operations, to prevent
+    /// runaway recursion.
+    unsigned MaxSubstitutionCount = 120000;
+
     /// Enable implicit lifetime dependence for ~Escapable return types.
     bool EnableExperimentalLifetimeDependenceInference = false;
 
@@ -636,11 +651,18 @@ namespace swift {
     /// Enables dumping macro expansions.
     bool DumpMacroExpansions = false;
 
+    /// Enables dumping imports for each SourceFile.
+    bool DumpSourceFileImports = false;
+
     /// The model of concurrency to be used.
     ConcurrencyModel ActiveConcurrencyModel = ConcurrencyModel::Standard;
 
     /// All block list configuration files to be honored in this compilation.
     std::vector<std::string> BlocklistConfigFilePaths;
+
+    /// List of top level modules to be considered as if they had require ObjC
+    /// in their module map.
+    llvm::SmallVector<StringRef> ModulesRequiringObjC;
 
     /// Whether to ignore checks that a module is resilient during
     /// type-checking, SIL verification, and IR emission,
@@ -683,18 +705,7 @@ namespace swift {
     /// This is only implemented on certain OSs. If no target has been
     /// configured, returns v0.0.0.
     llvm::VersionTuple getMinPlatformVersion() const {
-      if (Target.isMacOSX()) {
-        llvm::VersionTuple OSVersion;
-        Target.getMacOSXVersion(OSVersion);
-        return OSVersion;
-      } else if (Target.isiOS()) {
-        return Target.getiOSVersion();
-      } else if (Target.isWatchOS()) {
-        return Target.getOSVersion();
-      } else if (Target.isXROS()) {
-        return Target.getOSVersion();
-      }
-      return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
+      return getVersionForTriple(Target);
     }
 
     /// Sets an implicit platform condition.
@@ -942,6 +953,10 @@ namespace swift {
     /// (It's arbitrary, but will keep the compiler from taking too much time.)
     unsigned SwitchCheckingInvocationThreshold = 200000;
 
+    /// The maximum number of `@dynamicMemberLookup`s that can be chained to
+    /// resolve a member reference.
+    unsigned DynamicMemberLookupDepthLimit = 100;
+
     /// If true, the time it takes to type-check each function will be dumped
     /// to llvm::errs().
     bool DebugTimeFunctionBodies = false;
@@ -1001,6 +1016,9 @@ namespace swift {
 
     /// Disable the component splitter phase of the expression type checker.
     bool SolverDisableSplitter = false;
+
+    /// Enable the experimental "prepared overloads" optimization.
+    bool SolverEnablePreparedOverloads = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.
@@ -1035,6 +1053,10 @@ namespace swift {
 
     /// The bridging header PCH file.
     std::string BridgingHeaderPCH;
+
+    /// Whether the bridging header and PCH file are considered to be
+    /// internal imports.
+    bool BridgingHeaderIsInternal = false;
 
     /// When automatically generating a precompiled header from the bridging
     /// header, place it in this directory.
@@ -1096,6 +1118,10 @@ namespace swift {
     /// When set, don't enforce warnings with -Werror.
     bool DebuggerSupport = false;
 
+    /// Prefer the serialized preprocessed header over the one on disk.
+    /// Used by LLDB.
+    bool PreferSerializedBridgingHeader = false;
+
     /// When set, ClangImporter is disabled, and all requests go to the
     /// DWARFImporter delegate.
     bool DisableSourceImport = false;
@@ -1112,6 +1138,19 @@ namespace swift {
     /// Whether the dependency scanner should construct all swift-frontend
     /// invocations directly from clang cc1 args.
     bool ClangImporterDirectCC1Scan = false;
+
+    /// Whether we should import values (initializer expressions) of constant
+    /// globals.
+    bool EnableConstValueImporting = true;
+
+    /// Whether the importer should expect all APINotes to be wrapped
+    /// in versioned attributes, where the importer must select the appropriate
+    /// ones to apply.
+    bool LoadVersionIndependentAPINotes = false;
+
+    /// Whether the importer should skip SafeInteropWrappers, even though the
+    /// feature is enabled.
+    bool DisableSafeInteropWrappers = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

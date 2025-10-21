@@ -12,6 +12,29 @@
 
 import SIL
 
+private extension ArgumentConventions {
+  func isLifetimeSourceOrTarget(index argIndex: Int) -> Bool {
+    // Check if `argIndex` is a lifetime target
+    if self[parameterDependencies: argIndex] != nil {
+      return true
+    }
+
+    // Check if `argIndex` is a lifetime source in resultDependencies
+    if self[resultDependsOn: argIndex] != nil {
+      return true
+    }
+
+    // Check if `argIndex` is a lifetime source in parameterDependencies
+    for targetIndex in firstParameterIndex..<self.count {
+      if getDependence(target: targetIndex, source: argIndex) != nil {
+        return true
+      }
+    }
+
+    return false
+  }
+}
+
 /// Replace an apply with metatype arguments with an apply to a specialized function, where the
 /// metatype values are not passed, but rematerialized in the entry block of the specialized function
 ///
@@ -50,6 +73,15 @@ func specializeByRemovingMetatypeArguments(apply: FullApplySite, _ context: Modu
                          .map { $0.offset }
   if deadArgIndices.isEmpty {
     return
+  }
+
+  // If a function has lifetime dependencies, bailout if dead arguments precede lifetime sources or targets
+  if callee.convention.hasLifetimeDependencies() {
+    for (argIndex, _) in callee.arguments.enumerated() where argIndex >= deadArgIndices.first! {
+      if callee.argumentConventions.isLifetimeSourceOrTarget(index: argIndex) {
+        return
+      }
+    }
   }
 
   let specializedFuncName = context.mangle(withDeadArguments: deadArgIndices, from: callee)

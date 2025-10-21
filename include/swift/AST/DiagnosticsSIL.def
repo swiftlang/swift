@@ -84,7 +84,7 @@ ERROR(unimplemented_generator_witnesses,none,
       "protocol conformance emission for generator coroutines is unimplemented",
       ())
 
-ERROR(exclusivity_access_required,none,
+GROUPED_ERROR(exclusivity_access_required,ExclusivityViolation,none,
       "overlapping accesses to %0, but "
       "%select{initialization|read|modification|deinitialization}1 requires "
       "exclusive access; "
@@ -92,18 +92,18 @@ ERROR(exclusivity_access_required,none,
               "consider calling MutableCollection.swapAt(_:_:)}2",
       (StringRef, unsigned, bool))
 
-ERROR(exclusivity_access_required_unknown_decl,none,
+GROUPED_ERROR(exclusivity_access_required_unknown_decl,ExclusivityViolation,none,
         "overlapping accesses, but "
         "%select{initialization|read|modification|deinitialization}0 requires "
         "exclusive access; consider copying to a local variable", (unsigned))
 
-ERROR(exclusivity_access_required_moveonly,none,
+GROUPED_ERROR(exclusivity_access_required_moveonly,ExclusivityViolation,none,
       "overlapping accesses to %0, but "
       "%select{initialization|read|modification|deinitialization}1 requires "
       "exclusive access",
       (StringRef, unsigned))
 
-ERROR(exclusivity_access_required_unknown_decl_moveonly,none,
+GROUPED_ERROR(exclusivity_access_required_unknown_decl_moveonly,ExclusivityViolation,none,
         "overlapping accesses, but "
         "%select{initialization|read|modification|deinitialization}0 requires "
         "exclusive access", (unsigned))
@@ -378,32 +378,48 @@ ERROR(bad_attr_on_non_const_global,none,
       "global variable must be a compile-time constant to use %0 attribute", (StringRef))
 ERROR(global_must_be_compile_time_const,none,
       "global variable must be a compile-time constant", ())
-ERROR(embedded_cannot_specialize_class_method,none,
-      "classes cannot have a non-final, generic method %0 in embedded Swift", (DeclName))
-ERROR(embedded_cannot_specialize_witness_method,none,
-      "a protocol type cannot contain a generic method %0 in embedded Swift", (DeclName))
-ERROR(cannot_specialize_class,none,
-      "cannot specialize %0 because class definition is not available (make sure to build with -wmo)", (Type))
-ERROR(embedded_swift_existential_type,none,
-      "cannot use a value of protocol type %0 in embedded Swift", (Type))
-ERROR(embedded_swift_existential_protocol,none,
-      "cannot use a value of protocol type 'any %0' in embedded Swift", (StringRef))
-ERROR(embedded_swift_existential,none,
-      "cannot use a value of protocol type in embedded Swift", ())
 ERROR(perf_diag_existential_type,none,
       "cannot use a value of protocol type %0 in '@_noExistential' function", (Type))
 ERROR(perf_diag_existential,none,
       "cannot use a value of protocol type in '@_noExistential' function", ())
-ERROR(embedded_swift_value_deinit,none,
+
+// Embedded Swift diagnostics
+GROUPED_ERROR(embedded_cannot_specialize_class_method,EmbeddedRestrictions,none,
+      "classes cannot have a non-final, generic method %0 in embedded Swift", (DeclName))
+GROUPED_ERROR(embedded_cannot_specialize_witness_method,EmbeddedRestrictions,none,
+      "a protocol type cannot contain a generic method %0 in embedded Swift", (DeclName))
+GROUPED_ERROR(cannot_specialize_class,EmbeddedRestrictions,none,
+      "cannot specialize %0 because class definition is not available (make sure to build with -wmo)", (Type))
+GROUPED_ERROR(embedded_swift_existential_type,EmbeddedRestrictions,none,
+      "cannot use a value of protocol type %0 in embedded Swift", (Type))
+GROUPED_ERROR(embedded_swift_existential_protocol,EmbeddedRestrictions,none,
+      "cannot use a value of protocol type 'any %0' in embedded Swift", (StringRef))
+GROUPED_ERROR(embedded_swift_existential,EmbeddedRestrictions,none,
+      "cannot use a value of protocol type in embedded Swift", ())
+GROUPED_ERROR(embedded_swift_value_deinit,EmbeddedRestrictions,none,
       "cannot de-virtualize deinit of type %0", (Type))
-ERROR(embedded_swift_metatype_type,none,
+GROUPED_ERROR(embedded_swift_metatype_type,EmbeddedRestrictions,none,
       "cannot use metatype of type %0 in embedded Swift", (Type))
-ERROR(embedded_swift_metatype,none,
+GROUPED_ERROR(embedded_swift_metatype,EmbeddedRestrictions,none,
       "cannot use metatype in embedded Swift", ())
-ERROR(embedded_swift_keypath,none,
+GROUPED_ERROR(embedded_swift_keypath,EmbeddedRestrictions,none,
       "cannot use key path in embedded Swift", ())
-ERROR(embedded_swift_dynamic_cast,none,
+GROUPED_ERROR(embedded_swift_dynamic_cast,EmbeddedRestrictions,none,
       "cannot do dynamic casting in embedded Swift", ())
+GROUPED_ERROR(embedded_capture_of_generic_value_with_deinit,EmbeddedRestrictions,none,
+      "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
+GROUPED_ERROR(embedded_call_generic_function,EmbeddedRestrictions,none,
+      "cannot specialize generic function or default protocol method in this context", ())
+GROUPED_ERROR(embedded_call_generic_function_with_dynamic_self,EmbeddedRestrictions,none,
+      "cannot call an initializer or static method, which is defined as default protocol method, from a class method or initializer", ())
+NOTE(embedded_specialization_called_from,none,
+      "generic specialization called here", ())
+NOTE(embedded_existential_created,none,
+      "protocol type value created here", ())
+NOTE(embedded_constructor_called,none,
+      "instance of type created here", ())
+
+// no-allocations diagnostics
 ERROR(embedded_swift_allocating_type,none,
       "cannot use allocating type %0 in -no-allocations mode", (Type))
 ERROR(embedded_swift_allocating_coroutine,none,
@@ -412,28 +428,29 @@ ERROR(embedded_swift_allocating_closure,none,
       "cannot use escaping closures in -no-allocations mode", ())
 ERROR(embedded_swift_allocating,none,
       "cannot use allocating operation in -no-allocations mode", ())
-ERROR(embedded_capture_of_generic_value_with_deinit,none,
-      "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
-ERROR(embedded_call_generic_function,none,
-      "cannot specialize generic function or default protocol method in this context", ())
-ERROR(embedded_call_generic_function_with_dynamic_self,none,
-      "cannot call an initializer or static method, which is defined as default protocol method, from a class method or initializer", ())
-NOTE(embedded_specialization_called_from,none,
-      "generic specialization called here", ())
-NOTE(embedded_existential_created,none,
-      "protocol type value created here", ())
-NOTE(embedded_constructor_called,none,
-      "instance of type created here", ())
+
 ERROR(wrong_linkage_for_serialized_function,none,
       "function has wrong linkage to be called from %0", (StringRef))
 NOTE(performance_called_from,none,
       "called from here", ())
+ERROR(manualownership_copy,none,
+      "explicit 'copy' required here; please report this vague diagnostic as a bug", ())
+ERROR(manualownership_copy_happened,none,
+      "accessing %0 may produce a copy; write 'copy' to acknowledge or 'consume' to elide", (Identifier))
+ERROR(manualownership_copy_demanded,none,
+      "independent copy of %0 is required here; write 'copy' to acknowledge or 'consume' to elide", (Identifier))
+ERROR(manualownership_copy_captured,none,
+      "closure capture of '%0' requires independent copy of it; write [%0 = copy %0] in the closure's capture list to acknowledge", (StringRef))
 
 // 'transparent' diagnostics
 ERROR(circular_transparent,none,
       "inlining 'transparent' functions forms circular loop", ())
 NOTE(note_while_inlining,none,
      "while inlining here", ())
+
+// '@inline(always)' diagnostics
+ERROR(circular_inlineAlways,none,
+      "inlining '@inline(always)' functions forms circular loop", ())
 
 // Pre-specializations
 ERROR(cannot_prespecialize,none,
@@ -857,7 +874,8 @@ ERROR(sil_movechecking_borrowed_parameter_captured_by_closure, none,
       "parameter",
       (StringRef))
 ERROR(sil_movechecking_capture_consumed, none,
-      "noncopyable '%0' cannot be consumed when captured by an escaping closure", (StringRef))
+      "noncopyable '%0' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type",
+      (StringRef))
 ERROR(sil_movechecking_not_reinitialized_before_end_of_function, none,
       "missing reinitialization of %select{inout parameter|closure capture}1 '%0' "
       "after consume", (StringRef, bool))
@@ -1097,6 +1115,10 @@ NOTE(regionbasedisolation_typed_sendneversendable_via_arg_callee, none,
       "sending %0 value of non-Sendable type %1 to %2 %kind3 risks causing races in between %0 and %2 uses",
       (StringRef, Type, StringRef, const ValueDecl *))
 
+NOTE(regionbasedisolation_isolated_conformance_introduced, none,
+     "isolated conformance to %kind0 can be introduced here",
+     (const ValueDecl *))
+
 // Error that is only used when the send non sendable emitter cannot discover any
 // information to give a better diagnostic.
 ERROR(regionbasedisolation_task_or_actor_isolated_sent, none,
@@ -1114,6 +1136,32 @@ ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, none,
 NOTE(regionbasedisolation_inout_sending_cannot_be_actor_isolated_note, none,
       "%1 %0 risks causing races in between %1 uses and caller uses since caller assumes value is not actor isolated",
       (Identifier, StringRef))
+ERROR(regionbasedisolation_inout_sending_cannot_be_returned_param, none,
+      "'inout sending' parameter %0 cannot be returned",
+      (Identifier))
+ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value, none,
+      "%0 cannot be returned",
+      (Identifier))
+ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value_result, none,
+      "result of %kind0 cannot be returned",
+      (const ValueDecl *))
+NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_param, none,
+     "returning 'inout sending' parameter %0 risks concurrent access as caller assumes %0 and result can be sent to different isolation domains",
+     (Identifier))
+NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_value, none,
+     "returning %0 risks concurrent access to 'inout sending' parameter %1 as caller assumes %1 and result can be sent to different isolation domains",
+     (Identifier, Identifier))
+NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_return_value, none,
+     "returning result of %kind0 risks concurrent access to 'inout sending' parameter %1 as caller assumes %1 and result can be sent to different isolation domains",
+     (const ValueDecl *, Identifier))
+NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_actor_param, none,
+     "returning %0 risks concurrent access as caller assumes %0 is not actor-isolated and result is %1", (Identifier, StringRef))
+NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_actor_value, none,
+     "returning %0 risks concurrent access to 'inout sending' parameter %1 as caller assumes %1 is not actor-isolated and result is %2",
+     (Identifier, Identifier, StringRef))
+NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_actor_return_value, none,
+     "returning result of %kind0 risks concurrent access to 'inout sending' parameter %1 as caller assumes %1 is not actor-isolated and result is %2",
+     (const ValueDecl *, Identifier, StringRef))
 
 //===
 // Out Sending
@@ -1152,6 +1200,12 @@ NOTE(rbi_add_nominal_sendable_conformance,none,
 NOTE(rbi_add_generic_parameter_sendable_conformance,none,
      "consider making generic parameter %0 conform to the 'Sendable' protocol",
      (Type))
+
+ERROR(regionbasedisolation_inout_sending_in_same_region, none,
+      "'inout sending' parameters %0 and %1 can be potentially accessed from each other at function return risking data races in caller",
+      (Identifier, Identifier))
+NOTE(regionbasedisolation_inout_sending_in_same_region_note, none,
+     "caller function assumes on return that %0 and %1 cannot be used to access each other implying sending them to different isolation domains does not risk a data race", (Identifier, Identifier))
 
 // Concurrency related diagnostics
 ERROR(cannot_find_executor_factory_type, none,
@@ -1192,8 +1246,22 @@ NOTE(lifetime_outside_scope_use, none,
 NOTE(lifetime_outside_scope_escape, none,
      "this use causes the lifetime-dependent value to escape", ())
 
+NOTE(implicit_function_note, none, "error in compiler-generated '%0'", (StringRef))
+
 ERROR(noncopyable_shared_case_block_unimplemented, none,
       "matching a non-'Copyable' value using a case label that has multiple patterns is not implemented", ())
+
+
+/// Borrow and mutate accessors
+ERROR(invalid_borrow_accessor_return, none,
+      "invalid return value from borrow accessor", ())
+NOTE(borrow_accessor_not_a_projection_note, none,
+     "borrow accessors can return either literals, stored properties or computed "
+     "properties that have borrow accessors",
+     ())
+ERROR(invalid_multiple_return_borrow_accessor, none,
+      "multiple return statements in borrow accessors are not yet supported",
+      ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

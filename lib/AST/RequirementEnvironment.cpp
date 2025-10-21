@@ -17,8 +17,10 @@
 
 #include "swift/AST/RequirementEnvironment.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -69,7 +71,7 @@ RequirementEnvironment::RequirementEnvironment(
     return t;
   };
   auto conformanceToWitnessThunkConformanceFn =
-      MakeAbstractConformanceForGenericType();
+      LookUpConformanceInModule();
 
   auto substConcreteType = concreteType.subst(
       conformanceToWitnessThunkTypeFn,
@@ -115,38 +117,31 @@ RequirementEnvironment::RequirementEnvironment(
         InFlightSubstitution &IFS, Type type, ProtocolDecl *proto)
           -> ProtocolConformanceRef {
       // The protocol 'Self' conforms concretely to the conforming type.
-      if (type->isEqual(ctx.TheSelfType)) {
-        auto replacement = type.subst(IFS);
-        ASSERT(covariantSelf || replacement->isEqual(substConcreteType));
+      if (type->isEqual(ctx.TheSelfType) && !covariantSelf && conformance) {
+        ProtocolConformance *specialized = conformance;
 
-        if (conformance) {
-          ProtocolConformance *specialized = conformance;
-
-          if (conformance->getGenericSignature()) {
-            auto concreteSubs =
-              substConcreteType->getContextSubstitutionMap(conformanceDC);
-            specialized =
-              ctx.getSpecializedConformance(substConcreteType,
-                                            cast<NormalProtocolConformance>(conformance),
-                                            concreteSubs);
-          }
-
-          // findWitnessedObjCRequirements() does a weird thing by passing in a
-          // DC that is not the conformance DC. Work around it here.
-          if (!specialized->getType()->isEqual(replacement)) {
-            ASSERT(specialized->getType()->isExactSuperclassOf(substConcreteType));
-            ASSERT(covariantSelf ? replacement->is<GenericTypeParamType>()
-                                 : replacement->isEqual(substConcreteType));
-            specialized = ctx.getInheritedConformance(replacement, specialized);
-          }
-
-          return ProtocolConformanceRef(specialized);
+        if (conformance->getGenericSignature()) {
+          auto concreteSubs =
+            substConcreteType->getContextSubstitutionMap(conformanceDC);
+          specialized =
+            ctx.getSpecializedConformance(substConcreteType,
+                                          cast<NormalProtocolConformance>(conformance),
+                                          concreteSubs);
         }
+
+        // findWitnessedObjCRequirements() does a weird thing by passing in a
+        // DC that is not the conformance DC. Work around it here.
+        if (!specialized->getType()->isEqual(substConcreteType)) {
+          ASSERT(specialized->getType()->isExactSuperclassOf(substConcreteType));
+          specialized = ctx.getInheritedConformance(substConcreteType, specialized);
+        }
+
+        return ProtocolConformanceRef(specialized);
       }
 
       // All other generic parameters come from the requirement itself
       // and conform abstractly.
-      return MakeAbstractConformanceForGenericType()(IFS, type, proto);
+      return lookupConformance(type.subst(IFS), proto);
     });
 
   // If the requirement itself is non-generic, the witness thunk signature
@@ -156,6 +151,11 @@ RequirementEnvironment::RequirementEnvironment(
       reqSig.getRequirements().size() == 1) {
     witnessThunkSig = conformanceDC->getGenericSignatureOfContext()
         .getCanonicalSignature();
+    if (witnessThunkSig) {
+      reqToWitnessThunkSigMap = reqToWitnessThunkSigMap.subst(
+          witnessThunkSig.getGenericEnvironment()
+              ->getForwardingSubstitutionMap());
+    }
     return;
   }
 
@@ -219,4 +219,7 @@ RequirementEnvironment::RequirementEnvironment(
                                           std::move(genericParamTypes),
                                           std::move(requirements),
                                           /*allowInverses=*/false);
+  reqToWitnessThunkSigMap = reqToWitnessThunkSigMap.subst(
+      witnessThunkSig.getGenericEnvironment()
+          ->getForwardingSubstitutionMap());
 }

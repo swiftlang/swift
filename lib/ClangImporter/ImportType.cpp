@@ -347,7 +347,7 @@ namespace {
 
       // ARM SVE builtin types that don't have Swift equivalents.
 #define SVE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
-#include "clang/Basic/AArch64SVEACLETypes.def"
+#include "clang/Basic/AArch64ACLETypes.def"
         return Type();
 
       // PPC SVE builtin types that don't have Swift equivalents.
@@ -365,10 +365,15 @@ namespace {
         return Type();
 
       // AMDGPU builtin types that don't have Swift equivalents.
-#define AMDGPU_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#define AMDGPU_TYPE(Name, Id, SingletonId, Width, Align)                       \
+      case clang::BuiltinType::Id:
 #include "clang/Basic/AMDGPUTypes.def"
         return Type();
 
+      // HLSL intangible builtin types that don't have Swift equivalents.
+#define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLIntangibleTypes.def"
+        return Type();
       }
 
       llvm_unreachable("Invalid BuiltinType.");
@@ -411,6 +416,26 @@ namespace {
                                                 type->getTypeClassName()),
                                clang::SourceLocation());
       // FIXME: handle pointers and fields of atomic type
+      return Type();
+    }
+
+    ImportResult VisitHLSLAttributedResourceType(
+        const clang::HLSLAttributedResourceType *type) {
+      Impl.addImportDiagnostic(
+          type,
+          Diagnostic(diag::unsupported_builtin_type, type->getTypeClassName()),
+          clang::SourceLocation());
+      // FIXME: (?) HLSL types are not supported in Swift.
+      return Type();
+    }
+
+    ImportResult
+    VisitHLSLInlineSpirvType(const clang::HLSLInlineSpirvType *type) {
+      Impl.addImportDiagnostic(
+          type,
+          Diagnostic(diag::unsupported_builtin_type, type->getTypeClassName()),
+          clang::SourceLocation());
+      // FIXME: (?) HLSL types are not supported in Swift.
       return Type();
     }
 
@@ -2039,7 +2064,6 @@ private:
     return pass(ty, /*found=*/true);
   }
 
-  NEVER_VISIT(UnresolvedType)
   NEVER_VISIT(PlaceholderType)
   NEVER_VISIT(BuiltinType)
   NEVER_VISIT(BuiltinTupleType)
@@ -2724,8 +2748,12 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // C++ types taking a reference might return a reference/pointer to a
   // subobject of the referenced storage. In those cases we need to prevent the
   // Swift compiler to pass in a temporary copy to prevent dangling.
-  if (ASTContext.LangOpts.hasFeature(Feature::AddressableParameters) &&
-      !param->getType().isNull() && param->getType()->isReferenceType()) {
+  auto paramContext = param->getDeclContext();
+  if (!param->getType().isNull() && param->getType()->isLValueReferenceType() &&
+      !swiftParamTy->isForeignReferenceType() &&
+      !(isa<clang::FunctionDecl>(paramContext) &&
+        cast<clang::FunctionDecl>(paramContext)->isOverloadedOperator()) &&
+      !isa<clang::ObjCMethodDecl, clang::ObjCContainerDecl>(paramContext)) {
     paramInfo->setAddressable();
   }
 
@@ -2885,9 +2913,10 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   // Estimate locations for the begin and end of parameter list.
   auto begin = clangDecl->getLocation();
   auto end = begin;
-  if (!params.empty()) {
-    begin = params.front()->getBeginLoc();
-    end = params.back()->getEndLoc();
+  auto paramsRange = clangDecl->getParametersSourceRange();
+  if (paramsRange.isValid()) {
+    begin = paramsRange.getBegin();
+    end = paramsRange.getEnd();
   }
   return ParameterList::create(SwiftContext, importSourceLoc(begin), parameters,
                                importSourceLoc(end));

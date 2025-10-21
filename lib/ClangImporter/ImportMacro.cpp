@@ -333,12 +333,16 @@ getIntegerConstantForMacroToken(ClangImporter::Implementation &impl,
     }
 
   // Macro identifier.
-  // TODO: for some reason when in C++ mode, "hasMacroDefinition" is often
-  // false: rdar://110071334
-  } else if (token.is(clang::tok::identifier) &&
-             token.getIdentifierInfo()->hasMacroDefinition()) {
+  } else if (token.is(clang::tok::identifier)) {
 
     auto rawID = token.getIdentifierInfo();
+
+    // When importing in (Objective-)C++ language mode, sometimes a macro might
+    // have an outdated identifier info, which would cause Clang preprocessor to
+    // assume that it does not have a definition.
+    if (rawID->isOutOfDate())
+      (void)impl.getClangPreprocessor().getLeafModuleMacros(rawID);
+
     auto definition = impl.getClangPreprocessor().getMacroDefinition(rawID);
     if (!definition)
       return std::nullopt;
@@ -418,8 +422,8 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
                         SourceLoc(), alias, DC);
   V->setAccess(swift::AccessLevel::Public);
   V->setInterfaceType(Ty.getType());
-  V->getAttrs().add(new (Ctx) TransparentAttr(/*Implicit*/true));
-  V->getAttrs().add(new (Ctx) InlineAttr(InlineKind::Always));
+  V->addAttribute(new (Ctx) TransparentAttr(/*Implicit*/ true));
+  V->addAttribute(new (Ctx) InlineAttr(InlineKind::AlwaysUnderscored));
 
   /* Accessor */
   swift::AccessorDecl *G = nullptr;
@@ -617,7 +621,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       clang::LookupResult R(S, {{tok.getIdentifierInfo()}, {}},
                             clang::Sema::LookupAnyName);
       if (S.LookupName(R, S.TUScope))
-        if (R.getResultKind() == clang::LookupResult::LookupResultKind::Found)
+        if (R.getResultKind() == clang::LookupResultKind::Found)
           if (const auto *VD = dyn_cast<clang::ValueDecl>(R.getFoundDecl()))
             return importDeclAlias(impl, DC, VD, name);
     }

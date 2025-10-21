@@ -43,6 +43,7 @@ internal protocol RemoteProcess: AnyObject {
 
   func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?)
   func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void)
+  func iteratePotentialMetadataPages(_ body: (swift_addr_t, UInt64) -> Void)
 }
 
 extension RemoteProcess {

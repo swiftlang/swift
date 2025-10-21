@@ -39,7 +39,7 @@ public struct FirstSmallStruct {
 
 // CHECK: class SWIFT_SYMBOL("s:4Init16FirstSmallStructV") FirstSmallStruct final {
 // CHECK-NEXT: public:
-// CHECK:   SWIFT_INLINE_PRIVATE_HELPER FirstSmallStruct(FirstSmallStruct &&)
+// CHECK: SWIFT_INLINE_THUNK FirstSmallStruct &operator =(const FirstSmallStruct &other) noexcept {
 // CHECK: }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK uint32_t getX() const SWIFT_SYMBOL("s:4Init16FirstSmallStructV1xs6UInt32Vvp");
 // CHECK-NEXT:   static SWIFT_INLINE_THUNK FirstSmallStruct init() SWIFT_SYMBOL("s:4Init16FirstSmallStructVACycfc");

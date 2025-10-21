@@ -928,6 +928,23 @@ Added: _$ss14MutableRawSpanVN
 Added: _$sSS8UTF8ViewV4spans4SpanVys5UInt8VGvg
 Added: _$sSs8UTF8ViewV4spans4SpanVys5UInt8VGvg
 
+// OutputSpan
+Added: _$ss10OutputSpanVMa
+Added: _$ss10OutputSpanVMn
+Added: _$ss10OutputSpanVsRi_zrlE6_countSivM
+Added: _$ss10OutputSpanVsRi_zrlE6_countSivg
+Added: _$ss10OutputSpanVsRi_zrlE6_countSivs
+Added: _$ss10OutputSpanVsRi_zrlE8_pointerSvSgvg
+Added: _$ss10OutputSpanVsRi_zrlE8capacitySivg
+Added: _$ss13OutputRawSpanV6_countSivM
+Added: _$ss13OutputRawSpanV6_countSivg
+Added: _$ss13OutputRawSpanV6_countSivs
+Added: _$ss13OutputRawSpanV8_pointerSvSgvg
+Added: _$ss13OutputRawSpanV8capacitySivg
+Added: _$ss13OutputRawSpanVMa
+Added: _$ss13OutputRawSpanVMn
+Added: _$ss13OutputRawSpanVN
+
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
 Added: _$ss13_SwiftifyExprO6returnyA2BmFWC
@@ -1040,24 +1057,39 @@ Added: _$ss18EnumeratedSequenceVyxGSKsSkRzrlMc
 Added: __swift_stdlib_CreateIndirectTaggedPointerString
 
 // Span backward deployment
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVMa$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVMn$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVsRi_zrlE6_countSivg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVsRi_zrlE8_pointerSvSgvg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanV6_countSivg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanV8_pointerSvSgvg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanVMa$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanVMn$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanVN$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVMa$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVMn$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVsRi_zrlE6_countSivg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss4SpanVsRi_zrlE8_pointerSVSgvg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanV6_countSivg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanV8_pointerSVSgvg$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVMa$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVMn$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVN$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss11MutableSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss11MutableSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss11MutableSpanVsRi_zrlE6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss11MutableSpanVsRi_zrlE8_pointerSvSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss14MutableRawSpanV6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss14MutableRawSpanV8_pointerSvSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss14MutableRawSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss14MutableRawSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss14MutableRawSpanVN$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss10OutputSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss10OutputSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss10OutputSpanVsRi_zrlE6_countSivM$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss10OutputSpanVsRi_zrlE6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss10OutputSpanVsRi_zrlE6_countSivs$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss10OutputSpanVsRi_zrlE8_pointerSvSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss10OutputSpanVsRi_zrlE8capacitySivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanV6_countSivM$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanV6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanV6_countSivs$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanV8_pointerSvSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanV8capacitySivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss13OutputRawSpanVN$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss4SpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss4SpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss4SpanVsRi_zrlE6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss4SpanVsRi_zrlE8_pointerSVSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss7RawSpanV6_countSivg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss7RawSpanV8_pointerSVSgvg$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss7RawSpanVMa$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss7RawSpanVMn$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$26.0$_$ss7RawSpanVN$
 
 // Duration.nanoseconds(_:)
 Added: _$ss8DurationV11nanosecondsyABSdFZ
@@ -1089,3 +1121,25 @@ Added: _$ss11InlineArrayVsRi__rlE17_protectedAddressSPyq_GvpMV
 
 // lengthOfBytes(using:)
 Added: __swift_stdlib_NSStringLengthOfBytesInEncodingTrampoline
+
+// Word breaking symbols exposed in 6.3
+Added: _$sSS10_wordIndex19somewhereAtOrBeforeSS0B0VAD_tF
+Added: _$ss7UnicodeO15_WordRecognizerV22hasCandidateBreakAtEndSbyF
+Added: _$ss7UnicodeO15_WordRecognizerV5afterAdB6ScalarV_tcfC
+Added: _$ss7UnicodeO15_WordRecognizerV8hasBreak6beforeSb12setCandidate_Sb07breakAtH0Sb0I4HeretAB6ScalarV_tF
+Added: _$ss7UnicodeO15_WordRecognizerVADycfC
+Added: _$ss7UnicodeO15_WordRecognizerVMa
+Added: _$ss7UnicodeO15_WordRecognizerVMn
+Added: _$ss7UnicodeO15_WordRecognizerVN
+Added: _$ss7UnicodeO27_RandomAccessWordRecognizerV18hasGuaranteedBreak5afterSb12setCandidate_Sb07breakAtK0Sb0L4HeretAB6ScalarV_tF
+Added: _$ss7UnicodeO27_RandomAccessWordRecognizerV6beforeAdB6ScalarV_tcfC
+Added: _$ss7UnicodeO27_RandomAccessWordRecognizerVMa
+Added: _$ss7UnicodeO27_RandomAccessWordRecognizerVMn
+Added: _$ss7UnicodeO27_RandomAccessWordRecognizerVN
+// Obsolete/broken SPIs removed in 6.3
+Removed: _$sSS17_nearestWordIndex9atOrBelowSS0C0VAD_tF
+Removed: _$sSS10_wordIndex6beforeSS0B0VAD_tF
+
+// Internal info exposed for swift-inspect.
+Added: __swift_debug_allocationPoolSize
+Added: __swift_debug_metadataAllocatorPageSize

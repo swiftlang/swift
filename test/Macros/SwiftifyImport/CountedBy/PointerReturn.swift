@@ -38,6 +38,6 @@ func lifetimeDependentBorrow(_ p: borrowing UnsafePointer<CInt>, _ len1: CInt, _
 
 // CHECK:      @_alwaysEmitIntoClient @_lifetime(borrow p) @_disfavoredOverload
 // CHECK-NEXT: func lifetimeDependentBorrow(_ p: borrowing UnsafeBufferPointer<CInt>, _ len2: CInt) -> Span<CInt> {
-// CHECK-NEXT:     let len1 = CInt(exactly: unsafe p.count)!
+// CHECK-NEXT:     let len1 = CInt(exactly: p.count)!
 // CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(Span<CInt> (_unsafeStart: unsafe lifetimeDependentBorrow(p.baseAddress!, len1, len2), count: Int(len2)), copying: ())
 // CHECK-NEXT: }

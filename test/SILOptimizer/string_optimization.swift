@@ -1,5 +1,4 @@
 // RUN: %target-build-swift -O %s -module-name=test -Xfrontend -sil-verify-all -emit-sil | %FileCheck %s
-// RUN: %target-build-swift -O %s -module-name=test -Xfrontend -sil-verify-all -emit-sil -Xfrontend -enable-ossa-modules | %FileCheck %s
 
 // RUN: %empty-directory(%t) 
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out
@@ -7,9 +6,6 @@
 
 // REQUIRES: executable_test,swift_stdlib_no_asserts
 // REQUIRES: swift_in_compiler
-// Test needs to be updated for 32bit.
-// rdar://74810823
-// UNSUPPORTED: PTRSIZE=32
 
 #if _runtime(_ObjC)
 import Foundation

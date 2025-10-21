@@ -235,10 +235,10 @@ const TypeRepr *DeclRefTypeRepr::getRoot() const {
 DeclNameLoc DeclRefTypeRepr::getNameLoc() const { return NameLoc; }
 
 DeclNameRef DeclRefTypeRepr::getNameRef() const {
-  if (NameOrDecl.is<DeclNameRef>())
-    return NameOrDecl.get<DeclNameRef>();
+  if (isa<DeclNameRef>(NameOrDecl))
+    return cast<DeclNameRef>(NameOrDecl);
 
-  return NameOrDecl.get<TypeDecl *>()->createNameRef();
+  return cast<TypeDecl *>(NameOrDecl)->createNameRef();
 }
 
 void DeclRefTypeRepr::overwriteNameRef(DeclNameRef newId) {
@@ -246,7 +246,7 @@ void DeclRefTypeRepr::overwriteNameRef(DeclNameRef newId) {
   NameOrDecl = newId;
 }
 
-bool DeclRefTypeRepr::isBound() const { return NameOrDecl.is<TypeDecl *>(); }
+bool DeclRefTypeRepr::isBound() const { return isa<TypeDecl *>(NameOrDecl); }
 
 TypeDecl *DeclRefTypeRepr::getBoundDecl() const {
   return NameOrDecl.dyn_cast<TypeDecl *>();
@@ -413,7 +413,7 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
       customAttr->getTypeRepr()->print(Printer, Options, std::nullopt);
       Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
     } else {
-      auto typeAttr = attr.get<TypeAttribute*>();
+      auto typeAttr = cast<TypeAttribute *>(attr);
       if (Options.excludeAttrKind(typeAttr->getKind()))
         continue;
       typeAttr->print(Printer, Options);
@@ -472,20 +472,7 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
   Printer << " -> ";
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
-  // Check if we are supposed to suppress sending results. If so, look through
-  // the ret ty if it is a Sending TypeRepr.
-  //
-  // DISCUSSION: The reason why we do this is that Sending TypeRepr is used for
-  // arguments and results... and we need the arguments case when we suppress to
-  // print __owned. So this lets us handle both cases.
-  auto ActualRetTy = RetTy;
-  if (Opts.SuppressSendingArgsAndResults) {
-    if (auto *x = dyn_cast<SendingTypeRepr>(RetTy)) {
-      ActualRetTy = x->getBase();
-    }
-  }
-  printTypeRepr(ActualRetTy, Printer, Opts);
-
+  printTypeRepr(RetTy, Printer, Opts);
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   Printer.printStructurePost(PrintStructureKind::FunctionType);
 }
@@ -538,7 +525,7 @@ TupleTypeRepr::TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
   Bits.TupleTypeRepr.NumElements = Elements.size();
 
   std::uninitialized_copy(Elements.begin(), Elements.end(),
-                          getTrailingObjects<TupleTypeReprElement>());
+                          getTrailingObjects());
 }
 
 TupleTypeRepr *TupleTypeRepr::create(const ASTContext &C,
@@ -695,7 +682,7 @@ PackTypeRepr::PackTypeRepr(SourceLoc keywordLoc, SourceRange braceLocs,
   : TypeRepr(TypeReprKind::Pack),
     KeywordLoc(keywordLoc), BraceLocs(braceLocs) {
   Bits.PackTypeRepr.NumElements = elements.size();
-  memcpy(getTrailingObjects<TypeRepr*>(), elements.data(),
+  memcpy(getTrailingObjects(), elements.data(),
          elements.size() * sizeof(TypeRepr*));
 }
 
@@ -926,13 +913,7 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
     Printer.printKeyword("isolated", Opts, " ");
     break;
   case TypeReprKind::Sending:
-    // This handles the argument case. The result case is handled in
-    // FunctionTypeRepr.
-    if (!Opts.SuppressSendingArgsAndResults) {
-      Printer.printKeyword("sending", Opts, " ");
-    } else {
-      Printer.printKeyword("__owned", Opts, " ");
-    }
+    Printer.printKeyword("sending", Opts, " ");
     break;
   case TypeReprKind::CompileTimeLiteral:
     Printer.printKeyword("_const", Opts, " ");
@@ -987,15 +968,6 @@ void IntegerTypeRepr::printImpl(ASTPrinter &Printer,
                                 const PrintOptions &Opts,
                                 NonRecursivePrintOptions nrOpts) const {
   Printer.printText(getValue());
-}
-
-void ErrorTypeRepr::dischargeDiagnostic(swift::ASTContext &Context) {
-  if (!DelayedDiag)
-    return;
-
-  // Consume and emit the diagnostic.
-  Context.Diags.diagnose(Range.Start, *DelayedDiag).highlight(Range);
-  DelayedDiag = std::nullopt;
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

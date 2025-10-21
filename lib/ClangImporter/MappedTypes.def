@@ -129,6 +129,9 @@ MAP_STDLIB_TYPE("u_int64_t", UnsignedInt, 64, "UInt64", false, DoNothing)
 MAP_STDLIB_TYPE("va_list", VaList, 0, "CVaListPointer", false, DoNothing)
 MAP_STDLIB_TYPE("__gnuc_va_list", VaList, 0, "CVaListPointer", false, DoNothing)
 MAP_STDLIB_TYPE("__va_list", VaList, 0, "CVaListPointer", false, DoNothing)
+// Cover all va_list family of types just aliased by __builtin_va_list, including
+// __isoc_va_list from wasi-libc.
+MAP_STDLIB_TYPE("__builtin_va_list", VaList, 0, "CVaListPointer", false, DoNothing)
 
 // libkern/OSTypes.h types.
 MAP_STDLIB_TYPE("UInt", UnsignedInt, 32, "CUnsignedInt", false, DoNothing)

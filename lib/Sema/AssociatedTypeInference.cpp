@@ -292,7 +292,7 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
     if (needsImplementsAttr) {
       auto attr = ImplementsAttr::create(
           dc, assocType->getProtocol(), assocType->getName());
-      aliasDecl->getAttrs().add(attr);
+      aliasDecl->addAttribute(attr);
     }
 
     // Inject the typealias into the nominal decl that conforms to the protocol.
@@ -331,7 +331,7 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
     aliasDecl->setAccess(requiredAccess);
     if (requiredAccessScope.second) {
       auto *attr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
-      aliasDecl->getAttrs().add(attr);
+      aliasDecl->addAttribute(attr);
     }
 
     // Construct the availability of the type witnesses based on the
@@ -2126,13 +2126,13 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
         !witnessHasImplementsAttrForRequiredName(typeDecl, assocType))
       continue;
 
-    if (typeDecl->isInvalid()) {
+    if (typeDecl->isRecursiveValidation()) {
       LLVM_DEBUG(llvm::dbgs() << "Recursive validation\n";);
       continue;
     }
 
-    if (typeDecl->isRecursiveValidation()) {
-      LLVM_DEBUG(llvm::dbgs() << "Recursive validation\n";);
+    if (typeDecl->isInvalid()) {
+      LLVM_DEBUG(llvm::dbgs() << "Invalid type witness\n";);
       continue;
     }
 
@@ -2653,12 +2653,11 @@ AssociatedTypeInference::computeDerivedTypeWitness(
     return std::make_pair(Type(), nullptr);
 
   // Can we derive conformances for this protocol and adoptee?
-  NominalTypeDecl *derivingTypeDecl = dc->getSelfNominalTypeDecl();
-  if (!DerivedConformance::derivesProtocolConformance(dc, derivingTypeDecl,
-                                                      proto))
+  if (!DerivedConformance::derivesProtocolConformance(conformance))
     return std::make_pair(Type(), nullptr);
 
   // Try to derive the type witness.
+  NominalTypeDecl *derivingTypeDecl = dc->getSelfNominalTypeDecl();
   auto result = deriveTypeWitness(conformance, derivingTypeDecl, assocType);
   if (!result.first)
     return std::make_pair(Type(), nullptr);

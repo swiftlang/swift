@@ -82,7 +82,7 @@ public:
                             const ASTContext &ctx);
 
   llvm::ArrayRef<DomainInfo> getDomainInfos() const {
-    return llvm::ArrayRef(getTrailingObjects<DomainInfo>(), domainInfoCount);
+    return getTrailingObjects(domainInfoCount);
   }
 
   llvm::SmallVector<DomainInfo, 4> copyDomainInfos() const {

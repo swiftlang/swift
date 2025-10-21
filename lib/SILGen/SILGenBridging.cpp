@@ -1315,8 +1315,10 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &SGF,
                                            SILLocation loc,
                                            SILValue arg) {
   auto &lowering = SGF.getTypeLowering(arg->getType());
-  // If address-only, make a +1 copy and operate on that.
-  if (lowering.isAddressOnly() && SGF.useLoweredAddresses()) {
+  // If arg is non-trivial and has an address type, make a +1 copy and operate
+  // on that.
+  if (!lowering.isTrivial() && arg->getType().isAddress() &&
+      SGF.useLoweredAddresses()) {
     auto tmp = SGF.emitTemporaryAllocation(loc, arg->getType().getObjectType());
     SGF.B.createCopyAddr(loc, arg, tmp, IsNotTake, IsInitialization);
     return tmp;
@@ -1453,6 +1455,11 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
       auto buf = SGF.emitTemporaryAllocation(loc, native.getType());
       native.forwardInto(SGF, loc, buf);
       native = SGF.emitManagedBufferWithCleanup(buf);
+    } else if (!fnConv.isSILIndirect(nativeInputs[i]) &&
+               native.getType().isAddress() && SGF.useLoweredAddresses()) {
+      // Load the value if the argument has an address type and the native
+      // function expects the argument to be passed directly.
+      native = SGF.emitManagedLoadCopy(loc, native.getValue());
     }
 
     if (nativeInputs[i].isConsumedInCaller()) {
@@ -1667,23 +1674,22 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       isolatedParameter && isolatedParameter->hasOption(SILParameterInfo::ImplicitLeading)) {
     assert(F.isAsync() && "Can only be async");
     assert(isolation && "No isolation?!");
-    switch (isolation->getKind()) {
-    case ActorIsolation::Unspecified:
-    case ActorIsolation::Nonisolated:
-    case ActorIsolation::NonisolatedUnsafe:
-    case ActorIsolation::CallerIsolationInheriting:
-      args.push_back(emitNonIsolatedIsolation(loc).getValue());
-      break;
-    case ActorIsolation::ActorInstance:
-      llvm::report_fatal_error("Should never see this");
-      break;
-    case ActorIsolation::GlobalActor:
-      args.push_back(emitLoadGlobalActorExecutor(isolation->getGlobalActor()));
-      break;
-    case ActorIsolation::Erased:
-      llvm::report_fatal_error("Should never see this");
-      break;
-    }
+    auto value = [&]() -> SILValue {
+      switch (isolation->getKind()) {
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
+      case ActorIsolation::CallerIsolationInheriting:
+        return emitNonIsolatedIsolation(loc).getValue();
+      case ActorIsolation::ActorInstance:
+        llvm::report_fatal_error("Should never see this");
+      case ActorIsolation::GlobalActor:
+        return emitLoadGlobalActorExecutor(isolation->getGlobalActor());
+      case ActorIsolation::Erased:
+        llvm::report_fatal_error("Should never see this");
+      }
+    }();
+    args.push_back(B.convertToImplicitActor(loc, value));
   }
 
   // Bridge the arguments.
@@ -2170,23 +2176,22 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   SmallVector<SILValue, 8> params;
 
   bindParametersForForwarding(fd->getParameters(), params);
-  if (thunk.kind != SILDeclRef::Kind::Allocator)
-    if (auto *selfDecl = fd->getImplicitSelfDecl())
-      bindParameterForForwarding(selfDecl, params);
-
-  // For allocating constructors, 'self' is a metatype, not the 'self' value
-  // formally present in the constructor body.
   Type allocatorSelfType;
-  if (thunk.kind == SILDeclRef::Kind::Allocator) {
-    auto *selfDecl = fd->getImplicitSelfDecl();
-    allocatorSelfType = F.mapTypeIntoContext(
-      fd->getDeclContext()->getSelfInterfaceType());
-
-    auto selfMetatype =
-      CanMetatypeType::get(allocatorSelfType->getCanonicalType());
-    auto selfArg = F.begin()->createFunctionArgument(
-        getLoweredLoadableType(selfMetatype), selfDecl);
+  if (auto *selfDecl = fd->getImplicitSelfDecl()) {
+    // The self declaration sometimes differ in dynamic-self-ness from the
+    // lowered function type, so get the self parameter type from the function
+    // type rather than the declaration.
+    auto selfArgTy = F.getLoweredFunctionType()->getSelfParameter()
+      .getSILStorageType(getModule(), F.getLoweredFunctionType(), getTypeExpansionContext());
+    auto selfArg = F.begin()->createFunctionArgument(F.mapTypeIntoContext(selfArgTy), selfDecl);
     params.push_back(selfArg);
+
+    // For allocating constructors, 'self' is a metatype, not the 'self' value
+    // formally present in the constructor body.
+    if (thunk.kind == SILDeclRef::Kind::Allocator) {
+      allocatorSelfType = F.mapTypeIntoContext(
+        fd->getDeclContext()->getSelfInterfaceType());
+    }
   }
 
   // Set up the throw destination if necessary.

@@ -1,6 +1,7 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-performance-optimizations | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-performance-optimizations -enable-experimental-feature Lifetimes | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Lifetimes
 
 sil_stage canonical
 
@@ -8,8 +9,13 @@ import Builtin
 import Swift
 import SwiftShims
 
+struct NonTrivialStruct {
+  var s: String
+}
+
 sil_global [let] @g1 : $Int32
 sil_global [let] @g2 : $Int32
+sil_global [let] @g3 : $Int32
 
 sil @paable : $@convention(thin) (Builtin.Int64) -> ()
 sil @moved_pai_callee : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
@@ -156,6 +162,25 @@ bb0:
   return %6 : $()
 }
 
+// CHECK-LABEL: sil [global_init_once_fn] [no_locks] [perf_constraint] [ossa] @remove_loads_and_stores_in_globalinit :
+// CHECK-NOT:     store
+// CHECK:         debug_step
+// CHECK-NOT:     load
+// CHECK:       } // end sil function 'remove_loads_and_stores_in_globalinit'
+sil [global_init_once_fn] [no_locks] [ossa] @remove_loads_and_stores_in_globalinit : $@convention(c) () -> () {
+bb0:
+  alloc_global @g3
+  %1 = global_addr @g3 : $*Int32
+  %2 = integer_literal $Builtin.Int32, 10
+  %3 = struct $Int32 (%2)
+  store %3 to [trivial] %1
+  debug_step
+  %6 = load [trivial] %1
+  store %6 to [trivial] %1
+  %r = tuple ()
+  return %r
+}
+
 // Check that we don't crash on global init-once declarations.
 
 // CHECK-LABEL: sil [global_init_once_fn] [no_locks] @external_global_init_once : $@convention(c) () -> ()
@@ -202,6 +227,27 @@ bb3:
   return %1 : $Int32
 }
 
+sil @createNonTrivialStruct : $@convention(thin) (Int) -> @owned NonTrivialStruct
+
+// CHECK-LABEL: sil [no_allocation] [perf_constraint] [ossa] @test_dead_alloc_elimination_with_mark_dependence :
+// CHECK-NOT:     alloc_stack
+// CHECK:       } // end sil function 'test_dead_alloc_elimination_with_mark_dependence'
+sil [ossa] [no_allocation] @test_dead_alloc_elimination_with_mark_dependence : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack [lexical] $Int
+  store %0 to [trivial] %1
+  %4 = load [trivial] %1
+  %5 = function_ref @createNonTrivialStruct : $@convention(thin) (Int) -> @owned NonTrivialStruct
+  %6 = apply %5(%4) : $@convention(thin) (Int) -> @owned NonTrivialStruct
+  %7 = mark_dependence [nonescaping] %6 on %1
+  %9 = mark_dependence [nonescaping] %7 on %1
+  %10 = destructure_struct %9
+  destroy_value %10
+  %12 = tuple ()
+  dealloc_stack %1
+  return %12
+}
+
 // CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @remove_metatype_arg :
 // CHECK:         [[F:%.*]] = function_ref @$s12metatype_argTf4ndn_n : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
 // CHECK:         [[A:%.*]] = apply [[F]](%0, %1) : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
@@ -220,6 +266,78 @@ sil [ossa] @metatype_arg : $@convention(thin) (Int, @thick Int.Type, @owned Buil
 bb0(%0 : $Int, %1 : $@thick Int.Type, %2 : @owned $Builtin.NativeObject):
   fix_lifetime %1 : $@thick Int.Type
   return %2 : $Builtin.NativeObject
+}
+
+sil [no_locks] [perf_constraint] [ossa] @dont_remove_metatype_arg_lifetime : $@convention(thin) (Int, UnsafeRawPointer) -> @lifetime(borrow 1) Span<Int> {
+bb0(%0 : $Int, %1 : $UnsafeRawPointer):
+  %3 = metatype $@thick Int.Type
+  %7 = function_ref @metatype_arg_lifetime : $@convention(thin) (Int, @thick Int.Type, UnsafeRawPointer) -> @lifetime(borrow 2) Span<Int>
+  %8 = apply %7(%0, %3, %1) : $@convention(thin) (Int, @thick Int.Type, UnsafeRawPointer) -> @lifetime(borrow 2) Span<Int>
+  return %8
+}
+
+sil [ossa] @get_span : $@convention(thin) (UnsafeRawPointer) -> @lifetime(borrow 0) Span<Int>
+
+// CHECK-NOT: sil [signature_optimized_thunk] [ossa] @metatype_arg_lifetime :
+sil [ossa] @metatype_arg_lifetime : $@convention(thin) (Int, @thick Int.Type, UnsafeRawPointer) -> @lifetime(borrow 2) Span<Int> {
+bb0(%0 : $Int, %1 : $@thick Int.Type, %2 : $UnsafeRawPointer):
+  fix_lifetime %1 : $@thick Int.Type
+  %3 = function_ref @get_span : $@convention(thin) (UnsafeRawPointer) -> @lifetime(borrow 0) Span<Int>
+  %4 = apply %3(%2) : $@convention(thin) (UnsafeRawPointer) -> @lifetime(borrow 0) Span<Int>
+  return %4
+}
+
+sil [no_locks] [perf_constraint] [ossa] @can_remove_metatype_arg_lifetime : $@convention(thin) (Int, UnsafeRawPointer) -> @lifetime(borrow 1) Span<Int> {
+bb0(%0 : $Int, %1 : $UnsafeRawPointer):
+  %3 = metatype $@thick Int.Type
+  %7 = function_ref @metatype_arg_lifetime_opt : $@convention(thin) (UnsafeRawPointer, Int, @thick Int.Type) -> @lifetime(borrow 0) Span<Int>
+  %8 = apply %7(%1, %0, %3) : $@convention(thin) (UnsafeRawPointer, Int, @thick Int.Type) -> @lifetime(borrow 0) Span<Int>
+  return %8
+}
+
+// CHECK: sil [signature_optimized_thunk] [ossa] @metatype_arg_lifetime_opt :
+sil [ossa] @metatype_arg_lifetime_opt : $@convention(thin) (UnsafeRawPointer, Int, @thick Int.Type) -> @lifetime(borrow 0) Span<Int> {
+bb0(%2 : $UnsafeRawPointer, %0 : $Int, %1 : $@thick Int.Type):
+  fix_lifetime %1 : $@thick Int.Type
+  %3 = function_ref @get_span : $@convention(thin) (UnsafeRawPointer) -> @lifetime(borrow 0) Span<Int>
+  %4 = apply %3(%2) : $@convention(thin) (UnsafeRawPointer) -> @lifetime(borrow 0) Span<Int>
+  return %4
+}
+
+sil [no_locks] [perf_constraint] [ossa] @dont_remove_metatype_arg_lifetime_inout : $@convention(thin) (Int, @lifetime(copy 2) @inout MutableSpan<Int>, @owned MutableSpan<Int>) -> () {
+bb0(%0 : $Int, %1 : $*MutableSpan<Int>, %2 : @owned $MutableSpan<Int>):
+  %3 = metatype $@thick Int.Type
+  %7 = function_ref @metatype_arg_lifetime_inout : $@convention(thin) (Int, @thick Int.Type, @lifetime(copy 3) @inout MutableSpan<Int>, @owned MutableSpan<Int>) -> ()
+  %8 = apply %7(%0, %3, %1, %2) : $@convention(thin) (Int, @thick Int.Type, @lifetime(copy 3) @inout MutableSpan<Int>, @owned MutableSpan<Int>) -> ()
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-NOT: sil [signature_optimized_thunk] [ossa] @metatype_arg_lifetime_inout :
+sil [ossa] @metatype_arg_lifetime_inout : $@convention(thin) (Int, @thick Int.Type, @lifetime(copy 3) @inout MutableSpan<Int>, @owned MutableSpan<Int>) -> () {
+bb0(%0 : $Int, %1 : $@thick Int.Type, %2 : $*MutableSpan<Int>, %3 : @owned $MutableSpan<Int>):
+  fix_lifetime %1 : $@thick Int.Type
+  destroy_value %3
+  %r = tuple ()
+  return %r
+}
+
+sil [no_locks] [perf_constraint] [ossa] @dont_remove_metatype_arg_lifetime_inout_source : $@convention(thin) (Int, @lifetime(copy 2) @inout MutableSpan<Int>, @owned MutableSpan<Int>) -> () {
+bb0(%0 : $Int, %1 : $*MutableSpan<Int>, %2 : @owned $MutableSpan<Int>):
+  %3 = metatype $@thick Int.Type
+  %7 = function_ref @metatype_arg_lifetime_inout_source : $@convention(thin) (@lifetime(copy 3) @inout MutableSpan<Int>, Int, @thick Int.Type, @owned MutableSpan<Int>) -> ()
+  %8 = apply %7(%1, %0, %3, %2) : $@convention(thin) (@lifetime(copy 3) @inout MutableSpan<Int>, Int, @thick Int.Type, @owned MutableSpan<Int>) -> ()
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-NOT: sil [signature_optimized_thunk] [ossa] @metatype_arg_lifetime_inout_source :
+sil [ossa] @metatype_arg_lifetime_inout_source : $@convention(thin) (@lifetime(copy 3) @inout MutableSpan<Int>, Int, @thick Int.Type, @owned MutableSpan<Int>) -> () {
+bb0(%2 : $*MutableSpan<Int>, %0 : $Int, %1 : $@thick Int.Type, %3 : @owned $MutableSpan<Int>):
+  fix_lifetime %1 : $@thick Int.Type
+  destroy_value %3
+  %r = tuple ()
+  return %r
 }
 
 // CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @remove_metatype_arg_throws :

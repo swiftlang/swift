@@ -72,13 +72,15 @@ struct UnboundImport {
       importOrUnderlyingModuleDecl;
 
   NullablePtr<ImportDecl> getImportDecl() const {
-    return importOrUnderlyingModuleDecl.is<NullablePtr<ImportDecl>>() ?
-           importOrUnderlyingModuleDecl.get<NullablePtr<ImportDecl>>() : nullptr;
+    return isa<NullablePtr<ImportDecl>>(importOrUnderlyingModuleDecl)
+               ? cast<NullablePtr<ImportDecl>>(importOrUnderlyingModuleDecl)
+               : nullptr;
   }
 
   NullablePtr<ModuleDecl> getUnderlyingModule() const {
-    return importOrUnderlyingModuleDecl.is<ModuleDecl *>() ?
-           importOrUnderlyingModuleDecl.get<ModuleDecl *>() : nullptr;
+    return isa<ModuleDecl *>(importOrUnderlyingModuleDecl)
+               ? cast<ModuleDecl *>(importOrUnderlyingModuleDecl)
+               : nullptr;
   }
 
   /// Create an UnboundImport for a user-written import declaration.
@@ -161,6 +163,11 @@ class ImportResolver final : public DeclVisitor<ImportResolver> {
   /// The list of fully bound imports.
   SmallVector<AttributedImport<ImportedModule>, 16> boundImports;
 
+  /// Set of imported top-level clang modules. We normally don't expect
+  /// duplicated imports, but importing multiple submodules of the same clang
+  /// TLM would cause the same TLM to be imported once per submodule.
+  SmallPtrSet<const ModuleDecl*, 16> seenClangTLMs;
+
   /// All imported modules which should be considered when cross-importing.
   /// This is basically the transitive import graph, but with only top-level
   /// modules and without reexports from Objective-C modules.
@@ -187,6 +194,14 @@ class ImportResolver final : public DeclVisitor<ImportResolver> {
 
 public:
   ImportResolver(SourceFile &SF) : SF(SF), ctx(SF.getASTContext()) {
+    addImplicitImports();
+  }
+
+  // FIXME: Remove this ctor once namespace contents are imported to their
+  // corresponding module instead of the __ObjC module
+  ImportResolver(SourceFile &SF, ModuleDecl *explicitUnderlyingClangModule)
+      : SF(SF), ctx(SF.getASTContext()),
+        underlyingClangModule(explicitUnderlyingClangModule) {
     addImplicitImports();
   }
 
@@ -320,24 +335,21 @@ void swift::performImportResolution(SourceFile &SF) {
 }
 
 void swift::performImportResolutionForClangMacroBuffer(
-    SourceFile &SF, ModuleDecl *clangModule
-) {
-  // If we've already performed import resolution, bail.
-  if (SF.ASTStage == SourceFile::ImportsResolved)
-    return;
+    SourceFile &SF, ModuleDecl *explicitOriginModule) {
+  assert(SF.ASTStage == SourceFile::Unprocessed);
 
-  ImportResolver resolver(SF);
-  resolver.addImplicitImport(clangModule);
-
-  // FIXME: This is a hack that we shouldn't need, but be sure that we can
-  // see the Swift standard library.
-  if (auto stdlib = SF.getASTContext().getStdlibModule())
-    resolver.addImplicitImport(stdlib);
-
+  // `getWrapperForModule` has already declared all the implicit clang module
+  // imports we need
+  ImportResolver resolver(SF, explicitOriginModule);
   SF.setImports(resolver.getFinishedImports());
   SF.setImportedUnderlyingModule(resolver.getUnderlyingClangModule());
 
   SF.ASTStage = SourceFile::ImportsResolved;
+}
+
+static bool isSubmodule(const ModuleDecl* M) {
+  auto clangMod = M->findUnderlyingClangModule();
+  return clangMod && clangMod->Parent;
 }
 
 //===----------------------------------------------------------------------===//
@@ -387,14 +399,23 @@ void ImportResolver::bindImport(UnboundImport &&I) {
 
   I.validateOptions(topLevelModule, SF);
 
-  if (topLevelModule && topLevelModule != M) {
-    // If we have distinct submodule and top-level module, add both.
+  auto alreadyImportedTLM = [ID,this](const ModuleDecl *MD) {
+    ASSERT(!isSubmodule(MD));
+    // Scoped imports don't import all symbols from the module, so a scoped
+    // import does not count the module as imported
+    if (ID && isScopedImportKind(ID.get()->getImportKind()))
+      return false;
+    return !seenClangTLMs.insert(MD).second;
+  };
+  if (!M->isNonSwiftModule() || topLevelModule != M || !alreadyImportedTLM(M)) {
     addImport(I, M);
-    addImport(I, topLevelModule.get());
-  }
-  else {
-    // Add only the import itself.
-    addImport(I, M);
+    if (topLevelModule && topLevelModule != M &&
+        !alreadyImportedTLM(topLevelModule.get())) {
+      // If we have distinct submodule and top-level module, add both.
+      // Importing the submodule ensures that it gets loaded, but the decls
+      // are imported to the TLM, so import that for visibility.
+      addImport(I, topLevelModule.get());
+    }
   }
 
   crossImport(M, I);
@@ -572,8 +593,13 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
       !clangImporter->importBridgingHeader(bridgingHeaderPath, module)) {
     auto *headerModule = clangImporter->getImportedHeaderModule();
     assert(headerModule && "Didn't load bridging header?");
-    imports.emplace_back(
+    AttributedImport<ImportedModule> import(
         ImportedModule(headerModule), SourceLoc(), ImportFlags::Exported);
+    if (ctx.ClangImporterOpts.BridgingHeaderIsInternal) {
+      import.accessLevel = AccessLevel::Internal;
+    }
+
+    imports.emplace_back(import);
   }
 
   // Implicitly import the underlying Clang half of this module if needed.
@@ -590,7 +616,18 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
 }
 
 void ImportResolver::addImplicitImports() {
-  auto implicitImports = SF.getParentModule()->getImplicitImports();
+  // This is a workaround for the fact that namespaces are imported into the
+  // bridging header module. To allow correct lookup, we expose a ctor with an
+  // explicit underlying clang module input, which is the clang module that this
+  // macro expansion actually originates in.
+  const ModuleDecl *moduleToInherit = nullptr;
+  if (underlyingClangModule) {
+    moduleToInherit = underlyingClangModule;
+    boundImports.emplace_back(ImportedModule(underlyingClangModule));
+  } else {
+    moduleToInherit = SF.getParentModule();
+  }
+  auto implicitImports = moduleToInherit->getImplicitImports();
 
   // TODO: Support cross-module imports.
   for (auto &import : implicitImports.imports) {
@@ -906,8 +943,6 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                                      targetName, importerName);
 
   if (ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
-    // This will catch Swift 6 language mode as well where
-    // it will be reported as an error.
     inFlight.fixItRemove(import.accessLevelRange);
   } else {
     SourceRange attrRange = import.accessLevelRange;
@@ -915,12 +950,17 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
       inFlight.fixItReplace(attrRange, "internal");
     else
       inFlight.fixItInsert(import.importLoc, "internal ");
-
-    // Downgrade to warning only in pre-Swift 6 mode and
-    // when not using the experimental flag.
-    if (!ctx.LangOpts.hasFeature(Feature::AccessLevelOnImport))
-      inFlight.limitBehavior(DiagnosticBehavior::Warning);
   }
+
+  // Report as an error when InternalImportsByDefault is enabled or
+  // the experimental AccessLevelOnImport (but not Swift 6), only in libraries
+  // that are meant to be distributed.
+  auto featureEnabled =
+    ctx.LangOpts.hasFeature(Feature::AccessLevelOnImport) ||
+    ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault);
+  if (!featureEnabled ||
+      SF.getParentModule()->getLibraryLevel() < LibraryLevel::SPI)
+    inFlight.limitBehavior(DiagnosticBehavior::Warning);
 }
 
 void UnboundImport::diagnoseInvalidAttr(DeclAttrKind attrKind,
@@ -1157,7 +1197,6 @@ CheckInconsistentAccessLevelOnImport::evaluate(
       error.fixItInsert(implicitImport->getStartLoc(),
                         diag::inconsistent_implicit_access_level_on_import_fixit,
                         otherAccessLevel);
-      error.flush();
       diags.diagnose(implicitImport,
                      diag::inconsistent_implicit_access_level_on_import_silence);
     }
@@ -1350,7 +1389,6 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
 
     emittedDiag->fixItReplace(SourceRange(import->getKindLoc()),
                               getImportKindString(*actualKind));
-    emittedDiag->flush();
 
     if (decls.size() == 1)
       ctx.Diags.diagnose(decls.front(), diag::decl_declared_here,
@@ -1585,11 +1623,6 @@ void ImportResolver::findCrossImports(
       llvm::dbgs() << "import " << name << "\n";
     });
   }
-}
-
-static bool isSubmodule(ModuleDecl* M) {
-  auto clangMod = M->findUnderlyingClangModule();
-  return clangMod && clangMod->Parent;
 }
 
 void ImportResolver::addCrossImportableModules(

@@ -103,6 +103,7 @@ protected:
   virtual void emitCallToUnmappedExplosion(llvm::CallBase *call,
                                            Explosion &out) = 0;
   void emitYieldsToExplosion(Explosion &out);
+  void emitAddressResultToExplosion(Explosion &out);
   void setKeyPathAccessorArguments(Explosion &in, bool isOutlined,
                                    Explosion &out);
   virtual FunctionPointer getCalleeFunctionPointer() = 0;
@@ -152,11 +153,12 @@ public:
                        WitnessMetadata *witnessMetadata);
   virtual Address getCalleeErrorSlot(SILType errorType, bool isCalleeAsync) = 0;
 
-  void addFnAttribute(llvm::Attribute::AttrKind Attr);
+  void addFnAttribute(llvm::Attribute::AttrKind kind);
 
   void setIndirectReturnAddress(Address addr) { indirectReturnAddress = addr; }
 
-  void addParamAttribute(unsigned ParamIndex, llvm::Attribute::AttrKind Attr);
+  void addParamAttribute(unsigned paramIndex, llvm::Attribute::AttrKind kind);
+  void addParamAttribute(unsigned paramIndex, llvm::Attribute attr);
 
   void emitToMemory(Address addr, const LoadableTypeInfo &substResultTI,
                     bool isOutlined);

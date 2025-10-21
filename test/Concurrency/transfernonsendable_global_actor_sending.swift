@@ -34,9 +34,8 @@ func useValue<T>(_ t: T) {}
 @MainActor func testGlobalFakeInit() {
   let ns = NonSendableKlass()
 
-  // Will be resolved once @MainActor is @Sendable.
-  Task.fakeInit { @MainActor in // expected-error {{passing closure as a 'sending' parameter risks causing data races between main actor-isolated code and concurrent execution of the closure}}
-    print(ns) // expected-note {{closure captures 'ns' which is accessible to main actor-isolated code}}
+  Task.fakeInit { @MainActor in
+    print(ns)
   }
 
   useValue(ns)

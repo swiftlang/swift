@@ -67,3 +67,37 @@ exit:
   %retval = tuple ()
   return %retval : $()
 }
+
+class Klass {}
+
+public struct Wrapper {
+  var _k: Klass
+}
+
+sil @get_wrapper : $@convention(thin) () -> @owned Wrapper
+sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+sil [ossa] @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
+bb0(%0 : @guaranteed $Wrapper):
+  %2 = struct_extract %0, #Wrapper._k
+  return %2
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_borrow_accessor_noopt
+// CHECK:       Result: did not shrink
+// CHECK-LABEL: end running test {{.*}} on test_borrow_accessor_noopt
+sil [ossa] @test_borrow_accessor_noopt : $@convention(thin) () -> () {
+bb0:
+  %1 = function_ref @get_wrapper : $@convention(thin) () -> @owned Wrapper
+  %2 = apply %1() : $@convention(thin) () -> @owned Wrapper
+  %3 = begin_borrow %2
+  specify_test "shrink_borrow_scope %3"
+  %4 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %6 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %3
+  destroy_value %2
+  %10 = tuple ()
+  return %10
+}

@@ -796,14 +796,8 @@ static FunctionTest SSAPrunedLiveness__areUsesWithinBoundary(
 template <typename LivenessWithDefs>
 bool PrunedLiveRange<LivenessWithDefs>::areUsesWithinBoundary(
     ArrayRef<Operand *> uses, DeadEndBlocks *deadEndBlocks) const {
-  assert(asImpl().isInitialized());
-
-  for (auto *use : uses) {
-    auto *user = use->getUser();
-    if (!isWithinBoundary(user, deadEndBlocks))
-      return false;
-  }
-  return true;
+  SILInstruction::OperandUserRange users(uses, SILInstruction::OperandToUser());
+  return areWithinBoundary(users, deadEndBlocks);
 }
 
 template <typename LivenessWithDefs>

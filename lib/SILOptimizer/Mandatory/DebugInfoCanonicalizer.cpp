@@ -125,8 +125,8 @@ struct DebugInfoCanonicalizer {
       SILBasicBlock *startBlock,
       llvm::SmallDenseSet<SILDebugVariable, 8> &seenDebugVars) {
     LLVM_DEBUG(llvm::dbgs() << "==> PROPAGATING VALUE\n");
-    if (insertPt.is<SILInstruction *>()) {
-      LLVM_DEBUG(llvm::dbgs() << "Inst: " << *insertPt.get<SILInstruction *>());
+    if (isa<SILInstruction *>(insertPt)) {
+      LLVM_DEBUG(llvm::dbgs() << "Inst: " << *cast<SILInstruction *>(insertPt));
     }
 
     auto *dt = getDominance();
@@ -172,7 +172,7 @@ struct DebugInfoCanonicalizer {
         if (auto *inst = insertPt.dyn_cast<SILInstruction *>()) {
           cloneDebugValue(pred.second, inst);
         } else {
-          cloneDebugValue(pred.second, insertPt.get<SILBasicBlock *>());
+          cloneDebugValue(pred.second, cast<SILBasicBlock *>(insertPt));
         }
 
         madeChange = true;

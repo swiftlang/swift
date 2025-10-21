@@ -330,7 +330,7 @@ EnumImplStrategy::emitOutlinedGetEnumTag(IRGenFunction &IGF, SILType T,
                                                      manglingBits.second);
 
     const TypeInfo &ti = IGF.getTypeInfo(T);
-    auto ptrTy = ti.getStorageType()->getPointerTo();
+    auto *ptrTy = IGF.IGM.PtrTy;
     llvm::SmallVector<llvm::Type *, 4> paramTys;
     paramTys.push_back(ptrTy);
 
@@ -736,8 +736,8 @@ namespace {
 
       // Pre swift-5.1 runtimes were missing the initialization of the
       // the extraInhabitantCount field. Do it here instead.
-      auto payloadRef = IGF.Builder.CreateBitOrPointerCast(
-          payloadLayout, IGF.IGM.TypeLayoutTy->getPointerTo());
+      auto payloadRef =
+          IGF.Builder.CreateBitOrPointerCast(payloadLayout, IGM.PtrTy);
       auto payloadExtraInhabitantCount =
           IGF.Builder.CreateLoad(IGF.Builder.CreateStructGEP(
               Address(payloadRef, IGF.IGM.TypeLayoutTy, Alignment(1)), 3,
@@ -774,8 +774,8 @@ namespace {
       // Pre swift-5.1 runtimes were missing the initialization of the
       // the extraInhabitantCount field. Do it here instead.
       auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
-      auto payloadRef = IGF.Builder.CreateBitOrPointerCast(
-          payloadLayout, IGF.IGM.TypeLayoutTy->getPointerTo());
+      auto payloadRef =
+          IGF.Builder.CreateBitOrPointerCast(payloadLayout, IGM.PtrTy);
       auto payloadExtraInhabitantCount =
           IGF.Builder.CreateLoad(IGF.Builder.CreateStructGEP(
               Address(payloadRef, IGF.IGM.TypeLayoutTy, Alignment(1)), 3,
@@ -2071,8 +2071,7 @@ namespace {
       auto PayloadT = getPayloadType(IGF.IGM, T);
 
       auto &fixedTI = getFixedPayloadTypeInfo();
-      auto addr = IGF.Builder.CreateBitCast(
-          enumAddr.getAddress(), fixedTI.getStorageType()->getPointerTo());
+      auto addr = IGF.Builder.CreateBitCast(enumAddr.getAddress(), IGM.PtrTy);
       return fixedTI.getEnumTagSinglePayload(IGF, numEmptyCases,
                                              fixedTI.getAddressForPointer(addr),
                                              PayloadT, /*isOutlined*/ false);
@@ -6537,8 +6536,9 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
         std::move(elementsWithPayload), std::move(elementsWithNoPayload)));
   }
 
-  // Enums imported from Clang or marked with @objc use C-compatible layout.
-  if (theEnum->hasClangNode() || theEnum->isObjC()) {
+  // Enums imported from Clang or marked with @objc or @c use a
+  // C-compatible layout.
+  if (theEnum->hasClangNode() || theEnum->isCCompatibleEnum()) {
     assert(elementsWithPayload.empty() && "C enum with payload?!");
     assert(alwaysFixedSize == IsFixedSize && "C enum with resilient payload?!");
     return std::unique_ptr<EnumImplStrategy>(
@@ -6983,7 +6983,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                     llvm::StructType *enumTy){
   // The type should have come from Clang or be @objc,
   // and should have a raw type.
-  assert((theEnum->hasClangNode() || theEnum->isObjC())
+  assert((theEnum->hasClangNode() || theEnum->isCCompatibleEnum())
          && "c-compatible enum didn't come from clang!");
   assert(theEnum->hasRawType()
          && "c-compatible enum doesn't have raw type!");
@@ -7555,9 +7555,8 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestructiveProjectDataForLoad(
                                                          manglingBits.second,
                                                          caseIdx);
 
-  auto ptrTy = ti.getStorageType()->getPointerTo();
   llvm::SmallVector<llvm::Type *, 4> paramTys;
-  paramTys.push_back(ptrTy);
+  paramTys.push_back(PtrTy);
 
   return getOrCreateHelperFunction(funcName, PtrTy, paramTys,
       [&](IRGenFunction &IGF) {
@@ -7630,9 +7629,8 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedEnumTagStoreFunction(
                                                              manglingBits.second,
                                                              caseIdx);
 
-  auto ptrTy = ti.getStorageType()->getPointerTo();
   llvm::SmallVector<llvm::Type *, 4> paramTys;
-  paramTys.push_back(ptrTy);
+  paramTys.push_back(PtrTy);
 
   return getOrCreateHelperFunction(funcName, VoidTy, paramTys,
       [&](IRGenFunction &IGF) {

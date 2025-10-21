@@ -391,8 +391,6 @@ Added: _swift_task_getCurrentTaskName
 
 // startSynchronously, immediate, addImmediateTask{UnlessCancelled}
 Added: _swift_task_immediate
-Added: _$sScTss5Error_pRs_rlE18startSynchronously4name8priority_ScTyxsAA_pGSSSg_ScPSgxyYaKcntFZ
-Added: _$sScTss5NeverORs_rlE18startSynchronously4name8priority_ScTyxABGSSSg_ScPSgxyYaKcntFZ
 
 // isIsolatingCurrentContext
 Added: _swift_task_invokeSwiftIsIsolatingCurrentContext

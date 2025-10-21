@@ -80,6 +80,12 @@ bool DestructorAnalysis::isSafeType(CanType Ty) {
         areTypeParametersSafe(Ty))
       return cacheResult(Ty, true);
 
+    // Not allowed to look at stored properties of resilient types.
+    if (Struct->isResilient(Mod->getSwiftModule(),
+                            ResilienceExpansion::Maximal)) {
+      return cacheResult(Ty, false);
+    }
+
     // Check the stored properties.
     for (auto SP : Struct->getStoredProperties()) {
       if (!isSafeType(SP->getInterfaceType()->getCanonicalType()))
@@ -97,6 +103,8 @@ bool DestructorAnalysis::isSafeType(CanType Ty) {
   }
 
   // TODO: enum types.
+  // TODO: Don't forget to check resilience of enum decl, like
+  // we do for structs above.
 
   return cacheResult(Ty, false);
 }

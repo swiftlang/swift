@@ -116,6 +116,8 @@ enum class FunctionSigSpecializationParamKind : unsigned {
   BoxToStack = 7,
   InOutToOut = 8,
   ConstantPropKeyPath = 9,
+  ConstantPropStruct = 10,
+  ClosurePropPreviousArg = 11,
 
   // Option Set Flags use bits 6-31. This gives us 26 bits to use for option
   // flags.
@@ -193,6 +195,7 @@ public:
   };
 
   using IndexType = uint64_t;
+  using RemoteAddressType = std::pair<uint64_t, uint8_t>;
 
   friend class NodeFactory;
   
@@ -209,14 +212,20 @@ private:
     IndexType Index;
     NodePointer InlineChildren[2];
     NodeVector Children;
+    RemoteAddressType RemoteAddress;
   };
 
 
   Kind NodeKind;
 
   enum class PayloadKind : uint8_t {
-    None = 0, OneChild = 1, TwoChildren = 2,
-    Text, Index, ManyChildren
+    None = 0,
+    OneChild = 1,
+    TwoChildren = 2,
+    Text,
+    Index,
+    ManyChildren,
+    RemoteAddress
   };
   PayloadKind NodePayloadKind;
 
@@ -230,6 +239,10 @@ private:
   Node(Kind k, IndexType index)
       : NodeKind(k), NodePayloadKind(PayloadKind::Index) {
     Index = index;
+  }
+  Node(Kind k, uint64_t remoteAddress, uint8_t addressSpace)
+      : NodeKind(k), NodePayloadKind(PayloadKind::RemoteAddress) {
+    RemoteAddress = {remoteAddress, addressSpace};
   }
   Node(const Node &) = delete;
   Node &operator=(const Node &) = delete;
@@ -282,6 +295,14 @@ public:
   uint64_t getIndex() const {
     assert(hasIndex());
     return Index;
+  }
+
+  bool hasRemoteAddress() const {
+    return NodePayloadKind == PayloadKind::RemoteAddress;
+  }
+  std::pair<uint64_t, uint8_t> getRemoteAddress() const {
+    assert(hasRemoteAddress());
+    return RemoteAddress;
   }
 
   using iterator = const NodePointer *;
@@ -871,7 +892,7 @@ public:
 
   virtual ~NodePrinter() = default;
 
-  void printRoot(NodePointer root) {
+  virtual void printRoot(NodePointer root) {
     isValid = true;
     print(root, 0);
   }
@@ -949,9 +970,12 @@ protected:
 
   void printImplFunctionType(NodePointer fn, unsigned depth);
 
-  void printGenericSignature(NodePointer Node, unsigned depth);
+  virtual void printGenericSignature(NodePointer Node, unsigned depth);
 
   void printFunctionSigSpecializationParams(NodePointer Node, unsigned depth);
+  void printNextParamChildNode(NodePointer nd, unsigned &idx,
+                               FunctionSigSpecializationParamKind kind,
+                               unsigned depth);
 
   void printSpecializationPrefix(NodePointer node, StringRef Description,
                                  unsigned depth,

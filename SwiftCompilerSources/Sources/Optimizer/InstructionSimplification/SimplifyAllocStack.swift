@@ -179,7 +179,8 @@ private extension AllocStackInst {
   ///   use %3
   /// ```
   func optimizeExistential(_ context: SimplifyContext) -> Bool {
-    guard type.isExistential || type.isExistentialArchetype,
+    // TODO: support non-root existential archetypes
+    guard type.isExistential || type.isRootExistentialArchetype,
           let concreteFormalType = getConcreteTypeOfExistential()
     else {
       return false
@@ -206,7 +207,7 @@ private extension AllocStackInst {
           iea.replace(with: newAlloc, context)
         }
       case let oea as OpenExistentialAddrInst:
-        assert(oea.uses.ignoreUsers(ofType: DestroyAddrInst.self).isEmpty)
+        assert(oea.uses.ignore(usersOfType: DestroyAddrInst.self).isEmpty)
         oea.replace(with: newAlloc, context)
       case let cab as CheckedCastAddrBranchInst:
         let builder = Builder(before: cab, context)
@@ -246,7 +247,7 @@ private extension AllocStackInst {
            is DebugValueInst:
         break
       case let oea as OpenExistentialAddrInst:
-        if !oea.uses.ignoreUsers(ofType: DestroyAddrInst.self).isEmpty {
+        if !oea.uses.ignore(usersOfType: DestroyAddrInst.self).isEmpty {
           return nil
         }
       case let iea as InitExistentialAddrInst:

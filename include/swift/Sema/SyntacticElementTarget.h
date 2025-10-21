@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file defines the SyntacticElementTarget class.
+//  This file defines the SyntacticElementTarget class (a unit of
+//  type-checking).
 //
 //===----------------------------------------------------------------------===//
 
@@ -59,8 +60,8 @@ struct PackIterationInfo {
 /// within the constraint system.
 using ForEachStmtInfo = TaggedUnion<SequenceIterationInfo, PackIterationInfo>;
 
-/// Describes the target to which a constraint system's solution can be
-/// applied.
+/// Describes the target (a unit of type-checking) to which a constraint
+/// system's solution can be applied.
 class SyntacticElementTarget {
 public:
   enum class Kind {
@@ -262,8 +263,9 @@ public:
                     unsigned patternBindingIndex, bool bindPatternVarsOneWay);
 
   /// Form an expression target for a ReturnStmt.
-  static SyntacticElementTarget
-  forReturn(ReturnStmt *returnStmt, Type contextTy, DeclContext *dc);
+  static SyntacticElementTarget forReturn(ReturnStmt *returnStmt,
+                                          Expr *returnExpr, Type contextTy,
+                                          DeclContext *dc);
 
   /// Form a target for the preamble of a for-in loop, excluding its where
   /// clause and body.
@@ -450,7 +452,7 @@ public:
   /// For a pattern initialization target, retrieve the pattern.
   Pattern *getInitializationPattern() const {
     if (kind == Kind::uninitializedVar)
-      return uninitializedVar.declaration.get<Pattern *>();
+      return cast<Pattern *>(uninitializedVar.declaration);
 
     assert(isForInitialization());
     return expression.pattern;
@@ -589,7 +591,7 @@ public:
 
   void setPattern(Pattern *pattern) {
     if (kind == Kind::uninitializedVar) {
-      assert(uninitializedVar.declaration.is<Pattern *>());
+      assert(isa<Pattern *>(uninitializedVar.declaration));
       uninitializedVar.declaration = pattern;
       return;
     }
@@ -601,7 +603,6 @@ public:
 
     switch (getExprContextualTypePurpose()) {
     case CTP_Initialization:
-    case CTP_ForEachStmt:
     case CTP_ForEachSequence:
     case CTP_ExprPattern:
       break;
@@ -833,7 +834,7 @@ public:
               uninitializedVar.declaration.dyn_cast<VarDecl *>()) {
         return wrappedVar->getSourceRange();
       }
-      return uninitializedVar.declaration.get<Pattern *>()->getSourceRange();
+      return cast<Pattern *>(uninitializedVar.declaration)->getSourceRange();
     }
 
     // For-in preamble target doesn't cover the body.
@@ -877,7 +878,7 @@ public:
               uninitializedVar.declaration.dyn_cast<VarDecl *>()) {
         return wrappedVar->getLoc();
       }
-      return uninitializedVar.declaration.get<Pattern *>()->getLoc();
+      return cast<Pattern *>(uninitializedVar.declaration)->getLoc();
     }
 
     case Kind::forEachPreamble:

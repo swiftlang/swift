@@ -120,20 +120,20 @@ public:
   }
 
   RemoteAddress getSymbolAddress(const std::string &name) override {
-    return RemoteAddress(nullptr);
+    return RemoteAddress();
   }
 
   bool isAddressValid(RemoteAddress addr, uint64_t size) const { return true; }
 
   ReadBytesResult readBytes(RemoteAddress address, uint64_t size) override {
-    return ReadBytesResult((const void *)address.getAddressData(),
+    return ReadBytesResult((const void *)address.getRawAddress(),
                            [](const void *) {});
   }
 
   bool readString(RemoteAddress address, std::string &dest) override {
     if (!isAddressValid(address, 1))
       return false;
-    auto cString = StringRef((const char *)address.getAddressData());
+    auto cString = StringRef((const char *)address.getRawAddress());
     dest.append(cString.begin(), cString.end());
     return true;
   }
@@ -142,7 +142,8 @@ public:
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
   auto reader = std::make_shared<ObjectMemoryReader>();
   NativeReflectionContext context(std::move(reader));
-  context.addImage(RemoteAddress(Data));
+  context.addImage(
+      RemoteAddress((uint64_t)Data, RemoteAddress::DefaultAddressSpace));
   context.getBuilder().dumpAllSections<WithObjCInterop, sizeof(uintptr_t)>(std::cout);
   return 0; // Non-zero return values are reserved for future use.
 }

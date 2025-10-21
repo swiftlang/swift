@@ -97,6 +97,12 @@ bool canSILUseScalarCheckedCastInstructions(SILModule &M,
                                             CanType sourceType,
                                             CanType targetType);
 
+/// Can the given cast be performed by the scalar checked-cast instructions in
+/// the current SIL stage, or do we need to use the indirect instructions?
+bool canOptimizeToScalarCheckedCastInstructions(
+    SILFunction *func, CanType sourceType, CanType targetType,
+    CastConsumptionKind consumption);
+
 /// Can the given cast be performed by the scalar checked-cast
 /// instructions at IRGen, or do we need to use the indirect instructions?
 bool canIRGenUseScalarCheckedCastInstructions(SILModule &M,

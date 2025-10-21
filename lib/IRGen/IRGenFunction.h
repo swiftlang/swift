@@ -324,7 +324,6 @@ public:
   void emitMemCpy(Address dest, Address src, llvm::Value *size);
 
   llvm::Value *emitByteOffsetGEP(llvm::Value *base, llvm::Value *offset,
-                                 llvm::Type *objectType,
                                  const llvm::Twine &name = "");
   Address emitByteOffsetGEP(llvm::Value *base, llvm::Value *offset,
                             const TypeInfo &type,
@@ -396,9 +395,8 @@ public:
 
   // Emit a call to the given generic type metadata access function.
   MetadataResponse emitGenericTypeMetadataAccessFunctionCall(
-                                          llvm::Function *accessFunction,
-                                          ArrayRef<llvm::Value *> args,
-                                          DynamicMetadataRequest request);
+      llvm::Function *accessFunction, ArrayRef<llvm::Value *> args,
+      DynamicMetadataRequest request, bool hasPacks = false);
 
   // Emit a reference to the canonical type metadata record for the given AST
   // type. This can be used to identify the type at runtime. For types with

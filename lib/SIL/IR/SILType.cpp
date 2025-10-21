@@ -103,6 +103,21 @@ SILType SILType::getEmptyTupleType(const ASTContext &C) {
   return getPrimitiveObjectType(C.TheEmptyTupleType);
 }
 
+SILType SILType::getTupleType(const ASTContext &ctx,
+                              ArrayRef<SILType> elementTypes,
+                              SILValueCategory category) {
+  if (elementTypes.empty())
+    return SILType::getEmptyTupleType(ctx);
+
+  SmallVector<TupleTypeElt, 8> tupleTypeElts;
+  for (auto type : elementTypes) {
+    assert(type.getCategory() == category && "Mismatched tuple elt categories");
+    tupleTypeElts.push_back(TupleTypeElt(type.getRawASTType()));
+  }
+  auto tupleType = TupleType::get(tupleTypeElts, ctx);
+  return SILType::getPrimitiveType(tupleType->getCanonicalType(), category);
+}
+
 SILType SILType::getSILTokenType(const ASTContext &C) {
   return getPrimitiveObjectType(C.TheSILTokenType);
 }
@@ -117,21 +132,25 @@ SILType SILType::getOpaqueIsolationType(const ASTContext &C) {
   return getPrimitiveObjectType(CanType(actorType).wrapInOptionalType());
 }
 
+SILType SILType::getBuiltinImplicitActorType(const ASTContext &ctx) {
+  return getPrimitiveObjectType(ctx.TheImplicitActorType->getCanonicalType());
+}
+
 bool SILType::isTrivial(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
   
-  return F.getTypeLowering(contextType).isTrivial();
+  return F.getTypeProperties(contextType).isTrivial();
 }
 
 bool SILType::isOrContainsRawPointer(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
-  return F.getTypeLowering(contextType).isOrContainsRawPointer();
+  return F.getTypeProperties(contextType).isOrContainsRawPointer();
 }
 
 bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction *f) const {
   auto contextType = hasTypeParameter() ? f->mapTypeIntoContext(*this) : *this;
-  const TypeLowering &tyLowering = f->getTypeLowering(contextType);
-  bool result = !tyLowering.isTrivial() || tyLowering.isOrContainsRawPointer();
+  auto props = f->getTypeProperties(contextType);
+  bool result = !props.isTrivial() || props.isOrContainsRawPointer();
   assert((result || !isFunctionTypeWithContext()) &&
          "a function type with context must either be non trivial or marked as containing a pointer");
   return result;
@@ -139,12 +158,12 @@ bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction *f) const {
 
 bool SILType::isOrContainsPack(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
-  return F.getTypeLowering(contextType).isOrContainsPack();
+  return F.getTypeProperties(contextType).isOrContainsPack();
 }
 
 bool SILType::isEmpty(const SILFunction &F) const {
   // Infinite types are never empty.
-  if (F.getTypeLowering(*this).getRecursiveProperties().isInfinite()) {
+  if (F.getTypeProperties(*this).isInfinite()) {
     return false;
   }
   
@@ -162,6 +181,11 @@ bool SILType::isEmpty(const SILFunction &F) const {
     // Also, a struct is empty if it either has no fields or if all fields are
     // empty.
     SILModule &module = F.getModule();
+    if (structDecl->isResilient(module.getSwiftModule(),
+                                F.getResilienceExpansion())) {
+      return false;
+    }
+
     TypeExpansionContext typeEx = F.getTypeExpansionContext();
     for (VarDecl *field : structDecl->getStoredProperties()) {
       if (!getFieldType(field, module, typeEx).isEmpty(F))
@@ -199,8 +223,7 @@ bool SILType::isNoReturnFunction(SILModule &M,
 
 Lifetime SILType::getLifetime(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
-  const auto &lowering = F.getTypeLowering(contextType);
-  auto properties = lowering.getRecursiveProperties();
+  auto properties = F.getTypeProperties(contextType);
   if (properties.isTrivial())
     return Lifetime::None;
   return properties.isLexical() ? Lifetime::Lexical : Lifetime::EagerMove;
@@ -462,7 +485,7 @@ bool SILType::isAddressOnly(const SILFunction &F) const {
 
 bool SILType::isFixedABI(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
-  return F.getTypeLowering(contextType).isFixedABI();
+  return F.getTypeProperties(contextType).isFixedABI();
 }
 
 SILType SILType::substGenericArgs(SILModule &M, SubstitutionMap SubMap,
@@ -656,10 +679,23 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
   case ResultConvention::Owned:
     return OwnershipKind::Owned;
   case ResultConvention::Unowned:
+    // We insert a retain right after the call returning an unowned value in
+    // OwnershipModelEliminator. So treat the result as owned.
+    if (IsTrivial)
+      return OwnershipKind::None;
+    return OwnershipKind::Owned;
   case ResultConvention::UnownedInnerPointer:
     if (IsTrivial)
       return OwnershipKind::None;
     return OwnershipKind::Unowned;
+  case ResultConvention::GuaranteedAddress:
+    return isAddressResult(SILModuleConventions(M).loweredAddresses)
+               ? OwnershipKind::None
+               : OwnershipKind::Guaranteed;
+  case ResultConvention::Inout:
+    return OwnershipKind::None;
+  case ResultConvention::Guaranteed:
+    return OwnershipKind::Guaranteed;
   }
 
   llvm_unreachable("Unhandled ResultConvention in switch.");
@@ -671,7 +707,7 @@ SILModuleConventions::SILModuleConventions(SILModule &M)
 bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
                                                      SILModule &M) {
   if (SILModuleConventions(M).loweredAddresses) {
-    return M.Types.getTypeLowering(type, TypeExpansionContext::minimal())
+    return M.Types.getTypeProperties(type, TypeExpansionContext::minimal())
         .isAddressOnly();
   }
 
@@ -680,7 +716,7 @@ bool SILModuleConventions::isReturnedIndirectlyInSIL(SILType type,
 
 bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
   if (SILModuleConventions(M).loweredAddresses) {
-    return M.Types.getTypeLowering(type, TypeExpansionContext::minimal())
+    return M.Types.getTypeProperties(type, TypeExpansionContext::minimal())
         .isAddressOnly();
   }
 
@@ -689,7 +725,7 @@ bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
 
 bool SILModuleConventions::isThrownIndirectlyInSIL(SILType type, SILModule &M) {
   if (SILModuleConventions(M).loweredAddresses) {
-    return M.Types.getTypeLowering(type, TypeExpansionContext::minimal())
+    return M.Types.getTypeProperties(type, TypeExpansionContext::minimal())
         .isAddressOnly();
   }
 
@@ -731,8 +767,8 @@ bool SILFunctionType::isAddressable(unsigned paramIdx, SILModule &module,
         ? genericEnv->mapTypeIntoContext(argType)->getCanonicalType()
         : argType;
       assert(!contextType->hasTypeParameter());
-      auto &tl = typeConverter.getTypeLowering(contextType, expansion);
-      if (tl.getRecursiveProperties().isAddressableForDependencies())
+      if (typeConverter.getTypeProperties(contextType, expansion)
+            .isAddressableForDependencies())
         return true;
     }
   }
@@ -1184,8 +1220,8 @@ bool SILType::isMarkedAsImmortal() const {
 bool SILType::isAddressableForDeps(const SILFunction &function) const {
   auto contextType =
     hasTypeParameter() ? function.mapTypeIntoContext(*this) : *this;
-  auto &tl = function.getTypeLowering(contextType);
-  return tl.getRecursiveProperties().isAddressableForDependencies();
+  auto properties = function.getTypeProperties(contextType);
+  return properties.isAddressableForDependencies();
 }
 
 intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {
@@ -1240,7 +1276,7 @@ SILType SILType::addingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
   auto oldField = oldLayout->getFields()[0];
   if (oldField.getLoweredType()->is<SILMoveOnlyWrappedType>())
     return *this;
-  assert(!oldField.getLoweredType()->isNoncopyable() &&
+  assert(oldField.getLoweredType()->isCopyable() &&
          "Cannot moveonlywrapped in a moveonly type");
   auto newField =
       SILField(SILMoveOnlyWrappedType::get(oldField.getLoweredType()),

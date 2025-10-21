@@ -63,6 +63,15 @@ public class Instruction : CustomStringConvertible, Hashable {
     return allOperands[(allOperands.count - typeOperands.count) ..< allOperands.count]
   }
 
+  public final func setOperand(at index : Int, to value: Value, _ context: some MutatingContext) {
+    if let apply = self as? FullApplySite, apply.isCallee(operand: operands[index]) {
+      context.notifyCallsChanged()
+    }
+    context.notifyInstructionsChanged()
+    bridged.setOperand(index, value.bridged)
+    context.notifyInstructionChanged(self)
+  }
+
   fileprivate var resultCount: Int { 0 }
   fileprivate func getResult(index: Int) -> Value { fatalError() }
 
@@ -81,6 +90,16 @@ public class Instruction : CustomStringConvertible, Hashable {
 
   final public var location: Location {
     return Location(bridged: bridged.getLocation())
+  }
+
+  public final func move(before otherInstruction: Instruction, _ context: some MutatingContext) {
+    BridgedContext.moveInstructionBefore(bridged, otherInstruction.bridged)
+    context.notifyInstructionsChanged()
+  }
+  
+  public final func copy(before otherInstruction: Instruction, _ context: some MutatingContext) {
+    BridgedContext.copyInstructionBefore(bridged, otherInstruction.bridged)
+    context.notifyInstructionsChanged()
   }
 
   public var mayTrap: Bool { false }
@@ -163,6 +182,10 @@ public class Instruction : CustomStringConvertible, Hashable {
   public static func ==(lhs: Instruction, rhs: Instruction) -> Bool {
     lhs === rhs
   }
+  
+  public func isIdenticalTo(_ otherInst: Instruction) -> Bool {
+    return bridged.isIdenticalTo(otherInst.bridged)
+  }
 
   public func hash(into hasher: inout Hasher) {
     hasher.combine(ObjectIdentifier(self))
@@ -206,6 +229,12 @@ public class SingleValueInstruction : Instruction, Value {
   }
 
   public var isLexical: Bool { false }
+
+  /// Replaces all uses with `replacement` and then erases the instruction.
+  public final func replace(with replacement: Value, _ context: some MutatingContext) {
+    uses.replaceAll(with: replacement, context)
+    context.erase(instruction: self)
+  }
 }
 
 public final class MultipleValueInstructionResult : Value, Hashable {
@@ -246,6 +275,14 @@ public class MultipleValueInstruction : Instruction {
   }
   fileprivate final override func getResult(index: Int) -> Value {
     bridged.MultipleValueInstruction_getResult(index).result
+  }
+
+  /// Replaces all uses with the result of `replacement` and then erases the instruction.
+  public final func replace(with replacement: MultipleValueInstruction, _ context: some MutatingContext) {
+    for (origResult, newResult) in zip(self.results, replacement.results) {
+      origResult.uses.replaceAll(with: newResult, context)
+    }
+    context.erase(instruction: self)
   }
 }
 
@@ -310,8 +347,6 @@ final public class AssignInst : Instruction, StoringInstruction {
   }
 }
 
-final public class AssignByWrapperInst : Instruction, StoringInstruction {}
-
 final public class AssignOrInitInst : Instruction, StoringInstruction {}
 
 /// Instruction that copy or move from a source to destination address.
@@ -333,8 +368,19 @@ final public class CopyAddrInst : Instruction, SourceDestAddrInstruction {
   public var isTakeOfSource: Bool {
     bridged.CopyAddrInst_isTakeOfSrc()
   }
+  public func set(isTakeOfSource: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.CopyAddrInst_setIsTakeOfSrc(isTakeOfSource)
+    context.notifyInstructionChanged(self)
+  }
+
   public var isInitializationOfDestination: Bool {
     bridged.CopyAddrInst_isInitializationOfDest()
+  }
+  public func set(isInitializationOfDestination: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.CopyAddrInst_setIsInitializationOfDest(isInitializationOfDestination)
+    context.notifyInstructionChanged(self)
   }
 }
 
@@ -563,6 +609,12 @@ final public class RebindMemoryInst : SingleValueInstruction {}
 
 public class RefCountingInst : Instruction, UnaryInstruction {
   public var isAtomic: Bool { bridged.RefCountingInst_getIsAtomic() }
+
+  public final func setAtomicity(isAtomic: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.RefCountingInst_setIsAtomic(isAtomic)
+    context.notifyInstructionChanged(self)
+  }
 }
 
 final public class StrongRetainInst : RefCountingInst {
@@ -628,6 +680,7 @@ final public class ExtendLifetimeInst : Instruction, UnaryInstruction {}
 final public class InjectEnumAddrInst : Instruction, UnaryInstruction, EnumInstruction {
   public var `enum`: Value { operand.value }
   public var caseIndex: Int { bridged.InjectEnumAddrInst_caseIndex() }
+  public var element: EnumElementDecl { bridged.InjectEnumAddrInst_element().getAs(EnumElementDecl.self) }
 }
 
 //===----------------------------------------------------------------------===//
@@ -653,7 +706,9 @@ final public class DeallocRefInst : Instruction, UnaryInstruction, Deallocation 
 
 final public class DeallocPartialRefInst : Instruction, Deallocation {}
 
-final public class DeallocBoxInst : Instruction, UnaryInstruction, Deallocation {}
+final public class DeallocBoxInst : Instruction, UnaryInstruction, Deallocation {
+  public var isDeadEnd: Bool { bridged.DeallocBoxInst_isDeadEnd() }
+}
 
 final public class DeallocExistentialBoxInst : Instruction, UnaryInstruction, Deallocation {}
 
@@ -674,6 +729,11 @@ final public class LoadInst : SingleValueInstruction, LoadInstruction {
   }
   public var loadOwnership: LoadOwnership {
     LoadOwnership(rawValue: bridged.LoadInst_getLoadOwnership())!
+  }
+  public func set(ownership: LoadInst.LoadOwnership, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.LoadInst_setOwnership(ownership.rawValue)
+    context.notifyInstructionChanged(self)
   }
 }
 
@@ -728,7 +788,9 @@ final public class UncheckedTrivialBitCastInst : SingleValueInstruction, UnaryIn
 }
 
 final public class UncheckedBitwiseCastInst : SingleValueInstruction, UnaryInstruction {}
-final public class UncheckedValueCastInst : SingleValueInstruction, UnaryInstruction {}
+final public class UncheckedValueCastInst : SingleValueInstruction, UnaryInstruction {
+  public var fromValue: Value { operand.value }
+}
 
 final public class RefToRawPointerInst : SingleValueInstruction, UnaryInstruction {}
 final public class RefToUnmanagedInst : SingleValueInstruction, UnaryInstruction {}
@@ -762,6 +824,11 @@ class PointerToAddressInst : SingleValueInstruction, UnaryInstruction {
       return nil
     }
     return Int(exactly: maybeAlign)
+  }
+  public func set(alignment: Int?, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.PointerToAddressInst_setAlignment(UInt64(alignment ?? 0))
+    context.notifyInstructionChanged(self)
   }
 }
 
@@ -896,10 +963,22 @@ final public class GlobalAddrInst : GlobalAccessInstruction, VarDeclInstruction 
   public var dependencyToken: Value? {
     operands.count == 1 ? operands[0].value : nil
   }
+
+  public func clearToken(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.GlobalAddrInst_clearToken()
+    context.notifyInstructionChanged(self)
+  }
 }
 
 final public class GlobalValueInst : GlobalAccessInstruction {
   public var isBare: Bool { bridged.GlobalValueInst_isBare() }
+
+  public func setIsBare(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.GlobalValueInst_setIsBare()
+    context.notifyInstructionChanged(self)
+  }
 }
 
 final public class BaseAddrForOffsetInst : SingleValueInstruction {}
@@ -1016,6 +1095,12 @@ final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction
 
   public var isImmutable: Bool { bridged.RefElementAddrInst_isImmutable() }
   
+  public func set(isImmutable: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.RefElementAddrInst_setImmutable(isImmutable)
+    context.notifyInstructionChanged(self)
+  }
+
   public var varDecl: VarDecl? {
     bridged.RefElementAddr_getDecl().getAs(VarDecl.self)
   }
@@ -1028,6 +1113,14 @@ final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public class KeyPathInst : SingleValueInstruction {
+  public var substitutionMap: SubstitutionMap {
+    SubstitutionMap(bridged: bridged.KeyPathInst_getSubstitutionMap())
+  }
+
+  public var hasPattern: Bool {
+    bridged.KeyPathInst_hasPattern()
+  }
+
   public override func visitReferencedFunctions(_ cl: (Function) -> ()) {
     var results = BridgedInstruction.KeyPathFunctionResults()
     for componentIdx in 0..<bridged.KeyPathInst_getNumComponents() {
@@ -1127,6 +1220,17 @@ extension MarkDependenceInstruction {
   public var valueOrAddress: Value { valueOrAddressOperand.value }
   public var baseOperand: Operand { operands[1] }
   public var base: Value { baseOperand.value }
+
+  public func resolveToNonEscaping(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.MarkDependenceInstruction_resolveToNonEscaping()
+    context.notifyInstructionChanged(self)
+  }
+  public func settleToEscaping(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.MarkDependenceInstruction_settleToEscaping()
+    context.notifyInstructionChanged(self)
+  }
 }
 
 final public class MarkDependenceInst : SingleValueInstruction, MarkDependenceInstruction {
@@ -1404,6 +1508,12 @@ public class AllocRefInstBase : SingleValueInstruction, Allocation {
     bridged.AllocRefInstBase_canAllocOnStack()
   }
 
+  public final func setIsStackAllocatable(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.AllocRefInstBase_setIsStackAllocatable()
+    context.notifyInstructionChanged(self)
+  }
+
   final public var tailAllocatedCounts: OperandArray {
     let numTailTypes = bridged.AllocRefInstBase_getNumTailTypes()
     return operands[0..<numTailTypes]
@@ -1416,6 +1526,12 @@ public class AllocRefInstBase : SingleValueInstruction, Allocation {
 
 final public class AllocRefInst : AllocRefInstBase {
   public var isBare: Bool { bridged.AllocRefInst_isBare() }
+
+  public func setIsBare(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.AllocRefInst_setIsBare()
+    context.notifyInstructionChanged(self)
+  }
 }
 
 final public class AllocRefDynamicInst : AllocRefInstBase {
@@ -1530,6 +1646,38 @@ final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
   public var accessKind: AccessKind {
     AccessKind(rawValue: bridged.BeginAccessInst_getAccessKind())!
   }
+  public func set(accessKind: AccessKind, context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.BeginAccess_setAccessKind(accessKind.rawValue)
+    context.notifyInstructionChanged(self)
+  }
+
+  // The raw values must match SILAccessEnforcement.
+  public enum Enforcement: Int {
+    /// The access's enforcement has not yet been determined.
+    case unknown = 0
+
+    /// The access is statically known to not conflict with other accesses.
+    case `static` = 1
+
+    /// The access is not statically known to not conflict with anything and must be dynamically checked.
+    case dynamic = 2
+
+    /// The access is not statically known to not conflict with anything but dynamic checking should
+    /// be suppressed, leaving it undefined behavior.
+    case unsafe = 3
+
+    /// Access to pointers that are signed via pointer authentication.
+    case signed = 4
+  }
+  public var enforcement: Enforcement {
+    Enforcement(rawValue: bridged.BeginAccessInst_getEnforcement())!
+  }
+  public func set(enforcement: Enforcement, context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.BeginAccess_setEnforcement(enforcement.rawValue)
+    context.notifyInstructionChanged(self)
+  }
 
   public var isStatic: Bool { bridged.BeginAccessInst_isStatic() }
   public var isUnsafe: Bool { bridged.BeginAccessInst_isUnsafe() }
@@ -1573,6 +1721,9 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   public var yieldedValues: Results {
     Results(inst: self, numResults: resultCount - (isCalleeAllocated ? 2 : 1))
   }
+
+  public var isNonThrowing: Bool { bridged.BeginApplyInst_getNonThrowing() }
+  public var isNonAsync: Bool { bridged.BeginApplyInst_getNonAsync() }
 }
 
 final public class EndApplyInst : SingleValueInstruction, UnaryInstruction {
@@ -1691,6 +1842,11 @@ public class TermInst : Instruction {
   }
   
   public var isFunctionExiting: Bool { false }
+
+  public final func replaceBranchTarget(from fromBlock: BasicBlock, to toBlock: BasicBlock, _ context: some MutatingContext) {
+    context.notifyBranchesChanged()
+    bridged.TermInst_replaceBranchTarget(fromBlock.bridged, toBlock.bridged)
+  }
 }
 
 final public class UnreachableInst : TermInst {
@@ -1904,3 +2060,6 @@ final public class MergeIsolationRegionInst : Instruction {
 
 final public class IgnoredUseInst : Instruction, UnaryInstruction {
 }
+
+final public class ImplicitActorToOpaqueIsolationCastInst
+  : SingleValueInstruction, UnaryInstruction {}

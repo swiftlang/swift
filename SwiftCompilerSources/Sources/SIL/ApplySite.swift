@@ -72,6 +72,7 @@ public struct ApplyOperandConventions : Collection {
       calleeArgumentIndex(ofOperandIndex: operandIndex)!]
   }
 
+  // If the specified parameter is a dependency target, return its dependency sources.
   public subscript(parameterDependencies operandIndex: Int)
     -> FunctionConvention.LifetimeDependencies? {
     return calleeArgumentConventions[parameterDependencies:
@@ -297,6 +298,10 @@ extension ApplySite {
   /// Use `calleeArgument(of:,in:)` if possible.
   public func calleeArgumentIndex(of operand: Operand) -> Int? {
     operandConventions.calleeArgumentIndex(of: operand)
+  }
+
+  public var hasGuaranteedResult: Bool {
+    functionConvention.hasGuaranteedResult
   }
 }
 

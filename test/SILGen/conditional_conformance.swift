@@ -20,7 +20,7 @@ extension Conformance: P1 where A: P2 {
 // This is defined below but is emitted before any witness tables.
 // Just make sure it does not have a generic signature.
 //
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s23conditional_conformance16SameTypeConcreteVyxGAA2P1AASiRszlAaEP6normalyyFTW : $@convention(witness_method: P1) (@in_guaranteed SameTypeConcrete<Int>) -> ()
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s23conditional_conformance11ConformanceVyxGAA2P1A2A2P2RzlAaEP6normalyyFTW : $@convention(witness_method: P1) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed Conformance<τ_0_0>) -> () {
 
 
 // CHECK-LABEL: sil_witness_table hidden <A where A : P2> Conformance<A>: P1 module conditional_conformance {
@@ -48,8 +48,8 @@ extension SameTypeConcrete: P1 where B == Int {
 }
 
 // CHECK-LABEL: sil_witness_table hidden <B where B == Int> SameTypeConcrete<B>: P1 module conditional_conformance {
-// CHECK-NEXT:    method #P1.normal: <Self where Self : P1> (Self) -> () -> () : @$s23conditional_conformance16SameTypeConcreteVyxGAA2P1AASiRszlAaEP6normalyyFTW	// protocol witness for P1.normal() in conformance <A> SameTypeConcrete<A>
-// CHECK-NEXT:    method #P1.generic: <Self where Self : P1><T where T : P3> (Self) -> (T) -> () : @$s23conditional_conformance16SameTypeConcreteVyxGAA2P1AASiRszlAaEP7genericyyqd__AA2P3Rd__lFTW	// protocol witness for P1.generic<A>(_:) in conformance <A> SameTypeConcrete<A>
+// CHECK-NEXT:    method #P1.normal: <Self where Self : P1> (Self) -> () -> () : @$s23conditional_conformance16SameTypeConcreteVySiGAA2P1A2aEP6normalyyFTW	// protocol witness for P1.normal() in conformance SameTypeConcrete<Int>
+// CHECK-NEXT:    method #P1.generic: <Self where Self : P1><T where T : P3> (Self) -> (T) -> () : @$s23conditional_conformance16SameTypeConcreteVySiGAA2P1A2aEP7genericyyqd__AA2P3Rd__lFTW	// protocol witness for P1.generic<A>(_:) in conformance SameTypeConcrete<Int>
 // CHECK-NEXT:  }
 
 struct SameTypeGeneric<C, D> {}

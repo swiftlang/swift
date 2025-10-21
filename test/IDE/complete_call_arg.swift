@@ -1443,3 +1443,14 @@ struct NestedCallsWithoutClosingParen {
     _ = (foo(#^IN_TUPLE?check=NESTED_CALL_WITHOUT_TYPE_RELATION^#, 1)
   }
 }
+
+func testUnboundContextualType() {
+  struct S<T> {
+    func bar(x: Int) -> Self { self }
+  }
+
+  func foo(x: S<Int>) {
+    let _: S = x.bar(#^ARG_WITH_UNBOUND_CONTEXTUAL_TY^#
+    // ARG_WITH_UNBOUND_CONTEXTUAL_TY: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#x: Int#}[')'][#S<Int>#]; name=x:
+  }
+}

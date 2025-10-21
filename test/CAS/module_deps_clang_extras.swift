@@ -17,11 +17,11 @@
 // RUN: %validate-json %t/deps.json &>/dev/null
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json Test casFSRootID > %t/fs.casid
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s -DDIR=%basename_t -check-prefix FS_ROOT
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s -check-prefix FS_ROOT
 
-// FS_ROOT: [[DIR]].tmp/hidden/Dummy.h
-// FS_ROOT: [[DIR]].tmp/hidden/a.h
-// FS_ROOT: [[DIR]].tmp/hidden/b.h
+// FS_ROOT: TMP_DIR/hidden/Dummy.h
+// FS_ROOT: TMP_DIR/hidden/a.h
+// FS_ROOT: TMP_DIR/hidden/b.h
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
 // RUN: %swift_frontend_plain @%t/shim.cmd
@@ -29,9 +29,9 @@
 // RUN: %swift_frontend_plain @%t/dummy.cmd
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json bridgingHeader > %t/header.cmd
-// RUN: %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules -O -o %t/objc.pch
+// RUN: %target-swift-frontend @%t/header.cmd %t/Bridge.h -disable-implicit-swift-modules -O -o %t/objc.pch
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
-// RUN:   %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules -O -o %t/objc.pch > %t/keys.json
+// RUN:   %target-swift-frontend @%t/header.cmd %t/Bridge.h -disable-implicit-swift-modules -O -o %t/objc.pch > %t/keys.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json > %t/key
 
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json

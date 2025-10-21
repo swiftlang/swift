@@ -33,6 +33,7 @@ class NonSingleValueInstruction;
 class SILModule;
 class ValueBase;
 class SILNode;
+class SILPrintContext;
 class SILValue;
 
 /// An enumeration which contains values for all the nodes in SILNodes.def.
@@ -120,7 +121,6 @@ public:
   enum { NumStoreOwnershipQualifierBits = 2 };
   enum { NumLoadOwnershipQualifierBits = 2 };
   enum { NumAssignOwnershipQualifierBits = 2 };
-  enum { NumAssignByWrapperModeBits = 2 };
   enum { NumSILAccessKindBits = 2 };
   enum { NumSILAccessEnforcementBits = 3 };
   enum { NumAllocRefTailTypesBits = 4 };
@@ -196,7 +196,6 @@ protected:
     SHARED_FIELD(StoreInst, uint8_t ownershipQualifier);
     SHARED_FIELD(LoadInst, uint8_t ownershipQualifier);
     SHARED_FIELD(AssignInst, uint8_t ownershipQualifier);
-    SHARED_FIELD(AssignByWrapperInst, uint8_t mode);
     SHARED_FIELD(AssignOrInitInst, uint8_t mode);
     SHARED_FIELD(StringLiteralInst, uint8_t encoding);
     SHARED_FIELD(SwitchValueInst, bool hasDefault);
@@ -432,12 +431,14 @@ public:
   /// will be valid SIL assembly; otherwise, it will be an arbitrary
   /// format suitable for debugging.
   void print(raw_ostream &OS) const;
+  void print(SILPrintContext &ctx) const;
   void dump() const;
 
   /// Pretty-print the node in context, preceded by its operands (if the
   /// value represents the result of an instruction) and followed by its
   /// users.
   void printInContext(raw_ostream &OS) const;
+  void printInContext(SILPrintContext &ctx) const;
   void dumpInContext() const;
 
   // Cast to SingleValueInstruction.  This is an implementation detail

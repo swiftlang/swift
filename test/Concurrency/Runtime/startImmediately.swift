@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking %s %import-libdispatch -swift-version 6 -o %t/a.out
+// RUN: %target-build-swift -plugin-path %swift-plugin-dir -Xfrontend -disable-availability-checking %s %import-libdispatch -swift-version 6 -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s --dump-input=always
 
@@ -66,7 +66,7 @@ actor MyGlobalActor {
   static func test() {}
 }
 
-final class NaiveQueueExecutor: SerialExecutor {
+final class NaiveQueueExecutor: SerialExecutor, TaskExecutor {
   let queue: DispatchQueue
 
   init(queue: DispatchQueue) {
@@ -432,15 +432,10 @@ actor RecipientOnQueue: RecipientProtocol {
 }
 
 print("\n\n==== ------------------------------------------------------------------")
-print("call_startSynchronously_insideActor()")
+print("call_taskImmediate_insideActor()")
 
 actor A {
   func f() {
-    Task.startSynchronously(name: "hello") { print("Task.startSynchronously (\(Task.name!))") }
-    Task.startSynchronously() { print("Task.startSynchronously") }
-  }
-
-  func f2() {
     Task.immediate(name: "hello") { print("Task.immediate (\(Task.name!))") }
     Task.immediate() { print("Task.immediate") }
 
@@ -449,14 +444,119 @@ actor A {
   }
 }
 
-func call_startSynchronously_insideActor() async {
+func call_immediate_insideActor() async {
   await A().f()
-  await A().f2()
+}
+await call_immediate_insideActor()
+
+
+print("\n\n==== ------------------------------------------------------------------")
+print("call_taskImmediate_taskExecutor()")
+
+@TaskLocal
+nonisolated(unsafe) var niceTaskLocalValueYouGotThere: String = ""
+
+// FIXME: rdar://155596073 Task executors execution may not always hop as expected
+func call_taskImmediate_taskExecutor(taskExecutor: NaiveQueueExecutor) async {
+  await Task.immediate(executorPreference: taskExecutor) {
+    print("Task.immediate(executorPreference:)")
+    dispatchPrecondition(condition: .notOnQueue(taskExecutor.queue))
+    await Task.yield()
+    dispatchPrecondition(condition: .onQueue(taskExecutor.queue))
+  }.value
+
+  await Task.immediate(executorPreference: taskExecutor) { @MainActor in
+    print("Task.immediate(executorPreference:) { @MainActor }")
+    dispatchPrecondition(condition: .notOnQueue(taskExecutor.queue)) // since @MainActor requirement > preference
+    await Task.yield()
+    dispatchPrecondition(condition: .notOnQueue(taskExecutor.queue)) // since @MainActor requirement > preference
+  }.value
+
+  await $niceTaskLocalValueYouGotThere.withValue("value") {
+    assert(niceTaskLocalValueYouGotThere == "value")
+
+    // Task.immediate copies task locals
+    await Task.immediate(executorPreference: taskExecutor) {
+      assert(niceTaskLocalValueYouGotThere == "value")
+    }.value
+
+    // Task.immediateDetached does not copy task locals
+    await Task.immediateDetached(executorPreference: taskExecutor) {
+      assert(niceTaskLocalValueYouGotThere == "")
+    }.value
+  }
+
+  await withTaskGroup { group in
+    print("withTaskGroup { group.addTask(executorPreference:) { ... } }")
+    group.addImmediateTask(executorPreference: taskExecutor) {
+      print("addImmediateTask")
+      dispatchPrecondition(condition: .notOnQueue(taskExecutor.queue)) // "immediately" on caller
+      await Task.yield()
+      dispatchPrecondition(condition: .onQueue(taskExecutor.queue)) // hopped to preferred executor
+    }
+
+    let _: Bool = group.addImmediateTaskUnlessCancelled(executorPreference: taskExecutor) {
+      print("addImmediateTaskUnlessCancelled")
+      dispatchPrecondition(condition: .notOnQueue(taskExecutor.queue)) // "immediately" on caller
+      await Task.yield()
+      dispatchPrecondition(condition: .onQueue(taskExecutor.queue)) // hopped to preferred executor
+    }
+  }
+
+  await withThrowingTaskGroup { group in
+    print("withThrowingTaskGroup { group.addTask(executorPreference:) { ... } }")
+    group.addImmediateTask(executorPreference: taskExecutor) {
+      print("addImmediateTask")
+      dispatchPrecondition(condition: .notOnQueue(taskExecutor.queue)) // "immediately" on caller
+      await Task.yield()
+      dispatchPrecondition(condition: .onQueue(taskExecutor.queue)) // hopped to preferred executor
+    }
+
+    let _: Bool = group.addImmediateTaskUnlessCancelled(executorPreference: taskExecutor) {
+      print("addImmediateTaskUnlessCancelled")
+      dispatchPrecondition(condition: .notOnQueue(taskExecutor.queue)) // "immediately" on caller
+      await Task.yield()
+      dispatchPrecondition(condition: .onQueue(taskExecutor.queue)) // hopped to preferred executor
+    }
+  }
+
+  await withDiscardingTaskGroup { group in
+    print("withDiscardingTaskGroup { group.addTask(executorPreference:) { ... } }")
+    group.addImmediateTask(executorPreference: taskExecutor) {
+      print("addImmediateTask")
+      dispatchPrecondition(condition: .notOnQueue(taskExecutor.queue)) // "immediately" on caller
+      await Task.yield()
+      dispatchPrecondition(condition: .onQueue(taskExecutor.queue)) // hopped to preferred executor
+    }
+
+    let _: Bool = group.addImmediateTaskUnlessCancelled(executorPreference: taskExecutor) {
+      print("addImmediateTaskUnlessCancelled")
+      dispatchPrecondition(condition: .notOnQueue(taskExecutor.queue)) // "immediately" on caller
+      await Task.yield()
+      dispatchPrecondition(condition: .onQueue(taskExecutor.queue)) // hopped to preferred executor
+    }
+  }
+
+  await withDiscardingTaskGroup { group in
+    print("withDiscardingTaskGroup { group.addTask(executorPreference:) { ... } }")
+    group.addImmediateTask(executorPreference: taskExecutor) {
+      print("addImmediateTask")
+      dispatchPrecondition(condition: .notOnQueue(taskExecutor.queue)) // "immediately" on caller
+      await Task.yield()
+      dispatchPrecondition(condition: .onQueue(taskExecutor.queue)) // hopped to preferred executor
+    }
+
+    let _: Bool = group.addImmediateTaskUnlessCancelled(executorPreference: taskExecutor) {
+      print("addImmediateTaskUnlessCancelled")
+      dispatchPrecondition(condition: .notOnQueue(taskExecutor.queue)) // "immediately" on caller
+      await Task.yield()
+      dispatchPrecondition(condition: .onQueue(taskExecutor.queue)) // hopped to preferred executor
+    }
+  }
 }
 
-await call_startSynchronously_insideActor()
+// FIXME: rdar://155596073 task executors can be somewhat racy it seems and not always hop as we'd want them to
+// await call_taskImmediate_taskExecutor(
+//  taskExecutor: NaiveQueueExecutor(queue: DispatchQueue(label: "my-queue")))
 
-// CHECK-LABEL: call_startSynchronously_insideActor()
-// Those two definitely in this order, however the startSynchronously is not determinate
-// CHECK: Task.immediate
-// CHECK: Task.immediate { @MainActor }
+print("DONE!") // CHECK: DONE!

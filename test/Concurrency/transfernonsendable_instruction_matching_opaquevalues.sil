@@ -1,8 +1,7 @@
-// RUN: %target-sil-opt -send-non-sendable -enable-sil-opaque-values -enable-upcoming-feature RegionBasedIsolation -strict-concurrency=complete %s -verify -o /dev/null
+// RUN: %target-sil-opt -send-non-sendable -enable-sil-opaque-values -strict-concurrency=complete %s -verify -o /dev/null
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 // PLEASE READ THIS!
 //
@@ -192,9 +191,9 @@ bb0:
   // expected-warning @-1 {{}}
   // expected-note @-2 {{}}
 
-  %i = init_existential_value %1 : $NonSendableKlass, $NonSendableKlass, $P // expected-note {{access can happen concurrently}}
+  %i = init_existential_value %1 : $NonSendableKlass, $NonSendableKlass, $P
   %f2 = function_ref @useP : $@convention(thin) (@in_guaranteed P) -> ()
-  apply %f2(%i) : $@convention(thin) (@in_guaranteed P) -> ()
+  apply %f2(%i) : $@convention(thin) (@in_guaranteed P) -> () // expected-note {{access can happen concurrently}}
   destroy_value %i : $P
 
   %9999 = tuple ()

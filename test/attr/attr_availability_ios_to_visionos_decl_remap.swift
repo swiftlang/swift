@@ -52,7 +52,7 @@ func testDeploymentTarget() {
   doSomething() // expected-error {{'doSomething()' is only available in visionOS 1.1 or newer}}
   // expected-note@-1 {{add 'if #available' version check}}{{3-16=if #available(visionOS 1.1, *) {\n      doSomething()\n  \} else {\n      // Fallback on earlier versions\n  \}}}
   doSomethingFarFuture() // expected-error {{'doSomethingFarFuture()' is only available in iOS 99.0 or newer}}
-  // expected-note@-1 {{add 'if #available' version check}}{{3-25=if #available(visionOS 99.0, *) {\n      doSomethingFarFuture()\n  \} else {\n      // Fallback on earlier versions\n  \}}}
+  // expected-note@-1 {{add 'if #available' version check}}{{3-25=if #available(iOS 99.0, *) {\n      doSomethingFarFuture()\n  \} else {\n      // Fallback on earlier versions\n  \}}}
   doSomethingElse() // expected-error{{'doSomethingElse()' is unavailable in visionOS: you don't want to do that anyway}}
   doSomethingInadvisable() // expected-warning {{'doSomethingInadvisable()' was deprecated in iOS 1.0: please don't}}
   doSomethingGood()
@@ -61,7 +61,7 @@ func testDeploymentTarget() {
   takesSomeProto(ConformsToProtoIniOS17_4()) // expected-warning {{conformance of 'ConformsToProtoIniOS17_4' to 'SomeProto' is only available in visionOS 1.1 or newer; this is an error in the Swift 6 language mode}}
   // expected-note@-1 {{add 'if #available' version check}}{{3-45=if #available(visionOS 1.1, *) {\n      takesSomeProto(ConformsToProtoIniOS17_4())\n  \} else {\n      // Fallback on earlier versions\n  \}}}
   takesSomeProto(ConformsToProtoIniOS99()) // expected-warning {{conformance of 'ConformsToProtoIniOS99' to 'SomeProto' is only available in iOS 99 or newer; this is an error in the Swift 6 language mode}}
-  // expected-note@-1 {{add 'if #available' version check}}{{3-43=if #available(visionOS 99, *) {\n      takesSomeProto(ConformsToProtoIniOS99())\n  \} else {\n      // Fallback on earlier versions\n  \}}}
+  // expected-note@-1 {{add 'if #available' version check}}{{3-43=if #available(iOS 99, *) {\n      takesSomeProto(ConformsToProtoIniOS99())\n  \} else {\n      // Fallback on earlier versions\n  \}}}
   takesSomeProto(ConformsToProtoDeprecatedIniOS17()) // expected-warning {{conformance of 'ConformsToProtoDeprecatedIniOS17' to 'SomeProto' was deprecated in iOS 1.0: please don't}}
   takesSomeProto(ConformsToProtoObsoletedIniOS17()) // expected-error {{conformance of 'ConformsToProtoObsoletedIniOS17' to 'SomeProto' is unavailable in visionOS: you don't want to do that anyway}}
 

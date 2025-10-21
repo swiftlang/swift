@@ -83,10 +83,10 @@ public func testIfUnavailableDisabledDomain() {
 
 // CHECK-LABEL: sil{{.*}}$s4Test28testIfAvailableDynamicDomainyyF : $@convention(thin) () -> ()
 public func testIfAvailableDynamicDomain() {
-  // FIXME: [availability] Call dynamic domain predicate function
   // CHECK: bb0:
-  // CHECK:   [[PRED:%.*]] = integer_literal $Builtin.Int1, -1
-  // CHECK:   cond_br [[PRED]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
+  // CHECK:   [[QUERY_FUNC:%.*]] = function_ref @$sSC33__swift_DynamicDomain_isAvailableBi1_yF : $@convention(thin) () -> Builtin.Int1
+  // CHECK:   [[QUERY_RESULT:%.*]] = apply [[QUERY_FUNC]]() : $@convention(thin) () -> Builtin.Int1
+  // CHECK:   cond_br [[QUERY_RESULT]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
 
   // CHECK: [[TRUE_BB]]:
   // CHECK:   function_ref @available_in_dynamic_domain
@@ -101,12 +101,22 @@ public func testIfAvailableDynamicDomain() {
 }
 // CHECK: end sil function '$s4Test28testIfAvailableDynamicDomainyyF'
 
+// CHECK-LABEL: sil non_abi [serialized] [ossa] @$sSC33__swift_DynamicDomain_isAvailableBi1_yF : $@convention(thin) () -> Builtin.Int1
+// CHECK: bb0:
+// CHECK:   [[QUERY_FUNC:%.*]] = function_ref @__DynamicDomain_isAvailable : $@convention(c) () -> Bool
+// CHECK:   [[QUERY_RESULT:%.*]] = apply [[QUERY_FUNC]]() : $@convention(c) () -> Bool
+// CHECK:   [[RESULT:%.*]] = struct_extract [[QUERY_RESULT]], #Bool._value
+// CHECK:   return [[RESULT]]
+// CHECK: end sil function '$sSC33__swift_DynamicDomain_isAvailableBi1_yF'
+
 // CHECK-LABEL: sil{{.*}}$s4Test30testIfUnavailableDynamicDomainyyF : $@convention(thin) () -> ()
 public func testIfUnavailableDynamicDomain() {
-  // FIXME: [availability] Call dynamic domain predicate function
   // CHECK: bb0:
-  // CHECK:   [[PRED:%.*]] = integer_literal $Builtin.Int1, 0
-  // CHECK:   cond_br [[PRED]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
+  // CHECK:   [[QUERY_FUNC:%.*]] = function_ref @$sSC33__swift_DynamicDomain_isAvailableBi1_yF : $@convention(thin) () -> Builtin.Int1
+  // CHECK:   [[QUERY_RESULT:%.*]] = apply [[QUERY_FUNC]]() : $@convention(thin) () -> Builtin.Int1
+  // CHECK:   [[MINUSONE:%.*]] = integer_literal $Builtin.Int1, -1
+  // CHECK:   [[QUERY_INVERSION:%.*]] = builtin "xor_Int1"([[QUERY_RESULT]], [[MINUSONE]]) : $Builtin.Int1
+  // CHECK:   cond_br [[QUERY_INVERSION]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
 
   // CHECK: [[TRUE_BB]]:
   // CHECK:   function_ref @unavailable_in_dynamic_domain

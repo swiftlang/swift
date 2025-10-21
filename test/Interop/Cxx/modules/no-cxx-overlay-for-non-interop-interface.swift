@@ -6,11 +6,9 @@
 // RUN: %target-swift-frontend -typecheck %t/clientWithInteropDep.swift -I %t/deps -cxx-interoperability-mode=default -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -module-cache-path %t/module-cache &> %t/interop_dep.txt
 // RUN: cat %t/interop_dep.txt | %FileCheck %s -check-prefix=ENABLE-CHECK
 
-// RUN: %empty-directory(%t/module-cache)
 // RUN: %target-swift-frontend -typecheck %t/clientNoInteropDep.swift -I %t/deps -cxx-interoperability-mode=default -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -module-cache-path %t/module-cache &> %t/no_interop_dep.txt
 // RUN: cat %t/no_interop_dep.txt | %FileCheck %s -check-prefix=DISABLE-CHECK
 
-// RUN: %empty-directory(%t/module-cache)
 // RUN: %target-swift-frontend -typecheck %t/clientDarwin.swift -I %t/deps -cxx-interoperability-mode=default -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -module-cache-path %t/module-cache &> %t/darwin_dep.txt
 // RUN: cat %t/darwin_dep.txt | %FileCheck %s -check-prefix=DISABLE-CHECK
 

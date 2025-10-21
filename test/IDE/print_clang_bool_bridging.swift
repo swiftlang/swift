@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=BoolBridgingTests -function-definitions=false -skip-unavailable -F %S/Inputs/mock-sdk > %t.txt
-// RUN: diff -u <(tail -n +9 %s) %t.txt
+// RUN: tail -n +10 %s > %t/a
+// RUN: diff -u %t/a %t.txt
 
 // REQUIRES: objc_interop
 

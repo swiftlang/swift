@@ -94,8 +94,9 @@ static void withStatusRecordLock(
               status, newStatus,
               /*success*/ SWIFT_MEMORY_ORDER_CONSUME,
               /*failure*/ std::memory_order_relaxed)) {
+        bool wasRunning = status.isRunning();
         status = newStatus;
-        status.traceStatusChanged(task, false);
+        status.traceStatusChanged(task, false, wasRunning);
         break;
       }
     }
@@ -130,7 +131,7 @@ static void withStatusRecordLock(
             status, newStatus,
             /*success*/ std::memory_order_relaxed,
             /*failure*/ std::memory_order_relaxed)) {
-      newStatus.traceStatusChanged(task, false);
+      newStatus.traceStatusChanged(task, false, status.isRunning());
       break;
     }
   }
@@ -196,7 +197,7 @@ bool swift::addStatusRecord(AsyncTask *task, TaskStatusRecord *newRecord,
       if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /*success*/ std::memory_order_release,
               /*failure*/ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(task, false);
+        newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
         return true;
       } else {
         // Retry
@@ -302,7 +303,7 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
             oldStatus, newStatus,
             /*success*/ std::memory_order_relaxed,
             /*failure*/ std::memory_order_relaxed)) {
-      newStatus.traceStatusChanged(task, false);
+      newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
       return;
     }
 
@@ -521,8 +522,8 @@ swift_task_pushTaskExecutorPreferenceImpl(TaskExecutorRef taskExecutor) {
           // the executor.
           /*retainedExecutor=*/false);
   SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Create task executor "
-                       "preference record %p for task:%p",
-                       allocation, task);
+                       "preference record:%p taskExecutor:%p for task:%p",
+                       allocation, taskExecutor.getIdentity(), task);
 
 
   addStatusRecord(task, record,
@@ -589,8 +590,8 @@ void AsyncTask::pushInitialTaskExecutorPreference(
       ::new (allocation) TaskExecutorPreferenceStatusRecord(
           preferredExecutor, /*ownsExecutor=*/owned);
   SWIFT_TASK_DEBUG_LOG("[InitialTaskExecutorPreference] Create a task "
-                       "preference record %p for task:%p",
-                       record, this);
+                       "preference record:%p taskExecutor:%p for task:%p",
+                       record, preferredExecutor.getIdentity(), this);
 
   addStatusRecord(this, record,
                   [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
@@ -904,7 +905,7 @@ static void swift_task_cancelImpl(AsyncTask *task) {
     }
   }
 
-  newStatus.traceStatusChanged(task, false);
+  newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
   if (newStatus.getInnermostRecord() == nullptr) {
      // No records, nothing to propagate
      return;

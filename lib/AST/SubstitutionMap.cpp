@@ -267,6 +267,8 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   // If the protocol is invertible, fall back to a global lookup instead of
   // evaluating a conformance path, to avoid an infinite substitution issue.
+  //
+  // FIXME: Figure out a more principled way of breaking this cycle.
   if (proto->getInvertibleProtocolKind())
     return swift::lookupConformance(type.subst(*this), proto);
 
@@ -281,20 +283,6 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   // For each remaining step, project an associated conformance.
   while (iter != path.end()) {
-    // FIXME: Remove this hack. It is unsound, because we may not have diagnosed
-    // anything but still end up with an ErrorType in the AST.
-    if (conformance.isConcrete()) {
-      auto concrete = conformance.getConcrete();
-      if (auto normal = dyn_cast<NormalProtocolConformance>(concrete->getRootConformance())) {
-        if (!normal->hasComputedAssociatedConformances()) {
-          if (proto->getASTContext().evaluator.hasActiveRequest(
-                ResolveTypeWitnessesRequest{normal})) {
-            return ProtocolConformanceRef::forInvalid();
-          }
-        }
-      }
-    }
-
     const auto step = *iter++;
     conformance = conformance.getAssociatedConformance(step.first, step.second);
   }
@@ -304,7 +292,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
 SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfContext() const {
   return subst(MapTypeOutOfContext(),
-               MakeAbstractConformanceForGenericType(),
+               LookUpConformanceInModule(),
                SubstFlags::PreservePackExpansionLevel |
                SubstFlags::SubstitutePrimaryArchetypes);
 }
@@ -324,6 +312,13 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
 
 SubstitutionMap SubstitutionMap::subst(InFlightSubstitution &IFS) const {
   if (empty()) return SubstitutionMap();
+
+  // FIXME: Get this caching working with pack expansions as well.
+  if (IFS.ActivePackExpansions.empty()) {
+    auto found = IFS.SubMaps.find(*this);
+    if (found != IFS.SubMaps.end())
+      return found->second;
+  }
 
   SmallVector<Type, 4> newSubs;
   for (Type type : getReplacementTypes()) {
@@ -345,7 +340,12 @@ SubstitutionMap SubstitutionMap::subst(InFlightSubstitution &IFS) const {
   }
 
   assert(oldConformances.empty());
-  return SubstitutionMap(genericSig, newSubs, newConformances);
+  auto result = SubstitutionMap(genericSig, newSubs, newConformances);
+
+  if (IFS.ActivePackExpansions.empty())
+    (void) IFS.SubMaps.insert(std::make_pair(*this, result));
+
+  return result;
 }
 
 SubstitutionMap
@@ -519,7 +519,6 @@ void SubstitutionMap::verify(bool allowInvalid) const {
           !substType->is<PackElementType>() &&
           !substType->is<ArchetypeType>() &&
           !substType->isTypeVariableOrMember() &&
-          !substType->is<UnresolvedType>() &&
           !substType->is<PlaceholderType>() &&
           !substType->is<ErrorType>()) {
         ABORT([&](auto &out) {
@@ -624,9 +623,23 @@ SubstitutionMap swift::substOpaqueTypesWithUnderlyingTypes(
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
-  return subs.subst(replacer, replacer,
-                    SubstFlags::SubstituteOpaqueArchetypes |
-                    SubstFlags::PreservePackExpansionLevel);
+  InFlightSubstitution IFS(replacer, replacer,
+                           SubstFlags::SubstituteOpaqueArchetypes |
+                           SubstFlags::PreservePackExpansionLevel);
+
+  auto substSubs = subs.subst(IFS);
+
+  if (IFS.wasLimitReached()) {
+    ABORT([&](auto &out) {
+      out << "Possible non-terminating type substitution detected\n\n";
+      out << "Original substitution map:\n";
+      subs.dump(out, SubstitutionMap::DumpStyle::NoConformances);
+      out << "Substituted substitution map:\n";
+      substSubs.dump(out, SubstitutionMap::DumpStyle::NoConformances);
+    });
+  }
+
+  return substSubs;
 }
 
 Type OuterSubstitutions::operator()(SubstitutableType *type) const {

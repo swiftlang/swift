@@ -577,8 +577,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 void SolverTrail::Change::dump(llvm::raw_ostream &out,
                                ConstraintSystem &cs,
                                unsigned indent) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
 
   out.indent(indent);
 
@@ -671,7 +670,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     }
     else {
       out << " to fixed type ";
-      parentOrFixed.get<TypeBase *>()->print(out, PO);
+      cast<TypeBase *>(parentOrFixed)->print(out, PO);
     }
     out << " with options 0x";
     out.write_hex(Options);
@@ -887,8 +886,7 @@ void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
   llvm::set_subtract(removedConstraints, intersects);
 
   // Print out Changes.
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
   out.indent(indent);
   out << "(Changes:\n";
   if (!addedTypeVars.empty()) {
@@ -917,7 +915,7 @@ void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
         }
       }
 
-      if (typeVar->getImpl().ParentOrFixed.is<TypeBase *>())
+      if (isa<TypeBase *>(typeVar->getImpl().ParentOrFixed))
         assignments.push_back(typeVar);
     }
 
@@ -930,7 +928,7 @@ void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
       for (auto *typeVar : assignments) {
         out.indent(indent + 4);
         out << "> $T" << typeVar->getImpl().getID() << " := ";
-        typeVar->getImpl().ParentOrFixed.get<TypeBase *>()->print(out, PO);
+        cast<TypeBase *>(typeVar->getImpl().ParentOrFixed)->print(out, PO);
         out << '\n';
       }
       out.indent(indent + 2);

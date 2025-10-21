@@ -232,7 +232,6 @@ extension ${TYPE} {
   ///   - name: Human readable name of this task.
   % end
   % if HAS_TASK_EXECUTOR:
-  ///   - taskExecutor:
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
   ///      Explicitly passing `nil` as the executor preference is equivalent to
   ///      calling the `${METHOD_NAME}` method without a preference, and effectively
@@ -243,8 +242,6 @@ extension ${TYPE} {
   ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `nil` to inherit the task group's base priority.
   % end
-  ///     Omit this parameter or pass `.unspecified`
-  ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
   % if IS_ADD_UNLESS_CANCELLED:
   /// - Returns: `true` if the child task was added to the group;

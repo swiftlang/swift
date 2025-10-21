@@ -17,16 +17,15 @@ import OptimizerBridging
 @_cdecl("initializeSwiftModules")
 public func initializeSwiftModules() {
   registerAST()
-  registerSILClasses()
+  registerSIL()
   registerSwiftAnalyses()
-  registerUtilities()
   registerSwiftPasses()
   registerOptimizerTests()
 }
 
 private func registerPass(
       _ pass: ModulePass,
-      _ runFn: @escaping (@convention(c) (BridgedPassContext) -> ())) {
+      _ runFn: @escaping (@convention(c) (BridgedContext) -> ())) {
   pass.name._withBridgedStringRef { nameStr in
     SILPassManager_registerModulePass(nameStr, runFn)
   }
@@ -76,6 +75,7 @@ private func registerSwiftPasses() {
   registerPass(booleanLiteralFolding, { booleanLiteralFolding.run($0) })
   registerPass(letPropertyLowering, { letPropertyLowering.run($0) })
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
+  registerPass(constantCapturePropagation, { constantCapturePropagation.run($0) })
   registerPass(computeEscapeEffects, { computeEscapeEffects.run($0) })
   registerPass(computeSideEffects, { computeSideEffects.run($0) })
   registerPass(diagnoseInfiniteRecursion, { diagnoseInfiniteRecursion.run($0) })
@@ -105,14 +105,17 @@ private func registerSwiftPasses() {
   registerPass(tempRValueElimination, { tempRValueElimination.run($0) })
   registerPass(mandatoryTempRValueElimination, { mandatoryTempRValueElimination.run($0) })
   registerPass(tempLValueElimination, { tempLValueElimination.run($0) })
-  registerPass(generalClosureSpecialization, { generalClosureSpecialization.run($0) })
+  registerPass(closureSpecialization, { closureSpecialization.run($0) })
   registerPass(autodiffClosureSpecialization, { autodiffClosureSpecialization.run($0) })
+  registerPass(loopInvariantCodeMotionPass, { loopInvariantCodeMotionPass.run($0) })
 
   // Instruction passes
   registerForSILCombine(BeginBorrowInst.self,      { run(BeginBorrowInst.self, $0) })
   registerForSILCombine(BeginCOWMutationInst.self, { run(BeginCOWMutationInst.self, $0) })
+  registerForSILCombine(BuiltinInst.self,          { run(BuiltinInst.self, $0) })
   registerForSILCombine(FixLifetimeInst.self,      { run(FixLifetimeInst.self, $0) })
   registerForSILCombine(GlobalValueInst.self,      { run(GlobalValueInst.self, $0) })
+  registerForSILCombine(StructInst.self,           { run(StructInst.self, $0) })
   registerForSILCombine(StrongRetainInst.self,     { run(StrongRetainInst.self, $0) })
   registerForSILCombine(StrongReleaseInst.self,    { run(StrongReleaseInst.self, $0) })
   registerForSILCombine(RetainValueInst.self,      { run(RetainValueInst.self, $0) })
@@ -136,6 +139,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(AllocStackInst.self,        { run(AllocStackInst.self, $0) })
   registerForSILCombine(ApplyInst.self,             { run(ApplyInst.self, $0) })
   registerForSILCombine(TryApplyInst.self,          { run(TryApplyInst.self, $0) })
+  registerForSILCombine(EndCOWMutationAddrInst.self, { run(EndCOWMutationAddrInst.self, $0) })
 
   // Test passes
   registerPass(aliasInfoDumper, { aliasInfoDumper.run($0) })
@@ -147,7 +151,6 @@ private func registerSwiftPasses() {
   registerPass(deadEndBlockDumper, { deadEndBlockDumper.run($0) })
   registerPass(memBehaviorDumper, { memBehaviorDumper.run($0) })
   registerPass(rangeDumper, { rangeDumper.run($0) })
-  registerPass(runUnitTests, { runUnitTests.run($0) })
   registerPass(testInstructionIteration, { testInstructionIteration.run($0) })
   registerPass(updateBorrowedFromPass, { updateBorrowedFromPass.run($0) })
 }
@@ -155,9 +158,4 @@ private func registerSwiftPasses() {
 private func registerSwiftAnalyses() {
   AliasAnalysis.register()
   CalleeAnalysis.register()
-}
-
-private func registerUtilities() {
-  registerVerifier()
-  registerPhiUpdater()
 }

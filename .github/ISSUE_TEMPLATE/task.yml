@@ -18,7 +18,7 @@ body:
         This repository hosts the Swift compiler, the Swift standard library,
         the Swift runtime, SourceKit, and IDE support for the Swift language.
         It does *not* track feedback on Xcode and other closed source Apple
-        deeloper software such as SwiftUI and UIKit; please direct it to
+        developer software such as SwiftUI and UIKit; please direct it to
         [Feedback Assistant](https://developer.apple.com/bug-reporting)
         instead.
   - type: textarea

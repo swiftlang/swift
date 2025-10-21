@@ -79,11 +79,13 @@ static llvm::cl::opt<std::string>
                  llvm::cl::desc("Architecture to inspect in the binary"),
                  llvm::cl::Required);
 
-#if SWIFT_OBJC_INTEROP
 static llvm::cl::opt<bool> DisableObjCInterop(
     "no-objc-interop",
-    llvm::cl::desc("Disable Objective-C interoperability support"));
+    llvm::cl::desc("Disable Objective-C interoperability support"
+#if SWIFT_OBJC_INTEROP
+                   " (not supported)"
 #endif
+                   ));
 } // end namespace options
 
 static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,

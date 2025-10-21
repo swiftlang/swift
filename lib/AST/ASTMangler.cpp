@@ -161,6 +161,10 @@ static StringRef getCodeForAccessorKind(AccessorKind kind) {
     return "x";
   case AccessorKind::Read2:
     return "y";
+  case AccessorKind::Borrow:
+    return "b";
+  case AccessorKind::Mutate:
+    return "z";
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -249,6 +253,16 @@ std::string ASTMangler::mangleBackingInitializerEntity(const VarDecl *var,
   llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
   beginMangling();
   appendBackingInitializerEntity(var);
+  appendSymbolKind(SKind);
+  return finalize();
+}
+
+std::string
+ASTMangler::manglePropertyWrappedFieldInitAccessorEntity(const VarDecl *var,
+                                                         SymbolKind SKind) {
+  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
+  beginMangling();
+  appendPropertyWrappedFieldInitAccessorEntity(var);
   appendSymbolKind(SKind);
   return finalize();
 }
@@ -1403,7 +1417,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       llvm_unreachable("Cannot mangle module type yet");
 
     case TypeKind::Error:
-    case TypeKind::Unresolved:
     case TypeKind::Placeholder:
       appendOperator("Xe");
       return;
@@ -1458,6 +1471,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       auto loc = cast<LocatableType>(tybase);
       return appendType(loc->getSinglyDesugaredType(), sig, forDecl);
     }
+    case TypeKind::BuiltinImplicitActor:
+      return appendOperator("BA");
     case TypeKind::BuiltinFixedArray: {
       auto bfa = cast<BuiltinFixedArrayType>(tybase);
       appendType(bfa->getSize(), sig, forDecl);
@@ -1955,7 +1970,11 @@ void ASTMangler::appendFlatGenericArgs(SubstitutionMap subs,
   for (auto replacement : subs.getReplacementTypes()) {
     if (replacement->hasArchetype())
       replacement = replacement->mapTypeOutOfContext();
-    appendType(replacement, sig, forDecl);
+    if (DWARFMangling) {
+      appendType(replacement, sig, forDecl);
+    } else {
+      appendType(replacement->getCanonicalType(), sig, forDecl);
+    }
   }
 }
 
@@ -2268,7 +2287,13 @@ static char getResultConvention(ResultConvention conv) {
     case ResultConvention::UnownedInnerPointer: return 'u';
     case ResultConvention::Autoreleased: return 'a';
     case ResultConvention::Pack: return 'k';
-  }
+    case ResultConvention::GuaranteedAddress:
+      return 'l';
+    case ResultConvention::Guaranteed:
+      return 'g';
+    case ResultConvention::Inout:
+      return 'm';
+    }
   llvm_unreachable("bad result convention");
 }
 
@@ -2533,6 +2558,14 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
   if (auto file = dyn_cast<FileUnit>(decl->getDeclContext())) {
     if (file->getKind() == FileUnitKind::ClangModule ||
         file->getKind() == FileUnitKind::DWARFModule) {
+
+      // Use ClangImporterContext for compatibility aliases to avoid conflicting
+      // with the mangled name of the actual declaration.
+      if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(decl)) {
+        if (aliasDecl->isCompatibilityAlias())
+          return ASTMangler::ClangImporterContext;
+      }
+
       if (decl->getClangDecl())
         return ASTMangler::ObjCContext;
       return ASTMangler::ClangImporterContext;
@@ -2560,6 +2593,8 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
         hasNameForLinkage = !clangDecl->getDeclName().isEmpty();
       if (hasNameForLinkage) {
         auto *clangDC = clangDecl->getDeclContext();
+        while (isa<clang::LinkageSpecDecl>(clangDC))
+          clangDC = clangDC->getParent();
         // In C, "nested" structs, unions, enums, etc. will become siblings:
         //   struct Foo { struct Bar { }; }; -> struct Foo { }; struct Bar { };
         // Whereas in C++, nested records will actually be nested. So if this is
@@ -3018,7 +3053,7 @@ void ASTMangler::appendContextualInverses(const GenericTypeDecl *contextDecl,
   // that we're extending.
 
   // There are no generic parameters in this extension itself.
-  parts.params = std::nullopt;
+  parts.params = {};
 
   // The depth of parameters for this extension is +1 of the extended signature.
   parts.initialParamDepth = sig.getNextDepth();
@@ -3126,6 +3161,13 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
   // Always use Clang names for imported Clang declarations, unless they don't
   // have one.
   auto tryAppendClangName = [this, decl]() -> bool {
+    // We use the Swift name rather than the Clang name for compatibility
+    // aliases since they are ClangImporterContext entities.
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(decl)) {
+      if (aliasDecl->isCompatibilityAlias())
+        return false;
+    }
+
     auto *nominal = dyn_cast<NominalTypeDecl>(decl);
     auto namedDecl = getClangDeclForMangling(decl);
     if (!namedDecl) {
@@ -3389,7 +3431,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
       appendOperator("YA");
     break;
 
-  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+  case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
     appendOperator("YC");
     break;
   }
@@ -3616,7 +3658,7 @@ bool ASTMangler::GenericSignatureParts::hasRequirements() const {
 }
 
 void ASTMangler::GenericSignatureParts::clear() {
-  params = std::nullopt;
+  params = {};
   requirements.clear();
   inverses.clear();
   initialParamDepth = 0;
@@ -4104,6 +4146,14 @@ void ASTMangler::appendBackingInitializerEntity(const VarDecl *var) {
   BaseEntitySignature base(var);
   appendEntity(var, base, "vp", var->isStatic());
   appendOperator("fP");
+}
+
+void ASTMangler::appendPropertyWrappedFieldInitAccessorEntity(
+    const VarDecl *var) {
+  llvm::SaveAndRestore X(AllowInverses, inversesAllowed(var));
+  BaseEntitySignature base(var);
+  appendEntity(var, base, "vp", var->isStatic());
+  appendOperator("fF");
 }
 
 void ASTMangler::appendInitFromProjectedValueEntity(const VarDecl *var) {
@@ -4933,7 +4983,7 @@ void ASTMangler::appendMacroExpansionContext(
       discriminator = expr->getDiscriminator();
       outerExpansionDC = expr->getDeclContext();
     } else {
-      auto decl = cast<MacroExpansionDecl>(parent.get<Decl *>());
+      auto decl = cast<MacroExpansionDecl>(cast<Decl *>(parent));
       outerExpansionLoc = decl->getLoc();
       baseName = decl->getMacroName().getBaseName();
       discriminator = decl->getDiscriminator();
@@ -4948,13 +4998,13 @@ void ASTMangler::appendMacroExpansionContext(
     case GeneratedSourceInfo::Name##MacroExpansion:
 #include "swift/Basic/MacroRoles.def"
   {
-    auto decl = ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode)
-      .get<Decl *>();
+    auto decl =
+        cast<Decl *>(ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode));
     auto attr = generatedSourceInfo->attachedMacroCustomAttr;
     outerExpansionLoc = decl->getLoc();
     outerExpansionDC = decl->getDeclContext();
 
-    if (auto *macroDecl = decl->getResolvedMacro(attr))
+    if (auto *macroDecl = attr->getResolvedMacro())
       baseName = macroDecl->getBaseName();
     else
       baseName = Context.getIdentifier("__unknown_macro__");
@@ -5113,17 +5163,34 @@ namespace {
 /// Stores either a declaration or its enclosing context, for use in mangling
 /// of macro expansion contexts.
 struct DeclOrEnclosingContext: llvm::PointerUnion<const Decl *, const DeclContext *> {
+  using Base = llvm::PointerUnion<const Decl *, const DeclContext *>;
   using PointerUnion::PointerUnion;
 
-  const DeclContext *getEnclosingContext() const {
-    if (auto decl = dyn_cast<const Decl *>()) {
-      return decl->getDeclContext();
-    }
-
-    return get<const DeclContext *>();
-  }
+  const DeclContext *getEnclosingContext() const;
 };
 
+} // namespace
+
+namespace llvm {
+
+using ::DeclOrEnclosingContext;
+
+/// `isa`, `dyn_cast`, `cast` for `DeclOrEnclosingContext`.
+template <typename To>
+struct CastInfo<To, DeclOrEnclosingContext>
+    : CastInfo<To, DeclOrEnclosingContext::Base> {};
+template <typename To>
+struct CastInfo<To, const DeclOrEnclosingContext>
+    : CastInfo<To, const DeclOrEnclosingContext::Base> {};
+
+} // end namespace llvm
+
+const DeclContext *DeclOrEnclosingContext::getEnclosingContext() const {
+  if (auto decl = dyn_cast<const Decl *>()) {
+    return decl->getDeclContext();
+  }
+
+  return cast<const DeclContext *>(*this);
 }
 
 /// Given a declaration, find the declaration or enclosing context that is
@@ -5201,7 +5268,6 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
   // We don't mangle the declaration itself because doing so requires semantic
   // information (e.g., its interface type), which introduces cyclic
   // dependencies.
-  const Decl *attachedTo = decl;
   Identifier attachedToName;
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
     auto storage = accessor->getStorage();
@@ -5231,12 +5297,6 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
     }
 
     appendDeclWithName(storage, attachedToName);
-
-    // For member attribute macros, the attribute is attached to the enclosing
-    // declaration.
-    if (role == MacroRole::MemberAttribute) {
-      attachedTo = storage->getDeclContext()->getAsDecl();
-    }
   } else if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
     // Mangle the name, replacing special names with their user-facing names.
     auto name = valueDecl->getName().getBaseName();
@@ -5248,12 +5308,6 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
     }
 
     appendDeclWithName(valueDecl, attachedToName);
-
-    // For member attribute macros, the attribute is attached to the enclosing
-    // declaration.
-    if (role == MacroRole::MemberAttribute) {
-      attachedTo = decl->getDeclContext()->getAsDecl();
-    }
   } else {
     appendContext(decl->getDeclContext(), nullBase, "");
     appendIdentifier("_");
@@ -5261,7 +5315,7 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
 
   // Determine the name of the macro.
   DeclBaseName macroName;
-  if (auto *macroDecl = attachedTo->getResolvedMacro(attr)) {
+  if (auto *macroDecl = attr->getResolvedMacro()) {
     macroName = macroDecl->getName().getBaseName();
   } else {
     macroName = decl->getASTContext().getIdentifier("__unknown_macro__");

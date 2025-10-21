@@ -451,12 +451,6 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
   auto contextualPattern =
       ContextualPattern::forPatternBindingDecl(binding, entryNumber);
   Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-  if (patternType->hasError()) {
-    swift::setBoundVarsTypeError(pattern, Context);
-    binding->setInvalid();
-    pattern->setType(ErrorType::get(Context));
-    return &pbe;
-  }
 
   llvm::SmallVector<VarDecl *, 2> vars;
   binding->getPattern(entryNumber)->collectVariables(vars);
@@ -516,9 +510,7 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
 
   // If the pattern contains some form of unresolved type, we'll need to
   // check the initializer.
-  if (patternType->hasUnresolvedType() ||
-      patternType->hasPlaceholder() ||
-      patternType->hasUnboundGenericType()) {
+  if (patternType->hasPlaceholder() || patternType->hasUnboundGenericType()) {
     if (TypeChecker::typeCheckPatternBinding(binding, entryNumber,
                                              patternType)) {
       binding->setInvalid();
@@ -591,17 +583,12 @@ static void checkAndContextualizePatternBindingInit(PatternBindingDecl *binding,
                                                     unsigned i) {
   // Force the entry to be checked.
   (void)binding->getCheckedPatternBindingEntry(i);
-  if (binding->isInvalid())
-    return;
 
   if (!binding->isInitialized(i))
     return;
 
   if (!binding->isInitializerChecked(i))
     TypeChecker::typeCheckPatternBinding(binding, i);
-
-  if (binding->isInvalid())
-    return;
 
   // If we entered an initializer context, contextualize any auto-closures we
   // might have created. Note that we don't contextualize the initializer for a
@@ -648,6 +635,9 @@ directAccessorKindForReadImpl(ReadImplKind reader) {
 
   case ReadImplKind::Read2:
     return AccessorKind::Read2;
+
+  case ReadImplKind::Borrow:
+    return AccessorKind::Borrow;
   }
   llvm_unreachable("bad impl kind");
 }
@@ -842,6 +832,9 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
 
   case WriteImplKind::Modify2:
     return storage->getParsedAccessor(AccessorKind::Modify2)->isMutating();
+
+  case WriteImplKind::Mutate:
+    return storage->getParsedAccessor(AccessorKind::Mutate)->isMutating();
   }
   llvm_unreachable("bad storage kind");
 }
@@ -886,6 +879,9 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   }
 
   if (storage->getAccessor(AccessorKind::Read2))
+    return OpaqueReadOwnership::Borrowed;
+
+  if (storage->getAccessor(AccessorKind::Borrow))
     return OpaqueReadOwnership::Borrowed;
 
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
@@ -1063,7 +1059,7 @@ getPropertyWrapperLValueness(VarDecl *var) {
 ///     - Wrapped: \c self._member.wrappedValue
 ///     - Composition: \c self._member.wrappedValue.wrappedValue….wrappedValue
 ///     - Projected: \c self._member.projectedValue
-///     - Enclosed instance: \c Wrapper[_enclosedInstance: self, …]
+///     - Enclosed instance: \c Wrapper[_enclosingInstance: self, …]
 static Expr *buildStorageReference(AccessorDecl *accessor,
                                    AbstractStorageDecl *storage,
                                    TargetImpl target,
@@ -1803,6 +1799,9 @@ synthesizeGetterBody(AccessorDecl *getter, ASTContext &ctx) {
 
   case ReadImplKind::Read2:
     return synthesizeRead2CoroutineGetterBody(getter, ctx);
+
+  case ReadImplKind::Borrow:
+    llvm_unreachable("borrow accessor is not yet implemented");
   }
   llvm_unreachable("bad ReadImplKind");
 }
@@ -2070,6 +2069,9 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
 
   case WriteImplKind::Modify2:
     return synthesizeModify2CoroutineSetterBody(setter, ctx);
+
+  case WriteImplKind::Mutate:
+    llvm_unreachable("synthesizing setter from mutate");
   }
   llvm_unreachable("bad WriteImplKind");
 }
@@ -2283,6 +2285,12 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
 
   case AccessorKind::Init:
     llvm_unreachable("init accessor not yet implemented");
+
+  case AccessorKind::Borrow:
+    llvm_unreachable("borrow accessor is not yet implemented");
+
+  case AccessorKind::Mutate:
+    llvm_unreachable("mutate accessor is not yet implemented");
   }
   llvm_unreachable("bad synthesized function kind");
 }
@@ -2467,6 +2475,8 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
       asAvailableAs.push_back(mod);
     }
     break;
+  case WriteImplKind::Mutate:
+    llvm_unreachable("mutate accessor is not yet implemented");
   }
   
   if (!asAvailableAs.empty()) {
@@ -2794,6 +2804,11 @@ bool RequiresOpaqueModifyCoroutineRequest::evaluate(
     if (protoDecl->isObjC())
       return false;
 
+  // If a mutate accessor is present, we don't need a modify coroutine
+  if (storage->getAccessor(AccessorKind::Mutate)) {
+    return false;
+  }
+
   return true;
 }
 
@@ -2901,8 +2916,11 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
         break;
       }
 
-      // Anything else should not have a synthesized setter.
-      LLVM_FALLTHROUGH;
+      // Anything else we'll synthesize an invalid setter for in
+      // `synthesizeSetterBody`, this happens for cases such as stored
+      // properties defined in extensions or enums, we implicitly treat them as
+      // computed.
+      return false;
     case WriteImplKind::Immutable:
       if (accessor->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
         return false;
@@ -2920,6 +2938,8 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
     case WriteImplKind::Modify:
     case WriteImplKind::Modify2:
       break;
+    case WriteImplKind::Mutate:
+      llvm_unreachable("mutate accessor is not yet implemented");
     }
     break;
 
@@ -2929,12 +2949,15 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   case AccessorKind::Modify2:
   case AccessorKind::Init:
     break;
-
+  case AccessorKind::Borrow:
+    llvm_unreachable("borrow accessor is not yet implemented");
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
     llvm_unreachable("bad synthesized function kind");
+  case AccessorKind::Mutate:
+    llvm_unreachable("mutate accessor is not yet implemented");
   }
 
   switch (storage->getReadWriteImpl()) {
@@ -3126,9 +3149,9 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
   }
 
   if (!isa<ParamDecl>(var))
-    var->getAttrs().add(
-        new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(), SourceRange(),
-                                             /*Implicit=*/true));
+    var->addAttribute(new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(),
+                                                           SourceRange(),
+                                                           /*Implicit=*/true));
   return property;
 }
 
@@ -3819,11 +3842,13 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
       storage->getParsedAccessor(AccessorKind::Read) ||
       storage->getParsedAccessor(AccessorKind::Read2) ||
       storage->getParsedAccessor(AccessorKind::Address) ||
+      storage->getParsedAccessor(AccessorKind::Borrow) ||
       storage->getParsedAccessor(AccessorKind::Set) ||
       storage->getParsedAccessor(AccessorKind::Modify) ||
       storage->getParsedAccessor(AccessorKind::Modify2) ||
       storage->getParsedAccessor(AccessorKind::MutableAddress) ||
-      storage->getParsedAccessor(AccessorKind::Init))
+      storage->getParsedAccessor(AccessorKind::Init) ||
+      storage->getParsedAccessor(AccessorKind::Mutate))
     return false;
 
   // willSet or didSet in an overriding property imply that there is no storage.
@@ -3879,8 +3904,8 @@ void HasStorageRequest::cacheResult(bool hasStorage) const {
 
     if (hasStorage && !abiOnly &&
           !varDecl->getAttrs().hasAttribute<HasStorageAttr>())
-      varDecl->getAttrs().add(new (varDecl->getASTContext())
-                              HasStorageAttr(/*isImplicit=*/true));
+      varDecl->addAttribute(new (varDecl->getASTContext())
+                                HasStorageAttr(/*isImplicit=*/true));
   }
 }
 
@@ -4005,8 +4030,10 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   bool hasModify2 = storage->getParsedAccessor(AccessorKind::Modify2);
   bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
   bool hasInit = storage->getParsedAccessor(AccessorKind::Init);
+  auto *borrow = storage->getParsedAccessor(AccessorKind::Borrow);
+  auto *mutate = storage->getParsedAccessor(AccessorKind::Mutate);
 
-  // 'get', 'read', and a non-mutable addressor are all exclusive.
+  // 'get', 'read', 'borrow' and a non-mutable addressor are all exclusive.
   ReadImplKind readImpl;
   if (storage->getParsedAccessor(AccessorKind::Get)) {
     readImpl = ReadImplKind::Get;
@@ -4016,11 +4043,13 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     readImpl = ReadImplKind::Read;
   } else if (storage->getParsedAccessor(AccessorKind::Address)) {
     readImpl = ReadImplKind::Address;
+  } else if (storage->getParsedAccessor(AccessorKind::Borrow)) {
+    readImpl = ReadImplKind::Borrow;
 
-  // If there's a writing accessor of any sort, there must also be a
-  // reading accessor.
+    // If there's a writing accessor of any sort, there must also be a
+    // reading accessor.
   } else if (hasInit || hasSetter || hasModify || hasModify2 ||
-             hasMutableAddress) {
+             hasMutableAddress || mutate) {
     readImpl = ReadImplKind::Get;
 
   // Subscripts always have to have some sort of accessor; they can't be
@@ -4049,7 +4078,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     readImpl = ReadImplKind::Stored;
   }
 
-  // Prefer using 'set' and 'modify' over a mutable addressor.
+  // Prefer using 'set', 'mutate' and 'modify' over a mutable addressor.
   WriteImplKind writeImpl;
   ReadWriteImplKind readWriteImpl;
   if (hasSetter) {
@@ -4061,6 +4090,9 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     } else {
       readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
     }
+  } else if (mutate) {
+    writeImpl = WriteImplKind::Mutate;
+    readWriteImpl = ReadWriteImplKind::Mutate;
   } else if (hasModify2) {
     writeImpl = WriteImplKind::Modify2;
     readWriteImpl = ReadWriteImplKind::Modify2;
@@ -4099,6 +4131,24 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   } else {
     writeImpl = WriteImplKind::Immutable;
     readWriteImpl = ReadWriteImplKind::Immutable;
+  }
+
+  if (borrow || mutate) {
+    if (auto *extDecl = dyn_cast<ExtensionDecl>(DC)) {
+      auto extNominal = extDecl->getExtendedNominal();
+      if (!isa<StructDecl>(extNominal) && !isa<EnumDecl>(extNominal)) {
+        if (borrow) {
+          storage->getASTContext().Diags.diagnose(
+              borrow->getLoc(), diag::accessor_not_supported_in_decl,
+              "a borrow accessor");
+        }
+        if (mutate) {
+          storage->getASTContext().Diags.diagnose(
+              mutate->getLoc(), diag::accessor_not_supported_in_decl,
+              "a mutate accessor");
+        }
+      }
+    }
   }
 
   StorageImplInfo info(readImpl, writeImpl, readWriteImpl);

@@ -17,6 +17,7 @@
 #include "SwiftToClangInteropContext.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Assertions.h"
@@ -246,7 +247,7 @@ static int compareImportModulesByName(const ImportModuleTy *left,
   if (leftSwiftModule && rightSwiftModule)
     return leftSwiftModule->getName().compare(rightSwiftModule->getName());
 
-  auto *leftClangModule = left->get<const clang::Module *>();
+  auto *leftClangModule = cast<const clang::Module *>(*left);
   assert((isCxx || leftClangModule->isSubModule()) &&
          "top-level modules should use a normal swift::ModuleDecl");
   if (rightSwiftModule) {
@@ -260,7 +261,7 @@ static int compareImportModulesByName(const ImportModuleTy *left,
     return 1;
   }
 
-  auto *rightClangModule = right->get<const clang::Module *>();
+  auto *rightClangModule = cast<const clang::Module *>(*right);
   assert((isCxx || rightClangModule->isSubModule()) &&
          "top-level modules should use a normal swift::ModuleDecl");
 
@@ -518,7 +519,7 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
         }
       }
     } else {
-      const auto *clangModule = import.get<const clang::Module *>();
+      const auto *clangModule = cast<const clang::Module *>(import);
       assert((useCxxImport || clangModule->isSubModule()) &&
              "top-level modules should use a normal swift::ModuleDecl");
       out << importDirective << ' ';
@@ -615,12 +616,13 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   SwiftToClangInteropContext interopContext(*M, irGenOpts);
   writePrologue(os, M->getASTContext(), computeMacroGuard(M));
 
-  // C content (@cdecl)
+  // C content (@c)
   std::string moduleContentsScratch;
   if (M->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
     SmallPtrSet<ImportModuleTy, 8> imports;
     llvm::raw_string_ostream cModuleContents{moduleContentsScratch};
-    printModuleContentsAsC(cModuleContents, imports, *M, interopContext);
+    printModuleContentsAsC(cModuleContents, imports, *M, interopContext,
+                           frontendOpts.ClangHeaderMinAccess);
 
     llvm::StringMap<StringRef> exposedModuleHeaderNames;
     writeImports(os, imports, *M, bridgingHeader, frontendOpts,
@@ -634,7 +636,8 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   // Objective-C content
   SmallPtrSet<ImportModuleTy, 8> imports;
   llvm::raw_string_ostream objcModuleContents{moduleContentsScratch};
-  printModuleContentsAsObjC(objcModuleContents, imports, *M, interopContext);
+  printModuleContentsAsObjC(objcModuleContents, imports, *M, interopContext,
+                            frontendOpts.ClangHeaderMinAccess);
   emitObjCConditional(os, [&] {
     llvm::StringMap<StringRef> exposedModuleHeaderNames;
     writeImports(os, imports, *M, bridgingHeader, frontendOpts,
@@ -685,6 +688,7 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
     llvm::raw_string_ostream moduleContents{moduleContentsBuf};
     auto deps = printModuleContentsAsCxx(
         moduleContents, *M, interopContext,
+        frontendOpts.ClangHeaderMinAccess.value_or(AccessLevel::Public),
         /*requiresExposedAttribute=*/requiresExplicitExpose, exposedModules);
     // FIXME: In ObjC++ mode, we do not need to reimport duplicate modules.
     llvm::StringMap<StringRef> exposedModuleHeaderNames;
@@ -701,9 +705,10 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
       auto macroGuard = computeMacroGuard(M->getASTContext().getStdlibModule());
       os << "#ifndef " << macroGuard << "\n";
       os << "#define " << macroGuard << "\n";
-      printModuleContentsAsCxx(
-          os, *M->getASTContext().getStdlibModule(), interopContext,
-          /*requiresExposedAttribute=*/true, exposedModules);
+      printModuleContentsAsCxx(os, *M->getASTContext().getStdlibModule(),
+                               interopContext, AccessLevel::Public,
+                               /*requiresExposedAttribute=*/true,
+                               exposedModules);
       os << "#endif // " << macroGuard << "\n";
     }
 

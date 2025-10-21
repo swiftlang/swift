@@ -142,24 +142,20 @@ public:
   public:
     /*implicit*/ Serialized(serialization::BitOffset offset) : Value(offset) {}
 
-    bool isComplete() const {
-      return Value.template is<T>();
-    }
+    bool isComplete() const { return isa<T>(Value); }
 
-    T get() const {
-      return Value.template get<T>();
-    }
+    T get() const { return cast<T>(Value); }
 
     /*implicit*/ operator T() const {
       return get();
     }
 
     /*implicit*/ operator serialization::BitOffset() const {
-      return Value.template get<serialization::BitOffset>();
+      return cast<serialization::BitOffset>(Value);
     }
 
     /*implicit*/ operator RawBitOffset() const {
-      return Value.template get<serialization::BitOffset>();
+      return cast<serialization::BitOffset>(Value);
     }
 
     Serialized &operator=(T deserialized) {
@@ -713,6 +709,9 @@ public:
 
   /// \c true if this module was built with strict memory safety.
   bool strictMemorySafety() const { return Core->strictMemorySafety(); }
+
+  /// \c true if this module uses deferred code generation.
+  bool deferredCodeGen() const { return Core->deferredCodeGen(); }
 
   /// Associates this module file with the AST node representing it.
   ///

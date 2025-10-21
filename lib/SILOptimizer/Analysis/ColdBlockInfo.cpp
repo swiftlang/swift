@@ -441,7 +441,7 @@ bool ColdBlockInfo::isCold(const SILBasicBlock *BB) const {
 }
 
 void ColdBlockInfo::resetToCold(const SILBasicBlock *BB) {
-  auto &entry = EnergyMap.getOrInsertDefault(BB);
+  auto &entry = EnergyMap[BB];
   if (isColdEnergy(entry))
     return;
 
@@ -451,7 +451,7 @@ void ColdBlockInfo::resetToCold(const SILBasicBlock *BB) {
 }
 
 void ColdBlockInfo::set(const SILBasicBlock *BB, State::Temperature temp) {
-  auto &entry = EnergyMap.getOrInsertDefault(BB);
+  auto &entry = EnergyMap[BB];
   if (entry.contains(temp))
     return;
 

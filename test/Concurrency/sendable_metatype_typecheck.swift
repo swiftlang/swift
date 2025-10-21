@@ -21,7 +21,7 @@ func testSendableExistential() {
 nonisolated func acceptMeta<T>(_: T.Type) { }
 
 nonisolated func staticCallThroughMetaVal<T: Q>(_: T.Type) {
-  let x = T.self // expected-warning{{capture of non-Sendable type 'T.Type' in an isolated closure}}
+  let x = T.self
   Task.detached {
     x.g() // expected-warning{{capture of non-Sendable type 'T.Type' in an isolated closure}}
   }
@@ -35,7 +35,7 @@ nonisolated func captureThroughMetaValMoReqs<T>(_: T.Type) {
 }
 
 nonisolated func passMetaVal<T: Q>(_: T.Type) {
-  let x = T.self // expected-warning{{capture of non-Sendable type 'T.Type' in an isolated closure}}
+  let x = T.self
   Task.detached {
     acceptMeta(x) // expected-warning{{capture of non-Sendable type}}
   }
@@ -185,6 +185,23 @@ func f<T: P>(_: T.Type) {
   acceptClosure {
     Task {
       _ = T.self // okay to capture T.Type in this closure.
+    }
+  }
+}
+
+func sendableSequence<S: AsyncSequence & Sendable>(_ s: S) throws {
+  Task.detached {
+    for try await i in s {
+      print(i)
+    }
+  }
+}
+
+func nonSendableSequence<S: AsyncSequence>(_ s: S) throws {
+  Task.detached {
+    for try await i in s { // expected-warning{{capture of non-Sendable type 'S.AsyncIterator.Type' in an isolated closure}}
+      // expected-warning@-1{{capture of non-Sendable type 'S.Type' in an isolated closure}}
+      print(i)
     }
   }
 }

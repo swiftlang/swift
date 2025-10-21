@@ -43,10 +43,8 @@ using llvm::SmallVectorImpl;
 /// Create a SILCloner for Existential Specilizer.
 namespace {
 class ExistentialSpecializerCloner
-    : public TypeSubstCloner<ExistentialSpecializerCloner,
-                             SILOptFunctionBuilder> {
-  using SuperTy =
-      TypeSubstCloner<ExistentialSpecializerCloner, SILOptFunctionBuilder>;
+    : public TypeSubstCloner<ExistentialSpecializerCloner> {
+  using SuperTy = TypeSubstCloner<ExistentialSpecializerCloner>;
   friend class SILInstructionVisitor<ExistentialSpecializerCloner>;
   friend class SILCloner<ExistentialSpecializerCloner>;
 
@@ -383,7 +381,7 @@ void ExistentialTransform::populateThunkBody() {
   SILModule &M = F->getModule();
 
   F->setThunk(IsSignatureOptimizedThunk);
-  F->setInlineStrategy(AlwaysInline);
+  F->setInlineStrategy(HeuristicAlwaysInline);
 
   /// Remove original body of F.
   for (auto It = F->begin(), End = F->end(); It != End;) {
@@ -445,7 +443,7 @@ void ExistentialTransform::populateThunkBody() {
       switch (ExistentialRepr) {
       case ExistentialRepresentation::Opaque: {
         archetypeValue = Builder.createOpenExistentialAddr(
-            Loc, OrigOperand, OpenedSILType, it->second.AccessType);
+            Loc, OrigOperand, OpenedSILType.getAddressType(), it->second.AccessType);
         SILValue calleeArg = archetypeValue;
         if (OriginallyConsumed) {
           // open_existential_addr projects a borrowed address into the
@@ -535,7 +533,7 @@ void ExistentialTransform::populateThunkBody() {
           return type;
         }
       },
-      MakeAbstractConformanceForGenericType());
+      LookUpConformanceInModule());
 
   /// Perform the substitutions.
   auto SubstCalleeType = GenCalleeType->substGenericArgs(

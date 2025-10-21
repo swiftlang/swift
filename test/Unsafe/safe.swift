@@ -98,6 +98,8 @@ func testUnsafeAsSequenceForEach() {
   for _ in unsafe uas { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }}
 
   for unsafe _ in unsafe uas { } // okay
+
+  for unsafe _ in [1, 2, 3] { } // expected-warning{{no unsafe operations occur within 'unsafe' for-in loop}}
 }
 
 func testForInUnsafeAmbiguity(_ integers: [Int]) {
@@ -381,4 +383,12 @@ func testInterpolation(ptr: UnsafePointer<Int>) {
   _ = "Hello \(unsafe ptr)" // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
   // expected-note@-1{{reference to unsafe type 'UnsafePointer<Int>'}}
   // expected-note@-2{{argument #0 in call to instance method 'appendInterpolation' has unsafe type 'UnsafePointer<Int>'}}
+  // expected-note@-3{{reference to instance method 'appendInterpolation' involves unsafe type 'UnsafePointer<Int>'}}
+}
+
+func superDuperUnsafe(_ bytes: UnsafeRawBufferPointer) {
+  // expected-warning@+1{{no unsafe operations occur within 'unsafe' expression}}
+  let byte = unsafe unsafe bytes.first ?? 0
+  _ = byte
+  _ = unsafe bytes.first ?? 0
 }

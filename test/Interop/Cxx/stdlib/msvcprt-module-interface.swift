@@ -15,8 +15,9 @@
 // CHECK-STRING:   struct basic_string<CChar, std.char_traits<CChar>, std.allocator<CChar>> : CxxRandomAccessCollection {
 // CHECK-STRING:     typealias value_type = CChar
 // CHECK-STRING:   }
-// CHECK-STRING:   struct basic_string<CWideChar, std.char_traits<CWideChar>, std.allocator<CWideChar>> : CxxRandomAccessCollection {
-// CHECK-STRING:     typealias value_type = CWideChar
+// CHECK-STRING:   struct basic_string<CChar16, std.char_traits<CChar16>, std.allocator<CChar16>> : CxxRandomAccessCollection {
+// CHECK-STRING:     typealias value_type = UInt16
+// FIXME: why the value type is different from CChar16?
 // CHECK-STRING:   }
 // CHECK-STRING:   typealias string = std.basic_string<CChar, std.char_traits<CChar>, std.allocator<CChar>>
 // CHECK-STRING:   typealias wstring = std.basic_string<CWideChar, std.char_traits<CWideChar>, std.allocator<CWideChar>>

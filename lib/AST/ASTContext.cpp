@@ -425,6 +425,13 @@ struct ASTContext::Implementation {
   ///  -> Builtin.Int1
   FuncDecl *IsOSVersionAtLeastOrVariantVersionAtLeastDecl = nullptr;
 
+  /// func _isSwiftRuntimeVersionAtLeast(
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.word)
+  ///  -> Builtin.Int1
+  FuncDecl *IsSwiftRuntimeVersionAtLeastDecl = nullptr;
+
   /// The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
@@ -567,6 +574,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, ExistentialType *> ExistentialTypes;
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
+    llvm::FoldingSet<BuiltinFixedArrayType> BuiltinFixedArrayTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
     llvm::FoldingSet<ParameterizedProtocolType> ParameterizedProtocolTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
@@ -632,7 +640,6 @@ struct ASTContext::Implementation {
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> BuiltinIntegerTypes;
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
-  llvm::FoldingSet<BuiltinFixedArrayType> BuiltinFixedArrayTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, GenericEnvironment *> OpenedElementEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
@@ -808,10 +815,8 @@ ASTContext::ASTContext(
       StdlibModuleName(getIdentifier(STDLIB_NAME)),
       SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
       blockListConfig(SourceMgr),
-      TheErrorType(new(*this, AllocationArena::Permanent) ErrorType(
-          *this, Type(), RecursiveTypeProperties::HasError)),
-      TheUnresolvedType(new(*this, AllocationArena::Permanent)
-                            UnresolvedType(*this)),
+      TheErrorType(new (*this, AllocationArena::Permanent)
+                       ErrorType(*this, Type())),
       TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
       TheEmptyPackType(PackType::get(*this, {})),
       TheAnyType(ProtocolCompositionType::theAnyType(*this)),
@@ -839,6 +844,12 @@ ASTContext::ASTContext(
   // Initialize all of the known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Id_##Name = getIdentifier(IdStr);
 #include "swift/AST/KnownIdentifiers.def"
+
+  Identifier stdlibOverlayNames[] = {
+    Id_Concurrency,
+    Id_StringProcessing
+  };
+  StdlibOverlayNames = AllocateCopy(stdlibOverlayNames);
 
   // Record the initial set of search paths.
   for (const auto &path : SearchPathOpts.getImportSearchPaths())
@@ -1412,7 +1423,7 @@ ASTContext::synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const {
   protocol->setImplicit(true);
 
   // @_marker
-  protocol->getAttrs().add(new (*this) MarkerAttr(/*implicit=*/true));
+  protocol->addAttribute(new (*this) MarkerAttr(/*implicit=*/true));
 
   // public
   protocol->setAccess(AccessLevel::Public);
@@ -1930,7 +1941,7 @@ FuncDecl *ASTContext::getIsVariantOSVersionAtLeastDecl() const {
 }
 
 FuncDecl *ASTContext::getIsOSVersionAtLeastOrVariantVersionAtLeast() const {
-if (getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl)
+  if (getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl)
     return getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl;
 
   auto decl = findLibraryIntrinsic(*this,
@@ -1939,6 +1950,18 @@ if (getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl)
     return nullptr;
 
   getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getIsSwiftRuntimeVersionAtLeast() const {
+  if (getImpl().IsSwiftRuntimeVersionAtLeastDecl)
+    return getImpl().IsSwiftRuntimeVersionAtLeastDecl;
+
+  auto decl = findLibraryIntrinsic(*this, "_isSwiftRuntimeVersionAtLeast");
+  if (!decl)
+    return nullptr;
+
+  getImpl().IsSwiftRuntimeVersionAtLeastDecl = decl;
   return decl;
 }
 
@@ -2380,16 +2403,35 @@ void ASTContext::addLoadedModule(ModuleDecl *M) {
   // For example, if '-module-alias Foo=Bar' is passed in to the frontend,
   // and a source file has 'import Foo', a module called Bar (real name)
   // will be loaded and added to the map.
-  getImpl().LoadedModules[M->getRealName()] = M;
+
+  auto RealName = M->getRealName();
+  auto ABIName = M->getABIName();
+
+  auto &LoadedModules = getImpl().LoadedModules;
+  auto &NameToModules = getImpl().NameToModules;
+
+  // If a module with the same name has been loaded before, remove it from the
+  // list of modules that share the same name.
+  if (auto *current = LoadedModules.lookup(RealName)) {
+    auto isCurrentModule = [&](ModuleDecl *module) {
+      return module == current;
+    };
+    llvm::erase_if(NameToModules[RealName], isCurrentModule);
+
+    if (RealName != ABIName)
+      llvm::erase_if(NameToModules[ABIName], isCurrentModule);
+  }
+
+  LoadedModules[RealName] = M;
 
   // Add the module to the mapping from module name to list of modules that
   // share that name.
-  getImpl().NameToModules[M->getRealName()].push_back(M);
+  NameToModules[RealName].push_back(M);
 
   // If the ABI name differs from the real name, also add the module to the list
   // that share that ABI name.
-  if (M->getRealName() != M->getABIName())
-    getImpl().NameToModules[M->getABIName()].push_back(M);
+  if (RealName != ABIName)
+    NameToModules[ABIName].push_back(M);
 }
 
 void ASTContext::removeLoadedModule(Identifier RealName) {
@@ -2499,8 +2541,7 @@ void OverriddenDeclsRequest::cacheResult(
 
   // Record the overrides in the context.
   auto &ctx = decl->getASTContext();
-  auto overriddenCopy =
-    ctx.AllocateCopy(value.operator ArrayRef<ValueDecl *>());
+  auto overriddenCopy = ctx.AllocateCopy(ArrayRef<ValueDecl *>(value));
   (void)ctx.getImpl().Overrides.insert({decl, overriddenCopy});
 }
 
@@ -2617,7 +2658,7 @@ void ASTContext::addSucceededCanImportModule(
 
 bool ASTContext::canImportModuleImpl(
     ImportPath::Module ModuleName, SourceLoc loc, llvm::VersionTuple version,
-    bool underlyingVersion, bool isSourceCanImport,
+    bool isUnderlyingVersion, bool isSourceCanImport,
     llvm::VersionTuple &foundVersion,
     llvm::VersionTuple &foundUnderlyingClangVersion) const {
   SmallString<64> FullModuleName;
@@ -2629,16 +2670,16 @@ bool ASTContext::canImportModuleImpl(
     return false;
 
   auto missingVersion = [this, &loc, &ModuleName,
-                                 &underlyingVersion]() -> bool {
+                         &isUnderlyingVersion]() -> bool {
     // The module version could not be parsed from the preferred source for
-    // this query. Diagnose and return `true` to indicate that the unversioned module
-    // will satisfy the query.
+    // this query. Diagnose and return `true` to indicate that the unversioned
+    // module will satisfy the query.
     auto mID = ModuleName[0];
     auto diagLoc = mID.Loc;
     if (mID.Loc.isInvalid())
       diagLoc = loc;
-    Diags.diagnose(diagLoc, diag::cannot_find_project_version, mID.Item.str(),
-                   underlyingVersion);
+    Diags.diagnose(diagLoc, diag::cannot_find_module_version, mID.Item.str(),
+                   isUnderlyingVersion);
     return true;
   };
 
@@ -2650,9 +2691,9 @@ bool ASTContext::canImportModuleImpl(
     if (version.empty())
       return true;
 
-    const auto &foundComparisonVersion = underlyingVersion
-                                      ? Found->second.UnderlyingVersion
-                                      : Found->second.Version;
+    const auto &foundComparisonVersion = isUnderlyingVersion
+                                             ? Found->second.UnderlyingVersion
+                                             : Found->second.Version;
     if (!foundComparisonVersion.empty())
       return version <= foundComparisonVersion;
     else
@@ -2699,10 +2740,10 @@ bool ASTContext::canImportModuleImpl(
         bestUnderlyingVersionInfo = versionInfo;
     }
 
-    if (!underlyingVersion && !bestVersionInfo.isValid())
+    if (!isUnderlyingVersion && !bestVersionInfo.isValid())
       return false;
 
-    if (underlyingVersion && !bestUnderlyingVersionInfo.isValid())
+    if (isUnderlyingVersion && !bestUnderlyingVersionInfo.isValid())
       return false;
 
     foundVersion = bestVersionInfo.getVersion();
@@ -2751,7 +2792,8 @@ bool ASTContext::canImportModuleImpl(
   if (!lookupVersionedModule(versionInfo, underlyingVersionInfo))
     return false;
 
-  const auto &queryVersion = underlyingVersion ? underlyingVersionInfo : versionInfo;
+  const auto &queryVersion =
+      isUnderlyingVersion ? underlyingVersionInfo : versionInfo;
   if (queryVersion.getVersion().empty())
     return missingVersion();
 
@@ -3453,7 +3495,7 @@ TypeAliasType::TypeAliasType(TypeAliasDecl *typealias, Type parent,
   // Record the parent (or absence of a parent).
   if (parent) {
     Bits.TypeAliasType.HasParent = true;
-    *getTrailingObjects<Type>() = parent;
+    *getTrailingObjects() = parent;
   } else {
     Bits.TypeAliasType.HasParent = false;
   }
@@ -3466,8 +3508,7 @@ TypeAliasType::TypeAliasType(TypeAliasDecl *typealias, Type parent,
     ASSERT(params->size() == count);
     Bits.TypeAliasType.GenericArgCount = count;
     std::uninitialized_copy(genericArgs.begin(), genericArgs.end(),
-                            getTrailingObjects<Type>() +
-                            (parent ? 1 : 0));
+                            getTrailingObjects() + (parent ? 1 : 0));
   } else {
     ASSERT(params == nullptr);
     Bits.TypeAliasType.GenericArgCount = 0;
@@ -3585,13 +3626,9 @@ static Type replacingTypeVariablesAndPlaceholders(Type ty) {
     if (!ty->hasTypeVariableOrPlaceholder())
       return ty;
 
-    // Match the logic in `Solution::simplifyType` and use UnresolvedType.
-    // FIXME: Ideally we'd get rid of UnresolvedType and just use a fresh
-    // PlaceholderType, but we don't currently support placeholders with no
-    // originators.
     auto *typePtr = ty.getPointer();
     if (isa<TypeVariableType>(typePtr) || isa<PlaceholderType>(typePtr))
-      return ctx.TheUnresolvedType;
+      return ErrorType::get(ctx);
 
     return std::nullopt;
   });
@@ -3600,8 +3637,11 @@ static Type replacingTypeVariablesAndPlaceholders(Type ty) {
 Type ErrorType::get(Type originalType) {
   // The original type is only used for printing/debugging, and we don't support
   // solver-allocated ErrorTypes. As such, fold any type variables and
-  // placeholders into UnresolvedTypes, which print as placeholders.
+  // placeholders into ErrorTypes. If we have a top-level one, we can return
+  // that directly.
   originalType = replacingTypeVariablesAndPlaceholders(originalType);
+  if (isa<ErrorType>(originalType.getPointer()))
+    return originalType;
 
   ASSERT(originalType);
   ASSERT(!originalType->getRecursiveProperties().isSolverAllocated() &&
@@ -3616,8 +3656,7 @@ Type ErrorType::get(Type originalType) {
 
   void *mem = ctx.Allocate(sizeof(ErrorType) + sizeof(Type),
                            alignof(ErrorType), arena);
-  return entry = new (mem) ErrorType(ctx, originalType,
-                                     RecursiveTypeProperties::HasError);
+  return entry = new (mem) ErrorType(ctx, originalType);
 }
 
 void ErrorUnionType::Profile(llvm::FoldingSetNodeID &id, ArrayRef<Type> terms) {
@@ -3673,6 +3712,9 @@ Type PlaceholderType::get(ASTContext &ctx, Originator originator) {
 
     if (auto *depTy = originator.dyn_cast<DependentMemberType *>())
       return depTy->getRecursiveProperties();
+
+    if (auto *errTy = originator.dyn_cast<ErrorType *>())
+      return errTy->getRecursiveProperties();
 
     return RecursiveTypeProperties();
   }();
@@ -3737,20 +3779,26 @@ BuiltinUnboundGenericType::get(TypeKind genericTypeKind,
 
 BuiltinFixedArrayType *BuiltinFixedArrayType::get(CanType Size,
                                                   CanType ElementType) {
+  RecursiveTypeProperties properties;
+  properties |= Size->getRecursiveProperties();
+  properties |= ElementType->getRecursiveProperties();
+
+  AllocationArena arena = getArena(properties);
+
   llvm::FoldingSetNodeID id;
   BuiltinFixedArrayType::Profile(id, Size, ElementType);
-  auto &context = Size->getASTContext();
+  auto &ctx = Size->getASTContext();
 
   void *insertPos;
-  if (BuiltinFixedArrayType *vecType
-        = context.getImpl().BuiltinFixedArrayTypes
+  if (BuiltinFixedArrayType *faTy
+        = ctx.getImpl().getArena(arena).BuiltinFixedArrayTypes
                  .FindNodeOrInsertPos(id, insertPos))
-    return vecType;
+    return faTy;
 
   BuiltinFixedArrayType *faTy
-    = new (context, AllocationArena::Permanent)
-        BuiltinFixedArrayType(Size, ElementType);
-  context.getImpl().BuiltinFixedArrayTypes.InsertNode(faTy, insertPos);
+    = new (ctx, arena) BuiltinFixedArrayType(Size, ElementType, properties);
+  ctx.getImpl().getArena(arena).BuiltinFixedArrayTypes
+      .InsertNode(faTy, insertPos);
   return faTy;
 }
 
@@ -4069,7 +4117,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // Methods returning 'Self' have a dynamic 'self'.
     //
     // FIXME: All methods of non-final classes should have this.
-    else if (wantDynamicSelf && FD->hasDynamicSelfResult())
+    else if (wantDynamicSelf && FD->getResultInterfaceType()->hasDynamicSelfType())
       isDynamicSelf = true;
 
   } else if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
@@ -4657,6 +4705,8 @@ isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 // For now, generic function types cannot be dependent (in fact,
 // they erase dependence) or contain type variables, and they're
 // always materializable.
+// FIXME: This doesn't seem great, we should consider changing it to be opt-out
+// rather than opt-in.
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result, Type globalActor,
@@ -4665,34 +4715,25 @@ getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
-  for (auto param : params) {
-    if (param.getPlainType()->getRecursiveProperties().hasError())
-      properties |= RecursiveTypeProperties::HasError;
-    if (param.getPlainType()->getRecursiveProperties().isUnsafe())
-      properties |= RecursiveTypeProperties::IsUnsafe;
-  }
+  using Prop = RecursiveTypeProperties::Property;
+  auto mask = (unsigned)Prop::HasError | Prop::IsUnsafe | Prop::HasPlaceholder;
+
+  auto unionBits = [&](Type ty) {
+    if (!ty)
+      return;
+    auto bits = ty->getRecursiveProperties().getBits();
+    properties |= Prop(bits & mask);
+  };
+
+  for (auto param : params)
+    unionBits(param.getPlainType());
 
   if (result->getRecursiveProperties().hasDynamicSelf())
     properties |= RecursiveTypeProperties::HasDynamicSelf;
-  if (result->getRecursiveProperties().hasError())
-    properties |= RecursiveTypeProperties::HasError;
-  if (result->getRecursiveProperties().isUnsafe())
-    properties |= RecursiveTypeProperties::IsUnsafe;
-  
-  if (globalActor) {
-    if (globalActor->getRecursiveProperties().hasError())
-      properties |= RecursiveTypeProperties::HasError;
-    if (globalActor->getRecursiveProperties().isUnsafe())
-      properties |= RecursiveTypeProperties::IsUnsafe;
-  }
 
-  if (thrownError) {
-    if (thrownError->getRecursiveProperties().hasError())
-      properties |= RecursiveTypeProperties::HasError;
-    if (thrownError->getRecursiveProperties().isUnsafe())
-      properties |= RecursiveTypeProperties::IsUnsafe;
-  }
-
+  unionBits(result);
+  unionBits(globalActor);
+  unionBits(thrownError);
   return properties;
 }
 
@@ -5344,8 +5385,13 @@ SILFunctionType::SILFunctionType(
              "Cannot return an @noescape function type");
     }
   }
+  bool hasIsolatedParameter = false; (void) hasIsolatedParameter;
   for (auto param : getParameters()) {
-    (void)param;
+    if (param.hasOption(SILParameterInfo::Isolated)) {
+      assert(!hasIsolatedParameter &&
+             "building SIL function type with multiple isolated parameters");
+      hasIsolatedParameter = true;
+    }
     assert(!isa<PackExpansionType>(param.getInterfaceType()) &&
            "Cannot have a pack expansion directly as a parameter");
     assert(param.isPack() == isa<SILPackType>(param.getInterfaceType()) &&
@@ -5700,7 +5746,8 @@ OpaqueTypeArchetypeType *OpaqueTypeArchetypeType::getNew(
   ASTContext &ctx = interfaceType->getASTContext();
   auto mem = ctx.Allocate(size, alignof(OpaqueTypeArchetypeType), arena);
   return ::new (mem)
-      OpaqueTypeArchetypeType(environment, properties, interfaceType,
+      OpaqueTypeArchetypeType(environment->isCanonical() ? &ctx : nullptr,
+                              environment, properties, interfaceType,
                               conformsTo, superclass, layout);
 }
 
@@ -5728,6 +5775,7 @@ CanTypeWrapper<ExistentialArchetypeType> ExistentialArchetypeType::getNew(
   void *mem = ctx.Allocate(size, alignof(ExistentialArchetypeType), arena);
 
   return CanExistentialArchetypeType(::new (mem) ExistentialArchetypeType(
+      environment->isCanonical() ? &ctx : nullptr,
       environment, interfaceType, conformsTo, superclass, layout,
       properties));
 }
@@ -5831,7 +5879,7 @@ ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
   case TypeKind::GenericTypeParam:
   case TypeKind::TypeVariable:
   case TypeKind::DependentMember:
-  case TypeKind::Unresolved:
+  case TypeKind::Error:
   case TypeKind::Placeholder:
   case TypeKind::PrimaryArchetype:
   case TypeKind::PackArchetype:
@@ -5889,9 +5937,8 @@ const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
       ctx.Allocate(storageToAlloc, alignof(AvailabilityContext::Storage));
   auto *newNode = ::new (mem) AvailabilityContext::Storage(
       platformRange, isDeprecated, domainInfos.size());
-  std::uninitialized_copy(
-      domainInfos.begin(), domainInfos.end(),
-      newNode->getTrailingObjects<AvailabilityContext::DomainInfo>());
+  std::uninitialized_copy(domainInfos.begin(), domainInfos.end(),
+                          newNode->getTrailingObjects());
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
@@ -5899,7 +5946,8 @@ const AvailabilityContext::Storage *AvailabilityContext::Storage::get(
 
 const CustomAvailabilityDomain *
 CustomAvailabilityDomain::get(StringRef name, Kind kind, ModuleDecl *mod,
-                              Decl *decl, const ASTContext &ctx) {
+                              ValueDecl *decl, FuncDecl *predicateFunc,
+                              const ASTContext &ctx) {
   auto identifier = ctx.getIdentifier(name);
   llvm::FoldingSetNodeID id;
   CustomAvailabilityDomain::Profile(id, identifier, mod);
@@ -5912,8 +5960,8 @@ CustomAvailabilityDomain::get(StringRef name, Kind kind, ModuleDecl *mod,
 
   void *mem = ctx.Allocate(sizeof(CustomAvailabilityDomain),
                            alignof(CustomAvailabilityDomain));
-  auto *newNode =
-      ::new (mem) CustomAvailabilityDomain(identifier, kind, mod, decl);
+  auto *newNode = ::new (mem)
+      CustomAvailabilityDomain(identifier, kind, mod, decl, predicateFunc);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;
@@ -5976,6 +6024,25 @@ GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
   return newSig;
 }
 
+GenericSignature
+GenericSignature::forInvalid(ArrayRef<GenericTypeParamType *> params) {
+  ASSERT(!params.empty());
+  auto &ctx = params.front()->getASTContext();
+
+  // Add same type requirements that make each of the generic parameters
+  // concrete error types. This helps avoid downstream diagnostics and is
+  // handled the same as if the user wrote e.g `<T where T == Undefined>`.
+  SmallVector<Requirement, 2> requirements;
+  for (auto *param : params) {
+    if (param->isValue())
+      continue;
+
+    requirements.emplace_back(RequirementKind::SameType, param,
+                              ErrorType::get(ctx));
+  }
+  return GenericSignature::get(params, requirements);
+}
+
 GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
   auto &ctx = signature->getASTContext();
 
@@ -5983,8 +6050,8 @@ GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
   unsigned numGenericParams = signature.getGenericParams().size();
   size_t bytes = totalSizeToAlloc<SubstitutionMap,
                                   OpaqueEnvironmentData,
-                                  OpenedExistentialEnvironmentData,
-                                  OpenedElementEnvironmentData, Type>(
+                                  ExistentialEnvironmentData,
+                                  ElementEnvironmentData, Type>(
       0, 0, 0, 0, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   return new (mem) GenericEnvironment(signature);
@@ -5994,11 +6061,6 @@ GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
 /// outer substitutions.
 GenericEnvironment *GenericEnvironment::forOpaqueType(
     OpaqueTypeDecl *opaque, SubstitutionMap subs) {
-  // TODO: We could attempt to preserve type sugar in the substitution map.
-  // Currently archetypes are assumed to be always canonical in many places,
-  // though, so doing so would require fixing those places.
-  subs = subs.getCanonical();
-
   auto &ctx = opaque->getASTContext();
 
   auto properties = ArchetypeType::archetypeProperties(
@@ -6013,9 +6075,9 @@ GenericEnvironment *GenericEnvironment::forOpaqueType(
     auto signature = opaque->getOpaqueInterfaceGenericSignature();
     unsigned numGenericParams = signature.getGenericParams().size();
     size_t bytes = totalSizeToAlloc<SubstitutionMap,
-                                  OpaqueEnvironmentData,
-                                    OpenedExistentialEnvironmentData,
-                                    OpenedElementEnvironmentData, Type>(
+                                    OpaqueEnvironmentData,
+                                    ExistentialEnvironmentData,
+                                    ElementEnvironmentData, Type>(
         1, 1, 0, 0, numGenericParams);
     void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment), arena);
     env = new (mem) GenericEnvironment(signature, opaque, subs);
@@ -6077,8 +6139,8 @@ GenericEnvironment::forOpenedExistential(
   unsigned numGenericParams = signature.getGenericParams().size();
   size_t bytes = totalSizeToAlloc<SubstitutionMap,
                                   OpaqueEnvironmentData,
-                                  OpenedExistentialEnvironmentData,
-                                  OpenedElementEnvironmentData, Type>(
+                                  ExistentialEnvironmentData,
+                                  ElementEnvironmentData, Type>(
       1, 0, 1, 0, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   auto *genericEnv =
@@ -6115,8 +6177,8 @@ GenericEnvironment::forOpenedElement(GenericSignature signature,
   unsigned numOpenedParams = signature.getInnermostGenericParams().size();
   size_t bytes = totalSizeToAlloc<SubstitutionMap,
                                   OpaqueEnvironmentData,
-                                  OpenedExistentialEnvironmentData,
-                                  OpenedElementEnvironmentData,
+                                  ExistentialEnvironmentData,
+                                  ElementEnvironmentData,
                                   Type>(
       1, 0, 0, 1, numGenericParams + numOpenedParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
@@ -6882,15 +6944,8 @@ CanSILBoxType SILBoxType::get(CanType boxedType) {
                                         /*mutable*/ true),
                                /*captures generic env*/ false);
 
-  auto subMap =
-    SubstitutionMap::get(
-      singleGenericParamSignature,
-      [&](SubstitutableType *type) -> Type {
-        if (type->isEqual(genericParam)) return boxedType;
-
-        return nullptr;
-      },
-      MakeAbstractConformanceForGenericType());
+  auto subMap = SubstitutionMap::get(singleGenericParamSignature, boxedType,
+                                     LookUpConformanceInModule());
   return get(boxedType->getASTContext(), layout, subMap);
 }
 

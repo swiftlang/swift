@@ -700,12 +700,13 @@ bb0(%0 : $*Builtin.Int8):
 // CHECK-NOT: raw_pointer_to_ref
 // CHECK: tuple
 // CHECK-LABEL: } // end sil function 'cse_raw_pointer_to_ref'
-sil [ossa] @cse_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> (C, C) {
+sil [ossa] @cse_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> @owned (C, C) {
 bb0(%0 : $Builtin.RawPointer):
   %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
   %2 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
   %6 = tuple(%1: $C, %2: $C)
-  return %6 : $(C, C)
+  %7 = copy_value %6
+  return %7
 }
 
 // CHECK-LABEL: sil [ossa] @cse_unchecked_addr_cast :
@@ -1062,7 +1063,7 @@ bb0(%0 : $*Builtin.Int64, %1 : @guaranteed $Builtin.NativeObject):
   return %6 : $(Builtin.Int64, Builtin.Int64)
 }
 
-protocol Proto : class {
+protocol Proto : AnyObject {
   func doThis()
   func doThat()
 }

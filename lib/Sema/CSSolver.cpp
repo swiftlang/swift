@@ -22,6 +22,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/PreparedOverload.h"
 #include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -58,11 +59,17 @@ STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
 
 TypeVariableType *ConstraintSystem::createTypeVariable(
                                      ConstraintLocator *locator,
-                                     unsigned options) {
+                                     unsigned options,
+                                     PreparedOverloadBuilder *preparedOverload) {
   ++TotalNumTypeVariables;
   auto tv = TypeVariableType::getNew(getASTContext(), assignTypeVariableID(),
                                      locator, options);
-  addTypeVariable(tv);
+  if (preparedOverload) {
+    ASSERT(PreparingOverload);
+    preparedOverload->addedTypeVariable(tv);
+  } else {
+    addTypeVariable(tv);
+  }
   return tv;
 }
 
@@ -1150,7 +1157,7 @@ void ConstraintSystem::shrink(Expr *expr) {
     ///
     /// \param collection The type of the collection container.
     ///
-    /// \returns Null type, ErrorType or UnresolvedType on failure,
+    /// \returns Null type or ErrorType on failure,
     /// properly constructed type otherwise.
     Type extractElementType(Type collection) {
       auto &ctx = CS.getASTContext();
@@ -1159,8 +1166,7 @@ void ConstraintSystem::shrink(Expr *expr) {
 
       auto base = collection.getPointer();
       auto isInvalidType = [](Type type) -> bool {
-        return type.isNull() || type->hasUnresolvedType() ||
-               type->hasError();
+        return type.isNull() || type->hasError();
       };
 
       // Array type.
@@ -1172,9 +1178,6 @@ void ConstraintSystem::shrink(Expr *expr) {
 
       // Map or Set or any other associated collection type.
       if (auto boundGeneric = dyn_cast<BoundGenericType>(base)) {
-        if (boundGeneric->hasUnresolvedType())
-          return boundGeneric;
-
         // Avoid handling InlineArray, building a tuple would be wrong, and
         // we want to eliminate shrink.
         if (boundGeneric->getDecl() == ctx.getInlineArrayDecl())
@@ -1283,9 +1286,7 @@ void ConstraintSystem::shrink(Expr *expr) {
         auto elementType = extractElementType(contextualType);
         // If we couldn't deduce element type for the collection, let's
         // not attempt to solve it.
-        if (!elementType ||
-            elementType->hasError() ||
-            elementType->hasUnresolvedType())
+        if (!elementType || elementType->hasError())
           return;
 
         contextualType = elementType;
@@ -1450,7 +1451,7 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
     }
 
     case SolutionResult::Error:
-      maybeProduceFallbackDiagnostic(target);
+      maybeProduceFallbackDiagnostic(target.getLoc());
       return std::nullopt;
 
     case SolutionResult::TooComplex: {
@@ -1479,16 +1480,6 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
         reportSolutionsToSolutionCallback(solution);
         solution.markAsDiagnosed();
         return std::nullopt;
-      }
-
-      if (Options.contains(
-            ConstraintSystemFlags::AllowUnresolvedTypeVariables)) {
-        dumpSolutions(solution);
-        auto ambiguousSolutions = std::move(solution).takeAmbiguousSolutions();
-        std::vector<Solution> result(
-            std::make_move_iterator(ambiguousSolutions.begin()),
-            std::make_move_iterator(ambiguousSolutions.end()));
-        return std::move(result);
       }
 
       LLVM_FALLTHROUGH;
@@ -1587,8 +1578,6 @@ void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   assert(solverState);
 
   setPhase(ConstraintSystemPhase::Solving);
-
-  SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
 
   // If constraint system failed while trying to
   // genenerate constraints, let's stop right here.

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2023-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -120,12 +120,12 @@ extension ASTGenVisitor {
     }
 
     // FIXME: This location should be derived from the type repr.
-    let specifierLoc: BridgedSourceLoc = nil
+    let specifierLoc: SourceLoc = nil
 
-    let paramName: BridgedIdentifier
-    let paramNameLoc: BridgedSourceLoc
-    let argName: BridgedIdentifier
-    let argNameLoc: BridgedSourceLoc
+    let paramName: Identifier
+    let paramNameLoc: SourceLoc
+    let argName: Identifier
+    let argNameLoc: SourceLoc
 
     // Map the first name and second name to argument name and parameter name.
     // If we have both, use them. If we only have one, then use that as the

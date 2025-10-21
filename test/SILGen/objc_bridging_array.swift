@@ -22,8 +22,9 @@ func setChildren(p: Parent, c: Child) {
 // CHECK: [[FN:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [[ARRAY_AND_BUFFER:%.*]] = apply [[FN]]<Child>([[LENGTH]]) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: ([[ARRAY:%.*]], [[BUFFER_PTR:%.*]]) = destructure_tuple [[ARRAY_AND_BUFFER]] : $(Array<Child>, Builtin.RawPointer)
-// CHECK: [[MDI:%.*]] = mark_dependence [[BUFFER_PTR]] : $Builtin.RawPointer on [[ARRAY]]
-// CHECK: [[BUFFER:%.*]] = pointer_to_address [[MDI]] : $Builtin.RawPointer to [strict] $*Child
+// CHECK: [[BB:%.*]] = begin_borrow [[ARRAY]]
+// CHECK:            = struct_extract [[BB]]
+// CHECK: [[BUFFER:%.*]] = ref_tail_addr
 // CHECK: [[CHILD:%.*]] = copy_value %1 : $Child
 // CHECK: store [[CHILD]] to [init] [[BUFFER]] : $*Child
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF

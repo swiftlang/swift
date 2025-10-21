@@ -48,6 +48,7 @@ namespace swift {
   class SourceFile;
   class SILOptions;
   class ValueDecl;
+  class ParamDecl;
   class GenericSignature;
   enum class AccessorKind;
 
@@ -755,6 +756,12 @@ public:
                                SourceKitCancellationToken CancellationToken,
                                ConformingMethodListConsumer &Consumer,
                                std::optional<VFSOptions> vfsOptions) override;
+
+  void getSignatureHelp(StringRef PrimaryFilePath, unsigned Offset,
+                        ArrayRef<const char *> Args,
+                        SourceKitCancellationToken CancellationToken,
+                        SignatureHelpConsumer &Consumer,
+                        std::optional<VFSOptions> vfsOptions) override;
 
   void expandMacroSyntactically(llvm::MemoryBuffer *inputBuf,
                                 ArrayRef<const char *> args,

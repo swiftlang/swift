@@ -216,8 +216,8 @@ public:
                                           DeclContext *newContext,
                                           ClangInheritanceInfo inheritance) = 0;
 
-  /// Checks if \param decl is the original method or a clone from a base class
-  virtual bool isClonedMemberDecl(ValueDecl *decl) = 0;
+  /// Returnes the original method if \param decl is a clone from a base class
+  virtual ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) = 0;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
@@ -298,6 +298,9 @@ public:
 
   virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;
 
+  virtual FuncDecl *
+  getAvailabilityDomainPredicate(const clang::VarDecl *var) = 0;
+
   virtual std::optional<Type>
   importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                            DeclContext *dc) = 0;
@@ -312,6 +315,8 @@ public:
   /// about the directly-parsed headers.
   virtual SwiftLookupTable *
   findLookupTable(const clang::Module *clangModule) = 0;
+
+  virtual const clang::Module *getClangOwningModule(ClangNode Node) const = 0;
 
   virtual DeclName
   importName(const clang::NamedDecl *D,

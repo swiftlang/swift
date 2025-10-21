@@ -1196,7 +1196,7 @@ bool ModelASTWalker::handleAttrs(ArrayRef<TypeOrCustomAttr> Attrs) {
     if (auto CA = Attr.dyn_cast<CustomAttr*>()) {
       DeclRanges.push_back(std::make_pair(CA, CA->getRangeWithAt()));
     } else {
-      auto TA = Attr.get<TypeAttribute*>();
+      auto TA = cast<TypeAttribute *>(Attr);
       // TODO: Use the structure in the TypeAttribute
       DeclRanges.push_back(std::make_pair(nullptr, SourceRange(TA->getStartLoc())));
     }

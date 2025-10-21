@@ -14,8 +14,9 @@
 #include "../../IRGen/IRGenModule.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/DynamicCasts.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/IPO/ClosureSpecializer.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -48,16 +49,7 @@ llvm::cl::opt<bool> DisableSwiftVerification(
 //                              PassManager
 //===----------------------------------------------------------------------===//
 
-static BridgedUtilities::VerifyFunctionFn verifyFunctionFunction;
-
-void BridgedUtilities::registerVerifier(VerifyFunctionFn verifyFunctionFn) {
-  verifyFunctionFunction = verifyFunctionFn;
-}
-
 void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
-  if (!verifyFunctionFunction)
-    return;
-
   if (f->getModule().getOptions().VerifyNone)
     return;
 
@@ -69,7 +61,7 @@ void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
   }
 
   getSwiftPassInvocation()->beginVerifyFunction(f);
-  verifyFunctionFunction({getSwiftPassInvocation()}, {f});
+  BridgedVerifier::runSwiftFunctionVerification(f, getSwiftPassInvocation());
   getSwiftPassInvocation()->endVerifyFunction();
 }
 
@@ -83,34 +75,6 @@ void SILPassManager::runSwiftModuleVerification() {
 //===----------------------------------------------------------------------===//
 //                           OptimizerBridging
 //===----------------------------------------------------------------------===//
-
-void BridgedChangeNotificationHandler::notifyChanges(Kind changeKind) const {
-  switch (changeKind) {
-  case Kind::instructionsChanged:
-    invocation->notifyChanges(SILAnalysis::InvalidationKind::Instructions);
-    break;
-  case Kind::callsChanged:
-    invocation->notifyChanges(SILAnalysis::InvalidationKind::CallsAndInstructions);
-    break;
-  case Kind::branchesChanged:
-    invocation->notifyChanges(SILAnalysis::InvalidationKind::BranchesAndInstructions);
-    break;
-  case Kind::effectsChanged:
-    invocation->notifyChanges(SILAnalysis::InvalidationKind::Effects);
-    break;
-  case Kind::functionTablesChanged:
-    invocation->notifyFunctionTablesChanged();
-    break;
-  }
-}
-
-BridgedOwnedString BridgedPassContext::getModuleDescription() const {
-  std::string str;
-  llvm::raw_string_ostream os(str);
-  invocation->getPassManager()->getModule()->print(os);
-  str.pop_back(); // Remove trailing newline.
-  return BridgedOwnedString(str);
-}
 
 bool BridgedPassContext::tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const {
   auto *pa = closure.getAs<PartialApplyInst>();
@@ -209,13 +173,15 @@ bool BridgedPassContext::canMakeStaticObjectReadOnly(BridgedType type) const {
 }
 
 OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction function,
-                                                               BridgedSubstitutionMap substitutions) const {
+                                                               BridgedSubstitutionMap substitutions,
+                                                               bool convertIndirectToDirect,
+                                                               bool isMandatory) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   SILFunction *origFunc = function.getFunction();
   SubstitutionMap subs = substitutions.unbridged();
   ReabstractionInfo ReInfo(mod->getSwiftModule(), mod->isWholeModule(),
-                           ApplySite(), origFunc, subs, IsNotSerialized,
-                           /*ConvertIndirectToDirect=*/true,
+                           ApplySite(), origFunc, subs, origFunc->getSerializedKind(),
+                           convertIndirectToDirect,
                            /*dropUnusedArguments=*/false);
 
   if (!ReInfo.canBeSpecialized()) {
@@ -224,8 +190,8 @@ OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction f
 
   SILOptFunctionBuilder FunctionBuilder(*invocation->getTransform());
 
-  GenericFuncSpecializer FuncSpecializer(FunctionBuilder, origFunc, subs,
-                                         ReInfo, /*isMandatory=*/true);
+  GenericFuncSpecializer FuncSpecializer(FunctionBuilder, origFunc, ReInfo.getClonerParamSubstitutionMap(),
+                                         ReInfo, isMandatory);
   SILFunction *SpecializedF = FuncSpecializer.lookupSpecialization();
   if (!SpecializedF) SpecializedF = FuncSpecializer.tryCreateSpecialization();
   if (!SpecializedF || SpecializedF->getLoweredFunctionType()->hasError()) {
@@ -308,34 +274,46 @@ BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(BridgedArrayRef bridge
 }
 
 BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
-  BridgedValueArray bridgedClosureArgs,
-  BridgedArrayRef bridgedClosureArgIndices,
-  BridgedFunction applySiteCallee
+  BridgedArrayRef closureArgManglings, BridgedFunction applySiteCallee
 ) const {
   auto pass = Demangle::SpecializationPass::ClosureSpecializer;
   auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
   Mangle::FunctionSignatureSpecializationMangler mangler(applySiteCallee.getFunction()->getASTContext(),
       pass, serializedKind, applySiteCallee.getFunction());
 
-  llvm::SmallVector<swift::SILValue, 16> closureArgsStorage;
-  auto closureArgs = bridgedClosureArgs.getValues(closureArgsStorage);
-  auto closureArgIndices = bridgedClosureArgIndices.unbridged<SwiftInt>();
+  auto closureArgs = closureArgManglings.unbridged<ClosureArgMangling>();
 
-  assert(closureArgs.size() == closureArgIndices.size() &&
-         "Number of closures arguments and number of closure indices do not match!");
-
-  for (size_t i = 0; i < closureArgs.size(); i++) {
-    auto closureArg = closureArgs[i];
-    auto closureArgIndex = closureArgIndices[i];
-
-    if (auto *PAI = dyn_cast<PartialApplyInst>(closureArg)) {
-      mangler.setArgumentClosureProp(closureArgIndex,
-                                     const_cast<PartialApplyInst *>(PAI));
+  for (ClosureArgMangling argElmt : closureArgs) {
+    auto closureArgIndex = (unsigned)argElmt.argIdx;
+    if (SILInstruction *inst = argElmt.inst.unbridged()) {
+      mangler.setArgumentClosureProp(closureArgIndex, inst);
     } else {
-      auto *TTTFI = cast<ThinToThickFunctionInst>(closureArg);
-      mangler.setArgumentClosureProp(closureArgIndex, 
-                                     const_cast<ThinToThickFunctionInst *>(TTTFI));
+      mangler.setArgumentClosurePropPreviousArg(closureArgIndex, argElmt.otherArgIdx);
     }
+  }
+
+  return BridgedOwnedString(mangler.mangle());
+}
+
+BridgedOwnedString BridgedPassContext::mangleWithConstCaptureArgs(
+  BridgedArrayRef bridgedConstArgs, BridgedFunction applySiteCallee
+) const {
+
+  struct ConstArgElement {
+    SwiftInt argIdx;
+    BridgedValue constValue;
+  };
+
+  auto pass = Demangle::SpecializationPass::CapturePropagation;
+  auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
+  Mangle::FunctionSignatureSpecializationMangler mangler(applySiteCallee.getFunction()->getASTContext(),
+      pass, serializedKind, applySiteCallee.getFunction());
+
+  auto constArgs = bridgedConstArgs.unbridged<ConstArgElement>();
+
+  for (ConstArgElement argElmt : constArgs) {
+    auto constArgInst = cast<SingleValueInstruction>(argElmt.constValue.getSILValue());
+    mangler.setArgumentConstantProp(argElmt.argIdx, constArgInst);
   }
 
   return BridgedOwnedString(mangler.mangle());
@@ -355,49 +333,19 @@ BridgedOwnedString BridgedPassContext::mangleWithBoxToStackPromotedArgs(
   return BridgedOwnedString(mangler.mangle());
 }
 
-BridgedGlobalVar BridgedPassContext::createGlobalVariable(BridgedStringRef name, BridgedType type, BridgedLinkage linkage, bool isLet) const {
-  auto *global = SILGlobalVariable::create(
-      *invocation->getPassManager()->getModule(),
-      (swift::SILLinkage)linkage, IsNotSerialized,
-      name.unbridged(), type.unbridged());
-  if (isLet)
-    global->setLet(true);
-  return {global};
-}
-
 void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
   switch (StackNesting::fixNesting(function.getFunction())) {
     case StackNesting::Changes::None:
       break;
     case StackNesting::Changes::Instructions:
-      invocation->notifyChanges(SILAnalysis::InvalidationKind::Instructions);
+      invocation->notifyChanges(SILContext::NotificationKind::Instructions);
       break;
     case StackNesting::Changes::CFG:
-      invocation->notifyChanges(SILAnalysis::InvalidationKind::BranchesAndInstructions);
+      invocation->notifyChanges(SILContext::NotificationKind::Instructions);
+      invocation->notifyChanges(SILContext::NotificationKind::Branches);
       break;
   }
   invocation->setNeedFixStackNesting(false);
-}
-
-OptionalBridgedFunction BridgedPassContext::lookupStdlibFunction(BridgedStringRef name) const {
-  swift::SILModule *mod = invocation->getPassManager()->getModule();
-  SmallVector<ValueDecl *, 1> results;
-  mod->getASTContext().lookupInSwiftModule(name.unbridged(), results);
-  if (results.size() != 1)
-    return {nullptr};
-
-  auto *decl = dyn_cast<FuncDecl>(results.front());
-  if (!decl)
-    return {nullptr};
-
-  SILDeclRef declRef(decl, SILDeclRef::Kind::Func);
-  SILOptFunctionBuilder funcBuilder(*invocation->getTransform());
-  return {funcBuilder.getOrCreateFunction(SILLocation(decl), declRef, NotForDefinition)};
-}
-
-OptionalBridgedFunction BridgedPassContext::lookUpNominalDeinitFunction(BridgedDeclObj nominal)  const {
-  swift::SILModule *mod = invocation->getPassManager()->getModule();
-  return {mod->lookUpMoveOnlyDeinitFunction(nominal.getAs<swift::NominalTypeDecl>())};
 }
 
 bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const {
@@ -421,61 +369,13 @@ bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const 
 }
 
 BridgedFunction BridgedPassContext::
-createEmptyFunction(BridgedStringRef name,
-                    const BridgedParameterInfo * _Nullable bridgedParams,
-                    SwiftInt paramCount,
-                    bool hasSelfParam,
-                    BridgedFunction fromFunc) const {
-  swift::SILModule *mod = invocation->getPassManager()->getModule();
-  SILFunction *fromFn = fromFunc.getFunction();
-
-  llvm::SmallVector<SILParameterInfo> params;
-  for (unsigned idx = 0; idx < paramCount; ++idx) {
-    params.push_back(bridgedParams[idx].unbridged());
-  }
-
-  CanSILFunctionType fTy = fromFn->getLoweredFunctionType();
-  assert(fromFn->getGenericSignature().isNull() && "generic functions are not supported");
-
-  auto extInfo = fTy->getExtInfo();
-  if (fTy->hasSelfParam() && !hasSelfParam)
-    extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
-
-  CanSILFunctionType newTy = SILFunctionType::get(
-      /*GenericSignature=*/nullptr, extInfo, fTy->getCoroutineKind(),
-      fTy->getCalleeConvention(), params, fTy->getYields(),
-      fTy->getResults(), fTy->getOptionalErrorResult(),
-      SubstitutionMap(), SubstitutionMap(),
-      mod->getASTContext());
-
-  SILOptFunctionBuilder functionBuilder(*invocation->getTransform());
-
-  SILFunction *newF = functionBuilder.createFunction(
-      fromFn->getLinkage(), name.unbridged(), newTy, nullptr,
-      fromFn->getLocation(), fromFn->isBare(), fromFn->isTransparent(),
-      fromFn->getSerializedKind(), IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible, fromFn->getEntryCount(), fromFn->isThunk(),
-      fromFn->getClassSubclassScope(), fromFn->getInlineStrategy(),
-      fromFn->getEffectsKind(), nullptr, fromFn->getDebugScope());
-
-  return {newF};
-}
-
-void BridgedPassContext::moveFunctionBody(BridgedFunction sourceFunc, BridgedFunction destFunc) const {
-  SILFunction *sourceFn = sourceFunc.getFunction();
-  SILFunction *destFn = destFunc.getFunction();
-  destFn->moveAllBlocksFromOtherFunction(sourceFn);
-  invocation->getPassManager()->invalidateAnalysis(sourceFn, SILAnalysis::InvalidationKind::Everything);
-  invocation->getPassManager()->invalidateAnalysis(destFn, SILAnalysis::InvalidationKind::Everything);
-}
-
-BridgedFunction BridgedPassContext::
 createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
                                      const BridgedParameterInfo * _Nullable specializedBridgedParams,
                                      SwiftInt paramCount,
                                      BridgedFunction bridgedOriginal,
                                      bool makeThin,
-                                     bool makeBare)  const {
+                                     bool makeBare,
+                                     bool preserveGenericSignature) const {
   auto *original = bridgedOriginal.getFunction();
   auto originalType = original->getLoweredFunctionType();
 
@@ -492,13 +392,14 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
     extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
 
   auto ClonedTy = SILFunctionType::get(
-      originalType->getInvocationGenericSignature(), extInfo,
+      preserveGenericSignature ? originalType->getInvocationGenericSignature() : GenericSignature(),
+      extInfo,
       originalType->getCoroutineKind(),
       originalType->getCalleeConvention(), specializedParams,
       originalType->getYields(), originalType->getResults(),
       originalType->getOptionalErrorResult(),
-      originalType->getPatternSubstitutions(),
-      originalType->getInvocationSubstitutions(),
+      preserveGenericSignature ? originalType->getPatternSubstitutions() : SubstitutionMap(),
+      preserveGenericSignature ? originalType->getInvocationSubstitutions() : SubstitutionMap(),
       original->getModule().getASTContext());
 
   SILOptFunctionBuilder functionBuilder(*invocation->getTransform());
@@ -514,7 +415,8 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
       // classes (the classSubclassScope), because that may incorrectly
       // influence the linkage.
       getSpecializedLinkage(original, original->getLinkage()), specializedName.unbridged(),
-      ClonedTy, original->getGenericEnvironment(),
+      ClonedTy,
+      preserveGenericSignature ? original->getGenericEnvironment() : nullptr,
       original->getLocation(), makeBare ? IsBare : original->isBare(), original->isTransparent(),
       original->getSerializedKind(), IsNotDynamic, IsNotDistributed,
       IsNotRuntimeAccessible, original->getEntryCount(),
@@ -538,8 +440,9 @@ bool BridgedPassContext::completeLifetime(BridgedValue value) const {
   SILFunction *f = v->getFunction();
   DeadEndBlocks *deb = invocation->getPassManager()->getAnalysis<DeadEndBlocksAnalysis>()->get(f);
   DominanceInfo *domInfo = invocation->getPassManager()->getAnalysis<DominanceAnalysis>()->get(f);
-  OSSALifetimeCompletion completion(f, domInfo, *deb);
-  auto result = completion.completeOSSALifetime(v, OSSALifetimeCompletion::Boundary::Availability);
+  OSSACompleteLifetime completion(f, domInfo, *deb);
+  auto result = completion.completeOSSALifetime(
+      v, OSSACompleteLifetime::Boundary::Availability);
   return result == LifetimeCompletion::WasCompleted;
 }
 
@@ -573,126 +476,22 @@ BridgedCalleeAnalysis::CalleeList BridgedCalleeAnalysis::getDestructors(BridgedT
   return ca->getDestructors(type.unbridged(), isExactType);
 }
 
-// Need to put ClonerWithFixedLocation into namespace swift to forward reference
-// it in OptimizerBridging.h.
-namespace swift {
-
-class ClonerWithFixedLocation : public SILCloner<ClonerWithFixedLocation> {
-  friend class SILInstructionVisitor<ClonerWithFixedLocation>;
-  friend class SILCloner<ClonerWithFixedLocation>;
-
-  SILDebugLocation insertLoc;
-
-public:
-  ClonerWithFixedLocation(SILGlobalVariable *gVar)
-  : SILCloner<ClonerWithFixedLocation>(gVar),
-  insertLoc(ArtificialUnreachableLocation(), nullptr) {}
-
-  ClonerWithFixedLocation(SILInstruction *insertionPoint)
-  : SILCloner<ClonerWithFixedLocation>(*insertionPoint->getFunction()),
-  insertLoc(insertionPoint->getDebugLocation()) {
-    Builder.setInsertionPoint(insertionPoint);
-  }
-
-  SILValue getClonedValue(SILValue v) {
-    return getMappedValue(v);
-  }
-
-  void cloneInst(SILInstruction *inst) {
-    visit(inst);
-  }
-
-protected:
-
-  SILLocation remapLocation(SILLocation loc) {
-    return insertLoc.getLocation();
-  }
-
-  const SILDebugScope *remapScope(const SILDebugScope *DS) {
-    return insertLoc.getScope();
-  }
-};
-
-} // namespace swift
-
-BridgedCloner::BridgedCloner(BridgedGlobalVar var, BridgedPassContext context)
-  : cloner(new ClonerWithFixedLocation(var.getGlobal())) {
-  context.invocation->notifyNewCloner();
-}
-
-BridgedCloner::BridgedCloner(BridgedInstruction inst,
-                             BridgedPassContext context)
-    : cloner(new ClonerWithFixedLocation(inst.unbridged())) {
-  context.invocation->notifyNewCloner();
-}
-
-void BridgedCloner::destroy(BridgedPassContext context) {
-  delete cloner;
-  cloner = nullptr;
-  context.invocation->notifyClonerDestroyed();
-}
-
-BridgedValue BridgedCloner::getClonedValue(BridgedValue v) {
-  return {cloner->getClonedValue(v.getSILValue())};
-}
-
-bool BridgedCloner::isValueCloned(BridgedValue v) const {
-  return cloner->isValueCloned(v.getSILValue());
-}
-
-void BridgedCloner::clone(BridgedInstruction inst) {
-  cloner->cloneInst(inst.unbridged());
-}
-
-void BridgedCloner::recordFoldedValue(BridgedValue origValue, BridgedValue mappedValue) {
-  cloner->recordFoldedValue(origValue.getSILValue(), mappedValue.getSILValue());
-}
-
-namespace swift {
-  class SpecializationCloner: public SILClonerWithScopes<SpecializationCloner> {
-    friend class SILInstructionVisitor<SpecializationCloner>;
-    friend class SILCloner<SpecializationCloner>;
-  public:
-    using SuperTy = SILClonerWithScopes<SpecializationCloner>;
-    SpecializationCloner(SILFunction &emptySpecializedFunction): SuperTy(emptySpecializedFunction) {}
-  };
-} // namespace swift
-
-BridgedSpecializationCloner::BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction): 
-  cloner(new SpecializationCloner(*emptySpecializedFunction.getFunction())) {}
-
-BridgedFunction BridgedSpecializationCloner::getCloned() const {
-  return { &cloner->getBuilder().getFunction() };
-}
-
-BridgedBasicBlock BridgedSpecializationCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
-  return { cloner->getOpBasicBlock(originalBasicBlock.unbridged()) };
-}
-
-void BridgedSpecializationCloner::cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock, BridgedValueArray clonedEntryBlockArgs) const {
-  llvm::SmallVector<swift::SILValue, 16> clonedEntryBlockArgsStorage;
-  auto clonedEntryBlockArgsArrayRef = clonedEntryBlockArgs.getValues(clonedEntryBlockArgsStorage);
-  cloner->cloneFunctionBody(originalFunction.getFunction(), clonedEntryBlock.unbridged(), clonedEntryBlockArgsArrayRef);
-}
-
-void BridgedSpecializationCloner::cloneFunctionBody(BridgedFunction originalFunction) const {
-  cloner->cloneFunction(originalFunction.getFunction());
-}
-
 void BridgedBuilder::destroyCapturedArgs(BridgedInstruction partialApply) const {
   if (auto *pai = llvm::dyn_cast<PartialApplyInst>(partialApply.unbridged()); pai->isOnStack()) {
     auto b = unbridged();
-    return swift::insertDestroyOfCapturedArguments(pai, b); 
+    return swift::insertDestroyOfCapturedArguments(pai, b);
   } else {
-    assert(false && "`destroyCapturedArgs` must only be called on a `partial_apply` on stack!");   
+    assert(false && "`destroyCapturedArgs` must only be called on a `partial_apply` on stack!");
   }
 }
 
-void verifierError(BridgedStringRef message,
-                   OptionalBridgedInstruction atInstruction,
-                   OptionalBridgedArgument atArgument) {
-  Twine msg(message.unbridged());
-  verificationFailure(msg, atInstruction.unbridged(), atArgument.unbridged(), /*extraContext=*/nullptr);
+//===----------------------------------------------------------------------===//
+//                                Test
+//===----------------------------------------------------------------------===//
+
+void registerFunctionTest(BridgedStringRef name, void *nativeSwiftContext) {
+  swift::test::FunctionTest::createNativeSwiftFunctionTest(
+      name.unbridged(), nativeSwiftContext, /*isSILTest=*/ false);
 }
 
 //===----------------------------------------------------------------------===//
@@ -708,6 +507,13 @@ bool BridgedFunction::isConvertPointerToPointerArgument() const {
     auto *conversionDecl =
       declRef.getASTContext().getConvertPointerToPointerArgument();
     return declRef.getFuncDecl() == conversionDecl;
+  }
+  return false;
+}
+
+bool BridgedFunction::isAddressor() const {
+  if (auto declRef = dyn_cast_or_null<AccessorDecl>(getFunction()->getDeclRef().getDecl())) {
+    return declRef->isAnyAddressor();
   }
   return false;
 }
