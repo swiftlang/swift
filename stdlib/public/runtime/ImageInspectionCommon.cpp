@@ -140,6 +140,18 @@ swift_getMetadataSectionName(const swift::MetadataSections *section) {
 }
 
 SWIFT_RUNTIME_EXPORT
+void swift_getMetadataSectionBaseAddress(const swift::MetadataSections *section,
+                                         void const **out_actual,
+                                         void const **out_expected) {
+  if (auto info = swift::SymbolInfo::lookup(section)) {
+    *out_actual = info->getBaseAddress();
+  } else {
+    *out_actual = nullptr;
+  }
+  *out_expected = section->baseAddress;
+}
+
+SWIFT_RUNTIME_EXPORT
 size_t swift_getMetadataSectionCount() {
   auto snapshot = swift::registered->snapshot();
   return snapshot.count();
