@@ -4995,7 +4995,25 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
     return;
   }
 
+  // @_implementationOnly on structs only applies to non-public types.
   auto *VD = cast<ValueDecl>(D);
+  if (isa<StructDecl>(VD)) {
+    if (!Ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly)) {
+      diagnoseAndRemoveAttr(attr,
+          diag::implementation_only_on_structs_feature);
+      return;
+    }
+
+    auto access =
+        VD->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*treatUsableFromInlineAsPublic=*/true);
+    if (access.isPublicOrPackage())
+      diagnoseAndRemoveAttr(
+          attr, diag::attr_not_on_decl_with_invalid_access_level,
+          attr, access.accessLevelForDiagnostics());
+    return;
+  }
+
   auto *overridden = VD->getOverriddenDecl();
   if (!overridden) {
     diagnoseAndRemoveAttr(attr, diag::implementation_only_decl_non_override);

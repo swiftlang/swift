@@ -3946,6 +3946,9 @@ ERROR(implementation_only_override_import_without_attr,none,
       "override of %kindonly0 imported as implementation-only must be declared "
       "'@_implementationOnly'",
       (const ValueDecl *))
+ERROR(implementation_only_on_structs_feature,none,
+      "'@_implementationOnly' on structs requires "
+      "'-enable-experimental-feature CheckImplementationOnly'", ())
 
 ERROR(import_attr_conflict,none,
       "%0 inconsistently imported with %1",
@@ -4128,7 +4131,7 @@ WARNING(attr_has_no_effect_on_decl_with_access_level,none,
        (DeclAttribute, AccessLevel))
 ERROR(attr_not_on_decl_with_invalid_access_level,none,
       "'%0' may not be used on "
-      "%select{private|fileprivate|internal|package|%error|%error}1 declarations",
+      "%select{private|fileprivate|internal|package|public|%error}1 declarations",
       (DeclAttribute, AccessLevel))
 
 ERROR(attr_has_no_effect_decl_not_available_before,none,
