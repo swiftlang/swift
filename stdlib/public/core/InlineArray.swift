@@ -14,16 +14,17 @@
 ///
 /// An `InlineArray` is a specialized container that doesn't use a separate
 /// memory allocation just to store its elements. When a value is copied, all of
-/// its elements are copied eagerly. Use an `InlineArray` when you have a fixed
-/// number of elements and need to avoid a separate heap allocation.
+/// its elements are copied eagerly, like those of a tuple. Use an `InlineArray`
+/// when you have a fixed number of elements and need to avoid a separate heap
+/// allocation.
 ///
 /// Initializing a Value
 /// --------------------
 ///
-/// When initializing a new `InlineArray` value, you initialize all
-/// of its elements. You can use an array literal just as with `Array`, rely on
-/// type inference for the `count` and `Element` type, and spell the type with
-/// the shorthand `[count of Element]`.
+/// When initializing a new `InlineArray` value, you must initialize all of its
+/// elements. You can use an array literal just as with `Array`, rely on type
+/// inference for the `count` and `Element` type, and spell the type with the
+/// shorthand `[count of Element]`.
 ///
 ///     let a: InlineArray<3, Int> = [1, 2, 3]
 ///     let b: InlineArray<_, Int> = [1, 2, 3]
@@ -40,10 +41,10 @@
 /// Accessing Elements
 /// ------------------
 ///
-/// Just as with `Array`, you can read and modify an element in an
-/// `InlineArray` using a subscript. Unless you use the memory-unsafe
-/// `unchecked` subscript, any index you provide is subject to bounds checking;
-/// invalid indices trigger a runtime error in your program.
+/// Just as with `Array`, you can read and modify an element in an `InlineArray`
+/// using a subscript. Unless you use the memory-unsafe `unchecked` subscript,
+/// any index you provide is subject to bounds checking; an invalid index
+/// triggers a runtime error in your program.
 ///
 ///     var values: [3 of Double] = [1, 1.5, 2]
 ///     print(values[0])  // Prints "1.0"
@@ -69,8 +70,8 @@
 /// -------------
 ///
 /// An `InlineArray` stores its elements contiguously. If an `InlineArray` is a
-/// stored property of a class, then it's allocated on the heap along with
-/// the other stored properties of the class. Otherwise, in general, an
+/// stored property of a class, then it's allocated on the heap along with the
+/// other stored properties of the class. Otherwise, in general, an
 /// `InlineArray` is allocated on the stack.
 ///
 /// A *non-empty* `InlineArray`'s size and stride are both found by multiplying
