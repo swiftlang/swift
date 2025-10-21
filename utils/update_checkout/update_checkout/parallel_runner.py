@@ -1,8 +1,7 @@
-from multiprocessing.managers import ListProxy, ValueProxy
 import sys
-from multiprocessing import cpu_count, Manager
+from multiprocessing import cpu_count
 import time
-from typing import Callable, List, Any, Union
+from typing import Callable, List, Any, Tuple, Union
 from threading import Lock, Thread, Event
 from concurrent.futures import ThreadPoolExecutor
 import shutil
@@ -10,33 +9,63 @@ import shutil
 from .runner_arguments import RunnerArguments, AdditionalSwiftSourcesArguments
 
 
+class TaskTracker:
+    _running_tasks: List[str]
+    _done_task_counter: int
+    _lock: Lock
+
+    def __init__(self):
+        self._running_tasks = []
+        self._done_task_counter = 0
+        self._lock = Lock()
+
+    def mark_task_as_running(self, task_name: str):
+        self._lock.acquire()
+        self._running_tasks.append(task_name)
+        self._lock.release()
+
+    def mark_task_as_done(self, task_name: str):
+        self._lock.acquire()
+        if task_name in self._running_tasks:
+            self._running_tasks.remove(task_name)
+        self._done_task_counter += 1
+        self._lock.release()
+
+    def status(self) -> Tuple[List[str], int]:
+        self._lock.acquire()
+        running_tasks_str = ", ".join(self.running_tasks)
+        done_tasks = self.done_task_counter
+        self._lock.release()
+        return running_tasks_str, done_tasks
+
+    @property
+    def running_tasks(self) -> List[str]:
+        return self._running_tasks
+
+    @property
+    def done_task_counter(self) -> int:
+        return self._done_task_counter
+
+
 class MonitoredFunction:
     def __init__(
         self,
         fn: Callable,
-        running_tasks: ListProxy,
-        updated_repos: ValueProxy,
-        lock: Lock,
+        task_tracker: TaskTracker,
     ):
         self.fn = fn
-        self.running_tasks = running_tasks
-        self.updated_repos = updated_repos
-        self._lock = lock
+        self._task_tracker = task_tracker
 
     def __call__(self, *args: Union[RunnerArguments, AdditionalSwiftSourcesArguments]):
         task_name = args[0].repo_name
-        self.running_tasks.append(task_name)
+        self._task_tracker.mark_task_as_running(task_name)
         result = None
         try:
             result = self.fn(*args)
         except Exception as e:
             print(e)
         finally:
-            self._lock.acquire()
-            if task_name in self.running_tasks:
-                self.running_tasks.remove(task_name)
-            self.updated_repos.set(self.updated_repos.get() + 1)
-            self._lock.release()
+            self._task_tracker.mark_task_as_done(task_name)
             return result
 
 
@@ -61,13 +90,8 @@ class ParallelRunner:
         self._stop_event = Event()
         self._verbose = pool_args[0].verbose
         if not self._verbose:
-            manager = Manager()
-            self._lock = manager.Lock()
-            self._running_tasks = manager.list()
-            self._updated_repos = manager.Value("i", 0)
-            self._monitored_fn = MonitoredFunction(
-                self._fn, self._running_tasks, self._updated_repos, self._lock
-            )
+            self._task_tracker = TaskTracker()
+            self._monitored_fn = MonitoredFunction(self._fn, self._task_tracker)
 
     def run(self) -> List[Any]:
         print(f"Running ``{self._fn.__name__}`` with up to {self._n_threads} processes.")
@@ -86,12 +110,7 @@ class ParallelRunner:
     def _monitor(self):
         last_output = ""
         while not self._stop_event.is_set():
-            self._lock.acquire()
-            current = list(self._running_tasks)
-            current_line = ", ".join(current)
-            updated_repos = self._updated_repos.get()
-            self._lock.release()
-
+            current_line, updated_repos = self._task_tracker.status()
             if current_line != last_output:
                 truncated = f"{self._output_prefix} [{updated_repos}/{self._nb_repos}] ({current_line})"
                 if len(truncated) > self._terminal_width:
