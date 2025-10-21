@@ -294,16 +294,13 @@ extension CheckedContinuation {
 @_alwaysEmitIntoClient
 @available(SwiftStdlib 5.1, *)
 // ABI Note: We need to use @abi here because the ABI of this function otherwise conflicts with the legacy
-// @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit. We add the extra `N`
-// in the mangled name to avoid the clash.
-// // FIXME: We cannot use @abi since it causes issues with IDE/complete_diagnostics_concurrency.swift
-//@abi(
-//  nonisolated(nonsending) func withCheckedContinuationNonisolatedNonsending<T>(
-//    function: String,
-//    _ body: (CheckedContinuation<T, Never>) -> Void
-//  ) async -> sending T
-//)
-@_silgen_name("$ss24withCheckedContinuationN8function_xSS_yScCyxs5NeverOGXEtYalF")
+// @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit
+@abi(
+  nonisolated(nonsending) func withCheckedContinuationNonisolatedNonsending<T>(
+    function: String,
+    _ body: (CheckedContinuation<T, Never>) -> Void
+  ) async -> sending T
+)
 public nonisolated(nonsending) func withCheckedContinuation<T>(
   function: String = #function,
 _ body: (CheckedContinuation<T, Never>) -> Void
@@ -384,16 +381,13 @@ public func _unsafeInheritExecutor_withCheckedContinuation<T>(
 @_alwaysEmitIntoClient
 @available(SwiftStdlib 5.1, *)
 // ABI Note: We need to use @abi here because the ABI of this function otherwise conflicts with the legacy
-// @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit. We add the extra `N`
-// in the mangled name to avoid the clash.
-// // FIXME: We cannot use @abi since it causes issues with IDE/complete_diagnostics_concurrency.swift
-//@abi(
-//  nonisolated(nonsending) func withCheckedThrowingContinuationNonisolatedNonsending<T>(
-//    function: String,
-//    _ body: (CheckedContinuation<T, Error>) -> Void
-//  ) async throws -> sending T
-//)
-@_silgen_name("$ss32withCheckedThrowingContinuationN8function_xSS_yScCyxs5Error_pGXEtYaKlF")
+// @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit
+@abi(
+  nonisolated(nonsending) func withCheckedThrowingContinuationNonisolatedNonsending<T>(
+    function: String,
+    _ body: (CheckedContinuation<T, Error>) -> Void
+  ) async throws -> sending T
+)
 public nonisolated(nonsending)  func withCheckedThrowingContinuation<T>(
   function: String = #function,
   _ body: (CheckedContinuation<T, Error>) -> Void
