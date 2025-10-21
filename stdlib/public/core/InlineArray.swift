@@ -72,7 +72,7 @@
 /// An `InlineArray` stores its elements contiguously. If an `InlineArray` is a
 /// stored property of a class, then it's allocated on the heap along with
 /// the other stored properties of the class. Otherwise, in general, an
-/// `InlineArray` will be allocated on the stack.
+/// `InlineArray` is allocated on the stack.
 ///
 /// A *non-empty* `InlineArray`'s size and stride are both found by multiplying
 /// the `count` of elements by the `Element`'s stride. Its alignment is equal to
