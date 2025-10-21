@@ -95,7 +95,8 @@ extension B: @retroactive main::Equatable {
   // @_derivative(of:)
 
   @_dynamicReplacement(for: main::negate())
-  // FIXME improve: expected-error@-1 {{replaced function 'main::negate()' could not be found}}
+  // expected-error@-1 {{'negate()' is not imported through module 'main'}}
+  // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{29-33=ModuleSelectorTestingKit}}
 
   mutating func myNegate() {
     let fn: (main::Int, main::Int) -> main::Int =
@@ -260,7 +261,8 @@ extension D: @retroactive Swift::Equatable {
   // @_derivative(of:)
 
   @_dynamicReplacement(for: Swift::negate())
-  // FIXME improve: expected-error@-1 {{replaced function 'Swift::negate()' could not be found}}
+  // expected-error@-1 {{'negate()' is not imported through module 'Swift'}}
+  // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{29-34=ModuleSelectorTestingKit}}
 
   mutating func myNegate() {
   // expected-note@-1 {{'myNegate()' declared here}}
