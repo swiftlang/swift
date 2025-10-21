@@ -1525,12 +1525,15 @@ bool Decl::isAlwaysWeakImported() const {
     return clangDecl->isWeakImported(
         getASTContext().LangOpts.getMinPlatformVersion());
 
+  // FIXME: Weak linking on Windows is not yet supported
+  // https://github.com/apple/swift/issues/53303
+  if (getASTContext().LangOpts.Target.isOSWindows())
+    return false;
+
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
 
-  // FIXME: Weak linking on Windows is not yet supported
-  // https://github.com/apple/swift/issues/53303
-  if (isUnavailable() && !getASTContext().LangOpts.Target.isOSWindows())
+  if (isUnavailable())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
