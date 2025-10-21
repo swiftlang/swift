@@ -1075,7 +1075,7 @@ NOTE(regionbasedisolation_typed_tns_passed_to_sending, none,
      "causing races inbetween %0 uses and uses reachable from the callee",
      (StringRef, Type))
 
-ERROR(regionbasedisolation_typed_tns_passed_sending_closure, none,
+GROUPED_ERROR(regionbasedisolation_typed_tns_passed_sending_closure, SendingClosureRisksDataRace, none,
      "passing closure as a 'sending' parameter risks causing data races between %0 and concurrent execution of the closure",
      (StringRef))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value, none,

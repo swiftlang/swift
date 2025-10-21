@@ -69,10 +69,12 @@ GROUP(PerformanceHints, "performance-hints")
 GROUP(PreconcurrencyImport, "preconcurrency-import")
 GROUP(PropertyWrappers, "property-wrapper-requirements")
 GROUP(ProtocolTypeNonConformance, "protocol-type-non-conformance")
+GROUP(RegionIsolation, "region-isolation")
 GROUP(ResultBuilderMethods, "result-builder-methods")
 GROUP(ReturnTypeImplicitCopy, "return-type-implicit-copy")
 GROUP(SendableClosureCaptures, "sendable-closure-captures")
 GROUP(SendableMetatypes, "sendable-metatypes")
+GROUP(SendingClosureRisksDataRace, "sending-closure-risks-data-race")
 GROUP(SendingRisksDataRace, "sending-risks-data-race")
 GROUP(StrictLanguageFeatures, "strict-language-features")
 GROUP(StrictMemorySafety, "strict-memory-safety")
@@ -84,6 +86,9 @@ GROUP(WeakMutability, "weak-mutability")
 
 GROUP_LINK(PerformanceHints, ExistentialType)
 GROUP_LINK(PerformanceHints, ReturnTypeImplicitCopy)
+
+GROUP_LINK(RegionIsolation, SendingClosureRisksDataRace)
+GROUP_LINK(RegionIsolation, SendingRisksDataRace)
 
 #define UNDEFINE_DIAGNOSTIC_GROUPS_MACROS
 #include "swift/AST/DefineDiagnosticGroupsMacros.h"
