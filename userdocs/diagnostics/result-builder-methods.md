@@ -1,4 +1,6 @@
-# Result Builder Methods
+# Result builder methods (ResultBuilderMethods)
+
+## Overview
 
 To be useful as a result builder, a result builder type must provide a
 sufficient subset of function-building methods that enable the transformation of

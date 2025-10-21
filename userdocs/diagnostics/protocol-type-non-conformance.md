@@ -1,8 +1,10 @@
-# Protocol Types Cannot Conform to Protocols
+# Protocol types cannot conform to protocols (ProtocolTypeNonConformance)
+
+## Overview
 
 In Swift, a protocol that does not have `Self` or associated type requirements can be used as a type. You can use a variable or constant of a protocol type, also called an __existential type__, to hold a value of any conforming type:
 
-```swift 
+```swift
 protocol Animal {
     func makeNoise()
     static var species: String { get }
@@ -89,4 +91,10 @@ struct Habitat {
 }
 ```
 
-For more on using existential types, see [Protocols as Types](https://docs.swift.org/swift-book/LanguageGuide/Protocols.html#ID275) in _The Swift Programming Language_.
+For more on using existential types, see [Protocols as Types][protocols-as-types] in _The Swift Programming Language_.
+
+## See Also
+
+- [Protocols as Types][protocols-as-types]
+
+[protocols-as-types]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/protocols#Protocols-as-Types
