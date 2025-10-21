@@ -89,7 +89,8 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:-cxx-interoperability-mode=default>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -experimental-spi-only-imports>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
-  "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+  "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>"
+  "$<$<AND:$<BOOL:${${PROJECT_NAME}_MODULE_CACHE_PATH}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-module-cache-path ${${PROJECT_NAME}_MODULE_CACHE_PATH}>")
 
 # LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
 # LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'

@@ -194,7 +194,8 @@ add_compile_options(
   "$<$<AND:$<NOT:$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -disable-objc-interop>"
   "$<$<AND:$<PLATFORM_ID:Windows>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
-  "$<$<AND:$<BOOL:${SwiftCore_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+  "$<$<AND:$<BOOL:${SwiftCore_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>"
+  "$<$<AND:$<BOOL:${SwiftCore_MODULE_CACHE_PATH}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-module-cache-path ${SwiftCore_MODULE_CACHE_PATH}>")
 
 include(ExperimentalFeatures)
 

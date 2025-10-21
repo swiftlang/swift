@@ -55,7 +55,8 @@ if(SwiftRuntime_ENABLE_stringprocessing)
     # To ensure incremental builds work as expected
     BUILD_ALWAYS 1
     CMAKE_ARGS
-      ${COMMON_OPTIONS})
+      ${COMMON_OPTIONS}
+      -DSwiftStringProcessing_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH})
 endif()
 
 # Synchronization
@@ -68,7 +69,8 @@ if(SwiftRuntime_ENABLE_synchronization)
     # To ensure incremental builds work as expected
     BUILD_ALWAYS 1
     CMAKE_ARGS
-      ${COMMON_OPTIONS})
+      ${COMMON_OPTIONS}
+      -DSwiftSynchronization_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH})
 endif()
 
 # Distributed
@@ -81,7 +83,8 @@ if(SwiftRuntime_ENABLE_distributed)
     # To ensure incremental builds work as expected
     BUILD_ALWAYS 1
     CMAKE_ARGS
-      ${COMMON_OPTIONS})
+      ${COMMON_OPTIONS}
+      -DSwiftDistributed_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH})
 endif()
 
 
@@ -95,7 +98,8 @@ if(SwiftRuntime_ENABLE_differentiation)
     # To ensure incremental builds work as expected
     BUILD_ALWAYS 1
     CMAKE_ARGS
-      ${COMMON_OPTIONS})
+      ${COMMON_OPTIONS}
+      -DSwiftDifferentiation_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH})
 endif()
 
 # Observation
@@ -108,7 +112,8 @@ if(SwiftRuntime_ENABLE_observation)
     # To ensure incremental builds work as expected
     BUILD_ALWAYS 1
     CMAKE_ARGS
-      ${COMMON_OPTIONS})
+      ${COMMON_OPTIONS}
+      -DSwiftObservation_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH})
 endif()
 
 # Runtime
@@ -121,5 +126,6 @@ if(SwiftRuntime_ENABLE_runtime)
     # To ensure incremental builds work as expected
     BUILD_ALWAYS 1
     CMAKE_ARGS
-      ${COMMON_OPTIONS})
+      ${COMMON_OPTIONS}
+      -DSwiftRuntime_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH})
 endif()
