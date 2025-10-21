@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-irgen -enable-library-evolution | %FileCheck %s
 
-// XFAIL: CPU=arm64e
 // REQUIRES: PTRSIZE=64
 
 struct Empty: Error {}
