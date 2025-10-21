@@ -1145,7 +1145,7 @@ extension String {
   /// compare equal with `==`, but not all equal strings are considered
   /// identical.
   ///
-  /// - Performance: O(1)
+  /// - Complexity: O(1)
   @available(SwiftStdlib 6.3, *)
   public func isTriviallyIdentical(to other: Self) -> Bool {
     self._guts.rawBits == other._guts.rawBits

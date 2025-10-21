@@ -1419,7 +1419,7 @@ extension Substring {
   /// to compare equal with `==`, but not all equal substrings are considered
   /// identical.
   ///
-  /// - Performance: O(1)
+  /// - Complexity: O(1)
   @available(SwiftStdlib 6.3, *)
   public func isTriviallyIdentical(to other: Self) -> Bool {
     self._wholeGuts.rawBits == other._wholeGuts.rawBits &&
