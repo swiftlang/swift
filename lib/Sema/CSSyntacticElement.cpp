@@ -1267,20 +1267,40 @@ private:
       if (info->hasMultipleReturns()) {
         SmallVector<Expr *, 4> resultExprs;
         for (auto *R : info->getReturns()) {
-          // TODO: This would have to become a check which would
-          //       use the type of the return as an element in the type-join.
-          assert(!info->solveReturnIndividually(R));
+          // If this `return` has already been type-checked,
+          // let's use a placeholder opaque value expression
+          // to inject its type into the join.
+          if (info->solveReturnIndividually(R)) {
+            auto target = *cs.getTargetFor(R);
+            auto *resultExpr = OpaqueValueExpr::createImplicit(
+                ctx, cs.simplifyType(cs.getType(target.getAsExpr())),
+                /*isPlaceholder=*/true, AllocationArena::ConstraintSolver);
+            resultExprs.push_back(resultExpr);
+            continue;
+          }
 
           auto target = createTargetForReturn(R);
-          resultExprs.push_back(target.getAsExpr());
+          auto *resultExpr = target.getAsExpr();
+
+          resultExprs.push_back(resultExpr);
+
+          if (R->isImplied())
+            cs.recordImpliedResult(resultExpr, ImpliedResultKind::ForClosure);
+
+          cs.setTargetFor(R, target);
+          cs.setContextualInfo(resultExpr, target.getExprContextualTypeInfo());
         }
 
-        ASTNode join = TypeJoinExpr::create(
-            cs.getASTContext(), info->getType()->getResult(), resultExprs);
+        ASTNode join =
+            TypeJoinExpr::create(ctx, info->getType()->getResult(), resultExprs,
+                                 AllocationArena::ConstraintSolver);
 
-        elements.push_back(makeElement(join, locator,
-                                       /*contextualTypeInfo=*/{},
-                                       /*isDiscarded=*/true));
+        elements.push_back(makeElement(
+            join,
+            cs.getConstraintLocator(
+                locator, LocatorPathElt::ContextualType(CTP_ClosureResult)),
+            /*contextualTypeInfo=*/{},
+            /*isDiscarded=*/true));
       }
     }
 
@@ -1288,19 +1308,18 @@ private:
   }
 
   void visitReturnStmt(ReturnStmt *returnStmt) {
-    // Record an implied result if we have one.
-    if (returnStmt->isImplied()) {
-      auto kind = context.getAsClosureExpr() ? ImpliedResultKind::ForClosure
-                                             : ImpliedResultKind::Regular;
-      auto *result = returnStmt->getResult();
-      cs.recordImpliedResult(result, kind);
-    }
-
     auto target = createTargetForReturn(returnStmt);
     if (cs.generateConstraints(target)) {
       hadError = true;
       return;
     }
+
+    // Note that target and contextual information is registered after
+    // `generateConstraints` because that operation has side-effects and
+    // can change passed-in target.
+    
+    cs.setContextualInfo(target.getAsExpr(), target.getExprContextualTypeInfo());
+    cs.setTargetFor(returnStmt, target);
   }
 
   void visitThenStmt(ThenStmt *thenStmt) {
@@ -1355,7 +1374,7 @@ private:
       // on the closure itself. Otherwise we use the default contextual type
       // locator, which will be created for us.
       ConstraintLocator *loc = nullptr;
-      if (context.isSingleExpressionClosure(cs) && returnStmt->hasResult())
+      if (closure->hasSingleExpressionBody() && returnStmt->hasResult())
         loc = cs.getConstraintLocator(closure, {LocatorPathElt::ClosureBody()});
 
       return {cs.getClosureType(closure)->getResult(), CTP_ClosureResult, loc};
@@ -1440,7 +1459,6 @@ private:
           if (!cs.shouldAttemptFixes())
             return true;
 
-          // dfdf
           auto *locator = cs.getConstraintLocator(bodyVar);
           if (cs.recordFix(RenameConflictingPatternVariables::create(
                   cs, joinType, conflicts, locator)))
@@ -1456,27 +1474,20 @@ private:
   }
 
   SyntacticElementTarget createTargetForReturn(ReturnStmt *returnStmt) {
-    Expr *resultExpr;
-    if (returnStmt->hasResult()) {
-      resultExpr = returnStmt->getResult();
-      assert(resultExpr && "non-empty result without expression?");
-    } else {
-      // If this is simplify `return`, let's create an empty tuple
-      // which is also useful if contextual turns out to be e.g. `Void?`.
-      // Also, attach return stmt source location so if there is a contextual
-      // mismatch we can produce a diagnostic in a valid source location.
-      resultExpr = getVoidExpr(cs.getASTContext(), returnStmt->getEndLoc());
-    }
-
+    auto *DC = context.getAsDeclContext();
     auto contextualResultInfo = getContextualResultInfoFor(returnStmt);
 
-    SyntacticElementTarget target(resultExpr, context.getAsDeclContext(),
-                                  contextualResultInfo, /*isDiscarded=*/false);
+    if (!returnStmt->hasResult()) {
+      auto *voidExpr = getVoidExpr(cs.getASTContext(), returnStmt->getEndLoc());
+      return {voidExpr, DC, contextualResultInfo,
+              /*isDiscarded=*/false};
+    }
 
-    cs.setContextualInfo(target.getAsExpr(), contextualResultInfo);
-    cs.setTargetFor(returnStmt, target);
+    auto *resultExpr = returnStmt->getResult();
+    assert(resultExpr && "non-empty result without expression?");
 
-    return target;
+    return SyntacticElementTarget::forReturn(returnStmt, resultExpr,
+                                             contextualResultInfo, DC);
   }
 };
 }

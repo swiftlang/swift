@@ -4899,18 +4899,23 @@ bool ConstraintSystem::generateConstraints(
       target.setExprConversionType(TypeChecker::getOptionalType(expr->getLoc(), var));
     }
 
+    auto *DC = target.getDeclContext();
+
     // If we have a parent return statement, record whether it's implied.
     if (auto *RS = target.getParentReturnStmt()) {
-      if (RS->isImplied())
-        recordImpliedResult(expr, ImpliedResultKind::Regular);
+      if (RS->isImplied()) {
+        recordImpliedResult(expr, isa<AbstractClosureExpr>(DC)
+                                      ? ImpliedResultKind::ForClosure
+                                      : ImpliedResultKind::Regular);
+      }
     }
 
-    expr = buildTypeErasedExpr(expr, target.getDeclContext(),
+    expr = buildTypeErasedExpr(expr, DC,
                                target.getExprContextualType(),
                                target.getExprContextualTypePurpose());
 
     // Generate constraints for the main system.
-    expr = generateConstraints(expr, target.getDeclContext());
+    expr = generateConstraints(expr, DC);
     if (!expr)
       return true;
     target.setExpr(expr);
