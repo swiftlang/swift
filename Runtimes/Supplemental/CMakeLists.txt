@@ -56,7 +56,7 @@ if(SwiftRuntime_ENABLE_stringprocessing)
     BUILD_ALWAYS 1
     CMAKE_ARGS
       ${COMMON_OPTIONS}
-      -DSwiftStringProcessing_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH})
+      -DSwiftStringProcessing_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH}-stringprocessing)
 endif()
 
 # Synchronization
@@ -70,7 +70,7 @@ if(SwiftRuntime_ENABLE_synchronization)
     BUILD_ALWAYS 1
     CMAKE_ARGS
       ${COMMON_OPTIONS}
-      -DSwiftSynchronization_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH})
+      -DSwiftSynchronization_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH}-synchronization)
 endif()
 
 # Distributed
@@ -84,7 +84,7 @@ if(SwiftRuntime_ENABLE_distributed)
     BUILD_ALWAYS 1
     CMAKE_ARGS
       ${COMMON_OPTIONS}
-      -DSwiftDistributed_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH})
+      -DSwiftDistributed_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH}-distributed)
 endif()
 
 
@@ -99,7 +99,7 @@ if(SwiftRuntime_ENABLE_differentiation)
     BUILD_ALWAYS 1
     CMAKE_ARGS
       ${COMMON_OPTIONS}
-      -DSwiftDifferentiation_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH})
+      -DSwiftDifferentiation_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH}-differentiation)
 endif()
 
 # Observation
@@ -113,7 +113,7 @@ if(SwiftRuntime_ENABLE_observation)
     BUILD_ALWAYS 1
     CMAKE_ARGS
       ${COMMON_OPTIONS}
-      -DSwiftObservation_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH})
+      -DSwiftObservation_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH}-observation)
 endif()
 
 # Runtime
@@ -127,5 +127,5 @@ if(SwiftRuntime_ENABLE_runtime)
     BUILD_ALWAYS 1
     CMAKE_ARGS
       ${COMMON_OPTIONS}
-      -DSwiftRuntime_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH})
+      -DSwiftRuntime_MODULE_CACHE_PATH=${SwiftSupplemental_MODULE_CACHE_PATH}-runtime)
 endif()
