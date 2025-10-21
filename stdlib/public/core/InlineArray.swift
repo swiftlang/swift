@@ -44,7 +44,7 @@
 /// Just as with `Array`, you can read and modify an element in an
 /// `InlineArray` using a subscript. Unless you use the memory-unsafe
 /// `unchecked` subscript, any index you provide is subject to bounds checking;
-/// if invalid, it will trigger a runtime error in your program.
+/// invalid indices trigger a runtime error in your program.
 ///
 ///     var values: [3 of Double] = [1, 1.5, 2]
 ///     print(values[0])  // Prints "1.0"
