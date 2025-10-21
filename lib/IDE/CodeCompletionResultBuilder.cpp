@@ -110,7 +110,7 @@ static void verifyUSRToDeclReconstruction(const Decl *D) {
   if (!shouldCopyAssociatedUSRForDecl(VD))
     return;
 
-  // FIXME(#): We don't currently handle `@abi` correctly.
+  // FIXME(gh#85030): We don't currently handle `@abi` correctly.
   if (D->getAttrs().hasAttribute<ABIAttr>())
     return;
 
