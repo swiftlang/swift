@@ -3847,7 +3847,8 @@ ERROR(decl_from_hidden_module,none,
       "%2 was not imported by this file|"
       "C++ types from imported module %2 do not support library evolution|"
       "it was imported via the internal bridging header|"
-      "%2 was not imported publicly}3",
+      "%2 was not imported publicly|"
+      "it is a struct marked '@_implementationOnly'}3",
       (const Decl *, unsigned, Identifier, unsigned))
 ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "%0 aliases '%1.%2' and cannot be used %select{here|"
@@ -3865,7 +3866,8 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "%4 was not imported by this file|"
       "C++ types from imported module %4 do not support library evolution|"
       "it was imported via the internal bridging header|"
-      "%4 was not imported publicly}5",
+      "%4 was not imported publicly|"
+      "it is a struct marked '@_implementationOnly'}5",
       (const TypeAliasDecl *, StringRef, StringRef, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
@@ -3881,7 +3883,8 @@ ERROR(conformance_from_implementation_only_module,none,
       "%3 was not imported by this file|"
       "C++ types from imported module %3 do not support library evolution|"
       "it was imported via the internal bridging header|"
-      "%3 was not imported publicly}4",
+      "%3 was not imported publicly|"
+      "it is a struct marked '@_implementationOnly'}4",
       (Type, Identifier, unsigned, Identifier, unsigned))
 NOTE(assoc_conformance_from_implementation_only_module,none,
      "in associated type %0 (inferred as %1)", (Type, Type))
@@ -7349,7 +7352,8 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "%2 was not imported by this file|"
       "C++ APIs from imported module %2 do not support library evolution|"
       "it was imported via the internal bridging header|"
-      "%2 was not imported publicly}3",
+      "%2 was not imported publicly|"
+      "it is a struct marked '@_implementationOnly'}3",
       (const ValueDecl *, unsigned, Identifier, unsigned))
 
 ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
@@ -7361,7 +7365,8 @@ ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
       "%4 was not imported by this file|"
       "C++ types from imported module %4 do not support library evolution|"
       "it was imported via the internal bridging header|"
-      "%4 was not imported publicly}5",
+      "%4 was not imported publicly|"
+      "it is a struct marked '@_implementationOnly'}5",
       (const TypeAliasDecl *, StringRef, StringRef, unsigned, Identifier, unsigned))
 
 NOTE(missing_import_inserted,
