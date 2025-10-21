@@ -42,7 +42,7 @@ static const void *getBaseAddress(void) {
   // directly into each Swift binary rather than being exported from the Swift
   // runtime.
   Dl_info info;
-  if (dladdr(__dso_handle, &info)) [
+  if (dladdr(__dso_handle, &info)) {
     return info.dli_fbase;
   }
 #endif
