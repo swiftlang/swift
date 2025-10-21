@@ -155,6 +155,22 @@ copy_files(public/Platform Overlay/Android/Math
   FILES
     Math.swift)
 
+# Linux Glibc Overlay
+message(STATUS "Glibc modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Linux/glibc/clang")
+copy_files(public/Platform Overlay/Linux/glibc/clang
+  FILES
+    glibc.modulemap.gyb
+    SwiftGlibc.h.gyb)
+
+message(STATUS "Glibc [${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Linux/glibc")
+copy_files(public/Platform Overlay/Linux/glibc
+  FILES
+    Glibc.swift.gyb
+    POSIXError.swift
+    Platform.swift
+    TiocConstants.swift
+    tgmath.swift.gyb)
+
 # Windows Overlay
 message(STATUS "WinSDK[${StdlibSources}/public/Windows] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/WinSDK")
 copy_files(public/Windows Overlay/Windows/WinSDK FILES WinSDK.swift)
