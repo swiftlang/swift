@@ -70,7 +70,7 @@
 /// -------------
 ///
 /// An `InlineArray` stores its elements contiguously. If an `InlineArray` is a
-/// stored property of a class, then it will be allocated on the heap along with
+/// stored property of a class, then it's allocated on the heap along with
 /// the other stored properties of the class. Otherwise, in general, an
 /// `InlineArray` will be allocated on the stack.
 ///
