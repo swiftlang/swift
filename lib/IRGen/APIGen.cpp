@@ -84,6 +84,8 @@ static void serialize(llvm::json::OStream &OS, APIAvailability availability) {
     OS.attribute("obsoleted", availability.obsoleted);
   if (availability.unavailable)
     OS.attribute("unavailable", availability.unavailable);
+  if (availability.spiAvailable)
+    OS.attribute("SPIAvailable", availability.spiAvailable);
 }
 
 static void serialize(llvm::json::OStream &OS, APILinkage linkage) {
