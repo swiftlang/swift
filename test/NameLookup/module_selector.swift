@@ -111,6 +111,8 @@ extension B: @retroactive main::Equatable {
       // expected-error@-2 {{cannot infer contextual base in reference to member 'main::min'}}
 
       self = B.main::init(value: .min)
+      // FIXME improve: expected-error@-1 {{'B' cannot be constructed because it has no accessible initializers}}
+      // expected-error@-2 {{cannot infer contextual base in reference to member 'min'}}
     }
 
     self.main::myNegate()
@@ -119,7 +121,9 @@ extension B: @retroactive main::Equatable {
     // FIXME improve: expected-error@-1 {{cannot find 'main::fatalError' in scope}}
 
     _ = \main::A.magnitude
+    // FIXME improve: expected-error@-1 {{'main::A' in scope}} -- different diagnostic wording for legacy parser vs. ASTGen
     _ = \A.main::magnitude
+    // FIXME improve: expected-error@-1 {{value of type 'A' has no member 'main::magnitude'}}
   }
 
   // FIXME: Can we test @convention(witness_method:)?
@@ -167,11 +171,13 @@ extension C: @retroactive ModuleSelectorTestingKit::Equatable {
     }
     else {
       self = ModuleSelectorTestingKit::C(value: .ModuleSelectorTestingKit::min)
+      // FIXME improve: expected-error@-1 {{type 'Int' has no member 'ModuleSelectorTestingKit::min'}}
 
       self = C.ModuleSelectorTestingKit::init(value: .min)
     }
 
     self.ModuleSelectorTestingKit::myNegate()
+    // FIXME improve: expected-error@-1 {{value of type 'C' has no member 'ModuleSelectorTestingKit::myNegate'}}
 
     ModuleSelectorTestingKit::fatalError()
     // FIXME improve: expected-error@-1 {{cannot find 'ModuleSelectorTestingKit::fatalError' in scope}}
@@ -225,14 +231,19 @@ extension D: @retroactive Swift::Equatable {
       // expected-error@-2 {{cannot infer contextual base in reference to member 'Swift::min'}}
 
       self = D.Swift::init(value: .min)
+      // FIXME improve: expected-error@-1 {{'D' cannot be constructed because it has no accessible initializers}}
+      // expected-error@-2 {{cannot infer contextual base in reference to member 'min'}}
     }
 
     self.Swift::myNegate()
+    // FIXME improve: expected-error@-1 {{value of type 'D' has no member 'Swift::myNegate'}}
 
     Swift::fatalError()
 
     _ = \Swift::A.magnitude
+    // FIXME improve: expected-error@-1 {{'Swift::A' in scope}} -- different diagnostic wording for legacy parser vs. ASTGen
     _ = \A.Swift::magnitude
+    // FIXME improve: expected-error@-1 {{value of type 'A' has no member 'Swift::magnitude'}}
   }
 
   // FIXME: Can we test @convention(witness_method:)?
@@ -309,6 +320,8 @@ func badModuleNames() {
   // expected-error@-1 {{cannot find 'NonexistentModule::print' in scope}}
 
   _ = "foo".NonexistentModule::count
+  // FIXME improve: expected-error@-1 {{value of type 'String' has no member 'NonexistentModule::count'}}
+  // FIXME: expected-EVENTUALLY-note@-2 {{did you mean module 'Swift'?}} {{13-30=Swift}}
 
   let x: NonexistentModule::MyType = NonexistentModule::MyType()
   // expected-error@-1 {{cannot find type 'NonexistentModule::MyType' in scope}}
