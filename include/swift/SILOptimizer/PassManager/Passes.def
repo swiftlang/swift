@@ -254,8 +254,6 @@ LEGACY_PASS(ConstantEvaluatorTester, "test-constant-evaluator",
       "Test constant evaluator")
 LEGACY_PASS(ConstantEvaluableSubsetChecker, "test-constant-evaluable-subset",
      "Test Swift code snippets expected to be constant evaluable")
-LEGACY_PASS(CopyForwarding, "copy-forwarding",
-     "Copy Forwarding to Remove Redundant Copies")
 LEGACY_PASS(CopyPropagation, "copy-propagation",
      "Copy propagation to Remove Redundant SSA Copies, pruning debug info")
 LEGACY_PASS(MandatoryCopyPropagation, "mandatory-copy-propagation",

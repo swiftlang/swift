@@ -160,7 +160,11 @@ private func getRemovableAllocStackDestination(
   //   %x = load %allocStack   // looks like a load, but is a `load [take]`
   //   strong_release %x
   // ```
-  guard copy.parentFunction.hasOwnership || allocStack.isDestroyedOnAllPaths(context) else {
+  guard copy.parentFunction.hasOwnership ||
+        allocStack.isDestroyedOnAllPaths(context) ||
+        // We can easily remove a dead alloc_stack
+        allocStack.uses.ignore(user: copy).ignore(usersOfType: DeallocStackInst.self).isEmpty
+  else {
     return nil
   }
 
@@ -177,6 +181,10 @@ private func hoistDestroy(of allocStack: AllocStackInst, after lastUse: Instruct
   case let li as LoadInst where li.loadOwnership == .take:
     assert(li.address == allocStack, "load must be not take a projected address")
     return
+  case let apply as ApplyInst where apply.consumes(address: allocStack):
+    if allocStack.uses.contains(where: { $0.instruction == apply && apply.convention(of: $0)!.isGuaranteed }) {
+      return
+    }
   default:
     break
   }
@@ -263,6 +271,14 @@ private extension AllocStackInst {
       }
     }
     return true
+  }
+}
+
+private extension ApplySite {
+  func consumes(address: Value) -> Bool {
+    argumentOperands.contains { argOp in
+      argOp.value == address && convention(of: argOp)!.isConsumed
+    }
   }
 }
 
@@ -531,13 +547,21 @@ private struct UseCollector : AddressDefUseWalker {
       uses.insert(copyFromStack)
       return .continueWalk
 
+    case is DebugValueInst:
+      return .continueWalk
+
     default:
       return .abortWalk
     }
   }
 
   private mutating func visitApply(address: Operand, apply: ApplySite) -> WalkResult {
-    if !apply.convention(of: address)!.isGuaranteed {
+    let argConvention = apply.convention(of: address)!
+    guard argConvention.isGuaranteed ||
+          // Only accept consuming-in arguments if it consumes the whole `alloc_stack`. A consume from
+          // a projection would destroy only a part of the `alloc_stack` and we don't handle this.
+          (argConvention == .indirectIn && (copy.isTakeOfSource && address.value == copy.destinationAddress))
+    else {
       return .abortWalk
     }
     uses.insert(apply)
