@@ -260,7 +260,6 @@ register(Combos.benchmarks)
 register(ContiguousArrayTests.benchmarks)
 register(CountAlgo.benchmarks)
 register(ClassArrayGetter.benchmarks)
-register(ContiguousArrayTests.benchmarks)
 register(CreateObjects.benchmarks)
 // rdar://128520766
 // register(CxxSetToCollection.benchmarks)
