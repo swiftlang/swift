@@ -28,6 +28,8 @@ endif()
 include(GNUInstallDirs)
 include(ResourceEmbedding)
 
+set(Swift_MODULE_CACHE_DIR "" CACHE STRING "Module cache to use for Swift files")
+
 # NOTE: we disable availability checking because we need to use code from the
 # RuntimeModule, but we also need to build with an availability version below
 # that defined by Backtracing 6.2 (for now).
@@ -44,7 +46,8 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-cxx-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-availability-checking>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-availability-checking>"
+  "$<$<AND:$<BOOL:${Swift_MODULE_CACHE_DIR}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-module-cache-path ${Swift_MODULE_CACHE_DIR}>")
 
 # LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
 # LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'

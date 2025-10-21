@@ -1840,7 +1840,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
           -DSwiftCore_ENABLE_CONCURRENCY=${build_concurrency}
           -DSwiftCore_ENABLE_SOURCE_INFO=${SWIFT_STDLIB_ENABLE_SOURCE_INFO}
-          -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
+          -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}
+          -DSwift_MODULE_CACHE_DIR=<BINARY_DIR>/module-cache)
       if(_stdlib_needs_swift_frontend)
         add_dependencies("${stdlib_target}-core" swift-frontend libSwiftScan)
       endif()
@@ -1870,7 +1871,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=TRUE
           -DSwiftOverlay_ENABLE_CXX_INTEROP=TRUE
-          -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
+          -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}
+          -DSwift_MODULE_CACHE_DIR=<BINARY_DIR>/module-cache)
 
       set(runtimes_to_enable StringProcessing|Synchronization|Distributed|Observation)
       if(sdk STREQUAL "OSX")
@@ -1901,7 +1903,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=TRUE
-          -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
+          -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}
+          -DSwift_MODULE_CACHE_SUBDIR=module-cache)
     endforeach()
   endforeach()
 endif()
