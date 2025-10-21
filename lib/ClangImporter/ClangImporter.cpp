@@ -1021,10 +1021,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
 
   // Note: Reusing the file manager is safe; this is a component that's already
   // reused when building PCM files for the module cache.
-  CI.setVirtualFileSystem(
-      Impl.Instance->getFileManager().getVirtualFileSystemPtr());
-  CI.setFileManager(&Impl.Instance->getFileManager());
-  CI.createSourceManager();
+  CI.createSourceManager(Impl.Instance->getFileManager());
   auto &clangSrcMgr = CI.getSourceManager();
   auto FID = clangSrcMgr.createFileID(
                         std::make_unique<ZeroFilledMemoryBuffer>(1, "<main>"));
@@ -1405,15 +1402,21 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
   if (tracker)
     instance.addDependencyCollector(tracker->getClangCollector());
 
-  // Now set up the real client for Clang diagnostics---configured with proper
-  // options---as opposed to the temporary one we made above.
-  auto actualDiagClient = std::make_unique<ClangDiagnosticConsumer>(
-      importer->Impl, instance.getDiagnosticOpts(),
-      importerOpts.DumpClangDiagnostics);
+  {
+    // Now set up the real client for Clang diagnostics---configured with proper
+    // options---as opposed to the temporary one we made above.
+    auto actualDiagClient = std::make_unique<ClangDiagnosticConsumer>(
+        importer->Impl, instance.getDiagnosticOpts(),
+        importerOpts.DumpClangDiagnostics);
+    instance.createDiagnostics(*VFS, actualDiagClient.release());
+  }
 
-  instance.createVirtualFileSystem(std::move(VFS), actualDiagClient.get());
-  instance.createFileManager();
-  instance.createDiagnostics(actualDiagClient.release());
+  // Set up the file manager.
+  {
+    VFS = clang::createVFSFromCompilerInvocation(
+        instance.getInvocation(), instance.getDiagnostics(), std::move(VFS));
+    instance.createFileManager(VFS);
+  }
 
   // Don't stop emitting messages if we ever can't load a module.
   // FIXME: This is actually a general problem: any "fatal" error could mess up
@@ -1432,13 +1435,11 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
   if (ctx.LangOpts.ClangTarget.has_value()) {
     // If '-clang-target' is set, create a mock invocation with the Swift triple
     // to configure CodeGen and Target options for Swift compilation.
-    auto swiftTargetClangArgs = importer->getClangCC1Arguments(
-        ctx, instance.getVirtualFileSystemPtr(), true);
+    auto swiftTargetClangArgs = importer->getClangCC1Arguments(ctx, VFS, true);
     if (!swiftTargetClangArgs)
       return nullptr;
     auto swiftTargetClangInvocation = createClangInvocation(
-        importer.get(), importerOpts, instance.getVirtualFileSystemPtr(),
-        *swiftTargetClangArgs);
+        importer.get(), importerOpts, VFS, *swiftTargetClangArgs);
     if (!swiftTargetClangInvocation)
       return nullptr;
 
@@ -1923,14 +1924,15 @@ std::string ClangImporter::getBridgingHeaderContents(
 
   invocation->getPreprocessorOpts().resetNonModularOptions();
 
+  clang::FileManager &fileManager = Impl.Instance->getFileManager();
+
   clang::CompilerInstance rewriteInstance(
       std::move(invocation), Impl.Instance->getPCHContainerOperations(),
       &Impl.Instance->getModuleCache());
-  rewriteInstance.setVirtualFileSystem(
-      Impl.Instance->getFileManager().getVirtualFileSystemPtr());
-  rewriteInstance.setFileManager(&Impl.Instance->getFileManager());
-  rewriteInstance.createDiagnostics(new clang::IgnoringDiagConsumer);
-  rewriteInstance.createSourceManager();
+  rewriteInstance.createDiagnostics(fileManager.getVirtualFileSystem(),
+                                    new clang::IgnoringDiagConsumer);
+  rewriteInstance.setFileManager(&fileManager);
+  rewriteInstance.createSourceManager(fileManager);
   rewriteInstance.setTarget(&Impl.Instance->getTarget());
 
   std::string result;
@@ -1978,8 +1980,7 @@ std::string ClangImporter::getBridgingHeaderContents(
     return "";
   }
 
-  if (auto fileInfo =
-          rewriteInstance.getFileManager().getOptionalFileRef(headerPath)) {
+  if (auto fileInfo = fileManager.getOptionalFileRef(headerPath)) {
     fileSize = fileInfo->getSize();
     fileModTime = fileInfo->getModificationTime();
   }
@@ -2028,15 +2029,16 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
   // Share the CASOption and the underlying CAS.
   invocation->setCASOption(Impl.Invocation->getCASOptsPtr());
 
+  clang::FileManager &fileManager = Impl.Instance->getFileManager();
+
   auto clonedInstance = std::make_unique<clang::CompilerInstance>(
       std::move(invocation), Impl.Instance->getPCHContainerOperations(),
       &Impl.Instance->getModuleCache());
-  clonedInstance->setVirtualFileSystem(
-      Impl.Instance->getFileManager().getVirtualFileSystemPtr());
-  clonedInstance->setFileManager(&Impl.Instance->getFileManager());
-  clonedInstance->createDiagnostics(&Impl.Instance->getDiagnosticClient(),
+  clonedInstance->createDiagnostics(fileManager.getVirtualFileSystem(),
+                                    &Impl.Instance->getDiagnosticClient(),
                                     /*ShouldOwnClient=*/false);
-  clonedInstance->createSourceManager();
+  clonedInstance->setFileManager(&fileManager);
+  clonedInstance->createSourceManager(fileManager);
   clonedInstance->setTarget(&Impl.Instance->getTarget());
   clonedInstance->setOutputBackend(Impl.SwiftContext.OutputBackend);
 
