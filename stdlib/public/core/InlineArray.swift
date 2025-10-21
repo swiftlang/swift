@@ -35,8 +35,7 @@
 ///     let g: [3 of _]            = [1, 2, 3]
 ///     let h: [_ of _]            = [1, 2, 3]
 ///
-/// You can also use one of the type's initializers to create a new value
-/// programmatically.
+/// You can also use one of the type's initializers to create a new value.
 ///
 /// Accessing Elements
 /// ------------------
