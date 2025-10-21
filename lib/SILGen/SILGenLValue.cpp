@@ -1528,8 +1528,10 @@ namespace {
       return cast<AccessorDecl>(Accessor.getFuncDecl());
     }
 
-    ManagedValue emitValue(SILGenFunction &SGF, SILLocation loc, VarDecl *field,
-                           ArgumentSource &&value, AccessorKind accessorKind) {
+    ManagedValue emitValueForAssignOrInit(SILGenFunction &SGF, SILLocation loc,
+                                          VarDecl *field,
+                                          ArgumentSource &&value,
+                                          AccessorKind accessorKind) {
       auto accessorInfo = SGF.getConstantInfo(
           SGF.getTypeExpansionContext(),
           SILDeclRef(field->getOpaqueAccessor(accessorKind)));
@@ -1553,7 +1555,8 @@ namespace {
       assert(value.isRValue());
       ManagedValue Mval =
           std::move(value).asKnownRValue(SGF).getAsSingleValue(SGF, loc);
-      auto param = accessorTy->getParameters()[0];
+      auto paramIdx = accessorConv.getSILArgIndexOfFirstParam();
+      auto param = accessorConv.getParamInfoForSILArg(paramIdx);
       SILType loweredSubstArgType = Mval.getType();
       if (param.isIndirectInOut()) {
         loweredSubstArgType =
@@ -1572,11 +1575,8 @@ namespace {
             fieldTy->getCanonicalType());
       }
 
-      auto newValueArgIdx = accessorConv.getNumIndirectSILResults();
       // If we need the argument in memory, materialize an address.
-      if (accessorConv.getSILArgumentConvention(newValueArgIdx)
-              .isIndirectConvention() &&
-          !Mval.getType().isAddress()) {
+      if (accessorConv.isSILIndirect(param) && !Mval.getType().isAddress()) {
         Mval = Mval.materialize(SGF, loc);
       }
 
@@ -1610,7 +1610,7 @@ namespace {
         override {
       VarDecl *field = cast<VarDecl>(Storage);
       auto Mval =
-          emitValue(SGF, loc, field, std::move(value), AccessorKind::Init);
+          emitValueForAssignOrInit(SGF, loc, field, std::move(value), AccessorKind::Init);
       SGF.emitAssignOrInit(loc, base, field, Mval, Substitutions);
     }
 
@@ -1875,7 +1875,7 @@ namespace {
 
         // Create the assign_or_init SIL instruction
         auto Mval =
-            emitValue(SGF, loc, field, std::move(value), AccessorKind::Set);
+            emitValueForAssignOrInit(SGF, loc, field, std::move(value), AccessorKind::Set);
         auto selfOrLocal = selfMetatype ? base.getValue() : proj.forward(SGF);
         SGF.B.createAssignOrInit(loc, field, selfOrLocal, Mval.forward(SGF),
                                  initFn.getValue(), setterFn,
