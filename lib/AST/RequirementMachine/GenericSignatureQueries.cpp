@@ -354,7 +354,7 @@ Type RequirementMachine::getReducedTypeParameter(
     CanType t,
     ArrayRef<GenericTypeParamType *> genericParams) const {
   if (Failed)
-    return ErrorType::get(t);
+    return t;
 
   // Get a simplified term T.
   auto term = Context.getMutableTermForType(t, /*proto=*/nullptr);
