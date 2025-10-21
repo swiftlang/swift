@@ -12,7 +12,7 @@
 
 /// A fixed-size array.
 ///
-/// An `InlineArray` is a specialized container that does not use a separate
+/// An `InlineArray` is a specialized container that doesn't use a separate
 /// memory allocation just to store its elements. When a value is copied, all of
 /// its elements are copied eagerly. Use an `InlineArray` when you have a fixed
 /// number of elements and need to avoid a separate heap allocation.
