@@ -3617,6 +3617,28 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst: {
+    SourceLoc ValueLoc;
+    SILValue Value;
+
+    if (parseTypedValueRef(Value, ValueLoc, B) ||
+        parseSILDebugLocation(InstLoc, B)) {
+      return true;
+    }
+
+    if (B.getFunction().hasOwnership()) {
+      if (Value->getOwnershipKind() != OwnershipKind::Guaranteed) {
+        P.diagnose(ValueLoc, diag::sil_operand_has_wrong_ownership_kind,
+                   Value->getOwnershipKind().asString(),
+                   OwnershipKind(OwnershipKind::Guaranteed).asString());
+        return true;
+      }
+    }
+
+    ResultVal = B.createImplicitActorToOpaqueIsolationCast(InstLoc, Value);
+    break;
+  }
+
   case SILInstructionKind::MoveValueInst: {
     bool allowsDiagnostics = false;
     auto isLexical = IsNotLexical;

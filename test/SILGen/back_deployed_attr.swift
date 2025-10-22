@@ -93,7 +93,7 @@ public func backDeployedCaller(_ s: inout S<Z>) {
 @backDeployed(before: macOS 10.52)
 nonisolated(nonsending)
 public func backDeployedNonisolatedNonsending() async -> Int {
-  // CHECK: bb0(%0 : @guaranteed $Optional<any Actor>):
+  // CHECK: bb0(%0 : @guaranteed $Builtin.ImplicitActor):
   // CHECK:   [[FALLBACK_FN:%.*]] = function_ref @$s11back_deploy0A29DeployedNonisolatedNonsendingSiyYaFTwB :
   // CHECK:   apply [[FALLBACK_FN]](%0)
   // CHECK:   [[SHIPPING_FN:%.*]] = function_ref @$s11back_deploy0A29DeployedNonisolatedNonsendingSiyYaF :

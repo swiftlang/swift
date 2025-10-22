@@ -5,6 +5,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: std_span
 
 //--- Inputs/module.modulemap
 module Test {
@@ -92,6 +93,12 @@ using TTakeInt = TTake<int>;
 using TTakePtr = TTake<int *>;
 using TTakeSafeTuple = TTake<SafeTuple>;
 using TTakeUnsafeTuple = TTake<UnsafeTuple>;
+
+struct HoldsShared {
+  SharedObject* obj;
+
+  SharedObject* getObj() const SWIFT_RETURNS_INDEPENDENT_VALUE;
+};
 
 //--- test.swift
 
@@ -183,8 +190,9 @@ func useSharedReference(frt: SharedObject, x: OwnedData) {
 }
 
 @available(SwiftStdlib 5.8, *)
-func useSharedReference(frt: DerivedFromSharedObject) {
+func useSharedReference(frt: DerivedFromSharedObject, h: HoldsShared) {
   let _ = frt
+  let _ = h.getObj()
 }
 
 func useTTakeInt(x: TTakeInt) {

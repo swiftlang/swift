@@ -426,6 +426,9 @@ public:
 
   bool isSending() const;
 
+  /// Returns true if this SILFunctionArgument is an 'inout sending' parameter.
+  bool isInOutSending() const;
+
   Lifetime getLifetime() const {
     return getType()
         .getLifetime(*getFunction())

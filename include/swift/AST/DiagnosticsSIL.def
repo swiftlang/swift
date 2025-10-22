@@ -1201,6 +1201,12 @@ NOTE(rbi_add_generic_parameter_sendable_conformance,none,
      "consider making generic parameter %0 conform to the 'Sendable' protocol",
      (Type))
 
+ERROR(regionbasedisolation_inout_sending_in_same_region, none,
+      "'inout sending' parameters %0 and %1 can be potentially accessed from each other at function return risking data races in caller",
+      (Identifier, Identifier))
+NOTE(regionbasedisolation_inout_sending_in_same_region_note, none,
+     "caller function assumes on return that %0 and %1 cannot be used to access each other implying sending them to different isolation domains does not risk a data race", (Identifier, Identifier))
+
 // Concurrency related diagnostics
 ERROR(cannot_find_executor_factory_type, none,
       "the DefaultExecutorFactory type could not be found", ())

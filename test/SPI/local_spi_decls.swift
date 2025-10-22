@@ -51,10 +51,10 @@ func inlinable() -> SPIClass { // expected-error {{class 'SPIClass' cannot be us
   // expected-error@-1 {{stored property 'spiInFrozen' cannot be declared '@_spi' in a '@frozen' struct}}
 
   var spiTypeInFrozen = SPIStruct() // expected-error {{struct 'SPIStruct' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
-  // expected-error@-1 {{cannot use struct 'SPIStruct' here; it is SPI}}
+  // expected-error@-1 {{cannot use struct 'SPIStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
   // expected-error@-2 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
-  private var spiTypeInFrozen1: SPIClass // expected-error {{cannot use class 'SPIClass' here; it is SPI}}
+  private var spiTypeInFrozen1: SPIClass // expected-error {{cannot use class 'SPIClass' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 }
 
 @_spi(S)
@@ -81,8 +81,8 @@ public func genFuncBad<T: SPIProtocol>(_ t: T) {} // expected-error {{cannot use
 @_spi(S) func internalCantBeSPI() {} // expected-error{{internal global function cannot be declared '@_spi' because only public and open declarations can be '@_spi'}} {{1-10=}}
 
 public struct PublicStructWithProperties {
-  public var a: SPIClass // expected-error {{cannot use class 'SPIClass' here; it is SPI}}
-  public var b = SPIClass() // expected-error {{cannot use class 'SPIClass' here; it is SPI}}
+  public var a: SPIClass // expected-error {{cannot use class 'SPIClass' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+  public var b = SPIClass() // expected-error {{cannot use class 'SPIClass' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 }
 
 @_spi(S)

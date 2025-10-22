@@ -2642,7 +2642,9 @@ void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
           if (isa<ParenExpr>(expr) || isa<TupleExpr>(expr)) {
             DE.diagnose(expr->getLoc(),
                         diag::expr_string_interpolation_outside_string);
-          } else {
+          } else if (!isa<ErrorExpr>(expr)) {
+            // If we have an `ErrorExpr`, we've probably already emitted a
+            // diagnostic explaining it.
             DE.diagnose(expr->getLoc(),
                         diag::expr_swift_keypath_invalid_component);
           }

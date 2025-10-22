@@ -33,20 +33,24 @@ using namespace swift;
 #define ABSTRACT_TYPEREPR(Id, Parent) TYPEREPR(Id, Parent)
 #include "swift/AST/TypeReprNodes.def"
 
-BridgedUnqualifiedIdentTypeRepr
-BridgedUnqualifiedIdentTypeRepr_createParsed(BridgedASTContext cContext,
-                                             SourceLoc loc, Identifier id) {
+BridgedUnqualifiedIdentTypeRepr BridgedUnqualifiedIdentTypeRepr_createParsed(
+    BridgedASTContext cContext,
+    BridgedDeclNameRef cName,
+    BridgedDeclNameLoc cLoc) {
   return UnqualifiedIdentTypeRepr::create(cContext.unbridged(),
-                                          DeclNameLoc(loc), DeclNameRef(id));
+                                          cLoc.unbridged(),
+                                          cName.unbridged());
 }
 
 BridgedUnqualifiedIdentTypeRepr BridgedUnqualifiedIdentTypeRepr_createParsed(
-    BridgedASTContext cContext, Identifier name, SourceLoc nameLoc,
-    BridgedArrayRef genericArgs, SourceLoc lAngleLoc, SourceLoc rAngleLoc) {
+    BridgedASTContext cContext,
+    BridgedDeclNameRef cName,
+    BridgedDeclNameLoc cNameLoc,
+    BridgedArrayRef genericArgs,
+    SourceLoc lAngleLoc, SourceLoc rAngleLoc) {
   ASTContext &context = cContext.unbridged();
-  auto Loc = DeclNameLoc(nameLoc);
-  auto Name = DeclNameRef(name);
-  return UnqualifiedIdentTypeRepr::create(context, Loc, Name,
+  return UnqualifiedIdentTypeRepr::create(context, cNameLoc.unbridged(),
+                                          cName.unbridged(),
                                           genericArgs.unbridged<TypeRepr *>(),
                                           SourceRange{lAngleLoc, rAngleLoc});
 }
@@ -223,16 +227,17 @@ BridgedTupleTypeRepr_createParsed(BridgedASTContext cContext,
 }
 
 BridgedDeclRefTypeRepr BridgedDeclRefTypeRepr_createParsed(
-    BridgedASTContext cContext, BridgedTypeRepr cBase, Identifier name,
-    SourceLoc loc, BridgedArrayRef cGenericArguments, SourceRange angleRange) {
+    BridgedASTContext cContext, BridgedTypeRepr cBase, BridgedDeclNameRef cName,
+    BridgedDeclNameLoc cLoc, BridgedArrayRef cGenericArguments,
+    SourceRange angleRange) {
   ASTContext &context = cContext.unbridged();
   auto genericArguments = cGenericArguments.unbridged<TypeRepr *>();
 
   assert(angleRange.isValid() || genericArguments.empty());
 
-  return DeclRefTypeRepr::create(context, cBase.unbridged(), DeclNameLoc(loc),
-                                 DeclNameRef(name), genericArguments,
-                                 angleRange);
+  return DeclRefTypeRepr::create(
+      context, cBase.unbridged(), cLoc.unbridged(),
+      cName.unbridged(), genericArguments, angleRange);
 }
 
 BridgedCompositionTypeRepr

@@ -4555,6 +4555,9 @@ copy.
 The resulting value must meet the usual ownership requirements; for
 example, a trivial type must have '.none' ownership.
 
+NOTE: A guaranteed result value is assumed to be a non-dependent guaranteed
+value like a function argument.
+
 ### ref_to_raw_pointer
 
 ```
@@ -4870,6 +4873,27 @@ TODO
 ### objc_existential_metatype_to_object
 
 TODO
+
+### cast_implicitactor_to_opaqueisolation
+
+```
+sil-instruction ::= 'cast_implicitactor_to_opaqueisolation' sil-operand
+
+%1 = cast_implicitactor_to_opaqueisolation %0 : $Builtin.ImplicitActor
+// %0 must have guaranteed ownership
+// %1 must have guaranteed ownership
+// %1 will have type $Optional<any Actor>
+```
+
+Convert a `$Builtin.ImplicitActor` to a `$Optional<any Actor>` masking out any
+bits that we have stolen from the witness table pointer.
+
+At IRGen time, we lower this to the relevant masking operations, allowing us to
+avoid exposing these low level details to the SIL optimizer. On platforms where
+we support TBI, IRGen uses a mask that is the bottom 2 bits of the top nibble of
+the pointer. On 64 bit platforms this is bit 60,61. If the platform does not
+support TBI, then IRGen uses the bottom two tagged pointer bits of the pointer
+(bits 0,1).
 
 ## Checked Conversions
 

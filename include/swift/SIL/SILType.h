@@ -267,6 +267,8 @@ public:
 
   bool isBuiltinBridgeObject() const { return is<BuiltinBridgeObjectType>(); }
 
+  bool isBuiltinImplicitActor() const { return is<BuiltinImplicitActorType>(); }
+
   SILType getBuiltinVectorElementType() const {
     auto vector = castTo<BuiltinVectorType>();
     return getPrimitiveObjectType(vector.getElementType());
@@ -961,6 +963,13 @@ public:
   /// Returns true if this type is an actor or a distributed actor.
   bool isAnyActor() const { return getASTType()->isAnyActorType(); }
 
+  /// Is this a type whose value is a value that a function can use in an
+  /// isolated parameter position. This could be a type that actually conforms
+  /// to AnyActor or it could be a type like any Actor, Optional<any Actor> or
+  /// Builtin.ImplicitActor that do not conform to Actor but from which we can
+  /// derive a value that conforms to the Actor protocol.
+  bool canBeIsolatedTo() const { return getASTType()->canBeIsolatedTo(); }
+
   /// Returns true if this function conforms to the Sendable protocol.
   ///
   /// NOTE: For diagnostics this is not always the correct thing to check since
@@ -1026,8 +1035,28 @@ public:
   /// Return '()'
   static SILType getEmptyTupleType(const ASTContext &C);
 
+  /// Return (elementTypes) with control of category.
+  static SILType getTupleType(const ASTContext &ctx,
+                              ArrayRef<SILType> elementTypes,
+                              SILValueCategory category);
+
+  /// Return $(elementTypes)
+  static SILType getTupleObjectType(const ASTContext &ctx,
+                                    ArrayRef<SILType> elementTypes) {
+    return getTupleType(ctx, elementTypes, SILValueCategory::Object);
+  }
+
+  /// Return $*(elementTypes)
+  static SILType getTupleAddressType(const ASTContext &ctx,
+                                     ArrayRef<SILType> elementTypes) {
+    return getTupleType(ctx, elementTypes, SILValueCategory::Address);
+  }
+
   /// Get the type for opaque actor isolation values.
   static SILType getOpaqueIsolationType(const ASTContext &C);
+
+  /// Return Builtin.ImplicitActor.
+  static SILType getBuiltinImplicitActorType(const ASTContext &ctx);
 
   //
   // Utilities for treating SILType as a pointer-like type.

@@ -448,6 +448,7 @@ static bool usesFeatureInlineAlways(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(SwiftRuntimeAvailability)
+UNINTERESTING_FEATURE(StandaloneSwiftAvailability)
 
 static bool usesFeatureTildeSendable(Decl *decl) {
   auto *TD = dyn_cast<TypeDecl>(decl);

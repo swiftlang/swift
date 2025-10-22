@@ -5821,8 +5821,8 @@ decodeDomainKind(uint8_t kind) {
       return AvailabilityDomainKind::Universal;
     case static_cast<uint8_t>(AvailabilityDomainKind::SwiftLanguageMode):
       return AvailabilityDomainKind::SwiftLanguageMode;
-    case static_cast<uint8_t>(AvailabilityDomainKind::SwiftRuntime):
-      return AvailabilityDomainKind::SwiftRuntime;
+    case static_cast<uint8_t>(AvailabilityDomainKind::StandaloneSwiftRuntime):
+      return AvailabilityDomainKind::StandaloneSwiftRuntime;
     case static_cast<uint8_t>(AvailabilityDomainKind::PackageDescription):
       return AvailabilityDomainKind::PackageDescription;
     case static_cast<uint8_t>(AvailabilityDomainKind::Embedded):
@@ -5844,8 +5844,8 @@ decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
     return AvailabilityDomain::forUniversal();
   case AvailabilityDomainKind::SwiftLanguageMode:
     return AvailabilityDomain::forSwiftLanguageMode();
-  case AvailabilityDomainKind::SwiftRuntime:
-    return AvailabilityDomain::forSwiftRuntime();
+  case AvailabilityDomainKind::StandaloneSwiftRuntime:
+    return AvailabilityDomain::forStandaloneSwiftRuntime();
   case AvailabilityDomainKind::PackageDescription:
     return AvailabilityDomain::forPackageDescription();
   case AvailabilityDomainKind::Embedded:
@@ -7076,6 +7076,7 @@ getActualResultConvention(uint8_t raw) {
   CASE(Pack)
   CASE(GuaranteedAddress)
   CASE(Guaranteed)
+  CASE(Inout)
 #undef CASE
   }
   return std::nullopt;
@@ -9145,7 +9146,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
     // Determine whether we need to enter the actor isolation of the witness.
     std::optional<ActorIsolation> enterIsolation;
-    if (*rawIDIter++) {
+    if (*rawIDIter++ && witness) {
       enterIsolation = getActorIsolation(witness);
     }
 

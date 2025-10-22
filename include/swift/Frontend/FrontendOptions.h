@@ -13,6 +13,7 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
+#include "swift/AST/AttrKind.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/Version.h"
@@ -500,6 +501,10 @@ public:
   /// Indicates which declarations should be exposed in the generated clang
   /// header.
   std::optional<ClangHeaderExposeBehavior> ClangHeaderExposedDecls;
+
+  // Include declarations that are at least as visible as the acces specified
+  // by -emit-clang-header-min-access
+  std::optional<AccessLevel> ClangHeaderMinAccess;
 
   struct ClangHeaderExposedImportedModule {
     std::string moduleName;

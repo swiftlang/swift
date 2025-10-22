@@ -27,7 +27,6 @@ target_sources(swiftSILOptimizer PRIVATE
   SILDebugInfoGenerator.cpp
   SILSkippingChecker.cpp
   SimplifyUnreachableContainingBlocks.cpp
-  StripDebugInfo.cpp
   TestRunner.cpp
   OwnershipDumper.cpp
   OwnershipVerifierTextualErrorDumper.cpp)

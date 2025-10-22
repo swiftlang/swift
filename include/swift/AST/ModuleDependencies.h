@@ -32,6 +32,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/CAS/CASConfiguration.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
 #include "llvm/Support/Mutex.h"
 #include <optional>
@@ -1036,8 +1037,8 @@ using BridgeClangDependencyCallback = llvm::function_ref<ModuleDependencyInfo(
 /// A carrier of state shared among possibly multiple invocations of the
 /// dependency scanner.
 class SwiftDependencyScanningService {
-  /// The CASOption created the Scanning Service if used.
-  std::optional<clang::CASOptions> CASOpts;
+  /// The CAS configuration created the Scanning Service if used.
+  std::optional<llvm::cas::CASConfiguration> CASConfig;
 
   /// The persistent Clang dependency scanner service
   std::optional<clang::tooling::dependencies::DependencyScanningService>
@@ -1183,6 +1184,12 @@ public:
   /// Record dependencies for the given collection of Clang modules.
   void recordClangDependencies(
       const clang::tooling::dependencies::ModuleDepsGraph &dependencies,
+      DiagnosticEngine &diags,
+      BridgeClangDependencyCallback bridgeClangModule);
+
+  /// Record Clang module dependency.
+  void recordClangDependency(
+      const clang::tooling::dependencies::ModuleDeps &dependency,
       DiagnosticEngine &diags,
       BridgeClangDependencyCallback bridgeClangModule);
 

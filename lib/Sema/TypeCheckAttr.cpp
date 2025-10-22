@@ -7400,10 +7400,11 @@ computeLinearityParameters(ArrayRef<ParsedAutoDiffParameter> parsedLinearParams,
   if (isCurried)
     transposeResultType =
         transposeResultType->castTo<AnyFunctionType>()->getResult();
+  TupleTypeElt elementType(transposeResultType);
   if (auto resultTupleType = transposeResultType->getAs<TupleType>()) {
     transposeResultTypes = resultTupleType->getElements();
   } else {
-    transposeResultTypes = ArrayRef<TupleTypeElt>(transposeResultType);
+    transposeResultTypes = ArrayRef<TupleTypeElt>(elementType);
   }
 
   // If `self` is a linearity parameter, the transpose function must be static.

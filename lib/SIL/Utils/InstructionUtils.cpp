@@ -640,6 +640,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::FunctionExtractIsolationInst:
   case SILInstructionKind::TypeValueInst:
   case SILInstructionKind::IgnoredUseInst:
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::LoadInst: {
@@ -840,7 +841,9 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
     if (!ca->isTakeOfSrc())
       return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
-    return RuntimeEffect::MetaData;
+    if (ca->getSrc()->getType().hasArchetype())
+      return RuntimeEffect::MetaData;
+    return RuntimeEffect::NoEffect;
   }
   case SILInstructionKind::TupleAddrConstructorInst: {
     auto *ca = cast<TupleAddrConstructorInst>(inst);

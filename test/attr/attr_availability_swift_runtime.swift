@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -parse-as-library -enable-experimental-feature SwiftRuntimeAvailability
+// RUN: %target-typecheck-verify-swift -swift-version 5 -parse-as-library -enable-experimental-feature StandaloneSwiftAvailability
 
 // REQUIRES: swift_feature_SwiftRuntimeAvailability
+// REQUIRES: swift_feature_StandaloneSwiftAvailability
 
 @available(Swift 6, *)
 func availableInSwiftRuntime6Short() { }

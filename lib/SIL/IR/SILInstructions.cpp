@@ -1850,8 +1850,7 @@ bool TermInst::isProgramTerminating() const {
 
 TermInst::SuccessorBlockArgumentListTy
 TermInst::getSuccessorBlockArgumentLists() const {
-  function_ref<ArrayRef<SILArgument *>(const SILSuccessor &)> op;
-  op = [](const SILSuccessor &succ) -> ArrayRef<SILArgument *> {
+  auto op = [](const SILSuccessor &succ) -> ArrayRef<SILArgument *> {
     return succ.getBB()->getArguments();
   };
   return SuccessorBlockArgumentListTy(getSuccessors(), op);
@@ -3524,3 +3523,10 @@ MergeIsolationRegionInst::create(SILDebugLocation loc, ArrayRef<SILValue> args,
   auto buffer = mod.allocateInst(size, alignof(MergeIsolationRegionInst));
   return ::new (buffer) MergeIsolationRegionInst(loc, args);
 }
+
+ImplicitActorToOpaqueIsolationCastInst::ImplicitActorToOpaqueIsolationCastInst(
+    SILDebugLocation loc, SILValue value)
+    : UnaryInstructionBase(loc, value,
+                           SILType::getOpaqueIsolationType(
+                               value->getFunction()->getASTContext()),
+                           OwnershipKind::Guaranteed) {}

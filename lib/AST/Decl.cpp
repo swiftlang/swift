@@ -1525,12 +1525,15 @@ bool Decl::isAlwaysWeakImported() const {
     return clangDecl->isWeakImported(
         getASTContext().LangOpts.getMinPlatformVersion());
 
+  // FIXME: Weak linking on Windows is not yet supported
+  // https://github.com/apple/swift/issues/53303
+  if (getASTContext().LangOpts.Target.isOSWindows())
+    return false;
+
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
 
-  // FIXME: Weak linking on Windows is not yet supported
-  // https://github.com/apple/swift/issues/53303
-  if (isUnavailable() && !getASTContext().LangOpts.Target.isOSWindows())
+  if (isUnavailable())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
@@ -2254,6 +2257,20 @@ ExtensionDecl::isAddingConformanceToInvertible() const {
           return kind;
   }
   return std::nullopt;
+}
+
+bool Decl::hasOnlyCEntryPoint() const {
+  if (ExternAttr::find(getAttrs(), ExternKind::C))
+    return true;
+
+  if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>()) {
+    // The @c syntax only provides C entrypoints, not Swift ones. The historical
+    // @_cdecl introduces both Swift and C entrypoints.
+    if (!cdeclAttr->Underscored)
+      return true;
+  }
+
+  return false;
 }
 
 bool Decl::isObjCImplementation() const {

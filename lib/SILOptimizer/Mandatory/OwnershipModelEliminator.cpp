@@ -252,6 +252,7 @@ struct OwnershipModelEliminatorVisitor
   HANDLE_FORWARDING_INST(DifferentiableFunctionExtract)
   HANDLE_FORWARDING_INST(MarkUninitialized)
   HANDLE_FORWARDING_INST(FunctionExtractIsolation)
+  HANDLE_FORWARDING_INST(ImplicitActorToOpaqueIsolationCast)
 #undef HANDLE_FORWARDING_INST
 };
 

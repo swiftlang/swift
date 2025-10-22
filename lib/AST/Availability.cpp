@@ -854,8 +854,21 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
     return std::nullopt;
   }
 
-  if (domain->isSwiftLanguageMode() || domain->isPackageDescription() ||
-      domain->isSwiftRuntime()) {
+  // Diagnose unsupported unconditional availability (deprecated, unavailable,
+  // noasync).
+  switch (domain->getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::Custom:
+    break;
+
+  case AvailabilityDomain::Kind::Platform:
+    // FIXME: [runtime availability] Diagnose Swift runtime platform, too.
+    break;
+
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+  case AvailabilityDomain::Kind::PackageDescription:
     switch (attr->getKind()) {
     case AvailableAttr::Kind::Deprecated:
       diags.diagnose(attrLoc,
@@ -876,6 +889,7 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
     case AvailableAttr::Kind::Default:
       break;
     }
+    break;
   }
 
   if (!hasVersionSpec && domain->isVersioned()) {

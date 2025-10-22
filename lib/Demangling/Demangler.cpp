@@ -1441,6 +1441,10 @@ NodePointer Demangler::demangleBuiltinType() {
   NodePointer Ty = nullptr;
   const int maxTypeSize = 4096; // a very conservative upper bound
   switch (nextChar()) {
+    case 'A':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                              BUILTIN_TYPE_NAME_IMPLICITACTOR);
+      break;
     case 'b':
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                BUILTIN_TYPE_NAME_BRIDGEOBJECT);
@@ -2292,6 +2296,15 @@ NodePointer Demangler::demangleImplResultConvention(Node::Kind ConvKind) {
     case 'u': attr = "@unowned_inner_pointer"; break;
     case 'a': attr = "@autoreleased"; break;
     case 'k': attr = "@pack_out"; break;
+    case 'l':
+      attr = "@guaranteed_address";
+      break;
+    case 'g':
+      attr = "@guaranteed";
+      break;
+    case 'm':
+      attr = "@inout";
+      break;
     default:
       pushBack();
       return nullptr;

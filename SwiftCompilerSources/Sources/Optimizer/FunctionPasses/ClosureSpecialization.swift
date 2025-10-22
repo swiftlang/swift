@@ -224,6 +224,13 @@ private func isCalleeSpecializable(of apply: ApplySite) -> Bool {
   if let callee = apply.referencedFunction,
      callee.isDefinition,
 
+     // Calling `cloneRecursively` from `SpecializationInfo.cloneClosures`
+     // requires the callee having ownership info. Otherwise, the cloner
+     // uses `recordFoldedValue` instead of `recordClonedInstruction`, and
+     // `postProcess` hook is not called, which leads to an assertion
+     // failure in `BridgedClonerImpl::cloneInst`.
+     callee.hasOwnership,
+
      // We don't support generic functions (yet)
      !apply.hasSubstitutions,
 

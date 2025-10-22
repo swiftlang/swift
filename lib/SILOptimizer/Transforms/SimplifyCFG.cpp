@@ -1795,7 +1795,8 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
   if (Dest->args_empty()) {
     SILBuilderWithScope builder(SEI);
     if (SEI->getOperand()->getOwnershipKind() == OwnershipKind::Owned) {
-      builder.createDestroyValue(SEI->getLoc(), SEI->getOperand());
+      // Note that a `destroy_value` would be wrong for non-copyable enums with deinits.
+      builder.createEndLifetime(SEI->getLoc(), SEI->getOperand());
     }
     builder.createBranch(SEI->getLoc(), Dest);
 

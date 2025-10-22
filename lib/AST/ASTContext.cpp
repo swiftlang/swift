@@ -425,6 +425,13 @@ struct ASTContext::Implementation {
   ///  -> Builtin.Int1
   FuncDecl *IsOSVersionAtLeastOrVariantVersionAtLeastDecl = nullptr;
 
+  /// func _isSwiftRuntimeVersionAtLeast(
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.word)
+  ///  -> Builtin.Int1
+  FuncDecl *IsSwiftRuntimeVersionAtLeastDecl = nullptr;
+
   /// The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
@@ -1934,7 +1941,7 @@ FuncDecl *ASTContext::getIsVariantOSVersionAtLeastDecl() const {
 }
 
 FuncDecl *ASTContext::getIsOSVersionAtLeastOrVariantVersionAtLeast() const {
-if (getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl)
+  if (getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl)
     return getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl;
 
   auto decl = findLibraryIntrinsic(*this,
@@ -1943,6 +1950,18 @@ if (getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl)
     return nullptr;
 
   getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getIsSwiftRuntimeVersionAtLeast() const {
+  if (getImpl().IsSwiftRuntimeVersionAtLeastDecl)
+    return getImpl().IsSwiftRuntimeVersionAtLeastDecl;
+
+  auto decl = findLibraryIntrinsic(*this, "_isSwiftRuntimeVersionAtLeast");
+  if (!decl)
+    return nullptr;
+
+  getImpl().IsSwiftRuntimeVersionAtLeastDecl = decl;
   return decl;
 }
 

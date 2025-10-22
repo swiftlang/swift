@@ -1471,6 +1471,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       auto loc = cast<LocatableType>(tybase);
       return appendType(loc->getSinglyDesugaredType(), sig, forDecl);
     }
+    case TypeKind::BuiltinImplicitActor:
+      return appendOperator("BA");
     case TypeKind::BuiltinFixedArray: {
       auto bfa = cast<BuiltinFixedArrayType>(tybase);
       appendType(bfa->getSize(), sig, forDecl);
@@ -2286,10 +2288,12 @@ static char getResultConvention(ResultConvention conv) {
     case ResultConvention::Autoreleased: return 'a';
     case ResultConvention::Pack: return 'k';
     case ResultConvention::GuaranteedAddress:
-      return 'g';
+      return 'l';
     case ResultConvention::Guaranteed:
-      return 'G';
-  }
+      return 'g';
+    case ResultConvention::Inout:
+      return 'm';
+    }
   llvm_unreachable("bad result convention");
 }
 

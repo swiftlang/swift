@@ -79,6 +79,9 @@ struct SWIFT_NONCOPYABLE NonCopyableNonMovable { // expected-note {{record 'NonC
     NonCopyableNonMovable(NonCopyableNonMovable&& other) = delete;
 };
 
+template<typename T> struct SWIFT_COPYABLE_IF(T) DisposableContainer {};
+struct POD { int x; float y; }; // special members are implicit, but should be copyable
+using DisposablePOD = DisposableContainer<POD>; // should also be copyable
 
 //--- test.swift
 import Test
@@ -128,4 +131,8 @@ func doubleAnnotation() {
 func missingLifetimeOperation() {
     let s = NonCopyableNonMovable() // expected-error {{cannot find 'NonCopyableNonMovable' in scope}}
     takeCopyable(s)
+}
+
+func copyableDisposablePOD(p: DisposablePOD) {
+  takeCopyable(p)
 }
