@@ -20,4 +20,4 @@ func foo(isolated x b: MyActor) {} // expected-warning {{'isolated' before a par
 func foo(_const x b: MyClass) {} // expected-warning {{'_const' before a parameter name is not allowed, place it before the parameter type instead; this is an error in the Swift 6 language mode}}
 
 @available(SwiftStdlib 5.1, *)
-func foo(sending x b: MyActor) {} // expected-warning {{'sending' before a parameter name is not allowed, place it before the parameter type instead}}
+func foo(sending x b: MyClass) {} // expected-warning {{'sending' before a parameter name is not allowed, place it before the parameter type instead}}
