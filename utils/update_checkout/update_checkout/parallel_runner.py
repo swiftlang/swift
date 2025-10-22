@@ -31,7 +31,7 @@ class TaskTracker:
         self._done_task_counter += 1
         self._lock.release()
 
-    def status(self) -> Tuple[List[str], int]:
+    def status(self) -> Tuple[str, int]:
         self._lock.acquire()
         running_tasks_str = ", ".join(self.running_tasks)
         done_tasks = self.done_task_counter
