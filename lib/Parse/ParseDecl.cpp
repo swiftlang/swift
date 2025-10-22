@@ -3223,6 +3223,97 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::Warn: {
+    if (!consumeIfAttributeLParen()) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+
+    // Parse the diagnostic group identifier
+    StringRef ParsedCategoryIdentifier = Tok.getText();
+    if (!consumeIf(tok::identifier)) {
+      diagnose(Loc, diag::attr_expected_option_identifier, AttrName);
+      return makeParserSuccess();
+    }
+    auto DiagGroupID = getDiagGroupIDByName(ParsedCategoryIdentifier);
+    if (!DiagGroupID) {
+      diagnose(Loc, diag::attr_warn_expected_diagnostic_group_identifier,
+               ParsedCategoryIdentifier);
+    }
+
+    if (!consumeIf(tok::comma)) {
+      diagnose(Tok, diag::attr_expected_comma, "@warn", false);
+      return makeParserSuccess();
+    }
+
+    // Parse the `as: error|warning|ignored` behavior specifier
+    Identifier AsLabel;
+    consumeArgumentLabel(AsLabel, true);
+    if (AsLabel.str() != "as") {
+      diagnose(Loc, diag::attr_expected_label, "as:", AttrName);
+      return makeParserSuccess();
+    }
+    if (!consumeIf(tok::colon)) {
+      diagnose(Loc, diag::attr_expected_colon_after_label, AsLabel.str());
+      return makeParserSuccess();
+    }
+    // Map the behavior identifier to WarnAttr::Behavior
+    StringRef ParsedBehaviorIdentifier = Tok.getText();
+    if (!consumeIf(tok::identifier)) {
+      diagnose(Loc, diag::attr_expected_option_identifier, AttrName);
+      return makeParserSuccess();
+    }
+    auto BehaviorSpecifier =
+        llvm::StringSwitch<std::optional<WarnAttr::Behavior>>(
+            ParsedBehaviorIdentifier)
+            .Case("error", WarnAttr::Behavior::Error)
+            .Case("warning", WarnAttr::Behavior::Warning)
+            .Case("ignored", WarnAttr::Behavior::Ignored)
+            .Default(std::nullopt);
+    if (!BehaviorSpecifier) {
+      diagnose(Loc, diag::attr_warn_expected_known_behavior,
+               ParsedBehaviorIdentifier);
+    }
+
+    // Parse the optional `reason:` argument
+    std::optional<StringRef> ReasonString = std::nullopt;
+    if (consumeIf(tok::comma)) {
+      Identifier ReasonLabel;
+      consumeArgumentLabel(ReasonLabel, true);
+      if (ReasonLabel.str() != "reason") {
+        diagnose(Loc, diag::attr_expected_label, "reason:", AttrName);
+        return makeParserSuccess();
+      }
+      if (!consumeIf(tok::colon)) {
+        diagnose(Loc, diag::attr_expected_colon_after_label, AsLabel.str());
+        return makeParserSuccess();
+      }
+
+      // Parse out the given reason string literal
+      if (Tok.isNot(tok::string_literal)) {
+        diagnose(Loc, diag::attr_expected_string_literal, AttrName);
+        skipUntilTokenOrEndOfLine(tok::r_paren);
+      } else {
+        ReasonString =
+          getStringLiteralIfNotInterpolated(Loc, ("'" + AttrName + "'").str());
+        consumeToken(tok::string_literal);
+      }
+    }
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) WarnAttr(*DiagGroupID, *BehaviorSpecifier,
+                                            ReasonString, AtLoc, AttrRange,
+                                            /*Implicit=*/false));
+    break;
+  }
+
   case DeclAttrKind::Alignment: {
     if (!consumeIfAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,

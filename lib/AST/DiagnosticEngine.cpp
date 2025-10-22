@@ -17,6 +17,7 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -28,6 +29,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
@@ -35,6 +37,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Config.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "swift/Parse/Lexer.h" // bad dependency
@@ -1312,8 +1315,70 @@ llvm::cl::opt<bool> AssertOnError("swift-diagnostics-assert-on-error",
 llvm::cl::opt<bool> AssertOnWarning("swift-diagnostics-assert-on-warning",
                                     llvm::cl::init(false));
 
+std::optional<DiagnosticBehavior>
+DiagnosticState::determineSourceControlledBehavior(
+    const Diagnostic &diag, SourceManager &sourceMgr) const {
+  if (diag.getGroupID() == DiagGroupID::no_group)
+    return std::nullopt;
+  if (storedDiagnosticInfos[(unsigned)diag.getID()].kind !=
+      DiagnosticKind::Warning)
+    return std::nullopt;
+
+  std::optional<DiagnosticBehavior> sourceLevelControlBehavior = std::nullopt;
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  // Figure out the source location. // ACTODO: Duplicated
+  SourceLoc loc = diag.getLocOrDeclLoc();
+  if (loc.isInvalid() && diag.getDecl()) {
+    // If the location of the decl is invalid, try to pretty-print it into a
+    // buffer and capture the source location there. Make sure we don't have an
+    // active request running since printing AST can kick requests that may
+    // themselves emit diagnostics. This won't help the underlying cycle, but it
+    // at least stops us from overflowing the stack.
+    const Decl *decl = diag.getDecl();
+    PrettyPrintDeclRequest req(decl);
+    auto &eval = decl->getASTContext().evaluator;
+    if (!eval.hasActiveRequest(req))
+      loc = evaluateOrDefault(eval, req, SourceLoc());
+  }
+  if (loc.isValid()) {
+    auto sourceFiles = sourceMgr.getSourceFilesForBufferID(
+        sourceMgr.findBufferContainingLoc(loc));
+    SourceFile *SF = nullptr;
+    for (auto checkSF : sourceFiles) {
+      if (checkSF->getParentModule() == checkSF->getASTContext().MainModule) {
+        SF = checkSF;
+        break;
+      }
+    }
+    if (SF) {
+      BridgedWarningGroupBehavior bridgedBehavior =
+          swift_ASTGen_warningGroupBehaviorAtPosition(
+              SF->getASTContext(), SF->getExportedSourceFile(),
+              StringRef(getDiagGroupInfoByID(diag.getGroupID()).name), loc);
+
+      std::optional<DiagnosticBehavior> resultBehavior = std::nullopt;
+      switch (bridgedBehavior) {
+      case WarningGroupBehaviorError:
+        sourceLevelControlBehavior = DiagnosticBehavior::Error;
+        break;
+      case WarningGroupBehaviorWarning:
+        sourceLevelControlBehavior = DiagnosticBehavior::Warning;
+        break;
+      case WarningGroupBehaviorIgnored:
+        sourceLevelControlBehavior = DiagnosticBehavior::Ignore;
+        break;
+      case WarningGroupBehaviorNone:
+        break;
+      }
+    }
+  }
+#endif
+  return sourceLevelControlBehavior;
+}
+
 DiagnosticBehavior
-DiagnosticState::determineBehavior(const Diagnostic &diag) const {
+DiagnosticState::determineBehavior(const Diagnostic &diag,
+                                   SourceManager &sourceMgr) const {
   // We determine how to handle a diagnostic based on the following rules
   //   1) Map the diagnostic to its "intended" behavior, applying the behavior
   //      limit for this particular emission
@@ -1350,7 +1415,10 @@ DiagnosticState::determineBehavior(const Diagnostic &diag) const {
   //   4) If the user substituted a different behavior for this behavior, apply
   //      that change
   if (lvl == DiagnosticBehavior::Warning) {
-    if (getWarningsAsErrorsForDiagGroupID(diag.getGroupID()))
+    if (auto sourceLevelControlBehavior =
+            determineSourceControlledBehavior(diag, sourceMgr))
+      lvl = *sourceLevelControlBehavior;
+    else if (getWarningsAsErrorsForDiagGroupID(diag.getGroupID()))
       lvl = DiagnosticBehavior::Error;
     if (suppressWarnings)
       lvl = DiagnosticBehavior::Ignore;
@@ -1441,7 +1509,7 @@ void DiagnosticEngine::forwardTentativeDiagnosticsTo(
 std::optional<DiagnosticInfo>
 DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
                                               bool includeDiagnosticName) {
-  auto behavior = state.determineBehavior(diagnostic);
+  auto behavior = state.determineBehavior(diagnostic, SourceMgr);
   state.updateFor(behavior);
 
   if (behavior == DiagnosticBehavior::Ignore)

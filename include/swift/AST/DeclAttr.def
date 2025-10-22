@@ -902,12 +902,18 @@ DECL_ATTR(specialized, Specialized,
   AllowMultipleAttributes | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   172)
 
+
 SIMPLE_DECL_ATTR(_unsafeSelfDependentResult, UnsafeSelfDependentResult,
   OnAccessor,
   UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
   173)
 
-LAST_DECL_ATTR(UnsafeSelfDependentResult)
+DECL_ATTR(warn, Warn,
+  OnFunc | OnConstructor | OnSubscript | OnVar | OnNominalType | OnExtension | OnAccessor | OnImport,
+  AllowMultipleAttributes | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  174)
+
+LAST_DECL_ATTR(Warn)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

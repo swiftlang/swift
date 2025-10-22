@@ -562,6 +562,9 @@ EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
 /// Allow use of `~Sendable`.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TildeSendable, false)
 
+/// Enable source-level warning control with `@warn`
+EXPERIMENTAL_FEATURE(SourceWarningControl, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

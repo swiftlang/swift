@@ -652,7 +652,15 @@ namespace swift {
 
     /// Figure out the Behavior for the given diagnostic, taking current
     /// state such as fatality into account.
-    DiagnosticBehavior determineBehavior(const Diagnostic &diag) const;
+    DiagnosticBehavior determineBehavior(const Diagnostic &diag,
+                                         SourceManager &sourceMgr) const;
+
+    /// If this diagnostic is a warning belonging to a diagnostic group,
+    /// figure out if there is a source-level (`@warn`) control for this group
+    /// for this diagnostic's source location.
+    std::optional<DiagnosticBehavior>
+    determineSourceControlledBehavior(const Diagnostic &diag,
+                                      SourceManager &sourceMgr) const;
 
     /// Updates the diagnostic state for a diagnostic to emit.
     void updateFor(DiagnosticBehavior behavior);
@@ -1346,7 +1354,8 @@ namespace swift {
           Engine.TentativeDiagnostics.end());
 
       for (auto &diagnostic : diagnostics) {
-        auto behavior = Engine.state.determineBehavior(diagnostic.Diag);
+        auto behavior = Engine.state.determineBehavior(diagnostic.Diag,
+                                                       Engine.SourceMgr);
         if (behavior == DiagnosticBehavior::Fatal ||
             behavior == DiagnosticBehavior::Error)
           return true;
