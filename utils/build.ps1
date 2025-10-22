@@ -1965,11 +1965,11 @@ function Build-SPMProject {
   Invoke-IsolatingEnvVars {
     $RuntimeInstallRoot = [IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", $ProductVersion)
 
-    $env:Path = "$($BuildPlatform.ToolchainInstallRoot)\usr\bin;${env:Path}"
     $env:SDKROOT = (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)
     $env:SWIFTCI_USE_LOCAL_DEPS = "1"
 
     $Arguments = @(
+      "--triple", "$($Platform.Triple)",
       "--scratch-path", $Bin,
       "--package-path", $Src,
       "-c", $Configuration
