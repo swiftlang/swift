@@ -80,6 +80,10 @@ class QualType;
 class TypedefNameDecl;
 }
 
+namespace {
+  class SwiftifyInfoPrinter;
+}
+
 namespace swift {
 
 class ASTContext;
@@ -1827,6 +1831,9 @@ public:
   void addOptionSetTypealiases(NominalTypeDecl *nominal);
 
   void swiftify(AbstractFunctionDecl *MappedDecl);
+  bool swiftifyImpl(SwiftifyInfoPrinter &printer,
+                    const AbstractFunctionDecl *MappedDecl,
+                    const clang::FunctionDecl *ClangDecl);
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///

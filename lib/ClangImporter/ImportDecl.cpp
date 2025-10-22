@@ -9172,7 +9172,7 @@ public:
   llvm::StringMap<std::string> typeMapping;
   SwiftifyInfoPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext, llvm::raw_ostream &out, MacroDecl &SwiftifyImportDecl)
       : ctx(ctx), SwiftContext(SwiftContext), out(out), SwiftifyImportDecl(SwiftifyImportDecl) {
-    out << "@_SwiftifyImport(";
+    out << "(";
   }
   ~SwiftifyInfoPrinter() { out << ")"; }
 
@@ -9516,43 +9516,30 @@ static StringRef getAttributeName(const clang::CountAttributedType *CAT) {
   }
 }
 
-void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
-  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers) ||
-      SwiftContext.ClangImporterOpts.DisableSafeInteropWrappers)
-    return;
-  auto ClangDecl =
-      dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
-  if (!ClangDecl)
-    return;
+bool ClangImporter::Implementation::swiftifyImpl(
+    SwiftifyInfoPrinter &printer, const AbstractFunctionDecl *MappedDecl,
+    const clang::FunctionDecl *ClangDecl) {
   SIW_DBG("Checking " << *ClangDecl << " for bounds and lifetime info\n");
 
   // FIXME: for private macro generated functions we do not serialize the
   // SILFunction's body anywhere triggering assertions.
   if (ClangDecl->getAccess() == clang::AS_protected ||
       ClangDecl->getAccess() == clang::AS_private)
-    return;
-
-  MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(getKnownSingleDecl(SwiftContext, "_SwiftifyImport"));
-  if (!SwiftifyImportDecl)
-    return;
+    return false;
 
   {
     UnaliasedInstantiationVisitor visitor;
     visitor.TraverseType(ClangDecl->getType());
     if (visitor.hasUnaliasedInstantiation)
-      return;
+      return false;
   }
 
-  llvm::SmallString<128> MacroString;
   // We only attach the macro if it will produce an overload. Any __counted_by
   // will produce an overload, since UnsafeBufferPointer is still an improvement
   // over UnsafePointer, but std::span will only produce an overload if it also
   // has lifetime information, since std::span already contains bounds info.
   bool attachMacro = false;
   {
-    llvm::raw_svector_ostream out(MacroString);
-
-    SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl);
     Type swiftReturnTy;
     if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))
       swiftReturnTy = funcDecl->getResultInterfaceType();
@@ -9568,7 +9555,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       SIW_DBG("  Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
       attachMacro = true;
     }
-    auto dependsOnClass = [](ParamDecl *fromParam) {
+    auto dependsOnClass = [](const ParamDecl *fromParam) {
       return fromParam->getInterfaceType()->isAnyClassReferenceType();
     };
     bool returnHasLifetimeInfo = false;
@@ -9600,7 +9587,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       int mappedIndex = index < selfParamIndex ? index :
         index > selfParamIndex ? index - 1 :
         SwiftifyInfoPrinter::SELF_PARAM_INDEX;
-      ParamDecl *swiftParam = nullptr;
+      const ParamDecl *swiftParam = nullptr;
       if (mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX) {
         swiftParam = MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/true);
       } else {
@@ -9659,29 +9646,51 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       SIW_DBG("  Found both std::span and lifetime info for return value\n");
       attachMacro = true;
     }
+  }
+  return attachMacro;
+}
+
+void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
+  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers) ||
+      SwiftContext.ClangImporterOpts.DisableSafeInteropWrappers)
+    return;
+  auto ClangDecl = dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
+  if (!ClangDecl)
+    return;
+
+  MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(getKnownSingleDecl(SwiftContext, "_SwiftifyImport"));
+  if (!SwiftifyImportDecl)
+    return;
+
+  llvm::SmallString<128> MacroString;
+  {
+    llvm::raw_svector_ostream out(MacroString);
+    out << "@_SwiftifyImport";
+
+    SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl);
+    if (!swiftifyImpl(printer, MappedDecl, ClangDecl))
+      return;
     printer.printAvailability();
     printer.printTypeMapping();
   }
 
-  if (attachMacro) {
-    SIW_DBG("Attaching safe interop macro: " << MacroString << "\n");
-    if (clang::RawComment *raw =
-            getClangASTContext().getRawCommentForDeclNoCache(ClangDecl)) {
-      // swift::RawDocCommentAttr doesn't contain its text directly, but instead
-      // references the source range of the parsed comment. Instead of creating
-      // a new source file just to parse the doc comment, we can add the
-      // comment to the macro invocation attribute, which the macro has access
-      // to. Waiting until we know that the macro will be attached before
-      // emitting the comment to the string, despite the comment occurring
-      // first, avoids copying a bunch of potentially long comments for nodes
-      // that don't end up with wrappers.
-      auto commentString =
-          raw->getRawText(getClangASTContext().getSourceManager());
-      importNontrivialAttribute(MappedDecl,
-                                (commentString + "\n" + MacroString).str());
-    } else {
-      importNontrivialAttribute(MappedDecl, MacroString);
-    }
+  SIW_DBG("Attaching safe interop macro: " << MacroString << "\n");
+  if (clang::RawComment *raw =
+          getClangASTContext().getRawCommentForDeclNoCache(ClangDecl)) {
+    // swift::RawDocCommentAttr doesn't contain its text directly, but instead
+    // references the source range of the parsed comment. Instead of creating
+    // a new source file just to parse the doc comment, we can add the
+    // comment to the macro invocation attribute, which the macro has access
+    // to. Waiting until we know that the macro will be attached before
+    // emitting the comment to the string, despite the comment occurring
+    // first, avoids copying a bunch of potentially long comments for nodes
+    // that don't end up with wrappers.
+    auto commentString =
+        raw->getRawText(getClangASTContext().getSourceManager());
+    importNontrivialAttribute(MappedDecl,
+                              (commentString + "\n" + MacroString).str());
+  } else {
+    importNontrivialAttribute(MappedDecl, MacroString);
   }
 }
 #undef SIW_DBG
