@@ -508,6 +508,8 @@ BridgedWarnAttr_createParsed(BridgedASTContext cContext,
     case WarningGroupBehaviorIgnored:
       attrBehavior = WarnAttr::Behavior::Ignored;
       break;
+    default:
+      llvm_unreachable("unhandled warning group behavior");
   }
   
   std::optional<StringRef> reasonText = std::nullopt;
