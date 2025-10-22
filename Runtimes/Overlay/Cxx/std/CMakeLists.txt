@@ -34,7 +34,7 @@ target_link_libraries(swiftCxxStdlib PRIVATE
 install(FILES std.apinotes
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/swift/apinotes)
 install(TARGETS swiftCxxStdlib
-  EXPORT SwiftOverlayTargets
+  EXPORT SwiftCxxOverlayTargets
   ARCHIVE DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
