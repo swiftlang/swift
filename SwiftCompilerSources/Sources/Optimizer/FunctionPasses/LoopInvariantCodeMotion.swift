@@ -540,7 +540,35 @@ private extension AnalyzedInstructions {
         sideEffect.mayWrite(toAddress: address, aliasAnalysis)
       }
   }
-  
+
+  func sideEffectsMayWrite(to address: Value,
+                           outsideOf scope: InstructionRange,
+                           _ context: FunctionPassContext
+  ) -> Bool {
+    for sideEffectInst in loopSideEffects {
+      if sideEffectInst.mayWrite(toAddress: address, context.aliasAnalysis),
+         !scope.inclusiveRangeContains(sideEffectInst)
+      {
+        return true
+      }
+    }
+    return false
+  }
+
+  func sideEffectsMayReadOrWrite(to address: Value,
+                                 outsideOf scope: InstructionRange,
+                                 _ context: FunctionPassContext
+  ) -> Bool {
+    for sideEffectInst in loopSideEffects {
+      if sideEffectInst.mayReadOrWrite(address: address, context.aliasAnalysis),
+         !scope.inclusiveRangeContains(sideEffectInst)
+      {
+        return true
+      }
+    }
+    return false
+  }
+
   /// Find all loads that contain `accessPath`. Split them into a load with
   /// identical `accessPath` and a set of non-overlapping loads. Add the new
   /// non-overlapping loads to `loads`.
@@ -1208,47 +1236,19 @@ private extension ScopedInstruction {
     case is BeginApplyInst:
       return true // Has already been checked with other full applies.
     case let loadBorrowInst as LoadBorrowInst:
-      for sideEffectInst in analyzedInstructions.loopSideEffects {
-        if let endBorrow = sideEffectInst as? EndBorrowInst,
-           let begin = endBorrow.borrow as? LoadBorrowInst,
-           begin == self
-        {
-          continue
-        }
-        if sideEffectInst.mayWrite(toAddress: loadBorrowInst.address, context.aliasAnalysis),
-           !scope.contains(sideEffectInst)
-        {
-          return false
-        }
-      }
-      return true
+      return !analyzedInstructions.sideEffectsMayWrite(to: loadBorrowInst.address, outsideOf: scope, context)
 
     case let beginAccess as BeginAccessInst:
-      for fullApplyInst in analyzedInstructions.fullApplies {
-        guard mayWriteToMemory && fullApplyInst.mayReadOrWrite(address: beginAccess.address, context.aliasAnalysis) ||
-              !mayWriteToMemory && fullApplyInst.mayWrite(toAddress: beginAccess.address, context.aliasAnalysis) else {
-          continue
-        }
-
-        // After hoisting the begin/end_access the apply will be within the scope, so it must not have a conflicting access.
-        if !scope.contains(fullApplyInst) {
-          return false
-        }
-      }
-      
-      switch beginAccess.address.accessPath.base {
-      case .class, .global:
-        for sideEffect in analyzedInstructions.loopSideEffects where sideEffect.mayRelease {
-          // Since a class might have a deinitializer, hoisting begin/end_access pair could violate
-          // exclusive access if the deinitializer accesses address used by begin_access.
-          if !scope.contains(sideEffect) {
-            return false
-          }
-        }
-
-        return true
-      default:
-        return true
+      if beginAccess.accessKind == .read {
+        // Check that we don't generate nested accesses when extending the access scope. Also, we must not
+        // extend a "read" access scope over a memory write (to the same address) even if the write is _not_
+        // in an access scope, because this would confuse alias analysis.
+        return !analyzedInstructions.sideEffectsMayWrite(to: beginAccess.address, outsideOf: scope, context)
+      } else {
+        // This does not include memory-reading instructions which are not in `loopSideEffects`, like a
+        // plain `load`. This is fine because we can extend a "modify" access scope over memory reads
+        // (of the same address) as long as we are not generating nested accesses.
+        return !analyzedInstructions.sideEffectsMayReadOrWrite(to: beginAccess.address, outsideOf: scope, context)
       }
     case is BeginBorrowInst, is StoreBorrowInst:
       // Ensure the value is produced outside the loop.
