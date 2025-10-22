@@ -2264,8 +2264,16 @@ void CompletionLookup::getPostfixKeywordCompletions(Type ExprType,
       if (instanceTy->isAnyExistentialType()) {
         addKeyword("Protocol", MetatypeType::get(instanceTy),
                    SemanticContextKind::CurrentNominal);
-        addKeyword("Type", ExistentialMetatypeType::get(instanceTy),
-                   SemanticContextKind::CurrentNominal);
+        if (auto *typeExpr = dyn_cast<TypeExpr>(ParsedExpr)) {
+          if (auto *typeRepr = typeExpr->getTypeRepr()) {
+            if (typeRepr->isParenType())
+              addKeyword("Type", MetatypeType::get(instanceTy),
+                         SemanticContextKind::CurrentNominal);
+            else
+              addKeyword("Type", ExistentialMetatypeType::get(instanceTy),
+                         SemanticContextKind::CurrentNominal);
+          }
+        }
       } else {
         addKeyword("Type", MetatypeType::get(instanceTy),
                    SemanticContextKind::CurrentNominal);
