@@ -869,7 +869,9 @@ private:
       return AvailabilityQuery::dynamic(variantSpec->getDomain(), primaryRange,
                                         variantRange);
 
-    case AvailabilityDomain::Kind::SwiftRuntime:
+    case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+      return AvailabilityQuery::dynamic(domain, primaryRange, std::nullopt);
+
     case AvailabilityDomain::Kind::Platform:
       // Platform and Swift runtime checks are always dynamic. The SIL optimizer
       // is responsible eliminating these checks when it can prove that they can

@@ -521,57 +521,11 @@ extension ASTGenVisitor {
   func generateDeclNameRef(declReferenceExpr node: DeclReferenceExprSyntax) -> (
     name: BridgedDeclNameRef, loc: BridgedDeclNameLoc
   ) {
-    let baseName: DeclBaseName
-    switch node.baseName.keywordKind {
-    case .`init`:
-      baseName = .createConstructor()
-    case .deinit:
-      baseName = .createDestructor()
-    case .subscript:
-      baseName = .createSubscript()
-    default:
-      baseName = .init(self.generateIdentifier(node.baseName))
-    }
-    let baseNameLoc = self.generateSourceLoc(node.baseName)
-
-    if let argumentClause = node.argumentNames {
-      if argumentClause.arguments.isEmpty {
-        return (
-          name: .createParsed(
-            self.ctx,
-            baseName: baseName,
-            argumentLabels: BridgedArrayRef()
-          ),
-          loc: .createParsed(baseNameLoc)
-        )
-      } else {
-        let labels = argumentClause.arguments.lazy.map {
-          self.generateIdentifier($0.name)
-        }
-        let labelLocs = argumentClause.arguments.lazy.map {
-          self.generateSourceLoc($0.name)
-        }
-        return (
-          name: .createParsed(
-            self.ctx,
-            baseName: baseName,
-            argumentLabels: labels.bridgedArray(in: self)
-          ),
-          loc: .createParsed(
-            self.ctx,
-            baseNameLoc: baseNameLoc,
-            lParenLoc: self.generateSourceLoc(argumentClause.leftParen),
-            argumentLabelLocs: labelLocs.bridgedArray(in: self),
-            rParenLoc: self.generateSourceLoc(argumentClause.rightParen)
-          )
-        )
-      }
-    } else {
-      return (
-        name: .createParsed(baseName),
-        loc: .createParsed(baseNameLoc)
-      )
-    }
+    return self.generateDeclNameRef(
+      moduleSelector: node.moduleSelector,
+      baseName: node.baseName,
+      arguments: node.argumentNames
+    )
   }
 
   func generateEditorPlaceholderExpr(token: TokenSyntax) -> BridgedEditorPlaceholderExpr {
@@ -647,10 +601,16 @@ extension ASTGenVisitor {
       if node.argumentNames != nil {
         // TODO: Diagnose.
       }
+      if node.moduleSelector != nil {
+        // TODO: Diagnose.
+      }
       return generateEditorPlaceholderExpr(token: node.baseName).asExpr
     }
     if node.baseName.rawTokenKind == .dollarIdentifier {
       if node.argumentNames != nil {
+        // TODO: Diagnose.
+      }
+      if node.moduleSelector != nil {
         // TODO: Diagnose.
       }
       return generateDollarIdentifierExpr(token: node.baseName)
@@ -827,6 +787,7 @@ extension ASTGenVisitor {
 
   func generate(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> FreestandingMacroExpansionInfo {
     let poundLoc = self.generateSourceLoc(node.pound)
+    let moduleSelectorLoc = self.generateModuleSelector(node.moduleSelector)
     let nameLoc = self.generateIdentifierAndSourceLoc(node.macroName)
 
     let leftAngleLoc: SourceLoc
@@ -859,8 +820,16 @@ extension ASTGenVisitor {
 
     return FreestandingMacroExpansionInfo(
       poundLoc: poundLoc,
-      macroNameRef: .createParsed(.init(nameLoc.identifier)),
-      macroNameLoc: .createParsed(nameLoc.sourceLoc),
+      macroNameRef: .createParsed(
+        self.ctx,
+        moduleSelector: moduleSelectorLoc.moduleName,
+        baseName: .init(nameLoc.identifier)
+      ),
+      macroNameLoc: .createParsed(
+        self.ctx,
+        moduleSelectorLoc: moduleSelectorLoc.sourceLoc,
+        baseNameLoc: nameLoc.sourceLoc
+      ),
       leftAngleLoc: leftAngleLoc,
       genericArgs: genericArgs.lazy.bridgedArray(in: self),
       rightAngleLoc: rightAngleLoc,
@@ -1333,7 +1302,7 @@ extension ASTGenVisitor {
 
     return .createParsed(
       self.ctx,
-      name: .createParsed(.init(name)),
+      name: .createParsed(self.ctx, moduleSelector: nil, baseName: .init(name)),
       kind: kind,
       loc: .createParsed(nameLoc)
     );

@@ -265,6 +265,7 @@ private func registerSILClasses() {
   register(ThunkInst.self)
   register(MergeIsolationRegionInst.self)
   register(IgnoredUseInst.self)
+  register(ImplicitActorToOpaqueIsolationCastInst.self)
 }
 
 private func registerUtilities() {

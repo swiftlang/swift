@@ -219,6 +219,12 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
 
     changed = context.eliminateDeadAllocations(in: function) || changed
   }
+
+  if function.isGlobalInitOnceFunction {
+    // Cleanup leftovers from simplification. The InitializeStaticGlobals pass cannot deal with dead
+    // stores in global init functions.
+    eliminateDeadStores(in: function, context)
+  }
 }
 
 private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions: inout Set<PathFunctionTuple>,

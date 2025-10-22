@@ -101,18 +101,27 @@ AvailabilityDomain::forCustom(ValueDecl *decl) {
                            AvailabilityDomainForDeclRequest{decl}, {});
 }
 
+static AvailabilityDomain getSwiftRuntimeDomain(ASTContext &ctx) {
+  // If -enable-experimental-feature StandaloneSwiftAvailability is specified
+  // then forcibly separate platform and Swift runtime availability.
+  if (ctx.LangOpts.hasFeature(Feature::StandaloneSwiftAvailability))
+    return AvailabilityDomain::forStandaloneSwiftRuntime();
+
+  // FIXME: [runtime availability] Return the platform Swift runtime domain.
+
+  return AvailabilityDomain::forStandaloneSwiftRuntime();
+}
+
 std::optional<AvailabilityDomain>
 AvailabilityDomain::builtinDomainForString(StringRef string,
                                            const DeclContext *declContext) {
-  // This parameter is used in downstream forks, do not remove.
-  (void)declContext;
-
+  auto &ctx = declContext->getASTContext();
   auto domain =
       llvm::StringSwitch<std::optional<AvailabilityDomain>>(string)
           .Case("*", AvailabilityDomain::forUniversal())
           .Case("swift", AvailabilityDomain::forSwiftLanguageMode())
           .Case("SwiftLanguageMode", AvailabilityDomain::forSwiftLanguageMode())
-          .Case("Swift", AvailabilityDomain::forSwiftRuntime())
+          .Case("Swift", getSwiftRuntimeDomain(ctx))
           .Case("_PackageDescription",
                 AvailabilityDomain::forPackageDescription())
           .Default(std::nullopt);
@@ -132,7 +141,7 @@ bool AvailabilityDomain::isVersioned() const {
   case Kind::Embedded:
     return false;
   case Kind::SwiftLanguageMode:
-  case Kind::SwiftRuntime:
+  case Kind::StandaloneSwiftRuntime:
   case Kind::PackageDescription:
   case Kind::Platform:
     return true;
@@ -153,7 +162,7 @@ bool AvailabilityDomain::isVersionValid(
   case Kind::SwiftLanguageMode:
   case Kind::PackageDescription:
     return true;
-  case Kind::SwiftRuntime:
+  case Kind::StandaloneSwiftRuntime:
     // Swift 5.0 is the first ABI stable Swift runtime version.
     if (version.getMajor() < 5)
       return false;
@@ -175,7 +184,7 @@ bool AvailabilityDomain::supportsContextRefinement() const {
   case Kind::SwiftLanguageMode:
   case Kind::PackageDescription:
     return false;
-  case Kind::SwiftRuntime:
+  case Kind::StandaloneSwiftRuntime:
   case Kind::Platform:
   case Kind::Custom:
     return true;
@@ -189,7 +198,7 @@ bool AvailabilityDomain::supportsQueries() const {
   case Kind::SwiftLanguageMode:
   case Kind::PackageDescription:
     return false;
-  case Kind::SwiftRuntime:
+  case Kind::StandaloneSwiftRuntime:
   case Kind::Platform:
   case Kind::Custom:
     return true;
@@ -204,7 +213,10 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx,
   case Kind::PackageDescription:
   case Kind::Embedded:
     return true;
-  case Kind::SwiftRuntime:
+  case Kind::StandaloneSwiftRuntime:
+    // FIXME: [runtime availability] Active either when
+    // StandaloneSwiftAvailability is enabled or the target supports a
+    // standalone Swift runtime.
     return ctx.LangOpts.hasFeature(Feature::SwiftRuntimeAvailability);
   case Kind::Platform:
     return isPlatformActive(getPlatformKind(), ctx.LangOpts, forTargetVariant);
@@ -231,7 +243,7 @@ bool AvailabilityDomain::mustBeSpecifiedAlone() const {
   case Kind::Embedded:
   case Kind::Custom:
     return true;
-  case Kind::SwiftRuntime:
+  case Kind::StandaloneSwiftRuntime:
   case Kind::Platform:
     // Platform and Swift runtime availability specifications can appear
     // together, e.g. `@available(Swift 6, macOS 15, iOS 18, *)`.
@@ -252,7 +264,7 @@ getDeploymentVersion(const AvailabilityDomain &domain, const ASTContext &ctx) {
     return ctx.LangOpts.EffectiveLanguageVersion;
   case AvailabilityDomain::Kind::PackageDescription:
     return ctx.LangOpts.PackageDescriptionVersion;
-  case AvailabilityDomain::Kind::SwiftRuntime:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
     if (!ctx.LangOpts.hasFeature(Feature::SwiftRuntimeAvailability))
       return std::nullopt;
     return ctx.LangOpts.MinSwiftRuntimeVersion;
@@ -292,7 +304,7 @@ llvm::StringRef AvailabilityDomain::getNameForDiagnostics() const {
   case Kind::SwiftLanguageMode:
     // FIXME: [runtime availability] Render language mode diags differently.
     return "Swift";
-  case Kind::SwiftRuntime:
+  case Kind::StandaloneSwiftRuntime:
     return "Swift";
   case Kind::PackageDescription:
     return "PackageDescription";
@@ -311,7 +323,7 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
     return "*";
   case Kind::SwiftLanguageMode:
     return "swift";
-  case Kind::SwiftRuntime:
+  case Kind::StandaloneSwiftRuntime:
     return "Swift";
   case Kind::PackageDescription:
     return "_PackageDescription";
@@ -343,12 +355,11 @@ bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
   case Kind::Universal:
     return true;
   case Kind::SwiftLanguageMode:
+  case Kind::StandaloneSwiftRuntime:
   case Kind::PackageDescription:
   case Kind::Embedded:
   case Kind::Custom:
     return other == *this;
-  case Kind::SwiftRuntime:
-    return other.isPlatform() || other == *this;
   case Kind::Platform:
     if (getPlatformKind() == other.getPlatformKind())
       return true;
@@ -362,7 +373,7 @@ bool AvailabilityDomain::isRoot() const {
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::Embedded:
   case AvailabilityDomain::Kind::SwiftLanguageMode:
-  case AvailabilityDomain::Kind::SwiftRuntime:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
   case AvailabilityDomain::Kind::PackageDescription:
     return true;
   case AvailabilityDomain::Kind::Platform:
@@ -448,7 +459,7 @@ AvailabilityDomain AvailabilityDomain::copy(ASTContext &ctx) const {
   switch (getKind()) {
   case Kind::Universal:
   case Kind::SwiftLanguageMode:
-  case Kind::SwiftRuntime:
+  case Kind::StandaloneSwiftRuntime:
   case Kind::PackageDescription:
   case Kind::Embedded:
   case Kind::Platform:
@@ -471,7 +482,7 @@ bool StableAvailabilityDomainComparator::operator()(
   switch (lhsKind) {
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::SwiftLanguageMode:
-  case AvailabilityDomain::Kind::SwiftRuntime:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
   case AvailabilityDomain::Kind::PackageDescription:
   case AvailabilityDomain::Kind::Embedded:
     return false;
@@ -560,7 +571,7 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
   }
 
   // Use of the 'Swift' domain requires the 'SwiftRuntimeAvailability' feature.
-  if (!hasSwiftRuntimeAvailability && domain->isSwiftRuntime()) {
+  if (!hasSwiftRuntimeAvailability && domain->isStandaloneSwiftRuntime()) {
     diags.diagnose(loc, diag::availability_domain_requires_feature, *domain,
                    "SwiftRuntimeAvailability");
     return std::nullopt;

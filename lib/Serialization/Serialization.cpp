@@ -975,7 +975,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_SOURCE_LOC_REF);
   BLOCK_RECORD(sil_block, SIL_DEBUG_VALUE);
   BLOCK_RECORD(sil_block, SIL_DEBUG_VALUE_DELIMITER);
-
+  BLOCK_RECORD(sil_block, SIL_EXTRA_STRING);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -3134,8 +3134,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
             return AvailabilityDomainKind::Universal;
           case AvailabilityDomain::Kind::SwiftLanguageMode:
             return AvailabilityDomainKind::SwiftLanguageMode;
-          case AvailabilityDomain::Kind::SwiftRuntime:
-            return AvailabilityDomainKind::SwiftRuntime;
+          case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+            return AvailabilityDomainKind::StandaloneSwiftRuntime;
           case AvailabilityDomain::Kind::PackageDescription:
             return AvailabilityDomainKind::PackageDescription;
           case AvailabilityDomain::Kind::Embedded:
@@ -5526,6 +5526,7 @@ static uint8_t getRawStableResultConvention(swift::ResultConvention rc) {
   SIMPLE_CASE(ResultConvention, Pack)
   SIMPLE_CASE(ResultConvention, GuaranteedAddress)
   SIMPLE_CASE(ResultConvention, Guaranteed)
+  SIMPLE_CASE(ResultConvention, Inout)
   }
   llvm_unreachable("bad result convention kind");
 }

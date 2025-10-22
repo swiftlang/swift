@@ -442,3 +442,10 @@ bool SILFunctionArgument::isSending() const {
     return getFunction()->getLoweredFunctionType()->hasSendingResult();
   return getKnownParameterInfo().hasOption(SILParameterInfo::Sending);
 }
+
+bool SILFunctionArgument::isInOutSending() const {
+  // Make sure that we are sending, not an indirect result (since indirect
+  // results can be sending) and have an inout convention.
+  return isSending() && !isIndirectResult() &&
+         getArgumentConvention().isInoutConvention();
+}

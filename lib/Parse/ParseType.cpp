@@ -180,9 +180,28 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     tildeLoc = consumeToken();
   }
 
+  auto diagnoseAndRecover = [&]() -> ParserResult<TypeRepr> {
+    {
+      auto diag = diagnose(Tok, MessageID);
+      // If the next token is closing or separating, the type was likely
+      // forgotten
+      if (Tok.isAny(tok::r_paren, tok::r_brace, tok::r_square, tok::arrow,
+                    tok::equal, tok::comma, tok::semi))
+        diag.fixItInsert(getEndOfPreviousLoc(), " <#type#>");
+    }
+    if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
+      ty = makeParserErrorResult(ErrorTypeRepr::create(Context, Tok.getLoc()));
+      consumeToken();
+      return ty;
+    }
+    checkForInputIncomplete();
+    return nullptr;
+  };
+
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::identifier:
+  case tok::colon_colon:
     // In SIL files (not just when parsing SIL types), accept the
     // Pack{} syntax for spelling variadic type packs.
     if (isInSILMode() && Tok.isContextualKeyword("Pack") &&
@@ -225,7 +244,10 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     }
     break;
   case tok::kw_Any:
-    ty = parseAnyType();
+    if (peekToken().is(tok::colon_colon))
+      ty = parseTypeIdentifier(/*base=*/nullptr);
+    else
+      ty = parseAnyType();
     break;
   case tok::l_paren:
     ty = parseTypeTupleBody();
@@ -245,29 +267,26 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     break;
   }
   case tok::kw__:
-    ty = makeParserResult(new (Context) PlaceholderTypeRepr(consumeToken()));
+    if (peekToken().is(tok::colon_colon))
+      ty = parseTypeIdentifier(/*base=*/nullptr);
+    else
+      ty = makeParserResult(new (Context) PlaceholderTypeRepr(consumeToken()));
     break;
   case tok::kw_protocol:
     if (startsWithLess(peekToken())) {
       ty = parseOldStyleProtocolComposition();
       break;
     }
-    LLVM_FALLTHROUGH;
+    return diagnoseAndRecover();
+  case tok::kw_self:
+  case tok::kw_super:
+    if (peekToken().is(tok::colon_colon)) {
+      ty = parseTypeIdentifier(/*base=*/nullptr);
+      break;
+    }
+    return diagnoseAndRecover();
   default:
-    {
-      auto diag = diagnose(Tok, MessageID);
-      // If the next token is closing or separating, the type was likely forgotten
-      if (Tok.isAny(tok::r_paren, tok::r_brace, tok::r_square, tok::arrow,
-                    tok::equal, tok::comma, tok::semi))
-        diag.fixItInsert(getEndOfPreviousLoc(), " <#type#>");
-    }
-    if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
-      ty = makeParserErrorResult(ErrorTypeRepr::create(Context, Tok.getLoc()));
-      consumeToken();
-      return ty;
-    }
-    checkForInputIncomplete();
-    return nullptr;
+    return diagnoseAndRecover();
   }
 
   // '.X', '.Type', '.Protocol', '?', '!', '[]'.
@@ -1872,6 +1891,9 @@ bool Parser::canParseCollectionType() {
 }
 
 bool Parser::canParseTypeIdentifier() {
+  // Parse a module selector, if present.
+  parseModuleSelector();
+  
   // Parse an identifier.
   //
   // FIXME: We should expect e.g. 'X.var'. Almost any keyword is a valid member component.

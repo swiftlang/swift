@@ -15,6 +15,7 @@ struct NonTrivialStruct {
 
 sil_global [let] @g1 : $Int32
 sil_global [let] @g2 : $Int32
+sil_global [let] @g3 : $Int32
 
 sil @paable : $@convention(thin) (Builtin.Int64) -> ()
 sil @moved_pai_callee : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
@@ -159,6 +160,25 @@ bb0:
   store %3 to [trivial] %1 : $*Int32
   %6 = tuple ()
   return %6 : $()
+}
+
+// CHECK-LABEL: sil [global_init_once_fn] [no_locks] [perf_constraint] [ossa] @remove_loads_and_stores_in_globalinit :
+// CHECK-NOT:     store
+// CHECK:         debug_step
+// CHECK-NOT:     load
+// CHECK:       } // end sil function 'remove_loads_and_stores_in_globalinit'
+sil [global_init_once_fn] [no_locks] [ossa] @remove_loads_and_stores_in_globalinit : $@convention(c) () -> () {
+bb0:
+  alloc_global @g3
+  %1 = global_addr @g3 : $*Int32
+  %2 = integer_literal $Builtin.Int32, 10
+  %3 = struct $Int32 (%2)
+  store %3 to [trivial] %1
+  debug_step
+  %6 = load [trivial] %1
+  store %6 to [trivial] %1
+  %r = tuple ()
+  return %r
 }
 
 // Check that we don't crash on global init-once declarations.

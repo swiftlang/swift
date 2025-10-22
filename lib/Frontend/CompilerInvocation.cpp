@@ -786,15 +786,15 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   Opts.EnableCachingRemarks |= Args.hasArg(OPT_cache_remarks);
   Opts.CacheSkipReplay |= Args.hasArg(OPT_cache_disable_replay);
   if (const Arg *A = Args.getLastArg(OPT_cas_path))
-    Opts.CASOpts.CASPath = A->getValue();
+    Opts.Config.CASPath = A->getValue();
 
   if (const Arg *A = Args.getLastArg(OPT_cas_plugin_path))
-    Opts.CASOpts.PluginPath = A->getValue();
+    Opts.Config.PluginPath = A->getValue();
 
   for (StringRef Opt : Args.getAllArgValues(OPT_cas_plugin_option)) {
     StringRef Name, Value;
     std::tie(Name, Value) = Opt.split('=');
-    Opts.CASOpts.PluginOptions.emplace_back(std::string(Name),
+    Opts.Config.PluginOptions.emplace_back(std::string(Name),
                                             std::string(Value));
   }
 
@@ -939,9 +939,15 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     if (!seenFeatures.insert(*feature).second)
       continue;
 
+    bool forMigration = featureMode.has_value();
+
     // Enable the feature if requested.
     if (isEnableFeatureFlag)
-      Opts.enableFeature(*feature, /*forMigration=*/featureMode.has_value());
+      Opts.enableFeature(*feature, forMigration);
+
+    // 'StandaloneSwiftAvailability' implies 'SwiftRuntimeAvailability'
+    if (*feature == Feature::StandaloneSwiftAvailability)
+      Opts.enableFeature(Feature::SwiftRuntimeAvailability, forMigration);
   }
 
   // Since pseudo-features don't have a boolean on/off state, process them in
@@ -3522,6 +3528,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.TrapFuncName = Args.getLastArgValue(OPT_trap_function).str();
 
   Opts.FunctionSections = Args.hasArg(OPT_function_sections);
+
+  Opts.VerboseAsm = Args.hasFlag(OPT_verbose_asm, OPT_no_verbose_asm,
+                                 /*default*/ true);
 
   if (Args.hasArg(OPT_autolink_force_load))
     Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name).str();

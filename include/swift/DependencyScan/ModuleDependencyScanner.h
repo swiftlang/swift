@@ -17,6 +17,7 @@
 #include "swift/Serialization/ScanningLoaders.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "llvm/CAS/CASReference.h"
+#include "llvm/CAS/CASFileSystem.h"
 #include "llvm/Support/ThreadPool.h"
 
 namespace swift {
@@ -30,6 +31,11 @@ using LookupModuleOutputCallback = llvm::function_ref<std::string(
     const clang::tooling::dependencies::ModuleDeps &,
     clang::tooling::dependencies::ModuleOutputKind)>;
 using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
+
+/// A map from a module id to a collection of import statement infos.
+using ImportStatementInfoMap =
+    std::unordered_map<ModuleDependencyID,
+                       std::vector<ScannerImportStatementInfo>>;
 
 /// A dependency scanning worker which performs filesystem lookup
 /// of a named module dependency.
@@ -144,7 +150,11 @@ public:
                          const CompilerInvocation &CI);
   
   void startTracking(bool includeCommonDeps = true);
-  void trackFile(const Twine &path);
+
+  /// Track a file with path.
+  /// \returns true if the file is tracked, false if the file doesn't exist.
+  bool trackFile(const Twine &path);
+
   llvm::Expected<llvm::cas::ObjectProxy> createTreeFromDependencies();
   
 private:
@@ -249,7 +259,7 @@ public:
     return *CAS;
   }
 
-  llvm::vfs::FileSystem &getSharedCachingFS() const {
+  llvm::cas::CASBackedFileSystem &getSharedCachingFS() const {
     assert(CacheFS && "Expect CacheFS available");
     return *CacheFS;
   }
@@ -328,6 +338,56 @@ private:
   /// for a given module name.
   Identifier getModuleImportIdentifier(StringRef moduleName);
 
+private:
+  struct BatchClangModuleLookupResult {
+    llvm::StringMap<clang::tooling::dependencies::ModuleDeps>
+        discoveredDependencyInfos;
+    llvm::StringMap<std::vector<std::string>> visibleModules;
+  };
+
+  /// For the provided collection of unresolved imports
+  /// belonging to identified Swift dependnecies, execute a parallel
+  /// query to the Clang dependency scanner for each import's module identifier.
+  void performParallelClangModuleLookup(
+      const ImportStatementInfoMap &unresolvedImportsMap,
+      const ImportStatementInfoMap &unresolvedOptionalImportsMap,
+      ModuleDependenciesCache &cache,
+      BatchClangModuleLookupResult &result);
+
+  /// Given a result of a batch Clang module dependency lookup,
+  /// record its results in the cache:
+  /// 1. Record all discovered Clang module dependency infos
+  ///    in the \c cache.
+  /// 1. Update the set of visible Clang modules from each Swift module
+  ///    in the \c cache.
+  /// 2. Update the total collection of all disovered clang modules
+  ///    in \c allDiscoveredClangModules.
+  /// 3. Record all import identifiers which the scan failed to resolve
+  ///    in \c failedToResolveImports.
+  /// 4. Update the set of resolved Clang dependencies for each Swift
+  ///    module dependency in \c resolvedClangDependenciesMap.
+  void cacheComputedClangModuleLookupResults(
+      const BatchClangModuleLookupResult &lookupResult,
+      const ImportStatementInfoMap &unresolvedImportsMap,
+      const ImportStatementInfoMap &unresolvedOptionalImportsMap,
+      ArrayRef<ModuleDependencyID> swiftModuleDependents,
+      ModuleDependenciesCache &cache,
+      ModuleDependencyIDSetVector &allDiscoveredClangModules,
+      std::vector<std::pair<ModuleDependencyID, ScannerImportStatementInfo>>
+          &failedToResolveImports,
+      std::unordered_map<ModuleDependencyID, ModuleDependencyIDSetVector>
+          &resolvedClangDependenciesMap);
+
+  /// Re-query some failed-to-resolve Clang imports from cache
+  /// in chance they were brought in as transitive dependencies.
+  void reQueryMissedModulesFromCache(
+      ModuleDependenciesCache &cache,
+      const std::vector<
+          std::pair<ModuleDependencyID, ScannerImportStatementInfo>>
+          &failedToResolveImports,
+      std::unordered_map<ModuleDependencyID, ModuleDependencyIDSetVector>
+          &resolvedClangDependenciesMap);
+
   /// Assuming the \c `moduleImport` failed to resolve,
   /// iterate over all binary Swift module dependencies with serialized
   /// search paths and attempt to diagnose if the failed-to-resolve module
@@ -358,7 +418,7 @@ private:
   /// File prefix mapper.
   std::unique_ptr<llvm::PrefixMapper> PrefixMapper;
   /// CAS file system for loading file content.
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> CacheFS;
+  llvm::IntrusiveRefCntPtr<llvm::cas::CASBackedFileSystem> CacheFS;
   /// Protect worker access.
   std::mutex WorkersLock;
   /// Count of filesystem queries performed

@@ -1,6 +1,5 @@
-// REQUIRES: rdar162106619
-
 // REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: std_span
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t

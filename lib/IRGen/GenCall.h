@@ -278,9 +278,8 @@ namespace irgen {
   void emitYieldOnceCoroutineResult(IRGenFunction &IGF, Explosion &result,
                                     SILType funcResultType, SILType returnResultType);
 
-  void emitGuaranteedAddressResult(IRGenFunction &IGF, Explosion &result,
-                                   SILType funcResultType,
-                                   SILType returnResultType);
+  void emitAddressResult(IRGenFunction &IGF, Explosion &result,
+                         SILType funcResultType, SILType returnResultType);
 
   Address emitAutoDiffCreateLinearMapContextWithType(
       IRGenFunction &IGF, llvm::Value *topLevelSubcontextMetatype);

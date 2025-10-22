@@ -47,9 +47,7 @@ class AvailabilityQuery final {
 
   AvailabilityQuery(AvailabilityDomain domain, ResultKind kind,
                     const std::optional<AvailabilityRange> &primaryRange,
-                    const std::optional<AvailabilityRange> &variantRange)
-      : domain(domain), primaryRange(primaryRange), variantRange(variantRange),
-        kind(kind), unavailable(false) {};
+                    const std::optional<AvailabilityRange> &variantRange);
 
 public:
   /// Returns an `AvailabilityQuery` for a query that evaluates to true or

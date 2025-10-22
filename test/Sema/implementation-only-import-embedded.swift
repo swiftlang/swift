@@ -200,7 +200,7 @@ public func legalAccessToIndirect(arg: StructFromIndirect = StructFromIndirect()
 }
 
 public struct ExposedLayoutPublic {
-  public var publicField: StructFromDirect // expected-error {{cannot use struct 'StructFromDirect' here; 'directs' has been imported as implementation-only}}
+  public var publicField: StructFromDirect // expected-error {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
 
   private var privateField: StructFromDirect // FIXME should error
 }

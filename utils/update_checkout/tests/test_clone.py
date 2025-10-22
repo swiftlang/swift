@@ -41,7 +41,10 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
                             '--verbose'])
 
         # Test that we're actually checking out the 'extra' scheme based on the output
-        self.assertIn(b"git checkout refs/heads/main", output)
+        self.assertIn(
+            f"git -C {os.path.join(self.source_root, 'repo1')} checkout refs/heads/main",
+            output.decode("utf-8"),
+        )
 
     def test_manager_not_called_on_long_socket(self):
         fake_tmpdir = '/tmp/very/' + '/long' * 20 + '/tmp'

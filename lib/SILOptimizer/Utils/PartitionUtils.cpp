@@ -111,6 +111,18 @@ void PartitionOpError::InOutSendingReturnedError::print(
      << "        Rep: " << valueMap.getRepresentativeValue(returnedValue);
 }
 
+void PartitionOpError::InOutSendingParametersInSameRegionError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: InOutSendingParametersInSameRegion!\n"
+     << "        First ID:  %%" << firstInoutSendingParam
+     << "        First Rep: "
+     << valueMap.getRepresentativeValue(firstInoutSendingParam);
+  for (auto other : otherInOutSendingParams) {
+    os << "        Other ID:  %%" << other
+       << "        Other Rep: " << valueMap.getRepresentativeValue(other);
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                             MARK: PartitionOp
 //===----------------------------------------------------------------------===//

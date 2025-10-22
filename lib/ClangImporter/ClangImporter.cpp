@@ -665,6 +665,12 @@ void importer::getNormalInvocationArguments(
       });
     }
 
+    if (triple.isAndroid()) {
+      invocationArgStrs.insert(invocationArgStrs.end(), {
+        "-D__ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__",
+      });
+    }
+
     if (triple.isOSWindows()) {
       switch (triple.getArch()) {
       default: llvm_unreachable("unsupported Windows architecture");
@@ -1189,7 +1195,9 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     // compiler can be more efficient to compute swift cache key without having
     // the knowledge about clang command-line options.
     if (ctx.CASOpts.EnableCaching || ctx.CASOpts.ImportModuleFromCAS) {
-      CI->getCASOpts() = ctx.CASOpts.CASOpts;
+      CI->getCASOpts().CASPath = ctx.CASOpts.Config.CASPath;
+      CI->getCASOpts().PluginPath = ctx.CASOpts.Config.PluginPath;
+      CI->getCASOpts().PluginOptions = ctx.CASOpts.Config.PluginOptions;
       // When clangImporter is used to compile (generate .pcm or .pch), need to
       // inherit the include tree from swift args (last one wins) and clear the
       // input file.
@@ -2568,6 +2576,10 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
     deprecatedAsUnavailableMessage = "";
     break;
 
+  case PlatformKind::Android:
+    deprecatedAsUnavailableMessage = "";
+    break;
+
   case PlatformKind::none:
     break;
   }
@@ -2615,6 +2627,9 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
 
   case PlatformKind::Windows:
     return name == "windows";
+
+  case PlatformKind::Android:
+    return name == "android";
 
   case PlatformKind::none:
     return false;
@@ -2692,6 +2707,10 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   case PlatformKind::Windows:
     // No deprecation filter on Windows
     return false;
+
+  case PlatformKind::Android:
+    // The minimum Android API level supported by Swift is 21
+    return major <= 20;
   }
 
   llvm_unreachable("Unexpected platform");
@@ -8303,6 +8322,9 @@ static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
 }
 
 static bool hasDestroyTypeOperations(const clang::CXXRecordDecl *decl) {
+  if (decl->hasSimpleDestructor())
+    return true;
+
   if (auto dtor = decl->getDestructor()) {
     if (dtor->isDeleted() || dtor->isIneligibleOrNotSelected() ||
         dtor->getAccess() != clang::AS_public) {
@@ -8782,7 +8804,7 @@ ClangDeclExplicitSafety::evaluate(Evaluator &evaluator,
   
   // Explicitly unsafe.
   auto decl = desc.decl;
-  if (hasUnsafeAPIAttr(decl) || hasSwiftAttribute(decl, "unsafe"))
+  if (hasSwiftAttribute(decl, "unsafe"))
     return ExplicitSafety::Unsafe;
   
   // Explicitly safe.

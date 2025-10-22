@@ -815,6 +815,11 @@ def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
   HelpText<"Emit an Objective-C and C++ header file to <path>">,
   Alias<emit_objc_header_path>;
 
+def emit_clang_header_min_access : Separate<["-"], "emit-clang-header-min-access">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath, CacheInvariant]>,
+  MetaVarName<"<access-level>">,
+  HelpText<"The minimum access level of declarations to include in the emitted header.>">;
+
 def static : Flag<["-"], "static">,
   Flags<[FrontendOption, ModuleInterfaceOption, NoInteractiveOption]>,
   HelpText<"Make this module statically linkable and make the output of -emit-library a static library.">;

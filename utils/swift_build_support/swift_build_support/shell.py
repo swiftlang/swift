@@ -216,7 +216,7 @@ lock = None
 
 
 def run(*args, **kwargs):
-    repo_path = os.getcwd()
+    repo_path = kwargs.pop('repo_path', os.getcwd())
     echo_output = kwargs.pop('echo', False)
     dry_run = kwargs.pop('dry_run', False)
     env = kwargs.get('env', None)
@@ -249,9 +249,9 @@ def run(*args, **kwargs):
         lock.release()
 
     if ret != 0:
-        eout = Exception()
+        eout = Exception(f"[{repo_path}] '{args}' failed with '{output.decode('utf-8')}'")
         eout.ret = ret
-        eout.args = args
+        eout.arguments = args
         eout.repo_path = repo_path
         eout.stderr = output
         raise eout

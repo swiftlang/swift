@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-swift-frontend -primary-file %s -O -emit-assembly | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu
+// RUN: %target-swift-frontend -primary-file %s -O -emit-assembly -no-verbose-asm | \
+// RUN:   %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu
 // REQUIRES: swift_stdlib_no_asserts
 
 import Swift

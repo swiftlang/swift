@@ -224,15 +224,6 @@ Pattern *AbstractPatternEntryScope::getPattern() const {
   return getPatternEntry().getPattern();
 }
 
-NullablePtr<AbstractClosureExpr> BraceStmtScope::parentClosureIfAny() const {
-  if (auto parent = getParent()) {
-    if (auto closureScope = dyn_cast<ClosureParametersScope>(parent.get()))
-      return closureScope->closureExpr;
-  }
-
-  return nullptr;
-}
-
 std::string ASTScopeImpl::getClassName() const {
   // GenericTypeOrExtensionScope provides a custom implementation that deals
   // with declaration names and "portions".

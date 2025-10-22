@@ -1559,10 +1559,12 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
   // If the declaration is exported as a C function, emit its native-to-foreign
   // thunk too, if it wasn't already forced.
-  if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
-    auto thunk = SILDeclRef(AFD).asForeign();
-    if (!hasFunction(thunk))
-      emitNativeToForeignThunk(thunk);
+  if (auto cdeclAttr = AFD->getAttrs().getAttribute<CDeclAttr>()) {
+    if (cdeclAttr->Underscored) {
+      auto thunk = SILDeclRef(AFD).asForeign();
+      if (!hasFunction(thunk))
+        emitNativeToForeignThunk(thunk);
+    }
   }
 
   emitDistributedThunkForDecl(AFD);
@@ -1591,7 +1593,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
 
   if (shouldEmitFunctionBody(fd)) {
     Types.setCaptureTypeExpansionContext(SILDeclRef(fd), M);
-    emitOrDelayFunction(SILDeclRef(decl));
+    emitOrDelayFunction(SILDeclRef(decl, fd->hasOnlyCEntryPoint()));
   }
 }
 

@@ -176,6 +176,58 @@ func passInOutSendingMultipleTimes(_ x: inout NonSendableStruct) {
   // expected-note @-3 {{task-isolated 'x.second' is passed as a 'sending' parameter}}
 }
 
+func twoInoutSendingParamsInSameRegion(_ x: inout sending NonSendableKlass, _ y: inout sending NonSendableKlass) {
+  x = y
+} // expected-warning {{'inout sending' parameters 'x' and 'y' can be potentially accessed from each other at function return risking data races in caller; this is an error in the Swift 6 language mode}}
+// expected-note @-1 {{caller function assumes on return that 'x' and 'y' cannot be used to access each other implying sending them to different isolation domains does not risk a data race}}
+
+func twoInoutSendingParamsInSameRegion2(_ x: inout sending NonSendableKlass, _ y: inout sending NonSendableKlass) {
+  let z = y
+  x = z
+} // expected-warning {{'inout sending' parameters 'x' and 'y' can be potentially accessed from each other at function return risking data races in caller; this is an error in the Swift 6 language mode}}
+// expected-note @-1 {{caller function assumes on return that 'x' and 'y' cannot be used to access each other implying sending them to different isolation domains does not risk a data race}}
+
+func twoInoutSendingParamsInSameRegion3(_ x: inout sending NonSendableKlass, _ y: inout sending NonSendableKlass) {
+  let z = y
+  let y = (x, z) // expected-warning {{initialization of immutable value 'y' was never used; consider replacing with assignment to '_' or removing it}}
+} // expected-warning {{'inout sending' parameters 'x' and 'y' can be potentially accessed from each other at function return risking data races in caller; this is an error in the Swift 6 language mode}}
+// expected-note @-1 {{caller function assumes on return that 'x' and 'y' cannot be used to access each other implying sending them to different isolation domains does not risk a data race}}
+
+func twoInoutSendingParamsInSameRegion4(_ x: inout sending NonSendableKlass, _ y: inout sending NonSendableKlass) {
+  let z = y
+  let h = x
+  func doSomething(_ x: NonSendableKlass, _ y: NonSendableKlass) {
+  }
+  doSomething(z, h)
+} // expected-warning {{'inout sending' parameters 'x' and 'y' can be potentially accessed from each other at function return risking data races in caller; this is an error in the Swift 6 language mode}}
+// expected-note @-1 {{caller function assumes on return that 'x' and 'y' cannot be used to access each other implying sending them to different isolation domains does not risk a data race}}
+
+func multipleInOutSendingParamsInSameRegion1(_ x1: inout sending NonSendableKlass, _ x2: inout sending NonSendableKlass, _ x3: inout sending NonSendableKlass) {
+  x1 = x2
+  x2 = x3
+} // expected-warning {{'inout sending' parameters 'x2' and 'x3' can be potentially accessed from each other at function return risking data races in caller; this is an error in the Swift 6 language mode}}
+// expected-note @-1 {{caller function assumes on return that 'x2' and 'x3' cannot be used to access each other implying sending them to different isolation domains does not risk a data race}}
+
+func multipleInOutSendingParamsInSameRegion2(_ x1: inout sending NonSendableKlass, _ x2: inout sending NonSendableKlass, _ x3: inout sending NonSendableKlass) {
+  let y = (x1, x2, x3)
+  _ = y
+} // expected-warning {{'inout sending' parameters 'x2' and 'x3' can be potentially accessed from each other at function return risking data races in caller; this is an error in the Swift 6 language mode}}
+// expected-note @-1 {{caller function assumes on return that 'x2' and 'x3' cannot be used to access each other implying sending them to different isolation domains does not risk a data race}}
+// expected-warning @-2 {{'inout sending' parameters 'x1' and 'x3' can be potentially accessed from each other at function return risking data races in caller; this is an error in the Swift 6 language mode}}
+// expected-note @-3 {{caller function assumes on return that 'x1' and 'x3' cannot be used to access each other implying sending them to different isolation domains does not risk a data race}}
+// expected-warning @-4 {{'inout sending' parameters 'x1' and 'x2' can be potentially accessed from each other at function return risking data races in caller; this is an error in the Swift 6 language mode}}
+// expected-note @-5 {{caller function assumes on return that 'x1' and 'x2' cannot be used to access each other implying sending them to different isolation domains does not risk a data race}}
+
+func multipleInOutSendingParamsInSameRegion3(_ x1: inout sending NonSendableKlass, _ x2: inout sending NonSendableKlass, _ x3: inout sending NonSendableKlass) {
+  let y = (x2, x3, x1)
+  _ = y
+} // expected-warning {{'inout sending' parameters 'x2' and 'x3' can be potentially accessed from each other at function return risking data races in caller; this is an error in the Swift 6 language mode}}
+// expected-note @-1 {{caller function assumes on return that 'x2' and 'x3' cannot be used to access each other implying sending them to different isolation domains does not risk a data race}}
+// expected-warning @-2 {{'inout sending' parameters 'x1' and 'x3' can be potentially accessed from each other at function return risking data races in caller; this is an error in the Swift 6 language mode}}
+// expected-note @-3 {{caller function assumes on return that 'x1' and 'x3' cannot be used to access each other implying sending them to different isolation domains does not risk a data race}}
+// expected-warning @-4 {{'inout sending' parameters 'x1' and 'x2' can be potentially accessed from each other at function return risking data races in caller; this is an error in the Swift 6 language mode}}
+// expected-note @-5 {{caller function assumes on return that 'x1' and 'x2' cannot be used to access each other implying sending them to different isolation domains does not risk a data race}}
+
 //////////////////////////////////////
 // MARK: Return Inout Sending Tests //
 //////////////////////////////////////

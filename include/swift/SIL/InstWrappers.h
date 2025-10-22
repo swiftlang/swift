@@ -301,6 +301,8 @@ public:
       return &forwardingInst->getOperandRef(TuplePackExtractInst::TupleOperand);
     case SILInstructionKind::BorrowedFromInst:
       return &forwardingInst->getOperandRef(0);
+    case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
+      return &forwardingInst->getOperandRef(0);
     default:
       int numRealOperands = forwardingInst->getNumRealOperands();
       if (numRealOperands == 0) {
@@ -344,6 +346,7 @@ public:
     case SILInstructionKind::StructExtractInst:
     case SILInstructionKind::DifferentiableFunctionExtractInst:
     case SILInstructionKind::LinearFunctionExtractInst:
+    case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
       return true;
     default:
       return false;
@@ -352,6 +355,8 @@ public:
 
   /// Return true if the forwarded value has the same representation. If true,
   /// then the result can be mapped to the same storage without a move or copy.
+  ///
+  /// See ForwardingInstruction.swift preservesRepresentation().
   bool hasSameRepresentation() const;
 
   /// Return true if the forwarded value is address-only either before or after

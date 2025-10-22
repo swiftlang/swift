@@ -705,6 +705,9 @@ Types
   type ::= type 'Bv' NATURAL '_'             // Builtin.Vec<n>x<type>
   type ::= type type 'BV'                    // Builtin.FixedArray<N, T>
   type ::= 'Bw'                              // Builtin.Word
+#if SWIFT_RUNTIME_VERSION >= 6.2
+  type ::= 'BA'                              // Builtin.ImplicitActor
+#endif
   type ::= function-signature 'c'            // function type (escaping)
   type ::= function-signature 'X' FUNCTION-KIND // special function type
   type ::= bound-generic-type
@@ -922,6 +925,9 @@ mangled in to disambiguate.
   RESULT-CONVENTION ::= 'u'                  // unowned inner pointer
   RESULT-CONVENTION ::= 'a'                  // auto-released
   RESULT-CONVENTION ::= 'k'                  // pack
+  RESULT-CONVENTION ::= 'l'                  // guaranteed address
+  RESULT-CONVENTION ::= 'g'                  // guaranteed
+  RESULT-CONVENTION ::= 'm'                  // inout
 
   RESULT-DIFFERENTIABILITY ::= 'w'            // @noDerivative
 

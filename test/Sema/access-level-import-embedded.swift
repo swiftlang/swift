@@ -171,7 +171,7 @@ public func legalAccessToIndirect(arg: StructFromIndirect = StructFromIndirect()
 
 public struct ExposedLayoutPublic {
   public var publicField: StructFromDirect // expected-error {{property cannot be declared public because its type uses an internal type}}
-  // expected-error @-1 {{cannot use struct 'StructFromDirect' here; 'directs' has been imported as implementation-only}}
+  // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
   // expected-note @-2 {{struct 'StructFromDirect' is imported by this file as 'internal' from 'directs'}}
 
   private var privateField: StructFromDirect

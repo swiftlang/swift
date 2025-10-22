@@ -5,8 +5,8 @@
 @_spi(a) public let a: SPIInterface1
 @_spi(a) public let b: SPIInterface2
 
-public let c: SPIInterface1 // expected-error{{cannot use class 'SPIInterface1' here; it is an SPI imported from '__ObjC'}}
-public let d: SPIInterface2 // expected-error{{cannot use class 'SPIInterface2' here; it is an SPI imported from '__ObjC'}}
+public let c: SPIInterface1 // expected-error{{cannot use class 'SPIInterface1' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is an SPI imported from '__ObjC'}}
+public let d: SPIInterface2 // expected-error{{cannot use class 'SPIInterface2' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is an SPI imported from '__ObjC'}}
 
 @inlinable
 public func inlinableUsingSPI() { // expected-warning{{public declarations should have an availability attribute with an introduction version}}

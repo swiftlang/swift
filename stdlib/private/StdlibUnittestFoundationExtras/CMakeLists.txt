@@ -1,9 +1,21 @@
+if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
+  # This library imports Foundation from the SDK, which re-exports
+  # Observation which is part of this build.
+  list(APPEND swift_stdlib_unittest_foundationextras_darwin_dependencies Observation)
+endif()
+
 add_swift_target_library(swiftStdlibUnittestFoundationExtras ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
   StdlibUnittestFoundationExtras.swift
   UnavailableFoundationMethodThunks.mm
 
+  SWIFT_MODULE_DEPENDS_IOS ${swift_stdlib_unittest_foundationextras_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_OSX ${swift_stdlib_unittest_foundationextras_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_TVOS ${swift_stdlib_unittest_foundationextras_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_WATCHOS ${swift_stdlib_unittest_foundationextras_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_XROS ${swift_stdlib_unittest_foundationextras_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_stdlib_unittest_foundationextras_darwin_dependencies}
   SWIFT_MODULE_DEPENDS StdlibUnittest
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT stdlib-experimental
