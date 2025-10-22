@@ -99,17 +99,17 @@ import LibUnrelated
 ambiguous() // expected-error {{ambiguous use of 'ambiguous()'}}
 // CHECK-NOT: LibCore
 // CHECK-NOT: LibMiddle
-// CHECK: LibUnrelated.ambiguous:1:13: note: found this candidate in module 'LibUnrelated'
-// CHECK: Lib.ambiguous:1:13: note: found this candidate in module 'Lib'
-// CHECK: Lib.ambiguous:1:13: note: found this candidate in module 'Lib'
+// CHECK: LibUnrelated.ambiguous:1:13: note: found candidate with type '() -> ()' in module 'LibUnrelated'
+// CHECK: Lib.ambiguous:1:13: note: found candidate with type '() -> ()' in module 'Lib'
+// CHECK: Lib.ambiguous:1:13: note: found candidate with type '() -> ()' in module 'Lib'
 
 //--- ClientMiddle.swift
 import LibCore
 import LibMiddle
 
 ambiguous() // expected-error {{ambiguous use of 'ambiguous()'}}
-// CHECK: LibCore.ambiguous:1:13: note: found this candidate in module 'LibCore'
-// CHECK: LibMiddle.ambiguous:1:13: note: found this candidate in module 'LibMiddle'
+// CHECK: LibCore.ambiguous:1:13: note: found candidate with type '() -> ()' in module 'LibCore'
+// CHECK: LibMiddle.ambiguous:1:13: note: found candidate with type '() -> ()' in module 'LibMiddle'
 
 //--- ClientAccessLevelOnImports.swift
 internal import Lib // expected-note {{global function 'coreFunc()' imported as 'internal' from 'Lib' here}}
