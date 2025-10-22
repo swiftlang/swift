@@ -80,7 +80,7 @@ struct Loop {
     return loopBlock.successors.contains { !contains(block: $0) }
   }
   
-  func getBlocksThatDominateAllExitingAndLatchBlocks(_ context: FunctionPassContext) -> [BasicBlock] {
+  func getBlocksThatDominateAllExitingAndLatchBlocks(excludeColdExits: Bool = false, _ context: FunctionPassContext) -> [BasicBlock] {
     var result: [BasicBlock] = []
     var cachedExitingAndLatchBlocks = Stack<BasicBlock>(context)
     var workList = BasicBlockWorklist(context)
@@ -89,7 +89,7 @@ struct Loop {
       workList.deinitialize()
     }
     
-    cachedExitingAndLatchBlocks.append(contentsOf: exitingAndLatchBlocks)
+    cachedExitingAndLatchBlocks.append(contentsOf: exitingAndLatchBlocks.filter({ !excludeColdExits || !$0.isCold(context) }))
     workList.pushIfNotVisited(header)
     
     while let block = workList.pop() {
