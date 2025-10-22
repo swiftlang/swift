@@ -1635,6 +1635,20 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   // Generate function info for this signature.
   auto extInfo = clang::FunctionType::ExtInfo();
 
+  if (auto clangTy = FnType->getClangTypeInfo().getType()) {
+    const clang::FunctionType *fnTy = nullptr;
+
+    if (auto theFnTy = clangTy->getAs<clang::FunctionType>())
+      fnTy = theFnTy;
+    else if (auto ptrTy = clangTy->getAs<clang::PointerType>())
+      fnTy = ptrTy->getPointeeType()->getAs<clang::FunctionType>();
+    else if (auto refTy = clangTy->getAs<clang::ReferenceType>())
+      fnTy = refTy->getPointeeType()->getAs<clang::FunctionType>();
+
+    if (fnTy)
+      extInfo = fnTy->getExtInfo();
+  }
+
   bool isCXXMethod =
       FnType->getRepresentation() == SILFunctionTypeRepresentation::CXXMethod;
   auto &FI = isCXXMethod ?
@@ -2442,9 +2456,18 @@ Signature SignatureExpansion::getSignature() {
            (FnType->getLanguage() == SILFunctionLanguage::C) &&
          "C function type without C function info");
 
-  auto callingConv =
+  // If we have foreign type information from Clang, take the calling
+  // convention from there.  Otherwise, pick one based on the function
+  // type representation.
+  llvm::CallingConv::ID callingConv;
+
+  if (ForeignInfo.ClangInfo != nullptr) {
+    callingConv = ForeignInfo.ClangInfo->getEffectiveCallingConvention();
+  } else {
+    callingConv =
       expandCallingConv(IGM, FnType->getRepresentation(), FnType->isAsync(),
                         FnType->isCalleeAllocatedCoroutine());
+  }
 
   Signature result;
   result.Type = llvmType;

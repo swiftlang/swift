@@ -4054,6 +4054,13 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
     auto clangType = func->getType().getTypePtr();
+
+    if (clangType) {
+      // Pass the Clang type through, so we can extract information from it
+      // later on.
+      extInfoBuilder = extInfoBuilder.withClangFunctionType(clangType);
+    }
+
     AbstractionPattern origPattern =
         foreignInfo.self.isImportAsMember()
             ? AbstractionPattern::getCFunctionAsMethod(origType, clangType,

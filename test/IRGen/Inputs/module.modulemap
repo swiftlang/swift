@@ -43,3 +43,11 @@ module CFBridgedType {
 module RawLayoutCXX {
   header "raw_layout_cxx.h"
 }
+
+module Win32CallingConventions {
+  header "win32_calling_conventions.h"
+}
+
+module CallingConventions {
+  header "calling_conventions.h"
+}
