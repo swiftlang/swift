@@ -23,7 +23,6 @@ public enum E<T> {
   case c
 }
 
-sil @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
 sil @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
 sil @getC : $@convention(thin) () -> (@owned C)
 
@@ -536,6 +535,7 @@ bb0:
         ) : $Builtin.RawPointer
   %get = function_ref @swift_asyncLet_get : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
   apply %get(%async_let, %result_ptr) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  builtin "finishAsyncLet"(%async_let : $Builtin.RawPointer, %result_ptr : $Builtin.RawPointer) : $()
   builtin "endAsyncLetLifetime"(%async_let : $Builtin.RawPointer) : $()
   destroy_value %callee_noescape : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>
   destroy_value %callee_pa : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>

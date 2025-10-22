@@ -301,11 +301,11 @@ namespace {
 ///   @_silgen_name("swift_task_future_wait_throwing")
 ///   func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
 ///
-///   @_silgen_name("swift_asyncLet_wait")
-///   func _asyncLetGet<T>(_ task: Builtin.RawPointer) async -> T
+///   @_silgen_name("swift_asyncLet_get")
+///   func _asyncLet_get<T>(_ task: Builtin.RawPointer) async -> T
 ///
-///   @_silgen_name("swift_asyncLet_waitThrowing")
-///   func _asyncLetGetThrowing<T>(_ task: Builtin.RawPointer) async throws -> T
+///   @_silgen_name("swift_asyncLet_get_throwing")
+///   func _asyncLet_get_throwing<T>(_ task: Builtin.RawPointer) async throws -> T
 ///
 ///   @_silgen_name("swift_taskGroup_wait_next_throwing")
 ///   func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?

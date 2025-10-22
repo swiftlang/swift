@@ -1122,7 +1122,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case BuiltinValueKind::BuildComplexEqualitySerialExecutorRef:
     case BuiltinValueKind::BuildDefaultActorExecutorRef:
     case BuiltinValueKind::BuildMainActorExecutorRef:
-    case BuiltinValueKind::StartAsyncLet:
     case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
       return RuntimeEffect::MetaData;
     default:
