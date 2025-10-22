@@ -64,7 +64,7 @@ private:
   /// the mangled name of the variable will be used instead.
   StringRef AsmName;
 
-  /// Name of a section if @_section attribute was used, otherwise empty.
+  /// Name of a section if @section attribute was used, otherwise empty.
   StringRef Section;
 
   /// The lowered type of the variable.
@@ -86,7 +86,7 @@ private:
   /// once (either in its declaration, or once later), making it immutable.
   unsigned IsLet : 1;
 
-  /// Whether this declaration was marked `@_used`, meaning that it should be
+  /// Whether this declaration was marked `@used`, meaning that it should be
   /// added to the llvm.used list.
   unsigned IsUsed : 1;
 
@@ -162,7 +162,7 @@ public:
   StringRef asmName() const { return AsmName; }
   void setAsmName(StringRef value) { AsmName = value; }
 
-  /// Return custom section name if @_section was used, otherwise empty
+  /// Return custom section name if @section was used, otherwise empty
   StringRef section() const { return Section; }
   void setSection(StringRef value) { Section = value; }
 
@@ -242,7 +242,7 @@ public:
     StaticInitializerBlock.eraseAllInstructions(Module);
   }
 
-  /// Returns true if this global variable has `@_used` attribute.
+  /// Returns true if this global variable has `@used` attribute.
   bool markedAsUsed() const { return IsUsed; }
 
   void setMarkedAsUsed(bool used) { IsUsed = used; }

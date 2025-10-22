@@ -3211,7 +3211,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
-    // @_section in a local scope is not allowed.
+    // @section in a local scope is not allowed.
     if (CurDeclContext->isLocalContext()) {
       diagnose(Loc, diag::attr_name_only_at_non_local_scope, AttrName);
     }
@@ -4348,6 +4348,12 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
   // Historical name for result builders.
   checkInvalidAttrName("_functionBuilder", "resultBuilder",
                        DeclAttrKind::ResultBuilder, diag::attr_renamed_warning);
+
+  // Historical name for @section and @used
+  checkInvalidAttrName("_section", "section", DeclAttrKind::Section,
+                       diag::attr_name_close_match);
+  checkInvalidAttrName("_used", "used", DeclAttrKind::Used,
+                       diag::attr_name_close_match);
 
   // Historical name for 'nonisolated'.
   if (!DK && Tok.getText() == "actorIndependent") {

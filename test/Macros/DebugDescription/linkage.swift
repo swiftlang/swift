@@ -10,11 +10,11 @@ struct MyStruct: CustomDebugStringConvertible {
 }
 // CHECK: #if !os(Windows)
 // CHECK: #if os(Linux)
-// CHECK: @_section(".lldbsummaries")
+// CHECK: @section(".lldbsummaries")
 // CHECK: #else
-// CHECK: @_section("__TEXT,__lldbsummaries")
+// CHECK: @section("__TEXT,__lldbsummaries")
 // CHECK: #endif
-// CHECK: @_used
+// CHECK: @used
 // CHECK: static let _lldb_summary = (
 // CHECK:     /* version */ 1 as UInt8,
 // CHECK:     /* record size */ 23 as UInt8,
@@ -22,4 +22,3 @@ struct MyStruct: CustomDebugStringConvertible {
 // CHECK:     /* "thirty" */ 7 as UInt8, 116 as UInt8, 104 as UInt8, 105 as UInt8, 114 as UInt8, 116 as UInt8, 121 as UInt8, 0 as UInt8
 // CHECK: )
 // CHECK: #endif
-

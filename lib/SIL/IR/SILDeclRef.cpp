@@ -1217,7 +1217,7 @@ bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
     return false;
   }
 
-  // - @_section and @_used imply that external tools will look for this symbol.
+  // - @section and @used imply that external tools will look for this symbol.
   if (decl->getAttrs().hasAttribute<SectionAttr>() ||
       decl->getAttrs().hasAttribute<UsedAttr>()) {
     return false;

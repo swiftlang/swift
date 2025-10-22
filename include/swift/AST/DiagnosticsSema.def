@@ -2097,11 +2097,9 @@ ERROR(cdecl_feature_required,none,
       "'@c' requires '-enable-experimental-feature CDecl'",
       ())
 
-// @_used and @_section
-ERROR(section_linkage_markers_disabled,none,
-      "attribute requires '-enable-experimental-feature SymbolLinkageMarkers'", ())
+// @used and @section
 ERROR(section_empty_name,none,
-      "'@_section' section name cannot be empty", ())
+      "'@section' section name cannot be empty", ())
 
 // @_silgen_name and friends
 WARNING(reserved_runtime_symbol_name,none,

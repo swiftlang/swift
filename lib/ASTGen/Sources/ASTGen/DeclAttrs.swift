@@ -1024,7 +1024,7 @@ extension ASTGenVisitor {
 
   /// E.g.
   ///   ```
-  ///   @_section("__TEXT,__mysection")
+  ///   @section("__TEXT,__mysection")
   ///   ```
   func generateSectionAttr(attribute node: AttributeSyntax) -> BridgedSectionAttr? {
     return self.generateWithLabeledExprListArguments(attribute: node) { args in

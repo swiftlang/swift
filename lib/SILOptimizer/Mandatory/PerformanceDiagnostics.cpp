@@ -723,7 +723,7 @@ private:
 
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
 
-    // Check that @_section, @_silgen_name is only on constant globals
+    // Check that @section, @_silgen_name is only on constant globals
     for (SILGlobalVariable &g : module->getSILGlobals()) {
       if (!g.getStaticInitializerValue() && g.mustBeInitializedStatically()) {
         PrettyStackTraceSILGlobal stackTrace(
@@ -733,7 +733,7 @@ private:
         if (!g.section().empty()) {
           module->getASTContext().Diags.diagnose(
             g.getDecl()->getLoc(), diag::bad_attr_on_non_const_global,
-            "@_section");
+            "@section");
         } else if (decl && g.isDefinition() &&
                    decl->getAttrs().hasAttribute<SILGenNameAttr>()) {
           module->getASTContext().Diags.diagnose(

@@ -1,10 +1,8 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature SymbolLinkageMarkers %s -emit-sib -o %t/tmp.sib -module-name borrow
-// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature SymbolLinkageMarkers %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
-// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature SymbolLinkageMarkers %t/tmp.2.sib -module-name asmname -emit-sorted-sil | %FileCheck %s
-
-// REQUIRES: swift_feature_SymbolLinkageMarkers
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name borrow
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
+// RUN: %target-sil-opt -sil-print-types %t/tmp.2.sib -module-name asmname -emit-sorted-sil | %FileCheck %s
 
 import Swift
 

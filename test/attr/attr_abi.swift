@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature StrictMemorySafety -enable-experimental-feature Lifetimes -enable-experimental-feature CImplementation -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -debugger-support
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature StrictMemorySafety -enable-experimental-feature Lifetimes -enable-experimental-feature CImplementation -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -debugger-support
 
 // REQUIRES: swift_feature_AddressableParameters
 // REQUIRES: swift_feature_CImplementation
@@ -6,7 +6,6 @@
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_NoImplicitCopy
 // REQUIRES: swift_feature_StrictMemorySafety
-// REQUIRES: swift_feature_SymbolLinkageMarkers
 
 import _Differentiation
 
@@ -1592,15 +1591,15 @@ func extern2() {}
 @abi(func extern3())
 @_extern(c) @_extern(wasm, module: "foo", name: "bar") func extern3()
 
-// @_used -- banned in @abi
-@abi(@_used func used1()) // expected-error {{unused '_used' attribute in '@abi'}} {{6-12=}}
-@_used func used1() {}
+// @used -- banned in @abi
+@abi(@used func used1()) // expected-error {{unused '_used' attribute in '@abi'}} {{6-12=}}
+@used func used1() {}
 
-@abi(@_used func used2()) // expected-error {{unused '_used' attribute in '@abi'}} {{6-12=}}
+@abi(@used func used2()) // expected-error {{unused '_used' attribute in '@abi'}} {{6-12=}}
 func used2() {}
 
 @abi(func used3())
-@_used func used3() {}
+@used func used3() {}
 
 // weak, unowned, unowned(unsafe) -- banned in @abi
 class ReferenceOwnership {
@@ -1863,15 +1862,15 @@ func expose2() {}
 @abi(func expose3())
 @_expose(Cxx) func expose3() {}
 
-// @_section -- banned in @abi
-@abi(@_section("fnord") func section1()) // expected-error {{unused '_section' attribute in '@abi'}} {{6-24=}}
-@_section("fnord") func section1() {}
+// @section -- banned in @abi
+@abi(@section("fnord") func section1()) // expected-error {{unused '_section' attribute in '@abi'}} {{6-24=}}
+@section("fnord") func section1() {}
 
-@abi(@_section("fnord") func section2()) // expected-error {{unused '_section' attribute in '@abi'}} {{6-24=}}
+@abi(@section("fnord") func section2()) // expected-error {{unused '_section' attribute in '@abi'}} {{6-24=}}
 func section2() {}
 
 @abi(func section3())
-@_section("fnord") func section3() {}
+@section("fnord") func section3() {}
 
 // @inlinable -- banned in @abi
 // Although the inlining *does* occasionally get mangled, it's only done in the

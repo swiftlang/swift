@@ -2632,36 +2632,6 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
   }
 }
 
-static bool allowSymbolLinkageMarkers(ASTContext &ctx, Decl *D) {
-  if (ctx.LangOpts.hasFeature(Feature::SymbolLinkageMarkers))
-    return true;
-
-  auto *sourceFile = D->getDeclContext()->getParentModule()
-      ->getSourceFileContainingLocation(D->getStartLoc());
-  if (!sourceFile)
-    return false;
-
-  auto expansion = sourceFile->getMacroExpansion();
-  auto *macroAttr = sourceFile->getAttachedMacroAttribute();
-  if (!expansion || !macroAttr)
-    return false;
-
-  auto *decl = expansion.dyn_cast<Decl *>();
-  if (!decl)
-    return false;
-
-  auto *macroDecl = macroAttr->getResolvedMacro();
-  if (!macroDecl)
-    return false;
-
-  if (macroDecl->getParentModule()->isStdlibModule() &&
-      macroDecl->getName().getBaseIdentifier()
-          .str() == "_DebugDescriptionProperty")
-    return true;
-
-  return false;
-}
-
 void AttributeChecker::visitSILGenNameAttr(SILGenNameAttr *A) {
   if (!canDeclareSymbolName(A->Name, D->getModuleContext())) {
     diagnose(A->getLocation(), diag::reserved_runtime_symbol_name,
@@ -2674,11 +2644,6 @@ void AttributeChecker::visitSILGenNameAttr(SILGenNameAttr *A) {
 }
 
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
-  if (!allowSymbolLinkageMarkers(Ctx, D)) {
-    diagnoseAndRemoveAttr(attr, diag::section_linkage_markers_disabled);
-    return;
-  }
-
   if (D->getDeclContext()->isLocalContext())
     diagnose(attr->getLocation(), diag::attr_only_at_non_local_scope, attr);
   else if (D->getDeclContext()->isGenericContext() &&
@@ -2697,11 +2662,6 @@ void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
 }
 
 void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
-  if (!allowSymbolLinkageMarkers(Ctx, D)) {
-    diagnoseAndRemoveAttr(attr, diag::section_linkage_markers_disabled);
-    return;
-  }
-
   // The name must not be empty.
   if (attr->Name.empty())
     diagnose(attr->getLocation(), diag::section_empty_name);
