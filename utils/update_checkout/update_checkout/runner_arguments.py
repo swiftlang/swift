@@ -1,5 +1,7 @@
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, List
+
+from .cli_arguments import CliArguments
 
 @dataclass
 class RunnerArguments:
@@ -22,13 +24,8 @@ class UpdateArguments(RunnerArguments):
 
 @dataclass
 class AdditionalSwiftSourcesArguments(RunnerArguments):
-    args: Any
-    "Arguments passed during CLI invocation." # TODO: Properly type this.
+    args: CliArguments
     repo_info: str
     repo_branch: str
     remote: str
-    with_ssh: bool
-    skip_history: bool
-    skip_tags: bool
-    skip_repository_list: bool
-    use_submodules: bool
+    skip_repository_list: List[str]
