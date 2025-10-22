@@ -281,7 +281,8 @@ struct LocalVariableAccessMap: Collection, CustomStringConvertible {
   let context: Context
   let allocation: Value
 
-  let liveInAccess: LocalVariableAccess?
+  let isLiveIn: Bool
+  let isLiveOut: Bool
 
   // All mapped accesses have a valid instruction.
   //
@@ -306,12 +307,19 @@ struct LocalVariableAccessMap: Collection, CustomStringConvertible {
   init?(allocation: Value, _ context: Context) {
     switch allocation {
     case is AllocBoxInst, is AllocStackInst:
-      self.liveInAccess = nil
-      break
+      self.isLiveIn = false
+      self.isLiveOut = false
     case let arg as FunctionArgument:
       switch arg.convention {
-      case .indirectIn, .indirectInout, .indirectInoutAliasable:
-        self.liveInAccess = LocalVariableAccess(.incomingArgument, nil)
+      case .indirectIn:
+        self.isLiveIn = true
+        self.isLiveOut = false
+      case .indirectInout, .indirectInoutAliasable:
+        self.isLiveIn = true
+        self.isLiveOut = true
+      case .indirectOut:
+        self.isLiveIn = false
+        self.isLiveOut = true
       default:
         return nil
       }
@@ -779,7 +787,8 @@ extension LocalVariableReachableAccess {
       if block != accessMap.allocation.parentBlock {
         for predecessor in block.predecessors { blockList.pushIfNotVisited(predecessor) }
       } else if block == accessMap.function.entryBlock {
-        accessStack.push(accessMap.liveInAccess!)
+        assert(accessMap.isLiveIn)
+        accessStack.push(LocalVariableAccess(.incomingArgument, nil))
       }
     case .assignValue:
       break
@@ -829,7 +838,7 @@ extension LocalVariableReachableAccess {
   /// This performs a forward CFG walk to find known reachable uses from the function entry that guarantee liveness and
   /// may safely enclose dependent uses.
   private func gatherKnownLivenessUsesFromEntry(in accessStack: inout Stack<LocalVariableAccess>) {
-    assert(accessMap.liveInAccess!.kind == .incomingArgument, "only an argument access is live in to the function")
+    assert(accessMap.isLiveIn, "only an argument access is live in to the function")
     let firstInst = accessMap.function.entryBlock.instructions.first!
     _ = gatherReachableUses(onOrAfter: firstInst, in: &accessStack, mode: .livenessUses)
   }
@@ -906,7 +915,7 @@ extension LocalVariableReachableAccess {
       return false
     }
     forwardPropagateEffect(in: initialBlock, blockInfo: blockMap[initialBlock], effect: initialEffect,
-                           blockList: &blockList, accessStack: &accessStack)
+                           blockList: &blockList, accessStack: &accessStack, mode: mode)
     while let block = blockList.pop() {
       let blockInfo = blockMap[block]
       var currentEffect: ForwardDataFlowEffect?
@@ -933,7 +942,7 @@ extension LocalVariableReachableAccess {
         return false
       }
       forwardPropagateEffect(in: block, blockInfo: blockInfo, effect: currentEffect, blockList: &blockList,
-                             accessStack: &accessStack)
+                             accessStack: &accessStack, mode: mode)
     }
     log("\n\(accessMap)")
     log(prefix: false, "Reachable access:\n\(accessStack.map({ String(describing: $0)}).joined(separator: "\n"))")
@@ -945,16 +954,18 @@ extension LocalVariableReachableAccess {
 
   private func forwardPropagateEffect(in block: BasicBlock, blockInfo: BlockInfo?, effect: ForwardDataFlowEffect?,
                                       blockList: inout BasicBlockWorklist,
-                                      accessStack: inout Stack<LocalVariableAccess>) {
+                                      accessStack: inout Stack<LocalVariableAccess>,
+                                      mode: DataFlowMode) {
     switch effect {
     case .none, .read, .modify, .escape:
       if let blockInfo, blockInfo.hasDealloc {
         break
       }
-      if block.terminator.isFunctionExiting {
-        // Record any reachable function exit as .outgoingArgument.
+      // Assume that only a ReturnInst can return a live-out value.
+      // All other function exits are considered dead-ends.
+      if block.terminator is ReturnInstruction, accessMap.isLiveOut {
         accessStack.push(LocalVariableAccess(.outgoingArgument, block.terminator))
-      } else if block.successors.isEmpty {
+      } else if block.successors.isEmpty, mode == .livenessUses {
         accessStack.push(LocalVariableAccess(.deadEnd, block.terminator))
       } else {
         for successor in block.successors { blockList.pushIfNotVisited(successor) }
