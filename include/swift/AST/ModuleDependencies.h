@@ -1058,6 +1058,10 @@ public:
   /// Setup caching service.
   bool setupCachingDependencyScanningService(CompilerInstance &Instance);
 
+  std::vector<clang::tooling::dependencies::
+                  DependencyScanningFilesystemSharedCache::OutOfDateEntry>
+  getFileSystemCacheOutOfDateEntries();
+
 private:
   /// Enforce clients not being allowed to query this cache directly, it must be
   /// wrapped in an instance of `ModuleDependenciesCache`.
