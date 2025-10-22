@@ -14,9 +14,9 @@ extension Point {
     self.y = yy
   }
 
-  init(xx: Double) {
+  init(xx: Double) {// expected-error {{return from initializer without initializing all stored properties}} {{19:3-3=self.y = y\n}} {{18-18=, y: Double}}
     self.x = xx // expected-warning {{initializer for struct 'Point' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
-  } // expected-error {{return from initializer without initializing all stored properties}}
+  }
 
   init(xxx: Double, yyy: Double) {
     // This is OK
@@ -241,15 +241,14 @@ extension PrivatePoint {
     // This is OK
     self = other
   }
-
-  init(other: PrivatePoint, cond: Bool) {
+  init(other: PrivatePoint, cond: Bool) { // expected-error {{return from initializer without initializing all stored properties}} {{246:3-3=self.x = x\nself.y = y\n}} {{39-39=, x: Double, y: Double}}
     if cond { self = other }
-  } // expected-error {{return from initializer without initializing all stored properties}}
+  }
 
   // Ideally we wouldn't mention the names of non-public stored properties
   // across module boundaries, but this will go away in Swift 5 mode anyway.
-  init() {
-  } // expected-error {{return from initializer without initializing all stored properties}}
+  init() {// expected-error {{return from initializer without initializing all stored properties}} {{251:3-3=self.x = x\nself.y = y\n}} {{8-8=x: Double, y: Double}}
+  }
 }
 
 extension Empty {
