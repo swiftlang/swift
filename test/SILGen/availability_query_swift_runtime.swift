@@ -1,7 +1,7 @@
-// RUN: %target-swift-emit-sil %s -min-swift-runtime-version 5.0 -verify -enable-experimental-feature SwiftRuntimeAvailability
-// RUN: %target-swift-emit-silgen %s -min-swift-runtime-version 5.0 -enable-experimental-feature SwiftRuntimeAvailability | %FileCheck %s
+// RUN: %target-swift-emit-sil %s -min-swift-runtime-version 5.0 -verify -enable-experimental-feature StandaloneSwiftAvailability
+// RUN: %target-swift-emit-silgen %s -min-swift-runtime-version 5.0 -enable-experimental-feature StandaloneSwiftAvailability | %FileCheck %s
 
-// REQUIRES: swift_feature_SwiftRuntimeAvailability
+// REQUIRES: swift_feature_StandaloneSwiftAvailability
 
 // CHECK-LABEL: sil [ossa] @$s32availability_query_swift_runtime15testIfAvailableyyF : $@convention(thin) () -> () {
 // CHECK:         [[MAJOR:%.*]] = integer_literal $Builtin.Word, 6

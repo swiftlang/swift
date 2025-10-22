@@ -1,6 +1,6 @@
-// RUN: %target-swift-emit-ir %s -min-swift-runtime-version 5.0 -O -enable-experimental-feature SwiftRuntimeAvailability | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -min-swift-runtime-version 5.0 -O -enable-experimental-feature StandaloneSwiftAvailability | %FileCheck %s
 
-// REQUIRES: swift_feature_SwiftRuntimeAvailability
+// REQUIRES: swift_feature_StandaloneSwiftAvailability
 
 @_silgen_name("callMeMaybe")
 public func callMeMaybe()

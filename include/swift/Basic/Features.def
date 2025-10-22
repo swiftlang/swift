@@ -555,6 +555,10 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(InlineAlways, false)
 /// Allow use of 'Swift' (Swift runtime version) in @available attributes
 EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
 
+/// 'Swift' availability is always standalone, even when targeting platforms
+/// that have a built-in Swift runtime. Implies 'SwiftRuntimeAvailability'.
+EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
+
 /// Allow use of `~Sendable`.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TildeSendable, false)
 

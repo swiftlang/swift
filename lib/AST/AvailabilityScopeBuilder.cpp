@@ -869,7 +869,7 @@ private:
       return AvailabilityQuery::dynamic(variantSpec->getDomain(), primaryRange,
                                         variantRange);
 
-    case AvailabilityDomain::Kind::SwiftRuntime:
+    case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
       return AvailabilityQuery::dynamic(domain, primaryRange, std::nullopt);
 
     case AvailabilityDomain::Kind::Platform:
