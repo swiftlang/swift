@@ -96,7 +96,8 @@ using TTakeUnsafeTuple = TTake<UnsafeTuple>;
 struct HoldsShared {
   SharedObject* obj;
 
-  SharedObject* getObj() const SWIFT_RETURNS_INDEPENDENT_VALUE;
+  SharedObject* getObj() const SWIFT_RETURNS_INDEPENDENT_VALUE
+                               SWIFT_RETURNS_UNRETAINED;
 };
 
 //--- test.swift
