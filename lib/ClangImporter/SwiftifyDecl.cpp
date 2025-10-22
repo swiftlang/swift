@@ -167,9 +167,7 @@ private:
       out << ".param(" << pointerIndex + 1 << ")";
   }
 };
-} // namespace
 
-namespace {
 struct CountedByExpressionValidator
     : clang::ConstStmtVisitor<CountedByExpressionValidator, bool> {
   bool VisitDeclRefExpr(const clang::DeclRefExpr *e) { return true; }
@@ -229,7 +227,6 @@ struct CountedByExpressionValidator
 
   bool VisitStmt(const clang::Stmt *) { return false; }
 };
-} // namespace
 
 
 // Don't try to transform any Swift types that _SwiftifyImport doesn't know how
@@ -267,8 +264,6 @@ static bool SwiftifiableCAT(const clang::ASTContext &ctx,
      : SwiftifiableCountedByPointerType(swiftType));
 }
 
-namespace {
-
 // Searches for template instantiations that are not behind type aliases.
 // FIXME: make sure the generated code compiles for template
 // instantiations that are not behind type aliases.
@@ -284,7 +279,6 @@ struct UnaliasedInstantiationVisitor
     return false;
   }
 };
-} // namespace
 
 // until CountAttributedType::getAttributeName lands in our LLVM branch
 static StringRef getAttributeName(const clang::CountAttributedType *CAT) {
@@ -301,6 +295,7 @@ static StringRef getAttributeName(const clang::CountAttributedType *CAT) {
       llvm_unreachable("CountAttributedType cannot be ended_by");
   }
 }
+} // namespace
 
 static bool swiftifyImpl(ClangImporter::Implementation &Self,
                          SwiftifyInfoPrinter &printer,
