@@ -10,6 +10,7 @@ add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
     CxxConvertibleToBool.swift
     CxxConvertibleToCollection.swift
     CxxDictionary.swift
+    CxxFunction.swift
     CxxPair.swift
     CxxOptional.swift
     CxxSet.swift
@@ -24,6 +25,7 @@ add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
     -enable-experimental-feature BuiltinModule
     -enable-experimental-feature AllowUnsafeAttribute
     -enable-experimental-feature Lifetimes
+    -enable-experimental-feature AssumeResilientCxxTypes
     -strict-memory-safety
     # This module should not pull in the C++ standard library, so we disable it explicitly.
     # For functionality that depends on the C++ stdlib, use C++ stdlib overlay (`swiftstd` module).

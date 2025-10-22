@@ -21,6 +21,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
@@ -70,7 +71,7 @@ static CallExpr *createAccessorImplCallExpr(FuncDecl *accessorImpl,
   return accessorImplCallExpr;
 }
 
-static DeclRefExpr *createParamRefExpr(AccessorDecl *accessorDecl,
+static DeclRefExpr *createParamRefExpr(AbstractFunctionDecl *accessorDecl,
                                        unsigned index) {
   ASTContext &ctx = accessorDecl->getASTContext();
 
@@ -2596,6 +2597,286 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
   callExpr->setThrows(nullptr);
 
   return callExpr;
+}
+
+// MARK: C++ functional type constructors
+
+/// Synthesizer callback for the constructor that takes a Swift closure.
+///
+/// \code
+/// struct function<(Args...) -> ReturnType> { // imported from C++
+///   init(_ closure: (Args...) -> ReturnType) { // synthesized here
+///     self.init(__SwiftFunctionWrapper<...>(__convertToRawClosure(closure))))
+///   }
+/// }
+/// \endcode
+static std::pair<BraceStmt *, bool>
+synthesizeFunctionConstructorBody(AbstractFunctionDecl *afd, void *context) {
+  auto constructor = cast<ConstructorDecl>(afd);
+  auto functionTypeDecl = cast<StructDecl>(constructor->getParent());
+  auto functionTypeClangDecl =
+      cast<clang::CXXRecordDecl>(functionTypeDecl->getClangDecl());
+  auto callAsFunctionDecl = static_cast<FuncDecl *>(context);
+  auto operatorCallDecl =
+      cast<clang::CXXMethodDecl>(callAsFunctionDecl->getClangDecl());
+
+  ASTContext &ctx = constructor->getASTContext();
+  clang::ASTContext &clangCtx = functionTypeClangDecl->getASTContext();
+  auto clangImporter = ctx.getClangModuleLoader();
+  auto &clangSema = clangImporter->getClangSema();
+
+  auto desugarIfTemplateSubst = [](clang::QualType type) {
+    if (auto sugared = dyn_cast<clang::SubstTemplateTypeParmType>(type))
+      return sugared->desugar();
+    return type;
+  };
+
+  SmallVector<clang::TemplateArgument, 2> operatorCallParamTypes;
+  llvm::transform(operatorCallDecl->parameters(),
+                  std::back_inserter(operatorCallParamTypes),
+                  [&](const clang::ParmVarDecl *paramDecl) {
+                    return desugarIfTemplateSubst(paramDecl->getType());
+                  });
+
+  auto closureParamRefExr = createParamRefExpr(constructor, 0);
+
+  auto cxxStdlibShimModule =
+      ctx.getLoadedModule(ctx.getIdentifier(CXX_STDLIB_SHIM_NAME));
+  SmallVector<ValueDecl *, 1> cxxStdlibShimLookupResults;
+  ctx.lookupInModule(cxxStdlibShimModule, "__SwiftFunctionWrapper",
+                     cxxStdlibShimLookupResults);
+  ASSERT(cxxStdlibShimLookupResults.size() == 1 &&
+         "Must be one exactly __SwiftFunctionWrapper");
+  auto functionWrapperTemplate = cast<clang::ClassTemplateDecl>(
+      cxxStdlibShimLookupResults.front()->getClangDecl());
+
+  auto functionReturnType =
+      desugarIfTemplateSubst(operatorCallDecl->getReturnType());
+
+  SmallVector<clang::TemplateArgument, 3> functionWrapperTemplateArgs;
+  // FIXME: use proper ptrauth discriminator
+  functionWrapperTemplateArgs.push_back(clang::TemplateArgument(
+      clangCtx,
+      llvm::APSInt(APInt(clangCtx.getIntWidth(clangCtx.UnsignedIntTy), 0)),
+      clangCtx.UnsignedIntTy));
+  functionWrapperTemplateArgs.push_back(
+      clang::TemplateArgument(functionReturnType));
+  functionWrapperTemplateArgs.push_back(clang::TemplateArgument::CreatePackCopy(
+      clangCtx, operatorCallParamTypes));
+
+  // Instantiate __SwiftFunctionWrapper<...> for the closure.
+  auto wrapperInstDecl = clangImporter->instantiateCXXClassTemplate(
+      const_cast<clang::ClassTemplateDecl *>(functionWrapperTemplate),
+      functionWrapperTemplateArgs);
+  ASSERT(wrapperInstDecl && "expected __SwiftFunctionWrapper instantiation");
+
+  auto wrapperClangDecl =
+      cast<clang::CXXRecordDecl>(wrapperInstDecl->getClangDecl());
+  auto wrapperClangType = clangCtx.getRecordType(wrapperClangDecl);
+
+  // Create a fake variable with the __SwiftFunctionWrapper<...> type.
+  auto fakeWrapperVarDecl = clang::VarDecl::Create(
+      clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
+      clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
+      wrapperClangType, clangCtx.getTrivialTypeSourceInfo(wrapperClangType),
+      clang::StorageClass::SC_None);
+  auto fakeWrapperRefExpr = new (clangCtx) clang::DeclRefExpr(
+      clangCtx, fakeWrapperVarDecl, false, wrapperClangType,
+      clang::ExprValueKind::VK_LValue, clang::SourceLocation());
+
+  auto functionTypeClangType = clangCtx.getRecordType(functionTypeClangDecl);
+  auto functionTypeClangInfo =
+      clangCtx.getTrivialTypeSourceInfo(functionTypeClangType);
+  SmallVector<clang::Expr *, 1> constructExprArgs = {fakeWrapperRefExpr};
+
+  // Instantiate the templated constructor that would accept the fake
+  // __SwiftFunctionWrapper<...> variable.
+  auto constructExprResult = clangSema.BuildCXXTypeConstructExpr(
+      functionTypeClangInfo, functionTypeClangDecl->getLocation(),
+      constructExprArgs, functionTypeClangDecl->getLocation(),
+      /*ListInitialization*/ false);
+  ASSERT(constructExprResult.isUsable() && "constructor expression expected");
+
+  // Unwrap the instantiated C++ constructor.
+  auto castExpr = cast<clang::CastExpr>(constructExprResult.get());
+  auto bindTempExpr = cast<clang::CXXBindTemporaryExpr>(castExpr->getSubExpr());
+  auto constructExpr =
+      cast<clang::CXXConstructExpr>(bindTempExpr->getSubExpr());
+  auto constructorDecl = constructExpr->getConstructor();
+
+  // Import the constructor: std.function<...>(_: __SwiftFunctionWrapper<...>).
+  // It will be called from the synthesized Swift AST below.
+  auto functionTypeCtor =
+      cast<ConstructorDecl>(clangImporter->importDeclDirectly(constructorDecl));
+  functionTypeDecl->addMember(functionTypeCtor);
+
+  // Find __convertToRawClosure function with the correct number of generic
+  // parameters.
+  auto cxxModule = ctx.getLoadedModule(ctx.Id_Cxx);
+  SmallVector<ValueDecl *, 8> cxxLookupResults;
+  ctx.lookupInModule(cxxModule, "__convertToRawClosure", cxxLookupResults);
+  auto convertToRawFuncIt = llvm::find_if(
+      cxxLookupResults, [&](const ValueDecl *lookupResult) -> bool {
+        auto funcDecl = cast<FuncDecl>(lookupResult);
+        return funcDecl->getGenericParams()->size() ==
+               operatorCallDecl->parameters().size() + 1;
+      });
+  ASSERT(convertToRawFuncIt != cxxLookupResults.end() &&
+         "expected an overload of __convertToRawClosure");
+  auto convertToRawFunc = cast<FuncDecl>(*convertToRawFuncIt);
+
+  // Make a reference to __convertToRawClosure.
+  SmallVector<Type, 2> subs;
+  for (auto param : *callAsFunctionDecl->getParameters()) {
+    subs.push_back(param->getTypeInContext());
+  }
+  subs.push_back(callAsFunctionDecl->getResultInterfaceType());
+  SubstitutionMap subMap =
+      SubstitutionMap::get(convertToRawFunc->getGenericSignature(), subs,
+                           LookUpConformanceInModule());
+  ConcreteDeclRef convertToRawConcreteRef(convertToRawFunc, subMap);
+  auto convertToRawRefExpr = new (ctx)
+      DeclRefExpr(convertToRawConcreteRef, DeclNameLoc(), /*Implicit*/ true);
+  convertToRawRefExpr->setType(convertToRawFunc->getInterfaceType()
+                                   ->getAs<GenericFunctionType>()
+                                   ->substGenericArgs(subMap));
+  convertToRawRefExpr->setFunctionRefInfo(
+      FunctionRefInfo::singleBaseNameApply());
+
+  // Call __convertToRawClosure(closure).
+  auto convertToRawCallExpr = CallExpr::createImplicit(
+      ctx, convertToRawRefExpr,
+      ArgumentList::forImplicitUnlabeled(ctx, {closureParamRefExr})); // fixme
+  convertToRawCallExpr->setType(convertToRawFunc->getResultInterfaceType());
+  convertToRawCallExpr->setThrows(nullptr);
+
+  // Find the constructor:
+  // __SwiftFunctionWrapper<...>(_: __swift_interop_closure).
+  auto wrapperInstCtorIt =
+      llvm::find_if(wrapperInstDecl->getMembers(), [&](Decl *member) -> bool {
+        if (auto wrapperCtor = dyn_cast<ConstructorDecl>(member)) {
+          auto ctorParams = wrapperCtor->getParameters();
+          if (ctorParams->size() != 1)
+            return false;
+          auto ctorParam = ctorParams->front();
+          return ctorParam->getInterfaceType()->getAnyNominal()->getName().is(
+              "__swift_interop_closure");
+        }
+        return false;
+      });
+  ASSERT(wrapperInstCtorIt != wrapperInstDecl->getMembers().end() &&
+         "expected a constructor of __SwiftFunctionWrapper");
+  auto wrapperInstCtor = cast<ConstructorDecl>(*wrapperInstCtorIt);
+
+  auto wrapperInstCtorRefExpr =
+      new (ctx) DeclRefExpr(wrapperInstCtor, DeclNameLoc(), /*Implicit*/ true);
+  wrapperInstCtorRefExpr->setType(wrapperInstCtor->getInterfaceType());
+  wrapperInstCtorRefExpr->setFunctionRefInfo(
+      FunctionRefInfo::singleBaseNameApply());
+
+  auto wrapperInstTypeExpr = TypeExpr::createImplicitForDecl(
+      DeclNameLoc(), wrapperInstDecl, constructor,
+      constructor->mapTypeIntoContext(wrapperInstDecl->getInterfaceType()));
+  auto wrapperInstInitExpr = ConstructorRefCallExpr::create(
+      ctx, wrapperInstCtorRefExpr, wrapperInstTypeExpr,
+      wrapperInstCtor->getMethodInterfaceType());
+  wrapperInstInitExpr->setThrows(nullptr);
+
+  // Call the constructor:
+  // __SwiftFunctionWrapper<...>(__convertToRawClosure(closure))
+  auto wrapperInstInitCallExpr = CallExpr::createImplicit(
+      ctx, wrapperInstInitExpr,
+      ArgumentList::createImplicit(
+          ctx, {Argument(SourceLoc(), Identifier(), convertToRawCallExpr)}));
+  wrapperInstInitCallExpr->setType(wrapperInstCtor->getResultInterfaceType());
+  wrapperInstInitCallExpr->setThrows(nullptr);
+
+  // Find the std.function constructor.
+  auto functionTypeCtorRefExpr =
+      new (ctx) DeclRefExpr(functionTypeCtor, DeclNameLoc(), /*Implicit*/ true);
+  functionTypeCtorRefExpr->setType(functionTypeCtor->getInterfaceType());
+  functionTypeCtorRefExpr->setFunctionRefInfo(
+      FunctionRefInfo::singleBaseNameApply());
+
+  auto underlyingFunctionCtorRefExpr = new (ctx) OtherConstructorDeclRefExpr(
+      ConcreteDeclRef(functionTypeCtor), DeclNameLoc(), /*Implicit*/ true,
+      functionTypeCtor->getInitializerInterfaceType());
+
+  auto inoutSelfDecl = constructor->getImplicitSelfDecl();
+  auto inoutSelfRef = new (ctx) DeclRefExpr(inoutSelfDecl, DeclNameLoc(),
+                                            /*implicit*/ true);
+  inoutSelfRef->setType(LValueType::get(inoutSelfDecl->getInterfaceType()));
+
+  auto underlyingFunctionCtorCallExpr =
+      DotSyntaxCallExpr::create(ctx, underlyingFunctionCtorRefExpr, SourceLoc(),
+                                Argument::implicitInOut(ctx, inoutSelfRef));
+  underlyingFunctionCtorCallExpr->setType(
+      functionTypeCtor->getMethodInterfaceType());
+  underlyingFunctionCtorCallExpr->setThrows(nullptr);
+
+  // Finally, call the std.function constructor.
+  auto functionTypeInitCallExpr = CallExpr::createImplicit(
+      ctx, underlyingFunctionCtorCallExpr,
+      ArgumentList::createImplicit(
+          ctx, {Argument(SourceLoc(), Identifier(), wrapperInstInitCallExpr)}));
+  functionTypeInitCallExpr->setType(functionTypeCtor->getResultInterfaceType());
+  functionTypeInitCallExpr->setThrows(nullptr);
+
+  auto rebindSelfExpr = new (ctx)
+      RebindSelfInConstructorExpr(functionTypeInitCallExpr, inoutSelfDecl);
+  rebindSelfExpr->setImplicit();
+
+  auto returnStmt = ReturnStmt::createImplicit(ctx, /*expr*/ nullptr);
+
+  // Create the function body.
+  auto body = BraceStmt::create(ctx, SourceLoc(), {rebindSelfExpr, returnStmt},
+                                SourceLoc());
+  return {body, /*isTypeChecked=*/true};
+}
+
+ConstructorDecl *SwiftDeclSynthesizer::makeClosureConstructor(NominalTypeDecl *decl) {
+  PrettyStackTraceDecl trace("creating a closure constructor", decl);
+  assert(decl);
+  ASTContext &ctx = decl->getASTContext();
+  
+  auto callAsFunctionOverloads = decl->lookupDirect(ctx.Id_callAsFunction);
+  if (callAsFunctionOverloads.size() != 1)
+    return nullptr;
+  auto callAsFunctionDecl = cast<FuncDecl>(callAsFunctionOverloads.front());
+
+  auto closureType = callAsFunctionDecl->getInterfaceType()
+                       ->getAs<FunctionType>()
+                         ->getResult();
+
+  auto closureParam = new (ctx) ParamDecl(
+      /*specifierLoc*/ SourceLoc(), /*argumentNameLoc*/ SourceLoc(),
+      /*argumentName*/ Identifier(), /*parameterNameLoc*/ SourceLoc(),
+      /*parameterName*/ ctx.getIdentifier("closure"), /*declContext*/ decl);
+  closureParam->setInterfaceType(closureType);
+  closureParam->setSpecifier(ParamSpecifier::Default);
+  auto paramList = ParameterList::create(ctx, {closureParam});
+
+  DeclName constructorDeclName(ctx, DeclBaseName::createConstructor(),
+                               paramList);
+  auto constructorDecl = new (ctx) ConstructorDecl(
+      constructorDeclName, SourceLoc(),
+      /*Failable*/ false, /*FailabilityLoc*/ SourceLoc(),
+      /*Async*/ false, /*AsyncLoc*/ SourceLoc(),
+      /*Throws*/ false, /*ThrowsLoc*/ SourceLoc(),
+      /*ThrownType*/ TypeLoc(), paramList, /*GenericParams*/ nullptr, decl);
+  constructorDecl->setAccess(AccessLevel::Public);
+  constructorDecl->setSynthesized();
+  constructorDecl->setBodySynthesizer(synthesizeFunctionConstructorBody,
+                                      callAsFunctionDecl);
+
+  // The synthesized constructor calls the __convertToRawClosure function
+  // declared in the Cxx module. Currently, it only provides overloads with up
+  // to 6 generic parameters.
+  if (callAsFunctionDecl->getParameters()->size() > 6)
+    ImporterImpl.markUnavailable(constructorDecl,
+                                 "function takes too many parameters");
+
+  return constructorDecl;
 }
 
 // MARK: C++ foreign reference type constructors

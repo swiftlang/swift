@@ -1342,7 +1342,7 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     if (Invocation.shouldImportCxx() && canImportCxx())
       pushImport(CXX_MODULE_NAME);
     if (canImportCxxShim())
-      pushImport(CXX_SHIM_NAME, {ImportFlags::ImplementationOnly});
+      pushImport(CXX_SHIM_NAME);
   }
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
