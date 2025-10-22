@@ -870,7 +870,7 @@ bool CompilerInstance::setUpModuleLoaders() {
   // Install an explicit module loader if it was created earlier.
   if (ESML) {
     this->DefaultSerializedLoader = ESML.get();
-    Context->addModuleLoader(std::move(ESML));
+    Context->addModuleLoader(std::move(ESML), false, false, false, true);
   }
 
   if (!ExplicitModuleBuild) {
