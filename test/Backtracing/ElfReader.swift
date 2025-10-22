@@ -1,12 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang -x c -Wno-unused-command-line-argument -Wl,--build-id -g %S/Inputs/fib.c -o %t/fib
 // RUN: %target-clang -x c -Wno-unused-command-line-argument -g %S/Inputs/fib.c -o %t/fib-no-uuid
-// RUN: %target-clang -x c -Wno-unused-command-line-argument -Wl,--build-id -Wl,--compress-debug-sections=zlib-gnu -g %S/Inputs/fib.c -o %t/fib-compress-gnu
+// RUN: if %target-clang -x c -Wno-unused-command-line-argument -Wl,--build-id -Wl,--compress-debug-sections=zlib-gnu -g %S/Inputs/fib.c -o %t/fib-compress-gnu; then ( %target-run %t/ElfReader %t/fib-compress-gnu | %FileCheck %s --check-prefix CMPGNU ); else echo "warning: skipping zlib-gnu test as linker does not support zlib-gnu compression"; fi
 // RUN: %target-clang -x c -Wno-unused-command-line-argument -Wl,--build-id -Wl,--compress-debug-sections=zlib -g %S/Inputs/fib.c -o %t/fib-compress-zlib
 // RUN: %target-build-swift %s -parse-as-library -g -o %t/ElfReader
 // RUN: %target-run %t/ElfReader %t/fib | %FileCheck %s
 // RUN: %target-run %t/ElfReader %t/fib-no-uuid | %FileCheck %s --check-prefix NOUUID
-// RUN: %target-run %t/ElfReader %t/fib-compress-gnu | %FileCheck %s --check-prefix CMPGNU
 // RUN: %target-run %t/ElfReader %t/fib-compress-zlib | %FileCheck %s --check-prefix CMPZLIB
 // RUN: if %S/Inputs/make-minidebug %t/fib %t/fib-minidebug; then ( %target-run %t/ElfReader %t/fib-minidebug | %FileCheck %s --check-prefix MINIDEBUG ); else echo "warning: skipping minidebug test as we couldn't generate minidebug data"; fi
 // RUN: libc=$(ldd %t/fib | awk '/libc\.so\.6/ { print $3 }'); if %S/Inputs/has-uuid-syms "$libc" >/dev/null; then %target-run %t/ElfReader "$libc" | %FileCheck %s --check-prefix LIBC; else echo "warning: skipping /usr/lib/debug test as libc symbols are not installed"; fi
