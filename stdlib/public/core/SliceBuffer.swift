@@ -515,16 +515,25 @@ extension _SliceBuffer {
 extension _SliceBuffer {
   @_alwaysEmitIntoClient
   internal func isTriviallyIdentical(to other: Self) -> Bool {
-    guard
-      // FIXME: use builtin == function
-      // self.owner == other.owner,
-      unsafe unsafeBitCast(self.owner, to: Int.self) == unsafeBitCast(other.owner, to: Int.self),
+#if $Embedded
+    if
+      self.owner == other.owner,
       unsafe (self.subscriptBaseAddress == other.subscriptBaseAddress),
       self.startIndex == other.startIndex,
       self.endIndexAndFlags == other.endIndexAndFlags
-    else {
-      return false
+    {
+      return true
     }
-    return true
+#else
+    if
+      self.owner === other.owner,
+      unsafe (self.subscriptBaseAddress == other.subscriptBaseAddress),
+      self.startIndex == other.startIndex,
+      self.endIndexAndFlags == other.endIndexAndFlags
+    {
+      return true
+    }
+#endif
+    return false
   }
 }
