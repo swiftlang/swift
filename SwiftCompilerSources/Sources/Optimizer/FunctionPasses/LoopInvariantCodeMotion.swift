@@ -296,13 +296,15 @@ private func collectMovableInstructions(
           continue
         }
         
-        if !analyzedInstructions.sideEffectsMayRelease || !analyzedInstructions.loopSideEffectsMayWriteTo(address: fixLifetimeInst.operand.value, context.aliasAnalysis) {
+        if !analyzedInstructions.sideEffectsMayRelease ||
+            !analyzedInstructions.sideEffectsMayWrite(to: fixLifetimeInst.operand.value, context.aliasAnalysis)
+        {
           movableInstructions.sinkDown.append(fixLifetimeInst)
         }
       case let loadInst as LoadInst:
         // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
         if loadInstCounter * analyzedInstructions.loopSideEffects.count < 8000,
-           !analyzedInstructions.loopSideEffectsMayWriteTo(address: loadInst.operand.value, context.aliasAnalysis) {
+           !analyzedInstructions.sideEffectsMayWrite(to: loadInst.address, context.aliasAnalysis) {
           movableInstructions.hoistUp.append(loadInst)
         }
         
@@ -532,7 +534,7 @@ private extension AnalyzedInstructions {
   
   /// Returns true if `loopSideEffects` contains any memory writes which
   /// may alias with the memory `address`.
-  func loopSideEffectsMayWriteTo(address: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
+  func sideEffectsMayWrite(to address: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
     return loopSideEffects
       .contains { sideEffect in
         sideEffect.mayWrite(toAddress: address, aliasAnalysis)
