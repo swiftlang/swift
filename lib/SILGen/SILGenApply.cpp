@@ -3075,10 +3075,23 @@ static void emitDelayedArguments(SILGenFunction &SGF,
     }
   }
 
+  bool shouldFurtherDelayDefaultArgs = true;
+  // llvm::dbgs() << "JQ: emitting delayed args\n";
+  //  for (auto &arg: delayedArgs) {
+  //    if (arg.isSimpleInOut()) {
+  //      shouldDeferDefaultArgs = true;
+  //      break;
+  //    }
+  //  }
+  //  if (defaultArgIsolation)
+  //    shouldDeferDefaultArgs = true;
+
   SmallVector<std::tuple<
-      /*delayedArgIt*/decltype(delayedArgs)::iterator,
-      /*siteArgsIt*/decltype(args)::iterator,
-      /*index*/size_t>, 2> isolatedArgs;
+                  /*delayedArgIt*/ decltype(delayedArgs)::iterator,
+                  /*siteArgsIt*/ decltype(args)::iterator,
+                  /*index*/ size_t>,
+              2>
+      furtherDelayedDefaultArgs;
 
   SmallVector<std::pair<SILValue, SILLocation>, 4> emittedInoutArgs;
   auto delayedNext = delayedArgs.begin();
@@ -3111,8 +3124,9 @@ static void emitDelayedArguments(SILGenFunction &SGF,
       assert(delayedNext != delayedArgs.end());
       auto &delayedArg = *delayedNext;
 
-      if (defaultArgIsolation && delayedArg.isDefaultArg()) {
-        isolatedArgs.push_back(std::make_tuple(delayedNext, argsIt, i));
+      if (shouldFurtherDelayDefaultArgs && delayedArg.isDefaultArg()) {
+        // llvm::dbgs() << "JQ: found delayed default arg (" << i << "), delaying again\n";
+        furtherDelayedDefaultArgs.push_back(std::make_tuple(delayedNext, argsIt, i));
         ++i;
         if (++delayedNext == delayedArgs.end()) {
           goto done;
@@ -3122,6 +3136,7 @@ static void emitDelayedArguments(SILGenFunction &SGF,
       }
 
       // Emit the delayed argument and replace it in the arguments array.
+      // llvm::dbgs() << "JQ: emitting delayed arg (" << i << ")\n";
       delayedArg.emit(SGF, siteArgs, i);
 
       // Remember all the simple inouts we emitted so we can perform
@@ -3141,8 +3156,10 @@ static void emitDelayedArguments(SILGenFunction &SGF,
 
 done:
 
-  if (defaultArgIsolation) {
-    assert(!isolatedArgs.empty());
+  // TODO: fix
+  if (defaultArgIsolation ||
+      (shouldFurtherDelayDefaultArgs && !furtherDelayedDefaultArgs.empty())) {
+    assert(!furtherDelayedDefaultArgs.empty());
 
     // Only hop to the default arg isolation if the callee is async.
     // If we're in a synchronous function, the isolation has to match,
@@ -3155,8 +3172,8 @@ done:
     // do end up here for default argument generators and stored property
     // initializers. An alternative (and better) approach is to formally model
     // those generator functions as isolated.
-    if (SGF.F.isAsync()) {
-      auto &firstArg = *std::get<0>(isolatedArgs[0]);
+    if (defaultArgIsolation && SGF.F.isAsync()) { // TODO: fix
+      auto &firstArg = *std::get<0>(furtherDelayedDefaultArgs[0]);
       auto loc = firstArg.getDefaultArgLoc();
 
       SILValue executor;
@@ -3184,7 +3201,7 @@ done:
       SGF.emitHopToTargetExecutor(loc, executor);
     }
 
-    // The index saved in isolatedArgs is the index where we're
+    // The index saved in deferredDefaultArgs is the index where we're
     // supposed to fill in the argument in siteArgs. It should point
     // to a single null element, which we will replace with zero or
     // more actual argument values. This replacement can invalidate
@@ -3196,11 +3213,11 @@ done:
     size_t indexAdjustment = 0;
     auto indexAdjustmentSite = args.begin();
 
-    for (auto &isolatedArg : isolatedArgs) {
-      auto &delayedArg = *std::get<0>(isolatedArg);
-      auto site = std::get<1>(isolatedArg);
+    for (auto &deferredDefaultArg : furtherDelayedDefaultArgs) {
+      auto &delayedArg = *std::get<0>(deferredDefaultArg);
+      auto site = std::get<1>(deferredDefaultArg);
       auto &siteArgs = *site;
-      size_t argIndex = std::get<2>(isolatedArg);
+      size_t argIndex = std::get<2>(deferredDefaultArg);
 
       // Apply the current index adjustment if we haven't changed
       // sites.
@@ -3210,6 +3227,72 @@ done:
       // Otherwise, reset the current index adjustment.
       } else {
         indexAdjustment = 0;
+        indexAdjustmentSite = site;
+      }
+
+      if (siteArgs[argIndex]) {
+        llvm::dbgs() << "\n!!! ASSERTION ABOUT TO FAIL !!!\n";
+        llvm::dbgs() << "Attempting to write deferred default arg to non-null position\n";
+        llvm::dbgs() << "  argIndex=" << argIndex << "\n";
+        llvm::dbgs() << "  savedIndex=" << std::get<2>(deferredDefaultArg) << "\n";
+        llvm::dbgs() << "  indexAdjustment=" << indexAdjustment << "\n";
+        llvm::dbgs() << "  site=" << (site - args.begin()) << "\n";
+        llvm::dbgs() << "  indexAdjustmentSite=" << (indexAdjustmentSite - args.begin()) << "\n";
+        llvm::dbgs() << "  siteArgs.size()=" << siteArgs.size() << "\n";
+
+        // Show info about the delayed arg we're trying to emit
+        auto &delayedArg = *std::get<0>(deferredDefaultArg);
+        if (delayedArg.isDefaultArg()) {
+          auto loc = delayedArg.getDefaultArgLoc();
+          llvm::dbgs() << "\nDefault arg being emitted:\n";
+          llvm::dbgs() << "  Location: ";
+          loc.getSourceLoc().print(llvm::dbgs(), SGF.getASTContext().SourceMgr);
+          llvm::dbgs() << "\n";
+        }
+
+        llvm::dbgs() << "\nAll siteArgs contents:\n";
+        for (size_t j = 0; j < siteArgs.size(); ++j) {
+          llvm::dbgs() << "  siteArgs[" << j << "] = "
+                       << (siteArgs[j] ? "OCCUPIED" : "null");
+          if (siteArgs[j]) {
+            llvm::dbgs() << " type=" << siteArgs[j].getType();
+          }
+          if (j == argIndex) llvm::dbgs() << " <-- TRYING TO WRITE HERE";
+          if (j == std::get<2>(deferredDefaultArg)) llvm::dbgs() << " <-- SAVED INDEX";
+          llvm::dbgs() << "\n";
+        }
+
+        llvm::dbgs() << "\nAll furtherDelayedDefaultArgs:\n";
+        for (size_t i = 0; i < furtherDelayedDefaultArgs.size(); ++i) {
+          auto &t = furtherDelayedDefaultArgs[i];
+          auto &da = *std::get<0>(t);
+          llvm::dbgs() << "  [" << i << "] savedIndex=" << std::get<2>(t)
+                       << " site=" << (std::get<1>(t) - args.begin());
+          if (da.isDefaultArg()) {
+            llvm::dbgs() << " defaultArg at ";
+            da.getDefaultArgLoc().getSourceLoc().print(llvm::dbgs(),
+                                                       SGF.getASTContext().SourceMgr);
+          }
+          llvm::dbgs() << "\n";
+        }
+
+        llvm::dbgs() << "\nOriginal delayedArgs (" << delayedArgs.size() << " total):\n";
+        for (size_t i = 0; i < delayedArgs.size(); ++i) {
+          auto &da = delayedArgs[i];
+          llvm::dbgs() << "  [" << i << "] ";
+          if (da.isDefaultArg()) {
+            llvm::dbgs() << "DEFAULT at ";
+            da.getDefaultArgLoc().getSourceLoc().print(llvm::dbgs(),
+                                                       SGF.getASTContext().SourceMgr);
+          } else if (da.isSimpleInOut()) {
+            llvm::dbgs() << "INOUT at ";
+            da.getInOutLocation().getSourceLoc().print(llvm::dbgs(),
+                                                       SGF.getASTContext().SourceMgr);
+          } else {
+            llvm::dbgs() << "OTHER";
+          }
+          llvm::dbgs() << "\n";
+        }
       }
 
       assert(!siteArgs[argIndex] &&
@@ -5857,6 +5940,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
 
   // Emit any delayed arguments: formal accesses to inout arguments, etc.
   if (!delayedArgs.empty()) {
+    // llvm::dbgs() << "JQ: delayed arg count: " << delayedArgs.size() << "\n";
     emitDelayedArguments(SGF, delayedArgs, args);
   }
 
