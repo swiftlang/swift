@@ -106,7 +106,7 @@ extension OutputRawSpan {
   /// memory.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeMutableBufferPointer` to be initialized
+  ///   - buffer: an `UnsafeMutableRawBufferPointer` to be initialized
   ///   - initializedCount: the number of initialized bytes
   ///                       at the beginning of `buffer`.
   @unsafe
@@ -124,7 +124,7 @@ extension OutputRawSpan {
     }
     _precondition(
       0 <= initializedCount && initializedCount <= buffer.count,
-      "OutputSpan count is not within capacity"
+      "OutputRawSpan count is not within capacity"
     )
     unsafe self.init(
       _uncheckedBuffer: buffer, initializedCount: initializedCount
@@ -139,7 +139,7 @@ extension OutputRawSpan {
   /// memory.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeMutableBufferPointer` to be initialized
+  ///   - buffer: a `Slice<UnsafeMutableRawBufferPointer>` to be initialized
   ///   - initializedCount: the number of initialized bytes
   ///                       at the beginning of `buffer`.
   @unsafe
