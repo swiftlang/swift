@@ -29,7 +29,8 @@
 using namespace swift;
 using namespace importer;
 
-#define SIW_DBG(x) DEBUG_WITH_TYPE("safe-interop-wrappers", llvm::dbgs() << x)
+#define DEBUG_TYPE "safe-interop-wrappers"
+#define DLOG(x) LLVM_DEBUG(llvm::dbgs() << x)
 
 namespace {
 ValueDecl *getKnownSingleDecl(ASTContext &SwiftContext, StringRef DeclName) {
@@ -301,7 +302,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
                          SwiftifyInfoPrinter &printer,
                          const AbstractFunctionDecl *MappedDecl,
                          const clang::FunctionDecl *ClangDecl) {
-  SIW_DBG("Checking " << *ClangDecl << " for bounds and lifetime info\n");
+  DLOG("Checking " << *ClangDecl << " for bounds and lifetime info\n");
 
   // FIXME: for private macro generated functions we do not serialize the
   // SILFunction's body anywhere triggering assertions.
@@ -336,7 +337,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     auto *CAT = ClangDecl->getReturnType()->getAs<clang::CountAttributedType>();
     if (SwiftifiableCAT(clangASTContext, CAT, swiftReturnTy)) {
       printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
-      SIW_DBG("  Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
+      DLOG("  Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
       attachMacro = true;
     }
     auto dependsOnClass = [](const ParamDecl *fromParam) {
@@ -344,7 +345,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     };
     bool returnHasLifetimeInfo = false;
     if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(ClangDecl)) {
-      SIW_DBG("  Found lifetimebound attribute on implicit 'this'\n");
+      DLOG("  Found lifetimebound attribute on implicit 'this'\n");
       if (!dependsOnClass(
               MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true))) {
         printer.printLifetimeboundReturn(SwiftifyInfoPrinter::SELF_PARAM_INDEX,
@@ -391,8 +392,8 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
                       diag::note_swift_name_instance_method);
       } else if (SwiftifiableCAT(clangASTContext, CAT, swiftParamTy)) {
         printer.printCountedBy(CAT, mappedIndex);
-        SIW_DBG("  Found bounds info '" << clangParamTy
-                << "' on parameter '" << *clangParam << "'\n");
+        DLOG("  Found bounds info '" << clangParamTy << "' on parameter '"
+                                     << *clangParam << "'\n");
         attachMacro = paramHasBoundsInfo = true;
       }
       bool paramIsStdSpan =
@@ -401,12 +402,12 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
 
       bool paramHasLifetimeInfo = false;
       if (clangParam->hasAttr<clang::NoEscapeAttr>()) {
-        SIW_DBG("  Found noescape attribute on parameter '" << *clangParam << "'\n");
+        DLOG("  Found noescape attribute on parameter '" << *clangParam << "'\n");
         printer.printNonEscaping(mappedIndex);
         paramHasLifetimeInfo = true;
       }
       if (clangParam->template hasAttr<clang::LifetimeBoundAttr>()) {
-        SIW_DBG("  Found lifetimebound attribute on parameter '" << *clangParam
+        DLOG("  Found lifetimebound attribute on parameter '" << *clangParam
                                                               << "'\n");
         if (!dependsOnClass(swiftParam)) {
           // If this parameter has bounds info we will tranform it into a Span,
@@ -421,13 +422,13 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
         }
       }
       if (paramIsStdSpan && paramHasLifetimeInfo) {
-        SIW_DBG("  Found both std::span and lifetime info "
-                        "for parameter '" << *clangParam << "'\n");
+        DLOG("  Found both std::span and lifetime info for parameter '"
+             << *clangParam << "'\n");
         attachMacro = true;
       }
     }
     if (returnIsStdSpan && returnHasLifetimeInfo) {
-      SIW_DBG("  Found both std::span and lifetime info for return value\n");
+      DLOG("  Found both std::span and lifetime info for return value\n");
       attachMacro = true;
     }
   }
@@ -458,7 +459,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     printer.printTypeMapping();
   }
 
-  SIW_DBG("Attaching safe interop macro: " << MacroString << "\n");
+  DLOG("Attaching safe interop macro: " << MacroString << "\n");
   if (clang::RawComment *raw =
           getClangASTContext().getRawCommentForDeclNoCache(ClangDecl)) {
     // swift::RawDocCommentAttr doesn't contain its text directly, but instead
@@ -477,4 +478,4 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     importNontrivialAttribute(MappedDecl, MacroString);
   }
 }
-#undef SIW_DBG
+
