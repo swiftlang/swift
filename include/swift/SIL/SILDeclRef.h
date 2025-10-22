@@ -333,6 +333,10 @@ struct SILDeclRef {
   /// Produce a mangled form of this constant.
   std::string mangle(ManglingKind MKind = ManglingKind::Default) const;
 
+  /// If the symbol has a specific name for use at the LLVM IR level,
+  /// produce that name. This may be different than the mangled name in SIL.
+  std::optional<StringRef> getAsmName() const;
+
   /// True if the SILDeclRef references a function.
   bool isFunc() const {
     return kind == Kind::Func;

@@ -127,10 +127,8 @@ void SILFunctionBuilder::addFunctionAttributes(
       }
     }
 
-    if (constant.isFunc() && constant.hasFuncDecl()) {
-      auto func = constant.getFuncDecl();
-      if (auto *EA = ExternAttr::find(Attrs, ExternKind::C))
-        F->setAsmName(EA->getCName(func));
+    if (auto asmName = constant.getAsmName()) {
+      F->setAsmName(*asmName);
     }
   }
 
