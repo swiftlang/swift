@@ -2321,6 +2321,10 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
         # LLDB Unit tests link against this library
         LLVM_UNITTEST_LINK_FLAGS = "$(Get-SwiftSDK -OS Windows -Identifier Windows)\usr\lib\swift\windows\$($Platform.Architecture.LLVMName)\swiftCore.lib";
       }
+
+      if ($env:ONLY_SWIFT_LLDB_TESTS -eq '1') {
+        $TestingDefines.LLDB_TEST_USER_ARGS += ";--filter='lang/swift'"
+      }
     }
 
     if (-not $Targets) {
