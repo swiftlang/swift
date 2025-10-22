@@ -51,8 +51,9 @@ public:
     /// Represents availability with respect to Swift language mode.
     SwiftLanguageMode,
 
-    /// Represents availability with respect to the Swift runtime.
-    SwiftRuntime,
+    /// Represents availability with respect to the Swift runtime when it is not
+    /// built-in to the target platform.
+    StandaloneSwiftRuntime,
 
     /// Represents PackageDescription availability.
     PackageDescription,
@@ -147,8 +148,8 @@ public:
     return AvailabilityDomain(Kind::SwiftLanguageMode);
   }
 
-  static AvailabilityDomain forSwiftRuntime() {
-    return AvailabilityDomain(Kind::SwiftRuntime);
+  static AvailabilityDomain forStandaloneSwiftRuntime() {
+    return AvailabilityDomain(Kind::StandaloneSwiftRuntime);
   }
 
   static AvailabilityDomain forPackageDescription() {
@@ -192,7 +193,9 @@ public:
     return getKind() == Kind::SwiftLanguageMode;
   }
 
-  bool isSwiftRuntime() const { return getKind() == Kind::SwiftRuntime; }
+  bool isStandaloneSwiftRuntime() const {
+    return getKind() == Kind::StandaloneSwiftRuntime;
+  }
 
   bool isPackageDescription() const {
     return getKind() == Kind::PackageDescription;

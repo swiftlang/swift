@@ -786,7 +786,7 @@ enum class AvailabilityDomainKind : uint8_t {
   Embedded,
   Platform,
   Custom,
-  SwiftRuntime,
+  StandaloneSwiftRuntime,
 };
 using AvailabilityDomainKindField = BCFixed<3>;
 

@@ -37,7 +37,7 @@ AvailabilityQuery::AvailabilityQuery(
     DEBUG_ASSERT(kind != ResultKind::Dynamic);
     break;
 
-  case AvailabilityDomain::Kind::SwiftRuntime:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
     // Dynamic Swift runtime queries take just a primary version argument.
     if (kind == ResultKind::Dynamic) {
       DEBUG_ASSERT(primaryRange);
@@ -186,7 +186,7 @@ FuncDecl *AvailabilityQuery::getDynamicQueryDeclAndArguments(
     // These domains don't support dynamic queries.
     return nullptr;
 
-  case AvailabilityDomain::Kind::SwiftRuntime:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
     unpackVersion(getPrimaryArgument().value(), arguments);
     return ctx.getIsSwiftRuntimeVersionAtLeast();
   case AvailabilityDomain::Kind::Platform:
