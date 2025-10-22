@@ -44,12 +44,13 @@ follows:
 | Key             | Default | Meaning                                          |
 +=================+=========+==================================================+
 | enable          | yes*    | Set to ``no`` to disable crash catching, or      |
-|                 |         | ``tty`` to enable only if stdin is a terminal.   |
+|                 |         | ``tty`` to enable only if stdout is a terminal.  |
 +-----------------+---------+--------------------------------------------------+
 | demangle        | yes     | Set to ``no`` to disable demangling.             |
 +-----------------+---------+--------------------------------------------------+
 | interactive     | tty     | Set to ``no`` to disable interaction, or ``yes`` |
-|                 |         | to enable always.                                |
+|                 |         | to enable always. `tty`` to enable only if       |
+|                 |         | stdin and stdout are are both a terminal.        |
 +-----------------+---------+--------------------------------------------------+
 | color           | tty     | Set to ``yes`` to enable always, or ``no`` to    |
 |                 |         | disable.  Uses ANSI escape sequences.            |
@@ -95,7 +96,7 @@ follows:
 | format          | text    | Set to ``json`` to output JSON crash logs rather |
 |                 |         | than plain text.                                 |
 +-----------------+---------+--------------------------------------------------+
-| output-to       | stdout  | Set to ``stderr`` to send the backtrace to the   |
+| output-to       | stderr  | Set to ``stderr`` to send the backtrace to the   |
 |                 |         | standard error instead of standard output.  This |
 |                 |         | may be useful in some CI systems.                |
 |                 |         |                                                  |
@@ -118,7 +119,7 @@ follows:
 |                 |         | sometimes useful for testing.                    |
 +-----------------+---------+--------------------------------------------------+
 
-(*) On macOS, this defaults to ``no`` rather than ``yes``.
+(*) On macOS, this defaults to ``tty`` rather than ``yes``.
 
 Backtrace limits
 ----------------
