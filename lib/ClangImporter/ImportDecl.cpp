@@ -4199,20 +4199,6 @@ namespace {
       return false;
     }
 
-    static bool canTypeMutateBuffer(clang::QualType ty) {
-      // FIXME: better way to detect if a type can mutate the underlying buffer.
-      if (const auto *rd = ty->getAsRecordDecl()) {
-        if (rd->isInStdNamespace() && rd->getName() == "span")
-          return !cast<clang::ClassTemplateSpecializationDecl>(rd)
-                      ->getTemplateArgs()
-                      .get(0)
-                      .getAsType()
-                      .isConstQualified();
-      }
-      // Conservatively assume most types can mutate the underlying buffer.
-      return true;
-    }
-
     void addLifetimeDependencies(const clang::FunctionDecl *decl,
                                  AbstractFunctionDecl *result) {
       if (decl->getTemplatedKind() == clang::FunctionDecl::TK_FunctionTemplate)
@@ -4267,7 +4253,6 @@ namespace {
       }
 
       auto retType = decl->getReturnType();
-      bool retMayMutateBuffer = canTypeMutateBuffer(retType);
       auto warnForEscapableReturnType = [&] {
         if (isEscapableAnnotatedType(retType.getTypePtr())) {
           Impl.addImportDiagnostic(
@@ -4286,7 +4271,7 @@ namespace {
       auto processLifetimeBound = [&](unsigned idx, clang::QualType ty,
                                       bool forSelf = false) {
         warnForEscapableReturnType();
-        if (retMayMutateBuffer && importedAsClass(ty, forSelf))
+        if (importedAsClass(ty, forSelf))
           hasSkippedLifetimeAnnotation = true;
         paramHasAnnotation[idx] = true;
         if (isEscapable(ty))
@@ -9583,18 +9568,15 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       SIW_DBG("  Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
       attachMacro = true;
     }
-    auto requiresExclusiveClassDependency = [](ParamDecl *fromParam,
-                                               clang::QualType toType) {
-      return fromParam->getInterfaceType()->isAnyClassReferenceType() &&
-             SwiftDeclConverter::canTypeMutateBuffer(toType);
+    auto dependsOnClass = [](ParamDecl *fromParam) {
+      return fromParam->getInterfaceType()->isAnyClassReferenceType();
     };
     bool returnHasLifetimeInfo = false;
     if (SwiftDeclConverter::getImplicitObjectParamAnnotation<
             clang::LifetimeBoundAttr>(ClangDecl)) {
       SIW_DBG("  Found lifetimebound attribute on implicit 'this'\n");
-      if (!requiresExclusiveClassDependency(
-              MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true),
-              ClangDecl->getReturnType())) {
+      if (!dependsOnClass(
+              MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true))) {
         printer.printLifetimeboundReturn(SwiftifyInfoPrinter::SELF_PARAM_INDEX,
                                          true);
         returnHasLifetimeInfo = true;
@@ -9655,8 +9637,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       if (clangParam->hasAttr<clang::LifetimeBoundAttr>()) {
         SIW_DBG("  Found lifetimebound attribute on parameter '"
                         << *clangParam << "'\n");
-        if (!requiresExclusiveClassDependency(swiftParam,
-                                              ClangDecl->getReturnType())) {
+        if (!dependsOnClass(swiftParam)) {
           // If this parameter has bounds info we will tranform it into a Span,
           // so then it will no longer be Escapable.
           bool willBeEscapable =
