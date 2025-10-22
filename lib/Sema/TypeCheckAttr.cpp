@@ -708,6 +708,31 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
   // Verify that we don't have a static function.
   if (FD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::static_functions_not_mutating);
+
+  auto *accessor = dyn_cast<AccessorDecl>(FD);
+  if (accessor &&
+      (accessor->isBorrowAccessor() || accessor->isMutateAccessor())) {
+    if (attrModifier == SelfAccessKind::Consuming ||
+        attrModifier == SelfAccessKind::LegacyConsuming) {
+      diagnoseAndRemoveAttr(
+          attr, diag::consuming_invalid_borrow_mutate_accessor,
+          getAccessorNameForDiagnostic(accessor, /*article*/ true));
+    }
+    if (attrModifier == SelfAccessKind::NonMutating &&
+        accessor->isMutateAccessor()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::ownership_modifier_unsupported_borrow_mutate_accessor,
+          attr->getAttrName(),
+          getAccessorNameForDiagnostic(accessor, /*article*/ true));
+    }
+    if (attrModifier == SelfAccessKind::Mutating &&
+        accessor->isBorrowAccessor()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::ownership_modifier_unsupported_borrow_mutate_accessor,
+          attr->getAttrName(),
+          getAccessorNameForDiagnostic(accessor, /*article*/ true));
+    }
+  }
 }
 
 void AttributeChecker::visitDynamicAttr(DynamicAttr *attr) {

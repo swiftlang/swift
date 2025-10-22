@@ -7595,7 +7595,7 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
   case AccessorKind::Init:
     return article ? "an init accessor" : "init accessor";
   case AccessorKind::Borrow:
-    return article ? " a 'borrow' accessor" : "borrow accessor";
+    return article ? "a 'borrow' accessor" : "borrow accessor";
   case AccessorKind::Mutate:
     return article ? "a 'mutate' accessor" : "mutate accessor";
   }
