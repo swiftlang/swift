@@ -410,7 +410,8 @@ protocol ProtocolWithMutating {
   mutating func test2(_ a: Int?) // expected-note {{previously declared}}
   func test2(_ a: Int!) // expected-error{{invalid redeclaration of 'test2'}}
 
-  mutating static func classTest1() // expected-error {{static functions must not be declared mutating}} {{3-12=}} expected-note {{previously declared}}
+  mutating static func classTest1() // expected-error {{'mutating' modifier cannot be used on static functions}} {{3-12=}} expected-note {{previously declared}}
+                                    // expected-note@-1 {{static members cannot access instance properties or self}}
   static func classTest1() // expected-error{{invalid redeclaration of 'classTest1()'}}
 }
 
