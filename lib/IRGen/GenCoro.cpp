@@ -737,7 +737,7 @@ struct Allocator {
       case Field::AllocateFrame:
       case Field::DeallocateFrame:
         auto attrs = llvm::AttributeList();
-        IGM.addSwiftCoroAttributes(attrs, 0);
+        IGM.addSwiftCoroAttributes(attrs, 1);
         return attrs;
       }
     }
@@ -877,12 +877,13 @@ private:
 
 llvm::Constant *getCoroAllocFn(AllocationKind kind, IRGenModule &IGM) {
   return IGM.getOrCreateHelperFunction(
-      kind.getAllocationFunctionName(), IGM.Int8PtrTy,
-      {IGM.CoroAllocatorPtrTy, IGM.SizeTy},
+      kind.getAllocationFunctionName(), IGM.CoroAllocationTy,
+      {IGM.CoroAllocatorPtrTy, IGM.CoroAllocationTy, IGM.SizeTy},
       [kind](IRGenFunction &IGF) {
         auto isSwiftCoroCCAvailable =
             IGF.IGM.SwiftCoroCC == llvm::CallingConv::SwiftCoro;
         auto parameters = IGF.collectParameters();
+        auto *frame = parameters.claimNext();
         auto *allocatorValue = parameters.claimNext();
         auto allocator = Allocator(allocatorValue, IGF);
         auto *size = parameters.claimNext();
@@ -903,7 +904,7 @@ llvm::Constant *getCoroAllocFn(AllocationKind kind, IRGenModule &IGM) {
           });
         }
         auto fnPtr = allocator.getAllocate(kind);
-        auto *call = IGF.Builder.CreateCall(fnPtr, {allocatorValue, size});
+        auto *call = IGF.Builder.CreateCall(fnPtr, {frame, allocatorValue, size});
         call->setDoesNotThrow();
         call->setCallingConv(IGF.IGM.SwiftCC);
         IGF.Builder.CreateRet(call);
@@ -914,18 +915,19 @@ llvm::Constant *getCoroAllocFn(AllocationKind kind, IRGenModule &IGM) {
       /*optionalLinkageOverride=*/nullptr, IGM.SwiftCoroCC,
       /*transformAttributes=*/
       [&IGM](llvm::AttributeList &attrs) {
-        IGM.addSwiftCoroAttributes(attrs, 0);
+        IGM.addSwiftCoroAttributes(attrs, 1);
       });
 }
 
 llvm::Constant *getCoroDeallocFn(AllocationKind kind, IRGenModule &IGM) {
   return IGM.getOrCreateHelperFunction(
       kind.getDeallocationFunctionName(), IGM.VoidTy,
-      {IGM.CoroAllocatorPtrTy, IGM.Int8PtrTy},
+      {IGM.CoroAllocatorPtrTy, IGM.CoroAllocationTy, IGM.CoroAllocationTy},
       [kind](IRGenFunction &IGF) {
         auto isSwiftCoroCCAvailable =
             IGF.IGM.SwiftCoroCC == llvm::CallingConv::SwiftCoro;
         auto parameters = IGF.collectParameters();
+        auto *frame = parameters.claimNext();
         auto *allocatorValue = parameters.claimNext();
         auto allocator = Allocator(allocatorValue, IGF);
         auto *ptr = parameters.claimNext();
@@ -959,7 +961,7 @@ llvm::Constant *getCoroDeallocFn(AllocationKind kind, IRGenModule &IGM) {
         // Start emitting the "normal" block.
         IGF.Builder.emitBlock(normalBlock);
         auto fnPtr = allocator.getDeallocate(kind);
-        auto *call = IGF.Builder.CreateCall(fnPtr, {allocatorValue, ptr});
+        auto *call = IGF.Builder.CreateCall(fnPtr, {frame, allocatorValue, ptr});
         call->setDoesNotThrow();
         call->setCallingConv(IGF.IGM.SwiftCC);
         IGF.Builder.CreateRetVoid();
@@ -970,7 +972,7 @@ llvm::Constant *getCoroDeallocFn(AllocationKind kind, IRGenModule &IGM) {
       /*optionalLinkageOverride=*/nullptr, IGM.SwiftCoroCC,
       /*transformAttributes=*/
       [&IGM](llvm::AttributeList &attrs) {
-        IGM.addSwiftCoroAttributes(attrs, 0);
+        IGM.addSwiftCoroAttributes(attrs, 1);
       });
 }
 
@@ -1003,6 +1005,7 @@ getAddrOfSwiftCoroAllocThunk(StringRef name,
       name, ty->getReturnType(), ty->params(),
       [getAlloc](IRGenFunction &IGF) {
         auto parameters = IGF.collectParameters();
+        parameters.claimNext(); // frame
         parameters.claimNext(); // allocator
         auto *size = parameters.claimNext();
         auto alloc = (IGF.IGM.*getAlloc)();
@@ -1015,7 +1018,7 @@ getAddrOfSwiftCoroAllocThunk(StringRef name,
       /*specialCallingConv=*/std::nullopt,
       /*transformAttributes=*/
       [&IGM](llvm::AttributeList &attrs) {
-        IGM.addSwiftCoroAttributes(attrs, 0);
+        IGM.addSwiftCoroAttributes(attrs, 1);
       });
 }
 
@@ -1030,6 +1033,7 @@ getAddrOfSwiftCoroDeallocThunk(StringRef name,
       name, ty->getReturnType(), ty->params(),
       [getDealloc](IRGenFunction &IGF) {
         auto parameters = IGF.collectParameters();
+        parameters.claimNext(); // frame
         parameters.claimNext(); // allocator
         auto *ptr = parameters.claimNext();
         auto dealloc = (IGF.IGM.*getDealloc)();
@@ -1042,7 +1046,7 @@ getAddrOfSwiftCoroDeallocThunk(StringRef name,
       /*specialCallingConv=*/std::nullopt,
       /*transformAttributes=*/
       [&IGM](llvm::AttributeList &attrs) {
-        IGM.addSwiftCoroAttributes(attrs, 0);
+        IGM.addSwiftCoroAttributes(attrs, 1);
       });
 }
 

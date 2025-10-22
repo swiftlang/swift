@@ -65,7 +65,8 @@
 // CHECK-SAME:  }
 
 // CHECK-LABEL: @_swift_coro_alloc(
-// CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]]
+// CHECK-SAME:      ptr [[FRAME:%[^,]+]]
+// CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]],
 // CHECK-SAME:      i64 [[SIZE:%[^)]+]]
 // CHECK-SAME:  )
 // CHECK-SAME:  {
@@ -87,12 +88,13 @@
 // CHECK-arm64e:  [[ALLOCATE_FN_BITS:%[^,]+]] = ptrtoint ptr [[ALLOCATE_FN]] to i64
 // CHECK-arm64e:  [[ALLOCATE_FN_BITS_AUTHED:%[^,]+]] = call i64 @llvm.ptrauth.auth(i64 [[ALLOCATE_FN_BITS]], i32 0, i64 24469)
 // CHECK-arm64e:  [[ALLOCATE_FN:%[^,]+]] = inttoptr i64 [[ALLOCATE_FN_BITS_AUTHED]]
-// CHECK:         [[ALLOCATION:%[^,]+]] = call swiftcc ptr [[ALLOCATE_FN]](ptr swiftcoro [[ALLOCATOR]], [[INT]] [[SIZE]])
+// CHECK:         [[ALLOCATION:%[^,]+]] = call swiftcc ptr [[ALLOCATE_FN]](ptr [[FRAME]], ptr swiftcoro [[ALLOCATOR]], [[INT]] [[SIZE]])
 // CHECK:         ret ptr [[ALLOCATION]]
 // CHECK:       }
 
 // CHECK-LABEL: @_swift_coro_dealloc(
-// CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]]
+// CHECK-SAME:      ptr [[FRAME:%[^,]+]]
+// CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]],
 // CHECK-SAME:      ptr [[ADDRESS:%[^)]+]]
 // CHECK-SAME:  )
 // CHECK-SAME:  {
@@ -125,7 +127,7 @@
 // CHECK-arm64e:    [[DEALLOCATE_FN_BITS:%[^,]+]] = ptrtoint ptr [[DEALLOCATE_FN]] to i64
 // CHECK-arm64e:    [[DEALLOCATE_FN_BITS_AUTHED:%[^,]+]] = call i64 @llvm.ptrauth.auth(i64 [[DEALLOCATE_FN_BITS]], i32 0, i64 40879)
 // CHECK-arm64e:    [[DEALLOCATE_FN:%[^,]+]] = inttoptr i64 [[DEALLOCATE_FN_BITS_AUTHED]]
-// CHECK:           call swiftcc void [[DEALLOCATE_FN]](ptr swiftcoro [[ALLOCATOR]], ptr [[ADDRESS]])
+// CHECK:           call swiftcc void [[DEALLOCATE_FN]](ptr [[FRAME]], ptr swiftcoro [[ALLOCATOR]], ptr [[ADDRESS]])
 // CHECK:         ret void
 // CHECK:       }
 

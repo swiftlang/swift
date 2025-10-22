@@ -773,9 +773,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   CoroFunctionPointerTy = createStructType(*this, "swift.coro_func_pointer",
                                            {RelativeAddressTy, Int32Ty}, true);
   CoroAllocateFnTy = llvm::FunctionType::get(
-      CoroAllocationTy, {CoroAllocatorPtrTy, SizeTy}, /*isVarArg*/ false);
+      CoroAllocationTy, {CoroAllocationTy, CoroAllocatorPtrTy, SizeTy}, /*isVarArg*/ false);
   CoroDeallocateFnTy = llvm::FunctionType::get(
-      VoidTy, {CoroAllocatorPtrTy, CoroAllocationTy}, /*isVarArg*/ false);
+      VoidTy, {CoroAllocationTy, CoroAllocatorPtrTy, CoroAllocationTy}, /*isVarArg*/ false);
   CoroAllocatorFlagsTy = Int32Ty;
   // swift/ABI/Coro.h : CoroAllocator
   CoroAllocatorTy = createStructType(*this, "swift.coro_allocator",
