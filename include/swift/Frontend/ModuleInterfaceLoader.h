@@ -152,8 +152,9 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                  bool isCanImportLookup, bool isTestableDependencyLookup,
-                  bool &isFramework, bool &isSystemModule) override;
+                  std::string *cacheKey, bool isCanImportLookup,
+                  bool isTestableDependencyLookup, bool &isFramework,
+                  bool &isSystemModule) override;
 
   std::error_code findModuleFilesInDirectory(
       ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
@@ -181,6 +182,7 @@ public:
          const llvm::StringMap<std::string> &ExplicitSwiftModuleInputs,
          bool IgnoreSwiftSourceInfoFile);
 
+  void addExplicitModulePath(StringRef name, std::string path) override;
   /// Append visible module names to \p names. Note that names are possibly
   /// duplicated, and not guaranteed to be ordered in any way.
   void collectVisibleTopLevelModuleNames(
@@ -201,8 +203,9 @@ class ExplicitCASModuleLoader : public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-                  bool isCanImportLookup, bool isTestableDependencyLookup,
-                  bool &isFramework, bool &isSystemModule) override;
+                  std::string *cacheKey, bool isCanImportLookup,
+                  bool isTestableDependencyLookup, bool &isFramework,
+                  bool &isSystemModule) override;
 
   std::error_code findModuleFilesInDirectory(
       ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,

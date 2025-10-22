@@ -858,6 +858,13 @@ public:
   /// returns true.
   bool isSubmoduleOf(const ModuleDecl *M) const;
 
+private:
+  std::string CacheKey;
+
+public:
+  void setCacheKey(const std::string &key) { CacheKey = key; }
+  StringRef getCacheKey() const { return CacheKey; }
+
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
   }

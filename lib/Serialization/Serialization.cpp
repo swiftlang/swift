@@ -884,6 +884,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, DEPENDENCY_DIRECTORY);
   BLOCK_RECORD(input_block, MODULE_INTERFACE_PATH);
   BLOCK_RECORD(input_block, IMPORTED_MODULE_SPIS);
+  BLOCK_RECORD(input_block, IMPORTED_MODULE_PATH);
   BLOCK_RECORD(input_block, EXTERNAL_MACRO);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
@@ -1334,7 +1335,8 @@ static ImportSet getImportsAsSet(const ModuleDecl *M,
 void Serializer::writeInputBlock() {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 4);
   input_block::ImportedModuleLayout importedModule(Out);
-  input_block::ImportedModuleLayoutSPI ImportedModuleSPI(Out);
+  input_block::ImportedModuleSPILayout ImportedModuleSPI(Out);
+  input_block::ImportedModulePathLayout ImportedModulePath(Out);
   input_block::LinkLibraryLayout LinkLibrary(Out);
   input_block::ImportedHeaderLayout ImportedHeader(Out);
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
@@ -1510,9 +1512,17 @@ void Serializer::writeInputBlock() {
     llvm::SmallSetVector<Identifier, 4> spis;
     M->lookupImportedSPIGroups(import.importedModule, spis);
 
-    importedModule.emit(ScratchRecord,
-                        static_cast<uint8_t>(stableImportControl),
-                        !import.accessPath.empty(), !spis.empty(), importPath);
+    StringRef path;
+    if (Options.ExplicitModuleBuild && import.importedModule &&
+        !import.importedModule->isNonSwiftModule()) {
+      path = import.importedModule->getCacheKey();
+      if (path.empty())
+        path = import.importedModule->getModuleLoadedFilename();
+    }
+
+    importedModule.emit(
+        ScratchRecord, static_cast<uint8_t>(stableImportControl),
+        !import.accessPath.empty(), !spis.empty(), !path.empty(), importPath);
 
     if (!spis.empty()) {
       SmallString<64> out;
@@ -1522,6 +1532,9 @@ void Serializer::writeInputBlock() {
           [&outStream] { outStream << StringRef("\0", 1); });
       ImportedModuleSPI.emit(ScratchRecord, out);
     }
+
+    if (!path.empty())
+      ImportedModulePath.emit(ScratchRecord, path);
   }
 
   if (!Options.ModuleLinkName.empty())
