@@ -4506,7 +4506,26 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
     }
 
     // Does this constant have a preferred abstraction pattern set?
-    AbstractionPattern origType = [&]{
+    AbstractionPattern origType = [&] {
+      // If this is a constructor of std::function which was synthesized by
+      // ClangImporter, the SIL type of the closure parameter needs to match the
+      // Clang convention. For instance, directness of parameters needs to
+      // match. This needs special handling, because the constructor is
+      // synthesized as Swift AST, and therefore isn't considered foreign, but
+      // at the same time requires a Clang abstraction pattern.
+      if (auto ctor = dyn_cast_or_null<ConstructorDecl>(constant.getDecl())) {
+        if (auto parentStruct = ctor->getParent()->getSelfStructDecl()) {
+          if (auto functionTypeDecl = dyn_cast_or_null<clang::CXXRecordDecl>(
+                  parentStruct->getClangDecl())) {
+            auto clangImporter = TC.Context.getClangModuleLoader();
+            if (clangImporter->needsClosureConstructor(functionTypeDecl) ||
+                clangImporter->isSwiftFunctionWrapper(functionTypeDecl)) {
+              return AbstractionPattern::getCXXFunctionalConstructor(
+                  origLoweredInterfaceType, functionTypeDecl);
+            }
+          }
+        }
+      }
       if (auto closureInfo = TC.getClosureTypeInfo(constant)) {
         return closureInfo->OrigType;
       } else {

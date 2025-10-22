@@ -54,6 +54,10 @@ namespace llvm {
 struct fltSemantics;
 } // namespace llvm
 
+namespace clang {
+class FunctionType;
+} // namespace clang
+
 namespace swift {
 
 enum class AllocationArena;
@@ -4100,6 +4104,10 @@ public:
   std::optional<LifetimeDependenceInfo> getLifetimeDependenceForResult() const {
     return getLifetimeDependenceFor(getNumParams());
   }
+
+  uint16_t
+  getPointerAuthDiscriminator(ModuleDecl &m,
+                              const clang::FunctionType *clangType = nullptr);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     std::optional<ExtInfo> info = std::nullopt;
