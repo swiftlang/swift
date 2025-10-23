@@ -1,4 +1,6 @@
-# Underlying Type Inference for Opaque Result Types
+# Underlying type inference for opaque result types (OpaqueTypeInference)
+
+## Overview
 
 Opaque result types are a useful tool for abstracting the return type of a function or subscript, or type of a property. Although the concrete underlying type of an opaque type is hidden from clients, it is still inferred by the compiler, which enforces certain usage requirements:
 
@@ -64,5 +66,10 @@ func bar(_ x: Int) -> some Equatable { // OK, the underlying type can be inferre
 }
 ```
 
-To learn more about opaque result types, see the [Opaque Types](https://docs.swift.org/swift-book/LanguageGuide/OpaqueTypes.html) section of _The Swift Programming Language_.
+To learn more about opaque result types, see the [Opaque Types][opaque-types] section of _The Swift Programming Language_.
 
+## See Also
+
+- [Opaque Types][opaque-types]
+
+[opaque-types]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/opaquetypes
