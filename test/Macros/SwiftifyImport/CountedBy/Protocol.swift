@@ -5,7 +5,7 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend %t/test.swift -emit-module -plugin-path %swift-plugin-dir -enable-experimental-feature Lifetimes -verify
-// RUN: %target-swift-frontend %t/test.swift -typecheck -plugin-path %swift-plugin-dir -enable-experimental-feature Lifetimes -dump-macro-expansions 2> %t/expansions.out
+// RUN: env SWIFT_BACKTRACE="" %target-swift-frontend %t/test.swift -typecheck -plugin-path %swift-plugin-dir -enable-experimental-feature Lifetimes -dump-macro-expansions 2> %t/expansions.out
 // RUN: %diff %t/expansions.out %t/expansions.expected
 
 //--- test.swift
