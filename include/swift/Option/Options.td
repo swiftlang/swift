@@ -643,6 +643,12 @@ def project_name : Separate<["-"], "project-name">,
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
 
+def debug_module_path : Separate<["-"], "debug-module-path">,
+  Flags<[FrontendOption]>,
+  HelpText<"Path to this module's binary swiftmodule artifact (required by debug info)">;
+def debug_module_path_EQ : Joined<["-"], "debug-module-path=">, Flags<[FrontendOption]>,
+  Alias<debug_module_path>;
+
 def module_alias : Separate<["-"], "module-alias">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   MetaVarName<"<alias_name=real_name>">,
