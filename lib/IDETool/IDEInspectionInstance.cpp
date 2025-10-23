@@ -494,6 +494,14 @@ void IDEInspectionInstance::performNewOperation(
       IntermoduleDepTrackingMode::ExcludeSystem;
 
   {
+    // Turn down solver limits.
+    auto &TypeCheckOpts = Invocation.getTypeCheckerOptions();
+    TypeCheckOpts.SolverMemoryThreshold = 10000000;
+    TypeCheckOpts.SolverTrailThreshold = 10000;
+    TypeCheckOpts.SolverScopeThreshold = 10000;
+  }
+
+  {
     if (DiagC)
       CI->addDiagnosticConsumer(DiagC);
 
