@@ -32,7 +32,13 @@ func isNotSame<T: Equatable & ~Copyable>(_ lhs: borrowing T, _ rhs: borrowing T)
     lhs != rhs
 }
 
-NoncopyableEquatableTests.test("comparing noncopyables") {
+extension Noncopyable: Comparable {
+    static func <(lhs: borrowing Self, rhs: borrowing Self) -> Bool {
+        lhs.i < rhs.i
+    }
+}
+
+NoncopyableEquatableTests.test("equating noncopyables") {
     let a = Noncopyable(i: 1)
     let b = Noncopyable(i: 2)
     let c = Noncopyable(i: 1)
@@ -42,5 +48,27 @@ NoncopyableEquatableTests.test("comparing noncopyables") {
 
     expectTrue(isNotSame(a,b))
 }
+
+@available(SwiftStdlib 6.2, *)
+extension InlineArray where Element: Comparable & ~Copyable {
+    func minIndex() -> Int? {
+        indices.min { self[$0] < self[$1] }
+    }
+}
+
+NoncopyableEquatableTests.test("comparing noncopyables") {
+
+    guard #available(SwiftStdlib 6.2, *) else { return }
+
+    let a = Noncopyable(i: 1)
+    let b = Noncopyable(i: 2)
+    let c = Noncopyable(i: 0)
+
+    expectTrue(a > c)
+    expectFalse(a <= c)
+
+    let array: [3 of Noncopyable] = [a,b,c]
+    expectTrue(array.minIndex() == 2)
+ }
 
 runAllTests()
