@@ -163,7 +163,7 @@ SILValue InstSimplifier::visitStructInst(StructInst *SI) {
     }
 
     auto value = Ex0->getOperand();
-    extractStructFragmentDebugInfo(SI, value);
+    // extractStructFragmentDebugInfo(SI, value);
 
     return value;
   }
