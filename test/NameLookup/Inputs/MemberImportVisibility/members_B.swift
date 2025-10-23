@@ -59,3 +59,9 @@ open class DerivedClassInB: BaseClassInA {
 extension ProtocolInA {
   public func defaultedRequirementInB() { }
 }
+
+public struct EquatableInB: Equatable {
+  public static func ==(_: EquatableInB, _: EquatableInB) -> Bool {
+    false
+  }
+}
