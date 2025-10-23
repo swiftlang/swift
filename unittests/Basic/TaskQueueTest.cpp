@@ -149,8 +149,8 @@ TEST(TaskQueueTest, HighConcurrency) {
     return TaskFinishedResponse::ContinueExecution;
   };
 
+  const char *Args[] = {"test", nullptr};
   for (int i = 0; i < 50; i++) {
-    const char *Args[] = {"test", nullptr};
     TQ.addTask("/bin/echo", Args, llvm::ArrayRef<const char *>(), nullptr, false);
   }
 
@@ -182,8 +182,8 @@ TEST(TaskQueueTest, TaskBeganCallback) {
     return TaskFinishedResponse::ContinueExecution;
   };
 
+  const char *Args[] = {"echo", "test", nullptr};
   for (int i = 0; i < 3; i++) {
-    const char *Args[] = {"echo", "test", nullptr};
     TQ.addTask("/bin/echo", Args, llvm::ArrayRef<const char *>(), nullptr, false);
   }
 
@@ -219,8 +219,8 @@ TEST(TaskQueueTest, StopExecutionOnFailure) {
     return TaskFinishedResponse::ContinueExecution;
   };
 
+  const char *Args[] = {"test", nullptr};
   for (int i = 0; i < 10; i++) {
-    const char *Args[] = {"test", nullptr};
     TQ.addTask("/bin/echo", Args, llvm::ArrayRef<const char *>(), nullptr, false);
   }
 
