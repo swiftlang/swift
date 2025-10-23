@@ -807,10 +807,16 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // If we have a mutable binding for a 'let', such as 'self' in an
         // 'init' method, load it.
         if (val->getType().isMoveOnly()) {
-          val = B.createMarkUnresolvedNonCopyableValueInst(
-              loc, val,
-              MarkUnresolvedNonCopyableValueInst::CheckKind::
-                  NoConsumeOrAssign);
+          auto *moveOnlyIntroducer =
+              dyn_cast_or_null<MarkUnresolvedNonCopyableValueInst>(val);
+          if (!moveOnlyIntroducer || moveOnlyIntroducer->getCheckKind() !=
+                                         MarkUnresolvedNonCopyableValueInst::
+                                             CheckKind::NoConsumeOrAssign) {
+            val = B.createMarkUnresolvedNonCopyableValueInst(
+                loc, val,
+                MarkUnresolvedNonCopyableValueInst::CheckKind::
+                    NoConsumeOrAssign);
+          }
         }
         val = emitLoad(loc, val, tl, SGFContext(), IsNotTake).forward(*this);
       }

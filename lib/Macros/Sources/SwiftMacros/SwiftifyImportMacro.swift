@@ -1730,6 +1730,106 @@ public struct SwiftifyImportMacro: PeerMacro {
   }
 }
 
+func parseProtocolMacroParam(
+  _ paramAST: LabeledExprSyntax,
+  methods: [String: FunctionDeclSyntax]
+) throws -> (FunctionDeclSyntax, [ExprSyntax]) {
+  let paramExpr = paramAST.expression
+  guard let enumConstructorExpr = paramExpr.as(FunctionCallExprSyntax.self) else {
+    throw DiagnosticError(
+      "expected _SwiftifyProtocolMethodInfo enum literal as argument, got '\(paramExpr)'", node: paramExpr)
+  }
+  let enumName = try parseEnumName(paramExpr)
+  if enumName != "method" {
+    throw DiagnosticError(
+      "expected 'method', got '\(enumName)'",
+      node: enumConstructorExpr)
+  }
+  let argumentList = enumConstructorExpr.arguments
+  let methodSignatureArg = try getArgumentByName(argumentList, "signature")
+  guard let methodSignatureStringLit = methodSignatureArg.as(StringLiteralExprSyntax.self) else {
+    throw DiagnosticError(
+      "expected string literal for 'signature' parameter, got \(methodSignatureArg)", node: methodSignatureArg)
+  }
+  let methodSignature = methodSignatureStringLit.representedLiteralValue!
+  guard let methodSyntax = methods[methodSignature] else {
+    var notes: [Note] = []
+    var name = methodSignature
+    if let methodSyntax = DeclSyntax("\(raw: methodSignature)").as(FunctionDeclSyntax.self) {
+      name = methodSyntax.name.trimmed.text
+    }
+    for (tmp, method) in methods where method.name.trimmed.text == name {
+      notes.append(Note(node: Syntax(method.name), message: MacroExpansionNoteMessage("did you mean '\(method.trimmed.description)'?")))
+    }
+    throw DiagnosticError(
+      "method with signature '\(methodSignature)' not found in protocol", node: methodSignatureArg, notes: notes)
+  }
+  let paramInfoArg = try getArgumentByName(argumentList, "paramInfo")
+  guard let paramInfoArgList = paramInfoArg.as(ArrayExprSyntax.self) else {
+    throw DiagnosticError("expected array literal for 'paramInfo' parameter, got \(paramInfoArg)", node: paramInfoArg)
+  }
+  return (methodSyntax, paramInfoArgList.elements.map { ExprSyntax($0.expression) })
+}
+
+/// Similar to SwiftifyImportMacro, but for providing overloads to methods in
+/// protocols using an extension, rather than in the same scope as the original.
+public struct SwiftifyImportProtocolMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    do {
+      guard let protocolDecl = declaration.as(ProtocolDeclSyntax.self) else {
+        throw DiagnosticError("@_SwiftifyImportProtocol only works on protocols", node: declaration)
+      }
+      let argumentList = node.arguments!.as(LabeledExprListSyntax.self)!
+      var arguments = [LabeledExprSyntax](argumentList)
+      let typeMappings = try parseTypeMappingParam(arguments.last)
+      if typeMappings != nil {
+        arguments = arguments.dropLast()
+      }
+      let spanAvailability = try parseSpanAvailabilityParam(arguments.last)
+      if spanAvailability != nil {
+        arguments = arguments.dropLast()
+      }
+
+      var methods: [String: FunctionDeclSyntax] = [:]
+      for member in protocolDecl.memberBlock.members {
+        guard let methodDecl = member.decl.as(FunctionDeclSyntax.self) else {
+          continue
+        }
+        let trimmedDecl = methodDecl.with(\.body, nil)
+                                    .with(\.attributes, [])
+                                    .trimmed
+        methods[trimmedDecl.description] = methodDecl
+      }
+      let overloads = try arguments.map {
+        let (method, args) = try parseProtocolMacroParam($0, methods: methods)
+        let function = try constructOverloadFunction(
+          forDecl: method, leadingTrivia: Trivia(), args: args,
+          spanAvailability: spanAvailability,
+          typeMappings: typeMappings)
+        return MemberBlockItemSyntax(decl: function)
+      }
+
+      return [ExtensionDeclSyntax(extensionKeyword: .identifier("extension"), extendedType: type,
+                                  memberBlock: MemberBlockSyntax(leftBrace: .leftBraceToken(),
+                                                                 members: MemberBlockItemListSyntax(overloads),
+                                                                 rightBrace: .rightBraceToken())
+      )]
+    } catch let error as DiagnosticError {
+      context.diagnose(
+        Diagnostic(
+          node: error.node, message: MacroExpansionErrorMessage(error.description),
+          notes: error.notes))
+      return []
+    }
+  }
+}
+
 // MARK: syntax utils
 extension TypeSyntaxProtocol {
   public var isSwiftCoreModule: Bool {

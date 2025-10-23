@@ -2925,6 +2925,10 @@ internal func calculateAppendedKeyPathSize(
 
     if isLast {
       break
+    } else {
+      // Add the intermediate type.
+      result = MemoryLayout<Int>._roundingUpToAlignment(result)
+      result &+= MemoryLayout<Int>.size
     }
   }
 

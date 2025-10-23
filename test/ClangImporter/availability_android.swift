@@ -2,6 +2,9 @@
 
 // REQUIRES: OS=linux-android || OS=linux-androideabi
 
+// Disable this test till we get a LTS NDK on the CI that supports it.
+// REQUIRES: NDK28
+
 import AndroidVersioning
 import Android
 

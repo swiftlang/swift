@@ -154,6 +154,38 @@ extension LoadBorrowInst : VerifiableInstruction {
   }
 }
 
+extension BeginAccessInst : VerifiableInstruction {
+  func verify(_ context: VerifierContext) {
+    // Catch violations like
+    // ```
+    //   %1 = begin_access [read] %0
+    //   store %2 to %0
+    //   end_access %1
+    // ```
+
+    guard context.silStage == .canonical else {
+      // Mandatory passes on raw SIL need to be completed until we can verify this.
+      // Also, LoadableByAddress in lowered SIL can insert `copy_addr`s inside read-only access scope.
+      // Therefore we can only run this verification in canonical SIL.
+      return
+    }
+
+    if address.type.isMoveOnly && enforcement == .static {
+      // This is a workaround for a bug in the move-only checker: rdar://151841926.
+      // The move-only checker sometimes inserts destroy_addr within read-only static access scopes.
+      // TODO: remove this once the bug is fixed.
+      return
+    }
+    if accessKind == .read {
+      var mutatingInstructions = MutatingUsesWalker(context)
+      defer { mutatingInstructions.deinitialize() }
+
+      mutatingInstructions.findMutatingUses(of: self.address)
+      mutatingInstructions.verifyNoMutatingUsesInLinearLiverange(of: self)
+    }
+  }
+}
+
 extension VectorBaseAddrInst : VerifiableInstruction {
   func verify(_ context: VerifierContext) {
     require(vector.type.isBuiltinFixedArray,
@@ -210,9 +242,7 @@ private struct MutatingUsesWalker : AddressDefUseWalker {
     }
   }
 
-  private mutating func verifyNoMutatingUsesInLinearLiverange(of startInst: SingleValueInstruction) {
-    assert(startInst is LoadBorrowInst || startInst is BorrowedFromInst)
-
+  mutating func verifyNoMutatingUsesInLinearLiverange(of startInst: SingleValueInstruction) {
     var instWorklist = InstructionWorklist(context)
     defer { instWorklist.deinitialize() }
 
@@ -223,7 +253,7 @@ private struct MutatingUsesWalker : AddressDefUseWalker {
 
     while let inst = instWorklist.pop() {
       require(!mutatingInstructions.contains(inst),
-              "Load borrow invalidated by a local write", atInstruction: inst)
+              "read-only scope invalidated by a local write", atInstruction: inst)
       instWorklist.pushPredecessors(of: inst, ignoring: startInst)
     }
   }

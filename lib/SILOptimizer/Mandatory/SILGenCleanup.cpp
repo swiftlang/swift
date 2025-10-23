@@ -31,6 +31,7 @@
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "llvm/ADT/PostOrderIterator.h"
 
 using namespace swift;
@@ -107,6 +108,7 @@ namespace {
 struct SILGenCleanup : SILModuleTransform {
   void run() override;
 
+  bool fixupBorrowAccessors(SILFunction *function);
   bool completeOSSALifetimes(SILFunction *function);
   template <typename Range>
   bool completeLifetimesInRange(Range const &range,
@@ -229,6 +231,87 @@ void collectReachableRoots(SILFunction *function, BasicBlockWorklist &backward,
   } while (changed);
 }
 
+/*  SILGen may produce a borrow accessor result from within a local borrow
+ * scope. Such as:
+ *
+ *    ```
+ *      %ld = load_borrow %self
+ *      %fwd = unchecked_ownership %ld
+ *      %ex = struct_extract %fwd, #Struct.storedProperty
+ *      end_borrow %ld
+ *      return %ex
+ *    ```
+ *      This is illegal OSSA, since the return uses a value outside it's borrow
+ * scope.
+ *
+ *    Transform this into valid OSSA:
+ *
+ *    ```
+ *      %ld = load_borrow %self
+ *      %ex = struct_extract %ld, #Struct.storedProperty
+ *      return_borrow %ex from_scopes %ld
+ *    ```
+ */
+bool SILGenCleanup::fixupBorrowAccessors(SILFunction *function) {
+  if (!function->getConventions().hasGuaranteedResult()) {
+    return false;
+  }
+  auto returnBB = function->findReturnBB();
+  if (returnBB == function->end()) {
+    return false;
+  }
+
+  auto *returnInst = cast<ReturnInst>(returnBB->getTerminator());
+  if (returnInst->getOperand()->getOwnershipKind() !=
+      OwnershipKind::Guaranteed) {
+    return false;
+  }
+
+  SmallVector<SILValue, 8> enclosingValues;
+  findGuaranteedReferenceRoots(returnInst->getOperand(),
+                               /*lookThroughNestedBorrows=*/false,
+                               enclosingValues);
+  SmallVector<SILInstruction *> scopeEnds;
+  SmallVector<SILValue> operands;
+  SmallVector<SILInstruction *> toDelete;
+
+  // For all the local borrow scopes that enclose the return value, delete
+  // their end_borrow instructions and use them as an encolsing value in
+  // return_borrow instruction.
+  for (auto enclosingValue : enclosingValues) {
+    BorrowedValue borrow(enclosingValue);
+    if (!borrow.isLocalScope()) {
+      continue;
+    }
+    borrow.getLocalScopeEndingInstructions(scopeEnds);
+    for (auto *scopeEnd : scopeEnds) {
+      if (auto *endBorrow = dyn_cast<EndBorrowInst>(scopeEnd)) {
+        operands.push_back(endBorrow->getOperand());
+        endBorrow->eraseFromParent();
+      }
+    }
+    for (auto *uncheckedOwnership :
+         borrow->getUsersOfType<UncheckedOwnershipInst>()) {
+      uncheckedOwnership->replaceAllUsesWith(*borrow);
+      toDelete.push_back(uncheckedOwnership);
+    }
+  }
+
+  for (auto *inst : toDelete) {
+    inst->eraseFromParent();
+  }
+
+  if (operands.empty()) {
+    return false;
+  }
+
+  SILBuilderWithScope(returnInst)
+      .createReturnBorrow(returnInst->getLoc(), returnInst->getOperand(),
+                          operands);
+  returnInst->eraseFromParent();
+  return true;
+}
+
 bool SILGenCleanup::completeOSSALifetimes(SILFunction *function) {
   if (!getModule()->getOptions().OSSACompleteLifetimes)
     return false;
@@ -339,7 +422,8 @@ void SILGenCleanup::run() {
     LLVM_DEBUG(llvm::dbgs()
                << "\nRunning SILGenCleanup on " << function.getName() << "\n");
 
-    bool changed = completeOSSALifetimes(&function);
+    bool changed = fixupBorrowAccessors(&function);
+    changed |= completeOSSALifetimes(&function);
     DeadEndBlocks deadEndBlocks(&function);
     SILGenCanonicalize sgCanonicalize(deadEndBlocks);
 

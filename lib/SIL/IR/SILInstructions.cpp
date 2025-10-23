@@ -1814,6 +1814,7 @@ bool TermInst::isFunctionExiting() const {
   case TermKind::YieldInst:
     return false;
   case TermKind::ReturnInst:
+  case TermKind::ReturnBorrowInst:
   case TermKind::ThrowInst:
   case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
@@ -1835,6 +1836,7 @@ bool TermInst::isProgramTerminating() const {
   case TermKind::CheckedCastBranchInst:
   case TermKind::CheckedCastAddrBranchInst:
   case TermKind::ReturnInst:
+  case TermKind::ReturnBorrowInst:
   case TermKind::ThrowInst:
   case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
@@ -1861,6 +1863,7 @@ const Operand *TermInst::forwardedOperand() const {
   case TermKind::UnwindInst:
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
+  case TermKind::ReturnBorrowInst:
   case TermKind::ThrowInst:
   case TermKind::ThrowAddrInst:
   case TermKind::YieldInst:
@@ -3426,6 +3429,26 @@ ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,
   assert(ownershipKind &&
          "Conflicting ownership kinds when creating term inst from function "
          "result info?!");
+}
+
+ReturnBorrowInst *ReturnBorrowInst::create(SILDebugLocation DebugLoc,
+                                           SILValue returnValue,
+                                           ArrayRef<SILValue> enclosingValues,
+                                           SILModule &M) {
+  auto Size = totalSizeToAlloc<swift::Operand>(enclosingValues.size() + 1);
+  auto Buffer = M.allocateInst(Size, alignof(ReturnBorrowInst));
+  SmallVector<SILValue, 8> operands;
+  operands.push_back(returnValue);
+  for (SILValue ev : enclosingValues) {
+    operands.push_back(ev);
+  }
+  return ::new (Buffer) ReturnBorrowInst(DebugLoc, operands);
+}
+
+ReturnBorrowInst::ReturnBorrowInst(SILDebugLocation DebugLoc,
+                                   ArrayRef<SILValue> operands)
+    : InstructionBaseWithTrailingOperands(operands, DebugLoc) {
+  assert(operands[0]->getOwnershipKind() == OwnershipKind::Guaranteed);
 }
 
 // This may be called in an invalid SIL state. SILCombine creates new

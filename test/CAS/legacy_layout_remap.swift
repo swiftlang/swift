@@ -1,4 +1,5 @@
 // REQUIRES: objc_interop
+// REQUIRES: platform=Darwin
 // UNSUPPORTED: swift_only_stable_abi
 
 // RUN: %empty-directory(%t)
@@ -33,8 +34,8 @@
 // RUN:   /^tmp/main.swift @%t/MyApp.cmd -c -o %t/main.o
 
 /// Now do implicit search.
-// RUN: mkdir -p %t/resource/macosx
-// RUN: cp %t/layout.yaml %t/resource/macosx/layouts-%target-arch.yaml
+// RUN: mkdir -p %t/resource/%target-os
+// RUN: cp %t/layout.yaml %t/resource/%target-os/layouts-%target-arch.yaml
 
 // RUN: %target-swift-frontend -target %target-pre-stable-abi-triple -I %t -c -enable-library-evolution \
 // RUN:   -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache -O -module-load-mode prefer-serialized \

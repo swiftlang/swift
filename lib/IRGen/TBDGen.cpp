@@ -452,6 +452,15 @@ void TBDGenVisitor::didVisitDecl(Decl *D) {
 }
 
 void TBDGenVisitor::addFunction(SILDeclRef declRef) {
+  // If there is a specific symbol name this should have at the IR level,
+  // use it instead.
+  if (auto asmName = declRef.getAsmName()) {
+    addSymbol(*asmName, SymbolSource::forSILDeclRef(declRef),
+              SymbolFlags::Text);
+    return;
+  }
+
+
   addSymbol(declRef.mangle(), SymbolSource::forSILDeclRef(declRef),
             SymbolFlags::Text);
 }

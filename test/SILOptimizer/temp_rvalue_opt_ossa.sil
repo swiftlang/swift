@@ -988,7 +988,7 @@ bb0(%0 : $*Int):
 sil [ossa] @dontExtendAccessScopeOverBeginAccess : $@convention(thin) (@in Klass) -> () {
 bb0(%0 : $*Klass):
   %stack = alloc_stack $Klass
-  %access = begin_access [read] [static] %0 : $*Klass
+  %access = begin_access [modify] [static] %0 : $*Klass
   copy_addr [take] %access to [init] %stack : $*Klass
   end_access %access : $*Klass
   %f = function_ref @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> ()

@@ -12,15 +12,15 @@
 // RUN:   -swift-version 5 -external-plugin-path %t#%swift-plugin-server
 // RUN: llvm-bcanalyzer -dump %t/Test.swiftmodule | %FileCheck %s
 
-// CHECK-COUNT-1: <EXTERNAL_MACRO abbrevid=13 op0=4/> blob data = 'MacroOne'
-// CHECK-COUNT-1: <EXTERNAL_MACRO abbrevid=13 op0=4/> blob data = 'MacroTwo'
+// CHECK-COUNT-1: <EXTERNAL_MACRO abbrevid=14 op0=4/> blob data = 'MacroOne'
+// CHECK-COUNT-1: <EXTERNAL_MACRO abbrevid=14 op0=4/> blob data = 'MacroTwo'
 
 // RUN: %target-swift-frontend -emit-module %t/test2.swift -module-name Test2 -o %t/Test2.swiftmodule \
 // RUN:   -swift-version 5 -external-plugin-path %t#%swift-plugin-server -package-name Test
 // RUN: llvm-bcanalyzer -dump %t/Test2.swiftmodule | %FileCheck %s --check-prefix CHECK2
 
-// CHECK2-COUNT-1: <EXTERNAL_MACRO abbrevid=13 op0=4/> blob data = 'MacroOne'
-// CHECK2-COUNT-1: <EXTERNAL_MACRO abbrevid=13 op0=3/> blob data = 'MacroTwo'
+// CHECK2-COUNT-1: <EXTERNAL_MACRO abbrevid=14 op0=4/> blob data = 'MacroOne'
+// CHECK2-COUNT-1: <EXTERNAL_MACRO abbrevid=14 op0=3/> blob data = 'MacroTwo'
 
 //--- macro-1.swift
 import SwiftSyntax
