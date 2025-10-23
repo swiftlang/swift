@@ -1963,14 +1963,9 @@ function Build-SPMProject {
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
   Invoke-IsolatingEnvVars {
-    $RuntimeInstallRoot = [IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", $ProductVersion)
-
-    $env:Path = "$(Get-PinnedToolchainRuntime);$(Get-PinnedToolchainToolsDir);${env:Path}"
-    $env:SDKROOT = (Get-PinnedToolchainSDK -OS $BuildPlatform.OS)
     $env:SWIFTCI_USE_LOCAL_DEPS = "1"
 
     $Arguments = @(
-      "--triple", "$($Platform.Triple)",
       "--scratch-path", $Bin,
       "--package-path", $Src,
       "-c", $Configuration
@@ -1996,6 +1991,18 @@ function Build-SPMProject {
         $ActionName = "test"
         $Arguments += @("--parallel")
       }
+    }
+
+    if ($ActionName -eq "build") {
+        # For building, we are cross-compiling content using the pinned to ship as part of the toolchain
+        $env:Path = "$(Get-PinnedToolchainRuntime);$(Get-PinnedToolchainToolsDir);${env:Path}"
+        $env:SDKROOT = (Get-PinnedToolchainSDK -OS $BuildPlatform.OS)
+        $Arguments += @("--triple", "$($Platform.Triple)")
+    } else {
+        # For testing, we are doing this using the just-built toolchain and only when NOT cross-compiling
+        $RuntimeInstallRoot = [IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", $ProductVersion)
+        $env:Path = "$RuntimeInstallRoot\usr\bin;$($BuildPlatform.ToolchainInstallRoot)\usr\bin;${env:Path}"
+        $env:SDKROOT = (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)
     }
 
     Invoke-Program swift $ActionName @Arguments @AdditionalArguments
