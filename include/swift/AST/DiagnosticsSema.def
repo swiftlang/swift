@@ -2114,9 +2114,6 @@ ERROR(cdecl_throws,none,
 ERROR(cdecl_incompatible_with_objc,none,
       "cannot apply both '@c' and '@objc' to %kindonly0",
       (const Decl *))
-ERROR(cdecl_feature_required,none,
-      "'@c' requires '-enable-experimental-feature CDecl'",
-      ())
 
 // @used and @section
 ERROR(section_empty_name,none,
