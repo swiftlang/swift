@@ -1348,9 +1348,9 @@ void PrintAST::printAttributes(const Decl *D) {
   if (Options.PrintSyntheticSILGenName
         && !D->getAttrs().hasAttribute<SILGenNameAttr>()) {
     if (canPrintSyntheticSILGenName(D)) {
-      auto mangledName = Mangle::ASTMangler(D->getASTContext())
-                            .mangleAnyDecl(cast<ValueDecl>(D), /*prefix=*/true,
-                                           /*respectOriginallyDefinedIn=*/true);
+      auto mangledName =
+          Mangle::ASTMangler(D->getASTContext())
+              .mangleAnyDecl(cast<ValueDecl>(D), /*addPrefix*/ true);
       Printer.printAttrName("@_silgen_name");
       Printer << "(";
       Printer.printEscapedStringLiteral(mangledName);

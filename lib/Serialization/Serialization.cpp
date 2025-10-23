@@ -6910,14 +6910,15 @@ static void recordDerivativeFunctionConfig(
   auto &ctx = AFD->getASTContext();
   Mangle::ASTMangler Mangler(AFD->getASTContext());
   for (auto *attr : AFD->getAttrs().getAttributes<DifferentiableAttr>()) {
-    auto mangledName = ctx.getIdentifier(Mangler.mangleDeclAsUSR(AFD, ""));
+    auto mangledName = ctx.getIdentifier(Mangler.mangleDeclWithPrefix(AFD, ""));
     derivativeConfigs[mangledName].insert(
         {ctx.getIdentifier(attr->getParameterIndices()->getString()),
          attr->getDerivativeGenericSignature()});
   }
   for (auto *attr : AFD->getAttrs().getAttributes<DerivativeAttr>()) {
     auto *origAFD = attr->getOriginalFunction(ctx);
-    auto mangledName = ctx.getIdentifier(Mangler.mangleDeclAsUSR(origAFD, ""));
+    auto mangledName =
+        ctx.getIdentifier(Mangler.mangleDeclWithPrefix(origAFD, ""));
     derivativeConfigs[mangledName].insert(
         {ctx.getIdentifier(attr->getParameterIndices()->getString()),
          AFD->getGenericSignature()});

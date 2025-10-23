@@ -757,7 +757,7 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
     return;
   auto &ctx = originalAFD->getASTContext();
   Mangle::ASTMangler Mangler(ctx);
-  auto mangledName = Mangler.mangleDeclAsUSR(originalAFD, "");
+  auto mangledName = Mangler.mangleDeclWithPrefix(originalAFD, "");
   auto configs = Core->DerivativeFunctionConfigurations->find(mangledName);
   if (configs == Core->DerivativeFunctionConfigurations->end())
     return;
