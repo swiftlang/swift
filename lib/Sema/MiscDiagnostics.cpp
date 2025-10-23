@@ -6378,6 +6378,9 @@ static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
   if (!Ctx.LangOpts.hasFeature(Feature::WarnUnannotatedReturnOfCxxFrt))
     return false;
 
+  if (!Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))
+    return false;
+
   auto attrInfo = importer::ReturnOwnershipInfo(ND);
   if (attrInfo.hasRetainAttr())
     return false;
