@@ -42,13 +42,13 @@ def confirm_tag_in_repo(repo_path: str, tag: str, repo_name: str) -> Optional[st
         exist.
     """
 
-    tag_exists = Git.capture(
-        repo_path, ["ls-remote", "--tags", "origin", tag], echo=False
+    tag_exists, _, _ = Git.run(
+        repo_path, ["ls-remote", "--tags", "origin", tag], fatal=True
     )
     if not tag_exists:
         print("Tag '" + tag + "' does not exist for '" +
               repo_name + "', just updating regularly")
-        tag = None
+        return None
     return tag
 
 
@@ -61,7 +61,7 @@ def find_rev_by_timestamp(repo_path: str, timestamp: str, repo_name: str, refspe
     args = ["log", "-1", "--format=%H", "--first-parent", "--before=" + timestamp]
     if refspec_exists:
         args.append(refspec)
-    rev = Git.capture(repo_path, args).strip()
+    rev, _, _ = Git.run(repo_path, args, fatal=True)
     if rev:
         return rev
     else:
@@ -98,7 +98,7 @@ def get_branch_for_repo(repo_path, config, repo_name, scheme_name, scheme_map,
             pr_id = cross_repos_pr[remote_repo_id]
             repo_branch = "ci_pr_{0}".format(pr_id)
             Git.run(repo_path, ["checkout", scheme_branch], echo=True)
-            Git.capture(repo_path, ["branch", "-D", repo_branch], echo=True, allow_non_zero_exit=True)
+            Git.run(repo_path, ["branch", "-D", repo_branch], echo=True, allow_non_zero_exit=True, fatal=True)
             Git.run(repo_path, ["fetch", "origin", "pull/{0}/merge:{1}".format(pr_id, repo_branch), "--tags"], echo=True)
     return repo_branch, cross_repo
 
@@ -172,7 +172,7 @@ def update_single_repository(pool_args: UpdateArguments):
                 pass
 
         if checkout_target:
-            Git.run(repo_path, ['status', '--porcelain', '-uno'], echo=False)
+            Git.run(repo_path, ['status', '--porcelain', '-uno'])
 
             # Some of the projects switch branches/tags when they
             # are updated. Local checkout might not have that tag/branch
@@ -199,8 +199,7 @@ def update_single_repository(pool_args: UpdateArguments):
                 )
             except Exception:
                 try:
-                    result = Git.run(repo_path, ["rev-parse", checkout_target])
-                    revision = result[0].strip()
+                    revision, _, _ = Git.run(repo_path, ["rev-parse", checkout_target])
                     Git.run(
                         repo_path, ["checkout", revision], echo=verbose, prefix=prefix
                     )
@@ -233,7 +232,7 @@ def update_single_repository(pool_args: UpdateArguments):
             # This git command returns error code 1 if HEAD is detached.
             # Otherwise there was some other error, and we need to handle
             # it like other command errors.
-            Git.run(repo_path, ["symbolic-ref", "-q", "HEAD"], echo=False)
+            Git.run(repo_path, ["symbolic-ref", "-q", "HEAD"])
         except Exception as e:
             if e.ret == 1:
                 detached_head = True
@@ -286,9 +285,8 @@ def get_timestamp_to_match(match_timestamp, source_root):
     if not match_timestamp:
         return None
     swift_repo_path = os.path.join(source_root, "swift")
-    return Git.capture(
-        swift_repo_path, ["log", "-1", "--format=%cI"], echo=False
-    ).strip()
+    output, _, _ = Git.run(swift_repo_path, ["log", "-1", "--format=%cI"], fatal=True)
+    return output
 
 
 def get_scheme_map(config, scheme_name):
@@ -410,22 +408,19 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
         print("Cloning '" + pool_args.repo_name + "'")
 
     if pool_args.skip_history:
-        Git.run(None, ['clone', '--recursive', '--depth', '1',
+        Git.run(args.source_root, ['clone', '--recursive', '--depth', '1',
                     '--branch', repo_branch, remote, repo_name] +
                     (['--no-tags'] if skip_tags else []),
-                    cwd=args.source_root,
                     env=env,
                     echo=verbose)
     elif pool_args.use_submodules:
-        Git.run(None, ['submodule', 'add', remote, repo_name] +
+        Git.run(args.source_root, ['submodule', 'add', remote, repo_name] +
                     (['--no-tags'] if skip_tags else []),
-                    cwd=args.source_root,
                     env=env,
                     echo=verbose)
     else:
-        Git.run(None, ['clone', '--recursive', remote, repo_name] +
+        Git.run(args.source_root, ['clone', '--recursive', remote, repo_name] +
                     (['--no-tags'] if skip_tags else []),
-                    cwd=args.source_root,
                     env=env,
                     echo=verbose)
 
@@ -433,12 +428,11 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
     if pool_args.scheme_name:
         src_path = os.path.join(repo_path, ".git")
         Git.run(
-            None,
+            args.source_root,
             ["--git-dir", src_path, "--work-tree", repo_path, "checkout", repo_branch],
             env=env,
-            echo=False,
         )
-    Git.run(repo_path, ["submodule", "update", "--recursive"], env=env, echo=False)
+    Git.run(repo_path, ["submodule", "update", "--recursive"], env=env)
 
 
 def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
@@ -455,8 +449,7 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
 
         if use_submodules:
             repo_exists = False
-            submodules_status = Git.capture(repo_path, ['submodule', 'status'],
-                                            echo=False)
+            submodules_status, _, _ = Git.run(repo_path, ['submodule', 'status'], fatal=True)
             if submodules_status:
                 for line in submodules_status.splitlines():
                     if line[0].endswith(repo_name):
@@ -557,7 +550,7 @@ def repo_hashes(args, config):
     for repo_name, _ in sorted(config['repos'].items(), key=lambda x: x[0]):
         repo_path = os.path.join(args.source_root, repo_name)
         if os.path.exists(repo_path):
-            h = Git.capture(repo_path, ["rev-parse", "HEAD"], echo=False).strip()
+            h, _, _ = Git.run(repo_path, ["rev-parse", "HEAD"], fatal=True)
         else:
             h = "skip"
         repos[repo_name] = str(h)
@@ -633,11 +626,12 @@ def validate_config(config: Dict[str, Any]):
 
 
 def full_target_name(repo_path, repository, target):
-    tag = Git.capture(repo_path, ["tag", "-l", target], echo=False).strip()
+    tag, _, _ = Git.run(repo_path, ["tag", "-l", target], fatal=True)
     if tag == target:
         return tag
 
-    branch = Git.capture(repo_path, ["branch", "--list", target], echo=False).strip().replace("* ", "")
+    branch, _, _ = Git.run(repo_path, ["branch", "--list", target], fatal=True)
+    branch = branch.replace("* ", "")
     if branch == target:
         name = "%s/%s" % (repository, target)
         return name
