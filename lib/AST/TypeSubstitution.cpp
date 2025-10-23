@@ -1093,7 +1093,8 @@ ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
   InFlightSubstitution IFS(replacer, replacer,
-                           SubstFlags::SubstituteOpaqueArchetypes);
+                           SubstFlags::SubstituteOpaqueArchetypes |
+                           SubstFlags::PreservePackExpansionLevel);
 
   auto substRef = ref.subst(IFS);
 
