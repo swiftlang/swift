@@ -187,10 +187,10 @@ public:
     HasSymbolQuery,
   };
 
-  /// lldb overrides the defaulted argument to 'true'.
+  /// lldb overrides \p DWARFMangling to 'true'.
   ASTMangler(const ASTContext &Ctx, bool DWARFMangling = false) : Context(Ctx) {
     if (DWARFMangling) {
-      DWARFMangling = true;
+      this->DWARFMangling = true;
       RespectOriginallyDefinedIn = false;
     }
     Flavor = Ctx.LangOpts.hasFeature(Feature::Embedded)
