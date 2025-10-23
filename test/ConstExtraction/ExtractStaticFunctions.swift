@@ -48,6 +48,8 @@ struct Statics: MyProto {
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "item",
 // CHECK-NEXT:        "type": "Swift.String",
+// CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractStaticFunctions.swift",
+// CHECK-NEXT:        "line": 30,
 // CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "bar"
 // CHECK-NEXT:      }
@@ -70,6 +72,8 @@ struct Statics: MyProto {
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "item",
 // CHECK-NEXT:        "type": "Swift.String",
+// CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractStaticFunctions.swift",
+// CHECK-NEXT:        "line": 32,
 // CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "baz"
 // CHECK-NEXT:      }

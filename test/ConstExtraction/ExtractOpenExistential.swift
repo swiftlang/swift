@@ -56,6 +56,8 @@ public struct External: MyProto {
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "label": "",
 // CHECK-NEXT:               "type": "any ExtractOpenExistential.ExampleProtocol",
+// CHECK-NEXT:               "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractOpenExistential.swift",
+// CHECK-NEXT:               "line": 22,
 // CHECK-NEXT:               "valueKind": "InitCall",
 // CHECK-NEXT:               "value": {
 // CHECK-NEXT:                 "type": "ExtractOpenExistential.ConcreteType",
