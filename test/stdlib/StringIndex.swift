@@ -1050,8 +1050,11 @@ suite.test("UTF-16 single breadcrumb") {
     c̵̛̘̥̮̙̥̟̘̝͙̤̮͉͔̭̺̺̅̀̽̒̽̏̊̆͒͌̂͌̌̓̈́̐̔̿̂͑͠͝͝ͅ\#
     """#
   
-  let string = String(decoding: original.utf16, as: UTF16.self)
+  var string = String(decoding: original.utf16, as: UTF16.self)
+  string.reserveCapacity(1000) //make sure that when we mutate, we mutate in-place
   expectEqual(string.utf16.count, original.utf16.count)
+  string.append(contentsOf: "test")
+  expectNotEqual(string.utf16.count, original.utf16.count)
 }
 
 suite.test("String.replaceSubrange index validation")
