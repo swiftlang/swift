@@ -4351,9 +4351,9 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
 
   // Historical name for @section and @used
   checkInvalidAttrName("_section", "section", DeclAttrKind::Section,
-                       diag::attr_name_close_match);
+                       diag::attr_renamed_warning);
   checkInvalidAttrName("_used", "used", DeclAttrKind::Used,
-                       diag::attr_name_close_match);
+                       diag::attr_renamed_warning);
 
   // Historical name for 'nonisolated'.
   if (!DK && Tok.getText() == "actorIndependent") {
