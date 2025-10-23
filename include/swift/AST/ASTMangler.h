@@ -791,6 +791,28 @@ protected:
                                     const ValueDecl *forDecl);
 
   void appendLifetimeDependence(LifetimeDependenceInfo info);
+
+  void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
+                                     ParameterizedProtocolType *PPT) const;
+
+  /// Extracts a list of inverse requirements from a PCT serving as the
+  /// constraint type of an existential.
+  void extractExistentialInverseRequirements(
+      SmallVectorImpl<InverseRequirement> &inverses,
+      ProtocolCompositionType *PCT) const;
+
+  template <typename DeclType>
+  DeclType *getABIDecl(DeclType *D) const {
+    if (!D)
+      return nullptr;
+
+    auto abiRole = ABIRoleInfo(D);
+    if (!abiRole.providesABI())
+      return abiRole.getCounterpart();
+    return nullptr;
+  }
+
+  std::optional<SymbolicReferent> getABIDecl(SymbolicReferent ref) const;
 };
 
 } // end namespace Mangle

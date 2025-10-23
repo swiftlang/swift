@@ -68,33 +68,22 @@
 using namespace swift;
 using namespace swift::Mangle;
 
-template<typename DeclType>
-static DeclType *getABIDecl(DeclType *D) {
-  if (!D)
-    return nullptr;
-
-  auto abiRole = ABIRoleInfo(D);
-  if (!abiRole.providesABI())
-    return abiRole.getCounterpart();
-  return nullptr;
-}
-
-static std::optional<ASTMangler::SymbolicReferent>
-getABIDecl(ASTMangler::SymbolicReferent ref) {
+std::optional<ASTMangler::SymbolicReferent>
+ASTMangler::getABIDecl(SymbolicReferent ref) const {
   switch (ref.getKind()) {
-  case ASTMangler::SymbolicReferent::NominalType:
+  case SymbolicReferent::NominalType:
     if (auto abiTypeDecl = getABIDecl(ref.getNominalType())) {
-      return ASTMangler::SymbolicReferent(abiTypeDecl);
+      return SymbolicReferent(abiTypeDecl);
     }
     break;
 
-  case ASTMangler::SymbolicReferent::OpaqueType:
+  case SymbolicReferent::OpaqueType:
     if (auto abiTypeDecl = getABIDecl(ref.getOpaqueType())) {
-      return ASTMangler::SymbolicReferent(abiTypeDecl);
+      return SymbolicReferent(abiTypeDecl);
     }
     break;
 
-  case ASTMangler::SymbolicReferent::ExtendedExistentialTypeShape:
+  case SymbolicReferent::ExtendedExistentialTypeShape:
     // Do nothing; mangling will use the underlying ABI decls in the end.
     break;
   }
@@ -5329,8 +5318,8 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
   return finalize();
 }
 
-static void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
-                                          ParameterizedProtocolType *PPT) {
+void ASTMangler::gatherExistentialRequirements(
+    SmallVectorImpl<Requirement> &reqs, ParameterizedProtocolType *PPT) const {
   auto protoTy = PPT->getBaseType();
   ASSERT(!getABIDecl(protoTy->getDecl()) && "need to figure out behavior");
   PPT->getRequirements(protoTy->getDecl()->getSelfInterfaceType(), reqs);
@@ -5338,9 +5327,9 @@ static void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
 
 /// Extracts a list of inverse requirements from a PCT serving as the constraint
 /// type of an existential.
-static void extractExistentialInverseRequirements(
-                                SmallVectorImpl<InverseRequirement> &inverses,
-                                ProtocolCompositionType *PCT) {
+void ASTMangler::extractExistentialInverseRequirements(
+    SmallVectorImpl<InverseRequirement> &inverses,
+    ProtocolCompositionType *PCT) const {
   if (!PCT->hasInverse())
     return;
 
