@@ -155,8 +155,7 @@ static std::string getMangledNameString(const Decl *D) {
   if (!VD)
     return std::string();
   Mangle::ASTMangler mangler(VD->getASTContext());
-  return mangler.mangleAnyDecl(VD, /*prefix=*/true,
-                               /*respectOriginallyDefinedIn=*/true);
+  return mangler.mangleAnyDecl(VD, /*addPrefix*/ true);
 }
 
 static std::string getTypeString(const ValueDecl *VD) {

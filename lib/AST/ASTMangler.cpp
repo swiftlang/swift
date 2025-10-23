@@ -993,31 +993,28 @@ void ASTMangler::appendAnyDecl(const ValueDecl *Decl) {
   }
 }
 
-std::string
-ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
-                          bool prefix,
-                          bool respectOriginallyDefinedIn) {
+std::string ASTMangler::mangleAnyDecl(const ValueDecl *decl, bool addPrefix) {
   DWARFMangling = true;
-  RespectOriginallyDefinedIn = respectOriginallyDefinedIn;
-  if (prefix) {
+  if (addPrefix) {
     beginMangling();
   } else {
     beginManglingWithoutPrefix();
   }
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
 
-  appendAnyDecl(Decl);
+  appendAnyDecl(decl);
 
   // We have a custom prefix, so finalize() won't verify for us. If we're not
   // in invalid code (coming from an IDE caller) verify manually.
-  if (CONDITIONAL_ASSERT_enabled() && !prefix && !Decl->isInvalid())
+  if (CONDITIONAL_ASSERT_enabled() && !addPrefix && !decl->isInvalid())
     verify(Storage.str(), Flavor);
   return finalize();
 }
 
 std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
                                         StringRef USRPrefix) {
-  return (llvm::Twine(USRPrefix) + mangleAnyDecl(Decl, false)).str();
+  return (llvm::Twine(USRPrefix) + mangleAnyDecl(Decl, /*addPrefix*/ false))
+      .str();
 }
 
 std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
