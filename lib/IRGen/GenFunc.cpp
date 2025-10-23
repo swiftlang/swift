@@ -872,33 +872,36 @@ llvm::Constant *irgen::getCoroFrameAllocStubFn(IRGenModule &IGM) {
   // Otherwise, create a stub function to call it when available, or malloc
   // when it isn't.
   return IGM.getOrCreateHelperFunction(
-    "__swift_coroFrameAllocStub", IGM.Int8PtrTy,
-    {IGM.SizeTy, IGM.Int64Ty},
-    [&](IRGenFunction &IGF) {
-      auto parameters = IGF.collectParameters();
-      auto *size = parameters.claimNext();
-      auto *coroFrameAllocFn = IGF.IGM.getOpaquePtr(coroAllocPtr);
-      auto *nullSwiftCoroFrameAlloc = IGF.Builder.CreateCmp(
-        llvm::CmpInst::Predicate::ICMP_NE, coroFrameAllocFn,
-        llvm::ConstantPointerNull::get(
-            cast<llvm::PointerType>(coroFrameAllocFn->getType())));
-      auto *coroFrameAllocReturn = IGF.createBasicBlock("return-coroFrameAlloc");
-      auto *mallocReturn = IGF.createBasicBlock("return-malloc");
-      IGF.Builder.CreateCondBr(nullSwiftCoroFrameAlloc, coroFrameAllocReturn, mallocReturn);
+      "__swift_coroFrameAllocStub", IGM.Int8PtrTy, {IGM.SizeTy, IGM.Int64Ty},
+      [&](IRGenFunction &IGF) {
+        auto parameters = IGF.collectParameters();
+        auto *size = parameters.claimNext();
+        auto *coroFrameAllocFn = IGF.IGM.getOpaquePtr(coroAllocPtr);
+        auto *nullSwiftCoroFrameAlloc = IGF.Builder.CreateCmp(
+            llvm::CmpInst::Predicate::ICMP_NE, coroFrameAllocFn,
+            llvm::ConstantPointerNull::get(
+                cast<llvm::PointerType>(coroFrameAllocFn->getType())));
+        auto *coroFrameAllocReturn =
+            IGF.createBasicBlock("return-coroFrameAlloc");
+        auto *mallocReturn = IGF.createBasicBlock("return-malloc");
+        IGF.Builder.CreateCondBr(nullSwiftCoroFrameAlloc, coroFrameAllocReturn,
+                                 mallocReturn);
 
-      IGF.Builder.emitBlock(coroFrameAllocReturn);
-      auto *mallocTypeId = parameters.claimNext();
-      auto *coroFrameAllocCall = IGF.Builder.CreateCall(IGF.IGM.getCoroFrameAllocFunctionPointer(), {size, mallocTypeId});
-      IGF.Builder.CreateRet(coroFrameAllocCall);
+        IGF.Builder.emitBlock(coroFrameAllocReturn);
+        auto *mallocTypeId = parameters.claimNext();
+        auto *coroFrameAllocCall = IGF.Builder.CreateCall(
+            IGF.IGM.getCoroFrameAllocFunctionPointer(), {size, mallocTypeId});
+        IGF.Builder.CreateRet(coroFrameAllocCall);
 
-      IGF.Builder.emitBlock(mallocReturn);
-      auto *mallocCall = IGF.Builder.CreateCall(IGF.IGM.getMallocFunctionPointer(), {size});
-      IGF.Builder.CreateRet(mallocCall);
-    },
-    /*setIsNoInline=*/false,
-    /*forPrologue=*/false,
-    /*isPerformanceConstraint=*/false,
-    /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::C);
+        IGF.Builder.emitBlock(mallocReturn);
+        auto *mallocCall =
+            IGF.Builder.CreateCall(IGF.IGM.getMallocFunctionPointer(), {size});
+        IGF.Builder.CreateRet(mallocCall);
+      },
+      /*setIsNoInline=*/false,
+      /*forPrologue=*/false,
+      /*isPerformanceConstraint=*/false,
+      /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::C);
 }
 
 static Size getOffsetOfOpaqueIsolationField(IRGenModule &IGM,
