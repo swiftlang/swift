@@ -68,33 +68,22 @@
 using namespace swift;
 using namespace swift::Mangle;
 
-template<typename DeclType>
-static DeclType *getABIDecl(DeclType *D) {
-  if (!D)
-    return nullptr;
-
-  auto abiRole = ABIRoleInfo(D);
-  if (!abiRole.providesABI())
-    return abiRole.getCounterpart();
-  return nullptr;
-}
-
-static std::optional<ASTMangler::SymbolicReferent>
-getABIDecl(ASTMangler::SymbolicReferent ref) {
+std::optional<ASTMangler::SymbolicReferent>
+ASTMangler::getABIDecl(SymbolicReferent ref) const {
   switch (ref.getKind()) {
-  case ASTMangler::SymbolicReferent::NominalType:
+  case SymbolicReferent::NominalType:
     if (auto abiTypeDecl = getABIDecl(ref.getNominalType())) {
-      return ASTMangler::SymbolicReferent(abiTypeDecl);
+      return SymbolicReferent(abiTypeDecl);
     }
     break;
 
-  case ASTMangler::SymbolicReferent::OpaqueType:
+  case SymbolicReferent::OpaqueType:
     if (auto abiTypeDecl = getABIDecl(ref.getOpaqueType())) {
-      return ASTMangler::SymbolicReferent(abiTypeDecl);
+      return SymbolicReferent(abiTypeDecl);
     }
     break;
 
-  case ASTMangler::SymbolicReferent::ExtendedExistentialTypeShape:
+  case SymbolicReferent::ExtendedExistentialTypeShape:
     // Do nothing; mangling will use the underlying ABI decls in the end.
     break;
   }
@@ -969,8 +958,6 @@ std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
 }
 
 std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
-  DWARFMangling = true;
-  RespectOriginallyDefinedIn = false;
   beginMangling();
 
   Ty = getTypeForDWARFMangling(Ty);
@@ -1006,33 +993,27 @@ void ASTMangler::appendAnyDecl(const ValueDecl *Decl) {
   }
 }
 
-std::string
-ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
-                          bool prefix,
-                          bool respectOriginallyDefinedIn) {
+std::string ASTMangler::mangleAnyDecl(const ValueDecl *decl, bool addPrefix) {
   DWARFMangling = true;
-  RespectOriginallyDefinedIn = respectOriginallyDefinedIn;
-  if (prefix) {
+  if (addPrefix) {
     beginMangling();
   } else {
     beginManglingWithoutPrefix();
   }
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
 
-  appendAnyDecl(Decl);
+  appendAnyDecl(decl);
 
   // We have a custom prefix, so finalize() won't verify for us. If we're not
   // in invalid code (coming from an IDE caller) verify manually.
-  if (CONDITIONAL_ASSERT_enabled() && !prefix && !Decl->isInvalid())
+  if (CONDITIONAL_ASSERT_enabled() && !addPrefix && !decl->isInvalid())
     verify(Storage.str(), Flavor);
   return finalize();
 }
 
-std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
-                                        StringRef USRPrefix) {
-  llvm::SaveAndRestore<bool> respectOriginallyDefinedInRAII(
-      RespectOriginallyDefinedIn, false);
-  return (llvm::Twine(USRPrefix) + mangleAnyDecl(Decl, false)).str();
+std::string ASTMangler::mangleDeclWithPrefix(const ValueDecl *decl,
+                                             StringRef prefix) {
+  return (llvm::Twine(prefix) + mangleAnyDecl(decl, /*addPrefix*/ false)).str();
 }
 
 std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
@@ -1040,8 +1021,6 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
                                                   StringRef USRPrefix,
                                                   bool isStatic) {
   beginManglingWithoutPrefix();
-  llvm::SaveAndRestore<bool> respectOriginallyDefinedInRAII(
-      RespectOriginallyDefinedIn, false);
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
   appendAccessorEntity(getCodeForAccessorKind(kind), decl, isStatic);
@@ -5329,8 +5308,8 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
   return finalize();
 }
 
-static void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
-                                          ParameterizedProtocolType *PPT) {
+void ASTMangler::gatherExistentialRequirements(
+    SmallVectorImpl<Requirement> &reqs, ParameterizedProtocolType *PPT) const {
   auto protoTy = PPT->getBaseType();
   ASSERT(!getABIDecl(protoTy->getDecl()) && "need to figure out behavior");
   PPT->getRequirements(protoTy->getDecl()->getSelfInterfaceType(), reqs);
@@ -5338,9 +5317,9 @@ static void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
 
 /// Extracts a list of inverse requirements from a PCT serving as the constraint
 /// type of an existential.
-static void extractExistentialInverseRequirements(
-                                SmallVectorImpl<InverseRequirement> &inverses,
-                                ProtocolCompositionType *PCT) {
+void ASTMangler::extractExistentialInverseRequirements(
+    SmallVectorImpl<InverseRequirement> &inverses,
+    ProtocolCompositionType *PCT) const {
   if (!PCT->hasInverse())
     return;
 
