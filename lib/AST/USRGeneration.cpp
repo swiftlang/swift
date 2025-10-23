@@ -248,7 +248,7 @@ swift::SwiftUSRGenerationRequest::evaluate(Evaluator &evaluator,
 
   using namespace Mangle;
   ASTMangler NewMangler = ASTMangler::forUSR(D->getASTContext());
-  return NewMangler.mangleDeclAsUSR(D, getUSRSpacePrefix());
+  return NewMangler.mangleDeclWithPrefix(D, getUSRSpacePrefix());
 }
 
 std::string

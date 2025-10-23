@@ -399,7 +399,7 @@ public:
 
   void appendAnyDecl(const ValueDecl *Decl);
   std::string mangleAnyDecl(const ValueDecl *decl, bool addPrefix);
-  std::string mangleDeclAsUSR(const ValueDecl *Decl, StringRef USRPrefix);
+  std::string mangleDeclWithPrefix(const ValueDecl *decl, StringRef prefix);
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
                                         const AbstractStorageDecl *decl,

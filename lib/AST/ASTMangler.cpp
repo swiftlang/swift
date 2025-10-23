@@ -1011,10 +1011,9 @@ std::string ASTMangler::mangleAnyDecl(const ValueDecl *decl, bool addPrefix) {
   return finalize();
 }
 
-std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
-                                        StringRef USRPrefix) {
-  return (llvm::Twine(USRPrefix) + mangleAnyDecl(Decl, /*addPrefix*/ false))
-      .str();
+std::string ASTMangler::mangleDeclWithPrefix(const ValueDecl *decl,
+                                             StringRef prefix) {
+  return (llvm::Twine(prefix) + mangleAnyDecl(decl, /*addPrefix*/ false)).str();
 }
 
 std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
