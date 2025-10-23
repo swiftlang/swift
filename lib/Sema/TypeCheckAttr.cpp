@@ -4995,12 +4995,12 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
     return;
   }
 
-  // @_implementationOnly on structs only applies to non-public types.
   auto *VD = cast<ValueDecl>(D);
-  if (isa<StructDecl>(VD)) {
+
+  // @_implementationOnly on types only applies to non-public types.
+  if (isa<NominalTypeDecl>(D)) {
     if (!Ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly)) {
-      diagnoseAndRemoveAttr(attr,
-          diag::implementation_only_on_structs_feature);
+      diagnoseAndRemoveAttr(attr, diag::implementation_only_on_types_feature);
       return;
     }
 
