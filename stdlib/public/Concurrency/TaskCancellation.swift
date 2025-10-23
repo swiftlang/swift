@@ -73,11 +73,13 @@ import Swift
 /// as resuming a continuation, may acquire these same internal locks.
 /// Therefore, if a cancellation handler must acquire a lock, other code should
 /// not cancel tasks or resume continuations while holding that lock.
+@usableFromInline
 @available(SwiftStdlib 5.1, *)
 #if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
 #endif
-public func withTaskCancellationHandler<T>(
+@available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
+func withTaskCancellationHandler<T>(
   operation: () async throws -> T,
   onCancel handler: @Sendable () -> Void,
   isolation: isolated (any Actor)? = #isolation
@@ -91,6 +93,28 @@ public func withTaskCancellationHandler<T>(
   let record = unsafe _taskAddCancellationHandler(handler: handler)
   defer { unsafe _taskRemoveCancellationHandler(record: record) }
 #endif
+  return try await operation()
+}
+
+@inlinable
+@_alwaysEmitIntoClient
+@available(SwiftStdlib 5.1, *)
+// @abi(
+//   nonisolated(nonsending) func withTaskCancellationHandlerNonisolatedNonsending<T, Failure: Error>(
+//     operation: () async throws(Failure) -> sending T,
+//     onCancel handler: @Sendable () -> Void,
+//   ) async throws(Failure) -> sending T
+// )
+@_silgen_name("$s4test28withTaskCancellationHandlerN9operation8onCancelxxyYaq_YKYTXE_yyYbXEtYaq_YKs5ErrorR_r0_lF")
+public nonisolated(nonsending) func withTaskCancellationHandler<T, Failure: Error>(
+  operation: () async throws(Failure) -> sending T,
+  onCancel handler: @Sendable () -> Void,
+) async throws(Failure) -> sending T {
+  // unconditionally add the cancellation record to the task.
+  // if the task was already cancelled, it will be executed right away.
+  let record = unsafe _taskAddCancellationHandler(handler: handler)
+  defer { unsafe _taskRemoveCancellationHandler(record: record) }
+
   return try await operation()
 }
 
