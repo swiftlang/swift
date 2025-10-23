@@ -802,6 +802,9 @@ def main():
         '--sum-multi', action='store_true',
         default=False, help='simulate a multi-primary run and sum stats')
 
+    # Deterministic seed for the RNG.
+    random.seed(123456789)
+
     args = parser.parse_args(sys.argv[1:])
     if args.self_test:
         exit(self_test())
