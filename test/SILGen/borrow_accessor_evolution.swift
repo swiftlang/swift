@@ -1,4 +1,5 @@
 // RUN:%target-swift-frontend -emit-silgen %s -verify  -enable-experimental-feature BorrowAndMutateAccessors -enable-library-evolution | %FileCheck %s
+// RUN:%target-swift-frontend -c -Xllvm -sil-print-after=SILGenCleanup  %s -verify  -enable-experimental-feature BorrowAndMutateAccessors -enable-library-evolution 2>&1 | %FileCheck --check-prefixes=CHECK-SILGEN-CLEANUP %s
 
 // REQUIRES: swift_feature_BorrowAndMutateAccessors
 
@@ -131,10 +132,17 @@ func test() {
 // CHECK:   debug_value [[REG0]], let, name "self", argno 1, expr op_deref
 // CHECK:   [[REG2:%.*]] = struct_element_addr [[REG0]], #Wrapper._k
 // CHECK:   [[REG3:%.*]] = load_borrow [[REG2]]
-// CHECK:   [[REG4:%.*]] = unchecked_ownership_conversion [[REG3]], @guaranteed to @unowned
-// CHECK:   [[REG5:%.*]] = unchecked_ownership_conversion [[REG4]], @unowned to @guaranteed
-// CHECK:   return [[REG5]]
+// CHECK:   [[REG4:%.*]] = unchecked_ownership [[REG3]]
+// CHECK:   end_borrow [[REG3]]
+// CHECK:   return [[REG4]]
 // CHECK: }
+
+// CHECK-SILGEN-CLEANUP: sil hidden [ossa] @$s25borrow_accessor_evolution7WrapperV1kAA5KlassCvb : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass {
+// CHECK-SILGEN-CLEANUP: bb0([[REG0:%.*]] : $*Wrapper):
+// CHECK-SILGEN-CLEANUP:   [[REG2:%.*]] = struct_element_addr [[REG0]], #Wrapper._k
+// CHECK-SILGEN-CLEANUP:   [[REG3:%.*]] = load_borrow [[REG2]]
+// CHECK-SILGEN-CLEANUP:   return_borrow [[REG3]] from_scopes ([[REG3]])
+// CHECK-SILGEN-CLEANUP: }
 
 // CHECK-LABEL: sil hidden [ossa] @$s25borrow_accessor_evolution7WrapperV7nested1AA5KlassCvb : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass {
 // CHECK: bb0([[REG0:%.*]] : $*Wrapper):
@@ -159,11 +167,17 @@ func test() {
 // CHECK:   debug_value [[REG1]], let, name "self", argno 2, expr op_deref
 // CHECK:   [[REG4:%.*]] = struct_element_addr [[REG1]], #Wrapper._k
 // CHECK:   [[REG5:%.*]] = load_borrow [[REG4]]
-// CHECK:   [[REG6:%.*]] = unchecked_ownership_conversion [[REG5]], @guaranteed to @unowned
-// CHECK:   [[REG7:%.*]] = unchecked_ownership_conversion [[REG6]], @unowned to @guaranteed
+// CHECK:   [[REG6:%.*]] = unchecked_ownership [[REG5]]
 // CHECK:   end_borrow [[REG5]]
-// CHECK:   return [[REG7]]
+// CHECK:   return [[REG6]]
 // CHECK: }
+
+// CHECK-SILGEN-CLEANUP: sil hidden [ossa] @$s25borrow_accessor_evolution7WrapperVyAA5KlassCSicib : $@convention(method) (Int, @in_guaranteed Wrapper) -> @guaranteed Klass {
+// CHECK-SILGEN-CLEANUP: bb0([[REG0:%.*]] : $Int, [[REG1:%.*]] : $*Wrapper):
+// CHECK-SILGEN-CLEANUP:   [[REG4:%.*]] = struct_element_addr [[REG1]], #Wrapper._k
+// CHECK-SILGEN-CLEANUP:   [[REG5:%.*]] = load_borrow [[REG4]]
+// CHECK-SILGEN-CLEANUP:   return_borrow [[REG5]] from_scopes ([[REG5]])
+// CHECK-SILGEN-CLEANUP: }
 
 // CHECK-LABEL: sil hidden [ossa] @$s25borrow_accessor_evolution7WrapperV16nested_subscriptAA5KlassCvb : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass {
 // CHECK: bb0([[REG0:%.*]] : $*Wrapper):

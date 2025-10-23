@@ -1199,6 +1199,17 @@ the `set` case is passed `self`.
 
 This is only valid in Raw SIL.
 
+### unchecked_ownership
+
+```
+sil-instruction ::= 'unchecked_ownership' sil-operand
+
+unchecked_ownership %1 : $T
+```
+
+unchecked_ownership disables the ownership verification of it's operand. This used in cases 
+we cannot resolve ownership until a mandatory pass runs. This is only valid in Raw SIL. 
+
 ### copy_addr
 
 ```
@@ -5002,6 +5013,20 @@ does not apply in the `raw` SIL stage.
 `return` does not retain or release its operand or any other values.
 
 A function must not contain more than one `return` instruction.
+
+### return_borrow
+
+```
+sil-terminator ::= 'return_borrow' sil-operand 'from_scopes' '(' (sil-operand (',' sil-operand)*)? ')'
+
+return_borrow %0 : $T from_scopes (%1, %2 ...)
+// %0 must be a @guaranteed value
+// %1, %2, ... must be borrow introducers for %0, like `load_borrow`
+// $T must be the return type of the current function
+```
+
+return_borrow instruction is valid only for functions @guaranteed results.
+It is used to a return a @guaranteed value that maybe produced within borrow scopes local to the function.
 
 ### throw
 

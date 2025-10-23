@@ -130,6 +130,7 @@ private:
 
     case TermKind::UnreachableInst:
     case TermKind::ReturnInst:
+    case TermKind::ReturnBorrowInst:
     case TermKind::SwitchValueInst:
     case TermKind::ThrowInst:
     case TermKind::ThrowAddrInst:

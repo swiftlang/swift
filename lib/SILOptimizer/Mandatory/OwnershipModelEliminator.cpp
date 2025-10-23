@@ -192,6 +192,15 @@ struct OwnershipModelEliminatorVisitor
     eraseInstruction(eli);
     return true;
   }
+
+  bool visitReturnBorrowInst(ReturnBorrowInst *rbi) {
+    return withBuilder<bool>(rbi, [&](SILBuilder &b, SILLocation loc) {
+      b.createReturn(loc, rbi->getReturnValue());
+      eraseInstruction(rbi);
+      return true;
+    });
+  }
+
   bool visitUncheckedOwnershipConversionInst(
       UncheckedOwnershipConversionInst *uoci) {
     eraseInstructionAndRAUW(uoci, uoci->getOperand());
