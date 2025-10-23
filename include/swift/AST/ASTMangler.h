@@ -198,6 +198,12 @@ public:
                  : ManglingFlavor::Default;
   }
 
+  /// Create an ASTMangler suitable for mangling a USR for use in semantic
+  /// functionality.
+  static ASTMangler forUSR(const ASTContext &Ctx) {
+    return ASTMangler(Ctx, /*DWARFMangling*/ true);
+  }
+
   const ASTContext &getASTContext() { return Context; }
 
   void addTypeSubstitution(Type type, GenericSignature sig) {

@@ -958,8 +958,6 @@ std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
 }
 
 std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
-  DWARFMangling = true;
-  RespectOriginallyDefinedIn = false;
   beginMangling();
 
   Ty = getTypeForDWARFMangling(Ty);
@@ -1019,8 +1017,6 @@ ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
 
 std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
                                         StringRef USRPrefix) {
-  llvm::SaveAndRestore<bool> respectOriginallyDefinedInRAII(
-      RespectOriginallyDefinedIn, false);
   return (llvm::Twine(USRPrefix) + mangleAnyDecl(Decl, false)).str();
 }
 
@@ -1029,8 +1025,6 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
                                                   StringRef USRPrefix,
                                                   bool isStatic) {
   beginManglingWithoutPrefix();
-  llvm::SaveAndRestore<bool> respectOriginallyDefinedInRAII(
-      RespectOriginallyDefinedIn, false);
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
   appendAccessorEntity(getCodeForAccessorKind(kind), decl, isStatic);
