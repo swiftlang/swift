@@ -385,7 +385,7 @@ public:
       return E;
     }
 
-    // ( 'os' | 'arch' | '_endian' | '_pointerBitWidth' | '_runtime' | '_hasAtomicBitWidth' ) '(' identifier ')''
+    // ( 'os' | 'arch' | '_endian' | '_pointerBitWidth' | '_runtime' | '_hasAtomicBitWidth' | 'objectFormat' ) '(' identifier ')''
     auto Kind = getPlatformConditionKind(*KindName);
     if (!Kind.has_value()) {
       D.diagnose(E->getLoc(), diag::unsupported_platform_condition_expression);
@@ -429,6 +429,8 @@ public:
         DiagName = "pointer authentication scheme"; break;
       case PlatformConditionKind::HasAtomicBitWidth:
         DiagName = "has atomic bit width"; break;
+      case PlatformConditionKind::ObjectFileFormat:
+        DiagName = "object file format"; break;
       case PlatformConditionKind::Runtime:
         llvm_unreachable("handled above");
       }
