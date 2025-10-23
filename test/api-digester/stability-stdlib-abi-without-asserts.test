@@ -189,8 +189,8 @@ Protocol CodingKey has added inherited protocol Copyable
 Protocol CodingKey has added inherited protocol Escapable
 Protocol Collection has added inherited protocol Copyable
 Protocol Collection has added inherited protocol Escapable
-Protocol Comparable has added inherited protocol Copyable
 Protocol Comparable has added inherited protocol Escapable
+Protocol Comparable has generic signature change from <Self : Swift.Equatable> to <Self : Swift.Equatable, Self : ~Copyable>
 Protocol CustomDebugStringConvertible has added inherited protocol Copyable
 Protocol CustomDebugStringConvertible has added inherited protocol Escapable
 Protocol CustomLeafReflectable has added inherited protocol Copyable
@@ -546,6 +546,24 @@ Func Equatable.!=(_:_:) is now with @_preInverseGenerics
 Func Equatable.==(_:_:) has generic signature change from <Self where Self : Swift.Equatable> to <Self where Self : Swift.Equatable, Self : ~Copyable>
 Func Equatable.==(_:_:) has parameter 0 changing from Default to Shared
 Func Equatable.==(_:_:) has parameter 1 changing from Default to Shared
+Func Comparable.<(_:_:) has generic signature change from <Self where Self : Swift.Comparable> to <Self where Self : Swift.Comparable, Self : ~Copyable>
+Func Comparable.<(_:_:) has parameter 0 changing from Default to Shared
+Func Comparable.<(_:_:) has parameter 1 changing from Default to Shared
+Func Comparable.<=(_:_:) has generic signature change from <Self where Self : Swift.Comparable> to <Self where Self : Swift.Comparable, Self : ~Copyable>
+Func Comparable.<=(_:_:) has mangled name changing from 'static (extension in Swift):Swift.Comparable.<= infix(A, A) -> Swift.Bool' to 'static (extension in Swift):Swift.Comparable< where A: ~Swift.Copyable>.<= infix(A, A) -> Swift.Bool'
+Func Comparable.<=(_:_:) has parameter 0 changing from Default to Shared
+Func Comparable.<=(_:_:) has parameter 1 changing from Default to Shared
+Func Comparable.<=(_:_:) is now with @_preInverseGenerics
+Func Comparable.>(_:_:) has generic signature change from <Self where Self : Swift.Comparable> to <Self where Self : Swift.Comparable, Self : ~Copyable>
+Func Comparable.>(_:_:) has mangled name changing from 'static (extension in Swift):Swift.Comparable.> infix(A, A) -> Swift.Bool' to 'static (extension in Swift):Swift.Comparable< where A: ~Swift.Copyable>.> infix(A, A) -> Swift.Bool'
+Func Comparable.>(_:_:) has parameter 0 changing from Default to Shared
+Func Comparable.>(_:_:) has parameter 1 changing from Default to Shared
+Func Comparable.>(_:_:) is now with @_preInverseGenerics
+Func Comparable.>=(_:_:) has generic signature change from <Self where Self : Swift.Comparable> to <Self where Self : Swift.Comparable, Self : ~Copyable>
+Func Comparable.>=(_:_:) has mangled name changing from 'static (extension in Swift):Swift.Comparable.>= infix(A, A) -> Swift.Bool' to 'static (extension in Swift):Swift.Comparable< where A: ~Swift.Copyable>.>= infix(A, A) -> Swift.Bool'
+Func Comparable.>=(_:_:) has parameter 0 changing from Default to Shared
+Func Comparable.>=(_:_:) has parameter 1 changing from Default to Shared
+Func Comparable.>=(_:_:) is now with @_preInverseGenerics
 Func ManagedBuffer.create(minimumCapacity:makingHeaderWith:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Func ManagedBuffer.create(minimumCapacity:makingHeaderWith:) has mangled name changing from 'static Swift.ManagedBuffer.create(minimumCapacity: Swift.Int, makingHeaderWith: (Swift.ManagedBuffer<A, B>) throws -> A) throws -> Swift.ManagedBuffer<A, B>' to 'static (extension in Swift):Swift.ManagedBuffer< where B: ~Swift.Copyable>.create(minimumCapacity: Swift.Int, makingHeaderWith: (Swift.ManagedBuffer<A, B>) throws -> A) throws -> Swift.ManagedBuffer<A, B>'
 Func ManagedBuffer.create(minimumCapacity:makingHeaderWith:) is now with @_preInverseGenerics
