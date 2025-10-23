@@ -102,6 +102,13 @@ public class Instruction : CustomStringConvertible, Hashable {
     context.notifyInstructionsChanged()
   }
 
+  /// Transfer debug info associated with (the result of) this instruction to a
+  /// new `debug_value` instruction before this instruction is deleted.
+  public final func salvageDebugInfo(_ context: some MutatingContext) {
+    BridgedContext.salvageDebugInfo(self.bridged)
+    context.notifyInstructionsChanged()
+  }
+
   public var mayTrap: Bool { false }
 
   final public var mayHaveSideEffects: Bool {
