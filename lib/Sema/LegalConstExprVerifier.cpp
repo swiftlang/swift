@@ -157,12 +157,6 @@ checkSupportedWithSectionAttribute(const Expr *expr,
   while (!expressionsToCheck.empty()) {
     const Expr *expr = expressionsToCheck.pop_back_val();
 
-    // Look through IdentityExpr
-    if (const IdentityExpr *identityExpr = dyn_cast<IdentityExpr>(expr)) {
-      expressionsToCheck.push_back(identityExpr->getSubExpr());
-      continue;
-    }
-    
     // Tuples composed of constant expressions are allowed
     if (const TupleExpr *tupleExpr = dyn_cast<TupleExpr>(expr)) {
       for (const Expr *element : tupleExpr->getElements())
@@ -173,25 +167,24 @@ checkSupportedWithSectionAttribute(const Expr *expr,
     // Array literals of type InlineArray composed of constant expressions are
     // allowed
     if (const ArrayExpr *arrayExpr = dyn_cast<ArrayExpr>(expr)) {
-      // Check if this is specifically an InlineArray type
       auto arrayType = arrayExpr->getType();
-      if (arrayType && arrayType->getNominalOrBoundGenericNominal()) {
-        auto nominal = arrayType->getNominalOrBoundGenericNominal();
-        if (nominal->getName().str() == "InlineArray") {
-          for (const Expr *element : arrayExpr->getElements())
-            expressionsToCheck.push_back(element);
-          continue;
-        }
+      if (arrayType && arrayType->isInlineArray()) {
+        for (const Expr *element : arrayExpr->getElements())
+          expressionsToCheck.push_back(element);
+        continue;
       }
       // Non-InlineArray arrays are not allowed
       return std::make_pair(expr, TypeNotSupported);
     }
 
     // Operators are not allowed in @section expressions
-    if (isa<BinaryExpr>(expr) || isa<PrefixUnaryExpr>(expr)) {
+    if (isa<BinaryExpr>(expr)) {
       return std::make_pair(expr, UnsupportedBinaryOperator);
     }
-    
+    if (isa<PrefixUnaryExpr>(expr) || isa<PostfixUnaryExpr>(expr)) {
+      return std::make_pair(expr, UnsupportedUnaryOperator);
+    }
+
     // Optionals are not allowed
     if (isa<InjectIntoOptionalExpr>(expr)) {
       return std::make_pair(expr, TypeNotSupported);
@@ -213,28 +206,6 @@ checkSupportedWithSectionAttribute(const Expr *expr,
       }
       // Other literal types are not supported
       return std::make_pair(expr, TypeNotSupported);
-    }
-
-    // Direct references to non-generic metatypes are allowed
-    if (const TypeExpr *typeExpr = dyn_cast<TypeExpr>(expr)) {
-      auto type = typeExpr->getTypeRepr();
-      if (type) {
-        // Check if this is a direct type reference (SomeType.self)
-        if (auto dotSelfExpr = dyn_cast<DotSelfExpr>(expr)) {
-          auto baseType = dotSelfExpr->getSubExpr()->getType();
-          if (baseType && baseType->getMetatypeInstanceType()) {
-            auto instanceType = baseType->getMetatypeInstanceType();
-            // Check if it's non-generic and non-resilient
-            if (auto nominal =
-                    instanceType->getNominalOrBoundGenericNominal()) {
-              if (!nominal->isGeneric() && !nominal->isResilient()) {
-                continue;
-              }
-            }
-          }
-        }
-      }
-      return std::make_pair(expr, TypeExpression);
     }
 
     // Keypath expressions not supported in constant expressions
@@ -279,19 +250,29 @@ checkSupportedWithSectionAttribute(const Expr *expr,
       return std::make_pair(expr, OpaqueDeclRef);
     }
 
-    // DotSelfExpr for metatype references
+    // DotSelfExpr for metatype references (but only a direct TypeExpr inside)
     if (const DotSelfExpr *dotSelfExpr = dyn_cast<DotSelfExpr>(expr)) {
-      auto baseType = dotSelfExpr->getSubExpr()->getType();
-      if (baseType && baseType->is<MetatypeType>()) {
-        auto instanceType = baseType->getMetatypeInstanceType();
-        if (auto nominal = instanceType->getNominalOrBoundGenericNominal()) {
-          // Allow non-generic, non-resilient types
-          if (!nominal->isGeneric() && !nominal->isResilient()) {
-            continue;
+      if (const TypeExpr *typeExpr =
+              dyn_cast<TypeExpr>(dotSelfExpr->getSubExpr())) {
+        auto baseType = typeExpr->getType();
+        if (baseType && baseType->is<MetatypeType>()) {
+          auto instanceType = baseType->getMetatypeInstanceType();
+          if (auto nominal = instanceType->getNominalOrBoundGenericNominal()) {
+            // Allow non-generic, non-resilient types
+            if (!nominal->isGeneric() && !nominal->isResilient()) {
+              continue;
+            }
           }
         }
       }
       return std::make_pair(expr, TypeExpression);
+    }
+
+    // Look through IdentityExpr, but only after DotSelfExpr, which is also an
+    // IdentityExpr.
+    if (const IdentityExpr *identityExpr = dyn_cast<IdentityExpr>(expr)) {
+      expressionsToCheck.push_back(identityExpr->getSubExpr());
+      continue;
     }
 
     // Function calls and constructors are not allowed
@@ -301,7 +282,7 @@ checkSupportedWithSectionAttribute(const Expr *expr,
     // Anything else is not allowed
     return std::make_pair(expr, Default);
   }
-  
+
   return std::nullopt;
 }
 

@@ -63,12 +63,17 @@ func bar(x: Int) -> String { return "test" }
 struct S { }
 enum E { case a }
 
-// metatypes - TODO
-@section("mysection") let metatype1 = Int.self
-// expected-error@-1{{type expressions not supported in a '@const' expression}}
+// metatypes
+@section("mysection") let metatype1 = Int.self // ok
 
 // invalid metatype references
 @section("mysection") let invalidMetatype1 = Int.self.self
+// expected-error@-1{{type expressions not supported in a '@const' expression}}
+@section("mysection") let invalidMetatype2 = (1 == 1 ? Int.self : Int.self).self
+// expected-error@-1{{type expressions not supported in a '@const' expression}}
+@section("mysection") let invalidMetatype3 = Array<Int>.self // generic
+// expected-error@-1{{type expressions not supported in a '@const' expression}}
+@section("mysection") let invalidMetatype4 = Mirror.self // resilient
 // expected-error@-1{{type expressions not supported in a '@const' expression}}
 
 // tuples
