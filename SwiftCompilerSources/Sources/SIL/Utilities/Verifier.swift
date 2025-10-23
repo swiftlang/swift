@@ -156,15 +156,20 @@ extension LoadBorrowInst : VerifiableInstruction {
 
 extension BeginAccessInst : VerifiableInstruction {
   func verify(_ context: VerifierContext) {
-    if context.silStage == .raw {
-      return
-    }
     // Catch violations like
     // ```
     //   %1 = begin_access [read] %0
     //   store %2 to %0
     //   end_access %1
     // ```
+
+    guard context.silStage == .canonical else {
+      // Mandatory passes on raw SIL need to be completed until we can verify this.
+      // Also, LoadableByAddress in lowered SIL can insert `copy_addr`s inside read-only access scope.
+      // Therefore we can only run this verification in canonical SIL.
+      return
+    }
+
     if address.type.isMoveOnly && enforcement == .static {
       // This is a workaround for a bug in the move-only checker: rdar://151841926.
       // The move-only checker sometimes inserts destroy_addr within read-only static access scopes.
