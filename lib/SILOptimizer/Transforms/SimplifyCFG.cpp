@@ -2848,6 +2848,7 @@ bool SimplifyCFG::simplifyBlocks() {
     case TermKind::ThrowAddrInst:
     case TermKind::DynamicMethodBranchInst:
     case TermKind::ReturnInst:
+    case TermKind::ReturnBorrowInst:
     case TermKind::UnwindInst:
     case TermKind::YieldInst:
       break;

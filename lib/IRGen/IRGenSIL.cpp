@@ -1302,7 +1302,9 @@ public:
     auto e = getLoweredExplosion(i->getOperand());
     setLoweredExplosion(i, e);
   }
-
+  void visitUncheckedOwnershipInst(UncheckedOwnershipInst *i) {
+    llvm_unreachable("unimplemented");
+  }
   void visitMergeIsolationRegionInst(MergeIsolationRegionInst *i) {
     llvm_unreachable("Valid only when ownership is enabled");
   }
@@ -1504,6 +1506,9 @@ public:
   void visitBranchInst(BranchInst *i);
   void visitCondBranchInst(CondBranchInst *i);
   void visitReturnInst(ReturnInst *i);
+  void visitReturnBorrowInst(ReturnBorrowInst *i) {
+    llvm_unreachable("unimplemented");
+  }
   void visitThrowInst(ThrowInst *i);
   void visitThrowAddrInst(ThrowAddrInst *i);
   void visitUnwindInst(UnwindInst *i);
