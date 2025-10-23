@@ -34,7 +34,7 @@ public func foo() {}
     {
       key.kind: source.lang.swift.decl.function.free,
       key.name: "foo()",
-      key.usr: "s:3Mod3baryyF",
+      key.usr: "s:3Mod3fooyyF",
       key.offset: 0,
       key.length: 27,
       key.fully_annotated_decl: "<decl.function.free><syntaxtype.attribute.builtin>@abi(<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>bar</decl.name>()</decl.function.free>)</syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>()</decl.function.free>"

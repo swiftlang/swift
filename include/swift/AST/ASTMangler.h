@@ -106,6 +106,12 @@ protected:
   /// defined in.
   bool RespectOriginallyDefinedIn = true;
 
+  /// Whether to always mangle using the declaration's API, ignoring e.g
+  /// attached `@abi` attributes. This is necessary for USR mangling since for
+  /// semantic functionality we're only concerned about the API entity, and need
+  /// to be able to do name lookups to find the original decl based on the USR.
+  bool UseAPIMangling = false;
+
 public:
   class SymbolicReferent {
   public:
@@ -188,11 +194,14 @@ public:
   };
 
   /// lldb overrides \p DWARFMangling to 'true'.
-  ASTMangler(const ASTContext &Ctx, bool DWARFMangling = false) : Context(Ctx) {
+  ASTMangler(const ASTContext &Ctx, bool DWARFMangling = false,
+             bool UseAPIMangling = false)
+      : Context(Ctx) {
     if (DWARFMangling) {
       this->DWARFMangling = true;
       RespectOriginallyDefinedIn = false;
     }
+    this->UseAPIMangling = UseAPIMangling;
     Flavor = Ctx.LangOpts.hasFeature(Feature::Embedded)
                  ? ManglingFlavor::Embedded
                  : ManglingFlavor::Default;
@@ -201,7 +210,7 @@ public:
   /// Create an ASTMangler suitable for mangling a USR for use in semantic
   /// functionality.
   static ASTMangler forUSR(const ASTContext &Ctx) {
-    return ASTMangler(Ctx, /*DWARFMangling*/ true);
+    return ASTMangler(Ctx, /*DWARFMangling*/ true, /*UseAPIMangling*/ true);
   }
 
   const ASTContext &getASTContext() { return Context; }
@@ -808,7 +817,7 @@ protected:
 
   template <typename DeclType>
   DeclType *getABIDecl(DeclType *D) const {
-    if (!D)
+    if (!D || UseAPIMangling)
       return nullptr;
 
     auto abiRole = ABIRoleInfo(D);
