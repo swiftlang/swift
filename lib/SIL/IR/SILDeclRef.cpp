@@ -1443,8 +1443,11 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         return NameA->Name.str();
       }
 
-    // Use a given cdecl name for native-to-foreign thunks.
-    if (getDecl()->getAttrs().hasAttribute<CDeclAttr>())
+    // Use a given cdecl name for native-to-foreign thunks. Don't do this
+    // for functions that only have a C entrypoint.
+    if (getDecl()->getAttrs().hasAttribute<CDeclAttr>() &&
+        !(getDecl()->hasOnlyCEntryPoint() &&
+          !getDecl()->getImplementedObjCDecl())) {
       if (isNativeToForeignThunk() || isForeign) {
         // If this is an @implementation @_cdecl, mangle it like the clang
         // function it implements.
@@ -1455,6 +1458,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         }
         return getDecl()->getCDeclName().str();
       }
+    }
 
     if (SKind == ASTMangler::SymbolKind::DistributedThunk) {
       return mangler.mangleDistributedThunk(cast<FuncDecl>(getDecl()));
@@ -1542,6 +1546,19 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
   llvm_unreachable("bad entity kind!");
 }
+
+std::optional<StringRef> SILDeclRef::getAsmName() const {
+  if (isForeign && isFunc()) {
+    auto func = getFuncDecl();
+    if (auto *EA = ExternAttr::find(func->getAttrs(), ExternKind::C))
+      return EA->getCName(func);
+    if (func->hasOnlyCEntryPoint() && !func->getImplementedObjCDecl())
+      return func->getCDeclName();
+  }
+
+  return std::nullopt;
+}
+
 
 // Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
 // FIXME(https://github.com/apple/swift/issues/54833): Also consider derived declaration `@derivative` attributes.
