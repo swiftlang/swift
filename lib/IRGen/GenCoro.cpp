@@ -1002,23 +1002,21 @@ llvm::Constant *swift::irgen::getCoroDeallocFrameFn(IRGenModule &IGM) {
   return getCoroDeallocFn(AllocationKind::Frame, IGM);
 }
 
-using GetAllocatorFunctionPointer = FunctionPointer (IRGenModule::*)();
-
-static llvm::Constant *
-getAddrOfSwiftCoroAllocatorThunk(StringRef name, Allocator::Field field,
-                                 GetAllocatorFunctionPointer getCator,
-                                 IRGenModule &IGM) {
+static llvm::Constant *getAddrOfSwiftCoroAllocatorThunk(
+    StringRef name, Allocator::Field field, IRGenModule &IGM,
+    llvm::function_ref<llvm::Value *(IRGenFunction &, llvm::Value *,
+                                     llvm::Value *, llvm::Value *)>
+        builder) {
   auto *ty = field.getFunctionType(IGM);
   return IGM.getOrCreateHelperFunction(
       name, ty->getReturnType(), ty->params(),
-      [getCator, ty](IRGenFunction &IGF) {
+      [builder, ty](IRGenFunction &IGF) {
         auto parameters = IGF.collectParameters();
-        parameters.claimNext(); // frame
-        parameters.claimNext(); // allocator
-        // allocator - size; deallocator - address
+        auto *frame = parameters.claimNext();
+        auto *allocator = parameters.claimNext();
+        // allocate - size; deallocate - address
         auto *value = parameters.claimNext();
-        auto alloc = (IGF.IGM.*getCator)();
-        auto *result = IGF.Builder.CreateCall(alloc, {value});
+        auto *result = builder(IGF, frame, allocator, value);
         if (!ty->getReturnType()->isVoidTy()) {
           IGF.Builder.CreateRet(result);
         } else {
@@ -1032,6 +1030,22 @@ getAddrOfSwiftCoroAllocatorThunk(StringRef name, Allocator::Field field,
       /*transformAttributes=*/
       [&IGM](llvm::AttributeList &attrs) {
         IGM.addSwiftCoroAttributes(attrs, 1);
+      });
+}
+
+using GetAllocatorFunctionPointer = FunctionPointer (IRGenModule::*)();
+
+static llvm::Constant *
+getAddrOfSwiftCoroAllocatorThunk(StringRef name, Allocator::Field field,
+                                 GetAllocatorFunctionPointer getCator,
+                                 IRGenModule &IGM) {
+  return getAddrOfSwiftCoroAllocatorThunk(
+      name, field, IGM,
+      [getCator](IRGenFunction &IGF, auto *frame, auto *allocator,
+                 auto *value) {
+        auto alloc = (IGF.IGM.*getCator)();
+        auto *call = IGF.Builder.CreateCall(alloc, {value});
+        return call;
       });
 }
 
