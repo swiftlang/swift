@@ -1977,7 +1977,7 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::Expose:
     return "_expose";
   case DeclAttrKind::Section:
-    return "_section";
+    return "section";
   case DeclAttrKind::Documentation:
     return "_documentation";
   case DeclAttrKind::Nonisolated:

@@ -45,7 +45,7 @@ struct SomeStruct {}
 @section("") var g1: Int = 1 // expected-error {{'@section' section name cannot be empty}}
 
 func function() {
-  @section("__TEXT,__mysection") var l0: Int = 1 // expected-error {{attribute '_section' can only be used in a non-local scope}}
+  @section("__TEXT,__mysection") var l0: Int = 1 // expected-error {{attribute 'section' can only be used in a non-local scope}}
   l0 += 1
   _ = l0
 

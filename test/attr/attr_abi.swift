@@ -1592,10 +1592,10 @@ func extern2() {}
 @_extern(c) @_extern(wasm, module: "foo", name: "bar") func extern3()
 
 // @used -- banned in @abi
-@abi(@used func used1()) // expected-error {{unused '_used' attribute in '@abi'}} {{6-12=}}
+@abi(@used func used1()) // expected-error {{unused 'used' attribute in '@abi'}} {{6-11=}}
 @used func used1() {}
 
-@abi(@used func used2()) // expected-error {{unused '_used' attribute in '@abi'}} {{6-12=}}
+@abi(@used func used2()) // expected-error {{unused 'used' attribute in '@abi'}} {{6-11=}}
 func used2() {}
 
 @abi(func used3())
@@ -1863,10 +1863,10 @@ func expose2() {}
 @_expose(Cxx) func expose3() {}
 
 // @section -- banned in @abi
-@abi(@section("fnord") func section1()) // expected-error {{unused '_section' attribute in '@abi'}} {{6-24=}}
+@abi(@section("fnord") func section1()) // expected-error {{unused 'section' attribute in '@abi'}} {{6-23=}}
 @section("fnord") func section1() {}
 
-@abi(@section("fnord") func section2()) // expected-error {{unused '_section' attribute in '@abi'}} {{6-24=}}
+@abi(@section("fnord") func section2()) // expected-error {{unused 'section' attribute in '@abi'}} {{6-23=}}
 func section2() {}
 
 @abi(func section3())
