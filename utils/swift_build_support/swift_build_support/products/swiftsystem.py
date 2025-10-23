@@ -116,7 +116,7 @@ class SwiftSystemCMakeShim(cmake_product.CMakeProduct):
         # `install_with_cmake` later which already has the same prefix.
         self.cmake_options.define('CMAKE_INSTALL_PREFIX', '')
 
-        self.cmake_options.define('CMAKE_BUILD_TYPE', self.args.build_variant)
+        self.cmake_options.define('CMAKE_BUILD_TYPE', self.args.swift_system_build_variant)
 
         self.cmake_options.define('CMAKE_Swift_COMPILATION_MODE', 'wholemodule')
 

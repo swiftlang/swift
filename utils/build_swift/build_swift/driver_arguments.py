@@ -94,9 +94,6 @@ def _apply_default_arguments(args):
     if args.swift_system_build_variant is None:
         args.swift_system_build_variant = args.build_variant
 
-    if args.swift_system_tests_build_variant is None:
-        args.swift_system_tests_build_variant = args.build_variant
-
     if args.foundation_build_variant is None:
         args.foundation_build_variant = args.build_variant
 
@@ -1030,12 +1027,6 @@ def create_argument_parser():
     option('--debug-swift-system', store('swift_system_build_variant'),
            const='Debug',
            help='build the Debug variant of System')
-
-    option('--swift-system-tests-build-type', store('swift_system_tests_build_variant'),
-           choices=['Debug', 'Release'],
-           default=None,
-           help='build the System tests in a certain variant '
-                '(Debug builds much faster)')
 
     option('--debug-libdispatch', store('libdispatch_build_variant'),
            const='Debug',

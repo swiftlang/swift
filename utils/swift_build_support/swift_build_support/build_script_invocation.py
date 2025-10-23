@@ -102,8 +102,6 @@ class BuildScriptInvocation(object):
             "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
             "--lldb-build-type", args.lldb_build_variant,
             "--foundation-build-type", args.foundation_build_variant,
-# TODO: Do I have the option here?
-#            "--swift-system-build-type", args.swift_system_build_variant,
             "--libdispatch-build-type", args.libdispatch_build_variant,
             "--xctest-build-type", args.build_variant,
             "--llbuild-build-type", args.build_variant,

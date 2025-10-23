@@ -548,7 +548,6 @@ class TestDriverArgumentParser(
         self.assertEqual(namespace.foundation_build_variant, 'Debug')
         self.assertEqual(namespace.foundation_tests_build_variant, 'Debug')
         self.assertEqual(namespace.swift_system_build_variant, 'Debug')
-        self.assertEqual(namespace.swift_system_tests_build_variant, 'Debug')
         self.assertEqual(namespace.libdispatch_build_variant, 'Debug')
         self.assertEqual(namespace.lldb_build_variant, 'Debug')
         self.assertEqual(namespace.llvm_build_variant, 'Debug')
