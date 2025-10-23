@@ -1089,6 +1089,13 @@ swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
 
 ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
     ProtocolConformanceRef ref, TypeExpansionContext context) {
+  if (ref.isInvalid())
+    return ref;
+
+  if (!context.shouldLookThroughOpaqueTypeArchetypes() ||
+      !ref.getType()->hasOpaqueArchetype())
+    return ref;
+
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
