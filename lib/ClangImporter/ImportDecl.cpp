@@ -503,7 +503,8 @@ void ClangImporter::Implementation::addSynthesizedTypealias(
 
 void ClangImporter::Implementation::addSynthesizedProtocolAttrs(
     NominalTypeDecl *nominal,
-    ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs, bool isUnchecked) {
+    ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs, bool isUnchecked,
+    bool isSuppressed) {
   auto &ctx = nominal->getASTContext();
 
   for (auto kind : synthesizedProtocolAttrs) {
@@ -512,7 +513,7 @@ void ClangImporter::Implementation::addSynthesizedProtocolAttrs(
     // ctx.getProtocol(kind) != nulltpr which would be nice.
     if (auto proto = ctx.getProtocol(kind))
       nominal->addAttribute(
-          new (ctx) SynthesizedProtocolAttr(proto, this, isUnchecked));
+        new (ctx) SynthesizedProtocolAttr(proto, this, isUnchecked, isSuppressed));
   }
 }
 
@@ -9470,8 +9471,8 @@ void ClangImporter::Implementation::addExplicitProtocolConformance(
                decl->getDeclaredInterfaceType(), conformsToValue);
     }
 
-    decl->addAttribute(new (SwiftContext)
-                           SynthesizedProtocolAttr(protocol, this, false));
+    decl->addAttribute(new (SwiftContext) SynthesizedProtocolAttr(
+        protocol, this, /*isUnchecked=*/false, /*isSuppressed=*/false));
   } else {
     HeaderLoc attrLoc((conformsToAttr)->getLocation());
     diagnose(attrLoc, diag::conforms_to_not_protocol, result,
