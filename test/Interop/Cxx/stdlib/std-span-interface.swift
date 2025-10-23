@@ -40,10 +40,6 @@ import CxxStdlib
 
 // CHECK: class DependsOnSelfFRT {
 // CHECK-NEXT:   init()
-// CHECK-NEXT:   /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT:   @_lifetime(borrow self)
-// CHECK-NEXT:   @_alwaysEmitIntoClient @_disfavoredOverload public borrowing func get() -> Span<CInt>
 // CHECK-NEXT:   borrowing func get() -> ConstSpanOfInt
 // CHECK-NEXT:   borrowing func {{(__)?}}getMutable{{(Unsafe)?}}() -> SpanOfInt
 // CHECK-NEXT:   var v: std.{{.*}}vector<CInt, std.{{.*}}allocator<CInt>>

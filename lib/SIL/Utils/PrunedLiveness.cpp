@@ -249,7 +249,7 @@ void PrunedLiveRange<LivenessWithDefs>::updateForUse(
   // argument must be copied.
   auto iterAndSuccess = users.insert({user, lifetimeEnding});
   if (!iterAndSuccess.second) {
-    if (isa<BranchInst>(user)) {
+    if (isa<BranchInst>(user) || isa<ReturnBorrowInst>(user)) {
       branchMeetInPlace(iterAndSuccess.first->second, lifetimeEnding);
     } else {
       iterAndSuccess.first->second.meetInPlace(lifetimeEnding);

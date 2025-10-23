@@ -103,8 +103,8 @@ protected:
       std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-      bool isCanImportLookup, bool isTestableDependencyLookup,
-      bool &isFramework, bool &isSystemModule);
+      std::string *CacheKey, bool isCanImportLookup,
+      bool isTestableDependencyLookup, bool &isFramework, bool &isSystemModule);
 
   /// Attempts to search the provided directory for a loadable serialized
   /// .swiftmodule with the provided `ModuleFilename`. Subclasses must
@@ -268,6 +268,8 @@ public:
   /// A textual reason why the compiler rejected a binary module load
   /// attempt with a given status, to be used for diagnostic output.
   static std::optional<std::string> invalidModuleReason(serialization::Status status);
+
+  virtual void addExplicitModulePath(StringRef name, std::string path) {};
 };
 
 /// Imports serialized Swift modules into an ASTContext.

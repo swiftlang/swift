@@ -1497,7 +1497,6 @@ bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
       ctx.Allocate<SwiftDependencyScanningService>();
   ModuleDependenciesCache cache(CI.getMainModule()->getNameStr().str(),
                                 CI.getInvocation().getModuleScanningHash());
-
   if (service->setupCachingDependencyScanningService(CI))
     return true;
 

@@ -103,12 +103,12 @@ bb0(%0 : @guaranteed ${ var Int }, %1 : $Int):
 }
 
 // CHECK-LABEL: @writeIdentifiedBox
-// CHECK: [read] Box   %1 = alloc_box ${ var Int }
+// CHECK: [modify] Box   %1 = alloc_box ${ var Int }
 sil [ossa] @writeIdentifiedBox : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %2 = project_box %1 : ${ var Int }, 0
-  %3 = begin_access [read] [dynamic] %2 : $*Int
+  %3 = begin_access [modify] [dynamic] %2 : $*Int
   store %0 to [trivial] %3 : $*Int
   end_access %3 : $*Int
   destroy_value %1 : ${ var Int }
@@ -409,7 +409,7 @@ sil [ossa] @writeIdentifiedNestedClass : $@convention(thin) (@guaranteed C, Int)
 bb0(%0 : @guaranteed $C, %1 : $Int):
   %borrow = begin_borrow %0 : $C
   %2 = ref_element_addr %borrow : $C, #C.property
-  %3 = begin_access [read] [dynamic] %2 : $*Int
+  %3 = begin_access [modify] [dynamic] %2 : $*Int
   %4 = begin_access [modify] [dynamic] %3 : $*Int
   store %1 to [trivial] %4 : $*Int
   end_access %4 : $*Int

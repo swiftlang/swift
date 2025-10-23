@@ -825,7 +825,7 @@ bb0(%0 : @owned $T, %1 : @owned $Inner):
   %4 = alloc_stack $Inner
   store %1 to [init] %4
   %6 = mark_dependence %4 on %2
-  %7 = begin_access [read] [dynamic] %6
+  %7 = begin_access [modify] [dynamic] %6
   %8 = load [take] %7
   end_access %7
   dealloc_stack %4
@@ -841,7 +841,7 @@ bb0(%0 : @owned $T, %1 : @owned $Inner):
   %4 = alloc_stack $Inner
   store %1 to [init] %4
   mark_dependence_addr %4 on %2
-  %7 = begin_access [read] [dynamic] %4
+  %7 = begin_access [modify] [dynamic] %4
   %8 = load [take] %7
   end_access %7
   dealloc_stack %4

@@ -2367,6 +2367,10 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
+  void visitUncheckedOwnershipInst(UncheckedOwnershipInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitUnownedCopyValueInst(UnownedCopyValueInst *I) {
     *this << getIDAndType(I->getOperand());
   }
@@ -2905,6 +2909,21 @@ public:
 
   void visitReturnInst(ReturnInst *RI) {
     *this << getIDAndType(RI->getOperand());
+  }
+
+  void visitReturnBorrowInst(ReturnBorrowInst *rbi) {
+    *this << getIDAndType(rbi->getReturnValue());
+
+    *this << " from_scopes (";
+    bool first = true;
+    for (SILValue ev : rbi->getEnclosingValues()) {
+      if (!first) {
+        *this << ", ";
+      }
+      first = false;
+      *this << getIDAndType(ev);
+    }
+    *this << ")";
   }
 
   void visitSpecifyTestInst(SpecifyTestInst *TSI) {

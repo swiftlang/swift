@@ -66,6 +66,30 @@ public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo...,
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")
 #endif
 
+/// Allows annotating pointer parameters in a protocol method using the `@_SwiftifyImportProtocol` macro.
+///
+/// This is not marked @available, because _SwiftifyImportProtocolMethod is available for any target.
+/// Instances of _SwiftifyProtocolMethodInfo should ONLY be passed as arguments directly to
+/// _SwiftifyImportProtocolMethod, so they should not affect linkage since there are never any instances
+/// at runtime.
+public enum _SwiftifyProtocolMethodInfo {
+  case method(signature: String, paramInfo: [_SwiftifyInfo])
+}
+
+/// Like _SwiftifyImport, but since protocols cannot contain function implementations they need to
+/// be placed in a separate extension instead. Unlike _SwiftifyImport, which applies to a single
+/// function, this macro supports feeding info about multiple methods and generating safe overloads
+/// for all of them at once.
+#if hasFeature(Macros)
+  @attached(extension, names: arbitrary)
+  public macro _SwiftifyImportProtocol(
+    _ methodInfo: _SwiftifyProtocolMethodInfo...,
+    spanAvailability: String? = nil,
+    typeMappings: [String: String] = [:]
+  ) =
+    #externalMacro(module: "SwiftMacros", type: "SwiftifyImportProtocolMacro")
+#endif
+
 /// Unsafely discard any lifetime dependency on the `dependent` argument. Return
 /// a value identical to `dependent` with a lifetime dependency on the caller's
 /// borrow scope of the `source` argument.

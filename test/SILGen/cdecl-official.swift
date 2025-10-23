@@ -6,21 +6,21 @@
 
 // REQUIRES: swift_feature_CDecl
 
-// CHECK-LABEL: sil hidden [ossa] @pear : $@convention(c) (@convention(c) (Int) -> Int) -> () {
+// CHECK-LABEL: sil hidden [asmname "pear"] [ossa] @$s5cdecl5appleyyS2iXCFTo : $@convention(c) (@convention(c) (Int) -> Int) -> () {
 @c(pear)
 func apple(_ f: @convention(c) (Int) -> Int) { }
 
 func acceptSwiftFunc(_ f: (Int) -> Int) { }
 
 // CHECK-LABEL: sil hidden [ossa] @$s5cdecl16forceCEntryPoint{{[_0-9a-zA-Z]*}}F
-// CHECK: [[GRAPEFRUIT:%[0-9]+]] = function_ref @grapefruit : $@convention(c) (Int) -> Int
-// CHECK: [[PEAR:%[0-9]+]] = function_ref @pear : $@convention(c) (@convention(c) (Int) -> Int) -> ()
+// CHECK: [[GRAPEFRUIT:%[0-9]+]] = function_ref @$s5cdecl6orangeyS2iFTo : $@convention(c) (Int) -> Int
+// CHECK: [[PEAR:%[0-9]+]] = function_ref @$s5cdecl5appleyyS2iXCFTo : $@convention(c) (@convention(c) (Int) -> Int) -> ()
 // CHECK: apply [[PEAR]]([[GRAPEFRUIT]])
 func forceCEntryPoint() {
   apple(orange)
 }
 
-// CHECK-LABEL: sil hidden [ossa] @grapefruit : $@convention(c) (Int) -> Int {
+// CHECK-LABEL: sil hidden [asmname "grapefruit"] [ossa] @$s5cdecl6orangeyS2iFTo : $@convention(c) (Int) -> Int {
 @c(grapefruit)
 func orange(_ x: Int) -> Int {
   return x
@@ -36,7 +36,7 @@ func requiresThunk() {
   acceptSwiftFunc(orange)
 }
 
-// CHECK-LABEL: sil [serialized] [ossa] @cauliflower : $@convention(c) (Int) -> Int {
+// CHECK-LABEL: sil [serialized] [asmname "cauliflower"] [ossa] @$s5cdecl8broccoliyS2iFTo : $@convention(c) (Int) -> Int {
 // CHECK-NOT: apply
 // CHECK: return
 @c(cauliflower)
@@ -44,7 +44,7 @@ public func broccoli(_ x: Int) -> Int {
   return x
 }
 
-// CHECK-LABEL: sil private [ossa] @collard_greens : $@convention(c) (Int) -> Int {
+// CHECK-LABEL: sil private [asmname "collard_greens"] [ossa] @$s5cdecl4kale33_{{.*}}FTo : $@convention(c) (Int) -> Int {
 // CHECK-NOT: apply
 // CHECK: return
 @c(collard_greens)
@@ -52,7 +52,7 @@ private func kale(_ x: Int) -> Int {
   return x
 }
 
-// CHECK-LABEL: sil private [ossa] @defaultName : $@convention(c) (Int) -> Int {
+// CHECK-LABEL: sil private [asmname "defaultName"] [ossa] @$s5cdecl11defaultName33{{.*}}iFTo : $@convention(c) (Int) -> Int {
 // CHECK-NOT: apply
 // CHECK: return
 @c

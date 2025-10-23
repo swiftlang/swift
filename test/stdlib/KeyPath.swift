@@ -1271,5 +1271,26 @@ if #available(SwiftStdlib 6.3, *) {
   }
 }
 
-runAllTests()
+struct Thingy {
+  var thingy: Thingy { self }
 
+  var a = 42
+}
+
+extension Int {
+  var subscripty: Thingy {
+    Thingy(a: 67)
+  }
+}
+
+keyPath.test("appending keypath with multiple components") {
+  var kp: KeyPath = \Thingy.self
+  kp = kp.appending(path: \.thingy)
+  kp = kp.appending(path: \.a.subscripty)
+
+  let t = Thingy()
+  let value = t[keyPath: kp]
+  expectEqual(value.a, 67)
+}
+
+runAllTests()
