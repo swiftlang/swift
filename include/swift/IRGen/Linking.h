@@ -1886,7 +1886,7 @@ class ApplyIRLinkage {
   IRLinkage IRL;
 public:
   ApplyIRLinkage(IRLinkage IRL) : IRL(IRL) {}
-  void to(llvm::GlobalValue *GV, bool definition = true) const {
+  void to(llvm::GlobalValue *GV, bool nonAliasedDefinition = true) const {
     llvm::Module *M = GV->getParent();
     const llvm::Triple Triple(M->getTargetTriple());
 
@@ -1899,9 +1899,16 @@ public:
     if (Triple.isOSBinFormatELF())
       return;
 
-    // COMDATs cannot be applied to declarations.  If we have a definition,
-    // apply the COMDAT.
-    if (definition)
+    // COMDATs cannot be applied to declarations. Also, definitions that are
+    // exported through aliases should not have COMDATs, because the alias
+    // itself might represent an externally visible symbol but such symbols
+    // are discarded from the symtab when other object files have a COMDAT
+    // group with the same signature.
+    //
+    // If we have a non-aliased definition with ODR-based linkage, attach it
+    // to a COMDAT group so that duplicate definitions across object files
+    // can be merged by the linker.
+    if (nonAliasedDefinition)
       if (IRL.Linkage == llvm::GlobalValue::LinkOnceODRLinkage ||
           IRL.Linkage == llvm::GlobalValue::WeakODRLinkage)
         if (Triple.supportsCOMDAT())

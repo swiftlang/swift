@@ -2201,7 +2201,7 @@ void IRGenModule::emitVTableStubs() {
                                     &Module);
       ApplyIRLinkage(canLinkOnce ? IRLinkage::InternalLinkOnceODR
                                  : IRLinkage::Internal)
-          .to(stub);
+          .to(stub, /* nonAliasedDefinition */ false);
       stub->setAttributes(constructInitialAttributes());
       stub->setCallingConv(DefaultCC);
       auto *entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", stub);
