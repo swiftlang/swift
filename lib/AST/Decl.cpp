@@ -3264,6 +3264,10 @@ static AccessStrategy getOpaqueReadAccessStrategy(
     return AccessStrategy::getAccessor(AccessorKind::Read2, dispatch);
   if (storage->requiresOpaqueReadCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
+
+  if (storage->getParsedAccessor(AccessorKind::Borrow)) {
+    return AccessStrategy::getAccessor(AccessorKind::Borrow, dispatch);
+  }
   return AccessStrategy::getAccessor(AccessorKind::Get, dispatch);
 }
 
@@ -3435,11 +3439,6 @@ bool AbstractStorageDecl::requiresOpaqueSetter() const {
   if (!supportsMutation()) {
     return false;
   }
-
-  // If a mutate accessor is present, we don't need a setter.
-  if (getAccessor(AccessorKind::Mutate)) {
-    return false;
-  }
   return true;
 }
 
@@ -3450,7 +3449,7 @@ bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
         AccessorKind::Read2);
 
   // If a borrow accessor is present, we don't need a read coroutine.
-  if (getAccessor(AccessorKind::Borrow)) {
+  if (getParsedAccessor(AccessorKind::Borrow)) {
     return false;
   }
   return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
@@ -3462,7 +3461,7 @@ bool AbstractStorageDecl::requiresOpaqueRead2Coroutine() const {
     return false;
 
   // If a borrow accessor is present, we don't need a read coroutine.
-  if (getAccessor(AccessorKind::Borrow)) {
+  if (getParsedAccessor(AccessorKind::Borrow)) {
     return false;
   }
   return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
@@ -7595,7 +7594,7 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
   case AccessorKind::Init:
     return article ? "an init accessor" : "init accessor";
   case AccessorKind::Borrow:
-    return article ? " a 'borrow' accessor" : "borrow accessor";
+    return article ? "a 'borrow' accessor" : "borrow accessor";
   case AccessorKind::Mutate:
     return article ? "a 'mutate' accessor" : "mutate accessor";
   }

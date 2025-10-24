@@ -15,7 +15,7 @@ struct Wrapper {
     }
   }
   var k2: Klass {
-    borrow { // expected-error{{variable cannot provide both  a 'borrow' accessor and a getter}}
+    borrow { // expected-error{{variable cannot provide both a 'borrow' accessor and a getter}}
       return _k
     }
     get { // expected-note{{getter defined here}}
@@ -23,7 +23,7 @@ struct Wrapper {
     }
   }
   var k3: Klass {
-    borrow { // expected-error{{variable cannot provide both  a 'borrow' accessor and a '_read' accessor}}
+    borrow { // expected-error{{variable cannot provide both a 'borrow' accessor and a '_read' accessor}}
       return _k
     }
     _read { // expected-note{{'_read' accessor defined here}}
@@ -31,7 +31,7 @@ struct Wrapper {
     }
   }
   var k4: Klass {
-    borrow { // expected-error{{variable cannot provide both  a 'borrow' accessor and a 'read' accessor}}
+    borrow { // expected-error{{variable cannot provide both a 'borrow' accessor and a 'read' accessor}}
       return _k
     }
     read { // expected-note{{'read' accessor defined here}}
