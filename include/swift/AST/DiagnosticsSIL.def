@@ -435,17 +435,18 @@ NOTE(performance_called_from,none,
       "called from here", ())
 
 // ManualOwnership diagnostics
-GROUPED_WARNING(manualownership_copy,SemanticCopies,none,
+GROUPED_WARNING(manualownership_copy,SemanticCopies,DefaultIgnore,
       "implicit 'copy' happens here; please report this vague diagnostic as a bug", ())
-GROUPED_WARNING(manualownership_copy_happened,SemanticCopies,none,
+GROUPED_WARNING(manualownership_copy_happened,SemanticCopies,DefaultIgnore,
       "accessing %0 may produce a copy; write 'copy' to acknowledge or 'consume' to elide", (Identifier))
-GROUPED_WARNING(manualownership_copy_demanded,SemanticCopies,none,
+GROUPED_WARNING(manualownership_copy_demanded,SemanticCopies,DefaultIgnore,
       "independent copy of %0 is required here; write 'copy' to acknowledge or 'consume' to elide", (Identifier))
-GROUPED_WARNING(manualownership_copy_captured,SemanticCopies,none,
+GROUPED_WARNING(manualownership_copy_captured,SemanticCopies,DefaultIgnore,
       "closure capture of '%0' requires independent copy of it; write [%0 = copy %0] in the closure's capture list to acknowledge", (StringRef))
-GROUPED_WARNING(manualownership_exclusivity,DynamicExclusivity,none,
-      "exclusive access here will be checked at runtime", ())
-GROUPED_WARNING(manualownership_exclusivity_named,DynamicExclusivity,none,
+
+GROUPED_WARNING(manualownership_exclusivity,DynamicExclusivity,DefaultIgnore,
+      "exclusive access here will be checked at runtime; please report this vague diagnostic as a bug", ())
+GROUPED_WARNING(manualownership_exclusivity_named,DynamicExclusivity,DefaultIgnore,
       "accessing %0 here may incur runtime exclusivity check%1", (Identifier, StringRef))
 
 // 'transparent' diagnostics
