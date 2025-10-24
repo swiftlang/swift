@@ -1098,6 +1098,14 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   opts.CoroDeallocationFunction = PointerAuthSchema(
       codeKey, /*address*/ false, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::CoroDeallocationFunction);
+
+  opts.CoroAllocationFunction = PointerAuthSchema(
+      codeKey, /*address*/ false, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::CoroFrameAllocationFunction);
+
+  opts.CoroDeallocationFunction = PointerAuthSchema(
+      codeKey, /*address*/ false, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::CoroFrameDeallocationFunction);
 }
 
 std::unique_ptr<llvm::TargetMachine>
