@@ -349,8 +349,9 @@ private:
   llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedClassMetadata;
 
   llvm::SmallVector<CanType, 4> LazySpecializedClassMetadata;
+  llvm::SmallVector<CanType, 4> LazySpecializedValueMetadata;
 
-  llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedSpecializedClassMetadata;
+  llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedSpecializedMetadata;
 
   llvm::SmallVector<ClassDecl *, 4> ClassesForEagerInitialization;
 
@@ -509,6 +510,7 @@ public:
 
   void noteUseOfClassMetadata(CanType classType);
   void noteUseOfSpecializedClassMetadata(CanType classType);
+  void noteUseOfSpecializedValueMetadata(CanType valueType);
 
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
     noteUseOfTypeGlobals(type, true, RequireMetadata);
@@ -828,6 +830,7 @@ public:
   llvm::StructType *TupleTypeMetadataTy;     /// %swift.tuple_type
   llvm::StructType *FullHeapMetadataStructTy; /// %swift.full_heapmetadata = type { ... }
   llvm::StructType *FullBoxMetadataStructTy; /// %swift.full_boxmetadata = type { ... }
+  llvm::StructType *EmbeddedExistentialsMetadataStructTy;
   llvm::StructType *FullTypeMetadataStructTy; /// %swift.full_type = type { ... }
   llvm::StructType *FullExistentialTypeMetadataStructTy; /// %swift.full_existential_type = type { ... }
   llvm::StructType *FullForeignTypeMetadataStructTy; /// %swift.full_foreign_type = type { ... }

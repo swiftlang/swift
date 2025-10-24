@@ -392,6 +392,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     TypeMetadataStructTy
   });
 
+  EmbeddedExistentialsMetadataStructTy = createStructType(*this, "swift.embedded_existential_type", {
+    WitnessTablePtrTy,
+    TypeMetadataStructTy
+  });
+
   // A full heap metadata is basically just an additional small prefix
   // on a full metadata, used for metadata corresponding to heap
   // allocations.

@@ -89,11 +89,17 @@ enum class TypeMetadataAddress {
 inline bool isEmbedded(CanType t) {
   return t->getASTContext().LangOpts.hasFeature(Feature::Embedded);
 }
-
+inline bool isEmbeddedWithoutEmbeddedExitentials(CanType t) {
+  return t->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+    !t->getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials);
+}
 // Metadata is not generated and not allowed to be referenced in Embedded Swift,
 // expect for classes (both generic and non-generic), dynamic self, and
 // class-bound existentials.
 inline bool isMetadataAllowedInEmbedded(CanType t) {
+  bool embeddedExistentials =
+    t->getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials);
+
   if (isa<ClassType>(t) || isa<BoundGenericClassType>(t) ||
       isa<DynamicSelfType>(t)) {
     return true;
@@ -106,6 +112,9 @@ inline bool isMetadataAllowedInEmbedded(CanType t) {
     if (archeTy->requiresClass())
       return true;
   }
+
+  if (embeddedExistentials)
+    return true;
   return false;
 }
 
@@ -1098,7 +1107,7 @@ public:
   }
 
   static LinkEntity forValueWitnessTable(CanType type) {
-    assert(!isEmbedded(type));
+    assert(!isEmbeddedWithoutEmbeddedExitentials(type));
     LinkEntity entity;
     entity.setForType(Kind::ValueWitnessTable, type);
     return entity;
