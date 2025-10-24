@@ -6,6 +6,8 @@ from threading import Lock, Thread, Event
 from concurrent.futures import ThreadPoolExecutor
 import shutil
 
+from swift.utils.update_checkout.update_checkout.git_command import GitException
+
 from .runner_arguments import RunnerArguments, AdditionalSwiftSourcesArguments
 
 
@@ -129,13 +131,8 @@ class ParallelRunner:
         sys.stdout.flush()
 
     @staticmethod
-    def check_results(results, op) -> int:
-        """Function used to check the results of ParallelRunner.
-
-        NOTE: This function was originally located in the shell module of
-        swift_build_support and should eventually be replaced with a better
-        parallel implementation.
-        """
+    def check_results(results, operation: str) -> int:
+        """Check the results of ParallelRunner and print the failures."""
 
         fail_count = 0
         if results is None:
@@ -144,15 +141,13 @@ class ParallelRunner:
             if r is None:
                 continue
             if fail_count == 0:
-                print("======%s FAILURES======" % op)
+                print(f"======{operation} FAILURES======")
             fail_count += 1
             if isinstance(r, str):
                 print(r)
                 continue
-            if not hasattr(r, "repo_path"):
-                # TODO: create a proper Exception class with these attributes
+            if isinstance(r, GitException):
+                print(str(r))
                 continue
-            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
-            if r.stderr:
-                print(r.stderr.decode())
+            print(r)
         return fail_count
