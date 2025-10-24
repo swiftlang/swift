@@ -24,8 +24,16 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
+#include "clang/AST/DeclCXX.h"
+#include "clang/AST/DeclarationName.h"
+#include "clang/AST/Expr.h"
+#include "clang/AST/ExprCXX.h"
 #include "clang/AST/Mangle.h"
+#include "clang/AST/Stmt.h"
+#include "clang/AST/Type.h"
+#include "clang/Basic/SourceLocation.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 
 using namespace swift;
@@ -747,6 +755,53 @@ ConstructorDecl *SwiftDeclSynthesizer::createRawValueBridgingConstructor(
   }
 
   return init;
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeAsReferenceBody(AbstractFunctionDecl *afd, void *context) {
+  auto getterDecl = cast<AccessorDecl>(afd);
+  auto getterImpl = static_cast<FuncDecl *>(context);
+
+  ASTContext &ctx = getterDecl->getASTContext();
+
+  auto selfArg = createSelfArg(getterDecl);
+  auto *getterImplCallExpr =
+      createAccessorImplCallExpr(getterImpl, selfArg, {});
+
+  auto *returnStmt = ReturnStmt::createImplicit(ctx, getterImplCallExpr);
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), {returnStmt}, SourceLoc(),
+                                /*implicit*/ true);
+  return {body, /*isTypeChecked*/ true};
+}
+
+VarDecl *SwiftDeclSynthesizer::createSmartPtrBridgingProperty(
+    FuncDecl *bridgingFunction) {
+  auto smartPtrType = bridgingFunction->getDeclContext();
+  auto referenceType = bridgingFunction->getResultInterfaceType();
+  auto result = new (ImporterImpl.SwiftContext) VarDecl(
+      /*isStatic*/ false, VarDecl::Introducer::Var,
+      bridgingFunction->getStartLoc(),
+      ImporterImpl.SwiftContext.getIdentifier("asReference"), smartPtrType);
+  result->setInterfaceType(referenceType);
+  result->copyFormalAccessFrom(bridgingFunction);
+
+  AccessorDecl *getterDecl = AccessorDecl::create(
+      ImporterImpl.SwiftContext, bridgingFunction->getLoc(),
+      bridgingFunction->getLoc(), AccessorKind::Get, result,
+      /*async*/ false, SourceLoc(),
+      /*throws*/ false, SourceLoc(), /*ThrownType=*/TypeLoc(),
+      ParameterList::createEmpty(ImporterImpl.SwiftContext), referenceType,
+      smartPtrType);
+  getterDecl->copyFormalAccessFrom(bridgingFunction);
+  getterDecl->setImplicit();
+  getterDecl->setIsDynamic(false);
+  getterDecl->setIsTransparent(true);
+  getterDecl->setBodySynthesizer(synthesizeAsReferenceBody, bridgingFunction);
+  getterDecl->setSelfAccessKind(SelfAccessKind::NonMutating);
+  result->setIsGetterMutating(false);
+  ImporterImpl.makeComputed(result, getterDecl, nullptr);
+  return result;
 }
 
 void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
