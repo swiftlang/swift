@@ -7319,13 +7319,9 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
     auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
     assert(isolatedArg &&
            "Caller Isolation Inheriting without isolated parameter");
-    ManagedValue isolatedMV;
-    if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
-      isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
-    } else {
-      isolatedMV = ManagedValue::forUnmanagedOwnedValue(isolatedArg);
-    }
-    return RValue(SGF, E, isolatedMV);
+    auto isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
+    return RValue(
+        SGF, E, SGF.B.createImplicitActorToOpaqueIsolationCast(E, isolatedMV));
   }
 
   if (isolation == ActorIsolation::ActorInstance) {

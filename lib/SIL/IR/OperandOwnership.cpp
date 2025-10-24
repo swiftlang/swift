@@ -331,6 +331,7 @@ OPERAND_OWNERSHIP(GuaranteedForwarding, LinearFunctionExtract)
 OPERAND_OWNERSHIP(GuaranteedForwarding, OpenExistentialValue)
 OPERAND_OWNERSHIP(GuaranteedForwarding, OpenExistentialBoxValue)
 OPERAND_OWNERSHIP(GuaranteedForwarding, FunctionExtractIsolation)
+OPERAND_OWNERSHIP(GuaranteedForwarding, ImplicitActorToOpaqueIsolationCast)
 
 OPERAND_OWNERSHIP(EndBorrow, EndBorrow)
 

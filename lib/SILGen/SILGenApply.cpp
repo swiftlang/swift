@@ -5860,8 +5860,12 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
     args.push_back({});
     // NOTE: Even though this calls emitActorInstanceIsolation, this also
     // handles glboal actor isolated cases.
-    args.back().push_back(SGF.emitActorInstanceIsolation(
-        callSite->Loc, executor, executor.getType().getASTType()));
+    auto erasedActor =
+        SGF.emitActorInstanceIsolation(callSite->Loc, executor,
+                                       executor.getType().getASTType())
+            .borrow(SGF, callSite->Loc);
+    args.back().push_back(
+        SGF.B.convertToImplicitActor(callSite->Loc, erasedActor));
   }
 
   uncurriedLoc = callSite->Loc;

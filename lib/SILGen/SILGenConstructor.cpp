@@ -954,7 +954,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   if (F.isNonisolatedNonsending()) {
     auto paramTy = F.mapTypeIntoContext(
-        SILType::getOpaqueIsolationType(F.getASTContext()));
+        SILType::getBuiltinImplicitActorType(F.getASTContext()));
     auto inContextParamTy = F.getLoweredType(paramTy.getASTType())
                                 .getCategoryType(paramTy.getCategory());
     SILArgument *arg = F.begin()->createFunctionArgument(inContextParamTy);

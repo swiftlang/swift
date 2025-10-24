@@ -2167,6 +2167,11 @@ public:
           << "@" << UOCI->getConversionOwnershipKind();
   }
 
+  void visitImplicitActorToOpaqueIsolationCastInst(
+      ImplicitActorToOpaqueIsolationCastInst *inst) {
+    *this << getIDAndType(inst->getValue());
+  }
+
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
     *this << getIDAndType(CI->getOperand()) << " to ";
     if (CI->withoutActuallyEscaping())
