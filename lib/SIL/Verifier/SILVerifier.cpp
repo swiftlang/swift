@@ -2539,8 +2539,25 @@ public:
     if (builtinKind == BuiltinValueKind::ExtractFunctionIsolation) {
       require(false, "this builtin is pre-SIL-only");
     }
+
+    // Validate all "SIL builtins" never show up as BuiltinInst since they
+    // should just result in sequences of non-builtin inst SIL instructions
+    // being emitted and should never show up as a BuiltinInst.
+    switch (*builtinKind) {
+    case BuiltinValueKind::None:
+      break;
+#define BUILTIN_SIL_OPERATION(id, name, overload)                              \
+  case BuiltinValueKind::id:                                                   \
+    require(false,                                                             \
+            "this builtin should never show up as builtin inst. It should "    \
+            "only result in other SIL instructions being emitted by SILGen");
+#define BUILTIN(ID, Name, Attrs)                                               \
+  case BuiltinValueKind::ID:                                                   \
+    break;
+#include "swift/AST/Builtins.def"
+    }
   }
-  
+
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");
