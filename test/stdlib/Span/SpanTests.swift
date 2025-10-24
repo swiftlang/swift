@@ -496,7 +496,7 @@ suite.test("withUnsafeBytes()")
   }
 }
 
-suite.test("isIdentical(to:)")
+suite.test("isTriviallyIdentical(to:)")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -504,23 +504,70 @@ suite.test("isIdentical(to:)")
 .code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
+  func checkTriviallyIdentical<T: BitwiseCopyable>(
+    _ x: UnsafeMutableBufferPointer<T>,
+    _ y: UnsafeMutableBufferPointer<T>,
+    _ expected: Bool,
+    stackTrace: SourceLocStack = SourceLocStack(),
+    showFrame: Bool = true,
+    file: String = #file,
+    line: UInt = #line
+  ) {
+    let stackTrace = stackTrace.pushIf(showFrame, file: file, line: line)
+    do {
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+    }
+    do {
+      let x = UnsafeBufferPointer<T>(x)
+      let y = UnsafeBufferPointer<T>(y)
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+    }
+    do {
+      let x = UnsafeRawBufferPointer(x)
+      let y = UnsafeRawBufferPointer(y)
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+    }
+    do {
+      let x = UnsafeMutableRawBufferPointer(x)
+      let y = UnsafeMutableRawBufferPointer(y)
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+    }
+    do {
+      let x: Span<T> = unsafe x.span
+      let y: Span<T> = unsafe y.span
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+      expectEqual(expected, x.isIdentical(to: y), stackTrace: stackTrace)
+    }
+    do {
+      let x: RawSpan = unsafe x.span.bytes
+      let y: RawSpan = unsafe y.span.bytes
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+      expectEqual(expected, x.isIdentical(to: y), stackTrace: stackTrace)
+    }
+  }
+
+  let a = UnsafeMutableBufferPointer<Int>(start: nil, count: 0)
   let b = UnsafeMutableBufferPointer<Int>.allocate(capacity: 8)
+  let c = b.extracting(..<6) // FIXME: (first: 6)
+  let d = b.extracting(2...) // FIXME: (last: 6)
+  let e = c.extracting(2...) // FIXME: (last: 4)
+  let f = d.extracting(..<4) // FIXME: (first: 4)
+
   _ = b.initialize(fromContentsOf: 0..<8)
   defer { b.deallocate() }
 
-  let span = Span(_unsafeElements: b)
-  let pre = span.extracting(first: 6)
-  let suf = span.extracting(last: 6)
+  checkTriviallyIdentical(a, a, true)
+  checkTriviallyIdentical(b, b, true)
+  checkTriviallyIdentical(c, c, true)
+  checkTriviallyIdentical(d, d, true)
+  checkTriviallyIdentical(e, e, true)
+  checkTriviallyIdentical(f, f, true)
 
-  expectFalse(
-    pre.isIdentical(to: suf)
-  )
-  expectFalse(
-    pre.isIdentical(to: span)
-  )
-  expectTrue(
-    pre.extracting(last: 4).isIdentical(to: suf.extracting(first: 4))
-  )
+  checkTriviallyIdentical(a, b, false)
+  checkTriviallyIdentical(b, c, false)
+  checkTriviallyIdentical(c, d, false)
+  checkTriviallyIdentical(d, e, false)
+  checkTriviallyIdentical(e, f, true)
 }
 
 suite.test("indices(of:)")
