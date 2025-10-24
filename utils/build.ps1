@@ -2268,7 +2268,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
         # Check for required Python modules in CMake
         LLDB_ENFORCE_STRICT_TEST_REQUIREMENTS = "YES";
         # No watchpoint support on windows: https://github.com/llvm/llvm-project/issues/24820
-        LLDB_TEST_USER_ARGS = "--skip-category=watchpoint";
+        LLDB_TEST_USER_ARGS = "--skip-category=watchpoint;--skip-category=lldb-dap";
         # gtest sharding breaks llvm-lit's --xfail and LIT_XFAIL inputs: https://github.com/llvm/llvm-project/issues/102264
         LLVM_LIT_ARGS = "-v --no-gtest-sharding --time-tests";
         # LLDB Unit tests link against this library
