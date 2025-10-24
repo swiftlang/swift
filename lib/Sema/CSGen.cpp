@@ -944,7 +944,6 @@ namespace {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
     DeclContext *CurDC;
-    ConstraintSystemPhase CurrPhase;
 
     /// A map from each UnresolvedMemberExpr to the respective (implicit) base
     /// found during our walk.
@@ -1158,6 +1157,33 @@ namespace {
       if (addedTypeVars)
         addedTypeVars->push_back(memberTy);
 
+      SmallVector<AnyFunctionType::Param, 8> params;
+      getMatchingParams(argList, params);
+
+      // Add the constraint that the index expression's type be convertible
+      // to the input type of the subscript operator.
+      auto addApplicableFn = [&]() {
+        CS.addApplicationConstraint(
+            FunctionType::get(params, outputTy), memberTy,
+            /*trailingClosureMatching=*/std::nullopt, CurDC, fnLocator);
+      };
+
+      // If we have a dynamic member base we need to add the applicable function
+      // first since solving the member constraint requires the constraint to be
+      // available since it may retire it. We can't yet do this in the general
+      // case since the simplifying of the applicable fn in CSGen is currently
+      // load-bearing for existential opening.
+      // FIXME: Once existential opening is no longer sensitive to solving
+      // order, we ought to be able to just always record the applicable fn as
+      // an unsolved constraint before the member.
+      auto hasDynamicMemberLookup = CS.simplifyType(baseTy)
+                                        ->getRValueType()
+                                        ->getMetatypeInstanceType()
+                                        ->eraseDynamicSelfType()
+                                        ->hasDynamicMemberLookupAttribute();
+      if (hasDynamicMemberLookup)
+        addApplicableFn();
+
       // FIXME: synthesizeMaterializeForSet() wants to statically dispatch to
       // a known subscript here. This might be cleaner if we split off a new
       // UnresolvedSubscriptExpr from SubscriptExpr.
@@ -1173,14 +1199,10 @@ namespace {
                                     /*outerAlternatives=*/{}, memberLocator);
       }
 
-      SmallVector<AnyFunctionType::Param, 8> params;
-      getMatchingParams(argList, params);
-
-      // Add the constraint that the index expression's type be convertible
-      // to the input type of the subscript operator.
-      CS.addApplicationConstraint(FunctionType::get(params, outputTy), memberTy,
-                                  /*trailingClosureMatching=*/std::nullopt,
-                                  CurDC, fnLocator);
+      // If we don't have a dynamic member, we add the application after the
+      // member, see the above comment.
+      if (!hasDynamicMemberLookup)
+        addApplicableFn();
 
       if (CS.performanceHacksEnabled()) {
         Type fixedOutputType =
@@ -1250,13 +1272,7 @@ namespace {
 
   public:
     ConstraintGenerator(ConstraintSystem &CS, DeclContext *DC)
-        : CS(CS), CurDC(DC ? DC : CS.DC), CurrPhase(CS.getPhase()) {
-      // Although constraint system is initialized in `constraint
-      // generation` phase, we have to set it here manually because e.g.
-      // result builders could generate constraints for its body
-      // in the middle of the solving.
-      CS.setPhase(ConstraintSystemPhase::ConstraintGeneration);
-
+        : CS(CS), CurDC(DC ? DC : CS.DC) {
       // Pick up the saved stack of pack expansions so we can continue
       // to handle pack element references inside the closure body.
       if (auto *ACE = dyn_cast<AbstractClosureExpr>(CurDC)) {
@@ -1264,9 +1280,7 @@ namespace {
       }
     }
 
-    virtual ~ConstraintGenerator() {
-      CS.setPhase(CurrPhase);
-    }
+    virtual ~ConstraintGenerator() = default;
 
     ConstraintSystem &getConstraintSystem() const { return CS; }
 
