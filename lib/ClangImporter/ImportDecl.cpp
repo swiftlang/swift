@@ -9516,9 +9516,10 @@ static StringRef getAttributeName(const clang::CountAttributedType *CAT) {
   }
 }
 
-bool ClangImporter::Implementation::swiftifyImpl(
-    SwiftifyInfoPrinter &printer, const AbstractFunctionDecl *MappedDecl,
-    const clang::FunctionDecl *ClangDecl) {
+static bool swiftifyImpl(ClangImporter::Implementation &Self,
+                         SwiftifyInfoPrinter &printer,
+                         const AbstractFunctionDecl *MappedDecl,
+                         const clang::FunctionDecl *ClangDecl) {
   SIW_DBG("Checking " << *ClangDecl << " for bounds and lifetime info\n");
 
   // FIXME: for private macro generated functions we do not serialize the
@@ -9533,6 +9534,8 @@ bool ClangImporter::Implementation::swiftifyImpl(
     if (visitor.hasUnaliasedInstantiation)
       return false;
   }
+
+  clang::ASTContext &clangASTContext = Self.getClangASTContext();
 
   // We only attach the macro if it will produce an overload. Any __counted_by
   // will produce an overload, since UnsafeBufferPointer is still an improvement
@@ -9550,7 +9553,7 @@ bool ClangImporter::Implementation::swiftifyImpl(
     bool returnIsStdSpan = printer.registerStdSpanTypeMapping(
         swiftReturnTy, ClangDecl->getReturnType());
     auto *CAT = ClangDecl->getReturnType()->getAs<clang::CountAttributedType>();
-    if (SwiftifiableCAT(getClangASTContext(), CAT, swiftReturnTy)) {
+    if (SwiftifiableCAT(clangASTContext, CAT, swiftReturnTy)) {
       printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
       SIW_DBG("  Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
       attachMacro = true;
@@ -9598,14 +9601,15 @@ bool ClangImporter::Implementation::swiftifyImpl(
       bool paramHasBoundsInfo = false;
       auto *CAT = clangParamTy->getAs<clang::CountAttributedType>();
       if (CAT && mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX) {
-        diagnose(HeaderLoc(clangParam->getLocation()),
-                 diag::warn_clang_ignored_bounds_on_self, getAttributeName(CAT));
+        Self.diagnose(HeaderLoc(clangParam->getLocation()),
+                      diag::warn_clang_ignored_bounds_on_self,
+                      getAttributeName(CAT));
         auto swiftName = ClangDecl->getAttr<clang::SwiftNameAttr>();
         ASSERT(swiftName &&
                "free function mapped to instance method without swift_name??");
-        diagnose(HeaderLoc(swiftName->getLocation()),
-                 diag::note_swift_name_instance_method);
-      } else if (SwiftifiableCAT(getClangASTContext(), CAT, swiftParamTy)) {
+        Self.diagnose(HeaderLoc(swiftName->getLocation()),
+                      diag::note_swift_name_instance_method);
+      } else if (SwiftifiableCAT(clangASTContext, CAT, swiftParamTy)) {
         printer.printCountedBy(CAT, mappedIndex);
         SIW_DBG("  Found bounds info '" << clangParamTy
                 << "' on parameter '" << *clangParam << "'\n");
@@ -9668,7 +9672,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     out << "@_SwiftifyImport";
 
     SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl);
-    if (!swiftifyImpl(printer, MappedDecl, ClangDecl))
+    if (!swiftifyImpl(*this, printer, MappedDecl, ClangDecl))
       return;
     printer.printAvailability();
     printer.printTypeMapping();
