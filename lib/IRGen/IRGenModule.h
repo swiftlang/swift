@@ -1162,10 +1162,9 @@ public:
   CanType getRuntimeReifiedType(CanType type);
   Type substOpaqueTypesWithUnderlyingTypes(Type type);
   CanType substOpaqueTypesWithUnderlyingTypes(CanType type);
-  SILType substOpaqueTypesWithUnderlyingTypes(SILType type, CanGenericSignature genericSig);
-  std::pair<CanType, ProtocolConformanceRef>
-  substOpaqueTypesWithUnderlyingTypes(CanType type,
-                                      ProtocolConformanceRef conformance);
+  SILType substOpaqueTypesWithUnderlyingTypes(SILType type);
+  ProtocolConformanceRef
+  substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef conformance);
 
   bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion,
                    ClassDecl *asViewedFromRootClass = nullptr);
