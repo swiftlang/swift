@@ -26,7 +26,7 @@ private extension ArgumentConventions {
 
     // Check if `argIndex` is a lifetime source in parameterDependencies
     for targetIndex in firstParameterIndex..<self.count {
-      if getDependence(target: targetIndex, source: argIndex) != nil {
+      if parameterDependence(targetArgumentIndex: targetIndex, sourceArgumentIndex: argIndex) != nil {
         return true
       }
     }
