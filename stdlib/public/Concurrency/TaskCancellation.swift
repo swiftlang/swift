@@ -99,15 +99,14 @@ func withTaskCancellationHandler<T>(
 @inlinable
 @_alwaysEmitIntoClient
 @available(SwiftStdlib 5.1, *)
-// @abi(
-//   nonisolated(nonsending) func withTaskCancellationHandlerNonisolatedNonsending<T, Failure: Error>(
-//     operation: () async throws(Failure) -> sending T,
-//     onCancel handler: @Sendable () -> Void,
-//   ) async throws(Failure) -> sending T
-// )
-@_silgen_name("$s4test28withTaskCancellationHandlerN9operation8onCancelxxyYaq_YKYTXE_yyYbXEtYaq_YKs5ErrorR_r0_lF")
+@abi(
+  nonisolated(nonsending) func withTaskCancellationHandlerNonisolatedNonsending<T, Failure: Error>(
+    operation: () async throws(Failure) -> T,
+    onCancel handler: @Sendable () -> Void,
+  ) async throws(Failure) -> sending T
+)
 public nonisolated(nonsending) func withTaskCancellationHandler<T, Failure: Error>(
-  operation: () async throws(Failure) -> sending T,
+  operation: () async throws(Failure) -> T,
   onCancel handler: @Sendable () -> Void,
 ) async throws(Failure) -> sending T {
   // unconditionally add the cancellation record to the task.
