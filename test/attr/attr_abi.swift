@@ -1024,7 +1024,7 @@ func testNormalProtocols(
 ) {}
 
 @abi(
-  func testNormalProtocolsGeneric<A, B: CustomStringConvertible>( // expected-error {{generic signature '<A, B where A : Copyable, A : Escapable, B : CustomStringConvertible>' in '@abi' is not compatible with '<A, B where A : CustomStringConvertible, B : Copyable, B : Escapable>'}}
+  func testNormalProtocolsGeneric<A, B: CustomStringConvertible>( // expected-error {{generic signature '<A, B where A : Copyable, A : Escapable, B : Copyable, B : CustomStringConvertible>' in '@abi' is not compatible with '<A, B where A : Copyable, A : CustomStringConvertible, B : Copyable, B : Escapable>'}}
     _: A, _: B
   )
 )
