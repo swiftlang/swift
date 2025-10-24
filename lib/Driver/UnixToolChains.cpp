@@ -334,10 +334,9 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
     SmallString<128> LibProfile(SharedResourceDirPath);
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
     llvm::sys::path::append(LibProfile, "clang", "lib");
-
-    llvm::sys::path::append(LibProfile, getTriple().getOSName(),
-                            Twine("libclang_rt.profile-") +
-                                getTriple().getArchName() + ".a");
+    llvm::sys::path::append(
+        LibProfile, getUnversionedTriple(getTriple()).getOSName(),
+        Twine("libclang_rt.profile-") + getTriple().getArchName() + ".a");
     Arguments.push_back(context.Args.MakeArgString(LibProfile));
     Arguments.push_back(context.Args.MakeArgString(
         Twine("-u", llvm::getInstrProfRuntimeHookVarName())));
