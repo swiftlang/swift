@@ -79,6 +79,13 @@ a_array_4.forEach { $0.preen() }
 // CHECK-NEXT: A10
 // CHECK-NEXT: A20
 
+let get_a_array_1: [() -> A] = [ { A(5) }, { A(10) }, { A(20) } ]
+let get_preening_array_1 = get_a_array_1 as [Preening]
+get_preening_array_1.forEach { $0.preen() }
+// CHECK-NEXT: A5
+// CHECK-NEXT: A10
+// CHECK-NEXT: A20
+
 }
 
 do {
