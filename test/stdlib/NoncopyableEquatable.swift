@@ -71,4 +71,41 @@ NoncopyableEquatableTests.test("comparing noncopyables") {
     expectTrue(array.minIndex() == 2)
  }
 
+ extension Noncopyable: CustomStringConvertible {
+    var description: String {
+        "No copying the number \(i)"
+    }
+ }
+
+ extension Noncopyable: CustomDebugStringConvertible {
+    var debugDescription: String {
+        "Noncopyable(i: \(i))"
+    }
+ }
+
+extension Noncopyable: LosslessStringConvertible {
+    init?(_ description: String) {
+        guard let i = Int(description) else { return nil }
+        self.i = i
+    }
+}
+
+extension LosslessStringConvertible where Self: ~Copyable {
+    init(riskily with: String) {
+        self = .init(with)!
+    }
+}
+
+func debug(value: borrowing some CustomDebugStringConvertible & ~Copyable) -> String {
+    value.debugDescription
+}
+
+ NoncopyableEquatableTests.test("noncopyable interpolation") {
+
+    let a = Noncopyable(riskily: "99")
+
+    expectEqual("NC: \(a)", "NC: No copying the number \(a.i)")
+    expectEqual("Noncopyable(i: \(a.i))", debug(value: a))
+ }
+
 runAllTests()
