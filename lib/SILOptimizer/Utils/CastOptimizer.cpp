@@ -331,8 +331,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     OptionalTy = OptionalType::get(Dest->getType().getASTType())
                      ->getImplementationType()
                      ->getCanonicalType();
-    Tmp = Builder.createAllocStack(Loc,
-                                   F->getLoweredType(OptionalTy));
+    Tmp = Builder.createAllocStack(Loc, F->getLoweredType(OptionalTy));
     outOptionalParam = Tmp;
   } else {
     outOptionalParam = Dest;
