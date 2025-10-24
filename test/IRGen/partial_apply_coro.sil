@@ -1012,7 +1012,7 @@ bb0(%x : $SwiftClass):
 }
 
 // CHECK-LABEL: define {{.*}} { ptr, ptr } @indirect_guaranteed_captured_class_param
-// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE]]) %0, [[ARGTYPE:i32|i64]] %1, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[ARGPTR_SIZE:4|8]]) %2)
+// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE]]) %0, [[ARGTYPE:i32|i64]] %1, ptr noalias captures(none) dereferenceable([[ARGPTR_SIZE:4|8]]) %2)
 sil public @indirect_guaranteed_captured_class_param : $@yield_once @convention(thin) (Int, @in_guaranteed SwiftClass) -> (@yields SwiftClass) {
 entry(%i : $Int, %c : $*SwiftClass):
   %0 = builtin "int_trap"() : $Never
@@ -1020,7 +1020,7 @@ entry(%i : $Int, %c : $*SwiftClass):
 }
 
 // CHECK-LABEL: define {{.*}} { ptr, ptr } @partial_apply_indirect_guaranteed_class_param
-// CHECK-SAME: (ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[ARGPTR_SIZE]]) %[[ARGPTR:.*]])
+// CHECK-SAME: (ptr noalias captures(none) dereferenceable([[ARGPTR_SIZE]]) %[[ARGPTR:.*]])
 // CHECK: entry:
 // CHECK:   %[[ARG:.*]] = load ptr, ptr %[[ARGPTR]]
 // CHECK:   %[[RET:.*]] = insertvalue { ptr, ptr } { ptr @"$s40indirect_guaranteed_captured_class_paramTA{{.*}}", ptr undef }, ptr %[[ARG]], 1
@@ -1037,7 +1037,7 @@ entry(%i : $Int, %c : $*SwiftClass):
 // CHECK:   store ptr %[[PA_CTX_BOX]], ptr %[[SELFPTR]]
 // CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr %[[FRAMEPTR]])
-// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @indirect_guaranteed_captured_class_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %[[ARG0]], ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[ARGPTR_SIZE]]) %[[SELFPTR]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @indirect_guaranteed_captured_class_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %[[ARG0]], ptr noalias captures(none) dereferenceable([[ARGPTR_SIZE]]) %[[SELFPTR]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
 // CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s40indirect_guaranteed_captured_class_paramTA.Frame", ptr %[[SPILL]], i32 0, i32 1
 // CHECK:   store ptr %[[RESUME]], ptr %[[SPILL2]]
@@ -1079,7 +1079,7 @@ bb0(%x : $*SwiftClass):
 }
 
 // CHECK-LABEL: define {{.*}} { ptr, ptr } @indirect_consumed_captured_class_param
-// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE:(16|32)]]) %0, [[ARGTYPE:(i32|i64)]] %1, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[ARGPTR_SIZE:(4|8)]]) %2)
+// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE:(16|32)]]) %0, [[ARGTYPE:(i32|i64)]] %1, ptr noalias captures(none) dereferenceable([[ARGPTR_SIZE:(4|8)]]) %2)
 sil public @indirect_consumed_captured_class_param : $@yield_once @convention(thin) (Int, @in SwiftClass) -> (@yields SwiftClass) {
 entry(%i : $Int, %c : $*SwiftClass):
   %0 = builtin "int_trap"() : $Never
@@ -1087,7 +1087,7 @@ entry(%i : $Int, %c : $*SwiftClass):
 }
 
 // CHECK-LABEL: define {{.*}} { ptr, ptr } @partial_apply_indirect_consumed_class_param
-// CHECK-SAME: (ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[ARGPTR_SIZE]]) %[[ARGPTR:.*]])
+// CHECK-SAME: (ptr noalias captures(none) dereferenceable([[ARGPTR_SIZE]]) %[[ARGPTR:.*]])
 // CHECK: entry:
 // CHECK:   %[[ARG:.*]] = load ptr, ptr %[[ARGPTR]]
 // CHECK:   %[[RET:.*]] = insertvalue { ptr, ptr } { ptr @"$s38indirect_consumed_captured_class_paramTA{{.*}}", ptr undef }, ptr %[[ARG]], 1
@@ -1105,7 +1105,7 @@ entry(%i : $Int, %c : $*SwiftClass):
 // CHECK:   store ptr %[[PA_CTX_BOX]], ptr %[[SELFPTR]]
 // CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr %[[FRAMEPTR]])
-// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @indirect_consumed_captured_class_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %[[ARG0]], ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[ARGPTR_SIZE]]) %[[SELFPTR]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @indirect_consumed_captured_class_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %[[ARG0]], ptr noalias captures(none) dereferenceable([[ARGPTR_SIZE]]) %[[SELFPTR]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
 // CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s38indirect_consumed_captured_class_paramTA.Frame", ptr %[[SPILL]], i32 0, i32 1
 // CHECK:   store ptr %[[RESUME]], ptr %[[SPILL2]]
@@ -1231,7 +1231,7 @@ bb0(%x : $SwiftClassPair):
 
 // CHECK-64-LABEL: define {{.*}} { ptr, i64 } @indirect_guaranteed_captured_class_pair_param
 // CHECK-32-LABEL: define {{.*}} { ptr, i32 } @indirect_guaranteed_captured_class_pair_param
-// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE:(16|32)]]) %0, [[ARG_TYPE:(i32|i64)]] %1, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[PAIR_SIZE:(8|16)]]) %2)
+// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE:(16|32)]]) %0, [[ARG_TYPE:(i32|i64)]] %1, ptr noalias captures(none) dereferenceable([[PAIR_SIZE:(8|16)]]) %2)
 sil public @indirect_guaranteed_captured_class_pair_param : $@yield_once @convention(thin) (Int, @in_guaranteed SwiftClassPair) -> (@yields Int) {
 entry(%i : $Int, %c : $*SwiftClassPair):
   %0 = builtin "int_trap"() : $Never
@@ -1239,7 +1239,7 @@ entry(%i : $Int, %c : $*SwiftClassPair):
 }
 
 // CHECK-LABEL: define {{.*}} { ptr, ptr } @partial_apply_indirect_guaranteed_class_pair_param
-// CHECK-SAME: (ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[PAIR_SIZE]]) %[[ARG:.*]])
+// CHECK-SAME: (ptr noalias captures(none) dereferenceable([[PAIR_SIZE]]) %[[ARG:.*]])
 // CHECK: entry:
 // CHECK:   %[[BOX:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata.{{.*}}
 // CHECK:   %[[BOXPTR:.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, %T18partial_apply_coro14SwiftClassPairV }>, ptr %[[BOX]], i32 0, i32 1
@@ -1258,7 +1258,7 @@ entry(%i : $Int, %c : $*SwiftClassPair):
 // CHECK:   %[[PA_CTX:.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, %T18partial_apply_coro14SwiftClassPairV }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
 // CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[SPILL1]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr %[[FRAMEPTR]])
-// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @indirect_guaranteed_captured_class_pair_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %1, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[PAIR_SIZE]]) %[[PA_CTX]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @indirect_guaranteed_captured_class_pair_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %1, ptr noalias captures(none) dereferenceable([[PAIR_SIZE]]) %[[PA_CTX]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, [[ARG_TYPE]] } %[[YIELD_PAIR]], 0
 // CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.Frame", ptr %[[SPILL]], i32 0, i32 1
 // CHECK:   store ptr %[[RESUME]], ptr %[[SPILL2]]
@@ -1301,7 +1301,7 @@ bb0(%x : $*SwiftClassPair):
 
 // CHECK-32-LABEL: define {{.*}} { ptr, i32 } @indirect_consumed_captured_class_pair_param
 // CHECK-64-LABEL: define {{.*}} { ptr, i64 } @indirect_consumed_captured_class_pair_param
-// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE]]) %0, [[ARG_TYPE]] %1, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[PAIR_SIZE]]) %2)
+// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE]]) %0, [[ARG_TYPE]] %1, ptr noalias captures(none) dereferenceable([[PAIR_SIZE]]) %2)
 sil public @indirect_consumed_captured_class_pair_param : $@yield_once @convention(thin) (Int, @in SwiftClassPair) -> (@yields Int) {
 entry(%i : $Int, %c : $*SwiftClassPair):
   %0 = builtin "int_trap"() : $Never
@@ -1309,7 +1309,7 @@ entry(%i : $Int, %c : $*SwiftClassPair):
 }
 
 // CHECK-LABEL: define {{.*}} { ptr, ptr } @partial_apply_indirect_consumed_class_pair_param
-// CHECK-SAME: (ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[PAIR_SIZE]]) %[[ARG:.*]])
+// CHECK-SAME: (ptr noalias captures(none) dereferenceable([[PAIR_SIZE]]) %[[ARG:.*]])
 // CHECK: entry:
 // CHECK:   %[[BOX:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata.{{.*}}
 // CHECK:   %[[BOXPTR:.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, %T18partial_apply_coro14SwiftClassPairV }>, ptr %[[BOX]], i32 0, i32 1
@@ -1331,7 +1331,7 @@ entry(%i : $Int, %c : $*SwiftClassPair):
 // CHECK:   %{{.*}} = call ptr @"$s18partial_apply_coro14SwiftClassPairVWOc"(ptr %[[PA_CTX]], ptr %[[SPILL1]])
 // CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr %[[FRAMEPTR]])
-// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @indirect_consumed_captured_class_pair_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %1, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[PAIR_SIZE]]) %[[SPILL1]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @indirect_consumed_captured_class_pair_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %1, ptr noalias captures(none) dereferenceable([[PAIR_SIZE]]) %[[SPILL1]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, [[ARG_TYPE]] } %[[YIELD_PAIR]], 0
 // CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s43indirect_consumed_captured_class_pair_paramTA.Frame", ptr %[[SPILL]], i32 0, i32 2
 // CHECK:   store ptr %[[RESUME]], ptr %[[SPILL2]]
@@ -2059,7 +2059,7 @@ class  A3 {}
 sil_vtable A3 {}
 
 // CHECK-LABEL: define {{.*}} { ptr, ptr, ptr } @amethod
-// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE:(16|32)]]) %0, ptr noalias{{( nocapture)?}} swiftself{{( captures\(none\))?}} dereferenceable([[SELF_SIZE:(4|8)]]) %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable([[ERROR_SIZE:(4|8)]]) %2)
+// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE:(16|32)]]) %0, ptr noalias swiftself captures(none) dereferenceable([[SELF_SIZE:(4|8)]]) %1, ptr noalias swifterror captures(none) dereferenceable([[ERROR_SIZE:(4|8)]]) %2)
 sil @amethod : $@yield_once @convention(method) (@in_guaranteed A2<A3>) -> (@yields A1, @error Error) {
 entry(%a : $*A2<A3>):
   %0 = builtin "int_trap"() : $Never
@@ -2067,13 +2067,13 @@ entry(%a : $*A2<A3>):
 }
 
 // CHECK-LABEL: define {{.*}} { ptr, ptr } @repo
-// CHECK-SAME: (ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[SELF_SIZE]]) %[[ARG:.*]])
+// CHECK-SAME: (ptr noalias captures(none) dereferenceable([[SELF_SIZE]]) %[[ARG:.*]])
 // CHECK:   %[[RET:.*]] = insertvalue { ptr, ptr } { ptr @"$s7amethodTA{{.*}}", ptr undef }, ptr %{{.*}}, 1
 // CHECK:   ret { ptr, ptr } %[[RET]]
 // CHECK: }
 //
 // CHECK-LABEL: define {{.*}} { ptr, ptr, ptr } @"$s7amethodTA"
-// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTX:.*]], ptr swiftself %[[SELF:.*]], ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable([[ERROR_SIZE]]) %[[ERRORPTR:.*]])
+// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTX:.*]], ptr swiftself %[[SELF:.*]], ptr noalias swifterror captures(none) dereferenceable([[ERROR_SIZE]]) %[[ERRORPTR:.*]])
 // CHECK: entry:
 // CHECK:   %[[SELFPTR:.*]] = alloca ptr
 // CHECK:   %[[SPILL:.*]] = call ptr @malloc
@@ -2083,7 +2083,7 @@ entry(%a : $*A2<A3>):
 // CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr %[[FRAMEPTR]])
 // CHECK:   store ptr null, ptr %[[ERRORPTR]]
-// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr, ptr } @amethod(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], ptr noalias{{( nocapture)?}} swiftself{{( captures\(none\))?}} dereferenceable([[SELF_SIZE]]) %[[SELFPTR]], ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable([[ERROR_SIZE]]) %[[ERRORPTR]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr, ptr } @amethod(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], ptr noalias swiftself captures(none) dereferenceable([[SELF_SIZE]]) %[[SELFPTR]], ptr noalias swifterror captures(none) dereferenceable([[ERROR_SIZE]]) %[[ERRORPTR]])
 // CHECK:   %[[ERRORVAL:.*]] = load ptr, ptr %[[ERRORPTR]]
 // CHECK:   %[[RESUME0:.*]] = extractvalue { ptr, ptr, ptr } %[[YIELD_PAIR]], 0
 // CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s7amethodTA.Frame", ptr %[[SPILL]], i32 0, i32 1
@@ -2137,7 +2137,7 @@ bb0(%0 : $*A2<A3>):
 }
 
 // CHECK-LABEL: define {{.*}} { ptr, ptr } @partial_apply_callee_guaranteed_indirect_guaranteed_class_pair_param
-// CHECK-SAME: (ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[ARG_SIZE:(8|16)]]) %[[ARG:.*]])
+// CHECK-SAME: (ptr noalias captures(none) dereferenceable([[ARG_SIZE:(8|16)]]) %[[ARG:.*]])
 // CHECK: entry:
 // CHECK:   %[[BOX:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata
 // CHECK:   %[[BOXPTR:.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, %T18partial_apply_coro14SwiftClassPairV }>, ptr %[[BOX]], i32 0, i32 1
@@ -2156,7 +2156,7 @@ bb0(%0 : $*A2<A3>):
 // CHECK:   %[[PA_CTX:.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, %T18partial_apply_coro14SwiftClassPairV }>, ptr %[[PA_CTX_BOX]], i32 0, i32 1
 // CHECK:   %[[PA_ARG:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr %[[PA_ARG]])
-// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @indirect_guaranteed_captured_class_pair_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[PA_ARG]], [[ARG_TYPE]] %[[ARG0]], ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{8|16}}) %[[PA_CTX]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @indirect_guaranteed_captured_class_pair_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[PA_ARG]], [[ARG_TYPE]] %[[ARG0]], ptr noalias captures(none) dereferenceable({{8|16}}) %[[PA_CTX]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, [[ARG_TYPE]] } %[[YIELD_PAIR]], 0
 // CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.Frame", ptr %[[SPILL]], i32 0, i32 1
 // CHECK:   store ptr %[[RESUME]], ptr %[[SPILL2]],
@@ -2201,7 +2201,7 @@ bb0(%x : $*SwiftClassPair):
 sil public_external @use_closure2 : $@yield_once @convention(thin) (@noescape @yield_once @callee_guaranteed (Int) -> (@yields Int)) -> (@yields Int)
 
 // CHECK-LABEL: define {{.*}} @partial_apply_stack_callee_guaranteed_indirect_guaranteed_class_pair_param
-// CHECK-SAME: (ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[ARG_SIZE:(8|16)]]) %[[ARG:.*]])
+// CHECK-SAME: (ptr noalias captures(none) dereferenceable([[ARG_SIZE:(8|16)]]) %[[ARG:.*]])
 // CHECK: entry:
 // CHECK:   %[[CTX:.*]] = alloca [[[BUFFER_SIZE]] x i8]
 // CHECK:   %[[BOX:.*]] = alloca i8
@@ -2228,7 +2228,7 @@ sil public_external @use_closure2 : $@yield_once @convention(thin) (@noescape @y
 // CHECK:   %[[PA_ARG:.*]] = load ptr, ptr %[[PA_CTX]]
 // CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr %[[FRAMEPTR]])
-// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @indirect_guaranteed_captured_class_pair_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %[[ARG0]], ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{8|16}}) %[[PA_ARG]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @indirect_guaranteed_captured_class_pair_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %[[ARG0]], ptr noalias captures(none) dereferenceable({{8|16}}) %[[PA_ARG]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, [[ARG_TYPE]] } %[[YIELD_PAIR]], 0
 // CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}.Frame", ptr %[[SPILL]], i32 0, i32 1
 // CHECK:   store ptr %[[RESUME]], ptr %[[SPILL2]]
@@ -2276,7 +2276,7 @@ bb0(%x : $*SwiftClassPair):
 
 // CHECK-32-LABEL: define {{.*}} { ptr, i32 } @indirect_in_captured_class_pair_param
 // CHECK-64-LABEL: define {{.*}} { ptr, i64 } @indirect_in_captured_class_pair_param
-// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE:(16|32)]]) %0, [[ARG_TYPE:(i32|i64)]] %{{.*}}, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[PAIR_SIZE:(8|16)]]) %{{.*}})
+// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE:(16|32)]]) %0, [[ARG_TYPE:(i32|i64)]] %{{.*}}, ptr noalias captures(none) dereferenceable([[PAIR_SIZE:(8|16)]]) %{{.*}})
 sil public @indirect_in_captured_class_pair_param : $@yield_once @convention(thin) (Int, @in_guaranteed SwiftClassPair) -> (@yields Int) {
 entry(%i : $Int, %p : $*SwiftClassPair):
   %0 = builtin "int_trap"() : $Never
@@ -2284,7 +2284,7 @@ entry(%i : $Int, %p : $*SwiftClassPair):
 }
 
 // CHECK-LABEL: define {{.*}} void @partial_apply_stack_callee_guaranteed_indirect_in_class_pair_param
-// CHECK-SAME: (ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[PAIR_SIZE]]) %[[ARG:.*]])
+// CHECK-SAME: (ptr noalias captures(none) dereferenceable([[PAIR_SIZE]]) %[[ARG:.*]])
 // CHECK: entry:
 // CHECK:   %[[CTX:.*]] = alloca [[[BUFFER_SIZE]] x i8],
 // CHECK:   %[[BOX:.*]] = alloca i8
@@ -2312,7 +2312,7 @@ entry(%i : $Int, %p : $*SwiftClassPair):
 // CHECK:   %[[PA_ARG:.*]] = load ptr, ptr %[[PA_CTX]]
 // CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr %[[FRAMEPTR]])
-// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @indirect_in_captured_class_pair_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %[[ARG0]], ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[PAIR_SIZE]]) %[[PA_ARG]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @indirect_in_captured_class_pair_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %[[ARG0]], ptr noalias captures(none) dereferenceable([[PAIR_SIZE]]) %[[PA_ARG]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, [[ARG_TYPE]] } %[[YIELD_PAIR]], 0
 // CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s37indirect_in_captured_class_pair_paramTA.Frame", ptr %[[SPILL]], i32 0, i32 1
 // CHECK:   store ptr %[[RESUME]], ptr %[[SPILL2]]
@@ -2477,7 +2477,7 @@ entry:
 
 // CHECK-32: define {{.*}} { ptr, i32 } @indirect_in_constant_captured_class_pair_param
 // CHECK-64: define {{.*}} { ptr, i64 } @indirect_in_constant_captured_class_pair_param
-// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE:(16|32)]]) %0, [[ARG_TYPE:(i32|i64)]] %1, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[PAIR_SIZE:(8|16)]]) %2)
+// CHECK-SAME: (ptr noalias dereferenceable([[BUFFER_SIZE:(16|32)]]) %0, [[ARG_TYPE:(i32|i64)]] %1, ptr noalias captures(none) dereferenceable([[PAIR_SIZE:(8|16)]]) %2)
 sil public @indirect_in_constant_captured_class_pair_param : $@yield_once @convention(thin) (Int, @in_guaranteed SwiftClassPair) -> (@yields Int) {
 entry(%i : $Int, %ic : $*SwiftClassPair):
   %0 = builtin "int_trap"() : $Never
@@ -2485,7 +2485,7 @@ entry(%i : $Int, %ic : $*SwiftClassPair):
 }
 
 // CHECK-LABEL: define {{.*}} void @partial_apply_stack_callee_guaranteed_indirect_in_constant_class_pair_param
-// CHECK-SAME: (ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[PAIR_SIZE]]) %[[ARG:.*]])
+// CHECK-SAME: (ptr noalias captures(none) dereferenceable([[PAIR_SIZE]]) %[[ARG:.*]])
 // CHECK: entry:
 // CHECK:   %[[CTX:.*]] = alloca [[[BUFFER_SIZE]] x i8]
 // CHECK:   %[[BOX:.*]] = alloca i8
@@ -2513,7 +2513,7 @@ entry(%i : $Int, %ic : $*SwiftClassPair):
 // CHECK:   %[[PA_ARG:.*]] = load ptr, ptr %[[PA_CTX]]
 // CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr %[[FRAMEPTR]])
-// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @indirect_in_constant_captured_class_pair_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %[[ARG0]], ptr noalias {{(nocapture|captures\(none\))}} dereferenceable([[PAIR_SIZE]]) %[[PA_ARG]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @indirect_in_constant_captured_class_pair_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[FRAMEPTR]], [[ARG_TYPE]] %[[ARG0]], ptr noalias captures(none) dereferenceable([[PAIR_SIZE]]) %[[PA_ARG]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, [[ARG_TYPE]] } %[[YIELD_PAIR]], 0
 // CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s46indirect_in_constant_captured_class_pair_paramTA.Frame", ptr %[[SPILL]], i32 0, i32 1
 // CHECK:   store ptr %[[RESUME]], ptr %[[SPILL2]]
@@ -2579,7 +2579,7 @@ bb0(%thick : $@callee_guaranteed @yield_once @convention(thick) (Int64, Int32) -
 // CHECK: }
 //
 // CHECK-LABEL: define {{.*}} ptr @"$s16external_closureTA"
-// CHECK-SAME: (ptr noalias {{.*}} %[[CTX:.*]], [[ARG_TYPE]] %[[ARG1:.*]], ptr swiftself %[[PA_CTX_BOX:.*]], ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} {{.*}} %[[ERROR:.*]])
+// CHECK-SAME: (ptr noalias {{.*}} %[[CTX:.*]], [[ARG_TYPE]] %[[ARG1:.*]], ptr swiftself %[[PA_CTX_BOX:.*]], ptr noalias swifterror captures(none) {{.*}} %[[ERROR:.*]])
 // CHECK: entry:
 // CHECK:   %[[SPILL:.*]] = call ptr @malloc
 // CHECK:   store ptr %[[SPILL]], ptr %[[CTX]]
@@ -2590,7 +2590,7 @@ bb0(%thick : $@callee_guaranteed @yield_once @convention(thick) (Int64, Int32) -
 // CHECK:   %[[FRAMEPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[FRAME]], i32 0, i32 0
 // CHECK:   call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr %[[FRAMEPTR]])
 // CHECK:   store ptr null, ptr %[[ERROR]]
-// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc ptr @external_closure(ptr noalias {{.*}} %[[FRAMEPTR]], [[ARG_TYPE]] %[[ARG1]], [[ARG_TYPE]] %[[ARG2]], ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} {{.*}} %[[ERROR]])
+// CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc ptr @external_closure(ptr noalias {{.*}} %[[FRAMEPTR]], [[ARG_TYPE]] %[[ARG1]], [[ARG_TYPE]] %[[ARG2]], ptr swiftself undef, ptr noalias swifterror captures(none) {{.*}} %[[ERROR]])
 // CHECK:   %[[SPILL1:.*]] = getelementptr inbounds %"$s16external_closureTA.Frame", ptr %[[SPILL]], i32 0, i32 1
 // CHECK:   store ptr %[[YIELD_PAIR]], ptr %[[SPILL1]]
 // CHECK:   %[[ERRORVAL:.*]] = load ptr, ptr %[[ERROR]]

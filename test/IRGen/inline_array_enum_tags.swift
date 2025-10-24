@@ -10,7 +10,7 @@ public struct Bar {
     let y: [UInt64]
 }
 
-// CHECK: define {{.*}} i32 @"$s22inline_array_enum_tags3BazOwug"(ptr noalias{{( nocapture)?}} readonly{{( captures\(none\))?}} %value, ptr{{( nocapture)?}} readnone{{( captures\(none\))?}} %Baz)
+// CHECK: define {{.*}} i32 @"$s22inline_array_enum_tags3BazOwug"(ptr noalias readonly captures(none) %value, ptr readnone captures(none) %Baz)
 // CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds{{.*}} i8, ptr %value, {{i64|i32}} 24
 // CHECK:   [[TAG_VAL:%.*]] = load i8, ptr [[TAG_ADDR]], align 8
 // CHECK:   [[TAG_EXT:%.*]] = zext i8 [[TAG_VAL]] to i32
@@ -27,7 +27,7 @@ public struct Padded {
 }
 
 
-// CHECK: define {{.*}} i32 @"$s22inline_array_enum_tags17WithPaddedPayloadOwug"(ptr noalias{{( nocapture)?}} readonly{{( captures\(none\))?}} %value, ptr{{( nocapture)?}} readnone{{( captures\(none\))?}} %WithPaddedPayload)
+// CHECK: define {{.*}} i32 @"$s22inline_array_enum_tags17WithPaddedPayloadOwug"(ptr noalias readonly captures(none) %value, ptr readnone captures(none) %WithPaddedPayload)
 // CHECK: entry:
 // CHECK:   [[ADDR:%.*]] = getelementptr inbounds{{.*}} i8, ptr %value, {{i64|i32}} 8
 // CHECK:   [[VAL:%.*]] = load {{i64|i32}}, ptr [[ADDR]], align 8

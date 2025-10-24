@@ -262,7 +262,7 @@ struct ConformingStruct : ResilientProtocol {
   static func defaultF()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @noDefaultA(ptr noalias{{( nocapture)?}} swiftself{{( captures\(none\))?}} %0, ptr %Self, ptr %SelfWitnessTable)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @noDefaultA(ptr noalias swiftself captures(none) %0, ptr %Self, ptr %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
 sil @noDefaultA : $@convention(witness_method: ResilientProtocol) (@in_guaranteed ConformingStruct) -> () {
@@ -281,7 +281,7 @@ bb0(%0 : $*ConformingStruct):
 }
 
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @noDefaultB(ptr noalias{{( nocapture)?}} swiftself{{( captures\(none\))?}} %0, ptr %Self, ptr %SelfWitnessTable)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @noDefaultB(ptr noalias swiftself captures(none) %0, ptr %Self, ptr %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 
 sil @noDefaultB : $@convention(witness_method: ResilientProtocol) (@in_guaranteed ConformingStruct) -> () {
@@ -324,7 +324,7 @@ bb0(%0 : $*T):
   return %result : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @passConformingType(ptr noalias {{(nocapture|captures\(none\))}} %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @passConformingType(ptr noalias captures(none) %0)
 sil @passConformingType : $@convention(thin) (@in ResilientConformingType) -> () {
 bb0(%0 : $*ResilientConformingType):
 
@@ -381,7 +381,7 @@ bb0(%0 : $*T):
   return %result : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @passConformingTypeRefined(ptr noalias {{(nocapture|captures\(none\))}} %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @passConformingTypeRefined(ptr noalias captures(none) %0)
 sil @passConformingTypeRefined : $@convention(thin) (@in AnotherConformingStruct) -> () {
 bb0(%0 : $*AnotherConformingStruct):
 
@@ -424,7 +424,7 @@ bb0(%0 : $*T):
   return %result : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @passConformingTypeAssoc(ptr noalias {{(nocapture|captures\(none\))}} %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @passConformingTypeAssoc(ptr noalias captures(none) %0)
 sil @passConformingTypeAssoc : $@convention(thin) (@in ConformsWithResilientAssoc) -> () {
 bb0(%0 : $*ConformsWithResilientAssoc):
 

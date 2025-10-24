@@ -7,7 +7,7 @@
 
 // Make sure we call the deinit through the value witness table in the other module.
 
-// REFERRING_MODULE-LABEL: define {{.*}}swiftcc void @"$s6serverAAV4mainyyKFZ"(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{(8|4)}}) %1) {{.*}}{
+// REFERRING_MODULE-LABEL: define {{.*}}swiftcc void @"$s6serverAAV4mainyyKFZ"(ptr swiftself %0, ptr noalias swifterror captures(none) dereferenceable({{(8|4)}}) %1) {{.*}}{
 // REFERRING_MODULE: [[SERVER:%.*]] = alloca %T6server8MoveOnlyV
 // REFERRING_MODULE: [[VALUE_WITNESS_TABLE:%.*]] = getelementptr inbounds ptr, ptr %"$s6server8MoveOnlyVN.valueWitnesses"
 // REFERRING_MODULE: [[VALUE_WITNESS:%.*]] = load ptr, ptr [[VALUE_WITNESS_TABLE]]
