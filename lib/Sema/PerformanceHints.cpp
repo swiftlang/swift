@@ -30,6 +30,9 @@
 using namespace swift;
 
 bool swift::performanceHintDiagnosticsEnabled(ASTContext &ctx) {
+  if (ctx.TypeCheckerOpts.SkipFunctionBodies != FunctionBodySkipping::None)
+    return false;
+
   return !ctx.Diags.isIgnoredDiagnostic(
              diag::perf_hint_closure_returns_array.ID) ||
          !ctx.Diags.isIgnoredDiagnostic(
