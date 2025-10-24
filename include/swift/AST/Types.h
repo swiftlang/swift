@@ -874,6 +874,9 @@ public:
   /// can only be a GenericTypeParamType.
   bool isRootParameterPack();
 
+  bool isParameterPackExpansion();
+  bool isRootParameterPackExpansion();
+      
   /// Determine whether this type is a value parameter 'let N: Int', which is a
   /// GenericTypeParamType.
   ///
@@ -7560,6 +7563,10 @@ static CanGenericTypeParamType getType(unsigned depth, unsigned index,
                                        const ASTContext &C) {
   return CanGenericTypeParamType(
       GenericTypeParamType::getType(depth, index, C));
+}
+static CanGenericTypeParamType getPackType(unsigned depth, unsigned index, const ASTContext &ctx) {
+  return CanGenericTypeParamType(
+      GenericTypeParamType::getPack(depth, index, ctx));
 }
 static CanGenericTypeParamType getOpaqueResultType(unsigned depth, unsigned index,
                                                    const ASTContext &C) {

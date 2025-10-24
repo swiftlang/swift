@@ -182,10 +182,35 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   ASSERT(!lhs.empty());
   ASSERT(!rhs.empty());
-
-  if (Debug.contains(DebugFlags::Add)) {
-    llvm::dbgs() << "# Adding rule " << lhs << " == " << rhs << "\n\n";
+  
+  
+  bool leftHasShape = false;
+  bool rightHasShape = false;
+  for (auto t= lhs.begin(); t != lhs.end(); t++) {
+    if (t->getKind() == Symbol::Kind::Shape) {
+      leftHasShape = true;
+      break;
+    }
   }
+  for (auto t= rhs.begin(); t !=rhs.end(); t++) {
+    if (t->getKind() == Symbol::Kind::Shape) {
+      rightHasShape = true;
+      break;
+    }
+  }
+  
+  if (leftHasShape || rightHasShape) {
+    if (leftHasShape && rightHasShape && !(lhs.back().getKind() == Symbol::Kind::Shape && rhs.back().getKind()==Symbol::Kind::Shape)) {
+      llvm::dbgs() << "# Adding rule " << lhs << " == " << rhs << "\n\n";
+      ASSERT(false);
+    } else if (leftHasShape != rightHasShape) {
+      llvm::dbgs() << "# Adding rule " << lhs << " == " << rhs << "\n\n";
+      ASSERT(false);
+    }
+  }
+  //if (Debug.contains(DebugFlags::Add)) {
+    llvm::dbgs() << "# Adding rule " << lhs << " == " << rhs << "\n\n";
+  //}
 
   // Now simplify both sides as much as possible with the rules we have so far.
   //
@@ -573,6 +598,7 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
           index != 0 && index != lhs.size() - 1) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::Protocol);
       }
+      rule.dump(llvm::dbgs());
     }
 
     for (unsigned index : indices(rhs)) {
