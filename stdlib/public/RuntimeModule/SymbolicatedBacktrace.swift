@@ -17,11 +17,11 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
 internal import BacktracingImpl.OS.Darwin
 #endif
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
 internal import Darwin
 #elseif os(Windows)
 internal import ucrt
@@ -148,7 +148,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     }
 
     private func maybeUnderscore(_ sym: String) -> String {
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
       return "_" + sym
       #else
       return sym
@@ -156,7 +156,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     }
 
     private func dylibName(_ dylib: String) -> String {
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
       return dylib + ".dylib"
       #else
       return dylib + ".so"
@@ -168,7 +168,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     /// For instance, the `start` function from `dyld` on macOS is a system
     /// function, and we don't need to display it under normal circumstances.
     public var isSystemFunction: Bool {
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
       if rawName == "start" && imageName == "dyld" {
         return true
       }
@@ -279,7 +279,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     self.frames = frames
   }
 
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
   /// Convert a build ID to a CFUUIDBytes.
   private static func uuidBytesFromBuildID(_ buildID: [UInt8])
     -> CFUUIDBytes {
@@ -396,7 +396,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
     var frames: [Frame] = []
 
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
     withSymbolicator(images: theImages,
                      useSymbolCache: options.contains(.useSymbolCache)) {
       symbolicator in
