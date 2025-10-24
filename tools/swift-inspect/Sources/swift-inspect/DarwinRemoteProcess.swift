@@ -212,12 +212,12 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     })
   }
 
-  func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?) {
+  func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?, offset: Int?) {
     let symbol =
         CSSymbolicatorGetSymbolWithAddressAtTime(self.symbolicator.value, address, kCSNow)
 
     let module = CSSymbolGetSymbolOwner(symbol)
-    return (CSSymbolOwnerGetName(module), CSSymbolGetName(symbol))
+    return (CSSymbolOwnerGetName(module), CSSymbolGetName(symbol), nil)
   }
 
   internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
