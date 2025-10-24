@@ -1014,6 +1014,11 @@ enum ScoreKind: unsigned int {
   SK_EmptyExistentialConversion,
   /// A key path application subscript.
   SK_KeyPathSubscript,
+  /// A pointer conversion where the destination type is a generic parameter.
+  /// This should eventually be removed in favor of outright banning pointer
+  /// conversions for generic parameters. As such we consider it more impactful
+  /// than \c SK_ValueToPointerConversion.
+  SK_GenericParamPointerConversion,
   /// A conversion from a string, array, or inout to a pointer.
   SK_ValueToPointerConversion,
   /// A closure/function conversion to an autoclosure parameter.
@@ -1190,6 +1195,9 @@ struct Score {
 
     case SK_KeyPathSubscript:
       return "key path subscript";
+
+    case SK_GenericParamPointerConversion:
+      return "pointer conversion to generic parameter";
 
     case SK_ValueToPointerConversion:
       return "value-to-pointer conversion";

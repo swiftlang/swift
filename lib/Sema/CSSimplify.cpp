@@ -15403,6 +15403,50 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   llvm_unreachable("bad conversion restriction");
 }
 
+static void increaseScoreForGenericParamPointerConversion(
+    ConstraintSystem &cs, ConversionRestrictionKind kind,
+    ConstraintLocatorBuilder locator) {
+  switch (kind) {
+  case ConversionRestrictionKind::InoutToPointer:
+  case ConversionRestrictionKind::ArrayToPointer:
+  case ConversionRestrictionKind::StringToPointer:
+  case ConversionRestrictionKind::PointerToPointer:
+    break;
+  default:
+    return;
+  }
+
+  auto *loc = cs.getConstraintLocator(locator);
+  auto argInfo = loc->findLast<LocatorPathElt::ApplyArgToParam>();
+  if (!argInfo)
+    return;
+
+  auto overload = cs.findSelectedOverloadFor(cs.getCalleeLocator(loc));
+  if (!overload)
+    return;
+
+  auto *D = overload->choice.getDeclOrNull();
+  if (!D)
+    return;
+
+  auto *param = getParameterAt(D, argInfo->getParamIdx());
+  if (!param)
+    return;
+
+  // Check to see if the parameter is a generic parameter, or dependent member.
+  auto paramTy = param->getInterfaceType()->lookThroughAllOptionalTypes();
+  if (!paramTy->isTypeParameter())
+    return;
+
+  // Don't increase the score if the type parameter is rooted on the protocol
+  // 'Self' type, e.g extensions on `_Pointer` shouldn't be penalized.
+  if (auto *PD = D->getDeclContext()->getSelfProtocolDecl()) {
+    if (PD->getSelfInterfaceType()->isEqual(paramTy->getRootGenericParam()))
+      return;
+  }
+  cs.increaseScore(SK_GenericParamPointerConversion, locator);
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyRestrictedConstraint(
                                        ConversionRestrictionKind restriction,
@@ -15429,6 +15473,13 @@ ConstraintSystem::simplifyRestrictedConstraint(
           downgradeToWarning);
       addFixConstraint(fix, matchKind, type1, type2, locator);
     }
+
+    // Increase the score if needed for a pointer conversion to a generic
+    // parameter type.
+    // FIXME: We ought to consider outright banning pointer conversions to
+    // generic parameter types, in which case this logic could be adjusted to
+    // record a fix instead.
+    increaseScoreForGenericParamPointerConversion(*this, restriction, locator);
 
     addConversionRestriction(type1, type2, restriction);
     return SolutionKind::Solved;
