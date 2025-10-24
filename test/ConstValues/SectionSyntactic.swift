@@ -26,19 +26,19 @@
 
 // operators (should be rejected)
 @section("mysection") let invalidOperator1 = 1 + 1
-// expected-error@-1{{unsupported operator in a '@const' expression}}
+// expected-error@-1{{unsupported operator in a constant expression}}
 @section("mysection") let invalidOperator2 = 3.14 * 2.0
-// expected-error@-1{{unsupported operator in a '@const' expression}}
+// expected-error@-1{{unsupported operator in a constant expression}}
 @section("mysection") let invalidOperator3: Int = -(1)
-// expected-error@-1{{unsupported operator in a '@const' expression}}
+// expected-error@-1{{unsupported operator in a constant expression}}
 
 // non-literal expressions (should be rejected)
 @section("mysection") let invalidNonLiteral1 = Int.max
-// expected-error@-1{{not supported in a '@const' expression}}
+// expected-error@-1{{not supported in a constant expression}}
 @section("mysection") let invalidNonLiteral2 = UInt8(42)
-// expected-error@-1{{not supported in a '@const' expression}}
+// expected-error@-1{{not supported in a constant expression}}
 @section("mysection") let invalidNonLiteral3 = true.hashValue
-// expected-error@-1{{not supported in a '@const' expression}}
+// expected-error@-1{{not supported in a constant expression}}
 
 func foo() -> Int { return 42 }
 func bar(x: Int) -> String { return "test" }
@@ -49,21 +49,21 @@ func bar(x: Int) -> String { return "test" }
 
 // invalid function references (should be rejected)
 @section("mysection") let invalidFuncRef1 = foo()
-// expected-error@-1{{not supported in a '@const' expression}}
+// expected-error@-1{{not supported in a constant expression}}
 @section("mysection") let invalidFuncRef2 = Bool.self.random
-// expected-error@-1{{closures not supported in a '@const' expression}}
+// expected-error@-1{{closures not supported in a constant expression}}
 @section("mysection") let invalidFuncRef3 = (Bool.self as Bool.Type).random
-// expected-error@-1{{not supported in a '@const' expression}}
+// expected-error@-1{{not supported in a constant expression}}
 
 // generic function references (should be rejected)
 @section("mysection") let invalidGenericFunc = [Int].randomElement
-// expected-error@-1{{not supported in a '@const' expression}}
+// expected-error@-1{{not supported in a constant expression}}
 
 // closures (should be rejected)
 @section("mysection") let invalidClosure1 = { }
-// expected-error@-1{{closures not supported in a '@const' expression}}
+// expected-error@-1{{closures not supported in a constant expression}}
 @section("mysection") let invalidClosure2 = { return 42 }
-// expected-error@-1{{closures not supported in a '@const' expression}}
+// expected-error@-1{{closures not supported in a constant expression}}
 
 struct S { }
 enum E { case a }
@@ -73,13 +73,13 @@ enum E { case a }
 
 // invalid metatype references
 @section("mysection") let invalidMetatype1 = Int.self.self
-// expected-error@-1{{type expressions not supported in a '@const' expression}}
+// expected-error@-1{{type expressions not supported in a constant expression}}
 @section("mysection") let invalidMetatype2 = (1 == 1 ? Int.self : Int.self).self
-// expected-error@-1{{type expressions not supported in a '@const' expression}}
+// expected-error@-1{{type expressions not supported in a constant expression}}
 @section("mysection") let invalidMetatype3 = Array<Int>.self // generic
-// expected-error@-1{{type expressions not supported in a '@const' expression}}
+// expected-error@-1{{type expressions not supported in a constant expression}}
 @section("mysection") let invalidMetatype4 = Mirror.self // resilient
-// expected-error@-1{{type expressions not supported in a '@const' expression}}
+// expected-error@-1{{type expressions not supported in a constant expression}}
 
 // tuples
 @section("mysection") let tuple1 = (1, 2, 3, 2.718, true) // ok
@@ -88,15 +88,15 @@ enum E { case a }
 
 // invalid tuples (should be rejected)
 @section("mysection") let invalidTuple1 = (1, 2, Int.max)
-// expected-error@-1{{not supported in a '@const' expression}}
+// expected-error@-1{{not supported in a constant expression}}
 @section("mysection") let invalidTuple2 = (1 + 1, 2)
-// expected-error@-1{{unsupported operator in a '@const' expression}}
+// expected-error@-1{{unsupported operator in a constant expression}}
 
 let someVar = 42
 
 // variables (should be rejected)
 @section("mysection") let invalidVarRef = someVar
-// expected-error@-1{{unable to resolve variable reference in a '@const' expression}}
+// expected-error@-1{{unable to resolve variable reference in a constant expression}}
 
 struct MyCustomExpressibleByIntegerLiteral: ExpressibleByIntegerLiteral {
     init(integerLiteral value: Int) {}
@@ -104,19 +104,19 @@ struct MyCustomExpressibleByIntegerLiteral: ExpressibleByIntegerLiteral {
 
 // custom types (should be rejected)
 @section("mysection") let invalidCustomType1: MyCustomExpressibleByIntegerLiteral = 42
-// expected-error@-1{{unsupported type in a '@const' expression}}
+// expected-error@-1{{unsupported type in a constant expression}}
 @section("mysection") let invalidCustomType2: E = E.a
-// expected-error@-1{{not supported in a '@const' expression}}
+// expected-error@-1{{not supported in a constant expression}}
 @section("mysection") let invalidCustomType3: S = S()
-// expected-error@-1{{not supported in a '@const' expression}}
+// expected-error@-1{{not supported in a constant expression}}
 
 // other standard types (should be rejected)
 @section("mysection") let invalidString = "hello"
-// expected-error@-1{{unsupported type in a '@const' expression}}
+// expected-error@-1{{unsupported type in a constant expression}}
 @section("mysection") let invalidArray = [1, 2, 3]
-// expected-error@-1{{unsupported type in a '@const' expression}}
+// expected-error@-1{{unsupported type in a constant expression}}
 @section("mysection") let invalidDict = ["key": "value"]
-// expected-error@-1{{not supported in a '@const' expression}}
+// expected-error@-1{{not supported in a constant expression}}
 
 // inline array
 @available(SwiftStdlib 6.2, *)
@@ -125,20 +125,20 @@ struct MyCustomExpressibleByIntegerLiteral: ExpressibleByIntegerLiteral {
 // invalid inline array (should be rejected)
 @available(SwiftStdlib 6.2, *)
 @section("mysection") let invalidInlineArray: InlineArray = [1, 2, 3, Int.max]
-// expected-error@-1{{not supported in a '@const' expression}}
+// expected-error@-1{{not supported in a constant expression}}
 
 // optionals (should be rejected)
 @section("mysection") let optional1: Int? = 42
-// expected-error@-1{{unsupported type in a '@const' expression}}
+// expected-error@-1{{unsupported type in a constant expression}}
 @section("mysection") let optional2: Int? = nil
-// expected-error@-1{{unsupported type in a '@const' expression}}
+// expected-error@-1{{unsupported type in a constant expression}}
 @section("mysection") let optional3: Double? = 3.14
-// expected-error@-1{{unsupported type in a '@const' expression}}
+// expected-error@-1{{unsupported type in a constant expression}}
 @section("mysection") let optional4: Bool? = true
-// expected-error@-1{{unsupported type in a '@const' expression}}
+// expected-error@-1{{unsupported type in a constant expression}}
 @section("mysection") let optional5: Bool? = false
-// expected-error@-1{{unsupported type in a '@const' expression}}
+// expected-error@-1{{unsupported type in a constant expression}}
 @section("mysection") let optional6: Int? = 1 + 1
-// expected-error@-1{{unsupported type in a '@const' expression}}
+// expected-error@-1{{unsupported type in a constant expression}}
 @section("mysection") let optional7: Int? = Int.max
-// expected-error@-1{{unsupported type in a '@const' expression}}
+// expected-error@-1{{unsupported type in a constant expression}}
