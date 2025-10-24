@@ -99,7 +99,7 @@ extension TextOutputStream {
 /// To add `TextOutputStreamable` conformance to a custom type, implement the
 /// required `write(to:)` method. Call the given output stream's `write(_:)`
 /// method in your implementation.
-public protocol TextOutputStreamable {
+public protocol TextOutputStreamable: ~Copyable {
   /// Writes a textual representation of this instance into the given output
   /// stream.
   func write<Target: TextOutputStream>(to target: inout Target)
@@ -147,7 +147,7 @@ public protocol TextOutputStreamable {
 ///
 ///     print(p)
 ///     // Prints "(21, 30)"
-public protocol CustomStringConvertible {
+public protocol CustomStringConvertible: ~Copyable {
   /// A textual representation of this instance.
   ///
   /// Calling this property directly is discouraged. Instead, convert an
@@ -182,7 +182,7 @@ public protocol CustomStringConvertible {
 /// The description property of a conforming type must be a value-preserving
 /// representation of the original value. As such, it should be possible to
 /// re-create an instance from its string representation.
-public protocol LosslessStringConvertible: CustomStringConvertible {
+public protocol LosslessStringConvertible: CustomStringConvertible, ~Copyable {
   /// Instantiates an instance of the conforming type from a string
   /// representation.
   init?(_ description: String)
@@ -239,7 +239,7 @@ public protocol LosslessStringConvertible: CustomStringConvertible {
 ///
 ///     print(String(reflecting: p))
 ///     // Prints "(21, 30)"
-public protocol CustomDebugStringConvertible {
+public protocol CustomDebugStringConvertible: ~Copyable {
   /// A textual representation of this instance, suitable for debugging.
   ///
   /// Calling this property directly is discouraged. Instead, convert an
