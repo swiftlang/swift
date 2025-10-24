@@ -4197,11 +4197,6 @@ public:
         !decl->getASTContext().LangOpts.hasFeature(Feature::CImplementation))
       return;
 
-    // Only encourage @_objcImplementation *extension* adopters to adopt
-    // @implementation; @_objcImplementation @_cdecl hasn't been stabilized yet.
-    if (!isa<ExtensionDecl>(decl))
-      return;
-
     auto diag = diagnose(getAttr()->getLocation(),
                          diag::objc_implementation_early_spelling_deprecated);
     diag.fixItReplace(getAttr()->getRangeWithAt(), "@implementation");

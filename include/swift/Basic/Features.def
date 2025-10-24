@@ -278,6 +278,7 @@ LANGUAGE_FEATURE(InoutLifetimeDependence, 0, "Support @_lifetime(&)")
 SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums")
 LANGUAGE_FEATURE(ModuleSelector, 491, "Module selectors (`Module::name` syntax)")
 LANGUAGE_FEATURE(CDecl, 495, "C compatible functions and enums with @c")
+LANGUAGE_FEATURE(CImplementation, 495, "C compatible functions and enums with @c")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -469,9 +470,6 @@ EXPERIMENTAL_FEATURE(ClosureIsolation, true)
 // due to resilient stored properties. Requires OS support; this flag exists for
 // staging purposes.
 EXPERIMENTAL_FEATURE(ObjCImplementationWithResilientStorage, true)
-
-// Enable @implementation on @_cdecl functions.
-EXPERIMENTAL_FEATURE(CImplementation, true)
 
 // Enable @sensitive attribute.
 EXPERIMENTAL_FEATURE(Sensitive, true)
