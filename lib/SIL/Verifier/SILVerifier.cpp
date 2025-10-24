@@ -3191,9 +3191,9 @@ public:
       CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
       SILFunctionConventions initConv(initTy, AI->getModule());
 
-      require(initConv.getNumIndirectSILResults() ==
+      require(initConv.getResults().size() ==
                   AI->getNumInitializedProperties(),
-              "init function has invalid number of indirect results");
+              "init function has invalid number of results");
       checkAssigOrInitInstAccessorArgs(Src->getType(), initConv);
     }
 

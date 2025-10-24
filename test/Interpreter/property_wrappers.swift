@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-sil-opaque-values) | %FileCheck %s
 // REQUIRES: executable_test
 
 protocol Observed: AnyObject {
