@@ -76,6 +76,7 @@ char *_swift_backtrace_demangle(const char *mangledName,
                                 size_t mangledNameLength,
                                 char *outputBuffer,
                                 size_t *outputBufferSize);
+
 #ifdef __cplusplus
 } // namespace backtrace
 } // namespace runtime
