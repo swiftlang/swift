@@ -17,6 +17,11 @@ import Swift
 /// Execute an operation with a cancellation handler that's immediately
 /// invoked if the current task is canceled.
 ///
+/// - Parameters:
+///   - operation: The operation to perform.
+///   - handler: A closure to execute, once, if the operation is canceled.
+///   - isolation: The actor that the operation and cancellation handler are isolated to.
+///
 /// This differs from the operation cooperatively checking for cancellation
 /// and reacting to it in that the cancellation handler is _always_ and
 /// _immediately_ invoked when the task is canceled. For example, even if the
