@@ -264,7 +264,7 @@ int Requirement::compare(const Requirement &other) const {
 
   int compareProtos =
     TypeDecl::compare(getProtocolDecl(), other.getProtocolDecl());
-  assert(compareProtos != 0 && "Duplicate conformance requirements");
+  ASSERT(compareProtos != 0 && "Duplicate conformance requirements");
 
   return compareProtos;
 }
