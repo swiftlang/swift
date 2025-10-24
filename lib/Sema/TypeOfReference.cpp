@@ -2483,7 +2483,7 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
             return constraint->getKind() == ConstraintKind::ApplicableFunction;
           });
 
-      assert(constraints.size() == 1);
+      ASSERT(constraints.size() == 1);
       auto *applicableFn = constraints.front();
       retireConstraint(applicableFn);
 

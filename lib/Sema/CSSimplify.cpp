@@ -11457,22 +11457,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     if (result.actualBaseType)
       baseTy = result.actualBaseType;
 
-    // If only possible choice to refer to member is via keypath
-    // dynamic member dispatch, let's delay solving this constraint
-    // until constraint generation phase is complete, because
-    // subscript dispatch relies on presence of function application.
-    if (result.ViableCandidates.size() == 1) {
-      auto &choice = result.ViableCandidates.front();
-      if (Phase == ConstraintSystemPhase::ConstraintGeneration &&
-          choice.isKeyPathDynamicMemberLookup() &&
-          member.getBaseName().isSubscript()) {
-        // Let's move this constraint to the active
-        // list so it could be picked up right after
-        // constraint generation is done.
-        return formUnsolved(/*activate=*/true);
-      }
-    }
-
     generateOverloadConstraints(
         candidates, memberTy, result.ViableCandidates, useDC, locator,
         result.getFavoredIndex(), /*requiresFix=*/false,
@@ -13947,26 +13931,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     auto instance2 = getFixedTypeRecursive(meta2->getInstanceType(), true);
     if (instance2->isTypeVariableOrMember())
       return formUnsolved();
-
-    auto *argumentsLoc = getConstraintLocator(
-        outerLocator.withPathElement(ConstraintLocator::ApplyArgument));
-
-    auto *argumentList = getArgumentList(argumentsLoc);
-    assert(argumentList);
-
-    // Cannot simplify construction of callable types during constraint
-    // generation when trailing closures are present because such calls
-    // have special trailing closure matching semantics. It's unclear
-    // whether trailing arguments belong to `.init` or implicit
-    // `.callAsFunction` in this case.
-    //
-    // Note that the constraint has to be activate so that solver attempts
-    // once constraint generation is done.
-    if (getPhase() == ConstraintSystemPhase::ConstraintGeneration &&
-        argumentList->hasAnyTrailingClosures() &&
-        instance2->isCallAsFunctionType(DC)) {
-      return formUnsolved(/*activate=*/true);
-    }
 
     // Construct the instance from the input arguments.
     auto simplified = simplifyConstructionConstraint(

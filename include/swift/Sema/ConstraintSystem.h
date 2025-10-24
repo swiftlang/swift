@@ -2137,11 +2137,6 @@ public:
   virtual ~SyntacticElementTargetRewriter() = default;
 };
 
-enum class ConstraintSystemPhase {
-  ConstraintGeneration,
-  Solving
-};
-
 /// Retrieve the closure type from the constraint system.
 struct GetClosureType {
   ConstraintSystem &cs;
@@ -2202,9 +2197,6 @@ private:
   /// A constraint that has failed along the current solver path.
   /// Do not set directly, call \c recordFailedConstraint instead.
   Constraint *failedConstraint = nullptr;
-
-  /// Current phase of the constraint system lifetime.
-  ConstraintSystemPhase Phase = ConstraintSystemPhase::ConstraintGeneration;
 
   /// The set of expressions for which we have generated constraints.
   llvm::SetVector<Expr *> InputExprs;
@@ -2682,30 +2674,6 @@ public:
   /// Retrieve the first constraint that has failed along the solver's path, or
   /// \c nullptr if no constraint has failed.
   Constraint *getFailedConstraint() const { return failedConstraint; }
-
-  ConstraintSystemPhase getPhase() const { return Phase; }
-
-  /// Move constraint system to a new phase of its lifetime.
-  void setPhase(ConstraintSystemPhase newPhase) {
-    if (Phase == newPhase)
-      return;
-
-#ifndef NDEBUG
-    switch (Phase) {
-    case ConstraintSystemPhase::ConstraintGeneration:
-      assert(newPhase == ConstraintSystemPhase::Solving);
-      break;
-
-    case ConstraintSystemPhase::Solving:
-      // We can come back to constraint generation phase while
-      // processing result builder body.
-      assert(newPhase == ConstraintSystemPhase::ConstraintGeneration);
-      break;
-    }
-#endif
-
-    Phase = newPhase;
-  }
 
   /// Check whether constraint system is in valid state e.g.
   /// has left-over active/inactive constraints which should
@@ -3914,7 +3882,7 @@ public:
     // Add this constraint to the constraint graph.
     CG.addConstraint(constraint);
 
-    if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
+    if (isDebugMode() && solverState) {
       auto &log = llvm::errs();
       log.indent(solverState->getCurrentIndent() + 4) << "(added constraint: ";
       constraint->print(log, &getASTContext().SourceMgr,
@@ -3935,7 +3903,7 @@ public:
     if (solverState)
       recordChange(SolverTrail::Change::RetiredConstraint(where, constraint));
 
-    if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
+    if (isDebugMode() && solverState) {
       auto &log = llvm::errs();
       log.indent(solverState->getCurrentIndent() + 4)
           << "(removed constraint: ";
