@@ -1854,13 +1854,17 @@ public class TermInst : Instruction {
 final public class UnreachableInst : TermInst {
 }
 
-final public class ReturnInst : TermInst, UnaryInstruction {
+public protocol ReturnInstruction: TermInst {
+  var returnedValue: Value { get }
+}
+
+final public class ReturnInst : TermInst, UnaryInstruction, ReturnInstruction {
   public var returnedValue: Value { operand.value }
   public override var isFunctionExiting: Bool { true }
 }
 
-final public class ReturnBorrowInst : TermInst {
-  public var returnValue: Value { operands[0].value }
+final public class ReturnBorrowInst : TermInst, ReturnInstruction {
+  public var returnedValue: Value { operands[0].value }
   public var enclosingOperands: OperandArray {
     let ops = operands
     return ops[1..<ops.count]
