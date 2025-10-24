@@ -1,14 +1,21 @@
-;;===--- sil-mode.el ------------------------------------------------------===;;
-;;
+;;; sil-mode.el --- SIL major mode                   -*- lexical-binding: t; -*-
+
+;; Copyright (C) 2014 - 2025  Apple Inc. and the Swift project authors
+
+;; Author: Michael Gottesman <mgottesman@apple.com>
+;; Keywords: languages
+;; Version: 0.0.1
+
+;;; Commentary:
+
 ;; This source file is part of the Swift.org open source project
-;;
-;; Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+
 ;; Licensed under Apache License v2.0 with Runtime Library Exception
 ;;
 ;; See https://swift.org/LICENSE.txt for license information
 ;; See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-;;
-;;===----------------------------------------------------------------------===;;
+
+;;; Code:
 
 (eval-when-compile
   (require 'cl))
@@ -264,9 +271,7 @@
 
 (unless sil-mode-map
   (setq sil-mode-map (make-sparse-keymap))
-  (define-key sil-mode-map "\t" 'tab-to-tab-stop)
-  (define-key sil-mode-map "\es" 'center-line)
-  (define-key sil-mode-map "\eS" 'center-paragraph))
+  (define-key sil-mode-map (kbd "C-c C-c") 'sil-mode-display-function-cfg))
 
 ;;; Helper functions
 
@@ -289,52 +294,52 @@
 (defvar sil-mode-viewcfg-command (get-viewcfg-command)
   "The path to the viewcfg command that should be used")
 
-(defun sil-mode-display-function-cfg()
-  (interactive)
+(defun sil-mode-display-function-cfg (begin end)
+  "Generate a CFG visualization of the function between BEGIN and END if the region is active, or the function at point otherwise."
+  (interactive "r")
   ;; First we need to find the previous '{' and then the next '}'.
   (save-mark-and-excursion
-    (let ((brace-start (re-search-backward "{\s*$"))
-          (brace-end (re-search-forward "^} // end sil function '" nil t))
+    (let ((region (if (region-active-p)
+                      (cons begin end)
+                    (mark-defun)
+                    (cons (region-beginning) (region-end))))
           (process-connection-type nil))
-      ;; See if we failed to find } // end sil function. If we did, search again
-      ;; for ^} itself and see if we find anything.
-      (if (null brace-end)
-          (setq brace-end (re-search-forward "^}")))
       (let ((p (start-process sil-mode-viewcfg-program-name
                               sil-mode-viewcfg-buffer-name
                               sil-mode-viewcfg-command
                               (concat "--renderer=" sil-mode-viewcfg-renderer))))
-        (process-send-region p brace-start brace-end)
-       (process-send-eof p)))))
+        (process-send-region p (car region) (cdr region))
+        (process-send-eof p)))))
+
+(defun sil-mode-extract-index-name-function ()
+  "Extract the name of the SIL function or data structure defined on the current line."
+  (save-excursion
+    (when (re-search-forward "^\\(sil [^@]*@\\([^ :]+\\)\\|\\(sil_vtable\\|enum\\|class\\|struct\\|protocol\\) \\([^ ]+\\)\\)" nil t)
+      (or (match-string 2) (match-string 4)))))
 
 ;;; Top Level Entry point
 
-(defun sil-mode ()
+(define-derived-mode sil-mode prog-mode "SIL"
   "Major mode for editing SIL source files.
-  \\{sil-mode-map}
-  Runs sil-mode-hook on startup."
-  (interactive)
-  (kill-all-local-variables)
-  (use-local-map sil-mode-map)         ;; Provides the local keymap.
-  (setq major-mode 'sil-mode)
+\\{sil-mode-map}
+Runs `sil-mode-hook' on startup."
 
+  :syntax-table sil-mode-syntax-table
   (make-local-variable 'font-lock-defaults)
-  (setq major-mode 'sil-mode           ;; This is how describe-mode
-                                       ;; finds the doc string to print.
-  mode-name "SIL"                      ;; This name goes into the modeline.
-  font-lock-defaults `(sil-font-lock-keywords))
+  (setq
+    font-lock-defaults `(sil-font-lock-keywords))
 
   (setq local-abbrev-table sil-mode-abbrev-table)
-  (set-syntax-table sil-mode-syntax-table)
   (setq comment-start "//")
   (setq tab-stop-list (number-sequence 2 120 2))
   (setq tab-width 2)
-  (run-hooks 'sil-mode-hook))          ;; Finally, this permits the user to
-                                       ;;   customize the mode with a hook.
+  (setq defun-prompt-regexp "^\\(sil\\|enum\\|class\\|struct\\|protocol\\).* ")
+  (setq-local open-paren-in-column-0-is-defun-start nil)
+  (setq imenu-extract-index-name-function 'sil-mode-extract-index-name-function))
 
 ;; Associate .sil files with sil-mode
-(setq auto-mode-alist
-   (append '(("\\.sil$" . sil-mode)) auto-mode-alist))
+;;;###autoload
+(add-to-list 'auto-mode-alist '("\\.sil$" . sil-mode))
 
 (provide 'sil-mode)
-;; end of sil-mode.el
+;;; sil-mode.el ends here
