@@ -48,8 +48,17 @@
 // RUN:   -verify-additional-prefix embedded-opt-in- \
 // RUN:   -enable-experimental-feature CheckImplementationOnly
 
+/// Same diags with CheckImplementationOnlyStrict
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %s -I %t \
+// RUN:   -swift-version 5 -target arm64-apple-none-macho \
+// RUN:   -enable-experimental-feature Embedded \
+// RUN:   -verify-additional-prefix opt-in- -DUseImplementationOnly \
+// RUN:   -verify-additional-prefix embedded-opt-in- \
+// RUN:   -enable-experimental-feature CheckImplementationOnlyStrict
+
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_CheckImplementationOnly
+// REQUIRES: swift_feature_CheckImplementationOnlyStrict
 // REQUIRES: embedded_stdlib_cross_compiling
 
 @_implementationOnly import directs
