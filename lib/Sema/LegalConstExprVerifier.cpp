@@ -237,19 +237,6 @@ checkSupportedWithSectionAttribute(const Expr *expr,
       return std::make_pair(expr, OpaqueDeclRef);
     }
 
-    // Member references for function names are allowed if non-generic
-    if (const MemberRefExpr *memberRef = dyn_cast<MemberRefExpr>(expr)) {
-      if (auto *funcDecl =
-              dyn_cast<FuncDecl>(memberRef->getMember().getDecl())) {
-        if (!funcDecl->isGeneric() &&
-            !funcDecl->getDeclContext()->isGenericContext()) {
-          continue;
-        }
-        return std::make_pair(expr, OpaqueFuncDeclRef);
-      }
-      return std::make_pair(expr, OpaqueDeclRef);
-    }
-
     // DotSelfExpr for metatype references (but only a direct TypeExpr inside)
     if (const DotSelfExpr *dotSelfExpr = dyn_cast<DotSelfExpr>(expr)) {
       if (const TypeExpr *typeExpr =

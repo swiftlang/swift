@@ -21,6 +21,9 @@
 @section("mysection") let boolLiteral1 = true // ok
 @section("mysection") let boolLiteral2 = false // ok
 
+// magic literals
+@section("mysection") let invalidNonLiteral4 = #line
+
 // operators (should be rejected)
 @section("mysection") let invalidOperator1 = 1 + 1
 // expected-error@-1{{unsupported operator in a '@const' expression}}
@@ -31,8 +34,10 @@
 
 // non-literal expressions (should be rejected)
 @section("mysection") let invalidNonLiteral1 = Int.max
-// expected-error@-1{{unable to resolve variable reference in a '@const' expression}}
+// expected-error@-1{{not supported in a '@const' expression}}
 @section("mysection") let invalidNonLiteral2 = UInt8(42)
+// expected-error@-1{{not supported in a '@const' expression}}
+@section("mysection") let invalidNonLiteral3 = true.hashValue
 // expected-error@-1{{not supported in a '@const' expression}}
 
 func foo() -> Int { return 42 }
@@ -83,7 +88,7 @@ enum E { case a }
 
 // invalid tuples (should be rejected)
 @section("mysection") let invalidTuple1 = (1, 2, Int.max)
-// expected-error@-1{{unable to resolve variable reference in a '@const' expression}}
+// expected-error@-1{{not supported in a '@const' expression}}
 @section("mysection") let invalidTuple2 = (1 + 1, 2)
 // expected-error@-1{{unsupported operator in a '@const' expression}}
 
@@ -120,7 +125,7 @@ struct MyCustomExpressibleByIntegerLiteral: ExpressibleByIntegerLiteral {
 // invalid inline array (should be rejected)
 @available(SwiftStdlib 6.2, *)
 @section("mysection") let invalidInlineArray: InlineArray = [1, 2, 3, Int.max]
-// expected-error@-1{{unable to resolve variable reference in a '@const' expression}}
+// expected-error@-1{{not supported in a '@const' expression}}
 
 // optionals (should be rejected)
 @section("mysection") let optional1: Int? = 42
