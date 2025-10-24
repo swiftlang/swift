@@ -209,7 +209,8 @@ diagnoseIfModuleImportsShadowingDecl(ModuleInterfaceOptions const &Opts,
   using namespace namelookup;
 
   SmallVector<ValueDecl *, 4> decls;
-  lookupInModule(importedModule, importingModule->getName(), decls,
+  lookupInModule(importedModule, importingModule->getName(),
+                 /*hasModuleSelector=*/false, decls,
                  NLKind::UnqualifiedLookup, ResolutionKind::TypesOnly,
                  importedModule, SourceLoc(),
                  NL_UnqualifiedDefault | NL_IncludeUsableFromInline);
@@ -871,6 +872,51 @@ const StringLiteral InheritedProtocolCollector::DummyProtocolName =
 
 // MARK: Interface emission
 
+static void printSwiftInterfaceDecls(raw_ostream &out,
+                                     ModuleInterfaceOptions const &Opts,
+                                     ModuleDecl *M,
+                                     const PrintOptions &printOptions,
+                                     bool useModuleSelectors) {
+  PrintOptions::OverrideScope scope(printOptions);
+  OVERRIDE_PRINT_OPTION(scope, UseModuleSelectors, useModuleSelectors);
+
+  InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
+
+  SmallVector<Decl *, 16> topLevelDecls;
+  M->getTopLevelDeclsWithAuxiliaryDecls(topLevelDecls);
+  for (const Decl *D : topLevelDecls) {
+    InheritedProtocolCollector::collectProtocols(inheritedProtocolMap, D);
+
+    if (!D->shouldPrintInContext(printOptions) ||
+        !printOptions.shouldPrint(D)) {
+
+      InheritedProtocolCollector::collectSkippedConditionalConformances(
+          inheritedProtocolMap, D, printOptions);
+      continue;
+    }
+
+    D->print(out, printOptions);
+    out << "\n";
+
+    if (!useModuleSelectors)
+      diagnoseIfDeclShadowsKnownModule(Opts, const_cast<Decl *>(D), M);
+  }
+
+  // Print dummy extensions for any protocols that were indirectly conformed to.
+  bool needDummyProtocolDeclaration = false;
+  for (const auto &nominalAndCollector : inheritedProtocolMap) {
+    const NominalTypeDecl *nominal = nominalAndCollector.first;
+    const InheritedProtocolCollector &collector = nominalAndCollector.second;
+    collector.printSynthesizedExtensionIfNeeded(out, printOptions, M, nominal);
+    needDummyProtocolDeclaration |=
+        collector.printInaccessibleConformanceExtensionIfNeeded(out,
+                                                                printOptions,
+                                                                nominal);
+  }
+  if (needDummyProtocolDeclaration)
+    InheritedProtocolCollector::printDummyProtocolDeclaration(out);
+}
+
 bool swift::emitSwiftInterface(raw_ostream &out,
                                ModuleInterfaceOptions const &Opts,
                                ModuleDecl *M) {
@@ -890,40 +936,22 @@ bool swift::emitSwiftInterface(raw_ostream &out,
       Opts.InterfaceContentMode,
       useExportedModuleNames,
       Opts.AliasModuleNames, &aliasModuleNamesTargets);
-  InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
-  SmallVector<Decl *, 16> topLevelDecls;
-  M->getTopLevelDeclsWithAuxiliaryDecls(topLevelDecls);
-  for (const Decl *D : topLevelDecls) {
-    InheritedProtocolCollector::collectProtocols(inheritedProtocolMap, D);
-
-    if (!D->shouldPrintInContext(printOptions) ||
-        !printOptions.shouldPrint(D)) {
-
-      InheritedProtocolCollector::collectSkippedConditionalConformances(
-          inheritedProtocolMap, D, printOptions);
-      continue;
-    }
-
-    D->print(out, printOptions);
-    out << "\n";
-
-    diagnoseIfDeclShadowsKnownModule(Opts, const_cast<Decl *>(D), M);
+  switch (Opts.UseModuleSelectors) {
+  case ModuleInterfaceOptions::ModuleSelectorUsage::Never:
+    printSwiftInterfaceDecls(out, Opts, M, printOptions, false);
+    break;
+  case ModuleInterfaceOptions::ModuleSelectorUsage::Always:
+    printSwiftInterfaceDecls(out, Opts, M, printOptions, true);
+    break;
+  case ModuleInterfaceOptions::ModuleSelectorUsage::Conditional:
+    out << "#if swift(>=6.2) && $ModuleSelector\n";
+    printSwiftInterfaceDecls(out, Opts, M, printOptions, true);
+    out << "#else\n";
+    printSwiftInterfaceDecls(out, Opts, M, printOptions, false);
+    out << "#endif\n";
+    break;
   }
-
-  // Print dummy extensions for any protocols that were indirectly conformed to.
-  bool needDummyProtocolDeclaration = false;
-  for (const auto &nominalAndCollector : inheritedProtocolMap) {
-    const NominalTypeDecl *nominal = nominalAndCollector.first;
-    const InheritedProtocolCollector &collector = nominalAndCollector.second;
-    collector.printSynthesizedExtensionIfNeeded(out, printOptions, M, nominal);
-    needDummyProtocolDeclaration |=
-        collector.printInaccessibleConformanceExtensionIfNeeded(out,
-                                                                printOptions,
-                                                                nominal);
-  }
-  if (needDummyProtocolDeclaration)
-    InheritedProtocolCollector::printDummyProtocolDeclaration(out);
 
   if (Opts.DebugPrintInvalidSyntax)
     out << "#__debug_emit_invalid_swiftinterface_syntax__\n";

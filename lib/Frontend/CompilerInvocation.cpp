@@ -535,8 +535,31 @@ static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
   OS << '"';
 }
 
+static void ParseModuleInterfaceQualificationArg(ModuleInterfaceOptions &Opts,
+                                                 StringRef name,
+                                                 StringRef value,
+                                                 DiagnosticEngine &diags) {
+  if (value == "alias") {
+    Opts.AliasModuleNames = true;
+    Opts.UseModuleSelectors =
+      ModuleInterfaceOptions::ModuleSelectorUsage::Never;
+  } else if (value == "selector") {
+    Opts.UseModuleSelectors =
+      ModuleInterfaceOptions::ModuleSelectorUsage::Always;
+  } else if (value == "conditional") {
+    Opts.UseModuleSelectors =
+      ModuleInterfaceOptions::ModuleSelectorUsage::Conditional;
+  } else if (value == "none") {
+    Opts.UseModuleSelectors =
+      ModuleInterfaceOptions::ModuleSelectorUsage::Never;
+  } else if (!value.empty()) {
+    diags.diagnose(SourceLoc(), diag::error_invalid_arg_value, name, value);
+  }
+}
+
 static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
-                                     ArgList &Args) {
+                                     ArgList &Args,
+                                     DiagnosticEngine &diags) {
   using namespace options;
 
   Opts.PreserveTypesAsWritten |=
@@ -545,6 +568,16 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasFlag(OPT_alias_module_names_in_module_interface,
                  OPT_disable_alias_module_names_in_module_interface,
                  ::getenv("SWIFT_ALIAS_MODULE_NAMES_IN_INTERFACES"));
+
+  if (const Arg *A = Args.getLastArg(OPT_module_interface_qualification)) {
+    ParseModuleInterfaceQualificationArg(Opts, A->getAsString(Args),
+                                         A->getValue(), diags);
+  } else if (auto value = ::getenv("SWIFT_MODULE_INTERFACE_QUALIFICATION")) {
+    ParseModuleInterfaceQualificationArg(Opts,
+                                         "SWIFT_MODULE_INTERFACE_QUALIFICATION",
+                                         StringRef(value), diags);
+  }
+
   Opts.PrintFullConvention |=
     Args.hasArg(OPT_experimental_print_full_convention);
   Opts.DebugPrintInvalidSyntax |=
@@ -4164,7 +4197,7 @@ bool CompilerInvocation::parseArgs(
     setMainExecutablePath(mainExecutablePath);
   }
 
-  ParseModuleInterfaceArgs(ModuleInterfaceOpts, ParsedArgs);
+  ParseModuleInterfaceArgs(ModuleInterfaceOpts, ParsedArgs, Diags);
   SaveModuleInterfaceArgs(ModuleInterfaceOpts, FrontendOpts, ParsedArgs, Diags);
 
   if (ParseCASArgs(CASOpts, ParsedArgs, Diags, FrontendOpts)) {

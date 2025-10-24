@@ -2067,6 +2067,9 @@ struct MemberLookupResult {
     /// 'accesses' attributes of the init accessor and therefore canno
     /// t be referenced in its body.
     UR_UnavailableWithinInitAccessor,
+
+    /// The module selector in the `DeclNameRef` does not match this candidate.
+    UR_WrongModule
   };
 
   /// This is a list of considered (but rejected) candidates, along with a

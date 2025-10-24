@@ -646,7 +646,8 @@ private:
                                      const LangOptions &LangOpts,
                                      const ClangImporterOptions &clangImporterOpts,
                                      const CASOptions &casOpts,
-                                     bool suppressNotes, bool suppressRemarks);
+                                     bool suppressNotes, bool suppressRemarks,
+                                     PrintDiagnosticNamesMode diagnosticNamesMode);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
                                            DiagnosticEngine &subInstanceDiags,
                                            SwiftInterfaceInfo &interfaceInfo,
