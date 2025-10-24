@@ -129,6 +129,58 @@ getMaximallyAbstractedLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredTyp
   return {lowered, IGM.getTypeInfo(lowered)};
 }
 
+static bool emitLLVMIRIntrinsicCall(IRGenFunction &IGF, Identifier FnID,
+                                    Explosion &args, Explosion &out) {
+  const IntrinsicInfo &IInfo = IGF.getSILModule().getIntrinsicInfo(FnID);
+  llvm::Intrinsic::ID IID = IInfo.ID;
+
+  if (IID == llvm::Intrinsic::not_intrinsic)
+    return false;
+
+  // Emit non-mergeable traps only.
+  if (IGF.Builder.isTrapIntrinsic(IID)) {
+    IGF.Builder.CreateNonMergeableTrap(IGF.IGM, StringRef());
+    return true;
+  }
+
+  // Implement the ptrauth builtins as no-ops when the Clang
+  // intrinsics are disabled.
+  if ((IID == llvm::Intrinsic::ptrauth_sign ||
+       IID == llvm::Intrinsic::ptrauth_auth ||
+       IID == llvm::Intrinsic::ptrauth_resign ||
+       IID == llvm::Intrinsic::ptrauth_strip) &&
+      !IGF.IGM.getClangASTContext().getLangOpts().PointerAuthIntrinsics) {
+    out.add(args.claimNext()); // Return the input pointer.
+    (void)args.claimNext();    // Ignore the key.
+    if (IID != llvm::Intrinsic::ptrauth_strip) {
+      (void)args.claimNext(); // Ignore the discriminator.
+    }
+    if (IID == llvm::Intrinsic::ptrauth_resign) {
+      (void)args.claimNext(); // Ignore the new key.
+      (void)args.claimNext(); // Ignore the new discriminator.
+    }
+    return true;
+  }
+
+  SmallVector<llvm::Type *, 4> ArgTys;
+  for (auto T : IInfo.Types)
+    ArgTys.push_back(IGF.IGM.getStorageTypeForLowered(T->getCanonicalType()));
+
+  auto F = llvm::Intrinsic::getOrInsertDeclaration(
+      &IGF.IGM.Module, (llvm::Intrinsic::ID)IID, ArgTys);
+  llvm::FunctionType *FT = F->getFunctionType();
+  SmallVector<llvm::Value *, 8> IRArgs;
+  for (unsigned i = 0, e = FT->getNumParams(); i != e; ++i)
+    IRArgs.push_back(args.claimNext());
+  llvm::Value *TheCall =
+      IGF.Builder.CreateIntrinsicCall((llvm::Intrinsic::ID)IID, ArgTys, IRArgs);
+
+  if (!TheCall->getType()->isVoidTy())
+    extractScalarResults(IGF, TheCall->getType(), TheCall, out);
+
+  return true;
+}
+
 /// emitBuiltinCall - Emit a call to a builtin function.
 void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
                             BuiltinInst *Inst, ArrayRef<SILType> argTypes,
@@ -136,6 +188,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   auto &IGM = IGF.IGM;
 
   Identifier FnId = Inst->getName();
+
+  // Before we do anything, lets see if we have an LLVM IR Intrinsic Call. If we
+  // did, we can return early.
+  if (emitLLVMIRIntrinsicCall(IGF, FnId, args, out))
+    return;
+
   SILType resultType = Inst->getType();
   SubstitutionMap substitutions = Inst->getSubstitutions();
 
@@ -410,55 +468,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (Builtin.ID == BuiltinValueKind::InitializeDistributedRemoteActor) {
     auto actorMetatype = args.claimNext();
     emitDistributedActorInitializeRemote(IGF, resultType, actorMetatype, out);
-    return;
-  }
-
-  // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
-  const IntrinsicInfo &IInfo = IGF.getSILModule().getIntrinsicInfo(FnId);
-  llvm::Intrinsic::ID IID = IInfo.ID;
-
-  // Emit non-mergeable traps only.
-  if (IGF.Builder.isTrapIntrinsic(IID)) {
-    IGF.Builder.CreateNonMergeableTrap(IGF.IGM, StringRef());
-    return;
-  }
-
-  // Implement the ptrauth builtins as no-ops when the Clang
-  // intrinsics are disabled.
-  if ((IID == llvm::Intrinsic::ptrauth_sign ||
-       IID == llvm::Intrinsic::ptrauth_auth ||
-       IID == llvm::Intrinsic::ptrauth_resign ||
-       IID == llvm::Intrinsic::ptrauth_strip) &&
-      !IGF.IGM.getClangASTContext().getLangOpts().PointerAuthIntrinsics) {
-    out.add(args.claimNext()); // Return the input pointer.
-    (void) args.claimNext();   // Ignore the key.
-    if (IID != llvm::Intrinsic::ptrauth_strip) {
-      (void) args.claimNext(); // Ignore the discriminator.
-    }
-    if (IID == llvm::Intrinsic::ptrauth_resign) {
-      (void) args.claimNext(); // Ignore the new key.
-      (void) args.claimNext(); // Ignore the new discriminator.
-    }
-    return;
-  }
-
-  if (IID != llvm::Intrinsic::not_intrinsic) {
-    SmallVector<llvm::Type*, 4> ArgTys;
-    for (auto T : IInfo.Types)
-      ArgTys.push_back(IGF.IGM.getStorageTypeForLowered(T->getCanonicalType()));
-
-    auto F = llvm::Intrinsic::getOrInsertDeclaration(
-        &IGF.IGM.Module, (llvm::Intrinsic::ID)IID, ArgTys);
-    llvm::FunctionType *FT = F->getFunctionType();
-    SmallVector<llvm::Value*, 8> IRArgs;
-    for (unsigned i = 0, e = FT->getNumParams(); i != e; ++i)
-      IRArgs.push_back(args.claimNext());
-    llvm::Value *TheCall = IGF.Builder.CreateIntrinsicCall(
-        (llvm::Intrinsic::ID)IID, ArgTys, IRArgs);
-
-    if (!TheCall->getType()->isVoidTy())
-      extractScalarResults(IGF, TheCall->getType(), TheCall, out);
-
     return;
   }
 
