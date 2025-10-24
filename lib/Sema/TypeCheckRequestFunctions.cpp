@@ -172,6 +172,13 @@ bool SuppressesConformanceRequest::evaluate(Evaluator &evaluator,
     if (other == kp)
       return true;
   }
+
+  for (auto *attr :
+       nominal->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    if (attr->getProtocol()->isSpecificProtocol(kp) && attr->isSuppressed())
+      return true;
+  }
+
   return false;
 }
 

@@ -3306,6 +3306,13 @@ DeclAttributes::getEffectiveSendableAttr() const {
   if (auto sendableAttr = getAttribute<SendableAttr>())
     return sendableAttr;
 
+  // ~Sendable on declarations imported from Objective-C.
+  for (auto *attr : getAttributes<SynthesizedProtocolAttr>()) {
+    if (attr->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+        attr->isSuppressed())
+      return nullptr;
+  }
+
   return assumedAttr;
 }
 
