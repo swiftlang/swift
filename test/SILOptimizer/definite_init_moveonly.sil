@@ -1,0 +1,40 @@
+// RUN: %target-sil-opt -module-name definite_init_moveonly -enable-sil-verify-all -definite-init %s | %FileCheck %s
+
+import Swift
+
+class C {
+	init()
+}
+
+struct S: ~Copyable {
+	var c1: C
+	var c2: C
+}
+
+// Ensure that, when DI introduces cleanups for partially initialized move-
+// only values, the cleanups are applied under the `mark_unresolved`
+// instruction, so that the move checker properly accounts for the cleanups.
+// #85063 | rdar://163194098
+
+// CHECK-LABEL: sil [ossa] @$test
+sil [ossa] @$test : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+	%s = alloc_stack [lexical] [var_decl] $S, var, name "butts", type $S
+	%s_marked = mark_uninitialized [rootself] %s
+	// CHECK: [[S_MOVEONLY:%.*]] = mark_unresolved_non_copyable_value
+	%s_moveonly = mark_unresolved_non_copyable_value [consumable_and_assignable] %s_marked
+	%s_access = begin_access [modify] [static] %s_moveonly
+	%c1 = struct_element_addr %s_access, #S.c1
+	assign %c to %c1
+	end_access %s_access
+	// CHECK: br [[NEXT:bb[0-9]+]]
+	br next
+
+	// CHECK: [[NEXT]]:
+	// CHECK: [[FIELD_TO_DESTROY:%.*]] = struct_element_addr [[S_MOVEONLY]], #S.c1
+	// CHECK: destroy_addr [[FIELD_TO_DESTROY]]
+next:
+	destroy_addr %s_moveonly
+	dealloc_stack %s
+	return undef : $()
+}
