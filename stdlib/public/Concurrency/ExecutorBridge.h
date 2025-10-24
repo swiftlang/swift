@@ -23,6 +23,9 @@ namespace swift {
 extern "C" SWIFT_CC(swift)
 SerialExecutorRef swift_getMainExecutor();
 
+extern "C" SWIFT_CC(swift)
+TaskExecutorRef swift_getDefaultExecutor();
+
 #if !SWIFT_CONCURRENCY_EMBEDDED
 extern "C" SWIFT_CC(swift)
 void *swift_createDispatchEventC(void (*handler)(void *), void *context);

@@ -11,6 +11,7 @@
 # ----------------------------------------------------------------------------
 
 import os
+import platform
 
 from . import cmark
 from . import foundation
@@ -23,7 +24,7 @@ from . import swift
 from . import swift_testing
 from . import xctest
 from .. import shell
-from ..targets import StdlibDeploymentTarget
+from ..targets import StdlibDeploymentTarget, darwin_toolchain_prefix
 
 
 class SwiftPM(product.Product):
@@ -50,6 +51,10 @@ class SwiftPM(product.Product):
             *,
             compile_only_for_running_host_architecture=False,
     ):
+        toolchain_path = _get_toolchain_path(host_target, self, self.args)
+        swift_lib_path = os.path.join(toolchain_path,
+                                      'usr', 'lib', 'swift', 'macosx')
+
         script_path = os.path.join(
             self.source_dir, 'Utilities', 'bootstrap')
 
@@ -79,7 +84,8 @@ class SwiftPM(product.Product):
             "--cmake-path", self.toolchain.cmake,
             "--ninja-path", self.toolchain.ninja,
             "--build-dir", self.build_dir,
-            "--llbuild-build-dir", llbuild_build_dir
+            "--llbuild-build-dir", llbuild_build_dir,
+            "--extra-dynamic-library-path", swift_lib_path
         ]
 
         # Pass Dispatch directory down if we built it
@@ -169,3 +175,16 @@ class SwiftPM(product.Product):
                 xctest.XCTest,
                 llbuild.LLBuild,
                 swift_testing.SwiftTesting]
+
+def _get_toolchain_path(host_target, product, args):
+    # TODO check if we should prefer using product.install_toolchain_path
+    # this logic initially was inside run_build_script_helper
+    # and was factored out so it can be used in testing as well
+
+    toolchain_path = product.host_install_destdir(host_target)
+    if platform.system() == 'Darwin':
+        # The prefix is an absolute path, so concatenate without os.path.
+        toolchain_path += \
+            darwin_toolchain_prefix(args.install_prefix)
+
+    return toolchain_path
