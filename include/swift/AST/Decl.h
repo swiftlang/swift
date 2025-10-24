@@ -1134,8 +1134,7 @@ public:
   /// Returns the active `@backDeployed` attribute and the `AvailabilityRange`
   /// in which the decl is available as ABI.
   std::optional<std::pair<const BackDeployedAttr *, AvailabilityRange>>
-  getBackDeployedAttrAndRange(ASTContext &Ctx,
-                              bool forTargetVariant = false) const;
+  getBackDeployedAttrAndRange(bool forTargetVariant = false) const;
 
   /// Returns true if the decl has a valid and active `@backDeployed` attribute.
   bool isBackDeployed() const;

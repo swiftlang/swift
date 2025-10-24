@@ -5266,7 +5266,7 @@ void AttributeChecker::checkBackDeployedAttrs(
   std::map<PlatformKind, SourceLoc> seenPlatforms;
 
   const BackDeployedAttr *ActiveAttr = nullptr;
-  if (auto AttrAndRange = D->getBackDeployedAttrAndRange(Ctx))
+  if (auto AttrAndRange = D->getBackDeployedAttrAndRange())
     ActiveAttr = AttrAndRange->first;
 
   for (auto *Attr : Attrs) {

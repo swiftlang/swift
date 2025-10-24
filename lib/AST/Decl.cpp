@@ -597,13 +597,13 @@ Decl::getIntroducedOSVersion(PlatformKind Kind) const {
 }
 
 std::optional<std::pair<const BackDeployedAttr *, AvailabilityRange>>
-Decl::getBackDeployedAttrAndRange(ASTContext &Ctx,
-                                  bool forTargetVariant) const {
-  if (auto *attr = getAttrs().getBackDeployed(Ctx, forTargetVariant)) {
+Decl::getBackDeployedAttrAndRange(bool forTargetVariant) const {
+  auto &ctx = getASTContext();
+  if (auto *attr = getAttrs().getBackDeployed(ctx, forTargetVariant)) {
     auto version = attr->getVersion();
     AvailabilityDomain ignoredDomain;
     AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
-        attr, getASTContext(), ignoredDomain, version);
+        attr, ctx, ignoredDomain, version);
 
     // If the remap for fallback resulted in 1.0, then the
     // backdeployment prior to that is not meaningful.
@@ -615,14 +615,12 @@ Decl::getBackDeployedAttrAndRange(ASTContext &Ctx,
 
   // Accessors may inherit `@backDeployed`.
   if (auto *AD = dyn_cast<AccessorDecl>(this))
-    return AD->getStorage()->getBackDeployedAttrAndRange(Ctx, forTargetVariant);
+    return AD->getStorage()->getBackDeployedAttrAndRange(forTargetVariant);
 
   return std::nullopt;
 }
 
 bool Decl::isBackDeployed() const {
-  auto &Ctx = getASTContext();
-
   // A function declared in a local context can never be back-deployed.
   if (getDeclContext()->isLocalContext())
     return false;
@@ -636,11 +634,11 @@ bool Decl::isBackDeployed() const {
       return false;
   }
 
-  if (getBackDeployedAttrAndRange(Ctx))
+  if (getBackDeployedAttrAndRange())
     return true;
 
-  if (Ctx.LangOpts.TargetVariant) {
-    if (getBackDeployedAttrAndRange(Ctx, /*forTargetVariant=*/true))
+  if (getASTContext().LangOpts.TargetVariant) {
+    if (getBackDeployedAttrAndRange(/*forTargetVariant=*/true))
       return true;
   }
 
@@ -1482,7 +1480,7 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
 
   // When computing availability for linkage, use the "before" version from
   // the @backDeployed attribute, if present.
-  if (auto backDeployedAttrAndRange = getBackDeployedAttrAndRange(ctx))
+  if (auto backDeployedAttrAndRange = getBackDeployedAttrAndRange())
     return backDeployedAttrAndRange->second;
 
   auto containingContext = AvailabilityInference::annotatedAvailableRange(this);
