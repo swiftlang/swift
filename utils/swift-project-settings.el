@@ -430,6 +430,7 @@ files in the same directory."
       (,@gyb-targets "--" ,swiftc ,@swiftc-arguments ,@swift-sources))))
 
 (require 'flymake)
+(require 'flymake-proc nil 'noerror)
 (add-to-list 'flymake-allowed-file-name-masks '(".+\\.swift.gyb$" flymake-swift-init))
 
 (provide 'swift-project-settings)
