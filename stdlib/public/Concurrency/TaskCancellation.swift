@@ -19,7 +19,9 @@ import Swift
 ///
 /// - Parameters:
 ///   - operation: The operation to perform.
-///   - handler: A closure to execute, once, if the operation is canceled.
+///   - handler: A closure to execute on cancellation.
+///     If the task is canceled, this closure is called at most once;
+///     otherwise, it isn't called.
 ///   - isolation: The actor that the operation and cancellation handler are isolated to.
 ///
 /// This differs from the operation cooperatively checking for cancellation
