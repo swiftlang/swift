@@ -18,40 +18,9 @@
 #include <cstddef>
 #include <new>
 
-#if SWIFT_STDLIB_HAS_DLADDR
-#include <dlfcn.h>
-#endif
-
 #if defined(__ELF__)
-extern "C" const char __dso_handle[];
 extern "C" const char __ehdr_start[] __attribute__((__weak__));
 #endif
-
-static const void *getBaseAddress(void) {
-#if defined(__ELF__)
-  if (&__ehdr_start != nullptr) {
-    return __ehdr_start;
-  }
-
-#if SWIFT_STDLIB_HAS_DLADDR
-  // We've hit an edge case where the linker was invoked such that the ELF
-  // header was not placed in a loadable section (or some such) and as a result
-  // __ehdr_start was not declared. Fall back to calling dladdr().
-  //
-  // NOTE: We cannot use SymbolInfo::lookup() here because this code is linked
-  // directly into each Swift binary rather than being exported from the Swift
-  // runtime.
-  Dl_info info;
-  if (dladdr(__dso_handle, &info)) {
-    return info.dli_fbase;
-  }
-#endif
-#elif defined(__wasm__)
-  // NOTE: Multi images in a single process is not yet stabilized in WebAssembly
-  // toolchain outside of Emscripten.
-#endif
-  return nullptr;
-}
 
 #if SWIFT_ENABLE_BACKTRACING
 // Drag in a symbol from the backtracer, to force the static linker to include
@@ -119,9 +88,19 @@ static void swift_image_constructor() {
   { reinterpret_cast<uintptr_t>(&__start_##name),                              \
     static_cast<uintptr_t>(&__stop_##name - &__start_##name) }
 
+    const void *baseAddress = nullptr;
+#if defined(__ELF__)
+  if (&__ehdr_start != nullptr) {
+    baseAddress = __ehdr_start;
+  }
+#elif defined(__wasm__)
+  // NOTE: Multi images in a single process is not yet stabilized in WebAssembly
+  // toolchain outside of Emscripten.
+#endif
+
   ::new (&sections) swift::MetadataSections {
       swift::CurrentSectionMetadataVersion,
-      getBaseAddress(),
+      baseAddress,
 
       nullptr,
       nullptr,

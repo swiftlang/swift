@@ -36,6 +36,16 @@ namespace swift {
 
 SWIFT_RUNTIME_EXPORT
 void swift_addNewDSOImage(swift::MetadataSections *sections) {
+#if defined(__ELF__)
+  if (!sections->baseAddress || sections->version <= 4) {
+    // The base address was either unavailable at link time or is set to the
+    // wrong value and will need to be recomputed. We can use the address of the
+    // sections structure and derive the base address from there.
+    if (auto info = swift::SymbolInfo::lookup(sections)) {
+      sections->baseAddress = info->getBaseAddress();
+    }
+  }
+#endif
   auto baseAddress = sections->baseAddress;
 
   const auto &protocols_section = sections->swift5_protocols;
