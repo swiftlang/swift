@@ -8,9 +8,9 @@ struct RefCountedType {
 __attribute__((swift_attr("retain:retainRefCounted")))
 __attribute__((swift_attr("release:releaseRefCounted")));
 
-RefCountedType& getRefCountedByRef(); // expected-note {{'getRefCountedByRef()' is defined here}}
-RefCountedType& createRefCountedByRef(); // expected-note {{'createRefCountedByRef()' is defined here}}
-RefCountedType& copyRefCountedByRef(); // expected-note {{'copyRefCountedByRef()' is defined here}}   
+RefCountedType& getRefCountedByRef(); // expected-note {{annotate 'getRefCountedByRef()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
+RefCountedType& createRefCountedByRef(); // expected-note {{annotate 'createRefCountedByRef()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
+RefCountedType& copyRefCountedByRef(); // expected-note {{annotate 'copyRefCountedByRef()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
 
 } // namespace NoAnnotations
 
