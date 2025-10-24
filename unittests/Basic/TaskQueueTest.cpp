@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <condition_variable>
 #include <mutex>
 #include <thread>
 
@@ -93,9 +94,15 @@ TEST(TaskQueueTest, TaskSignalHandling) {
   bool TaskSignalled = false;
   int ReceivedSignal = 0;
   ProcessId ChildPid = 0;
+  std::mutex PidMutex;
+  std::condition_variable PidCv;
 
   auto TaskBegan = [&](ProcessId Pid, void *Context) {
-    ChildPid = Pid;
+    {
+      std::lock_guard<std::mutex> lock(PidMutex);
+      ChildPid = Pid;
+    }
+    PidCv.notify_one();
   };
 
   auto TaskSignalledCallback = [&](ProcessId Pid, llvm::StringRef ErrorMsg,
@@ -117,7 +124,11 @@ TEST(TaskQueueTest, TaskSignalHandling) {
     TQ.execute(TaskBegan, nullptr, TaskSignalledCallback);
   });
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  // Wait for the task to actually start and get its PID
+  {
+    std::unique_lock<std::mutex> lock(PidMutex);
+    PidCv.wait_for(lock, std::chrono::seconds(5), [&] { return ChildPid > 0; });
+  }
 
   if (ChildPid > 0) {
     EXPECT_EQ(0, kill(ChildPid, SIGTERM)) << "Should kill the specific child process we spawned";
