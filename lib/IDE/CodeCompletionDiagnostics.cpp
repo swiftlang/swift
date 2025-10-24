@@ -13,7 +13,6 @@
 #include "CodeCompletionDiagnostics.h"
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsIDE.h"
