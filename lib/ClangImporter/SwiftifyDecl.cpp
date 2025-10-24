@@ -37,7 +37,7 @@ namespace {
 ValueDecl *getKnownSingleDecl(ASTContext &SwiftContext, StringRef DeclName) {
   SmallVector<ValueDecl *, 1> decls;
   SwiftContext.lookupInSwiftModule(DeclName, decls);
-  assert(decls.size() < 2);
+  ASSERT(decls.size() < 2);
   if (decls.size() != 1) return nullptr;
   return decls[0];
 }
@@ -468,7 +468,7 @@ public:
     out << "\", paramInfo: [";
     // reset firstParam inside paramInfo array. At this point firstParam will
     // always be false, so no need to save the current value.
-    assert(!firstParam);
+    ASSERT(!firstParam);
     firstParam = true;
     bool hadAttributes = swiftifyImpl(ImporterImpl, *this, Method, ClangDecl);
     firstParam = false;
