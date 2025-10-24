@@ -3265,8 +3265,13 @@ namespace {
           conformToCxxPairIfNeeded(Impl, nominalDecl, decl);
           conformToCxxOptionalIfNeeded(Impl, nominalDecl, decl);
           conformToCxxVectorIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxFunctionIfNeeded(Impl, nominalDecl, decl);
           conformToCxxSpanIfNeeded(Impl, nominalDecl, decl);
+
+          if (decl->getName() == "function") {
+            auto closureCtor = synthesizer.makeClosureConstructor(nominalDecl);
+            if (closureCtor)
+              nominalDecl->addMember(closureCtor);
+          }
         }
       }
 
