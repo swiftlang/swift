@@ -390,7 +390,7 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER=1")
   endif()
 
-  if(SWIFT_STDLIB_STABLE_ABI)
+  if(SWIFT_STDLIB_STABLE_ABI AND NOT "${CFLAGS_SDK}" STREQUAL "LINUX_STATIC")
     list(APPEND result "-DSWIFT_LIBRARY_EVOLUTION=1")
   else()
     list(APPEND result "-DSWIFT_LIBRARY_EVOLUTION=0")
