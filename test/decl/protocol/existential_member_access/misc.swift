@@ -61,6 +61,7 @@ protocol PackExpansionResult {
 func packExpansionResult(p: any PackExpansionResult) {
   p.foo(t: 1, "hi")
   // expected-error@-1 {{member 'foo' cannot be used on value of type 'any PackExpansionResult'; consider using a generic constraint instead}}
+  // expected-note@-2 {{member 'foo' refrences 'Self.A', which cannot be resolved on type 'any PackExpansionResult'}}
 }
 
 // rdar://135974645 - invalid error: heterogeneous collection literal could only be inferred to '[Any]'
