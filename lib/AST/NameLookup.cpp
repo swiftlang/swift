@@ -4168,7 +4168,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
     if (attr->isUnchecked())
       attributes.uncheckedLoc = loc;
     result.push_back({attr->getProtocol(), loc, /*inheritedTypeRepr=*/nullptr,
-                      attributes, /*isSuppressed=*/false});
+                      attributes, attr->isSuppressed()});
   }
 
   // Else we have access to this information on the where clause.
