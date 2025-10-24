@@ -873,65 +873,37 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
           continue;
       }
 
-      // Signatures are the same, but interface types are not. We must
-      // have a type that we've massaged as part of signature
-      // interface type generation.
-      if (current->getInterfaceType()->isEqual(other->getInterfaceType())) {
-        if (currentDC->isTypeContext() == other->getDeclContext()->isTypeContext()) {
-          auto currFnTy = current->getInterfaceType()->getAs<AnyFunctionType>();
-          auto otherFnTy = other->getInterfaceType()->getAs<AnyFunctionType>();
-          if (currFnTy && otherFnTy && currentDC->isTypeContext()) {
-            currFnTy = currFnTy->getResult()->getAs<AnyFunctionType>();
-            otherFnTy = otherFnTy->getResult()->getAs<AnyFunctionType>();
-          }
-          
-          if (currFnTy && otherFnTy) {
-            ArrayRef<AnyFunctionType::Param> currParams = currFnTy->getParams();
-            ArrayRef<AnyFunctionType::Param> otherParams = otherFnTy->getParams();
-            
-            if (currParams.size() == otherParams.size()) {
-              auto diagnosed = false;
-              for (unsigned i : indices(currParams)) {
-                  
-                bool currIsIUO = false;
-                bool otherIsIUO = false;
-                bool optionalRedecl = false;
-                
-                if (currParams[i].getPlainType()->getOptionalObjectType()) {
-                  optionalRedecl = true;
-                  auto *param = swift::getParameterAt(current, i);
-                  assert(param);
-                  if (param->isImplicitlyUnwrappedOptional())
-                    currIsIUO = true;
-                }
-                
-                if (otherParams[i].getPlainType()->getOptionalObjectType()) {
-                  auto *param = swift::getParameterAt(other, i);
-                  assert(param);
-                  if (param->isImplicitlyUnwrappedOptional())
-                    otherIsIUO = true;
-                }
-                else {
-                  optionalRedecl = false;
-                }
-                
-                if (optionalRedecl && currIsIUO != otherIsIUO) {
-                  ctx.Diags.diagnoseWithNotes(
-                    current->diagnose(diag::invalid_redecl, current), [&]() {
-                    other->diagnose(diag::invalid_redecl_prev, other);
-                  });
-                  current->diagnose(diag::invalid_redecl_by_optionality_note,
-                                    otherIsIUO, currIsIUO);
-                  
-                  current->setInvalid();
-                  diagnosed = true;
-                  break;
-                }
-              }
+      // Emit a custom diagnostic if the interface types match but one of the
+      // parameters differ in IUO-ness.
+      if (current->getInterfaceType()->isEqual(other->getInterfaceType()) &&
+          currentDC->isTypeContext() == otherDC->isTypeContext()) {
+        auto currParams = current->getParameterList();
+        auto otherParams = other->getParameterList();
 
-              if (diagnosed)
-                break;
+        if (currParams && otherParams &&
+            currParams->size() == otherParams->size()) {
+          for (unsigned i : indices(*currParams)) {
+            auto *currParam = currParams->get(i);
+            auto *otherParam = otherParams->get(i);
+
+            if (!currParam->getInterfaceType()->isOptional() ||
+                !otherParam->getInterfaceType()->isOptional()) {
+              continue;
             }
+
+            auto currIsIUO = currParam->isImplicitlyUnwrappedOptional();
+            auto otherIsIUO = otherParam->isImplicitlyUnwrappedOptional();
+            if (currIsIUO == otherIsIUO)
+              continue;
+
+            ctx.Diags.diagnoseWithNotes(
+                current->diagnose(diag::invalid_redecl, current),
+                [&]() { other->diagnose(diag::invalid_redecl_prev, other); });
+            current->diagnose(diag::invalid_redecl_by_optionality_note,
+                              otherIsIUO, currIsIUO);
+
+            current->setInvalid();
+            return std::make_tuple();
           }
         }
       }

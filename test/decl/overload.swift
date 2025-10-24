@@ -402,6 +402,16 @@ class optionalOverloads {
 func optional_3() -> Int? { } // expected-note{{previously declared}}
 func optional_3() -> Int! { } // expected-error{{invalid redeclaration of 'optional_3()'}}
 
+var optionalFnVar: (Int?) -> Void // expected-note {{previously declared}}
+var optionalFnVar: (Int?) -> Void // expected-error {{invalid redeclaration of 'optionalFnVar'}}
+
+enum IUORedeclarationCaseConstructor {
+  case foo(Int?) // expected-note{{previously declared}}
+  static func foo(_ x: Int!) -> Self {}
+  // expected-error@-1 {{invalid redeclaration of 'foo'}}
+  // expected-note@-2 {{implicitly unwrapped optional parameter is of same type as optional parameter}}
+}
+
 // mutating / nonmutating
 protocol ProtocolWithMutating {
   mutating func test1() // expected-note {{previously declared}}
