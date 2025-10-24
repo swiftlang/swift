@@ -788,7 +788,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///
   ///     intPointer.deallocate()
   ///
-  /// You should only use `deallocate()` to end the lifetime of memory
+  /// You must only use `deallocate()` to end the lifetime of memory
   /// created with `allocate()`; it is a programming error to use `free` or
   /// another deallocation API, and may result in undefined behavior.
   ///
