@@ -650,8 +650,13 @@ Added: _$ss7UInt128V15Synchronization19AtomicRepresentableACMc
 // protocol witness table for Swift.UInt128 : Synchronization.AtomicRepresentable in Synchronization
 Added: _$ss7UInt128V15Synchronization19AtomicRepresentableACWP
 
+// This shipped in 6.2, but _nobody_ should ever be calling into this. This isn't marked
+// as a removal because the baselines haven't finalized yet.
 // Synchronization._MutexHandle.value.read : Synchronization._Cell<__C.os_unfair_lock_s>
-Added: _$s15Synchronization12_MutexHandleV5valueAA5_CellVySo16os_unfair_lock_sVGvr
+// Removed: _$s15Synchronization12_MutexHandleV5valueAA5_CellVySo16os_unfair_lock_sVGvr
+
+// Synchronization._MutexHandle.value.read : Synchronization._Cell<UInt32>
+Added: _$s15Synchronization12_MutexHandleV5valueAA5_CellVys6UInt32VGvr
 
 // type metadata accessor for Synchronization._MutexHandle
 Added: _$s15Synchronization12_MutexHandleVMa
