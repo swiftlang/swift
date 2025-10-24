@@ -257,6 +257,14 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Stored in a coro allocator struct, the function used to deallocate memory.
   PointerAuthSchema CoroDeallocationFunction;
+
+  /// Stored in a coro allocator struct, the function used to allocate a callee
+  /// coroutine's fixed-size frame.
+  PointerAuthSchema CoroFrameAllocationFunction;
+
+  /// Stored in a coro allocator struct, the function used to deallocate a
+  /// callee coroutine's fixed-size frame.
+  PointerAuthSchema CoroFrameDeallocationFunction;
 };
 
 enum class JITDebugArtifact : unsigned {
