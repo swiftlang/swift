@@ -1089,11 +1089,19 @@ swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
 
 ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
     ProtocolConformanceRef ref, TypeExpansionContext context) {
+  if (ref.isInvalid())
+    return ref;
+
+  if (!context.shouldLookThroughOpaqueTypeArchetypes() ||
+      !ref.getType()->hasOpaqueArchetype())
+    return ref;
+
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());
   InFlightSubstitution IFS(replacer, replacer,
-                           SubstFlags::SubstituteOpaqueArchetypes);
+                           SubstFlags::SubstituteOpaqueArchetypes |
+                           SubstFlags::PreservePackExpansionLevel);
 
   auto substRef = ref.subst(IFS);
 

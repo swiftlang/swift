@@ -1047,7 +1047,8 @@ findMissingGenericRequirementForSolutionFix(
 
       return env->mapTypeIntoContext(gp);
     },
-    LookUpConformanceInModule());
+    LookUpConformanceInModule(),
+    SubstFlags::PreservePackExpansionLevel);
   };
 
   type = getTypeInConformanceContext(type);
