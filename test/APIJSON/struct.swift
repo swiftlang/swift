@@ -28,7 +28,8 @@ public struct TestStruct {
 // CHECK-NEXT:       "name": "_$s8MyModule10TestStructVACycfC",
 // CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/struct.swift",
-// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "introduced": "10.13"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule10TestStructVMa",
