@@ -826,29 +826,29 @@ ERROR(expect_compile_time_literal,none,
       "expect a compile-time constant literal", ())
 
 ERROR(const_unsupported_enum_associated_value,none,
-      "enums with associated values not supported in a '@const' expression", ())
+      "enums with associated values not supported in a constant expression", ())
 ERROR(const_unsupported_operator,none,
-      "unsupported operator in a '@const' expression", ())
+      "unsupported operator in a constant expression", ())
 ERROR(const_unsupported_type,none,
-      "unsupported type in a '@const' expression", ())
+      "unsupported type in a constant expression", ())
 ERROR(const_unsupported_type_expr,none,
-      "type expressions not supported in a '@const' expression", ())
+      "type expressions not supported in a constant expression", ())
 ERROR(const_unsupported_closure,none,
-      "closures not supported in a '@const' expression", ())
+      "closures not supported in a constant expression", ())
 ERROR(const_unsupported_keypath,none,
-      "keypaths not supported in a '@const' expression", ())
+      "keypaths not supported in a constant expression", ())
 ERROR(const_opaque_decl_ref,none,
-      "unable to resolve variable reference in a '@const' expression", ())
+      "unable to resolve variable reference in a constant expression", ())
 ERROR(const_opaque_func_decl_ref,none,
-      "unable to resolve function reference in a '@const' expression", ())
+      "unable to resolve function reference in a constant expression", ())
 ERROR(const_non_convention_c_conversion,none,
-      "only 'convention(c)' function values are supported in a '@const' expression", ())
+      "only 'convention(c)' function values are supported in a constant expression", ())
 ERROR(const_opaque_callee,none,
-      "unable to resolve callee in a '@const' expression", ())
+      "unable to resolve callee in a constant expression", ())
 ERROR(const_non_const_param,none,
-      "reference to a non-'@const' parameter in a '@const' expression", ())
+      "reference to a non-'@const' parameter in a constant expression", ())
 ERROR(const_unknown_default,none,
-      "not supported in a '@const' expression", ())
+      "not supported in a constant expression", ())
 
 //------------------------------------------------------------------------------
 // MARK: Import Resolution
@@ -2097,11 +2097,9 @@ ERROR(cdecl_feature_required,none,
       "'@c' requires '-enable-experimental-feature CDecl'",
       ())
 
-// @_used and @_section
-ERROR(section_linkage_markers_disabled,none,
-      "attribute requires '-enable-experimental-feature SymbolLinkageMarkers'", ())
+// @used and @section
 ERROR(section_empty_name,none,
-      "'@_section' section name cannot be empty", ())
+      "'@section' section name cannot be empty", ())
 
 // @_silgen_name and friends
 WARNING(reserved_runtime_symbol_name,none,

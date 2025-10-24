@@ -52,7 +52,7 @@ public:
       linkEmbeddedConcurrency();
     }
 
-    // In embedded Swift, we need to explicitly link any @_used globals and
+    // In embedded Swift, we need to explicitly link any @used globals and
     // functions from imported modules.
     if (M.getOptions().EmbeddedSwift && LinkUsedFunctions) {
       linkUsedGlobalsAndFunctions();
@@ -230,7 +230,7 @@ public:
             } else if (VarDecl *G = dyn_cast<VarDecl>(D)) {
               Globals.push_back(G);
             } else {
-              assert(false && "only funcs and globals can be @_used");
+              assert(false && "only funcs and globals can be @used");
             }
           }
         }
