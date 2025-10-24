@@ -714,7 +714,7 @@ public:
   }
 };
 
-/// Defines the @_section attribute.
+/// Defines the @section attribute.
 class SectionAttr : public DeclAttribute {
 public:
   SectionAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)

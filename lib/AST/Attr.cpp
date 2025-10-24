@@ -1323,7 +1323,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DeclAttrKind::Section:
-    Printer.printAttrName("@_section");
+    Printer.printAttrName("@section");
     Printer << "(\"" << cast<SectionAttr>(this)->Name << "\")";
     break;
 
@@ -1977,7 +1977,7 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::Expose:
     return "_expose";
   case DeclAttrKind::Section:
-    return "_section";
+    return "section";
   case DeclAttrKind::Documentation:
     return "_documentation";
   case DeclAttrKind::Nonisolated:

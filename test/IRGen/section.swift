@@ -1,36 +1,36 @@
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -emit-sil -parse-as-library | %FileCheck %s --check-prefix=SIL
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR
+// RUN: %target-swift-frontend -enable-experimental-feature CompileTimeValuesPreview -primary-file %s -emit-sil -parse-as-library | %FileCheck %s --check-prefix=SIL
+// RUN: %target-swift-frontend -enable-experimental-feature CompileTimeValuesPreview -primary-file %s -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_SymbolLinkageMarkers
+// REQUIRES: swift_feature_CompileTimeValuesPreview
 
-@_section("__DATA,__mysection") var g0: Int = 1
-@_section("__DATA,__mysection") var g1: (Int, Int) = (42, 43)
-@_section("__DATA,__mysection") var g2: Bool = true
-@_section("__DATA,__mysection") public var g3: Bool = true
-@_section("__DATA,__mysection") var g4: UnsafeMutablePointer<Int>? = nil
-@_section("__DATA,__mysection") var g5: UnsafeMutablePointer<Int>? = UnsafeMutablePointer(bitPattern: 0x42424242)
-@_section("__TEXT,__mysection") @_used func foo() {}
+@section("__DATA,__mysection") var g0: Int = 1
+@section("__DATA,__mysection") var g1: (Int, Int) = (42, 43)
+@section("__DATA,__mysection") var g2: Bool = true
+@section("__DATA,__mysection") public var g3: Bool = true
+@section("__DATA,__mysection") var g4: UnsafeMutablePointer<Int>? = nil
+@section("__DATA,__mysection") var g5: UnsafeMutablePointer<Int>? = UnsafeMutablePointer(bitPattern: 0x42424242)
+@section("__TEXT,__mysection") @used func foo() {}
 
 struct MyStruct {
-	@_section("__DATA,__mysection") static var static0: Int = 1
-	@_section("__TEXT,__mysection") @_used func foo() {}
+	@section("__DATA,__mysection") static var static0: Int = 1
+	@section("__TEXT,__mysection") @used func foo() {}
 }
 
-@_section("__TEXT,__mysection")
+@section("__TEXT,__mysection")
 var functionptr = testit
 func testit(_ e: consuming Any) -> Any { e }
 
-// SIL: @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g0: Int { get set }
-// SIL: @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g1: (Int, Int) { get set }
-// SIL: @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g2: Bool { get set }
-// SIL: @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue public var g3: Bool { get set }
-// SIL: @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g4: UnsafeMutablePointer<Int>? { get set }
-// SIL: @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g5: UnsafeMutablePointer<Int>? { get set }
-// SIL: @_section("__TEXT,__mysection") @_used func foo()
+// SIL: @section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g0: Int { get set }
+// SIL: @section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g1: (Int, Int) { get set }
+// SIL: @section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g2: Bool { get set }
+// SIL: @section("__DATA,__mysection") @_hasStorage @_hasInitialValue public var g3: Bool { get set }
+// SIL: @section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g4: UnsafeMutablePointer<Int>? { get set }
+// SIL: @section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g5: UnsafeMutablePointer<Int>? { get set }
+// SIL: @section("__TEXT,__mysection") @used func foo()
 // SIL: struct MyStruct {
-// SIL:   @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue static var static0: Int { get set }
-// SIL:   @_section("__TEXT,__mysection") @_used func foo()
+// SIL:   @section("__DATA,__mysection") @_hasStorage @_hasInitialValue static var static0: Int { get set }
+// SIL:   @section("__TEXT,__mysection") @used func foo()
 
 // SIL: sil private [global_init_once_fn] @$s7section2g0_WZ : $@convention(c)
 // SIL: sil hidden [global_init] @$s7section2g0Sivau : $@convention(thin)
