@@ -1798,8 +1798,15 @@ ERROR(mutating_invalid_classes,none, "%0 is not valid on %kindonly1s in "
 ERROR(functions_mutating_and_not,none,
       "method must not be declared both %0 and %1",
       (SelfAccessKind, SelfAccessKind))
+
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
+
+ERROR(consuming_invalid_borrow_mutate_accessor, none,
+      "%0 cannot be declared consuming", (StringRef))
+
+ERROR(ownership_modifier_unsupported_borrow_mutate_accessor, none,
+      "%0 ownership modifier is not yet supported on %1", (StringRef, StringRef))
 
 ERROR(readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,none,
       "%0 cannot be %1 when "
