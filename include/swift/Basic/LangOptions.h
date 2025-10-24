@@ -273,9 +273,6 @@ namespace swift {
     /// Emit a remark when indexing a system module.
     bool EnableIndexingSystemModuleRemarks = false;
 
-    /// Emit a remark on early exit in explicit interface build
-    bool EnableSkipExplicitInterfaceModuleBuildRemarks = false;
-
     ///
     /// Support for alternate usage modes
     ///
