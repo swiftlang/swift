@@ -9,6 +9,7 @@
 // REQUIRES: swift_feature_CoroutineAccessors
 
 var _i: Int = 0
+var _j: Int = 0
 
 // CHECK:      #if compiler(>=5.3) && $CoroutineAccessors
 // CHECK-NEXT: public var i: Swift.Int {
@@ -21,11 +22,32 @@ var _i: Int = 0
 // CHECK-NEXT:   _modify
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
+@_borrowed
 public var i: Int {
   read {
     yield _i
   }
   modify {
     yield &_i
+  }
+}
+
+// CHECK:      #if compiler(>=5.3) && $CoroutineAccessors
+// CHECK-NEXT: public var j: Swift.Int {
+// CHECK-NEXT:   read
+// CHECK-NEXT:   modify
+// CHECK-NEXT: }
+// CHECK-NEXT: #else
+// CHECK-NEXT: public var j: Swift.Int {
+// CHECK-NEXT:   get
+// CHECK-NEXT:   _modify
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif
+public var j: Int {
+  read {
+    yield _j
+  }
+  modify {
+    yield &_j
   }
 }

@@ -2672,6 +2672,10 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
           Options.SuppressCoroutineAccessors) {
         AddAccessorToPrint(AccessorKind::Read);
       }
+      if (ASD->getAccessor(AccessorKind::Get) &&
+          Options.SuppressCoroutineAccessors) {
+        AddAccessorToPrint(AccessorKind::Get);
+      }
       AddAccessorToPrint(AccessorKind::Read2);
       break;
     case ReadImplKind::Borrow:
