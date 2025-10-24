@@ -1561,6 +1561,8 @@ RValue SILGenFunction::emitCollectionConversion(
 
 static bool
 needsCustomConversion(CollectionUpcastConversionExpr::ConversionPair const & pair) {
+  assert(pair);
+
   if (auto conv = dyn_cast<ImplicitConversionExpr>(pair.Conversion)) {
     if (isa<ForeignObjectConversionExpr>(conv)) {
       if (auto B2O = dyn_cast<BridgeToObjCExpr>(conv->getSubExpr())) {
@@ -1578,12 +1580,18 @@ needsCustomConversion(CollectionUpcastConversionExpr::ConversionPair const & pai
           return false;
         case ExprKind::FunctionConversion:
           return true;
+        case ExprKind::CollectionUpcastConversion: {
+          auto upcast = cast<CollectionUpcastConversionExpr>(conv);
+          if (upcast->getKeyConversion() && needsCustomConversion(upcast->getKeyConversion())) {
+            return true;
+          }
+          return needsCustomConversion(upcast->getValueConversion());
+        }
         case ExprKind::Load:
         case ExprKind::ABISafeConversion:
         case ExprKind::DestructureTuple:
         case ExprKind::CovariantFunctionConversion:
         case ExprKind::CovariantReturnConversion:
-        case ExprKind::CollectionUpcastConversion:
         case ExprKind::BridgeFromObjC:
         case ExprKind::ConditionalBridgeFromObjC:
         case ExprKind::ArchetypeToSuper:
