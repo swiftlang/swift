@@ -13,7 +13,7 @@
 /// Contains tests for non-trapping type conversions reported by users.
 ///
 // -----------------------------------------------------------------------------
-// RAN: %empty-directory(%t)
+// RUN: %empty-directory(%t)
 //
 // RUN: %target-build-swift -Xfrontend -verify -swift-version 6 -g -Onone  -module-name a %s -o %t/a.swift6.Onone.out
 // RUN: %target-codesign %t/a.swift6.Onone.out
@@ -61,6 +61,8 @@ class Base: Root {
 class Derived: Base {
 
 }
+
+@preconcurrency func id(_ x: [@MainActor () -> String]) -> [@MainActor () -> String] { x }
 
 extension TestSuite {
   @inline(never)
@@ -609,6 +611,33 @@ ArrayCasts.testSync("Covariant nested") {
 
   // Despite the warning saying that this cast always succeeds, it actually fails
   // expected-warning@+1 {{conditional cast from 'X' (aka 'Array<(Array<() -> any StringProtocol>) -> Array<String>>') to 'Y' (aka 'Array<(Array<() -> String>) -> Array<any StringProtocol>>') always succeeds}}
+  let c = a as? Y
+  expectNil(c)
+
+  let d = (a as Any) as? Y
+  expectNil(d)
+}
+
+ArrayCasts.testSync("Preconcurrency") {
+
+  typealias X = [() -> String]
+  typealias Y = [@MainActor () -> String]
+
+  let a: X = [
+    { "abc" },
+    { "xyz" },
+    { "ijk" }
+  ]
+
+  // expected-warning@+1 {{converting non-Sendable function value to '@MainActor @Sendable () -> String' may introduce data races}}
+  let b: Y = id(a)
+  expectEqual(b.count, 3)
+  expectEqual(b[0](), "abc")
+  expectEqual(b[1](), "xyz")
+  expectEqual(b[2](), "ijk")
+
+  // Despite the warning saying that this cast always succeeds, it actually fails
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Array<() -> String>') to 'Y' (aka 'Array<@MainActor @Sendable () -> String>') always succeeds}}
   let c = a as? Y
   expectNil(c)
 
