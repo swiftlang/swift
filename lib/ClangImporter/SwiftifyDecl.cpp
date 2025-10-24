@@ -31,9 +31,38 @@ using namespace swift;
 using namespace importer;
 
 #define DEBUG_TYPE "safe-interop-wrappers"
-#define DLOG(x) LLVM_DEBUG(llvm::dbgs() << x)
+
+#define DLOG(x) LLVM_DEBUG(LogIndentTracker::indent(DBGS) << x)
+
+#ifndef NDEBUG
+#define DBGS llvm::dbgs() << "[swiftify:" << __LINE__ << "] "
+#define DUMP(x) DLOG(""); x->dump()
+#define DLOG_SCOPE(x) DLOG(x); LogIndentTracker Scope
+#else
+#define DLOG_SCOPE(x) do {} while(false);
+#endif
+
 
 namespace {
+#ifndef NDEBUG
+struct LogIndentTracker {
+  static thread_local uint8_t LogIndent;
+  static llvm::raw_ostream &indent(llvm::raw_ostream &out) {
+    for (uint8_t i = 0; i < LogIndent; i++)
+      out << "| ";
+    return out;
+  }
+
+  LogIndentTracker() {
+    LogIndent++;
+  }
+  ~LogIndentTracker() {
+    LogIndent--;
+  }
+};
+thread_local uint8_t LogIndentTracker::LogIndent = 0;
+#endif
+
 ValueDecl *getKnownSingleDecl(ASTContext &SwiftContext, StringRef DeclName) {
   SmallVector<ValueDecl *, 1> decls;
   SwiftContext.lookupInSwiftModule(DeclName, decls);
@@ -189,8 +218,7 @@ struct CountedByExpressionValidator
     case clang::BuiltinType::ULong:
     case clang::BuiltinType::LongLong:
     case clang::BuiltinType::ULongLong:
-      // These integer literals are printed with a suffix that isn't valid Swift
-      // syntax
+      DLOG("Ignoring count parameter with non-portable integer literal");
       return false;
     default:
       return true;
@@ -229,7 +257,10 @@ struct CountedByExpressionValidator
   SUPPORTED_BINOP(Or)
 #undef SUPPORTED_BINOP
 
-  bool VisitStmt(const clang::Stmt *) { return false; }
+  bool VisitStmt(const clang::Stmt *) {
+    DLOG("Ignoring count parameter with unsupported expression\n");
+    return false;
+  }
 };
 
 
@@ -248,16 +279,24 @@ static bool SwiftifiableSizedByPointerType(const clang::ASTContext &ctx,
   if (nonnullType->isOpaquePointer())
     return true;
   PointerTypeKind PTK;
-  if (!nonnullType->getAnyPointerElementType(PTK))
+  if (!nonnullType->getAnyPointerElementType(PTK)) {
+    DLOG("Ignoring sized_by on non-pointer type\n");
     return false;
+  }
   if (PTK == PTK_UnsafeRawPointer || PTK == PTK_UnsafeMutableRawPointer)
     return true;
-  if (PTK != PTK_UnsafePointer && PTK != PTK_UnsafeMutablePointer)
+  if (PTK != PTK_UnsafePointer && PTK != PTK_UnsafeMutablePointer) {
+    DLOG("Ignoring sized_by on Autoreleasing pointer\n");
+    CONDITIONAL_ASSERT(PTK == PTK_AutoreleasingUnsafeMutablePointer);
     return false;
+  }
   // We have a pointer to a type with a size. Verify that it is char-sized.
   auto PtrT = CAT->getAs<clang::PointerType>();
   auto PointeeT = PtrT->getPointeeType();
-  return ctx.getTypeSizeInChars(PointeeT).isOne();
+  bool isByteSized ctx.getTypeSizeInChars(PointeeT).isOne();
+  if (!isByteSized)
+    DLOG("Ignoring sized_by on non-byte-sized pointer\n");
+  return isByteSized;
 }
 static bool SwiftifiableCAT(const clang::ASTContext &ctx,
                             const clang::CountAttributedType *CAT,
@@ -280,6 +319,7 @@ struct UnaliasedInstantiationVisitor
   bool
   VisitTemplateSpecializationType(const clang::TemplateSpecializationType *) {
     hasUnaliasedInstantiation = true;
+    DLOG("Signature contains raw template, skipping");
     return false;
   }
 };
@@ -318,7 +358,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
                          SwiftifyInfoPrinter &printer,
                          const AbstractFunctionDecl *MappedDecl,
                          const T *ClangDecl) {
-  DLOG("Checking " << *ClangDecl << " for bounds and lifetime info\n");
+  DLOG_SCOPE("Checking '" << *ClangDecl << "' for bounds and lifetime info\n");
 
   // FIXME: for private macro generated functions we do not serialize the
   // SILFunction's body anywhere triggering assertions.
@@ -347,7 +387,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     auto *CAT = clangReturnTy->getAs<clang::CountAttributedType>();
     if (SwiftifiableCAT(clangASTContext, CAT, swiftReturnTy)) {
       printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
-      DLOG("  Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
+      DLOG("Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
       attachMacro = true;
     }
     auto dependsOnClass = [](const ParamDecl *fromParam) {
@@ -355,12 +395,14 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     };
     bool returnHasLifetimeInfo = false;
     if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(ClangDecl)) {
-      DLOG("  Found lifetimebound attribute on implicit 'this'\n");
+      DLOG("Found lifetimebound attribute on implicit 'this'\n");
       if (!dependsOnClass(
               MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true))) {
         printer.printLifetimeboundReturn(SwiftifyInfoPrinter::SELF_PARAM_INDEX,
                                          true);
         returnHasLifetimeInfo = true;
+      } else {
+        DLOG("lifetimebound ignored because it depends on class with refcount\n");
       }
     }
 
@@ -378,6 +420,8 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
                                 : getNumParams(ClangDecl);
     for (auto [index, clangParam] : llvm::enumerate(ClangDecl->parameters())) {
       clang::QualType clangParamTy = clangParam->getType();
+      DLOG_SCOPE("Checking parameter '" << *clangParam << "' with type '"
+                                        << clangParamTy << "'\n");
       int mappedIndex = index < selfParamIndex ? index :
         index > selfParamIndex ? index - 1 :
         SwiftifyInfoPrinter::SELF_PARAM_INDEX;
@@ -401,8 +445,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
                  diag::note_swift_name_instance_method);
       } else if (SwiftifiableCAT(clangASTContext, CAT, swiftParamTy)) {
         printer.printCountedBy(CAT, mappedIndex);
-        DLOG("  Found bounds info '" << clangParamTy << "' on parameter '"
-                                     << *clangParam << "'\n");
+        DLOG("Found bounds info '" << clangParamTy << "'\n");
         attachMacro = paramHasBoundsInfo = true;
       }
       bool paramIsStdSpan =
@@ -411,13 +454,12 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
 
       bool paramHasLifetimeInfo = false;
       if (clangParam->template hasAttr<clang::NoEscapeAttr>()) {
-        DLOG("  Found noescape attribute on parameter '" << *clangParam << "'\n");
+        DLOG("Found noescape attribute\n");
         printer.printNonEscaping(mappedIndex);
         paramHasLifetimeInfo = true;
       }
       if (clangParam->template hasAttr<clang::LifetimeBoundAttr>()) {
-        DLOG("  Found lifetimebound attribute on parameter '" << *clangParam
-                                                              << "'\n");
+        DLOG("Found lifetimebound attribute\n");
         if (!dependsOnClass(swiftParam)) {
           // If this parameter has bounds info we will tranform it into a Span,
           // so then it will no longer be Escapable.
@@ -428,16 +470,17 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
           printer.printLifetimeboundReturn(mappedIndex, willBeEscapable);
           paramHasLifetimeInfo = true;
           returnHasLifetimeInfo = true;
+        } else {
+          DLOG("lifetimebound ignored because it depends on class with refcount\n");
         }
       }
       if (paramIsStdSpan && paramHasLifetimeInfo) {
-        DLOG("  Found both std::span and lifetime info for parameter '"
-             << *clangParam << "'\n");
+        DLOG("Found both std::span and lifetime info\n");
         attachMacro = true;
       }
     }
     if (returnIsStdSpan && returnHasLifetimeInfo) {
-      DLOG("  Found both std::span and lifetime info for return value\n");
+      DLOG("Found both std::span and lifetime info for return value\n");
       attachMacro = true;
     }
   }
@@ -493,6 +536,11 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (!ClangDecl)
     return;
 
+  DLOG_SCOPE(
+      "Checking '" << *ClangDecl << "' (imported as '"
+                   << MappedDecl->getName().getBaseName().userFacingName()
+                   << "')\n");
+
   {
     UnaliasedInstantiationVisitor visitor;
     visitor.TraverseType(ClangDecl->getType());
@@ -501,8 +549,10 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   }
 
   MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(getKnownSingleDecl(SwiftContext, "_SwiftifyImport"));
-  if (!SwiftifyImportDecl)
+  if (!SwiftifyImportDecl) {
+    DLOG("_SwiftifyImport macro not found");
     return;
+  }
 
   llvm::SmallString<128> MacroString;
   {
@@ -510,8 +560,10 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     out << "@_SwiftifyImport";
 
     SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl);
-    if (!swiftifyImpl(*this, printer, MappedDecl, ClangDecl))
+    if (!swiftifyImpl(*this, printer, MappedDecl, ClangDecl)) {
+      DLOG("No relevant bounds or lifetime info found\n");
       return;
+    }
     printer.printAvailability();
     printer.printTypeMapping();
   }
@@ -546,10 +598,13 @@ void ClangImporter::Implementation::swiftifyProtocol(
 
   MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(
       getKnownSingleDecl(SwiftContext, "_SwiftifyImportProtocol"));
-  if (!SwiftifyImportDecl)
+  if (!SwiftifyImportDecl) {
+    DLOG("_SwiftifyImportProtocol macro not found");
     return;
+  }
 
-  DLOG("Checking " << MappedDecl->getName() << " protocol for methods with bounds and lifetime info\n");
+  DLOG_SCOPE("Checking '" << MappedDecl->getName()
+              << "' protocol for methods with bounds and lifetime info\n");
   llvm::SmallString<128> MacroString;
   {
     llvm::raw_svector_ostream out(MacroString);
@@ -566,8 +621,10 @@ void ClangImporter::Implementation::swiftifyProtocol(
       hasBoundsAttributes |= printer.printMethod(SwiftDecl);
     }
 
-    if (!hasBoundsAttributes)
+    if (!hasBoundsAttributes) {
+      DLOG("No relevant bounds or lifetime info found\n");
       return;
+    }
     printer.printAvailability();
     printer.printTypeMapping();
   }
