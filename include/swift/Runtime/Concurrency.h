@@ -38,13 +38,6 @@
 #define SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL 0
 #endif
 
-// Does the runtime integrate with libdispatch?
-#if defined(SWIFT_CONCURRENCY_USES_DISPATCH)
-#define SWIFT_CONCURRENCY_ENABLE_DISPATCH SWIFT_CONCURRENCY_USES_DISPATCH
-#else
-#define SWIFT_CONCURRENCY_ENABLE_DISPATCH 0
-#endif
-
 namespace swift {
 class DefaultActor;
 class TaskOptionRecord;
