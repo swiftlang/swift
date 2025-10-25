@@ -815,7 +815,7 @@ SIMPLE_DECL_ATTR(_noObjCBridging, NoObjCBridging,
   UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   155)
 
-SIMPLE_DECL_ATTR(_manualOwnership, ManualOwnership,
+SIMPLE_DECL_ATTR(_noManualOwnership, NoManualOwnership,
   OnAbstractFunction | OnSubscript,
   UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   156)
