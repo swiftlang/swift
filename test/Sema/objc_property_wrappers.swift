@@ -75,7 +75,7 @@ public struct WrapperStruct {
 class EnumCase {
     @objc
     func foo(@WrapperEnum _ ref: Int) throws {} // expected-error {{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
-    // expected-note@-1 {{non-'@objc' enums cannot be represented in Objective-C}}
+    // expected-note@-1 {{Swift enums not marked '@c' or '@objc' cannot be represented in Objective-C}}
 }
 
 @propertyWrapper

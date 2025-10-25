@@ -2486,12 +2486,6 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   if (D->getAttrs().getAttribute<ObjCAttr>()) {
     diagnose(attr->getLocation(), diag::cdecl_incompatible_with_objc, D);
   }
-
-  // @c needs to be enabled via a feature flag.
-  if (!attr->Underscored &&
-      !Ctx.LangOpts.hasFeature(Feature::CDecl)) {
-    diagnose(attr->getLocation(), diag::cdecl_feature_required);
-  }
 }
 
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {

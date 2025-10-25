@@ -31,7 +31,7 @@ enum UnderscoreCDeclEnum: CInt { case A, B }
 func swiftStruct(x: SwiftStruct) {} // expected-error{{cannot be represented}} expected-note{{Swift struct}}
 
 @_cdecl("swiftEnum")
-func swiftEnum(x: SwiftEnum) {} // expected-error{{cannot be represented}} expected-note{{non-'@objc' enum}}
+func swiftEnum(x: SwiftEnum) {} // expected-error{{cannot be represented}} expected-note{{Swift enums not marked '@c' or '@objc' cannot be represented in Objective-C}}
 
 @_cdecl("cEnum")
 func cEnum(x: CEnum) {}
