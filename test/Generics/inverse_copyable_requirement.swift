@@ -232,7 +232,7 @@ func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
 // the stdlib right now is not yet being compiled with NoncopyableGenerics
 func checkStdlibTypes(_ mo: borrowing MO) {
   _ = "\(mo)" // expected-error {{no exact matches in call to instance method 'appendInterpolation'}}
-  let _: String = String(describing: mo) // expected-error {{no exact matches in call to initializer}}
+  let _: String = String(describing: mo) // expected-error {{initializer 'init(describing:)' requires that 'MO' conform to 'Copyable'}}
 
   let _: [MO] = // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
       [MO(), MO()]
