@@ -6725,13 +6725,14 @@ public:
     Bits.VarDecl.IsDebuggerVar = IsDebuggerVar;
   }
 
-  /// Visit all auxiliary declarations to this VarDecl.
+  /// Visit all auxiliary variables for this VarDecl.
   ///
-  /// An auxiliary declaration is a declaration synthesized by the compiler to support
-  /// this VarDecl, such as synthesized property wrapper variables.
+  /// An auxiliary variable is one that is synthesized by the compiler to
+  /// support this VarDecl, such as synthesized property wrapper variables.
   ///
-  /// \note this function only visits auxiliary decls that are not part of the AST.
-  void visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)>) const;
+  /// \note this function only visits auxiliary variables that are not part of
+  /// the AST.
+  void visitAuxiliaryVars(llvm::function_ref<void(VarDecl *)>) const;
 
   /// Is this the synthesized storage for a 'lazy' property?
   bool isLazyStorageProperty() const {

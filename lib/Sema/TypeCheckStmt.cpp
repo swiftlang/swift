@@ -153,9 +153,8 @@ namespace {
 
       // Auxiliary decls need to have their contexts adjusted too.
       if (auto *VD = dyn_cast<VarDecl>(D)) {
-        VD->visitAuxiliaryDecls([&](VarDecl *D) {
-          D->setDeclContext(ParentDC);
-        });
+        VD->visitAuxiliaryVars(
+            [&](VarDecl *D) { D->setDeclContext(ParentDC); });
       }
 
       // We don't currently support peer macro declarations in local contexts,

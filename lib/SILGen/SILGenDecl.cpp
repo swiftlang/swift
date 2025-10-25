@@ -1716,7 +1716,7 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
   }
 
   // Emit lazy and property wrapper backing storage.
-  D->visitAuxiliaryDecls([&](VarDecl *var) {
+  D->visitAuxiliaryVars([&](VarDecl *var) {
     if (auto *patternBinding = var->getParentPatternBinding())
       visitPatternBindingDecl(patternBinding);
 

@@ -507,7 +507,7 @@ void Decl::visitAuxiliaryDecls(
     }
   }
 
-  // FIXME: fold VarDecl::visitAuxiliaryDecls into this.
+  // FIXME: fold VarDecl::visitAuxiliaryVars into this.
 }
 
 void Decl::forEachAttachedMacro(MacroRole role,
@@ -8767,7 +8767,8 @@ bool VarDecl::hasStorageOrWrapsStorage() const {
   return false;
 }
 
-void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) const {
+void VarDecl::visitAuxiliaryVars(
+    llvm::function_ref<void(VarDecl *)> visit) const {
   if (getDeclContext()->isTypeContext() ||
       (isImplicit() && !isa<ParamDecl>(this)))
     return;
