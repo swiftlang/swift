@@ -27,7 +27,7 @@ extension UTF8Span {
 }
 
 
-// 
+//
 @available(SwiftStdlib 6.2, *)
 struct ContentEquivalenceTestCase {
   var str: String
@@ -82,7 +82,7 @@ extension ContentEquivalenceTestCase {
 
 
   func withUTF8Span<R>(_ f: (UTF8Span) throws -> R) rethrows -> R {
-    try Array(str.utf8).withSpan { span in 
+    try Array(str.utf8).withSpan { span in
       try f(try! UTF8Span(validating: span))
     }
   }
@@ -99,12 +99,12 @@ extension ContentEquivalenceTestCase {
       }
     }
 
-    // NOTE: There's a slight jarring due to not having the same 
+    // NOTE: There's a slight jarring due to not having the same
     // iterators for code units
   }
 
   func testScalars() {
-    withUTF8Span { utf8Span in 
+    withUTF8Span { utf8Span in
       // Test forwards
       var utf8SpanIter = utf8Span.makeUnicodeScalarIterator()
       var stringIter = str.unicodeScalars.makeIterator()
@@ -153,7 +153,7 @@ extension ContentEquivalenceTestCase {
   }
 
   func testCharacters() {
-    withUTF8Span { utf8Span in 
+    withUTF8Span { utf8Span in
       // Test forwards
       var utf8SpanIter = utf8Span.makeCharacterIterator()
       var stringIter = str.makeIterator()
@@ -200,12 +200,97 @@ extension ContentEquivalenceTestCase {
     }
   }
 
+  func testBoundsChecks() {
+    var count = str.utf8.count
+    let span = str.utf8Span
+    expectEqual(count, span.count)
+
+    var scalarIter = span.makeUnicodeScalarIterator()
+    var charIter = span.makeCharacterIterator()
+
+    // Rounding: count is invariant
+    scalarIter.reset(roundingForwardsFrom: count)
+    expectEqual(count, scalarIter.currentCodeUnitOffset)
+    scalarIter.reset(roundingBackwardsFrom: count)
+    expectEqual(count, scalarIter.currentCodeUnitOffset)
+
+    charIter.reset(roundingForwardsFrom: count)
+    expectEqual(count, charIter.currentCodeUnitOffset)
+    charIter.reset(roundingBackwardsFrom: count)
+    expectEqual(count, charIter.currentCodeUnitOffset)
+
+    // Rounding: 0 is invariant
+    scalarIter.reset(roundingForwardsFrom: 0)
+    expectEqual(0, scalarIter.currentCodeUnitOffset)
+    scalarIter.reset(roundingBackwardsFrom: 0)
+    expectEqual(0, scalarIter.currentCodeUnitOffset)
+
+    charIter.reset(roundingForwardsFrom: 0)
+    expectEqual(0, charIter.currentCodeUnitOffset)
+    charIter.reset(roundingBackwardsFrom: 0)
+    expectEqual(0, charIter.currentCodeUnitOffset)
+
+    // Trap for positions outside of 0..<count
+    expectCrash {
+      scalarIter.reset(roundingForwardsFrom: count+1)
+    }
+    expectCrash {
+      scalarIter.reset(roundingForwardsFrom: count+1_000_000)
+    }
+    expectCrash {
+      scalarIter.reset(roundingForwardsFrom: -1)
+    }
+    expectCrash {
+      scalarIter.reset(roundingForwardsFrom: -count)
+    }
+
+    expectCrash {
+      scalarIter.reset(roundingBackwardsFrom: count+1)
+    }
+    expectCrash {
+      scalarIter.reset(roundingBackwardsFrom: count+1_000_000)
+    }
+    expectCrash {
+      scalarIter.reset(roundingBackwardsFrom: -1)
+    }
+    expectCrash {
+      scalarIter.reset(roundingBackwardsFrom: -count)
+    }
+
+    expectCrash {
+      charIter.reset(roundingForwardsFrom: count+1)
+    }
+    expectCrash {
+      charIter.reset(roundingForwardsFrom: count+1_000_000)
+    }
+    expectCrash {
+      charIter.reset(roundingForwardsFrom: -1)
+    }
+    expectCrash {
+      charIter.reset(roundingForwardsFrom: -count)
+    }
+
+    expectCrash {
+      charIter.reset(roundingBackwardsFrom: count+1)
+    }
+    expectCrash {
+      charIter.reset(roundingBackwardsFrom: count+1_000_000)
+    }
+    expectCrash {
+      charIter.reset(roundingBackwardsFrom: -1)
+    }
+    expectCrash {
+      charIter.reset(roundingBackwardsFrom: -count)
+    }
+  }
+
   func run() {
     testBytes()
     testScalars()
     testCharacters()
 
-    // TODO: test grapheme break iterator
+    // Tests that have expected crashes
+    testBoundsChecks()
   }
 
 }
