@@ -600,17 +600,18 @@ std::optional<std::pair<const BackDeployedAttr *, AvailabilityRange>>
 Decl::getBackDeployedAttrAndRange(bool forTargetVariant) const {
   auto &ctx = getASTContext();
   if (auto *attr = getAttrs().getBackDeployed(ctx, forTargetVariant)) {
-    auto version = attr->getVersion();
-    AvailabilityDomain ignoredDomain;
-    AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
-        attr, ctx, ignoredDomain, version);
+    auto remappedDomainAndRange =
+        attr->getAvailabilityDomain().getRemappedDomainAndRange(
+            attr->getVersion(), AvailabilityVersionKind::Introduced, ctx);
 
-    // If the remap for fallback resulted in 1.0, then the
-    // backdeployment prior to that is not meaningful.
-    if (version == llvm::VersionTuple(1, 0, 0, 0))
+    // If the before version was remapped to '1.0', then this decl has
+    // effectively always been available on the current platform and does not
+    // qualify as back deployed.
+    if (remappedDomainAndRange.getRange().getRawMinimumVersion() ==
+        llvm::VersionTuple(1, 0, 0, 0))
       return std::nullopt;
 
-    return std::make_pair(attr, AvailabilityRange(version));
+    return std::make_pair(attr, remappedDomainAndRange.getRange());
   }
 
   // Accessors may inherit `@backDeployed`.

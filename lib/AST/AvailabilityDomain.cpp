@@ -400,16 +400,73 @@ AvailabilityDomain AvailabilityDomain::getRootDomain() const {
   return *this;
 }
 
-const AvailabilityDomain
-AvailabilityDomain::getRemappedDomain(const ASTContext &ctx,
-                                      bool &didRemap) const {
+std::optional<AvailabilityDomain>
+AvailabilityDomain::getRemappedDomainOrNull(const ASTContext &ctx) const {
   if (getPlatformKind() == PlatformKind::iOS &&
-      isPlatformActive(PlatformKind::visionOS, ctx.LangOpts)) {
-    didRemap = true;
+      isPlatformActive(PlatformKind::visionOS, ctx.LangOpts))
     return AvailabilityDomain::forPlatform(PlatformKind::visionOS);
+
+  return std::nullopt;
+}
+
+static const clang::DarwinSDKInfo::RelatedTargetVersionMapping *
+getFallbackVersionMapping(const ASTContext &Ctx,
+                          clang::DarwinSDKInfo::OSEnvPair Kind) {
+  auto *SDKInfo = Ctx.getDarwinSDKInfo();
+  if (SDKInfo)
+    return SDKInfo->getVersionMapping(Kind);
+
+  return Ctx.getAuxiliaryDarwinPlatformRemapInfo(Kind);
+}
+
+static std::optional<clang::VersionTuple>
+getRemappedIntroducedVersionForFallbackPlatform(
+    const ASTContext &Ctx, const llvm::VersionTuple &Version) {
+  const auto *Mapping = getFallbackVersionMapping(
+      Ctx, clang::DarwinSDKInfo::OSEnvPair(
+               llvm::Triple::IOS, llvm::Triple::UnknownEnvironment,
+               llvm::Triple::XROS, llvm::Triple::UnknownEnvironment));
+  if (!Mapping)
+    return std::nullopt;
+  return Mapping->mapIntroducedAvailabilityVersion(Version);
+}
+
+static std::optional<clang::VersionTuple>
+getRemappedDeprecatedObsoletedVersionForFallbackPlatform(
+    const ASTContext &Ctx, const llvm::VersionTuple &Version) {
+  const auto *Mapping = getFallbackVersionMapping(
+      Ctx, clang::DarwinSDKInfo::OSEnvPair(
+               llvm::Triple::IOS, llvm::Triple::UnknownEnvironment,
+               llvm::Triple::XROS, llvm::Triple::UnknownEnvironment));
+  if (!Mapping)
+    return std::nullopt;
+  return Mapping->mapDeprecatedObsoletedAvailabilityVersion(Version);
+}
+
+AvailabilityDomainAndRange AvailabilityDomain::getRemappedDomainAndRange(
+    const llvm::VersionTuple &version, AvailabilityVersionKind versionKind,
+    const ASTContext &ctx) const {
+  auto remappedDomain = getRemappedDomainOrNull(ctx);
+  if (!remappedDomain)
+    return {*this, AvailabilityRange{version}};
+
+  std::optional<clang::VersionTuple> remappedVersion;
+  switch (versionKind) {
+  case AvailabilityVersionKind::Introduced:
+    remappedVersion =
+        getRemappedIntroducedVersionForFallbackPlatform(ctx, version);
+    break;
+  case AvailabilityVersionKind::Deprecated:
+  case AvailabilityVersionKind::Obsoleted:
+    remappedVersion =
+        getRemappedDeprecatedObsoletedVersionForFallbackPlatform(ctx, version);
+    break;
   }
 
-  return *this;
+  if (!remappedVersion)
+    return {*this, AvailabilityRange{version}};
+
+  return {*remappedDomain, AvailabilityRange{*remappedVersion}};
 }
 
 bool IsCustomAvailabilityDomainPermanentlyEnabled::evaluate(
