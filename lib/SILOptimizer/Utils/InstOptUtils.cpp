@@ -2054,6 +2054,22 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     }
   }
 
+  // If the operand of an unchecked_enum_data was an enum instruction, we can
+  // refer to the original value stored inside the enum.
+  if (auto *UEI = dyn_cast<UncheckedEnumDataInst>(I)) {
+    if (auto *EI = dyn_cast_or_null<EnumInst>(UEI->getOperand())) {
+      auto UEVal = UEI->getResult(0);
+      auto EnumValue = EI->getOperand();
+      for (Operand *U : getDebugUses(UEVal)) {
+        auto *DbgInst = cast<DebugValueInst>(U->getUser());
+        if (auto VarInfo = DbgInst->getVarInfo()) {
+          SILBuilder(UEI, DbgInst->getDebugScope())
+              .createDebugValue(DbgInst->getLoc(), EnumValue, *VarInfo);
+        }
+      }
+    }
+  }
+
   if (auto *IA = dyn_cast<IndexAddrInst>(I)) {
     if (IA->getBase() && IA->getIndex())
       // Only handle cases where offset is constant.
