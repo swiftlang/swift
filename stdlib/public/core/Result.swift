@@ -27,7 +27,24 @@ extension Result: Escapable where Success: Escapable & ~Copyable {}
 
 extension Result: Sendable where Success: Sendable & ~Copyable & ~Escapable {}
 
-extension Result: Equatable where Success: Equatable, Failure: Equatable {}
+@_preInverseGenerics
+extension Result: Equatable where Success: Equatable & ~Copyable, Failure: Equatable {
+  @_preInverseGenerics
+  public static func ==(lhs: borrowing Self, rhs: borrowing Self) -> Bool {
+    switch lhs {
+      case let .success(l):
+      switch rhs {
+        case let .success(r): l == r
+        case .failure: false
+      }
+      case let .failure(l):
+      switch rhs {
+        case .success: false
+        case let .failure(r): l == r
+      }
+    }
+  }
+}
 
 extension Result: Hashable where Success: Hashable, Failure: Hashable {}
 
