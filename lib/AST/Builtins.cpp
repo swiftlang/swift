@@ -3738,3 +3738,7 @@ BuiltinFixedArrayType::isFixedNegativeSize() const {
   }
   return false;
 }
+
+ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, StringRef Name) {
+  return getBuiltinValueDecl(Context, Context.getIdentifier(Name));
+}
