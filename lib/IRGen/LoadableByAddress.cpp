@@ -26,6 +26,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
@@ -1914,6 +1915,8 @@ static void allocateAndSetAll(StructLoweringState &pass,
                               LoadableStorageAllocation &allocator,
                               SILInstruction *user,
                               MutableArrayRef<Operand> operands) {
+  PrettyStackTraceSILNode backtrace("Running allocateAndSetAll on ", user);
+
   for (Operand &operand : operands) {
     SILValue value = operand.get();
     SILType silType = value->getType();
@@ -2424,6 +2427,8 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
 }
 
 void LoadableByAddress::runOnFunction(SILFunction *F) {
+  PrettyStackTraceSILFunction backtrace("Running LoadableByAddress on ", F);
+
   CanSILFunctionType funcType = F->getLoweredFunctionType();
   IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
 
