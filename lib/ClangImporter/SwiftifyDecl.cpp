@@ -42,24 +42,82 @@ ValueDecl *getKnownSingleDecl(ASTContext &SwiftContext, StringRef DeclName) {
   return decls[0];
 }
 
-class SwiftifyInfoPrinter {
-public:
+struct SwiftifyInfoPrinter {
   static const ssize_t SELF_PARAM_INDEX = -2;
   static const ssize_t RETURN_VALUE_INDEX = -1;
   clang::ASTContext &ctx;
   ASTContext &SwiftContext;
-  llvm::raw_ostream &out;
+  llvm::raw_svector_ostream &out;
   MacroDecl &SwiftifyImportDecl;
   bool firstParam = true;
-  llvm::StringMap<std::string> typeMapping;
+  llvm::StringMap<std::string> &typeMapping;
 
+protected:
   SwiftifyInfoPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext,
-                      llvm::raw_ostream &out, MacroDecl &SwiftifyImportDecl)
+                      llvm::raw_svector_ostream &out,
+                      MacroDecl &SwiftifyImportDecl,
+                      llvm::StringMap<std::string> &typeMapping)
       : ctx(ctx), SwiftContext(SwiftContext), out(out),
-        SwiftifyImportDecl(SwiftifyImportDecl) {
-    out << "(";
+        SwiftifyImportDecl(SwiftifyImportDecl), typeMapping(typeMapping) {}
+
+public:
+  void printTypeMapping() {
+    printSeparator();
+    out << "typeMappings: [";
+    if (typeMapping.empty()) {
+      out << ":]";
+      return;
+    }
+    llvm::interleaveComma(typeMapping, out, [&](const auto &entry) {
+      out << '"' << entry.getKey() << "\" : \"" << entry.getValue() << '"';
+    });
+    out << "]";
   }
-  ~SwiftifyInfoPrinter() { out << ")"; }
+
+  void printAvailability() {
+    if (!hasMacroParameter("spanAvailability"))
+      return;
+    printSeparator();
+    out << "spanAvailability: ";
+    printAvailabilityOfType("Span");
+  }
+private:
+  bool hasMacroParameter(StringRef ParamName) {
+    for (auto *Param : *SwiftifyImportDecl.parameterList)
+      if (Param->getArgumentName().str() == ParamName)
+        return true;
+    return false;
+  }
+
+  void printAvailabilityOfType(StringRef Name) {
+    ValueDecl *D = getKnownSingleDecl(SwiftContext, Name);
+    out << "\"";
+    llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
+    for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/true)) {
+      auto introducedOpt = attr.getIntroduced();
+      if (!introducedOpt.has_value()) continue;
+      printSeparator();
+      out << prettyPlatformString(attr.getPlatform()) << " " << introducedOpt.value();
+    }
+    out << "\"";
+  }
+
+protected:
+  void printSeparator() {
+    if (!firstParam) {
+      out << ", ";
+    } else {
+      firstParam = false;
+    }
+  }
+};
+
+struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
+  SwiftifyInfoFunctionPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext,
+                      llvm::raw_svector_ostream &out,
+                      MacroDecl &SwiftifyImportDecl,
+                      llvm::StringMap<std::string> &typeMapping)
+      : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl, typeMapping) {}
 
   void printCountedBy(const clang::CountAttributedType *CAT,
                       ssize_t pointerIndex) {
@@ -108,57 +166,6 @@ public:
       return true;
     }
     return false;
-  }
-
-  void printTypeMapping() {
-    printSeparator();
-    out << "typeMappings: [";
-    if (typeMapping.empty()) {
-      out << ":]";
-      return;
-    }
-    llvm::interleaveComma(typeMapping, out, [&](const auto &entry) {
-      out << '"' << entry.getKey() << "\" : \"" << entry.getValue() << '"';
-    });
-    out << "]";
-  }
-
-  void printAvailability() {
-    if (!hasMacroParameter("spanAvailability"))
-      return;
-    printSeparator();
-    out << "spanAvailability: ";
-    printAvailabilityOfType("Span");
-  }
-
-private:
-  bool hasMacroParameter(StringRef ParamName) {
-    for (auto *Param : *SwiftifyImportDecl.parameterList)
-      if (Param->getArgumentName().str() == ParamName)
-        return true;
-    return false;
-  }
-
-  void printAvailabilityOfType(StringRef Name) {
-    ValueDecl *D = getKnownSingleDecl(SwiftContext, Name);
-    out << "\"";
-    llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
-    for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/true)) {
-      auto introducedOpt = attr.getIntroduced();
-      if (!introducedOpt.has_value()) continue;
-      printSeparator();
-      out << prettyPlatformString(attr.getPlatform()) << " " << introducedOpt.value();
-    }
-    out << "\"";
-  }
-
-protected:
-  void printSeparator() {
-    if (!firstParam) {
-      out << ", ";
-    } else {
-      firstParam = false;
-    }
   }
 
 private:
@@ -315,7 +322,7 @@ static size_t getNumParams(const clang::FunctionDecl* D) {
 
 template<typename T>
 static bool swiftifyImpl(ClangImporter::Implementation &Self,
-                         SwiftifyInfoPrinter &printer,
+                         SwiftifyInfoFunctionPrinter &printer,
                          const AbstractFunctionDecl *MappedDecl,
                          const T *ClangDecl) {
   DLOG("Checking " << *ClangDecl << " for bounds and lifetime info\n");
@@ -451,28 +458,29 @@ private:
 public:
   SwiftifyProtocolInfoPrinter(ClangImporter::Implementation &ImporterImpl,
                               clang::ASTContext &ctx, ASTContext &SwiftContext,
-                              llvm::raw_ostream &out,
-                              MacroDecl &SwiftifyImportDecl)
-      : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl),
+                              llvm::raw_svector_ostream &out,
+                              MacroDecl &SwiftifyImportDecl,
+                              llvm::StringMap<std::string> &typeMapping)
+      : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl, typeMapping),
         ImporterImpl(ImporterImpl) {}
 
   bool printMethod(const FuncDecl *Method) {
-    // don't emit .method() if we know it's going to be empty
     auto ClangDecl = dyn_cast_or_null<clang::ObjCMethodDecl>(Method->getClangDecl());
     if (!ClangDecl)
       return false;
 
-    printSeparator();
-    out << ".method(signature: \"";
-    printMethodSignature(Method);
-    out << "\", paramInfo: [";
-    // reset firstParam inside paramInfo array. At this point firstParam will
-    // always be false, so no need to save the current value.
-    ASSERT(!firstParam);
-    firstParam = true;
-    bool hadAttributes = swiftifyImpl(ImporterImpl, *this, Method, ClangDecl);
-    firstParam = false;
-    out << "])";
+    llvm::SmallString<128> paramInfoString;
+    llvm::raw_svector_ostream tmpOut(paramInfoString);
+
+    SwiftifyInfoFunctionPrinter methodPrinter(ctx, SwiftContext, tmpOut,
+                                              SwiftifyImportDecl, typeMapping);
+    bool hadAttributes = swiftifyImpl(ImporterImpl, methodPrinter, Method, ClangDecl);
+    if (hadAttributes) {
+      printSeparator();
+      out << ".method(signature: \"";
+      printMethodSignature(Method);
+      out << "\", paramInfo: [" << paramInfoString << "])";
+    }
     return hadAttributes;
   }
 
@@ -507,13 +515,16 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   llvm::SmallString<128> MacroString;
   {
     llvm::raw_svector_ostream out(MacroString);
-    out << "@_SwiftifyImport";
+    out << "@_SwiftifyImport(";
 
-    SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl);
+    llvm::StringMap<std::string> typeMapping;
+    SwiftifyInfoFunctionPrinter printer(getClangASTContext(), SwiftContext, out,
+                                        *SwiftifyImportDecl, typeMapping);
     if (!swiftifyImpl(*this, printer, MappedDecl, ClangDecl))
       return;
     printer.printAvailability();
     printer.printTypeMapping();
+    out << ")";
   }
 
   DLOG("Attaching safe interop macro: " << MacroString << "\n");
@@ -553,11 +564,13 @@ void ClangImporter::Implementation::swiftifyProtocol(
   llvm::SmallString<128> MacroString;
   {
     llvm::raw_svector_ostream out(MacroString);
-    out << "@_SwiftifyImportProtocol";
+    out << "@_SwiftifyImportProtocol(";
 
     bool hasBoundsAttributes = false;
+    llvm::StringMap<std::string> typeMapping;
     SwiftifyProtocolInfoPrinter printer(*this, getClangASTContext(),
-                                        SwiftContext, out, *SwiftifyImportDecl);
+                                        SwiftContext, out, *SwiftifyImportDecl,
+                                        typeMapping);
     for (Decl *SwiftMember :
          cast<IterableDeclContext>(MappedDecl)->getAllMembers()) {
       FuncDecl *SwiftDecl = dyn_cast<FuncDecl>(SwiftMember);
@@ -570,6 +583,7 @@ void ClangImporter::Implementation::swiftifyProtocol(
       return;
     printer.printAvailability();
     printer.printTypeMapping();
+    out << ")";
   }
 
   DLOG("Attaching safe interop macro: " << MacroString << "\n");
