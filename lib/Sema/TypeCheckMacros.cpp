@@ -1360,6 +1360,7 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
   return macroSourceFile->getBufferID();
 }
 
+
 static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
                                          CustomAttr *attr,
                                          bool passParentContext, MacroRole role,
@@ -1370,7 +1371,11 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     dc = attachedTo->getDeclContext();
   } else if (role == MacroRole::Conformance || role == MacroRole::Extension) {
     // Conformance macros always expand to extensions at file-scope.
-    dc = attachedTo->getDeclContext()->getParentSourceFile();
+    dc = attachedTo->getDeclContext();
+    if (!isa<ClangModuleUnit>(dc->getModuleScopeContext()))
+      dc = dc->getParentSourceFile();
+    else // decls imported from clang do not have a SourceFile
+      ASSERT(isa<FileUnit>(dc) && !isa<SourceFile>(dc));
   } else {
     dc = attachedTo->getInnermostDeclContext();
   }
