@@ -12,25 +12,34 @@
 
 import TestsUtils
 
-public let benchmarks = [
-  BenchmarkInfo(name: "EqualStringSubstring", runFunction: run_EqualStringSubstring, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "EqualSubstringString", runFunction: run_EqualSubstringString, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "EqualSubstringSubstring", runFunction: run_EqualSubstringSubstring, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "EqualSubstringSubstringGenericEquatable", runFunction: run_EqualSubstringSubstringGenericEquatable, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "SubstringRemoveFirst1", runFunction: run_SubstringRemoveFirst1, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "SubstringRemoveLast1", runFunction: run_SubstringRemoveLast1, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "LessSubstringSubstring", runFunction: run_LessSubstringSubstring, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "LessSubstringSubstringGenericComparable", runFunction: run_LessSubstringSubstringGenericComparable, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringFromLongWholeSubstring", runFunction: run_StringFromLongWholeSubstring, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "StringFromLongWholeSubstringGeneric", runFunction: run_StringFromLongWholeSubstringGeneric, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "SubstringComparable", runFunction: run_SubstringComparable, tags: [.validation, .api, .String],
-    setUpFunction: { blackHole(_comparison) }),
-  BenchmarkInfo(name: "SubstringEqualString", runFunction: run_SubstringEqualString, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "SubstringEquatable", runFunction: run_SubstringEquatable, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "SubstringFromLongString2", runFunction: run_SubstringFromLongString, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "SubstringFromLongStringGeneric2", runFunction: run_SubstringFromLongStringGeneric, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "SubstringTrimmingASCIIWhitespace", runFunction: run_SubstringTrimmingASCIIWhitespace, tags: [.validation, .api, .String]),
-]
+public var benchmarks: [BenchmarkInfo] {
+  var result = [
+    BenchmarkInfo(name: "EqualStringSubstring", runFunction: run_EqualStringSubstring, tags: [.validation, .api, .String]),
+    BenchmarkInfo(name: "EqualSubstringString", runFunction: run_EqualSubstringString, tags: [.validation, .api, .String]),
+    BenchmarkInfo(name: "EqualSubstringSubstring", runFunction: run_EqualSubstringSubstring, tags: [.validation, .api, .String]),
+    BenchmarkInfo(name: "EqualSubstringSubstringGenericEquatable", runFunction: run_EqualSubstringSubstringGenericEquatable, tags: [.validation, .api, .String]),
+    BenchmarkInfo(name: "SubstringRemoveFirst1", runFunction: run_SubstringRemoveFirst1, tags: [.validation, .api, .String]),
+    BenchmarkInfo(name: "SubstringRemoveLast1", runFunction: run_SubstringRemoveLast1, tags: [.validation, .api, .String]),
+    BenchmarkInfo(name: "LessSubstringSubstring", runFunction: run_LessSubstringSubstring, tags: [.validation, .api, .String]),
+    BenchmarkInfo(name: "LessSubstringSubstringGenericComparable", runFunction: run_LessSubstringSubstringGenericComparable, tags: [.validation, .api, .String]),
+    BenchmarkInfo(name: "StringFromLongWholeSubstring", runFunction: run_StringFromLongWholeSubstring, tags: [.validation, .api, .String]),
+    BenchmarkInfo(name: "StringFromLongWholeSubstringGeneric", runFunction: run_StringFromLongWholeSubstringGeneric, tags: [.validation, .api, .String]),
+    BenchmarkInfo(name: "SubstringComparable", runFunction: run_SubstringComparable, tags: [.validation, .api, .String],
+      setUpFunction: { blackHole(_comparison) }),
+    BenchmarkInfo(name: "SubstringEqualString", runFunction: run_SubstringEqualString, tags: [.validation, .api, .String]),
+    BenchmarkInfo(name: "SubstringEquatable", runFunction: run_SubstringEquatable, tags: [.validation, .api, .String]),
+    BenchmarkInfo(name: "SubstringFromLongString2", runFunction: run_SubstringFromLongString, tags: [.validation, .api, .String]),
+    BenchmarkInfo(name: "SubstringFromLongStringGeneric2", runFunction: run_SubstringFromLongStringGeneric, tags: [.validation, .api, .String]),
+    BenchmarkInfo(name: "SubstringTrimmingASCIIWhitespace", runFunction: run_SubstringTrimmingASCIIWhitespace, tags: [.validation, .api, .String]),
+  ]
+
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *) {
+    result.append(
+      BenchmarkInfo(name: "SubstringIdentical", runFunction: run_SubstringIdentical, tags: [.validation, .String]),
+    )
+  }
+  return result
+}
 
 // A string that doesn't fit in small string storage and doesn't fit in Latin-1
 let longWide = "fὢasὢodὢijὢadὢolὢsjὢalὢsdὢjlὢasὢdfὢijὢliὢsdὢjøὢslὢdiὢalὢiὢ"
@@ -332,3 +341,12 @@ public func run _LessSubstringSubstringGenericStringProtocol(_ n: Int) {
   }
 }
 */
+
+@inline(never)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
+public func run_SubstringIdentical(_ n: Int) {
+  let (a, b) = (ss1, ss1)
+  for _ in 1...n*500 {
+    blackHole(a.isTriviallyIdentical(to: b))
+  }
+}
