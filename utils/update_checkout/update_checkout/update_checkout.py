@@ -15,10 +15,10 @@ import re
 import sys
 import traceback
 from multiprocessing import freeze_support
-from typing import Any, Dict, Optional, Set, List, Union
+from typing import Any, Dict, Hashable, Optional, Set, List, Union
 
 from .cli_arguments import CliArguments
-from .git_command import Git
+from .git_command import Git, GitException
 from .runner_arguments import AdditionalSwiftSourcesArguments, UpdateArguments
 from .parallel_runner import ParallelRunner
 
@@ -74,7 +74,7 @@ def get_branch_for_repo(
     config: Dict[str, Any],
     repo_name: str,
     scheme_name: str,
-    scheme_map: Dict[str, str],
+    scheme_map: Optional[Dict[str, str]],
     cross_repos_pr: Dict[str, str],
 ):
     """Infer, fetch, and return a branch corresponding to a given PR, otherwise
@@ -85,7 +85,7 @@ def get_branch_for_repo(
         config (Dict[str, Any]): deserialized `update-checkout-config.json`
         repo_name (str): name of the repository for checking out the branch
         scheme_name (str): name of the scheme to look up in the config
-        scheme_map (Dict[str, str]): map of repo names to branches to check out
+        scheme_map (Dict[str, str] | None): map of repo names to branches to check out
         cross_repos_pr (Dict[str, str]): map of repo ids to PRs to check out
 
     Returns:
@@ -239,8 +239,8 @@ def update_single_repository(pool_args: UpdateArguments):
             # Otherwise there was some other error, and we need to handle
             # it like other command errors.
             Git.run(repo_path, ["symbolic-ref", "-q", "HEAD"])
-        except Exception as e:
-            if e.ret == 1:
+        except GitException as e:
+            if e.returncode == 1:
                 detached_head = True
             else:
                 raise  # Pass this error up the chain.
@@ -268,19 +268,17 @@ def update_single_repository(pool_args: UpdateArguments):
             prefix=prefix,
         )
     except Exception:
-        (type, value, tb) = sys.exc_info()
         if verbose:
             print('Error on repo "%s": %s' % (repo_path, traceback.format_exc()))
-        return value
+        raise
 
 
-def get_timestamp_to_match(match_timestamp, source_root):
-    # type: (str | None, str) -> str | None
+def get_timestamp_to_match(match_timestamp: bool, source_root: str):
     """Computes a timestamp of the last commit on the current branch in
     the `swift` repository.
 
     Args:
-        match_timestamp (str | None): value of `--match-timestamp` to check.
+        match_timestamp (bool): value of `--match-timestamp` to check.
         source_root (str): directory that contains sources of the Swift project.
 
     Returns:
@@ -295,7 +293,7 @@ def get_timestamp_to_match(match_timestamp, source_root):
     return output
 
 
-def get_scheme_map(config: Dict[str, Any], scheme_name: str):
+def get_scheme_map(config: Dict[str, Any], scheme_name: str) -> Optional[Dict[str, str]]:
     """Find a mapping from repository IDs to branches in the config.
 
     Args:
@@ -342,7 +340,7 @@ def _is_any_repository_locked(pool_args: List[UpdateArguments]) -> Set[str]:
                 locked_repositories.add(repo_name)
     return locked_repositories
 
-def _move_llvm_project_to_first_index(pool_args: List[Union[UpdateArguments, AdditionalSwiftSourcesArguments]]):
+def _move_llvm_project_to_first_index(pool_args: Union[List[UpdateArguments], List[AdditionalSwiftSourcesArguments]]):
     llvm_project_idx = None
     for i in range(len(pool_args)):
         if pool_args[i].repo_name == "llvm-project":
@@ -351,7 +349,13 @@ def _move_llvm_project_to_first_index(pool_args: List[Union[UpdateArguments, Add
     if llvm_project_idx is not None:
         pool_args.insert(0, pool_args.pop(llvm_project_idx))
 
-def update_all_repositories(args: CliArguments, config, scheme_name, scheme_map, cross_repos_pr):
+def update_all_repositories(
+    args: CliArguments,
+    config: Dict[str, Any],
+    scheme_name: str,
+    scheme_map: Optional[Dict[str, Any]],
+    cross_repos_pr: Dict[str, str],
+):
     pool_args: List[UpdateArguments] = []
     timestamp = get_timestamp_to_match(args.match_timestamp, args.source_root)
     for repo_name in config['repos'].keys():
@@ -392,7 +396,7 @@ def update_all_repositories(args: CliArguments, config, scheme_name, scheme_map,
     locked_repositories: set[str] = _is_any_repository_locked(pool_args)
     if len(locked_repositories) > 0:
         return [
-            f"'{repo_name}' is locked by git. Cannot update it."
+            Exception(f"'{repo_name}' is locked by git. Cannot update it.")
             for repo_name in locked_repositories
         ]
     _move_llvm_project_to_first_index(pool_args)
@@ -484,7 +488,7 @@ def obtain_all_additional_swift_sources(
             else:
                 remote = config['https-clone-pattern'] % remote_repo_id
 
-        repo_branch = None
+        repo_branch: Optional[str] = None
         repo_not_in_scheme = False
         if scheme_name:
             for v in config['branch-schemes'].values():
@@ -500,6 +504,9 @@ def obtain_all_additional_swift_sources(
                 repo_branch = scheme_name
         if repo_not_in_scheme:
             continue
+        
+        if repo_branch is None:
+            raise RuntimeError("repo_branch is None")
 
         new_args = AdditionalSwiftSourcesArguments(
             args=args,
@@ -570,7 +577,7 @@ def print_repo_hashes(args: CliArguments, config: Dict[str, Any]):
         print("{:<35}: {:<35}".format(repo_name, repo_hash))
 
 
-def merge_no_duplicates(a: dict, b: dict) -> dict:
+def merge_no_duplicates(a: Dict[Hashable, Any], b: Dict[Hashable, Any]) -> Dict[Hashable, Any]:
     result = {**a}
     for key, value in b.items():
         if key in a:
@@ -580,7 +587,7 @@ def merge_no_duplicates(a: dict, b: dict) -> dict:
     return result
 
 
-def merge_config(config: dict, new_config: dict) -> dict:
+def merge_config(config: Dict[str, Any], new_config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Merge two configs, with a 'last-wins' strategy.
 
@@ -619,7 +626,7 @@ def validate_config(config: Dict[str, Any]):
                                'too.'.format(scheme_name))
 
     # Then make sure the alias names used by our branches are unique.
-    seen = dict()
+    seen: Dict[str, Any] = dict()
     for (scheme_name, scheme) in config['branch-schemes'].items():
         aliases = scheme['aliases']
         for alias in aliases:
@@ -631,7 +638,7 @@ def validate_config(config: Dict[str, Any]):
                 seen[alias] = scheme_name
 
 
-def full_target_name(repo_path, repository, target):
+def full_target_name(repo_path: str, repository: str, target: str) -> str:
     tag, _, _ = Git.run(repo_path, ["tag", "-l", target], fatal=True)
     if tag == target:
         return tag
@@ -645,13 +652,13 @@ def full_target_name(repo_path, repository, target):
     raise RuntimeError('Cannot determine if %s is a branch or a tag' % target)
 
 
-def skip_list_for_platform(config: Dict[str, Any], all_repos: List[str]) -> List[str]:
+def skip_list_for_platform(config: Dict[str, Any], all_repos: bool) -> List[str]:
     """Computes a list of repositories to skip when updating or cloning, if not
     overridden by `--all-repositories` CLI argument.
 
     Args:
         config (Dict[str, Any]): deserialized `update-checkout-config.json`
-        all_repos (List[str]): repositories not required for current platform.
+        all_repos (bool): include all repositories.
 
     Returns:
         List[str]: a resulting list of repositories to skip or empty list if
@@ -677,7 +684,7 @@ def skip_list_for_platform(config: Dict[str, Any], all_repos: List[str]) -> List
     return skip_list
 
 
-def main():
+def main() -> int:
     freeze_support()
     args = CliArguments.parse_args()
 
@@ -704,7 +711,7 @@ def main():
             config = merge_config(config, json.load(f))
     validate_config(config)
 
-    cross_repos_pr = {}
+    cross_repos_pr: Dict[str, str] = {}
     if args.github_comment:
         regex_pr = r'(apple/[-a-zA-Z0-9_]+/pull/\d+'\
             r'|apple/[-a-zA-Z0-9_]+#\d+'\
@@ -755,11 +762,11 @@ def main():
 
     if args.dump_hashes:
         dump_repo_hashes(args, config)
-        return (None, None)
+        return 0
 
     if args.dump_hashes_config:
         dump_repo_hashes(args, config, args.dump_hashes_config)
-        return (None, None)
+        return 0
 
     # Quick check whether somebody is calling update in an empty directory
     directory_contents = os.listdir(args.source_root)

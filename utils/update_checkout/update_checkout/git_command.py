@@ -36,7 +36,7 @@ class GitException(Exception):
 
     def __str__(self):
         return (
-            f"[{self.repo_name}] {Git._quote_command(self.command)} "
+            f"[{self.repo_name}] '{Git._quote_command(self.command)}' "
             f"returned ({self.returncode}) with the following {self.stderr}."
         )
 
