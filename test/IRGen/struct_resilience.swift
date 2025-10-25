@@ -80,7 +80,7 @@ public struct MySize {
   public let h: Int
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience32functionWithMyResilientTypesSize_1fAA0eH0VAEn_A2EnXEtF"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{8|(16)}}) %1, ptr %2, ptr %3)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience32functionWithMyResilientTypesSize_1fAA0eH0VAEn_A2EnXEtF"(ptr noalias sret({{.*}}) captures(none) %0, ptr noalias captures(none) dereferenceable({{8|(16)}}) %1, ptr %2, ptr %3)
 public func functionWithMyResilientTypesSize(_ s: __owned MySize, f: (__owned MySize) -> MySize) -> MySize {
 
 // There's an alloca for debug info?
@@ -108,7 +108,7 @@ public func functionWithMyResilientTypesSize(_ s: __owned MySize, f: (__owned My
 // CHECK: store [[INT]] [[H]], ptr [[H_PTR]]
 
 
-// CHECK: call swiftcc void %2(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{8|16}}) [[DST]], ptr swiftself %3)
+// CHECK: call swiftcc void %2(ptr noalias sret({{.*}}) captures(none) %0, ptr noalias captures(none) dereferenceable({{8|16}}) [[DST]], ptr swiftself %3)
 // CHECK: call void @llvm.lifetime.end.p0({{i32|i64}} {{8|16}}, ptr [[DST]])
 
 // CHECK: ret void
@@ -164,7 +164,7 @@ public struct ResilientStructWithMethod {
 
 // Corner case -- type is address-only in SIL, but empty in IRGen
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience29partialApplyOfResilientMethod1ryAA0f10StructWithG0V_tF"(ptr noalias {{(nocapture|captures\(none\))}} %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience29partialApplyOfResilientMethod1ryAA0f10StructWithG0V_tF"(ptr noalias captures(none) %0)
 public func partialApplyOfResilientMethod(r: ResilientStructWithMethod) {
   _ = r.method
 }
@@ -190,7 +190,7 @@ public func resilientAny(s : ResilientWeakRef) {
 // CHECK: [[TYADDR:%.*]] = getelementptr inbounds{{.*}} %Any, ptr [[ANY]], i32 0, i32 1
 // CHECK: store ptr [[META2]], ptr [[TYADDR]]
 // CHECK: call ptr @__swift_allocate_boxed_opaque_existential_0(ptr [[ANY]])
-// CHECK: call swiftcc void @"$s17struct_resilience8wantsAnyyyypF"(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{(32|16)}}) [[ANY]])
+// CHECK: call swiftcc void @"$s17struct_resilience8wantsAnyyyypF"(ptr noalias captures(none) dereferenceable({{(32|16)}}) [[ANY]])
 // CHECK: call void @__swift_destroy_boxed_opaque_existential_0(ptr [[ANY]])
 // CHECK: ret void
 
