@@ -2395,6 +2395,12 @@ namespace {
           }
         }
 
+        if (isa<clang::TypedefNameDecl>(nd))
+          // Do not import type aliases members eagerly, since they may trigger
+          // template over-instantiation. If these type aliases are needed
+          // elsewhere, they will be imported on demand.
+          continue;
+
         Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
 
         if (!member) {
