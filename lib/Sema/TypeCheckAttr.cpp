@@ -183,6 +183,7 @@ public:
   IGNORED_ATTR(NoAllocation)
   IGNORED_ATTR(NoRuntime)
   IGNORED_ATTR(NoExistentials)
+  IGNORED_ATTR(NoManualOwnership)
   IGNORED_ATTR(NoObjCBridging)
   IGNORED_ATTR(EmitAssemblyVisionRemarks)
   IGNORED_ATTR(ShowInInterface)
@@ -476,7 +477,6 @@ public:
   void visitUnsafeNonEscapableResultAttr(UnsafeNonEscapableResultAttr *attr);
 
   void visitStaticExclusiveOnlyAttr(StaticExclusiveOnlyAttr *attr);
-  void visitManualOwnershipAttr(ManualOwnershipAttr *attr);
   void visitWeakLinkedAttr(WeakLinkedAttr *attr);
   void visitSILGenNameAttr(SILGenNameAttr *attr);
   void visitLifetimeAttr(LifetimeAttr *attr);
@@ -8406,13 +8406,6 @@ void AttributeChecker::visitStaticExclusiveOnlyAttr(
   if (structDecl->canBeCopyable() != TypeDecl::CanBeInvertible::Never) {
     diagnoseAndRemoveAttr(attr, diag::attr_static_exclusive_only_noncopyable);
   }
-}
-
-void AttributeChecker::visitManualOwnershipAttr(ManualOwnershipAttr *attr) {
-  if (Ctx.LangOpts.hasFeature(Feature::ManualOwnership))
-    return;
-
-  diagnoseAndRemoveAttr(attr, diag::attr_manual_ownership_experimental);
 }
 
 void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {
