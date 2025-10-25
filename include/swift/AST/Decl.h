@@ -6730,9 +6730,13 @@ public:
   /// An auxiliary variable is one that is synthesized by the compiler to
   /// support this VarDecl, such as synthesized property wrapper variables.
   ///
+  /// \param forNameLookup If \c true, will only visit auxiliary variables that
+  /// may appear in name lookup results.
+  ///
   /// \note this function only visits auxiliary variables that are not part of
   /// the AST.
-  void visitAuxiliaryVars(llvm::function_ref<void(VarDecl *)>) const;
+  void visitAuxiliaryVars(bool forNameLookup,
+                          llvm::function_ref<void(VarDecl *)>) const;
 
   /// Is this the synthesized storage for a 'lazy' property?
   bool isLazyStorageProperty() const {

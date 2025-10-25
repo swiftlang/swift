@@ -204,6 +204,12 @@ class LazyVarContainer {
   }
 }
 
+// The backing storage for lazy locals just isn't exposed through name lookup.
+func testLazyLocal() {
+  lazy var foo = 0
+  print($__lazy_storage_$_foo) // expected-error {{cannot find '$__lazy_storage_$_foo' in scope}}
+}
+
 // Make sure we can still access a synthesized variable with the same name as a lazy storage variable
 // i.e. $__lazy_storage_$_{property_name} when using property wrapper where the property name is 
 // '__lazy_storage_$_{property_name}'.

@@ -2382,8 +2382,9 @@ public:
     checkGlobalIsolation(VD);
 
     // Visit auxiliary decls first
-    VD->visitAuxiliaryVars(
-        [&](VarDecl *var) { this->visitBoundVariable(var); });
+    VD->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *var) {
+      this->visitBoundVariable(var);
+    });
 
     // Reject cases where this is a variable that has storage but it isn't
     // allowed.
@@ -4118,9 +4119,10 @@ void TypeChecker::checkParameterList(ParameterList *params,
 
     if (!param->isInvalid()) {
       auto *SF = owner->getParentSourceFile();
-      param->visitAuxiliaryVars([&](VarDecl *auxiliaryDecl) {
-        if (!isa<ParamDecl>(auxiliaryDecl))
-          DeclChecker(SF->getASTContext(), SF).visitBoundVariable(auxiliaryDecl);
+      auto &ctx = SF->getASTContext();
+      param->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *auxVar) {
+        if (!isa<ParamDecl>(auxVar))
+          DeclChecker(ctx, SF).visitBoundVariable(auxVar);
       });
     }
 

@@ -8768,14 +8768,21 @@ bool VarDecl::hasStorageOrWrapsStorage() const {
 }
 
 void VarDecl::visitAuxiliaryVars(
-    llvm::function_ref<void(VarDecl *)> visit) const {
+    bool forNameLookup, llvm::function_ref<void(VarDecl *)> visit) const {
   if (getDeclContext()->isTypeContext() ||
       (isImplicit() && !isa<ParamDecl>(this)))
     return;
 
-  if (getAttrs().hasAttribute<LazyAttr>()) {
-    if (auto *backingVar = getLazyStorageProperty())
-      visit(backingVar);
+  // The backing storage for a lazy property is not accessible to name lookup.
+  // This is not only a matter of hiding implementation details, but also
+  // correctness since triggering LazyStoragePropertyRequest currently eagerly
+  // requests the interface type for the var, which could result in incorrectly
+  // type-checking a lazy local independently of its surrounding closure.
+  if (!forNameLookup) {
+    if (getAttrs().hasAttribute<LazyAttr>()) {
+      if (auto *backingVar = getLazyStorageProperty())
+        visit(backingVar);
+    }
   }
 
   if (getAttrs().hasAttribute<CustomAttr>() || hasImplicitPropertyWrapper()) {
