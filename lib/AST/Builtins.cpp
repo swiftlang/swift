@@ -2912,6 +2912,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!autodiff::getBuiltinApplyDerivativeConfig(
             OperationName, kind, arity, throws))
       return nullptr;
+    // TODO: Support somehow typed throws
     return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity,
                                               throws, /*thrownType=*/Type());
   }
@@ -2921,6 +2922,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!autodiff::getBuiltinApplyTransposeConfig(
             OperationName, arity, throws))
       return nullptr;
+    // TODO: Support somehow typed throws
     return getAutoDiffApplyTransposeFunction(Context, Id, arity, throws,
                                              /*thrownType=*/Type());
   }
