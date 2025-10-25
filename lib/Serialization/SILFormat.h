@@ -114,6 +114,7 @@ namespace sil_index_block {
     SIL_PROPERTY_OFFSETS,
     SIL_DIFFERENTIABILITY_WITNESS_NAMES,
     SIL_DIFFERENTIABILITY_WITNESS_OFFSETS,
+    SIL_ASM_NAMES,
   };
 
   using ListLayout = BCGenericRecordLayout<

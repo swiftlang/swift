@@ -235,6 +235,10 @@ private:
   llvm::StringMap<SILFunction *> FunctionTable;
   llvm::StringMap<SILFunction *> ZombieFunctionTable;
 
+  /// Lookup table for SIL functions by their asmnames, for those that
+  /// have them.
+  llvm::StringMap<SILFunction *> FunctionByAsmNameTable;
+
   /// The list of SILFunctions in the module.
   FunctionListType functions;
 
@@ -309,6 +313,9 @@ private:
 
   /// Lookup table for SIL Global Variables.
   llvm::StringMap<SILGlobalVariable *> GlobalVariableMap;
+
+  /// Lookup table for SIL Global Variables, indexed by their asmnames.
+  llvm::StringMap<SILGlobalVariable *> GlobalVariableByAsmNameMap;
 
   /// The list of SILGlobalVariables in the module.
   GlobalListType silGlobals;
@@ -822,14 +829,20 @@ public:
   /// Look for a global variable by name.
   ///
   /// \return null if this module has no such global variable
-  SILGlobalVariable *lookUpGlobalVariable(StringRef name) const {
+  SILGlobalVariable *lookUpGlobalVariable(StringRef name,
+                                          bool byAsmName = false) const {
+    if (byAsmName)
+      return GlobalVariableByAsmNameMap.lookup(name);
+
     return GlobalVariableMap.lookup(name);
   }
 
   /// Look for a function by name.
   ///
   /// \return null if this module has no such function
-  SILFunction *lookUpFunction(StringRef name) const {
+  SILFunction *lookUpFunction(StringRef name, bool byAsmName = false) const {
+    if (byAsmName)
+      return FunctionByAsmNameTable.lookup(name);
     return FunctionTable.lookup(name);
   }
 

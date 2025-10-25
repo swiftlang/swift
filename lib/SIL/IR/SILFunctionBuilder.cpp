@@ -128,7 +128,7 @@ void SILFunctionBuilder::addFunctionAttributes(
     }
 
     if (auto asmName = constant.getAsmName()) {
-      F->setAsmName(*asmName);
+      F->setAsmName(M.getASTContext().AllocateCopy(*asmName));
     }
   }
 
@@ -177,16 +177,18 @@ void SILFunctionBuilder::addFunctionAttributes(
     if (Attrs.hasAttribute<CDeclAttr>()) {
       // If the function is marked with @c, expose only C compatible
       // thunk function.
-      shouldExportDecl = constant.isNativeToForeignThunk();
+      shouldExportDecl = constant.isNativeToForeignThunk() || constant.isForeign;
     }
     if (EA->getExposureKind() == ExposureKind::Wasm && shouldExportDecl) {
       // A wasm-level exported function must be retained if it appears in a
       // compilation unit.
       F->setMarkedAsUsed(true);
-      if (EA->Name.empty())
-        F->setWasmExportName(F->getName());
-      else
+      if (!EA->Name.empty())
         F->setWasmExportName(EA->Name);
+      else if (!F->asmName().empty())
+        F->setWasmExportName(F->asmName());
+      else
+        F->setWasmExportName(F->getName());
     }
   }
 

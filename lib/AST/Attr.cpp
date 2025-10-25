@@ -3273,11 +3273,11 @@ bool MacroRoleAttr::hasNameKind(MacroIntroducedDeclNameKind kind) const {
   }) != getNames().end();
 }
 
-StringRef ExternAttr::getCName(const FuncDecl *D) const {
+StringRef ExternAttr::getCName(const ValueDecl *D) const {
   if (auto cName = this->Name)
     return cName.value();
   // If no name was specified, fall back on the Swift base name without mangling.
-  // Base name is always available and non-empty for FuncDecl.
+  // Base name is always available and non-empty for functions and variables.
   return D->getBaseIdentifier().str();
 }
 
