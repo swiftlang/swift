@@ -1,12 +1,14 @@
 import sys
 from multiprocessing import cpu_count
 import time
-from typing import Callable, List, Any, Tuple, Union
+from typing import Callable, List, Any, Optional, Tuple, Union
 from threading import Lock, Thread, Event
 from concurrent.futures import ThreadPoolExecutor
 import shutil
 
-from .runner_arguments import RunnerArguments, AdditionalSwiftSourcesArguments
+from .git_command import GitException
+
+from .runner_arguments import RunnerArguments, AdditionalSwiftSourcesArguments, UpdateArguments
 
 
 class TaskTracker:
@@ -50,10 +52,10 @@ class TaskTracker:
 class MonitoredFunction:
     def __init__(
         self,
-        fn: Callable,
+        fn: Callable[..., Union[Exception]],
         task_tracker: TaskTracker,
     ):
-        self.fn = fn
+        self._fn = fn
         self._task_tracker = task_tracker
 
     def __call__(self, *args: Union[RunnerArguments, AdditionalSwiftSourcesArguments]):
@@ -61,7 +63,7 @@ class MonitoredFunction:
         self._task_tracker.mark_task_as_running(task_name)
         result = None
         try:
-            result = self.fn(*args)
+            result = self._fn(*args)
         except Exception as e:
             print(e)
         finally:
@@ -69,13 +71,19 @@ class MonitoredFunction:
             return result
 
 
-class ParallelRunner:
+class ParallelRunner():
     def __init__(
         self,
-        fn: Callable,
-        pool_args: List[Union[RunnerArguments, AdditionalSwiftSourcesArguments]],
+        fn: Callable[..., None],
+        pool_args: Union[List[UpdateArguments], List[AdditionalSwiftSourcesArguments]],
         n_threads: int = 0,
     ):
+        def run_safely(*args, **kwargs):
+            try:
+                fn(*args, **kwargs)
+            except GitException as e:
+                return e
+
         if n_threads == 0:
             # Limit the number of threads as the performance regresses if the
             # number is too high.
@@ -84,7 +92,8 @@ class ParallelRunner:
         self._monitor_polling_period = 0.1
         self._terminal_width = shutil.get_terminal_size().columns
         self._pool_args = pool_args
-        self._fn = fn
+        self._fn_name = fn.__name__
+        self._fn = run_safely
         self._output_prefix = pool_args[0].output_prefix
         self._nb_repos = len(pool_args)
         self._stop_event = Event()
@@ -93,8 +102,8 @@ class ParallelRunner:
             self._task_tracker = TaskTracker()
             self._monitored_fn = MonitoredFunction(self._fn, self._task_tracker)
 
-    def run(self) -> List[Any]:
-        print(f"Running ``{self._fn.__name__}`` with up to {self._n_threads} processes.")
+    def run(self) -> List[Union[None, Exception]]:
+        print(f"Running ``{self._fn_name}`` with up to {self._n_threads} processes.")
         if self._verbose:
             with ThreadPoolExecutor(max_workers=self._n_threads) as pool:
                 results = list(pool.map(self._fn, self._pool_args, timeout=1800))
@@ -129,13 +138,10 @@ class ParallelRunner:
         sys.stdout.flush()
 
     @staticmethod
-    def check_results(results, op) -> int:
-        """Function used to check the results of ParallelRunner.
-
-        NOTE: This function was originally located in the shell module of
-        swift_build_support and should eventually be replaced with a better
-        parallel implementation.
-        """
+    def check_results(
+        results: Optional[List[Union[GitException, Exception, Any]]], operation: str
+    ) -> int:
+        """Check the results of ParallelRunner and print the failures."""
 
         fail_count = 0
         if results is None:
@@ -144,15 +150,10 @@ class ParallelRunner:
             if r is None:
                 continue
             if fail_count == 0:
-                print("======%s FAILURES======" % op)
+                print(f"======{operation} FAILURES======")
             fail_count += 1
-            if isinstance(r, str):
+            if isinstance(r, (GitException, Exception)):
                 print(r)
                 continue
-            if not hasattr(r, "repo_path"):
-                # TODO: create a proper Exception class with these attributes
-                continue
-            print("%s failed (ret=%d): %s" % (r.repo_path, r.ret, r))
-            if r.stderr:
-                print(r.stderr.decode())
+            print(r)
         return fail_count
