@@ -611,7 +611,9 @@ Func Optional.!=(_:_:) has mangled name changing from 'static Swift.Optional.!= 
 Func Optional.!=(_:_:) has parameter 0 changing from Default to Shared
 Func Optional.!=(_:_:) has parameter 1 changing from Default to Shared
 Func Optional.!=(_:_:) is now with @_preInverseGenerics
+Func Optional.==(_:_:) has generic signature change from <Wrapped where Wrapped : Swift.Equatable> to <Wrapped where Wrapped : Swift.Equatable, Wrapped : ~Copyable>
 Func Optional.==(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
+Func Optional.==(_:_:) has mangled name changing from 'static (extension in Swift):Swift.Optional<A where A: Swift.Equatable>.== infix(Swift.Optional<A>, Swift.Optional<A>) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: Swift.Equatable, A: ~Swift.Copyable>.== infix(Swift.Optional<A>, Swift.Optional<A>) -> Swift.Bool'
 Func Optional.==(_:_:) has mangled name changing from 'static Swift.Optional.== infix(Swift.Optional<A>, Swift._OptionalNilComparisonType) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: ~Swift.Copyable, A: ~Swift.Escapable>.== infix(Swift.Optional<A>, Swift._OptionalNilComparisonType) -> Swift.Bool'
 Func Optional.==(_:_:) has mangled name changing from 'static Swift.Optional.== infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: ~Swift.Copyable, A: ~Swift.Escapable>.== infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool'
 Func Optional.==(_:_:) has parameter 0 changing from Default to Shared
@@ -623,6 +625,11 @@ Func Optional.~=(_:_:) has parameter 1 changing from Default to Shared
 Func Optional.~=(_:_:) is now with @_preInverseGenerics
 Func Result.get() has been removed
 Func Result.mapError(_:) has been removed
+Func Result.==(_:_:) has generic signature change from <Success, Failure where Success : Swift.Equatable, Failure : Swift.Equatable, Failure : Swift.Error> to <Success, Failure where Success : Swift.Equatable, Failure : Swift.Equatable, Failure : Swift.Error, Success : ~Copyable>
+Func Result.==(_:_:) has mangled name changing from 'static (extension in Swift):Swift.Result< where A: Swift.Equatable, B: Swift.Equatable>.== infix(Swift.Result<A, B>, Swift.Result<A, B>) -> Swift.Bool' to 'static (extension in Swift):Swift.Result< where A: Swift.Equatable, B: Swift.Equatable, A: ~Swift.Copyable>.== infix(Swift.Result<A, B>, Swift.Result<A, B>) -> Swift.Bool'
+Func Result.==(_:_:) has parameter 0 changing from Default to Shared
+Func Result.==(_:_:) has parameter 1 changing from Default to Shared
+Func Result.==(_:_:) is now with @_preInverseGenerics
 Func TextOutputStreamable.write(to:) has generic signature change from <Self, Target where Self : Swift.TextOutputStreamable, Target : Swift.TextOutputStream> to <Self, Target where Self : Swift.TextOutputStreamable, Target : Swift.TextOutputStream, Self : ~Copyable>
 Func UnsafeBufferPointer.deallocate() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Func UnsafeBufferPointer.deallocate() has mangled name changing from 'Swift.UnsafeBufferPointer.deallocate() -> ()' to '(extension in Swift):Swift.UnsafeBufferPointer< where A: ~Swift.Copyable>.deallocate() -> ()'
