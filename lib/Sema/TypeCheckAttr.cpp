@@ -27,7 +27,6 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -5291,7 +5290,7 @@ void AttributeChecker::checkBackDeployedAttrs(
   std::map<PlatformKind, SourceLoc> seenPlatforms;
 
   const BackDeployedAttr *ActiveAttr = nullptr;
-  if (auto AttrAndRange = D->getBackDeployedAttrAndRange(Ctx))
+  if (auto AttrAndRange = D->getBackDeployedAttrAndRange())
     ActiveAttr = AttrAndRange->first;
 
   for (auto *Attr : Attrs) {
@@ -5391,14 +5390,8 @@ void AttributeChecker::checkBackDeployedAttrs(
 
     // Unavailable decls cannot be back deployed.
     if (availability.containsUnavailableDomain(Domain)) {
-      auto domainForDiagnostics = Domain;
-      llvm::VersionTuple ignoredVersion;
-
-      AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
-          Attr, Ctx, domainForDiagnostics, ignoredVersion);
-
       diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
-               domainForDiagnostics);
+               Domain.getRemappedDomain(Ctx));
 
       // Find the attribute that makes the declaration unavailable.
       const Decl *attrDecl = D;
@@ -5421,23 +5414,22 @@ void AttributeChecker::checkBackDeployedAttrs(
     // fallback could never be executed at runtime.
     if (auto availableRangeAttrPair =
             getSemanticAvailableRangeDeclAndAttr(VD, Domain)) {
-      auto beforeDomain = Domain;
-      auto beforeVersion = Attr->getVersion();
-      auto availableAttr = availableRangeAttrPair.value().first;
-      auto introVersion = availableAttr.getIntroduced().value();
-      AvailabilityDomain introDomain = availableAttr.getDomain();
+      auto availableAttr = availableRangeAttrPair->first;
+      auto introDomainAndRange = availableAttr.getIntroducedDomainAndRange(Ctx);
+      if (!introDomainAndRange)
+        continue;
 
-      AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
-          Attr, Ctx, beforeDomain, beforeVersion);
-      AvailabilityInference::updateIntroducedAvailabilityDomainForFallback(
-          availableAttr, Ctx, introDomain, introVersion);
+      auto beforeDomainAndRange = Domain.getRemappedDomainAndRange(
+          Attr->getVersion(), AvailabilityVersionKind::Introduced, Ctx);
 
-      if (beforeVersion <= introVersion) {
+      auto introRange = introDomainAndRange->getRange();
+      auto beforeRange = beforeDomainAndRange.getRange();
+      if (introRange.isContainedIn(beforeRange)) {
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
-                 Attr, VD, beforeDomain, AvailabilityRange(beforeVersion));
+                 Attr, VD, beforeDomainAndRange.getDomain(), beforeRange);
         diagnose(availableAttr.getParsedAttr()->AtLoc,
-                 diag::availability_introduced_in_version, VD, introDomain,
-                 AvailabilityRange(introVersion))
+                 diag::availability_introduced_in_version, VD,
+                 introDomainAndRange->getDomain(), introRange)
             .highlight(availableAttr.getParsedAttr()->getRange());
         continue;
       }
