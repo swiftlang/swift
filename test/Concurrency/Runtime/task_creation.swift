@@ -31,6 +31,15 @@ enum SomeError: Error {
       return 7
     }
 
+    let t2f = Task { () throws(SomeError) -> Int in
+      throw SomeError.bad
+    }
+    do {
+      try await t2f.value
+    } catch {
+      let err: SomeError = error // confirm it was a typed throw
+    }
+
     let t3 = Task.detached {
       return 9
     }
@@ -43,7 +52,7 @@ enum SomeError: Error {
       return 11
     }
 
-    let result = try! await t1.get() + t2.get() + t3.get() + t4.get()
+    let result = try! await t1.value + t2.value + t3.value + t4.value
     assert(result == 32)
   }
 }
