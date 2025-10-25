@@ -113,9 +113,9 @@ static std::optional<AvailabilityQuery>
 getAvailabilityQueryForBackDeployment(AbstractFunctionDecl *AFD) {
   auto &ctx = AFD->getASTContext();
   if (ctx.LangOpts.TargetVariant) {
-    auto primaryAttrAndRange = AFD->getBackDeployedAttrAndRange(ctx);
+    auto primaryAttrAndRange = AFD->getBackDeployedAttrAndRange();
     auto variantAttrAndRange =
-        AFD->getBackDeployedAttrAndRange(ctx, /*forTargetVariant=*/true);
+        AFD->getBackDeployedAttrAndRange(/*forTargetVariant=*/true);
 
     if (!primaryAttrAndRange && !variantAttrAndRange)
       return std::nullopt;
@@ -134,7 +134,7 @@ getAvailabilityQueryForBackDeployment(AbstractFunctionDecl *AFD) {
                                       primaryRange, variantRange);
   }
 
-  if (auto primaryAttrAndRange = AFD->getBackDeployedAttrAndRange(ctx))
+  if (auto primaryAttrAndRange = AFD->getBackDeployedAttrAndRange())
     return AvailabilityQuery::dynamic(
         primaryAttrAndRange->first->getAvailabilityDomain(),
         primaryAttrAndRange->second, std::nullopt);
@@ -284,7 +284,7 @@ SILGenFunction::emitIfAvailableQuery(SILLocation loc,
 bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,
                                                ResilienceExpansion expansion) {
   auto &ctx = getASTContext();
-  auto attrAndRange = decl->getBackDeployedAttrAndRange(ctx);
+  auto attrAndRange = decl->getBackDeployedAttrAndRange();
   if (!attrAndRange)
     return false;
 
