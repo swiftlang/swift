@@ -576,8 +576,8 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
         auto loc = declRef->getLoc();
         if (name.isSimpleName(ctx.Id_self)) {
           auto *otherSelfDecl =
-            ASTScope::lookupSingleLocalDecl(Decl->getParentSourceFile(),
-                                            name.getFullName(), loc);
+            ASTScope::lookupSingleLocalDecl(Decl->getParentSourceFile(), name,
+                                            loc);
           if (otherSelfDecl == Decl->getImplicitSelfDecl())
             myKind = BodyInitKind::Delegating;
         }

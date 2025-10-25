@@ -1653,6 +1653,27 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt to reference member from the wrong module with a module
+/// selector, e.g.
+///
+/// ```swift
+/// import Foo
+/// import Bar
+///
+/// SomeType.Bar::methodDefinedInFoo()
+/// ```
+class MemberFromWrongModuleFailure final : public FailureDiagnostic {
+  ValueDecl *Member;
+  DeclNameRef Name;
+
+public:
+  MemberFromWrongModuleFailure(const Solution &solution, DeclNameRef name,
+                               ValueDecl *member, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), Member(member), Name(name) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose an attempt to reference member marked as `mutating`
 /// on immutable base e.g. `let` variable:
 ///
