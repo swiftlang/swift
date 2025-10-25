@@ -8706,9 +8706,14 @@ ExplicitSafety ClangTypeExplicitSafety::evaluate(
   if (auto recordDecl = clangType->getAsTagDecl()) {
     // If we reached this point the types is not imported as a shared reference,
     // so we don't need to check the bases whether they are shared references.
-    return evaluateOrDefault(evaluator,
-                             ClangDeclExplicitSafety({recordDecl, false}),
-                             ExplicitSafety::Unspecified);
+    auto req = ClangDeclExplicitSafety({recordDecl, false});
+    if (evaluator.hasActiveRequest(req))
+      // Cycles are allowed in templates, e.g.:
+      //   template <typename>   class Foo { ... }; // throws away template arg
+      //   template <typename T> class Bar : Foo<Bar<T>> { ... };
+      // We need to avoid them here.
+      return ExplicitSafety::Unspecified;
+    return evaluateOrDefault(evaluator, req, ExplicitSafety::Unspecified);
   }
 
   // Everything else is safe.
@@ -8828,6 +8833,29 @@ ClangDeclExplicitSafety::evaluate(Evaluator &evaluator,
           ClangTypeEscapability({recordDecl->getTypeForDecl(), nullptr}),
           CxxEscapability::Unknown) != CxxEscapability::Unknown)
     return ExplicitSafety::Safe;
+
+  // A template class is unsafe if any of its type arguments are unsafe.
+  // Note that this does not rely on the record being defined.
+  if (const auto *ctsd =
+          dyn_cast<clang::ClassTemplateSpecializationDecl>(recordDecl)) {
+    for (auto arg : ctsd->getTemplateArgs().asArray()) {
+      switch (arg.getKind()) {
+      case clang::TemplateArgument::Type:
+        if (hasUnsafeType(evaluator, arg.getAsType()))
+          return ExplicitSafety::Unsafe;
+        break;
+      case clang::TemplateArgument::Pack:
+        for (auto pkArg : arg.getPackAsArray()) {
+          if (pkArg.getKind() == clang::TemplateArgument::Type &&
+              hasUnsafeType(evaluator, pkArg.getAsType()))
+            return ExplicitSafety::Unsafe;
+        }
+        break;
+      default:
+        continue;
+      }
+    }
+  }
   
   // If we don't have a definition, leave it unspecified.
   recordDecl = recordDecl->getDefinition();
@@ -8841,7 +8869,7 @@ ClangDeclExplicitSafety::evaluate(Evaluator &evaluator,
         return ExplicitSafety::Unsafe;
     }
   }
-  
+
   // Check the fields.
   for (auto field : recordDecl->fields()) {
     if (hasUnsafeType(evaluator, field->getType()))
