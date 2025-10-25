@@ -6,7 +6,6 @@
 // RUN: %empty-directory(%t/test-sdk/usr/lib/Bar.swiftmodule)
 // RUN: %empty-directory(%t/test-sdk/usr/lib/_Foo_Bar.swiftmodule)
 // RUN: %empty-directory(%t/test-sdk/usr/lib/Foo.swiftcrossimport)
-// RUN: cp -r %platform-module-dir/Swift.swiftmodule %t/test-sdk/usr/lib/swift/Swift.swiftmodule
 
 // RUN: split-file %s %t
 
