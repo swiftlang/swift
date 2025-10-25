@@ -63,7 +63,7 @@ public:
     using namespace RuntimeConstants;
 #define FUNCTION(ID, MODULE, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS,     \
                  EFFECT, MEMORY_EFFECTS)                                       \
-  linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT);                            \
+linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT, StringRef(#CC) == "C_CC");    \
   if (getModule()->getASTContext().hadError())                                 \
     return;
 
@@ -79,7 +79,8 @@ public:
 #include "swift/Runtime/RuntimeFunctions.def"
 
       // swift_retainCount is not part of private contract between the compiler and runtime, but we still need to link it
-      linkEmbeddedRuntimeFunctionByName("swift_retainCount", { RefCounting });
+      linkEmbeddedRuntimeFunctionByName("swift_retainCount", { RefCounting },
+                                        /*byAsmName=*/true);
   }
 
   void linkEmbeddedConcurrency() {
@@ -95,25 +96,28 @@ public:
     // runtime functions, which are public.
 
 #define SWIFT_CONCURRENCY_HOOK(RETURNS, NAME, ...)                  \
-  linkUsedFunctionByName(#NAME "Impl", SILLinkage::HiddenExternal)
+  linkUsedFunctionByName(#NAME "Impl", SILLinkage::HiddenExternal,  \
+                         /*byAsmName=*/false)
 #define SWIFT_CONCURRENCY_HOOK0(RETURNS, NAME)                      \
-  linkUsedFunctionByName(#NAME "Impl", SILLinkage::HiddenExternal)
+  linkUsedFunctionByName(#NAME "Impl", SILLinkage::HiddenExternal,  \
+                         /*byAsmName=*/false)
 
     #include "swift/Runtime/ConcurrencyHooks.def"
 
     linkUsedFunctionByName("swift_task_asyncMainDrainQueueImpl",
-                           SILLinkage::HiddenExternal);
+                           SILLinkage::HiddenExternal, /*byAsmName=*/false);
     linkUsedFunctionByName("_swift_task_enqueueOnExecutor",
-                           SILLinkage::HiddenExternal);
+                           SILLinkage::HiddenExternal, /*byAsmName=*/false);
     linkUsedFunctionByName("swift_createDefaultExecutors",
-                           SILLinkage::HiddenExternal);
+                           SILLinkage::HiddenExternal, /*byAsmName=*/false);
     linkUsedFunctionByName("swift_getDefaultExecutor",
-                           SILLinkage::HiddenExternal);
+                           SILLinkage::HiddenExternal, /*byAsmName=*/false);
     linkEmbeddedRuntimeWitnessTables();
   }
 
   void linkEmbeddedRuntimeFunctionByName(StringRef name,
-                                         ArrayRef<RuntimeEffect> effects) {
+                                         ArrayRef<RuntimeEffect> effects,
+                                         bool byAsmName) {
     SILModule &M = *getModule();
 
     bool allocating = false;
@@ -125,7 +129,7 @@ public:
     if (M.getOptions().NoAllocations && allocating) return;
 
     // Swift Runtime functions are all expected to be SILLinkage::PublicExternal
-    linkUsedFunctionByName(name, SILLinkage::PublicExternal);
+    linkUsedFunctionByName(name, SILLinkage::PublicExternal, byAsmName);
   }
 
   void linkEmbeddedRuntimeWitnessTables() {
@@ -146,13 +150,15 @@ public:
   }
 
   SILFunction *linkUsedFunctionByName(StringRef name,
-                                      std::optional<SILLinkage> Linkage) {
+                                      std::optional<SILLinkage> Linkage,
+                                      bool byAsmName) {
     SILModule &M = *getModule();
 
     // Bail if function is already loaded.
-    if (auto *Fn = M.lookUpFunction(name)) return Fn;
+    if (auto *Fn = M.lookUpFunction(name, byAsmName)) return Fn;
 
-    SILFunction *Fn = M.getSILLoader()->lookupSILFunction(name, Linkage);
+    SILFunction *Fn =
+        M.getSILLoader()->lookupSILFunction(name, Linkage, byAsmName);
     if (!Fn) return nullptr;
 
     if (M.linkFunction(Fn, LinkMode))
@@ -170,13 +176,15 @@ public:
     return Fn;
   }
 
-  SILGlobalVariable *linkUsedGlobalVariableByName(StringRef name) {
+  SILGlobalVariable *linkUsedGlobalVariableByName(StringRef name,
+                                                  bool byAsmName) {
     SILModule &M = *getModule();
 
     // Bail if runtime function is already loaded.
-    if (auto *GV = M.lookUpGlobalVariable(name)) return GV;
+    if (auto *GV = M.lookUpGlobalVariable(name, byAsmName)) return GV;
 
-    SILGlobalVariable *GV = M.getSILLoader()->lookupSILGlobalVariable(name);
+    SILGlobalVariable *GV =
+        M.getSILLoader()->lookupSILGlobalVariable(name, byAsmName);
     if (!GV) return nullptr;
 
     // Make sure that dead-function-elimination doesn't remove the explicitly
@@ -194,17 +202,19 @@ public:
 
     for (auto *G : Globals) {
       auto declRef = SILDeclRef(G, SILDeclRef::Kind::Func);
-      linkUsedGlobalVariableByName(declRef.mangle());
+      linkUsedGlobalVariableByName(declRef.mangle(), /*byAsmName=*/false);
     }
 
     for (auto *F : Functions) {
       auto declRef = SILDeclRef(F, SILDeclRef::Kind::Func);
-      auto *Fn = linkUsedFunctionByName(declRef.mangle(), /*Linkage*/{});
+      auto *Fn = linkUsedFunctionByName(declRef.mangle(), /*Linkage*/{},
+                                        /*byAsmName=*/false);
 
       // If we have @_cdecl or @_silgen_name, also link the foreign thunk
       if (Fn->hasCReferences()) {
         auto declRef = SILDeclRef(F, SILDeclRef::Kind::Func, /*isForeign*/true);
-        linkUsedFunctionByName(declRef.mangle(), /*Linkage*/{});
+        linkUsedFunctionByName(declRef.mangle(), /*Linkage*/{},
+                               /*byAsmName=*/false);
       }
     }
   }
