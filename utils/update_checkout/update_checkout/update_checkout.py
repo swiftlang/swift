@@ -27,6 +27,20 @@ SCRIPT_FILE = os.path.abspath(__file__)
 SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
 
 
+class SkippedReason:
+    def __init__(self, repo_name: str, reason: str):
+        self.repo_name = repo_name
+        self.reason = reason
+
+    @staticmethod
+    def print_skipped_repositories(skipped_reasons: List["SkippedReason"], step: str):
+        if not skipped_reasons:
+            return
+        print(f"Skipped {step}:")
+        for reason in skipped_reasons:
+            print(f"  '{reason.repo_name}' - {reason.reason}")
+
+
 def confirm_tag_in_repo(repo_path: str, tag: str, repo_name: str) -> Optional[str]:
     """Confirm that a given tag exists in a git repository. This function
     assumes that the repository is already a current working directory before
@@ -356,24 +370,19 @@ def update_all_repositories(
     scheme_map: Optional[Dict[str, Any]],
     cross_repos_pr: Dict[str, str],
 ):
+    skipped_repositories = []
     pool_args: List[UpdateArguments] = []
     timestamp = get_timestamp_to_match(args.match_timestamp, args.source_root)
     for repo_name in config['repos'].keys():
         if repo_name in args.skip_repository_list:
-            print("Skipping update of '" + repo_name + "', requested by user")
+            skipped_repositories.append(SkippedReason(repo_name, "requested by user",))
             continue
 
         # If the repository is not listed in the branch-scheme, skip it.
         if scheme_map and repo_name not in scheme_map:
             # If the repository exists locally, notify we are skipping it.
             if os.path.isdir(os.path.join(args.source_root, repo_name)):
-                print(
-                    "Skipping update of '"
-                    + repo_name
-                    + "', repository not listed in the '"
-                    + scheme_name
-                    + "' branch-scheme"
-                )
+                skipped_repositories.append(SkippedReason(repo_name, f"repository not listed in the {scheme_name} branch-scheme"))
             continue
 
         my_args = UpdateArguments(
@@ -400,7 +409,7 @@ def update_all_repositories(
             for repo_name in locked_repositories
         ]
     _move_llvm_project_to_first_index(pool_args)
-    return ParallelRunner(update_single_repository, pool_args, args.n_processes).run()
+    return skipped_repositories, ParallelRunner(update_single_repository, pool_args, args.n_processes).run()
 
 
 def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
@@ -451,12 +460,12 @@ def obtain_all_additional_swift_sources(
     scheme_name: str,
     skip_repository_list: List[str],
 ):
+    skipped_repositories = []
     pool_args = []
     for repo_name, repo_info in config['repos'].items():
         repo_path = os.path.join(args.source_root, repo_name)
         if repo_name in skip_repository_list:
-            print("Skipping clone of '" + repo_name + "', requested by "
-                    "user")
+            skipped_repositories.append(SkippedReason(repo_name, "requested by user"))
             continue
 
         if args.use_submodules:
@@ -472,8 +481,7 @@ def obtain_all_additional_swift_sources(
             repo_exists = os.path.isdir(os.path.join(repo_path, ".git"))
 
         if repo_exists:
-            print("Skipping clone of '" + repo_name + "', directory "
-                    "already exists")
+            skipped_repositories.append(SkippedReason(repo_name, "directory already exists"))
             continue
 
         # If we have a url override, use that url instead of
@@ -528,13 +536,13 @@ def obtain_all_additional_swift_sources(
     # Only use `ParallelRunner` when submodules are not used, since `.git` dir
     # can't be accessed concurrently.
     if args.use_submodules:
-        return
+        return [], None
     if not pool_args:
         print("Not cloning any repositories.")
-        return
+        return [], None
 
     _move_llvm_project_to_first_index(pool_args)
-    return ParallelRunner(
+    return skipped_repositories, ParallelRunner(
         obtain_additional_swift_sources, pool_args, args.n_processes
     ).run()
 
@@ -735,9 +743,10 @@ def main() -> int:
     if args.clone or args.clone_with_ssh:
         skip_repo_list = skip_list_for_platform(config, args.all_repositories)
         skip_repo_list.extend(args.skip_repository_list)
-        clone_results = obtain_all_additional_swift_sources(args, config,
-                                                            scheme_name,
-                                                            skip_repo_list)
+        skipped_repositories, clone_results = obtain_all_additional_swift_sources(
+            args, config, scheme_name, skip_repo_list
+        )
+        SkippedReason.print_skipped_repositories(skipped_repositories, "clone")
 
     swift_repo_path = os.path.join(args.source_root, 'swift')
     if 'swift' not in skip_repo_list and os.path.exists(swift_repo_path):
@@ -776,8 +785,10 @@ def main() -> int:
         print("You don't have all swift sources. "
               "Call this script with --clone to get them.")
 
-    update_results = update_all_repositories(args, config, scheme_name,
+    skipped_repositories, update_results = update_all_repositories(args, config, scheme_name,
                                              scheme_map, cross_repos_pr)
+    SkippedReason.print_skipped_repositories(skipped_repositories, "update")
+
     fail_count = 0
     fail_count += ParallelRunner.check_results(clone_results, "CLONE")
     fail_count += ParallelRunner.check_results(update_results, "UPDATE")
