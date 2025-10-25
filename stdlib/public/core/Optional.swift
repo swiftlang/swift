@@ -522,7 +522,8 @@ func _diagnoseUnexpectedNilOptional(
   }
 }
 
-extension Optional: Equatable where Wrapped: Equatable {
+@_preInverseGenerics
+extension Optional: Equatable where Wrapped: Equatable & ~Copyable {
   /// Returns a Boolean value indicating whether two optional instances are
   /// equal.
   ///
@@ -568,14 +569,19 @@ extension Optional: Equatable where Wrapped: Equatable {
   ///   - lhs: An optional value to compare.
   ///   - rhs: Another optional value to compare.
   @_transparent
-  public static func ==(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
-    switch (lhs, rhs) {
-    case let (l?, r?):
-      return l == r
-    case (nil, nil):
-      return true
-    default:
-      return false
+  @_preInverseGenerics
+  public static func ==(lhs: borrowing Wrapped?, rhs: borrowing Wrapped?) -> Bool {
+    switch lhs {
+    case let l?:
+      switch rhs {
+      case let r?: l == r
+      case nil: false
+      }
+    case nil:
+      switch rhs {
+      case _?: false
+      case nil: true
+      }
     }
   }
 }
