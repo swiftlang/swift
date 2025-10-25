@@ -43,6 +43,7 @@ set(${PROJECT_NAME}_VENDOR_MODULE_DIR "${CMAKE_SOURCE_DIR}/../cmake/modules/vend
 
 find_package(SwiftCore REQUIRED)
 find_package(SwiftOverlay REQUIRED)
+find_package(SwiftCxxOverlay REQUIRED)
 find_package(SwiftDarwin)
 
 include(GNUInstallDirs)
