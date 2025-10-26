@@ -208,7 +208,6 @@ Protocol Encodable has added inherited protocol Copyable
 Protocol Encodable has added inherited protocol Escapable
 Protocol Encoder has added inherited protocol Copyable
 Protocol Encoder has added inherited protocol Escapable
-Protocol Equatable has added inherited protocol Escapable
 Protocol Error has added inherited protocol Copyable
 Protocol Error has added inherited protocol Escapable
 Protocol ExpressibleByArrayLiteral has added inherited protocol Copyable
@@ -882,12 +881,12 @@ Enum DecodingError has added a conformance to an existing protocol CustomDebugSt
 Enum EncodingError has added a conformance to an existing protocol CustomDebugStringConvertible
 
 // Equatable: ~Copyable
-Func Equatable.!=(_:_:) has generic signature change from <Self where Self : Swift.Equatable> to <Self where Self : Swift.Equatable, Self : ~Copyable>
-Func Equatable.!=(_:_:) has mangled name changing from 'static (extension in Swift):Swift.Equatable.!= infix(A, A) -> Swift.Bool' to 'static (extension in Swift):Swift.Equatable< where A: ~Swift.Copyable>.!= infix(A, A) -> Swift.Bool'
+Func Equatable.!=(_:_:) has generic signature change from <Self where Self : Swift.Equatable> to <Self where Self : Swift.Equatable, Self : ~Copyable, Self : ~Escapable>
+Func Equatable.!=(_:_:) has mangled name changing from 'static (extension in Swift):Swift.Equatable.!= infix(A, A) -> Swift.Bool' to 'static (extension in Swift):Swift.Equatable< where A: ~Swift.Copyable, A: ~Swift.Escapable>.!= infix(A, A) -> Swift.Bool'
 Func Equatable.!=(_:_:) has parameter 0 changing from Default to Shared
 Func Equatable.!=(_:_:) has parameter 1 changing from Default to Shared
 Func Equatable.!=(_:_:) is now with @_preInverseGenerics
-Func Equatable.==(_:_:) has generic signature change from <Self where Self : Swift.Equatable> to <Self where Self : Swift.Equatable, Self : ~Copyable>
+Func Equatable.==(_:_:) has generic signature change from <Self where Self : Swift.Equatable> to <Self where Self : Swift.Equatable, Self : ~Copyable, Self : ~Escapable>
 Func Equatable.==(_:_:) has parameter 0 changing from Default to Shared
 Func Equatable.==(_:_:) has parameter 1 changing from Default to Shared
 

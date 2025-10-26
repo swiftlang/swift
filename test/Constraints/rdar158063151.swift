@@ -8,7 +8,7 @@ struct Value: Equatable, ExpressibleByNilLiteral {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13rdar1580631514test1vyAA5ValueV_tF : $@convention(thin) (Value) -> ()
-// CHECK: [[EQUALS_REF:%.*]] = witness_method $Value, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool
+// CHECK: [[EQUALS_REF:%.*]] = witness_method $Value, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool
 // CHECK-NEXT: apply [[EQUALS_REF]]<Value>({{.*}})
 func test(v: Value) {
   _ = v == nil
