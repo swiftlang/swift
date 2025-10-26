@@ -8949,7 +8949,8 @@ namespace {
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       // For closures, update the parameter types and check the body.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-        rewriteFunction(closure);
+        if (rewriteFunction(closure))
+          return Action::Stop();
 
         if (AnyFunctionRef(closure).hasExternalPropertyWrapperParameters()) {
           auto *thunkTy = Rewriter.cs.getType(closure)->castTo<FunctionType>();
@@ -8962,19 +8963,22 @@ namespace {
       }
 
       if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
-        rewriteSingleValueStmtExpr(SVE);
+        if (rewriteSingleValueStmtExpr(SVE))
+          return Action::Stop();
         return Action::SkipNode(SVE);
       }
 
       if (auto tap = dyn_cast_or_null<TapExpr>(expr)) {
-        rewriteTapExpr(tap);
+        if (rewriteTapExpr(tap))
+          return Action::Stop();
         return Action::SkipNode(tap);
       }
 
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
         // Rewrite captures.
         for (const auto &capture : captureList->getCaptureList()) {
-          (void)rewriteTarget(SyntacticElementTarget(capture.PBD));
+          if (!rewriteTarget(SyntacticElementTarget(capture.PBD)))
+            return Action::Stop();
         }
       }
 
@@ -9000,31 +9004,36 @@ namespace {
       return Action::SkipNode();
     }
 
-    NullablePtr<Pattern>
-    rewritePattern(Pattern *pattern, DeclContext *DC);
+    [[nodiscard]]
+    NullablePtr<Pattern> rewritePattern(Pattern *pattern, DeclContext *DC);
 
     /// Rewrite the target, producing a new target.
+    [[nodiscard]]
     std::optional<SyntacticElementTarget>
     rewriteTarget(SyntacticElementTarget target) override;
 
     /// Rewrite the function for the given solution.
     ///
     /// \returns true if an error occurred.
+    [[nodiscard]]
     bool rewriteFunction(AnyFunctionRef fn) {
       return Rewriter.cs.applySolution(fn, *this);
     }
 
+    [[nodiscard]]
     bool rewriteSingleValueStmtExpr(SingleValueStmtExpr *SVE) {
       return Rewriter.cs.applySolutionToSingleValueStmt(SVE, *this);
     }
 
-    void rewriteTapExpr(TapExpr *tap) {
+    [[nodiscard]]
+    bool rewriteTapExpr(TapExpr *tap) {
       // First, let's visit the tap expression itself
       // and set all of the inferred types.
-      Rewriter.visitTapExpr(tap);
+      if (!Rewriter.visitTapExpr(tap))
+        return true;
 
       // Now, let's apply solution to the body
-      (void)Rewriter.cs.applySolutionToBody(tap, *this);
+      return Rewriter.cs.applySolutionToBody(tap, *this);
     }
   };
 } // end anonymous namespace
