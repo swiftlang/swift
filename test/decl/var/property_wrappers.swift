@@ -1346,6 +1346,15 @@ struct MissingPropertyWrapperUnwrap {
   }
 }
 
+_ = {
+  struct S {
+    @WrapperWithInitialValue var x = 0
+    init() {}
+  }
+  func a<T>(_: WrapperWithInitialValue<T>) {}
+  a(S().x) // expected-error {{cannot convert value 'x' of type 'Int' to expected type 'WrapperWithInitialValue<Int>', use wrapper instead}} {{9-9=_}}
+}
+
 struct InvalidPropertyDelegateUse {
   // TODO(diagnostics): We need to a tailored diagnostic for extraneous arguments in property delegate initialization
   @Foo var x: Int = 42 // expected-error@:21 {{extra argument 'wrappedValue' in call}}

@@ -1244,72 +1244,51 @@ TypeVariableType *ConstraintSystem::isRepresentativeFor(
   return *member;
 }
 
-static std::optional<std::pair<VarDecl *, Type>>
-getPropertyWrapperInformationFromOverload(
-    SelectedOverload resolvedOverload, DeclContext *DC,
-    llvm::function_ref<std::optional<std::pair<VarDecl *, Type>>(VarDecl *)>
-        getInformation) {
-  if (auto *decl =
-          dyn_cast_or_null<VarDecl>(resolvedOverload.choice.getDeclOrNull())) {
-    if (auto declInformation = getInformation(decl)) {
-      Type type;
-      VarDecl *memberDecl;
-      std::tie(memberDecl, type) = *declInformation;
-      if (Type baseType = resolvedOverload.choice.getBaseType()) {
-        type = baseType->getRValueType()->getTypeOfMember(memberDecl, type);
-      }
-      return std::make_pair(decl, type);
-    }
-  }
-  return std::nullopt;
+static Type getPropertyWrapperTypeFromOverload(
+    ConstraintSystem &cs, SelectedOverload resolvedOverload,
+    llvm::function_ref<VarDecl *(VarDecl *)> getWrapperVar) {
+  auto *D = dyn_cast_or_null<VarDecl>(resolvedOverload.choice.getDeclOrNull());
+  if (!D)
+    return Type();
+
+  auto *wrapperVar = getWrapperVar(D);
+  if (!wrapperVar)
+    return Type();
+
+  // For the backing property we need to query the request to ensure it kicks
+  // type-checking if necessary. Otherwise we can query the interface type.
+  auto ty = wrapperVar == D->getPropertyWrapperBackingProperty()
+                ? D->getPropertyWrapperBackingPropertyType()
+                : wrapperVar->getInterfaceType();
+  if (!ty)
+    return Type();
+
+  // If this is a for a property, substitute the base type.
+  if (auto baseType = resolvedOverload.choice.getBaseType())
+    ty = baseType->getRValueType()->getTypeOfMember(wrapperVar, ty);
+
+  return ty;
 }
 
-std::optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getPropertyWrapperProjectionInfo(
+Type ConstraintSystem::getPropertyWrapperProjectionType(
     SelectedOverload resolvedOverload) {
-  return getPropertyWrapperInformationFromOverload(
-      resolvedOverload, DC,
-      [](VarDecl *decl) -> std::optional<std::pair<VarDecl *, Type>> {
-        if (!decl->hasAttachedPropertyWrapper())
-          return std::nullopt;
-
-        auto projectionVar = decl->getPropertyWrapperProjectionVar();
-        if (!projectionVar)
-          return std::nullopt;
-
-        return std::make_pair(projectionVar,
-                              projectionVar->getInterfaceType());
-      });
+  return getPropertyWrapperTypeFromOverload(
+      *this, resolvedOverload,
+      [&](VarDecl *decl) { return decl->getPropertyWrapperProjectionVar(); });
 }
 
-std::optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getPropertyWrapperInformation(
+Type ConstraintSystem::getPropertyWrapperBackingType(
     SelectedOverload resolvedOverload) {
-  return getPropertyWrapperInformationFromOverload(
-      resolvedOverload, DC,
-      [](VarDecl *decl) -> std::optional<std::pair<VarDecl *, Type>> {
-        if (!decl->hasAttachedPropertyWrapper())
-          return std::nullopt;
-
-        auto backingTy = decl->getPropertyWrapperBackingPropertyType();
-        if (!backingTy)
-          return std::nullopt;
-
-        return std::make_pair(decl, backingTy);
-      });
+  return getPropertyWrapperTypeFromOverload(
+      *this, resolvedOverload,
+      [](VarDecl *decl) { return decl->getPropertyWrapperBackingProperty(); });
 }
 
-std::optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getWrappedPropertyInformation(
+Type ConstraintSystem::getWrappedPropertyType(
     SelectedOverload resolvedOverload) {
-  return getPropertyWrapperInformationFromOverload(
-      resolvedOverload, DC,
-      [](VarDecl *decl) -> std::optional<std::pair<VarDecl *, Type>> {
-        if (auto wrapped = decl->getOriginalWrappedProperty())
-          return std::make_pair(decl, wrapped->getInterfaceType());
-
-        return std::nullopt;
-      });
+  return getPropertyWrapperTypeFromOverload(
+      *this, resolvedOverload,
+      [](VarDecl *decl) { return decl->getOriginalWrappedProperty(); });
 }
 
 void ConstraintSystem::addOverloadSet(Type boundType,
