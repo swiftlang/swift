@@ -2131,6 +2131,7 @@ public:
 
   virtual void addLocalDeclToTypeCheck(Decl *D) = 0;
 
+  [[nodiscard]]
   virtual std::optional<SyntacticElementTarget>
   rewriteTarget(SyntacticElementTarget target) = 0;
 

@@ -109,16 +109,6 @@ func transitiveForwardCapture3() {
   }
 }
 
-func captureInClosure() {
-  let x = { (i: Int) in // expected-error {{closure captures 'currentTotal' before it is declared}}
-    currentTotal += i // expected-note {{captured here}}
-  }
-
-  var currentTotal = 0 // expected-note {{captured value declared here}}
-
-  _ = x
-}
-
 /// Regression tests
 
 // https://github.com/apple/swift/issues/47389
@@ -181,14 +171,4 @@ func f_57097() {
   }
   var r = g() // expected-note {{captured value declared here}}
   // expected-warning@-1 {{variable 'r' was never mutated; consider changing to 'let' constant}}
-}
-
-class class77933460 {}
-
-func func77933460() {
-  var obj: class77933460 = { obj }()
-  // expected-error@-1 {{closure captures 'obj' before it is declared}}
-  // expected-note@-2 {{captured here}}
-  // expected-note@-3 {{captured value declared here}}
-  // expected-warning@-4 {{variable 'obj' was never mutated; consider changing to 'let' constant}}
 }

@@ -244,23 +244,24 @@ func test_as_2() {
   x as [] // expected-error {{expected element type}} {{9-9= <#type#>}}
 }
 
-func test_lambda() {
+func test_lambda1() {
   // A simple closure.
   var a = { (value: Int) -> () in markUsed(value+1) }
   // expected-warning@-1 {{initialization of variable 'a' was never used; consider replacing with assignment to '_' or removing it}}
+}
 
+func test_lambda2() {
   // A recursive lambda.
-  var fib = { (n: Int) -> Int in
-    // expected-warning@-1 {{variable 'fib' was never mutated; consider changing to 'let' constant}}
+  var fib = { (n: Int) -> Int in // expected-note 2{{'fib' declared here}}
     if (n < 2) {
       return n
     }
     
-    return fib(n-1)+fib(n-2)
+    return fib(n-1)+fib(n-2) // expected-error 2{{use of local variable 'fib' before its declaration}}
   }
 }
 
-func test_lambda2() {
+func test_lambda3() {
   { () -> protocol<Int> in
     // expected-error @-1 {{'protocol<...>' composition syntax has been removed and is not needed here}} {{11-24=Int}}
     // expected-error @-2 {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
