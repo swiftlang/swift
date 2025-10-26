@@ -90,7 +90,6 @@ Protocol Encodable has added inherited protocol Copyable
 Protocol Encodable has added inherited protocol Escapable
 Protocol Encoder has added inherited protocol Copyable
 Protocol Encoder has added inherited protocol Escapable
-Protocol Equatable has added inherited protocol Escapable
 Protocol Error has added inherited protocol Copyable
 Protocol Error has added inherited protocol Escapable
 Protocol ExpressibleByArrayLiteral has added inherited protocol Copyable
@@ -378,11 +377,11 @@ Accessor UnsafeMutableBufferPointer.indices.Get() has generic signature change f
 Func type(of:) has generic signature change from <T, Metatype> to <T, Metatype where T : ~Copyable, T : ~Escapable>
 Func type(of:) has parameter 0 changing from Default to Shared
 
-// Equatable: ~Copyable
-Func Equatable.!=(_:_:) has generic signature change from <Self where Self : Swift.Equatable> to <Self where Self : Swift.Equatable, Self : ~Copyable>
+// Equatable: ~Copyable & ~Escapable
+Func Equatable.!=(_:_:) has generic signature change from <Self where Self : Swift.Equatable> to <Self where Self : Swift.Equatable, Self : ~Copyable, Self : ~Escapable>
 Func Equatable.!=(_:_:) has parameter 0 changing from Default to Shared
 Func Equatable.!=(_:_:) has parameter 1 changing from Default to Shared
-Func Equatable.==(_:_:) has generic signature change from <Self where Self : Swift.Equatable> to <Self where Self : Swift.Equatable, Self : ~Copyable>
+Func Equatable.==(_:_:) has generic signature change from <Self where Self : Swift.Equatable> to <Self where Self : Swift.Equatable, Self : ~Copyable, Self : ~Escapable>
 Func Equatable.==(_:_:) has parameter 0 changing from Default to Shared
 Func Equatable.==(_:_:) has parameter 1 changing from Default to Shared
 
@@ -400,4 +399,3 @@ Func Comparable.>(_:_:) has parameter 1 changing from Default to Shared
 Func Comparable.>=(_:_:) has generic signature change from <Self where Self : Swift.Comparable> to <Self where Self : Swift.Comparable, Self : ~Copyable>
 Func Comparable.>=(_:_:) has parameter 0 changing from Default to Shared
 Func Comparable.>=(_:_:) has parameter 1 changing from Default to Shared
-
