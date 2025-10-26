@@ -1255,6 +1255,15 @@ static Type getPropertyWrapperTypeFromOverload(
   if (!wrapperVar)
     return Type();
 
+  // First check to see if we have a type for this wrapper variable, which will
+  // the case for e.g local wrappers in closures.
+  if (auto ty = cs.getTypeIfAvailable(wrapperVar))
+    return ty;
+
+  // If we don't have a type for the wrapper variable this shouldn't be a
+  // VarDecl we're solving for.
+  ASSERT(!cs.hasType(D) && "Should have recorded type for wrapper var");
+
   // For the backing property we need to query the request to ensure it kicks
   // type-checking if necessary. Otherwise we can query the interface type.
   auto ty = wrapperVar == D->getPropertyWrapperBackingProperty()
@@ -1263,10 +1272,13 @@ static Type getPropertyWrapperTypeFromOverload(
   if (!ty)
     return Type();
 
-  // If this is a for a property, substitute the base type.
-  if (auto baseType = resolvedOverload.choice.getBaseType())
+  // If this is a for a property, substitute the base type. Otherwise we have
+  // a local property wrapper and need to map the resulting type into context.
+  if (auto baseType = resolvedOverload.choice.getBaseType()) {
     ty = baseType->getRValueType()->getTypeOfMember(wrapperVar, ty);
-
+  } else {
+    ty = cs.DC->mapTypeIntoContext(ty);
+  }
   return ty;
 }
 
