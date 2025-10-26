@@ -924,6 +924,17 @@ void swift::findGuaranteedReferenceRoots(SILValue referenceValue,
       // regardless of whether they were already visited.
       continue;
     }
+
+    // Special handling until borrowing apply is represented as a
+    // ForwardingOperation.
+    if (auto *apply =
+            dyn_cast_or_null<ApplyInst>(value->getDefiningInstruction())) {
+      if (apply->hasGuaranteedResult()) {
+        worklist.pushIfNotVisited(apply->getSelfArgument());
+        continue;
+      }
+    }
+
     // Found a potential root.
     if (lookThroughNestedBorrows) {
       if (auto *bbi = dyn_cast<BeginBorrowInst>(value)) {

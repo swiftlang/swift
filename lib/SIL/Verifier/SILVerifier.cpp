@@ -1091,10 +1091,10 @@ public:
             what + " must be Optional<Builtin.Executor>");
   }
 
-  /// Require the operand to be an object of some type that conforms to
-  /// Actor or DistributedActor.
-  void requireAnyActorType(SILValue value, bool allowOptional,
-                           bool allowExecutor, const Twine &what) {
+  /// Require the operand to be an object of some type that can be used to hop
+  /// since we can extract an executor from it.
+  void canExtractExecutorFrom(SILValue value, bool allowOptional,
+                              bool allowExecutor, const Twine &what) {
     auto type = value->getType();
     require(type.isObject(), what + " must be an object type");
 
@@ -1105,7 +1105,7 @@ public:
     }
     if (allowExecutor && isa<BuiltinExecutorType>(actorType))
       return;
-    require(actorType->isAnyActorType(),
+    require(actorType->canBeIsolatedTo(),
             what + " must be some kind of actor type");
   }
 
@@ -1657,7 +1657,11 @@ public:
 
       require(lhs == rhs ||
               (lhs.isAddress() && lhs.getObjectType() == rhs) ||
-              (DebugVarTy.isAddress() && lhs == rhs.getObjectType()),
+              (DebugVarTy.isAddress() && lhs == rhs.getObjectType()) ||
+
+              // When cloning SIL (e.g. in LoopUnroll) local archetypes are uniqued
+              // and therefore distinct in cloned instructions.
+              (lhs.hasLocalArchetype() && rhs.hasLocalArchetype()),
               "Two variables with different type but same scope!");
     }
 
@@ -2535,8 +2539,25 @@ public:
     if (builtinKind == BuiltinValueKind::ExtractFunctionIsolation) {
       require(false, "this builtin is pre-SIL-only");
     }
+
+    // Validate all "SIL builtins" never show up as BuiltinInst since they
+    // should just result in sequences of non-builtin inst SIL instructions
+    // being emitted and should never show up as a BuiltinInst.
+    switch (*builtinKind) {
+    case BuiltinValueKind::None:
+      break;
+#define BUILTIN_SIL_OPERATION(id, name, overload)                              \
+  case BuiltinValueKind::id:                                                   \
+    require(false,                                                             \
+            "this builtin should never show up as builtin inst. It should "    \
+            "only result in other SIL instructions being emitted by SILGen");
+#define BUILTIN(ID, Name, Attrs)                                               \
+  case BuiltinValueKind::ID:                                                   \
+    break;
+#include "swift/AST/Builtins.def"
+    }
   }
-  
+
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");
@@ -2724,6 +2745,8 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
+    require(F.getModule().getStage() == SILStage::Raw || !LBI->isUnchecked(),
+            "load_borrow's unchecked bit is on");
   }
 
   void checkBeginBorrowInst(BeginBorrowInst *bbi) {
@@ -2843,6 +2866,25 @@ public:
             "cannot convert ownership of an address");
     require(uoci->getType() == uoci->getOperand()->getType(),
             "converting ownership does not affect the type");
+  }
+
+  void checkImplicitActorToOpaqueIsolationCastInst(
+      ImplicitActorToOpaqueIsolationCastInst *igi) {
+    if (F.hasOwnership()) {
+      require(igi->getValue()->getOwnershipKind() == OwnershipKind::Guaranteed,
+              "implicitactor_to_optionalactor_cast's operand should have "
+              "guaranteed ownership");
+      require(igi->getOwnershipKind() == OwnershipKind::Guaranteed,
+              "result value should have guaranteed ownership");
+    }
+
+    require(igi->getValue()->getType() ==
+                SILType::getBuiltinImplicitActorType(
+                    igi->getFunction()->getASTContext()),
+            "operand should be an implicit actor type");
+    require(igi->getType() == SILType::getOpaqueIsolationType(
+                                  igi->getFunction()->getASTContext()),
+            "result must be Optional<any Actor>");
   }
 
   template <class AI>
@@ -3166,9 +3208,9 @@ public:
       CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
       SILFunctionConventions initConv(initTy, AI->getModule());
 
-      require(initConv.getNumIndirectSILResults() ==
+      require(initConv.getResults().size() ==
                   AI->getNumInitializedProperties(),
-              "init function has invalid number of indirect results");
+              "init function has invalid number of results");
       checkAssigOrInitInstAccessorArgs(Src->getType(), initConv);
     }
 
@@ -5806,20 +5848,20 @@ public:
       requireOptionalExecutorType(executor,
                                   "hop_to_executor operand in lowered SIL");
     } else {
-      requireAnyActorType(executor,
-                          /*allow optional*/ true,
-                          /*allow executor*/ true,
-                          "hop_to_executor operand");
+      canExtractExecutorFrom(executor,
+                             /*allow optional*/ true,
+                             /*allow executor*/ true,
+                             "hop_to_executor operand");
     }
   }
 
   void checkExtractExecutorInst(ExtractExecutorInst *EEI) {
     requireObjectType(BuiltinExecutorType, EEI,
                       "extract_executor result");
-    requireAnyActorType(EEI->getExpectedExecutor(),
-                        /*allow optional*/ false,
-                        /*allow executor*/ false,
-                        "extract_executor operand");
+    canExtractExecutorFrom(EEI->getExpectedExecutor(),
+                           /*allow optional*/ false,
+                           /*allow executor*/ false,
+                           "extract_executor operand");
     if (EEI->getModule().getStage() == SILStage::Lowered) {
       require(false,
               "extract_executor instruction should have been lowered away");
@@ -6686,6 +6728,11 @@ public:
             "Result and operand must have the same type, today.");
   }
 
+  void checkUncheckedOwnershipInst(UncheckedOwnershipInst *uoi) {
+    require(F.getModule().getStage() == SILStage::Raw,
+            "unchecked_ownership is valid only in raw SIL");
+  }
+
   void checkAllocPackMetadataInst(AllocPackMetadataInst *apmi) {
     require(apmi->getIntroducer()->mayRequirePackMetadata(*apmi->getFunction()),
             "Introduces instruction of kind which cannot emit on-stack pack "
@@ -6729,9 +6776,9 @@ public:
     bool FoundThrowBlock = false;
     bool FoundUnwindBlock = false;
     for (auto &BB : *F) {
-      if (isa<ReturnInst>(BB.getTerminator())) {
-        require(!FoundReturnBlock,
-                "more than one return block in function");
+      if (isa<ReturnInst>(BB.getTerminator()) ||
+          isa<ReturnBorrowInst>(BB.getTerminator())) {
+        require(!FoundReturnBlock, "more than one return block in function");
         FoundReturnBlock = true;
       } else if (isa<ThrowInst>(BB.getTerminator()) ||
                  isa<ThrowAddrInst>(BB.getTerminator())) {
@@ -7455,7 +7502,7 @@ public:
         auto *actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
         auto *distributedProtocol =
             ctx.getProtocol(KnownProtocolKind::DistributedActor);
-        require(argType->isAnyActorType() ||
+        require(argType->canBeIsolatedTo() ||
                     genericSig->requiresProtocol(argType, actorProtocol) ||
                     genericSig->requiresProtocol(argType, distributedProtocol),
                 "Only any actor types can be isolated");

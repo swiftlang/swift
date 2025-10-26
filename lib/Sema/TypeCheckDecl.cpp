@@ -32,7 +32,6 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -1857,7 +1856,7 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
                      operatorName, dc->getDeclaredInterfaceType())
           .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
                        "final ");
-        FD->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
+        FD->addAttribute(new (C) FinalAttr(/*IsImplicit=*/true));
       }
     }
   } else if (!dc->isModuleScopeContext()) {
@@ -1906,11 +1905,11 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
       if (isPostfix) {
         insertionText = "postfix ";
         op = postfixOp;
-        FD->getAttrs().add(new (C) PostfixAttr(/*implicit*/false));
+        FD->addAttribute(new (C) PostfixAttr(/*implicit*/ false));
       } else {
         insertionText = "prefix ";
         op = prefixOp;
-        FD->getAttrs().add(new (C) PrefixAttr(/*implicit*/false));
+        FD->addAttribute(new (C) PrefixAttr(/*implicit*/ false));
       }
 
       // Emit diagnostic with the Fix-It.
@@ -2100,7 +2099,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       StringRef unavailabilityMsgRef = "return type is unavailable in Swift";
       auto ua = AvailableAttr::createUniversallyUnavailable(
           ctx, unavailabilityMsgRef);
-      decl->getAttrs().add(ua);
+      decl->addAttribute(ua);
     }
 
     return ctx.getNeverType();
@@ -2255,11 +2254,7 @@ static Type validateParameterType(ParamDecl *decl) {
   if (isa<AbstractClosureExpr>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::ClosureExpr);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    unboundTyOpener = [](auto unboundTy) {
-      // FIXME: Don't let unbound generic types escape type resolution.
-      // For now, just return the unbound generic type.
-      return unboundTy;
-    };
+    unboundTyOpener = TypeResolution::defaultUnboundTypeOpener;
     // FIXME: Don't let placeholder types escape type resolution. For now, just
     // return the placeholder type, which we open in `inferClosureType`.
     placeholderOpener = PlaceholderType::get;

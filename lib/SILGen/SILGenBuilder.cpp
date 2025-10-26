@@ -1248,3 +1248,16 @@ ManagedValue SILGenBuilder::borrowObjectRValue(SILGenFunction &SGF,
   }
   return SGF.emitFormalEvaluationManagedBeginBorrow(loc, value);
 }
+
+SILValue SILGenBuilder::convertToImplicitActor(SILLocation loc,
+                                               SILValue value) {
+  auto type = SILType::getBuiltinImplicitActorType(getASTContext());
+  if (value->getType() == type)
+    return value;
+  assert(value->getType() == SILType::getOpaqueIsolationType(getASTContext()) &&
+         "Can only convert Optional<any Actor> to "
+         "Builtin.ImplicitActor");
+  if (value->getOwnershipKind() != OwnershipKind::Guaranteed)
+    value = SGF.emitManagedBeginBorrow(loc, value).getValue();
+  return createUncheckedValueCast(loc, value, type);
+}

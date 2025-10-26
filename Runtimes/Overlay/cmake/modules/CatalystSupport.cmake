@@ -7,7 +7,7 @@ include(CheckCompilerFlag)
 
 if(${PROJECT_NAME}_COMPILER_VARIANT_TARGET)
   add_compile_options(
-    "$<$<COMPILE_LANGUAGE:C,CXX>:SHELL:-darwin-target-variant ${${PROJECT_NAME}_COMPILER_VARIANT_TARGET}>"
+    "$<$<COMPILE_LANGUAGE:ASM,C,CXX>:SHELL:-darwin-target-variant ${${PROJECT_NAME}_COMPILER_VARIANT_TARGET}>"
     "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-target-variant ${${PROJECT_NAME}_COMPILER_VARIANT_TARGET}>"
 
     # TODO: Remove me once we have a driver with
@@ -15,7 +15,7 @@ if(${PROJECT_NAME}_COMPILER_VARIANT_TARGET)
     "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xclang-linker -darwin-target-variant -Xclang-linker ${${PROJECT_NAME}_COMPILER_VARIANT_TARGET}>")
 
   add_link_options(
-    "$<$<LINK_LANGUAGE:C,CXX>:SHELL:-darwin-target-variant ${${PROJECT_NAME}_COMPILER_VARIANT_TARGET}>"
+    "$<$<LINK_LANGUAGE:ASM,C,CXX>:SHELL:-darwin-target-variant ${${PROJECT_NAME}_COMPILER_VARIANT_TARGET}>"
     "$<$<LINK_LANGUAGE:Swift>:SHELL:-target-variant ${${PROJECT_NAME}_COMPILER_VARIANT_TARGET}>"
 
     # TODO: Remove me once we have a driver with

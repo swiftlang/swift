@@ -736,7 +736,7 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
       if (auto dtor = dyn_cast<DestructorDecl>(func)) {
         ASTContext &C = dtor->getASTContext();
         auto selfDecl = dtor->getImplicitSelfDecl();
-        selfDecl->getAttrs().add(new (C) KnownToBeLocalAttr(true));
+        selfDecl->addAttribute(new (C) KnownToBeLocalAttr(true));
       }
       if (!func->isDistributed())
         continue;

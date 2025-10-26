@@ -69,7 +69,9 @@ private func removeTempRValues(in function: Function, keepDebugInfo: Bool, _ con
 private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ context: FunctionPassContext) {
 
   guard let (allocStack, lastUseOfAllocStack) =
-          getRemovableAllocStackDestination(of: copy, keepDebugInfo: keepDebugInfo, context) else {
+          getRemovableAllocStackDestination(of: copy, keepDebugInfo: keepDebugInfo, context),
+        let needHoistDestroys = needHoistDestroys(of: allocStack, after: lastUseOfAllocStack, copy: copy, context)
+  else {
     return
   }
 
@@ -77,13 +79,15 @@ private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ cont
     return
   }
 
-  if copy.isTakeOfSource {
+  if needHoistDestroys {
+    // Hoist destroy_addrs after the last use, because between the last use and the original destroy
+    // the source is modified.
     hoistDestroy(of: allocStack, after: lastUseOfAllocStack, context)
-  } else {
+  } else if !copy.isTakeOfSource {
     removeDestroys(of: allocStack, context)
   }
 
-  allocStack.uses.ignoreUses(ofType: DeallocStackInst.self).replaceAll(with: copy.sourceAddress, context)
+  allocStack.uses.ignore(usersOfType: DeallocStackInst.self).replaceAll(with: copy.sourceAddress, context)
 
   if keepDebugInfo {
     Builder(before: copy, context).createDebugStep()
@@ -140,6 +144,47 @@ private func getRemovableAllocStackDestination(
     return nil
   }
 
+  // Bail if in non-OSSA the `allocStack` is destroyed in a non-obvious way, e.g. by
+  // ```
+  //   %x = load %allocStack   // looks like a load, but is a `load [take]`
+  //   strong_release %x
+  // ```
+  guard copy.parentFunction.hasOwnership ||
+        allocStack.isDestroyedOnAllPaths(context) ||
+        // We can easily remove a dead alloc_stack
+        allocStack.uses.ignore(user: copy).ignore(usersOfType: DeallocStackInst.self).isEmpty
+  else {
+    return nil
+  }
+
+  return (allocStack, lastUseOfAllocStack)
+}
+
+/// Returns true if the final `destroy_addr`s need to be hoisted to the last use of the `allocStack`.
+/// This is required if the copy-source is re-initialized inbetween, e.g.
+/// ```
+///   copy_addr %source, %allocStack
+///   ...
+///   last_use(%allocStack)
+///   ...                                <- the destroy_addr needs to be moved here
+///   store %newValue to [init] %source
+///   ...
+///   destroy_addr %allocStack
+/// ```
+/// Returns nil if hoisting is needed but not possible.
+private func needHoistDestroys(of allocStack: AllocStackInst,
+                               after lastUseOfAllocStack: Instruction,
+                               copy: CopyLikeInstruction,
+                               _ context: FunctionPassContext
+) -> Bool? {
+  guard copy.isTakeOfSource else {
+    return false
+  }
+  if lastUseOfAllocStack is DestroyAddrInst {
+    assert(!copy.parentFunction.hasOwnership, "should not treat destroy_addr as uses in OSSA")
+    return false
+  }
+
   // We cannot insert the destroy of `copy.source` after `lastUseOfAllocStack` if `copy.source` is
   // re-initialized by exactly this instruction.
   // This is a corner case, but can happen if `lastUseOfAllocStack` is a `copy_addr`. Example:
@@ -147,24 +192,57 @@ private func getRemovableAllocStackDestination(
   //   copy_addr [take] %src to [init] %allocStack   // `copy`
   //   copy_addr [take] %allocStack to [init] %src   // `lastUseOfAllocStack`
   // ```
-  if copy.isTakeOfSource,
-     lastUseOfAllocStack != copy,
-     !(lastUseOfAllocStack is DestroyAddrInst),
-     lastUseOfAllocStack.mayWrite(toAddress: copy.sourceAddress, context.aliasAnalysis)
-  {
+  if lastUseOfAllocStack != copy, lastUseOfAllocStack.mayWrite(toAddress: copy.sourceAddress, context.aliasAnalysis) {
     return nil
   }
 
-  // Bail if in non-OSSA the `allocStack` is destroyed in a non-obvious way, e.g. by
-  // ```
-  //   %x = load %allocStack   // looks like a load, but is a `load [take]`
-  //   strong_release %x
-  // ```
-  guard copy.parentFunction.hasOwnership || allocStack.isDestroyedOnAllPaths(context) else {
-    return nil
+  if mayWrite(to: copy.sourceAddress, after: lastUseOfAllocStack, beforeDestroysOf: allocStack, context) {
+    if hasDestroyBarrier(after: lastUseOfAllocStack, beforeDestroysOf: allocStack, context) {
+      return nil
+    }
+    return true
+  }
+  return false
+}
+
+private func mayWrite(to source: Value,
+                      after lastUse: Instruction,
+                      beforeDestroysOf allocStack: AllocStackInst,
+                      _ context: FunctionPassContext
+) -> Bool {
+  return visitInstructions(after: lastUse, beforeDestroysOf: allocStack, context) { inst in
+    inst.mayWrite(toAddress: source, context.aliasAnalysis)
+  }
+}
+
+private func hasDestroyBarrier(after lastUse: Instruction,
+                              beforeDestroysOf allocStack: AllocStackInst,
+                               _ context: FunctionPassContext
+) -> Bool {
+  return visitInstructions(after: lastUse, beforeDestroysOf: allocStack, context) { inst in
+    inst.isBarrierForDestroy(of: allocStack.type, context)
+  }
+}
+
+private func visitInstructions(after lastUse: Instruction,
+                               beforeDestroysOf allocStack: AllocStackInst,
+                               _ context: FunctionPassContext,
+                               _ predicate: (Instruction) -> Bool
+) -> Bool {
+  var worklist = InstructionWorklist(context)
+  defer { worklist.deinitialize() }
+
+  for destroy in allocStack.uses.users(ofType: DestroyAddrInst.self) {
+    worklist.pushPredecessors(of: destroy, ignoring: lastUse)
   }
 
-  return (allocStack, lastUseOfAllocStack)
+  while let inst = worklist.pop() {
+    if predicate(inst) {
+      return true
+    }
+    worklist.pushPredecessors(of: inst, ignoring: lastUse)
+  }
+  return false
 }
 
 // We need to hoist the destroy of the stack location up to its last use because the source of the copy
@@ -177,6 +255,10 @@ private func hoistDestroy(of allocStack: AllocStackInst, after lastUse: Instruct
   case let li as LoadInst where li.loadOwnership == .take:
     assert(li.address == allocStack, "load must be not take a projected address")
     return
+  case let apply as ApplyInst where apply.consumes(address: allocStack):
+    if allocStack.uses.contains(where: { $0.instruction == apply && apply.convention(of: $0)!.isGuaranteed }) {
+      return
+    }
   default:
     break
   }
@@ -247,7 +329,7 @@ private extension AllocStackInst {
     var liferange = InstructionRange(begin: self, context)
     defer { liferange.deinitialize() }
 
-    liferange.insert(contentsOf: uses.ignoreUses(ofType: DeallocStackInst.self).lazy.map { $0.instruction })
+    liferange.insert(contentsOf: uses.ignore(usersOfType: DeallocStackInst.self).lazy.map { $0.instruction })
 
     for use in uses {
       switch use.instruction {
@@ -263,6 +345,14 @@ private extension AllocStackInst {
       }
     }
     return true
+  }
+}
+
+private extension ApplySite {
+  func consumes(address: Value) -> Bool {
+    argumentOperands.contains { argOp in
+      argOp.value == address && convention(of: argOp)!.isConsumed
+    }
   }
 }
 
@@ -531,13 +621,21 @@ private struct UseCollector : AddressDefUseWalker {
       uses.insert(copyFromStack)
       return .continueWalk
 
+    case is DebugValueInst:
+      return .continueWalk
+
     default:
       return .abortWalk
     }
   }
 
   private mutating func visitApply(address: Operand, apply: ApplySite) -> WalkResult {
-    if !apply.convention(of: address)!.isGuaranteed {
+    let argConvention = apply.convention(of: address)!
+    guard argConvention.isGuaranteed ||
+          // Only accept consuming-in arguments if it consumes the whole `alloc_stack`. A consume from
+          // a projection would destroy only a part of the `alloc_stack` and we don't handle this.
+          (argConvention == .indirectIn && (copy.isTakeOfSource && address.value == copy.destinationAddress))
+    else {
       return .abortWalk
     }
     uses.insert(apply)

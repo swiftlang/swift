@@ -813,7 +813,7 @@ function Invoke-BuildStep {
           $NextArg = $RemainingArgs[$RemainingArgs.IndexOf($Arg) + 1]
           if ($NextArg -is [string] -and !$NextArg.StartsWith('-')) {
             $SplatArgs[$ParamName] = $NextArg
-            $Enumerator.MoveNext() # Skip NextArg
+            $Enumerator.MoveNext() | Out-Null # Skip NextArg
             continue
           }
         }
@@ -1121,6 +1121,17 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
 
 function Get-Dependencies {
   Record-OperationTime $BuildPlatform "Get-Dependencies" {
+    function Write-Success([string] $Description) {
+      $HeavyCheckMark = @{
+        Object = [Char]0x2714
+        ForegroundColor = 'DarkGreen'
+        NoNewLine = $true
+      }
+      Write-Host @HeavyCheckMark
+      Write-Host " $Description"
+    }
+
+    $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
     Write-Host "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies ..." -ForegroundColor Cyan
     $ProgressPreference = "SilentlyContinue"
 
@@ -1131,7 +1142,7 @@ function Get-Dependencies {
         return
       }
 
-      Write-Output "$Destination not found. Downloading ..."
+      # Write-Output "$Destination not found. Downloading ..."
       if ($ToBatch) {
         Write-Output "md `"$(Split-Path -Path $Destination -Parent)`""
         Write-Output "curl.exe -sL $URL -o $Destination"
@@ -1164,14 +1175,14 @@ function Get-Dependencies {
           $ExtractedLastWriteTime = (Get-Item $Destination).LastWriteTime
           # Compare the last write times
           if ($ZipLastWriteTime -le $ExtractedLastWriteTime) {
-              Write-Output "'$ZipFileName' is already extracted and up to date."
+              # Write-Output "'$ZipFileName' is already extracted and up to date."
               return
           }
       }
 
       $Destination = if ($CreateExtractPath) { $Destination } else { $BinaryCache }
 
-      Write-Output "Extracting '$ZipFileName' ..."
+      # Write-Output "Extracting '$ZipFileName' ..."
       New-Item -ItemType Directory -ErrorAction Ignore -Path $BinaryCache | Out-Null
       Expand-Archive -Path $Source -DestinationPath $Destination -Force
     }
@@ -1191,12 +1202,12 @@ function Get-Dependencies {
           $ExtractedLastWriteTime = (Get-Item $Destination).LastWriteTime
           # Compare the last write times
           if ($TarLastWriteTime -le $ExtractedLastWriteTime) {
-              Write-Output "'$SourceName' is already extracted and up to date."
+              # Write-Output "'$SourceName' is already extracted and up to date."
               return
           }
       }
 
-      Write-Output "Extracting '$Source' ..."
+      # Write-Output "Extracting '$Source' ..."
       New-Item -ItemType Directory -ErrorAction Ignore -Path $Destination | Out-Null
       tar -xvf $Source -C $Destination | Out-Null
     }
@@ -1217,12 +1228,12 @@ function Get-Dependencies {
           $installerWriteTime = (Get-Item $source).LastWriteTime
           $extractedWriteTime = (Get-Item $destination).LastWriteTime
           if ($installerWriteTime -le $extractedWriteTime) {
-              Write-Output "'$InstallerExeName' is already extracted and up to date."
+              # Write-Output "'$InstallerExeName' is already extracted and up to date."
               return
           }
       }
 
-      Write-Output "Extracting '$InstallerExeName' ..."
+      # Write-Output "Extracting '$InstallerExeName' ..."
 
       # The new runtime MSI is built to expand files into the immediate directory. So, setup the installation location.
       New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin | Out-Null
@@ -1238,44 +1249,8 @@ function Get-Dependencies {
       $syft = Get-Syft
       DownloadAndVerify $syft.URL "$BinaryCache\syft-$SyftVersion.zip" $syft.SHA256
       Expand-ZipFile syft-$SyftVersion.zip $BinaryCache syft-$SyftVersion
+      Write-Success "syft $SyftVersion"
     }
-
-    if ($SkipBuild -and $SkipPackaging) { return }
-
-    $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
-    if ($ToBatch) {
-      Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies..."
-    }
-
-    DownloadAndVerify $WiX.URL "$BinaryCache\WiX-$($WiX.Version).zip" $WiX.SHA256
-    Expand-ZipFile WiX-$($WiX.Version).zip $BinaryCache WiX-$($WiX.Version)
-
-    if ($SkipBuild) { return }
-
-    if ($EnableCaching) {
-      $SCCache = Get-SCCache
-      $FileExtension = [System.IO.Path]::GetExtension($SCCache.URL)
-      DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion.$FileExtension" $SCCache.SHA256
-      if ($FileExtension -eq "tar.gz") {
-        Expand-TapeArchive sccache-$SCCacheVersion.$FileExtension $BinaryCache sccache-$SCCacheVersion
-      } else {
-        Expand-ZipFile sccache-$SCCacheVersion.$FileExtension $BinaryCache sccache-$SCCacheVersion
-      }
-    }
-
-    DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
-
-    if ($Test -contains "lldb") {
-      # The make tool isn't part of MSYS
-      $GnuWin32MakeURL = "https://downloads.sourceforge.net/project/ezwinports/make-4.4.1-without-guile-w32-bin.zip"
-      $GnuWin32MakeHash = "fb66a02b530f7466f6222ce53c0b602c5288e601547a034e4156a512dd895ee7"
-      DownloadAndVerify $GnuWin32MakeURL "$BinaryCache\GnuWin32Make-4.4.1.zip" $GnuWin32MakeHash
-      Expand-ZipFile GnuWin32Make-4.4.1.zip $BinaryCache GnuWin32Make-4.4.1
-    }
-
-    # TODO(compnerd) stamp/validate that we need to re-extract
-    New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
-    Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain.TrimStart("swift-").TrimEnd("-a-windows10")
 
     function Get-KnownPython([string] $ArchName) {
       if (-not $KnownPythons.ContainsKey($PythonVersion)) {
@@ -1289,67 +1264,106 @@ function Get-Dependencies {
       DownloadAndVerify $Python.URL "$BinaryCache\Python$ArchName-$PythonVersion.zip" $Python.SHA256
       if (-not $ToBatch) {
         Expand-ZipFile Python$ArchName-$PythonVersion.zip "$BinaryCache" Python$ArchName-$PythonVersion
+        Write-Success "$ArchName Python $PythonVersion"
       }
     }
 
-    function Install-PIPIfNeeded() {
+    function Install-PIPIfNeeded {
       try {
         Invoke-Program -Silent "$(Get-PythonExecutable)" -m pip
       } catch {
-        Write-Output "Installing pip ..."
         Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m ensurepip -U --default-pip
       } finally {
-        Write-Output "pip installed."
+        Write-Success "pip"
       }
     }
 
     function Test-PythonModuleInstalled([string] $ModuleName) {
       try {
-        Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import $ModuleName"
-        return $true;
+        Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('$ModuleName') else 1)"
+        return $true
       } catch {
-        return $false;
+        return $false
       }
     }
 
     function Install-PythonModule([string] $ModuleName) {
       if (Test-PythonModuleInstalled $ModuleName) {
-        Write-Output "$ModuleName already installed."
-        return;
+        # Write-Output "$ModuleName already installed."
+        return
       }
+
       $TempRequirementsTxt = New-TemporaryFile
+
       $Module = $PythonModules[$ModuleName]
-      $Dependencies = $Module["Dependencies"]
-      Write-Output "$ModuleName==$($Module.Version) --hash=`"sha256:$($Module.SHA256)`"" >> $TempRequirementsTxt
-      for ($i = 0; $i -lt $Dependencies.Length; $i++) {
-        $Dependency = $PythonModules[$Dependencies[$i]]
-        Write-Output "$($Dependencies[$i])==$($Dependency.Version) --hash=`"sha256:$($Dependency.SHA256)`"" >> $TempRequirementsTxt
+      "$ModuleName==$($Module.Version) --hash=`"sha256:$($Module.SHA256)`"" | Out-File -FilePath $TempRequirementsTxt -Append -Encoding utf8
+      foreach ($Dependency in $Module.Dependencies) {
+        $Module = $PythonModules[$Dependency]
+        "$Dependency==$($Dependency.Version) --hash=`"sha256:$($Module.SHA256)`"" | Out-File -FilePath $TempRequirementsTxt -Append -Encoding utf8
       }
+
       Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --no-binary==:all: --disable-pip-version-check
-      Write-Output "$ModuleName installed."
+
+      Write-Success "$ModuleName"
     }
 
-    function Install-PythonModules() {
+    function Install-PythonModules {
       Install-PIPIfNeeded
-      Install-PythonModule "packaging" # For building LLVM 18+
+      Install-PythonModule "packaging"  # For building LLVM 18+
       Install-PythonModule "setuptools" # Required for SWIG support
       if ($Test -contains "lldb") {
-        Install-PythonModule "psutil" # Required for testing LLDB
+        Install-PythonModule "psutil"   # Required for testing LLDB
       }
     }
 
+    # Ensure Python modules that are required as host build tools
     Install-Python $HostArchName
     if ($IsCrossCompiling) {
       Install-Python $BuildArchName
     }
-
-    # Ensure Python modules that are required as host build tools
     Install-PythonModules
+
+    if ($SkipBuild -and $SkipPackaging) { return }
+
+    DownloadAndVerify $WiX.URL "$BinaryCache\WiX-$($WiX.Version).zip" $WiX.SHA256
+    Expand-ZipFile WiX-$($WiX.Version).zip $BinaryCache WiX-$($WiX.Version)
+    Write-Success "WiX $($WiX.Version)"
+
+    if ($SkipBuild) { return }
+
+    if ($EnableCaching) {
+      $SCCache = Get-SCCache
+      $FileExtension = [System.IO.Path]::GetExtension($SCCache.URL)
+      DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion.$FileExtension" $SCCache.SHA256
+      if ($FileExtension -eq "tar.gz") {
+        Expand-TapeArchive sccache-$SCCacheVersion.$FileExtension $BinaryCache sccache-$SCCacheVersion
+      } else {
+        Expand-ZipFile sccache-$SCCacheVersion.$FileExtension $BinaryCache sccache-$SCCacheVersion
+      }
+      Write-Success "sccache $SCCacheVersion"
+    }
+
+    DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
+
+    if ($Test -contains "lldb") {
+      # The make tool isn't part of MSYS
+      $GnuWin32MakeURL = "https://downloads.sourceforge.net/project/ezwinports/make-4.4.1-without-guile-w32-bin.zip"
+      $GnuWin32MakeHash = "fb66a02b530f7466f6222ce53c0b602c5288e601547a034e4156a512dd895ee7"
+      DownloadAndVerify $GnuWin32MakeURL "$BinaryCache\GnuWin32Make-4.4.1.zip" $GnuWin32MakeHash
+      Expand-ZipFile GnuWin32Make-4.4.1.zip $BinaryCache GnuWin32Make-4.4.1
+      Write-Success "GNUWin32 make 4.4.1"
+    }
+
+    # TODO(compnerd) stamp/validate that we need to re-extract
+    New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
+    Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain.TrimStart("swift-").TrimEnd("-a-windows10")
+    Write-Success "Swift Toolchain $PinnedVersion"
 
     if ($Android) {
       $NDK = Get-AndroidNDK
       DownloadAndVerify $NDK.URL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDK.SHA256
       Expand-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
+      Write-Success "Android NDK $AndroidNDKVersion"
     }
 
     if ($IncludeDS2) {
@@ -1359,6 +1373,7 @@ function Get-Dependencies {
       DownloadAndVerify $WinFlexBisonURL "$BinaryCache\win_flex_bison-$WinFlexBisonVersion.zip" $WinFlexBisonHash
 
       Expand-ZipFile -ZipFileName "win_flex_bison-$WinFlexBisonVersion.zip" -BinaryCache $BinaryCache -ExtractPath "win_flex_bison"
+      Write-Success "flex/bison $WinFlexBisonVersion"
     }
 
     if ($WinSDKVersion) {
@@ -1668,7 +1683,7 @@ function Build-CMakeProject {
           }
 
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER $SWIFTC
-          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Platform)
+          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
 
           # TODO(compnerd): remove this once we have the early swift-driver
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
@@ -1787,7 +1802,7 @@ function Build-CMakeProject {
             Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath  "swiftc.exe"
           }
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER $SWIFTC
-          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Platform)
+          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
 
           # TODO(compnerd) remove this once we have the early swift-driver
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
@@ -2479,9 +2494,9 @@ function Build-Brotli([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\brotli `
     -Bin "$(Get-ProjectBinaryCache $Platform brotli)" `
-    -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
     -Platform $Platform `
     -UseMSVCCompilers C `
+    -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
@@ -2572,6 +2587,17 @@ function Build-CURL([Hashtable] $Platform) {
       BUILD_SHARED_LIBS = "NO";
       BUILD_TESTING = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
+      BROTLI_INCLUDE_DIR = "$SourceCache\brotli\c\include";
+      BROTLICOMMON_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+        "$(Get-ProjectBinaryCache $Platform brotli)\brotlicommon.lib"
+      } else {
+        "$(Get-ProjectBinaryCache $Platform brotli)\libbrotlicommon.a"
+      };
+      BROTLIDEC_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+        "$(Get-ProjectBinaryCache $Platform brotli)\brotlidec.lib"
+      } else {
+        "$(Get-ProjectBinaryCache $Platform brotli)\libbrotlidec.a"
+      }
       BUILD_CURL_EXE = "NO";
       BUILD_LIBCURL_DOCS = "NO";
       BUILD_MISC_DOCS = "NO";
@@ -2656,7 +2682,6 @@ function Build-CURL([Hashtable] $Platform) {
       USE_WIN32_LDAP = "NO";
       ZLIB_ROOT = "$BinaryCache\$($Platform.Triple)\usr";
       ZLIB_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib";
-      BROTLI_DIR = "$BinaryCache\$($Platform.Triple)\usr";
     })
 }
 
@@ -2948,7 +2973,6 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
       -Defines @{
         BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
-        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
@@ -3046,6 +3070,17 @@ function Build-Foundation([Hashtable] $Platform) {
       # FIXME(compnerd) - workaround ARM64 build failure when cross-compiling.
       CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      BROTLI_INCLUDE_DIR = "$SourceCache\brotli\c\include";
+      BROTLICOMMON_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+        "$(Get-ProjectBinaryCache $Platform brotli)\brotlicommon.lib"
+      } else {
+        "$(Get-ProjectBinaryCache $Platform brotli)\libbrotlicommon.a"
+      };
+      BROTLIDEC_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+        "$(Get-ProjectBinaryCache $Platform brotli)\brotlidec.lib"
+      } else {
+        "$(Get-ProjectBinaryCache $Platform brotli)\libbrotlidec.a"
+      }
       FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
       LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
@@ -3056,7 +3091,6 @@ function Build-Foundation([Hashtable] $Platform) {
       };
       ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
       dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
-      BROTLI_DIR = "$BinaryCache\$($Platform.Triple)\usr";
       _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
       _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
       _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
@@ -3081,7 +3115,7 @@ function Test-Foundation {
     $env:LIBXML_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
     $env:LIBXML_INCLUDE_PATH="$BinaryCache/$($Platform.Triple)/usr/include/libxml2"
     $env:ZLIB_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
-    $env:BROTLI_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
+    $env:BROTLI_LIBRARY_PATH="$(Get-ProjectBinaryCache $BuildPlatform brotli)"
     $env:CURL_LIBRARY_PATH="$BinaryCache/$($Platform.Triple)/usr/lib"
     $env:CURL_INCLUDE_PATH="$BinaryCache/$($Platform.Triple)/usr/include"
     Build-SPMProject `
@@ -4196,15 +4230,12 @@ if (-not $SkipBuild) {
       if (-not $Build.LinkModes.Contains("static")) { continue }
 
       $SDKROOT = Get-SwiftSDK -OS $Build.OS -Identifier "$($Build.OS)Experimental"
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.lib" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libcurl.lib" | Out-Null
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2s.lib" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libxml2s.lib" | Out-Null
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\zlib\zlibstatic.lib" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\zlibstatic.lib" | Out-Null
+      $SwiftResourceDir = "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)"
+      Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\brotlicommon.lib" -Destination "${SwiftResourceDir}\brotlicommon.lib" | Out-Null
+      Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\brotlidec.lib" -Destination "${SwiftResourceDir}\brotlidec.lib" | Out-Null
+      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.lib" -Destination "${SwiftResourceDir}\libcurl.lib" | Out-Null
+      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2s.lib" -Destination "${SwiftResourceDir}\libxml2s.lib" | Out-Null
+      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\zlib\zlibstatic.lib" -Destination "${SwiftResourceDir}\zlibstatic.lib" | Out-Null
     }
   }
 
@@ -4215,6 +4246,7 @@ if (-not $SkipBuild) {
       }
 
       Invoke-BuildStep Build-ZLib $Build
+      Invoke-BuildStep Build-Brotli $Build
       Invoke-BuildStep Build-XML2 $Build
       Invoke-BuildStep Build-CURL $Build
     }
@@ -4275,15 +4307,12 @@ if (-not $SkipBuild) {
       if (-not $Build.LinkModes.Contains("static")) { continue }
 
       $SDKROOT = Get-SwiftSDK -OS $Build.OS -Identifier "$($Build.OS)Experimental"
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.a" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libcurl.a" | Out-Null
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2.a" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libxml2.a" | Out-Null
-      Copy-Item -Force `
-        -Path "${BinaryCache}\$($Build.Triple)\zlib\libz.a" `
-        -Destination "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)\libz.a" | Out-Null
+      $SwiftResourceDir = "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)"
+      Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\libbrotlicommon.a" -Destination "${SwiftResourceDir}\libbrotlicommon.a" | Out-Null
+      Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\libbrotlidec.a" -Destination "${SwiftResourceDir}\libbrotlidec.a" | Out-Null
+      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\curl\lib\libcurl.a" -Destination "${SwiftResourceDir}\libcurl.a" | Out-Null
+      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\libxml2-2.11.5\libxml2.a" -Destination "${SwiftResourceDir}\libxml2.a" | Out-Null
+      Copy-Item -Force -Path "${BinaryCache}\$($Build.Triple)\zlib\libz.a" -Destination "${SwiftResourceDir}\libz.a" | Out-Null
     }
   }
 

@@ -735,7 +735,7 @@ private:
           (ScopedDependencies.contains(pd) &&
            SGF.getTypeProperties(origType, substType)
                .isAddressableForDependencies()) ||
-          SGF.getFunction().getConventions().hasGuaranteedAddressResult() ||
+          SGF.getFunction().getConventions().hasAddressResult() ||
           SGF.getFunction().getConventions().hasGuaranteedResult();
       paramValue = argEmitter.handleParam(origType, substType, pd,
                                           isAddressable);
@@ -1331,11 +1331,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   case CaptureKind::Immutable: {
     auto argIndex = SGF.F.begin()->getNumArguments();
     // Non-escaping stored decls are captured as the address of the value.
-    auto argConv = SGF.F.getConventions().getSILArgumentConvention(argIndex);
-    bool isInOut = (argConv == SILArgumentConvention::Indirect_Inout ||
-                    argConv == SILArgumentConvention::Indirect_InoutAliasable);
-    auto param = SGF.F.getConventions().getParamInfoForSILArg(argIndex);
-    if (SGF.F.getConventions().isSILIndirect(param)) {
+    auto fnConv = SGF.F.getConventions();
+    auto paramInfo = fnConv.getParamInfoForSILArg(argIndex);
+    if (fnConv.isSILIndirect(paramInfo)) {
       ty = ty.getAddressType();
     }
     auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
@@ -1343,7 +1341,8 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     arg = SILValue(fArg);
     
     if (isNoImplicitCopy && !arg->getType().isMoveOnly()) {
-      switch (argConv) {
+      // FIXME: this incompatible with -enable-sil-opaque-values
+      switch (fnConv.getSILArgumentConvention(argIndex)) {
       case SILArgumentConvention::Indirect_Inout:
       case SILArgumentConvention::Indirect_InoutAliasable:
       case SILArgumentConvention::Indirect_In:
@@ -1377,6 +1376,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // in SIL since it is illegal to capture an inout value in an escaping
     // closure. The later code knows how to handle that we have the
     // mark_unresolved_non_copyable_value here.
+    bool isInOut = paramInfo.isIndirectMutating();
     if (isInOut && arg->getType().isMoveOnly()) {
       arg = SGF.B.createMarkUnresolvedNonCopyableValueInst(
           Loc, arg,

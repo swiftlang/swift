@@ -1190,22 +1190,24 @@ private:
         Name);
     // Collect the members.
     SmallVector<MemberDIType, 16> MemberTypes;
-    for (VarDecl *VD : Decl->getStoredProperties()) {
-      auto memberTy = Type->getTypeOfMember(VD);
-      if (auto DbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
-              memberTy,
-              IGM.getTypeInfoForUnlowered(
-                  IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
-              IGM))
-        MemberTypes.emplace_back(VD->getName().str(),
-                                 getByteSize() *
-                                     DbgTy->getAlignment().getValue(),
-                                 getOrCreateType(*DbgTy));
-      else
-        // Without complete type info we can only create a forward decl.
-        return DBuilder.createForwardDecl(
-            llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
-            llvm::dwarf::DW_LANG_Swift, SizeInBits, 0);
+    if (!IGM.isResilient(Decl, ResilienceExpansion::Maximal)) {
+      for (VarDecl *VD : Decl->getStoredProperties()) {
+        auto memberTy = Type->getTypeOfMember(VD);
+        if (auto DbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
+                memberTy,
+                IGM.getTypeInfoForUnlowered(
+                    IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
+                IGM))
+          MemberTypes.emplace_back(VD->getName().str(),
+                                   getByteSize() *
+                                       DbgTy->getAlignment().getValue(),
+                                   getOrCreateType(*DbgTy));
+        else
+          // Without complete type info we can only create a forward decl.
+          return DBuilder.createForwardDecl(
+              llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
+              llvm::dwarf::DW_LANG_Swift, SizeInBits, 0);
+      }
     }
 
     SmallVector<llvm::Metadata *, 16> Members;
@@ -1245,17 +1247,21 @@ private:
         UniqueID, Name);
     // Collect the members.
     SmallVector<MemberDIType, 16> MemberTypes;
-    for (VarDecl *VD : Decl->getStoredProperties()) {
-      Type memberTy = UnsubstitutedType->getTypeOfMember(VD);
-      auto DbgTy = DebugTypeInfo::getFromTypeInfo(
-          memberTy,
-          IGM.getTypeInfoForUnlowered(
-              IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
-          IGM);
-      MemberTypes.emplace_back(VD->getName().str(),
-                               getByteSize() * DbgTy.getAlignment().getValue(),
-                               getOrCreateType(DbgTy));
+
+    if (!IGM.isResilient(Decl, ResilienceExpansion::Maximal)) {
+      for (VarDecl *VD : Decl->getStoredProperties()) {
+        Type memberTy = UnsubstitutedType->getTypeOfMember(VD);
+        auto DbgTy = DebugTypeInfo::getFromTypeInfo(
+            memberTy,
+            IGM.getTypeInfoForUnlowered(
+                IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
+            IGM);
+        MemberTypes.emplace_back(VD->getName().str(),
+                                 getByteSize() * DbgTy.getAlignment().getValue(),
+                                 getOrCreateType(DbgTy));
+      }
     }
+
     SmallVector<llvm::Metadata *, 16> Members;
     for (auto &Member : MemberTypes) {
       unsigned OffsetInBits = 0;
@@ -1968,6 +1974,12 @@ private:
     case TypeKind::BuiltinExecutor: {
       return createDoublePointerSizedStruct(
           Scope, "Builtin.Executor", nullptr, MainFile, 0,
+          llvm::DINode::FlagArtificial, MangledName);
+    }
+
+    case TypeKind::BuiltinImplicitActor: {
+      return createDoublePointerSizedStruct(
+          Scope, "Builtin.ImplicitActor", nullptr, MainFile, 0,
           llvm::DINode::FlagArtificial, MangledName);
     }
 

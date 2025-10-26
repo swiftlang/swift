@@ -67,6 +67,7 @@ class CustomAttributeInitializer;
 class GenericFunctionType;
 class LazyConformanceLoader;
 class LazyMemberLoader;
+class MacroDecl;
 class ModuleDecl;
 class NominalTypeDecl;
 class PatternBindingInitializer;
@@ -619,6 +620,9 @@ public:
                                      DeclAttrKind kind, SourceLoc atLoc,
                                      SourceLoc attrLoc);
 
+  /// Attaches the attribute to the given declaration.
+  void attachToDecl(Decl *D);
+
   /// Create a copy of this attribute.
   DeclAttribute *clone(ASTContext &ctx) const;
 
@@ -629,6 +633,11 @@ public:
   /// would have the same effect on \p attachedTo were they attached to it. A
   /// clone should always be equivalent to the original.
   bool isEquivalent(const DeclAttribute *other, Decl *attachedTo) const;
+
+private:
+  void attachToDeclImpl(Decl *D) {
+    // Most attributes don't need any custom logic for this.
+  }
 };
 
 #define UNIMPLEMENTED_CLONE(AttrType)    \
@@ -705,7 +714,7 @@ public:
   }
 };
 
-/// Defines the @_section attribute.
+/// Defines the @section attribute.
 class SectionAttr : public DeclAttribute {
 public:
   SectionAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
@@ -1254,19 +1263,22 @@ class DynamicReplacementAttr final
   friend class DynamicallyReplacedDeclRequest;
 
   DeclNameRef ReplacedFunctionName;
+  DeclNameLoc ReplacedFunctionNameLoc;
   LazyMemberLoader *Resolver = nullptr;
   uint64_t ResolverContextData;
 
   /// Create an @_dynamicReplacement(for:) attribute written in the source.
   DynamicReplacementAttr(SourceLoc atLoc, SourceRange baseRange,
                          DeclNameRef replacedFunctionName,
+                         DeclNameLoc replacedFunctionNameLoc,
                          SourceRange parenRange);
 
   DynamicReplacementAttr(DeclNameRef name, AbstractFunctionDecl *f)
       : DeclAttribute(DeclAttrKind::DynamicReplacement, SourceLoc(),
                       SourceRange(),
                       /*Implicit=*/false),
-        ReplacedFunctionName(name), Resolver(nullptr), ResolverContextData(0) {
+        ReplacedFunctionName(name), ReplacedFunctionNameLoc(),
+        Resolver(nullptr), ResolverContextData(0) {
     Bits.DynamicReplacementAttr.HasTrailingLocationInfo = false;
   }
 
@@ -1275,8 +1287,8 @@ class DynamicReplacementAttr final
       : DeclAttribute(DeclAttrKind::DynamicReplacement, SourceLoc(),
                       SourceRange(),
                       /*Implicit=*/false),
-        ReplacedFunctionName(name), Resolver(Resolver),
-        ResolverContextData(Data) {
+        ReplacedFunctionName(name), ReplacedFunctionNameLoc(),
+        Resolver(Resolver), ResolverContextData(Data) {
     Bits.DynamicReplacementAttr.HasTrailingLocationInfo = false;
   }
 
@@ -1297,7 +1309,8 @@ class DynamicReplacementAttr final
 public:
   static DynamicReplacementAttr *
   create(ASTContext &Context, SourceLoc AtLoc, SourceLoc DynReplLoc,
-         SourceLoc LParenLoc, DeclNameRef replacedFunction, SourceLoc RParenLoc);
+         SourceLoc LParenLoc, DeclNameRef replacedFunction,
+         DeclNameLoc replacedFunctionNameLoc, SourceLoc RParenLoc);
 
   static DynamicReplacementAttr *create(ASTContext &ctx,
                                         DeclNameRef replacedFunction,
@@ -1310,6 +1323,10 @@ public:
 
   DeclNameRef getReplacedFunctionName() const {
     return ReplacedFunctionName;
+  }
+
+  DeclNameLoc getReplacedFunctionNameLoc() const {
+    return ReplacedFunctionNameLoc;
   }
 
   /// Retrieve the location of the opening parentheses, if there is one.
@@ -1800,6 +1817,7 @@ private:
   GenericSignature specializedSignature;
 
   DeclNameRef targetFunctionName;
+  DeclNameLoc targetFunctionNameLoc;
   LazyMemberLoader *resolver = nullptr;
   uint64_t resolverContextData;
   size_t numSPIGroups;
@@ -1812,7 +1830,9 @@ protected:
                  TrailingWhereClause *clause,
                  bool exported,
                  SpecializationKind kind, GenericSignature specializedSignature,
-                 DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
+                 DeclNameRef targetFunctionName,
+                 DeclNameLoc targetFunctionNameLoc,
+                 ArrayRef<Identifier> spiGroups,
                  ArrayRef<AvailableAttr *> availabilityAttrs,
                  size_t typeErasedParamsCount);
 
@@ -1896,6 +1916,10 @@ public:
     return targetFunctionName;
   }
 
+  DeclNameLoc getTargetFunctionNameLoc() const {
+    return targetFunctionNameLoc;
+  }
+
   /// \p forDecl is the value decl that the attribute belongs to.
   ValueDecl *getTargetFunctionDecl(const ValueDecl *forDecl) const;
 
@@ -1925,19 +1949,23 @@ private:
                  TrailingWhereClause *clause,
                  bool exported,
                  SpecializationKind kind, GenericSignature specializedSignature,
-                 DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
+                 DeclNameRef targetFunctionName,
+                 DeclNameLoc targetFunctionNameLoc,
+                 ArrayRef<Identifier> spiGroups,
                  ArrayRef<AvailableAttr *> availabilityAttrs,
                  size_t typeErasedParamsCount) :
     AbstractSpecializeAttr(DeclAttrKind::Specialize, atLoc, Range, clause,
                    exported, kind, specializedSignature, targetFunctionName,
-                   spiGroups, availabilityAttrs, typeErasedParamsCount) {}
+                   targetFunctionNameLoc, spiGroups, availabilityAttrs,
+                   typeErasedParamsCount) {}
 
 public:
   static SpecializeAttr *
   create(ASTContext &Ctx, SourceLoc atLoc, SourceRange Range,
          TrailingWhereClause *clause, bool exported,
          SpecializationKind kind,
-         DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
+         DeclNameRef targetFunctionName, DeclNameLoc targetFunctionNameLoc,
+         ArrayRef<Identifier> spiGroups,
          ArrayRef<AvailableAttr *> availabilityAttrs,
          GenericSignature specializedSignature = nullptr);
 
@@ -1981,19 +2009,23 @@ private:
                  TrailingWhereClause *clause,
                  bool exported,
                  SpecializationKind kind, GenericSignature specializedSignature,
-                 DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
+                 DeclNameRef targetFunctionName,
+                 DeclNameLoc targetFunctionNameLoc,
+                 ArrayRef<Identifier> spiGroups,
                  ArrayRef<AvailableAttr *> availabilityAttrs,
                  size_t typeErasedParamsCount) :
     AbstractSpecializeAttr(DeclAttrKind::Specialized, atLoc, Range, clause,
                    exported, kind, specializedSignature, targetFunctionName,
-                   spiGroups, availabilityAttrs, typeErasedParamsCount) {}
+                   targetFunctionNameLoc, spiGroups, availabilityAttrs,
+                   typeErasedParamsCount) {}
 
 public:
   static SpecializedAttr *
   create(ASTContext &Ctx, SourceLoc atLoc, SourceRange Range,
          TrailingWhereClause *clause, bool exported,
          SpecializationKind kind,
-         DeclNameRef targetFunctionName, ArrayRef<Identifier> spiGroups,
+         DeclNameRef targetFunctionName, DeclNameLoc targetFunctionNameLoc,
+         ArrayRef<Identifier> spiGroups,
          ArrayRef<AvailableAttr *> availabilityAttrs,
          GenericSignature specializedSignature = nullptr);
 
@@ -2292,6 +2324,8 @@ public:
 
 /// Defines a custom attribute.
 class CustomAttr final : public DeclAttribute {
+  friend class DeclAttribute;
+
   TypeExpr *typeExpr;
   ArgumentList *argList;
   CustomAttrOwner owner;
@@ -2322,13 +2356,16 @@ public:
 
   /// Retrieve the Decl or DeclContext owner for the attribute.
   CustomAttrOwner getOwner() const { return owner; }
-  void setOwner(CustomAttrOwner newOwner) { owner = newOwner; }
 
   ASTContext &getASTContext() const;
 
   /// Retrieve the NominalTypeDecl the CustomAttr refers to, or \c nullptr if
   /// it doesn't refer to one (which can be the case for e.g macro attrs).
   NominalTypeDecl *getNominalDecl() const;
+
+  /// Retrieve the resolved macro for the CustomAttr, or \c nullptr if the
+  /// attribute does not refer to a macro.
+  MacroDecl *getResolvedMacro() const;
 
   /// Destructure an attribute's type repr for a macro reference.
   ///
@@ -2377,10 +2414,11 @@ public:
   void printCustomAttr(ASTPrinter &Printer, const PrintOptions &Options) const;
 
 private:
+  void attachToDeclImpl(Decl *D);
+
   friend class CustomAttrNominalRequest;
   void resetTypeInformation(TypeExpr *repr);
 
-private:
   friend class CustomAttrTypeRequest;
   void setType(Type ty);
 };
@@ -2517,6 +2555,7 @@ class DifferentiableAttr final
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
   friend class DifferentiableAttributeTypeCheckRequest;
+  friend class DeclAttribute;
 
   /// The declaration on which the `@differentiable` attribute is declared.
   /// May not be a valid declaration for `@differentiable` attributes.
@@ -2576,11 +2615,9 @@ public:
 
   Decl *getOriginalDeclaration() const { return OriginalDeclaration; }
 
-  /// Sets the original declaration on which this attribute is declared.
-  /// Should only be used by parsing and deserialization.
-  void setOriginalDeclaration(Decl *originalDeclaration);
-
 private:
+  void attachToDeclImpl(Decl *D);
+
   /// Returns true if the given `@differentiable` attribute has been
   /// type-checked.
   bool hasBeenTypeChecked() const;
@@ -2695,6 +2732,7 @@ class DerivativeAttr final
       private llvm::TrailingObjects<DerivativeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
   friend class DerivativeAttrOriginalDeclRequest;
+  friend class DeclAttribute;
 
   /// The declaration on which the `@derivative` attribute is declared.
   /// May not be a valid declaration for `@derivative` attributes.
@@ -2755,10 +2793,6 @@ public:
 
   Decl *getOriginalDeclaration() const { return OriginalDeclaration; }
 
-  /// Sets the original declaration on which this attribute is declared.
-  /// Should only be used by parsing and deserialization.
-  void setOriginalDeclaration(Decl *originalDeclaration);
-
   TypeRepr *getBaseTypeRepr() const { return BaseTypeRepr; }
   DeclNameRefWithLoc getOriginalFunctionName() const {
     return OriginalFunctionName;
@@ -2803,6 +2837,9 @@ public:
     // Not properly implemented (very complex and not currently needed)
     return false;
   }
+
+private:
+  void attachToDeclImpl(Decl *D);
 };
 
 /// The `@transpose(of:)` attribute registers a function as a transpose of
@@ -3093,7 +3130,7 @@ public:
   StringRef getCName(const FuncDecl *forDecl) const;
 
   /// Find an ExternAttr with the given kind in the given DeclAttributes.
-  static ExternAttr *find(DeclAttributes &attrs, ExternKind kind);
+  static const ExternAttr *find(const DeclAttributes &attrs, ExternKind kind);
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Extern;
@@ -3538,6 +3575,8 @@ public:
 
 /// Defines the @abi attribute.
 class ABIAttr : public DeclAttribute {
+  friend class DeclAttribute;
+
 public:
   ABIAttr(Decl *abiDecl, SourceLoc AtLoc, SourceRange Range, bool Implicit)
       : DeclAttribute(DeclAttrKind::ABI, AtLoc, Range, Implicit),
@@ -3564,6 +3603,9 @@ public:
     // Unsupported: tricky to implement and unneeded.
     return true;
   }
+
+private:
+  void attachToDeclImpl(Decl *D);
 };
 
 /// Defines a @nonexhaustive attribute.

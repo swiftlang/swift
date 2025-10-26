@@ -1348,9 +1348,9 @@ void PrintAST::printAttributes(const Decl *D) {
   if (Options.PrintSyntheticSILGenName
         && !D->getAttrs().hasAttribute<SILGenNameAttr>()) {
     if (canPrintSyntheticSILGenName(D)) {
-      auto mangledName = Mangle::ASTMangler(D->getASTContext())
-                            .mangleAnyDecl(cast<ValueDecl>(D), /*prefix=*/true,
-                                           /*respectOriginallyDefinedIn=*/true);
+      auto mangledName =
+          Mangle::ASTMangler(D->getASTContext())
+              .mangleAnyDecl(cast<ValueDecl>(D), /*addPrefix*/ true);
       Printer.printAttrName("@_silgen_name");
       Printer << "(";
       Printer.printEscapedStringLiteral(mangledName);
@@ -2716,6 +2716,32 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     }
   }
 
+  Printer << " {";
+
+  // For var decls, if it has an initializer, the parser only expects observing
+  // accessors. But sometimes for example in '.swiftinterface', we want to print
+  // both the initializer and the accessors. So when we print the initializer
+  // *and* the accessor block not starting with willSet/didSet, print an
+  // attribute as a disambiguation marker.
+  bool needsDisambiguationAttr = false;
+  if (auto *VD = dyn_cast<VarDecl>(ASD)) {
+    if (auto *PBD = VD->getParentPatternBinding()) {
+      if (accessorsToPrint.empty() ||
+          !accessorsToPrint.front()->isObservingAccessor()) {
+        const auto i = PBD->getPatternEntryIndexForVarDecl(VD);
+        if (Options.PrintExprs) {
+          needsDisambiguationAttr |= bool(PBD->getInit(i));
+        } else if (Options.VarInitializers) {
+          needsDisambiguationAttr |= bool(PBD->hasInitStringRepresentation(i) &&
+                                          VD->isInitExposedToClients());
+        }
+      }
+    }
+  }
+  if (needsDisambiguationAttr) {
+    Printer << " @_accessorBlock";
+  }
+
   // If we're not printing the accessor bodies and none of the accessors have
   // attributes then we can print in a shorter, compact form.
   bool PrintCompactAccessors =
@@ -2724,9 +2750,6 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
                   [](AccessorDecl *accessor) {
                     return accessor->getAttrs().isEmpty();
                   });
-
-  Printer << " {";
-
   if (!PrintCompactAccessors)
     Printer.printNewline();
 
@@ -6266,6 +6289,7 @@ public:
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinIntegerType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinFloatType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinUnboundGenericType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinImplicitActorType)
 #undef ASTPRINTER_PRINT_BUILTINTYPE
 
   void visitBuiltinFixedArrayType(BuiltinFixedArrayType *T,
@@ -7917,9 +7941,11 @@ static StringRef getStringForResultConvention(ResultConvention conv) {
   case ResultConvention::Autoreleased: return "@autoreleased ";
   case ResultConvention::Pack: return "@pack_out ";
   case ResultConvention::GuaranteedAddress:
-    return "@guaranteed_addr ";
+    return "@guaranteed_address ";
   case ResultConvention::Guaranteed:
     return "@guaranteed ";
+  case ResultConvention::Inout:
+    return "@inout ";
   }
   llvm_unreachable("bad result convention");
 }

@@ -1,14 +1,13 @@
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers %s -emit-ir -parse-as-library | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -parse-as-library | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_SymbolLinkageMarkers
 
-@_used
-@_section("__TEXT,__mysection")
+@used
+@section("__TEXT,__mysection")
 let my_global1: Int = 42
 
-@_used
-@_section("__TEXT,__mysection")
+@used
+@section("__TEXT,__mysection")
 let my_global2: Int = 46
 
 @_silgen_name(raw: "section$start$__TEXT$__mysection")

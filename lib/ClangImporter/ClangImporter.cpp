@@ -665,6 +665,12 @@ void importer::getNormalInvocationArguments(
       });
     }
 
+    if (triple.isAndroid()) {
+      invocationArgStrs.insert(invocationArgStrs.end(), {
+        "-D__ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__",
+      });
+    }
+
     if (triple.isOSWindows()) {
       switch (triple.getArch()) {
       default: llvm_unreachable("unsupported Windows architecture");
@@ -1191,7 +1197,9 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     // compiler can be more efficient to compute swift cache key without having
     // the knowledge about clang command-line options.
     if (ctx.CASOpts.EnableCaching || ctx.CASOpts.ImportModuleFromCAS) {
-      CI->getCASOpts() = ctx.CASOpts.CASOpts;
+      CI->getCASOpts().CASPath = ctx.CASOpts.Config.CASPath;
+      CI->getCASOpts().PluginPath = ctx.CASOpts.Config.PluginPath;
+      CI->getCASOpts().PluginOptions = ctx.CASOpts.Config.PluginOptions;
       // When clangImporter is used to compile (generate .pcm or .pch), need to
       // inherit the include tree from swift args (last one wins) and clear the
       // input file.
@@ -1401,7 +1409,6 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
   auto actualDiagClient = std::make_unique<ClangDiagnosticConsumer>(
       importer->Impl, instance.getDiagnosticOpts(),
       importerOpts.DumpClangDiagnostics);
-  
   instance.createVirtualFileSystem(std::move(VFS), actualDiagClient.get());
   instance.createFileManager();
   instance.createDiagnostics(actualDiagClient.release());
@@ -1423,11 +1430,13 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
   if (ctx.LangOpts.ClangTarget.has_value()) {
     // If '-clang-target' is set, create a mock invocation with the Swift triple
     // to configure CodeGen and Target options for Swift compilation.
-    auto swiftTargetClangArgs = importer->getClangCC1Arguments(ctx, instance.getVirtualFileSystemPtr(), true);
+    auto swiftTargetClangArgs = importer->getClangCC1Arguments(
+        ctx, instance.getVirtualFileSystemPtr(), true);
     if (!swiftTargetClangArgs)
       return nullptr;
     auto swiftTargetClangInvocation = createClangInvocation(
-        importer.get(), importerOpts, instance.getVirtualFileSystemPtr(), *swiftTargetClangArgs);
+        importer.get(), importerOpts, instance.getVirtualFileSystemPtr(),
+        *swiftTargetClangArgs);
     if (!swiftTargetClangInvocation)
       return nullptr;
 
@@ -1915,7 +1924,8 @@ std::string ClangImporter::getBridgingHeaderContents(
   clang::CompilerInstance rewriteInstance(
       std::move(invocation), Impl.Instance->getPCHContainerOperations(),
       &Impl.Instance->getModuleCache());
-  rewriteInstance.setVirtualFileSystem(Impl.Instance->getVirtualFileSystemPtr());
+  rewriteInstance.setVirtualFileSystem(
+      Impl.Instance->getVirtualFileSystemPtr());
   rewriteInstance.setFileManager(Impl.Instance->getFileManagerPtr());
   rewriteInstance.createDiagnostics(new clang::IgnoringDiagConsumer);
   rewriteInstance.createSourceManager();
@@ -2018,7 +2028,8 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
   auto clonedInstance = std::make_unique<clang::CompilerInstance>(
       std::move(invocation), Impl.Instance->getPCHContainerOperations(),
       &Impl.Instance->getModuleCache());
-  clonedInstance->setVirtualFileSystem(Impl.Instance->getVirtualFileSystemPtr());
+  clonedInstance->setVirtualFileSystem(
+      Impl.Instance->getVirtualFileSystemPtr());
   clonedInstance->setFileManager(Impl.Instance->getFileManagerPtr());
   clonedInstance->createDiagnostics(&Impl.Instance->getDiagnosticClient(),
                                     /*ShouldOwnClient=*/false);
@@ -2560,6 +2571,10 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
     deprecatedAsUnavailableMessage = "";
     break;
 
+  case PlatformKind::Android:
+    deprecatedAsUnavailableMessage = "";
+    break;
+
   case PlatformKind::none:
     break;
   }
@@ -2607,6 +2622,9 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
 
   case PlatformKind::Windows:
     return name == "windows";
+
+  case PlatformKind::Android:
+    return name == "android";
 
   case PlatformKind::none:
     return false;
@@ -2684,6 +2702,10 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   case PlatformKind::Windows:
     // No deprecation filter on Windows
     return false;
+
+  case PlatformKind::Android:
+    // The minimum Android API level supported by Swift is 21
+    return major <= 20;
   }
 
   llvm_unreachable("Unexpected platform");
@@ -2840,10 +2862,22 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
     for (auto UI : implicitImportInfo.AdditionalUnloadedImports)
       Imported.insert(UI.module.getImportPath());
     assert(implicitImportInfo.AdditionalImports.empty());
+    const bool cxx = SwiftContext.LangOpts.EnableCXXInterop;
 
-    auto addImplicitImport = [&implicitImportInfo, &Imported,
+    auto addImplicitImport = [&implicitImportInfo, &Imported, cxx,
                               this](const clang::Module *M,
                                     bool guaranteedUnique) {
+      const bool cannotBeImported =
+          llvm::any_of(M->Requirements, [cxx](auto &Req) {
+            if (Req.FeatureName == "swift")
+              return !Req.RequiredState;
+            if (Req.FeatureName == "cplusplus")
+              return Req.RequiredState != cxx;
+            return false;
+          });
+      if (cannotBeImported) {
+        return;
+      }
       ImportPath::Builder builder = getSwiftModulePath(M);
       if (!guaranteedUnique && Imported.count(builder.get()))
         return;
@@ -3819,11 +3853,10 @@ ImportDecl *swift::createImportDecl(ASTContext &Ctx,
                                 ImportKind::Module, SourceLoc(),
                                 importPath.get(), ClangN);
   if (Ctx.ClangImporterOpts.BridgingHeaderIsInternal) {
-    ID->getAttrs().add(
-        new (Ctx) AccessControlAttr(SourceLoc(), SourceRange(),
-                                    AccessLevel::Internal, /*implicit=*/true));
+    ID->addAttribute(new (Ctx) AccessControlAttr(
+        SourceLoc(), SourceRange(), AccessLevel::Internal, /*implicit=*/true));
   } else if (IsExported) {
-    ID->getAttrs().add(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+    ID->addAttribute(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
   }
   return ID;
 }
@@ -6243,39 +6276,39 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
 
 // Clone attributes that have been imported from Clang.
 void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl* toDecl) {
-  ASTContext& context = fromDecl->getASTContext();
-  DeclAttributes& attrs = toDecl->getAttrs();
+  ASTContext &context = fromDecl->getASTContext();
   for (auto attr : fromDecl->getAttrs()) {
     switch (attr->getKind()) {
     case DeclAttrKind::Available: {
-      attrs.add(cast<AvailableAttr>(attr)->clone(context, true));
+      toDecl->addAttribute(cast<AvailableAttr>(attr)->clone(context, true));
       break;
     }
     case DeclAttrKind::Custom: {
       CustomAttr *cAttr = cast<CustomAttr>(attr);
-      attrs.add(CustomAttr::create(context, SourceLoc(), cAttr->getTypeExpr(),
-                                   /*owner*/ toDecl, cAttr->getInitContext(),
-                                   cAttr->getArgs(), /*implicit*/ true));
+      toDecl->addAttribute(
+          CustomAttr::create(context, SourceLoc(), cAttr->getTypeExpr(),
+                             /*owner*/ toDecl, cAttr->getInitContext(),
+                             cAttr->getArgs(), /*implicit*/ true));
       break;
     }
     case DeclAttrKind::DiscardableResult: {
-      attrs.add(new (context) DiscardableResultAttr(true));
+      toDecl->addAttribute(new (context) DiscardableResultAttr(true));
       break;
     }
     case DeclAttrKind::Effects: {
-      attrs.add(cast<EffectsAttr>(attr)->clone(context));
+      toDecl->addAttribute(cast<EffectsAttr>(attr)->clone(context));
       break;
     }
     case DeclAttrKind::Final: {
-      attrs.add(new (context) FinalAttr(true));
+      toDecl->addAttribute(new (context) FinalAttr(true));
       break;
     }
     case DeclAttrKind::Transparent: {
-      attrs.add(new (context) TransparentAttr(true));
+      toDecl->addAttribute(new (context) TransparentAttr(true));
       break;
     }
     case DeclAttrKind::WarnUnqualifiedAccess: {
-      attrs.add(new (context) WarnUnqualifiedAccessAttr(true));
+      toDecl->addAttribute(new (context) WarnUnqualifiedAccessAttr(true));
       break;
     }
     default:
@@ -7578,8 +7611,8 @@ static ValueDecl *addThunkForDependentTypes(FuncDecl *oldDecl,
   newFnDecl->setBodySynthesizer(synthesizeDependentTypeThunkParamForwarding, newDecl);
   newFnDecl->setSelfAccessKind(newDecl->getSelfAccessKind());
   if (newDecl->isStatic()) newFnDecl->setStatic();
-  newFnDecl->getAttrs().add(
-      new (newDecl->getASTContext()) TransparentAttr(/*IsImplicit=*/true));
+  newFnDecl->addAttribute(new (newDecl->getASTContext())
+                              TransparentAttr(/*IsImplicit=*/true));
   return newFnDecl;
 }
 
@@ -7705,8 +7738,8 @@ static ValueDecl *generateThunkForExtraMetatypes(SubstitutionMap subst,
   thunk->setBodySynthesizer(synthesizeForwardingThunkBody, newDecl);
   thunk->setSelfAccessKind(newDecl->getSelfAccessKind());
   if (newDecl->isStatic()) thunk->setStatic();
-  thunk->getAttrs().add(
-      new (newDecl->getASTContext()) TransparentAttr(/*IsImplicit=*/true));
+  thunk->addAttribute(new (newDecl->getASTContext())
+                          TransparentAttr(/*IsImplicit=*/true));
 
   return thunk;
 }
@@ -8284,6 +8317,9 @@ static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
 }
 
 static bool hasDestroyTypeOperations(const clang::CXXRecordDecl *decl) {
+  if (decl->hasSimpleDestructor())
+    return true;
+
   if (auto dtor = decl->getDestructor()) {
     if (dtor->isDeleted() || dtor->isIneligibleOrNotSelected() ||
         dtor->getAccess() != clang::AS_public) {
@@ -8633,6 +8669,51 @@ SourceLoc swift::extractNearestSourceLoc(SafeUseOfCxxDeclDescriptor desc) {
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
+                           ClangTypeExplicitSafetyDescriptor desc) {
+  auto qt = static_cast<clang::QualType>(desc.type);
+  out << "Checking if type '" << qt.getAsString() << "' is explicitly safe.\n";
+}
+
+SourceLoc swift::extractNearestSourceLoc(ClangTypeExplicitSafetyDescriptor desc) {
+  return SourceLoc();
+}
+
+ExplicitSafety ClangTypeExplicitSafety::evaluate(
+    Evaluator &evaluator, ClangTypeExplicitSafetyDescriptor desc) const {
+  auto clangType = static_cast<clang::QualType>(desc.type);
+
+  // Handle pointers.
+  auto pointeeType = clangType->getPointeeType();
+  if (!pointeeType.isNull()) {
+    // Function pointers are okay.
+    if (pointeeType->isFunctionType())
+      return ExplicitSafety::Safe;
+
+    // Pointers to record types are okay if they come in as foreign reference
+    // types.
+    if (auto *recordDecl = pointeeType->getAsRecordDecl()) {
+      if (hasImportAsRefAttr(recordDecl))
+        return ExplicitSafety::Safe;
+    }
+
+    // All other pointers are considered unsafe.
+    return ExplicitSafety::Unsafe;
+  }
+
+  // Handle records recursively.
+  if (auto recordDecl = clangType->getAsTagDecl()) {
+    // If we reached this point the types is not imported as a shared reference,
+    // so we don't need to check the bases whether they are shared references.
+    return evaluateOrDefault(evaluator,
+                             ClangDeclExplicitSafety({recordDecl, false}),
+                             ExplicitSafety::Unspecified);
+  }
+
+  // Everything else is safe.
+  return ExplicitSafety::Safe;
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
                            CxxDeclExplicitSafetyDescriptor desc) {
   out << "Checking if '";
   if (auto namedDecl = dyn_cast<clang::NamedDecl>(desc.decl))
@@ -8703,55 +8784,22 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
 
 /// Check whether the given Clang type involves an unsafe type.
 static bool hasUnsafeType(Evaluator &evaluator, clang::QualType clangType) {
-  // Handle pointers.
-  auto pointeeType = clangType->getPointeeType();
-  if (!pointeeType.isNull()) {
-    // Function pointers are okay.
-    if (pointeeType->isFunctionType())
-      return false;
-    
-    // Pointers to record types are okay if they come in as foreign reference
-    // types.
-    if (auto recordDecl = pointeeType->getAsRecordDecl()) {
-      if (hasImportAsRefAttr(recordDecl))
-        return false;
-    }
-    
-    // All other pointers are considered unsafe.
-    return true;
-  }
 
-  // Handle records recursively.
-  if (auto recordDecl = clangType->getAsTagDecl()) {
-    // If we reached this point the types is not imported as a shared reference,
-    // so we don't need to check the bases whether they are shared references.
-    auto safety = evaluateOrDefault(
-        evaluator, ClangDeclExplicitSafety({recordDecl, false}),
-        ExplicitSafety::Unspecified);
-    switch (safety) {
-      case ExplicitSafety::Unsafe:
-        return true;
-        
-      case ExplicitSafety::Safe:
-      case ExplicitSafety::Unspecified:
-        return false;        
-    }
-  }
-    
-  // Everything else is safe.
-  return false;
+  auto safety =
+      evaluateOrDefault(evaluator, ClangTypeExplicitSafety({clangType}),
+                        ExplicitSafety::Unspecified);
+  return safety == ExplicitSafety::Unsafe;
 }
 
 ExplicitSafety
 ClangDeclExplicitSafety::evaluate(Evaluator &evaluator,
                                   CxxDeclExplicitSafetyDescriptor desc) const {
-  // FIXME: Somewhat duplicative with importAsUnsafe.
   // FIXME: Also similar to hasPointerInSubobjects
   // FIXME: should probably also subsume IsSafeUseOfCxxDecl
   
   // Explicitly unsafe.
   auto decl = desc.decl;
-  if (hasUnsafeAPIAttr(decl) || hasSwiftAttribute(decl, "unsafe"))
+  if (hasSwiftAttribute(decl, "unsafe"))
     return ExplicitSafety::Unsafe;
   
   // Explicitly safe.
@@ -8966,7 +9014,7 @@ void ClangInheritanceInfo::setUnavailableIfNecessary(
     msg = "this base member is not accessible because of private inheritance";
 
   if (msg)
-    clonedDecl->getAttrs().add(AvailableAttr::createUniversallyUnavailable(
+    clonedDecl->addAttribute(AvailableAttr::createUniversallyUnavailable(
         clonedDecl->getASTContext(), msg));
 }
 

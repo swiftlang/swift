@@ -53,6 +53,10 @@ import SIL
 let deadStoreElimination = FunctionPass(name: "dead-store-elimination") {
   (function: Function, context: FunctionPassContext) in
 
+  eliminateDeadStores(in: function, context)
+}
+
+func eliminateDeadStores(in function: Function, _ context: FunctionPassContext) {
   // Avoid quadratic complexity by limiting the number of visited instructions.
   // This limit is sufficient for most "real-world" functions, by far.
   var complexityBudget = 10_000

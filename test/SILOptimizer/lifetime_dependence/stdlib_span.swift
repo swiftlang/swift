@@ -54,11 +54,9 @@ func testUBPStorageCopy(ubp: UnsafeRawBufferPointer) -> RawSpan {
 
 @available(SwiftStdlib 6.2, *)
 func testUBPStorageEscape(array: [Int64]) {
-  var span = RawSpan()
-  array.withUnsafeBytes {
-    span = $0.storage // expected-error {{lifetime-dependent value escapes its scope}}
-                      // expected-note  @-2{{it depends on the lifetime of argument '$0'}}
-                      // expected-note  @-2{{this use causes the lifetime-dependent value to escape}}
-  }
+  var span = RawSpan()  // expected-error{{lifetime-dependent variable 'span' escapes its scope}}
+  array.withUnsafeBytes {  // expected-note{{it depends on the lifetime of argument '$0'}}
+    span = $0.storage
+  } // expected-note{{this use causes the lifetime-dependent value to escape}}
   read(span)
 }

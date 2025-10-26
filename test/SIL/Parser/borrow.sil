@@ -53,6 +53,24 @@ sil [ossa] @foo : $@convention(thin) () -> () {
   return %res : $()
 }
 
+struct Wrapper {
+  var _k: C
+}
+
+// CHECK-LABEL: sil [ossa] @return_borrow_test : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed C {
+// CHECK: bb0(%0 : $*Wrapper):
+// CHECK:   %1 = struct_element_addr %0 : $*Wrapper, #Wrapper._k
+// CHECK:   %2 = load_borrow %1 : $*C
+// CHECK:   return_borrow %2 : $C from_scopes (%2 : $C)
+// CHECK: }
+sil [ossa] @return_borrow_test : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed C {
+bb0(%0 : $*Wrapper):
+  %1 = struct_element_addr %0, #Wrapper._k
+  %2 = load_borrow %1
+  return_borrow %2 from_scopes (%2)
+}
+
+
 // CHECK-LABEL: sil [ossa] @reborrowTest : $@convention(thin) (@owned C) -> () {
 // CHECK:       bb3([[ARG:%.*]] : @reborrow $C):
 // CHECK-NEXT:    {{%.*}} = borrowed [[ARG]] : $C from (%0 : $C)
@@ -91,3 +109,4 @@ bb1(%2 : @guaranteed $FakeOptional<C>):
   %4 = tuple ()
   return %4 : $()
 }
+

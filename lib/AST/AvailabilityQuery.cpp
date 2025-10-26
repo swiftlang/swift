@@ -17,6 +17,54 @@
 
 using namespace swift;
 
+AvailabilityQuery::AvailabilityQuery(
+    AvailabilityDomain domain, ResultKind kind,
+    const std::optional<AvailabilityRange> &primaryRange,
+    const std::optional<AvailabilityRange> &variantRange)
+    : domain(domain), primaryRange(primaryRange), variantRange(variantRange),
+      kind(kind), unavailable(false) {
+  // Check invariants.
+  switch (domain.getKind()) {
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::PackageDescription:
+  case AvailabilityDomain::Kind::Embedded:
+    // These domains don't support queries at all.
+    DEBUG_ASSERT(false);
+    break;
+
+  case AvailabilityDomain::Kind::Universal:
+    // The universal domain can only support constant queries.
+    DEBUG_ASSERT(kind != ResultKind::Dynamic);
+    break;
+
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+    // Dynamic Swift runtime queries take just a primary version argument.
+    if (kind == ResultKind::Dynamic) {
+      DEBUG_ASSERT(primaryRange);
+      DEBUG_ASSERT(!variantRange);
+    }
+    break;
+
+  case AvailabilityDomain::Kind::Platform:
+    // Dynamic platform version queries must have either a primary version
+    // argument or a variant version argument (or both).
+    if (kind == ResultKind::Dynamic) {
+      DEBUG_ASSERT(primaryRange || variantRange);
+    }
+    break;
+
+  case AvailabilityDomain::Kind::Custom:
+    // Custom availability domains do not support versioned queries at all yet.
+    DEBUG_ASSERT(!primaryRange);
+    DEBUG_ASSERT(!variantRange);
+
+    // A valid custom domain object is required.
+    auto customDomain = domain.getCustomDomain();
+    ASSERT(customDomain);
+    break;
+  }
+}
+
 static void unpackVersion(const llvm::VersionTuple &version,
                           llvm::SmallVectorImpl<unsigned> &arguments) {
   arguments.push_back(version.getMajor());
@@ -133,16 +181,17 @@ FuncDecl *AvailabilityQuery::getDynamicQueryDeclAndArguments(
   switch (domain.getKind()) {
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::SwiftLanguageMode:
-  case AvailabilityDomain::Kind::SwiftRuntime:
   case AvailabilityDomain::Kind::PackageDescription:
   case AvailabilityDomain::Kind::Embedded:
+    // These domains don't support dynamic queries.
     return nullptr;
+
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+    unpackVersion(getPrimaryArgument().value(), arguments);
+    return ctx.getIsSwiftRuntimeVersionAtLeast();
   case AvailabilityDomain::Kind::Platform:
     return getOSAvailabilityDeclAndArguments(*this, arguments, ctx);
   case AvailabilityDomain::Kind::Custom:
-    auto customDomain = domain.getCustomDomain();
-    ASSERT(customDomain);
-
-    return customDomain->getPredicateFunc();
+    return domain.getCustomDomain()->getPredicateFunc();
   }
 }

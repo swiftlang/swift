@@ -5482,9 +5482,10 @@ ManagedValue SILGenFunction::applyBorrowMutateAccessor(
   if (fn.getFunction()->getConventions().hasGuaranteedResult()) {
     auto selfArg = args.back().getValue();
     if (isa<LoadBorrowInst>(selfArg)) {
-      rawResult = emitUncheckedGuaranteedConversion(rawResult);
+      rawResult = B.createUncheckedOwnership(loc, rawResult);
     }
   }
+
   if (rawResult->getType().isMoveOnly()) {
     if (rawResult->getType().isAddress()) {
       auto result = B.createMarkUnresolvedNonCopyableValueInst(
@@ -5845,8 +5846,12 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
     args.push_back({});
     // NOTE: Even though this calls emitActorInstanceIsolation, this also
     // handles glboal actor isolated cases.
-    args.back().push_back(SGF.emitActorInstanceIsolation(
-        callSite->Loc, executor, executor.getType().getASTType()));
+    auto erasedActor =
+        SGF.emitActorInstanceIsolation(callSite->Loc, executor,
+                                       executor.getType().getASTType())
+            .borrow(SGF, callSite->Loc);
+    args.back().push_back(
+        SGF.B.convertToImplicitActor(callSite->Loc, erasedActor));
   }
 
   uncurriedLoc = callSite->Loc;
@@ -6230,7 +6235,8 @@ RValue SILGenFunction::emitApply(
       break;
     case ResultConvention::GuaranteedAddress:
     case ResultConvention::Guaranteed:
-      llvm_unreachable("borrow accessor is not yet implemented");
+    case ResultConvention::Inout:
+      llvm_unreachable("borrow/mutate accessor is not yet implemented");
       break;
     }
 

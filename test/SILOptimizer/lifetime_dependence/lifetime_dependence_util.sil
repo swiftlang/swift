@@ -212,6 +212,7 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
 // CHECK-LABEL: dependence_access: lifetime_dependence_use with: %0
 // CHECK: LifetimeDependence uses of: %0 = argument of bb0 : $*NE
 // CHECK-NEXT: Leaf use: operand #0 of   end_access %{{.*}} : $*NE
+// CHECK-NEXT: Returned inout: %0 = argument of bb0 : $*NE
 // CHECK-NEXT: dependence_access: lifetime_dependence_use with: %0
 sil [ossa] @dependence_access : $@convention(thin) (@inout NE, @owned C) -> () {
 bb0(%0 : $*NE, %1 : @owned $C):

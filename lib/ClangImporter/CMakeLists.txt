@@ -24,6 +24,7 @@ add_swift_host_library(swiftClangImporter STATIC
   ImportName.cpp
   ImportType.cpp
   Serializability.cpp
+  SwiftifyDecl.cpp
   SwiftLookupTable.cpp
 )
 target_link_libraries(swiftClangImporter PRIVATE

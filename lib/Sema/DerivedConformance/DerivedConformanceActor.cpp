@@ -144,13 +144,13 @@ static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
       executorType, /*static*/ false, /*final*/ false);
   auto property = propertyPair.first;
   property->setSynthesized(true);
-  property->getAttrs().add(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
-                                                   SourceLoc(), SourceRange(),
-                                                   /*implicit*/ true));
-  property->getAttrs().add(NonisolatedAttr::createImplicit(ctx));
+  property->addAttribute(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
+                                                 SourceLoc(), SourceRange(),
+                                                 /*implicit*/ true));
+  property->addAttribute(NonisolatedAttr::createImplicit(ctx));
 
   // Make the property implicitly final.
-  property->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
+  property->addAttribute(new (ctx) FinalAttr(/*IsImplicit=*/true));
   if (property->getFormalAccess() == AccessLevel::Open)
     property->overwriteAccess(AccessLevel::Public);
 

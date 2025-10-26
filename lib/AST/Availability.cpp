@@ -201,13 +201,11 @@ void AvailabilityInference::applyInferredAvailableAttrs(
     } while (D);
   }
 
-  DeclAttributes &Attrs = ToDecl->getAttrs();
-
   // Create an availability attribute for each observed platform and add
   // to ToDecl.
   for (auto &Pair : Inferred) {
     if (auto Attr = createAvailableAttr(Pair.first, Pair.second, Context))
-      Attrs.add(Attr);
+      ToDecl->addAttribute(Attr);
   }
 }
 
@@ -256,128 +254,6 @@ static bool isBetterThan(const SemanticAvailableAttr &newAttr,
   // If the new attribute's platform inherits from the old one, it wins.
   return inheritsAvailabilityFromPlatform(newAttr.getPlatform(),
                                           prevAttr->getPlatform());
-}
-
-static const clang::DarwinSDKInfo::RelatedTargetVersionMapping *
-getFallbackVersionMapping(const ASTContext &Ctx,
-                          clang::DarwinSDKInfo::OSEnvPair Kind) {
-  auto *SDKInfo = Ctx.getDarwinSDKInfo();
-  if (SDKInfo)
-    return SDKInfo->getVersionMapping(Kind);
-
-  return Ctx.getAuxiliaryDarwinPlatformRemapInfo(Kind);
-}
-
-static std::optional<clang::VersionTuple>
-getRemappedIntroducedVersionForFallbackPlatform(
-    const ASTContext &Ctx, const llvm::VersionTuple &Version) {
-  const auto *Mapping = getFallbackVersionMapping(
-      Ctx, clang::DarwinSDKInfo::OSEnvPair(
-               llvm::Triple::IOS, llvm::Triple::UnknownEnvironment,
-               llvm::Triple::XROS, llvm::Triple::UnknownEnvironment));
-  if (!Mapping)
-    return std::nullopt;
-  return Mapping->mapIntroducedAvailabilityVersion(Version);
-}
-
-static std::optional<clang::VersionTuple>
-getRemappedDeprecatedObsoletedVersionForFallbackPlatform(
-    const ASTContext &Ctx, const llvm::VersionTuple &Version) {
-  const auto *Mapping = getFallbackVersionMapping(
-      Ctx, clang::DarwinSDKInfo::OSEnvPair(
-               llvm::Triple::IOS, llvm::Triple::UnknownEnvironment,
-               llvm::Triple::XROS, llvm::Triple::UnknownEnvironment));
-  if (!Mapping)
-    return std::nullopt;
-  return Mapping->mapDeprecatedObsoletedAvailabilityVersion(Version);
-}
-
-bool AvailabilityInference::updateIntroducedAvailabilityDomainForFallback(
-    const SemanticAvailableAttr &attr, const ASTContext &ctx,
-    AvailabilityDomain &domain, llvm::VersionTuple &platformVer) {
-  std::optional<llvm::VersionTuple> introducedVersion = attr.getIntroduced();
-  if (!introducedVersion.has_value())
-    return false;
-
-  bool hasRemap = false;
-  auto remappedDomain = attr.getDomain().getRemappedDomain(ctx, hasRemap);
-  if (!hasRemap)
-    return false;
-
-  auto potentiallyRemappedIntroducedVersion =
-      getRemappedIntroducedVersionForFallbackPlatform(ctx, *introducedVersion);
-  if (potentiallyRemappedIntroducedVersion.has_value()) {
-    domain = remappedDomain;
-    platformVer = potentiallyRemappedIntroducedVersion.value();
-    return true;
-  }
-  return false;
-}
-
-bool AvailabilityInference::updateDeprecatedAvailabilityDomainForFallback(
-    const SemanticAvailableAttr &attr, const ASTContext &ctx,
-    AvailabilityDomain &domain, llvm::VersionTuple &platformVer) {
-  std::optional<llvm::VersionTuple> deprecatedVersion = attr.getDeprecated();
-  if (!deprecatedVersion.has_value())
-    return false;
-
-  bool hasRemap = false;
-  auto remappedDomain = attr.getDomain().getRemappedDomain(ctx, hasRemap);
-  if (!hasRemap)
-    return false;
-
-  auto potentiallyRemappedDeprecatedVersion =
-      getRemappedDeprecatedObsoletedVersionForFallbackPlatform(
-          ctx, *deprecatedVersion);
-  if (potentiallyRemappedDeprecatedVersion.has_value()) {
-    domain = remappedDomain;
-    platformVer = potentiallyRemappedDeprecatedVersion.value();
-    return true;
-  }
-  return false;
-}
-
-bool AvailabilityInference::updateObsoletedAvailabilityDomainForFallback(
-    const SemanticAvailableAttr &attr, const ASTContext &ctx,
-    AvailabilityDomain &domain, llvm::VersionTuple &platformVer) {
-  std::optional<llvm::VersionTuple> obsoletedVersion = attr.getObsoleted();
-  if (!obsoletedVersion.has_value())
-    return false;
-
-  bool hasRemap = false;
-  auto remappedDomain = attr.getDomain().getRemappedDomain(ctx, hasRemap);
-  if (!hasRemap)
-    return false;
-
-  auto potentiallyRemappedObsoletedVersion =
-      getRemappedDeprecatedObsoletedVersionForFallbackPlatform(
-          ctx, *obsoletedVersion);
-  if (potentiallyRemappedObsoletedVersion.has_value()) {
-    domain = remappedDomain;
-    platformVer = potentiallyRemappedObsoletedVersion.value();
-    return true;
-  }
-  return false;
-}
-
-bool AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
-    const BackDeployedAttr *attr, const ASTContext &ctx,
-    AvailabilityDomain &domain, llvm::VersionTuple &platformVer) {
-  bool hasRemap = false;
-  auto remappedDomain =
-      attr->getAvailabilityDomain().getRemappedDomain(ctx, hasRemap);
-  if (!hasRemap)
-    return false;
-
-  auto beforeVersion = attr->getVersion();
-  auto potentiallyRemappedIntroducedVersion =
-      getRemappedIntroducedVersionForFallbackPlatform(ctx, beforeVersion);
-  if (potentiallyRemappedIntroducedVersion.has_value()) {
-    domain = remappedDomain;
-    platformVer = potentiallyRemappedIntroducedVersion.value();
-    return true;
-  }
-  return false;
 }
 
 static std::optional<SemanticAvailableAttr>
@@ -856,8 +732,21 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
     return std::nullopt;
   }
 
-  if (domain->isSwiftLanguageMode() || domain->isPackageDescription() ||
-      domain->isSwiftRuntime()) {
+  // Diagnose unsupported unconditional availability (deprecated, unavailable,
+  // noasync).
+  switch (domain->getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::Custom:
+    break;
+
+  case AvailabilityDomain::Kind::Platform:
+    // FIXME: [runtime availability] Diagnose Swift runtime platform, too.
+    break;
+
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+  case AvailabilityDomain::Kind::PackageDescription:
     switch (attr->getKind()) {
     case AvailableAttr::Kind::Deprecated:
       diags.diagnose(attrLoc,
@@ -878,6 +767,7 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
     case AvailableAttr::Kind::Default:
       break;
     }
+    break;
   }
 
   if (!hasVersionSpec && domain->isVersioned()) {
@@ -905,40 +795,31 @@ std::optional<llvm::VersionTuple> SemanticAvailableAttr::getIntroduced() const {
 std::optional<AvailabilityDomainAndRange>
 SemanticAvailableAttr::getIntroducedDomainAndRange(
     const ASTContext &Ctx) const {
-  auto *attr = getParsedAttr();
   auto domain = getDomain();
-
   if (domain.isUniversal())
     return std::nullopt;
 
-  if (!attr->getRawIntroduced().has_value()) {
-    // For versioned domains, an "introduced:" version is always required to
-    // indicate introduction.
-    if (domain.isVersioned())
-      return std::nullopt;
+  if (auto introduced = getIntroduced())
+    return domain.getRemappedDomainAndRange(
+        *introduced, AvailabilityVersionKind::Introduced, Ctx);
 
-    // For version-less domains, an attribute that does not indicate some other
-    // kind of unconditional availability constraint implicitly specifies that
-    // the decl is available in all versions of the domain.
-    switch (attr->getKind()) {
-    case AvailableAttr::Kind::Default:
-      return AvailabilityDomainAndRange(domain.getRemappedDomain(Ctx),
-                                        AvailabilityRange::alwaysAvailable());
-    case AvailableAttr::Kind::Deprecated:
-    case AvailableAttr::Kind::Unavailable:
-    case AvailableAttr::Kind::NoAsync:
-      return std::nullopt;
-    }
+  // For versioned domains, an "introduced:" version is always required to
+  // indicate introduction.
+  if (domain.isVersioned())
+    return std::nullopt;
+
+  // For version-less domains, an attribute that does not indicate some other
+  // kind of unconditional availability constraint implicitly specifies that
+  // the decl is available in all versions of the domain.
+  switch (attr->getKind()) {
+  case AvailableAttr::Kind::Default:
+    return AvailabilityDomainAndRange(domain.getRemappedDomain(Ctx),
+                                      AvailabilityRange::alwaysAvailable());
+  case AvailableAttr::Kind::Deprecated:
+  case AvailableAttr::Kind::Unavailable:
+  case AvailableAttr::Kind::NoAsync:
+    return std::nullopt;
   }
-
-  llvm::VersionTuple introducedVersion = getIntroduced().value();
-  llvm::VersionTuple remappedVersion;
-  if (AvailabilityInference::updateIntroducedAvailabilityDomainForFallback(
-          *this, Ctx, domain, remappedVersion))
-    introducedVersion = remappedVersion;
-
-  return AvailabilityDomainAndRange(domain,
-                                    AvailabilityRange{introducedVersion});
 }
 
 std::optional<llvm::VersionTuple> SemanticAvailableAttr::getDeprecated() const {
@@ -950,28 +831,18 @@ std::optional<llvm::VersionTuple> SemanticAvailableAttr::getDeprecated() const {
 std::optional<AvailabilityDomainAndRange>
 SemanticAvailableAttr::getDeprecatedDomainAndRange(
     const ASTContext &Ctx) const {
-  auto *attr = getParsedAttr();
-  AvailabilityDomain domain = getDomain();
+  if (auto deprecated = getDeprecated())
+    return getDomain().getRemappedDomainAndRange(
+        *deprecated, AvailabilityVersionKind::Deprecated, Ctx);
 
-  if (!attr->getRawDeprecated().has_value()) {
-    // Regardless of the whether the domain supports versions or not, an
-    // unconditional deprecation attribute indicates the decl is always
-    // deprecated.
-    if (isUnconditionallyDeprecated())
-      return AvailabilityDomainAndRange(domain.getRemappedDomain(Ctx),
-                                        AvailabilityRange::alwaysAvailable());
+  // Regardless of the whether the domain supports versions or not, an
+  // unconditional deprecation attribute indicates the decl is always
+  // deprecated.
+  if (isUnconditionallyDeprecated())
+    return AvailabilityDomainAndRange(getDomain().getRemappedDomain(Ctx),
+                                      AvailabilityRange::alwaysAvailable());
 
-    return std::nullopt;
-  }
-
-  llvm::VersionTuple deprecatedVersion = getDeprecated().value();
-  llvm::VersionTuple remappedVersion;
-  if (AvailabilityInference::updateDeprecatedAvailabilityDomainForFallback(
-          *this, Ctx, domain, remappedVersion))
-    deprecatedVersion = remappedVersion;
-
-  return AvailabilityDomainAndRange(domain,
-                                    AvailabilityRange{deprecatedVersion});
+  return std::nullopt;
 }
 
 std::optional<llvm::VersionTuple> SemanticAvailableAttr::getObsoleted() const {
@@ -982,26 +853,16 @@ std::optional<llvm::VersionTuple> SemanticAvailableAttr::getObsoleted() const {
 
 std::optional<AvailabilityDomainAndRange>
 SemanticAvailableAttr::getObsoletedDomainAndRange(const ASTContext &Ctx) const {
-  auto *attr = getParsedAttr();
-  AvailabilityDomain domain = getDomain();
+  if (auto obsoleted = getObsoleted())
+    return getDomain().getRemappedDomainAndRange(
+        *obsoleted, AvailabilityVersionKind::Obsoleted, Ctx);
 
-  if (!attr->getRawObsoleted().has_value()) {
-    // An "unavailable" attribute effectively means obsolete in all versions.
-    if (attr->isUnconditionallyUnavailable())
-      return AvailabilityDomainAndRange(domain.getRemappedDomain(Ctx),
-                                        AvailabilityRange::alwaysAvailable());
+  // An "unavailable" attribute effectively means obsolete in all versions.
+  if (isUnconditionallyUnavailable())
+    return AvailabilityDomainAndRange(getDomain().getRemappedDomain(Ctx),
+                                      AvailabilityRange::alwaysAvailable());
 
-    return std::nullopt;
-  }
-
-  llvm::VersionTuple obsoletedVersion = getObsoleted().value();
-  llvm::VersionTuple remappedVersion;
-  if (AvailabilityInference::updateObsoletedAvailabilityDomainForFallback(
-          *this, Ctx, domain, remappedVersion))
-    obsoletedVersion = remappedVersion;
-
-  return AvailabilityDomainAndRange(domain,
-                                    AvailabilityRange{obsoletedVersion});
+  return std::nullopt;
 }
 
 namespace {

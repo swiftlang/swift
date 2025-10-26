@@ -150,7 +150,10 @@ bool swift::tripleRequiresRPathForSwiftLibrariesInOS(
 }
 
 bool swift::tripleBTCFIByDefaultInOpenBSD(const llvm::Triple &triple) {
-  return triple.isOSOpenBSD() && triple.getArch() == llvm::Triple::aarch64;
+  return triple.isOSOpenBSD() && (
+     triple.getArch() == llvm::Triple::aarch64 ||
+     triple.getArch() == llvm::Triple::x86_64);
+
 }
 
 DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
@@ -301,6 +304,8 @@ llvm::VersionTuple swift::getVersionForTriple(const llvm::Triple &triple) {
     return triple.getOSVersion();
   } else if (triple.isOSWindows()) {
     return triple.getOSVersion();
+  } else if (triple.isAndroid()) {
+    return triple.getEnvironmentVersion();
   }
   return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
 }

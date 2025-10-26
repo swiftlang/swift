@@ -801,6 +801,9 @@ public:
   // Swift._stdlib_isOSVersionAtLeastOrVariantVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastOrVariantVersionAtLeast() const;
 
+  /// Retrieve the declaration of Swift._isSwiftRuntimeVersionAtLeast.
+  FuncDecl *getIsSwiftRuntimeVersionAtLeast() const;
+
   /// Look for the declaration with the given name within the
   /// passed in module.
   void lookupInModule(ModuleDecl *M, StringRef name,
@@ -1071,6 +1074,9 @@ public:
   /// Does any proper bookkeeping to keep all module loaders up to date as well.
   void addSearchPath(StringRef searchPath, bool isFramework, bool isSystem);
 
+  /// Adds the path to the explicitly built module \c name.
+  void addExplicitModulePath(StringRef name, std::string path);
+
   /// Adds a module loader to this AST context.
   ///
   /// \param loader The new module loader, which will be added after any
@@ -1084,7 +1090,7 @@ public:
   ///                interface.
   void addModuleLoader(std::unique_ptr<ModuleLoader> loader,
                        bool isClang = false, bool isDWARF = false,
-                       bool IsInterface = false);
+                       bool IsInterface = false, bool IsExplicit = false);
 
   /// Add a module interface checker to use for this AST context.
   void addModuleInterfaceChecker(std::unique_ptr<ModuleInterfaceChecker> checker);

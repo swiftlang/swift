@@ -323,9 +323,6 @@ EXPERIMENTAL_FEATURE(FullTypedThrows, false)
 EXPERIMENTAL_FEATURE(SameElementRequirements, false)
 EXPERIMENTAL_FEATURE(KeyPathWithMethodMembers, false)
 
-// Whether to enable @_used and @_section attributes
-EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
-
 // Whether to emit an Embedded Swift module with "deferred" code generation,
 // meaning that the only code that will be emitted into the object file is
 // code that was marked as "never emit into client". For everything else,
@@ -452,7 +449,9 @@ EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
-/// Enable the `@_manualOwnership` attribute.
+/// Enable the ManualOwnership diagnostic groups:
+///   * -Wwarning SemanticCopies
+///   * -Wwarning DynamicExclusivity
 EXPERIMENTAL_FEATURE(ManualOwnership, false)
 
 /// Enable the @extractConstantsFromMembers attribute.
@@ -498,10 +497,9 @@ EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 /// Import inherited non-public members when importing C++ classes.
 EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 
-/// Emit a warning when a C++ API returns a SWIFT_SHARED_REFERENCE type
-/// without being explicitly annotated with either SWIFT_RETURNS_RETAINED
-/// or SWIFT_RETURNS_UNRETAINED.
-EXPERIMENTAL_FEATURE(WarnUnannotatedReturnOfCxxFrt, true)
+/// Suppress the synthesis of static factory methods for C++ foreign reference
+/// types and importing them as Swift initializers.
+EXPERIMENTAL_FEATURE(SuppressCXXForeignReferenceTypeInitializers, true)
 
 /// modify/read single-yield coroutines
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
@@ -555,8 +553,15 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(InlineAlways, false)
 /// Allow use of 'Swift' (Swift runtime version) in @available attributes
 EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
 
+/// 'Swift' availability is always standalone, even when targeting platforms
+/// that have a built-in Swift runtime. Implies 'SwiftRuntimeAvailability'.
+EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
+
 /// Allow use of `~Sendable`.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TildeSendable, false)
+
+/// Allow use of protocol typed values in Embedded mode (`Any` and friends)
+EXPERIMENTAL_FEATURE(EmbeddedExistentials, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

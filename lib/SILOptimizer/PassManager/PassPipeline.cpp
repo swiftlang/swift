@@ -459,12 +459,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     P.addDestroyAddrHoisting();
   }
 
-  // Propagate copies through stack locations.  Should run after
-  // box-to-stack promotion since it is limited to propagating through
-  // stack locations. Should run before aggregate lowering since that
-  // splits up copy_addr.
-  P.addCopyForwarding();
-
   // This DCE pass is the only DCE on ownership SIL. It can cleanup OSSA related
   // dead code, e.g. left behind by the ObjCBridgingOptimization.
   P.addDCE();

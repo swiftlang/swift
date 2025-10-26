@@ -5024,7 +5024,7 @@ public:
   TRIVIAL_ATTR_PRINTER(NoLocks, no_locks)
   TRIVIAL_ATTR_PRINTER(NoMetadata, no_metadata)
   TRIVIAL_ATTR_PRINTER(NoObjCBridging, no_objc_bridging)
-  TRIVIAL_ATTR_PRINTER(ManualOwnership, manual_ownership)
+  TRIVIAL_ATTR_PRINTER(NoManualOwnership, no_manual_ownership)
   TRIVIAL_ATTR_PRINTER(NoRuntime, no_runtime)
   TRIVIAL_ATTR_PRINTER(NonEphemeral, non_ephemeral)
   TRIVIAL_ATTR_PRINTER(NonEscapable, non_escapable)
@@ -5172,12 +5172,8 @@ public:
     } else if (isTypeChecked()) {
       // If the type is null, it might be a macro reference. Try that if we're
       // dumping the fully type-checked AST.
-      auto macroRef =
-          evaluateOrDefault(const_cast<ASTContext *>(Ctx)->evaluator,
-                            ResolveMacroRequest{Attr, DC}, ConcreteDeclRef());
-      if (macroRef) {
+      if (auto macroRef = Attr->getResolvedMacro())
         printDeclRefField(macroRef, Label::always("macro"));
-      }
     }
     if (!Writer.isParsable()) {
       // The type has the semantic information we want for parsable outputs, so
@@ -6118,6 +6114,7 @@ namespace {
     TRIVIAL_TYPE_PRINTER(BuiltinRawUnsafeContinuation, builtin_raw_unsafe_continuation)
     TRIVIAL_TYPE_PRINTER(BuiltinNativeObject, builtin_native_object)
     TRIVIAL_TYPE_PRINTER(BuiltinBridgeObject, builtin_bridge_object)
+    TRIVIAL_TYPE_PRINTER(BuiltinImplicitActor, builtin_implicit_isolated_actor)
     TRIVIAL_TYPE_PRINTER(BuiltinUnsafeValueBuffer, builtin_unsafe_value_buffer)
     TRIVIAL_TYPE_PRINTER(SILToken, sil_token)
 

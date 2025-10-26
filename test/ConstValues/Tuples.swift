@@ -11,4 +11,4 @@
 @const let constGlobal5: (Int, Float) = (42, 42.0)
 
 // Closure call not supported in syntactically-validated mode
-@const let constGlobal7: (UInt64, StaticString, @convention(c) ()->Int) = (42, "hi", { return 42 }) // expected-error {{not supported in a '@const' expression}}
+@const let constGlobal7: (UInt64, StaticString, @convention(c) ()->Int) = (42, "hi", { return 42 }) // expected-error {{not supported in a constant expression}}

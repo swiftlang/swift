@@ -651,6 +651,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         isa<LoadBorrowInst>(searchValue) || isa<BeginAccessInst>(searchValue) ||
         isa<MarkUnresolvedNonCopyableValueInst>(searchValue) ||
         isa<ProjectBoxInst>(searchValue) || isa<CopyValueInst>(searchValue) ||
+        isa<ExplicitCopyValueInst>(searchValue) ||
         isa<ConvertFunctionInst>(searchValue) ||
         isa<MarkUninitializedInst>(searchValue) ||
         isa<MarkDependenceInst>(searchValue) ||

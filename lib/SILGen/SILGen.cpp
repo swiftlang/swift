@@ -1368,15 +1368,15 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
   //
   // If ManualOwnership ends up subsuming those prior mechanisms for an
   // explicit-copy mode, we can move this somewhere else, like postEmitFunction.
-  if (auto *ace = constant.getAbstractClosureExpr()) {
-    if (auto *dc = ace->getOutermostFunctionContext()) {
-      if (auto *decl = dc->getAsDecl()) {
-        if (decl->getAttrs().hasAttribute<ManualOwnershipAttr>()) {
-          F->setPerfConstraints(PerformanceConstraints::ManualOwnership);
-        }
-      }
-    }
-  }
+  //
+  // FIXME: maybe this should happen in SILFunctionBuilder::getOrCreateFunction
+  if (getASTContext().LangOpts.hasFeature(Feature::ManualOwnership))
+    if (auto *ace = constant.getAbstractClosureExpr())
+      if (auto *dc = ace->getOutermostFunctionContext())
+        if (auto *decl = dc->getAsDecl())
+          if (!decl->isImplicit() &&
+              !decl->getAttrs().hasAttribute<NoManualOwnershipAttr>())
+            F->setPerfConstraints(PerformanceConstraints::ManualOwnership);
 
   LLVM_DEBUG(llvm::dbgs() << "lowering ";
              F->printName(llvm::dbgs());
@@ -1409,7 +1409,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 
 void SILGenModule::emitDifferentiabilityWitnessesForFunction(
     SILDeclRef constant, SILFunction *F) {
-  // Visit `@derivative` attributes and generate SIL differentiability
+  // Visit `@differentiable` attributes and generate SIL differentiability
   // witnesses.
   // Skip if the SILDeclRef is a:
   // - Default argument generator function.
@@ -1438,33 +1438,6 @@ void SILGenModule::emitDifferentiabilityWitnessesForFunction(
       emitDifferentiabilityWitness(AFD, F, DifferentiabilityKind::Reverse,
                                    config, /*jvp*/ nullptr,
                                    /*vjp*/ nullptr, diffAttr);
-    }
-    for (auto *derivAttr : Attrs.getAttributes<DerivativeAttr>()) {
-      SILFunction *jvp = nullptr;
-      SILFunction *vjp = nullptr;
-      switch (derivAttr->getDerivativeKind()) {
-      case AutoDiffDerivativeFunctionKind::JVP:
-        jvp = F;
-        break;
-      case AutoDiffDerivativeFunctionKind::VJP:
-        vjp = F;
-        break;
-      }
-      auto *origAFD = derivAttr->getOriginalFunction(getASTContext());
-      auto origDeclRef =
-          SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
-      auto *origFn = getFunction(origDeclRef, NotForDefinition);
-      auto witnessGenSig =
-          autodiff::getDifferentiabilityWitnessGenericSignature(
-              origAFD->getGenericSignature(), AFD->getGenericSignature());
-      auto *resultIndices =
-        autodiff::getFunctionSemanticResultIndices(origAFD,
-                                                   derivAttr->getParameterIndices());
-      AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
-                            witnessGenSig);
-      emitDifferentiabilityWitness(origAFD, origFn,
-                                   DifferentiabilityKind::Reverse, config, jvp,
-                                   vjp, derivAttr);
     }
   };
   if (auto *accessor = dyn_cast<AccessorDecl>(AFD))
@@ -1559,10 +1532,12 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
   // If the declaration is exported as a C function, emit its native-to-foreign
   // thunk too, if it wasn't already forced.
-  if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
-    auto thunk = SILDeclRef(AFD).asForeign();
-    if (!hasFunction(thunk))
-      emitNativeToForeignThunk(thunk);
+  if (auto cdeclAttr = AFD->getAttrs().getAttribute<CDeclAttr>()) {
+    if (cdeclAttr->Underscored) {
+      auto thunk = SILDeclRef(AFD).asForeign();
+      if (!hasFunction(thunk))
+        emitNativeToForeignThunk(thunk);
+    }
   }
 
   emitDistributedThunkForDecl(AFD);
@@ -1580,6 +1555,43 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
         SILDeclRef::BackDeploymentKind::Thunk);
     emitBackDeploymentThunk(thunk);
   }
+
+  // Emit differentiability witness for the function referenced in
+  // @derivative(of:) attribute registering current function as VJP / JVP.
+  // Differentiability witnesses for a function could originate either from its
+  // @differentiable attribute or from explicit @derivative(of:) attribute on
+  // the derivative. In the latter case the derivative itself might not be
+  // emitted, while original function is (e.g. original function is @inlineable,
+  // but derivative is @usableFromInline). Ensure the differentiability witness
+  // originating from @derivative(of:) is emitted even if we're not going to
+  // emit body of the derivative.
+  for (auto *derivAttr : AFD->getAttrs().getAttributes<DerivativeAttr>()) {
+      auto *f = getFunction(SILDeclRef(AFD), NotForDefinition);
+      SILFunction *jvp = nullptr, *vjp = nullptr;
+      switch (derivAttr->getDerivativeKind()) {
+      case AutoDiffDerivativeFunctionKind::JVP:
+        jvp = f;
+        break;
+      case AutoDiffDerivativeFunctionKind::VJP:
+        vjp = f;
+        break;
+      }
+      auto *origAFD = derivAttr->getOriginalFunction(getASTContext());
+      auto origDeclRef =
+          SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
+      auto *origFn = getFunction(origDeclRef, NotForDefinition);
+      auto witnessGenSig =
+          autodiff::getDifferentiabilityWitnessGenericSignature(
+              origAFD->getGenericSignature(), AFD->getGenericSignature());
+      auto *resultIndices =
+        autodiff::getFunctionSemanticResultIndices(origAFD,
+                                                   derivAttr->getParameterIndices());
+      AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
+                            witnessGenSig);
+      emitDifferentiabilityWitness(origAFD, origFn,
+                                   DifferentiabilityKind::Reverse, config, jvp,
+                                   vjp, derivAttr);
+    }
 }
 
 void SILGenModule::emitFunction(FuncDecl *fd) {
@@ -1591,7 +1603,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
 
   if (shouldEmitFunctionBody(fd)) {
     Types.setCaptureTypeExpansionContext(SILDeclRef(fd), M);
-    emitOrDelayFunction(SILDeclRef(decl));
+    emitOrDelayFunction(SILDeclRef(decl, fd->hasOnlyCEntryPoint()));
   }
 }
 

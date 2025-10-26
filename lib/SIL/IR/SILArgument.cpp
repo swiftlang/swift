@@ -87,6 +87,8 @@ SILParameterInfo SILFunctionArgument::getKnownParameterInfo() const {
   return getFunction()->getConventions().getParamInfoForSILArg(getIndex());
 }
 
+/// WARNING: Do not use this from SILGen!
+/// Use methods such as `isSILIndirect` or query the ParameterInfo instead.
 SILArgumentConvention
 SILFunctionConventions::getSILArgumentConvention(unsigned index) const {
   assert(index < getNumSILArguments());
@@ -315,6 +317,7 @@ getSingleTerminatorOperandForPred(const SILBasicBlock *parentBlock,
   switch (predTermInst->getTermKind()) {
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
+  case TermKind::ReturnBorrowInst:
   case TermKind::ThrowInst:
   case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
@@ -441,4 +444,11 @@ bool SILFunctionArgument::isSending() const {
   if (isIndirectResult())
     return getFunction()->getLoweredFunctionType()->hasSendingResult();
   return getKnownParameterInfo().hasOption(SILParameterInfo::Sending);
+}
+
+bool SILFunctionArgument::isInOutSending() const {
+  // Make sure that we are sending, not an indirect result (since indirect
+  // results can be sending) and have an inout convention.
+  return isSending() && !isIndirectResult() &&
+         getArgumentConvention().isInoutConvention();
 }

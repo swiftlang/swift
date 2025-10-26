@@ -2160,6 +2160,11 @@ public:
           << "@" << UOCI->getConversionOwnershipKind();
   }
 
+  void visitImplicitActorToOpaqueIsolationCastInst(
+      ImplicitActorToOpaqueIsolationCastInst *inst) {
+    *this << getIDAndType(inst->getValue());
+  }
+
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
     *this << getIDAndType(CI->getOperand()) << " to ";
     if (CI->withoutActuallyEscaping())
@@ -2359,6 +2364,10 @@ public:
       *this << "[guaranteed] ";
       break;
     }
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitUncheckedOwnershipInst(UncheckedOwnershipInst *I) {
     *this << getIDAndType(I->getOperand());
   }
 
@@ -2900,6 +2909,21 @@ public:
 
   void visitReturnInst(ReturnInst *RI) {
     *this << getIDAndType(RI->getOperand());
+  }
+
+  void visitReturnBorrowInst(ReturnBorrowInst *rbi) {
+    *this << getIDAndType(rbi->getReturnValue());
+
+    *this << " from_scopes (";
+    bool first = true;
+    for (SILValue ev : rbi->getEnclosingValues()) {
+      if (!first) {
+        *this << ", ";
+      }
+      first = false;
+      *this << getIDAndType(ev);
+    }
+    *this << ")";
   }
 
   void visitSpecifyTestInst(SpecifyTestInst *TSI) {
@@ -3709,6 +3733,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (!section().empty())
     OS << "[section \"" << section() << "\"] ";
 
+  if (!asmName().empty())
+    OS << "[asmname \"" << asmName() << "\"] ";
+
   // TODO: Handle clang node owners which don't have a name.
   if (hasClangNode() && getClangNodeOwner()->hasName()) {
     OS << "[clang ";
@@ -3776,6 +3803,12 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
 
   if (markedAsUsed())
     OS << "[used] ";
+
+  if (!asmName().empty())
+    OS << "[asmname \"" << asmName() << "\"] ";
+
+  if (!section().empty())
+    OS << "[section \"" << section() << "\"] ";
 
   printName(OS);
   OS << " : " << LoweredType;

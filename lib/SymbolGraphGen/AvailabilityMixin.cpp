@@ -60,6 +60,8 @@ StringRef getDomain(const SemanticAvailableAttr &AvAttr) {
       return { "OpenBSD" };
     case swift::PlatformKind::Windows:
       return { "Windows" };
+    case swift::PlatformKind::Android:
+      return { "Android" };
     case swift::PlatformKind::none:
       return { "*" };
   }

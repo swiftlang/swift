@@ -33,7 +33,7 @@ static FuncDecl *synthesizeExit(ASTContext &ctx, ModuleDecl *moduleDecl) {
       DeclName(ctx, DeclBaseName(ctx.getIdentifier("exit")), params), {},
       /*async*/ false, /*throws*/ false, /*thrownType*/ Type(), {}, params,
       ctx.getNeverType(), moduleDecl);
-  exitFuncDecl->getAttrs().add(new (ctx) ExternAttr(
+  exitFuncDecl->addAttribute(new (ctx) ExternAttr(
       std::nullopt, std::nullopt, ExternKind::C, /*implicit*/ true));
   return exitFuncDecl;
 }

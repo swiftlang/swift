@@ -97,6 +97,14 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
     return false;
   }
 
+  // Embedded functions can reference non-public decls as they are visible
+  // to clients. Still report references to decls imported non-publicly
+  // to enforce access-level on imports.
+  ImportAccessLevel problematicImport = D->getImportAccessFrom(DC);
+  if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient &&
+      !problematicImport)
+    return false;
+
   DowngradeToWarning downgradeToWarning = DowngradeToWarning::No;
 
   // Swift 4.2 did not perform any checks for type aliases.
@@ -127,7 +135,6 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
   Context.Diags.diagnose(D, diag::resilience_decl_declared_here, D);
 
-  ImportAccessLevel problematicImport = D->getImportAccessFrom(DC);
   if (problematicImport.has_value() &&
       problematicImport->accessLevel < D->getFormalAccess()) {
     Context.Diags.diagnose(problematicImport->importLoc,
@@ -162,7 +169,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
         ModuleDecl *importedVia = attributedImport.module.importedModule,
                    *sourceModule = D->getModuleContext();
         ctx.Diags.diagnose(loc, diag::module_api_import_aliases, D, importedVia,
-                           sourceModule, importedVia == sourceModule);
+                           sourceModule,
+                           importedVia->getTopLevelModule() == sourceModule);
       });
 
   auto ignoredDowngradeToWarning = DowngradeToWarning::No;
@@ -255,6 +263,7 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
   case ExportabilityReason::General:
   case ExportabilityReason::ResultBuilder:
   case ExportabilityReason::PropertyWrapper:
+  case ExportabilityReason::PublicVarDecl:
     return false;
   }
 }
@@ -283,7 +292,8 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
           ModuleDecl *importedVia = attributedImport.module.importedModule,
                      *sourceModule = D->getModuleContext();
           ctx.Diags.diagnose(loc, diag::module_api_import, D, importedVia,
-                             sourceModule, importedVia == sourceModule,
+                             sourceModule,
+                             importedVia->getTopLevelModule() == sourceModule,
                              /*isImplicit*/ false);
         }
       });
@@ -426,7 +436,7 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
         ctx.Diags.diagnose(loc, diag::module_api_import_conformance,
                            rootConf->getType(), rootConf->getProtocol(),
                            importedVia, sourceModule,
-                           importedVia == sourceModule);
+                           importedVia->getTopLevelModule() == sourceModule);
       });
 
   auto originKind = getDisallowedOriginKind(ext, where);

@@ -471,7 +471,7 @@ bb0:
   // def
   %def = apply %f() : $@convention(thin) () -> @owned AnyObject
   %copy = copy_value %def : $AnyObject
-  %access = begin_access [read] [dynamic] %adr : $*AnyObject
+  %access = begin_access [modify] [dynamic] %adr : $*AnyObject
   // use
   store %def to [init] %adr : $*AnyObject
   %obj = load [copy] %access : $*AnyObject
@@ -519,7 +519,7 @@ bb0:
   // def
   %def = apply %f() : $@convention(thin) () -> @owned AnyObject
   %copy = copy_value %def : $AnyObject
-  %access = begin_access [read] [dynamic] %adr : $*AnyObject
+  %access = begin_access [modify] [dynamic] %adr : $*AnyObject
   // use
   store %def to [init] %adr : $*AnyObject
   br bb1
@@ -561,7 +561,7 @@ sil [ossa] @testFullOverlapInDefBlock : $@convention(thin) () -> () {
 bb0:
   %box = alloc_box ${ var AnyObject }, var, name "x"
   %adr = project_box %box : ${ var AnyObject }, 0
-  %access = begin_access [read] [dynamic] %adr : $*AnyObject
+  %access = begin_access [modify] [dynamic] %adr : $*AnyObject
   %f = function_ref @getObject : $@convention(thin) () -> @owned AnyObject
   // def
   %def = apply %f() : $@convention(thin) () -> @owned AnyObject
@@ -609,7 +609,7 @@ sil [ossa] @testFullOverlapBeforeDefBlock : $@convention(thin) () -> () {
 bb0:
   %box = alloc_box ${ var AnyObject }, var, name "x"
   %adr = project_box %box : ${ var AnyObject }, 0
-  %access = begin_access [read] [dynamic] %adr : $*AnyObject
+  %access = begin_access [modify] [dynamic] %adr : $*AnyObject
   br bb1
 
 bb1:
@@ -657,7 +657,7 @@ bb0:
   // def
   %def = apply %f() : $@convention(thin) () -> @owned AnyObject
   %copy = copy_value %def : $AnyObject
-  %access = begin_access [read] [dynamic] %adr : $*AnyObject
+  %access = begin_access [modify] [dynamic] %adr : $*AnyObject
   // use
   store %def to [init] %adr : $*AnyObject
   destroy_value %copy : $AnyObject
@@ -692,7 +692,7 @@ bb0:
   // def
   %def = apply %f() : $@convention(thin) () -> @owned AnyObject
   %copy = copy_value %def : $AnyObject
-  %access = begin_access [read] [dynamic] %adr : $*AnyObject
+  %access = begin_access [modify] [dynamic] %adr : $*AnyObject
   // use
   store %def to [init] %adr : $*AnyObject
   br bb1

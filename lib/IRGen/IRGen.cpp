@@ -160,6 +160,8 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
   // command-line flags.
   TargetOpts.EmulatedTLS = Clang->getCodeGenOpts().EmulatedTLS;
 
+  TargetOpts.MCOptions.AsmVerbose = Opts.VerboseAsm;
+
   // WebAssembly doesn't support atomics yet, see
   // https://github.com/apple/swift/issues/54533 for more details.
   if (Clang->getTargetInfo().getTriple().isOSBinFormatWasm())
@@ -259,7 +261,6 @@ static std::optional<PGOOptions> buildIRUseOptions(const IRGenOptions &Opts,
       /*CSProfileGenFile=*/"",
       /*ProfileRemappingFile=*/"",
       /*MemoryProfile=*/"",
-      /*FS=*/FS,
       /*Action=*/PGOOptions::IRUse,
       /*CSPGOAction=*/IsCS ? PGOOptions::CSIRUse : PGOOptions::NoCSAction,
       /*ColdType=*/PGOOptions::ColdFuncOpt::Default,
@@ -275,7 +276,6 @@ static void populatePGOOptions(std::optional<PGOOptions> &Out,
       /*CSProfileGenFile=*/ "",
       /*ProfileRemappingFile=*/ "",
       /*MemoryProfile=*/ "",
-      /*FS=*/ llvm::vfs::getRealFileSystem(), // TODO: is this fine?
       /*Action=*/ PGOOptions::SampleUse,
       /*CSPGOAction=*/ PGOOptions::NoCSAction,
       /*ColdType=*/ PGOOptions::ColdFuncOpt::Default,
@@ -291,7 +291,6 @@ static void populatePGOOptions(std::optional<PGOOptions> &Out,
         /*CSProfileGenFile=*/Opts.InstrProfileOutput,
         /*ProfileRemappingFile=*/"",
         /*MemoryProfile=*/"",
-        /*FS=*/llvm::vfs::getRealFileSystem(),
         /*Action=*/hasUse ? PGOOptions::IRUse : PGOOptions::NoAction,
         /*CSPGOAction=*/PGOOptions::CSIRInstr,
         /*ColdType=*/PGOOptions::ColdFuncOpt::Default,
@@ -305,7 +304,6 @@ static void populatePGOOptions(std::optional<PGOOptions> &Out,
         /*CSProfileGenFile=*/"",
         /*ProfileRemappingFile=*/"",
         /*MemoryProfile=*/"",
-        /*FS=*/llvm::vfs::getRealFileSystem(),
         /*Action=*/PGOOptions::IRInstr,
         /*CSPGOAction=*/PGOOptions::NoCSAction,
         /*ColdType=*/PGOOptions::ColdFuncOpt::Default,
@@ -324,7 +322,6 @@ static void populatePGOOptions(std::optional<PGOOptions> &Out,
         /*CSProfileGenFile=*/ "",
         /*ProfileRemappingFile=*/ "",
         /*MemoryProfile=*/ "",
-        /*FS=*/ nullptr,
         /*Action=*/ PGOOptions::NoAction,
         /*CSPGOAction=*/ PGOOptions::NoCSAction,
         /*ColdType=*/ PGOOptions::ColdFuncOpt::Default,
@@ -1096,6 +1093,14 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   opts.CoroDeallocationFunction = PointerAuthSchema(
       codeKey, /*address*/ false, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::CoroDeallocationFunction);
+
+  opts.CoroAllocationFunction = PointerAuthSchema(
+      codeKey, /*address*/ false, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::CoroFrameAllocationFunction);
+
+  opts.CoroDeallocationFunction = PointerAuthSchema(
+      codeKey, /*address*/ false, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::CoroFrameDeallocationFunction);
 }
 
 std::unique_ptr<llvm::TargetMachine>

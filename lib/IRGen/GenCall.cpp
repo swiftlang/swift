@@ -592,9 +592,8 @@ namespace {
     /// function type.
     void expandCoroutineContinuationType();
 
-    /// Initializes the result type for functions with @guaranteed_addr return
-    /// convention.
-    void expandGuaranteedAddressResult();
+    /// Initializes the result type for borrow and mutate accessors.
+    void expandAddressResult();
 
     // Expand the components for the async continuation entrypoint of the
     // function type (the function to be called on returning).
@@ -699,8 +698,8 @@ void SignatureExpansion::expandResult(
 
   auto fnConv = getSILFuncConventions();
 
-  if (fnConv.hasGuaranteedAddressResult()) {
-    return expandGuaranteedAddressResult();
+  if (fnConv.hasAddressResult()) {
+    return expandAddressResult();
   }
 
   // Disable the use of sret if we have multiple indirect results.
@@ -920,7 +919,7 @@ void SignatureExpansion::expandCoroutineContinuationParameters() {
   }
 }
 
-void SignatureExpansion::expandGuaranteedAddressResult() {
+void SignatureExpansion::expandAddressResult() {
   CanUseSRet = false;
   ResultIRType = IGM.PtrTy;
 }
@@ -3959,7 +3958,7 @@ void CallEmission::emitYieldsToExplosion(Explosion &out) {
   }
 }
 
-void CallEmission::emitGuaranteedAddressToExplosion(Explosion &out) {
+void CallEmission::emitAddressResultToExplosion(Explosion &out) {
   auto call = emitCallSite();
   out.add(call);
 }
@@ -3980,10 +3979,10 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
   SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
                                 IGF.getSILModule());
 
-  if (fnConv.hasGuaranteedAddressResult()) {
+  if (fnConv.hasAddressResult()) {
     assert(LastArgWritten == 0 &&
-           "@guaranteed_addr along with indirect result?");
-    emitGuaranteedAddressToExplosion(out);
+           "@guaranteed_address/@inout along with indirect result?");
+    emitAddressResultToExplosion(out);
     return;
   }
 
@@ -5178,10 +5177,12 @@ void irgen::emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,
   IGF.setCoroutineAllocator(allocator);
   auto allocFn = IGF.IGM.getOpaquePtr(getCoroAllocFn(IGF.IGM));
   auto deallocFn = IGF.IGM.getOpaquePtr(getCoroDeallocFn(IGF.IGM));
+  auto allocFrameFn = IGF.IGM.getOpaquePtr(getCoroAllocFrameFn(IGF.IGM));
+  auto deallocFrameFn = IGF.IGM.getOpaquePtr(getCoroDeallocFrameFn(IGF.IGM));
   emitRetconCoroutineEntry(
       IGF, fnType, buffer, llvm::Intrinsic::coro_id_retcon_once_dynamic,
       Size(-1) /*dynamic-to-IRGen size*/, IGF.IGM.getCoroStaticFrameAlignment(),
-      {cfp, allocator}, allocFn, deallocFn, {});
+      {cfp, allocator}, allocFn, deallocFn, {allocFrameFn, deallocFrameFn});
 }
 void irgen::emitYieldOnce2CoroutineEntry(
     IRGenFunction &IGF, LinkEntity coroFunction, CanSILFunctionType fnType,
@@ -5267,9 +5268,10 @@ StackAddress irgen::emitAllocCoroStaticFrame(IRGenFunction &IGF,
   // TODO: Avoid swift_task_alloc (async) and malloc (yield_once) if the
   //       suspension doesn't span an apply of an async function or a yield
   //       respectively.
-  auto retval =
-      IGF.emitDynamicAlloca(IGF.IGM.Int8Ty, size, Alignment(MaximumAlignment),
-                            /*allowTaskAlloc*/ true, "caller-coro-frame");
+  auto retval = IGF.emitDynamicAlloca(
+      IGF.IGM.Int8Ty, size, Alignment(MaximumAlignment), AllowsTaskAlloc,
+      IsForCalleeCoroutineFrame_t(IGF.isCalleeAllocatedCoroutine()),
+      "callee-coro-frame");
   IGF.Builder.CreateLifetimeStart(retval.getAddress(),
                                   Size(-1) /*dynamic size*/);
   return retval;
@@ -5277,7 +5279,8 @@ StackAddress irgen::emitAllocCoroStaticFrame(IRGenFunction &IGF,
 void irgen::emitDeallocCoroStaticFrame(IRGenFunction &IGF, StackAddress frame) {
   IGF.Builder.CreateLifetimeEnd(frame.getAddress(), Size(-1) /*dynamic size*/);
   IGF.emitDeallocateDynamicAlloca(frame, /*allowTaskAlloc*/ true,
-                                  /*useTaskDeallocThrough*/ true);
+                                  /*useTaskDeallocThrough*/ true,
+                                  /*forCalleeCoroutineFrame*/ true);
 }
 
 llvm::Value *irgen::emitYield(IRGenFunction &IGF,
@@ -6832,9 +6835,9 @@ void irgen::emitYieldOnceCoroutineResult(IRGenFunction &IGF, Explosion &result,
   }
 }
 
-void irgen::emitGuaranteedAddressResult(IRGenFunction &IGF, Explosion &result,
-                                        SILType funcResultType,
-                                        SILType returnResultType) {
+void irgen::emitAddressResult(IRGenFunction &IGF, Explosion &result,
+                              SILType funcResultType,
+                              SILType returnResultType) {
   assert(funcResultType == returnResultType);
   assert(funcResultType.isAddress());
   auto &Builder = IGF.Builder;

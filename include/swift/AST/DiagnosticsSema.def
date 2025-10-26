@@ -826,29 +826,29 @@ ERROR(expect_compile_time_literal,none,
       "expect a compile-time constant literal", ())
 
 ERROR(const_unsupported_enum_associated_value,none,
-      "enums with associated values not supported in a '@const' expression", ())
+      "enums with associated values not supported in a constant expression", ())
 ERROR(const_unsupported_operator,none,
-      "unsupported operator in a '@const' expression", ())
+      "unsupported operator in a constant expression", ())
 ERROR(const_unsupported_type,none,
-      "unsupported type in a '@const' expression", ())
+      "unsupported type in a constant expression", ())
 ERROR(const_unsupported_type_expr,none,
-      "type expressions not supported in a '@const' expression", ())
+      "type expressions not supported in a constant expression", ())
 ERROR(const_unsupported_closure,none,
-      "closures not supported in a '@const' expression", ())
+      "closures not supported in a constant expression", ())
 ERROR(const_unsupported_keypath,none,
-      "keypaths not supported in a '@const' expression", ())
+      "keypaths not supported in a constant expression", ())
 ERROR(const_opaque_decl_ref,none,
-      "unable to resolve variable reference in a '@const' expression", ())
+      "unable to resolve variable reference in a constant expression", ())
 ERROR(const_opaque_func_decl_ref,none,
-      "unable to resolve function reference in a '@const' expression", ())
+      "unable to resolve function reference in a constant expression", ())
 ERROR(const_non_convention_c_conversion,none,
-      "only 'convention(c)' function values are supported in a '@const' expression", ())
+      "only 'convention(c)' function values are supported in a constant expression", ())
 ERROR(const_opaque_callee,none,
-      "unable to resolve callee in a '@const' expression", ())
+      "unable to resolve callee in a constant expression", ())
 ERROR(const_non_const_param,none,
-      "reference to a non-'@const' parameter in a '@const' expression", ())
+      "reference to a non-'@const' parameter in a constant expression", ())
 ERROR(const_unknown_default,none,
-      "not supported in a '@const' expression", ())
+      "not supported in a constant expression", ())
 
 //------------------------------------------------------------------------------
 // MARK: Import Resolution
@@ -1798,8 +1798,15 @@ ERROR(mutating_invalid_classes,none, "%0 is not valid on %kindonly1s in "
 ERROR(functions_mutating_and_not,none,
       "method must not be declared both %0 and %1",
       (SelfAccessKind, SelfAccessKind))
+
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
+
+ERROR(consuming_invalid_borrow_mutate_accessor, none,
+      "%0 cannot be declared consuming", (StringRef))
+
+ERROR(ownership_modifier_unsupported_borrow_mutate_accessor, none,
+      "%0 ownership modifier is not yet supported on %1", (StringRef, StringRef))
 
 ERROR(readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,none,
       "%0 cannot be %1 when "
@@ -2097,11 +2104,9 @@ ERROR(cdecl_feature_required,none,
       "'@c' requires '-enable-experimental-feature CDecl'",
       ())
 
-// @_used and @_section
-ERROR(section_linkage_markers_disabled,none,
-      "attribute requires '-enable-experimental-feature SymbolLinkageMarkers'", ())
+// @used and @section
 ERROR(section_empty_name,none,
-      "'@_section' section name cannot be empty", ())
+      "'@section' section name cannot be empty", ())
 
 // @_silgen_name and friends
 WARNING(reserved_runtime_symbol_name,none,
@@ -2140,9 +2145,7 @@ ERROR(attr_static_exclusive_only_mutating,none,
 ERROR(attr_static_exclusive_no_setters,none,
       "variable of type %0 must not have a setter", (Type))
 
-// @_manualOwnership
-ERROR(attr_manual_ownership_experimental,none,
-      "'@_manualOwnership' requires '-enable-experimental-feature ManualOwnership'", ())
+// ManualOwnership
 ERROR(attr_manual_ownership_noimplicitcopy,none,
       "'@_noImplicitCopy' cannot be used with ManualOwnership", ())
 
@@ -2211,12 +2214,12 @@ ERROR(expose_nested_type_to_cxx,none,
       "nested %kind0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_macro_to_cxx,none,
       "Swift macro can not yet be represented in C++", (ValueDecl *))
-WARNING(warn_unannotated_cxx_func_returning_frt, none,
-        "cannot infer the ownership of the returned value, annotate %0 with "
-        "either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED",
+GROUPED_WARNING(warn_unannotated_cxx_func_returning_frt, ForeignReferenceType, none,
+        "cannot infer ownership of foreign reference value returned by %0",
         (const ValueDecl *))
-NOTE(note_unannotated_cxx_func_returning_frt, none, "%0 is defined here",
-     (const ValueDecl *))
+NOTE(note_unannotated_cxx_func_returning_frt, none,
+        "annotate %0 with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED",
+        (const ValueDecl *))
 ERROR(unexposed_other_decl_in_cxx,none,
       "%kind0 is not yet exposed to C++", (ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,
@@ -3831,7 +3834,8 @@ ERROR(decl_from_hidden_module,none,
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances|"
       "in a public or '@usableFromInline' conformance|"
-      "in an '@available' attribute here}1; "
+      "in an '@available' attribute here|"
+      "in a property declaration marked public or in a '@frozen' or '@usableFromInline' context}1; "
       "%select{%2 has been imported as implementation-only|"
       "it is an SPI imported from %2|"
       "it is SPI|"
@@ -3848,7 +3852,8 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformance|"
       "in a public or '@usableFromInline' conformance|"
-      "<<ERROR>>}3 "
+      "<<ERROR>>|"
+      "in a property declaration marked public or in a '@frozen' or '@usableFromInline' context}3 "
       "because %select{%4 has been imported as implementation-only|"
       "it is an SPI imported from %4|"
       "<<ERROR>>|"
@@ -3863,7 +3868,8 @@ ERROR(conformance_from_implementation_only_module,none,
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances|"
-      "<<ERROR>>|<<ERROR>>}2; "
+      "<<ERROR>>|<<ERROR>>|"
+      "in a property declaration marked public or in a '@frozen' or '@usableFromInline' context}2; "
       "%select{%3 has been imported as implementation-only|"
       "the conformance is declared as SPI in %3|"
       "the conformance is declared as SPI|"
@@ -5343,12 +5349,27 @@ GROUPED_ERROR(opaque_type_unsupported_availability,OpaqueTypeInference,none,
 //------------------------------------------------------------------------------
 // MARK: Discard Statement
 //------------------------------------------------------------------------------
+#define FRAGILE_FUNC_KIND \
+  "%select{a '@_transparent' function|" \
+  "an '@inlinable' function|" \
+  "an '@_alwaysEmitIntoClient' function|" \
+  "a default argument value|" \
+  "a property initializer in a '@frozen' type|" \
+  "a '@backDeployed' function|" \
+  "an embedded function not marked '@_neverEmitIntoClient'}"
+
 ERROR(discard_wrong_context_decl,none,
       "'discard' statement cannot appear in %kindonly0",
       (const Decl *))
 ERROR(discard_no_deinit,none,
       "'discard' has no effect for type %0 unless it has a deinitializer",
       (Type))
+ERROR(discard_in_inlinable_method,none,
+      "'discard' statement cannot be used in " FRAGILE_FUNC_KIND "0 inside of type %1, which is not '@frozen'",
+      (unsigned, Type))
+WARNING(discard_in_inlinable_method_warning,none,
+        "'discard' statement cannot be used in " FRAGILE_FUNC_KIND "0 inside of type %1, which is not '@frozen'; this will become an error",
+        (unsigned, Type))
 ERROR(discard_wrong_context_closure,none,
       "'discard' statement cannot appear in closure",
       ())
@@ -7305,14 +7326,6 @@ WARNING(inlinable_implies_usable_from_inline,none,
 
 ERROR(usable_from_inline_attr_in_protocol,none,
       "'@usableFromInline' attribute cannot be used in protocols", ())
-
-#define FRAGILE_FUNC_KIND \
-  "%select{a '@_transparent' function|" \
-  "an '@inlinable' function|" \
-  "an '@_alwaysEmitIntoClient' function|" \
-  "a default argument value|" \
-  "a property initializer in a '@frozen' type|" \
-  "a '@backDeployed' function'}"
 
 ERROR(local_type_in_inlinable_function,
       none, "type %0 cannot be nested inside " FRAGILE_FUNC_KIND "1",

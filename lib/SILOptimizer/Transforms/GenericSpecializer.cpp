@@ -113,7 +113,8 @@ bool swift::specializeAppliesInFunction(SILFunction &F,
       // store_borrow. This does not work for borrow accessors that return the
       // projection from within the store_borrow scope.
       if (F.hasOwnership() &&
-          Callee->getConventions().hasGuaranteedAddressResult()) {
+          (Callee->getConventions().hasAddressResult() ||
+           Callee->getConventions().hasGuaranteedResult())) {
         continue;
       }
 

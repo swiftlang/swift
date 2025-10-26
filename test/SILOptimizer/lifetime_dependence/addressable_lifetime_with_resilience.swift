@@ -17,9 +17,6 @@ public struct Resilient {
     borrowing func getSpan() -> RawSpan { fatalError() }
 }
 
-/*
-// TODO (rdar://151268401): We still get spurious errors about escaping `self`
-// in cases where the wrapped type is concretely addressable-for-dependencies.
 internal struct AFDWrapper {
     let inner: AFDResilient
 
@@ -32,4 +29,3 @@ public struct AFDResilient {
     @_lifetime(borrow self)
     borrowing func getSpan() -> RawSpan { fatalError() }
 }
-*/

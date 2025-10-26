@@ -68,33 +68,22 @@
 using namespace swift;
 using namespace swift::Mangle;
 
-template<typename DeclType>
-static DeclType *getABIDecl(DeclType *D) {
-  if (!D)
-    return nullptr;
-
-  auto abiRole = ABIRoleInfo(D);
-  if (!abiRole.providesABI())
-    return abiRole.getCounterpart();
-  return nullptr;
-}
-
-static std::optional<ASTMangler::SymbolicReferent>
-getABIDecl(ASTMangler::SymbolicReferent ref) {
+std::optional<ASTMangler::SymbolicReferent>
+ASTMangler::getABIDecl(SymbolicReferent ref) const {
   switch (ref.getKind()) {
-  case ASTMangler::SymbolicReferent::NominalType:
+  case SymbolicReferent::NominalType:
     if (auto abiTypeDecl = getABIDecl(ref.getNominalType())) {
-      return ASTMangler::SymbolicReferent(abiTypeDecl);
+      return SymbolicReferent(abiTypeDecl);
     }
     break;
 
-  case ASTMangler::SymbolicReferent::OpaqueType:
+  case SymbolicReferent::OpaqueType:
     if (auto abiTypeDecl = getABIDecl(ref.getOpaqueType())) {
-      return ASTMangler::SymbolicReferent(abiTypeDecl);
+      return SymbolicReferent(abiTypeDecl);
     }
     break;
 
-  case ASTMangler::SymbolicReferent::ExtendedExistentialTypeShape:
+  case SymbolicReferent::ExtendedExistentialTypeShape:
     // Do nothing; mangling will use the underlying ABI decls in the end.
     break;
   }
@@ -969,8 +958,6 @@ std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
 }
 
 std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
-  DWARFMangling = true;
-  RespectOriginallyDefinedIn = false;
   beginMangling();
 
   Ty = getTypeForDWARFMangling(Ty);
@@ -1006,33 +993,27 @@ void ASTMangler::appendAnyDecl(const ValueDecl *Decl) {
   }
 }
 
-std::string
-ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
-                          bool prefix,
-                          bool respectOriginallyDefinedIn) {
+std::string ASTMangler::mangleAnyDecl(const ValueDecl *decl, bool addPrefix) {
   DWARFMangling = true;
-  RespectOriginallyDefinedIn = respectOriginallyDefinedIn;
-  if (prefix) {
+  if (addPrefix) {
     beginMangling();
   } else {
     beginManglingWithoutPrefix();
   }
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
 
-  appendAnyDecl(Decl);
+  appendAnyDecl(decl);
 
   // We have a custom prefix, so finalize() won't verify for us. If we're not
   // in invalid code (coming from an IDE caller) verify manually.
-  if (CONDITIONAL_ASSERT_enabled() && !prefix && !Decl->isInvalid())
+  if (CONDITIONAL_ASSERT_enabled() && !addPrefix && !decl->isInvalid())
     verify(Storage.str(), Flavor);
   return finalize();
 }
 
-std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
-                                        StringRef USRPrefix) {
-  llvm::SaveAndRestore<bool> respectOriginallyDefinedInRAII(
-      RespectOriginallyDefinedIn, false);
-  return (llvm::Twine(USRPrefix) + mangleAnyDecl(Decl, false)).str();
+std::string ASTMangler::mangleDeclWithPrefix(const ValueDecl *decl,
+                                             StringRef prefix) {
+  return (llvm::Twine(prefix) + mangleAnyDecl(decl, /*addPrefix*/ false)).str();
 }
 
 std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
@@ -1040,8 +1021,6 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
                                                   StringRef USRPrefix,
                                                   bool isStatic) {
   beginManglingWithoutPrefix();
-  llvm::SaveAndRestore<bool> respectOriginallyDefinedInRAII(
-      RespectOriginallyDefinedIn, false);
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
   appendAccessorEntity(getCodeForAccessorKind(kind), decl, isStatic);
@@ -1471,6 +1450,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       auto loc = cast<LocatableType>(tybase);
       return appendType(loc->getSinglyDesugaredType(), sig, forDecl);
     }
+    case TypeKind::BuiltinImplicitActor:
+      return appendOperator("BA");
     case TypeKind::BuiltinFixedArray: {
       auto bfa = cast<BuiltinFixedArrayType>(tybase);
       appendType(bfa->getSize(), sig, forDecl);
@@ -2286,10 +2267,12 @@ static char getResultConvention(ResultConvention conv) {
     case ResultConvention::Autoreleased: return 'a';
     case ResultConvention::Pack: return 'k';
     case ResultConvention::GuaranteedAddress:
-      return 'g';
+      return 'l';
     case ResultConvention::Guaranteed:
-      return 'G';
-  }
+      return 'g';
+    case ResultConvention::Inout:
+      return 'm';
+    }
   llvm_unreachable("bad result convention");
 }
 
@@ -5000,7 +4983,7 @@ void ASTMangler::appendMacroExpansionContext(
     outerExpansionLoc = decl->getLoc();
     outerExpansionDC = decl->getDeclContext();
 
-    if (auto *macroDecl = decl->getResolvedMacro(attr))
+    if (auto *macroDecl = attr->getResolvedMacro())
       baseName = macroDecl->getBaseName();
     else
       baseName = Context.getIdentifier("__unknown_macro__");
@@ -5264,7 +5247,6 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
   // We don't mangle the declaration itself because doing so requires semantic
   // information (e.g., its interface type), which introduces cyclic
   // dependencies.
-  const Decl *attachedTo = decl;
   Identifier attachedToName;
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
     auto storage = accessor->getStorage();
@@ -5294,12 +5276,6 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
     }
 
     appendDeclWithName(storage, attachedToName);
-
-    // For member attribute macros, the attribute is attached to the enclosing
-    // declaration.
-    if (role == MacroRole::MemberAttribute) {
-      attachedTo = storage->getDeclContext()->getAsDecl();
-    }
   } else if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
     // Mangle the name, replacing special names with their user-facing names.
     auto name = valueDecl->getName().getBaseName();
@@ -5311,12 +5287,6 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
     }
 
     appendDeclWithName(valueDecl, attachedToName);
-
-    // For member attribute macros, the attribute is attached to the enclosing
-    // declaration.
-    if (role == MacroRole::MemberAttribute) {
-      attachedTo = decl->getDeclContext()->getAsDecl();
-    }
   } else {
     appendContext(decl->getDeclContext(), nullBase, "");
     appendIdentifier("_");
@@ -5324,7 +5294,7 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
 
   // Determine the name of the macro.
   DeclBaseName macroName;
-  if (auto *macroDecl = attachedTo->getResolvedMacro(attr)) {
+  if (auto *macroDecl = attr->getResolvedMacro()) {
     macroName = macroDecl->getName().getBaseName();
   } else {
     macroName = decl->getASTContext().getIdentifier("__unknown_macro__");
@@ -5338,8 +5308,8 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
   return finalize();
 }
 
-static void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
-                                          ParameterizedProtocolType *PPT) {
+void ASTMangler::gatherExistentialRequirements(
+    SmallVectorImpl<Requirement> &reqs, ParameterizedProtocolType *PPT) const {
   auto protoTy = PPT->getBaseType();
   ASSERT(!getABIDecl(protoTy->getDecl()) && "need to figure out behavior");
   PPT->getRequirements(protoTy->getDecl()->getSelfInterfaceType(), reqs);
@@ -5347,9 +5317,9 @@ static void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
 
 /// Extracts a list of inverse requirements from a PCT serving as the constraint
 /// type of an existential.
-static void extractExistentialInverseRequirements(
-                                SmallVectorImpl<InverseRequirement> &inverses,
-                                ProtocolCompositionType *PCT) {
+void ASTMangler::extractExistentialInverseRequirements(
+    SmallVectorImpl<InverseRequirement> &inverses,
+    ProtocolCompositionType *PCT) const {
   if (!PCT->hasInverse())
     return;
 

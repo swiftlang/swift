@@ -3449,7 +3449,7 @@ class DeclDeserializer {
       cast<ExtensionDecl *>(decl)->setInherited(inherited);
   }
 
-  llvm::Error finishRecursiveAttrs(Decl *decl, DeclAttribute *attrs);
+  llvm::Error finishRecursiveAttrs();
 
 public:
   DeclDeserializer(ModuleFile &MF, Serialized<Decl *> &declOrOffset)
@@ -3476,9 +3476,13 @@ public:
 
     if (DAttrs) {
       decl->getAttrs().setRawAttributeChain(DAttrs);
-      // Wire up the correct owner for any CustomAttrs we deserialized.
-      for (auto *CA : decl->getAttrs().getAttributes<CustomAttr>())
-        CA->setOwner(decl);
+      // Wire up the attached decl.
+      for (auto *attr : decl->getAttrs())
+        attr->attachToDecl(decl);
+
+      // Wire up the indices for @differentiable.
+      for (auto *attr : decl->getAttrs().getAttributes<DifferentiableAttr>())
+        attr->setParameterIndices(diffAttrParamIndicesMap[attr]);
     }
 
     if (auto value = dyn_cast<ValueDecl>(decl)) {
@@ -4489,9 +4493,9 @@ public:
                                     std::move(op));
 
           if (isa<PrefixOperatorDecl>(op))
-            fn->getAttrs().add(new (ctx) PrefixAttr(/*implicit*/false));
+            fn->addAttribute(new (ctx) PrefixAttr(/*implicit*/ false));
           else if (isa<PostfixOperatorDecl>(op))
-            fn->getAttrs().add(new (ctx) PostfixAttr(/*implicit*/false));
+            fn->addAttribute(new (ctx) PostfixAttr(/*implicit*/ false));
           // Note that an explicit 'infix' is not required.
         }
         // Otherwise, unknown associated decl kind.
@@ -5817,8 +5821,8 @@ decodeDomainKind(uint8_t kind) {
       return AvailabilityDomainKind::Universal;
     case static_cast<uint8_t>(AvailabilityDomainKind::SwiftLanguageMode):
       return AvailabilityDomainKind::SwiftLanguageMode;
-    case static_cast<uint8_t>(AvailabilityDomainKind::SwiftRuntime):
-      return AvailabilityDomainKind::SwiftRuntime;
+    case static_cast<uint8_t>(AvailabilityDomainKind::StandaloneSwiftRuntime):
+      return AvailabilityDomainKind::StandaloneSwiftRuntime;
     case static_cast<uint8_t>(AvailabilityDomainKind::PackageDescription):
       return AvailabilityDomainKind::PackageDescription;
     case static_cast<uint8_t>(AvailabilityDomainKind::Embedded):
@@ -5840,8 +5844,8 @@ decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
     return AvailabilityDomain::forUniversal();
   case AvailabilityDomainKind::SwiftLanguageMode:
     return AvailabilityDomain::forSwiftLanguageMode();
-  case AvailabilityDomainKind::SwiftRuntime:
-    return AvailabilityDomain::forSwiftRuntime();
+  case AvailabilityDomainKind::StandaloneSwiftRuntime:
+    return AvailabilityDomain::forStandaloneSwiftRuntime();
   case AvailabilityDomainKind::PackageDescription:
     return AvailabilityDomain::forPackageDescription();
   case AvailabilityDomainKind::Embedded:
@@ -6774,41 +6778,24 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 }
 
 /// Complete attributes that contain recursive references to the decl being
-/// deserialized or to other decls. This method is called after \p decl is
+/// deserialized or to other decls. This method is called after the decl is
 /// created and stored into the \c ModuleFile::Decls table, so any cycles
 /// between mutually-referencing decls will be broken.
 ///
 /// Attributes handled here include:
 ///
-///  \li \c \@differentiable
-///  \li \c \@derivative
 ///  \li \c \@abi
-llvm::Error DeclDeserializer::finishRecursiveAttrs(Decl *decl, DeclAttribute *attrs) {
-  DeclAttributes tempAttrs;
-  tempAttrs.setRawAttributeChain(attrs);
-
-  // @differentiable and @derivative
-  for (auto *attr : tempAttrs.getAttributes<DifferentiableAttr>()) {
-    auto *diffAttr = const_cast<DifferentiableAttr *>(attr);
-    diffAttr->setOriginalDeclaration(decl);
-    diffAttr->setParameterIndices(diffAttrParamIndicesMap[diffAttr]);
-  }
-  for (auto *attr : tempAttrs.getAttributes<DerivativeAttr>()) {
-    auto *derAttr = const_cast<DerivativeAttr *>(attr);
-    derAttr->setOriginalDeclaration(decl);
-  }
-
+llvm::Error DeclDeserializer::finishRecursiveAttrs() {
   // @abi
   if (unresolvedABIAttr) {
     auto abiDeclOrError = MF.getDeclChecked(unresolvedABIAttr->second);
     if (!abiDeclOrError)
       return abiDeclOrError.takeError();
     unresolvedABIAttr->first->abiDecl = abiDeclOrError.get();
-    decl->recordABIAttr(unresolvedABIAttr->first);
   }
   if (ABIDeclCounterpartID != 0) {
     // This decl is the `abiDecl` of an `ABIAttr`. Force the decl that `ABIAttr`
-    // belongs to so that `recordABIAttr()` will be called.
+    // belongs to so that `attachToDecl()` will be called.
     auto counterpartOrError = MF.getDeclChecked(ABIDeclCounterpartID);
     if (!counterpartOrError)
       return counterpartOrError.takeError();
@@ -6865,7 +6852,7 @@ DeclDeserializer::getDeclCheckedImpl(
     if (!declOrError) \
       return declOrError; \
     declOrOffset = declOrError.get(); \
-    if (auto finishError = finishRecursiveAttrs(declOrError.get(), DAttrs)) \
+    if (auto finishError = finishRecursiveAttrs()) \
       return finishError; \
     break; \
   }
@@ -7089,6 +7076,7 @@ getActualResultConvention(uint8_t raw) {
   CASE(Pack)
   CASE(GuaranteedAddress)
   CASE(Guaranteed)
+  CASE(Inout)
 #undef CASE
   }
   return std::nullopt;
@@ -9158,7 +9146,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
     // Determine whether we need to enter the actor isolation of the witness.
     std::optional<ActorIsolation> enterIsolation;
-    if (*rawIDIter++) {
+    if (*rawIDIter++ && witness) {
       enterIsolation = getActorIsolation(witness);
     }
 

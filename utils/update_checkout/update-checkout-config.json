@@ -32,6 +32,8 @@
             "remote": { "id": "apple/swift-numerics" } },
         "swift-toolchain-sqlite": {
             "remote": { "id": "swiftlang/swift-toolchain-sqlite" } },
+        "swift-tools-protocols": {
+            "remote": { "id": "swiftlang/swift-tools-protocols" } },
         "swift-tools-support-core": {
             "remote": { "id": "swiftlang/swift-tools-support-core" } },
         "swiftpm": {
@@ -143,6 +145,7 @@
                 "llbuild": "main",
                 "swift-build": "main",
                 "swift-toolchain-sqlite": "1.0.7",
+                "swift-tools-protocols": "0.0.2",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "1.5.1",
@@ -188,7 +191,7 @@
                 "zlib": "v1.3.1",
                 "brotli": "v1.1.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.1"
+                "swift-subprocess": "0.2.1"
             }
         },
         "release/6.2": {
@@ -574,6 +577,7 @@
                 "llbuild": "main",
                 "swift-build": "main",
                 "swift-toolchain-sqlite": "1.0.7",
+                "swift-tools-protocols": "0.0.2",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "1.5.1",
@@ -619,7 +623,7 @@
                 "zlib": "v1.3.1",
                 "brotli": "v1.1.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.1"
+                "swift-subprocess": "0.2.1"
             }
         },
         "next" : {
@@ -634,6 +638,7 @@
                 "llbuild": "main",
                 "swift-build": "main",
                 "swift-toolchain-sqlite": "1.0.7",
+                "swift-tools-protocols": "0.0.2",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "1.5.1",
@@ -679,7 +684,7 @@
                 "zlib": "v1.3.1",
                 "brotli": "v1.1.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.1"
+                "swift-subprocess": "0.2.1"
             }
         }
     }

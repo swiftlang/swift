@@ -257,6 +257,14 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Stored in a coro allocator struct, the function used to deallocate memory.
   PointerAuthSchema CoroDeallocationFunction;
+
+  /// Stored in a coro allocator struct, the function used to allocate a callee
+  /// coroutine's fixed-size frame.
+  PointerAuthSchema CoroFrameAllocationFunction;
+
+  /// Stored in a coro allocator struct, the function used to deallocate a
+  /// callee coroutine's fixed-size frame.
+  PointerAuthSchema CoroFrameDeallocationFunction;
 };
 
 enum class JITDebugArtifact : unsigned {
@@ -627,6 +635,9 @@ public:
   /// Set to true if we support AArch64TBI.
   bool HasAArch64TBI = false;
 
+  /// Generate verbose assembly output with comments.
+  bool VerboseAsm = true;
+
   IRGenOptions()
       : OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
         Verify(true), VerifyEach(false), OptMode(OptimizationMode::NotSet),
@@ -676,7 +687,8 @@ public:
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
-        CASObjMode(llvm::CASBackendMode::Native), HasAArch64TBI(false) {
+        CASObjMode(llvm::CASBackendMode::Native), HasAArch64TBI(false),
+        VerboseAsm(true) {
     DisableRoundTripDebugTypes = !CONDITIONAL_ASSERT_enabled();
   }
 

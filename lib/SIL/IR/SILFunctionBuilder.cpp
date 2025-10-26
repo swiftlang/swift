@@ -126,6 +126,10 @@ void SILFunctionBuilder::addFunctionAttributes(
         F->setEffectsKind(effectsAttr->getKind());
       }
     }
+
+    if (auto asmName = constant.getAsmName()) {
+      F->setAsmName(*asmName);
+    }
   }
 
   if (!customEffects.empty()) {
@@ -204,7 +208,9 @@ void SILFunctionBuilder::addFunctionAttributes(
     F->setPerfConstraints(PerformanceConstraints::NoExistentials);
   } else if (Attrs.hasAttribute<NoObjCBridgingAttr>()) {
     F->setPerfConstraints(PerformanceConstraints::NoObjCBridging);
-  } else if (Attrs.hasAttribute<ManualOwnershipAttr>()) {
+  } else if (M.getASTContext().LangOpts.hasFeature(Feature::ManualOwnership) &&
+             constant && constant.hasDecl() && !constant.isImplicit() &&
+             !Attrs.hasAttribute<NoManualOwnershipAttr>()) {
     F->setPerfConstraints(PerformanceConstraints::ManualOwnership);
   }
 

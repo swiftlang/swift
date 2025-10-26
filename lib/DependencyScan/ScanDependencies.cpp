@@ -471,6 +471,27 @@ private:
                      [this](const auto &entry) {
                        tracker->trackFile(entry.second.LibraryPath);
                      });
+      StringRef readLegacyTypeInfoPath =
+          instance.getInvocation().getIRGenOptions().ReadLegacyTypeInfoPath;
+      if (!readLegacyTypeInfoPath.empty()) {
+        // If legacy layout is specifed, just need to track that file.
+        if (tracker->trackFile(readLegacyTypeInfoPath))
+          commandline.push_back("-read-legacy-type-info-path=" +
+                                scanner.remapPath(readLegacyTypeInfoPath));
+      } else {
+        // Otherwise, search RuntimeLibrary Path for implicit legacy layout.
+        // Search logic need to match IRGen/GenType.cpp.
+        const auto &triple = instance.getInvocation().getLangOptions().Target;
+        auto archName = swift::getMajorArchitectureName(triple);
+        SmallString<256> legacyLayoutPath(instance.getInvocation()
+                                              .getSearchPathOptions()
+                                              .RuntimeLibraryPaths[0]);
+        llvm::sys::path::append(legacyLayoutPath,
+                                "layouts-" + archName + ".yaml");
+        if (tracker->trackFile(legacyLayoutPath))
+          commandline.push_back("-read-legacy-type-info-path=" +
+                                scanner.remapPath(legacyLayoutPath));
+      }
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return diagnoseCASFSCreationError(root.takeError());
@@ -549,14 +570,14 @@ private:
     // action cache. We just use the CASID of the binary module itself as key.
     auto Ref = CASFS.getObjectRefForFileContent(path);
     if (!Ref) {
-      instance.getDiags().diagnose(SourceLoc(), diag::error_cas_file_ref, path);
+      instance.getDiags().diagnose(SourceLoc(), diag::error_cas_file_ref, path,
+                                   toString(Ref.takeError()));
       return true;
     }
-    assert(*Ref && "Binary module should be loaded into CASFS already");
-    depInfo.updateModuleCacheKey(CAS.getID(**Ref).toString());
+    depInfo.updateModuleCacheKey(CAS.getID(*Ref).toString());
 
     swift::cas::CompileJobCacheResult::Builder Builder;
-    Builder.addOutput(file_types::ID::TY_SwiftModuleFile, **Ref);
+    Builder.addOutput(file_types::ID::TY_SwiftModuleFile, *Ref);
     auto Result = Builder.build(CAS);
     if (!Result) {
       instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
@@ -564,7 +585,7 @@ private:
                                    toString(Result.takeError()));
       return true;
     }
-    if (auto E = instance.getActionCache().put(CAS.getID(**Ref),
+    if (auto E = instance.getActionCache().put(CAS.getID(*Ref),
                                                CAS.getID(*Result))) {
       instance.getDiags().diagnose(
           SourceLoc(), diag::error_cas,
@@ -1380,7 +1401,7 @@ performModuleScanImpl(
   }
 
   auto scanner = ModuleDependencyScanner(
-      service, instance->getInvocation(), instance->getSILOptions(),
+      service, cache, instance->getInvocation(), instance->getSILOptions(),
       instance->getASTContext(), *instance->getDependencyTracker(),
       instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
       instance->getDiags(),
@@ -1396,7 +1417,7 @@ performModuleScanImpl(
                                                instance->getMainModule()));
 
   // Perform the full module scan starting at the main module.
-  auto allModules = scanner.performDependencyScan(mainModuleID, cache);
+  auto allModules = scanner.performDependencyScan(mainModuleID);
   if (diagnoseCycle(*instance, cache, mainModuleID))
     return std::make_error_code(std::errc::not_supported);
 
@@ -1432,7 +1453,7 @@ static llvm::ErrorOr<swiftscan_import_set_t> performModulePrescanImpl(
     DepScanInMemoryDiagnosticCollector *diagnosticCollector) {
   // Setup the scanner
   auto scanner = ModuleDependencyScanner(
-      service, instance->getInvocation(), instance->getSILOptions(),
+      service, cache, instance->getInvocation(), instance->getSILOptions(),
       instance->getASTContext(), *instance->getDependencyTracker(),
       instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
       instance->getDiags(),
@@ -1476,7 +1497,6 @@ bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
       ctx.Allocate<SwiftDependencyScanningService>();
   ModuleDependenciesCache cache(CI.getMainModule()->getNameStr().str(),
                                 CI.getInvocation().getModuleScanningHash());
-
   if (service->setupCachingDependencyScanningService(CI))
     return true;
 

@@ -311,6 +311,9 @@ namespace {
     void writeSILBlock(const SILModule *SILMod);
     void writeIndexTables();
 
+    /// Write an extra-string record if the string itself is non-empty.
+    void writeExtraStringIfNonEmpty(ExtraStringFlavor flavor, StringRef string);
+
     /// Serialize and write SILDebugScope graph in post order.
     void writeDebugScopes(const SILDebugScope *Scope, const SourceManager &SM);
     void writeSourceLoc(SILLocation SLoc, const SourceManager &SM);
@@ -527,7 +530,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     usedAdHocWitnessFunctionID = S.addUniquedStringRef(fun->getName());
   }
 
-  unsigned numAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
+  unsigned numTrailingRecords = NoBody ? 0 : F.getSpecializeAttrs().size();
   auto resilience = F.getModule().getSwiftModule()->getResilienceStrategy();
   bool serializeDerivedEffects =
     // We must not serialize computed effects if library evolution is turned on,
@@ -544,7 +547,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     [&](int effectIdx, int argumentIndex, bool isDerived) {
       if (isDerived && !serializeDerivedEffects)
         return;
-      numAttrs++;
+      numTrailingRecords++;
     });
 
   std::optional<llvm::VersionTuple> available;
@@ -554,6 +557,13 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
   ENCODE_VER_TUPLE(available, available)
 
+  // Each extra string emitted below needs to update the trailing record
+  // count here.
+  if (!F.asmName().empty())
+    ++numTrailingRecords;
+  if (!F.section().empty())
+    ++numTrailingRecords;
+
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.getSerializedKind(),
@@ -562,7 +572,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.getOptimizationMode(), (unsigned)F.getPerfConstraints(),
       (unsigned)F.getClassSubclassScope(), (unsigned)F.hasCReferences(),
       (unsigned)F.markedAsUsed(), (unsigned)F.getEffectsKind(),
-      (unsigned)numAttrs, (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
+      (unsigned)numTrailingRecords, (unsigned)F.hasOwnership(), F.isAlwaysWeakImported(),
       LIST_VER_TUPLE_PIECES(available), (unsigned)F.isDynamicallyReplaceable(),
       (unsigned)F.isExactSelfClass(), (unsigned)F.isDistributed(),
       (unsigned)F.isRuntimeAccessible(),
@@ -588,6 +598,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
           Out, ScratchRecord, abbrCode, effectsStrID,
           argIdx, (unsigned)isGlobalSideEffects, (unsigned)isDerived);
     });
+
+  // Each extra string emitted here needs to be reflected in the trailing
+  // record count above.
+  writeExtraStringIfNonEmpty(ExtraStringFlavor::AsmName, F.asmName());
+  writeExtraStringIfNonEmpty(ExtraStringFlavor::Section, F.section());
 
   if (NoBody)
     return;
@@ -1791,6 +1806,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     writeOneOperandExtraAttributeLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
   }
+  case SILInstructionKind::UncheckedOwnershipInst: {
+    llvm_unreachable("Invalid unchecked_ownership during serialzation");
+  }
   case SILInstructionKind::YieldInst: {
     auto YI = cast<YieldInst>(&SI);
     SmallVector<ValueID, 4> args;
@@ -2356,6 +2374,16 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         addValueRef(operand));
     break;
   }
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst: {
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    auto operand =
+        cast<ImplicitActorToOpaqueIsolationCastInst>(&SI)->getOperand();
+    SILOneOperandLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), 0 /*attr*/,
+        S.addTypeRef(operand->getType().getRawASTType()),
+        (unsigned)operand->getType().getCategory(), addValueRef(operand));
+    break;
+  }
 
   case SILInstructionKind::BeginUnpairedAccessInst: {
     unsigned abbrCode = SILAbbrCodes[SILTwoOperandsExtraAttributeLayout::Code];
@@ -2563,6 +2591,24 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)svi->getType().getCategory(), ListOfValues);
     break;
   }
+
+  case SILInstructionKind::ReturnBorrowInst: {
+    // Format: a type followed by a list of typed values. A typed value is
+    // expressed by 4 IDs: TypeID, TypeCategory, ValueID, ValueResultNumber.
+    const auto *rbi = cast<ReturnBorrowInst>(&SI);
+    SmallVector<ValueID, 4> ListOfValues;
+    for (auto Elt : rbi->getOperandValues()) {
+      ListOfValues.push_back(S.addTypeRef(Elt->getType().getRawASTType()));
+      ListOfValues.push_back((unsigned)Elt->getType().getCategory());
+      ListOfValues.push_back(addValueRef(Elt));
+    }
+
+    SILValuesLayout::emitRecord(Out, ScratchRecord,
+                                SILAbbrCodes[SILValuesLayout::Code],
+                                (unsigned)SI.getKind(), ListOfValues);
+    break;
+  }
+
   case SILInstructionKind::TupleElementAddrInst:
   case SILInstructionKind::TupleExtractInst: {
     SILValue operand;
@@ -3119,6 +3165,15 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
   if (auto *parentModule = g.getParentModule())
     parentModuleID = S.addModuleRef(parentModule);
 
+  unsigned numTrailingRecords = 0;
+
+  // Each extra string emitted below needs to update the trailing record
+  // count here.
+  if (!g.asmName().empty())
+    ++numTrailingRecords;
+  if (!g.section().empty())
+    ++numTrailingRecords;
+
   SILGlobalVarLayout::emitRecord(Out, ScratchRecord,
                                  SILAbbrCodes[SILGlobalVarLayout::Code],
                                  toStableSILLinkage(g.getLinkage()),
@@ -3126,7 +3181,11 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
                                  (unsigned)!g.isDefinition(),
                                  (unsigned)g.isLet(),
                                  (unsigned)g.markedAsUsed(),
+                                 numTrailingRecords,
                                  TyID, dID, parentModuleID);
+
+  writeExtraStringIfNonEmpty(ExtraStringFlavor::AsmName, g.asmName());
+  writeExtraStringIfNonEmpty(ExtraStringFlavor::Section, g.section());
 
   // Don't emit the initializer instructions if not marked as "serialized".
   if (!g.isAnySerialized())
@@ -3290,6 +3349,16 @@ void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
   SourceLocLayout::emitRecord(Out, ScratchRecord,
                               SILAbbrCodes[SourceLocLayout::Code], Row, Column,
                               FNameID, LocationKind, (unsigned)Loc.isImplicit());
+}
+
+void SILSerializer::writeExtraStringIfNonEmpty(
+    ExtraStringFlavor flavor, StringRef string) {
+  if (string.empty())
+    return;
+
+  SILExtraStringLayout::emitRecord(
+      Out, ScratchRecord, SILAbbrCodes[SILExtraStringLayout::Code],
+      static_cast<uint8_t>(flavor), string);
 }
 
 void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
@@ -3658,6 +3727,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SourceLocLayout>();
   registerSILAbbr<SourceLocRefLayout>();
   registerSILAbbr<DebugValueDelimiterLayout>();
+  registerSILAbbr<SILExtraStringLayout>();
 
   // Write out VTables first because it may require serializations of
   // non-transparent SILFunctions (body is not needed).

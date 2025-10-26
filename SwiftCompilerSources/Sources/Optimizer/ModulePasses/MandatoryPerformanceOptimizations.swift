@@ -219,6 +219,12 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
 
     changed = context.eliminateDeadAllocations(in: function) || changed
   }
+
+  if function.isGlobalInitOnceFunction {
+    // Cleanup leftovers from simplification. The InitializeStaticGlobals pass cannot deal with dead
+    // stores in global init functions.
+    eliminateDeadStores(in: function, context)
+  }
 }
 
 private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions: inout Set<PathFunctionTuple>,
@@ -406,7 +412,7 @@ private extension Value {
       //   var p = Point(x: 10, y: 20)
       //   let o = UnsafePointer(&p)
       // Therefore ignore the `end_access` use of a `begin_access`.
-      let relevantUses = singleUseValue.uses.ignoreDebugUses.ignoreUses(ofType: EndAccessInst.self)
+      let relevantUses = singleUseValue.uses.ignoreDebugUses.ignore(usersOfType: EndAccessInst.self)
 
       guard let use = relevantUses.singleUse else {
         return nil

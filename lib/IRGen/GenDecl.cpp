@@ -2860,13 +2860,13 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     if (!forDefinition)
       gvar->setComdat(nullptr);
 
-    // Mark as llvm.used if @_used, set section if @_section
+    // Mark as llvm.used if @used, set section if @section
     if (var->markedAsUsed())
       addUsedGlobal(gvar);
     else if (var->shouldBePreservedForDebugger() && forDefinition) 
       addUsedGlobal(gvar);
-    if (auto *sectionAttr = var->getSectionAttr())
-      gvar->setSection(sectionAttr->Name);
+    if (!var->section().empty())
+      gvar->setSection(var->section());
   }
   if (forDefinition && !gvar->hasInitializer()) {
     if (initVal) {
@@ -3734,7 +3734,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   fn = createFunction(*this, link, signature, insertBefore,
                       f->getOptimizationMode(), shouldEmitStackProtector(f));
 
-  // Mark as llvm.used if @_used, set section if @_section
+  // Mark as llvm.used if @used, set section if @section
   if (f->markedAsUsed())
     addUsedGlobal(fn);
 

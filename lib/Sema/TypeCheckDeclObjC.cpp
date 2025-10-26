@@ -846,7 +846,7 @@ bool swift::isRepresentableInLanguage(
   }
 
   // Check that @objc functions can't have typed throw.
-  if (AFD->hasThrows()) {
+  if (!AFD->getDeclContext()->isInSwiftinterface() && AFD->hasThrows()) {
     Type thrownType = AFD->getThrownInterfaceType();
     // TODO: only `throws(Error)` is allowed.
     // Throwing `any MyError` that confronts `Error` is not implemented yet.
@@ -1405,8 +1405,8 @@ static std::optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
       if (attr->hasName() && !CD->isGenericContext()) {
         // @objc with a name on a non-generic subclass of a generic class is
         // just controlling the runtime name. Don't diagnose this case.
-        const_cast<ClassDecl *>(CD)->getAttrs().add(
-          new (ctx) ObjCRuntimeNameAttr(*attr));
+        const_cast<ClassDecl *>(CD)->addAttribute(
+            new (ctx) ObjCRuntimeNameAttr(*attr));
         return std::nullopt;
       }
 
@@ -1421,8 +1421,8 @@ static std::optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
     if (ancestry.contains(AncestryFlags::ResilientOther) &&
         !checkObjCClassStubAvailability(ctx, CD)) {
       if (attr->hasName()) {
-        const_cast<ClassDecl *>(CD)->getAttrs().add(
-          new (ctx) ObjCRuntimeNameAttr(*attr));
+        const_cast<ClassDecl *>(CD)->addAttribute(
+            new (ctx) ObjCRuntimeNameAttr(*attr));
         return std::nullopt;
       }
 
@@ -1964,7 +1964,7 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
 
     // Create an @objc attribute with the implicit name.
     attr = ObjCAttr::create(ctx, selector, /*implicitName=*/true);
-    decl->getAttrs().add(attr);
+    decl->addAttribute(attr);
   };
 
   // If this declaration overrides an @objc declaration, use its name.

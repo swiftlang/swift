@@ -103,6 +103,21 @@ SILType SILType::getEmptyTupleType(const ASTContext &C) {
   return getPrimitiveObjectType(C.TheEmptyTupleType);
 }
 
+SILType SILType::getTupleType(const ASTContext &ctx,
+                              ArrayRef<SILType> elementTypes,
+                              SILValueCategory category) {
+  if (elementTypes.empty())
+    return SILType::getEmptyTupleType(ctx);
+
+  SmallVector<TupleTypeElt, 8> tupleTypeElts;
+  for (auto type : elementTypes) {
+    assert(type.getCategory() == category && "Mismatched tuple elt categories");
+    tupleTypeElts.push_back(TupleTypeElt(type.getRawASTType()));
+  }
+  auto tupleType = TupleType::get(tupleTypeElts, ctx);
+  return SILType::getPrimitiveType(tupleType->getCanonicalType(), category);
+}
+
 SILType SILType::getSILTokenType(const ASTContext &C) {
   return getPrimitiveObjectType(C.TheSILTokenType);
 }
@@ -115,6 +130,10 @@ SILType SILType::getOpaqueIsolationType(const ASTContext &C) {
   auto actorProtocol = C.getProtocol(KnownProtocolKind::Actor);
   auto actorType = ExistentialType::get(actorProtocol->getDeclaredInterfaceType());
   return getPrimitiveObjectType(CanType(actorType).wrapInOptionalType());
+}
+
+SILType SILType::getBuiltinImplicitActorType(const ASTContext &ctx) {
+  return getPrimitiveObjectType(ctx.TheImplicitActorType->getCanonicalType());
 }
 
 bool SILType::isTrivial(const SILFunction &F) const {
@@ -162,6 +181,11 @@ bool SILType::isEmpty(const SILFunction &F) const {
     // Also, a struct is empty if it either has no fields or if all fields are
     // empty.
     SILModule &module = F.getModule();
+    if (structDecl->isResilient(module.getSwiftModule(),
+                                F.getResilienceExpansion())) {
+      return false;
+    }
+
     TypeExpansionContext typeEx = F.getTypeExpansionContext();
     for (VarDecl *field : structDecl->getStoredProperties()) {
       if (!getFieldType(field, module, typeEx).isEmpty(F))
@@ -665,6 +689,10 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
       return OwnershipKind::None;
     return OwnershipKind::Unowned;
   case ResultConvention::GuaranteedAddress:
+    return isAddressResult(SILModuleConventions(M).loweredAddresses)
+               ? OwnershipKind::None
+               : OwnershipKind::Guaranteed;
+  case ResultConvention::Inout:
     return OwnershipKind::None;
   case ResultConvention::Guaranteed:
     return OwnershipKind::Guaranteed;

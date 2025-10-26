@@ -1875,6 +1875,13 @@ synthesizeModify2CoroutineSetterBody(AccessorDecl *setter, ASTContext &ctx) {
       setter, TargetImpl::Implementation, setter->getStorage(), ctx);
 }
 
+static std::pair<BraceStmt *, bool>
+synthesizeMutateSetterBody(AccessorDecl *setter, ASTContext &ctx) {
+  // This should call the mutate accessor.
+  return synthesizeTrivialSetterBodyWithStorage(
+      setter, TargetImpl::Implementation, setter->getStorage(), ctx);
+}
+
 static Expr *maybeWrapInOutExpr(Expr *expr, ASTContext &ctx) {
   if (auto lvalueType = expr->getType()->getAs<LValueType>()) {
     auto type = lvalueType->getObjectType();
@@ -2071,7 +2078,7 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
     return synthesizeModify2CoroutineSetterBody(setter, ctx);
 
   case WriteImplKind::Mutate:
-    llvm_unreachable("synthesizing setter from mutate");
+    return synthesizeMutateSetterBody(setter, ctx);
   }
   llvm_unreachable("bad WriteImplKind");
 }
@@ -2476,7 +2483,9 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
     }
     break;
   case WriteImplKind::Mutate:
-    llvm_unreachable("mutate accessor is not yet implemented");
+    if (auto mutate = storage->getOpaqueAccessor(AccessorKind::Mutate)) {
+      asAvailableAs.push_back(mutate);
+    }
   }
   
   if (!asAvailableAs.empty()) {
@@ -2804,11 +2813,6 @@ bool RequiresOpaqueModifyCoroutineRequest::evaluate(
     if (protoDecl->isObjC())
       return false;
 
-  // If a mutate accessor is present, we don't need a modify coroutine
-  if (storage->getAccessor(AccessorKind::Mutate)) {
-    return false;
-  }
-
   return true;
 }
 
@@ -2937,9 +2941,8 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
     case WriteImplKind::MutableAddress:
     case WriteImplKind::Modify:
     case WriteImplKind::Modify2:
-      break;
     case WriteImplKind::Mutate:
-      llvm_unreachable("mutate accessor is not yet implemented");
+      break;
     }
     break;
 
@@ -2950,14 +2953,12 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   case AccessorKind::Init:
     break;
   case AccessorKind::Borrow:
-    llvm_unreachable("borrow accessor is not yet implemented");
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
-    llvm_unreachable("bad synthesized function kind");
   case AccessorKind::Mutate:
-    llvm_unreachable("mutate accessor is not yet implemented");
+    llvm_unreachable("bad synthesized function kind");
   }
 
   switch (storage->getReadWriteImpl()) {
@@ -3149,9 +3150,9 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
   }
 
   if (!isa<ParamDecl>(var))
-    var->getAttrs().add(
-        new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(), SourceRange(),
-                                             /*Implicit=*/true));
+    var->addAttribute(new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(),
+                                                           SourceRange(),
+                                                           /*Implicit=*/true));
   return property;
 }
 
@@ -3904,8 +3905,8 @@ void HasStorageRequest::cacheResult(bool hasStorage) const {
 
     if (hasStorage && !abiOnly &&
           !varDecl->getAttrs().hasAttribute<HasStorageAttr>())
-      varDecl->getAttrs().add(new (varDecl->getASTContext())
-                              HasStorageAttr(/*isImplicit=*/true));
+      varDecl->addAttribute(new (varDecl->getASTContext())
+                                HasStorageAttr(/*isImplicit=*/true));
   }
 }
 

@@ -1,0 +1,16 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name borrow
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
+// RUN: %target-sil-opt -sil-print-types %t/tmp.2.sib -module-name asmname -emit-sorted-sil | %FileCheck %s
+
+import Swift
+
+// CHECK: sil_global [asmname "v1"] @$s4main13renamedGlobalSivp : $Int
+sil_global [asmname "v1"] @$s4main13renamedGlobalSivp : $Int
+
+// CHECK: sil [asmname "f1"] @$s4main15renamedFunctionyyF : $@convention(thin) () -> ()
+sil [asmname "f1"] @$s4main15renamedFunctionyyF : $@convention(thin) () -> () {
+  %0 = tuple ()
+  return %0
+}

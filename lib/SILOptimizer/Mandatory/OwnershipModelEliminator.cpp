@@ -192,6 +192,15 @@ struct OwnershipModelEliminatorVisitor
     eraseInstruction(eli);
     return true;
   }
+
+  bool visitReturnBorrowInst(ReturnBorrowInst *rbi) {
+    return withBuilder<bool>(rbi, [&](SILBuilder &b, SILLocation loc) {
+      b.createReturn(loc, rbi->getReturnValue());
+      eraseInstruction(rbi);
+      return true;
+    });
+  }
+
   bool visitUncheckedOwnershipConversionInst(
       UncheckedOwnershipConversionInst *uoci) {
     eraseInstructionAndRAUW(uoci, uoci->getOperand());
@@ -252,6 +261,7 @@ struct OwnershipModelEliminatorVisitor
   HANDLE_FORWARDING_INST(DifferentiableFunctionExtract)
   HANDLE_FORWARDING_INST(MarkUninitialized)
   HANDLE_FORWARDING_INST(FunctionExtractIsolation)
+  HANDLE_FORWARDING_INST(ImplicitActorToOpaqueIsolationCast)
 #undef HANDLE_FORWARDING_INST
 };
 

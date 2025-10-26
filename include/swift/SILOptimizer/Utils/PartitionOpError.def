@@ -66,4 +66,7 @@ PARTITION_OP_ERROR(UnknownCodePattern)
 /// non-Sendable value.
 PARTITION_OP_ERROR(NonSendableIsolationCrossingResult)
 
+/// Used to signify that two 'inout sending' values are in the same region.
+PARTITION_OP_ERROR(InOutSendingParametersInSameRegion)
+
 #undef PARTITION_OP_ERROR

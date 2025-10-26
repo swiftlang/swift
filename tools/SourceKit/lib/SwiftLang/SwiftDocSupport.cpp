@@ -186,10 +186,22 @@ public:
     TopEntities.push_back(std::move(Entity));
   }
 
+  bool shouldIgnoreDecl(const Decl *D) {
+    // Parameters are handled specially in addParameters().
+    if (isa<ParamDecl>(D))
+      return true;
+
+    // We only care about API for documentation purposes.
+    if (!ABIRoleInfo(D).providesAPI())
+      return true;
+
+    return false;
+  }
+
   void printDeclPre(const Decl *D,
                     std::optional<BracketOptions> Bracket) override {
-    if (isa<ParamDecl>(D))
-      return; // Parameters are handled specially in addParameters().
+    if (shouldIgnoreDecl(D))
+      return;
     if (!shouldContinuePre(D, Bracket))
       return;
     unsigned StartOffset = OS.tell();
@@ -212,17 +224,13 @@ public:
 
   void printDeclPost(const Decl *D,
                      std::optional<BracketOptions> Bracket) override {
-    if (isa<ParamDecl>(D))
-      return; // Parameters are handled specially in addParameters().
+    if (shouldIgnoreDecl(D))
+      return;
     if (!shouldContinuePost(D, Bracket))
       return;
     assert(!EntitiesStack.empty());
     TextEntity Entity = std::move(EntitiesStack.back());
     EntitiesStack.pop_back();
-
-    // We only care about API for documentation purposes.
-    if (!ABIRoleInfo(D).providesAPI())
-      return;
 
     unsigned EndOffset = OS.tell();
     Entity.Range.Length = EndOffset - Entity.Range.Offset;
@@ -688,6 +696,7 @@ static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
   static UIdent PlatformFreeBSD("source.availability.platform.freebsd");
   static UIdent PlatformOpenBSD("source.availability.platform.openbsd");
   static UIdent PlatformWindows("source.availability.platform.windows");
+  static UIdent PlatformAndroid("source.availability.platform.android");
   std::vector<SemanticAvailableAttr> Scratch;
 
   for (auto Attr : getAvailableAttrs(D, Scratch)) {
@@ -742,6 +751,9 @@ static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
       break;
     case PlatformKind::Windows:
       PlatformUID = PlatformWindows;
+      break;
+    case PlatformKind::Android:
+      PlatformUID = PlatformAndroid;
       break;
     }
     // FIXME: [availability] Handle other availability domains?
