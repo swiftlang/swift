@@ -452,7 +452,7 @@ public func missingVersionFunc3() {}
 @backDeployed(before: macOS 0) // expected-warning {{expected version number in '@backDeployed' attribute; this is an error in the Swift 6 language mode}}
 public func missingVersionFunc4() {}
 
-@backDeployed(before: macOS 12.0, iOS 15.0,) // expected-error {{unexpected ',' separator}}
+@backDeployed(before: macOS 12.0, iOS 15.0,) // expected-error {{unexpected ',' separator}} {{43-44=}}
 public func unexpectedSeparatorFunc() {}
 
 @backDeployed(before: macOS 12.0.1) // expected-warning {{'@backDeployed' only uses major and minor version number}}

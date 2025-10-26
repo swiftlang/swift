@@ -1423,7 +1423,8 @@ bool Parser::parseDifferentiableAttributeArguments(
     if (!consumeIf(tok::comma)) return false;
     // Diagnose trailing comma before 'where' or ')'.
     if (Tok.is(tok::kw_where) || Tok.is(tok::r_paren)) {
-      diagnose(Tok, diag::unexpected_separator, ",");
+      diagnose(Tok, diag::unexpected_separator, ",")
+        .fixItRemove(PreviousLoc);
       return true;
     }
     // Check that token after comma is 'wrt'.
@@ -1665,14 +1666,16 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
       // If comma is required but does not exist and ')' has not been reached,
       // diagnose missing comma.
       if (requireComma && !Tok.is(tok::r_paren)) {
-        diagnose(getEndOfPreviousLoc(), diag::expected_separator, ",");
+        diagnose(getEndOfPreviousLoc(), diag::expected_separator, ",")
+          .fixItInsertAfter(PreviousLoc, ",");
         return true;
       }
       return false;
     }
     // Diagnose trailing comma before ')'.
     if (Tok.is(tok::r_paren)) {
-      diagnose(Tok, diag::unexpected_separator, ",");
+      diagnose(Tok, diag::unexpected_separator, ",")
+        .fixItRemove(PreviousLoc);
       return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     }
     // Check that token after comma is 'wrt:'.
@@ -1745,14 +1748,16 @@ ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
       // If comma is required but does not exist and ')' has not been reached,
       // diagnose missing comma.
       if (requireComma && !Tok.is(tok::r_paren)) {
-        diagnose(Tok, diag::expected_separator, ",");
+        diagnose(Tok, diag::expected_separator, ",")
+          .fixItInsertAfter(PreviousLoc, ",");
         return true;
       }
       return false;
     }
     // Diagnose trailing comma before ')'.
     if (Tok.is(tok::r_paren)) {
-      diagnose(Tok, diag::unexpected_separator, ",");
+      diagnose(Tok, diag::unexpected_separator, ",")
+        .fixItRemove(PreviousLoc);
       return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     }
     // Check that token after comma is 'wrt:'.
