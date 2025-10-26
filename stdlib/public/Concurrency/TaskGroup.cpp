@@ -1822,7 +1822,12 @@ reevaluate_if_taskgroup_has_results:;
     // We're going back to running the task, so if we suspended before,
     // we need to flag it as running again.
     if (hasSuspended) {
-      waitingTask->flagAsRunning();
+      // This will always return zero because we were just
+      // running this Task so its BasePriority (which is
+      // immutable) should've already been set on the thread.
+      [[maybe_unused]]
+      uint32_t opaque = waitingTask->flagAsRunning();
+      assert(opaque == 0);
     }
 
     // Success! We are allowed to poll.

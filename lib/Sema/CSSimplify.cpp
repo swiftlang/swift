@@ -5582,6 +5582,10 @@ bool ConstraintSystem::repairFailures(
     if (!anchor)
       return false;
 
+    // If we have an ErrorExpr anchor, we don't need to do any more fixes.
+    if (isExpr<ErrorExpr>(anchor))
+      return true;
+
     // This could be:
     // - `InOutExpr` used with r-value e.g. `foo(&x)` where `x` is a `let`.
     // - `ForceValueExpr` e.g. `foo.bar! = 42` where `bar` or `foo` are
@@ -6694,6 +6698,10 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::Condition: {
+    // If the condition is already a hole, we're done.
+    if (lhs->isPlaceholder())
+      return true;
+
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       return true;
@@ -7739,16 +7747,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                  isExpr<ForcedCheckedCastExpr>(anchor);
         };
 
-        if (!isCGFloatInit(anchor) && !isCoercionOrCast(anchor, path) &&
-            llvm::none_of(path, [&](const LocatorPathElt &rawElt) {
-              if (auto elt =
-                      rawElt.getAs<LocatorPathElt::ImplicitConversion>()) {
-                auto convKind = elt->getConversionKind();
-                return convKind == ConversionRestrictionKind::DoubleToCGFloat ||
-                       convKind == ConversionRestrictionKind::CGFloatToDouble;
-              }
-              return false;
-            })) {
+        if (!isCGFloatInit(anchor) && !isCoercionOrCast(anchor, path)) {
           conversionsOrFixes.push_back(
               desugar1->isCGFloat()
                   ? ConversionRestrictionKind::CGFloatToDouble
@@ -9977,7 +9976,7 @@ ConstraintSystem::matchPackElementType(Type elementType, Type patternType,
       return tryFix([&]() {
         auto envShape = genericEnv->mapTypeIntoEnvironment(
             genericEnv->getOpenedElementShapeClass());
-        if (auto *pack = dyn_cast<PackType>(envShape))
+        if (auto *pack = dyn_cast<PackType>(envShape.getPointer()))
           envShape = pack->unwrapSingletonPackExpansion()->getPatternType();
 
         return SkipSameShapeRequirement::create(
@@ -11031,10 +11030,6 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
   if (!anchor)
     return nullptr;
 
-  // Avoid checking implicit conversions injected by the compiler.
-  if (locator->findFirst<LocatorPathElt::ImplicitConversion>())
-    return nullptr;
-
   auto getType = [&cs](Expr *expr) -> Type {
     return cs.simplifyType(cs.getType(expr))->getRValueType();
   };
@@ -11604,22 +11599,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             // `key path` constraint can't be retired until all components
             // are simplified.
             addTypeVariableConstraintsToWorkList(memberTypeVar);
-          } else if (isa<Expr *>(locator->getAnchor()) &&
-                     !getSemanticsProvidingParentExpr(
-                         getAsExpr(locator->getAnchor()))) {
-            // If there are no contextual expressions that could provide
-            // a type for the member type variable, let's default it to
-            // a placeholder eagerly so it could be propagated to the
-            // pattern if necessary.
-            recordTypeVariablesAsHoles(memberTypeVar);
-          } else if (locator->isLastElement<LocatorPathElt::PatternMatch>()) {
-            // Let's handle member patterns specifically because they use
-            // equality instead of argument application constraint, so allowing
-            // them to bind member could mean missing valid hole positions in
-            // the pattern.
-            recordTypeVariablesAsHoles(memberTypeVar);
           } else {
-            recordPotentialHole(memberTypeVar);
+            // Eagerly turn the member type variable into a hole since we know
+            // this is where the issue is and we've recorded a fix for it. This
+            // avoids producing unnecessary holes for e.g generic parameters.
+            recordTypeVariablesAsHoles(memberTypeVar);
           }
         }
 

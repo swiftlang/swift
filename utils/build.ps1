@@ -1298,16 +1298,6 @@ function Get-Dependencies {
         Expand-ZipFile "$FileName.zip" "$BinaryCache" "$FileName"
         Write-Success "$ArchName Python $PythonVersion"
       }
-      if (-not $EmbeddedPython) {
-        return
-      }
-      $PythonPTHPath = "$BinaryCache/$FileName/$(Get-PythonLibName)._pth"
-      $PythonPTHContent = [System.IO.File]::ReadAllText($PythonPTHPath).Replace("#import site","import site")
-      [System.IO.File]::WriteAllText($PythonPTHPath, $PythonPTHContent)
-      $GetPipURL = "https://bootstrap.pypa.io/get-pip.py"
-      $GetPipPath = "$BinaryCache/$FileName/get-pip.py"
-      $WebClient.DownloadFile($GetPipURL, $GetPipPath)
-      Invoke-Program -Silent "$(Get-PythonExecutable)" $GetPipPath
     }
 
     function Install-PIPIfNeeded {
@@ -3523,6 +3513,7 @@ function Build-Subprocess([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      SwiftSystem_DIR = (Get-ProjectCMakeModules $Platform System);
     }
 }
 
@@ -4330,12 +4321,12 @@ if (-not $SkipBuild) {
           foreach ($Build in $WindowsSDKBuilds) {
             Invoke-BuildStep Build-ExperimentalSDK $Build
 
-            Get-ChildItem "${SDKROOT}\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+            Get-ChildItem -ErrorAction Ignore "${SDKROOT}\usr\lib\swift\windows" -Filter "*.lib" -File | ForEach-Object {
               Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
               Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
             }
 
-            Get-ChildItem "${SDKROOT}\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+            Get-ChildItem -ErrorAction Ignore "${SDKROOT}\usr\lib\swift_static\windows" -Filter "*.lib" -File | ForEach-Object {
               Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
               Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\windows\$($Build.Architecture.LLVMName)\" | Out-Null
             }
@@ -4412,7 +4403,7 @@ if (-not $SkipBuild) {
               Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\android\$($Build.Architecture.LLVMName)\" | Out-Null
             }
 
-            Get-ChildItem "${SDKROOT}\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
+            Get-ChildItem -ErrorAction Ignore "${SDKROOT}\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
               Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
               Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\android\$($Build.Architecture.LLVMName)\" | Out-Null
             }

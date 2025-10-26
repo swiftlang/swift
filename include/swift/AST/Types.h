@@ -1112,9 +1112,6 @@ public:
   /// Check if this is a ObjCBool type from the Objective-C module.
   bool isObjCBool();
 
-  /// Check if this is a std.string type from C++.
-  bool isCxxString();
-
   /// Check if this is the type Unicode.Scalar from the Swift standard library.
   bool isUnicodeScalar();
 

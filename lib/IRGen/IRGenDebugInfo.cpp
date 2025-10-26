@@ -1599,7 +1599,7 @@ private:
     std::vector<Type> GenericArgs;
     Type CurrentType = BGT;
     while (CurrentType && CurrentType->getAnyNominal()) {
-      if (auto *BGT = llvm::dyn_cast<BoundGenericType>(CurrentType))
+      if (auto *BGT = CurrentType->getAs<BoundGenericType>())
         GenericArgs.insert(GenericArgs.end(), BGT->getGenericArgs().begin(),
                            BGT->getGenericArgs().end());
       CurrentType = CurrentType->getNominalParent();
@@ -2460,9 +2460,10 @@ private:
         return TypeWalker::Action::Stop;
 
       DeclContext *D = nullptr;
-      if (auto *TAT = llvm::dyn_cast<TypeAliasType>(T))
+      if (auto *TAT = llvm::dyn_cast<TypeAliasType>(T.getPointer()))
         D = TAT->getDecl()->getDeclContext();
-      else if (auto *NT = llvm::dyn_cast<NominalOrBoundGenericNominalType>(T))
+      else if (auto *NT = llvm::dyn_cast<NominalOrBoundGenericNominalType>(
+                   T.getPointer()))
         D = NT->getDecl()->getDeclContext();
 
       // A type inside a function uses that function's signature as part of

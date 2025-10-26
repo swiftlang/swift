@@ -2627,7 +2627,7 @@ private:
           if (ty->isKnownImmutableKeyPathType())
             return StorageAccessKind::Get;
 
-          if (auto existential = dyn_cast<ExistentialType>(ty)) {
+          if (auto *existential = ty->getAs<ExistentialType>()) {
             if (auto superclass =
                     existential->getExistentialLayout().getSuperclass()) {
               if (superclass->isKnownImmutableKeyPathType())

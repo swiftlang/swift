@@ -174,7 +174,7 @@ public func sorted(_ span: borrowing MutableSpan<Int>) -> Bool {
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests22outputspan_get_elementySis10OutputSpanVySiG_SitF :
 // CHECK-SIL:   [[REG1:%.*]] = struct_extract %0, #OutputSpan._count
 // CHECK-SIL:   [[REG2:%.*]] = struct_extract [[REG1]], #Int._value
-// CHECK-SIL:   [[REG3:%.*]] = builtin "assumeNonNegative_Int64"([[REG2]]) : $Builtin.Int64
+// CHECK-SIL:   [[REG3:%.*]] = builtin "assumeNonNegative_Int{{32|64}}"([[REG2]]) : $Builtin.Int{{32|64}}
 // CHECK-SIL-LABEL:} // end sil function '$s31mutable_span_bounds_check_tests22outputspan_get_elementySis10OutputSpanVySiG_SitF'
 public func outputspan_get_element(_ v: borrowing OutputSpan<Int>, _ i: Int) -> Int {
   return v[i]

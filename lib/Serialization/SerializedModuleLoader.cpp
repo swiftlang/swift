@@ -1708,6 +1708,19 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   return M;
 }
 
+bool MemoryBufferSerializedModuleLoader::registerMemoryBuffer(
+    StringRef importPath, std::unique_ptr<llvm::MemoryBuffer> input,
+    llvm::VersionTuple version) {
+  return MemoryBuffers
+      .insert({importPath, MemoryBufferInfo(std::move(input), version)})
+      .second;
+}
+
+bool MemoryBufferSerializedModuleLoader::unregisterMemoryBuffer(
+    StringRef importPath) {
+  return MemoryBuffers.erase(importPath);
+}
+
 void SerializedModuleLoaderBase::loadExtensions(NominalTypeDecl *nominal,
                                                 unsigned previousGeneration) {
   for (auto &modulePair : LoadedModuleFiles) {
