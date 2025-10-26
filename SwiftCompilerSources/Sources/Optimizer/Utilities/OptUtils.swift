@@ -462,6 +462,10 @@ extension Instruction {
       }
     case let gvi as GlobalValueInst:
       return context.canMakeStaticObjectReadOnly(objectType: gvi.type)
+    case let mti as MetatypeInst:
+      return true
+    case let mti as InitExistentialMetatypeInst:
+      return true
     case is StructInst,
          is TupleInst,
          is EnumInst,
