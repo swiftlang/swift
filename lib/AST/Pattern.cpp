@@ -192,8 +192,7 @@ namespace {
     const std::function<void(VarDecl*)> &fn;
   public:
     
-    WalkToVarDecls(const std::function<void(VarDecl*)> &fn)
-    : fn(fn) {}
+    WalkToVarDecls(const std::function<void(VarDecl*)> &fn) : fn(fn) {}
 
     /// Walk everything that's available; there shouldn't be macro expansions
     /// that matter anyway.
@@ -239,6 +238,9 @@ namespace {
   };
 } // end anonymous namespace
 
+void Expr::forEachUnresolvedVariable(llvm::function_ref<void(VarDecl *)> f) const {
+  const_cast<Expr *>(this)->walk(WalkToVarDecls(f));
+}
 
 /// apply the specified function to all variables referenced in this
 /// pattern.
