@@ -744,9 +744,9 @@ extension Sequence {
   }
 
   @_transparent
-  public func _filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+  public func _filter<E>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
 
     var result = ContiguousArray<Element>()
 
@@ -968,17 +968,32 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @inlinable
-  public __consuming func split(
+  public __consuming func split<E>(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [ArraySlice<Element>] {
+    whereSeparator isSeparator: (Element) throws(E) -> Bool
+  ) throws(E) -> [ArraySlice<Element>] {
     _precondition(maxSplits >= 0, "Must take zero or more splits")
     let whole = Array(self)
     return try whole.split(
                   maxSplits: maxSplits, 
                   omittingEmptySubsequences: omittingEmptySubsequences, 
                   whereSeparator: isSeparator)
+  }
+  
+  // ABI-only
+  @inlinable
+  @_silgen_name("$sSTsE5split9maxSplits25omittingEmptySubsequences14whereSeparatorSays10ArraySliceVy7ElementQzGGSi_S2bAHKXEtKF")
+  __consuming func __rethrows_split(
+    maxSplits: Int = Int.max,
+    omittingEmptySubsequences: Bool = true,
+    whereSeparator isSeparator: (Element) throws -> Bool
+  ) rethrows -> [ArraySlice<Element>] {
+    try split(
+      maxSplits: maxSplits,
+      omittingEmptySubsequences: omittingEmptySubsequences,
+      whereSeparator: isSeparator
+    )
   }
 
   /// Returns a subsequence, up to the given maximum length, containing the

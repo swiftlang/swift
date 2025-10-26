@@ -71,9 +71,18 @@ extension _ArrayProtocol {
   // efficient, we should make the default implementation coming from Sequence
   // preferred.
   @inlinable
-  public __consuming func filter(
+  public __consuming func filter<E>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
+    return try _filter(isIncluded)
+  }
+  
+  // ABI-only
+  @inlinable
+  @_silgen_name("$ss14_ArrayProtocolPsE6filterySay7ElementQzGSbAEKXEKF")
+  __consuming func __rethrows_filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element] {
-    return try _filter(isIncluded)
+    try filter(isIncluded)
   }
 }
