@@ -164,7 +164,7 @@
 ///     let c = a
 ///     print(c === a, c === b, separator: ", ")
 ///     // Prints "true, false"
-public protocol Equatable: ~Copyable {
+public protocol Equatable: ~Copyable, ~Escapable {
   /// Returns a Boolean value indicating whether two values are equal.
   ///
   /// Equality is the inverse of inequality. For any values `a` and `b`,
@@ -176,7 +176,7 @@ public protocol Equatable: ~Copyable {
   static func == (lhs: borrowing Self, rhs: borrowing Self) -> Bool
 }
 
-extension Equatable where Self: ~Copyable {
+extension Equatable where Self: ~Copyable & ~Escapable {
   /// Returns a Boolean value indicating whether two values are not equal.
   ///
   /// Inequality is the inverse of equality. For any values `a` and `b`, `a != b`
