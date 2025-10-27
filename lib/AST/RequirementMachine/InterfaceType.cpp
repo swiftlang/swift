@@ -158,12 +158,8 @@ MutableTerm RewriteContext::getMutableTermForType(CanType paramType,
                                                   const ProtocolDecl *proto) {
   ASSERT(paramType->isTypeParameter());
 
-  llvm::dbgs() << "getMutableTermForType "<<  paramType <<  "\n";
-  
   // Collect zero or more nested type names in reverse order.
   bool innermostAssocTypeWasResolved = false;
-  
-  bool containsShape = false;
   
   SmallVector<Symbol, 3> symbols;
   while (auto memberType = dyn_cast<DependentMemberType>(paramType)) {
@@ -198,9 +194,6 @@ MutableTerm RewriteContext::getMutableTermForType(CanType paramType,
   }
 
   std::reverse(symbols.begin(), symbols.end());
-
-  if (containsShape)
-    symbols.push_back(Symbol::forShape(*this));
 
   return MutableTerm(symbols);
 }
@@ -431,10 +424,6 @@ MutableTerm
 RewriteContext::getRelativeTermForType(CanType typeWitness,
                                        ArrayRef<Term> substitutions) {
   MutableTerm result;
-  llvm::dbgs() << "getrelativeterm "<< typeWitness << "\n ";
-  for(auto s : substitutions)
-    s.dump(llvm::dbgs());
-  llvm::dbgs() <<"\n\n";
   // Get the substitution S corresponding to τ_0_n.
   unsigned index = getGenericParamIndex(typeWitness->getRootGenericParam());
 

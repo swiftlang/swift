@@ -78,12 +78,22 @@ void Term::dump(llvm::raw_ostream &out) const {
 
 Term Term::get(const MutableTerm &mutableTerm, RewriteContext &ctx) {
   unsigned size = mutableTerm.size();
+  bool shapeTerm = mutableTerm.isShapeTerm();
+  std::optional<Symbol> shapeSymbol = std::nullopt;
+  if (shapeTerm) {
+    size++;
+    shapeSymbol = mutableTerm.getShape();
+  }
+
   DEBUG_ASSERT(size > 0 && "Term must have at least one symbol");
 
   llvm::FoldingSetNodeID id;
   id.AddInteger(size);
   for (auto symbol : mutableTerm)
     id.AddPointer(symbol.getOpaquePointer());
+
+  if (shapeTerm)
+    id.AddPointer(shapeSymbol.value().getOpaquePointer());
 
   void *insertPos = nullptr;
   if (auto *term = ctx.Terms.FindNodeOrInsertPos(id, insertPos))
@@ -94,7 +104,10 @@ Term Term::get(const MutableTerm &mutableTerm, RewriteContext &ctx) {
       alignof(Storage));
   auto *term = new (mem) Storage(size);
   for (unsigned i = 0; i < size; ++i)
-    term->getElements()[i] = mutableTerm[i];
+    if (shapeTerm && i+1 == size)
+      term->getElements()[i] = shapeSymbol.value();
+    else
+      term->getElements()[i] = mutableTerm[i];
 
   ctx.Terms.InsertNode(term, insertPos);
   ctx.TermHistogram.add(size);
@@ -134,8 +147,10 @@ bool Term::containsNameSymbols() const {
 ///
 static std::optional<int> compareImpl(const Symbol *lhsBegin,
                                       const Symbol *lhsEnd,
+                                      bool lhsShape,
                                       const Symbol *rhsBegin,
                                       const Symbol *rhsEnd,
+                                      bool rhsShape,
                                       RewriteContext &ctx) {
   ASSERT(lhsBegin != lhsEnd);
   ASSERT(rhsBegin != rhsEnd);
@@ -184,8 +199,8 @@ static std::optional<int> compareImpl(const Symbol *lhsBegin,
     return lhsNameCount > rhsNameCount ? 1 : -1;
 
   // Next, compare term length.
-  unsigned lhsSize = (lhsEnd - lhsBegin);
-  unsigned rhsSize = (rhsEnd - rhsBegin);
+  unsigned lhsSize = (lhsEnd - lhsBegin) + (lhsShape ? 1 : 0);
+  unsigned rhsSize = (rhsEnd - rhsBegin) + (rhsShape ? 1 : 0);
 
   // A longer term orders after a shorter term.
   if (lhsSize != rhsSize)
@@ -214,20 +229,24 @@ static std::optional<int> compareImpl(const Symbol *lhsBegin,
 /// Reduction order on terms. Returns None if the terms are identical except
 /// for an incomparable superclass or concrete type symbol at the end.
 std::optional<int> Term::compare(Term other, RewriteContext &ctx) const {
-  return compareImpl(begin(), end(), other.begin(), other.end(), ctx);
+  return compareImpl(begin(), end(), false,
+                     other.begin(), other.end(), false, ctx);
 }
 
 /// Reduction order on mutable terms. Returns None if the terms are identical
 /// except for an incomparable superclass or concrete type symbol at the end.
 std::optional<int> MutableTerm::compare(const MutableTerm &other,
                                         RewriteContext &ctx) const {
-  return compareImpl(begin(), end(), other.begin(), other.end(), ctx);
+  return compareImpl(begin(), end(), isShapeTerm(),
+                     other.begin(), other.end(), other.isShapeTerm(), ctx);
 }
 
 /// Replace the subterm in the range [from,to) of this term with \p rhs.
 void MutableTerm::rewriteSubTerm(Symbol *from, Symbol *to, Term rhs) {
   auto oldSize = size();
   size_t lhsLength = (size_t)(to - from);
+  bool rhsShape = rhs.isShapeTerm();
+  bool toEnd = to == rhs.end();
 
   if (lhsLength == rhs.size()) {
     // Copy the RHS to the LHS.
@@ -254,6 +273,12 @@ void MutableTerm::rewriteSubTerm(Symbol *from, Symbol *to, Term rhs) {
   }
 
   DEBUG_ASSERT(size() == oldSize - lhsLength + rhs.size());
+
+  // But mutable term may need to change shape representation
+  // to keep shape property constraints, so move if needed
+  if (rhsShape && toEnd) {
+    Shape = removeEnd();
+  }
 }
 
 void MutableTerm::dump(llvm::raw_ostream &out) const {
@@ -266,5 +291,10 @@ void MutableTerm::dump(llvm::raw_ostream &out) const {
       first = false;
 
     symbol.dump(out);
+  }
+  if (Shape) {
+    if (!first)
+      out << ".";
+    Shape.value().dump(out);
   }
 }

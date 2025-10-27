@@ -160,9 +160,6 @@ namespace {
       bool lhsAbstract = lhsType->isTypeParameter();
       bool rhsAbstract = rhsType->isTypeParameter();
       
-      bool lhsAbstractPack = lhsAbstract && lhsType->isParameterPack();
-      bool rhsAbstractPack = rhsAbstract && rhsType->isParameterPack();
-
       if (lhsAbstract && rhsAbstract) {
         
         unsigned lhsIndex = RewriteContext::getGenericParamIndex(lhsType);
