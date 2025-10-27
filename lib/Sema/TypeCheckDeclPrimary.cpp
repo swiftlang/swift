@@ -1864,6 +1864,7 @@ static void diagnoseRetroactiveConformances(
       continue;
     }
 
+    bool isMarkedRetroactive = entry.isRetroactive();
     SmallVector<ProtocolDecl *, 2> protos;
     if (auto *protoTy = inheritedTy->getAs<ProtocolType>()) {
       auto *proto = protoTy->getDecl();
@@ -1871,10 +1872,8 @@ static void diagnoseRetroactiveConformances(
       // As a fallback, to support previous language versions, also allow
       // this through if the protocol has been explicitly module-qualified.
       TypeRepr *repr = unwrapAttributedRepr(entry.getTypeRepr());
-      if (isModuleQualified(repr, proto->getParentModule())) {
-        protocolsWithRetroactiveAttr.insert(proto);
-        continue;
-      }
+      if (isModuleQualified(repr, proto->getParentModule()))
+        isMarkedRetroactive = true;
 
       protos.push_back(proto);
     } else if (auto *compositionTy = inheritedTy->getAs<ProtocolCompositionType>()) {
@@ -1920,7 +1919,7 @@ static void diagnoseRetroactiveConformances(
         }
 
         // If it's marked @retroactive, no need to warn.
-        if (entry.isRetroactive()) {
+        if (isMarkedRetroactive) {
           // Note that we encountered this protocol through a conformance marked
           // @retroactive in case multiple clauses cause the protocol to be
           // inherited.
