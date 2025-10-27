@@ -207,235 +207,118 @@ public func _stdlib_atomicAcquiringLoadARCRef<T: AnyObject>(
 // Conversion of primitive types to `String`
 //===----------------------------------------------------------------------===//
 
-/// A 32 byte buffer.
-internal struct _Buffer32 {
-  internal var _x0: UInt8 = 0
-  internal var _x1: UInt8 = 0
-  internal var _x2: UInt8 = 0
-  internal var _x3: UInt8 = 0
-  internal var _x4: UInt8 = 0
-  internal var _x5: UInt8 = 0
-  internal var _x6: UInt8 = 0
-  internal var _x7: UInt8 = 0
-  internal var _x8: UInt8 = 0
-  internal var _x9: UInt8 = 0
-  internal var _x10: UInt8 = 0
-  internal var _x11: UInt8 = 0
-  internal var _x12: UInt8 = 0
-  internal var _x13: UInt8 = 0
-  internal var _x14: UInt8 = 0
-  internal var _x15: UInt8 = 0
-  internal var _x16: UInt8 = 0
-  internal var _x17: UInt8 = 0
-  internal var _x18: UInt8 = 0
-  internal var _x19: UInt8 = 0
-  internal var _x20: UInt8 = 0
-  internal var _x21: UInt8 = 0
-  internal var _x22: UInt8 = 0
-  internal var _x23: UInt8 = 0
-  internal var _x24: UInt8 = 0
-  internal var _x25: UInt8 = 0
-  internal var _x26: UInt8 = 0
-  internal var _x27: UInt8 = 0
-  internal var _x28: UInt8 = 0
-  internal var _x29: UInt8 = 0
-  internal var _x30: UInt8 = 0
-  internal var _x31: UInt8 = 0
+// Support legacy ABI on top of new implementation:
+// ================================================
 
-  internal init() {}
-
-  internal mutating func withBytes<Result>(
-    _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
-  ) rethrows -> Result {
-    return try unsafe withUnsafeMutablePointer(to: &self) {
-      try unsafe body(UnsafeMutableRawPointer($0).assumingMemoryBound(to: UInt8.self))
-    }
-  }
-}
-
-/// A 72 byte buffer.
-internal struct _Buffer72 {
-  internal var _x0: UInt8 = 0
-  internal var _x1: UInt8 = 0
-  internal var _x2: UInt8 = 0
-  internal var _x3: UInt8 = 0
-  internal var _x4: UInt8 = 0
-  internal var _x5: UInt8 = 0
-  internal var _x6: UInt8 = 0
-  internal var _x7: UInt8 = 0
-  internal var _x8: UInt8 = 0
-  internal var _x9: UInt8 = 0
-  internal var _x10: UInt8 = 0
-  internal var _x11: UInt8 = 0
-  internal var _x12: UInt8 = 0
-  internal var _x13: UInt8 = 0
-  internal var _x14: UInt8 = 0
-  internal var _x15: UInt8 = 0
-  internal var _x16: UInt8 = 0
-  internal var _x17: UInt8 = 0
-  internal var _x18: UInt8 = 0
-  internal var _x19: UInt8 = 0
-  internal var _x20: UInt8 = 0
-  internal var _x21: UInt8 = 0
-  internal var _x22: UInt8 = 0
-  internal var _x23: UInt8 = 0
-  internal var _x24: UInt8 = 0
-  internal var _x25: UInt8 = 0
-  internal var _x26: UInt8 = 0
-  internal var _x27: UInt8 = 0
-  internal var _x28: UInt8 = 0
-  internal var _x29: UInt8 = 0
-  internal var _x30: UInt8 = 0
-  internal var _x31: UInt8 = 0
-  internal var _x32: UInt8 = 0
-  internal var _x33: UInt8 = 0
-  internal var _x34: UInt8 = 0
-  internal var _x35: UInt8 = 0
-  internal var _x36: UInt8 = 0
-  internal var _x37: UInt8 = 0
-  internal var _x38: UInt8 = 0
-  internal var _x39: UInt8 = 0
-  internal var _x40: UInt8 = 0
-  internal var _x41: UInt8 = 0
-  internal var _x42: UInt8 = 0
-  internal var _x43: UInt8 = 0
-  internal var _x44: UInt8 = 0
-  internal var _x45: UInt8 = 0
-  internal var _x46: UInt8 = 0
-  internal var _x47: UInt8 = 0
-  internal var _x48: UInt8 = 0
-  internal var _x49: UInt8 = 0
-  internal var _x50: UInt8 = 0
-  internal var _x51: UInt8 = 0
-  internal var _x52: UInt8 = 0
-  internal var _x53: UInt8 = 0
-  internal var _x54: UInt8 = 0
-  internal var _x55: UInt8 = 0
-  internal var _x56: UInt8 = 0
-  internal var _x57: UInt8 = 0
-  internal var _x58: UInt8 = 0
-  internal var _x59: UInt8 = 0
-  internal var _x60: UInt8 = 0
-  internal var _x61: UInt8 = 0
-  internal var _x62: UInt8 = 0
-  internal var _x63: UInt8 = 0
-  internal var _x64: UInt8 = 0
-  internal var _x65: UInt8 = 0
-  internal var _x66: UInt8 = 0
-  internal var _x67: UInt8 = 0
-  internal var _x68: UInt8 = 0
-  internal var _x69: UInt8 = 0
-  internal var _x70: UInt8 = 0
-  internal var _x71: UInt8 = 0
-
-  internal init() {}
-
-  internal mutating func withBytes<Result>(
-    _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
-  ) rethrows -> Result {
-    return try unsafe withUnsafeMutablePointer(to: &self) {
-      try unsafe body(UnsafeMutableRawPointer($0).assumingMemoryBound(to: UInt8.self))
-    }
-  }
-}
-
-#if !$Embedded
 // Returns a UInt64, but that value is the length of the string, so it's
 // guaranteed to fit into an Int. This is part of the ABI, so we can't
 // trivially change it to Int. Callers can safely convert the result
 // to any integer type without checks, however.
 @_silgen_name("swift_int64ToString")
 internal func _int64ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UInt,
-  _ value: Int64,
-  _ radix: Int64,
-  _ uppercase: Bool
-) -> UInt64
-#else
-internal func _int64ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: Int64,
   _ radix: Int64,
   _ uppercase: Bool
 ) -> UInt64 {
-  return UInt64(unsafe value._toStringImpl(buffer, bufferLength, Int(radix), uppercase))
-}
-#endif
+  var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
+    _unchecked: textBuffer,
+    count: Int(bufferLength))
+  let textRange = _UInt64ToASCII(
+    value: value.magnitude,
+    radix: radix.magnitude,
+    uppercase: uppercase,
+    negative: value < 0,
+    buffer: &buffer)
+  let byteCount = textRange.upperBound &- textRange.lowerBound
 
-internal func _int64ToString(
-  _ value: Int64,
-  radix: Int64 = 10,
-  uppercase: Bool = false
-) -> String {
-  if radix >= 10 {
-    var buffer = _Buffer32()
-    return unsafe buffer.withBytes { (bufferPtr) in
-      let actualLength = unsafe _int64ToStringImpl(bufferPtr, 32, value, radix, uppercase)
-      return unsafe String._fromASCII(UnsafeBufferPointer(
-        start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
-      ))
-    }
-  } else {
-    var buffer = _Buffer72()
-    return unsafe buffer.withBytes { (bufferPtr) in
-      let actualLength = unsafe _int64ToStringImpl(bufferPtr, 72, value, radix, uppercase)
-      return unsafe String._fromASCII(UnsafeBufferPointer(
-        start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
-      ))
-    }
+  // Move text to start of buffer.
+  if textRange.lowerBound != 0 {
+    unsafe _memmove(
+      dest: textBuffer,
+      src: textBuffer + textRange.lowerBound,
+      size: UInt(truncatingIfNeeded: byteCount))
   }
+  return UInt64(truncatingIfNeeded: byteCount)
 }
 
-#if !$Embedded
 // Returns a UInt64, but that value is the length of the string, so it's
 // guaranteed to fit into an Int. This is part of the ABI, so we can't
 // trivially change it to Int. Callers can safely convert the result
 // to any integer type without checks, however.
 @_silgen_name("swift_uint64ToString")
 internal func _uint64ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UInt,
-  _ value: UInt64,
-  _ radix: Int64,
-  _ uppercase: Bool
-) -> UInt64
-#else
-internal func _uint64ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
   _ value: UInt64,
   _ radix: Int64,
   _ uppercase: Bool
 ) -> UInt64 {
-  return unsafe UInt64(value._toStringImpl(buffer, bufferLength, Int(radix), uppercase))
+  var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
+    _unchecked: textBuffer,
+    count: Int(bufferLength))
+  let textRange = _UInt64ToASCII(
+    value: value,
+    radix: radix.magnitude,
+    uppercase: uppercase,
+    negative: false,
+    buffer: &buffer)
+  let byteCount = textRange.upperBound &- textRange.lowerBound
+
+  // Move text to start of buffer.
+  if textRange.lowerBound != 0 {
+    unsafe _memmove(
+      dest: textBuffer,
+      src: textBuffer + textRange.lowerBound,
+      size: UInt(truncatingIfNeeded: byteCount))
+  }
+  return UInt64(truncatingIfNeeded: byteCount)
 }
-#endif
 
 public // @testable
 func _uint64ToString(
-    _ value: UInt64,
-    radix: Int64 = 10,
-    uppercase: Bool = false
+  _ value: UInt64,
+  radix: Int64 = 10,
+  uppercase: Bool = false
 ) -> String {
+  _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
+
   if radix >= 10 {
-    var buffer = _Buffer32()
-    return unsafe buffer.withBytes { (bufferPtr) in
-      let actualLength = unsafe _uint64ToStringImpl(bufferPtr, 32, value, radix, uppercase)
-      return unsafe String._fromASCII(UnsafeBufferPointer(
-        start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
-      ))
-    }
-  } else {
-    var buffer = _Buffer72()
-    return unsafe buffer.withBytes { (bufferPtr) in
-      let actualLength = unsafe _uint64ToStringImpl(bufferPtr, 72, value, radix, uppercase)
-      return unsafe String._fromASCII(UnsafeBufferPointer(
-        start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
-      ))
-    }
+    var buffer = _InlineArray<21, UTF8.CodeUnit>(repeating: 0x30)
+    var span = buffer.mutableSpan
+    let textRange = _UInt64ToASCII(
+      value: value,
+      radix: radix.magnitude,
+      uppercase: uppercase,
+      negative: false,
+      buffer: &span)
+    let textStart =
+      unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self)
+        + textRange.lowerBound
+    let byteCount = textRange.upperBound &- textRange.lowerBound
+    let textBuffer =
+      unsafe UnsafeBufferPointer<UTF8.CodeUnit>(
+        _uncheckedStart: textStart, count: byteCount)
+    return unsafe String._fromASCII(textBuffer)
   }
+
+  var buffer = _InlineArray<65, UTF8.CodeUnit>(repeating: 0x30)
+  var span = buffer.mutableSpan
+  let textRange = _UInt64ToASCII(
+    value: value,
+    radix: radix.magnitude,
+    uppercase: false, // When radix < 10, case is irrelevant.
+    negative: false,
+    buffer: &span)
+  let textStart =
+    unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self)
+      + textRange.lowerBound
+  let byteCount = textRange.upperBound &- textRange.lowerBound
+  let textBuffer =
+    unsafe UnsafeBufferPointer<UTF8.CodeUnit>(
+      _uncheckedStart: textStart, count: byteCount)
+  return unsafe String._fromASCII(textBuffer)
 }
 
 @inlinable
