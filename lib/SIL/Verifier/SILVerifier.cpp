@@ -2550,7 +2550,8 @@ public:
   case BuiltinValueKind::id:                                                   \
     require(false,                                                             \
             "this builtin should never show up as builtin inst. It should "    \
-            "only result in other SIL instructions being emitted by SILGen");
+            "only result in other SIL instructions being emitted by SILGen");  \
+    break;
 #define BUILTIN(ID, Name, Attrs)                                               \
   case BuiltinValueKind::ID:                                                   \
     break;
