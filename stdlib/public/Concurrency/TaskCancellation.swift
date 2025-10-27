@@ -103,12 +103,12 @@ func withTaskCancellationHandler<T>(
   nonisolated(nonsending) func withTaskCancellationHandlerNonisolatedNonsending<T, Failure: Error>(
     operation: () async throws(Failure) -> T,
     onCancel handler: @Sendable () -> Void,
-  ) async throws(Failure) -> sending T
+  ) async throws(Failure) -> T
 )
 public nonisolated(nonsending) func withTaskCancellationHandler<T, Failure: Error>(
   operation: () async throws(Failure) -> T,
   onCancel handler: @Sendable () -> Void,
-) async throws(Failure) -> sending T {
+) async throws(Failure) -> T {
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
   let record = unsafe _taskAddCancellationHandler(handler: handler)
