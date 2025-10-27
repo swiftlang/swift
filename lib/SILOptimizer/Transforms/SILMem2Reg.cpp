@@ -1968,11 +1968,16 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
       if (!runningVals) {
         // Loading from uninitialized memory is only acceptable if the type is
         // empty--an aggregate of types without storage.
+        const auto initialValue =
+            createEmptyAndUndefValue(asi->getElementType(), inst, ctx);
         runningVals = {
             LiveValues::toReplace(asi,
-                                  /*replacement=*/createEmptyAndUndefValue(
-                                      asi->getElementType(), inst, ctx)),
+                                  /*replacement=*/initialValue),
             /*isStorageValid=*/!doesLoadInvalidateStorage(inst)};
+        if (auto varInfo = asi->getVarInfo()) {
+          SILBuilderWithScope(inst, ctx).createDebugValue(
+              inst->getLoc(), initialValue, *varInfo);
+        }
       }
       auto *loadInst = dyn_cast<LoadInst>(inst);
       if (loadInst &&
