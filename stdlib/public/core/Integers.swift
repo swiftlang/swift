@@ -1377,17 +1377,169 @@ extension BinaryInteger {
 //===--- CustomStringConvertible conformance ------------------------------===//
 //===----------------------------------------------------------------------===//
 
+internal func _UInt64ToASCII(
+  value: UInt64,
+  radix: UInt64,
+  uppercase: Bool,
+  negative: Bool,
+  buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
+) -> Range<Int> {
+  _precondition(
+    radix >= 2 && radix <= 36,
+    "invalid radix for string conversion")
+
+  // We need a `MutableRawSpan` to use wide store/load operations.
+  var buffer = utf8Buffer.mutableBytes
+  _precondition(
+    buffer.byteCount >= (radix >= 10 ? 21 : 65),
+    "insufficient buffer size")
+
+  var value = value
+  var offset = buffer.byteCount
+
+  if value == 0 {
+    unsafe buffer.storeBytes(
+      of: 0x30 /* "0" */,
+      toUncheckedByteOffset: 0,
+      as: UInt8.self)
+    // Unlike the C++ implementation, we'll never return "-0".
+    return 0..<1
+  }
+
+  if radix == 10 {
+    // Look up two digits at once.
+    let lookup: _InlineArray<100, (UInt8, UInt8)> = [
+      (0x30, 0x30), (0x30, 0x31), (0x30, 0x32), (0x30, 0x33), (0x30, 0x34),
+      (0x30, 0x35), (0x30, 0x36), (0x30, 0x37), (0x30, 0x38), (0x30, 0x39),
+      (0x31, 0x30), (0x31, 0x31), (0x31, 0x32), (0x31, 0x33), (0x31, 0x34),
+      (0x31, 0x35), (0x31, 0x36), (0x31, 0x37), (0x31, 0x38), (0x31, 0x39),
+      (0x32, 0x30), (0x32, 0x31), (0x32, 0x32), (0x32, 0x33), (0x32, 0x34),
+      (0x32, 0x35), (0x32, 0x36), (0x32, 0x37), (0x32, 0x38), (0x32, 0x39),
+      (0x33, 0x30), (0x33, 0x31), (0x33, 0x32), (0x33, 0x33), (0x33, 0x34),
+      (0x33, 0x35), (0x33, 0x36), (0x33, 0x37), (0x33, 0x38), (0x33, 0x39),
+      (0x34, 0x30), (0x34, 0x31), (0x34, 0x32), (0x34, 0x33), (0x34, 0x34),
+      (0x34, 0x35), (0x34, 0x36), (0x34, 0x37), (0x34, 0x38), (0x34, 0x39),
+      (0x35, 0x30), (0x35, 0x31), (0x35, 0x32), (0x35, 0x33), (0x35, 0x34),
+      (0x35, 0x35), (0x35, 0x36), (0x35, 0x37), (0x35, 0x38), (0x35, 0x39),
+      (0x36, 0x30), (0x36, 0x31), (0x36, 0x32), (0x36, 0x33), (0x36, 0x34),
+      (0x36, 0x35), (0x36, 0x36), (0x36, 0x37), (0x36, 0x38), (0x36, 0x39),
+      (0x37, 0x30), (0x37, 0x31), (0x37, 0x32), (0x37, 0x33), (0x37, 0x34),
+      (0x37, 0x35), (0x37, 0x36), (0x37, 0x37), (0x37, 0x38), (0x37, 0x39),
+      (0x38, 0x30), (0x38, 0x31), (0x38, 0x32), (0x38, 0x33), (0x38, 0x34),
+      (0x38, 0x35), (0x38, 0x36), (0x38, 0x37), (0x38, 0x38), (0x38, 0x39),
+      (0x39, 0x30), (0x39, 0x31), (0x39, 0x32), (0x39, 0x33), (0x39, 0x34),
+      (0x39, 0x35), (0x39, 0x36), (0x39, 0x37), (0x39, 0x38), (0x39, 0x39)
+    ]
+    while value >= 10 {
+      offset &-= 2
+      unsafe buffer.storeBytes(
+        of: lookup[Int(truncatingIfNeeded: value % 100)],
+        toUncheckedByteOffset: offset,
+        as: (UInt8, UInt8).self)
+      value /= 100
+    }
+    if value != 0 {
+      offset &-= 1
+      unsafe buffer.storeBytes(
+        of: UInt8(truncatingIfNeeded: value) &+ 0x30,
+        toUncheckedByteOffset: offset,
+        as: UInt8.self)
+    }
+  } else if radix == 16 {
+    let lookup: _InlineArray<16, UInt8> = [
+      0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39,
+      0x41, 0x42, 0x43, 0x44, 0x45, 0x46
+    ]
+    let adjustment: UInt8 = uppercase ? 0 : 0x20
+
+    while value != 0 {
+      offset &-= 1
+      unsafe buffer.storeBytes(
+        of: lookup[Int(truncatingIfNeeded: value & 0xf)] | adjustment,
+        toUncheckedByteOffset: offset,
+        as: UInt8.self)
+      value &>>= 4
+    }
+  } else if radix == 2 {
+    while value != 0 {
+      offset &-= 1
+      unsafe buffer.storeBytes(
+        of: UInt8(truncatingIfNeeded: value & 1) &+ 0x30,
+        toUncheckedByteOffset: offset,
+        as: UInt8.self
+      )
+      value &>>= 1
+    }
+  } else {
+    let lookup: _InlineArray<36, UInt8> = [
+      0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39,
+      0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a,
+      0x4b, 0x4c, 0x4d, 0x4e, 0x4f, 0x50, 0x51, 0x52, 0x53, 0x54,
+      0x55, 0x56, 0x57, 0x58, 0x59, 0x5a
+    ]
+    let adjustment: UInt8 = uppercase ? 0 : 0x20
+
+    while value != 0 {
+      offset &-= 1
+      unsafe buffer.storeBytes(
+        of: lookup[Int(truncatingIfNeeded: value % radix)] | adjustment,
+        toUncheckedByteOffset: offset,
+        as: UInt8.self)
+      value /= radix
+    }
+  }
+
+  if negative {
+    offset &-= 1
+    unsafe buffer.storeBytes(
+      of: 0x2d /* "-" */,
+      toUncheckedByteOffset: offset,
+      as: UInt8.self)
+  }
+
+  return offset..<buffer.byteCount
+}
+
 extension BinaryInteger {
   internal func _description(radix: Int, uppercase: Bool) -> String {
     _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
 
-    if bitWidth <= 64 {
-      let radix_ = Int64(radix)
-      return Self.isSigned
-        ? _int64ToString(
-          Int64(truncatingIfNeeded: self), radix: radix_, uppercase: uppercase)
-        : _uint64ToString(
-          UInt64(truncatingIfNeeded: self), radix: radix_, uppercase: uppercase)
+    if _fastPath(bitWidth <= 64) {
+      if radix >= 10 {
+        var buffer = _InlineArray<21, UTF8.CodeUnit>(repeating: 0x30)
+        var span = buffer.mutableSpan
+        let textRange = _UInt64ToASCII(
+          value: UInt64(truncatingIfNeeded: magnitude),
+          radix: UInt64(truncatingIfNeeded: radix),
+          uppercase: uppercase,
+          negative: Self.isSigned && self < 0,
+          buffer: &span)
+        let textStart =
+          unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self)
+            + textRange.lowerBound
+        let byteCount = textRange.upperBound &- textRange.lowerBound
+        let textBuffer =
+          unsafe UnsafeBufferPointer<UTF8.CodeUnit>(
+            _uncheckedStart: textStart, count: byteCount)
+        return unsafe String._fromASCII(textBuffer)
+      }
+
+      var buffer = _InlineArray<65, UTF8.CodeUnit>(repeating: 0x30)
+      var span = buffer.mutableSpan
+      let textRange = _UInt64ToASCII(
+        value: UInt64(truncatingIfNeeded: magnitude),
+        radix: UInt64(truncatingIfNeeded: radix),
+        uppercase: false, // When radix < 10, case is irrelevant.
+        negative: Self.isSigned && self < 0,
+        buffer: &span)
+      let textStart =
+        unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self)
+          + textRange.lowerBound
+      let byteCount = textRange.upperBound &- textRange.lowerBound
+      let textBuffer =
+        unsafe UnsafeBufferPointer<UTF8.CodeUnit>(
+          _uncheckedStart: textStart, count: byteCount)
+      return unsafe String._fromASCII(textBuffer)
     }
 
     if self == (0 as Self) { return "0" }
@@ -3400,132 +3552,4 @@ extension SignedInteger where Self: FixedWidthInteger {
   public static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self {
     lhs.subtractingReportingOverflow(rhs).partialValue
   }
-}
-
-//===----------------------------------------------------------------------===//
-//===--- UInt64 to String -------------------------------------------------===//
-//===----------------------------------------------------------------------===//
-
-@usableFromInline
-internal func _UInt64ToASCII(
-  value: UInt64,
-  radix: UInt64,
-  uppercase: Bool,
-  negative: Bool,
-  buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
-) -> Range<Int> {
-  _precondition(
-    radix >= 2 && radix <= 36,
-    "invalid radix for string conversion")
-
-  // We need a `MutableRawSpan` to use wide store/load operations.
-  var buffer = utf8Buffer.mutableBytes
-  _precondition(
-    buffer.byteCount >= (radix >= 10 ? 21 : (!negative ? 64 : 65)),
-    "insufficient buffer size")
-
-  var value = value
-  var offset = buffer.byteCount
-
-  if value == 0 {
-    unsafe buffer.storeBytes(
-      of: 0x30 /* "0" */,
-      toUncheckedByteOffset: 0,
-      as: UInt8.self)
-    // Unlike the C++ implementation, we'll never return "-0".
-    return 0..<1
-  }
-
-  if _fastPath(radix == 10) {
-    // Look up two digits at once.
-    let lookup: _InlineArray<100, (UInt8, UInt8)> = [
-      (0x30, 0x30), (0x30, 0x31), (0x30, 0x32), (0x30, 0x33), (0x30, 0x34),
-      (0x30, 0x35), (0x30, 0x36), (0x30, 0x37), (0x30, 0x38), (0x30, 0x39),
-      (0x31, 0x30), (0x31, 0x31), (0x31, 0x32), (0x31, 0x33), (0x31, 0x34),
-      (0x31, 0x35), (0x31, 0x36), (0x31, 0x37), (0x31, 0x38), (0x31, 0x39),
-      (0x32, 0x30), (0x32, 0x31), (0x32, 0x32), (0x32, 0x33), (0x32, 0x34),
-      (0x32, 0x35), (0x32, 0x36), (0x32, 0x37), (0x32, 0x38), (0x32, 0x39),
-      (0x33, 0x30), (0x33, 0x31), (0x33, 0x32), (0x33, 0x33), (0x33, 0x34),
-      (0x33, 0x35), (0x33, 0x36), (0x33, 0x37), (0x33, 0x38), (0x33, 0x39),
-      (0x34, 0x30), (0x34, 0x31), (0x34, 0x32), (0x34, 0x33), (0x34, 0x34),
-      (0x34, 0x35), (0x34, 0x36), (0x34, 0x37), (0x34, 0x38), (0x34, 0x39),
-      (0x35, 0x30), (0x35, 0x31), (0x35, 0x32), (0x35, 0x33), (0x35, 0x34),
-      (0x35, 0x35), (0x35, 0x36), (0x35, 0x37), (0x35, 0x38), (0x35, 0x39),
-      (0x36, 0x30), (0x36, 0x31), (0x36, 0x32), (0x36, 0x33), (0x36, 0x34),
-      (0x36, 0x35), (0x36, 0x36), (0x36, 0x37), (0x36, 0x38), (0x36, 0x39),
-      (0x37, 0x30), (0x37, 0x31), (0x37, 0x32), (0x37, 0x33), (0x37, 0x34),
-      (0x37, 0x35), (0x37, 0x36), (0x37, 0x37), (0x37, 0x38), (0x37, 0x39),
-      (0x38, 0x30), (0x38, 0x31), (0x38, 0x32), (0x38, 0x33), (0x38, 0x34),
-      (0x38, 0x35), (0x38, 0x36), (0x38, 0x37), (0x38, 0x38), (0x38, 0x39),
-      (0x39, 0x30), (0x39, 0x31), (0x39, 0x32), (0x39, 0x33), (0x39, 0x34),
-      (0x39, 0x35), (0x39, 0x36), (0x39, 0x37), (0x39, 0x38), (0x39, 0x39)
-    ]
-    while value >= 10 {
-      offset &-= 2
-      unsafe buffer.storeBytes(
-        of: lookup[Int(truncatingIfNeeded: value % 100)],
-        toUncheckedByteOffset: offset,
-        as: (UInt8, UInt8).self)
-      value /= 100
-    }
-    if value != 0 {
-      offset &-= 1
-      unsafe buffer.storeBytes(
-        of: UInt8(truncatingIfNeeded: value) &+ 0x30,
-        toUncheckedByteOffset: offset,
-        as: UInt8.self)
-    }
-  } else if radix == 16 {
-    let lookup: _InlineArray<16, UInt8> = [
-      0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39,
-      0x41, 0x42, 0x43, 0x44, 0x45, 0x46
-    ]
-    let adjustment: UInt8 = uppercase ? 0 : 0x20
-
-    while value != 0 {
-      offset &-= 1
-      unsafe buffer.storeBytes(
-        of: lookup[Int(truncatingIfNeeded: value & 0xf)] | adjustment,
-        toUncheckedByteOffset: offset,
-        as: UInt8.self)
-      value &>>= 4
-    }
-  } else if radix == 2 {
-    while value != 0 {
-      offset &-= 1
-      unsafe buffer.storeBytes(
-        of: UInt8(truncatingIfNeeded: value & 1) &+ 0x30,
-        toUncheckedByteOffset: offset,
-        as: UInt8.self
-      )
-      value &>>= 1
-    }
-  } else {
-    let lookup: _InlineArray<36, UInt8> = [
-      0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39,
-      0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a,
-      0x4b, 0x4c, 0x4d, 0x4e, 0x4f, 0x50, 0x51, 0x52, 0x53, 0x54,
-      0x55, 0x56, 0x57, 0x58, 0x59, 0x5a
-    ]
-    let adjustment: UInt8 = uppercase ? 0 : 0x20
-
-    while value != 0 {
-      offset &-= 1
-      unsafe buffer.storeBytes(
-        of: lookup[Int(truncatingIfNeeded: value % radix)] | adjustment,
-        toUncheckedByteOffset: offset,
-        as: UInt8.self)
-      value /= radix
-    }
-  }
-
-  if negative {
-    offset &-= 1
-    unsafe buffer.storeBytes(
-      of: 0x2d /* "-" */,
-      toUncheckedByteOffset: offset,
-      as: UInt8.self)
-  }
-
-  return offset..<buffer.byteCount
 }
