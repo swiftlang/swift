@@ -1083,6 +1083,13 @@ static llvm::Constant *getAddrOfGlobalCoroAllocator(
   return taskAllocator;
 }
 
+static llvm::Constant *getAddrOfGlobalCoroAllocator(
+    IRGenModule &IGM, CoroAllocatorKind kind, bool shouldDeallocateImmediately,
+    llvm::Constant *allocFn, llvm::Constant *deallocFn) {
+  return getAddrOfGlobalCoroAllocator(IGM, kind, shouldDeallocateImmediately,
+                                      allocFn, deallocFn, allocFn, deallocFn);
+}
+
 static llvm::Constant *getAddrOfSwiftCoroMalloc(
                                                 IRGenModule &IGM) {
   return getAddrOfSwiftCoroAllocThunk("_swift_coro_malloc",
@@ -1098,13 +1105,10 @@ static llvm::Constant *getAddrOfSwiftCoroFree(
 }
 
 llvm::Constant *IRGenModule::getAddrOfGlobalCoroMallocAllocator() {
-  return getAddrOfGlobalCoroAllocator(
-      *this, CoroAllocatorKind::Malloc,
-      /*shouldDeallocateImmediately=*/true,
-      getAddrOfSwiftCoroMalloc(*this),
-      getAddrOfSwiftCoroFree(*this),
-      getAddrOfSwiftCoroMalloc(*this),
-      getAddrOfSwiftCoroFree(*this));
+  return getAddrOfGlobalCoroAllocator(*this, CoroAllocatorKind::Malloc,
+                                      /*shouldDeallocateImmediately=*/true,
+                                      getAddrOfSwiftCoroMalloc(*this),
+                                      getAddrOfSwiftCoroFree(*this));
 }
 
 static llvm::Constant *
@@ -1122,13 +1126,10 @@ getAddrOfSwiftCoroTaskDealloc(IRGenModule &IGM) {
 }
 
 llvm::Constant *IRGenModule::getAddrOfGlobalCoroAsyncTaskAllocator() {
-  return getAddrOfGlobalCoroAllocator(
-      *this, CoroAllocatorKind::Async,
-      /*shouldDeallocateImmediately=*/false,
-      getAddrOfSwiftCoroTaskAlloc(*this),
-      getAddrOfSwiftCoroTaskDealloc(*this),
-      getAddrOfSwiftCoroTaskAlloc(*this),
-      getAddrOfSwiftCoroTaskDealloc(*this));
+  return getAddrOfGlobalCoroAllocator(*this, CoroAllocatorKind::Async,
+                                      /*shouldDeallocateImmediately=*/false,
+                                      getAddrOfSwiftCoroTaskAlloc(*this),
+                                      getAddrOfSwiftCoroTaskDealloc(*this));
 }
 
 llvm::Value *
