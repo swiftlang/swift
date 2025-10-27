@@ -202,19 +202,18 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
     /// Demangle the raw name, if possible.
     private func demangleRawName() -> String {
+      // Fallback to backtrace entrypoint to the demangler.
       var length: size_t = 0
-      if let demangled = _swift_backtrace_demangle(rawName, rawName.utf8.count,
-                                                   nil, &length) {
+      if let demangled = _swift_backtrace_demangle(rawName, rawName.utf8.count, nil, &length) {
         defer { free(demangled) }
 
         // length is the size of the buffer that was allocated, *not* the
         // length of the string.
         let stringLen = strlen(demangled)
         if stringLen > 0 {
-          return demangled.withMemoryRebound(to: UInt8.self,
-                                             capacity: stringLen) {
+          return demangled.withMemoryRebound(to: UInt8.self, capacity: stringLen) {
             let demangledBytes = UnsafeBufferPointer<UInt8>(start: $0,
-                                                            count: stringLen)
+            count: stringLen)
             return String(decoding: demangledBytes, as: UTF8.self)
           }
         }

@@ -24,6 +24,12 @@
 #include <objc/runtime.h>
 #endif
 
+#ifdef _WIN32
+// We'll probably want dbghelp.h here
+#else
+#include <cxxabi.h>
+#endif
+
 using namespace swift;
 
 Demangle::NodePointer
@@ -1033,3 +1039,110 @@ char *swift_demangle(const char *mangledName,
   return outputBuffer;
 #endif
 }
+
+namespace swift {
+  namespace runtime {
+    // Demangle entry point for backtrace and public demangle() Swift API.
+    SWIFT_RUNTIME_STDLIB_SPI char *
+    _swift_runtime_demangle(const char *mangledName,
+                            size_t mangledNameLength,
+                            char *outputBuffer,
+                            size_t *outputBufferSize,
+                            uint32_t flags) {
+      if (flags > 1) {
+        // ignore not supported flags
+        return nullptr;
+      }
+
+      // Very simple flags parsing, move to something more proper once we support more flags
+      bool shouldNullTerminateString = flags & 1;
+      bool shouldUseSimplifiedUIDemangleOptions = flags & 1;
+
+      llvm::StringRef name = llvm::StringRef(mangledName, mangledNameLength);
+
+      // You must provide buffer size if you're providing your own output buffer
+      if (outputBuffer && !outputBufferSize) {
+        return nullptr;
+      }
+
+      if (Demangle::isSwiftSymbol(name)) {
+        // Determine demangling/formatting options:
+        auto options = DemangleOptions();
+        if (shouldUseSimplifiedUIDemangleOptions) {
+          // simplified display options, for backtraces
+          options = DemangleOptions::SimplifiedUIDemangleOptions();
+        }
+
+        auto result = Demangle::demangleSymbolAsString(name, options);
+        size_t bufferSize;
+
+        if (outputBufferSize) {
+          bufferSize = *outputBufferSize;
+          *outputBufferSize = result.length();
+        }
+
+        if (outputBuffer == nullptr) {
+          auto totalLength = shouldNullTerminateString ? (result.length() + 1) : result.length();
+          outputBuffer = (char *)::malloc(totalLength);
+          bufferSize = result.length();
+        }
+
+        size_t toCopy = std::min(
+          shouldNullTerminateString ? (bufferSize - 1) : bufferSize, 
+          shouldNullTerminateString ? (result.length() - 1) : result.length()
+        );
+        ::memcpy(outputBuffer, result.data(), toCopy);
+        if (shouldNullTerminateString) {
+          outputBuffer[toCopy] = '\0';
+        }
+
+        return outputBuffer;
+    #ifndef _WIN32
+      } else if (name.starts_with("_Z")) {
+        // Try C++; note that we don't want to force callers to use malloc() to
+        // allocate their buffer, which is a requirement for __cxa_demangle
+        // because it may call realloc() on the incoming pointer.  As a result,
+        // we never pass the caller's buffer to __cxa_demangle.
+        size_t resultLen;
+        int status = 0;
+        char *result = abi::__cxa_demangle(mangledName, nullptr, &resultLen, &status);
+
+        if (result) {
+          size_t bufferSize;
+
+          if (outputBufferSize) {
+            bufferSize = *outputBufferSize;
+            *outputBufferSize = resultLen;
+          }
+
+          if (outputBuffer == nullptr) {
+            return result;
+          }
+
+          size_t toCopy = std::min(
+            shouldNullTerminateString ? (bufferSize - 1) : bufferSize, 
+            shouldNullTerminateString ? (resultLen - 1) : resultLen
+          );
+          ::memcpy(outputBuffer, result, toCopy);
+          if (shouldNullTerminateString) {
+            outputBuffer[toCopy] = '\0';
+          }
+
+          free(result);
+
+          return outputBuffer;
+        }
+    #else
+        // On Windows, the mangling is different.
+        // ###TODO: Call __unDName()
+    #endif
+      }
+
+      if (outputBufferSize) {
+        *outputBufferSize = 0; // indicate we did not write to buffer
+      }
+      return nullptr;
+    }
+  }
+}
+
