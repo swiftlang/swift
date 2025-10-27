@@ -1441,7 +1441,7 @@ internal func _UInt64ToASCII(
     if value != 0 {
       offset &-= 1
       unsafe buffer.storeBytes(
-        of: UInt8(truncatingIfNeeded: value) &+ 0x30,
+        of: UInt8(truncatingIfNeeded: value) | 0x30,
         toUncheckedByteOffset: offset,
         as: UInt8.self)
     }
@@ -1460,14 +1460,22 @@ internal func _UInt64ToASCII(
         as: UInt8.self)
       value &>>= 4
     }
+  } else if radix == 8 {
+    while value != 0 {
+      offset &-= 1
+      unsafe buffer.storeBytes(
+        of: UInt8(truncatingIfNeeded: value & 0x7) | 0x30,
+        toUncheckedByteOffset: offset,
+        as: UInt8.self)
+      value &>>= 3
+    }
   } else if radix == 2 {
     while value != 0 {
       offset &-= 1
       unsafe buffer.storeBytes(
-        of: UInt8(truncatingIfNeeded: value & 1) &+ 0x30,
+        of: UInt8(truncatingIfNeeded: value & 1) | 0x30,
         toUncheckedByteOffset: offset,
-        as: UInt8.self
-      )
+        as: UInt8.self)
       value &>>= 1
     }
   } else {
