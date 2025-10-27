@@ -73,14 +73,12 @@ Protocol CodingKey has added inherited protocol Escapable
 Protocol Collection has added inherited protocol Copyable
 Protocol Collection has added inherited protocol Escapable
 Protocol Comparable has generic signature change from <Self : Swift.Equatable> to <Self : Swift.Equatable, Self : ~Copyable, Self : ~Escapable>
-Protocol CustomDebugStringConvertible has added inherited protocol Escapable
 Protocol CustomLeafReflectable has added inherited protocol Copyable
 Protocol CustomLeafReflectable has added inherited protocol Escapable
 Protocol CustomPlaygroundDisplayConvertible has added inherited protocol Copyable
 Protocol CustomPlaygroundDisplayConvertible has added inherited protocol Escapable
 Protocol CustomReflectable has added inherited protocol Copyable
 Protocol CustomReflectable has added inherited protocol Escapable
-Protocol CustomStringConvertible has added inherited protocol Escapable
 Protocol Decodable has added inherited protocol Copyable
 Protocol Decodable has added inherited protocol Escapable
 Protocol Decoder has added inherited protocol Copyable
@@ -173,7 +171,6 @@ Protocol StringProtocol has added inherited protocol Copyable
 Protocol StringProtocol has added inherited protocol Escapable
 Protocol TextOutputStream has added inherited protocol Copyable
 Protocol TextOutputStream has added inherited protocol Escapable
-Protocol TextOutputStreamable has added inherited protocol Escapable
 Protocol UnicodeCodec has added inherited protocol Copyable
 Protocol UnicodeCodec has added inherited protocol Escapable
 Protocol UnkeyedDecodingContainer has added inherited protocol Copyable
@@ -185,8 +182,8 @@ Protocol UnsignedInteger has added inherited protocol Escapable
 Protocol _AppendKeyPath has added inherited protocol Copyable
 Protocol _AppendKeyPath has added inherited protocol Escapable
 
-Accessor CustomDebugStringConvertible.debugDescription.Get() has generic signature change from <Self where Self : Swift.CustomDebugStringConvertible> to <Self where Self : Swift.CustomDebugStringConvertible, Self : ~Copyable>
-Accessor CustomStringConvertible.description.Get() has generic signature change from <Self where Self : Swift.CustomStringConvertible> to <Self where Self : Swift.CustomStringConvertible, Self : ~Copyable>
+Accessor CustomDebugStringConvertible.debugDescription.Get() has generic signature change from <Self where Self : Swift.CustomDebugStringConvertible> to <Self where Self : Swift.CustomDebugStringConvertible, Self : ~Copyable, Self : ~Escapable>
+Accessor CustomStringConvertible.description.Get() has generic signature change from <Self where Self : Swift.CustomStringConvertible> to <Self where Self : Swift.CustomStringConvertible, Self : ~Copyable, Self : ~Escapable>
 Accessor ManagedBuffer.capacity.Get() has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Accessor ManagedBuffer.header.Get() has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Accessor ManagedBuffer.header.Set() has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
@@ -338,9 +335,9 @@ TypeAlias UnsafePointer.Stride has generic signature change from <Pointee> to <P
 Func FixedWidthInteger.&*(_:_:) has been added as a protocol requirement
 Accessor UnsafeBufferPointer.debugDescription.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Accessor UnsafeMutableBufferPointer.debugDescription.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
-Func DefaultStringInterpolation.appendInterpolation(_:) has generic signature change from <T where T : Swift.CustomStringConvertible, T : Swift.TextOutputStreamable> to <T where T : Swift.CustomStringConvertible, T : Swift.TextOutputStreamable, T : ~Copyable>
-Func DefaultStringInterpolation.appendInterpolation(_:) has generic signature change from <T where T : Swift.CustomStringConvertible> to <T where T : Swift.CustomStringConvertible, T : ~Copyable>
-Func DefaultStringInterpolation.appendInterpolation(_:) has generic signature change from <T where T : Swift.TextOutputStreamable> to <T where T : Swift.TextOutputStreamable, T : ~Copyable>
+Func DefaultStringInterpolation.appendInterpolation(_:) has generic signature change from <T where T : Swift.CustomStringConvertible, T : Swift.TextOutputStreamable> to <T where T : Swift.CustomStringConvertible, T : Swift.TextOutputStreamable, T : ~Copyable, T : ~Escapable>
+Func DefaultStringInterpolation.appendInterpolation(_:) has generic signature change from <T where T : Swift.CustomStringConvertible> to <T where T : Swift.CustomStringConvertible, T : ~Copyable, T : ~Escapable>
+Func DefaultStringInterpolation.appendInterpolation(_:) has generic signature change from <T where T : Swift.TextOutputStreamable> to <T where T : Swift.TextOutputStreamable, T : ~Copyable, T : ~Escapable>
 Func DefaultStringInterpolation.appendInterpolation(_:) has parameter 0 changing from Default to Shared
 Func ManagedBuffer.withUnsafeMutablePointerToElements(_:) has generic signature change from <Header, Element, R> to <Header, Element, E, R where E : Swift.Error, Element : ~Copyable, R : ~Copyable>
 Func ManagedBuffer.withUnsafeMutablePointerToElements(_:) is now without rethrows
@@ -364,7 +361,7 @@ Func Result.flatMapError(_:) has generic signature change from <Success, Failure
 Func Result.flatMapError(_:) has self access kind changing from NonMutating to Consuming
 Func Result.map(_:) has generic signature change from <Success, Failure, NewSuccess where Failure : Swift.Error> to <Success, Failure, NewSuccess where Failure : Swift.Error, NewSuccess : ~Copyable>
 Func Result.mapError(_:) has generic signature change from <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error> to <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error, Success : ~Copyable, Success : ~Escapable>
-Func TextOutputStreamable.write(to:) has generic signature change from <Self, Target where Self : Swift.TextOutputStreamable, Target : Swift.TextOutputStream> to <Self, Target where Self : Swift.TextOutputStreamable, Target : Swift.TextOutputStream, Self : ~Copyable>
+Func TextOutputStreamable.write(to:) has generic signature change from <Self, Target where Self : Swift.TextOutputStreamable, Target : Swift.TextOutputStream> to <Self, Target where Self : Swift.TextOutputStreamable, Target : Swift.TextOutputStream, Self : ~Copyable, Self : ~Escapable>
 Func UnsafeBufferPointer.withMemoryRebound(to:_:) has generic signature change from <Element, T, Result> to <Element, T, E, Result where E : Swift.Error, Element : ~Copyable, T : ~Copyable, Result : ~Copyable>
 Func UnsafeBufferPointer.withMemoryRebound(to:_:) is now without rethrows
 Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) has generic signature change from <Element, T, Result> to <Element, T, E, Result where E : Swift.Error, Element : ~Copyable, T : ~Copyable, Result : ~Copyable>

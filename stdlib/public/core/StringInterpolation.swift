@@ -107,7 +107,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   @inlinable
   @_preInverseGenerics
   public mutating func appendInterpolation<T>(_ value: borrowing T)
-    where T: TextOutputStreamable, T: CustomStringConvertible, T: ~Copyable
+    where T: TextOutputStreamable, T: CustomStringConvertible, T: ~Copyable & ~Escapable
   {
     value.write(to: &self)
   }
@@ -130,7 +130,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   @inlinable
   @_preInverseGenerics
   public mutating func appendInterpolation<T>(_ value: borrowing T)
-    where T: TextOutputStreamable & ~Copyable
+    where T: TextOutputStreamable & ~Copyable & ~Escapable
   {
     value.write(to: &self)
   }
@@ -155,7 +155,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   @inlinable
   @_preInverseGenerics
   public mutating func appendInterpolation<T>(_ value: borrowing T)
-    where T: CustomStringConvertible, T: ~Copyable
+    where T: CustomStringConvertible, T: ~Copyable & ~Escapable
   {
     value.description.write(to: &self)
   }
@@ -224,7 +224,7 @@ extension DefaultStringInterpolation {
   public mutating func appendInterpolation<T>(
     _ value: borrowing T?,
     default: @autoclosure () -> some StringProtocol
-  ) where T: TextOutputStreamable, T: CustomStringConvertible, T: ~Copyable {
+  ) where T: TextOutputStreamable, T: CustomStringConvertible, T: ~Copyable & ~Escapable {
     switch value {
     case let value?:
       self.appendInterpolation(value)
@@ -256,7 +256,7 @@ extension DefaultStringInterpolation {
   public mutating func appendInterpolation<T>(
     _ value: borrowing T?,
     default: @autoclosure () -> some StringProtocol
-  ) where T: TextOutputStreamable & ~Copyable {
+  ) where T: TextOutputStreamable & ~Copyable & ~Escapable {
     switch value {
     case let value?:
       self.appendInterpolation(value)
@@ -288,7 +288,7 @@ extension DefaultStringInterpolation {
   public mutating func appendInterpolation<T>(
     _ value: borrowing T?, 
     default: @autoclosure () -> some StringProtocol
-  ) where T: CustomStringConvertible, T: ~Copyable {
+  ) where T: CustomStringConvertible, T: ~Copyable & ~Escapable {
     switch value {
     case let value?:
       self.appendInterpolation(value)
