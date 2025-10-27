@@ -1022,7 +1022,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   // Note: Reusing the file manager is safe; this is a component that's already
   // reused when building PCM files for the module cache.
   CI.setVirtualFileSystem(Impl.Instance->getVirtualFileSystemPtr());
-  CI.setFileManager(&Impl.Instance->getFileManager());
+  CI.setFileManager(Impl.Instance->getFileManagerPtr());
   CI.createSourceManager();
   auto &clangSrcMgr = CI.getSourceManager();
   auto FID = clangSrcMgr.createFileID(
@@ -1409,7 +1409,6 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
   auto actualDiagClient = std::make_unique<ClangDiagnosticConsumer>(
       importer->Impl, instance.getDiagnosticOpts(),
       importerOpts.DumpClangDiagnostics);
-
   instance.createVirtualFileSystem(std::move(VFS), actualDiagClient.get());
   instance.createFileManager();
   instance.createDiagnostics(actualDiagClient.release());
@@ -1927,7 +1926,7 @@ std::string ClangImporter::getBridgingHeaderContents(
       &Impl.Instance->getModuleCache());
   rewriteInstance.setVirtualFileSystem(
       Impl.Instance->getVirtualFileSystemPtr());
-  rewriteInstance.setFileManager(&Impl.Instance->getFileManager());
+  rewriteInstance.setFileManager(Impl.Instance->getFileManagerPtr());
   rewriteInstance.createDiagnostics(new clang::IgnoringDiagConsumer);
   rewriteInstance.createSourceManager();
   rewriteInstance.setTarget(&Impl.Instance->getTarget());
@@ -1977,8 +1976,7 @@ std::string ClangImporter::getBridgingHeaderContents(
     return "";
   }
 
-  if (auto fileInfo =
-          rewriteInstance.getFileManager().getOptionalFileRef(headerPath)) {
+  if (auto fileInfo = rewriteInstance.getFileManager().getOptionalFileRef(headerPath)) {
     fileSize = fileInfo->getSize();
     fileModTime = fileInfo->getModificationTime();
   }
@@ -2032,7 +2030,7 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
       &Impl.Instance->getModuleCache());
   clonedInstance->setVirtualFileSystem(
       Impl.Instance->getVirtualFileSystemPtr());
-  clonedInstance->setFileManager(&Impl.Instance->getFileManager());
+  clonedInstance->setFileManager(Impl.Instance->getFileManagerPtr());
   clonedInstance->createDiagnostics(&Impl.Instance->getDiagnosticClient(),
                                     /*ShouldOwnClient=*/false);
   clonedInstance->createSourceManager();
