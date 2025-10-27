@@ -1094,11 +1094,11 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
       codeKey, /*address*/ false, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::CoroDeallocationFunction);
 
-  opts.CoroAllocationFunction = PointerAuthSchema(
+  opts.CoroFrameAllocationFunction = PointerAuthSchema(
       codeKey, /*address*/ false, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::CoroFrameAllocationFunction);
 
-  opts.CoroDeallocationFunction = PointerAuthSchema(
+  opts.CoroFrameDeallocationFunction = PointerAuthSchema(
       codeKey, /*address*/ false, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::CoroFrameDeallocationFunction);
 }
