@@ -157,7 +157,11 @@ public func freeBridgedString(bridged: BridgedStringRef) {
   bridged.data?.deallocate()
 }
 
-extension BridgedStringRef: /*@retroactive*/ Swift.ExpressibleByStringLiteral {
+extension BridgedStringRef:
+  /*@retroactive*/ Swift.ExpressibleByStringLiteral,
+                   Swift.ExpressibleByExtendedGraphemeClusterLiteral,
+                   Swift.ExpressibleByUnicodeScalarLiteral
+{
   public init(stringLiteral str: StaticString) {
     self.init(data: str.utf8Start, count: str.utf8CodeUnitCount)
   }
