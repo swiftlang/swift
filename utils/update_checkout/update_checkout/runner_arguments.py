@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from .cli_arguments import CliArguments
 
@@ -15,12 +15,12 @@ class UpdateArguments(RunnerArguments):
     source_root: str
     config: Dict[str, Any]
     scheme_map: Any
-    tag: str
+    tag: Optional[str]
     timestamp: Any
     reset_to_remote: bool
     clean: bool
     stash: bool
-    cross_repos_pr: bool
+    cross_repos_pr: Dict[str, str]
 
 @dataclass
 class AdditionalSwiftSourcesArguments(RunnerArguments):
