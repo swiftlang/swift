@@ -3032,14 +3032,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
 
   case DeclAttrKind::CDecl: {
-    if (!AttrName.starts_with("_") &&
-
-        // Backwards support for @c("stringId"). Remove before enabling in
-        // production so we accept only the identifier format.
-        lookahead(1, [&](CancellableBacktrackingScope &) {
-           return Tok.isNot(tok::string_literal);
-        })) {
-
+    if (AttrName == "c") {
       std::optional<StringRef> CName;
       if (consumeIfAttributeLParen()) {
         // Custom C name.

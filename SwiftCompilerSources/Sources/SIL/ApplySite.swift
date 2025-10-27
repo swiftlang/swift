@@ -256,6 +256,14 @@ extension ApplySite {
   }
 
   public func isAddressable(operand: Operand) -> Bool {
+    for targetOperand in argumentOperands {
+      guard !targetOperand.value.isEscapable else {
+        continue
+      }
+      if let dep = parameterDependence(target: targetOperand, source: operand), dep.isAddressable(for: operand.value) {
+        return true
+      }
+    }
     if let dep = resultDependence(on: operand) {
       return dep.isAddressable(for: operand.value)
     }
@@ -398,4 +406,16 @@ extension FullApplySite {
     }
     return values
   }
+}
+
+let addressableTest = Test("addressable_arguments") {
+  function, arguments, context in
+
+  let operand = arguments.takeOperand()
+  guard let apply = operand.instruction as? ApplySite, let argIdx = apply.calleeArgumentIndex(of: operand) else {
+    fatalError("tested operand must be an apply argument")
+  }
+  let isAddressable = apply.isAddressable(operand: operand)
+  print("Arg Index: \(argIdx) of Apply: \(apply)")
+  print("  isAddressable: \(isAddressable)")
 }
