@@ -147,7 +147,8 @@ public func registerTests() {
     borrowIntroducersTest,
     enclosingValuesTest,
     forwardingDefUseTest,
-    forwardingUseDefTest
+    forwardingUseDefTest,
+    addressableTest
   )
 
   registerTestThunk(testThunk)
