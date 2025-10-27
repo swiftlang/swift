@@ -160,8 +160,8 @@ do {
     var p: UnsafeMutableRawPointer { get { fatalError() } }
 
     func f(_ p: UnsafeMutableRawPointer) {
-      // The old hack (which is now removed) couldn't handle member references, only direct declaration references.
       guard let x = UnsafeMutablePointer<Double>(OpaquePointer(self.p)) else {
+        // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'UnsafeMutablePointer<Double>'}}
         return
       }
       _ = x
