@@ -99,7 +99,7 @@ extension TextOutputStream {
 /// To add `TextOutputStreamable` conformance to a custom type, implement the
 /// required `write(to:)` method. Call the given output stream's `write(_:)`
 /// method in your implementation.
-public protocol TextOutputStreamable: ~Copyable {
+public protocol TextOutputStreamable: ~Copyable, ~Escapable {
   /// Writes a textual representation of this instance into the given output
   /// stream.
   func write<Target: TextOutputStream>(to target: inout Target)
@@ -147,7 +147,7 @@ public protocol TextOutputStreamable: ~Copyable {
 ///
 ///     print(p)
 ///     // Prints "(21, 30)"
-public protocol CustomStringConvertible: ~Copyable {
+public protocol CustomStringConvertible: ~Copyable, ~Escapable {
   /// A textual representation of this instance.
   ///
   /// Calling this property directly is discouraged. Instead, convert an
@@ -239,7 +239,7 @@ public protocol LosslessStringConvertible: CustomStringConvertible, ~Copyable {
 ///
 ///     print(String(reflecting: p))
 ///     // Prints "(21, 30)"
-public protocol CustomDebugStringConvertible: ~Copyable {
+public protocol CustomDebugStringConvertible: ~Copyable, ~Escapable {
   /// A textual representation of this instance, suitable for debugging.
   ///
   /// Calling this property directly is discouraged. Instead, convert an
