@@ -560,6 +560,9 @@ func bad_if() {
   if (x: false) {} // expected-error {{cannot convert value of type '(x: Bool)' to expected condition type 'Bool'}}
   if (x: 1) {} // expected-error {{cannot convert value of type '(x: Int)' to expected condition type 'Bool'}}
   if nil {} // expected-error {{'nil' is not compatible with expected condition type 'Bool'}}
+  if undefined {} // expected-error {{cannot find 'undefined' in scope}}
+  if [undefined] {} // expected-error {{cannot find 'undefined' in scope}}
+  // expected-error@-1 {{cannot convert value of type '[Element]' to expected condition type 'Bool'}}
 }
 
 // Typo correction for loop labels

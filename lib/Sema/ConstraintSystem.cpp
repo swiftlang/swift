@@ -3581,12 +3581,13 @@ void constraints::simplifyLocator(ASTNode &anchor,
     }
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::LValueConversion:
+    case ConstraintLocator::OptionalInjection:
     case ConstraintLocator::DynamicType:
     case ConstraintLocator::UnresolvedMember:
     case ConstraintLocator::ImplicitCallAsFunction:
       // Arguments in autoclosure positions, lvalue and rvalue adjustments,
-      // unresolved members, and implicit callAsFunction references are
-      // implicit.
+      // optional injections, unresolved members, and implicit callAsFunction
+      // references are implicit.
       path = path.slice(1);
       continue;
 
@@ -3913,7 +3914,6 @@ void constraints::simplifyLocator(ASTNode &anchor,
 
     case ConstraintLocator::Witness:
     case ConstraintLocator::WrappedValue:
-    case ConstraintLocator::OptionalInjection:
     case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
     case ConstraintLocator::FallbackType:
     case ConstraintLocator::KeyPathSubscriptIndex:
