@@ -1322,7 +1322,18 @@ namespace {
     }
 
     virtual Type visitErrorExpr(ErrorExpr *E) {
-      return recordInvalidNode(E);
+      auto ty = recordInvalidNode(E);
+      // If we have an original expression, introduce a conversion to the hole
+      // type of the ErrorExpr. This avoids unnecessary diagnostics for the
+      // original expression in cases where the ErrorExpr could have provided
+      // contextual info, while also still allowing the original expression to
+      // be solved without holes being introduced prematurely, allowing e.g
+      // cursor info to work correctly.
+      if (auto *orig = E->getOriginalExpr()) {
+        CS.addConstraint(ConstraintKind::Conversion, CS.getType(orig), ty,
+                         CS.getConstraintLocator(E));
+      }
+      return ty;
     }
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
