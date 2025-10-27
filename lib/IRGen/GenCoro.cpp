@@ -801,17 +801,24 @@ struct Allocator {
   Allocator(llvm::Value *address, IRGenFunction &IGF)
       : address(address), IGF(IGF) {}
 
-  llvm::Value *getField(Field field) {
+  struct FieldLoad {
+    llvm::Value *address;
+    llvm::Value *value;
+  };
+
+  FieldLoad loadField(Field field) {
     auto *fieldAddress = IGF.Builder.CreateInBoundsGEP(
         IGF.IGM.CoroAllocatorTy, address,
         {llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0),
          llvm::ConstantInt::get(IGF.IGM.Int32Ty, field.kind)});
-    return IGF.Builder.CreateLoad(Address(fieldAddress, field.getType(IGF.IGM),
-                                          field.getAlignment(IGF.IGM)),
-                                  field.getName());
+    auto *value =
+        IGF.Builder.CreateLoad(Address(fieldAddress, field.getType(IGF.IGM),
+                                       field.getAlignment(IGF.IGM)),
+                               field.getName());
+    return {fieldAddress, value};
   }
 
-  llvm::Value *getFlags() { return getField(Field::Flags); }
+  llvm::Value *getFlags() { return loadField(Field::Flags).value; }
 
   FunctionPointer getAllocate(AllocationKind kind) {
     switch (kind) {
@@ -862,10 +869,11 @@ private:
   }
 
   FunctionPointer getFunctionPointer(Field field) {
-    llvm::Value *callee = getField(field);
+    auto fieldValues = loadField(field);
+    auto *callee = fieldValues.value;
     if (auto &schema = field.getSchema(IGF.IGM)) {
-      auto info =
-          PointerAuthInfo::emit(IGF, schema, nullptr, PointerAuthEntity());
+      auto info = PointerAuthInfo::emit(IGF, schema, fieldValues.address,
+                                        field.getEntity(IGF.IGM));
       callee = emitPointerAuthAuth(IGF, callee, info);
     }
     return FunctionPointer::createUnsigned(
