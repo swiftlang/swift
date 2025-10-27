@@ -1090,15 +1090,13 @@ static llvm::Constant *getAddrOfGlobalCoroAllocator(
                                       allocFn, deallocFn, allocFn, deallocFn);
 }
 
-static llvm::Constant *getAddrOfSwiftCoroMalloc(
-                                                IRGenModule &IGM) {
+static llvm::Constant *getAddrOfSwiftCoroMalloc(IRGenModule &IGM) {
   return getAddrOfSwiftCoroAllocThunk("_swift_coro_malloc",
                                       &IRGenModule::getMallocFunctionPointer,
                                       IGM);
 }
 
-static llvm::Constant *getAddrOfSwiftCoroFree(
-                                              IRGenModule &IGM) {
+static llvm::Constant *getAddrOfSwiftCoroFree(IRGenModule &IGM) {
   return getAddrOfSwiftCoroDeallocThunk("_swift_coro_free",
                                         &IRGenModule::getFreeFunctionPointer,
                                         IGM);
