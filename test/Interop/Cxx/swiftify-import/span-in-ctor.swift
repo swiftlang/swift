@@ -10,8 +10,6 @@
 // CHECK:    unsafe self.init(IntSpan(sp))
 // CHECK: }
 
-// rdar://163511959 error: circular reference
-// XFAIL: *
 
 //--- Inputs/module.modulemap
 module Method {
