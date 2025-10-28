@@ -424,7 +424,7 @@ RewriteContext::getRelativeTermForType(CanType typeWitness,
   // Get the substitution S corresponding to τ_0_n.
   unsigned index = getGenericParamIndex(typeWitness->getRootGenericParam());
   result = MutableTerm(substitutions[index]);
-  ASSERT(result.back().getKind() != Symbol::Kind::Shape);
+  ASSERT(!result.hasShape());
 
   // If the substitution is a term consisting of a single protocol symbol
   // [P], save P for later.
@@ -485,7 +485,7 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
           auto substitution = substitutions[index];
 
           bool isShapePosition = (pos == TypePosition::Shape);
-          bool isShapeTerm = (substitution.back() == Symbol::forShape(Context));
+          bool isShapeTerm = substitution.hasShape();
           if (isShapePosition != isShapeTerm) {
             ABORT([&](auto &out) {
               out << "Shape vs. type mixup\n\n";
@@ -504,8 +504,8 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
           // Undo the thing where the count type of a PackExpansionType
           // becomes a shape term.
           if (isShapeTerm) {
-            MutableTerm mutTerm(substitution.begin(), substitution.end() - 1);
-            substitution = Term::get(mutTerm, Context);
+            MutableTerm noShape = substitution.termWithoutShape();
+            substitution = Term::get(noShape, Context);
           }
 
           // Prepend the prefix of the lookup key to the substitution.
