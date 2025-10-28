@@ -20,8 +20,12 @@ public struct Sample3 {}
 public struct Sample4 {}
 public struct Sample5 {}
 public struct Sample6 {}
+public struct Sample6a {}
+public struct Sample6b {}
+public struct Sample6c {}
 public struct Sample7 {}
 public struct Sample8 {}
+public struct Sample8a {}
 
 public struct SampleAlreadyConforms: SampleProtocol1 {}
 
@@ -76,9 +80,13 @@ typealias MySample6 = Sample6
 extension MySample6: SampleProtocol1 {} // expected-warning {{extension declares a conformance of imported type 'Sample6' to imported protocol 'SampleProtocol1'}}
 // expected-note @-1 {{add '@retroactive' to silence this warning}} {{22-37=@retroactive SampleProtocol1}}
 
-// Ensure module-qualifying both types still silences the warning
+// Ensure module-qualifying the protocol silences the warning
 
-extension Library.Sample6: Library.SampleProtocol2 {} // ok, module-qualified.
+extension Library.Sample6: Library.SampleProtocol2 {} // ok, both types are module-qualified.
+extension Sample6a: Library.SampleProtocol2 {} // ok, protocol is module qualified.
+extension Library.Sample6b: SampleProtocol2 {} // expected-warning {{extension declares a conformance of imported type 'Sample6b' to imported protocol 'SampleProtocol2'; this will not behave correctly if the owners of 'Library' introduce this conformance in the future}}
+// expected-note @-1 {{add '@retroactive' to silence this warning}}
+extension Sample6c: Library.SampleProtocol1a {} // ok, protocol is module qualified.
 
 protocol ClientProtocol {}
 
