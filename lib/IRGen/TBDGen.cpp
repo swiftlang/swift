@@ -245,6 +245,12 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver,
   switch(Ver.Platform) {
   case swift::PlatformKind::none:
     llvm_unreachable("cannot find platform kind");
+  case swift::PlatformKind::DriverKit:
+    llvm_unreachable("not used for this platform");
+  case swift::PlatformKind::Swift:
+    llvm_unreachable("not used for this platform");
+  case PlatformKind::anyAppleOS:
+    llvm_unreachable("not used for this platform");
   case swift::PlatformKind::FreeBSD:
     llvm_unreachable("not used for this platform");
   case swift::PlatformKind::OpenBSD:
@@ -253,6 +259,7 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver,
     llvm_unreachable("not used for this platform");
   case swift::PlatformKind::Android:
     llvm_unreachable("not used for this platform");
+
   case swift::PlatformKind::iOS:
   case swift::PlatformKind::iOSApplicationExtension:
     if (target && target->isMacCatalystEnvironment())

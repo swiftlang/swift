@@ -115,6 +115,9 @@ swift::basePlatformForExtensionPlatform(PlatformKind Platform) {
   case PlatformKind::tvOS:
   case PlatformKind::watchOS:
   case PlatformKind::visionOS:
+  case PlatformKind::DriverKit:
+  case PlatformKind::Swift:
+  case PlatformKind::anyAppleOS:
   case PlatformKind::FreeBSD:
   case PlatformKind::OpenBSD:
   case PlatformKind::Windows:
@@ -159,6 +162,11 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
     case PlatformKind::visionOS:
     case PlatformKind::visionOSApplicationExtension:
       return Target.isXROS();
+    case PlatformKind::DriverKit:
+      return Target.isDriverKit();
+    case PlatformKind::Swift:
+    case PlatformKind::anyAppleOS:
+      return Target.isOSDarwin();
     case PlatformKind::OpenBSD:
       return Target.isOSOpenBSD();
     case PlatformKind::FreeBSD:
@@ -292,6 +300,11 @@ swift::tripleOSTypeForPlatform(PlatformKind platform) {
   case PlatformKind::visionOS:
   case PlatformKind::visionOSApplicationExtension:
     return llvm::Triple::XROS;
+  case PlatformKind::DriverKit:
+    return llvm::Triple::DriverKit;
+  case PlatformKind::Swift:
+  case PlatformKind::anyAppleOS:
+      return std::nullopt;
   case PlatformKind::FreeBSD:
     return llvm::Triple::FreeBSD;
   case PlatformKind::OpenBSD:
@@ -332,6 +345,9 @@ bool swift::isPlatformSPI(PlatformKind Platform) {
   case PlatformKind::watchOSApplicationExtension:
   case PlatformKind::visionOS:
   case PlatformKind::visionOSApplicationExtension:
+  case PlatformKind::DriverKit:
+  case PlatformKind::Swift:
+  case PlatformKind::anyAppleOS:
   case PlatformKind::OpenBSD:
   case PlatformKind::FreeBSD:
   case PlatformKind::Windows:

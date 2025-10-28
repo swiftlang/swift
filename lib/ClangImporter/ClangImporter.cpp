@@ -2559,6 +2559,14 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
   case PlatformKind::visionOSApplicationExtension:
     break;
 
+  case PlatformKind::DriverKit:
+    deprecatedAsUnavailableMessage = "";
+    break;
+
+  case PlatformKind::Swift:
+  case PlatformKind::anyAppleOS:
+    llvm_unreachable("Unexpected platform");
+
   case PlatformKind::FreeBSD:
     deprecatedAsUnavailableMessage = "";
     break;
@@ -2613,6 +2621,13 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
   case PlatformKind::visionOSApplicationExtension:
     return name == "xros" || name == "xros_app_extension" ||
            name == "visionos" || name == "visionos_app_extension";
+
+  case PlatformKind::DriverKit:
+    return name == "driverkit";
+
+  case PlatformKind::Swift:
+  case PlatformKind::anyAppleOS:
+    break; // Unexpected
 
   case PlatformKind::FreeBSD:
     return name == "freebsd";
@@ -2690,6 +2705,15 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   case PlatformKind::visionOSApplicationExtension:
     // No deprecation filter on xrOS
     return false;
+
+  case PlatformKind::DriverKit:
+    // No deprecation filter on DriverKit
+    // FIXME: [availability] This should probably have a value.
+    return false;
+
+  case PlatformKind::Swift:
+  case PlatformKind::anyAppleOS:
+    break; // Unexpected
 
   case PlatformKind::FreeBSD:
     // No deprecation filter on FreeBSD
