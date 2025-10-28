@@ -1702,10 +1702,11 @@ public:
     // Type-check the subject expression.
     Expr *subjectExpr = switchStmt->getSubjectExpr();
     auto resultTy = TypeChecker::typeCheckExpression(subjectExpr, DC);
+
     auto limitExhaustivityChecks = !resultTy;
-    if (Expr *newSubjectExpr =
-            TypeChecker::coerceToRValue(getASTContext(), subjectExpr))
-      subjectExpr = newSubjectExpr;
+    if (resultTy)
+      subjectExpr = TypeChecker::coerceToRValue(getASTContext(), subjectExpr);
+
     switchStmt->setSubjectExpr(subjectExpr);
     Type subjectType = switchStmt->getSubjectExpr()->getType();
 
