@@ -648,6 +648,88 @@ swiftscan_diagnostics_set_dispose(swiftscan_diagnostic_set_t* diagnostics){
   }
 }
 
+//=== Scanner File System Cache Diagnostics -------------------------------===//
+
+namespace {
+typedef clang::tooling::dependencies::DependencyScanningFilesystemSharedCache::
+    OutOfDateEntry DependencyScannerFSOutOfDateEntry;
+typedef std::vector<DependencyScannerFSOutOfDateEntry>
+    DependencyScannerFSOutOfDateEntrySet;
+} // namespace
+
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(
+    std::vector<clang::tooling::dependencies::
+                    DependencyScanningFilesystemSharedCache::OutOfDateEntry>,
+    swiftscan_scanner_out_of_date_file_system_entry_set_t)
+DEFINE_SIMPLE_CONVERSION_FUNCTIONS(
+    DependencyScannerFSOutOfDateEntry,
+    swiftscan_scanner_out_of_date_file_system_entry_t)
+
+swiftscan_scanner_out_of_date_file_system_entry_set_t
+swiftscan_scanner_get_out_of_date_file_system_entry_set(
+    swiftscan_scanner_t scanner) {
+  DependencyScanningTool *ScanningTool = unwrap(scanner);
+  auto *OutOfDateEntries = new DependencyScannerFSOutOfDateEntrySet();
+  *OutOfDateEntries = ScanningTool->getFileSystemCacheOutOfDateEntries();
+  return wrap(OutOfDateEntries);
+}
+
+size_t swiftscan_scanner_out_of_date_file_system_entry_set_get_size(
+    swiftscan_scanner_out_of_date_file_system_entry_set_t s) {
+  return unwrap(s)->size();
+}
+
+swiftscan_scanner_out_of_date_file_system_entry_t
+swiftscan_scanner_out_of_date_file_system_entry_set_get_entry(
+    swiftscan_scanner_out_of_date_file_system_entry_set_t s, size_t Idx) {
+  return wrap(&((*unwrap(s))[Idx]));
+}
+
+swiftscan_scanner_out_of_date_file_system_entry_kind
+swiftscan_scanner_out_of_date_file_system_entry_get_kind(
+    swiftscan_scanner_out_of_date_file_system_entry_t e) {
+  auto *Entry = unwrap(e);
+  auto &Info = Entry->Info;
+  return std::visit(
+      llvm::makeVisitor(
+          [](const DependencyScannerFSOutOfDateEntry::NegativelyCachedInfo
+                 &Info) { return SWIFTSCAN_OOD_FS_ENTRY_NEGATIVELY_CACHED; },
+          [](const DependencyScannerFSOutOfDateEntry::SizeChangedInfo &Info) {
+            return SWIFTSCAN_OOD_FS_ENTRY_SIZE_CHANGED;
+          }),
+      Info);
+}
+
+swiftscan_string_ref_t swiftscan_scanner_out_of_date_file_system_entry_get_path(
+    swiftscan_scanner_out_of_date_file_system_entry_t e) {
+  const char *path = unwrap(e)->Path;
+  size_t len = strlen(path);
+  return swiftscan_string_ref_t{path, len};
+}
+
+static DependencyScannerFSOutOfDateEntry::SizeChangedInfo *
+getOutOfDateEntrySizeChangedInfo(DependencyScannerFSOutOfDateEntry *E) {
+  auto *SizeInfo =
+      std::get_if<DependencyScannerFSOutOfDateEntry::SizeChangedInfo>(&E->Info);
+  assert(SizeInfo && "Wrong entry kind to get size changed info!");
+  return SizeInfo;
+}
+
+uint64_t swiftscan_scanner_out_of_date_file_system_entry_get_cached_size(
+    swiftscan_scanner_out_of_date_file_system_entry_t e) {
+  return getOutOfDateEntrySizeChangedInfo(unwrap(e))->CachedSize;
+}
+
+uint64_t swiftscan_scanner_out_of_date_file_system_entry_get_actual_size(
+    swiftscan_scanner_out_of_date_file_system_entry_t e) {
+  return getOutOfDateEntrySizeChangedInfo(unwrap(e))->ActualSize;
+}
+
+void swiftscan_scanner_out_of_date_file_system_entry_set_dispose(
+    swiftscan_scanner_out_of_date_file_system_entry_set_t s) {
+  delete unwrap(s);
+}
+
 //=== Source Location -----------------------------------------------------===//
 
 swiftscan_string_ref_t
