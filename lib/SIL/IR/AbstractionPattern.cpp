@@ -15,6 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Types.h"
+#include "llvm/ADT/SmallVector.h"
 #define DEBUG_TYPE "libsil"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -2673,32 +2675,38 @@ public:
     // Otherwise, there are no structural type parameters to visit.
     return nom;
   }
-  
-  CanType visitBuiltinFixedArrayType(CanBuiltinFixedArrayType bfa,
-                                     AbstractionPattern pattern) {
-    auto orig = pattern.getAs<BuiltinFixedArrayType>();
+
+  CanType visitBuiltinGenericType(CanBuiltinGenericType bga,
+                                  AbstractionPattern pattern) {
+    auto orig = pattern.getAs<BuiltinGenericType>();
 
     // If there are no loose type parameters in the pattern here, we don't need
     // to do a recursive visit at all.
     if (!orig->hasTypeParameter()
         && !orig->hasArchetype()
         && !orig->hasOpaqueArchetype()) {
-      return bfa;
+      return bga;
     }
-    
-    CanType newSize = visit(bfa->getSize(),
-                         AbstractionPattern(pattern.getGenericSubstitutions(),
-                                            pattern.getGenericSignatureOrNull(),
-                                            orig->getSize()));
-    CanType newElement = visit(bfa->getElementType(),
-                         AbstractionPattern(pattern.getGenericSubstitutions(),
-                                            pattern.getGenericSignatureOrNull(),
-                                            orig->getElementType()));
-                                
-    return BuiltinFixedArrayType::get(newSize, newElement)
-      ->getCanonicalType();
+
+    SmallVector<Type, 2> newReplacements;
+
+    for (unsigned i : indices(bga->getSubstitutions().getReplacementTypes())) {
+      CanType newReplacement
+        = visit(CanType(bga->getSubstitutions().getReplacementTypes()[i]),
+                AbstractionPattern(pattern.getGenericSubstitutions(),
+                 pattern.getGenericSignatureOrNull(),
+                 CanType(orig->getSubstitutions().getReplacementTypes()[i])));
+      newReplacements.push_back(newReplacement);
+    }
+
+    // TODO: handle conformances. no generic builtins currently have protocol
+    // requirements.
+    auto newSubs = SubstitutionMap::get(bga->getGenericSignature(),
+                                        newReplacements,
+                                        ArrayRef<ProtocolConformanceRef>{});
+    return bga->getWithSubstitutions(newSubs);
   }
-  
+
   CanType visitBoundGenericType(CanBoundGenericType bgt,
                                 AbstractionPattern pattern) {
     return handleGenericNominalType(pattern, bgt);

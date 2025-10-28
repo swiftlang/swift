@@ -21,6 +21,8 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/LifetimeDependence.h"
+#include "swift/AST/SubstitutionMap.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 
@@ -117,29 +119,26 @@ case TypeKind::Id:
     case TypeKind::Integer:
       return t;
 
+    // BuiltinGenericType subclasses
     case TypeKind::BuiltinFixedArray: {
-      auto bfaTy = cast<BuiltinFixedArrayType>(base);
-      
-      Type transSize = doIt(bfaTy->getSize(),
-                            TypePosition::Invariant);
-      if (!transSize) {
-        return Type();
+      auto bgaTy = cast<BuiltinGenericType>(base);
+
+      llvm::SmallVector<Type, 2> transReplacements;
+
+      for (auto t : bgaTy->getSubstitutions().getReplacementTypes()) {
+        Type transTy = doIt(t, TypePosition::Invariant);
+        if (!transTy) {
+          return Type();
+        }
+        transReplacements.push_back(transTy);
       }
-      
-      Type transElement = doIt(bfaTy->getElementType(),
-                               TypePosition::Invariant);
-      if (!transElement) {
-        return Type();
-      }
-      
-      CanType canTransSize = transSize->getCanonicalType();
-      CanType canTransElement = transElement->getCanonicalType();
-      if (canTransSize != bfaTy->getSize()
-          || canTransElement != bfaTy->getElementType()) {
-        return BuiltinFixedArrayType::get(canTransSize, canTransElement);
-      }
-      
-      return bfaTy;
+
+      // TODO: translate conformances. No builtin types yet have conformance
+      // requirements in their generic signatures.
+      auto transSubs = SubstitutionMap::get(bgaTy->getGenericSignature(),
+                                            transReplacements,
+                                            ArrayRef<ProtocolConformanceRef>{});
+      return bgaTy->getWithSubstitutions(transSubs);
     }
 
     case TypeKind::PrimaryArchetype:
