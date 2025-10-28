@@ -296,6 +296,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
         }
       });
 
+  auto fragileKind = where.getFragileFunctionKind();
   switch (originKind) {
   case DisallowedOriginKind::None:
     // The decl does not come from a source that needs to be checked for
@@ -327,11 +328,15 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
     if (reason && reason == ExportabilityReason::AvailableAttribute &&
         ctx.LangOpts.LibraryLevel == LibraryLevel::API)
       return false;
+    LLVM_FALLTHROUGH;
+
+  case DisallowedOriginKind::SPIImported:
+  case DisallowedOriginKind::SPILocal:
+    if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient)
+      return false;
     break;
 
   case DisallowedOriginKind::ImplementationOnly:
-  case DisallowedOriginKind::SPIImported:
-  case DisallowedOriginKind::SPILocal:
   case DisallowedOriginKind::FragileCxxAPI:
     break;
   }
@@ -343,7 +348,6 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
       return false;
   }
 
-  auto fragileKind = where.getFragileFunctionKind();
   if (fragileKind.kind == FragileFunctionKind::None) {
     DiagnosticBehavior limit = downgradeToWarning == DowngradeToWarning::Yes
                              ? DiagnosticBehavior::Warning
