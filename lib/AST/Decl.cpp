@@ -5565,10 +5565,18 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
     access = AccessLevel::FilePrivate;
 
   // Only certain declarations can be 'open'.
-  if (access == AccessLevel::Open && !isSyntacticallyOverridable()) {
-    assert(!isa<ClassDecl>(this) &&
-           "copying 'open' onto a class has complications");
-    access = AccessLevel::Public;
+  if (access == AccessLevel::Open) {
+    auto classDecl = dyn_cast<ClassDecl>(source);
+    if (classDecl && classDecl->isDistributedActor()) {
+      // don't copy 'public'; an 'open distributed actor' is illegal to begin with
+      return;
+    }
+
+    if (!isSyntacticallyOverridable()) {
+      assert(!isa<ClassDecl>(this) &&
+             "copying 'open' onto a class has complications");
+      access = AccessLevel::Public;
+    }
   }
 
   setAccess(access);

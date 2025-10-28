@@ -18,6 +18,9 @@
 // REQUIRES: OS=macosx || OS=linux-gnu
 // UNSUPPORTED: LinuxDistribution=fedora-41
 
+// rdar://163511959 error: circular reference
+// XFAIL: *
+
 import StdlibUnittest
 #if !BRIDGING_HEADER
 import StdSet

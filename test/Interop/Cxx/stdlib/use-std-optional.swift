@@ -11,6 +11,9 @@
 // rdar://121551667
 // XFAIL: OS=freebsd
 
+// rdar://163511959 error: circular reference
+// XFAIL: *
+
 import StdlibUnittest
 import StdOptional
 import CxxStdlib

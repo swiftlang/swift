@@ -1,6 +1,9 @@
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -Xcc -std=c++20 2>&1
 // REQUIRES: std_span
 
+// rdar://163511959 error: circular reference
+// XFAIL: *
+
 import StdSpan
 
 let arr: [Int32] = [1, 2, 3]

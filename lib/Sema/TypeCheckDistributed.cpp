@@ -709,6 +709,13 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   if (!swift::ensureDistributedModuleLoaded(nominal))
     return;
 
+  if (nominal->getFormalAccess() == AccessLevel::Open) {
+    // we should have outright banned 'open' for all actors, but seems we didn't.
+    // distributed actor synthesis always previously crashed if someone were to
+    // declare one as open, so we're banning it now, rather than leave it crashing.
+    (void) nominal->diagnose(diag::access_control_open_bad_decl);
+  }
+
   auto &C = nominal->getASTContext();
   auto loc = nominal->getLoc();
   recordRequiredImportAccessLevelForDecl(C.getDistributedActorDecl(), nominal,
