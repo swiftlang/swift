@@ -51,14 +51,31 @@ public:
         resolutionKind(resolutionKind),
         respectAccessControl(!ctx.isAccessControlDisabled()) {}
 
-  /// Performs a qualified lookup into the given module and, if necessary, its
-  /// reexports.
+  /// Performs the qualified lookup requested by \p LookupStrategy into the
+  /// given module and, if necessary, its reexports.
   ///
-  /// The results are appended to \p decls.
+  /// If 'moduleOrFile' is a ModuleDecl, we search the module and its
+  /// public imports. If 'moduleOrFile' is a SourceFile, we search the
+  /// file's parent module, the module's public imports, and the source
+  /// file's private imports.
+  ///
+  /// \param[out] decls Results are appended to this vector.
+  /// \param moduleOrFile The module or file unit to search, including imports.
+  /// \param accessPath The access path that was imported; if not empty, only
+  ///                   the named declaration will be imported.
+  /// \param moduleScopeContext The top-level context from which the lookup is
+  ///        being performed, for checking access. This must be either a
+  ///        FileUnit or a Module.
+  /// \param hasModuleSelector Whether \p name was originally qualified by a
+  ///        module selector. This information is threaded through to underlying
+  ///        lookup calls; the callee is responsible for actually applying the
+  ///        module selector.
+  /// \param options Lookup options to apply.
   void lookupInModule(SmallVectorImpl<ValueDecl *> &decls,
                       const DeclContext *moduleOrFile,
                       ImportPath::Access accessPath,
                       const DeclContext *moduleScopeContext,
+                      bool hasModuleSelector,
                       NLOptions options);
 };
 
@@ -77,6 +94,10 @@ class LookupByName : public ModuleNameLookup<LookupByName> {
   const NLKind lookupKind;
 
 public:
+  /// \param ctx The AST context that the lookup will be performed in.
+  /// \param name The name that will be looked up.
+  /// \param lookupKind Whether this lookup is qualified or unqualified.
+  /// \param resolutionKind What sort of decl is expected.
   LookupByName(ASTContext &ctx, ResolutionKind resolutionKind,
                DeclName name, NLKind lookupKind)
     : Super(ctx, resolutionKind), name(name),
@@ -89,6 +110,10 @@ private:
     return true;
   }
 
+  /// \param module The module to search for declarations in.
+  /// \param path The access path that was imported; if not empty, only the
+  ///             named declaration will be imported.
+  /// \param[out] localDecls Results are appended to this vector.
   void doLocalLookup(ModuleDecl *module, ImportPath::Access path,
                      OptionSet<ModuleLookupFlags> flags,
                      SmallVectorImpl<ValueDecl *> &localDecls) {
@@ -153,6 +178,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
     const DeclContext *moduleOrFile,
     ImportPath::Access accessPath,
     const DeclContext *moduleScopeContext,
+    bool hasModuleSelector,
     NLOptions options) {
   assert(moduleOrFile->isModuleScopeContext());
 
@@ -169,7 +195,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
         selfOverlay = true;
       else
         lookupInModule(decls, overlay, accessPath, moduleScopeContext,
-                       options);
+                       hasModuleSelector, options);
     }
     // FIXME: This may not work gracefully if more than one of these lookups
     // finds something.
@@ -208,6 +234,8 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
     currentModuleLookupFlags |= ModuleLookupFlags::ExcludeMacroExpansions;
   if (options & NL_ABIProviding)
     currentModuleLookupFlags |= ModuleLookupFlags::ABIProviding;
+  if (hasModuleSelector)
+    currentModuleLookupFlags |= ModuleLookupFlags::HasModuleSelector;
 
   // Do the lookup into the current module.
   auto *module = moduleOrFile->getParentModule();
@@ -235,6 +263,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
     OptionSet<ModuleLookupFlags> importedModuleLookupFlags = {};
     if (options & NL_ABIProviding)
       currentModuleLookupFlags |= ModuleLookupFlags::ABIProviding;
+    // Do not propagate HasModuleSelector here; the selector wasn't specific.
 
     auto visitImport = [&](ImportedModule import,
                            const DeclContext *moduleScopeContext) {
@@ -337,27 +366,29 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
 QualifiedLookupResult
 LookupInModuleRequest::evaluate(
     Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
-    NLKind lookupKind, ResolutionKind resolutionKind,
+    bool hasModuleSelector, NLKind lookupKind, ResolutionKind resolutionKind,
     const DeclContext *moduleScopeContext, NLOptions options) const {
   assert(moduleScopeContext->isModuleScopeContext());
 
   QualifiedLookupResult decls;
   LookupByName lookup(moduleOrFile->getASTContext(), resolutionKind,
                       name, lookupKind);
-  lookup.lookupInModule(decls, moduleOrFile, {}, moduleScopeContext, options);
+  lookup.lookupInModule(decls, moduleOrFile, {}, moduleScopeContext,
+                        hasModuleSelector, options);
   return decls;
 }
 
 void namelookup::lookupInModule(const DeclContext *moduleOrFile,
                                 DeclName name,
+                                bool hasModuleSelector,
                                 SmallVectorImpl<ValueDecl *> &decls,
                                 NLKind lookupKind,
                                 ResolutionKind resolutionKind,
                                 const DeclContext *moduleScopeContext,
                                 SourceLoc loc, NLOptions options) {
   auto &ctx = moduleOrFile->getASTContext();
-  LookupInModuleRequest req(moduleOrFile, name, lookupKind, resolutionKind,
-                            moduleScopeContext, loc, options);
+  LookupInModuleRequest req(moduleOrFile, name, hasModuleSelector, lookupKind,
+                            resolutionKind, moduleScopeContext, loc, options);
   auto results = evaluateOrDefault(ctx.evaluator, req, {});
   decls.append(results.begin(), results.end());
 }
@@ -373,6 +404,7 @@ void namelookup::lookupVisibleDeclsInModule(
   auto &ctx = moduleOrFile->getASTContext();
   LookupVisibleDecls lookup(ctx, resolutionKind, lookupKind);
   lookup.lookupInModule(decls, moduleOrFile, accessPath, moduleScopeContext,
+                        /*hasModuleSelector=*/false,
                         NL_QualifiedDefault);
 }
 
