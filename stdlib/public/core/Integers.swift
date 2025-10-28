@@ -1518,6 +1518,7 @@ internal func _BinaryIntegerToASCII<T: BinaryInteger>(
 // trivially change it to Int. Callers can safely convert the result
 // to any integer type without checks, however.
 @_silgen_name("swift_int64ToString")
+@usableFromInline
 internal func _int64ToStringImpl(
   _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
@@ -1556,6 +1557,7 @@ internal func _int64ToStringImpl(
 // trivially change it to Int. Callers can safely convert the result
 // to any integer type without checks, however.
 @_silgen_name("swift_uint64ToString")
+@usableFromInline
 internal func _uint64ToStringImpl(
   _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt,
