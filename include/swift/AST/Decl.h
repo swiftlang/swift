@@ -3071,11 +3071,10 @@ public:
     return Name.getBaseIdentifier();
   }
 
-  /// Generates a DeclNameRef referring to this declaration with as much
-  /// specificity as possible.
-  DeclNameRef createNameRef() const {
-    return DeclNameRef(Name);
-  }
+  /// Generates a DeclNameRef referring to this declaration.
+  ///
+  /// \param moduleSelector If true, the name ref includes the module name.
+  DeclNameRef createNameRef(bool moduleSelector = false) const;
 
   /// Retrieve the C declaration name that names this function, or empty
   /// string if it has none.

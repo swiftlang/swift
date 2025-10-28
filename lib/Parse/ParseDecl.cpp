@@ -4257,8 +4257,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
         .warnUntilSwiftVersion(6);
   }
 
-  bool hasModuleSelector = Context.LangOpts.hasFeature(Feature::ModuleSelector)
-                              && peekToken().is(tok::colon_colon);
+  bool hasModuleSelector = peekToken().is(tok::colon_colon);
 
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&

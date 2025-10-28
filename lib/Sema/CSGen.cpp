@@ -897,7 +897,7 @@ TypeVarRefCollector::walkToExprPre(Expr *expr) {
     auto loc = declRef->getLoc();
     if (name.isSimpleName() && loc.isValid()) {
       auto *SF = CS.DC->getParentSourceFile();
-      auto *D = ASTScope::lookupSingleLocalDecl(SF, name.getFullName(), loc);
+      auto *D = ASTScope::lookupSingleLocalDecl(SF, name, loc);
       inferTypeVars(D);
     }
   }
@@ -1454,7 +1454,7 @@ namespace {
         if (!protocol)
           return Type();
 
-        auto macroIdent = ctx.getIdentifier(kind);
+        auto macroIdent = DeclNameRef(ctx.getIdentifier(kind));
         auto macros = lookupMacros(Identifier(), macroIdent,
                                    FunctionRefInfo::unappliedBaseName(),
                                    MacroRole::Expression);
@@ -3884,10 +3884,9 @@ namespace {
           componentTypeVars.push_back(memberTy);
           auto lookupName =
               kind == KeyPathExpr::Component::Kind::UnresolvedMember
-                  ? DeclNameRef(
-                        component.getUnresolvedDeclName()) // FIXME: type change
-                                                           // needed
-                  : component.getDeclRef().getDecl()->createNameRef();
+                  ? component.getUnresolvedDeclName()
+                  : component.getDeclRef().getDecl()->createNameRef(
+                                                          /*modSel=*/true);
 
           auto refKind = component.getFunctionRefInfo();
           CS.addValueMemberConstraint(base, lookupName, memberTy, CurDC,
@@ -4126,12 +4125,12 @@ namespace {
 
     /// Lookup all macros with the given macro name.
     SmallVector<OverloadChoice, 1> lookupMacros(DeclName moduleName,
-                                                DeclName macroName,
+                                                DeclNameRef macroName,
                                                 FunctionRefInfo functionRefInfo,
                                                 MacroRoles roles) {
       SmallVector<OverloadChoice, 1> choices;
       auto results = namelookup::lookupMacros(CurDC, DeclNameRef(moduleName),
-                                              DeclNameRef(macroName), roles);
+                                              macroName, roles);
       for (const auto &result : results) {
         // Ignore invalid results. This matches the OverloadedDeclRefExpr
         // logic.
@@ -4158,11 +4157,21 @@ namespace {
 
       // Look up the macros with this name.
       auto moduleIdent = expr->getModuleName().getBaseName();
-      auto macroIdent = expr->getMacroName().getBaseName();
+      auto macroIdent = expr->getMacroName().withoutArgumentLabels(ctx);
       FunctionRefInfo functionRefInfo = FunctionRefInfo::singleBaseNameApply();
       auto macros = lookupMacros(moduleIdent, macroIdent, functionRefInfo,
                                  expr->getMacroRoles());
       if (macros.empty()) {
+        // Try removing a module selector if present.
+        if (macroIdent.hasModuleSelector()) {
+          auto anyMacroIdent = DeclNameRef(macroIdent.getFullName());
+          ModuleSelectorCorrection correction(
+            lookupMacros(moduleIdent, anyMacroIdent, functionRefInfo,
+                         expr->getMacroRoles()));
+          if (correction.diagnose(ctx, expr->getMacroNameLoc(), macroIdent))
+            return Type();
+        }
+
         ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
                            macroIdent)
             .highlight(expr->getMacroNameLoc().getSourceRange());
@@ -5325,10 +5334,14 @@ ResolvedMemberResult swift::resolveValueMember(DeclContext &DC, Type BaseTy,
   ResolvedMemberResult Result;
   ConstraintSystem CS(&DC, std::nullopt);
 
+  // OK: By contract, `Name` should be derived from an existing Decl, not a
+  // name written by the user in source code. So when used as intended, we won't
+  // be dropping a module selector here.
+  DeclNameRef NameRef(Name);
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult =
-      CS.performMemberLookup(ConstraintKind::ValueMember, DeclNameRef(Name),
-                             BaseTy, FunctionRefInfo::singleBaseNameApply(),
+      CS.performMemberLookup(ConstraintKind::ValueMember, NameRef, BaseTy,
+                             FunctionRefInfo::singleBaseNameApply(),
                              CS.getConstraintLocator({}), false);
 
   // Keep track of all the unviable members.
