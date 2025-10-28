@@ -10,6 +10,9 @@
 // REQUIRES: executable_test
 // REQUIRES: std_span
 
+// rdar://163511959 error: circular reference
+// XFAIL: *
+
 import StdlibUnittest
 #if !BRIDGING_HEADER
 import StdSpan

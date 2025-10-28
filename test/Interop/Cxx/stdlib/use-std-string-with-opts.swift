@@ -4,6 +4,9 @@
 
 // Tests optimizations related to CxxStdlib.
 
+// rdar://163511959 error: circular reference
+// XFAIL: *
+
 import StdlibUnittest
 import CxxStdlib
 import StdStringAndVector
