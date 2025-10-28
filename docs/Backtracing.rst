@@ -96,8 +96,8 @@ follows:
 | format          | text    | Set to ``json`` to output JSON crash logs rather |
 |                 |         | than plain text.                                 |
 +-----------------+---------+--------------------------------------------------+
-| output-to       | stderr  | Set to ``stderr`` to send the backtrace to the   |
-|                 |         | standard error instead of standard output.  This |
+| output-to       | stderr  | Set to ``stdout`` to send the backtrace to the   |
+|                 |         | standard output instead of standard error.  This |
 |                 |         | may be useful in some CI systems.                |
 |                 |         |                                                  |
 |                 |         | You may also specify a path; if this points at a |
