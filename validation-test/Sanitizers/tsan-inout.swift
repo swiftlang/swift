@@ -27,7 +27,7 @@ var gInThread2: () -> () = { }
 // Spawn two threads, run the two passed in closures simultaneously, and
 // join them.
 func testRace(name: String, thread inThread1: @escaping () -> (), thread inThread2: @escaping () -> ()) {
-#if canImport(Darwin)
+#if canImport(Darwin) || os(FreeBSD)
   var thread1: pthread_t?
   var thread2: pthread_t?
 #else
