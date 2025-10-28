@@ -14,10 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "OpenedExistentials.h"
+#include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/OptionSet.h"
@@ -28,7 +29,6 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
 #include <functional>
@@ -709,15 +709,29 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
 
   auto *argument =
       argumentList->getUnlabeledUnaryExpr()->getSemanticsProvidingExpr();
+
+  // If the type associated with a member expression doesn't have any type
+  // variables it means that it was resolved during pre-check to a single
+  // declaration.
+  //
+  // This helps in situations like `Double(x)` where `x` is a property of some
+  // type that is referenced using an implicit `self.` injected by the compiler.
+  auto isResolvedMemberReference = [&cs](Expr *expr) -> bool {
+    auto *UDE = dyn_cast<UnresolvedDotExpr>(expr);
+    return UDE && !cs.getType(UDE)->hasTypeVariable();
+  };
+
   // The hack operated on "favored" types and only declaration references,
   // applications, and (dynamic) subscripts had them if they managed to
   // get an overload choice selected during constraint generation.
-  // It's sometimes possible to infer a type of a literal and an operator
-  // chain, so it should be allowed as well.
+  // 
+  // It's sometimes possible to infer a type of a literal, an operator
+  // chain, and a member, so it should be allowed as well.
   if (!(isExpr<DeclRefExpr>(argument) || isExpr<ApplyExpr>(argument) ||
         isExpr<SubscriptExpr>(argument) ||
         isExpr<DynamicSubscriptExpr>(argument) ||
-        isExpr<LiteralExpr>(argument) || isExpr<BinaryExpr>(argument)))
+        isExpr<LiteralExpr>(argument) || isExpr<BinaryExpr>(argument) ||
+        isResolvedMemberReference(argument)))
     return DisjunctionInfo::none();
 
   auto argumentType = cs.getType(argument)->getRValueType();
