@@ -349,7 +349,8 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
   // Link compatibility libraries, if we're deploying back to OSes that
   // have an older Swift runtime.
   SmallString<128> SharedResourceDirPath;
-  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true,
+                     context.OI.SDKPath);
   std::optional<llvm::VersionTuple> runtimeCompatibilityVersion;
 
   if (context.Args.hasArg(options::OPT_runtime_compatibility_version)) {

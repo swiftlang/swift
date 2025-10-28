@@ -1606,7 +1606,7 @@ void ToolChain::getClangLibraryPath(const ArgList &Args,
                                     SmallString<128> &LibPath) const {
   const llvm::Triple &T = getTriple();
 
-  getResourceDirPath(LibPath, Args, /*Shared=*/true);
+  getResourceDirPath(LibPath, Args, /*Shared=*/true, StringRef());
   // Remove platform name.
   llvm::sys::path::remove_filename(LibPath);
   StringRef platformName = "darwin";
@@ -1619,13 +1619,12 @@ void ToolChain::getClangLibraryPath(const ArgList &Args,
 /// relative to the compiler.
 void ToolChain::getResourceDirPath(SmallVectorImpl<char> &resourceDirPath,
                                    const llvm::opt::ArgList &args,
-                                   bool shared) const {
+                                   bool shared, StringRef SDKPath) const {
   if (const Arg *A = args.getLastArg(options::OPT_resource_dir)) {
     StringRef value = A->getValue();
     resourceDirPath.append(value.begin(), value.end());
-  } else if (!getTriple().isOSDarwin() && args.hasArg(options::OPT_sdk)) {
-    StringRef value = args.getLastArg(options::OPT_sdk)->getValue();
-    resourceDirPath.append(value.begin(), value.end());
+  } else if (!getTriple().isOSDarwin() && !SDKPath.empty()) {
+    resourceDirPath.append(SDKPath.begin(), SDKPath.end());
     llvm::sys::path::append(resourceDirPath, "usr");
     CompilerInvocation::appendSwiftLibDir(resourceDirPath, shared);
   } else {
@@ -1661,7 +1660,7 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
                                        const llvm::opt::ArgList &args,
                                        StringRef SDKPath, bool shared) const {
   SmallString<128> scratchPath;
-  getResourceDirPath(scratchPath, args, shared);
+  getResourceDirPath(scratchPath, args, shared, SDKPath);
   runtimeLibPaths.push_back(std::string(scratchPath.str()));
 
   // If there's a secondary resource dir, add it too.

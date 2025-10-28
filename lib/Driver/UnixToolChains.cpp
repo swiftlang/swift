@@ -232,7 +232,8 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
 
   SmallString<128> SharedResourceDirPath;
   getResourceDirPath(SharedResourceDirPath, context.Args,
-                     /*Shared=*/!(staticExecutable || staticStdlib));
+                     /*Shared=*/!(staticExecutable || staticStdlib),
+                     context.OI.SDKPath);
 
   if (!context.Args.hasArg(options::OPT_nostartfiles)) {
     SmallString<128> swiftrtPath = SharedResourceDirPath;
@@ -294,7 +295,8 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   // if we're going that route, we'll set `linkFilePath` to the path to that
   // file.
   SmallString<128> linkFilePath;
-  getResourceDirPath(linkFilePath, context.Args, /*Shared=*/false);
+  getResourceDirPath(linkFilePath, context.Args, /*Shared=*/false,
+                     context.OI.SDKPath);
 
   if (staticExecutable) {
     llvm::sys::path::append(linkFilePath, "static-executable-args.lnk");
