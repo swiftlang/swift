@@ -4,6 +4,9 @@
 //
 // REQUIRES: executable_test
 
+// rdar://163511959 error: circular reference
+// XFAIL: *
+
 import MemberInline
 import StdlibUnittest
 

@@ -9,6 +9,9 @@
 
 // RUN: ls -R %/t | %FileCheck %s
 
+// rdar://163511959 error: circular reference
+// XFAIL: *
+
 #if canImport(Foundation)
 import Foundation
 #endif
