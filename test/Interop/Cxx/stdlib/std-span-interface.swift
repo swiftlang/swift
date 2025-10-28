@@ -9,9 +9,6 @@
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: std_span
 
-// rdar://163511959 error: circular reference
-// XFAIL: *
-
 #if !BRIDGING_HEADER
 import StdSpan
 #endif

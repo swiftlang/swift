@@ -6,9 +6,6 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: std_span
 
-// rdar://163511959 error: circular reference
-// XFAIL: *
-
 //--- Inputs/swiftify-non-public.h
 #pragma once
 
