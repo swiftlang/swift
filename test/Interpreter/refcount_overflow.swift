@@ -224,4 +224,13 @@ RefcountOverflowTests.test("nonatomic_unownedRetain moderate increment") {
   didDeinit = false
 }
 
+RefcountOverflowTests.test("swift_retain overflow") {
+  let obj = C()
+  let u = Unmanaged.passRetained(obj)
+  expectCrashLater(withMessage: "Fatal error: Object was retained too many times")
+  while true {
+    _ = u.retain()
+  }
+}
+
 runAllTests()
