@@ -67,6 +67,17 @@ swift::DeclNameLoc BridgedDeclNameLoc::unbridged() const {
 }
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedLangOptions
+//===----------------------------------------------------------------------===//
+
+BridgedLangOptions::BridgedLangOptions(const swift::LangOptions &langOpts)
+  : LangOpts(&langOpts) { }
+
+const swift::LangOptions &BridgedLangOptions::unbridged() const {
+  return *LangOpts;
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: BridgedASTContext
 //===----------------------------------------------------------------------===//
 
@@ -553,6 +564,26 @@ bool BridgedASTType::isUnownedStorageType() const {
 
 bool BridgedASTType::isBuiltinType() const {
   return unbridged()->isBuiltinType();
+}
+
+BridgedASTType BridgedASTType::getAnyPointerElementType() const {
+  return {unbridged()->getCanonicalType()->getAnyPointerElementType().getPointer()};
+}
+
+bool BridgedASTType::isUnsafeBufferPointerType() const {
+  return unbridged()->isUnsafeBufferPointer();
+}
+
+bool BridgedASTType::isUnsafeMutableBufferPointerType() const {
+  return unbridged()->isUnsafeMutableBufferPointer();
+}
+
+bool BridgedASTType::isUnsafeRawBufferPointerType() const {
+  return unbridged()->isUnsafeRawBufferPointer();
+}
+
+bool BridgedASTType::isUnsafeMutableRawBufferPointerType() const {
+  return unbridged()->isUnsafeMutableRawBufferPointer();
 }
 
 OptionalBridgedDeclObj BridgedASTType::getNominalOrBoundGenericNominal() const {

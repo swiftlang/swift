@@ -315,13 +315,12 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
 // where completing the metadata during demangling might cause cyclic
 // dependencies.
 static std::pair<llvm::Constant *, unsigned>
-getTypeRefByFunction(IRGenModule &IGM,
-                     CanGenericSignature sig,
-                     CanType t) {
+getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
+                     MangledTypeRefRole role) {
   IRGenMangler mangler(IGM.Context);
   std::string symbolName =
     mangler.mangleSymbolNameForMangledMetadataAccessorString(
-                                                   "get_type_metadata", sig, t);
+                                                   "get_type_metadata", sig, t, role);
   auto constant = IGM.getAddrOfStringForMetadataRef(symbolName, /*align*/2,
                                                     /*low bit*/false,
     [&](ConstantInitBuilder &B) {
@@ -352,9 +351,22 @@ getTypeRefByFunction(IRGenModule &IGM,
           ? genericEnv->mapTypeIntoContext(t)->getCanonicalType()
           : t;
 
-        // If a type is noncopyable, lie about the resolved type unless the
-        // runtime is sufficiently aware of noncopyable types.
-        if (substT->isNoncopyable()) {
+        // If a type is noncopyable, lie about the resolved type to reflection
+        // APIs unless the runtime is sufficiently aware of noncopyable types.
+        bool shouldHideNoncopyableTypeFromOldRuntimes;
+        switch (role) {
+        case MangledTypeRefRole::Metadata:
+        case MangledTypeRefRole::DefaultAssociatedTypeWitness:
+        case MangledTypeRefRole::FlatUnique:
+          shouldHideNoncopyableTypeFromOldRuntimes = false;
+          break;
+        case MangledTypeRefRole::FieldMetadata:
+        case MangledTypeRefRole::Reflection:
+          shouldHideNoncopyableTypeFromOldRuntimes = true;
+          break;
+        }
+        if (shouldHideNoncopyableTypeFromOldRuntimes
+            && substT->isNoncopyable()) {
           // Darwin-based platforms have ABI stability, and we want binaries
           // that use noncopyable types nongenerically today to be forward
           // compatible with a future OS runtime that supports noncopyable
@@ -433,7 +445,11 @@ getTypeRefByFunction(IRGenModule &IGM,
       // Form the mangled name with its relative reference.
       auto S = B.beginStruct();
       S.setPacked(true);
-      S.add(llvm::ConstantInt::get(IGM.Int8Ty, 255));
+      if (role == MangledTypeRefRole::DefaultAssociatedTypeWitness) {
+        S.add(llvm::ConstantInt::get(
+            IGM.Int8Ty,
+            ProtocolRequirementFlags::AssociatedTypeInProtocolContextByte));
+      }
       S.add(llvm::ConstantInt::get(IGM.Int8Ty, 9));
       S.addCompactFunctionReference(accessor);
 
@@ -513,7 +529,7 @@ getTypeRefImpl(IRGenModule &IGM,
     // the field will be artificially hidden to reflectors.
     if (isAlwaysNoncopyable) {
       IGM.IRGen.noteUseOfTypeMetadata(type);
-      return getTypeRefByFunction(IGM, sig, type);
+      return getTypeRefByFunction(IGM, sig, type, role);
     }
   }
   LLVM_FALLTHROUGH;
@@ -524,12 +540,12 @@ getTypeRefImpl(IRGenModule &IGM,
     // ensuring that we can always reconstruct type metadata from a mangled name
     // in-process.
     IGM.IRGen.noteUseOfTypeMetadata(type);
-    
+
     // If the minimum deployment target's runtime demangler wouldn't understand
     // this mangled name, then fall back to generating a "mangled name" with a
     // symbolic reference with a callback function.
     if (mangledNameIsUnknownToDeployTarget(IGM, type)) {
-      return getTypeRefByFunction(IGM, sig, type);
+      return getTypeRefByFunction(IGM, sig, type, role);
     }
 
     break;
@@ -567,8 +583,7 @@ std::pair<llvm::Constant *, unsigned>
 IRGenModule::getLoweredTypeRef(SILType loweredType,
                                CanGenericSignature genericSig,
                                MangledTypeRefRole role) {
-  auto substTy =
-    substOpaqueTypesWithUnderlyingTypes(loweredType, genericSig);
+  auto substTy = substOpaqueTypesWithUnderlyingTypes(loweredType);
   auto type = substTy.getASTType();
   return getTypeRefImpl(*this, type, genericSig, role);
 }
@@ -584,8 +599,8 @@ IRGenModule::emitWitnessTableRefString(CanType type,
                                       ProtocolConformanceRef conformance,
                                       GenericSignature origGenericSig,
                                       bool shouldSetLowBit) {
-  std::tie(type, conformance)
-    = substOpaqueTypesWithUnderlyingTypes(type, conformance);
+  type = substOpaqueTypesWithUnderlyingTypes(type);
+  conformance = substOpaqueTypesWithUnderlyingTypes(conformance);
   
   auto origType = type;
   auto genericSig = origGenericSig.getCanonicalSignature();

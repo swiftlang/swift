@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 protocol P<A, B> {
   associatedtype A  // expected-note {{multiple matching types named 'A'}}

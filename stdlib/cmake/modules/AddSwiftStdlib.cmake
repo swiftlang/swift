@@ -1920,9 +1920,6 @@ endfunction()
 # INSTALL_WITH_SHARED
 #   Install a static library target alongside shared libraries
 #
-# IMPORTS_NON_OSSA
-#   Imports a non-ossa module
-#
 # MACCATALYST_BUILD_FLAVOR
 #   Possible values are 'ios-like', 'macos-like', 'zippered', 'unzippered-twin'
 #   Presence of a build flavor requires SWIFT_MODULE_DEPENDS_MACCATALYST to be
@@ -1984,8 +1981,7 @@ function(add_swift_target_library name)
         SHARED
         STATIC
         NO_LINK_NAME
-        INSTALL_WITH_SHARED
-        IMPORTS_NON_OSSA)
+        INSTALL_WITH_SHARED)
   set(SWIFTLIB_single_parameter_options
         DEPLOYMENT_VERSION_IOS
         DEPLOYMENT_VERSION_OSX
@@ -2150,10 +2146,6 @@ function(add_swift_target_library name)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-lexical-lifetimes=false")
   endif()
 
-  if (NOT SWIFTLIB_IMPORTS_NON_OSSA)
-    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-ossa-modules")
-  endif()
-
   if(NOT DEFINED SWIFTLIB_INSTALL_BINARY_SWIFTMODULE)
     set(SWIFTLIB_INSTALL_BINARY_SWIFTMODULE TRUE)
   endif()
@@ -2258,6 +2250,9 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "LINUX")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
+    elseif(sdk STREQUAL "ANDROID")
+      list(APPEND swiftlib_module_depends_flattened
+           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_ANDROID})
     elseif(sdk STREQUAL "LINUX_STATIC")
       list(APPEND swiftlib_module_depends_flattened
           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX_STATIC})
@@ -2547,6 +2542,11 @@ function(add_swift_target_library name)
         list(APPEND swiftlib_link_flags_all "-Wl,-soname,lib${name}.so")
         # Ensure compatibility with Android 15+ devices using 16KB memory pages.
         list(APPEND swiftlib_link_flags_all "-Wl,-z,max-page-size=16384")
+      endif()
+
+      # This is a Android-specific hack till we transition the stdlib fully to versioned triples.
+      if(sdk STREQUAL "ANDROID" AND name STREQUAL "swiftSwiftReflectionTest")
+        list(APPEND swiftlib_swift_compile_flags_all "-target" "${SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE}${SWIFT_ANDROID_API_LEVEL}")
       endif()
 
       if (SWIFTLIB_BACK_DEPLOYMENT_LIBRARY)

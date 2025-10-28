@@ -9,6 +9,5 @@ Documentation on diagnostics emitted by the compiler and settings that control t
 
 ## Topics
 
-- <doc:diagnostic-descriptions>
 - <doc:diagnostic-groups>
 - <doc:upcoming-language-features>

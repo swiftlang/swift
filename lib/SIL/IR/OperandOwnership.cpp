@@ -332,6 +332,7 @@ OPERAND_OWNERSHIP(GuaranteedForwarding, LinearFunctionExtract)
 OPERAND_OWNERSHIP(GuaranteedForwarding, OpenExistentialValue)
 OPERAND_OWNERSHIP(GuaranteedForwarding, OpenExistentialBoxValue)
 OPERAND_OWNERSHIP(GuaranteedForwarding, FunctionExtractIsolation)
+OPERAND_OWNERSHIP(GuaranteedForwarding, ImplicitActorToOpaqueIsolationCast)
 
 OPERAND_OWNERSHIP(EndBorrow, EndBorrow)
 
@@ -420,6 +421,7 @@ AGGREGATE_OWNERSHIP(DestructureTuple)
 AGGREGATE_OWNERSHIP(Enum)
 AGGREGATE_OWNERSHIP(UncheckedEnumData)
 AGGREGATE_OWNERSHIP(SwitchEnum)
+AGGREGATE_OWNERSHIP(UncheckedOwnership)
 #undef AGGREGATE_OWNERSHIP
 
 // A begin_borrow is conditionally nested.
@@ -484,7 +486,8 @@ OperandOwnershipClassifier::visitDropDeinitInst(DropDeinitInst *i) {
 // This does not apply to uses that begin an explicit borrow scope in the
 // caller, such as begin_apply.
 static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
-                                                bool hasScopeInCaller) {
+                                                bool hasScopeInCaller,
+                                                bool forwardsGuaranteedValues) {
 
   switch (argConv) {
   case SILArgumentConvention::Indirect_In_CXX:
@@ -501,7 +504,6 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
   // explicit borrow scope in the caller so we must treat arguments passed to it
   // as being borrowed for the entire region of coroutine execution.
   case SILArgumentConvention::Indirect_In_Guaranteed:
-  case SILArgumentConvention::Direct_Guaranteed:
   case SILArgumentConvention::Pack_Guaranteed:
   case SILArgumentConvention::Pack_Inout:
   case SILArgumentConvention::Pack_Out:
@@ -509,6 +511,16 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
     // throughout the caller's borrow scope.
     return hasScopeInCaller ? OperandOwnership::Borrow
                             : OperandOwnership::InstantaneousUse;
+
+  case SILArgumentConvention::Direct_Guaranteed: {
+    if (hasScopeInCaller) {
+      return OperandOwnership::Borrow;
+    }
+    if (forwardsGuaranteedValues) {
+      return OperandOwnership::GuaranteedForwarding;
+    }
+    return OperandOwnership::InstantaneousUse;
+  }
 
   case SILArgumentConvention::Direct_Unowned:
     return OperandOwnership::UnownedInstantaneousUse;
@@ -541,7 +553,8 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
   }();
 
   auto argOwnership = getFunctionArgOwnership(
-    argConv, /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation());
+      argConv, /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation(),
+      /*forwardsGuaranteedValues*/ apply.hasGuaranteedResult());
 
   // OSSA cleanup needs to handle each of these callee ownership cases.
   //
@@ -604,14 +617,16 @@ OperandOwnership OperandOwnershipClassifier::visitYieldInst(YieldInst *i) {
   auto fnType = i->getFunction()->getLoweredFunctionType();
   SILArgumentConvention argConv(
     fnType->getYields()[getOperandIndex()].getConvention());
-  return getFunctionArgOwnership(argConv, /*hasScopeInCaller*/ false);
+  return getFunctionArgOwnership(argConv, /*hasScopeInCaller*/ false,
+                                 /*forwardsGuaranteedValues*/ false);
 }
 
 OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {
   switch (i->getOwnershipKind()) {
   case OwnershipKind::Any:
-  case OwnershipKind::Guaranteed:
     llvm_unreachable("invalid value ownership");
+  case OwnershipKind::Guaranteed:
+    return OperandOwnership::GuaranteedForwarding;
   case OwnershipKind::None:
     return OperandOwnership::TrivialUse;
   case OwnershipKind::Unowned:
@@ -620,6 +635,12 @@ OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {
     return OperandOwnership::ForwardingConsume;
   }
   llvm_unreachable("covered switch");
+}
+
+OperandOwnership
+OperandOwnershipClassifier::visitReturnBorrowInst(ReturnBorrowInst *rbi) {
+  return getOperandIndex() == 0 ? OperandOwnership::GuaranteedForwarding
+                                : OperandOwnership::EndBorrow;
 }
 
 OperandOwnership OperandOwnershipClassifier::visitAssignInst(AssignInst *i) {

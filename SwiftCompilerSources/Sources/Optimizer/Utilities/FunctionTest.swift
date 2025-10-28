@@ -43,7 +43,6 @@ public func registerOptimizerTests() {
   registerFunctionTests(
     addressOwnershipLiveRangeTest,
     argumentConventionsTest,
-    getPullbackClosureInfoTest,
     interiorLivenessTest,
     lifetimeDependenceRootTest,
     lifetimeDependenceScopeTest,
@@ -52,9 +51,8 @@ public func registerOptimizerTests() {
     localVariableReachableUsesTest,
     localVariableReachingAssignmentsTest,
     rangeOverlapsPathTest,
-    rewrittenCallerBodyTest,
-    specializedFunctionSignatureAndBodyTest,
-    variableIntroducerTest
+    variableIntroducerTest,
+    destroyBarrierTest
   )
 
   // Finally register the thunk they all call through.

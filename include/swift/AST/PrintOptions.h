@@ -403,6 +403,12 @@ public:
   /// Suppress @_lifetime attribute and emit @lifetime instead.
   bool SuppressLifetimes = false;
 
+  /// Suppress @inline(always) attribute and emit @inline(__always) instead.
+  bool SuppressInlineAlways = false;
+
+  /// Suppress printing of ~Sendable in inheritance and requirement lists.
+  bool SuppressTildeSendable = false;
+
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;
 
@@ -691,6 +697,13 @@ public:
   static PrintOptions forDiagnosticArguments() {
     PrintOptions result;
     result.PrintExplicitPackTypes = false;
+    return result;
+  }
+
+  /// Print options suitable for debug printing.
+  static PrintOptions forDebugging() {
+    PrintOptions result;
+    result.PrintTypesForDebugging = true;
     return result;
   }
 

@@ -58,6 +58,8 @@ class ExecutorBreadcrumb;
 struct LValueOptions {
   bool IsNonAccessing = false;
   bool TryAddressable = false;
+  bool ForGuaranteedReturn = false;
+  bool ForGuaranteedAddressReturn = false;
 
   /// Derive options for accessing the base of an l-value, given that
   /// applying the derived component might touch the memory.
@@ -79,6 +81,18 @@ struct LValueOptions {
   LValueOptions withAddressable(bool addressable) const {
     auto copy = *this;
     copy.TryAddressable = addressable;
+    return copy;
+  }
+
+  LValueOptions forGuaranteedReturn(bool value) const {
+    auto copy = *this;
+    copy.ForGuaranteedReturn = value;
+    return copy;
+  }
+
+  LValueOptions forGuaranteedAddressReturn(bool value) const {
+    auto copy = *this;
+    copy.ForGuaranteedAddressReturn = value;
     return copy;
   }
 };
@@ -1885,11 +1899,10 @@ public:
   ManagedValue emitUndef(Type type);
   ManagedValue emitUndef(SILType type);
   RValue emitUndefRValue(SILLocation loc, Type type);
-  
-  std::pair<ManagedValue, SILValue>
-  emitUninitializedArrayAllocation(Type ArrayTy,
-                                   SILValue Length,
-                                   SILLocation Loc);
+
+  ManagedValue emitUninitializedArrayAllocation(Type ArrayTy,
+                                                SILValue Length,
+                                                SILLocation Loc);
 
   CleanupHandle enterDeallocateUninitializedArrayCleanup(SILValue array);
   void emitUninitializedArrayDeallocation(SILLocation loc, SILValue array);
@@ -2065,6 +2078,19 @@ public:
                                       SmallVectorImpl<ManagedValue> &yields,
                                       bool isOnSelfParameter);
 
+  ManagedValue emitBorrowMutateAccessor(SILLocation loc, SILDeclRef accessor,
+                                        SubstitutionMap substitutions,
+                                        ArgumentSource &&selfValue,
+                                        bool isSuper, bool isDirectUse,
+                                        PreparedArguments &&subscriptIndices,
+                                        bool isOnSelfParameter);
+
+  ManagedValue applyBorrowMutateAccessor(SILLocation loc, ManagedValue fn,
+                                         bool canUnwind, SubstitutionMap subs,
+                                         ArrayRef<ManagedValue> args,
+                                         CanSILFunctionType substFnType,
+                                         ApplyOptions options);
+
   RValue emitApplyConversionFunction(SILLocation loc,
                                      Expr *funcExpr,
                                      Type resultType,
@@ -2211,6 +2237,8 @@ public:
                                    TSanKind tsanKind = TSanKind::None);
   ManagedValue emitBorrowedLValue(SILLocation loc, LValue &&src,
                                   TSanKind tsanKind = TSanKind::None);
+  std::optional<ManagedValue>
+  tryEmitProjectedLValue(SILLocation loc, LValue &&src, TSanKind tsanKind);
   ManagedValue emitConsumedLValue(SILLocation loc, LValue &&src,
                                   TSanKind tsanKind = TSanKind::None);
   /// Simply projects the LValue as a ManagedValue, allowing the caller
@@ -2243,6 +2271,10 @@ public:
   SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
 
   void emitReturnExpr(SILLocation loc, Expr *ret);
+
+  bool
+  emitBorrowOrMutateAccessorResult(SILLocation loc, Expr *ret,
+                                   SmallVectorImpl<SILValue> &directResults);
 
   void emitYield(SILLocation loc, MutableArrayRef<ArgumentSource> yieldValues,
                  ArrayRef<AbstractionPattern> origTypes,
@@ -2366,9 +2398,8 @@ public:
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       CanSILFunctionType fnTy,
                                       ExecutorBreadcrumb prevExecutor,
-                                      SILResultInfo errorResult,
-                                      SILValue indirectErrorAddr,
-                                      bool isSuppressed);
+                                      TaggedUnion<SILValue, SILType> errorAddrOrType,
+                                      bool suppressErrorPath);
 
   /// Emit a dynamic member reference.
   RValue emitDynamicMemberRef(SILLocation loc, SILValue operand,

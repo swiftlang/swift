@@ -38,8 +38,9 @@ func addFDF(x: Float, y: Double, z: Float) -> Float {
 // CHECK: fadd double
 // CHECK: ret double
 // V7K-LABEL: _$s8test_v7k8addStack
+// V7K: mov     r7, sp
 // V7K: sub     sp, #72
-// V7K: vldr d16, [sp, #72]
+// V7K: vldr d16, [r7, #8]
 // V7K: vadd.f64 d0, d6, d16
 // a is assigned to d6, c is passed via stack
 func addStack(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
@@ -50,8 +51,9 @@ func addStack(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
 // CHECK-LABEL: define hidden swiftcc float @"$s8test_v7k9addStack{{.*}}"(double %0, double %1, double %2, double %3, double %4, double %5, double %6, float %7, double %8, float %9)
 // CHECK: fadd float
 // V7K-LABEL: _$s8test_v7k9addStack
+// V7K: mov     r7, sp
 // V7K: sub     sp, #80
-// V7K: vldr s0, [sp, #88]
+// V7K: vldr s0, [r7, #16]
 // V7K: vadd.f32 s0, s14, s0
 // a is assigned to s14, b is via stack, c is via stack since it can't be back-filled to s15
 func addStack2(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double, 
@@ -81,11 +83,12 @@ func testSingle(x: SingleCase) -> Int32{
 // CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k0A4Data{{.*}}"(i32 %0, double %1)
 // CHECK: ret double
 // V7K-LABEL: _$s8test_v7k0A4Data
+// V7K: push    {r7, lr}
 // V7K: vstr    d0, [sp, #16]
 // V7K: vldr    d16, [sp, #16]
 // V7K: vstr    d16, [sp, #8]
 // V7K: vldr    d0, [sp, #8]
-// V7K: bx      lr
+// V7K: pop     {r7, pc}
 enum DataCase { case Y(Int, Double) }
 func testData(x: DataCase) -> Double {
   switch x {
@@ -184,6 +187,7 @@ func testSingleP(x: SinglePayload) -> Double {
 // CHECK: phi double [ 0.000000e+00, {{.*}} ]
 // CHECK: ret double
 // V7K-LABEL: _$s8test_v7k0A6MultiP
+// V7K:        push    {r7, lr}
 // V7K:        ldr     r0, [sp, #24]
 // V7K:        ldr     r1, [sp, #28]
 // V7K:        vmov    d16, r0, r1
@@ -192,7 +196,7 @@ func testSingleP(x: SinglePayload) -> Double {
 // V7K:        vstr    d16, [sp]
 // V7K:        vldr    d0, [sp]
 // V7K:        add     sp, #{{[0-9]+}}
-// V7K:        bx      lr
+// V7K:        pop     {r7, pc}
 // Backend will assign r0, r1 and r2 for input parameters and d0 for return values.
 class Bignum {}
 enum MultiPayload {

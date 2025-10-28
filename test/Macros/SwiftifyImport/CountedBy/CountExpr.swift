@@ -8,7 +8,7 @@ func myFunc(_ ptr: UnsafePointer<CInt>, _ size: CInt, _ count: CInt) {
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func myFunc(_ ptr: UnsafeBufferPointer<CInt>, _ size: CInt, _ count: CInt) {
-// CHECK-NEXT:     let _ptrCount = unsafe ptr.count
+// CHECK-NEXT:     let _ptrCount = ptr.count
 // CHECK-NEXT:     if _ptrCount != size * count {
 // CHECK-NEXT:       fatalError("bounds check failure in myFunc: expected \(size * count) but got \(_ptrCount)")
 // CHECK-NEXT:     }

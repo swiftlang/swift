@@ -112,6 +112,7 @@ private:
   const LoadableTypeInfo *JobTI = nullptr;
   const LoadableTypeInfo *ExecutorTI = nullptr;
   const LoadableTypeInfo *WitnessTablePtrTI = nullptr;
+  const LoadableTypeInfo *ImplicitActorTI = nullptr;
   const TypeInfo *TypeMetadataPtrTI = nullptr;
   const TypeInfo *SwiftContextPtrTI = nullptr;
   const TypeInfo *TaskContinuationFunctionPtrTI = nullptr;
@@ -202,6 +203,7 @@ public:
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
+  const LoadableTypeInfo &getImplicitActorTypeInfo();
   const LoadableTypeInfo &getRawPointerTypeInfo();
   const LoadableTypeInfo &getRawUnsafeContinuationTypeInfo();
   const LoadableTypeInfo &getJobTypeInfo();

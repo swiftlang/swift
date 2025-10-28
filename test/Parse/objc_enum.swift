@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-objc-interop
 
 @objc enum Foo: Int32 {
   case Zim, Zang, Zung

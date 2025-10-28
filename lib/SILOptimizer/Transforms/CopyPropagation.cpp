@@ -688,10 +688,10 @@ void CopyPropagation::verifyOwnership() {
                          : deBlocksAnalysis->get(f));
 }
 
-// MandatoryCopyPropagation is not currently enabled in the -Onone pipeline
-// because it may negatively affect the debugging experience.
+// MandatoryCopyPropagation runs in the -Onone pipeline and needs to be more
+// conservative, preserving debug information.
 SILTransform *swift::createMandatoryCopyPropagation() {
-  return new CopyPropagation(PruneDebugInsts, /*canonicalizeAll*/ true,
+  return new CopyPropagation(DontPruneDebugInsts, /*canonicalizeAll*/ true,
                              /*canonicalizeBorrows*/ false);
 }
 

@@ -1266,6 +1266,18 @@ bb0:
   return %r : $()
 }
 
+// CHECK-LABEL: @test_debug_step
+// CHECK:       PAIR #0.
+// CHECK-NEXT:     debug_step
+// CHECK-NEXT:     %0 = argument of bb0
+// CHECK-NEXT:     r=0,w=0
+sil [ossa] @test_debug_step : $@convention(thin) (@inout_aliasable Int) -> () {
+bb0(%0 : $*Int):
+  debug_step
+  %99 = tuple ()
+  return %99 : $()
+}
+
 // CHECK-LABEL: @test_store_assign
 // CHECK:       PAIR #0.
 // CHECK-NEXT:      store %2 to [assign] %0 : $*C

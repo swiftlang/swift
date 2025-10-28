@@ -86,6 +86,25 @@ public func getPointOffsets() -> [Int] {
   enumerateByteOffsets(Point.self)
 }
 
+public class PointClass {
+  public var x, y: Int
+
+  public init(x: Int, y: Int) {
+    self.x = x
+    self.y = y
+  }
+}
+
+public protocol Reflectable: AnyObject {
+  func reflect()
+}
+
+extension PointClass: Reflectable {
+  public func reflect() {
+    swap(&x, &y)
+  }
+}
+
 //--- ClientA.swift
 import Root
 
@@ -97,6 +116,10 @@ public struct Color {
 
 public func getPointAndColorOffsets() -> [Int] {
   getPointOffsets() + enumerateByteOffsets(Color.self)
+}
+
+public func getReflectableA() -> any AnyObject & Reflectable {
+  return PointClass(x: 5, y: 5)
 }
 
 //--- ClientB.swift
@@ -112,6 +135,10 @@ public func getExtraPoint3DOffsets() -> [Int] {
   return Array(point3DOffsets[pointOffsets.count...])
 }
 
+public func getReflectableB() -> any AnyObject & Reflectable {
+  return PointClass(x: 5, y: 5)
+}
+
 //--- Application.swift
 import ClientA
 import ClientB
@@ -124,6 +151,7 @@ struct Main {
     print(pointAndColorOffsets.count)
     print(extraColor3DOffsets.count)
 
+    let reflected = [getReflectableA(), getReflectableB()]
     // CHECK: DONE
     print("DONE")
   }

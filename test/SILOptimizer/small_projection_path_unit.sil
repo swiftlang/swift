@@ -1,0 +1,9 @@
+// RUN: %target-sil-opt -test-runner -sil-disable-input-verify %s -o /dev/null
+
+sil_stage raw
+
+sil @small_projection_path_unit_tests : $@convention(thin) () -> () {
+bb0:
+  specify_test "small_projection_path"
+  unreachable
+}

@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 struct NonCopyable {
     NonCopyable(int x) : x(x) {}
@@ -25,6 +26,13 @@ struct NonCopyableDerived: public NonCopyable {
 
 inline std::shared_ptr<NonCopyable> getNonCopyableSharedPtr() { return std::make_shared<NonCopyableDerived>(42); }
 inline std::unique_ptr<NonCopyable> getNonCopyableUniquePtr() { return std::make_unique<NonCopyableDerived>(42); }
+
+inline std::vector<std::unique_ptr<NonCopyable>>
+getVectorNonCopyableUniquePtr() {
+  std::vector<std::unique_ptr<NonCopyable>> vec;
+  vec.emplace_back();
+  return vec;
+}
 
 std::unique_ptr<int> makeInt() {
   return std::make_unique<int>(42);

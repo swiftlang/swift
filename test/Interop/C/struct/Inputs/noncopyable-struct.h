@@ -47,7 +47,7 @@ void badDestroy2(BadDestroyNonCopyableType2 *ptr);
 
 struct __attribute__((swift_attr("~Copyable"))) __attribute__((swift_attr("destroy:extraDestroy"))) ExtraDestroy {
   void *storage;
-
+  ExtraDestroy(ExtraDestroy&&) = default;
   ~ExtraDestroy() { }
 };
 

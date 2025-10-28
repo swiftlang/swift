@@ -236,6 +236,7 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
       "-lswiftSynchronization",
       "-lswiftGlibc",
       "-lswiftAndroid",
+      "-lswiftWASILibc",
       "-lBlocksRuntime",
       // Dispatch-specific Swift runtime libs
       "-ldispatch",
@@ -249,6 +250,9 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
       "-lFoundationInternationalization",
       "-lFoundationNetworking",
       "-lFoundationXML",
+      "-l_CFXMLInterface",
+      "-l_FoundationCShims",
+      "-l_FoundationCollections",
       // Foundation support libs
       "-lcurl",
       "-lxml2",
@@ -256,12 +260,20 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
       "-lTesting",
       // XCTest runtime libs (must be first due to http://github.com/apple/swift-corelibs-xctest/issues/432)
       "-lXCTest",
+      // swift-testing libraries
+      "-l_TestingInternals",
+      "-l_TestDiscovery",
+      "-l_Testing_Foundation",
       // Common-use ordering-agnostic Linux system libs
       "-lm",
       "-lpthread",
       "-lutil",
       "-ldl",
       "-lz",
+      // Common-use ordering-agnostic WASI system libs
+      "-lwasi-emulated-getpid",
+      "-lwasi-emulated-mman",
+      "-lwasi-emulated-signal",
   };
   std::unordered_map<std::string, bool> SwiftRuntimeLibraries;
   for (const auto &RuntimeLib : SwiftRuntimeLibsOrdered) {

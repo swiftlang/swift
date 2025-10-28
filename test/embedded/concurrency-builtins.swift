@@ -6,6 +6,7 @@
 // REQUIRES: swift_feature_Embedded
 
 import Builtin
+import _Concurrency
 
 public func test() async {
     _ = Builtin.createAsyncTask(0) { () async throws -> Int in

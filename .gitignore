@@ -89,6 +89,8 @@ Runtimes/**/*.cpp
 Runtimes/**/*.c
 Runtimes/**/*.m
 Runtimes/**/*.mm
+Runtimes/**/*.S
+Runtimes/**/*.asm
 Runtimes/**/*.def
 Runtimes/**/*.gyb
 Runtimes/**/*.apinotes

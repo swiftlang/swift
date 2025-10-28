@@ -44,6 +44,7 @@ add_swift_host_library(swiftSema STATIC
   MiscDiagnostics.cpp
   OpenedExistentials.cpp
   PCMacro.cpp
+  PerformanceHints.cpp
   PlaygroundTransform.cpp
   PreCheckTarget.cpp
   ResilienceDiagnostics.cpp
@@ -69,6 +70,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckEffects.cpp
   TypeCheckExpr.cpp
   TypeCheckExprObjC.cpp
+  TypeCheckEmbedded.cpp
   TypeCheckGeneric.cpp
   TypeCheckInvertible.cpp
   TypeCheckMacros.cpp

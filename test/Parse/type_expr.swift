@@ -344,10 +344,9 @@ func testFunctionCollectionTypes() {
 
 func testInvalidArrowWithClosure() {
   _ = { undefined -> undefined2 }
-  // expected-error@-1 {{cannot find 'undefined' in scope}}
-  // expected-error@-2 {{cannot find 'undefined2' in scope}}
-  // expected-error@-3 {{expected type before '->'}}
-  // expected-error@-4 {{expected type after '->'}}
+  // expected-error@-1 {{expected 'in' after the closure signature}}
+  // expected-error@-2 {{cannot find type 'undefined2' in scope}}
+  // expected-error@-3 {{cannot infer type of closure parameter 'undefined' without a type annotation}}
 
   () -> { let x: Int = "" }
   // expected-error@-1 {{expected type after '->'}}

@@ -21,13 +21,9 @@
 
 # TODO:
 # Platform support:
-#   - Work on/Verify cross-compiling
-#   - Work on/Verify Windows and Linux native builds
+#   - Work on/Verify Linux native builds
 # Embedded
 #   -- -Xfrontend -emit-empty-object-file
-# Catalyst Support
-#   -- Will need shadow invocations to generate swiftmodules for Swift parts
-# Install *.abi.json, swiftdoc, and swiftsourceinfo
 
 cmake_minimum_required(VERSION 3.29)
 # TODO before requiring CMake 4.1 or later
@@ -176,7 +172,7 @@ add_compile_options(
 # a compromise, treat all linker warnings as errors.
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 # Ensure all symbols are fully resolved on Linux
-add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
+add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
@@ -193,7 +189,6 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:-no-link-objc-runtime>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-ossa-modules>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -empty-abi-descriptor>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<AND:$<NOT:$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -disable-objc-interop>"

@@ -1243,7 +1243,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   if (superclassConformsTo(dyn_cast<ClassDecl>(derived.Nominal),
                            KnownProtocolKind::Encodable)) {
     auto *attr = new (C) OverrideAttr(/*IsImplicit=*/true);
-    encodeDecl->getAttrs().add(attr);
+    encodeDecl->addAttribute(attr);
   }
 
   addNonIsolatedToSynthesized(derived, encodeDecl);
@@ -1894,7 +1894,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   // This constructor should be marked as `required` for non-final classes.
   if (classDecl && !classDecl->isSemanticallyFinal()) {
     auto *reqAttr = new (C) RequiredAttr(/*IsImplicit=*/true);
-    initDecl->getAttrs().add(reqAttr);
+    initDecl->addAttribute(reqAttr);
   }
 
   addNonIsolatedToSynthesized(derived, initDecl);

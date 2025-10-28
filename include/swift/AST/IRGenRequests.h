@@ -151,6 +151,7 @@ struct IRGenDescriptor {
   const PrimarySpecificPaths &PSPs;
   StringRef PrivateDiscriminator;
   ArrayRef<std::string> parallelOutputFilenames;
+  ArrayRef<std::string> parallelIROutputFilenames;
   llvm::GlobalVariable **outModuleHash;
   llvm::raw_pwrite_stream *out = nullptr;
 
@@ -188,6 +189,7 @@ public:
                            PSPs,
                            PrivateDiscriminator,
                            {},
+                           {},
                            outModuleHash};
   }
 
@@ -197,6 +199,7 @@ public:
       std::unique_ptr<SILModule> &&SILMod, StringRef ModuleName,
       const PrimarySpecificPaths &PSPs, SymsToEmit symsToEmit = std::nullopt,
       ArrayRef<std::string> parallelOutputFilenames = {},
+      ArrayRef<std::string> parallelIROutputFilenames = {},
       llvm::GlobalVariable **outModuleHash = nullptr) {
     return IRGenDescriptor{M,
                            symsToEmit,
@@ -209,6 +212,7 @@ public:
                            PSPs,
                            "",
                            parallelOutputFilenames,
+                           parallelIROutputFilenames,
                            outModuleHash};
   }
 

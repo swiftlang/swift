@@ -17,6 +17,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckEmbedded.h"
 #include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTBridging.h"
@@ -390,6 +391,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
       }
 
+      // Embedded Swift places restrictions on dynamic casting.
+      diagnoseDynamicCastInEmbedded(DC, cast);
+
       // now, look for conditional casts to marker protocols.
 
       if (!isa<ConditionalCheckedCastExpr>(cast) && !isa<IsExpr>(cast))
@@ -474,6 +478,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             copyExpr->getLoc(),
             diag::copy_expression_cannot_be_used_with_noncopyable_types);
       }
+
+      /// FIXME: there really is no reason for the restriction on copy not being
+      ///   permitted on fields, other than needing tests to ensure it works.
+      if (Ctx.LangOpts.hasFeature(ManualOwnership))
+        return;
 
       // We only allow for copy_expr to be applied directly to lvalues. We do
       // not allow currently for it to be applied to fields.
@@ -3218,7 +3227,7 @@ bool swift::computeFixitsForOverriddenDeclaration(
 }
 
 //===----------------------------------------------------------------------===//
-// Per func/init diagnostics
+// MARK: Per func/init diagnostics
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -3859,71 +3868,6 @@ public:
   }
 };
 
-class ReturnTypePlaceholderReplacer : public ASTWalker {
-  FuncDecl *Implementation;
-  BraceStmt *Body;
-  SmallVector<Type, 4> Candidates;
-
-  bool HasInvalidReturn = false;
-
-public:
-  ReturnTypePlaceholderReplacer(FuncDecl *Implementation, BraceStmt *Body)
-      : Implementation(Implementation), Body(Body) {}
-
-  void check() {
-    auto *resultRepr = Implementation->getResultTypeRepr();
-    if (!resultRepr) {
-      return;
-    }
-
-    Implementation->getASTContext()
-        .Diags
-        .diagnose(resultRepr->getLoc(),
-                  diag::placeholder_type_not_allowed_in_return_type)
-        .highlight(resultRepr->getSourceRange());
-
-    Body->walk(*this);
-
-    // If given function has any invalid returns in the body
-    // let's not try to validate the types, since it wouldn't
-    // be accurate.
-    if (HasInvalidReturn)
-      return;
-
-    auto writtenType = Implementation->getResultInterfaceType();
-    llvm::SmallPtrSet<TypeBase *, 8> seenTypes;
-    for (auto candidate : Candidates) {
-      if (!seenTypes.insert(candidate.getPointer()).second) {
-        continue;
-      }
-      TypeChecker::notePlaceholderReplacementTypes(writtenType, candidate);
-    }
-  }
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::ArgumentsAndExpansion;
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *E) override { return Action::Continue(E); }
-
-  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    if (auto *RS = dyn_cast<ReturnStmt>(S)) {
-      if (RS->hasResult()) {
-        auto resultTy = RS->getResult()->getType();
-        HasInvalidReturn |= resultTy.isNull() || resultTy->hasError();
-        Candidates.push_back(resultTy);
-      }
-    }
-
-    return Action::Continue(S);
-  }
-
-  // Don't descend into nested decls.
-  PreWalkAction walkToDeclPre(Decl *D) override {
-    return Action::SkipNode();
-  }
-};
-
 } // end anonymous namespace
 
 SourceLoc swift::getFixItLocForVarToLet(VarDecl *var) {
@@ -4005,8 +3949,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     if (!(access & RK_Defined))
       continue;
 
-    if (auto *caseStmt =
-            dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {
+    if (isa_and_nonnull<CaseStmt>(var->getRecursiveParentPatternStmt())) {
       // Only diagnose for the parent-most VarDecl.
       if (var->getParentVarDecl())
         continue;
@@ -4537,13 +4480,6 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
         OpaqueUnderlyingTypeChecker(AFD, opaqueResultTy, body).check();
       }
     }
-  } else if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-    auto resultIFaceTy = FD->getResultInterfaceType();
-    // If the result has a placeholder, we need to try to use the contextual
-    // type inferred in the body to replace it.
-    if (resultIFaceTy && resultIFaceTy->hasPlaceholder()) {
-      ReturnTypePlaceholderReplacer(FD, body).check();
-    }
   }
 }
 
@@ -5030,6 +4966,8 @@ public:
           case AccessorKind::Modify:
           case AccessorKind::Modify2:
           case AccessorKind::Init:
+          case AccessorKind::Borrow:
+          case AccessorKind::Mutate:
             llvm_unreachable("cannot be @objc");
           }
         } else {
@@ -5193,7 +5131,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       info->isUnavailability() ? "#unavailable" : "#available";
 
   bool hasValidSpecs = false;
-  bool allValidSpecsArePlatform = true;
+  bool wildcardRequiredInList = false;
   std::optional<SourceLoc> wildcardLoc;
   llvm::SmallSet<AvailabilityDomain, 8> seenDomains;
   for (auto spec : info->getSemanticAvailabilitySpecs(DC)) {
@@ -5206,6 +5144,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
     auto domain = spec.getDomain();
     auto loc = parsedSpec->getStartLoc();
     bool hasVersion = !spec.getVersion().empty();
+    bool mustBeSpecifiedAlone = domain.mustBeSpecifiedAlone();
 
     if (!domain.supportsQueries()) {
       diags.diagnose(loc, diag::availability_query_not_allowed, domain,
@@ -5213,7 +5152,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       return true;
     }
 
-    if (!domain.isPlatform() && info->getQueries().size() > 1) {
+    if (mustBeSpecifiedAlone && info->getQueries().size() > 1) {
       diags.diagnose(loc, diag::availability_must_occur_alone, domain,
                      hasVersion);
       return true;
@@ -5261,8 +5200,8 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
     }
 
     hasValidSpecs = true;
-    if (!domain.isPlatform())
-      allValidSpecsArePlatform = false;
+    if (!mustBeSpecifiedAlone)
+      wildcardRequiredInList = true;
   }
 
   if (info->isUnavailability()) {
@@ -5272,7 +5211,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
                     diag::unavailability_query_wildcard_not_required)
           .fixItRemove(*wildcardLoc);
     }
-  } else if (!wildcardLoc && hasValidSpecs && allValidSpecsArePlatform) {
+  } else if (!wildcardLoc && hasValidSpecs && wildcardRequiredInList) {
     if (info->getQueries().size() > 0) {
       auto insertLoc = info->getQueries().back()->getSourceRange().End;
       diags.diagnose(insertLoc, diag::availability_query_wildcard_required)
@@ -5284,7 +5223,8 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
   // restriction, macros would need to either be expanded when printed in
   // swiftinterfaces or be parsable as macros by module clients.
   auto fragileKind = DC->getFragileFunctionKind();
-  if (fragileKind.kind != FragileFunctionKind::None) {
+  if (fragileKind.kind != FragileFunctionKind::None &&
+      fragileKind.kind != FragileFunctionKind::EmbeddedAlwaysEmitIntoClient) {
     for (auto availSpec : info->getQueries()) {
       if (availSpec->getMacroLoc().isValid()) {
         diags.diagnose(availSpec->getMacroLoc(),
@@ -6435,8 +6375,6 @@ static bool isReturningFRT(const clang::NamedDecl *ND,
 static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
                                                  clang::QualType retType,
                                                  ASTContext &Ctx) {
-  if (!Ctx.LangOpts.hasFeature(Feature::WarnUnannotatedReturnOfCxxFrt))
-    return false;
 
   auto attrInfo = importer::ReturnOwnershipInfo(ND);
   if (attrInfo.hasRetainAttr())
@@ -6514,7 +6452,7 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
       if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx)) {
         SourceLoc diagnosticLoc = func->getLoc();
         if (diagnosticLoc.isInvalid() && func->getClangDecl()) {
-          // Fixme: Remove the diagnosticLoc once the source locations of the
+          // FIXME: Remove the diagnosticLoc once the source locations of the
           // objc method declarations are imported correctly.
           diagnosticLoc = Ctx.getClangModuleLoader()->importSourceLocation(
               ND->getLocation());
@@ -6536,7 +6474,7 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
 }
 
 //===----------------------------------------------------------------------===//
-// High-level entry points.
+// MARK: High-level entry points.
 //===----------------------------------------------------------------------===//
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
@@ -6560,9 +6498,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
-  if (ctx.LangOpts.hasFeature(Feature::CompileTimeValues) &&
-      !ctx.LangOpts.hasFeature(Feature::CompileTimeValuesPreview))
-    diagnoseInvalidConstExpressions(E, DC, isConstInitExpr);
+  diagnoseInvalidConstExpressions(E, DC, isConstInitExpr);
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
   diagnoseMissingMemberImports(E, DC);
@@ -6587,7 +6523,7 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
 }
 
 //===----------------------------------------------------------------------===//
-// Utility functions
+// MARK: Utility functions
 //===----------------------------------------------------------------------===//
 
 void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,

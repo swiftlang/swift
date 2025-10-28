@@ -1048,19 +1048,14 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
 }
 
 void ConstraintGraphNode::dump() const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
-  print(llvm::dbgs(), 0, PO);
+  print(llvm::dbgs(), 0, PrintOptions::forDebugging());
 }
 
 void ConstraintGraph::print(ArrayRef<TypeVariableType *> typeVars,
                             llvm::raw_ostream &out) {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
-
   for (auto typeVar : typeVars) {
-    (*this)[typeVar].print(
-        out, (CS.solverState ? CS.solverState->getCurrentIndent() : 0) + 2, PO);
+    auto indent = (CS.solverState ? CS.solverState->getCurrentIndent() : 0) + 2;
+    (*this)[typeVar].print(out, indent, PrintOptions::forDebugging());
     out << "\n";
   }
 }
@@ -1077,8 +1072,7 @@ void ConstraintGraph::printConnectedComponents(
     ArrayRef<TypeVariableType *> typeVars,
     llvm::raw_ostream &out) {
   auto components = computeConnectedComponents(typeVars);
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+
   for (const auto& component : components) {
     out.indent((CS.solverState ? CS.solverState->getCurrentIndent() : 0) + 2);
     out << component.solutionIndex << ": ";
@@ -1087,13 +1081,12 @@ void ConstraintGraph::printConnectedComponents(
     };
 
     // Print all of the type variables in this connected component.
-    interleave(component.typeVars,
-               [&](TypeVariableType *typeVar) {
-                 Type(typeVar).print(out, PO);
-               },
-               [&] {
-                 out << ' ';
-               });
+    interleave(
+        component.typeVars,
+        [&](TypeVariableType *typeVar) {
+          Type(typeVar).print(out, PrintOptions::forDebugging());
+        },
+        [&] { out << ' '; });
   }
 }
 

@@ -123,7 +123,7 @@ void ConformingMethodListCallbacks::readyForTypeChecking(SourceFile *SrcFile) {
   Type T = Res.Ty;
   WithSolutionSpecificVarTypesRAII VarType(Res.SolutionSpecificVarTypes);
 
-  if (!T || T->is<ErrorType>() || T->is<UnresolvedType>())
+  if (!T || T->is<ErrorType>())
     return;
 
   T = T->getRValueType();

@@ -66,7 +66,12 @@ printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm
   case AccessorKind::Init:
     OS << "init:" << ASD->getName();
     return false;
-
+  case AccessorKind::Borrow:
+    OS << "borrow:" << ASD->getName();
+    return false;
+  case AccessorKind::Mutate:
+    OS << "mutate:" << ASD->getName();
+    return false;
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Read:
@@ -129,8 +134,12 @@ public:
   }
 
   ArrayRef<FileUnit *> getFiles() const {
-    return isa<SourceFile *>(SFOrMod) ? *SFOrMod.getAddrOfPtr1()
-                                      : cast<ModuleDecl *>(SFOrMod)->getFiles();
+    if (isa<SourceFile *>(SFOrMod)) {
+      SourceFile *const *SF = SFOrMod.getAddrOfPtr1();
+      return ArrayRef((FileUnit *const *)SF, 1);
+    } else {
+      return cast<ModuleDecl *>(SFOrMod)->getFiles();
+    }
   }
 
   StringRef getFilename() const {

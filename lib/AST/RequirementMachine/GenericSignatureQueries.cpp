@@ -353,6 +353,9 @@ static Type substPrefixType(Type type, unsigned suffixLength, Type prefixType,
 Type RequirementMachine::getReducedTypeParameter(
     CanType t,
     ArrayRef<GenericTypeParamType *> genericParams) const {
+  if (Failed)
+    return ErrorType::get(t);
+
   // Get a simplified term T.
   auto term = Context.getMutableTermForType(t, /*proto=*/nullptr);
   System.simplify(term);
@@ -800,6 +803,9 @@ void RequirementMachine::verify(const MutableTerm &term) const {
       });
     }
   }
+
+  if (Failed)
+    return;
 
   MutableTerm erased;
 

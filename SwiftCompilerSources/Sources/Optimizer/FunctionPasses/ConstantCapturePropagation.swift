@@ -66,6 +66,10 @@ let constantCapturePropagation = FunctionPass(name: "constant-capture-propagatio
       continue
     }
 
+    if !context.continueWithNextSubpassRun(for: partialApply) {
+      return
+    }
+
     optimizeClosureWithDeadCaptures(of: partialApply, context)
 
     if partialApply.isDeleted {
@@ -108,7 +112,7 @@ private func constantPropagateCaptures(of partialApply: PartialApplyInst, _ cont
     // Escaping closures consume their arguments. Therefore we need to destroy the removed argument values.
     addCompensatingDestroys(for: constArgs, context)
   }
-  let newArguments = nonConstArgs.map { $0.value }
+  let newArguments = Array(nonConstArgs.values)
   rewritePartialApply(partialApply, withSpecialized: specializedCallee, arguments: newArguments, context)
 }
 
@@ -191,8 +195,7 @@ private func cloneArgument(_ argumentOp: Operand,
   if partialApply.calleeArgumentConventions[calleeArgIdx].isGuaranteed {
     // If the original argument was passed as guaranteed, i.e. is _not_ destroyed in the closure, we have
     // to destroy the cloned argument at function exits.
-    for block in targetFunction.blocks where block.terminator.isFunctionExiting {
-      let builder = Builder(before: block.terminator, context)
+    Builder.insertCleanupAtFunctionExits(of: targetFunction, context) { builder in
       builder.emitDestroy(of: clonedArg)
     }
   }
@@ -230,7 +233,7 @@ private func rewritePartialApply(_ partialApply: PartialApplyInst, withSpecializ
   // leave the key path itself out of the dependency chain, and introduce dependencies on those
   // operands instead, so that the key path object itself can be made dead.
   for md in newClosure.uses.users(ofType: MarkDependenceInst.self) {
-    if md.base.uses.getSingleUser(ofType: PartialApplyInst.self) == partialApply {
+    if md.base.uses.singleUser(ofType: PartialApplyInst.self) == partialApply {
       md.replace(with: newClosure, context)
     }
   }
@@ -301,9 +304,15 @@ private extension PartialApplyInst {
     var nonConstArgs = [Operand]()
     var hasKeypath = false
     for argOp in argumentOperands {
-      if argOp.value.isConstant(hasKeypath: &hasKeypath) {
+      // In non-OSSA we don't know where to insert the compensating release for a propagated keypath.
+      // Therefore bail if a keypath has multiple uses.
+      switch argOp.value.isConstant(requireSingleUse: !parentFunction.hasOwnership && !isOnStack) {
+      case .constant:
         constArgs.append(argOp)
-      } else {
+      case .constantWithKeypath:
+        constArgs.append(argOp)
+        hasKeypath = true
+      case .notConstant:
         nonConstArgs.append(argOp)
       }
     }
@@ -333,33 +342,49 @@ private extension FullApplySite {
   }
 }
 
+private enum ConstantKind {
+  case notConstant
+  case constant
+  case constantWithKeypath
+
+  func merge(with other: ConstantKind) -> ConstantKind {
+    switch (self, other) {
+      case (.notConstant, _):      return .notConstant
+      case (_, .notConstant):      return .notConstant
+      case (.constant, .constant): return .constant
+      default:                     return .constantWithKeypath
+    }
+  }
+}
+
 private extension Value {
-  func isConstant(hasKeypath: inout Bool) -> Bool {
+  func isConstant(requireSingleUse: Bool) -> ConstantKind {
     // All instructions handled here must also be handled in
     // `FunctionSignatureSpecializationMangler::mangleConstantProp`.
+    let result: ConstantKind
     switch self {
     case let si as StructInst:
-      for op in si.operands {
-        if !op.value.isConstant(hasKeypath: &hasKeypath) {
-          return false
-        }
-      }
-      return true
+      result = si.operands.reduce(.constant, {
+        $0.merge(with: $1.value.isConstant(requireSingleUse: requireSingleUse))
+      })
     case is ThinToThickFunctionInst, is ConvertFunctionInst, is UpcastInst, is OpenExistentialRefInst:
-      return (self as! UnaryInstruction).operand.value.isConstant(hasKeypath: &hasKeypath)
+      result = (self as! UnaryInstruction).operand.value.isConstant(requireSingleUse: requireSingleUse)
     case is StringLiteralInst, is IntegerLiteralInst, is FloatLiteralInst, is FunctionRefInst, is GlobalAddrInst:
-      return true
+      result = .constant
     case let keyPath as KeyPathInst:
-      hasKeypath = true
       guard keyPath.operands.isEmpty,
             keyPath.hasPattern,
             !keyPath.substitutionMap.hasAnySubstitutableParams
       else {
-        return false
+        return .notConstant
       }
-      return true
+      result = .constantWithKeypath
     default:
-      return false
+      return .notConstant
     }
+    if requireSingleUse, result == .constantWithKeypath, !uses.ignoreDebugUses.isSingleUse {
+      return .notConstant
+    }
+    return result
   }
 }

@@ -59,6 +59,9 @@ static std::optional<std::string_view> optionalFlagName(Feature feature) {
   case Feature::StrictMemorySafety:
     return "-strict-memory-safety";
 
+  case Feature::LibraryEvolution:
+    return "-enable-library-evolution";
+
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description) case Feature::FeatureName:
 #define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"

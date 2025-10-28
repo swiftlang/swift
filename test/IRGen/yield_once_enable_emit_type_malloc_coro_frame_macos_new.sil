@@ -1,0 +1,4 @@
+// REQUIRES: OS=macosx
+// RUN: %target-swift-frontend -target %target-cpu-apple-macosx26.0 -emit-irgen %S/yield_once_enable_emit_type_malloc_coro_frame.sil | %FileCheck %s
+
+// CHECK-NOT: __swift_coroFrameAllocStub

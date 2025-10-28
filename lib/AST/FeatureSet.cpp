@@ -83,7 +83,6 @@ UNINTERESTING_FEATURE(FlowSensitiveConcurrencyCaptures)
 UNINTERESTING_FEATURE(CodeItemMacros)
 UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
-UNINTERESTING_FEATURE(SymbolLinkageMarkers)
 UNINTERESTING_FEATURE(DeferredCodeGen)
 UNINTERESTING_FEATURE(LazyImmediate)
 UNINTERESTING_FEATURE(MoveOnlyClasses)
@@ -116,6 +115,7 @@ UNINTERESTING_FEATURE(RegionBasedIsolation)
 UNINTERESTING_FEATURE(PlaygroundExtendedCallbacks)
 UNINTERESTING_FEATURE(ThenStatements)
 UNINTERESTING_FEATURE(DoExpressions)
+UNINTERESTING_FEATURE(ForExpressions)
 UNINTERESTING_FEATURE(ImplicitLastExprResults)
 UNINTERESTING_FEATURE(RawLayout)
 UNINTERESTING_FEATURE(Embedded)
@@ -127,6 +127,7 @@ UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
 UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 UNINTERESTING_FEATURE(ImportMacroAliases)
 UNINTERESTING_FEATURE(NoExplicitNonIsolated)
+UNINTERESTING_FEATURE(EmbeddedExistentials)
 
 // TODO: Return true for inlinable function bodies with module selectors in them
 UNINTERESTING_FEATURE(ModuleSelector)
@@ -138,6 +139,7 @@ static bool usesFeatureInlineArrayTypeSugar(Decl *D) {
 }
 
 UNINTERESTING_FEATURE(StaticExclusiveOnly)
+UNINTERESTING_FEATURE(ManualOwnership)
 UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
 UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
@@ -326,11 +328,11 @@ static bool usesFeatureCDecl(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(StrictMemorySafety)
+UNINTERESTING_FEATURE(LibraryEvolution)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(SuppressCXXForeignReferenceTypeInitializers)
-UNINTERESTING_FEATURE(WarnUnannotatedReturnOfCxxFrt)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
@@ -435,6 +437,38 @@ UNINTERESTING_FEATURE(BuiltinInterleave)
 UNINTERESTING_FEATURE(BuiltinVectorsExternC)
 UNINTERESTING_FEATURE(AddressOfProperty2)
 UNINTERESTING_FEATURE(ImmutableWeakCaptures)
+// Ignore borrow and mutate accessors until it is used in the standard library.
+UNINTERESTING_FEATURE(BorrowAndMutateAccessors)
+
+static bool usesFeatureInlineAlways(Decl *decl) {
+  if (auto *inlineAttr = decl->getAttrs().getAttribute<InlineAttr>()) {
+    return inlineAttr->getKind() == InlineKind::Always;
+  }
+  return false;
+}
+
+UNINTERESTING_FEATURE(SwiftRuntimeAvailability)
+UNINTERESTING_FEATURE(StandaloneSwiftAvailability)
+
+static bool usesFeatureTildeSendable(Decl *decl) {
+  auto *TD = dyn_cast<TypeDecl>(decl);
+  if (!TD)
+    return false;
+
+  return llvm::any_of(
+      TD->getInherited().getEntries(), [&decl](const auto &entry) {
+        if (!entry.isSuppressed())
+          return false;
+
+        auto T = entry.getType();
+        if (!T)
+          return false;
+
+        auto &C = decl->getASTContext();
+        return C.getProtocol(KnownProtocolKind::Sendable) == T->getAnyNominal();
+      });
+}
+
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

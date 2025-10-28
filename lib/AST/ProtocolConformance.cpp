@@ -1267,7 +1267,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
     }
   }
 
-  // Actor classes conform to the actor protocol.
+  // Actor classes conform to the appropriate actor protocol.
   if (auto classDecl = dyn_cast<ClassDecl>(mutableThis)) {
     if (classDecl->isDistributedActor()) {
       addSynthesized(ctx.getProtocol(KnownProtocolKind::DistributedActor));

@@ -316,6 +316,8 @@ public:
   virtual SwiftLookupTable *
   findLookupTable(const clang::Module *clangModule) = 0;
 
+  virtual const clang::Module *getClangOwningModule(ClangNode Node) const = 0;
+
   virtual DeclName
   importName(const clang::NamedDecl *D,
              clang::DeclarationName givenName = clang::DeclarationName()) = 0;

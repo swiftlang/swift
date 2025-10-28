@@ -121,12 +121,13 @@ public:
 
 /// The information identifying the llvm intrinsic - its id and types.
 class IntrinsicInfo {
-  mutable llvm::AttributeList Attrs =
-      llvm::DenseMapInfo<llvm::AttributeList>::getEmptyKey();
+  mutable llvm::AttributeSet FnAttrs =
+      llvm::DenseMapInfo<llvm::AttributeSet>::getEmptyKey();
+
 public:
   llvm::Intrinsic::ID ID;
   SmallVector<Type, 4> Types;
-  const llvm::AttributeList &getOrCreateAttributes(ASTContext &Ctx) const;
+  const llvm::AttributeSet &getOrCreateFnAttributes(ASTContext &Ctx) const;
 };
 
 /// Turn a string like "release" into the LLVM enum.

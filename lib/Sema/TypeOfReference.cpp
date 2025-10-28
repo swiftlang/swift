@@ -22,25 +22,26 @@
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeTransform.h"
+#include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/PreparedOverload.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Statistic.h"
-#include "swift/Basic/Defer.h"
 
 using namespace swift;
 using namespace constraints;
 using namespace inference;
 
 #define DEBUG_TYPE "ConstraintSystem"
-
-
 
 Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
                                               Type parentTy,
@@ -261,22 +262,49 @@ public:
   }
 
   Type transformTypeAliasType(TypeAliasType *aliasTy) {
+    auto *TAD = aliasTy->getDecl();
+
+    // For a non-generic typealias, we can simply recurse into the underlying
+    // type. The constraint system doesn't properly handle opened types in
+    // the underlying type of a typealias (e.g TypeWalker won't visit them),
+    // so we don't preserve the sugar.
+    if (!TAD->getGenericSignature())
+      return transform(aliasTy->getSinglyDesugaredType());
+
+    // Otherwise we have a generic typealias, or typealias in a generic context,
+    // and need to open any requirements introduced. Then we need to
+    // re-substitute any opened types into the underlying type. Like the
+    // non-generic codepath we also don't want to preserve sugar.
     SmallVector<Type, 4> genericArgs;
     for (auto arg : aliasTy->getDirectGenericArgs())
       genericArgs.push_back(transform(arg));
 
-    auto substTy = TypeAliasType::get(
-        aliasTy->getDecl(), transform(aliasTy->getParent()), genericArgs,
-        transform(aliasTy->getSinglyDesugaredType()));
-    openGenericTypeRequirements(substTy->getDecl(),
-                                substTy->getSubstitutionMap());
-    return substTy;
+    auto parentTy = transform(aliasTy->getParent());
+    auto subMap = TypeAliasType::get(TAD, parentTy, genericArgs,
+                                     aliasTy->getSinglyDesugaredType())
+                      ->getSubstitutionMap(/*wantContextualType*/ true);
+
+    openGenericTypeRequirements(TAD, subMap);
+    return transform(TAD->getUnderlyingType().subst(subMap));
   }
 
   Type transformErrorType(ErrorType *errTy) {
     // For ErrorTypes we want to eagerly produce a hole since we know this is
     // where the issue is.
     return PlaceholderType::get(cs.getASTContext(), errTy);
+  }
+
+  Type transformDependentMemberType(DependentMemberType *DMT) {
+    auto assocTy = DMT->getAssocType();
+    ASSERT(assocTy && "Should not have structural type here");
+
+    // If the new base is a hole, propagate it to cover the entire
+    // DependentMemberType.
+    auto newBase = transform(DMT->getBase());
+    if (newBase->isPlaceholder())
+      return PlaceholderType::get(cs.getASTContext(), DMT);
+
+    return DependentMemberType::get(newBase, assocTy);
   }
 
   Type transform(Type type) {
@@ -290,7 +318,8 @@ public:
     // an invalid AST node.
     if (type->hasError()) {
       cs.recordFix(
-          IgnoreInvalidASTNode::create(cs, cs.getConstraintLocator(locator)));
+          IgnoreInvalidASTNode::create(cs, cs.getConstraintLocator(locator)),
+          /*impact=*/1, preparedOverload);
     }
     return type.transformRec([&](Type type) -> std::optional<Type> {
       if (!type->hasUnboundGenericType() && !type->hasPlaceholder() &&
@@ -308,6 +337,8 @@ public:
         return transformTypeAliasType(aliasTy);
       if (auto *errTy = dyn_cast<ErrorType>(tyPtr))
         return transformErrorType(errTy);
+      if (auto *DMT = dyn_cast<DependentMemberType>(tyPtr))
+        return transformDependentMemberType(DMT);
 
       return std::nullopt;
     });
@@ -799,27 +830,24 @@ void ConstraintSystem::recordOpenedTypes(
 
   // If the last path element is an archetype or associated type, ignore it.
   SmallVector<LocatorPathElt, 2> pathElts;
-  auto anchor = locator.getLocatorParts(pathElts);
+  (void) locator.getLocatorParts(pathElts);
   if (!pathElts.empty() &&
       pathElts.back().getKind() == ConstraintLocator::GenericParameter)
-    return;
-
-  // If the locator is empty, ignore it.
-  if (!anchor && pathElts.empty())
     return;
 
   ConstraintLocator *locatorPtr = getConstraintLocator(locator);
   assert(locatorPtr && "No locator for opened types?");
 
-  OpenedType *openedTypes
-    = Allocator.Allocate<OpenedType>(replacements.size());
-  std::copy(replacements.begin(), replacements.end(), openedTypes);
-
   // FIXME: Get rid of fixmeAllowDuplicates.
-  if (!fixmeAllowDuplicates || OpenedTypes.count(locatorPtr) == 0)
+  if (!fixmeAllowDuplicates || OpenedTypes.count(locatorPtr) == 0) {
+    OpenedType *openedTypes
+      = Allocator.Allocate<OpenedType>(replacements.size());
+    std::copy(replacements.begin(), replacements.end(), openedTypes);
+
     recordOpenedType(
       locatorPtr, llvm::ArrayRef(openedTypes, replacements.size()),
       preparedOverload);
+  }
 }
 
 /// Determine how many levels of argument labels should be removed from the
@@ -941,16 +969,22 @@ static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
 
 FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
     FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
-    unsigned numApplies, bool isMainDispatchQueue, ArrayRef<OpenedType> replacements,
-    ConstraintLocatorBuilder locator, PreparedOverloadBuilder *preparedOverload) {
+    unsigned numApplies, bool isMainDispatchQueue, bool openGlobalActorType,
+    ConstraintLocatorBuilder locator) {
 
   auto *adjustedTy = swift::adjustFunctionTypeForConcurrency(
       fnType, decl, dc, numApplies, isMainDispatchQueue, GetClosureType{*this},
       ClosureIsolatedByPreconcurrency{*this}, [&](Type type) {
-        if (replacements.empty())
+        if (!type->hasTypeParameter())
           return type;
 
-        return openType(type, replacements, locator, preparedOverload);
+        // FIXME: This should be handled elsewhere.
+        if (!openGlobalActorType)
+          return type;
+
+        auto replacements = getOpenedTypes(getConstraintLocator(locator));
+        ASSERT(!replacements.empty());
+        return openType(type, replacements, locator, /*preparedOverload=*/nullptr);
       });
 
   // Infer @Sendable for global actor isolated function types under the
@@ -1065,12 +1099,13 @@ static Type replaceParamErrorTypeByPlaceholder(Type type, ValueDecl *value, bool
                            funcType->getExtInfo());
 }
 
-DeclReferenceType
-ConstraintSystem::getTypeOfReference(ValueDecl *value,
-                                     FunctionRefInfo functionRefInfo,
-                                     ConstraintLocatorBuilder locator,
-                                     DeclContext *useDC,
-                                     PreparedOverloadBuilder *preparedOverload) {
+std::pair<Type, Type>
+ConstraintSystem::getTypeOfReferencePre(OverloadChoice choice,
+                                        DeclContext *useDC,
+                                        ConstraintLocatorBuilder locator,
+                                        PreparedOverloadBuilder *preparedOverload) {
+  auto *value = choice.getDecl();
+
   ASSERT(!!preparedOverload == PreparingOverload);
 
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
@@ -1089,43 +1124,13 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements, preparedOverload);
 
-    auto origOpenedType = openedType;
-    if (!isRequirementOrWitness(locator)) {
-      unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
-                                               functionRefInfo);
-      openedType = adjustFunctionTypeForConcurrency(
-          origOpenedType, /*baseType=*/Type(), func, useDC, numApplies, false,
-          replacements, locator, preparedOverload);
-    }
-
-    // If this is a method whose result type is dynamic Self, replace
-    // DynamicSelf with the actual object type. Repeat the adjustment
-    // for the original and adjusted types.
-    auto type = openedType;
-    if (openedType->hasDynamicSelfType()) {
-      auto params = openedType->getParams();
-      assert(params.size() == 1);
-      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
-      type = openedType->replaceDynamicSelfType(selfTy)
-                       ->castTo<FunctionType>();
-    }
-
-    auto origType = origOpenedType;
-    if (origOpenedType->hasDynamicSelfType()) {
-      auto params = origOpenedType->getParams();
-      assert(params.size() == 1);
-      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
-      origType = origOpenedType->replaceDynamicSelfType(selfTy)
-                               ->castTo<FunctionType>();
-    }
-
-    // The reference implicitly binds 'self'.
-    return {origOpenedType, openedType,
-            origType->getResult(), type->getResult(), Type()};
+    return {openedType, Type()};
   }
 
   // Unqualified reference to a local or global function.
   if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(value)) {
+    auto functionRefInfo = choice.getFunctionRefInfo();
+
     SmallVector<OpenedType, 4> replacements;
 
     auto funcType = funcDecl->getInterfaceType()->castTo<AnyFunctionType>();
@@ -1150,16 +1155,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements, preparedOverload);
 
-    auto origOpenedType = openedType;
-    if (!isRequirementOrWitness(locator)) {
-      unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
-                                               functionRefInfo);
-      openedType = adjustFunctionTypeForConcurrency(
-          origOpenedType->castTo<FunctionType>(), /*baseType=*/Type(), funcDecl,
-          useDC, numApplies, false, replacements, locator, preparedOverload);
-    }
-
-    return { origOpenedType, openedType, origOpenedType, openedType, Type() };
+    return {openedType, Type()};
   }
 
   // Unqualified reference to a type.
@@ -1181,11 +1177,11 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // Module types are not wrapped in metatypes.
     if (type->is<ModuleType>())
-      return { type, type, type, type, Type() };
+      return { type, Type() };
 
     // If it's a value reference, refer to the metatype.
     type = MetatypeType::get(type);
-    return { type, type, type, type, Type() };
+    return {type, Type()};
   }
 
   // Unqualified reference to a macro.
@@ -1204,7 +1200,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // FIXME: Should we use replaceParamErrorTypeByPlaceholder() here?
 
-    return { openedType, openedType, openedType, openedType, Type() };
+    return {openedType, Type()};
   }
 
   // Only remaining case: unqualified reference to a property.
@@ -1216,11 +1212,9 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       getUnopenedTypeOfReference(varDecl, Type(), useDC, 
                                  getConstraintLocator(locator),
                                  wantInterfaceType);
-  // FIXME: Adjust the type for concurrency if requested.
-  valueType = adjustVarTypeForConcurrency(
-      valueType, varDecl, useDC,
-      GetClosureType{*this},
-      ClosureIsolatedByPreconcurrency{*this});
+
+  ASSERT(!valueType->hasUnboundGenericType() &&
+         !valueType->hasTypeParameter());
 
   Type thrownErrorType;
   if (auto accessor = varDecl->getEffectfulGetAccessor()) {
@@ -1228,9 +1222,116 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
         accessor->getEffectiveThrownErrorType().value_or(Type());
   }
 
-  assert(!valueType->hasUnboundGenericType() &&
-         !valueType->hasTypeParameter());
-  return { valueType, valueType, valueType, valueType, thrownErrorType };
+  return {valueType, thrownErrorType};
+}
+
+DeclReferenceType
+ConstraintSystem::getTypeOfReferencePost(OverloadChoice choice,
+                                         DeclContext *useDC,
+                                         ConstraintLocatorBuilder locator,
+                                         Type openedType, Type thrownErrorType) {
+  auto *value = choice.getDecl();
+
+  if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
+    // Unqualified lookup can find operator names within nominal types.
+    auto func = cast<FuncDecl>(value);
+    assert(func->isOperator() && "Lookup should only find operators");
+
+    auto functionRefInfo = choice.getFunctionRefInfo();
+
+    auto origOpenedType = openedType;
+    if (!isRequirementOrWitness(locator)) {
+      unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
+                                               functionRefInfo);
+      openedType = adjustFunctionTypeForConcurrency(
+          origOpenedType->castTo<FunctionType>(), /*baseType=*/Type(),
+          func, useDC, numApplies, /*isMainDispatchQueue=*/false,
+          /*openGlobalActorType=*/true, locator);
+    }
+
+    // If this is a method whose result type is dynamic Self, replace
+    // DynamicSelf with the actual object type. Repeat the adjustment
+    // for the original and adjusted types.
+    auto type = openedType;
+    if (openedType->hasDynamicSelfType()) {
+      auto params = openedType->castTo<FunctionType>()->getParams();
+      assert(params.size() == 1);
+      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
+      type = openedType->replaceDynamicSelfType(selfTy)
+          ->castTo<FunctionType>();
+    }
+
+    auto origType = origOpenedType;
+    if (origOpenedType->hasDynamicSelfType()) {
+      auto params = origOpenedType->castTo<FunctionType>()->getParams();
+      assert(params.size() == 1);
+      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
+      origType = origOpenedType->replaceDynamicSelfType(selfTy)
+          ->castTo<FunctionType>();
+    }
+
+    // The reference implicitly binds 'self'.
+    return {origOpenedType, openedType,
+            origType->castTo<FunctionType>()->getResult(),
+            type->castTo<FunctionType>()->getResult(), Type()};
+  }
+
+  // Unqualified reference to a local or global function.
+  if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(value)) {
+    auto origOpenedType = openedType;
+    if (!isRequirementOrWitness(locator)) {
+      unsigned numApplies = getNumApplications(/*hasAppliedSelf*/ false,
+                                               choice.getFunctionRefInfo());
+      openedType = adjustFunctionTypeForConcurrency(
+          origOpenedType->castTo<FunctionType>(), /*baseType=*/Type(), funcDecl,
+          useDC, numApplies, /*isMainDispatchQueue=*/false,
+          /*openGlobalActorType=*/true, locator);
+    }
+
+    return { origOpenedType, openedType, origOpenedType, openedType, Type() };
+  }
+
+  // Unqualified reference to a type.
+  if (isa<TypeDecl>(value)) {
+    return { openedType, openedType, openedType, openedType, Type() };
+  }
+
+  // Unqualified reference to a macro.
+  if (isa<MacroDecl>(value)) {
+    return { openedType, openedType, openedType, openedType, Type() };
+  }
+
+  // Only remaining case: unqualified reference to a property.
+  auto *varDecl = cast<VarDecl>(value);
+
+  // Adjust the type for concurrency.
+  auto origOpenedType = openedType;
+
+  if (!isRequirementOrWitness(locator)) {
+    openedType = adjustVarTypeForConcurrency(
+        openedType, varDecl, useDC,
+        GetClosureType{*this},
+        ClosureIsolatedByPreconcurrency{*this});
+  }
+
+  return { origOpenedType, openedType,
+           origOpenedType, openedType,
+           thrownErrorType };
+}
+
+DeclReferenceType
+ConstraintSystem::getTypeOfReference(OverloadChoice choice,
+                                     DeclContext *useDC,
+                                     ConstraintLocatorBuilder locator,
+                                     PreparedOverloadBuilder *preparedOverload) {
+  ASSERT(!!preparedOverload == PreparingOverload);
+
+  Type openedType, thrownErrorType;
+  std::tie(openedType, thrownErrorType) = getTypeOfReferencePre(
+      choice, useDC, locator, preparedOverload);
+
+  return getTypeOfReferencePost(choice, useDC, locator,
+                                openedType, thrownErrorType);
 }
 
 /// Bind type variables for archetypes that are determined from
@@ -1427,10 +1528,10 @@ void ConstraintSystem::openGenericRequirement(
                 preparedOverload);
 }
 
-DeclReferenceType ConstraintSystem::getTypeOfMemberTypeReference(
+Type ConstraintSystem::getTypeOfMemberTypeReference(
     Type baseObjTy, TypeDecl *typeDecl, ConstraintLocator *locator,
     PreparedOverloadBuilder *preparedOverload) {
-  assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
+  ASSERT(!isa<ModuleDecl>(typeDecl) && "Nested module?");
 
   auto memberTy = TypeChecker::substMemberTypeWithBase(typeDecl, baseObjTy);
 
@@ -1456,8 +1557,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberTypeReference(
   }
 
   FunctionType::Param baseObjParam(baseObjTy);
-  auto openedType = FunctionType::get({baseObjParam}, memberTy);
-  return { openedType, openedType, memberTy, memberTy, Type() };
+  return FunctionType::get({baseObjParam}, memberTy);
 }
 
 std::pair<Type, Type> ConstraintSystem::getOpenedStorageType(
@@ -1528,8 +1628,8 @@ std::pair<Type, Type> ConstraintSystem::getOpenedStorageType(
   FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
 
   FunctionType::ExtInfo info;
-  return std::make_pair(thrownErrorType,
-                        FunctionType::get({selfParam}, refType, info));
+  return std::make_pair(FunctionType::get({selfParam}, refType, info),
+                        thrownErrorType);
 }
 
 /// Add the constraint on the type used for the 'Self' type for a member
@@ -1547,11 +1647,12 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
                               PreparedOverloadBuilder *preparedOverload) {
   assert(!selfTy->is<ProtocolType>());
 
-  // Otherwise, use a subtype constraint for classes to cope with inheritance.
+  // Otherwise, use a subtype constraint for classes to cope with
+  // inheritance.
   if (selfTy->getClassOrBoundGenericClass()) {
     cs.addConstraint(ConstraintKind::Subtype, objectTy, selfTy,
-                     cs.getConstraintLocator(locator), /*isFavored=*/false,
-                     preparedOverload);
+                     cs.getConstraintLocator(locator),
+                     /*isFavored=*/false, preparedOverload);
     return;
   }
 
@@ -1658,8 +1759,10 @@ static bool isExistentialMemberAccessWithExplicitBaseExpression(
 
 Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     Type type, Type baseObjTy, ValueDecl *value,
-    ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
-    ArrayRef<OpenedType> replacements) {
+    ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup) {
+  if (isa<MacroDecl>(value) || type->is<ErrorType>())
+    return ErrorType::get(getASTContext());
+
   auto *outerDC = value->getDeclContext();
 
   // Cope with dynamic 'Self'.
@@ -1691,8 +1794,8 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
           baseObjTy, value, locator, isDynamicLookup) &&
       // If there are no type variables, there were no references to 'Self'.
       type->hasTypeVariable()) {
-    auto selfGP = outerDC->getSelfInterfaceType();
-    ASSERT(selfGP->isEqual(replacements[0].first));
+    auto replacements = getOpenedTypes(locator);
+    ASSERT(replacements[0].first->isEqual(getASTContext().TheSelfType));
     auto openedTypeVar = replacements[0].second;
 
     type = typeEraseOpenedExistentialReference(type, baseObjTy, openedTypeVar,
@@ -1756,26 +1859,32 @@ static FunctionType *applyOptionality(ValueDecl *value, FunctionType *fnTy) {
                            fnTy->getExtInfo());
 }
 
-DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
-    Type baseTy, ValueDecl *value, DeclContext *useDC, bool isDynamicLookup,
-    FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
-    SmallVectorImpl<OpenedType> *replacementsPtr,
+std::pair<Type, Type>
+ConstraintSystem::getTypeOfMemberReferencePre(
+    OverloadChoice choice, DeclContext *useDC,
+    ConstraintLocator *locator,
     PreparedOverloadBuilder *preparedOverload) {
   ASSERT(!!preparedOverload == PreparingOverload);
 
+  auto *value = choice.getDecl();
+  auto functionRefInfo = choice.getFunctionRefInfo();
+
   // Figure out the instance type used for the base.
+  auto baseTy = choice.getBaseType();
   Type baseRValueTy = baseTy->getRValueType();
   auto baseObjTy = baseRValueTy->getMetatypeInstanceType();
 
-  // If the base is a module type, just use the type of the decl.
   if (baseObjTy->is<ModuleType>()) {
-    return getTypeOfReference(value, functionRefInfo, locator, useDC,
-                              preparedOverload);
+    return getTypeOfReferencePre(choice, useDC, locator, preparedOverload);
   }
 
+  Type openedType;
+  Type thrownErrorType;
+
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
-    return getTypeOfMemberTypeReference(baseObjTy, typeDecl,
-                                        locator, preparedOverload);
+    openedType = getTypeOfMemberTypeReference(baseObjTy, typeDecl,
+                                              locator, preparedOverload);
+    return {openedType, thrownErrorType};
   }
 
   // Figure out the declaration context to use when opening this type.
@@ -1785,40 +1894,33 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   auto genericSig = innerDC->getGenericSignatureOfContext();
 
   // Open the type of the generic function or member of a generic type.
-  ArrayRef<OpenedType> replacements;
-  SmallVector<OpenedType, 4> localReplacements;
-  {
-    auto &_replacements = replacementsPtr ? *replacementsPtr : localReplacements;
+  SmallVector<OpenedType, 4> replacements;
 
-    // If we have a generic signature, open the parameters. We delay opening
-    // requirements to allow contextual types to affect the situation.
-    if (genericSig) {
-      openGenericParameters(outerDC, genericSig, _replacements, locator,
-                            preparedOverload);
-    }
-
-    // If we opened up any type variables, record the replacements. We do this
-    // up-front to allow requirement fix coalescing logic to work correctly with
-    // requirements imposed on base type (since that relies on being able to
-    // find the recorded opened type). We then make the array immutable for the
-    // following logic to ensure they don't attempt to add any additional opened
-    // types.
-    recordOpenedTypes(locator, _replacements, preparedOverload);
-    replacements = _replacements;
+  // If we have a generic signature, open the parameters. We delay opening
+  // requirements to allow contextual types to affect the situation.
+  if (genericSig) {
+    openGenericParameters(outerDC, genericSig, replacements, locator,
+                          preparedOverload);
   }
+
+  // If we opened up any type variables, record the replacements. We do this
+  // up-front to allow requirement fix coalescing logic to work correctly with
+  // requirements imposed on base type (since that relies on being able to
+  // find the recorded opened type). We then make the array immutable for the
+  // following logic to ensure they don't attempt to add any additional opened
+  // types.
+  recordOpenedTypes(locator, replacements, preparedOverload);
 
   // Check to see if the self parameter is applied, in which case we'll want to
   // strip it off later.
   auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseRValueTy, value);
 
-  Type openedType;
-  Type thrownErrorType;
   if (isa<AbstractFunctionDecl>(value) ||
       isa<EnumElementDecl>(value) ||
       isa<MacroDecl>(value)) {
     auto interfaceType = value->getInterfaceType();
     if (interfaceType->is<ErrorType>() || isa<MacroDecl>(value))
-      return { interfaceType, interfaceType, interfaceType, interfaceType, Type() };
+      return { interfaceType, Type() };
 
     if (outerDC->getSelfClassDecl()) {
       if (isa<ConstructorDecl>(value)) {
@@ -1838,7 +1940,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   } else {
     auto *storage = cast<AbstractStorageDecl>(value);
 
-    std::tie(thrownErrorType, openedType) = getOpenedStorageType(
+    std::tie(openedType, thrownErrorType) = getOpenedStorageType(
         baseTy, storage, useDC, hasAppliedSelf, replacements, locator,
         preparedOverload);
   }
@@ -1849,6 +1951,29 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   unsigned numRemovedArgumentLabels = getNumRemovedArgumentLabels(
       value, /*isCurriedInstanceReference*/ !hasAppliedSelf, functionRefInfo);
   openedType = openedType->removeArgumentLabels(numRemovedArgumentLabels);
+
+  // Adjust for C++ inline namespaces.
+  if (const auto *FT = openedType->getAs<FunctionType>()) {
+    auto openedParams = FT->getParams();
+    assert(openedParams.size() == 1);
+    auto param = openedParams.front();
+
+    Type selfObjTy = param.getPlainType();
+    bool wasMetaType = false;
+    if (param.getPlainType()->is<MetatypeType>()) {
+      selfObjTy = param.getPlainType()->getMetatypeInstanceType();
+      wasMetaType = true;
+    }
+    if (auto *objectTyNominal = baseObjTy->getAs<NominalType>()) {
+      if (auto *selfTyNominal = selfObjTy->getAs<NominalType>())
+        if (auto newSelfTy =
+                swift::stripInlineNamespaces(objectTyNominal, selfTyNominal))
+          openedType = FunctionType::get(
+              param.withType(wasMetaType ? Type(MetatypeType::get(newSelfTy))
+                                         : Type(newSelfTy)),
+              FT->getResult(), FT->getExtInfo());
+    }
+  }
 
   Type baseOpenedTy = baseObjTy;
 
@@ -1875,7 +2000,6 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
           // to make sure that it's opened before use.
           baseOpenedTy = openType(concreteSelf, replacements, locator,
                                   preparedOverload);
-          baseObjTy = baseOpenedTy;
         }
       }
     } else {
@@ -1900,7 +2024,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
                   getConstraintLocator(locator), /*isFavored=*/false,
                   preparedOverload);
-  } else if (!isDynamicLookup) {
+  } else if (choice.getKind() != OverloadChoiceKind::DeclViaDynamic) {
     addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator, preparedOverload);
   }
 
@@ -1934,21 +2058,47 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     }
   }
 
+  return { openedType, thrownErrorType };
+}
+
+DeclReferenceType ConstraintSystem::getTypeOfMemberReferencePost(
+    OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
+    Type openedType, Type thrownErrorType) {
+  auto *value = choice.getDecl();
+
+  // Figure out the instance type used for the base.
+  Type baseTy = choice.getBaseType();
+  Type baseRValueTy = baseTy->getRValueType();
+  Type baseObjTy = baseRValueTy->getMetatypeInstanceType();
+
+  if (baseObjTy->is<ModuleType>()) {
+    return getTypeOfReferencePost(choice, useDC, locator,
+                                  openedType, thrownErrorType);
+  }
+
+  if (isa<TypeDecl>(value)) {
+    auto type = openedType->castTo<FunctionType>()->getResult();
+    return { openedType, openedType, type, type, Type() };
+  }
+
+  auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseRValueTy, value);
+
   // Adjust the opened type for concurrency.
   Type origOpenedType = openedType;
   if (isRequirementOrWitness(locator)) {
     // Don't adjust when doing witness matching, because that can cause cycles.
   } else if (isa<AbstractFunctionDecl>(value) || isa<EnumElementDecl>(value)) {
-    unsigned numApplies = getNumApplications(hasAppliedSelf, functionRefInfo);
+    unsigned numApplies = getNumApplications(
+        hasAppliedSelf, choice.getFunctionRefInfo());
     openedType = adjustFunctionTypeForConcurrency(
-        origOpenedType->castTo<FunctionType>(), baseRValueTy, value, useDC,
-        numApplies, isMainDispatchQueueMember(locator), replacements, locator,
-        preparedOverload);
+        origOpenedType->castTo<FunctionType>(), baseObjTy, value, useDC,
+        numApplies, isMainDispatchQueueMember(locator),
+        /*openGlobalActorType=*/true, locator);
   } else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
     openedType = adjustFunctionTypeForConcurrency(
-        origOpenedType->castTo<FunctionType>(), baseRValueTy, subscript, useDC,
-        /*numApplies=*/2, /*isMainDispatchQueue=*/false, replacements, locator,
-        preparedOverload);
+        origOpenedType->castTo<FunctionType>(), baseObjTy, subscript, useDC,
+        /*numApplies=*/2, /*isMainDispatchQueue=*/false,
+        /*openGlobalActorType=*/true, locator);
   } else if (auto var = dyn_cast<VarDecl>(value)) {
     // Adjust the function's result type, since that's the Var's actual type.
     auto origFnType = origOpenedType->castTo<AnyFunctionType>();
@@ -1961,6 +2111,8 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
                   origFnType->getParams(), resultTy, origFnType->getExtInfo());
   }
 
+  bool isDynamicLookup = (choice.getKind() == OverloadChoiceKind::DeclViaDynamic);
+
   // Check if we need to apply a layer of optionality to the type.
   if (!isRequirementOrWitness(locator)) {
     if (isDynamicLookup || value->getAttrs().hasAttribute<OptionalAttr>()) {
@@ -1972,17 +2124,30 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   // Handle DynamicSelfType and a couple of other things.
   Type type = getMemberReferenceTypeFromOpenedType(
       openedType, baseObjTy, value, locator, hasAppliedSelf,
-      isDynamicLookup, replacements);
+      isDynamicLookup);
 
   // Do the same thing for the original type, if there can be any difference.
   Type origType = type;
   if (openedType.getPointer() != origOpenedType.getPointer()) {
     origType = getMemberReferenceTypeFromOpenedType(
         origOpenedType, baseObjTy, value, locator, hasAppliedSelf,
-        isDynamicLookup, replacements);
+        isDynamicLookup);
   }
 
   return { origOpenedType, openedType, origType, type, thrownErrorType };
+}
+
+DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
+    OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
+    PreparedOverloadBuilder *preparedOverload) {
+  ASSERT(!!preparedOverload == PreparingOverload);
+
+  Type openedType, thrownErrorType;
+  std::tie(openedType, thrownErrorType)
+      = getTypeOfMemberReferencePre(choice, useDC, locator, preparedOverload);
+
+  return getTypeOfMemberReferencePost(
+      choice, useDC, locator, openedType, thrownErrorType);
 }
 
 Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
@@ -2083,9 +2248,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       FunctionType::ExtInfo info;
       type = adjustFunctionTypeForConcurrency(
           FunctionType::get(indices, elementTy, info), overload.getBaseType(),
-          subscript, useDC,
-          /*numApplies=*/1, /*isMainDispatchQueue=*/false, emptyReplacements,
-          locator, /*preparedOverload=*/nullptr);
+          subscript, useDC, /*numApplies=*/1, /*isMainDispatchQueue=*/false,
+          /*openGlobalActorType=*/false, locator);
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       type = var->getValueInterfaceType();
       if (doesStorageProduceLValue(
@@ -2130,8 +2294,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       type = adjustFunctionTypeForConcurrency(
                  type->castTo<FunctionType>(), overload.getBaseType(), decl,
                  useDC, numApplies, /*isMainDispatchQueue=*/false,
-                 emptyReplacements, locator, /*preparedOverload=*/nullptr)
-                 ->getResult();
+                 /*openGlobalActorType=*/false, locator)
+                    ->getResult();
     }
   }
 
@@ -2256,13 +2420,13 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
 
     if (auto *existential = paramTy->getAs<ExistentialType>()) {
       paramTy = existential->getSuperclass();
-      assert(isKnownKeyPathType(paramTy));
+      assert(paramTy->isKnownKeyPathType());
     }
 
     auto keyPathTy = paramTy->castTo<BoundGenericType>();
 
     auto *keyPathDecl = keyPathTy->getAnyNominal();
-    assert(isKnownKeyPathType(keyPathTy) &&
+    assert(keyPathTy->isKnownKeyPathType() &&
            "parameter is supposed to be a keypath");
 
     auto *keyPathLoc = getConstraintLocator(
@@ -2319,7 +2483,7 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
             return constraint->getKind() == ConstraintKind::ApplicableFunction;
           });
 
-      assert(constraints.size() == 1);
+      ASSERT(constraints.size() == 1);
       auto *applicableFn = constraints.front();
       retireConstraint(applicableFn);
 
@@ -2480,7 +2644,7 @@ isInvalidPartialApplication(ConstraintSystem &cs,
 /// checking semantics, compute the type of the reference.  For now, follow
 /// the lead of \c getTypeOfMemberReference and return a pair of
 /// the full opened type and the reference's type.
-static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
+static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     ConstraintSystem &CS, ConstraintLocator *locator,
     DeclTypeCheckingSemantics semantics,
     PreparedOverloadBuilder *preparedOverload) {
@@ -2509,8 +2673,7 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         /*isFavored=*/false, preparedOverload);
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
-    auto refType = FunctionType::get({inputArg}, output, info);
-    return {refType, refType, refType, refType, Type()};
+    return FunctionType::get({inputArg}, output, info);
   }
   case DeclTypeCheckingSemantics::WithoutActuallyEscaping: {
     // Proceed with a "WithoutActuallyEscaping" operation. The body closure
@@ -2557,14 +2720,13 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
       withoutEscapingIsolation = FunctionTypeIsolation::forNonIsolatedCaller();
     }
 
-    auto refType = FunctionType::get(args, result,
-                                     FunctionType::ExtInfoBuilder()
-                                         .withNoEscape(false)
-                                         .withIsolation(withoutEscapingIsolation)
-                                         .withAsync(true)
-                                         .withThrows(true, thrownError)
-                                         .build());
-    return {refType, refType, refType, refType, Type()};
+    return FunctionType::get(args, result,
+                             FunctionType::ExtInfoBuilder()
+                                 .withNoEscape(false)
+                                 .withIsolation(withoutEscapingIsolation)
+                                 .withAsync(true)
+                                 .withThrows(true, thrownError)
+                                 .build());
   }
   case DeclTypeCheckingSemantics::OpenExistential: {
     // The body closure receives a freshly-opened archetype constrained by the
@@ -2610,14 +2772,13 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
       openExistentialIsolation = FunctionTypeIsolation::forNonIsolatedCaller();
     }
 
-    auto refType = FunctionType::get(args, result,
-                                     FunctionType::ExtInfoBuilder()
-                                         .withNoEscape(false)
-                                         .withThrows(true, thrownError)
-                                         .withIsolation(openExistentialIsolation)
-                                         .withAsync(true)
-                                         .build());
-    return {refType, refType, refType, refType, Type()};
+    return FunctionType::get(args, result,
+                             FunctionType::ExtInfoBuilder()
+                                 .withNoEscape(false)
+                                 .withThrows(true, thrownError)
+                                 .withIsolation(openExistentialIsolation)
+                                 .withAsync(true)
+                                 .build());
   }
   }
 
@@ -2650,7 +2811,8 @@ void ConstraintSystem::replayChanges(
       addConstraint(ConstraintKind::Bind,
                     change.Bind.FirstType,
                     change.Bind.SecondType,
-                    locator, /*isFavored=*/false);
+                    locator,
+                    /*isFavored=*/false);
       break;
 
     case PreparedOverload::Change::OpenedTypes: {
@@ -2687,6 +2849,10 @@ void ConstraintSystem::replayChanges(
     case PreparedOverload::Change::AddedFix:
       recordFix(change.Fix.TheFix, change.Fix.Impact);
       break;
+
+    case PreparedOverload::Change::RecordedNodeType:
+      setType(change.Node.Node, change.Node.TheType);
+      break;
     }
   }
 }
@@ -2695,43 +2861,42 @@ void ConstraintSystem::replayChanges(
 /// that are to be introduced into the constraint system when this choice
 /// is taken.
 ///
+/// Returns a pair consisting of the opened type, and the thrown error type.
+///
 /// FIXME: As a transitional mechanism, if preparedOverload is nullptr, this
 /// immediately performs all operations.
-DeclReferenceType
-ConstraintSystem::prepareOverloadImpl(ConstraintLocator *locator,
-                                      OverloadChoice choice,
+std::pair<Type, Type>
+ConstraintSystem::prepareOverloadImpl(OverloadChoice choice,
                                       DeclContext *useDC,
+                                      ConstraintLocator *locator,
                                       PreparedOverloadBuilder *preparedOverload) {
   // If we refer to a top-level decl with special type-checking semantics,
   // handle it now.
   auto semantics =
       TypeChecker::getDeclTypeCheckingSemantics(choice.getDecl());
   if (semantics != DeclTypeCheckingSemantics::Normal) {
-    return getTypeOfReferenceWithSpecialTypeCheckingSemantics(
+    auto openedType = getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         *this, locator, semantics, preparedOverload);
-  } else if (auto baseTy = choice.getBaseType()) {
-    // Retrieve the type of a reference to the specific declaration choice.
-    assert(!baseTy->hasTypeParameter());
-
-    return getTypeOfMemberReference(
-        baseTy, choice.getDecl(), useDC,
-        (choice.getKind() == OverloadChoiceKind::DeclViaDynamic),
-        choice.getFunctionRefInfo(), locator, nullptr, preparedOverload);
+    return {openedType, Type()};
+  } else if (choice.getBaseType()) {
+    return getTypeOfMemberReferencePre(choice, useDC, locator, preparedOverload);
   } else {
-    return getTypeOfReference(
-        choice.getDecl(), choice.getFunctionRefInfo(), locator, useDC,
-        preparedOverload);
+    return getTypeOfReferencePre(choice, useDC, locator, preparedOverload);
   }
 }
 
-PreparedOverload *ConstraintSystem::prepareOverload(ConstraintLocator *locator,
-                                                    OverloadChoice choice,
-                                                    DeclContext *useDC) {
+PreparedOverload *ConstraintSystem::prepareOverload(OverloadChoice choice,
+                                                    DeclContext *useDC,
+                                                    ConstraintLocator *locator,
+                                                    bool forDiagnostics) {
   ASSERT(!PreparingOverload);
   PreparingOverload = true;
 
-  PreparedOverloadBuilder builder;
-  auto declRefType = prepareOverloadImpl(locator, choice, useDC, &builder);
+  PreparedOverloadBuilder builder(locator);
+  Type openedType;
+  Type thrownErrorType;
+  std::tie(openedType, thrownErrorType) = prepareOverloadImpl(
+      choice, useDC, locator, &builder);
 
   PreparingOverload = false;
 
@@ -2739,19 +2904,15 @@ PreparedOverload *ConstraintSystem::prepareOverload(ConstraintLocator *locator,
   auto size = PreparedOverload::totalSizeToAlloc<PreparedOverload::Change>(count);
   auto mem = Allocator.Allocate(size, alignof(PreparedOverload));
 
-  return new (mem) PreparedOverload(declRefType, builder.Changes);
+  return new (mem) PreparedOverload(openedType, thrownErrorType, builder.Changes,
+                                    forDiagnostics);
 }
 
-void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
-                                       Type boundType, OverloadChoice choice,
-                                       DeclContext *useDC,
+void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC,
+                                       ConstraintLocator *locator, Type boundType,
                                        PreparedOverload *preparedOverload) {
   // Determine the type to which we'll bind the overload set's type.
-  Type openedType;
-  Type adjustedOpenedType;
-  Type refType;
-  Type adjustedRefType;
-  Type thrownErrorTypeOnAccess;
+  DeclReferenceType declRefType;
 
   switch (choice.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -2760,22 +2921,34 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
+    Type openedType, thrownErrorType;
+
     if (preparedOverload) {
       replayChanges(locator, preparedOverload);
 
       openedType = preparedOverload->getOpenedType();
-      adjustedOpenedType = preparedOverload->getAdjustedOpenedType();
-      refType = preparedOverload->getReferenceType();
-      adjustedRefType = preparedOverload->getAdjustedReferenceType();
-      thrownErrorTypeOnAccess = preparedOverload->getThrownErrorTypeOnAccess();
+      thrownErrorType = preparedOverload->getThrownErrorType();
     } else {
-      auto declRefType = prepareOverloadImpl(locator, choice, useDC, nullptr);
+      std::tie(openedType, thrownErrorType) = prepareOverloadImpl(
+          choice, useDC, locator, nullptr);
+    }
 
-      openedType = declRefType.openedType;
-      adjustedOpenedType = declRefType.adjustedOpenedType;
-      refType = declRefType.referenceType;
-      adjustedRefType = declRefType.adjustedReferenceType;
-      thrownErrorTypeOnAccess = declRefType.thrownErrorTypeOnAccess;
+    auto semantics =
+        TypeChecker::getDeclTypeCheckingSemantics(choice.getDecl());
+    if (semantics != DeclTypeCheckingSemantics::Normal) {
+      declRefType.openedType = openedType;
+      declRefType.adjustedOpenedType = openedType;
+      declRefType.referenceType = openedType;
+      declRefType.adjustedReferenceType = openedType;
+      declRefType.thrownErrorTypeOnAccess = thrownErrorType;
+    } else {
+      if (choice.getBaseType()) {
+        declRefType = getTypeOfMemberReferencePost(
+            choice, useDC, locator, openedType, thrownErrorType);
+      } else {
+        declRefType = getTypeOfReferencePost(
+            choice, useDC, locator, openedType, thrownErrorType);
+      }
     }
 
     break;
@@ -2785,14 +2958,16 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     if (auto lvalueTy = choice.getBaseType()->getAs<LValueType>()) {
       // When the base of a tuple lvalue, the member is always an lvalue.
       auto tuple = lvalueTy->getObjectType()->castTo<TupleType>();
-      adjustedRefType = tuple->getElementType(choice.getTupleIndex())->getRValueType();
-      adjustedRefType = LValueType::get(adjustedRefType);
+      declRefType.adjustedReferenceType =
+          LValueType::get(
+              tuple->getElementType(choice.getTupleIndex())->getRValueType());
     } else {
       // When the base is a tuple rvalue, the member is always an rvalue.
       auto tuple = choice.getBaseType()->castTo<TupleType>();
-      adjustedRefType = tuple->getElementType(choice.getTupleIndex())->getRValueType();
+      declRefType.adjustedReferenceType =
+          tuple->getElementType(choice.getTupleIndex())->getRValueType();
     }
-    refType = adjustedRefType;
+    declRefType.referenceType = declRefType.adjustedReferenceType;
     break;
 
   case OverloadChoiceKind::MaterializePack: {
@@ -2802,18 +2977,18 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // In the future, _if_ the syntax allows for multiple expansions
     // this code would have to be adjusted to project l-value from the
     // base type just like TupleIndex does.
-    adjustedRefType =
+    declRefType.adjustedReferenceType =
         getPatternTypeOfSingleUnlabeledPackExpansionTuple(choice.getBaseType());
-    refType = adjustedRefType;
+    declRefType.referenceType = declRefType.adjustedReferenceType;
     break;
   }
 
   case OverloadChoiceKind::ExtractFunctionIsolation: {
     // The type of `.isolation` is `(any Actor)?`
     auto actor = getASTContext().getProtocol(KnownProtocolKind::Actor);
-    adjustedRefType =
+    declRefType.adjustedReferenceType =
         OptionalType::get(actor->getDeclaredExistentialType());
-    refType = adjustedRefType;
+    declRefType.referenceType = declRefType.adjustedReferenceType;
     break;
   }
 
@@ -2844,11 +3019,11 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo fullInfo;
     auto fullTy = FunctionType::get({baseParam}, subscriptTy, fullInfo);
-    openedType = fullTy;
-    adjustedOpenedType = fullTy;
+    declRefType.openedType = fullTy;
+    declRefType.adjustedOpenedType = fullTy;
     // FIXME: @preconcurrency
-    refType = subscriptTy;
-    adjustedRefType = subscriptTy;
+    declRefType.referenceType = subscriptTy;
+    declRefType.adjustedReferenceType = subscriptTy;
 
     // Increase the score so that actual subscripts get preference.
     // ...except if we're solving for code completion and the index expression
@@ -2861,8 +3036,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     break;
   }
   }
-  assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
-  assert(!adjustedRefType->hasTypeParameter() &&
+  assert(!declRefType.referenceType->hasTypeParameter() &&
+         "Cannot have a dependent type here");
+  assert(!declRefType.adjustedReferenceType->hasTypeParameter() &&
          "Cannot have a dependent type here");
 
   if (auto *decl = choice.getDeclOrNull()) {
@@ -2882,7 +3058,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       if (locator->isResultOfKeyPathDynamicMemberLookup() ||
           locator->isKeyPathSubscriptComponent()) {
         // Subscript type has a format of (Self[.Type) -> (Arg...) -> Result
-        auto declTy = adjustedOpenedType->castTo<FunctionType>();
+        auto declTy = declRefType.adjustedOpenedType->castTo<FunctionType>();
         auto subscriptTy = declTy->getResult()->castTo<FunctionType>();
         // If we have subscript, each of the arguments has to conform to
         // Hashable, because it would be used as a component inside key path.
@@ -2954,7 +3130,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
       // The default type of the #isolation builtin macro is `(any Actor)?`
       if (macro->getBuiltinKind() == BuiltinMacroKind::IsolationMacro) {
-        auto *fnType = openedType->getAs<FunctionType>();
+        auto *fnType = declRefType.openedType->getAs<FunctionType>();
         auto actor = getASTContext().getProtocol(KnownProtocolKind::Actor);
         addConstraint(
             ConstraintKind::Defaultable, fnType->getResult(),
@@ -2966,14 +3142,20 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
   // If accessing this declaration could throw an error, record this as a
   // potential throw site.
-  if (thrownErrorTypeOnAccess) {
+  if (declRefType.thrownErrorTypeOnAccess) {
     recordPotentialThrowSite(
-        PotentialThrowSite::PropertyAccess, thrownErrorTypeOnAccess, locator);
+        PotentialThrowSite::PropertyAccess,
+        declRefType.thrownErrorTypeOnAccess,
+        locator);
   }
 
   // Note that we have resolved this overload.
   auto overload = SelectedOverload{
-      choice, openedType, adjustedOpenedType, refType, adjustedRefType,
+      choice,
+      declRefType.openedType,
+      declRefType.adjustedOpenedType,
+      declRefType.referenceType,
+      declRefType.adjustedReferenceType,
       boundType};
   recordResolvedOverload(locator, overload);
 
@@ -2981,15 +3163,14 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   bindOverloadType(overload, boundType, locator, useDC);
 
   if (isDebugMode()) {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
+    PrintOptions PO = PrintOptions::forDebugging();
 
     auto &log = llvm::errs();
     log.indent(solverState ? solverState->getCurrentIndent() : 2);
     log << "(overload set choice binding ";
     boundType->print(log, PO);
     log << " := ";
-    adjustedRefType->print(log, PO);
+    declRefType.adjustedReferenceType->print(log, PO);
 
     auto openedAtLoc = getOpenedTypes(locator);
     if (!openedAtLoc.empty()) {
@@ -3021,8 +3202,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                   OverloadChoiceKind::DeclViaDynamic)) {
 
         // Strip curried 'self' parameters.
-        auto fromTy = openedType->castTo<AnyFunctionType>()->getResult();
-        auto toTy = refType;
+        auto fromTy = declRefType.openedType
+            ->castTo<AnyFunctionType>()->getResult();
+        auto toTy = declRefType.referenceType;
         if (!doesMemberRefApplyCurriedSelf(baseTy, decl)) {
           toTy = toTy->castTo<AnyFunctionType>()->getResult();
         }

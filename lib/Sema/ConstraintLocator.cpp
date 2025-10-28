@@ -129,8 +129,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
 }
 
 void LocatorPathElt::dump(raw_ostream &out) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
 
   auto dumpReqKind = [&out](RequirementKind kind) {
     out << " (";
@@ -811,9 +810,6 @@ void ConstraintLocator::dump(ConstraintSystem *CS) const {
 
 
 void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
-  
   out << "locator@" << (void*) this << " [";
 
   constraints::dumpAnchor(anchor, sm, out);

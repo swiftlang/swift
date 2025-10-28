@@ -483,6 +483,9 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
     nlOptions |= NL_ExcludeMacroExpansions;
   if (options.contains(Flags::ABIProviding))
     nlOptions |= NL_ABIProviding;
+  if (options.contains(Flags::IgnoreAccessControl))
+    nlOptions |= NL_IgnoreAccessControl;
+
   lookupInModule(dc, Name.getFullName(), CurModuleResults,
                  NLKind::UnqualifiedLookup, resolutionKind, dc,
                  Loc, nlOptions);

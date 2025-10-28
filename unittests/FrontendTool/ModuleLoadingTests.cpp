@@ -111,8 +111,7 @@ protected:
 
     ctx->addModuleInterfaceChecker(
       std::make_unique<ModuleInterfaceCheckerImpl>(*ctx, cacheDir,
-        prebuiltCacheDir, ModuleInterfaceLoaderOptions(),
-        swift::RequireOSSAModules_t(silOpts)));
+        prebuiltCacheDir, ModuleInterfaceLoaderOptions()));
 
     auto loader = ModuleInterfaceLoader::create(
         *ctx, *static_cast<ModuleInterfaceCheckerImpl*>(
@@ -131,7 +130,7 @@ protected:
         SerializedModuleBaseName(tempDir, SerializedModuleBaseName("Library")),
         /*ModuleInterfacePath=*/nullptr, /*ModuleInterfaceSourcePath=*/nullptr,
         &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer,
-        /*skipBuildingInterface*/ false, /*IsFramework*/false);
+        /*isCanImportLookup*/ false, /*IsFramework*/false);
     ASSERT_FALSE(error);
     ASSERT_FALSE(diags.hadAnyError());
 
@@ -152,7 +151,7 @@ protected:
 
     auto bufData = (*bufOrErr)->getBuffer();
     auto validationInfo = serialization::validateSerializedAST(
-        bufData, silOpts.EnableOSSAModules,
+        bufData,
         /*requiredSDK*/StringRef());
     ASSERT_EQ(serialization::Status::Valid, validationInfo.status);
     ASSERT_EQ(bufData, moduleBuffer->getBuffer());

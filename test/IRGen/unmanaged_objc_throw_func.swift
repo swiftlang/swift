@@ -15,7 +15,8 @@ import Foundation
   func returnUnmanagedCFArray() throws -> Unmanaged<CFArray> {
     // CHECK: %[[T0:.+]] = call swiftcc { ptr, ptr } @"$ss27_allocateUninitializedArrayySayxG_BptBwlF"(i{{32|64}} 1, ptr @"$sSiN")
     // CHECK-NEXT: %[[T1:.+]] = extractvalue { ptr, ptr } %[[T0]], 0
-    // CHECK-NEXT: %[[T2:.+]] = extractvalue { ptr, ptr } %[[T0]], 1
+    // CHECK-NEXT:            = extractvalue { ptr, ptr } %[[T0]], 1
+    // CHECK-NEXT: %[[T2:.+]] = getelementptr inbounds i8, ptr %[[T1]]
     // CHECK-NEXT: %._value = getelementptr inbounds{{.*}} %TSi, ptr %[[T2]], i32 0, i32 0
     // CHECK:      %[[T7:.+]] = call swiftcc ptr @"$ss27_finalizeUninitializedArrayySayxGABnlF"(ptr %[[T1]], ptr @"$sSiN")
     // CHECK:      %[[T4:.+]] = call swiftcc ptr @"$sSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF"(ptr %[[T7]], ptr @"$sSiN")

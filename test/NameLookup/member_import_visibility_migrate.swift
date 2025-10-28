@@ -14,7 +14,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t %t/InternalUsesOnlyDefaultedImportSPIOnly.swift -I %t
 // RUN: %target-swift-frontend -emit-module -o %t %t/PublicUsesOnlySPIOnly.swift -I %t
 
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 \
+// RUN: %target-swift-frontend -emit-silgen -verify -swift-version 5 \
 // RUN:   -primary-file %t/main.swift \
 // RUN:   %t/imports.swift \
 // RUN:   -I %t -package-name Package \
@@ -81,6 +81,31 @@ extension Int {
   internal func usesTypealiasInMixedUses_Internal(x: TypealiasInMixedUses) {} // expected-note {{type alias 'TypealiasInMixedUses' from 'MixedUses' used here}}
 }
 
+struct GenericType<T> { }
+
+extension Int {
+  var referencesMemberInInternalUsesOnly: Int { memberInInternalUsesOnly } // expected-note {{property 'memberInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+
+  func testTypes<T: ProtocolInInternalUsesOnly>(_ t: T) -> TypealiasInInternalUsesOnly? {
+    // expected-note@-1 {{protocol 'ProtocolInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+    // expected-note@-2 {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+
+    let _: TypealiasInInternalUsesOnly = 0 // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+    _ = TypealiasInInternalUsesOnly.self // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+    _ = (TypealiasInInternalUsesOnly).self // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+    _ = (Int, TypealiasInInternalUsesOnly).self // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+    _ = GenericType<TypealiasInInternalUsesOnly>.self // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+    return t as? TypealiasInInternalUsesOnly // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+  }
+
+  func testLeadingDotSyntax() {
+    func takesP<T: ProtocolInInternalUsesOnly>(_: T) { } // expected-note {{protocol 'ProtocolInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+    takesP(.staticDefaultMemberInInternalUsesOnly) // expected-note {{static property 'staticDefaultMemberInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+  }
+}
+
+extension Int.TypealiasInInternalUsesOnly { } // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+
 //--- imports.swift
 
 internal import InternalUsesOnly
@@ -97,8 +122,15 @@ internal import ImportsOtherModules
 //--- InternalUsesOnly.swift
 
 extension Int {
+  public protocol ProtocolInInternalUsesOnly { }
   public typealias TypealiasInInternalUsesOnly = Self
   public var memberInInternalUsesOnly: Int { return self }
+}
+
+extension Int: Int.ProtocolInInternalUsesOnly { }
+
+extension Int.ProtocolInInternalUsesOnly where Self == Int {
+  public static var staticDefaultMemberInInternalUsesOnly: Int { 0 }
 }
 
 //--- InternalUsesOnlyDefaultedImport.swift

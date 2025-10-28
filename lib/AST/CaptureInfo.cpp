@@ -77,7 +77,7 @@ CaptureInfo::CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
   // This is the only kind of local generic environment we can capture right now.
 #ifndef NDEBUG
   for (auto *env : genericEnv) {
-    assert(env->getKind() == GenericEnvironment::Kind::OpenedElement);
+    assert(env->getKind() == GenericEnvironment::Kind::Element);
   }
 #endif
 

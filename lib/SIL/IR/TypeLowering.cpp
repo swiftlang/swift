@@ -354,6 +354,7 @@ namespace {
     IMPL(BuiltinPackIndex, Trivial)
     IMPL(BuiltinNativeObject, Reference)
     IMPL(BuiltinBridgeObject, Reference)
+    IMPL(BuiltinImplicitActor, Reference)
     IMPL(BuiltinVector, Trivial)
     IMPL(SILToken, Trivial)
     IMPL(AnyMetatype, Trivial)
@@ -2388,6 +2389,19 @@ namespace {
       auto silType = SILType::getPrimitiveAddressType(type);
       return new (TC)
           UnsafeValueBufferTypeLowering(silType, Expansion, isSensitive);
+    }
+
+    TypeLowering *
+    visitBuiltinImplicitActorType(CanBuiltinImplicitActorType type,
+                                  AbstractionPattern origType,
+                                  IsTypeExpansionSensitive_t isSensitive) {
+      auto silType = SILType::getPrimitiveObjectType(type);
+      auto properties = SILTypeProperties();
+      properties.setTypeExpansionSensitive(isSensitive);
+      properties.setNonTrivial();
+      properties.setLexical(IsLexical);
+      return new (TC)
+          MiscNontrivialTypeLowering(silType, properties, Expansion);
     }
 
     TypeLowering *visitPackType(CanPackType packType,
@@ -4598,6 +4612,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             break;
           case ReadImplKind::Inherited:
             llvm_unreachable("inherited local variable?");
+          case ReadImplKind::Borrow:
+            llvm_unreachable("borrow accessor is not yet implemented");
           }
 
           switch (impl.getWriteImpl()) {
@@ -4622,6 +4638,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             break;
           case WriteImplKind::InheritedWithObservers:
             llvm_unreachable("inherited local variable");
+          case WriteImplKind::Mutate:
+            llvm_unreachable("mutate accessor is not yet implemented");
           }
 
           switch (impl.getReadWriteImpl()) {
@@ -4645,6 +4663,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             break;
           case ReadWriteImplKind::InheritedWithDidSet:
             llvm_unreachable("inherited local variable");
+          case ReadWriteImplKind::Mutate:
+            llvm_unreachable("mutate accessor is not yet implemented");
           }
         }
 

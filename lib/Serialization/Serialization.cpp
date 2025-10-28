@@ -17,6 +17,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
@@ -41,6 +42,7 @@
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileSystem.h"
@@ -533,6 +535,7 @@ static uint8_t getRawReadImplKind(swift::ReadImplKind kind) {
   CASE(Address)
   CASE(Read)
   CASE(Read2)
+  CASE(Borrow)
 #undef CASE
   }
   llvm_unreachable("bad kind");
@@ -551,6 +554,7 @@ static unsigned getRawWriteImplKind(swift::WriteImplKind kind) {
   CASE(MutableAddress)
   CASE(Modify)
   CASE(Modify2)
+  CASE(Mutate)
 #undef CASE
   }
   llvm_unreachable("bad kind");
@@ -569,6 +573,7 @@ static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
   CASE(Modify2)
   CASE(StoredWithDidSet)
   CASE(InheritedWithDidSet)
+  CASE(Mutate)
 #undef CASE
   }
   llvm_unreachable("bad kind");
@@ -837,7 +842,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, TARGET);
   BLOCK_RECORD(control_block, SDK_NAME);
   BLOCK_RECORD(control_block, REVISION);
-  BLOCK_RECORD(control_block, IS_OSSA);
   BLOCK_RECORD(control_block, ALLOWABLE_CLIENT_NAME);
   BLOCK_RECORD(control_block, CHANNEL);
   BLOCK_RECORD(control_block, SDK_VERSION);
@@ -880,6 +884,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, DEPENDENCY_DIRECTORY);
   BLOCK_RECORD(input_block, MODULE_INTERFACE_PATH);
   BLOCK_RECORD(input_block, IMPORTED_MODULE_SPIS);
+  BLOCK_RECORD(input_block, IMPORTED_MODULE_PATH);
   BLOCK_RECORD(input_block, EXTERNAL_MACRO);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
@@ -971,7 +976,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_SOURCE_LOC_REF);
   BLOCK_RECORD(sil_block, SIL_DEBUG_VALUE);
   BLOCK_RECORD(sil_block, SIL_DEBUG_VALUE_DELIMITER);
-
+  BLOCK_RECORD(sil_block, SIL_EXTRA_STRING);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -1013,7 +1018,6 @@ void Serializer::writeHeader() {
     control_block::SDKVersionLayout SDKVersion(Out);
     control_block::RevisionLayout Revision(Out);
     control_block::ChannelLayout Channel(Out);
-    control_block::IsOSSALayout IsOSSA(Out);
     control_block::AllowableClientLayout Allowable(Out);
 
     // Write module 'real name', which can be different from 'name'
@@ -1069,8 +1073,6 @@ void Serializer::writeHeader() {
     Revision.emit(ScratchRecord, revision);
 
     Channel.emit(ScratchRecord, version::getCurrentCompilerChannel());
-
-    IsOSSA.emit(ScratchRecord, Options.IsOSSA);
 
     {
       llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);
@@ -1333,7 +1335,8 @@ static ImportSet getImportsAsSet(const ModuleDecl *M,
 void Serializer::writeInputBlock() {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 4);
   input_block::ImportedModuleLayout importedModule(Out);
-  input_block::ImportedModuleLayoutSPI ImportedModuleSPI(Out);
+  input_block::ImportedModuleSPILayout ImportedModuleSPI(Out);
+  input_block::ImportedModulePathLayout ImportedModulePath(Out);
   input_block::LinkLibraryLayout LinkLibrary(Out);
   input_block::ImportedHeaderLayout ImportedHeader(Out);
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
@@ -1509,9 +1512,17 @@ void Serializer::writeInputBlock() {
     llvm::SmallSetVector<Identifier, 4> spis;
     M->lookupImportedSPIGroups(import.importedModule, spis);
 
-    importedModule.emit(ScratchRecord,
-                        static_cast<uint8_t>(stableImportControl),
-                        !import.accessPath.empty(), !spis.empty(), importPath);
+    StringRef path;
+    if (Options.ExplicitModuleBuild && import.importedModule &&
+        !import.importedModule->isNonSwiftModule()) {
+      path = import.importedModule->getCacheKey();
+      if (path.empty())
+        path = import.importedModule->getModuleLoadedFilename();
+    }
+
+    importedModule.emit(
+        ScratchRecord, static_cast<uint8_t>(stableImportControl),
+        !import.accessPath.empty(), !spis.empty(), !path.empty(), importPath);
 
     if (!spis.empty()) {
       SmallString<64> out;
@@ -1521,6 +1532,9 @@ void Serializer::writeInputBlock() {
           [&outStream] { outStream << StringRef("\0", 1); });
       ImportedModuleSPI.emit(ScratchRecord, out);
     }
+
+    if (!path.empty())
+      ImportedModulePath.emit(ScratchRecord, path);
   }
 
   if (!Options.ModuleLinkName.empty())
@@ -1794,7 +1808,7 @@ void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
   assert(GenericEnvironmentsToSerialize.hasRef(genericEnv));
 
   switch (genericEnv->getKind()) {
-  case GenericEnvironment::Kind::OpenedExistential: {
+  case GenericEnvironment::Kind::Existential: {
     auto kind = GenericEnvironmentKind::OpenedExistential;
     auto existentialTypeID = addTypeRef(genericEnv->getOpenedExistentialType());
     auto parentSigID = addGenericSignatureRef(genericEnv->getGenericSignature());
@@ -1808,7 +1822,7 @@ void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
     return;
   }
 
-  case GenericEnvironment::Kind::OpenedElement: {
+  case GenericEnvironment::Kind::Element: {
     auto kind = GenericEnvironmentKind::OpenedElement;
     auto shapeClassID = addTypeRef(genericEnv->getOpenedElementShapeClass());
     auto parentSigID = addGenericSignatureRef(genericEnv->getGenericSignature());
@@ -3131,8 +3145,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         switch (domain.getKind()) {
           case AvailabilityDomain::Kind::Universal:
             return AvailabilityDomainKind::Universal;
-          case AvailabilityDomain::Kind::SwiftLanguage:
-            return AvailabilityDomainKind::SwiftLanguage;
+          case AvailabilityDomain::Kind::SwiftLanguageMode:
+            return AvailabilityDomainKind::SwiftLanguageMode;
+          case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+            return AvailabilityDomainKind::StandaloneSwiftRuntime;
           case AvailabilityDomain::Kind::PackageDescription:
             return AvailabilityDomainKind::PackageDescription;
           case AvailabilityDomain::Kind::Embedded:
@@ -3301,7 +3317,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto theAttr = cast<CustomAttr>(DA);
 
       // Macro attributes are not serialized.
-      if (D->getResolvedMacro(const_cast<CustomAttr *>(theAttr)))
+      if (theAttr->getResolvedMacro())
         return;
 
       auto attrType =
@@ -4784,6 +4800,7 @@ public:
         param->isConstVal(),
         param->isSending(),
         param->isCallerIsolated(),
+        param->isAddressable(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),
         getRawStableActorIsolationKind(isolation.getKind()),
@@ -5520,6 +5537,9 @@ static uint8_t getRawStableResultConvention(swift::ResultConvention rc) {
   SIMPLE_CASE(ResultConvention, UnownedInnerPointer)
   SIMPLE_CASE(ResultConvention, Autoreleased)
   SIMPLE_CASE(ResultConvention, Pack)
+  SIMPLE_CASE(ResultConvention, GuaranteedAddress)
+  SIMPLE_CASE(ResultConvention, Guaranteed)
+  SIMPLE_CASE(ResultConvention, Inout)
   }
   llvm_unreachable("bad result convention kind");
 }
@@ -5567,6 +5587,31 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx, Type T) {
   return cast<TypeAliasDecl>(CurModuleResults[0]);
 }
 
+namespace {
+struct ImplementationOnlyWalker : TypeWalker {
+  bool hadImplementationOnlyDecl = false;
+  const ModuleDecl *currentModule;
+  ImplementationOnlyWalker(const ModuleDecl *M) : currentModule(M) {}
+  Action walkToTypePre(Type ty) override {
+    if (auto *typeAlias = dyn_cast<TypeAliasType>(ty)) {
+      if (importedImplementationOnly(typeAlias->getDecl()))
+        return Action::Stop;
+    } else if (auto *nominal = ty->getAs<NominalType>()) {
+      if (importedImplementationOnly(nominal->getDecl()))
+        return Action::Stop;
+    }
+    return Action::Continue;
+  }
+  bool importedImplementationOnly(const Decl *D) {
+    if (currentModule->isImportedImplementationOnly(D->getModuleContext())) {
+      hadImplementationOnlyDecl = true;
+      return true;
+    }
+    return false;
+  }
+};
+} // namespace
+
 class Serializer::TypeSerializer : public TypeVisitor<TypeSerializer> {
   Serializer &S;
 
@@ -5585,17 +5630,6 @@ public:
       return;
     }
     llvm_unreachable("should not serialize an ErrorType");
-  }
-
-  void visitUnresolvedType(const UnresolvedType *) {
-    // If for some reason we have an unresolved type while compiling with
-    // errors, just serialize an ErrorType and continue.
-    if (S.getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
-      visitErrorType(
-          cast<ErrorType>(ErrorType::get(S.getASTContext()).getPointer()));
-      return;
-    }
-    llvm_unreachable("should not serialize an UnresolvedType");
   }
 
   void visitPlaceholderType(const PlaceholderType *) {
@@ -5920,10 +5954,23 @@ public:
     using namespace decls_block;
 
     auto resultType = S.addTypeRef(fnTy->getResult());
-    auto clangType =
-      S.getASTContext().LangOpts.UseClangFunctionTypes
-      ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
-      : ClangTypeID(0);
+    bool shouldSerializeClangType = true;
+    if (S.hadImplementationOnlyImport && S.M &&
+        S.M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
+      // Deserializing clang types from implementation only modules could crash
+      // as the transitive clang module might not be available to retrieve the
+      // declarations from. In an optimal world we would make the deseriaization
+      // more resilient to these problems but the failure is in Clang's
+      // deserialization code path that is not architected with potentially
+      // missing declarations in mind.
+      ImplementationOnlyWalker walker{S.M};
+      Type(const_cast<FunctionType *>(fnTy)).walk(walker);
+      if (walker.hadImplementationOnlyDecl)
+        shouldSerializeClangType = false;
+    }
+    auto clangType = shouldSerializeClangType
+                         ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
+                         : ClangTypeID(0);
 
     auto isolation = encodeIsolation(fnTy->getIsolation());
 
@@ -6315,6 +6362,9 @@ public:
   // these types into Swift.
   void writeTypeCoupledDeclRefInfo(clang::TypeCoupledDeclRefInfo info) {
     llvm_unreachable("TypeCoupledDeclRefInfo shouldn't be reached from swift");
+  }
+  void writeHLSLSpirvOperand(clang::SpirvOperand) {
+    llvm_unreachable("SpirvOperand shouldn't be reached from swift");
   }
 };
 
@@ -6860,14 +6910,15 @@ static void recordDerivativeFunctionConfig(
   auto &ctx = AFD->getASTContext();
   Mangle::ASTMangler Mangler(AFD->getASTContext());
   for (auto *attr : AFD->getAttrs().getAttributes<DifferentiableAttr>()) {
-    auto mangledName = ctx.getIdentifier(Mangler.mangleDeclAsUSR(AFD, ""));
+    auto mangledName = ctx.getIdentifier(Mangler.mangleDeclWithPrefix(AFD, ""));
     derivativeConfigs[mangledName].insert(
         {ctx.getIdentifier(attr->getParameterIndices()->getString()),
          attr->getDerivativeGenericSignature()});
   }
   for (auto *attr : AFD->getAttrs().getAttributes<DerivativeAttr>()) {
     auto *origAFD = attr->getOriginalFunction(ctx);
-    auto mangledName = ctx.getIdentifier(Mangler.mangleDeclAsUSR(origAFD, ""));
+    auto mangledName =
+        ctx.getIdentifier(Mangler.mangleDeclWithPrefix(origAFD, ""));
     derivativeConfigs[mangledName].insert(
         {ctx.getIdentifier(attr->getParameterIndices()->getString()),
          AFD->getGenericSignature()});
@@ -7005,8 +7056,13 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     nextFile->getTopLevelDeclsWithAuxiliaryDecls(fileDecls);
 
     for (auto D : fileDecls) {
-      if (isa<ImportDecl>(D) || isa<MacroExpansionDecl>(D) ||
-          isa<TopLevelCodeDecl>(D) || isa<UsingDecl>(D)) {
+      if (const auto *ID = dyn_cast<ImportDecl>(D)) {
+        if (ID->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+          hadImplementationOnlyImport = true;
+        continue;
+      }
+      if (isa<MacroExpansionDecl>(D) || isa<TopLevelCodeDecl>(D) ||
+          isa<UsingDecl>(D)) {
         continue;
       }
 

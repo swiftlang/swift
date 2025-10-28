@@ -29,6 +29,9 @@ class C {
   @_hasStorage let x: String
 }
 
+struct NC: ~Copyable {
+  var i: Int
+}
 
 sil @unknown : $@convention(thin) () -> ()
 sil @load_string : $@convention(thin) (@in_guaranteed String) -> String
@@ -840,5 +843,18 @@ bb0(%0 : $*Klass):
   destroy_addr %2
   dealloc_stack %2
   return %4
+}
+
+// CHECK-LABEL: sil @dead_alloc_stack :
+// CHECK:       bb0(%0 : $*NC):
+// CHECK-NEXT:    tuple
+// CHECK-LABEL: } // end sil function 'dead_alloc_stack'
+sil @dead_alloc_stack : $@convention(thin) (@in NC) -> () {
+bb0(%0 : $*NC):
+  %1 = alloc_stack $NC
+  copy_addr [take] %0 to [init] %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
 }
 

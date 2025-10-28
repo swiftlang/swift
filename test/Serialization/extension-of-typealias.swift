@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -module-name Library -o %t -D LIBRARY %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=Library -I %t -source-filename=%s | %FileCheck %s
-// RUN: %target-swift-frontend -typecheck -I %t %s -verify
+// RUN: %target-swift-frontend -typecheck -I %t %s -verify -verify-ignore-unrelated
 
 // Check that base types of extensions are desugared. This isn't necessarily
 // the behavior we want long-term, but it's the behavior we need right now.

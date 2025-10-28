@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -407,6 +408,8 @@ int main(int argc, char **argv) {
   // if main()'s first function call is passing argv[0].
   std::rand();
 #endif
+  PROGRAM_START(argc, argv);
+
   llvm::cl::ParseCommandLineOptions(argc, argv);
 
   swift::Demangle::DemangleOptions options;

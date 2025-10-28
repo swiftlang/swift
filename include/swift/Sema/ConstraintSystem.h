@@ -1014,6 +1014,11 @@ enum ScoreKind: unsigned int {
   SK_EmptyExistentialConversion,
   /// A key path application subscript.
   SK_KeyPathSubscript,
+  /// A pointer conversion where the destination type is a generic parameter.
+  /// This should eventually be removed in favor of outright banning pointer
+  /// conversions for generic parameters. As such we consider it more impactful
+  /// than \c SK_ValueToPointerConversion.
+  SK_GenericParamPointerConversion,
   /// A conversion from a string, array, or inout to a pointer.
   SK_ValueToPointerConversion,
   /// A closure/function conversion to an autoclosure parameter.
@@ -1190,6 +1195,9 @@ struct Score {
 
     case SK_KeyPathSubscript:
       return "key path subscript";
+
+    case SK_GenericParamPointerConversion:
+      return "pointer conversion to generic parameter";
 
     case SK_ValueToPointerConversion:
       return "value-to-pointer conversion";
@@ -1677,7 +1685,11 @@ public:
   /// \param wantInterfaceType If true, maps the resulting type out of context,
   /// and replaces type variables for opened generic parameters with the
   /// generic parameter types. Should only be used for diagnostic logic.
-  Type simplifyType(Type type, bool wantInterfaceType = false) const;
+  /// \param forCompletion If true, will produce archetypes instead of
+  /// ErrorTypes for generic parameter originators, which is what completion
+  /// currently expects for the code completion token.
+  Type simplifyType(Type type, bool wantInterfaceType = false,
+                    bool forCompletion = false) const;
 
   // To aid code completion, we need to attempt to convert type placeholders
   // back into underlying generic parameters if possible, since type
@@ -1764,7 +1776,7 @@ public:
   /// Retrieve the overload choice associated with the given
   /// locator.
   SelectedOverload getOverloadChoice(ConstraintLocator *locator) const {
-    return *getOverloadChoiceIfAvailable(locator);
+    return getOverloadChoiceIfAvailable(locator).value();
   }
 
   /// Retrieve the overload choice for the callee associated with the given
@@ -2119,17 +2131,11 @@ public:
 
   virtual void addLocalDeclToTypeCheck(Decl *D) = 0;
 
+  [[nodiscard]]
   virtual std::optional<SyntacticElementTarget>
   rewriteTarget(SyntacticElementTarget target) = 0;
 
   virtual ~SyntacticElementTargetRewriter() = default;
-};
-
-enum class ConstraintSystemPhase {
-  ConstraintGeneration,
-  Solving,
-  Diagnostics,
-  Finalization
 };
 
 /// Retrieve the closure type from the constraint system.
@@ -2192,9 +2198,6 @@ private:
   /// A constraint that has failed along the current solver path.
   /// Do not set directly, call \c recordFailedConstraint instead.
   Constraint *failedConstraint = nullptr;
-
-  /// Current phase of the constraint system lifetime.
-  ConstraintSystemPhase Phase = ConstraintSystemPhase::ConstraintGeneration;
 
   /// The set of expressions for which we have generated constraints.
   llvm::SetVector<Expr *> InputExprs;
@@ -2673,41 +2676,6 @@ public:
   /// \c nullptr if no constraint has failed.
   Constraint *getFailedConstraint() const { return failedConstraint; }
 
-  ConstraintSystemPhase getPhase() const { return Phase; }
-
-  /// Move constraint system to a new phase of its lifetime.
-  void setPhase(ConstraintSystemPhase newPhase) {
-    if (Phase == newPhase)
-      return;
-
-#ifndef NDEBUG
-    switch (Phase) {
-    case ConstraintSystemPhase::ConstraintGeneration:
-      assert(newPhase == ConstraintSystemPhase::Solving);
-      break;
-
-    case ConstraintSystemPhase::Solving:
-      // We can come back to constraint generation phase while
-      // processing result builder body.
-      assert(newPhase == ConstraintSystemPhase::ConstraintGeneration ||
-             newPhase == ConstraintSystemPhase::Diagnostics ||
-             newPhase == ConstraintSystemPhase::Finalization);
-      break;
-
-    case ConstraintSystemPhase::Diagnostics:
-      assert(newPhase == ConstraintSystemPhase::Solving ||
-             newPhase == ConstraintSystemPhase::Finalization);
-      break;
-
-    case ConstraintSystemPhase::Finalization:
-      assert(newPhase == ConstraintSystemPhase::Diagnostics);
-      break;
-    }
-#endif
-
-    Phase = newPhase;
-  }
-
   /// Check whether constraint system is in valid state e.g.
   /// has left-over active/inactive constraints which should
   /// have been simplified.
@@ -3068,7 +3036,7 @@ public:
     return nullptr;
   }
 
-  TypeBase* getFavoredType(Expr *E) {
+  TypeBase *getFavoredType(Expr *E) {
     assert(E != nullptr);
     return this->FavoredTypes[E];
   }
@@ -3082,39 +3050,15 @@ public:
   ///
   /// The side tables are used through the expression type checker to avoid
   /// mutating nodes until we know we have successfully type-checked them.
-  void setType(ASTNode node, Type type) {
-    ASSERT(!node.isNull() && "Cannot set type information on null node");
-    ASSERT(type && "Expected non-null type");
-
-    // Record the type.
-    Type &entry = NodeTypes[node];
-    Type oldType = entry;
-    entry = type;
-
-    if (oldType.getPointer() != type.getPointer()) {
-      // Record the fact that we assigned a type to this node.
-      if (solverState)
-        recordChange(SolverTrail::Change::RecordedNodeType(node, oldType));
-    }
-  }
+  void setType(ASTNode node, Type type,
+               PreparedOverloadBuilder *preparedOverload=nullptr);
 
   /// Undo the above change.
-  void restoreType(ASTNode node, Type oldType) {
-    ASSERT(!node.isNull() && "Cannot set type information on null node");
-
-    if (oldType) {
-      auto found = NodeTypes.find(node);
-      ASSERT(found != NodeTypes.end());
-      found->second = oldType;
-    } else {
-      bool erased = NodeTypes.erase(node);
-      ASSERT(erased);
-    }
-  }
+  void restoreType(ASTNode node, Type oldType);
 
   /// Check to see if we have a type for a node.
   bool hasType(ASTNode node) const {
-    assert(!node.isNull() && "Expected non-null node");
+    ASSERT(!node.isNull() && "Expected non-null node");
     return NodeTypes.count(node) > 0;
   }
 
@@ -3122,55 +3066,30 @@ public:
   /// map is used throughout the expression type checker in order to
   /// avoid mutating expressions until we know we have successfully
   /// type-checked them.
-  void setType(const KeyPathExpr *KP, unsigned I, Type T) {
-    ASSERT(KP && "Expected non-null key path parameter!");
-    ASSERT(T && "Expected non-null type!");
+  void setType(const KeyPathExpr *KP, unsigned I, Type T);
 
-    Type &entry = KeyPathComponentTypes[{KP, I}];
-    Type oldType = entry;
-    entry = T;
-
-    if (oldType.getPointer() != T.getPointer()) {
-      if (solverState) {
-        recordChange(
-          SolverTrail::Change::RecordedKeyPathComponentType(
-            KP, I, oldType));
-      }
-    }
-  }
-
-  void restoreType(const KeyPathExpr *KP, unsigned I, Type T) {
-    ASSERT(KP && "Expected non-null key path parameter!");
-
-    if (T) {
-      auto found = KeyPathComponentTypes.find({KP, I});
-      ASSERT(found != KeyPathComponentTypes.end());
-      found->second = T;
-    } else {
-      bool erased = KeyPathComponentTypes.erase({KP, I});
-      ASSERT(erased);
-    }
-  }
+  void restoreType(const KeyPathExpr *KP, unsigned I, Type T);
 
   bool hasType(const KeyPathExpr *KP, unsigned I) const {
-    assert(KP && "Expected non-null key path parameter!");
+    ASSERT(KP && "Expected non-null key path parameter!");
     return KeyPathComponentTypes.find(std::make_pair(KP, I))
               != KeyPathComponentTypes.end();
   }
 
   /// Get the type for an node.
   Type getType(ASTNode node) const {
-    assert(hasType(node) && "Expected type to have been set!");
-    // FIXME: lvalue differences
-    //    assert((!E->getType() ||
-    //            E->getType()->isEqual(ExprTypes.find(E)->second)) &&
-    //           "Mismatched types!");
-    return NodeTypes.find(node)->second;
+    ASSERT(!node.isNull() && "Expected non-null node");
+    auto found = NodeTypes.find(node);
+    ASSERT(found != NodeTypes.end() && "Expected type to have been set!");
+    return found->second;
   }
 
   Type getType(const KeyPathExpr *KP, unsigned I) const {
-    assert(hasType(KP, I) && "Expected type to have been set!");
-    return KeyPathComponentTypes.find(std::make_pair(KP, I))->second;
+    ASSERT(KP && "Expected non-null key path parameter!");
+    auto found = KeyPathComponentTypes.find(std::make_pair(KP, I));
+    ASSERT(found != KeyPathComponentTypes.end() &&
+           "Expected type to have been set!");
+    return found->second;
   }
 
   /// Retrieve the type of the node, if known.
@@ -3181,11 +3100,6 @@ public:
 
     return known->second;
   }
-
-  /// Retrieve type of the given declaration to be used in
-  /// constraint system, this is better than calling `getType()`
-  /// directly because it accounts of constraint system flags.
-  Type getVarType(const VarDecl *var);
 
   /// Cache the type of the expression argument and return that same
   /// argument.
@@ -3795,7 +3709,7 @@ public:
   /// Add a constraint that binds an overload set to a specific choice.
   void addBindOverloadConstraint(Type boundTy, OverloadChoice choice,
                                  ConstraintLocator *locator, DeclContext *useDC) {
-    resolveOverload(locator, boundTy, choice, useDC,
+    resolveOverload(choice, useDC, locator, boundTy,
                     /*preparedOverload=*/nullptr);
   }
 
@@ -3969,7 +3883,7 @@ public:
     // Add this constraint to the constraint graph.
     CG.addConstraint(constraint);
 
-    if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
+    if (isDebugMode() && solverState) {
       auto &log = llvm::errs();
       log.indent(solverState->getCurrentIndent() + 4) << "(added constraint: ";
       constraint->print(log, &getASTContext().SourceMgr,
@@ -3990,7 +3904,7 @@ public:
     if (solverState)
       recordChange(SolverTrail::Change::RetiredConstraint(where, constraint));
 
-    if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
+    if (isDebugMode() && solverState) {
       auto &log = llvm::errs();
       log.indent(solverState->getCurrentIndent() + 4)
           << "(removed constraint: ";
@@ -4437,8 +4351,7 @@ public:
   FunctionType *adjustFunctionTypeForConcurrency(
       FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
       unsigned numApplies, bool isMainDispatchQueue,
-      ArrayRef<OpenedType> replacements, ConstraintLocatorBuilder locator,
-      PreparedOverloadBuilder *preparedOverload);
+      bool openGlobalActorType, ConstraintLocatorBuilder locator);
 
   /// Retrieve the type of a reference to the given value declaration.
   ///
@@ -4446,15 +4359,10 @@ public:
   /// the type by replacing each instance of an archetype with a fresh type
   /// variable.
   ///
-  /// \param decl The declarations whose type is being computed.
-  ///
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfReference(
-                          ValueDecl *decl,
-                          FunctionRefInfo functionRefInfo,
-                          ConstraintLocatorBuilder locator,
-                          DeclContext *useDC,
-                          PreparedOverloadBuilder *preparedOverload);
+      OverloadChoice choice, DeclContext *useDC, ConstraintLocatorBuilder locator,
+      PreparedOverloadBuilder *preparedOverload);
 
   /// Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
@@ -4463,15 +4371,10 @@ public:
   /// this routine "opens up" the type by replacing each instance of a generic
   /// parameter with a fresh type variable.
   ///
-  /// \param isDynamicLookup Indicates that this declaration was found via
-  /// dynamic lookup.
-  ///
   /// \returns a description of the type of this declaration reference.
   DeclReferenceType getTypeOfMemberReference(
-      Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
-      FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
-      SmallVectorImpl<OpenedType> *replacements = nullptr,
-      PreparedOverloadBuilder *preparedOverload = nullptr);
+      OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
+      PreparedOverloadBuilder *preparedOverload);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.
@@ -4483,7 +4386,25 @@ public:
   }
 
 private:
-  DeclReferenceType getTypeOfMemberTypeReference(
+  /// \returns The opened type and the thrown error type.
+  std::pair<Type, Type> getTypeOfReferencePre(
+       OverloadChoice choice, DeclContext *useDC, ConstraintLocatorBuilder locator,
+       PreparedOverloadBuilder *preparedOverload);
+
+  DeclReferenceType getTypeOfReferencePost(
+       OverloadChoice choice, DeclContext *useDC, ConstraintLocatorBuilder locator,
+       Type openedType, Type thrownErrorType);
+
+  /// \returns the opened type and the thrown error type.
+  std::pair<Type, Type> getTypeOfMemberReferencePre(
+      OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
+      PreparedOverloadBuilder *preparedOverload);
+
+  DeclReferenceType getTypeOfMemberReferencePost(
+      OverloadChoice choice, DeclContext *useDC, ConstraintLocator *locator,
+      Type openedType, Type thrownErrorType);
+
+  Type getTypeOfMemberTypeReference(
       Type baseObjTy, TypeDecl *typeDecl, ConstraintLocator *locator,
       PreparedOverloadBuilder *preparedOverload);
 
@@ -4513,8 +4434,7 @@ private:
   /// determine the reference type of the member reference.
   Type getMemberReferenceTypeFromOpenedType(
       Type type, Type baseObjTy, ValueDecl *value,
-      ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup,
-      ArrayRef<OpenedType> replacements);
+      ConstraintLocator *locator, bool hasAppliedSelf, bool isDynamicLookup);
 
   /// Add the constraints needed to bind an overload's type variable.
   void bindOverloadType(const SelectedOverload &overload, Type boundType,
@@ -4918,17 +4838,23 @@ public:
                               SelectedOverload choice);
 
   /// Build and allocate a prepared overload in the solver arena.
-  PreparedOverload *prepareOverload(ConstraintLocator *locator,
-                                    OverloadChoice choice,
-                                    DeclContext *useDC);
+  PreparedOverload *prepareOverload(OverloadChoice choice,
+                                    DeclContext *useDC,
+                                    ConstraintLocator *locator,
+                                    bool forDiagnostics);
 
   /// Populate the prepared overload with all type variables and constraints
   /// that are to be introduced into the constraint system when this choice
   /// is taken.
-  DeclReferenceType
-  prepareOverloadImpl(ConstraintLocator *locator,
-                      OverloadChoice choice,
+  ///
+  /// Returns a pair consisting of the opened type, and the thrown error type.
+  ///
+  /// FIXME: As a transitional mechanism, if preparedOverload is nullptr, this
+  /// immediately performs all operations.
+  std::pair<Type, Type>
+  prepareOverloadImpl(OverloadChoice choice,
                       DeclContext *useDC,
+                      ConstraintLocator *locator,
                       PreparedOverloadBuilder *preparedOverload);
 
   void replayChanges(
@@ -4936,8 +4862,8 @@ public:
       PreparedOverload *preparedOverload);
 
   /// Resolve the given overload set to the given choice.
-  void resolveOverload(ConstraintLocator *locator, Type boundType,
-                       OverloadChoice choice, DeclContext *useDC,
+  void resolveOverload(OverloadChoice choice, DeclContext *useDC,
+                       ConstraintLocator *locator, Type boundType,
                        PreparedOverload *preparedOverload);
 
   /// Simplify a type, by replacing type variables with either their
@@ -6266,8 +6192,7 @@ public:
   fixForHole(ConstraintSystem &cs) const;
 
   void print(llvm::raw_ostream &Out, SourceManager *, unsigned indent) const {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
+    PrintOptions PO = PrintOptions::forDebugging();
     Out << "type variable binding " << TypeVar->getString(PO)
         << " := " << Binding.BindingType->getString(PO);
   }
@@ -6568,10 +6493,6 @@ public:
     return TypeVars.getArrayRef();
   }
 };
-
-/// Determine whether given type is a known one
-/// for a key path `{Any, Partial, Writable, ReferenceWritable}KeyPath`.
-bool isKnownKeyPathType(Type type);
 
 /// Determine whether the given type is a PartialKeyPath and
 /// AnyKeyPath or existential type thererof, for example,

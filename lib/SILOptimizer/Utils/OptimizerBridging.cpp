@@ -274,32 +274,21 @@ BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(BridgedArrayRef bridge
 }
 
 BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
-  BridgedArrayRef bridgedClosureArgs, BridgedFunction applySiteCallee
+  BridgedArrayRef closureArgManglings, BridgedFunction applySiteCallee
 ) const {
-
-  struct ClosureArgElement {
-    SwiftInt argIdx;
-    BridgeValueExistential argValue;
-  };
-
   auto pass = Demangle::SpecializationPass::ClosureSpecializer;
   auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
   Mangle::FunctionSignatureSpecializationMangler mangler(applySiteCallee.getFunction()->getASTContext(),
       pass, serializedKind, applySiteCallee.getFunction());
 
-  auto closureArgs = bridgedClosureArgs.unbridged<ClosureArgElement>();
+  auto closureArgs = closureArgManglings.unbridged<ClosureArgMangling>();
 
-  for (ClosureArgElement argElmt : closureArgs) {
-    auto closureArg = argElmt.argValue.value.getSILValue();
-    auto closureArgIndex = argElmt.argIdx;
-
-    if (auto *PAI = dyn_cast<PartialApplyInst>(closureArg)) {
-      mangler.setArgumentClosureProp(closureArgIndex,
-                                     const_cast<PartialApplyInst *>(PAI));
+  for (ClosureArgMangling argElmt : closureArgs) {
+    auto closureArgIndex = (unsigned)argElmt.argIdx;
+    if (SILInstruction *inst = argElmt.inst.unbridged()) {
+      mangler.setArgumentClosureProp(closureArgIndex, inst);
     } else {
-      auto *TTTFI = cast<ThinToThickFunctionInst>(closureArg);
-      mangler.setArgumentClosureProp(closureArgIndex,
-                                     const_cast<ThinToThickFunctionInst *>(TTTFI));
+      mangler.setArgumentClosurePropPreviousArg(closureArgIndex, argElmt.otherArgIdx);
     }
   }
 
@@ -518,6 +507,13 @@ bool BridgedFunction::isConvertPointerToPointerArgument() const {
     auto *conversionDecl =
       declRef.getASTContext().getConvertPointerToPointerArgument();
     return declRef.getFuncDecl() == conversionDecl;
+  }
+  return false;
+}
+
+bool BridgedFunction::isAddressor() const {
+  if (auto declRef = dyn_cast_or_null<AccessorDecl>(getFunction()->getDeclRef().getDecl())) {
+    return declRef->isAnyAddressor();
   }
   return false;
 }

@@ -76,7 +76,6 @@ set(swift_runtime_sources
     RefCount.cpp
     ReflectionMirror.cpp
     RuntimeInvocationsTracking.cpp
-    SwiftDtoa.cpp
     SwiftTLSContext.cpp
     ThreadingError.cpp
     Tracing.cpp

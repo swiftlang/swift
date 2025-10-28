@@ -110,6 +110,9 @@ emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
                Explosion &taskFunction,
                SubstitutionMap subs);
 
+llvm::Value *clearImplicitIsolatedActorBits(IRGenFunction &IGF,
+                                            llvm::Value *value);
+
 } // end namespace irgen
 } // end namespace swift
 

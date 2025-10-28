@@ -22,10 +22,12 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
@@ -368,6 +370,7 @@ namespace {
       : public StructTypeInfoBase<LoadableClangRecordTypeInfo, LoadableTypeInfo,
                                   ClangFieldInfo> {
     const clang::RecordDecl *ClangDecl;
+    bool HasReferenceField;
 
   public:
     LoadableClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
@@ -376,14 +379,14 @@ namespace {
                                 Alignment align,
                                 IsTriviallyDestroyable_t isTriviallyDestroyable,
                                 IsCopyable_t isCopyable,
-                                const clang::RecordDecl *clangDecl)
+                                const clang::RecordDecl *clangDecl,
+                                bool hasReferenceField)
         : StructTypeInfoBase(StructTypeInfoKind::LoadableClangRecordTypeInfo,
                              fields, explosionSize, FieldsAreABIAccessible,
                              storageType, size, std::move(spareBits), align,
-                             isTriviallyDestroyable,
-                             isCopyable,
-                             IsFixedSize, IsABIAccessible),
-          ClangDecl(clangDecl) {}
+                             isTriviallyDestroyable, isCopyable, IsFixedSize,
+                             IsABIAccessible),
+          ClangDecl(clangDecl), HasReferenceField(hasReferenceField) {}
 
     TypeLayoutEntry
     *buildTypeLayoutEntry(IRGenModule &IGM,
@@ -447,6 +450,7 @@ namespace {
                                    const ClangFieldInfo &field) const {
       llvm_unreachable("non-fixed field in Clang type?");
     }
+    bool hasReferenceField() const { return HasReferenceField; }
   };
 
   class AddressOnlyPointerAuthRecordTypeInfo final
@@ -553,7 +557,8 @@ namespace {
         if (ctor->isCopyConstructor() &&
             // FIXME: Support default arguments (rdar://142414553)
             ctor->getNumParams() == 1 &&
-            ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
+            ctor->getAccess() == clang::AS_public && !ctor->isDeleted() &&
+            !ctor->isIneligibleOrNotSelected())
           return ctor;
       }
       return nullptr;
@@ -567,7 +572,8 @@ namespace {
         if (ctor->isMoveConstructor() &&
             // FIXME: Support default arguments (rdar://142414553)
             ctor->getNumParams() == 1 &&
-            ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
+            ctor->getAccess() == clang::AS_public && !ctor->isDeleted() &&
+            !ctor->isIneligibleOrNotSelected())
           return ctor;
       }
       return nullptr;
@@ -620,8 +626,54 @@ namespace {
       auto fnType = createCXXCopyConstructorFunctionType(IGF, T);
       auto globalDecl =
           clang::GlobalDecl(copyConstructor, clang::Ctor_Complete);
+
+      auto &ctx = IGF.IGM.Context;
+      auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+      
+      auto &diagEngine = importer->getClangSema().getDiagnostics();
+      clang::DiagnosticErrorTrap trap(diagEngine);
       auto clangFnAddr =
           IGF.IGM.getAddrOfClangGlobalDecl(globalDecl, NotForDefinition);
+
+      if (trap.hasErrorOccurred()) {
+        SourceLoc copyConstructorLoc =
+            importer->importSourceLocation(copyConstructor->getLocation());
+        auto *recordDecl = copyConstructor->getParent();
+        ctx.Diags.diagnose(copyConstructorLoc, diag::failed_emit_copy,
+                           recordDecl);
+
+        bool hasCopyableIfAttr =
+            recordDecl->hasAttrs() &&
+            llvm::any_of(recordDecl->getAttrs(), [&](clang::Attr *attr) {
+              if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+                StringRef attrStr = swiftAttr->getAttribute();
+                assert(!attrStr.starts_with("~Copyable") &&
+                       "Trying to emit copy of a type annotated with "
+                       "'SWIFT_NONCOPYABLE'?");
+                if (attrStr.starts_with("copyable_if:"))
+                  return true;
+              }
+              return false;
+            });
+
+        bool hasRequiresClause =
+            !copyConstructor->getTrailingRequiresClause().isNull();
+
+        if (hasRequiresClause || hasCopyableIfAttr) {
+          ctx.Diags.diagnose(copyConstructorLoc, diag::maybe_missing_annotation,
+                             recordDecl);
+          ctx.Diags.diagnose(copyConstructorLoc, diag::maybe_missing_parameter,
+                             hasCopyableIfAttr, recordDecl);
+        } else {
+          ctx.Diags.diagnose(copyConstructorLoc, diag::use_requires_expression);
+          ctx.Diags.diagnose(copyConstructorLoc, diag::annotate_copyable_if);
+        }
+
+        if (!copyConstructor->isUserProvided()) {
+          ctx.Diags.diagnose(copyConstructorLoc, diag::annotate_non_copyable);
+        }
+      }
+
       auto callee = cast<llvm::Function>(clangFnAddr->stripPointerCasts());
       Signature signature = IGF.IGM.getSignature(fnType, copyConstructor);
       std::string name = "__swift_cxx_copy_ctor" + callee->getName().str();
@@ -1319,6 +1371,11 @@ class ClangRecordLowering {
   Size NextOffset = Size(0);
   Size SubobjectAdjustment = Size(0);
   unsigned NextExplosionIndex = 0;
+  // Types that are trivial in C++ but are containing fields to reference types
+  // are not trivial in Swift, they cannot be copied using memcpy as we need to
+  // do the proper retain operations.
+  bool hasReferenceField = false;
+
 public:
   ClangRecordLowering(IRGenModule &IGM, StructDecl *swiftDecl,
                       const clang::RecordDecl *clangDecl,
@@ -1359,11 +1416,12 @@ public:
     return LoadableClangRecordTypeInfo::create(
         FieldInfos, NextExplosionIndex, llvmType, TotalStride,
         std::move(SpareBits), TotalAlignment,
-        (SwiftDecl && SwiftDecl->getValueTypeDestructor())
-          ? IsNotTriviallyDestroyable : IsTriviallyDestroyable,
-        (SwiftDecl && !SwiftDecl->canBeCopyable())
-          ? IsNotCopyable : IsCopyable,
-        ClangDecl);
+        (SwiftDecl &&
+         (SwiftDecl->getValueTypeDestructor() || hasReferenceField))
+            ? IsNotTriviallyDestroyable
+            : IsTriviallyDestroyable,
+        (SwiftDecl && !SwiftDecl->canBeCopyable()) ? IsNotCopyable : IsCopyable,
+        ClangDecl, hasReferenceField);
   }
 
 private:
@@ -1410,7 +1468,7 @@ private:
         // Collect all of the following bitfields.
         unsigned bitStart =
           layout.getFieldOffset(clangField->getFieldIndex());
-        unsigned bitEnd = bitStart + clangField->getBitWidthValue(ClangContext);
+        unsigned bitEnd = bitStart + clangField->getBitWidthValue();
 
         while (cfi != cfe && (*cfi)->isBitField()) {
           clangField = *cfi++;
@@ -1426,7 +1484,7 @@ private:
             bitStart = nextStart;
           }
 
-          bitEnd = nextStart + clangField->getBitWidthValue(ClangContext);
+          bitEnd = nextStart + clangField->getBitWidthValue();
         }
 
         addOpaqueBitField(bitStart, bitEnd);
@@ -1488,6 +1546,17 @@ private:
           SwiftType.getFieldType(swiftField, IGM.getSILModule(),
                                  IGM.getMaximalTypeExpansionContext())));
       addField(swiftField, offset, fieldTI, isZeroSized);
+      auto fieldTy =
+          swiftField->getInterfaceType()->lookThroughSingleOptionalType();
+      if (fieldTy->isAnyClassReferenceType() &&
+          fieldTy->getReferenceCounting() != ReferenceCounting::None)
+        hasReferenceField = true;
+      else if (auto structDecl = fieldTy->getStructOrBoundGenericStruct();
+               structDecl && structDecl->hasClangNode() &&
+               getStructTypeInfoKind(fieldTI) ==
+                   StructTypeInfoKind::LoadableClangRecordTypeInfo)
+        if (fieldTI.as<LoadableClangRecordTypeInfo>().hasReferenceField())
+          hasReferenceField = true;
       return;
     }
 

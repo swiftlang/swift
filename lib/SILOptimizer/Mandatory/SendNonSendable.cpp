@@ -723,6 +723,7 @@ struct DiagnosticEvaluator final
     case PartitionOpError::SentNeverSendable:
     case PartitionOpError::AssignNeverSendableIntoSendingResult:
     case PartitionOpError::NonSendableIsolationCrossingResult:
+    case PartitionOpError::InOutSendingParametersInSameRegion:
       // We are going to process these later... but dump so we can see that we
       // handled an error here. The rest of the explicit handlers will dump as
       // appropriate if they want to emit an error here (some will squelch the
@@ -3502,6 +3503,138 @@ void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
 }
 
 //===----------------------------------------------------------------------===//
+//               MARK: InOutSendingParametersInSameRegionError
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class InOutSendingParametersInSameRegionDiagnosticEmitter {
+  /// The function exiting inst where the 'inout sending' parameter was actor
+  /// isolated.
+  TermInst *functionExitingInst;
+
+  /// The first 'inout sending' param in the region.
+  SILValue firstInOutSendingParam;
+
+  /// The second 'inout sending' param in the region.
+  SILValue secondInOutSendingParam;
+
+  bool emittedErrorDiagnostic = false;
+
+public:
+  InOutSendingParametersInSameRegionDiagnosticEmitter(
+      TermInst *functionExitingInst, SILValue firstInOutSendingParam,
+      SILValue secondInOutSendingParam)
+      : functionExitingInst(functionExitingInst),
+        firstInOutSendingParam(firstInOutSendingParam),
+        secondInOutSendingParam(secondInOutSendingParam) {}
+
+  ~InOutSendingParametersInSameRegionDiagnosticEmitter() {
+    // If we were supposed to emit a diagnostic and didn't emit an unknown
+    // pattern error.
+    if (!emittedErrorDiagnostic)
+      emitUnknownPatternError();
+  }
+
+  SILFunction *getFunction() const {
+    return functionExitingInst->getFunction();
+  }
+
+  std::optional<DiagnosticBehavior> getBehaviorLimit() const {
+    auto first =
+        firstInOutSendingParam->getType().getConcurrencyDiagnosticBehavior(
+            getFunction());
+    auto second =
+        secondInOutSendingParam->getType().getConcurrencyDiagnosticBehavior(
+            getFunction());
+    if (!first)
+      return second;
+    if (!second)
+      return first;
+    return first->merge(*second);
+  }
+
+  void emitUnknownPatternError() {
+    if (shouldAbortOnUnknownPatternMatchError()) {
+      llvm::report_fatal_error(
+          "RegionIsolation: Aborting on unknown pattern match error");
+    }
+
+    diagnoseError(functionExitingInst,
+                  diag::regionbasedisolation_unknown_pattern)
+        .limitBehaviorIf(getBehaviorLimit());
+  }
+
+  void emit();
+
+  ASTContext &getASTContext() const {
+    return functionExitingInst->getFunction()->getASTContext();
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
+                                   U &&...args) {
+    emittedErrorDiagnostic = true;
+    return std::move(getASTContext()
+                         .Diags.diagnose(loc, diag, std::forward<U>(args)...)
+                         .warnUntilSwiftVersion(6));
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILLocation loc, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(loc.getSourceLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
+    return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
+  }
+};
+
+} // namespace
+
+void InOutSendingParametersInSameRegionDiagnosticEmitter::emit() {
+  // We should always be able to find a name for an inout sending param. If we
+  // do not, emit an unknown pattern error.
+  auto firstName = inferNameHelper(firstInOutSendingParam);
+  if (!firstName) {
+    return emitUnknownPatternError();
+  }
+  auto secondName = inferNameHelper(secondInOutSendingParam);
+  if (!secondName) {
+    return emitUnknownPatternError();
+  }
+
+  diagnoseError(functionExitingInst,
+                diag::regionbasedisolation_inout_sending_in_same_region,
+                *firstName, *secondName)
+      .limitBehaviorIf(getBehaviorLimit());
+
+  diagnoseNote(functionExitingInst,
+               diag::regionbasedisolation_inout_sending_in_same_region_note,
+               *firstName, *secondName);
+}
+
+//===----------------------------------------------------------------------===//
 //                         MARK: Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
@@ -3567,6 +3700,30 @@ void SendNonSendableImpl::emitVerbatimErrors() {
       NonSendableIsolationCrossingResultDiagnosticEmitter diagnosticInferrer(
           info->getValueMap(), std::move(e));
       diagnosticInferrer.emit();
+      continue;
+    }
+    case PartitionOpError::InOutSendingParametersInSameRegion: {
+      auto e =
+          std::move(erasedError).getInOutSendingParametersInSameRegionError();
+      REGIONBASEDISOLATION_LOG(e.print(llvm::dbgs(), info->getValueMap()));
+      auto firstParam =
+          info->getValueMap().getRepresentativeValue(e.firstInoutSendingParam);
+      // Walk through our secondInOutSendingParams and use one that is not
+      // ignore.
+      for (auto paramElt : e.otherInOutSendingParams) {
+        auto paramValue =
+            info->getValueMap().getRepresentativeValue(paramElt).getValue();
+        if (auto behavior =
+                paramValue->getType().getConcurrencyDiagnosticBehavior(
+                    info->getFunction());
+            behavior && *behavior == DiagnosticBehavior::Ignore) {
+          continue;
+        }
+        InOutSendingParametersInSameRegionDiagnosticEmitter diagnosticEmitter(
+            cast<TermInst>(e.op->getSourceInst()), firstParam.getValue(),
+            paramValue);
+        diagnosticEmitter.emit();
+      }
       continue;
     }
     }

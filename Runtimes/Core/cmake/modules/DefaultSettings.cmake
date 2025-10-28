@@ -76,7 +76,9 @@ elseif(WIN32)
   set(SwiftCore_ENABLE_CONCURRENCY_default NO)
   set(SwiftCore_ENABLE_REMOTE_MIRROR_default NO)
   set(SwiftCore_THREADING_PACKAGE_default "WIN32")
-  set(SwiftCore_ENABLE_PRESPECIALIZATION_default ON)
+  # FIXME(swiftlang/swift#84780) - generic prespecialization seems to cause
+  # errors
+  set(SwiftCore_ENABLE_PRESPECIALIZATION_default OFF)
   set(SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR_default "dispatch")
 
   set(SwiftCore_ENABLE_VECTOR_TYPES_default ON)

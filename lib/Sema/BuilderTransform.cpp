@@ -1289,9 +1289,7 @@ bool AnyFunctionRef::bodyHasExplicitReturnStmt() const {
     return false;
   }
 
-  auto &ctx = getAsDeclContext()->getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-                           BraceHasExplicitReturnStmtRequest{body}, false);
+  return body->hasExplicitReturnStmt(getAsDeclContext()->getASTContext());
 }
 
 void AnyFunctionRef::getExplicitReturnStmts(

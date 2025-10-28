@@ -43,6 +43,8 @@
 #include "swift/IDE/IDERequests.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/REPLCodeCompletion.h"
+#include "swift/IDE/SignatureHelp.h"
+#include "swift/IDE/SignatureHelpFormatter.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/TypeContextInfo.h"
@@ -53,7 +55,7 @@
 #include "swift/Markup/Markup.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "llvm/ADT/RewriteBuffer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
@@ -117,6 +119,7 @@ enum class ActionType {
   Range,
   TypeContextInfo,
   ConformingMethodList,
+  SignatureHelp,
 };
 
 class NullDebuggerClient : public DebuggerClient {
@@ -251,7 +254,9 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "Print types for all expressions in the file"),
            clEnumValN(ActionType::ConformingMethodList,
 	                    "conforming-methods",
-                      "Perform conforming method analysis for expression")));
+                      "Perform conforming method analysis for expression"),
+           clEnumValN(ActionType::SignatureHelp, "signature-help",
+                      "Perform signature help")));
 
 static llvm::cl::opt<std::string>
 SourceFilename("source-filename", llvm::cl::desc("Name of the source file"),
@@ -584,6 +589,11 @@ PreferTypeRepr("prefer-type-repr",
                llvm::cl::desc("When printing types, prefer printing TypeReprs"),
                llvm::cl::cat(Category),
                llvm::cl::init(true));
+
+static llvm::cl::opt<bool> PrintForDebugging(
+    "debug-print",
+    llvm::cl::desc("Print using the debug representation for types"),
+    llvm::cl::cat(Category), llvm::cl::init(true));
 
 static llvm::cl::opt<bool>
 FullyQualifiedTypes("fully-qualified-types",
@@ -1186,14 +1196,15 @@ printResult(CancellableResult<ResultType> Result,
   }
 }
 
-static int printTypeContextInfo(
-    CancellableResult<TypeContextInfoResult> CancellableResult) {
+static int
+printTypeContextInfo(CancellableResult<TypeContextInfoResult> CancellableResult,
+                     const PrintOptions &PO) {
   return printResult<TypeContextInfoResult>(
-      CancellableResult, [](const TypeContextInfoResult &Result) {
+      CancellableResult, [&](const TypeContextInfoResult &Result) {
         llvm::outs() << "-----BEGIN TYPE CONTEXT INFO-----\n";
         for (auto resultItem : Result.Results) {
           llvm::outs() << "- TypeName: ";
-          resultItem.ExpectedTy.print(llvm::outs());
+          resultItem.ExpectedTy.print(llvm::outs(), PO);
           llvm::outs() << "\n";
 
           llvm::outs() << "  TypeUSR: ";
@@ -1224,11 +1235,10 @@ static int printTypeContextInfo(
       });
 }
 
-static int doTypeContextInfo(const CompilerInvocation &InitInvok,
-                             StringRef SourceFilename,
-                             StringRef SecondSourceFileName,
-                             StringRef CodeCompletionToken,
-                             bool CodeCompletionDiagnostics) {
+static int
+doTypeContextInfo(const CompilerInvocation &InitInvok, StringRef SourceFilename,
+                  StringRef SecondSourceFileName, StringRef CodeCompletionToken,
+                  bool CodeCompletionDiagnostics, const PrintOptions &PO) {
   return performWithCompletionLikeOperationParams(
       InitInvok, SourceFilename, SecondSourceFileName, CodeCompletionToken,
       CodeCompletionDiagnostics,
@@ -1241,16 +1251,17 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
             Params.CompletionBuffer, Params.Offset, Params.DiagC,
             /*CancellationFlag=*/nullptr,
             [&](CancellableResult<TypeContextInfoResult> Result) {
-              ExitCode = printTypeContextInfo(Result);
+              ExitCode = printTypeContextInfo(Result, PO);
             });
         return ExitCode;
       });
 }
 
 static int printConformingMethodList(
-    CancellableResult<ConformingMethodListResults> CancellableResult) {
+    CancellableResult<ConformingMethodListResults> CancellableResult,
+    const PrintOptions &PO) {
   return printResult<ConformingMethodListResults>(
-      CancellableResult, [](const ConformingMethodListResults &Results) {
+      CancellableResult, [&](const ConformingMethodListResults &Results) {
         auto Result = Results.Result;
         if (!Result) {
           return 0;
@@ -1258,7 +1269,7 @@ static int printConformingMethodList(
         llvm::outs() << "-----BEGIN CONFORMING METHOD LIST-----\n";
 
         llvm::outs() << "- TypeName: ";
-        Result->ExprType.print(llvm::outs());
+        Result->ExprType.print(llvm::outs(), PO);
         llvm::outs() << "\n";
 
         llvm::outs() << "- Members: ";
@@ -1275,7 +1286,7 @@ static int printConformingMethodList(
           llvm::outs() << "\n";
 
           llvm::outs() << "     TypeName: ";
-          resultTy.print(llvm::outs());
+          resultTy.print(llvm::outs(), PO);
           llvm::outs() << "\n";
 
           StringRef BriefDoc = VD->getSemanticBriefComment();
@@ -1291,12 +1302,11 @@ static int printConformingMethodList(
       });
 }
 
-static int
-doConformingMethodList(const CompilerInvocation &InitInvok,
-                       StringRef SourceFilename, StringRef SecondSourceFileName,
-                       StringRef CodeCompletionToken,
-                       bool CodeCompletionDiagnostics,
-                       const std::vector<std::string> expectedTypeNames) {
+static int doConformingMethodList(
+    const CompilerInvocation &InitInvok, StringRef SourceFilename,
+    StringRef SecondSourceFileName, StringRef CodeCompletionToken,
+    bool CodeCompletionDiagnostics,
+    const std::vector<std::string> expectedTypeNames, const PrintOptions &PO) {
   SmallVector<const char *, 4> typeNames;
   for (auto &name : expectedTypeNames)
     typeNames.push_back(name.c_str());
@@ -1313,7 +1323,7 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
             Params.CompletionBuffer, Params.Offset, Params.DiagC, typeNames,
             /*CancellationFlag=*/nullptr,
             [&](CancellableResult<ConformingMethodListResults> Result) {
-              ExitCode = printConformingMethodList(Result);
+              ExitCode = printConformingMethodList(Result, PO);
             });
         return ExitCode;
       });
@@ -1446,6 +1456,99 @@ printCodeCompletionLookedupTypeNames(ArrayRef<NullTerminatedStringRef> names,
   OS << "]\n";
 }
 
+static void printWithEscaping(StringRef Str, llvm::raw_ostream &OS) {
+  for (char C : Str) {
+    switch (C) {
+    case '\n':
+      OS << "\\n";
+      break;
+    case '\r':
+      OS << "\\r";
+      break;
+    case '\t':
+      OS << "\\t";
+      break;
+    case '\v':
+      OS << "\\v";
+      break;
+    case '\f':
+      OS << "\\f";
+      break;
+    default:
+      OS << C;
+      break;
+    }
+  }
+}
+
+static void printSignatureHelpResultsImpl(const FormattedSignatureHelp &Result,
+                                          llvm::raw_ostream &OS) {
+  OS << "Begin signatures, " << Result.Signatures.size() << " items\n";
+
+  for (unsigned i = 0; i < Result.Signatures.size(); ++i) {
+    const auto &Signature = Result.Signatures[i];
+    if (i == Result.ActiveSignature) {
+      OS << "Signature[Active]: ";
+    } else {
+      OS << "Signature: ";
+    }
+
+    StringRef signatureText = Signature.Text;
+
+    unsigned currentPos = 0;
+    for (unsigned j = 0; j < Signature.Params.size(); ++j) {
+      const auto &Param = Signature.Params[j];
+
+      if (Param.Offset > currentPos) {
+        OS << signatureText.substr(currentPos, Param.Offset - currentPos);
+      }
+
+      OS << "<param";
+      if (!Param.Name.empty()) {
+        OS << " name=\"" << Param.Name << '"';
+      }
+      if (Signature.ActiveParam && *Signature.ActiveParam == j) {
+        OS << " active";
+      }
+      OS << ">";
+      OS << signatureText.substr(Param.Offset, Param.Length);
+      OS << "</param>";
+
+      currentPos = Param.Offset + Param.Length;
+    }
+
+    if (currentPos < signatureText.size()) {
+      OS << signatureText.substr(currentPos);
+    }
+
+    if (!Signature.DocComment.empty()) {
+      OS << "; Documentation=";
+      printWithEscaping(Signature.DocComment, OS);
+    }
+
+    OS << "\n";
+  }
+
+  OS << "End signatures\n";
+}
+
+static int printSignatureHelpResults(
+    CancellableResult<SignatureHelpResults> CancellableResult) {
+  llvm::raw_fd_ostream &OS = llvm::outs();
+  return printResult<SignatureHelpResults>(
+      CancellableResult, [&](const SignatureHelpResults &Results) {
+        if (Results.Result) {
+          llvm::BumpPtrAllocator Allocator;
+          SignatureHelpFormatter Formatter(Allocator);
+          auto FormattedResult = Formatter.format(*Results.Result);
+          printSignatureHelpResultsImpl(FormattedResult, OS);
+        } else {
+          OS << "No signature help results\n";
+        }
+        return 0;
+      });
+}
+
 static int printCodeCompletionResults(
     CancellableResult<CodeCompleteResult> CancellableResult,
     bool IncludeKeywords, bool IncludeComments, bool IncludeSourceText,
@@ -1460,6 +1563,27 @@ static int printCodeCompletionResults(
         printCodeCompletionLookedupTypeNames(
             Result.Info.completionContext->LookedupNominalTypeNames, OS);
         return 0;
+      });
+}
+
+static int doSignatureHelp(const CompilerInvocation &InitInvok,
+                           StringRef SourceFilename,
+                           StringRef SecondSourceFileName,
+                           StringRef SignatureHelpToken,
+                           bool SignatureHelpDiagnostics) {
+  return performWithCompletionLikeOperationParams(
+      InitInvok, SourceFilename, SecondSourceFileName, SignatureHelpToken,
+      SignatureHelpDiagnostics,
+      [&](CompletionLikeOperationParams Params) -> bool {
+        IDEInspectionInstance Inst(std::make_shared<PluginRegistry>());
+        int ExitCode = 2;
+        Inst.signatureHelp(Params.Invocation, Params.Args, Params.FileSystem,
+                           Params.CompletionBuffer, Params.Offset, Params.DiagC,
+                           /*CancellationFlag=*/nullptr,
+                           [&](CancellableResult<SignatureHelpResults> Result) {
+                             ExitCode = printSignatureHelpResults(Result);
+                           });
+        return ExitCode;
       });
 }
 
@@ -2149,7 +2273,7 @@ static int doDumpImporterLookupTables(const CompilerInvocation &InitInvok,
 class StructureAnnotator : public ide::SyntaxModelWalker {
   SourceManager &SM;
   unsigned BufferID;
-  clang::RewriteBuffer RewriteBuf;
+  llvm::RewriteBuffer RewriteBuf;
   std::vector<SyntaxStructureNode> NodeStack;
   CharSourceRange LastPoppedNodeRange;
 
@@ -2754,7 +2878,8 @@ static int doPrintExpressionTypes(const CompilerInvocation &InitInvok,
 }
 
 static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
-                             const std::vector<std::string> ModulesToPrint) {
+                             const std::vector<std::string> ModulesToPrint,
+                             const PrintOptions &PO) {
   using NodeKind = Demangle::Node::Kind;
 
   CompilerInvocation Invocation(InitInvok);
@@ -2774,8 +2899,6 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
     return 1;
 
   int ExitCode = 0;
-
-  PrintOptions Options = PrintOptions::printDeclarations();
 
   for (StringRef ModuleName : ModulesToPrint) {
     auto *M = getModuleByFullName(Context, ModuleName);
@@ -2867,9 +2990,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
 
       llvm::outs() << remangled << "\n";
 
-      auto Options = PrintOptions::printDeclarations();
-      Options.PrintAccess = false;
-      LTD->print(llvm::outs(), Options);
+      LTD->print(llvm::outs(), PO);
       llvm::outs() << "\n";
     }
   }
@@ -3410,8 +3531,7 @@ public:
 } // unnamed namespace
 
 static int doPrintTypes(const CompilerInvocation &InitInvok,
-                        StringRef SourceFilename,
-                        bool FullyQualifiedTypes) {
+                        StringRef SourceFilename, const PrintOptions &PO) {
   CompilerInvocation Invocation(InitInvok);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
@@ -3427,9 +3547,7 @@ static int doPrintTypes(const CompilerInvocation &InitInvok,
   registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
-  PrintOptions Options = PrintOptions::printDeclarations();
-  Options.FullyQualifiedTypes = FullyQualifiedTypes;
-  ASTTypePrinter Printer(CI.getSourceMgr(), Options);
+  ASTTypePrinter Printer(CI.getSourceMgr(), PO);
 
   CI.getMainModule()->walk(Printer);
 
@@ -3469,19 +3587,6 @@ class ASTCommentPrinter : public ASTWalker {
 public:
   ASTCommentPrinter(SourceManager &SM, XMLValidator &TheXMLValidator)
       : OS(llvm::outs()), SM(SM), TheXMLValidator(TheXMLValidator) {}
-
-  void printWithEscaping(StringRef Str) {
-    for (char C : Str) {
-      switch (C) {
-      case '\n': OS << "\\n"; break;
-      case '\r': OS << "\\r"; break;
-      case '\t': OS << "\\t"; break;
-      case '\v': OS << "\\v"; break;
-      case '\f': OS << "\\f"; break;
-      default:   OS << C;     break;
-      }
-    }
-  }
 
   void printDeclName(const ValueDecl *VD) {
     if (auto *NTD = dyn_cast<NominalTypeDecl>(VD->getDeclContext())) {
@@ -3533,6 +3638,12 @@ public:
       case AccessorKind::Init:
         OS << "init accessor for ";
         break;
+      case AccessorKind::Borrow:
+        OS << "borrow accessor for ";
+        break;
+      case AccessorKind::Mutate:
+        OS << "mutate accessor for ";
+        break;
       }
       printDeclName(storage);
       OS << ">";
@@ -3549,7 +3660,7 @@ public:
     }
     OS << "[";
     for (auto &SRC : RC.Comments)
-      printWithEscaping(SRC.RawText);
+      printWithEscaping(SRC.RawText, OS);
     OS << "]";
   }
 
@@ -3560,7 +3671,7 @@ public:
       return;
     }
     OS << "[";
-    printWithEscaping(Brief);
+    printWithEscaping(Brief, OS);
     OS << "]";
   }
 
@@ -3576,7 +3687,7 @@ public:
       return;
     }
     OS << "[";
-    printWithEscaping(XML);
+    printWithEscaping(XML, OS);
     OS << "]";
 
     auto Status = TheXMLValidator.validate(XML);
@@ -3793,9 +3904,14 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       llvm::outs() << ":\n";
 
       scratch.clear();
-      next.importedModule->getImportedModules(
-          scratch, ModuleDecl::ImportFilterKind::Exported);
-      // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
+      if (options::ModulePrintHidden) {
+        next.importedModule->getImportedModules(
+            scratch, ModuleDecl::getImportFilterAll());
+      } else {
+        next.importedModule->getImportedModules(
+            scratch, ModuleDecl::ImportFilterKind::Exported);
+        // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
+      }
       for (auto &import : scratch) {
         llvm::outs() << "\t" << import.importedModule->getName();
         for (auto accessPathPiece : import.accessPath) {
@@ -3960,10 +4076,12 @@ class TypeReconstructWalker : public SourceEntityWalker {
   llvm::raw_ostream &Stream;
   llvm::DenseSet<ValueDecl *> SeenDecls;
   llvm::SmallVector<DeclContext *, 2> NestedDCs;
+  const PrintOptions &PO;
 
 public:
-  TypeReconstructWalker(ASTContext &Ctx, llvm::raw_ostream &Stream)
-      : Ctx(Ctx), Stream(Stream) {}
+  TypeReconstructWalker(ASTContext &Ctx, llvm::raw_ostream &Stream,
+                        const PrintOptions &PO)
+      : Ctx(Ctx), Stream(Stream), PO(PO) {}
 
   bool walkToDeclPre(Decl *D, CharSourceRange range) override {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -4008,7 +4126,7 @@ private:
         Demangle::getTypeForMangling(Ctx, mangledName));
     Stream << "type: ";
     if (ReconstructedType) {
-      ReconstructedType->print(Stream);
+      ReconstructedType->print(Stream, PO);
     } else {
       Stream << "FAILURE";
     }
@@ -4033,7 +4151,11 @@ private:
     }
 
     if (TypeDecl *reDecl = Demangle::getTypeDeclForUSR(Ctx, USR)) {
-      PrintOptions POpts;
+      PrintOptions POpts = PO.clone();
+      POpts.TypeDefinitions = false;
+      POpts.VarInitializers = false;
+      POpts.FunctionDefinitions = false;
+      POpts.PrintExprs = false;
       POpts.PreferTypeRepr = false;
       POpts.PrintParameterSpecifiers = true;
       reDecl->print(Stream, POpts);
@@ -4045,7 +4167,7 @@ private:
 };
 
 static int doReconstructType(const CompilerInvocation &InitInvok,
-                             StringRef SourceFilename) {
+                             StringRef SourceFilename, const PrintOptions &PO) {
   CompilerInvocation Invocation(InitInvok);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
@@ -4069,15 +4191,14 @@ static int doReconstructType(const CompilerInvocation &InitInvok,
       break;
   }
   assert(SF && "no source file?");
-  TypeReconstructWalker Walker(SF->getASTContext(), llvm::outs());
+  TypeReconstructWalker Walker(SF->getASTContext(), llvm::outs(), PO);
   Walker.walk(SF);
   return 0;
 }
 
 static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
-                            StringRef SourceFileName,
-                            StringRef StartPos,
-                            StringRef EndPos) {
+                            StringRef SourceFileName, StringRef StartPos,
+                            StringRef EndPos, const PrintOptions &PO) {
   auto StartOp = parseLineCol(StartPos);
   auto EndOp = parseLineCol(EndPos);
   if (!StartOp.has_value() || !EndOp.has_value())
@@ -4116,7 +4237,7 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
                                          EndLineCol.second);
   ResolvedRangeInfo Result = evaluateOrDefault(SF->getASTContext().evaluator,
     RangeInfoRequest(RangeInfoOwner({SF, StartLoc, EndLoc})), ResolvedRangeInfo());
-  Result.print(llvm::outs());
+  Result.print(llvm::outs(), PO);
   return 0;
 }
 
@@ -4725,6 +4846,7 @@ int main(int argc, char *argv[]) {
       return PrintOptions::printDocInterface();
     } else {
       auto PrintOpts = PrintOptions::printEverything();
+      PrintOpts.PrintTypesForDebugging = options::PrintForDebugging;
       PrintOpts.FullyQualifiedTypes = options::FullyQualifiedTypes;
       PrintOpts.FullyQualifiedTypesIfAmbiguous =
         options::FullyQualifiedTypesIfAmbiguous;
@@ -4817,11 +4939,10 @@ int main(int argc, char *argv[]) {
       llvm::errs() << "token name required\n";
       return 1;
     }
-    ExitCode = doTypeContextInfo(InitInvok,
-                                  options::SourceFilename,
-                                  options::SecondSourceFilename,
-                                  options::CodeCompletionToken,
-                                  options::CodeCompletionDiagnostics);
+    ExitCode = doTypeContextInfo(InitInvok, options::SourceFilename,
+                                 options::SecondSourceFilename,
+                                 options::CodeCompletionToken,
+                                 options::CodeCompletionDiagnostics, PrintOpts);
     break;
 
   case ActionType::PrintExpressionTypes:
@@ -4835,12 +4956,20 @@ int main(int argc, char *argv[]) {
       llvm::errs() << "token name required\n";
       return 1;
     }
-    ExitCode = doConformingMethodList(InitInvok,
-                                      options::SourceFilename,
-                                      options::SecondSourceFilename,
-                                      options::CodeCompletionToken,
-                                      options::CodeCompletionDiagnostics,
-                                      options::ConformingMethodListExpectedTypes);
+    ExitCode = doConformingMethodList(
+        InitInvok, options::SourceFilename, options::SecondSourceFilename,
+        options::CodeCompletionToken, options::CodeCompletionDiagnostics,
+        options::ConformingMethodListExpectedTypes, PrintOpts);
+    break;
+
+  case ActionType::SignatureHelp:
+    if (options::CodeCompletionToken.empty()) {
+      llvm::errs() << "signature help token name required\n";
+      return 1;
+    }
+    ExitCode = doSignatureHelp(
+        InitInvok, options::SourceFilename, options::SecondSourceFilename,
+        options::CodeCompletionToken, options::CodeCompletionDiagnostics);
     break;
 
   case ActionType::SyntaxColoring:
@@ -4881,7 +5010,7 @@ int main(int argc, char *argv[]) {
     break;
   }
   case ActionType::PrintLocalTypes:
-    ExitCode = doPrintLocalTypes(InitInvok, options::ModuleToPrint);
+    ExitCode = doPrintLocalTypes(InitInvok, options::ModuleToPrint, PrintOpts);
     break;
 
   case ActionType::PrintModuleGroups:
@@ -4932,8 +5061,7 @@ int main(int argc, char *argv[]) {
   }
 
   case ActionType::PrintTypes:
-    ExitCode = doPrintTypes(InitInvok, options::SourceFilename,
-                            options::FullyQualifiedTypes);
+    ExitCode = doPrintTypes(InitInvok, options::SourceFilename, PrintOpts);
     break;
 
   case ActionType::PrintComments:
@@ -4968,12 +5096,12 @@ int main(int argc, char *argv[]) {
                                                 options::USR);
     break;
   case ActionType::ReconstructType:
-    ExitCode = doReconstructType(InitInvok, options::SourceFilename);
+    ExitCode = doReconstructType(InitInvok, options::SourceFilename, PrintOpts);
     break;
   case ActionType::Range:
     ExitCode = doPrintRangeInfo(InitInvok, options::SourceFilename,
                                 options::LineColumnPair,
-                                options::EndLineColumnPair);
+                                options::EndLineColumnPair, PrintOpts);
     break;
   case ActionType::PrintIndexedSymbols:
       if (options::ModuleToPrint.empty()) {

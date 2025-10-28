@@ -197,7 +197,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.DocOutputPath = outs.ModuleDocOutputPath;
   serializationOpts.SourceInfoOutputPath = outs.ModuleSourceInfoOutputPath;
   serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
-  if (opts.ModuleHasBridgingHeader && !outs.ModuleOutputPath.empty())
+  if (opts.ModuleHasBridgingHeader && !outs.ModuleOutputPath.empty() &&
+      !opts.ImportHeaderAsInternal)
     serializationOpts.SerializeBridgingHeader = true;
   // For batch mode, emit empty header path as placeholder.
   if (serializationOpts.SerializeBridgingHeader &&
@@ -279,8 +280,6 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       !getParseStdlib()) {
     serializationOpts.SerializeDebugInfoSIL = true;
   }
-
-  serializationOpts.IsOSSA = getSILOptions().EnableOSSAModules;
 
   serializationOpts.SkipNonExportableDecls =
       getLangOptions().SkipNonExportableDecls;
@@ -435,7 +434,8 @@ bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
     DiagVerifier = std::make_unique<DiagnosticVerifier>(
         SourceMgr, InputSourceCodeBufferIDs, diagOpts.AdditionalVerifierFiles,
         diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
-        diagOpts.VerifyIgnoreUnknown, diagOpts.UseColor,
+        diagOpts.VerifyIgnoreUnknown, diagOpts.VerifyIgnoreUnrelated,
+        diagOpts.VerifyIgnoreMacroLocationNote, diagOpts.UseColor,
         diagOpts.AdditionalDiagnosticVerifierPrefixes);
 
     addDiagnosticConsumer(DiagVerifier.get());
@@ -474,12 +474,12 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
     return false;
 
   const auto &Opts = getInvocation().getCASOptions();
-  if (Opts.CASOpts.CASPath.empty() && Opts.CASOpts.PluginPath.empty()) {
+  if (Opts.Config.CASPath.empty() && Opts.Config.PluginPath.empty()) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
                          "no CAS options provided");
     return true;
   }
-  auto MaybeDB = Opts.CASOpts.getOrCreateDatabases();
+  auto MaybeDB = Opts.Config.createDatabases();
   if (!MaybeDB) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
                          toString(MaybeDB.takeError()));
@@ -791,8 +791,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     Context->addModuleInterfaceChecker(
         std::make_unique<ModuleInterfaceCheckerImpl>(
             *Context, ModuleCachePathFromInvocation, FEOpts.PrebuiltModuleCachePath,
-            FEOpts.BackupModuleInterfaceDir, LoaderOpts,
-            RequireOSSAModules_t(Invocation.getSILOptions())));
+            FEOpts.BackupModuleInterfaceDir, LoaderOpts));
 
     if (MLM != ModuleLoadingMode::OnlySerialized) {
       // We only need ModuleInterfaceLoader for implicit modules.
@@ -812,10 +811,7 @@ bool CompilerInstance::setUpModuleLoaders() {
   }
 
   if (hasSourceImport()) {
-    bool enableLibraryEvolution =
-      Invocation.getFrontendOptions().EnableLibraryEvolution;
     Context->addModuleLoader(SourceLoader::create(*Context,
-                                                  enableLibraryEvolution,
                                                   getDependencyTracker()));
   }
 
@@ -869,13 +865,12 @@ bool CompilerInstance::setUpModuleLoaders() {
   Context->addModuleInterfaceChecker(
       std::make_unique<ModuleInterfaceCheckerImpl>(
           *Context, ModuleCachePath, FEOpts.PrebuiltModuleCachePath,
-          FEOpts.BackupModuleInterfaceDir, LoaderOpts,
-          RequireOSSAModules_t(Invocation.getSILOptions())));
+          FEOpts.BackupModuleInterfaceDir, LoaderOpts));
 
   // Install an explicit module loader if it was created earlier.
   if (ESML) {
     this->DefaultSerializedLoader = ESML.get();
-    Context->addModuleLoader(std::move(ESML));
+    Context->addModuleLoader(std::move(ESML), false, false, false, true);
   }
 
   if (!ExplicitModuleBuild) {
@@ -912,8 +907,7 @@ bool CompilerInstance::setUpModuleLoaders() {
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
         FEOpts.CacheReplayPrefixMap,
         FEOpts.SerializeModuleInterfaceDependencyHashes,
-        FEOpts.shouldTrackSystemDependencies(),
-        RequireOSSAModules_t(Invocation.getSILOptions()));
+        FEOpts.shouldTrackSystemDependencies());
   }
 
   return false;
@@ -1172,7 +1166,7 @@ bool CompilerInvocation::shouldImportCxx() const {
   if (getFrontendOptions().ModuleName == CXX_MODULE_NAME)
     return false;
   // Cxx cannot be imported when Library evolution is enabled
-  if (getFrontendOptions().EnableLibraryEvolution)
+  if (getLangOptions().hasFeature(Feature::LibraryEvolution))
     return false;
   // Implicit import of Cxx is disabled
   if (getLangOptions().DisableImplicitCxxModuleImport)
@@ -1506,7 +1500,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setPublicModuleName(getASTContext().getIdentifier(
           Invocation.getFrontendOptions().PublicModuleName));
     }
-    if (Invocation.getFrontendOptions().EnableLibraryEvolution)
+    if (Invocation.getLangOptions().hasFeature(Feature::LibraryEvolution))
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
     if (Invocation.getLangOptions().isSwiftVersionAtLeast(6))
       MainModule->setIsConcurrencyChecked(true);

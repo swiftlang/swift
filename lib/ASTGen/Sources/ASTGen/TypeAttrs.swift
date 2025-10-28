@@ -104,6 +104,7 @@ extension ASTGenVisitor {
         .ErrorIndirect,
         .ErrorUnowned,
         .Guaranteed,
+        .GuaranteedAddress,
         .In,
         .InConstant,
         .InGuaranteed,

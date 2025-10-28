@@ -609,10 +609,9 @@ LookupConformanceInModuleRequest::evaluate(
   if (type->isTypeVariableOrMember())
     return ProtocolConformanceRef::forAbstract(type, protocol);
 
-  // UnresolvedType is a placeholder for an unknown type used when generating
-  // diagnostics.  We consider it to conform to all protocols, since the
-  // intended type might have. Same goes for PlaceholderType.
-  if (type->is<UnresolvedType>() || type->is<PlaceholderType>())
+  // PlaceholderType is a placeholder for an unknown type. We consider it to
+  // conform to all protocols, since the intended type might have.
+  if (type->is<PlaceholderType>())
     return ProtocolConformanceRef::forAbstract(type, protocol);
 
   // Pack types can conform to protocols.

@@ -743,8 +743,7 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
       if (expansionDecl->getMacroRef().getDecl() == macro)
         return true;
     } else if (auto *macroAttr = sourceFile->getAttachedMacroAttribute()) {
-      auto *decl = expansion.dyn_cast<Decl *>();
-      auto *macroDecl = decl->getResolvedMacro(macroAttr);
+      auto *macroDecl = macroAttr->getResolvedMacro();
       if (!macroDecl)
         return false;
 
@@ -977,14 +976,14 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
     if (auto *expr = target.dyn_cast<Expr *>()) {
       ASSERT(isa<ClosureExpr>(expr));
 
-      auto *closure = cast<ClosureExpr>(expr);
       // A closure body macro expansion replaces the full source
-      // range of the closure body starting from `in` and ending right
-      // before the closing brace.
-      return Lexer::getCharSourceRangeFromSourceRange(
-          sourceMgr, SourceRange(Lexer::getLocForEndOfToken(
-                                     sourceMgr, closure->getInLoc()),
-                                 closure->getEndLoc()));
+      // range of the closure body's contents.
+      auto *closure = cast<ClosureExpr>(expr);
+      if (auto range = closure->getBody()->getContentRange())
+        return Lexer::getCharSourceRangeFromSourceRange(sourceMgr, range);
+
+      // If we have an empty body, just use the end loc.
+      return CharSourceRange(closure->getEndLoc(), 0);
     }
 
     // If the function has a body, that's what's being replaced.
@@ -1062,10 +1061,13 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
       /*parsingOpts=*/{}, /*isPrimary=*/false);
   if (auto parentSourceFile = dc->getParentSourceFile())
     macroSourceFile->setImports(parentSourceFile->getImports());
-  else if (auto clangModuleUnit =
-               dyn_cast<ClangModuleUnit>(dc->getModuleScopeContext())) {
-    auto clangModule = clangModuleUnit->getParentModule();
-    performImportResolutionForClangMacroBuffer(*macroSourceFile, clangModule);
+  else if (isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
+    ModuleDecl *originModule = nullptr;
+    // FIXME: remove this workaround once namespace contents are imported into
+    // their corresponding modules
+    if (macroSourceFile->getParentModule()->isClangHeaderImportModule())
+      originModule = cast<Decl *>(target)->getModuleContextForNameLookup();
+    performImportResolutionForClangMacroBuffer(*macroSourceFile, originModule);
   }
   return macroSourceFile;
 }
@@ -1217,7 +1219,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     BridgedStringRef evaluatedSourceOut{nullptr, 0};
     assert(!externalDef.isError());
     swift_Macros_expandFreestandingMacro(
-        &ctx.Diags, externalDef.get(), discriminator->c_str(),
+        ctx, externalDef.get(), discriminator->c_str(),
         getRawMacroRole(macroRole), astGenSourceFile,
         expansion->getSourceRange().Start.getOpaquePointerValue(),
         &evaluatedSourceOut);
@@ -1574,7 +1576,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     BridgedStringRef evaluatedSourceOut{nullptr, 0};
     assert(!externalDef.isError());
     swift_Macros_expandAttachedMacro(
-        &ctx.Diags, externalDef.get(), discriminator->c_str(),
+        ctx, externalDef.get(), discriminator->c_str(),
         extendedType.c_str(), conformanceList.c_str(), getRawMacroRole(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, startLoc.getOpaquePointerValue(),
@@ -1717,7 +1719,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro,
     BridgedStringRef evaluatedSourceOut{nullptr, 0};
     assert(!externalDef.isError());
     swift_Macros_expandAttachedMacro(
-        &ctx.Diags, externalDef.get(), discriminator->c_str(),
+        ctx, externalDef.get(), discriminator->c_str(),
         "", "", getRawMacroRole(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenClosureSourceFile, startLoc.getOpaquePointerValue(),
@@ -1964,7 +1966,7 @@ swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
     SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
                                           decl->getAttrs().end());
     for (auto *attr : attrs) {
-      member->getAttrs().add(attr);
+      member->addAttribute(attr);
     }
   }
 
@@ -2071,11 +2073,9 @@ ArrayRef<unsigned>
 ExpandExtensionMacros::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *nominal) const {
   SmallVector<unsigned, 2> bufferIDs;
-  for (auto customAttrConst :
-       nominal->getExpandedAttrs().getAttributes<CustomAttr>()) {
-    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
-    auto *macro = nominal->getResolvedMacro(customAttr);
-
+  auto expandedAttrs = nominal->getExpandedAttrs();
+  for (auto *customAttr : expandedAttrs.getAttributes<CustomAttr>()) {
+    auto *macro = customAttr->getResolvedMacro();
     if (!macro)
       continue;
 
@@ -2223,9 +2223,11 @@ static bool diagnoseArbitraryGlobalNames(DeclContext *dc,
   return isInvalid;
 }
 
-ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
-                                              UnresolvedMacroReference macroRef,
-                                              DeclContext *dc) const {
+ConcreteDeclRef
+ResolveMacroRequest::evaluate(Evaluator &evaluator,
+                              UnresolvedMacroReference macroRef) const {
+  auto *dc = macroRef.getDeclContext();
+
   // Macro expressions and declarations have their own stored macro
   // reference. Use it if it's there.
   if (auto *expansion = macroRef.getFreestanding()) {
@@ -2238,7 +2240,12 @@ ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
 
   // When a macro is not found for a custom attribute, it may be a non-macro.
   // So bail out to prevent diagnostics from the contraint system.
-  if (macroRef.getAttr()) {
+  if (auto *attr = macroRef.getAttr()) {
+    // If we already resolved this CustomAttr to a nominal, this isn't for a
+    // macro.
+    if (attr->getNominalDecl())
+      return ConcreteDeclRef();
+
     auto foundMacros = namelookup::lookupMacros(dc, macroRef.getModuleName(),
                                                 macroRef.getMacroName(), roles);
     if (foundMacros.empty())

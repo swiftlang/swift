@@ -20,6 +20,7 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/PreparedOverload.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
@@ -338,8 +339,7 @@ ProtocolDecl *Constraint::getProtocol() const {
 void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
                        unsigned indent, bool skipLocator) const {
   // Print all type variables as $T0 instead of _ here.
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
 
   if (Kind == ConstraintKind::Disjunction ||
       Kind == ConstraintKind::Conjunction) {
@@ -1142,4 +1142,19 @@ Constraint::getTrailingClosureMatching() const {
 void *Constraint::operator new(size_t bytes, ConstraintSystem& cs,
                                size_t alignment) {
   return ::operator new (bytes, cs, alignment);
+}
+
+// FIXME: Perhaps we should store the Constraint -> PreparedOverload mapping
+// in a SolverStep or something? Mutating Constraint feels wrong.
+
+void Constraint::setPreparedOverload(PreparedOverload *preparedOverload) {
+  ASSERT(Kind == ConstraintKind::BindOverload);
+
+  // We can only set a prepared overload at most once in normal
+  // type checking, and then once in salvage.
+  ASSERT(!Overload.Prepared ||
+         (!Overload.Prepared->wasForDiagnostics() &&
+          preparedOverload->wasForDiagnostics()));
+
+  Overload.Prepared = preparedOverload;
 }

@@ -693,7 +693,7 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
 
       // For a GenericFunctionType, we only want to substitute the
       // param/result types, as otherwise we might end up with a bad generic
-      // signature if there are UnresolvedTypes present in the base type. Note
+      // signature if there are ErrorTypes present in the base type. Note
       // we pass in DesugarMemberTypes so that we see the actual concrete type
       // witnesses instead of type alias types.
       if (auto *GFT = T->getAs<GenericFunctionType>()) {
@@ -2182,11 +2182,9 @@ bool CompletionLookup::tryModuleCompletions(Type ExprType,
     // If the module is shadowed by a separately imported overlay(s), look up
     // the symbols from the overlay(s) instead.
     SmallVector<ModuleDecl *, 1> ShadowingOrOriginal;
-    if (auto *SF = CurrDeclContext->getParentSourceFile()) {
-      SF->getSeparatelyImportedOverlays(M, ShadowingOrOriginal);
-      if (ShadowingOrOriginal.empty())
-        ShadowingOrOriginal.push_back(M);
-    }
+    CurrDeclContext->getSeparatelyImportedOverlays(M, ShadowingOrOriginal);
+    if (ShadowingOrOriginal.empty())
+      ShadowingOrOriginal.push_back(M);
     for (ModuleDecl *M : ShadowingOrOriginal) {
       RequestedResultsTy Request =
           RequestedResultsTy::fromModule(M, Filter).needLeadingDot(needDot());

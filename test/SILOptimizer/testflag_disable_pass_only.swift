@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -emit-sil %s -Xllvm -sil-disable-pass=OnoneSimplification -Xllvm -sil-disable-pass-only-function='$s26testflag_disable_pass_only4foo1SiyF' | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s -Xllvm -sil-disable-pass=DiagnosticConstantPropagation,OnoneSimplification -Xllvm -sil-disable-pass-only-function='$s26testflag_disable_pass_only4foo1SiyF' | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [noinline] @$s26testflag_disable_pass_only4foo1SiyF :
-// CHECK:         br bb1
+// CHECK:         cond_br
 // CHECK-LABEL: } // end sil function '$s26testflag_disable_pass_only4foo1SiyF'
 @inline(never)
 func foo1() -> Int {

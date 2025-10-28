@@ -111,10 +111,34 @@ struct FunctionPassContext : MutatingContext {
     return String(taking: bridgedPassContext.mangleOutlinedVariable(function.bridged))
   }
 
-  func mangle(withClosureArguments closureArgs: [(argumentIndex: Int, argumentValue: Value)],
+  enum ClosureArgumentMangling {
+    case closure(SingleValueInstruction)
+
+    /// The argument specializes for the same closure as a previous argument, e.g.
+    /// ```
+    ///   %1 = partial_apply %closure
+    ///   apply %f(%1, %1)    // first argument: `.closure(%1)`
+    ///                       // second argument: `.previousArgumentIndex(0)`
+    case previousArgumentIndex(Int)
+  }
+
+  func mangle(withClosureArguments closureArgs: [(argumentIndex: Int, argumentValue: ClosureArgumentMangling)],
               from applySiteCallee: Function
   ) -> String {
-    closureArgs.withBridgedArrayRef{ bridgedClosureArgs in
+    let bridgedArgManglings = closureArgs.map {
+      switch $0.argumentValue {
+      case .closure(let closure):
+        return BridgedPassContext.ClosureArgMangling(argIdx: $0.argumentIndex,
+                                                     inst: Optional<Instruction>(closure).bridged,
+                                                     otherArgIdx: -1)
+      case .previousArgumentIndex(let idx):
+        return BridgedPassContext.ClosureArgMangling(argIdx: $0.argumentIndex,
+                                                     inst: OptionalBridgedInstruction(),
+                                                     otherArgIdx: idx)
+      }
+    }
+
+    return bridgedArgManglings.withBridgedArrayRef{ bridgedClosureArgs in
       String(taking: bridgedPassContext.mangleWithClosureArgs(bridgedClosureArgs, applySiteCallee.bridged))
     }
   }

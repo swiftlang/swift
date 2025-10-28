@@ -7,9 +7,7 @@
 
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_Lifetimes
-
-// FIXME swift-ci linux tests do not support std::span
-// UNSUPPORTED: OS=linux-gnu, OS=linux-android, OS=linux-androideabi
+// REQUIRES: std_span
 
 #if !BRIDGING_HEADER
 import StdSpan
@@ -38,6 +36,13 @@ import CxxStdlib
 // CHECK-NEXT:   mutating func foo(_ s: std.{{.*}}span<__cxxConst<CInt>, _C{{.*}}_{{.*}}>)
 // CHECK-NEXT:   mutating func otherTemplatedType(_ copy: ConstSpanOfInt, _: S<CInt>)
 // CHECK-NEXT:   mutating func otherTemplatedType2(_ copy: ConstSpanOfInt, _: UnsafeMutablePointer<S<CInt>>!)
+// CHECK-NEXT: }
+
+// CHECK: class DependsOnSelfFRT {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   borrowing func get() -> ConstSpanOfInt
+// CHECK-NEXT:   borrowing func {{(__)?}}getMutable{{(Unsafe)?}}() -> SpanOfInt
+// CHECK-NEXT:   var v: std.{{.*}}vector<CInt, std.{{.*}}allocator<CInt>>
 // CHECK-NEXT: }
 
 // CHECK:      /// This is an auto-generated wrapper for safer interop

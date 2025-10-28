@@ -68,22 +68,24 @@ namespace swift {
     Complete,
   };
 
-  /// Access or distribution level of a library.
+  /// Intended distribution level of a module.
+  ///
+  /// Ordered from more private to more public.
   enum class LibraryLevel : uint8_t {
-    /// Application Programming Interface that is publicly distributed so
-    /// public decls are really public and only @_spi decls are SPI.
-    API,
+    /// This isn't a library or the library distribution intent is unknown.
+    Other,
 
-    /// System Programming Interface that has restricted distribution
-    /// all decls in the module are considered to be SPI including public ones.
-    SPI,
-
-    /// Internal Programming Interface that is not distributed and only usable
-    /// from within a project.
+    /// Internal Programming Interface: the module is not distributed and
+    /// only usable from within its project.
     IPI,
 
-    /// The library has some other undefined distribution.
-    Other
+    /// System Programming Interface: the module has restricted distribution,
+    /// all public decls in the module are considered to be SPI.
+    SPI,
+
+    /// Application Programming Interface: the module is distributed publicly,
+    /// public decls are really public and only @_spi decls are SPI.
+    API,
   };
 
   enum class AccessNoteDiagnosticBehavior : uint8_t {
@@ -185,6 +187,9 @@ namespace swift {
 
     /// Swift runtime version to compile for.
     version::Version RuntimeVersion = version::Version::getCurrentLanguageVersion();
+
+    /// The minimum Swift runtime version that the progam can be deployed to.
+    version::Version MinSwiftRuntimeVersion;
 
     /// PackageDescription version to compile for.
     version::Version PackageDescriptionVersion;
@@ -454,6 +459,9 @@ namespace swift {
     bool EnableDeserializationSafety =
       ::getenv("SWIFT_ENABLE_DESERIALIZATION_SAFETY");
 
+    /// Disable injecting deserializes module paths into the explict module map.
+    bool DisableDeserializationOfExplicitPaths = false;
+
     /// Attempt to recover for imported modules with broken modularization
     /// in an unsafe way. Currently applies only to xrefs where the target
     /// decl moved to a different module that is already loaded.
@@ -646,6 +654,9 @@ namespace swift {
     /// Enables dumping macro expansions.
     bool DumpMacroExpansions = false;
 
+    /// Enables dumping imports for each SourceFile.
+    bool DumpSourceFileImports = false;
+
     /// The model of concurrency to be used.
     ConcurrencyModel ActiveConcurrencyModel = ConcurrencyModel::Standard;
 
@@ -673,9 +684,6 @@ namespace swift {
 #else
     bool RestrictNonProductionExperimentalFeatures = false;
 #endif
-
-    /// Set to true if we support AArch64TBI.
-    bool HasAArch64TBI = false;
 
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
@@ -1011,6 +1019,9 @@ namespace swift {
 
     /// Disable the component splitter phase of the expression type checker.
     bool SolverDisableSplitter = false;
+
+    /// Enable the experimental "prepared overloads" optimization.
+    bool SolverEnablePreparedOverloads = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.
@@ -1045,6 +1056,10 @@ namespace swift {
 
     /// The bridging header PCH file.
     std::string BridgingHeaderPCH;
+
+    /// Whether the bridging header and PCH file are considered to be
+    /// internal imports.
+    bool BridgingHeaderIsInternal = false;
 
     /// When automatically generating a precompiled header from the bridging
     /// header, place it in this directory.
@@ -1135,6 +1150,10 @@ namespace swift {
     /// in versioned attributes, where the importer must select the appropriate
     /// ones to apply.
     bool LoadVersionIndependentAPINotes = false;
+
+    /// Whether the importer should skip SafeInteropWrappers, even though the
+    /// feature is enabled.
+    bool DisableSafeInteropWrappers = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

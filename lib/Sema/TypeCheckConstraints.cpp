@@ -57,10 +57,8 @@ using namespace constraints;
 #pragma mark Type variable implementation
 
 void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
-  getTypeVariable()->print(OS, PO);
-  
+  getTypeVariable()->print(OS, PrintOptions::forDebugging());
+
   SmallVector<TypeVariableOptions, 4> bindingOptions;
   if (canBindToLValue())
     bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToLValue);
@@ -895,7 +893,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   return hadError;
 }
 
-bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt) {
+bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
+                                           bool skipWhere) {
   auto &Context = dc->getASTContext();
   FrontendStatsTracer statsTracer(Context.Stats, "typecheck-for-each", stmt);
   PrettyStackTraceStmt stackTrace(Context, "type-checking-for-each", stmt);
@@ -904,18 +903,20 @@ bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt) {
   if (!typeCheckTarget(target))
     return true;
 
-  if (auto *where = stmt->getWhere()) {
-    auto boolType = dc->getASTContext().getBoolType();
-    if (!boolType)
-      return true;
+  if (!skipWhere) {
+    if (auto *where = stmt->getWhere()) {
+      auto boolType = dc->getASTContext().getBoolType();
+      if (!boolType)
+        return true;
 
-    SyntacticElementTarget whereClause(where, dc, {boolType, CTP_Condition},
-                                       /*isDiscarded=*/false);
-    auto result = typeCheckTarget(whereClause);
-    if (!result)
-      return true;
+      SyntacticElementTarget whereClause(where, dc, {boolType, CTP_Condition},
+                                         /*isDiscarded=*/false);
+      auto result = typeCheckTarget(whereClause);
+      if (!result)
+        return true;
 
-    stmt->setWhere(result->getAsExpr());
+      stmt->setWhere(result->getAsExpr());
+    }
   }
 
   // Check to see if the sequence expr is throwing (in async context),
@@ -1271,8 +1272,7 @@ TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
 
 void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
                           raw_ostream &out) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
   out << " with ";
 
   switch (getKind()) {
@@ -1317,8 +1317,7 @@ void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
 void Solution::dump() const { dump(llvm::errs(), 0); }
 
 void Solution::dump(raw_ostream &out, unsigned indent) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
 
   SourceManager *sm = &getConstraintSystem().getASTContext().SourceMgr;
 
@@ -1493,8 +1492,7 @@ void ConstraintSystem::print(raw_ostream &out, Expr *E) const {
 
 void ConstraintSystem::print(raw_ostream &out) const {
   // Print all type variables as $T0 instead of _ here.
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
 
   auto indent = solverState ? solverState->getCurrentIndent() : 0;
   out.indent(indent) << "Score:";

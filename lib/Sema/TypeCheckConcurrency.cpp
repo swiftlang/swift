@@ -311,18 +311,17 @@ VarDecl *GlobalActorInstanceRequest::evaluate(
 }
 
 std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
-swift::checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
-                                  ArrayRef<CustomAttr *> attrs) {
-  ASTContext &ctx = dc->getASTContext();
+swift::checkGlobalActorAttributes(SourceLoc loc, ArrayRef<CustomAttr *> attrs) {
+  if (attrs.empty())
+    return std::nullopt;
+
+  auto &ctx = attrs[0]->getASTContext();
 
   CustomAttr *globalActorAttr = nullptr;
   NominalTypeDecl *globalActorNominal = nullptr;
   for (auto attr : attrs) {
     // Figure out which nominal declaration this custom attribute refers to.
-    auto *nominal = evaluateOrDefault(ctx.evaluator,
-                                      CustomAttrNominalRequest{attr, dc},
-                                      nullptr);
-
+    auto *nominal = attr->getNominalDecl();
     if (!nominal)
       continue;
 
@@ -352,11 +351,9 @@ std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 GlobalActorAttributeRequest::evaluate(
     Evaluator &evaluator,
     llvm::PointerUnion<Decl *, ClosureExpr *> subject) const {
-  DeclContext *dc = nullptr;
   DeclAttributes *declAttrs = nullptr;
   SourceLoc loc;
   if (auto decl = subject.dyn_cast<Decl *>()) {
-    dc = decl->getDeclContext();
     declAttrs = &decl->getAttrs();
     // HACK: `getLoc`, when querying the attr from a serialized decl,
     // depending on deserialization order, may launch into arbitrary
@@ -372,7 +369,6 @@ GlobalActorAttributeRequest::evaluate(
     loc = decl->getLoc(/* SerializedOK */ false);
   } else {
     auto closure = cast<ClosureExpr *>(subject);
-    dc = closure;
     declAttrs = &closure->getAttrs();
     loc = closure->getLoc();
   }
@@ -385,7 +381,7 @@ GlobalActorAttributeRequest::evaluate(
   }
 
   // Look for a global actor attribute.
-  auto result = checkGlobalActorAttributes(loc, dc, attrs);
+  auto result = checkGlobalActorAttributes(loc, attrs);
   if (!result)
     return std::nullopt;
 
@@ -1016,12 +1012,15 @@ static bool diagnoseSingleNonSendableType(
 
     if (type->is<FunctionType>()) {
       ctx.Diags.diagnose(loc, diag::nonsendable_function_type);
+    } else if (nominal &&
+               nominal->suppressesConformance(KnownProtocolKind::Sendable)) {
+      nominal->diagnose(diag::sendable_conformance_is_suppressed, nominal);
     } else if (nominal && nominal->getParentModule() == module) {
       // If the nominal type is in the current module, suggest adding
       // `Sendable` if it might make sense. Otherwise, just complain.
       if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
-        auto note = nominal->diagnose(
-            diag::add_nominal_sendable_conformance, nominal);
+        auto note =
+            nominal->diagnose(diag::add_nominal_sendable_conformance, nominal);
         addSendableFixIt(nominal, note, /*unchecked=*/false);
       } else {
         nominal->diagnose(diag::non_sendable_nominal, nominal);
@@ -1302,6 +1301,9 @@ inferSendableFromInstanceStorage(NominalTypeDecl *nominal,
     }
   }
 
+  if (nominal->suppressesConformance(KnownProtocolKind::Sendable))
+    return std::nullopt;
+
   class Visitor : public StorageVisitor {
   public:
     NominalTypeDecl *nominal;
@@ -1393,6 +1395,10 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
   if (!nominal->getFormalAccessScope(
         /*useDC=*/nullptr,
         /*treatUsableFromInlineAsPublic=*/true).isPublic())
+    return;
+
+  // If `Sendable` conformance is explicitly suppressed, do nothing.
+  if (nominal->suppressesConformance(KnownProtocolKind::Sendable))
     return;
 
   // If the conformance is explicitly stated, do nothing.
@@ -2666,7 +2672,8 @@ namespace {
 
     /// Some function conversions synthesized by the constraint solver may not
     /// be correct AND the solver doesn't know, so we must emit a diagnostic.
-    void checkFunctionConversion(Expr *funcConv, Type fromType, Type toType) {
+    void checkFunctionConversion(ImplicitConversionExpr *funcConv,
+                                 Type fromType, Type toType) {
       auto diagnoseNonSendableParametersAndResult =
           [&](FunctionType *fnType,
               std::optional<unsigned> warnUntilSwiftMode = std::nullopt) {
@@ -2771,6 +2778,18 @@ namespace {
               if (!fromFnType->isAsync())
                 break;
 
+              // Applying `nonisolated(nonsending)` to an interface type
+              // of a declaration.
+              if (auto *declRef =
+                      dyn_cast<DeclRefExpr>(funcConv->getSubExpr())) {
+                auto *decl = declRef->getDecl();
+                if (auto *nonisolatedAttr =
+                        decl->getAttrs().getAttribute<NonisolatedAttr>()) {
+                  if (nonisolatedAttr->isNonSending())
+                    return;
+                }
+              }
+
               // @concurrent -> nonisolated(nonsending)
               // crosses an isolation boundary.
               LLVM_FALLTHROUGH;
@@ -2780,16 +2799,13 @@ namespace {
               diagnoseNonSendableParametersAndResult(toFnType);
               break;
 
+            // @Sendable nonisolated(nonsending) -> nonisolated(nonsending)
+            // doesn't require Sendable checking.
+            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
+              break;
+
             case FunctionTypeIsolation::Kind::Parameter:
               llvm_unreachable("invalid conversion");
-
-            case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
-              // Non isolated caller is always async. This can only occur if we
-              // are converting from an `@Sendable` representation to something
-              // else. So we need to just check that we diagnose non sendable
-              // parameters and results.
-              diagnoseNonSendableParametersAndResult(toFnType);
-              break;
             }
             break;
           }
@@ -3460,19 +3476,6 @@ namespace {
         }
       }
 
-      // The constraint solver may not have chosen legal casts.
-      if (auto funcConv = dyn_cast<FunctionConversionExpr>(expr)) {
-        checkFunctionConversion(funcConv,
-                                funcConv->getSubExpr()->getType(),
-                                funcConv->getType());
-      }
-
-      if (auto *isolationErasure = dyn_cast<ActorIsolationErasureExpr>(expr)) {
-        checkFunctionConversion(isolationErasure,
-                                isolationErasure->getSubExpr()->getType(),
-                                isolationErasure->getType());
-      }
-
       if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(expr)) {
         checkDefaultArgument(defaultArg);
       }
@@ -3562,6 +3565,19 @@ namespace {
             }
           }
         }
+      }
+
+      // The constraint solver may not have chosen legal casts.
+      if (auto funcConv = dyn_cast<FunctionConversionExpr>(expr)) {
+        checkFunctionConversion(funcConv,
+                                funcConv->getSubExpr()->getType(),
+                                funcConv->getType());
+      }
+
+      if (auto *isolationErasure = dyn_cast<ActorIsolationErasureExpr>(expr)) {
+        checkFunctionConversion(isolationErasure,
+                                isolationErasure->getSubExpr()->getType(),
+                                isolationErasure->getType());
       }
 
       return Action::Continue(expr);
@@ -4530,8 +4546,8 @@ namespace {
 
         // Add the @Sendable attribute implicitly, so we don't diagnose
         // again.
-        const_cast<FuncDecl *>(func)->getAttrs().add(
-            new (ctx) SendableAttr(true));
+        const_cast<FuncDecl *>(func)->addAttribute(new (ctx)
+                                                       SendableAttr(true));
         return true;
       }
 
@@ -6054,13 +6070,13 @@ static void addAttributesForActorIsolation(ValueDecl *value,
   ASTContext &ctx = value->getASTContext();
   switch (isolation) {
   case ActorIsolation::CallerIsolationInheriting:
-    value->getAttrs().add(new (ctx) NonisolatedAttr(
+    value->addAttribute(new (ctx) NonisolatedAttr(
         /*atLoc=*/{}, /*range=*/{}, NonIsolatedModifier::NonSending,
         /*implicit=*/true));
     break;
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe: {
-    value->getAttrs().add(NonisolatedAttr::createImplicit(
+    value->addAttribute(NonisolatedAttr::createImplicit(
         ctx, isolation == ActorIsolation::NonisolatedUnsafe
                  ? NonIsolatedModifier::Unsafe
                  : NonIsolatedModifier::None));
@@ -6068,14 +6084,14 @@ static void addAttributesForActorIsolation(ValueDecl *value,
   }
   case ActorIsolation::GlobalActor: {
     auto typeExpr = TypeExpr::createImplicit(isolation.getGlobalActor(), ctx);
-    auto attr =
-        CustomAttr::create(ctx, SourceLoc(), typeExpr, /*implicit=*/true);
-    value->getAttrs().add(attr);
+    auto attr = CustomAttr::create(ctx, SourceLoc(), typeExpr, /*owner*/ value,
+                                   /*implicit=*/true);
+    value->addAttribute(attr);
 
     if (isolation.preconcurrency() &&
         !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
       auto preconcurrency = new (ctx) PreconcurrencyAttr(/*isImplicit*/ true);
-      value->getAttrs().add(preconcurrency);
+      value->addAttribute(preconcurrency);
     }
     break;
   }
@@ -6307,14 +6323,9 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
 
   // Asynchronous variants for functions imported from ObjC are
   // `nonisolated(nonsending)` by default.
-  if (value->hasClangNode()) {
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(value)) {
-      if (!isa<ProtocolDecl>(AFD->getDeclContext()) &&
-          AFD->getForeignAsyncConvention()) {
-        return {
-            {ActorIsolation::forCallerIsolationInheriting(), {}}, nullptr, {}};
-      }
-    }
+  if (value->hasClangNode() && value->isAsync() &&
+      !isa<ProtocolDecl>(value->getDeclContext())) {
+    return {{ActorIsolation::forCallerIsolationInheriting(), {}}, nullptr, {}};
   }
 
   // We did not find anything special, return unspecified.
@@ -6399,7 +6410,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
     auto preconcurrency =
         new (ctx) PreconcurrencyAttr(/*isImplicit*/true);
-    value->getAttrs().add(preconcurrency);
+    value->addAttribute(preconcurrency);
   }
 
   // Check if we inferred CallerIsolationInheriting from our isolation attr, but
@@ -6414,7 +6425,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     // Replace `nonisolated` with `nonisolated(nonsending)`
     if (!nonisolated || !nonisolated->isNonSending()) {
       value->getAttrs().removeAttribute(nonisolated);
-      value->getAttrs().add(NonisolatedAttr::createImplicit(
+      value->addAttribute(NonisolatedAttr::createImplicit(
           ctx, NonIsolatedModifier::NonSending));
     }
   }
@@ -7168,6 +7179,14 @@ static bool checkSendableInstanceStorage(
     }
   }
 
+  if (nominal->suppressesConformance(KnownProtocolKind::Sendable)) {
+    auto *conformanceDecl = dc->getAsDecl() ? dc->getAsDecl() : nominal;
+    if (!isImplicitSendableCheck(check)) {
+      conformanceDecl->diagnose(diag::non_sendable_type_suppressed);
+    }
+    return true;
+  }
+
   // Stored properties of structs and classes must have
   // Sendable-conforming types.
   class Visitor: public StorageVisitor {
@@ -7473,7 +7492,7 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
           SourceRange(), available.getObsoleted().value_or(noVersion),
           SourceRange(),
           /*Implicit=*/true, available.getParsedAttr()->isSPI());
-      ext->getAttrs().add(attr);
+      ext->addAttribute(attr);
       anyPlatformSpecificAttrs = true;
     }
 
@@ -7484,7 +7503,7 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
 
   // Add the blanket "unavailable".
 
-  ext->getAttrs().add(
+  ext->addAttribute(
       AvailableAttr::createUniversallyUnavailable(ctx, /*Message=*/""));
 }
 
@@ -7492,6 +7511,10 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
     Evaluator &evaluator, NominalTypeDecl *nominal) {
   // Protocols never get implicit Sendable conformances.
   if (isa<ProtocolDecl>(nominal))
+    return nullptr;
+
+  // An explicit use `~Sendable` suppresses the conformance.
+  if (nominal->suppressesConformance(KnownProtocolKind::Sendable))
     return nullptr;
 
   // Actor types are always Sendable; they don't get it via this path.

@@ -58,6 +58,7 @@ class IfConfigClauseRangeInfo;
 class GenericSignature;
 class GenericSignatureImpl;
 struct LabeledStmtInfo;
+class LangOptions;
 class LayoutConstraint;
 class LayoutConstraintInfo;
 struct LifetimeDescriptor;
@@ -82,6 +83,7 @@ enum class RequirementReprKind : unsigned;
 struct BridgedASTType;
 class BridgedCanType;
 class BridgedASTContext;
+class BridgedLangOptions;
 struct BridgedSubstitutionMap;
 struct BridgedGenericSignature;
 struct BridgedConformance;
@@ -146,14 +148,19 @@ public:
   BRIDGED_INLINE swift::DeclNameRef unbridged() const;
 };
 
-SWIFT_NAME("BridgedDeclNameRef.createParsed(_:baseName:argumentLabels:)")
-BridgedDeclNameRef BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
-                                                   swift::DeclBaseName baseName,
-                                                   BridgedArrayRef cLabels);
-
-SWIFT_NAME("BridgedDeclNameRef.createParsed(_:)")
+SWIFT_NAME("BridgedDeclNameRef.createParsed(_:moduleSelector:baseName:"
+           "argumentLabels:)")
 BridgedDeclNameRef
-BridgedDeclNameRef_createParsed(swift::DeclBaseName baseName);
+BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
+                                swift::Identifier cModuleSelector,
+                                swift::DeclBaseName cBaseName,
+                                BridgedArrayRef cLabels);
+
+SWIFT_NAME("BridgedDeclNameRef.createParsed(_:moduleSelector:baseName:)")
+BridgedDeclNameRef
+BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
+                                swift::Identifier cModuleSelector,
+                                swift::DeclBaseName cBaseName);
 
 class BridgedDeclNameLoc {
   const void *_Nullable LocationInfo;
@@ -192,14 +199,10 @@ BridgedDeclNameLoc_createParsed(BridgedASTContext cContext,
                                 swift::SourceLoc moduleSelectorLoc,
                                 swift::SourceLoc baseNameLoc);
 
+
 //===----------------------------------------------------------------------===//
 // MARK: ASTContext
 //===----------------------------------------------------------------------===//
-
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedEndianness : size_t {
-  EndianLittle,
-  EndianBig,
-};
 
 class BridgedASTContext {
   swift::ASTContext * _Nonnull Ctx;
@@ -218,16 +221,10 @@ public:
   unsigned getMajorLanguageVersion() const;
 
   SWIFT_COMPUTED_PROPERTY
-  unsigned getLangOptsTargetPointerBitWidth() const;
-
-  SWIFT_COMPUTED_PROPERTY
-  bool getLangOptsAttachCommentsToDecls() const;
-
-  SWIFT_COMPUTED_PROPERTY
-  BridgedEndianness getLangOptsTargetEndianness() const;
-
-  SWIFT_COMPUTED_PROPERTY
   BridgedAvailabilityMacroMap getAvailabilityMacroMap() const;
+
+  SWIFT_COMPUTED_PROPERTY
+  BridgedDiagnosticEngine getDiags() const;
 };
 
 #define IDENTIFIER_WITH_NAME(Name, _)                                          \
@@ -259,56 +256,12 @@ SWIFT_NAME("BridgedASTContext.getDollarIdentifier(self:_:)")
 swift::Identifier
 BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext, size_t idx);
 
-SWIFT_NAME("BridgedASTContext.langOptsHasFeature(self:_:)")
-bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
-                                          BridgedFeature feature);
+SWIFT_NAME("getter:BridgedASTContext.langOpts(self:)")
+BridgedLangOptions BridgedASTContext_langOpts(BridgedASTContext cContext);
 
-SWIFT_NAME("BridgedASTContext.langOptsCustomConditionSet(self:_:)")
-bool BridgedASTContext_langOptsCustomConditionSet(BridgedASTContext cContext,
-                                                  BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsHasFeatureNamed(self:_:)")
-bool BridgedASTContext_langOptsHasFeatureNamed(BridgedASTContext cContext,
-                                               BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsHasAttributeNamed(self:_:)")
-bool BridgedASTContext_langOptsHasAttributeNamed(BridgedASTContext cContext,
-                                                 BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetOS(self:_:)")
-bool BridgedASTContext_langOptsIsActiveTargetOS(BridgedASTContext cContext,
-                                                BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetArchitecture(self:_:)")
-bool BridgedASTContext_langOptsIsActiveTargetArchitecture(BridgedASTContext cContext,
-                                                          BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetEnvironment(self:_:)")
-bool BridgedASTContext_langOptsIsActiveTargetEnvironment(BridgedASTContext cContext,
-                                                         BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetRuntime(self:_:)")
-bool BridgedASTContext_langOptsIsActiveTargetRuntime(BridgedASTContext cContext,
-                                                     BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetPtrAuth(self:_:)")
-bool BridgedASTContext_langOptsIsActiveTargetPtrAuth(BridgedASTContext cContext,
-                                                     BridgedStringRef cName);
-
-SWIFT_NAME("BridgedASTContext.langOptsGetTargetAtomicBitWidths(self:_:)")
-SwiftInt BridgedASTContext_langOptsGetTargetAtomicBitWidths(BridgedASTContext cContext,
-                                                      SwiftInt* _Nullable * _Nonnull cComponents);
-
-SWIFT_NAME("BridgedASTContext.langOptsGetLanguageVersion(self:_:)")
-SwiftInt BridgedASTContext_langOptsGetLanguageVersion(BridgedASTContext cContext,
-                                                      SwiftInt* _Nullable * _Nonnull cComponents);
-
-SWIFT_NAME("BridgedASTContext.langOptsGetCompilerVersion(self:_:)")
-SwiftInt BridgedASTContext_langOptsGetCompilerVersion(BridgedASTContext cContext,
-                                                      SwiftInt* _Nullable * _Nonnull cComponents);
-
-/* Deallocate an array of Swift int values that was allocated in C++. */
-void deallocateIntBuffer(SwiftInt * _Nullable cComponents);
+SWIFT_NAME("BridgedLangOptions.hasAttributeNamed(self:_:)")
+bool BridgedLangOptions_hasAttributeNamed(BridgedLangOptions cLangOpts,
+                                          BridgedStringRef cName);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedCanImportVersion : size_t {
   CanImportUnversioned,
@@ -323,6 +276,9 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
                                  BridgedCanImportVersion versionKind,
                                  const SwiftInt *_Nullable versionComponents,
                                  SwiftInt numVersionComponents);
+
+SWIFT_NAME("getter:BridgedASTContext.staticBuildConfigurationPtr(self:)")
+void * _Nonnull BridgedASTContext_staticBuildConfiguration(BridgedASTContext cContext);
 
 //===----------------------------------------------------------------------===//
 // MARK: AST nodes
@@ -901,10 +857,11 @@ BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                BridgedStringRef cName,
                                                bool underscored);
 
-SWIFT_NAME(
-    "BridgedCustomAttr.createParsed(_:atLoc:type:initContext:argumentList:)")
+SWIFT_NAME("BridgedCustomAttr.createParsed(atLoc:type:declContext:initContext:"
+           "argumentList:)")
 BridgedCustomAttr BridgedCustomAttr_createParsed(
-    BridgedASTContext cContext, swift::SourceLoc atLoc, BridgedTypeRepr cType,
+    swift::SourceLoc atLoc, BridgedTypeRepr cType,
+    BridgedDeclContext cDeclContext,
     BridgedNullableCustomAttributeInitializer cInitContext,
     BridgedNullableArgumentList cArgumentList);
 
@@ -941,11 +898,12 @@ BridgedDocumentationAttr BridgedDocumentationAttr_createParsed(
 
 SWIFT_NAME(
     "BridgedDynamicReplacementAttr.createParsed(_:atLoc:attrNameLoc:lParenLoc:"
-    "replacedFunction:rParenLoc:)")
+    "replacedFunction:replacedFunctionLoc:rParenLoc:)")
 BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
-    BridgedASTContext cContext, swift::SourceLoc atLoc,
-    swift::SourceLoc attrNameLoc, swift::SourceLoc lParenLoc,
-    BridgedDeclNameRef cReplacedFunction, swift::SourceLoc rParenLoc);
+    BridgedASTContext cContext, swift::SourceLoc cAtLoc,
+    swift::SourceLoc cAttrNameLoc, swift::SourceLoc cLParenLoc,
+    BridgedDeclNameRef cReplacedFunction,
+    BridgedDeclNameLoc cReplacedFunctionLoc, swift::SourceLoc cRParenLoc);
 
 SWIFT_NAME("BridgedEffectsAttr.createParsed(_:atLoc:range:effectKind:)")
 BridgedEffectsAttr BridgedEffectsAttr_createParsed(
@@ -1276,22 +1234,24 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedSpecializationKind : uint8_t {
 };
 
 SWIFT_NAME("BridgedSpecializeAttr.createParsed(_:atLoc:range:whereClause:"
-           "exported:kind:taretFunction:spiGroups:availableAttrs:)")
+           "exported:kind:targetFunction:targetFunctionLoc:spiGroups:"
+           "availableAttrs:)")
 BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedNullableTrailingWhereClause cWhereClause,
     bool exported, BridgedSpecializationKind cKind,
-    BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
-    BridgedArrayRef cAvailableAttrs);
+    BridgedDeclNameRef cTargetFunction, BridgedDeclNameLoc cTargetFunctionLoc,
+    BridgedArrayRef cSPIGroups, BridgedArrayRef cAvailableAttrs);
 
 SWIFT_NAME("BridgedSpecializedAttr.createParsed(_:atLoc:range:whereClause:"
-           "exported:kind:taretFunction:spiGroups:availableAttrs:)")
+           "exported:kind:targetFunction:targetFunctionLoc:spiGroups:"
+           "availableAttrs:)")
 BridgedSpecializedAttr BridgedSpecializedAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedNullableTrailingWhereClause cWhereClause,
     bool exported, BridgedSpecializationKind cKind,
-    BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
-    BridgedArrayRef cAvailableAttrs);
+    BridgedDeclNameRef cTargetFunction, BridgedDeclNameLoc cTargetFunctionLoc,
+    BridgedArrayRef cSPIGroups, BridgedArrayRef cAvailableAttrs);
 
 SWIFT_NAME(
     "BridgedSPIAccessControlAttr.createParsed(_:atLoc:range:spiGroupName:)")
@@ -2544,9 +2504,10 @@ BridgedOpaqueReturnTypeOfTypeAttr_createParsed(
 // MARK: TypeReprs
 //===----------------------------------------------------------------------===//
 
-SWIFT_NAME("BridgedUnqualifiedIdentTypeRepr.createParsed(_:loc:name:)")
+SWIFT_NAME("BridgedUnqualifiedIdentTypeRepr.createParsed(_:name:loc:)")
 BridgedUnqualifiedIdentTypeRepr BridgedUnqualifiedIdentTypeRepr_createParsed(
-    BridgedASTContext cContext, swift::SourceLoc loc, swift::Identifier id);
+    BridgedASTContext cContext, BridgedDeclNameRef cName,
+    BridgedDeclNameLoc cLoc);
 
 SWIFT_NAME(
     "BridgedArrayTypeRepr.createParsed(_:base:leftSquareLoc:rightSquareLoc:)")
@@ -2580,8 +2541,8 @@ BridgedCompileTimeLiteralTypeRepr_createParsed(BridgedASTContext cContext,
 SWIFT_NAME("BridgedDeclRefTypeRepr.createParsed(_:base:name:nameLoc:"
            "genericArguments:angleRange:)")
 BridgedDeclRefTypeRepr BridgedDeclRefTypeRepr_createParsed(
-    BridgedASTContext cContext, BridgedTypeRepr cBase, swift::Identifier name,
-    swift::SourceLoc loc, BridgedArrayRef cGenericArguments,
+    BridgedASTContext cContext, BridgedTypeRepr cBase, BridgedDeclNameRef cName,
+    BridgedDeclNameLoc cLoc, BridgedArrayRef cGenericArguments,
     swift::SourceRange angleRange);
 
 SWIFT_NAME("BridgedDictionaryTypeRepr.createParsed(_:leftSquareLoc:keyType:"
@@ -2606,8 +2567,8 @@ BridgedFunctionTypeRepr BridgedFunctionTypeRepr_createParsed(
 SWIFT_NAME("BridgedUnqualifiedIdentTypeRepr.createParsed(_:name:nameLoc:"
            "genericArgs:leftAngleLoc:rightAngleLoc:)")
 BridgedUnqualifiedIdentTypeRepr BridgedUnqualifiedIdentTypeRepr_createParsed(
-    BridgedASTContext cContext, swift::Identifier name,
-    swift::SourceLoc nameLoc, BridgedArrayRef genericArgs,
+    BridgedASTContext cContext, BridgedDeclNameRef cName,
+    BridgedDeclNameLoc cNameLoc, BridgedArrayRef genericArgs,
     swift::SourceLoc lAngleLoc, swift::SourceLoc rAngleLoc);
 
 SWIFT_NAME("BridgedOptionalTypeRepr.createParsed(_:base:questionLoc:)")
@@ -3004,6 +2965,11 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isBuiltinFixedWidthInteger(SwiftInt width) const;
   BRIDGED_INLINE bool isOptional() const;
   BRIDGED_INLINE bool isBuiltinType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getAnyPointerElementType() const;
+  BRIDGED_INLINE bool isUnsafeBufferPointerType() const;
+  BRIDGED_INLINE bool isUnsafeMutableBufferPointerType() const;
+  BRIDGED_INLINE bool isUnsafeRawBufferPointerType() const;
+  BRIDGED_INLINE bool isUnsafeMutableRawBufferPointerType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getNominalOrBoundGenericNominal() const;
   BRIDGED_INLINE TraitResult canBeClass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getAnyNominal() const;

@@ -481,6 +481,7 @@ public:
   const bool ImportForwardDeclarations;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
+  const bool BridgingHeaderIsInternal;
   const bool DisableOverlayModules;
   const bool EnableClangSPI;
 
@@ -640,22 +641,22 @@ private:
   /// corresponding to the instantiating Swift compilation's triple. These are
   /// to be used by all IRGen/CodeGen clients of `ClangImporter`.
   std::unique_ptr<clang::TargetInfo> CodeGenTargetInfo;
+  /// - Important: Do not access directly. This field exists only to make sure
+  ///   we own the target options stored in `CodeGenTargetInfo` because
+  ///   `clang::TargetOptions` no longer co-owns them:
+  ///   https://github.com/llvm/llvm-project/pull/106271.
+  std::unique_ptr<clang::TargetOptions> TargetOpts;
   std::unique_ptr<clang::CodeGenOptions> CodeGenOpts;
 
-public:
-  void setSwiftTargetInfo(clang::TargetInfo *SwiftTargetInfo) {
-    CodeGenTargetInfo.reset(SwiftTargetInfo);
-  }
-  clang::TargetInfo *getSwiftTargetInfo() const {
-    return CodeGenTargetInfo.get();
-  }
+  /// Sets the target & code generation options for use by IRGen/CodeGen
+  /// clients of `ClangImporter`. If `CI` is null, the data is drawn from the
+  /// importer's invocation.
+  void configureOptionsForCodeGen(clang::DiagnosticsEngine &Diags,
+                                  clang::CompilerInvocation *CI = nullptr);
 
-  void setSwiftCodeGenOptions(clang::CodeGenOptions *SwiftCodeGenOpts) {
-    CodeGenOpts.reset(SwiftCodeGenOpts);
-  }
-  clang::CodeGenOptions *getSwiftCodeGenOptions() const {
-    return CodeGenOpts.get();
-  }
+  clang::TargetInfo &getCodeGenTargetInfo() const { return *CodeGenTargetInfo; }
+
+  clang::CodeGenOptions &getCodeGenOptions() const;
 
 private:
   /// Generation number that is used for crude versioning.
@@ -1277,6 +1278,8 @@ public:
   ///
   /// \returns The named module, or null if the module has not been imported.
   ModuleDecl *getNamedModule(StringRef name);
+
+  ImportPath::Builder getSwiftModulePath(const clang::Module *M);
 
   /// Returns the "Foundation" module, if it can be loaded.
   ///
@@ -2200,7 +2203,23 @@ ImportedType findOptionSetEnum(clang::QualType type,
 ///
 /// The name we're looking for is the Swift name.
 llvm::SmallVector<ValueDecl *, 1>
-getValueDeclsForName(const clang::Decl *decl, ASTContext &ctx, StringRef name);
+getValueDeclsForName(NominalTypeDecl* decl, StringRef name);
+
+template <typename T>
+const T *
+getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
+  const clang::TypeSourceInfo *TSI = FD->getTypeSourceInfo();
+  if (!TSI)
+    return nullptr;
+  clang::AttributedTypeLoc ATL;
+  for (clang::TypeLoc TL = TSI->getTypeLoc();
+       (ATL = TL.getAsAdjusted<clang::AttributedTypeLoc>());
+       TL = ATL.getModifiedLoc()) {
+    if (auto attr = ATL.getAttrAs<T>())
+      return attr;
+  }
+  return nullptr;
+}
 
 } // end namespace importer
 } // end namespace swift

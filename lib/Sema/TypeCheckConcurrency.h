@@ -609,8 +609,7 @@ bool diagnoseSendabilityErrorBasedOn(
 /// and perform any necessary resolution and diagnostics, returning the
 /// global actor attribute and type it refers to (or \c std::nullopt).
 std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
-checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
-                           ArrayRef<CustomAttr *> attrs);
+checkGlobalActorAttributes(SourceLoc loc, ArrayRef<CustomAttr *> attrs);
 
 /// Get the explicit global actor specified for a closure.
 Type getExplicitGlobalActor(ClosureExpr *closure);

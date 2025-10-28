@@ -68,7 +68,7 @@ bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
 // We are using a single non-trivial field of the struct. We should explode this
 // so we eliminate the second non-trivial leaf.
 //
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @big_arg_with_one_nontrivial_use : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] @big_arg_with_one_nontrivial_use : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
 // CHECK: bb0([[ARG:%.*]] : $LargeNonTrivialStructOneNonTrivialField):
 // CHECK:   [[FUNC:%.*]] = function_ref @$s31big_arg_with_one_nontrivial_useTf4x_n
 // CHECK:   [[FIELD:%.*]] = struct_extract [[ARG]] : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.k1
@@ -86,7 +86,7 @@ bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
 // We are using a single non-trivial field and a single trivial field. We are
 // willing to blow this up.
 //
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @big_arg_with_one_nontrivial_use_one_trivial_use : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] @big_arg_with_one_nontrivial_use_one_trivial_use : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
 // CHECK: bb0([[ARG:%.*]] : $LargeNonTrivialStructOneNonTrivialField):
 // CHECK:   [[FUNC:%.*]] = function_ref @$s032big_arg_with_one_nontrivial_use_d9_trivial_F0Tf4x_n : $@convention(thin) (@guaranteed Klass, Builtin.Int32) -> ()
 // CHECK:   [[TRIVIAL_FIELD:%.*]] = struct_extract [[ARG]] : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.x1
@@ -107,7 +107,7 @@ bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
 
 // We can still explode this, since our limit is 3 values.
 //
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @big_arg_with_one_nontrivial_use_two_trivial_uses : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] @big_arg_with_one_nontrivial_use_two_trivial_uses : $@convention(thin) (@guaranteed LargeNonTrivialStructOneNonTrivialField) -> () {
 // CHECK: bb0([[ARG:%.*]] : $LargeNonTrivialStructOneNonTrivialField):
 // CHECK:   [[FUNC:%.*]] = function_ref @$s48big_arg_with_one_nontrivial_use_two_trivial_usesTf4x_n : $@convention(thin)
 // CHECK:   [[TRIVIAL_FIELD1:%.*]] = struct_extract [[ARG]] : $LargeNonTrivialStructOneNonTrivialField, #LargeNonTrivialStructOneNonTrivialField.x2
@@ -168,7 +168,7 @@ bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
 // We are using a single non-trivial field of the struct. We should explode this
 // so we eliminate the second non-trivial leaf.
 //
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @big_arg_with_one_nontrivial_use_o2g_other_dead : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> () {
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] @big_arg_with_one_nontrivial_use_o2g_other_dead : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> () {
 // CHECK-NOT: release_value
 // CHECK: apply
 // CHECK-NOT: release_value
@@ -190,7 +190,7 @@ bb0(%0 : $LargeNonTrivialStructOneNonTrivialField):
 //
 // We check that we can inline this correctly in the inline test.
 //
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @big_arg_with_one_nontrivial_use_o2g : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> () {
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] @big_arg_with_one_nontrivial_use_o2g : $@convention(thin) (@owned LargeNonTrivialStructOneNonTrivialField) -> () {
 // CHECK: bb0([[ARG:%.*]] : $LargeNonTrivialStructOneNonTrivialField):
 // CHECK:   [[FUNC:%.*]] = function_ref @$s35big_arg_with_one_nontrivial_use_o2gTf4x_n : $@convention(thin) (@owned Klass, @owned Klass) -> ()
 // CHECK:   apply [[FUNC]](

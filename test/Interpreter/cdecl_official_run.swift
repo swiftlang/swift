@@ -5,12 +5,16 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   %t/Lib.swift -emit-module -verify -o %t -emit-module-doc \
 // RUN:   -emit-clang-header-path %t/cdecl.h \
+// RUN:   -disable-implicit-string-processing-module-import \
+// RUN:   -disable-implicit-concurrency-module-import \
 // RUN:   -enable-experimental-feature CDecl
 
 /// Build and run a binary from Swift and C code.
 // RUN: %clang-no-modules -c %t/Client.c -o %t/Client.o -target %target-triple \
 // RUN:   %target-pic-opt -I %t -I %clang-include-dir -Werror -isysroot %sdk
 // RUN: %target-build-swift %t/Lib.swift %t/Client.o -O -o %t/a.out \
+// RUN:   -Xfrontend -disable-implicit-string-processing-module-import \
+// RUN:   -Xfrontend -disable-implicit-concurrency-module-import \
 // RUN:   -enable-experimental-feature CDecl -parse-as-library
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out > %t/run.log
@@ -22,22 +26,22 @@
 //--- Lib.swift
 
 /// My documentation
-@cdecl(simple) public func simpleNameSwiftSide(x: CInt, bar y: CInt) -> CInt {
+@c(simple) public func simpleNameSwiftSide(x: CInt, bar y: CInt) -> CInt {
     print(x, y)
     return x
 }
 
-@cdecl func defaultName(x: Int) {
+@c func defaultName(x: Int) {
     print(x)
 }
 
-@cdecl public func primitiveTypes(i: Int, ci: CInt, l: CLong, c: CChar, f: Float, d: Double, b: Bool) {
+@c public func primitiveTypes(i: Int, ci: CInt, l: CLong, c: CChar, f: Float, d: Double, b: Bool) {
     print(i, ci, l, c, f, d, b)
 }
 
-@cdecl enum CEnum: CInt { case A, B }
+@c enum CEnum: CInt { case A, B }
 
-@cdecl func useEnum(e: CEnum) -> CEnum {
+@c func useEnum(e: CEnum) -> CEnum {
     print(e)
     print(e.rawValue)
     return e

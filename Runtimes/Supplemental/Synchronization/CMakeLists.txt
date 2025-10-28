@@ -13,6 +13,7 @@ list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_SOURCE_DIR}/../cmake/modules"
   "${CMAKE_SOURCE_DIR}/../../cmake/modules")
 
+include(LanguageVersions)
 include(SwiftProjectVersion)
 project(SwiftSynchronization
   LANGUAGES Swift
@@ -103,7 +104,7 @@ add_compile_options(
 # a compromise, treat all linker warnings as errors.
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 # Ensure all symbols are fully resolved on Linux
-add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
+add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 gyb_expand(Atomics/AtomicIntegers.swift.gyb Atomics/AtomicIntegers.swift)
 gyb_expand(Atomics/AtomicStorage.swift.gyb Atomics/AtomicStorage.swift)

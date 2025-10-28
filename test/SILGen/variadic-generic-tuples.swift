@@ -102,7 +102,7 @@ public struct Container<each T> {
 //   Finally, the actual assignment.
 // CHECK-NEXT:    [[ACCESS:%.*]] = begin_access [modify] [unknown] %1 :
 // CHECK-NEXT:    [[FIELD:%.*]] = struct_element_addr [[ACCESS]] : $*Container<repeat each T>, #Container.storage
-// CHECK-NEXT:    copy_addr [take] [[COPY2]] to [[FIELD]] : $*(repeat Stored<each T>)
+// CHECK-NEXT:    copy_addr [[COPY2]] to [[FIELD]] : $*(repeat Stored<each T>)
 // CHECK-NEXT:    end_access [[ACCESS]]
 //   Clean up.
 // CHECK-NEXT:    dealloc_stack [[COPY2]]
@@ -430,6 +430,16 @@ func convertVoidPayloads() {
   convertPayloads(as: Void.self)
 }
 
+// CHECK-LABEL:   sil{{.*}} [ossa] @{{.*}}convertPayloads{{.*}} :
+// CHECK:           ignored_use {{.*}}
+// CHECK-NEXT:      unreachable
+//
+// CHECK:           bb1:
+// CHECK-NOT:         Preds
+// CHECK:             [[BOGUS_ALLOC:%.*]] = alloc_stack $(repeat each Value)
+// CHECK-NEXT:        copy_addr [take] undef to [init] [[BOGUS_ALLOC]]
+//
+// CHECK:             = tuple_pack_element_addr {{.*}} of [[BOGUS_ALLOC]]
 func convertPayloads<each Value>(as valueTypes: repeat (each Value).Type) -> (repeat each Value) {
   fatalError()
 }

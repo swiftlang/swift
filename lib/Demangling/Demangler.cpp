@@ -1125,7 +1125,8 @@ recur:
       // outlined copy functions. We treat such a suffix as "unmangled suffix".
       pushBack();
       return createNode(Node::Kind::Suffix, consumeAll());
-    case '$': return demangleIntegerType();
+    case '$':
+      return demangleIntegerType();
     default:
       pushBack();
       return demangleIdentifier();
@@ -1440,6 +1441,10 @@ NodePointer Demangler::demangleBuiltinType() {
   NodePointer Ty = nullptr;
   const int maxTypeSize = 4096; // a very conservative upper bound
   switch (nextChar()) {
+    case 'A':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                              BUILTIN_TYPE_NAME_IMPLICITACTOR);
+      break;
     case 'b':
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                BUILTIN_TYPE_NAME_BRIDGEOBJECT);
@@ -2291,6 +2296,15 @@ NodePointer Demangler::demangleImplResultConvention(Node::Kind ConvKind) {
     case 'u': attr = "@unowned_inner_pointer"; break;
     case 'a': attr = "@autoreleased"; break;
     case 'k': attr = "@pack_out"; break;
+    case 'l':
+      attr = "@guaranteed_address";
+      break;
+    case 'g':
+      attr = "@guaranteed";
+      break;
+    case 'm':
+      attr = "@inout";
+      break;
     default:
       pushBack();
       return nullptr;
@@ -3429,6 +3443,18 @@ NodePointer Demangler::demangleFuncSpecParam(Node::Kind Kind) {
       return addChild(Param, createNode(
         Node::Kind::FunctionSignatureSpecializationParamKind,
         uint64_t(FunctionSigSpecializationParamKind::ClosureProp)));
+    case 'C': {
+      // Consumes an identifier and multiple type parameters.
+      // The parameters will be added later.
+      addChild(Param, createNode(
+        Node::Kind::FunctionSignatureSpecializationParamKind,
+        uint64_t(FunctionSigSpecializationParamKind::ClosurePropPreviousArg)));
+      int prevArgIdx = demangleNatural();
+      if (prevArgIdx < 0)
+        return nullptr;
+      return addChild(Param, createNode(
+         Node::Kind::FunctionSignatureSpecializationParamPayload, (Node::IndexType)prevArgIdx));
+    }
     case 'p': {
       for (;;) {
         switch (nextChar()) {
@@ -4094,6 +4120,12 @@ NodePointer Demangler::demangleAccessor(NodePointer ChildNode) {
     case 'M': Kind = Node::Kind::ModifyAccessor; break;
     case 'x': Kind = Node::Kind::Modify2Accessor; break;
     case 'i': Kind = Node::Kind::InitAccessor; break;
+    case 'b':
+      Kind = Node::Kind::BorrowAccessor;
+      break;
+    case 'z':
+      Kind = Node::Kind::MutateAccessor;
+      break;
     case 'a':
       switch (nextChar()) {
         case 'O': Kind = Node::Kind::OwningMutableAddressor; break;

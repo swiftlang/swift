@@ -384,23 +384,40 @@ protected:
   enum { ForInlining = true };
   /// Helper function to clone the parent function of a SILDebugScope if
   /// necessary when inlining said function into a new generic context.
-  /// \param SubsMap - the substitutions of the inlining/specialization process.
-  /// \param RemappedSig - the generic signature.
+  /// \param SubsMap - the substitutions for the call to the callee.
+  /// \param CalleeSig - the callee generic signature.
   template<typename FunctionBuilderTy>
   static SILFunction *remapParentFunction(FunctionBuilderTy &FuncBuilder,
                                           SILModule &M,
                                           SILFunction *ParentFunction,
                                           SubstitutionMap SubsMap,
-                                          GenericSignature RemappedSig,
+                                          GenericSignature CalleeSig,
                                           bool ForInlining = false) {
     // If the original, non-inlined version of the function had no generic
     // environment, there is no need to remap it.
-    auto *OriginalEnvironment = ParentFunction->getGenericEnvironment();
-    if (!RemappedSig || !OriginalEnvironment)
+    auto *CalleeEnv = ParentFunction->getGenericEnvironment();
+    if (!CalleeSig || !CalleeEnv)
       return ParentFunction;
 
-    if (SubsMap.getRecursiveProperties().hasPrimaryArchetype())
+    // FIXME: Pass the CallerSig down directly instead of doing this.
+    GenericSignature CallerSig;
+    if (SubsMap.getRecursiveProperties().hasPrimaryArchetype()) {
+      for (auto ReplacementType : SubsMap.getReplacementTypes()) {
+        ReplacementType.visit([&](Type t) {
+          if (t->is<PrimaryArchetypeType>() || t->is<PackArchetypeType>()) {
+            auto sig =
+              t->castTo<ArchetypeType>()->getGenericEnvironment()
+                ->getGenericSignature();
+            if (!CallerSig)
+              CallerSig = sig;
+            else
+              ASSERT(CallerSig.getPointer() == sig.getPointer());
+          }
+        });
+      }
+
       SubsMap = SubsMap.mapReplacementTypesOutOfContext();
+    }
 
     // One abstract function in the debug info can only have one set of variables
     // and types. We check if the function is called with non-identity substitutions
@@ -419,7 +436,7 @@ protected:
     Mangle::GenericSpecializationMangler Mangler(M.getASTContext(), ParentFunction,
                                                  IsNotSerialized);
     std::string MangledName =
-      Mangler.mangleForDebugInfo(RemappedSig, SubsMap, ForInlining);
+      Mangler.mangleForDebugInfo(CalleeSig, SubsMap, CallerSig, ForInlining);
 
     if (ParentFunction->getName() == MangledName)
       return ParentFunction;
@@ -443,7 +460,7 @@ protected:
         // undead.
         if (ParentFunction->empty()) {
           FuncBuilder.eraseFunction(ParentFunction);
-          ParentFunction->setGenericEnvironment(OriginalEnvironment);
+          ParentFunction->setGenericEnvironment(CalleeEnv);
         }
       }
     }

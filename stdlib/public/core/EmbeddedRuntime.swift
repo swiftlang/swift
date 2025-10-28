@@ -48,7 +48,7 @@ public struct ClassMetadata {
   └──────────────┴──────────────────────────────────────────────┘
 
   If the highest bit (doNotFreeBit) is set, the behavior of dropping the last reference (release operation where
-  refcount ends up being 0) is altered to avoid calling free() on the object (deinit is still run). This is crutial for
+  refcount ends up being 0) is altered to avoid calling free() on the object (deinit is still run). This is crucial for
   class instances that are promoted by the compiler from being heap-allocated to instead be located on the stack
   (see swift_initStackObject).
 

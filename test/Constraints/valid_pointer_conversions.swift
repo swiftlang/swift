@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 func foo(_ a: [[UInt8]], _ p: [UnsafeRawPointer]) {
   foo(a, a) // expect-warning {{all paths through this function will call itself}}
@@ -87,4 +87,32 @@ do {
 
   let _: UInt8 = result1 // Ok
   let _: [UInt8] = result2 // Ok
+}
+
+protocol PointerProtocol {}
+extension UnsafePointer: PointerProtocol {}
+
+extension PointerProtocol {
+  func foo(_ x: Self) {} // expected-note {{found this candidate}}
+  func foo(_ x: UnsafePointer<CChar>) {} // expected-note {{found this candidate}}
+}
+
+func testGenericPointerConversions(
+  chars: [CChar], mutablePtr: UnsafeMutablePointer<CChar>, ptr: UnsafePointer<CChar>
+) {
+  func id<T>(_ x: T) -> T { x }
+  func optID<T>(_ x: T?) -> T { x! }
+  func takesCharPtrs(_: UnsafePointer<CChar>, _: UnsafePointer<CChar>?) {}
+
+  // Make sure we don't end up with an ambiguity here, we should prefer to
+  // do the pointer conversion for `takesPtrs` not `id`.
+  takesCharPtrs(chars, "a")
+  takesCharPtrs(id(chars), id("a"))
+  takesCharPtrs(id("a"), optID(chars))
+  takesCharPtrs(mutablePtr, mutablePtr)
+  takesCharPtrs(id(mutablePtr), id(mutablePtr))
+  takesCharPtrs(id(mutablePtr), optID(mutablePtr))
+
+  // Make sure this is ambiguous.
+  ptr.foo(chars) // expected-error {{ambiguous use of 'foo'}}
 }

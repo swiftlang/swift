@@ -1825,6 +1825,21 @@ IgnoreAssignmentDestinationType::create(ConstraintSystem &cs, Type sourceTy,
       IgnoreAssignmentDestinationType(cs, sourceTy, destTy, locator);
 }
 
+IgnoreNonMetatypeDynamicType *
+IgnoreNonMetatypeDynamicType::create(ConstraintSystem &cs, Type instanceTy,
+                                     Type metatypeTy,
+                                     ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreNonMetatypeDynamicType(cs, instanceTy, metatypeTy, locator);
+}
+
+bool IgnoreNonMetatypeDynamicType::diagnose(const Solution &solution,
+                                            bool asNote) const {
+  NonMetatypeDynamicTypeFailure failure(solution, getFromType(), getToType(),
+                                        getLocator());
+  return failure.diagnose(asNote);
+}
+
 bool AllowInOutConversion::diagnose(const Solution &solution,
                                     bool asNote) const {
   InOutConversionFailure failure(solution, getFromType(), getToType(),

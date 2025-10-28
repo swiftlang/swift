@@ -753,8 +753,10 @@ Pattern *resolvePattern(Pattern *P, DeclContext *dc, bool isStmtCondition);
 ///
 /// \returns the type of the pattern, which may be an error type if an
 /// unrecoverable error occurred. If the options permit it, the type may
-/// involve \c UnresolvedType (for patterns with no type information) and
+/// involve \c PlaceholderType (for patterns with no type information) and
 /// unbound generic types.
+/// TODO: We ought to expose hooks that let callers open the
+/// PlaceholderTypes directly, similar to type resolution.
 Type typeCheckPattern(ContextualPattern pattern);
 
 /// Attempt to simplify an ExprPattern into a BoolPattern or
@@ -797,7 +799,8 @@ bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
 /// together.
 ///
 /// \returns true if a failure occurred.
-bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt);
+bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
+                              bool skipWhereClause);
 
 /// Compute the set of captures for the given closure.
 void computeCaptures(AbstractClosureExpr *ACE);
@@ -1238,24 +1241,6 @@ bool diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
                                  std::optional<FunctionTypeRepr *> repr,
                                  DeclContext *dc,
                                  std::optional<TypeResolutionStage> stage);
-
-/// Walk the parallel structure of a type with user-provided placeholders and
-/// an inferred type produced by the type checker. Where placeholders can be
-/// found, suggest the corresponding inferred type.
-///
-/// For example,
-///
-/// \code
-///  func foo(_ x: [_] = [0])
-/// \endcode
-///
-/// Has a written type of `(ArraySlice (Placeholder))` and an inferred type of
-/// `(ArraySlice Int)`, so we walk to `Placeholder` and `Int` in each type and
-/// suggest replacing `_` with `Int`.
-///
-/// \param writtenType The interface type usually derived from a user-written
-/// type repr. \param inferredType The type inferred by the type checker.
-void notePlaceholderReplacementTypes(Type writtenType, Type inferredType);
 } // namespace TypeChecker
 
 /// Returns the protocol requirement kind of the given declaration.

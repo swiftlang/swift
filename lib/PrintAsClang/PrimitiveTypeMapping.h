@@ -21,18 +21,21 @@ namespace swift {
 
 class ASTContext;
 class TypeDecl;
+class Type;
 
 /// Provides a mapping from Swift's primitive types to C / Objective-C / C++
 /// primitive types.
 ///
 /// Certain types have mappings that differ in different language modes.
-/// For example, Swift's `Int` maps to `NSInteger` for Objective-C declarations,
-/// but to something like `intptr_t` or `swift::Int` for C and C++ declarations.
+/// For example, Swift's `Int` maps to `NSInteger` for Objective-C
+/// declarations, but to something like `intptr_t` or `swift::Int` for C and
+/// C++ declarations.
 class PrimitiveTypeMapping {
 public:
   struct ClangTypeInfo {
     StringRef name;
     bool canBeNullable;
+    bool simd;
   };
 
   /// Returns the Objective-C type name and nullability for the given Swift
@@ -47,6 +50,8 @@ public:
   /// primitive type declaration, or \c None if no such type name exists.
   std::optional<ClangTypeInfo> getKnownCxxTypeInfo(const TypeDecl *typeDecl);
 
+  std::optional<ClangTypeInfo> getKnownSIMDTypeInfo(Type t, ASTContext &ctx);
+
 private:
   void initialize(ASTContext &ctx);
 
@@ -58,6 +63,7 @@ private:
     // The C++ name of the Swift type.
     std::optional<StringRef> cxxName;
     bool canBeNullable;
+    bool simd = false;
   };
 
   FullClangTypeInfo *getMappedTypeInfoOrNull(const TypeDecl *typeDecl);

@@ -601,6 +601,16 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (auto *rei = dyn_cast<RefElementAddrInst>(inst)) {
     auto varIsolation = swift::getActorIsolation(rei->getField());
 
+    // If we have a global actor isolated field, then we know that we override
+    // the actual isolation of the actor or global actor isolated class with
+    // some other form of isolation. In such a case, we need to use that
+    // isolation instead.
+    if (varIsolation.isGlobalActor()) {
+      return SILIsolationInfo::getGlobalActorIsolated(
+                 rei, varIsolation.getGlobalActor())
+          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+    }
+
     if (auto instance = ActorInstance::getForValue(rei->getOperand())) {
       if (auto *fArg = llvm::dyn_cast_or_null<SILFunctionArgument>(
               instance.maybeGetValue())) {
@@ -812,6 +822,16 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   // See if we have a struct_extract from a global-actor-isolated type.
   if (auto *sei = dyn_cast<StructExtractInst>(inst)) {
     auto varIsolation = swift::getActorIsolation(sei->getField());
+
+    // If our var is global actor isolated, then we override the isolation of
+    // whatever our struct was with a specific isolation on the struct
+    // itself. We should use that instead.
+    if (varIsolation.isGlobalActor()) {
+      return SILIsolationInfo::getGlobalActorIsolated(
+                 sei, varIsolation.getGlobalActor())
+          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+    }
+
     if (auto isolation =
             SILIsolationInfo::getGlobalActorIsolated(sei, sei->getStructDecl()))
       return isolation.withUnsafeNonIsolated(
@@ -822,6 +842,16 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
 
   if (auto *seai = dyn_cast<StructElementAddrInst>(inst)) {
     auto varIsolation = swift::getActorIsolation(seai->getField());
+
+    // If our var is global actor isolated, then we override the isolation of
+    // whatever our struct was with a specific isolation on the struct
+    // itself. We should use that instead.
+    if (varIsolation.isGlobalActor()) {
+      return SILIsolationInfo::getGlobalActorIsolated(
+                 seai, varIsolation.getGlobalActor())
+          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+    }
+
     if (auto isolation = SILIsolationInfo::getGlobalActorIsolated(
             seai, seai->getStructDecl()))
       return isolation.withUnsafeNonIsolated(

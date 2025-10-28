@@ -353,6 +353,13 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
       }
 
+      // Skip @c @implementation functions along with the attribute.
+      if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+        if (options.excludeAttrKind(DeclAttrKind::ObjCImplementation) &&
+            AFD->isObjCImplementation() && AFD->getCDeclKind())
+          return false;
+      }
+
       // Skip extensions that extend things we wouldn't print.
       if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
         if (!shouldPrint(ED->getExtendedNominal(), options))
@@ -1341,9 +1348,9 @@ void PrintAST::printAttributes(const Decl *D) {
   if (Options.PrintSyntheticSILGenName
         && !D->getAttrs().hasAttribute<SILGenNameAttr>()) {
     if (canPrintSyntheticSILGenName(D)) {
-      auto mangledName = Mangle::ASTMangler(D->getASTContext())
-                            .mangleAnyDecl(cast<ValueDecl>(D), /*prefix=*/true,
-                                           /*respectOriginallyDefinedIn=*/true);
+      auto mangledName =
+          Mangle::ASTMangler(D->getASTContext())
+              .mangleAnyDecl(cast<ValueDecl>(D), /*addPrefix*/ true);
       Printer.printAttrName("@_silgen_name");
       Printer << "(";
       Printer.printEscapedStringLiteral(mangledName);
@@ -2667,6 +2674,8 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       }
       AddAccessorToPrint(AccessorKind::Read2);
       break;
+    case ReadImplKind::Borrow:
+      AddAccessorToPrint(AccessorKind::Borrow);
     }
     switch (impl.getWriteImpl()) {
     case WriteImplKind::Immutable:
@@ -2701,7 +2710,36 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       }
       AddAccessorToPrint(AccessorKind::Modify2);
       break;
+    case WriteImplKind::Mutate:
+      AddAccessorToPrint(AccessorKind::Mutate);
+      break;
     }
+  }
+
+  Printer << " {";
+
+  // For var decls, if it has an initializer, the parser only expects observing
+  // accessors. But sometimes for example in '.swiftinterface', we want to print
+  // both the initializer and the accessors. So when we print the initializer
+  // *and* the accessor block not starting with willSet/didSet, print an
+  // attribute as a disambiguation marker.
+  bool needsDisambiguationAttr = false;
+  if (auto *VD = dyn_cast<VarDecl>(ASD)) {
+    if (auto *PBD = VD->getParentPatternBinding()) {
+      if (accessorsToPrint.empty() ||
+          !accessorsToPrint.front()->isObservingAccessor()) {
+        const auto i = PBD->getPatternEntryIndexForVarDecl(VD);
+        if (Options.PrintExprs) {
+          needsDisambiguationAttr |= bool(PBD->getInit(i));
+        } else if (Options.VarInitializers) {
+          needsDisambiguationAttr |= bool(PBD->hasInitStringRepresentation(i) &&
+                                          VD->isInitExposedToClients());
+        }
+      }
+    }
+  }
+  if (needsDisambiguationAttr) {
+    Printer << " @_accessorBlock";
   }
 
   // If we're not printing the accessor bodies and none of the accessors have
@@ -2712,9 +2750,6 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
                   [](AccessorDecl *accessor) {
                     return accessor->getAttrs().isEmpty();
                   });
-
-  Printer << " {";
-
   if (!PrintCompactAccessors)
     Printer.printNewline();
 
@@ -2784,87 +2819,72 @@ static void addNamespaceMembers(Decl *decl,
       if (declOwner && declOwner != redeclOwner->getTopLevelModule())
         continue;
     }
+    for (auto member : redecl->decls()) {
+      if (auto classTemplate = dyn_cast<clang::ClassTemplateDecl>(member)) {
+        // Add all specializations to a worklist so we don't accidentally mutate
+        // the list of decls we're iterating over.
+        llvm::SmallPtrSet<const clang::ClassTemplateSpecializationDecl *, 16> specWorklist;
+        for (auto spec : classTemplate->specializations())
+          specWorklist.insert(spec);
+        for (auto spec : specWorklist) {
+          if (auto import =
+                  ctx.getClangModuleLoader()->importDeclDirectly(spec))
+            if (addedMembers.insert(import).second)
+              members.push_back(import);
+        }
+      }
 
-    std::function<void(clang::DeclContext *)> addDeclsFromContext =
-        [&](clang::DeclContext *declContext) {
-          for (auto member : declContext->decls()) {
-            if (auto classTemplate =
-                    dyn_cast<clang::ClassTemplateDecl>(member)) {
-              // Add all specializations to a worklist so we don't accidentally
-              // mutate the list of decls we're iterating over.
-              llvm::SmallPtrSet<const clang::ClassTemplateSpecializationDecl *,
-                                16>
-                  specWorklist;
-              for (auto spec : classTemplate->specializations())
-                specWorklist.insert(spec);
-              for (auto spec : specWorklist) {
-                if (auto import =
-                        ctx.getClangModuleLoader()->importDeclDirectly(spec))
-                  if (addedMembers.insert(import).second)
-                    members.push_back(import);
-              }
-            }
+      auto lookupAndAddMembers = [&](DeclName name) {
+        auto allResults = evaluateOrDefault(
+            ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}), {});
 
-            auto lookupAndAddMembers = [&](clang::NamedDecl *namedDecl) {
-              auto name = ctx.getClangModuleLoader()->importName(namedDecl);
-              if (!name)
-                return;
+        for (auto found : allResults) {
+          auto clangMember = cast<clang::NamedDecl *>(found);
+          if (auto importedDecl =
+                  ctx.getClangModuleLoader()->importDeclDirectly(clangMember)) {
+            if (addedMembers.insert(importedDecl).second) {
+              members.push_back(importedDecl);
 
-              auto allResults = evaluateOrDefault(
-                  ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}),
-                  {});
+              // Handle macro-expanded declarations.
+              importedDecl->visitAuxiliaryDecls([&](Decl *decl) {
+                auto valueDecl = dyn_cast<ValueDecl>(decl);
+                if (!valueDecl)
+                  return;
 
-              for (auto found : allResults) {
-                auto clangMember = cast<clang::NamedDecl *>(found);
-                if (auto importedDecl =
-                        ctx.getClangModuleLoader()->importDeclDirectly(
-                            clangMember)) {
-                  if (addedMembers.insert(importedDecl).second) {
-                    members.push_back(importedDecl);
+                // Bail out if the auxiliary decl was not produced by a macro.
+                auto module = decl->getDeclContext()->getParentModule();
+                auto *sf = module->getSourceFileContainingLocation(decl->getLoc());
+                if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+                  return;
 
-                    // Handle macro-expanded declarations.
-                    importedDecl->visitAuxiliaryDecls([&](Decl *decl) {
-                      auto valueDecl = dyn_cast<ValueDecl>(decl);
-                      if (!valueDecl)
-                        return;
-
-                      // Bail out if the auxiliary decl was not produced by a
-                      // macro.
-                      auto module = decl->getDeclContext()->getParentModule();
-                      auto *sf = module->getSourceFileContainingLocation(
-                          decl->getLoc());
-                      if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
-                        return;
-
-                      members.push_back(valueDecl);
-                    });
-                  }
-                }
-              }
-            };
-
-            // Look through `extern` blocks.
-            if (auto linkageSpecDecl = dyn_cast<clang::LinkageSpecDecl>(member))
-              addDeclsFromContext(linkageSpecDecl);
-
-            auto namedDecl = dyn_cast<clang::NamedDecl>(member);
-            if (!namedDecl)
-              continue;
-            lookupAndAddMembers(namedDecl);
-
-            // Unscoped enums could have their enumerators present
-            // in the parent namespace.
-            if (auto *ed = dyn_cast<clang::EnumDecl>(member)) {
-              if (!ed->isScoped()) {
-                for (auto *ecd : ed->enumerators()) {
-                  lookupAndAddMembers(ecd);
-                }
-              }
+                members.push_back(valueDecl);
+              });
             }
           }
-        };
+        }
+      };
 
-    addDeclsFromContext(redecl);
+      auto namedDecl = dyn_cast<clang::NamedDecl>(member);
+      if (!namedDecl)
+        continue;
+      auto name = ctx.getClangModuleLoader()->importName(namedDecl);
+      if (!name)
+        continue;
+      lookupAndAddMembers(name);
+
+      // Unscoped enums could have their enumerators present
+      // in the parent namespace.
+      if (auto *ed = dyn_cast<clang::EnumDecl>(member)) {
+        if (!ed->isScoped()) {
+          for (const auto *ecd : ed->enumerators()) {
+            auto name = ctx.getClangModuleLoader()->importName(ecd);
+            if (!name)
+              continue;
+            lookupAndAddMembers(name);
+          }
+        }
+      }
+    }
   }
 }
 
@@ -3288,6 +3308,12 @@ suppressingFeatureLifetimes(PrintOptions &options,
   action();
 }
 
+static void suppressingFeatureTildeSendable(PrintOptions &options,
+                                            llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressTildeSendable, true);
+  action();
+}
+
 namespace {
 struct ExcludeAttrRAII {
   std::vector<AnyAttrKind> &ExcludeAttrList;
@@ -3305,7 +3331,7 @@ struct ExcludeAttrRAII {
     ExcludeAttrList.resize(OriginalExcludeAttrCount);
   }
 };
-}
+} // namespace
 
 static void
 suppressingFeatureCoroutineAccessors(PrintOptions &options,
@@ -3334,6 +3360,13 @@ static void
 suppressingFeatureNonexhaustiveAttribute(PrintOptions &options,
                                          llvm::function_ref<void()> action) {
   ExcludeAttrRAII scope(options.ExcludeAttrList, DeclAttrKind::Nonexhaustive);
+  action();
+}
+
+static void
+suppressingFeatureInlineAlways(PrintOptions &options,
+                               llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressInlineAlways, true);
   action();
 }
 
@@ -3630,16 +3663,6 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 
   if (ShouldPrint) {
     Printer << " = ";
-    // FIXME: An inferred associated type witness type alias may reference
-    // an opaque type, but OpaqueTypeArchetypes are always canonicalized
-    // so lose type sugar for generic params. Bind the generic signature so
-    // we can map params back into the generic signature and print them
-    // correctly.
-    //
-    // Remove this when we have a way to represent non-canonical archetypes
-    // preserving sugar.
-    PrintOptions::OverrideScope scope(Options);
-    OVERRIDE_PRINT_OPTION(scope, GenericSig, decl->getGenericSignature().getPointer());
     printTypeLoc(TypeLoc(decl->getUnderlyingTypeRepr(), Ty));
     printDeclGenericRequirements(decl);
   }
@@ -4252,6 +4275,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::Modify2:
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
+  case AccessorKind::Borrow:
     recordDeclLoc(decl,
       [&]{
         Printer << getAccessorLabel(decl->getAccessorKind());
@@ -4260,6 +4284,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::Set:
   case AccessorKind::WillSet:
   case AccessorKind::Init:
+  case AccessorKind::Mutate:
     recordDeclLoc(decl,
       [&]{
         Printer << getAccessorLabel(decl->getAccessorKind());
@@ -5551,9 +5576,6 @@ void PrintAST::visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *e
 void PrintAST::visitProtocolMetatypeToObjectExpr(ProtocolMetatypeToObjectExpr *expr) {
 }
 
-void PrintAST::visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *expr) {
-}
-
 void PrintAST::visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *expr) {
 }
 
@@ -6194,17 +6216,11 @@ public:
       if (Options.PrintTypesForDebugging || Options.PrintInSILBody)
         Printer << "@error_type ";
       visit(originalType);
-    }
-    else
+    } else if (Options.PrintTypesForDebugging) {
       Printer << "<<error type>>";
-  }
-
-  void visitUnresolvedType(UnresolvedType *T,
-                           NonRecursivePrintOptions nrOptions) {
-    if (Options.PrintTypesForDebugging)
-      Printer << "<<unresolvedtype>>";
-    else
+    } else {
       Printer << "_";
+    }
   }
 
   void visitErrorUnionType(ErrorUnionType *T,
@@ -6237,6 +6253,8 @@ public:
         visit(DMT);
       } else if (isa<TypeRepr *>(originator)) {
         Printer << "type_repr";
+      } else if (isa<Pattern *>(originator)) {
+        Printer << "pattern";
       } else {
         assert(false && "unknown originator");
       }
@@ -6271,6 +6289,7 @@ public:
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinIntegerType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinFloatType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinUnboundGenericType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinImplicitActorType)
 #undef ASTPRINTER_PRINT_BUILTINTYPE
 
   void visitBuiltinFixedArrayType(BuiltinFixedArrayType *T,
@@ -7501,11 +7520,6 @@ public:
       if (auto existential = constraint->getAs<ExistentialType>())
         constraint = existential->getConstraintType();
 
-      // Opaque archetype substitutions are always canonical, so re-sugar the
-      // constraint type using the owning declaration's generic parameter names.
-      if (genericSig)
-        constraint = genericSig->getSugaredType(constraint);
-
       visit(constraint);
       return;
     }
@@ -7926,6 +7940,12 @@ static StringRef getStringForResultConvention(ResultConvention conv) {
   case ResultConvention::UnownedInnerPointer: return "@unowned_inner_pointer ";
   case ResultConvention::Autoreleased: return "@autoreleased ";
   case ResultConvention::Pack: return "@pack_out ";
+  case ResultConvention::GuaranteedAddress:
+    return "@guaranteed_address ";
+  case ResultConvention::Guaranteed:
+    return "@guaranteed ";
+  case ResultConvention::Inout:
+    return "@inout ";
   }
   llvm_unreachable("bad result convention");
 }
@@ -8229,9 +8249,19 @@ swift::getInheritedForPrinting(
       }
     }
 
-    if (options.SuppressConformanceSuppression &&
-        inherited.getEntry(i).isSuppressed()) {
-      continue;
+    if (inherited.getEntry(i).isSuppressed()) {
+      // All `~<<Protocol>>` inheritances are suppressed.
+      if (options.SuppressConformanceSuppression)
+        continue;
+
+      if (options.SuppressTildeSendable) {
+        if (auto type = inherited.getAsSuppressed(i)->first) {
+          auto *sendable =
+              decl->getASTContext().getProtocol(KnownProtocolKind::Sendable);
+          if (sendable && sendable == type->getAnyNominal())
+            continue;
+        }
+      }
     }
 
     Results.push_back(inherited.getEntry(i));

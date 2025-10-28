@@ -77,6 +77,15 @@ bool SILInliner::canInlineApplySite(FullApplySite apply) {
   if (auto BA = dyn_cast<BeginApplyInst>(apply))
     return canInlineBeginApply(BA);
 
+  if (apply.hasGuaranteedResult()) {
+    if (auto *callee = apply.getReferencedFunctionOrNull()) {
+      auto returnBB = callee->findReturnBB();
+      if (returnBB != callee->end() &&
+          isa<ReturnBorrowInst>(returnBB->getTerminator())) {
+        return false;
+      }
+    }
+  }
   return true;
 }
 
@@ -376,7 +385,8 @@ protected:
 
   SILLocation remapLocation(SILLocation InLoc) {
     // For performance inlining return the original location.
-    if (IKind == InlineKind::PerformanceInline)
+    if (IKind == InlineKind::PerformanceInline ||
+        IKind == InlineKind::InlineAlwaysInline)
       return InLoc;
     // Inlined location wraps the call site that is being inlined, regardless of
     // the input location.
@@ -767,6 +777,14 @@ Scope scopeForArgument(Scope nonlexicalScope, SILValue callArg, unsigned index,
     // the argument.  Just do an ownership conversion if needed.
     return nonlexicalScope;
   }
+
+  // Use non-lexical scope for functions returning @guaranteed results.
+  // TODO: Represent the SILFunctionArgument of borrow accessors as non-lexical
+  // during SILGen.
+  if (callee->getConventions().hasGuaranteedResult()) {
+    return nonlexicalScope;
+  }
+
   // Lexical lifetimes are enabled, the function argument's lifetime is
   // lexical, but the caller's value is not lexical.  Extra care is required to
   // maintain the function argument's lifetime.  We need to add a lexical
@@ -931,6 +949,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
   case SILInstructionKind::IgnoredUseInst:
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
+  case SILInstructionKind::UncheckedOwnershipInst:
     return InlineCost::Free;
 
   // Typed GEPs are free.
@@ -1047,6 +1067,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   // Return and unreachable are free.
   case SILInstructionKind::UnreachableInst:
   case SILInstructionKind::ReturnInst:
+  case SILInstructionKind::ReturnBorrowInst:
   case SILInstructionKind::ThrowInst:
   case SILInstructionKind::ThrowAddrInst:
   case SILInstructionKind::UnwindInst:

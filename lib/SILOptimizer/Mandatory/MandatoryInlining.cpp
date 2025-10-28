@@ -70,6 +70,11 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
+enum class MandatoryInlining_t {
+  transparent,
+  inlineAlways
+};
+
 /// Fixup reference counts after inlining a function call (which is a no-op
 /// unless the function is a thick function).
 ///
@@ -673,7 +678,8 @@ static SILFunction *
 getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
                   SmallVectorImpl<ParameterConvention> &CapturedArgConventions,
                   SmallVectorImpl<SILValue> &FullArgs,
-                  PartialApplyInst *&PartialApply) {
+                  PartialApplyInst *&PartialApply,
+                  MandatoryInlining_t whatToInline) {
   IsThick = false;
   PartialApply = nullptr;
   CapturedArgConventions.clear();
@@ -744,8 +750,20 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
 
   // If the CalleeFunction is a not-transparent definition, we can not process
   // it.
-  if (CalleeFunction->isTransparent() == IsNotTransparent)
+  if (whatToInline == MandatoryInlining_t::transparent &&
+      CalleeFunction->isTransparent() == IsNotTransparent)
     return nullptr;
+
+  // If the CalleeFunction is not inline(always) definition, we can not process
+  // it.
+  bool calleeThunkIsTransparentAndAThunk =
+    CalleeFunction->isTransparent() == IsTransparent &&
+    CalleeFunction->isThunk();
+  if (whatToInline == MandatoryInlining_t::inlineAlways &&
+      CalleeFunction->getInlineStrategy() != AlwaysInline &&
+      !calleeThunkIsTransparentAndAThunk) {
+    return nullptr;
+  }
 
   // If CalleeFunction is a declaration, see if we can load it.
   if (CalleeFunction->empty())
@@ -807,7 +825,8 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
                          ImmutableFunctionSet::Factory &SetFactory,
                          ImmutableFunctionSet CurrentInliningSet,
                          ClassHierarchyAnalysis *CHA,
-                         DenseFunctionSet &changedFunctions) {
+                         DenseFunctionSet &changedFunctions,
+                         MandatoryInlining_t whatToInline) {
   // Avoid reprocessing functions needlessly.
   if (FullyInlinedSet.count(F))
     return true;
@@ -818,8 +837,10 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
     assert(AI && "Cannot have circular inline without apply");
     SILLocation L = AI.getLoc();
     assert(L && "Must have location for transparent inline apply");
+
     diagnose(F->getModule().getASTContext(), L.getStartSourceLoc(),
-             diag::circular_transparent);
+             whatToInline == MandatoryInlining_t::transparent ?
+               diag::circular_transparent : diag::circular_inlineAlways);
     return false;
   }
 
@@ -870,7 +891,8 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
       bool IsThick;
       PartialApplyInst *PAI;
       SILFunction *CalleeFunction = getCalleeFunction(
-          F, InnerAI, IsThick, CapturedArgConventions, FullArgs, PAI);
+          F, InnerAI, IsThick, CapturedArgConventions, FullArgs, PAI,
+          whatToInline);
 
       if (!CalleeFunction)
         continue;
@@ -878,7 +900,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
       // Then recursively process it first before trying to inline it.
       if (!runOnFunctionRecursively(
               FuncBuilder, pm, CalleeFunction, InnerAI, FullyInlinedSet, SetFactory,
-              CurrentInliningSet, CHA, changedFunctions)) {
+              CurrentInliningSet, CHA, changedFunctions, whatToInline)) {
         // If we failed due to circular inlining, then emit some notes to
         // trace back the failure if we have more information.
         // FIXME: possibly it could be worth recovering and attempting other
@@ -909,7 +931,10 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
         }));
 
       SILInliner Inliner(FuncBuilder, deleter,
-                         SILInliner::InlineKind::MandatoryInline, Subs);
+                         whatToInline == MandatoryInlining_t::transparent ?
+                           SILInliner::InlineKind::MandatoryInline :
+                           SILInliner::InlineKind::InlineAlwaysInline,
+                         Subs);
       if (!Inliner.canInlineApplySite(InnerAI))
         continue;
 
@@ -1019,6 +1044,9 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
 namespace {
 
 class MandatoryInlining : public SILModuleTransform {
+
+  MandatoryInlining_t whatToInline;
+
   /// The entry point to the transformation.
   void run() override {
     ClassHierarchyAnalysis *CHA = getAnalysis<ClassHierarchyAnalysis>();
@@ -1052,7 +1080,8 @@ class MandatoryInlining : public SILModuleTransform {
 
       runOnFunctionRecursively(FuncBuilder, getPassManager(), &F, FullApplySite(),
                                FullyInlinedSet, SetFactory,
-                               SetFactory.getEmptySet(), CHA, changedFunctions);
+                               SetFactory.getEmptySet(), CHA, changedFunctions,
+                               whatToInline);
 
       // The inliner splits blocks at call sites. Re-merge trivial branches
       // to reestablish a canonical CFG.
@@ -1075,9 +1104,15 @@ class MandatoryInlining : public SILModuleTransform {
     }
   }
 
+public:
+  MandatoryInlining(MandatoryInlining_t whatToInline) :
+    whatToInline(whatToInline) {}
 };
 } // end anonymous namespace
 
 SILTransform *swift::createMandatoryInlining() {
-  return new MandatoryInlining();
+  return new MandatoryInlining(MandatoryInlining_t::transparent);
+}
+SILTransform *swift::createInlineAlwaysInlining() {
+  return new MandatoryInlining(MandatoryInlining_t::inlineAlways);
 }

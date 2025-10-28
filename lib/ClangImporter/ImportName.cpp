@@ -1538,6 +1538,10 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   if (!swift3OrLaterName && isa<clang::CXXMethodDecl>(D)) {
     return ImportedName();
   }
+  // If this function uses C++23 deducing this, bail.
+  if (auto functionDecl = dyn_cast<clang::FunctionDecl>(D))
+    if (functionDecl->hasCXXExplicitFunctionObjectParameter())
+      return {};
 
   // Dig out the definition, if there is one.
   if (auto def = getDefinitionForClangTypeDecl(D)) {

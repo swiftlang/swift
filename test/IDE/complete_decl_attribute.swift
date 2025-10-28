@@ -86,6 +86,7 @@ actor MyGenericGlobalActor<T> {
 // AVAILABILITY1-NEXT: Keyword/None:                       FreeBSD[#Platform#]; name=FreeBSD{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       OpenBSD[#Platform#]; name=OpenBSD{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       Windows[#Platform#]; name=Windows{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       Android[#Platform#]; name=Android{{$}}
 
 @available(*, #^AVAILABILITY2^#)
 

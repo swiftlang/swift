@@ -201,8 +201,8 @@ class PluginDiagnosticsEngine {
   private let bridgedDiagEngine: BridgedDiagnosticEngine
   private var exportedSourceFileByName: [String: UnsafePointer<ExportedSourceFile>] = [:]
 
-  init(cxxDiagnosticEngine: UnsafeMutableRawPointer) {
-    self.bridgedDiagEngine = BridgedDiagnosticEngine(raw: cxxDiagnosticEngine)
+  init(cContext: BridgedASTContext) {
+    self.bridgedDiagEngine = cContext.diags
   }
 
   /// Failable convenience initializer for optional cxx engine pointer.

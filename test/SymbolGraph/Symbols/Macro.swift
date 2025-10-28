@@ -1,4 +1,4 @@
-// REQUIRES: swift_swift_parser, executable_test
+// REQUIRES: swift_swift_parser, executable_test, string_processing
 
 // RUN: %empty-directory(%t)
 

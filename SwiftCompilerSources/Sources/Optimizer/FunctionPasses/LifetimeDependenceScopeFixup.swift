@@ -685,7 +685,7 @@ extension ScopeExtension {
     do {
       // The innermost scope that must be extended must dominate all uses.
       var walker = LifetimeDependentUseWalker(function, localReachabilityCache, context) {
-        inRangeUses.append($0.instruction)
+        inRangeUses.append($0)
         return .continueWalk
       }
       defer {walker.deinitialize()}
@@ -744,10 +744,9 @@ extension ScopeExtension {
 
     // Append each scope that needs extension to scopesToExtend from the inner to the outer scope.
     for extScope in scopes.reversed() {
-      // An outer scope might not originally cover one of its inner scopes. Therefore, extend 'extendedUseRange' to to
-      // cover this scope's end instructions. The extended scope must at least cover the original scopes because the
-      // original scopes may protect other operations.
       var mustExtend = false
+      // Iterating over scopeEndInst ignores unreachable paths which may not include the dealloc_stack. This is fine
+      // because the stack allocation effectively covers the entire unreachable path.
       for scopeEndInst in extScope.endInstructions {
         switch extendedUseRange.overlaps(pathBegin: extScope.firstInstruction, pathEnd: scopeEndInst, context) {
         case .containsPath, .containsEnd, .disjoint:
@@ -757,6 +756,10 @@ extension ScopeExtension {
           break
         case .containsBegin, .overlappedByPath:
           // containsBegin can occur when the extendable scope has the same begin as the use range.
+          //
+          // An outer scope might not originally cover one of its inner scopes. Therefore, extend 'extendedUseRange' to
+          // to cover this scope's end instructions. The extended scope must at least cover the original scopes because
+          // the original scopes may protect other operations.
           extendedUseRange.insert(scopeEndInst)
           break
         }
@@ -1061,7 +1064,7 @@ private extension BeginApplyInst {
 private struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
   let function: Function
   let context: Context
-  let visitor: (Operand) -> WalkResult
+  let visitor: (Instruction) -> WalkResult
   let localReachabilityCache: LocalVariableReachabilityCache
   var visitedValues: ValueSet
 
@@ -1069,7 +1072,7 @@ private struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
   var dependsOnCaller = false
 
   init(_ function: Function, _ localReachabilityCache: LocalVariableReachabilityCache, _ context: Context,
-       visitor: @escaping (Operand) -> WalkResult) {
+       visitor: @escaping (Instruction) -> WalkResult) {
     self.function = function
     self.context = context
     self.visitor = visitor
@@ -1088,42 +1091,42 @@ private struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
   mutating func deadValue(_ value: Value, using operand: Operand?)
   -> WalkResult {
     if let operand {
-      return visitor(operand)
+      return visitor(operand.instruction)
     }
     return .continueWalk
   }
 
   mutating func leafUse(of operand: Operand) -> WalkResult {
-    return visitor(operand)
+    return visitor(operand.instruction)
   }
 
   mutating func escapingDependence(on operand: Operand) -> WalkResult {
     log(">>> Escaping dependence: \(operand)")
-    _ = visitor(operand)
+    _ = visitor(operand.instruction)
     // Make a best-effort attempt to extend the access scope regardless of escapes. It is possible that some mandatory
     // pass between scope fixup and diagnostics will make it possible for the LifetimeDependenceDefUseWalker to analyze
     // this use.
     return .continueWalk
   }
 
-  mutating func inoutDependence(argument: FunctionArgument, on operand: Operand) -> WalkResult {
+  mutating func inoutDependence(argument: FunctionArgument, functionExit: Instruction) -> WalkResult {
     dependsOnCaller = true
-    return visitor(operand)
+    return visitor(functionExit)
   }
 
   mutating func returnedDependence(result operand: Operand) -> WalkResult {
     dependsOnCaller = true
-    return visitor(operand)
+    return visitor(operand.instruction)
   }
 
   mutating func returnedDependence(address: FunctionArgument,
                                    on operand: Operand) -> WalkResult {
     dependsOnCaller = true
-    return visitor(operand)
+    return visitor(operand.instruction)
   }
 
   mutating func yieldedDependence(result: Operand) -> WalkResult {
-    return visitor(result)
+    return visitor(result.instruction)
   }
 
   mutating func storeToYieldDependence(address: Value, of operand: Operand) -> WalkResult {

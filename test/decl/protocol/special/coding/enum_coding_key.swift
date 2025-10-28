@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown
 
 // Enums with no raw type conforming to CodingKey should get implicit derived
 // conformance of methods.

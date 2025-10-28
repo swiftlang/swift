@@ -13,6 +13,7 @@ list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_SOURCE_DIR}/../cmake/modules"
   "${CMAKE_SOURCE_DIR}/../../cmake/modules")
 
+include(LanguageVersions)
 include(SwiftProjectVersion)
 project(SwiftObservation
   LANGUAGES Swift CXX
@@ -22,9 +23,6 @@ if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Observation must build as a standalone project")
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED YES)
-set(CMAKE_CXX_EXTENSIONS NO)
 set(CMAKE_POSITION_INDEPENDENT_CODE YES)
 
 set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
@@ -80,7 +78,6 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Macros>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature ExtensionMacros>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-ossa-modules>"
   "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
@@ -94,7 +91,7 @@ add_compile_options(
 # a compromise, treat all linker warnings as errors.
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 # Ensure all symbols are fully resolved on Linux
-add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
+add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 add_library(swiftObservation
   Sources/Observation/Locking.swift

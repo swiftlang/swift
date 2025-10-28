@@ -858,6 +858,13 @@ public:
   /// returns true.
   bool isSubmoduleOf(const ModuleDecl *M) const;
 
+private:
+  std::string CacheKey;
+
+public:
+  void setCacheKey(const std::string &key) { CacheKey = key; }
+  StringRef getCacheKey() const { return CacheKey; }
+
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
   }
@@ -964,6 +971,10 @@ public:
   void lookupImportedSPIGroups(
                          const ModuleDecl *importedModule,
                          llvm::SmallSetVector<Identifier, 4> &spiGroups) const;
+
+  /// Returns true if any import of \p importedModule has the `@preconcurrency`
+  /// attribute.
+  bool isModuleImportedPreconcurrency(const ModuleDecl *importedModule) const;
 
   /// Finds the custom availability domain defined by this module with the
   /// given identifier and if one exists adds it to results.

@@ -22,7 +22,7 @@ bb0(%instance : @guaranteed $WeakBox<T>):
   return %retval : $Optional<T>
 }
 
-sil [always_inline] [ossa] @strong_copy_weak_value : $@convention(thin) <T where T : AnyObject> (@in_guaranteed WeakBox<T>) -> @owned Optional<T> {
+sil [heuristic_always_inline] [ossa] @strong_copy_weak_value : $@convention(thin) <T where T : AnyObject> (@in_guaranteed WeakBox<T>) -> @owned Optional<T> {
 bb0(%instance : @guaranteed $WeakBox<T>):
   %weak_optional = struct_extract %instance : $WeakBox<T>, #WeakBox.t
   %strong_optional = strong_copy_weak_value %weak_optional : $@sil_weak Optional<T>
@@ -44,7 +44,7 @@ entry(%tuple_addr : $*(repeat each T)):
   return %retval : $()
 }
 
-sil [always_inline] [ossa] @tuple_pack_extract : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> () {
+sil [heuristic_always_inline] [ossa] @tuple_pack_extract : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> () {
 entry(%tuple_addr : $*(repeat each T)):
   %tuple = load_borrow %tuple_addr : $*(repeat each T)
   %zero = integer_literal $Builtin.Word, 0
@@ -70,7 +70,7 @@ bb0(%value : @owned $Optional<T>):
   return %retval : $WeakBox<T>
 }
 
-sil [always_inline] [ossa] @weak_copy_value : $@convention(thin) <T where T : AnyObject> (@owned Optional<T>) -> @out WeakBox<T> {
+sil [heuristic_always_inline] [ossa] @weak_copy_value : $@convention(thin) <T where T : AnyObject> (@owned Optional<T>) -> @out WeakBox<T> {
 bb0(%value : @owned $Optional<T>):
   %weak_value = weak_copy_value %value : $Optional<T>
   destroy_value %value : $Optional<T>

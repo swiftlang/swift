@@ -27,6 +27,8 @@ NOTE(kind_declname_declared_here,none,
      "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
 NOTE(decl_declared_here_with_kind,none,
      "%kind0 declared here", (const Decl *))
+NOTE(through_decl_declared_here_with_kind,none,
+     "through %kind0 declared here", (const Decl *))
 
 ERROR(not_implemented,none,
       "INTERNAL ERROR: feature not implemented: %0", (StringRef))
@@ -276,6 +278,13 @@ ERROR(macro_experimental,none,
       
 ERROR(lookup_outputs_dont_match,none,
 "Unqualified lookup output from ASTScope and SwiftLexicalLookup don't match", ())
+
+//------------------------------------------------------------------------------
+// MARK: Accessor diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(accessor_not_supported_in_decl,none,
+      "%0 is supported only on a struct or enum", (StringRef))      
 
 //------------------------------------------------------------------------------
 // MARK: bridged diagnostics

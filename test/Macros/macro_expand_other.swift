@@ -32,7 +32,15 @@ func testFreestandingExpansionOfOther() {
 
   #if TEST_DIAGNOSTICS
 #recurseThrough(true)
-  // expected-note@-1 {{in expansion of macro 'recurseThrough' here}}
+  /*
+     expected-expansion@-2:1{{
+       expected-expansion@1:1{{
+         expected-error@1:1{{recursive expansion of macro 'recurse'}}
+       }}
+       expected-note@1:1{{in expansion of macro 'recurse' here}}
+     }}
+     expected-note@-8 {{in expansion of macro 'recurseThrough' here}}
+  */
   #endif
 }
 

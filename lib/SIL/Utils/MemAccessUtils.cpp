@@ -924,6 +924,17 @@ void swift::findGuaranteedReferenceRoots(SILValue referenceValue,
       // regardless of whether they were already visited.
       continue;
     }
+
+    // Special handling until borrowing apply is represented as a
+    // ForwardingOperation.
+    if (auto *apply =
+            dyn_cast_or_null<ApplyInst>(value->getDefiningInstruction())) {
+      if (apply->hasGuaranteedResult()) {
+        worklist.pushIfNotVisited(apply->getSelfArgument());
+        continue;
+      }
+    }
+
     // Found a potential root.
     if (lookThroughNestedBorrows) {
       if (auto *bbi = dyn_cast<BeginBorrowInst>(value)) {
@@ -1416,7 +1427,8 @@ public:
              // copyable_to_moveonlywrapper_addr, we just look through it when
              // we see it
              || isa<MoveOnlyWrapperToCopyableAddrInst>(projectedAddr) ||
-             isa<CopyableToMoveOnlyWrapperAddrInst>(projectedAddr));
+             isa<CopyableToMoveOnlyWrapperAddrInst>(projectedAddr) ||
+             isGuaranteedAddressReturn(projectedAddr));
     }
     return sourceAddr->get();
   }
@@ -2029,6 +2041,9 @@ bool AccessPathDefUseTraversal::visitUser(DFSEntry dfs) {
         && visitSingleValueUser(svi, dfs) == IgnoredUse) {
       return true;
     }
+    if (isGuaranteedAddressReturn(svi)) {
+      pushUsers(svi, dfs);
+    }
   }
   if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser())) {
     if (use->get() == sbi->getDest()) {
@@ -2038,6 +2053,7 @@ bool AccessPathDefUseTraversal::visitUser(DFSEntry dfs) {
   if (isa<EndBorrowInst>(use->getUser())) {
     return true;
   }
+
   // We weren't able to "see through" any more address conversions; so
   // record this as a use.
 

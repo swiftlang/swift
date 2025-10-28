@@ -375,6 +375,10 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
     return IsRef ? KindRefAccessorModify : KindDeclAccessorModify;
   case AccessorKind::Init:
     return IsRef ? KindRefAccessorInit : KindDeclAccessorInit;
+  case AccessorKind::Borrow:
+    return IsRef ? KindRefAccessorBorrow : KindDeclAccessorBorrow;
+  case AccessorKind::Mutate:
+    return IsRef ? KindRefAccessorMutate : KindDeclAccessorMutate;
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");

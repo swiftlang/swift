@@ -201,7 +201,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
     }
   }
   if (ExpectedCallType &&
-      (ExpectedCallType->hasUnresolvedType() ||
+      (ExpectedCallType->hasError() ||
        ExpectedCallType->hasUnboundGenericType())) {
     ExpectedCallType = Type();
   }

@@ -2373,7 +2373,7 @@ sil_global hidden @$s4test12bufferMemorySpys5UInt8VGvp : $UnsafeMutablePointer<U
 // x
 sil_global hidden @$s4test1xypvp : $Any
 
-sil [serialized] [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+sil [serialized] [heuristic_always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
 
 // CHECK-LABEL: sil @testTsanInoutAccess : $@convention(thin) () -> () {
 // CHECK:   alloc_global @$s4test12bufferMemorySpys5UInt8VGvp

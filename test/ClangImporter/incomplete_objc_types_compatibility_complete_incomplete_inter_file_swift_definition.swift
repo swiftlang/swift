@@ -31,7 +31,7 @@ class Main {
         // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Foo' is incomplete
         // CHECK-NEXT: Foo *returnAFoo();
         // CHECK-NEXT: ^
-        // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Foo' is incomplete and cannot be imported as a stub; its name conflicts with a class in module CompleteSwiftTypes
+        // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Foo' is incomplete and cannot be imported as a stub; its name conflicts with a class in module 'CompleteSwiftTypes'
         // CHECK-NEXT: @class Foo;
         // CHECK-NEXT: ^
         // CHECK-NEXT: objc-library-forward-declaring-complete-swift-types.h:{{[0-9]+}}:{{[0-9]+}}: note: interface 'Foo' forward declared here

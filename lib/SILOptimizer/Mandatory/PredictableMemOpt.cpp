@@ -102,6 +102,11 @@ static unsigned getNumSubElements(SILType T, SILFunction &F,
   }
   
   if (auto *SD = getFullyReferenceableStruct(T)) {
+    if (SD->isResilient(F.getModule().getSwiftModule(),
+                        F.getResilienceExpansion())) {
+      return false;
+    }
+
     unsigned NumElements = 0;
     for (auto *D : SD->getStoredProperties())
       NumElements +=
@@ -2339,7 +2344,7 @@ SILValue OptimizeDeadAlloc::promoteMarkDepBase(
   }
   LLVM_DEBUG(llvm::dbgs() << "      To value: " << dependentValue);
   md->replaceAllUsesWith(dependentValue);
-  deleter.deleteIfDead(md);
+  deleter.forceDelete(md);
   return dependentValue;
 }
 

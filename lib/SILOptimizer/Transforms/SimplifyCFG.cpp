@@ -1793,7 +1793,12 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
   }
 
   if (Dest->args_empty()) {
-    SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest);
+    SILBuilderWithScope builder(SEI);
+    if (SEI->getOperand()->getOwnershipKind() == OwnershipKind::Owned) {
+      // Note that a `destroy_value` would be wrong for non-copyable enums with deinits.
+      builder.createEndLifetime(SEI->getLoc(), SEI->getOperand());
+    }
+    builder.createBranch(SEI->getLoc(), Dest);
 
     addToWorklist(SEI->getParent());
     addToWorklist(Dest);
@@ -2843,6 +2848,7 @@ bool SimplifyCFG::simplifyBlocks() {
     case TermKind::ThrowAddrInst:
     case TermKind::DynamicMethodBranchInst:
     case TermKind::ReturnInst:
+    case TermKind::ReturnBorrowInst:
     case TermKind::UnwindInst:
     case TermKind::YieldInst:
       break;

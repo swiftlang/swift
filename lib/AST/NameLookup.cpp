@@ -3630,7 +3630,17 @@ NominalTypeDecl *ExtensionDecl::computeExtendedNominal(
   if (nominalTypes.empty())
     return nullptr;
 
-  return nominalTypes[0];
+  auto *result = nominalTypes[0];
+
+  // Tuple extensions are experimental, if the feature isn't enabled let's not
+  // bind this extension at all. This fixes a bunch of crashers that we don't
+  // yet properly handle with the feature enabled.
+  if (isa<BuiltinTupleDecl>(result) &&
+      !ctx.LangOpts.hasFeature(Feature::TupleConformances)) {
+    return nullptr;
+  }
+
+  return result;
 }
 
 NominalTypeDecl *
@@ -3961,18 +3971,36 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
       parsedGenericParams->getRAngleLoc());
 }
 
-NominalTypeDecl *
-CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
-                                   CustomAttr *attr, DeclContext *dc) const {
+static bool shouldPreferPropertyWrapperOverMacro(CustomAttrOwner owner) {
+  // If we have a VarDecl in a local context, prefer to use a property wrapper
+  // if one exists. This is necessary since we don't properly support peer
+  // declarations in local contexts, so want to use a property wrapper if one
+  // exists.
+  if (auto *D = owner.getAsDecl()) {
+    if ((isa<VarDecl>(D) || isa<PatternBindingDecl>(D)) &&
+        D->getDeclContext()->isLocalContext()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+NominalTypeDecl *CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
+                                                    CustomAttr *attr) const {
+  auto owner = attr->getOwner();
+  auto *dc = owner.getDeclContext();
+
   // Look for names at module scope, so we don't trigger name lookup for
   // nested scopes. At this point, we're looking to see whether there are
-  // any suitable macros.
+  // any suitable macros. If we're preferring property wrappers we wait to see
+  // if any property wrappers are in scope before returning.
   auto [module, macro] = attr->destructureMacroRef();
   auto moduleName = (module) ? module->getNameRef() : DeclNameRef();
   auto macroName = (macro) ? macro->getNameRef() : DeclNameRef();
   auto macros = namelookup::lookupMacros(dc, moduleName, macroName,
                                          getAttachedMacroRoles());
-  if (!macros.empty())
+  auto shouldPreferPropWrapper = shouldPreferPropertyWrapperOverMacro(owner);
+  if (!macros.empty() && !shouldPreferPropWrapper)
     return nullptr;
 
   // Find the types referenced by the custom attribute.
@@ -3992,6 +4020,15 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   auto nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls.first,
                                             ResolveToNominalOptions(),
                                             modulesFound, anyObject);
+  // If we're preferring property wrappers and found a suitable match, continue.
+  // Otherwise we can bail and resolve as a macro.
+  if (shouldPreferPropWrapper) {
+    auto hasPropWrapper = llvm::any_of(nominals, [](NominalTypeDecl *NTD) {
+      return NTD->getAttrs().hasAttribute<PropertyWrapperAttr>();
+    });
+    if (!macros.empty() && !hasPropWrapper)
+      return nullptr;
+  }
   if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front()))
     return nominals.front();
 

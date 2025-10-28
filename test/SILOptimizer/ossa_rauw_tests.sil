@@ -302,51 +302,56 @@ bbExitBlock(%result : @owned $FakeOptional<Klass>):
   return %result : $FakeOptional<Klass>
 }
 
-// CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_2 : $@convention(thin) (@guaranteed Klass) -> (Klass, Klass) {
+// CHECK-LABEL: sil [ossa] @owned_to_guaranteed_rauw_2 : $@convention(thin) (@guaranteed Klass) -> @owned (Klass, Klass) {
 // CHECK: bb0(
 // CHECK-NEXT: tuple
+// CHECK-NEXT: copy_value
 // CHECK-NEXT: return
-// CHECK: } // end sil function 'unowned_to_guaranteed_rauw_2'
-sil [ossa] @unowned_to_guaranteed_rauw_2 : $@convention(thin) (@guaranteed Klass) -> (Klass, Klass) {
+// CHECK: } // end sil function 'owned_to_guaranteed_rauw_2'
+sil [ossa] @owned_to_guaranteed_rauw_2 : $@convention(thin) (@guaranteed Klass) -> @owned (Klass, Klass) {
 bb0(%0 : @guaranteed $Klass):
   %1 = unchecked_bitwise_cast %0 : $Klass to $SubKlass
   %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
   %3 = tuple(%2 : $Klass, %2 : $Klass)
-  return %3 : $(Klass, Klass)
+  %4 = copy_value %3
+  return %4 : $(Klass, Klass)
 }
 
-// CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_2a : $@convention(thin) (@guaranteed Builtin.NativeObject) -> (Klass, Klass) {
+// CHECK-LABEL: sil [ossa] @owned_to_guaranteed_rauw_2a : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned (Klass, Klass) {
 // CHECK: bb0(
 // CHECK-NEXT: unchecked_ref_cast
 // CHECK-NEXT: tuple
+// CHECK-NEXT: copy_value
 // CHECK-NEXT: return
-// CHECK: } // end sil function 'unowned_to_guaranteed_rauw_2a'
-sil [ossa] @unowned_to_guaranteed_rauw_2a : $@convention(thin) (@guaranteed Builtin.NativeObject) -> (Klass, Klass) {
+// CHECK: } // end sil function 'owned_to_guaranteed_rauw_2a'
+sil [ossa] @owned_to_guaranteed_rauw_2a : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned (Klass, Klass) {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   %0a = unchecked_ref_cast %0 : $Builtin.NativeObject to $Klass
   %1 = unchecked_bitwise_cast %0a : $Klass to $SubKlass
   %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
   %3 = tuple(%2 : $Klass, %2 : $Klass)
-  return %3 : $(Klass, Klass)
+  %4 = copy_value %3
+  return %4 : $(Klass, Klass)
 }
 
 // We need the unchecked_ownership_conversion since our base value is
 // guaranteed, not a function argument, and our user is a function exiting
 // terminator.
 //
-// CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_2b : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Klass {
+// CHECK-LABEL: sil [ossa] @owned_to_guaranteed_rauw_2b : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned Klass {
 // CHECK: bb0(
 // CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: copy_value
 // CHECK-NEXT: return
-// CHECK: } // end sil function 'unowned_to_guaranteed_rauw_2b'
-sil [ossa] @unowned_to_guaranteed_rauw_2b : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Klass {
+// CHECK: } // end sil function 'owned_to_guaranteed_rauw_2b'
+sil [ossa] @owned_to_guaranteed_rauw_2b : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @owned Klass {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   %0a = unchecked_ref_cast %0 : $Builtin.NativeObject to $Klass
   %1 = unchecked_bitwise_cast %0a : $Klass to $SubKlass
   %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
-  return %2 : $Klass
+  %3 = copy_value %2
+  return %3 : $Klass
 }
-
 
 // CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_2_loop : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<(Klass, Klass)> {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Klass):
@@ -404,15 +409,17 @@ bbExitBlock(%result : @owned $FakeOptional<(Klass, Klass)>):
   return %result : $FakeOptional<(Klass, Klass)>
 }
 
-// CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_3 : $@convention(thin) (@guaranteed Klass) -> Klass {
+// CHECK-LABEL: sil [ossa] @owned_to_guaranteed_rauw_3 : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
 // CHECK: bb0(
+// CHECK-NEXT: copy_value
 // CHECK-NEXT: return
-// CHECK: } // end sil function 'unowned_to_guaranteed_rauw_3'
-sil [ossa] @unowned_to_guaranteed_rauw_3 : $@convention(thin) (@guaranteed Klass) -> Klass {
+// CHECK: } // end sil function 'owned_to_guaranteed_rauw_3'
+sil [ossa] @owned_to_guaranteed_rauw_3 : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
 bb0(%0 : @guaranteed $Klass):
   %1 = unchecked_bitwise_cast %0 : $Klass to $SubKlass
   %2 = unchecked_bitwise_cast %1 : $SubKlass to $Klass
-  return %2 : $Klass
+  %3 = copy_value %2
+  return %3 : $Klass
 }
 
 //===---

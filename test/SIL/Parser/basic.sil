@@ -1760,6 +1760,20 @@ bb0(%0 : $@thick any P2.Type):
   return %r
 }
 
+// CHECK-LABEL: sil [heuristic_always_inline] @heuristic_always_inline_attribute
+sil [heuristic_always_inline] @heuristic_always_inline_attribute : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil [always_inline] @always_inline_attribute
+sil [always_inline] @always_inline_attribute : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
 class Foo2: Foo {}
 
 // CHECK-LABEL: sil_vtable Foo {
@@ -1789,4 +1803,3 @@ sil_vtable GenKlass {
 // CHECK-LABEL: sil_vtable $GenKlass<Int> {
 sil_vtable $GenKlass<Int> {
 }
-

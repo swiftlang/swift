@@ -254,13 +254,6 @@ ERROR(cannot_apply_lvalue_binop_to_subelement,none,
 ERROR(cannot_apply_lvalue_binop_to_rvalue,none,
       "left side of mutating operator has immutable type %0", (Type))
 
-ERROR(cannot_subscript_base,none,
-      "cannot subscript a value of type %0",
-      (Type))
-
-ERROR(cannot_subscript_ambiguous_base,none,
-      "cannot subscript a value of incorrect or ambiguous type", ())
-
 ERROR(cannot_subscript_nil_literal,none,
       "cannot subscript a nil literal value", ())
 ERROR(conditional_cast_from_nil,none,
@@ -365,6 +358,11 @@ ERROR(cannot_convert_return_type_to_anyobject,none,
       (Type, Type))
 ERROR(cannot_convert_to_return_type_nil,none,
       "'nil' is incompatible with return type %0", (Type))
+
+ERROR(cannot_convert_metatype_to_non_metatype,none,
+      "cannot convert metatype %0 to non-metatype %1", (Type, Type))
+ERROR(cannot_convert_typeof_to_non_metatype,none,
+      "cannot convert 'type(of:)' metatype to non-metatype %0", (Type))
 
 ERROR(cannot_convert_thrown_type,none,
       "thrown expression type %0 %select{cannot be converted to error type %1|"
@@ -828,29 +826,29 @@ ERROR(expect_compile_time_literal,none,
       "expect a compile-time constant literal", ())
 
 ERROR(const_unsupported_enum_associated_value,none,
-      "enums with associated values not supported in a '@const' expression", ())
+      "enums with associated values not supported in a constant expression", ())
 ERROR(const_unsupported_operator,none,
-      "unsupported operator in a '@const' expression", ())
+      "unsupported operator in a constant expression", ())
 ERROR(const_unsupported_type,none,
-      "unsupported type in a '@const' expression", ())
+      "unsupported type in a constant expression", ())
 ERROR(const_unsupported_type_expr,none,
-      "type expressions not supported in a '@const' expression", ())
+      "type expressions not supported in a constant expression", ())
 ERROR(const_unsupported_closure,none,
-      "closures not supported in a '@const' expression", ())
+      "closures not supported in a constant expression", ())
 ERROR(const_unsupported_keypath,none,
-      "keypaths not supported in a '@const' expression", ())
+      "keypaths not supported in a constant expression", ())
 ERROR(const_opaque_decl_ref,none,
-      "unable to resolve variable reference in a '@const' expression", ())
+      "unable to resolve variable reference in a constant expression", ())
 ERROR(const_opaque_func_decl_ref,none,
-      "unable to resolve function reference in a '@const' expression", ())
+      "unable to resolve function reference in a constant expression", ())
 ERROR(const_non_convention_c_conversion,none,
-      "only 'convention(c)' function values are supported in a '@const' expression", ())
+      "only 'convention(c)' function values are supported in a constant expression", ())
 ERROR(const_opaque_callee,none,
-      "unable to resolve callee in a '@const' expression", ())
+      "unable to resolve callee in a constant expression", ())
 ERROR(const_non_const_param,none,
-      "reference to a non-'@const' parameter in a '@const' expression", ())
+      "reference to a non-'@const' parameter in a constant expression", ())
 ERROR(const_unknown_default,none,
-      "not supported in a '@const' expression", ())
+      "not supported in a constant expression", ())
 
 //------------------------------------------------------------------------------
 // MARK: Import Resolution
@@ -965,9 +963,6 @@ ERROR(serialization_target_too_new_repl,none,
       "deployment target of %0 %3: %4",
       (StringRef, llvm::VersionTuple, Identifier, llvm::VersionTuple,
        StringRef))
-ERROR(serialization_non_ossa_module_incompatible, Fatal,
-      "cannot import non-OSSA module into an OSSA module",
-      (Identifier))
 
 ERROR(serialization_fatal,Fatal,
       "fatal error encountered while reading from module '%0'; "
@@ -1590,6 +1585,9 @@ ERROR(missing_address_of,none,
 ERROR(missing_address_of_yield,none,
       "yielding mutable value of type %0 requires explicit '&'",
       (Type))
+ERROR(missing_address_of_return,none,
+      "returning mutable value from a mutate accessor requires explicit '&'",
+      ())
 ERROR(extraneous_address_of,none,
       "'&' may only be used to pass an argument to inout parameter",
       ())
@@ -1800,8 +1798,15 @@ ERROR(mutating_invalid_classes,none, "%0 is not valid on %kindonly1s in "
 ERROR(functions_mutating_and_not,none,
       "method must not be declared both %0 and %1",
       (SelfAccessKind, SelfAccessKind))
+
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
+
+ERROR(consuming_invalid_borrow_mutate_accessor, none,
+      "%0 cannot be declared consuming", (StringRef))
+
+ERROR(ownership_modifier_unsupported_borrow_mutate_accessor, none,
+      "%0 ownership modifier is not yet supported on %1", (StringRef, StringRef))
 
 ERROR(readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,none,
       "%0 cannot be %1 when "
@@ -1886,12 +1891,12 @@ ERROR(objc_implementation_cannot_have_generics,none,
       "'@objc @implementation' cannot be used to implement %kind0",
       (ValueDecl *))
 ERROR(attr_objc_implementation_category_not_found,none,
-      "could not find category %0 on Objective-C class %1; make sure your "
-      "umbrella or bridging header imports the header that declares it",
+      "could not find category %0 on Objective-C class %1; make sure you "
+      "import the module or header that declares it",
       (Identifier, ValueDecl*))
 ERROR(attr_objc_implementation_func_not_found,none,
-      "could not find imported function '%0' matching %kind1; make sure your "
-      "umbrella or bridging header imports the header that declares it",
+      "could not find imported function '%0' matching %kind1; make sure you "
+      "import the module or header that declares it",
       (StringRef, ValueDecl*))
 NOTE(attr_objc_implementation_fixit_remove_category_name,none,
      "remove arguments to implement the main '@interface' for this class",
@@ -2093,17 +2098,15 @@ ERROR(cdecl_empty_name,none,
 ERROR(cdecl_throws,none,
       "raising errors from %0 functions is not supported", (DeclAttribute))
 ERROR(cdecl_incompatible_with_objc,none,
-      "cannot apply both '@cdecl' and '@objc' to %kindonly0",
+      "cannot apply both '@c' and '@objc' to %kindonly0",
       (const Decl *))
 ERROR(cdecl_feature_required,none,
-      "'@cdecl' requires '-enable-experimental-feature CDecl'",
+      "'@c' requires '-enable-experimental-feature CDecl'",
       ())
 
-// @_used and @_section
-ERROR(section_linkage_markers_disabled,none,
-      "attribute requires '-enable-experimental-feature SymbolLinkageMarkers'", ())
+// @used and @section
 ERROR(section_empty_name,none,
-      "'@_section' section name cannot be empty", ())
+      "'@section' section name cannot be empty", ())
 
 // @_silgen_name and friends
 WARNING(reserved_runtime_symbol_name,none,
@@ -2141,6 +2144,10 @@ ERROR(attr_static_exclusive_only_mutating,none,
       "type %0 cannot have mutating function %1", (Type, ValueDecl *))
 ERROR(attr_static_exclusive_no_setters,none,
       "variable of type %0 must not have a setter", (Type))
+
+// ManualOwnership
+ERROR(attr_manual_ownership_noimplicitcopy,none,
+      "'@_noImplicitCopy' cannot be used with ManualOwnership", ())
 
 // @extractConstantsFromMembers
 ERROR(attr_extractConstantsFromMembers_experimental,none,
@@ -2207,12 +2214,12 @@ ERROR(expose_nested_type_to_cxx,none,
       "nested %kind0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_macro_to_cxx,none,
       "Swift macro can not yet be represented in C++", (ValueDecl *))
-WARNING(warn_unannotated_cxx_func_returning_frt, none,
-        "cannot infer the ownership of the returned value, annotate %0 with "
-        "either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED",
+GROUPED_WARNING(warn_unannotated_cxx_func_returning_frt, ForeignReferenceType, none,
+        "cannot infer ownership of foreign reference value returned by %0",
         (const ValueDecl *))
-NOTE(note_unannotated_cxx_func_returning_frt, none, "%0 is defined here",
-     (const ValueDecl *))
+NOTE(note_unannotated_cxx_func_returning_frt, none,
+        "annotate %0 with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED",
+        (const ValueDecl *))
 ERROR(unexposed_other_decl_in_cxx,none,
       "%kind0 is not yet exposed to C++", (ValueDecl *))
 ERROR(unsupported_other_decl_in_cxx,none,
@@ -2233,9 +2240,6 @@ ERROR(attr_only_at_non_generic_scope, none,
       "attribute %0 cannot be used in a generic context", (DeclAttribute))
 ERROR(attr_only_on_static_properties, none,
       "properties with attribute %0 must be static", (DeclAttribute))
-
-ERROR(weak_unowned_in_embedded_swift, none,
-      "attribute %0 cannot be used in embedded Swift", (ReferenceOwnership))
 
 ERROR(access_control_in_protocol,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
@@ -2705,13 +2709,13 @@ NOTE(module_imported_here,none,
 NOTE(decl_import_via_here,none,
      "%kind0 imported as "
      "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
-     "from %2 here",
-     (const Decl *, AccessLevel, const ModuleDecl*))
+     "from %select{%2 here|bridging header}3",
+     (const Decl *, AccessLevel, const ModuleDecl*, bool))
 NOTE(decl_import_via_local,none,
      "%kind0 is imported by this file as "
      "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
-     "from %2",
-     (const Decl *, AccessLevel, const ModuleDecl*))
+     "from %select{%2|bridging header}3",
+     (const Decl *, AccessLevel, const ModuleDecl*, bool))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -3830,13 +3834,15 @@ ERROR(decl_from_hidden_module,none,
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances|"
       "in a public or '@usableFromInline' conformance|"
-      "in an '@available' attribute here}1; "
+      "in an '@available' attribute here|"
+      "in a property declaration marked public or in a '@frozen' or '@usableFromInline' context}1; "
       "%select{%2 has been imported as implementation-only|"
       "it is an SPI imported from %2|"
       "it is SPI|"
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
       "C++ types from imported module %2 do not support library evolution|"
+      "it was imported via the internal bridging header|"
       "%2 was not imported publicly}3",
       (const Decl *, unsigned, Identifier, unsigned))
 ERROR(typealias_desugars_to_type_from_hidden_module,none,
@@ -3846,13 +3852,15 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformance|"
       "in a public or '@usableFromInline' conformance|"
-      "<<ERROR>>}3 "
+      "<<ERROR>>|"
+      "in a property declaration marked public or in a '@frozen' or '@usableFromInline' context}3 "
       "because %select{%4 has been imported as implementation-only|"
       "it is an SPI imported from %4|"
       "<<ERROR>>|"
       "%4 was imported for SPI only|"
       "%4 was not imported by this file|"
       "C++ types from imported module %4 do not support library evolution|"
+      "it was imported via the internal bridging header|"
       "%4 was not imported publicly}5",
       (const TypeAliasDecl *, StringRef, StringRef, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
@@ -3860,13 +3868,15 @@ ERROR(conformance_from_implementation_only_module,none,
       "as result builder here|"
       "in an extension with public or '@usableFromInline' members|"
       "in an extension with conditional conformances|"
-      "<<ERROR>>|<<ERROR>>}2; "
+      "<<ERROR>>|<<ERROR>>|"
+      "in a property declaration marked public or in a '@frozen' or '@usableFromInline' context}2; "
       "%select{%3 has been imported as implementation-only|"
       "the conformance is declared as SPI in %3|"
       "the conformance is declared as SPI|"
       "%3 was imported for SPI only|"
       "%3 was not imported by this file|"
       "C++ types from imported module %3 do not support library evolution|"
+      "it was imported via the internal bridging header|"
       "%3 was not imported publicly}4",
       (Type, Identifier, unsigned, Identifier, unsigned))
 NOTE(assoc_conformance_from_implementation_only_module,none,
@@ -4866,10 +4876,6 @@ NOTE(descriptive_generic_type_declared_here,none,
 
 ERROR(placeholder_type_not_allowed,none,
       "type placeholder not allowed here", ())
-ERROR(placeholder_type_not_allowed_in_return_type,none,
-      "type placeholder may not appear in function return type", ())
-ERROR(placeholder_type_not_allowed_in_parameter,none,
-      "type placeholder may not appear in top-level parameter", ())
 ERROR(placeholder_type_not_allowed_in_pattern,none,
       "placeholder type may not appear as type of a variable", ())
 NOTE(replace_placeholder_with_inferred_type,none,
@@ -5343,12 +5349,27 @@ GROUPED_ERROR(opaque_type_unsupported_availability,OpaqueTypeInference,none,
 //------------------------------------------------------------------------------
 // MARK: Discard Statement
 //------------------------------------------------------------------------------
+#define FRAGILE_FUNC_KIND \
+  "%select{a '@_transparent' function|" \
+  "an '@inlinable' function|" \
+  "an '@_alwaysEmitIntoClient' function|" \
+  "a default argument value|" \
+  "a property initializer in a '@frozen' type|" \
+  "a '@backDeployed' function|" \
+  "an embedded function not marked '@_neverEmitIntoClient'}"
+
 ERROR(discard_wrong_context_decl,none,
       "'discard' statement cannot appear in %kindonly0",
       (const Decl *))
 ERROR(discard_no_deinit,none,
       "'discard' has no effect for type %0 unless it has a deinitializer",
       (Type))
+ERROR(discard_in_inlinable_method,none,
+      "'discard' statement cannot be used in " FRAGILE_FUNC_KIND "0 inside of type %1, which is not '@frozen'",
+      (unsigned, Type))
+WARNING(discard_in_inlinable_method_warning,none,
+        "'discard' statement cannot be used in " FRAGILE_FUNC_KIND "0 inside of type %1, which is not '@frozen'; this will become an error",
+        (unsigned, Type))
 ERROR(discard_wrong_context_closure,none,
       "'discard' statement cannot appear in closure",
       ())
@@ -5559,6 +5580,10 @@ WARNING(no_throw_in_do_with_catch,none,
 
 ERROR(thrown_type_not_error,none,
       "thrown type %0 does not conform to the 'Error' protocol", (Type))
+
+ERROR(typed_throw_in_objc_forbidden,none,
+      "typed 'throws' %kindonly0 cannot be represented in Objective-C",
+      (const AbstractFunctionDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: Concurrency
@@ -6067,12 +6092,6 @@ ERROR(nonisolated_local_var,none,
       ())
 ERROR(nonisolated_actor_sync_init,none,
       "'nonisolated' on an actor's synchronous initializer is invalid",
-      ())
-ERROR(nonisolated_wrapped_property,none,
-      "'nonisolated' is not supported on properties with property wrappers",
-      ())
-ERROR(nonisolated_lazy,none,
-      "'nonisolated' is not supported on lazy properties",
       ())
 
 ERROR(non_sendable_from_deinit,none,
@@ -6620,7 +6639,7 @@ ERROR(objc_cannot_infer_name_raw_identifier,none,
       (const ValueDecl *))
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked '@cdecl'|marked '@_cdecl'|marked dynamic|marked '@objc'|marked '@objcMembers'|marked '@IBOutlet'|marked '@IBAction'|marked '@IBSegueAction'|marked '@NSManaged'|a member of an '@objc' protocol|implicitly '@objc'|an '@objc' override|an implementation of an '@objc' requirement|marked '@IBInspectable'|marked '@GKInspectable'|in an '@objc' extension of a class (without '@nonobjc')|in an '@objc @implementation' extension of a class (without final or '@nonobjc')|marked '@objc' by an access note}"
+#define OBJC_ATTR_SELECT "select{marked '@c'|marked '@_cdecl'|marked dynamic|marked '@objc'|marked '@objcMembers'|marked '@IBOutlet'|marked '@IBAction'|marked '@IBSegueAction'|marked '@NSManaged'|a member of an '@objc' protocol|implicitly '@objc'|an '@objc' override|an implementation of an '@objc' requirement|marked '@IBInspectable'|marked '@GKInspectable'|in an '@objc' extension of a class (without '@nonobjc')|in an '@objc @implementation' extension of a class (without final or '@nonobjc')|marked '@objc' by an access note}"
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
@@ -6674,7 +6693,7 @@ NOTE(not_objc_swift_struct,none,
 NOTE(not_objc_swift_enum,none,
       "non-'@objc' enums cannot be represented in Objective-C", ())
 NOTE(not_cdecl_or_objc_swift_enum,none,
-     "Swift enums not marked '@cdecl'%select{| or '@objc'}0 cannot be "
+     "Swift enums not marked '@c'%select{| or '@objc'}0 cannot be "
      "represented in %" FOREIGN_LANG_SELECT "0",
      (ForeignLanguage))
 NOTE(not_objc_generic_type_param,none,
@@ -6712,6 +6731,8 @@ ERROR(objc_addressor, none,
       "addressors are not allowed to be marked '@objc'", ())
 ERROR(objc_coroutine_accessor, none,
       "'read' and 'modify' accessors are not allowed to be marked '@objc'", ())
+ERROR(objc_borrow_mutate_accessor, none,
+      "borrow and mutate accessors are not allowed to be marked '@objc'", ())
 ERROR(objc_invalid_on_func_variadic,none,
       "%kindonly0 cannot be %" OBJC_ATTR_SELECT "1 because it has a variadic "
       "parameter", (const AbstractFunctionDecl*, unsigned))
@@ -6986,6 +7007,12 @@ WARNING(availability_unsupported_version_number, none,
 WARNING(availability_invalid_version_number_for_domain, none,
         "'%0' is not a valid version number for %1",
         (llvm::VersionTuple, AvailabilityDomain))
+WARNING(availability_domain_renamed, none,
+        "%0 has been renamed to '%1'",
+        (Identifier, StringRef))
+ERROR(availability_domain_requires_feature, none,
+      "%0 requires '-enable-experimental-feature %1'",
+      (AvailabilityDomain, StringRef))
 
 WARNING(attr_availability_expected_deprecated_version, none,
        "expected version number with 'deprecated' in '%0' attribute for %1",
@@ -6996,9 +7023,6 @@ WARNING(attr_availability_cannot_be_used_for_domain, none,
 WARNING(attr_availability_expected_version_spec, none,
        "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
        "for %1", (const DeclAttribute, AvailabilityDomain))
-ERROR(attr_availability_requires_custom_availability, none,
-      "%0 requires '-enable-experimental-feature CustomAvailability'",
-      (AvailabilityDomain))
 ERROR(attr_availability_domain_access, none,
       "availability domain '%0' is "
       "%select{private|fileprivate|internal|package|%error|%error}1 "
@@ -7010,6 +7034,15 @@ ERROR(attr_availability_domain_not_usable_from_inline, none,
       "availability domain '%0' used in '%1' on %kind2 must be "
       "'@usableFromInline' or public",
       (AvailabilityDomain, DeclAttribute, const Decl *))
+
+GROUPED_WARNING(attr_availability_has_no_effect_domain_always_available,
+                AlwaysAvailableDomain, none,
+                "'%0' has no effect because '%1' is always available",
+                (DeclAttribute, AvailabilityDomain))
+GROUPED_WARNING(attr_availability_domain_always_available,
+                AlwaysAvailableDomain, none,
+                "'%0' is always available, use '*' instead",
+                (AvailabilityDomain))
 
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
@@ -7131,6 +7164,12 @@ WARNING(availability_query_useless_enclosing_scope, none,
 
 NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
+
+GROUPED_WARNING(availability_query_useless_always_true,
+                AlwaysAvailableDomain, none,
+                "unnecessary check for '%0'; "
+                "this condition will always be %select{false|true}1",
+                (AvailabilityDomain, unsigned))
 
 ERROR(availability_decl_no_potential, none,
       "%kindonly0 cannot be marked potentially unavailable with '@available'",
@@ -7288,14 +7327,6 @@ WARNING(inlinable_implies_usable_from_inline,none,
 ERROR(usable_from_inline_attr_in_protocol,none,
       "'@usableFromInline' attribute cannot be used in protocols", ())
 
-#define FRAGILE_FUNC_KIND \
-  "%select{a '@_transparent' function|" \
-  "an '@inlinable' function|" \
-  "an '@_alwaysEmitIntoClient' function|" \
-  "a default argument value|" \
-  "a property initializer in a '@frozen' type|" \
-  "a '@backDeployed' function'}"
-
 ERROR(local_type_in_inlinable_function,
       none, "type %0 cannot be nested inside " FRAGILE_FUNC_KIND "1",
       (Identifier, unsigned))
@@ -7318,6 +7349,7 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
       "C++ APIs from imported module %2 do not support library evolution|"
+      "it was imported via the internal bridging header|"
       "%2 was not imported publicly}3",
       (const ValueDecl *, unsigned, Identifier, unsigned))
 
@@ -7329,6 +7361,7 @@ ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
       "%4 was imported for SPI only|"
       "%4 was not imported by this file|"
       "C++ types from imported module %4 do not support library evolution|"
+      "it was imported via the internal bridging header|"
       "%4 was not imported publicly}5",
       (const TypeAliasDecl *, StringRef, StringRef, unsigned, Identifier, unsigned))
 
@@ -8580,8 +8613,8 @@ ERROR(value_type_used_in_type_parameter,none,
       "cannot use value type %0 for generic argument %1", (Type, Type))
 ERROR(invalid_value_type_value_generic,none,
       "%0 is not a supported value type for %1", (Type, Type))
-ERROR(invalid_value_generic_conformance,none,
-      "value generic type %0 cannot conform to protocol %1", (Type, Type))
+ERROR(invalid_value_generic_constraint,none,
+      "cannot use type constraint with generic value parameter %0", (Type))
 ERROR(invalid_value_generic_same_type,none,
       "cannot constrain value parameter %0 to be type %1", (Type, Type))
 ERROR(integer_type_not_accepted,none,
@@ -8605,6 +8638,30 @@ ERROR(inlinearray_literal_incorrect_count,none,
 
 ERROR(inline_array_type_backwards,none,
       "element count must precede inline array element type", ())
+
+//===----------------------------------------------------------------------===//
+// MARK: Embedded Swift
+//===----------------------------------------------------------------------===//
+
+GROUPED_ERROR(weak_unowned_in_embedded_swift, EmbeddedRestrictions, none,
+              "attribute %0 cannot be used in Embedded Swift",
+              (ReferenceOwnership))
+
+GROUPED_WARNING(untyped_throws_in_embedded_swift, EmbeddedRestrictions,
+                DefaultIgnore,
+                "untyped throws is not available in Embedded Swift; add a thrown error type with '(type)'", ())
+GROUPED_WARNING(generic_nonfinal_in_embedded_swift, EmbeddedRestrictions,
+                DefaultIgnore,
+                "generic %kind0 in a class %select{must be 'final'|cannot be 'required'}1 in Embedded Swift",
+                (const Decl *, bool))
+GROUPED_WARNING(use_generic_member_of_existential_in_embedded_swift,
+                EmbeddedRestrictions, DefaultIgnore,
+                "cannot use generic %kind0 on a value of type %1 in Embedded Swift",
+                (const Decl *, Type))
+GROUPED_WARNING(dynamic_cast_involving_protocol_in_embedded_swift,
+                EmbeddedRestrictions, DefaultIgnore,
+                "cannot perform a dynamic cast to a type involving %kind0 in Embedded Swift",
+                (const Decl *))
 
 //===----------------------------------------------------------------------===//
 // MARK: @abi Attribute
@@ -8881,6 +8938,79 @@ ERROR(invalid_redecl_of_file_isolation,none,
       "invalid redeclaration of file-level default actor isolation", ())
 NOTE(invalid_redecl_of_file_isolation_prev,none,
      "default isolation was previously declared here", ())
+
+//===----------------------------------------------------------------------===//
+// MARK: `@inline(always)` attribute
+//===----------------------------------------------------------------------===//
+ERROR(attr_inline_always_experimental,none,
+      "'@inline(always)' is an experimental feature", ())
+ERROR(attr_inline_always_requires_inlinable,none,
+      "'@inline(always)' on public or package declarations must be used "
+      "together with '@inlinable'", ())
+ERROR(attr_inline_always_no_usable_from_inline,none,
+      "cannot use '@inline(always)' together with '@usableFromInline'", ())
+ERROR(attr_inline_always_requires_final_method,none,
+      "'@inline(always)' on class %select{methods|vars}1 requires %0 to be "
+      "marked 'final'", (DeclName, bool))
+ERROR(attr_inline_always_on_accessor,none,
+      "'@inline(always)' on class variable accessors whose variable declaration"
+      " is not final are not allowed", ())
+
+//===----------------------------------------------------------------------===//
+// MARK: `~Sendable`
+//===----------------------------------------------------------------------===//
+ERROR(tilde_sendable_requires_feature_flag,none,
+      "'~Sendable' requires -enable-experimental-feature TildeSendable",
+      ())
+
+NOTE(sendable_conformance_is_suppressed, none,
+     "%kind0 explicitly suppresses conformance to 'Sendable' protocol",
+     (const NominalTypeDecl *))
+
+ERROR(non_sendable_type_suppressed,none,
+      "cannot both conform to and suppress conformance to 'Sendable'", ())
+
+ERROR(conformance_repression_only_on_struct_class_enum,none,
+      "conformance to %0 can only be suppressed on structs, classes, and enums",
+      (const ProtocolDecl *))
+
+//===----------------------------------------------------------------------===//
+// MARK: Swift Performance hints
+//===----------------------------------------------------------------------===//
+
+GROUPED_WARNING(perf_hint_function_returns_array,ReturnTypeImplicitCopy,DefaultIgnore,
+                "Performance: %0 returns a%select{ dictionary|n array}1, leading to implicit copies. "
+                "Consider using an 'inout' parameter instead.", (const FuncDecl *, bool))
+GROUPED_WARNING(perf_hint_closure_returns_array,ReturnTypeImplicitCopy,DefaultIgnore,
+                "Performance: closure returns a%select{ dictionary|n array}0, leading to implicit copies. "
+                "Consider using an 'inout' parameter instead.", (bool))
+
+GROUPED_WARNING(perf_hint_param_expects_existential,ExistentialType,DefaultIgnore,
+                "Performance: %0 expects an existential, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
+                (const ParamDecl*))
+GROUPED_WARNING(perf_hint_func_returns_existential,ExistentialType,DefaultIgnore,
+                "Performance: %0 returns an existential, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
+                (const FuncDecl*))
+GROUPED_WARNING(perf_hint_closure_returns_existential,ExistentialType,DefaultIgnore,
+                "Performance: closure returns an existential, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.", ())
+GROUPED_WARNING(perf_hint_var_uses_existential,ExistentialType,DefaultIgnore,
+                "Performance: %0 uses an existential, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
+                (const VarDecl *))
+GROUPED_WARNING(perf_hint_any_pattern_uses_existential,ExistentialType,DefaultIgnore,
+                "Performance: declaration uses an existential, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
+                ())
+GROUPED_WARNING(perf_hint_typealias_uses_existential,ExistentialType,DefaultIgnore,
+                "Performance: %0 aliases an existential type, leading to heap allocation, reference counting, "
+                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
+                (const TypeAliasDecl *))
+
+ERROR(unsafe_self_dependent_result_attr_on_invalid_decl,none,
+      "invalid use of @_unsafeSelfDependentResult", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

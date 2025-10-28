@@ -914,6 +914,7 @@ public:
   /// Pretty-print the value.
   void dump() const;
   void print(raw_ostream &OS) const;
+  void print(SILPrintContext &ctx) const;
 
   /// Pretty-print the value with DebugInfo.
   void dump(bool DebugInfo) const;
@@ -921,8 +922,9 @@ public:
   /// Pretty-print the value in context, preceded by its operands (if the
   /// value represents the result of an instruction) and followed by its
   /// users.
-  void dumpInContext() const;
   void printInContext(raw_ostream &OS) const;
+  void printInContext(SILPrintContext &ctx) const;
+  void dumpInContext() const;
 
   static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_SILInstruction &&
@@ -1737,7 +1739,7 @@ public:
 
   // Destruct tail allocated objects.
   ~InstructionBaseWithTrailingOperands() {
-    Operand *Operands = TrailingObjects::template getTrailingObjects<Operand>();
+    Operand *Operands = this->template getTrailingObjectsNonStrict<Operand>();
     auto end = sharedUInt32().InstructionBaseWithTrailingOperands.numOperands;
     for (unsigned i = 0; i < end; ++i) {
       Operands[i].~Operand();
@@ -1750,13 +1752,13 @@ public:
   }
 
   ArrayRef<Operand> getAllOperands() const {
-    return {TrailingObjects::template getTrailingObjects<Operand>(),
-            sharedUInt32().InstructionBaseWithTrailingOperands.numOperands};
+    return this->template getTrailingObjectsNonStrict<Operand>(
+        sharedUInt32().InstructionBaseWithTrailingOperands.numOperands);
   }
 
   MutableArrayRef<Operand> getAllOperands() {
-    return {TrailingObjects::template getTrailingObjects<Operand>(),
-            sharedUInt32().InstructionBaseWithTrailingOperands.numOperands};
+    return this->template getTrailingObjectsNonStrict<Operand>(
+        sharedUInt32().InstructionBaseWithTrailingOperands.numOperands);
   }
 };
 
@@ -2839,13 +2841,13 @@ public:
   ///   - the formal arguments
   ///   - the type-dependency arguments
   MutableArrayRef<Operand> getAllOperands() {
-    return { asImpl().template getTrailingObjects<Operand>(),
-             getNumAllOperands() };
+    return asImpl().template getTrailingObjectsNonStrict<Operand>(
+        getNumAllOperands());
   }
 
   ArrayRef<Operand> getAllOperands() const {
-    return { asImpl().template getTrailingObjects<Operand>(),
-             getNumAllOperands() };
+    return asImpl().template getTrailingObjectsNonStrict<Operand>(
+        getNumAllOperands());
   }
 
   /// Check whether the given operand index is a call-argument index
@@ -3147,6 +3149,15 @@ class ApplyInst final
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
          std::optional<ApplyIsolationCrossing> isolationCrossing);
+
+public:
+  bool hasGuaranteedResult() const {
+    return getSubstCalleeConv().hasGuaranteedResult();
+  }
+
+  bool hasAddressResult() const {
+    return getSubstCalleeConv().hasAddressResult();
+  }
 };
 
 /// PartialApplyInst - Represents the creation of a closure object by partial
@@ -4329,7 +4340,7 @@ public:
 
   /// The PGO function name for the function in which the counter resides.
   StringRef getPGOFuncName() const {
-    return StringRef(getTrailingObjects<char>(), PGOFuncNameLength);
+    return StringRef(getTrailingObjects(), PGOFuncNameLength);
   }
 
   /// The total number of counters within the function.
@@ -4552,7 +4563,7 @@ private:
 public:
   /// getValue - Return the string data for the literal, in UTF-8.
   StringRef getValue() const {
-    return {getTrailingObjects<char>(), sharedUInt32().StringLiteralInst.length};
+    return {getTrailingObjects(), sharedUInt32().StringLiteralInst.length};
   }
 
   /// getEncoding - Return the desired encoding of the text.
@@ -5612,7 +5623,7 @@ public:
   void setValueForName(StringRef name, SILValue value) { values[name] = value; }
   llvm::StringMap<SILValue> const &getValues() { return values; }
   StringRef getArgumentsSpecification() const {
-    return StringRef(getTrailingObjects<char>(), ArgumentsSpecificationLength);
+    return StringRef(getTrailingObjects(), ArgumentsSpecificationLength);
   }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
@@ -8779,6 +8790,18 @@ public:
   }
 };
 
+class ImplicitActorToOpaqueIsolationCastInst final
+    : public UnaryInstructionBase<
+          SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst,
+          OwnershipForwardingSingleValueInstruction> {
+  friend SILBuilder;
+
+  ImplicitActorToOpaqueIsolationCastInst(SILDebugLocation loc, SILValue value);
+
+public:
+  SILValue getValue() const { return getOperand(); }
+};
+
 enum class MarkDependenceKind {
   Unresolved, Escaping, NonEscaping
 };
@@ -9530,6 +9553,17 @@ class MoveOnlyWrapperToCopyableAddrInst
   }
 };
 
+class UncheckedOwnershipInst final
+    : public UnaryInstructionBase<SILInstructionKind::UncheckedOwnershipInst,
+                                  OwnershipForwardingSingleValueInstruction> {
+  friend class SILBuilder;
+
+  UncheckedOwnershipInst(SILDebugLocation DebugLoc, SILValue operand,
+                         ValueOwnershipKind forwardingOwnershipKind)
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType(),
+                             forwardingOwnershipKind) {}
+};
+
 /// Given an object reference, return true iff it is non-nil and refers
 /// to a native swift object with strong reference count of 1.
 class IsUniqueInst
@@ -9876,9 +9910,7 @@ class CondFailInst final
                               StringRef Message, SILModule &M);
 
 public:
-  StringRef getMessage() const {
-    return {getTrailingObjects<char>(), MessageSize};
-  }
+  StringRef getMessage() const { return {getTrailingObjects(), MessageSize}; }
 };
 
 //===----------------------------------------------------------------------===//
@@ -10102,6 +10134,7 @@ public:
     case TermKind::UnwindInst:
     case TermKind::UnreachableInst:
     case TermKind::ReturnInst:
+    case TermKind::ReturnBorrowInst:
     case TermKind::ThrowInst:
     case TermKind::ThrowAddrInst:
     case TermKind::YieldInst:
@@ -10224,6 +10257,34 @@ public:
   /// Return the ownership kind for this instruction if we had any direct
   /// results.
   ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }
+
+  SuccessorListTy getSuccessors() {
+    // No Successors.
+    return SuccessorListTy();
+  }
+};
+
+class ReturnBorrowInst final
+    : public InstructionBaseWithTrailingOperands<
+          SILInstructionKind::ReturnBorrowInst, ReturnBorrowInst, TermInst> {
+  friend SILBuilder;
+
+  ReturnBorrowInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> operands);
+
+  static ReturnBorrowInst *create(SILDebugLocation DebugLoc, SILValue value,
+                                  ArrayRef<SILValue> enclosingValues,
+                                  SILModule &M);
+
+public:
+  SILValue getReturnValue() const { return getAllOperands()[0].get(); }
+
+  ArrayRef<Operand> getEnclosingValueOperands() const {
+    return getAllOperands().drop_front();
+  }
+
+  OperandValueArrayRef getEnclosingValues() const {
+    return OperandValueArrayRef(getEnclosingValueOperands());
+  }
 
   SuccessorListTy getSuccessors() {
     // No Successors.
@@ -11645,6 +11706,8 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::FunctionExtractIsolationInst:
   case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::BorrowedFromInst:
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
+  case SILInstructionKind::UncheckedOwnershipInst:
     return true;
   default:
     return false;

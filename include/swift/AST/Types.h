@@ -141,24 +141,24 @@ public:
     /// This type expression contains a GenericTypeParamType.
     HasTypeParameter     = 0x04,
 
-    /// This type expression contains an UnresolvedType.
-    HasUnresolvedType    = 0x08,
-
     /// Whether this type expression contains an unbound generic type.
-    HasUnboundGeneric    = 0x10,
+    HasUnboundGeneric    = 0x08,
 
     /// This type expression contains an LValueType other than as a
     /// function input, and can be loaded to convert to an rvalue.
-    IsLValue             = 0x20,
+    IsLValue             = 0x10,
 
     /// This type expression contains an opened existential ArchetypeType.
-    HasOpenedExistential = 0x40,
+    HasOpenedExistential = 0x20,
 
     /// This type expression contains a DynamicSelf type.
-    HasDynamicSelf       = 0x80,
+    HasDynamicSelf       = 0x40,
 
     /// This type contains an Error type.
-    HasError             = 0x100,
+    HasError             = 0x80,
+
+    /// This type contains an Error type without an underlying original type.
+    HasBareError         = 0x100,
 
     /// This type contains a DependentMemberType.
     HasDependentMember   = 0x200,
@@ -225,14 +225,14 @@ public:
   /// Does a type with these properties have a type parameter somewhere in it?
   bool hasTypeParameter() const { return Bits & HasTypeParameter; }
 
-  /// Does a type with these properties have an unresolved type somewhere in it?
-  bool hasUnresolvedType() const { return Bits & HasUnresolvedType; }
-
   /// Is a type with these properties an lvalue?
   bool isLValue() const { return Bits & IsLValue; }
 
   /// Does this type contain an error?
   bool hasError() const { return Bits & HasError; }
+
+  /// Does this type contain an error without an original type?
+  bool hasBareError() const { return Bits & HasBareError; }
 
   /// Does this type contain a dependent member type, possibly with a
   /// non-type parameter base, such as a type variable or concrete type?
@@ -407,7 +407,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 15 };
+  enum { NumAFTExtInfoBits = 16 };
   enum { NumSILExtInfoBits = 14 };
 
   // clang-format off
@@ -444,8 +444,7 @@ protected:
     HasExtInfo : 1,
     HasClangTypeInfo : 1,
     HasThrownError : 1,
-    HasLifetimeDependencies : 1,
-    NumParams : 15
+    HasLifetimeDependencies : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
@@ -750,11 +749,6 @@ public:
   /// member root in a type variable.
   bool isTypeVariableOrMember();
 
-  /// Determine whether this type involves a UnresolvedType.
-  bool hasUnresolvedType() const {
-    return getRecursiveProperties().hasUnresolvedType();
-  }
-
   /// Determine whether this type involves a \c PlaceholderType.
   bool hasPlaceholder() const {
     return getRecursiveProperties().hasPlaceholder();
@@ -855,12 +849,11 @@ public:
   /// type variables referenced by this type.
   void getTypeVariables(SmallPtrSetImpl<TypeVariableType *> &typeVariables);
 
-private:
+public:
   /// If the receiver is a `DependentMemberType`, returns its root. Otherwise,
   /// returns the receiver.
   Type getDependentMemberRoot();
 
-public:
   /// Determine whether this type is a type parameter, which is either a
   /// GenericTypeParamType or a DependentMemberType.
   ///
@@ -949,6 +942,16 @@ public:
     return getRecursiveProperties().hasError();
   }
 
+  /// Determine whether this type contains an error type without an
+  /// underlying original type, i.e prints as `_`.
+  bool hasBareError() const {
+    return getRecursiveProperties().hasBareError();
+  }
+
+  /// Whether this is a top-level ErrorType without an underlying original
+  /// type, i.e prints as `_`.
+  bool isBareErrorType() const;
+
   /// Does this type contain a dependent member type, possibly with a
   /// non-type parameter base, such as a type variable or concrete type?
   bool hasDependentMember() const {
@@ -999,6 +1002,13 @@ public:
 
   /// Determines whether this type is an any actor type.
   bool isAnyActorType();
+
+  /// Is this a type whose value is a value that a function can use in an
+  /// isolated parameter position. This could be a type that actually conforms
+  /// to AnyActor or it could be a type like any Actor, Optional<any Actor> or
+  /// Builtin.ImplicitActor that do not conform to Actor but from which we can
+  /// derive a value that conforms to the Actor protocol.
+  bool canBeIsolatedTo();
 
   /// Returns true if this type conforms to Sendable, or if its a function type
   /// that is @Sendable.
@@ -1102,6 +1112,15 @@ public:
 
   /// Check if this is a std.string type from C++.
   bool isCxxString();
+
+  /// Check if this is the type Unicode.Scalar from the Swift standard library.
+  bool isUnicodeScalar();
+
+  /// Check if this type is known to represent key paths.
+  bool isKnownKeyPathType();
+
+  /// Check if this type is known to represent immutable key paths.
+  bool isKnownImmutableKeyPathType();
 
   /// Check if this is either an Array, Set or Dictionary collection type defined
   /// at the top level of the Swift module
@@ -1648,11 +1667,19 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalOrBoundGenericNominalType, AnyGenericType)
 /// have to emit further diagnostics to abort compilation.
 class ErrorType final : public TypeBase {
   friend class ASTContext;
-  // The Error type is always canonical.
-  ErrorType(ASTContext &C, Type originalType,
-            RecursiveTypeProperties properties)
-      : TypeBase(TypeKind::Error, &C, properties) {
-    assert(properties.hasError());
+
+  static RecursiveTypeProperties getProperties(Type originalType) {
+    RecursiveTypeProperties props = RecursiveTypeProperties::HasError;
+    if (!originalType || originalType->hasBareError())
+      props |= RecursiveTypeProperties::HasBareError;
+
+    return props;
+  }
+
+  ErrorType(ASTContext &C, Type originalType)
+      : TypeBase(TypeKind::Error,
+                 (!originalType || originalType->isCanonical()) ? &C : nullptr,
+                 getProperties(originalType)) {
     if (originalType) {
       Bits.ErrorType.HasOriginalType = true;
       *reinterpret_cast<Type *>(this + 1) = originalType;
@@ -1683,25 +1710,6 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorType, Type)
-
-/// UnresolvedType - This represents a type variable that cannot be resolved to
-/// a concrete type because the expression is ambiguous.  This is produced when
-/// parsing expressions and producing diagnostics.  Any instance of this should
-/// cause the entire expression to be ambiguously typed.
-class UnresolvedType : public TypeBase {
-  friend class ASTContext;
-  // The Unresolved type is always canonical.
-  UnresolvedType(ASTContext &C)
-    : TypeBase(TypeKind::Unresolved, &C,
-       RecursiveTypeProperties(RecursiveTypeProperties::HasUnresolvedType)) { }
-public:
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Unresolved;
-  }
-};
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnresolvedType, Type)
-
   
 /// BuiltinType - An abstract class for all the builtin types.
 class BuiltinType : public TypeBase {
@@ -2017,6 +2025,19 @@ public:
 BEGIN_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getElementType)
 END_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
+
+class BuiltinImplicitActorType : public BuiltinType {
+  friend class ASTContext;
+
+  BuiltinImplicitActorType(const ASTContext &context)
+      : BuiltinType(TypeKind::BuiltinImplicitActor, context) {}
+
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinImplicitActor;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinImplicitActorType, BuiltinType)
 
 /// Size descriptor for a builtin integer type. This is either a fixed bit
 /// width or an abstract target-dependent value such as "size of a pointer".
@@ -2339,22 +2360,24 @@ public:
   /// Retrieve the parent of this type as written, e.g., the part that was
   /// written before ".", if provided.
   Type getParent() const {
-    return Bits.TypeAliasType.HasParent ? *getTrailingObjects<Type>()
-                                        : Type();
+    return Bits.TypeAliasType.HasParent ? *getTrailingObjects() : Type();
   }
 
   /// Retrieve the substitution map applied to the declaration's underlying
   /// to produce the described type.
-  SubstitutionMap getSubstitutionMap() const;
+  ///
+  /// \param wantContextualType If \c true, the substitution map will bind
+  /// outer local generic parameters to archetypes. Otherwise they will be left
+  /// unchanged.
+  SubstitutionMap getSubstitutionMap(bool wantContextualType = false) const;
 
   /// Get the direct generic arguments, which correspond to the generic
   /// arguments that are directly applied to the typealias declaration
   /// this type references.
   ArrayRef<Type> getDirectGenericArgs() const {
-    return ArrayRef<Type>(
-        getTrailingObjects<Type>() +
-        (Bits.TypeAliasType.HasParent ? 1 : 0),
-        Bits.TypeAliasType.GenericArgCount);
+    return ArrayRef<Type>(getTrailingObjects() +
+                              (Bits.TypeAliasType.HasParent ? 1 : 0),
+                          Bits.TypeAliasType.GenericArgCount);
   }
 
   SmallVector<Type, 2> getExpandedGenericArgs();
@@ -2745,16 +2768,16 @@ public:
 
   /// getElements - Return the elements of this tuple.
   ArrayRef<TupleTypeElt> getElements() const {
-    return {getTrailingObjects<TupleTypeElt>(), getNumElements()};
+    return getTrailingObjects(getNumElements());
   }
 
   const TupleTypeElt &getElement(unsigned i) const {
-    return getTrailingObjects<TupleTypeElt>()[i];
+    return getTrailingObjects()[i];
   }
 
   /// getElementType - Return the type of the specified element.
   Type getElementType(unsigned ElementNo) const {
-    return getTrailingObjects<TupleTypeElt>()[ElementNo].getType();
+    return getTrailingObjects()[ElementNo].getType();
   }
 
   TupleEltTypeArrayRef getElementTypes() const {
@@ -2784,7 +2807,7 @@ private:
       : TypeBase(TypeKind::Tuple, CanCtx, properties) {
     Bits.TupleType.Count = elements.size();
     std::uninitialized_copy(elements.begin(), elements.end(),
-                            getTrailingObjects<TupleTypeElt>());
+                            getTrailingObjects());
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
@@ -3348,7 +3371,8 @@ END_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
 /// represented at the binary level as a single function pointer.
 class AnyFunctionType : public TypeBase {
   const Type Output;
-  
+  uint16_t NumParams;
+
 public:
   using Representation = FunctionTypeRepresentation;
 
@@ -3609,8 +3633,8 @@ protected:
       Bits.AnyFunctionType.HasThrownError = false;
       Bits.AnyFunctionType.HasLifetimeDependencies = false;
     }
-    Bits.AnyFunctionType.NumParams = NumParams;
-    assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
+    this->NumParams = NumParams;
+    assert(this->NumParams == NumParams && "Params dropped!");
     
     if (Info && CONDITIONAL_ASSERT_enabled()) {
       unsigned maxLifetimeTarget = NumParams + 1;
@@ -3648,7 +3672,7 @@ public:
 
   Type getResult() const { return Output; }
   ArrayRef<Param> getParams() const;
-  unsigned getNumParams() const { return Bits.AnyFunctionType.NumParams; }
+  unsigned getNumParams() const { return NumParams; }
 
   GenericSignature getOptGenericSignature() const;
   
@@ -4776,7 +4800,7 @@ enum class ResultConvention : uint8_t {
   /// The validity of the return value is dependent on the 'self' parameter,
   /// so it may be invalidated if that parameter is released.
   UnownedInnerPointer,
-  
+
   /// This value has been (or may have been) returned autoreleased.
   /// The caller should make an effort to reclaim the autorelease.
   /// The type must be a class or class existential type, and this
@@ -4788,6 +4812,18 @@ enum class ResultConvention : uint8_t {
   /// depending on the pact type).  The callee is responsible for
   /// leaving an initialized object in each element of the pack.
   Pack,
+
+  /// The caller is responsible for using the returned address within a valid
+  /// scope. This is valid only for borrow accessors.
+  GuaranteedAddress,
+
+  /// The caller is responsible for using the returned value within a valid
+  /// scope. This is valid only for borrow accessors.
+  Guaranteed,
+
+  /// The caller is responsible for mutating the returned address within a valid
+  /// scope. This is valid only for mutate accessors.
+  Inout,
 };
 
 // Does this result require indirect storage for the purpose of reabstraction?
@@ -4942,6 +4978,22 @@ public:
   /// Is this a pack result?  Pack results are always indirect.
   bool isPack() const {
     return getConvention() == ResultConvention::Pack;
+  }
+
+  bool isAddressResult(bool loweredAddresses) const {
+    if (loweredAddresses) {
+      return getConvention() == ResultConvention::GuaranteedAddress ||
+             getConvention() == ResultConvention::Inout;
+    }
+    return getConvention() == ResultConvention::Inout;
+  }
+
+  bool isGuaranteedResult(bool loweredAddresses) const {
+    if (loweredAddresses) {
+      return getConvention() == ResultConvention::Guaranteed;
+    }
+    return getConvention() == ResultConvention::Guaranteed ||
+           getConvention() == ResultConvention::GuaranteedAddress;
   }
 
   /// Transform this SILResultInfo by applying the user-provided
@@ -5382,6 +5434,20 @@ public:
   }
   bool hasIndirectErrorResult() const {
     return hasErrorResult() && getErrorResult().isFormalIndirect();
+  }
+
+  bool hasGuaranteedResult(bool loweredAddresses) const {
+    if (getNumResults() != 1) {
+      return false;
+    }
+    return getResults()[0].isGuaranteedResult(loweredAddresses);
+  }
+
+  bool hasAddressResult(bool loweredAddresses) const {
+    if (getNumResults() != 1) {
+      return false;
+    }
+    return getResults()[0].isAddressResult(loweredAddresses);
   }
 
   struct IndirectFormalResultFilter {
@@ -6198,7 +6264,7 @@ private:
       : TypeBase(TypeKind::SILPack, &ctx, properties) {
     Bits.SILPackType.Count = elements.size();
     Bits.SILPackType.ElementIsAddress = info.ElementIsAddress;
-    memcpy(getTrailingObjects<CanType>(), elements.data(),
+    memcpy(getTrailingObjects(), elements.data(),
            elements.size() * sizeof(CanType));
   }
 
@@ -6220,13 +6286,13 @@ public:
 
   /// Retrieves the type of the elements in the pack.
   ArrayRef<CanType> getElementTypes() const {
-    return {getTrailingObjects<CanType>(), getNumElements()};
+    return getTrailingObjects(getNumElements());
   }
 
   /// Returns the type of the element at the given \p index.
   /// This is a lowered SIL type.
   CanType getElementType(unsigned index) const {
-    return getTrailingObjects<CanType>()[index];
+    return getTrailingObjects()[index];
   }
 
   SILType getSILElementType(unsigned index) const; // in SILType.h
@@ -6521,7 +6587,8 @@ public:
   /// a protocol composition type; you also have to look at
   /// hasExplicitAnyObject().
   ArrayRef<Type> getMembers() const {
-    return {getTrailingObjects<Type>(), static_cast<size_t>(Bits.ProtocolCompositionType.Count)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.ProtocolCompositionType.Count));
   }
 
   InvertibleProtocolSet getInverses() const { return Inverses; }
@@ -6569,7 +6636,7 @@ private:
     Bits.ProtocolCompositionType.HasExplicitAnyObject = hasExplicitAnyObject;
     Bits.ProtocolCompositionType.Count = members.size();
     std::uninitialized_copy(members.begin(), members.end(),
-                            getTrailingObjects<Type>());
+                            getTrailingObjects());
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
@@ -6618,8 +6685,8 @@ public:
   }
 
   ArrayRef<Type> getArgs() const {
-    return {getTrailingObjects<Type>(),
-            static_cast<size_t>(Bits.ParameterizedProtocolType.ArgCount)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.ParameterizedProtocolType.ArgCount));
   }
 
   bool requiresClass() const {
@@ -6973,7 +7040,7 @@ public:
   }
 protected:
   ArchetypeType(TypeKind Kind,
-                const ASTContext &C,
+                const ASTContext *C,
                 RecursiveTypeProperties properties,
                 Type InterfaceType,
                 ArrayRef<ProtocolDecl *> ConformsTo,
@@ -7052,7 +7119,8 @@ public:
   }
 
 private:
-  OpaqueTypeArchetypeType(GenericEnvironment *environment,
+  OpaqueTypeArchetypeType(const ASTContext *ctx,
+                          GenericEnvironment *environment,
                           RecursiveTypeProperties properties,
                           Type interfaceType,
                           ArrayRef<ProtocolDecl*> conformsTo,
@@ -7196,11 +7264,13 @@ public:
   }
   
 private:
-  ExistentialArchetypeType(GenericEnvironment *environment, Type interfaceType,
-                      ArrayRef<ProtocolDecl *> conformsTo,
-                      Type superclass,
-                      LayoutConstraint layout,
-                      RecursiveTypeProperties properties);
+  ExistentialArchetypeType(const ASTContext *ctx,
+                           GenericEnvironment *environment,
+                           Type interfaceType,
+                           ArrayRef<ProtocolDecl *> conformsTo,
+                           Type superclass,
+                           LayoutConstraint layout,
+                           RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(ExistentialArchetypeType, LocalArchetypeType)
 END_CAN_TYPE_WRAPPER(ExistentialArchetypeType, LocalArchetypeType)
@@ -7273,7 +7343,7 @@ public:
   }
   
 private:
-  ElementArchetypeType(const ASTContext &ctx,
+  ElementArchetypeType(const ASTContext *ctx,
                        GenericEnvironment *environment, Type interfaceType,
                        ArrayRef<ProtocolDecl *> conformsTo, Type superclass,
                        LayoutConstraint layout);
@@ -7700,8 +7770,7 @@ class ErrorUnionType final
                  RecursiveTypeProperties properties) 
         : TypeBase(TypeKind::ErrorUnion, /*Context=*/ctx, properties) {
     Bits.ErrorUnionType.NumTerms = terms.size();
-    std::uninitialized_copy(terms.begin(), terms.end(),
-                            getTrailingObjects<Type>());
+    std::uninitialized_copy(terms.begin(), terms.end(), getTrailingObjects());
   }
 
 public:
@@ -7709,7 +7778,8 @@ public:
   static Type get(const ASTContext &ctx, ArrayRef<Type> terms);
 
   ArrayRef<Type> getTerms() const {
-    return { getTrailingObjects<Type>(), static_cast<size_t>(Bits.ErrorUnionType.NumTerms) };
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.ErrorUnionType.NumTerms));
   };
 
   // Support for FoldingSet.
@@ -7726,16 +7796,16 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorUnionType, Type)
 
-/// PlaceholderType - This represents a placeholder type for a type variable
-/// or dependent member type that cannot be resolved to a concrete type
-/// because the expression is ambiguous. This type is only used by the
-/// constraint solver and transformed into UnresolvedType to be used in AST.
+/// PlaceholderType - In the AST, this represents the type of a placeholder `_`.
+/// In the constraint system, this is opened into a type variable, and uses of
+/// PlaceholderType are instead used to represent holes where types cannot be
+/// inferred.
 class PlaceholderType : public TypeBase {
   // NOTE: If you add a new Type-based originator, you'll need to update the
   // recursive property logic in PlaceholderType::get.
   using Originator =
       llvm::PointerUnion<TypeVariableType *, DependentMemberType *, ErrorType *,
-                         VarDecl *, ErrorExpr *, TypeRepr *>;
+                         VarDecl *, ErrorExpr *, TypeRepr *, Pattern *>;
 
   Originator O;
 
@@ -7801,12 +7871,12 @@ public:
 
   /// Retrieves the type of the elements in the pack.
   ArrayRef<Type> getElementTypes() const {
-    return {getTrailingObjects<Type>(), getNumElements()};
+    return getTrailingObjects(getNumElements());
   }
 
   /// Returns the type of the element at the given \p index.
   Type getElementType(unsigned index) const {
-    return getTrailingObjects<Type>()[index];
+    return getTrailingObjects()[index];
   }
 
   bool containsPackExpansionType() const;
@@ -7832,7 +7902,7 @@ private:
      : TypeBase(TypeKind::Pack, CanCtx, properties) {
      Bits.PackType.Count = elements.size();
      std::uninitialized_copy(elements.begin(), elements.end(),
-                             getTrailingObjects<Type>());
+                             getTrailingObjects());
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(PackType, Type)
@@ -8092,6 +8162,11 @@ inline ASTContext &TypeBase::getASTContext() const {
   return *const_cast<ASTContext*>(getCanonicalType()->Context);
 }
 
+inline bool TypeBase::isBareErrorType() const {
+  auto *errTy = dyn_cast<ErrorType>(this);
+  return errTy && !errTy->getOriginalType();
+}
+
 // TODO: This will become redundant once InOutType is removed.
 inline bool TypeBase::isMaterializable() {
   return !(hasLValueType() || is<InOutType>());
@@ -8320,11 +8395,11 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
   if (auto ty = dyn_cast<BoundGenericStructType>(this))
-    return ty->getTrailingObjects<Type>();
+    return ty->getTrailingObjects();
   if (auto ty = dyn_cast<BoundGenericEnumType>(this))
-    return ty->getTrailingObjects<Type>();
+    return ty->getTrailingObjects();
   if (auto ty = dyn_cast<BoundGenericClassType>(this))
-    return ty->getTrailingObjects<Type>();
+    return ty->getTrailingObjects();
   llvm_unreachable("Unhandled BoundGenericType!");
 }
 

@@ -1113,6 +1113,14 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
     return true;
   }
 
+  if (auto *applyInst = dyn_cast_or_null<ApplyInst>(
+          stripAccessMarkers(operand)->getDefiningInstruction())) {
+    if (applyInst->hasAddressResult()) {
+      LLVM_DEBUG(llvm::dbgs() << "Adding apply as init!\n");
+      return true;
+    }
+  }
+
   if (isa<UncheckedTakeEnumDataAddrInst>(stripAccessMarkers(operand))) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding enum projection as init!\n");
@@ -2408,6 +2416,12 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
             checkKind == MarkUnresolvedNonCopyableValueInst::CheckKind::
                              NoConsumeOrAssign &&
             !moveChecker.canonicalizer.hasPartialApplyConsumingUse()) {
+          moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
+              markedValue);
+          return true;
+        }
+
+        if (operand->isBorrowAccessorResult()) {
           moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
               markedValue);
           return true;

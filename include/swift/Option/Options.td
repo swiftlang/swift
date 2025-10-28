@@ -298,6 +298,13 @@ def language_mode : Separate<["-"], "language-mode">,
   MetaVarName<"<mode>">,
   Alias<swift_version>;
 
+def min_swift_runtime_version
+    : Separate<["-"], "min-swift-runtime-version">,
+      Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+      HelpText<"The minimum Swift runtime version "
+               "that will be available at runtime">,
+      MetaVarName<"<vers>">;
+
 def package_description_version: Separate<["-"], "package-description-version">,
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"The version number to be applied on the input for the PackageDescription availability kind">,
@@ -347,15 +354,24 @@ def import_underlying_module : Flag<["-"], "import-underlying-module">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Implicitly imports the Objective-C half of a module">;
 
+def import_bridging_header : Separate<["-"], "import-bridging-header">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Implicitly imports a C header file">;
 def import_objc_header : Separate<["-"], "import-objc-header">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
-  HelpText<"Implicitly imports an Objective-C header file">;
-def import_bridging_header : Separate<["-"], "import-bridging-header">,
-  Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
-  Alias<import_objc_header>;
+  Alias<import_bridging_header>;
+
+def internal_import_bridging_header : Separate<["-"], "internal-import-bridging-header">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Implicitly imports a C header file as an internal import">;
+
 def import_pch : Separate<["-"], "import-pch">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Import bridging header PCH file">;
+
+def internal_import_pch : Separate<["-"], "internal-import-pch">,
+  Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
+  HelpText<"Import bridging header PCH file as internal">;
 
 def pch_output_dir: Separate<["-"], "pch-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
@@ -799,6 +815,11 @@ def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
   HelpText<"Emit an Objective-C and C++ header file to <path>">,
   Alias<emit_objc_header_path>;
 
+def emit_clang_header_min_access : Separate<["-"], "emit-clang-header-min-access">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath, CacheInvariant]>,
+  MetaVarName<"<access-level>">,
+  HelpText<"The minimum access level of declarations to include in the emitted header.>">;
+
 def static : Flag<["-"], "static">,
   Flags<[FrontendOption, ModuleInterfaceOption, NoInteractiveOption]>,
   HelpText<"Make this module statically linkable and make the output of -emit-library a static library.">;
@@ -890,7 +911,7 @@ def experimental_package_interface_load:
 def experimental_serialize_debug_info:
   Flag<["-"], "experimental-serialize-debug-info">,
   Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Enables seriailzation/deserialization of debug scopes">;
+  HelpText<"Enables serialization/deserialization of debug scopes">;
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
@@ -919,6 +940,10 @@ def Wwarning : Separate<["-"], "Wwarning">,
   Flags<[FrontendOption, HelpHidden]>,
   MetaVarName<"<diagnostic_group>">,
   HelpText<"Treat this warning group as warning">;
+
+def suppress_notes : Flag<["-"], "suppress-notes">,
+  Flags<[FrontendOption]>,
+  HelpText<"Suppress all notes">;
 
 def suppress_remarks : Flag<["-"], "suppress-remarks">,
   Flags<[FrontendOption]>,
@@ -1171,7 +1196,7 @@ def ExperimentalPackageCMO : Flag<["-"], "experimental-package-cmo">,
 
 def PackageCMO : Flag<["-"], "package-cmo">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable optimization to perform defalut CMO within a package boundary">;
+  HelpText<"Enable optimization to perform default CMO within a package boundary">;
 
 def EnableDefaultCMO : Flag<["-"], "enable-default-cmo">,
   Flags<[HelpHidden, FrontendOption]>,
@@ -1533,6 +1558,9 @@ def target_legacy_spelling : Joined<["--"], "target=">,
 def print_target_info : Flag<["-"], "print-target-info">,
     Flags<[FrontendOption]>,
     HelpText<"Print target information for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
+def print_static_build_config : Flag<["-"], "print-static-build-config">,
+    Flags<[FrontendOption]>,
+    HelpText<"Print static build configuration that can be used to evaluate #ifs in Swift source code">;
 
 def print_supported_features : Flag<["-"], "print-supported-features">,
     Flags<[FrontendOption]>,
@@ -1607,6 +1635,29 @@ def profile_sample_use : Joined<["-"], "profile-sample-use=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath, NewDriverOnlyOption]>,
   MetaVarName<"<profile data>">,
   HelpText<"Supply sampling-based profiling data from llvm-profdata to enable profile-guided optimization">;
+
+def cs_profile_generate : Flag<["-"], "cs-profile-generate">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Generate instrumented code to collect context sensitive execution counts into default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def cs_profile_generate_EQ : Joined<["-"], "cs-profile-generate=">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  MetaVarName<"<directory>">,
+  HelpText<"Generate instrumented code to collect context sensitive execution counts into <directory>/default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def ir_profile_generate: Flag<["-"], "ir-profile-generate">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Generate instrumented code to collect execution counts into default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def ir_profile_generate_EQ : Joined<["-"], "ir-profile-generate=">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  MetaVarName<"<directory>">,
+  HelpText<"Generate instrumented code to collect execution counts into <directory>/default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def ir_profile_use : CommaJoined<["-"], "ir-profile-use=">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
+  MetaVarName<"<profdata>">,
+  HelpText<"Supply an IR-level PGO profdata file to enable profile-guided optimization">;
 
 def embed_bitcode : Flag<["-"], "embed-bitcode">,
   Flags<[FrontendOption, NoInteractiveOption]>,
@@ -2128,6 +2179,13 @@ def emit_module_serialize_diagnostics_path:
            "<path>">,
   MetaVarName<"<path>">;
 
+def dependency_scan_serialize_diagnostics_path:
+  Separate<["-"], "dependency-scan-serialize-diagnostics-path">,
+  Flags<[ArgumentIsPath, SupplementaryOutput, NewDriverOnlyOption]>,
+  HelpText<"Emit a serialized diagnostics file for the dependency scanning task to "
+           "<path>">,
+  MetaVarName<"<path>">;
+
 def emit_module_dependencies_path:
   Separate<["-"], "emit-module-dependencies-path">,
   Flags<[ArgumentIsPath, SupplementaryOutput, NewDriverOnlyOption]>,
@@ -2315,7 +2373,7 @@ def load_resolved_plugin:
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Path to resolved plugin configuration and a comma-separated list "
            "of module names where the macro types are declared. Library path "
-           "and exectuable path can be empty if not used">,
+           "and executable path can be empty if not used">,
   MetaVarName<"<library-path>#<executable-path>#<module-names>">;
 
 def resolved_plugin_verification : Flag<["-"], "resolved-plugin-verification">,

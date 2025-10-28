@@ -1,10 +1,11 @@
 
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging -Xcc -std=c++20 -I %t/Inputs  %t/test.swift -strict-memory-safety -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1
+// RUN: %target-swift-frontend -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging -Xcc -iapinotes-modules -Xcc %swift_src_root/stdlib/public/Cxx/std -Xcc -std=c++20 -I %t/Inputs  %t/test.swift -strict-memory-safety -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: std_span
 
 //--- Inputs/module.modulemap
 module Test {
@@ -64,9 +65,13 @@ View safeFunc(View v1 [[clang::noescape]], View v2 [[clang::lifetimebound]]);
 void unsafeFunc(View v1 [[clang::noescape]], View v2);
 
 class SharedObject {
+public:
+  View getView() const [[clang::lifetimebound]];
 private:
   int *p;
 } SWIFT_SHARED_REFERENCE(retainSharedObject, releaseSharedObject);
+
+View getViewFromSharedObject(SharedObject* p [[clang::lifetimebound]]);
 
 inline void retainSharedObject(SharedObject *) {}
 inline void releaseSharedObject(SharedObject *) {}
@@ -76,6 +81,34 @@ struct DerivedFromSharedObject : SharedObject {};
 struct OwnedData {
   SpanOfInt getView() const [[clang::lifetimebound]];
   void takeSharedObject(SharedObject *) const;
+};
+
+// A class template that throws away its type argument.
+//
+// If this template is instantiated with an unsafe type, it should be considered
+// unsafe even if that type is never used.
+template <typename> struct TTake {};
+
+using TTakeInt = TTake<int>;
+using TTakePtr = TTake<int *>;
+using TTakeSafeTuple = TTake<SafeTuple>;
+using TTakeUnsafeTuple = TTake<UnsafeTuple>;
+
+// An escapability or explicit safety annotation means a type is considered safe
+// even if it would otherwise be considered unsafe.
+template <typename> struct SWIFT_ESCAPABLE TEscape {};
+template <typename> struct __attribute__((swift_attr("safe"))) TSafe { void *ptr; };
+
+using TEscapePtr = TEscape<int *>;
+using TEscapeUnsafeTuple = TEscape<UnsafeTuple>;
+using TSafePtr = TSafe<int *>;
+using TSafeTuple = TSafe<UnsafeTuple>;
+
+struct HoldsShared {
+  SharedObject* obj;
+
+  SharedObject* getObj() const SWIFT_RETURNS_INDEPENDENT_VALUE
+                               SWIFT_RETURNS_UNRETAINED;
 };
 
 //--- test.swift
@@ -134,6 +167,7 @@ func useUnsafeTuple(x: UnsafeTuple) {
 func useCppSpan(x: SpanOfInt) {
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
   _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+  _ = x.size()
 }
 
 func useCppSpan2(x: SpanOfIntAlias) {
@@ -160,9 +194,37 @@ func useUnsafeLifetimeAnnotated(v: View) {
 func useSharedReference(frt: SharedObject, x: OwnedData) {
   let _ = frt
   x.takeSharedObject(frt)
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  let _ = frt.getView() // expected-note{{reference to unsafe instance method 'getView()'}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  let _ = getViewFromSharedObject(frt) // expected-note{{reference to unsafe global function 'getViewFromSharedObject'}}
 }
 
 @available(SwiftStdlib 5.8, *)
-func useSharedReference(frt: DerivedFromSharedObject) {
+func useSharedReference(frt: DerivedFromSharedObject, h: HoldsShared) {
   let _ = frt
+  let _ = h.getObj()
 }
+
+func useTTakeInt(x: TTakeInt) {
+  _ = x
+}
+
+func useTTakePtr(x: TTakePtr) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}
+
+func useTTakeSafeTuple(x: TTakeSafeTuple) {
+  _ = x
+}
+
+func useTTakeUnsafeTuple(x: TTakeUnsafeTuple) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}
+
+func useTEscapePtr(x: TEscapePtr) { _ = x }
+func useTEscapeUnsafeTuple(x: TEscapeUnsafeTuple) { _ = x }
+func useTSafePtr(x: TSafePtr) { _ = x }
+func useTSafeTuple(x: TSafeTuple) { _ = x }

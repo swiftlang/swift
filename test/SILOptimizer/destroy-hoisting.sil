@@ -395,3 +395,58 @@ bb2:
   unreachable
 }
 
+
+public struct Wrapper {
+  var _k: Klass
+  var i: Int
+}
+
+sil @get_wrapper : $@convention(thin) () -> @owned Wrapper
+sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+sil [ossa] @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
+bb0(%0 : @guaranteed $Wrapper):
+  %2 = struct_extract %0, #Wrapper._k
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrow_accessor_noopt1 :
+// CHECK:  [[F:%.*]] = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:  [[A:%.*]] = apply [[F]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:  end_borrow {{.*}}
+// CHECK:  destroy_value %0
+// CHECK-LABEL: } // end sil function 'test_borrow_accessor_noopt1'
+sil [ossa] @test_borrow_accessor_noopt1 : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %1 = begin_borrow %0
+  %2 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %4 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %1
+  destroy_value %0
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrow_accessor_noopt2 :
+// CHECK:  [[F:%.*]] = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:  [[A:%.*]] = apply [[F]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:  end_borrow {{.*}}
+// CHECK:  destroy_value {{.*}}
+// CHECK-LABEL: } // end sil function 'test_borrow_accessor_noopt2'
+sil [ossa] @test_borrow_accessor_noopt2 : $@convention(thin) () -> () {
+bb0:
+  %1 = function_ref @get_wrapper : $@convention(thin) () -> @owned Wrapper
+  %2 = apply %1() : $@convention(thin) () -> @owned Wrapper
+  %3 = begin_borrow %2
+  %4 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %6 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %3
+  destroy_value %2
+  %10 = tuple ()
+  return %10
+}
+

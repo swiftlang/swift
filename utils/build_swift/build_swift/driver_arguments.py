@@ -71,7 +71,7 @@ def _apply_default_arguments(args):
 
     # Set the default build variant.
     if args.build_variant is None:
-        args.build_variant = 'Debug'
+        args.build_variant = 'RelWithDebInfo'
 
     if args.llvm_build_variant is None:
         args.llvm_build_variant = args.build_variant
@@ -950,7 +950,7 @@ def create_argument_parser():
 
     with mutually_exclusive_group():
 
-        set_defaults(build_variant='Debug')
+        set_defaults(build_variant='RelWithDebInfo')
 
         option(['-d', '--debug'], store('build_variant'),
                const='Debug',

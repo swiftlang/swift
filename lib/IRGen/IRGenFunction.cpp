@@ -307,11 +307,18 @@ llvm::Value *
 IRGenFunction::emitTargetOSVersionAtLeastCall(llvm::Value *major,
                                               llvm::Value *minor,
                                               llvm::Value *patch) {
-  auto fn = IGM.getPlatformVersionAtLeastFunctionPointer();
+  // compiler-rt in the NDK does not include __isPlatformVersionAtLeast
+  // but only __isOSVersionAtLeast
+  if (IGM.Triple.isAndroid()) {
+    auto fn = IGM.getOSVersionAtLeastFunctionPointer();
+    return Builder.CreateCall(fn, {major, minor, patch});
+  } else {
+    auto fn = IGM.getPlatformVersionAtLeastFunctionPointer();
 
-  llvm::Value *platformID =
-    llvm::ConstantInt::get(IGM.Int32Ty, getBaseMachOPlatformID(IGM.Triple));
-  return Builder.CreateCall(fn, {platformID, major, minor, patch});
+    llvm::Value *platformID =
+      llvm::ConstantInt::get(IGM.Int32Ty, getBaseMachOPlatformID(IGM.Triple));
+    return Builder.CreateCall(fn, {platformID, major, minor, patch});
+  }
 }
 
 llvm::Value *
@@ -524,8 +531,8 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
   }
 
   // Emit the trap instruction.
-  llvm::Function *trapIntrinsic =
-      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::trap);
+  llvm::Function *trapIntrinsic = llvm::Intrinsic::getOrInsertDeclaration(
+      &IGM.Module, llvm::Intrinsic::trap);
   if (EnableTrapDebugInfo && IGM.DebugInfo && !failureMsg.empty()) {
     IGM.DebugInfo->addFailureMessageToCurrentLoc(*this, failureMsg);
   }

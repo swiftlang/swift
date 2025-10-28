@@ -52,6 +52,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isConvertPointerToPointerArgument: Bool { bridged.isConvertPointerToPointerArgument() }
 
+  public var isAddressor: Bool { bridged.isAddressor() }
+
   public var specializationLevel: Int { bridged.specializationLevel() }
 
   public var isSpecialization: Bool { bridged.isSpecialization() }
@@ -267,6 +269,18 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     return StringRef(bridged: bridged.getAccessorName()).string
   }
 
+  public var isInitializer: Bool {
+    return bridged.isInitializer()
+  }
+
+  public var isDeinitializer: Bool {
+    return bridged.isDeinitializer()
+  }
+
+  public var isImplicit: Bool {
+    return bridged.isImplicit()
+  }
+
   /// True, if the function runs with a swift 5.1 runtime.
   /// Note that this is function specific, because inlinable functions are de-serialized
   /// in a client module, which might be compiled with a different deployment target.
@@ -293,6 +307,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case noRuntime
     case noExistentials
     case noObjCRuntime
+    case manualOwnership
   }
 
   public var performanceConstraints: PerformanceConstraints {
@@ -303,6 +318,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       case .NoRuntime: return .noRuntime
       case .NoExistentials: return .noExistentials
       case .NoObjCBridging: return .noObjCRuntime
+      case .ManualOwnership: return .manualOwnership
       default: fatalError("unknown performance constraint")
     }
   }
@@ -314,6 +330,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public enum InlineStrategy {
     case automatic
     case never
+    case heuristicAlways
     case always
   }
 
@@ -321,6 +338,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     switch bridged.getInlineStrategy() {
       case .InlineDefault: return .automatic
       case .NoInline: return .never
+      case .HeuristicAlwaysInline: return .heuristicAlways
       case .AlwaysInline: return .always
       default:
         fatalError()

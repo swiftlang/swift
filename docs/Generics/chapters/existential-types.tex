@@ -106,7 +106,7 @@ In both signatures, the interface type of the existential is \texttt{\ttgp{1}{0}
 Recall from \ChapRef{genericenv} that there are three kinds of generic environments. We've seen primary generic environments, which are associated with generic declarations. We also saw opaque generic environments, which are instantiated from an opaque return declaration and substitution map, in \SecRef{opaquearchetype}. Now, it's time to introduce the third kind, the opened generic environment. An opened generic environment is created from an opened existential signature of the first kind (with no parent generic signature). The archetypes of an opened generic environment are \emph{opened archetypes}.
 
 \index{call expression}
-When the expression type checker encounters a call expression where an argument of existential type is passed to a parameter of generic parameter type, the existential value is \emph{opened}, projecting the value and assigning it a new opened archetype from a fresh opened generic environment. The call expression is rewritten by wrapping the entire call is wrapped in an \texttt{OpenExistentialExpr}, which stores two sub-expressions. The first sub-expression is the original call argument, which evaluates to the value of existential type. The payload value and opened archetype is scoped to the second sub-expression, which consumes the payload value. The call argument is replaced with a \texttt{OpaqueValueExpr}, which has the opened archetype type. The opened archetype also becomes the replacement type for the generic parameter in the call's substitution map.
+When the expression type checker encounters a call expression where an argument of existential type is passed to a parameter of generic parameter type, the existential value is \emph{opened}, projecting the value and assigning it a new opened archetype from a fresh opened generic environment. The call expression is rewritten by wrapping the entire call in an \texttt{OpenExistentialExpr}, which stores two sub-expressions. The first sub-expression is the original call argument, which evaluates to the value of existential type. The payload value and opened archetype is scoped to the second sub-expression, which consumes the payload value. The call argument is replaced with a \texttt{OpaqueValueExpr}, which has the opened archetype type. The opened archetype also becomes the replacement type for the generic parameter in the call's substitution map.
 
 For example, if \texttt{animal} is a value of type \texttt{any Animal}, the expression \texttt{animal.eat()} calling a protocol method looks like this before opening:
 \begin{quote}
@@ -463,8 +463,8 @@ func petAnimal<A: Animal>(_ animal: A) {...}
 
 func careForAnimals(_ animals: [any Animal]) {
   for animal in animals {
-    careForAnimal(animal)  // existential opened here in Swift 5.7;
-                           // type check error in Swift 5.6.
+    petAnimal(animal)  // existential opened here in Swift 5.7;
+                       // type check error in Swift 5.6.
   }
 }
 \end{Verbatim}

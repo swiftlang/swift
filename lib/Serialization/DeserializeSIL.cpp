@@ -984,7 +984,9 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     assert(next.Kind == llvm::BitstreamEntry::Record);
 
     scratch.clear();
-    llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(next.ID, scratch);
+    StringRef blobData;
+    llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(next.ID, scratch,
+                                                              &blobData);
     if (!maybeKind)
       return maybeKind.takeError();
     unsigned kind = maybeKind.get();
@@ -1006,6 +1008,21 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
         }
         (void)error;
         assert(!error.first && "effects deserialization error");
+      }
+      continue;
+    }
+
+    if (kind == SIL_EXTRA_STRING) {
+      unsigned stringFlavor;
+      SILExtraStringLayout::readRecord(scratch, stringFlavor);
+
+      switch (static_cast<ExtraStringFlavor>(stringFlavor)) {
+      case ExtraStringFlavor::AsmName:
+        fn->setAsmName(blobData);
+        break;
+      case ExtraStringFlavor::Section:
+        fn->setSection(blobData);
+        break;
       }
       continue;
     }
@@ -2762,6 +2779,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createDestructureStruct(Loc, Operand);
     break;
   }
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst: {
+    assert(RecordKind == SIL_ONE_OPERAND);
+    auto Ty = MF->getType(TyID);
+    ResultInst = Builder.createImplicitActorToOpaqueIsolationCast(
+        Loc, getLocalValue(Builder.maybeGetFunction(), ValID,
+                           getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    break;
+  }
   case SILInstructionKind::UncheckedOwnershipConversionInst: {
     auto Ty = MF->getType(TyID);
     auto ResultKind = decodeValueOwnership(Attr);
@@ -2891,6 +2916,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                       getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
         CKind, Strict);
     break;
+  }
+  case SILInstructionKind::UncheckedOwnershipInst: {
+    llvm_unreachable("Invalid unchecked_ownership in deserialization");
   }
   case SILInstructionKind::StoreInst: {
     auto Ty = MF->getType(TyID);
@@ -3089,6 +3117,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
       ResultInst = Builder.createBorrowedFrom(
         Loc, OpList[0], ArrayRef(OpList).drop_front());
     }
+    break;
+  }
+  case SILInstructionKind::ReturnBorrowInst: {
+    SmallVector<SILValue, 4> OpList;
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 3) {
+      auto EltTy = MF->getType(ListOfValues[I]);
+      OpList.push_back(getLocalValue(
+          Builder.maybeGetFunction(), ListOfValues[I + 2],
+          getSILType(EltTy, (SILValueCategory)ListOfValues[I + 1], Fn)));
+    }
+    ResultInst = Builder.createReturnBorrow(Loc, OpList[0],
+                                            ArrayRef(OpList).drop_front());
     break;
   }
   case SILInstructionKind::TupleElementAddrInst:
@@ -4080,8 +4120,10 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   DeclID dID;
   ModuleID parentModuleID;
   unsigned rawLinkage, serializedKind, IsDeclaration, IsLet, IsUsed;
+  unsigned numTrailingRecords;
   SILGlobalVarLayout::readRecord(scratch, rawLinkage, serializedKind,
-                                 IsDeclaration, IsLet, IsUsed, TyID, dID,
+                                 IsDeclaration, IsLet, IsUsed,
+                                 numTrailingRecords, TyID, dID,
                                  parentModuleID);
   if (TyID == 0) {
     LLVM_DEBUG(llvm::dbgs() << "SILGlobalVariable typeID is 0.\n");
@@ -4124,6 +4166,42 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
     Callback->didDeserialize(MF->getAssociatedModule(), v);
 
   scratch.clear();
+
+  // Read trailing reecords.
+  for (unsigned recordIdx = 0; recordIdx < numTrailingRecords; ++recordIdx) {
+    StringRef blobData;
+    llvm::Expected<llvm::BitstreamEntry> maybeNext =
+        SILCursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeNext)
+      return nullptr;
+    llvm::BitstreamEntry next = maybeNext.get();
+    assert(next.Kind == llvm::BitstreamEntry::Record);
+
+    scratch.clear();
+    llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(next.ID, scratch,
+                                                              &blobData);
+    if (!maybeKind)
+      return nullptr;
+    unsigned kind = maybeKind.get();
+
+    if (kind == SIL_EXTRA_STRING) {
+      unsigned stringFlavor;
+      SILExtraStringLayout::readRecord(scratch, stringFlavor);
+
+      switch (static_cast<ExtraStringFlavor>(stringFlavor)) {
+      case ExtraStringFlavor::AsmName:
+        v->setAsmName(blobData);
+        break;
+      case ExtraStringFlavor::Section:
+        v->setSection(blobData);
+        break;
+      }
+      continue;
+    }
+
+    return nullptr;
+  }
+
   maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry)
     MF->fatal(maybeEntry.takeError());
@@ -4131,6 +4209,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   if (entry.Kind == llvm::BitstreamEntry::EndBlock)
     return v;
 
+  scratch.clear();
   maybeKind = SILCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeKind)
     MF->fatal(maybeKind.takeError());

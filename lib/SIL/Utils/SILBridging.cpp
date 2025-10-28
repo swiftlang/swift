@@ -186,9 +186,11 @@ static_assert((int)BridgedFunction::PerformanceConstraints::NoLocks == (int)swif
 static_assert((int)BridgedFunction::PerformanceConstraints::NoRuntime == (int)swift::PerformanceConstraints::NoRuntime);
 static_assert((int)BridgedFunction::PerformanceConstraints::NoExistentials == (int)swift::PerformanceConstraints::NoExistentials);
 static_assert((int)BridgedFunction::PerformanceConstraints::NoObjCBridging == (int)swift::PerformanceConstraints::NoObjCBridging);
+static_assert((int)BridgedFunction::PerformanceConstraints::ManualOwnership == (int)swift::PerformanceConstraints::ManualOwnership);
 
 static_assert((int)BridgedFunction::InlineStrategy::InlineDefault == (int)swift::InlineDefault);
 static_assert((int)BridgedFunction::InlineStrategy::NoInline == (int)swift::NoInline);
+static_assert((int)BridgedFunction::InlineStrategy::HeuristicAlwaysInline == (int)swift::HeuristicAlwaysInline);
 static_assert((int)BridgedFunction::InlineStrategy::AlwaysInline == (int)swift::AlwaysInline);
 
 static_assert((int)BridgedFunction::ABILanguage::Swift == (int)swift::SILFunctionLanguage::Swift);
@@ -695,6 +697,11 @@ void BridgedCloner::recordFoldedValue(BridgedValue orig, BridgedValue mapped) co
 
 BridgedInstruction BridgedCloner::clone(BridgedInstruction inst) const {
   return {cloner->cloneInst(inst.unbridged())->asSILNode()};
+}
+
+void BridgedCloner::setInsertionBlockIfNotSet(BridgedBasicBlock block) const {
+  if (!cloner->getBuilder().hasValidInsertionPoint())
+    cloner->getBuilder().setInsertionPoint(block.unbridged());
 }
 
 BridgedBasicBlock BridgedCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {

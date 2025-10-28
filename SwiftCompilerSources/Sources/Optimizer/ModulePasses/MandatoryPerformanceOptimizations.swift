@@ -219,6 +219,12 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
 
     changed = context.eliminateDeadAllocations(in: function) || changed
   }
+
+  if function.isGlobalInitOnceFunction {
+    // Cleanup leftovers from simplification. The InitializeStaticGlobals pass cannot deal with dead
+    // stores in global init functions.
+    eliminateDeadStores(in: function, context)
+  }
 }
 
 private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions: inout Set<PathFunctionTuple>,
@@ -302,7 +308,9 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
     return false
   }
 
-  if apply.parentFunction.isGlobalInitOnceFunction && callee.inlineStrategy == .always {
+  if apply.parentFunction.isGlobalInitOnceFunction && (
+      callee.inlineStrategy == .heuristicAlways ||
+      callee.inlineStrategy == .always) {
     // Some arithmetic operations, like integer conversions, are not transparent but `inline(__always)`.
     // Force inlining them in global initializers so that it's possible to statically initialize the global.
     return true
@@ -404,7 +412,7 @@ private extension Value {
       //   var p = Point(x: 10, y: 20)
       //   let o = UnsafePointer(&p)
       // Therefore ignore the `end_access` use of a `begin_access`.
-      let relevantUses = singleUseValue.uses.ignoreDebugUses.ignoreUses(ofType: EndAccessInst.self)
+      let relevantUses = singleUseValue.uses.ignoreDebugUses.ignore(usersOfType: EndAccessInst.self)
 
       guard let use = relevantUses.singleUse else {
         return nil

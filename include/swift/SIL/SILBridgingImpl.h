@@ -260,10 +260,6 @@ bool SILFunctionType_hasSelfParam(BridgedCanType funcTy) {
   return funcTy.unbridged()->castTo<swift::SILFunctionType>()->hasSelfParam();
 }
 
-bool SILFunctionType_isTrivialNoescape(BridgedCanType funcTy) {
-  return funcTy.unbridged()->castTo<swift::SILFunctionType>()->isTrivialNoEscape();
-}
-
 BridgedYieldInfoArray SILFunctionType_getYields(BridgedCanType funcTy) {
   return {funcTy.unbridged()->castTo<swift::SILFunctionType>()->getYields()};
 }
@@ -699,6 +695,21 @@ bool BridgedFunction::isAccessor() const {
 BridgedStringRef BridgedFunction::getAccessorName() const {
   auto *accessorDecl  = llvm::cast<swift::AccessorDecl>(getFunction()->getDeclRef().getDecl());
   return accessorKindName(accessorDecl->getAccessorKind());
+}
+
+bool BridgedFunction::isInitializer() const {
+  return getFunction()->getDeclRef().isConstructor();
+}
+
+bool BridgedFunction::isDeinitializer() const {
+  return getFunction()->getDeclRef().isDestructor();
+}
+
+bool BridgedFunction::isImplicit() const {
+  if (auto *funcDecl = getFunction()->getDeclRef().getAbstractFunctionDecl()) {
+    return funcDecl->isImplicit();
+  }
+  return false;
 }
 
 bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(); }
@@ -1347,6 +1358,14 @@ bool BridgedInstruction::TryApplyInst_getNonAsync() const {
 
 BridgedGenericSpecializationInformation BridgedInstruction::TryApplyInst_getSpecializationInfo() const {
   return {getAs<swift::TryApplyInst>()->getSpecializationInfo()};
+}
+
+bool BridgedInstruction::BeginApplyInst_getNonThrowing() const {
+  return getAs<swift::BeginApplyInst>()->isNonThrowing();
+}
+
+bool BridgedInstruction::BeginApplyInst_getNonAsync() const {
+  return getAs<swift::BeginApplyInst>()->isNonAsync();
 }
 
 BridgedDeclRef BridgedInstruction::ClassMethodInst_getMember() const {
@@ -2219,9 +2238,11 @@ BridgedInstruction BridgedBuilder::createCondFail(BridgedValue condition, Bridge
                                      message.unbridged())};
 }
 
-BridgedInstruction BridgedBuilder::createIntegerLiteral(BridgedType type, SwiftInt value) const {
-  return {
-      unbridged().createIntegerLiteral(regularLoc(), type.unbridged(), value)};
+BridgedInstruction
+BridgedBuilder::createIntegerLiteral(BridgedType type, SwiftInt value,
+                                     bool treatAsSigned) const {
+  return {unbridged().createIntegerLiteral(regularLoc(), type.unbridged(),
+                                           value, treatAsSigned)};
 }
 
 BridgedInstruction BridgedBuilder::createAllocRef(BridgedType type,
@@ -2296,6 +2317,11 @@ BridgedInstruction BridgedBuilder::createUncheckedRefCast(BridgedValue op, Bridg
 
 BridgedInstruction BridgedBuilder::createUncheckedAddrCast(BridgedValue op, BridgedType type) const {
   return {unbridged().createUncheckedAddrCast(regularLoc(), op.getSILValue(),
+                                              type.unbridged())};
+}
+
+BridgedInstruction BridgedBuilder::createUncheckedValueCast(BridgedValue op, BridgedType type) const {
+  return {unbridged().createUncheckedValueCast(regularLoc(), op.getSILValue(),
                                               type.unbridged())};
 }
 

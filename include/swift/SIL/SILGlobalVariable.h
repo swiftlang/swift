@@ -60,6 +60,13 @@ private:
   /// binary.  A pointer into the module's lookup table.
   StringRef Name;
 
+  /// The name that this variable should have when lowered to LLVM IR. If empty,
+  /// the mangled name of the variable will be used instead.
+  StringRef AsmName;
+
+  /// Name of a section if @section attribute was used, otherwise empty.
+  StringRef Section;
+
   /// The lowered type of the variable.
   SILType LoweredType;
   
@@ -79,7 +86,7 @@ private:
   /// once (either in its declaration, or once later), making it immutable.
   unsigned IsLet : 1;
 
-  /// Whether this declaration was marked `@_used`, meaning that it should be
+  /// Whether this declaration was marked `@used`, meaning that it should be
   /// added to the llvm.used list.
   unsigned IsUsed : 1;
 
@@ -150,7 +157,15 @@ public:
   }
 
   StringRef getName() const { return Name; }
-  
+
+  /// Return custom assembler name, otherwise empty.
+  StringRef asmName() const { return AsmName; }
+  void setAsmName(StringRef value) { AsmName = value; }
+
+  /// Return custom section name if @section was used, otherwise empty
+  StringRef section() const { return Section; }
+  void setSection(StringRef value) { Section = value; }
+
   void setDeclaration(bool isD) { IsDeclaration = isD; }
 
   /// True if this is a definition of the variable.
@@ -227,19 +242,10 @@ public:
     StaticInitializerBlock.eraseAllInstructions(Module);
   }
 
-  /// Returns true if this global variable has `@_used` attribute.
+  /// Returns true if this global variable has `@used` attribute.
   bool markedAsUsed() const { return IsUsed; }
 
   void setMarkedAsUsed(bool used) { IsUsed = used; }
-
-  /// Returns a SectionAttr if this global variable has `@_section` attribute.
-  SectionAttr *getSectionAttr() const {
-    auto *V = getDecl();
-    if (!V)
-      return nullptr;
-
-    return V->getAttrs().getAttribute<SectionAttr>();
-  }
 
   /// Return whether this variable corresponds to a Clang node.
   bool hasClangNode() const;

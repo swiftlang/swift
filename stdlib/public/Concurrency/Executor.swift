@@ -93,7 +93,7 @@ public protocol SchedulingExecutor: Executor {
   ///              will not be executed before this time.
   /// - tolerance: The maximum additional delay permissible before the
   ///              job is executed.  `nil` means no limit.
-  /// - clock:     The clock used for the delay..
+  /// - clock:     The clock used for the delay.
   @available(StdlibDeploymentTarget 6.2, *)
   func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                          at instant: C.Instant,
@@ -604,7 +604,7 @@ public protocol ExecutorFactory {
   static var defaultExecutor: any TaskExecutor { get }
 }
 
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 typealias DefaultExecutorFactory = PlatformExecutorFactory
 
 @available(StdlibDeploymentTarget 6.2, *)
@@ -616,7 +616,7 @@ public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
   Task._defaultExecutor = factory.defaultExecutor
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftStdlib 6.3, *)
 @_silgen_name("swift_createDefaultExecutors")
 func _createDefaultExecutors() {
   if Task._defaultExecutor == nil {

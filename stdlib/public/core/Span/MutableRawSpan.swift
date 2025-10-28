@@ -42,7 +42,6 @@ public struct MutableRawSpan: ~Copyable & ~Escapable {
   }
 
   @unsafe
-  @_unsafeNonescapableResult
   @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
   internal init(

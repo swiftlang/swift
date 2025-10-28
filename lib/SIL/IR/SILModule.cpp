@@ -112,7 +112,6 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
     : Stage(SILStage::Raw), loweredAddresses(!Options.EnableSILOpaqueValues),
       indexTrieRoot(new IndexTrieNode()), Options(Options),
       irgenOptions(irgenOptions), serialized(false),
-      regDeserializationNotificationHandlerForNonTransparentFuncOME(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),
       hasAccessMarkerHandler(false),
       prespecializedFunctionDeclsImported(false), SerializeSILAction(),
@@ -505,6 +504,33 @@ void SILModule::eraseGlobalVariable(SILGlobalVariable *gv) {
   getSILGlobalList().erase(gv);
 }
 
+void SILModule::eraseDifferentiabilityWitness(SILDifferentiabilityWitness *dw) {
+  getSILLoader()->invalidateDifferentiabilityWitness(dw);
+
+  Mangle::ASTMangler mangler(getASTContext());
+  auto originalFunction = dw->getOriginalFunction()->getName();
+  auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
+    originalFunction, dw->getKind(), dw->getConfig());
+  DifferentiabilityWitnessMap.erase(mangledKey);
+  llvm::erase(DifferentiabilityWitnessesByFunction[originalFunction], dw);
+
+  getDifferentiabilityWitnessList().erase(dw);
+}
+
+void SILModule::eraseAllDifferentiabilityWitnesses(SILFunction *f) {
+  Mangle::ASTMangler mangler(getASTContext());
+
+  for (auto *dw : DifferentiabilityWitnessesByFunction.at(f->getName())) {
+    getSILLoader()->invalidateDifferentiabilityWitness(dw);
+    auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
+      f->getName(), dw->getKind(), dw->getConfig());
+    DifferentiabilityWitnessMap.erase(mangledKey);
+    getDifferentiabilityWitnessList().erase(dw);
+  }
+
+  DifferentiabilityWitnessesByFunction.erase(f->getName());
+}
+
 SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
                                    bool deserializeLazily) {
   if (!C)
@@ -805,7 +831,10 @@ unsigned SILModule::getFieldIndex(NominalTypeDecl *decl, VarDecl *field) {
   if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
     for (auto *superDecl = classDecl->getSuperclassDecl(); superDecl != nullptr;
          superDecl = superDecl->getSuperclassDecl()) {
-      index += superDecl->getStoredProperties().size();
+      if (!superDecl->isResilient(getSwiftModule(),
+                                  ResilienceExpansion::Maximal)) {
+        index += superDecl->getStoredProperties().size();
+      }
     }
   }
   for (VarDecl *property : decl->getStoredProperties()) {
@@ -889,8 +918,8 @@ void SILModule::notifyMovedInstruction(SILInstruction *inst,
 bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
   const auto &IntrinsicInfo = getIntrinsicInfo(Name);
   if (IntrinsicInfo.ID != llvm::Intrinsic::not_intrinsic) {
-    return IntrinsicInfo.getOrCreateAttributes(getASTContext())
-        .hasFnAttr(llvm::Attribute::NoReturn);
+    return IntrinsicInfo.getOrCreateFnAttributes(getASTContext())
+        .hasAttribute(llvm::Attribute::NoReturn);
   }
   const auto &BuiltinInfo = getBuiltinInfo(Name);
   switch (BuiltinInfo.ID) {

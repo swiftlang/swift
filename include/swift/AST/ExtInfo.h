@@ -537,7 +537,8 @@ class ASTExtInfoBuilder {
     DifferentiabilityMaskOffset = 11,
     DifferentiabilityMask = 0x7 << DifferentiabilityMaskOffset,
     SendingResultMask = 1 << 14,
-    NumMaskBits = 15
+    InOutResultMask = 1 << 15,
+    NumMaskBits = 16
   };
 
   static_assert(FunctionTypeIsolation::Mask == 0x7, "update mask manually");
@@ -659,6 +660,8 @@ public:
     return FunctionTypeIsolation::fromOpaqueValues(getIsolationKind(),
                                                    globalActor);
   }
+
+  constexpr bool hasInOutResult() const { return bits & InOutResultMask; }
 
   constexpr bool hasSelfParam() const {
     switch (getSILRepresentation()) {
@@ -782,6 +785,11 @@ public:
         lifetimeDependencies);
   }
 
+  [[nodiscard]] ASTExtInfoBuilder withHasInOutResult() const {
+    return ASTExtInfoBuilder((bits | InOutResultMask), clangTypeInfo,
+                             globalActor, thrownError, lifetimeDependencies);
+  }
+
   void Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddInteger(bits);
     ID.AddPointer(clangTypeInfo.getType());
@@ -876,6 +884,8 @@ public:
   }
 
   FunctionTypeIsolation getIsolation() const { return builder.getIsolation(); }
+
+  constexpr bool hasInOutResult() const { return builder.hasInOutResult(); }
 
   /// Helper method for changing the representation.
   ///

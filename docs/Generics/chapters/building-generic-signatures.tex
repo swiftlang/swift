@@ -768,7 +768,7 @@ To get a derivation $G \vdash \SameReq{\rT.Indices}{\rT.Indices}$, we make use o
 \ReflexStep{2}{\rT.Indices}{3}
 \end{gather*}
 
-We now state the general result. We need this for the proof of \ThmRef{valid theorem}, and also later in \SecRef{conformance paths exist}, when we show that every derived conformance requirement has a derivation of a certrain form.
+We now state the general result. We need this for the proof of \ThmRef{valid theorem}, and also later in \SecRef{conformance paths exist}, when we show that every derived conformance requirement has a derivation of a certain form.
 
 \begin{lemma}[Formal substitution]\label{subst lemma}
 Let $G$ be an arbitrary generic signature. Suppose that $G\vdash\tT$ and $G\vdash\TP$ for some type parameter \tT\ and protocol \tP. Then if we take a valid type parameter or derived requirement of~$\GP$ and replace \tSelf\ with \tT\ throughout, we get a valid type parameter or derived requirement of~$G$, just rooted in \tT. That is:
@@ -1312,7 +1312,7 @@ In \texttt{f3()}, we can replace \emph{either} requirement with $\SameReq{T.X}{I
 We now state the general definition.
 
 \begin{definition}\label{conflicting req def}
-Let $G$ be a \index{well-formed generic signature}well-formed generic signature. If $G$ has a pair of \index{derived requirement!conflicts}derived requirements $R_1$~and~$R_2$ where $R_1\otimes\Sigma$ and $R_2\otimes\Sigma$ cannot both be \index{satisfied requirement!conflicts}satisfied by the same substitution map~$\Sigma$, then $R_1$~and~$R_2$ define a pair of \IndexDefinition{conflicting requirement}\emph{confliciting requirements}. A generic signature $G$ is \emph{conflict-free} if it does not have any pairs of conflicting requirements. The pairs of derived requirements that can lead to conflicts are enumerated below:
+Let $G$ be a \index{well-formed generic signature}well-formed generic signature. If $G$ has a pair of \index{derived requirement!conflicts}derived requirements $R_1$~and~$R_2$ where $R_1\otimes\Sigma$ and $R_2\otimes\Sigma$ cannot both be \index{satisfied requirement!conflicts}satisfied by the same substitution map~$\Sigma$, then $R_1$~and~$R_2$ define a pair of \IndexDefinition{conflicting requirement}\emph{conflicting requirements}. A generic signature $G$ is \emph{conflict-free} if it does not have any pairs of conflicting requirements. The pairs of derived requirements that can lead to conflicts are enumerated below:
 \begin{enumerate}
 \item For two concrete \index{same-type requirement!conflicts}same-type requirements $\SameReq{T}{$\tX_1$}$ and $\SameReq{T}{$\tX_2$}$, we desugar the ``combined'' requirement $\SameReq{$\tX_1$}{$\tX_2$}$, as we already saw. Here and every remaining case below, desugaring will either detect a conflict, or produce a simpler list of requirements that can replace one of the two original requirements.
 \item For a concrete same-type requirement $\TX$ and superclass requirement $\TC$, we desugar $\ConfReq{X}{C}$, which can be satisfied only if~\tX\ is a class type that is also a subclass of~\tC.

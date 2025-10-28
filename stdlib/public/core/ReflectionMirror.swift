@@ -378,7 +378,11 @@ public func _forEachFieldWithKeyPath<Root>(
            body: UnsafeRawBufferPointer(start: nil, count: 0))
       unsafe component.clone(
         into: &destBuilder.buffer,
-        endOfReferencePrefix: false)
+        endOfReferencePrefix: false,
+
+        // We are just storing offset components and not computed ones.
+        adjustForAlignment: false
+      )
     }
 
     if let name = unsafe field.name {

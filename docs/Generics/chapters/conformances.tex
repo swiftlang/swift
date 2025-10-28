@@ -64,7 +64,7 @@ When building the conformance lookup table for a subclass, we wrap each supercla
 \draw [arrow] (SquareShape) -- (Square);
 \end{tikzpicture}
 \end{center}
-We denote this inherited conformance by $\ConfReq{Square}{Shape}$. It behaves identically to the superclass conformance $\ConfReq{Polygon}{Shape}$, except if ask for its \index{conforming type!inherited conformance}conforming type, we get back \texttt{Square} instead of \texttt{Polygon}. In \ExRef{inherited specialized conf}, we will see that more complex behavors can manifest when the superclass declaration has generic parameters.
+We denote this inherited conformance by $\ConfReq{Square}{Shape}$. It behaves identically to the superclass conformance $\ConfReq{Polygon}{Shape}$, except if ask for its \index{conforming type!inherited conformance}conforming type, we get back \texttt{Square} instead of \texttt{Polygon}. In \ExRef{inherited specialized conf}, we will see that more complex behaviors can manifest when the superclass declaration has generic parameters.
 
 \section{Conformance Lookup}\label{conformance lookup}
 
@@ -320,7 +320,7 @@ struct Cat: Pet {
   func play(_: String) {}
 }
 \end{Verbatim}
-Associated type inference \index{synthesized declaration}synthesizes a type alias member for each inferred associated type, so we can refer to \texttt{Cat.Toy} elsewhere in the program, as if we explictly declared the type alias \texttt{Toy} as a member of \texttt{Cat}. Now, consider \texttt{Dog}, which witnesses \texttt{Pet}'s associated type with a generic parameter named \texttt{Toy}. This is Case~3:
+Associated type inference \index{synthesized declaration}synthesizes a type alias member for each inferred associated type, so we can refer to \texttt{Cat.Toy} elsewhere in the program, as if we explicitly declared the type alias \texttt{Toy} as a member of \texttt{Cat}. Now, consider \texttt{Dog}, which witnesses \texttt{Pet}'s associated type with a generic parameter named \texttt{Toy}. This is Case~3:
 \begin{Verbatim}
 struct Dog<Toy>: Pet {
   // synthesized: typealias Toy = Toy

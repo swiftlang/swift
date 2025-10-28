@@ -32,7 +32,6 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -389,6 +388,9 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
       return storage->isDynamic();
     return false;
   case AccessorKind::Init:
+    return false;
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
     return false;
   }
   llvm_unreachable("covered switch");
@@ -876,7 +878,9 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           case AccessorKind::Modify:
           case AccessorKind::Get:
           case AccessorKind::DistributedGet:
-          case AccessorKind::Set: {
+          case AccessorKind::Set:
+          case AccessorKind::Borrow:
+          case AccessorKind::Mutate: {
             // Coroutines and accessors are final if their storage is.
             auto storage = accessor->getStorage();
             if (storage->isFinal())
@@ -1645,6 +1649,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::DistributedGet:
     case AccessorKind::Read:
     case AccessorKind::Read2:
+    case AccessorKind::Borrow:
       break;
 
     case AccessorKind::Init:
@@ -1652,6 +1657,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::Set:
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
+    case AccessorKind::Mutate:
       if (AD->isInstanceMember() && AD->getDeclContext()->hasValueSemantics())
         return SelfAccessKind::Mutating;
       break;
@@ -1850,7 +1856,7 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
                      operatorName, dc->getDeclaredInterfaceType())
           .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
                        "final ");
-        FD->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
+        FD->addAttribute(new (C) FinalAttr(/*IsImplicit=*/true));
       }
     }
   } else if (!dc->isModuleScopeContext()) {
@@ -1899,11 +1905,11 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
       if (isPostfix) {
         insertionText = "postfix ";
         op = postfixOp;
-        FD->getAttrs().add(new (C) PostfixAttr(/*implicit*/false));
+        FD->addAttribute(new (C) PostfixAttr(/*implicit*/ false));
       } else {
         insertionText = "prefix ";
         op = prefixOp;
-        FD->getAttrs().add(new (C) PrefixAttr(/*implicit*/false));
+        FD->addAttribute(new (C) PrefixAttr(/*implicit*/ false));
       }
 
       // Emit diagnostic with the Fix-It.
@@ -2041,6 +2047,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     // For getters, set the result type to the value type.
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
+    case AccessorKind::Borrow:
       return storage->getValueInterfaceType();
 
     // For setters and observers, set the old/new value parameter's type
@@ -2050,6 +2057,9 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case AccessorKind::Set:
     case AccessorKind::Init:
       return TupleType::getEmpty(ctx);
+
+    case AccessorKind::Mutate:
+      return storage->getValueInterfaceType();
 
     // Addressor result types can get complicated because of the owner.
     case AccessorKind::Address:
@@ -2089,7 +2099,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       StringRef unavailabilityMsgRef = "return type is unavailable in Swift";
       auto ua = AvailableAttr::createUniversallyUnavailable(
           ctx, unavailabilityMsgRef);
-      decl->getAttrs().add(ua);
+      decl->addAttribute(ua);
     }
 
     return ctx.getNeverType();
@@ -2112,7 +2122,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto *const dc = decl->getInnermostDeclContext();
   return TypeResolution::forInterface(dc, options,
                                       /*unboundTyOpener*/ nullptr,
-                                      PlaceholderType::get,
+                                      /*placeholderOpener*/ nullptr,
                                       /*packElementOpener*/ nullptr)
       .resolveType(resultTyRepr);
 }
@@ -2240,16 +2250,14 @@ static Type validateParameterType(ParamDecl *decl) {
 
   TypeResolutionOptions options(std::nullopt);
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
+  HandlePlaceholderTypeReprFn placeholderOpener = nullptr;
   if (isa<AbstractClosureExpr>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::ClosureExpr);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    unboundTyOpener = [](auto unboundTy) {
-      // FIXME: Don't let unbound generic types escape type resolution.
-      // For now, just return the unbound generic type.
-      return unboundTy;
-    };
-    // FIXME: Don't let placeholder types escape type resolution.
-    // For now, just return the placeholder type.
+    unboundTyOpener = TypeResolution::defaultUnboundTypeOpener;
+    // FIXME: Don't let placeholder types escape type resolution. For now, just
+    // return the placeholder type, which we open in `inferClosureType`.
+    placeholderOpener = PlaceholderType::get;
   } else if (isa<AbstractFunctionDecl>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::AbstractFunctionDecl);
   } else if (isa<SubscriptDecl>(dc)) {
@@ -2300,7 +2308,7 @@ static Type validateParameterType(ParamDecl *decl) {
 
   const auto resolution =
       TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                   PlaceholderType::get,
+                                   placeholderOpener,
                                    /*packElementOpener*/ nullptr);
 
   if (isa<VarargTypeRepr>(nestedRepr)) {
@@ -2577,7 +2585,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         selfInfoBuilder =
             selfInfoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
-
+      auto *accessor = dyn_cast<AccessorDecl>(AFD);
+      if (accessor && accessor->isMutateAccessor()) {
+        selfInfoBuilder = selfInfoBuilder.withHasInOutResult();
+      }
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       auto selfInfo = selfInfoBuilder.build();
       if (sig) {
@@ -3014,9 +3025,11 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 
 Type
 ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
-  auto error = [&ext]() {
+  auto &ctx = ext->getASTContext();
+
+  auto error = [&]() {
     ext->setInvalid();
-    return ErrorType::get(ext->getASTContext());
+    return ErrorType::get(ctx);
   };
 
   // If we didn't parse a type, fill in an error type and bail out.
@@ -3040,6 +3053,15 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   if (extendedType->hasError())
     return error();
 
+  auto &diags = ctx.Diags;
+
+  // Cannot extend types who contain placeholders.
+  if (extendedType->hasPlaceholder()) {
+    diags.diagnose(ext->getLoc(), diag::extension_placeholder)
+      .highlight(extendedRepr->getSourceRange());
+    return error();
+  }
+
   // Hack to allow extending a generic typealias.
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
@@ -3057,12 +3079,17 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     }
   }
 
-  auto &diags = ext->getASTContext().Diags;
-
   // Cannot extend a metatype.
   if (extendedType->is<AnyMetatypeType>()) {
     diags.diagnose(ext->getLoc(), diag::extension_metatype, extendedType)
          .highlight(extendedRepr->getSourceRange());
+    return error();
+  }
+
+  // Tuple extensions are experimental.
+  if (extendedType->is<TupleType>() &&
+      !ctx.LangOpts.hasFeature(Feature::TupleConformances)) {
+    diags.diagnose(ext, diag::experimental_tuple_extension);
     return error();
   }
 
@@ -3072,13 +3099,6 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
       !extendedType->is<ParameterizedProtocolType>()) {
     diags.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
          .highlight(extendedRepr->getSourceRange());
-    return error();
-  }
-
-  // Cannot extend types who contain placeholders.
-  if (extendedType->hasPlaceholder()) {
-    diags.diagnose(ext->getLoc(), diag::extension_placeholder)
-      .highlight(extendedRepr->getSourceRange());
     return error();
   }
 

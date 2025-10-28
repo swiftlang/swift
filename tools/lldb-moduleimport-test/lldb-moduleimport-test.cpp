@@ -46,12 +46,12 @@ void anchorForGetMainExecutable() {}
 using namespace llvm::MachO;
 
 static bool validateModule(
-    llvm::StringRef data, bool Verbose, bool requiresOSSAModules,
+    llvm::StringRef data, bool Verbose,
     swift::serialization::ValidationInfo &info,
     swift::serialization::ExtendedValidationInfo &extendedInfo,
     llvm::SmallVectorImpl<swift::serialization::SearchPath> &searchPaths) {
   info = swift::serialization::validateSerializedAST(
-      data, requiresOSSAModules,
+      data,
       /*requiredSDK*/ StringRef(), &extendedInfo, /* dependencies*/ nullptr,
       &searchPaths);
   if (info.status != swift::serialization::Status::Valid) {
@@ -284,9 +284,6 @@ int main(int argc, char **argv) {
   opt<bool> QualifyTypes("qualify-types", desc("Qualify dumped types"),
                          cat(Visible));
 
-  opt<bool> EnableOSSAModules("enable-ossa-modules", init(false),
-                              desc("Serialize modules in OSSA"), cat(Visible));
-
   ParseCommandLineOptions(argc, argv);
 
   // Unregister our options so they don't interfere with the command line
@@ -331,7 +328,6 @@ int main(int argc, char **argv) {
     info = {};
     extendedInfo = {};
     if (!validateModule(StringRef(Module.first, Module.second), Verbose,
-                        EnableOSSAModules,
                         info, extendedInfo, searchPaths)) {
       llvm::errs() << "Malformed module!\n";
       return 1;
@@ -355,7 +351,6 @@ int main(int argc, char **argv) {
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.getLangOptions().EnableMemoryBufferImporter = true;
-  Invocation.getSILOptions().EnableOSSAModules = EnableOSSAModules;
 
   if (!ResourceDir.empty()) {
     Invocation.setRuntimeResourcePath(ResourceDir);

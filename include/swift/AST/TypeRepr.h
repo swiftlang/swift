@@ -266,9 +266,7 @@ class AttributedTypeRepr final
       : TypeRepr(TypeReprKind::Attributed), Ty(Ty) {
     assert(!attrs.empty());
     Bits.AttributedTypeRepr.NumAttributes = attrs.size();
-    std::uninitialized_copy(attrs.begin(), attrs.end(),
-                            getTrailingObjects<TypeOrCustomAttr>());
-
+    std::uninitialized_copy(attrs.begin(), attrs.end(), getTrailingObjects());
   }
 
   friend TrailingObjects;
@@ -279,8 +277,7 @@ public:
                                     TypeRepr *ty);
 
   ArrayRef<TypeOrCustomAttr> getAttrs() const {
-    return llvm::ArrayRef(getTrailingObjects<TypeOrCustomAttr>(),
-                          Bits.AttributedTypeRepr.NumAttributes);
+    return getTrailingObjects(Bits.AttributedTypeRepr.NumAttributes);
   }
 
   TypeAttribute *get(TypeAttrKind kind) const;
@@ -870,12 +867,10 @@ public:
   SourceRange getBracesRange() const { return BraceLocs; }
 
   MutableArrayRef<TypeRepr*> getMutableElements() {
-    return llvm::MutableArrayRef(getTrailingObjects<TypeRepr *>(),
-                                 Bits.PackTypeRepr.NumElements);
+    return getTrailingObjects(Bits.PackTypeRepr.NumElements);
   }
   ArrayRef<TypeRepr*> getElements() const {
-    return llvm::ArrayRef(getTrailingObjects<TypeRepr *>(),
-                          Bits.PackTypeRepr.NumElements);
+    return getTrailingObjects(Bits.PackTypeRepr.NumElements);
   }
 
   static bool classof(const TypeRepr *T) {
@@ -958,8 +953,8 @@ public:
   }
 
   ArrayRef<TupleTypeReprElement> getElements() const {
-    return { getTrailingObjects<TupleTypeReprElement>(),
-             static_cast<size_t>(Bits.TupleTypeRepr.NumElements) };
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.TupleTypeRepr.NumElements));
   }
 
   void getElementTypes(SmallVectorImpl<TypeRepr *> &Types) const {
@@ -1040,13 +1035,13 @@ class CompositionTypeRepr final : public TypeRepr,
       : TypeRepr(TypeReprKind::Composition), FirstTypeLoc(FirstTypeLoc),
         CompositionRange(CompositionRange) {
     Bits.CompositionTypeRepr.NumTypes = Types.size();
-    std::uninitialized_copy(Types.begin(), Types.end(),
-                            getTrailingObjects<TypeRepr*>());
+    std::uninitialized_copy(Types.begin(), Types.end(), getTrailingObjects());
   }
 
 public:
   ArrayRef<TypeRepr *> getTypes() const {
-    return {getTrailingObjects<TypeRepr*>(), static_cast<size_t>(Bits.CompositionTypeRepr.NumTypes)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.CompositionTypeRepr.NumTypes));
   }
   SourceLoc getSourceLoc() const { return FirstTypeLoc; }
   SourceRange getCompositionRange() const { return CompositionRange; }

@@ -66,6 +66,16 @@ namespace irgen {
   class TypeInfo;
   enum class ValueWitness : unsigned;
 
+enum AllowsTaskAlloc_t : bool {
+  DoesNotAllowTaskAlloc = false,
+  AllowsTaskAlloc = true,
+};
+
+enum IsForCalleeCoroutineFrame_t : bool {
+  IsNotForCalleeCoroutineFrame,
+  IsForCalleeCoroutineFrame,
+};
+
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.
 class IRGenFunction {
@@ -302,12 +312,16 @@ public:
                        const llvm::Twine &name = "");
 
   StackAddress emitDynamicAlloca(SILType type, const llvm::Twine &name = "");
-  StackAddress emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize,
-                                 Alignment align, bool allowTaskAlloc = true,
-                                 const llvm::Twine &name = "");
+  StackAddress
+  emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize, Alignment align,
+                    AllowsTaskAlloc_t allowTaskAlloc = AllowsTaskAlloc,
+                    IsForCalleeCoroutineFrame_t forCalleeCoroutineFrame =
+                        IsNotForCalleeCoroutineFrame,
+                    const llvm::Twine &name = "");
   void emitDeallocateDynamicAlloca(StackAddress address,
                                    bool allowTaskDealloc = true,
-                                   bool useTaskDeallocThrough = false);
+                                   bool useTaskDeallocThrough = false,
+                                   bool forCalleeCoroutineFrame = false);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
@@ -395,9 +409,8 @@ public:
 
   // Emit a call to the given generic type metadata access function.
   MetadataResponse emitGenericTypeMetadataAccessFunctionCall(
-                                          llvm::Function *accessFunction,
-                                          ArrayRef<llvm::Value *> args,
-                                          DynamicMetadataRequest request);
+      llvm::Function *accessFunction, ArrayRef<llvm::Value *> args,
+      DynamicMetadataRequest request, bool hasPacks = false);
 
   // Emit a reference to the canonical type metadata record for the given AST
   // type. This can be used to identify the type at runtime. For types with

@@ -457,6 +457,20 @@ public:
   Access getAccessPath(ImportKind importKind) const {
     return getAccessPath(isScopedImportKind(importKind));
   }
+
+private:
+  struct UnsafePrivateConstructorTag {};
+
+  // Doesn't require a module name like the public constructor.
+  // Only used for getEmptyKey() and getTombstoneKey().
+  ImportPath(Raw raw, UnsafePrivateConstructorTag tag) : ImportPathBase(raw) {}
+public:
+  static ImportPath getEmptyKey() {
+    return swift::ImportPath(llvm::DenseMapInfo<Raw>::getEmptyKey(), UnsafePrivateConstructorTag{});
+  }
+  static ImportPath getTombstoneKey() {
+    return swift::ImportPath(llvm::DenseMapInfo<Raw>::getTombstoneKey(), UnsafePrivateConstructorTag{});
+  }
 };
 
 // MARK: - Abstractions of imports
@@ -808,6 +822,27 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
            a.docVisibility == b.docVisibility &&
            a.accessLevel == b.accessLevel &&
            a.accessLevelRange == b.accessLevelRange;
+  }
+};
+
+template <>
+class DenseMapInfo<swift::ImportPath> {
+  using ImportPath = swift::ImportPath;
+public:
+  static ImportPath getEmptyKey() {
+    return swift::ImportPath::getEmptyKey();
+  }
+  static ImportPath getTombstoneKey() {
+    return swift::ImportPath::getTombstoneKey();
+  }
+
+  static unsigned getHashValue(const ImportPath &val) {
+    return llvm::DenseMapInfo<ImportPath::Raw>::getHashValue(val.getRaw());
+  }
+
+  static bool isEqual(const ImportPath &lhs,
+                      const ImportPath &rhs) {
+    return lhs == rhs;
   }
 };
 }

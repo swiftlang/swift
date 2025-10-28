@@ -41,6 +41,8 @@ SILValue stripCastsWithoutMarkDependence(SILValue V);
 /// begin_borrow instructions.
 SILValue lookThroughOwnershipInsts(SILValue v);
 
+SILValue lookThroughMoveOnlyCheckerPattern(SILValue value);
+
 /// Reverse of lookThroughOwnershipInsts.
 ///
 /// Return true if \p visitor returned true for all uses.

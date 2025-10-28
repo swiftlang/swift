@@ -621,22 +621,33 @@ getOrCreateSubsetParametersThunkForLinearMap(
 
   // If differential thunk, deallocate local allocations and directly return
   // `apply` result (if it is desired).
+  // TODO: Unify with VJP code below
   if (kind == AutoDiffDerivativeFunctionKind::JVP) {
     SmallVector<SILValue, 8> differentialDirectResults;
     extractAllElements(ai, builder, differentialDirectResults);
     SmallVector<SILValue, 8> allResults;
     collectAllActualResultsInTypeOrder(ai, differentialDirectResults, allResults);
-    unsigned numResults = thunk->getConventions().getNumDirectSILResults() +
-     thunk->getConventions().getNumDirectSILResults();
     SmallVector<SILValue, 8> results;
-    for (unsigned idx : *actualConfig.resultIndices) {
-      if (idx >= numResults)
-        break;
 
-      auto result = allResults[idx];
-      if (desiredConfig.isWrtResult(idx))
-        results.push_back(result);
-      else {
+    unsigned firstSemanticParamResultIdx = origFnType->getNumResults();
+    for (unsigned resultIndex : *actualConfig.resultIndices) {
+      SILValue result;
+      if (resultIndex >= firstSemanticParamResultIdx) {
+        auto semanticResultArgIdx = resultIndex - firstSemanticParamResultIdx;
+        result =
+          *std::next(ai->getAutoDiffSemanticResultArguments().begin(),
+                     semanticResultArgIdx);
+      } else
+        result = allResults[resultIndex];
+
+      // If result is desired:
+      // - Do nothing if result is indirect.
+      //   (It was already forwarded to the `apply` instruction).
+      // - Push it to `results` if result is direct.
+      if (desiredConfig.isWrtResult(resultIndex)) {
+        if (result->getType().isObject())
+          results.push_back(result);
+      } else { // Otherwise, cleanup the unused results.
         if (result->getType().isAddress())
           builder.emitDestroyAddrAndFold(loc, result);
         else

@@ -539,10 +539,10 @@ public func objectFieldToPointer(rc: RefObj) {
 // CHECK: [[ARRAY_REF:%.*]] = begin_access [modify] [unknown] %0 : $*Array<Int>
 // CHECK: [[CONVERT_ARRAY_TO_POINTER:%.*]] = function_ref @$ss37_convertMutableArrayToPointerArgumentyyXlSg_q_tSayxGzs01_E0R_r0_lF
 // CHECK: apply [[CONVERT_ARRAY_TO_POINTER]]<Int, UnsafeMutableRawPointer>({{.*}}, [[ARRAY_REF]])
-// CHECK: [[V_REF:%.*]] = begin_access [modify] [unknown] %28 : $*Double
+// CHECK: [[V_REF:%.*]] = begin_access [modify] [unknown] %{{[0-9]+}} : $*Double
 // CHECK: [[DOUBLE_AS_PTR:%.*]] = address_to_pointer [stack_protection] [[V_REF]] : $*Double to $Builtin.RawPointer
 // CHECK: [[INOUT_TO_PTR:%.*]] = function_ref @$ss30_convertInOutToPointerArgumentyxBps01_E0RzlF
-// CHECK: apply [[INOUT_TO_PTR]]<UnsafeMutableRawPointer>(%39, [[DOUBLE_AS_PTR]])
+// CHECK: apply [[INOUT_TO_PTR]]<UnsafeMutableRawPointer>(%{{[0-9]+}}, [[DOUBLE_AS_PTR]])
 // CHECK: } // end sil function '$s18pointer_conversion21testVariadicParameter1aySaySiGz_tF'
 public func testVariadicParameter(a: inout [Int]) {
   func test(_ : UnsafeMutableRawPointer?...) {}

@@ -14,7 +14,7 @@
 
 #include "ArgsToFrontendInputsConverter.h"
 #include "ArgsToFrontendOutputsConverter.h"
-#include "clang/Driver/Driver.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
@@ -24,18 +24,19 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
+#include "clang/Driver/Driver.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/TargetParser/Triple.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/Compression.h"
-#include "llvm/Support/PrefixMapper.h"
-#include "llvm/Support/Process.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/PrefixMapper.h"
+#include "llvm/Support/Process.h"
+#include "llvm/TargetParser/Triple.h"
 
 using namespace swift;
 using namespace llvm::opt;
@@ -97,6 +98,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
   Opts.IndexIgnoreStdlib |= Args.hasArg(OPT_index_ignore_stdlib);
   Opts.IndexIncludeLocals |= Args.hasArg(OPT_index_include_locals);
+  Opts.IndexStoreCompress |= Args.hasArg(OPT_index_store_compress);
   Opts.SerializeDebugInfoSIL |=
       Args.hasArg(OPT_experimental_serialize_debug_info);
 
@@ -107,15 +109,11 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
   Opts.EnablePrivateImports |= Args.hasArg(OPT_enable_private_imports);
-  Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_library_evolution);
   Opts.FrontendParseableOutput |= Args.hasArg(OPT_frontend_parseable_output);
   Opts.ExplicitInterfaceBuild |= Args.hasArg(OPT_explicit_interface_module_build);
 
   Opts.EmitClangHeaderWithNonModularIncludes |=
       Args.hasArg(OPT_emit_clang_header_nonmodular_includes);
-
-  // FIXME: Remove this flag
-  Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_resilience);
 
   Opts.EnableImplicitDynamic |= Args.hasArg(OPT_enable_implicit_dynamic);
 
@@ -212,6 +210,10 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   if (Args.hasArg(OPT_print_target_info)) {
     Opts.PrintTargetInfo = true;
+  }
+
+  if (Args.hasArg(OPT_print_static_build_config)) {
+    Opts.PrintBuildConfig = true;
   }
 
   if (Args.hasArg(OPT_print_supported_features)) {
@@ -398,6 +400,17 @@ bool ArgsToFrontendOptionsConverter::convert(
                   FrontendOptions::ClangHeaderExposeBehavior::
                       HasExposeAttrOrImplicitDeps)
             .Default(std::nullopt);
+  }
+  if (const Arg *A = Args.getLastArg(OPT_emit_clang_header_min_access)) {
+    Opts.ClangHeaderMinAccess =
+        llvm::StringSwitch<std::optional<AccessLevel>>(A->getValue())
+            .Case("public", AccessLevel::Public)
+            .Case("package", AccessLevel::Package)
+            .Case("internal", AccessLevel::Internal)
+            .Default(std::nullopt);
+    if (!Opts.ClangHeaderMinAccess)
+      Diags.diagnose(SourceLoc(), diag::error_invalid_clang_header_access_level,
+                     A->getValue());
   }
   for (const auto &arg :
        Args.getAllArgValues(options::OPT_clang_header_expose_module)) {
@@ -913,18 +926,40 @@ static inline bool isPCHFilenameExtension(StringRef path) {
 
 void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
-  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
-    // Legacy support for passing PCH file through `-import-objc-header`.
+  bool hadNormalBridgingHeader = false;
+  if (const Arg *A = Args.getLastArgNoClaim(
+          OPT_import_bridging_header,
+          OPT_internal_import_bridging_header)) {
+    // Legacy support for passing PCH file through `-import-bridging-header`.
     if (isPCHFilenameExtension(A->getValue()))
       Opts.ImplicitObjCPCHPath = A->getValue();
     else
       Opts.ImplicitObjCHeaderPath = A->getValue();
-    // If `-import-object-header` is used, it means the module has a direct
+    // If `-import-bridging-header` is used, it means the module has a direct
     // bridging header dependency and it can be serialized into binary module.
     Opts.ModuleHasBridgingHeader |= true;
+
+    Opts.ImportHeaderAsInternal =
+        A->getOption().getID() == OPT_internal_import_bridging_header;
+
+    hadNormalBridgingHeader = true;
   }
-  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_pch))
+  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_pch,
+                                            OPT_internal_import_pch)) {
     Opts.ImplicitObjCPCHPath = A->getValue();
+
+    bool importAsInternal = A->getOption().getID() == OPT_internal_import_pch;
+
+    /// Don't let the bridging-header and precompiled-header options differ in
+    /// whether they are treated as internal or public imports.
+    if (hadNormalBridgingHeader &&
+        importAsInternal != Opts.ImportHeaderAsInternal) {
+      Diags.diagnose(SourceLoc(),
+                     diag::bridging_header_and_pch_internal_mismatch);
+    }
+
+    Opts.ImportHeaderAsInternal = importAsInternal;
+  }
 }
 void ArgsToFrontendOptionsConverter::
 computeImplicitImportModuleNames(OptSpecifier id, bool isTestable) {

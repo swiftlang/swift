@@ -10,6 +10,10 @@ import FakeDistributedActorSystems
 @available(SwiftStdlib 5.5, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
+@propertyWrapper struct P {
+  var wrappedValue = 0
+}
+
 distributed actor DA {
 
   let local: Int = 42
@@ -48,6 +52,9 @@ distributed actor DA {
     // expected-error@-1{{cannot declare method 'distributedNonisolated()' as both 'nonisolated' and 'distributed'}}{{15-27=}}
     fatalError()
   }
+
+  nonisolated lazy var a = 0 // expected-error {{'nonisolated' can not be applied to distributed actor stored properties}}
+  @P nonisolated var b = 0 // expected-error {{'nonisolated' can not be applied to distributed actor stored properties}}
 
 }
 

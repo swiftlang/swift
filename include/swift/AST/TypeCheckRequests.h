@@ -3728,6 +3728,8 @@ public:
   ArrayRef<TypeRepr *> getGenericArgs() const;
   ArgumentList *getArgs() const;
 
+  DeclContext *getDeclContext() const;
+
   /// Returns the macro roles corresponding to this macro reference.
   MacroRoles getMacroRoles() const;
 
@@ -3753,8 +3755,7 @@ void simple_display(llvm::raw_ostream &out,
 /// Resolve a given custom attribute to an attached macro declaration.
 class ResolveMacroRequest
     : public SimpleRequest<ResolveMacroRequest,
-                           ConcreteDeclRef(UnresolvedMacroReference,
-                                           DeclContext *),
+                           ConcreteDeclRef(UnresolvedMacroReference),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3763,8 +3764,7 @@ private:
   friend SimpleRequest;
 
   ConcreteDeclRef evaluate(Evaluator &evaluator,
-                           UnresolvedMacroReference macroRef,
-                           DeclContext *decl) const;
+                           UnresolvedMacroReference macroRef) const;
 
 public:
   bool isCached() const { return true; }
@@ -4948,7 +4948,7 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Check @cdecl functions for compatibility with the foreign language.
+/// Check @c functions for compatibility with the foreign language.
 class TypeCheckCDeclFunctionRequest
     : public SimpleRequest<TypeCheckCDeclFunctionRequest,
                            evaluator::SideEffect(FuncDecl *FD,
@@ -4967,7 +4967,25 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Check @cdecl enums for compatibility with C.
+/// A request to emit performance hints
+class EmitPerformanceHints
+: public SimpleRequest<EmitPerformanceHints,
+                       evaluator::SideEffect(SourceFile *),
+                       RequestFlags::Cached> {
+public:
+using SimpleRequest::SimpleRequest;
+
+private:
+friend SimpleRequest;
+
+evaluator::SideEffect
+evaluate(Evaluator &evaluator, SourceFile *SF) const;
+
+public:
+bool isCached() const { return true; }
+};
+
+/// Check @c enums for compatibility with C.
 class TypeCheckCDeclEnumRequest
     : public SimpleRequest<TypeCheckCDeclEnumRequest,
                            evaluator::SideEffect(EnumDecl *ED,
@@ -5505,7 +5523,6 @@ public:
 private:
   friend SimpleRequest;
 
-  // Evaluation.
   std::optional<AvailabilityDomain> evaluate(Evaluator &evaluator,
                                              ValueDecl *decl) const;
 
@@ -5513,6 +5530,30 @@ public:
   bool isCached() const { return true; }
   std::optional<std::optional<AvailabilityDomain>> getCachedResult() const;
   void cacheResult(std::optional<AvailabilityDomain> domain) const;
+};
+
+class IsCustomAvailabilityDomainPermanentlyEnabled
+    : public SimpleRequest<IsCustomAvailabilityDomainPermanentlyEnabled,
+                           bool(const CustomAvailabilityDomain *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator,
+                const CustomAvailabilityDomain *customDomain) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<bool> getCachedResult() const;
+  void cacheResult(bool isPermanentlyEnabled) const;
+
+  SourceLoc getNearestLoc() const {
+    auto *domain = std::get<0>(getStorage());
+    return extractNearestSourceLoc(domain->getDecl());
+  }
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

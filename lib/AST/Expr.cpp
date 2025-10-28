@@ -414,7 +414,6 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
 
   PASS_THROUGH_REFERENCE(Load, getSubExpr);
   NO_REFERENCE(DestructureTuple);
-  NO_REFERENCE(UnresolvedTypeConversion);
   PASS_THROUGH_REFERENCE(ABISafeConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(FunctionConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(CovariantFunctionConversion, getSubExpr);
@@ -783,7 +782,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::Load:
   case ExprKind::ABISafeConversion:
   case ExprKind::DestructureTuple:
-  case ExprKind::UnresolvedTypeConversion:
   case ExprKind::FunctionConversion:
   case ExprKind::CovariantFunctionConversion:
   case ExprKind::CovariantReturnConversion:
@@ -993,7 +991,6 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::Binary:
   case ExprKind::Load:
   case ExprKind::DestructureTuple:
-  case ExprKind::UnresolvedTypeConversion:
   case ExprKind::ABISafeConversion:
   case ExprKind::FunctionConversion:
   case ExprKind::CovariantFunctionConversion:
@@ -1380,8 +1377,8 @@ CaptureListEntry CaptureListEntry::createParsed(
       new (Ctx) VarDecl(/*isStatic==*/false, introducer, nameLoc, name, DC);
 
   if (ownershipKind != ReferenceOwnership::Strong)
-    VD->getAttrs().add(
-        new (Ctx) ReferenceOwnershipAttr(ownershipRange, ownershipKind));
+    VD->addAttribute(new (Ctx)
+                         ReferenceOwnershipAttr(ownershipRange, ownershipKind));
 
   auto *pattern = NamedPattern::createImplicit(Ctx, VD);
 
@@ -2207,17 +2204,6 @@ void ClosureExpr::setExplicitResultType(Type ty) {
       ->setType(MetatypeType::get(ty));
 }
 
-MacroDecl *
-ClosureExpr::getResolvedMacro(CustomAttr *customAttr) {
-  auto &ctx = getASTContext();
-  auto declRef = evaluateOrDefault(
-      ctx.evaluator,
-      ResolveMacroRequest{customAttr, this},
-      ConcreteDeclRef());
-
-  return dyn_cast_or_null<MacroDecl>(declRef.getDecl());
-}
-
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
 
 void AutoClosureExpr::setBody(Expr *E) {
@@ -2766,6 +2752,8 @@ SingleValueStmtExpr::Kind SingleValueStmtExpr::getStmtKind() const {
     return Kind::Do;
   case StmtKind::DoCatch:
     return Kind::DoCatch;
+  case StmtKind::ForEach:
+    return Kind::For;
   default:
     llvm_unreachable("Unhandled kind!");
   }
@@ -2784,6 +2772,9 @@ SingleValueStmtExpr::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
     return scratch;
   case Kind::DoCatch:
     return cast<DoCatchStmt>(getStmt())->getBranches(scratch);
+  case Kind::For:
+    scratch.push_back(cast<ForEachStmt>(getStmt())->getBody());
+    return scratch;
   }
   llvm_unreachable("Unhandled case in switch!");
 }
@@ -2918,7 +2909,7 @@ TypeJoinExpr::TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
   Bits.TypeJoinExpr.NumElements = elements.size();
   // Copy elements.
   std::uninitialized_copy(elements.begin(), elements.end(),
-                          getTrailingObjects<Expr *>());
+                          getTrailingObjects());
 }
 
 TypeJoinExpr *TypeJoinExpr::createImpl(

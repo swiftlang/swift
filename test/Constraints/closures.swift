@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 func myMap<T1, T2>(_ array: [T1], _ fn: (T1) -> T2) -> [T2] {}
 

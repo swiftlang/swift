@@ -1388,7 +1388,7 @@ static void invalidateOverrideAttribute(ValueDecl *decl) {
   auto overrideAttr = decl->getAttrs().getAttribute<OverrideAttr>(true);
   if (!overrideAttr) {
     overrideAttr = new (decl->getASTContext()) OverrideAttr(true);
-    decl->getAttrs().add(overrideAttr);
+    decl->addAttribute(overrideAttr);
   }
 
   overrideAttr->setInvalid();
@@ -1620,6 +1620,7 @@ namespace  {
     UNINTERESTING_ATTR(NoAllocation)
     UNINTERESTING_ATTR(NoRuntime)
     UNINTERESTING_ATTR(NoExistentials)
+    UNINTERESTING_ATTR(NoManualOwnership)
     UNINTERESTING_ATTR(NoObjCBridging)
     UNINTERESTING_ATTR(Inlinable)
     UNINTERESTING_ATTR(Effects)
@@ -1753,6 +1754,7 @@ namespace  {
     UNINTERESTING_ATTR(Unsafe)
     UNINTERESTING_ATTR(Safe)
     UNINTERESTING_ATTR(AddressableForDependencies)
+    UNINTERESTING_ATTR(UnsafeSelfDependentResult)
 #undef UNINTERESTING_ATTR
 
     void visitABIAttr(ABIAttr *attr) {
@@ -2194,7 +2196,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
 
     switch (domain.getKind()) {
     case AvailabilityDomain::Kind::Universal:
-    case AvailabilityDomain::Kind::SwiftLanguage:
+    case AvailabilityDomain::Kind::SwiftLanguageMode:
+    case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
     case AvailabilityDomain::Kind::PackageDescription:
     case AvailabilityDomain::Kind::Platform:
       // FIXME: [availability] Diagnose as an error in a future Swift version.
@@ -2368,6 +2371,8 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
     case AccessorKind::Read2:
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
       break;
 
     case AccessorKind::WillSet:

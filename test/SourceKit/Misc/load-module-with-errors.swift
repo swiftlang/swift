@@ -17,11 +17,11 @@ func testInvalidStructMemberCompletion() {
   let foo: InvalidStruct
   foo.#^INVALID-MEMBER^#
   // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberA[#Int#];
-  // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberB[#<<error type>>#];
-  // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberC[#<<error type>>#];
-  // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberD[#<<error type>>#];
-  // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberE[#<<error type>>#];
-  // INVALID-MEMBER-DAG: Decl[InstanceMethod]/Super:         add({#<<error type>>#})[#Void#];
+  // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberB[#_#];
+  // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberC[#_#];
+  // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberD[#_#];
+  // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberE[#_#];
+  // INVALID-MEMBER-DAG: Decl[InstanceMethod]/Super:         add({#_#})[#Void#];
   // INVALID-MEMBER-DAG: Decl[InstanceMethod]/Super:         get()[#InvalidStruct.Item#];
   // INVALID-MEMBER-DAG: Decl[InstanceMethod]/Super:         set({#item: InvalidStruct.Item#})[#Void#];
 }
@@ -45,21 +45,21 @@ func testInvalidTopLevelCompletion() {
   // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidGenericFuncBody({#param: T#})[#T#];
   // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidPartialFunc()[#Void#];
   // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncBody()[#Void#];
-  // INVALID-TOP-DAG: Decl[GlobalVar]/OtherModule[errors]: invalidGlobalClosureBody[#<<error type>>#];
+  // INVALID-TOP-DAG: Decl[GlobalVar]/OtherModule[errors]: invalidGlobalClosureBody[#_#];
   // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncSignature()[#Void#];
   // INVALID-TOP-DAG: Decl[GlobalVar]/OtherModule[errors]: invalidGlobalMissingInit[#String#];
   // INVALID-TOP-DAG: Decl[Struct]/OtherModule[errors]:   InvalidGenericStruct[#InvalidGenericStruct<T, U>#];
   // INVALID-TOP-DAG: Decl[Struct]/OtherModule[errors]:   InvalidStruct[#InvalidStruct#];
-  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: typeUsesFunc({#pe: InvalidEnum#}, {#pa: <<error type>>#}, {#pp: any InvalidProtocol#}, {#ps: InvalidStruct#}, {#pg: <<error type>>#}, {#pc: InvalidClass#})[#Int#];
+  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: typeUsesFunc({#pe: InvalidEnum#}, {#pa: _#}, {#pp: any InvalidProtocol#}, {#ps: InvalidStruct#}, {#pg: _#}, {#pc: InvalidClass#})[#Int#];
   // INVALID-TOP-DAG: Decl[GlobalVar]/OtherModule[errors]: invalidGlobalKeypath[#InvalidStruct.Type#];
   // INVALID-TOP-DAG: Decl[TypeAlias]/OtherModule[errors]: InvalidAlias[#InvalidAlias#];
-  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidGenericFuncType({#param: T#})[#<<error type>>#];
-  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncType()[#<<error type>>#];
+  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidGenericFuncType({#param: T#})[#_#];
+  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncType()[#_#];
   // INVALID-TOP-DAG: Decl[GlobalVar]/OtherModule[errors]: invalidGlobalClosureType[#() -> ()#];
   // INVALID-TOP-DAG: Decl[Class]/OtherModule[errors]:    InvalidClassSub1[#InvalidClassSub1#];
   // INVALID-TOP-DAG: Decl[Class]/OtherModule[errors]:    InvalidClassSub2[#InvalidClassSub2#];
   // INVALID-TOP-DAG: Decl[Protocol]/OtherModule[errors]/Flair[RareType]: InvalidProtocol[#InvalidProtocol#];
-  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncThrows()[' throws'][#<<error type>>#];
+  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncThrows()[' throws'][#_#];
 }
 
 // RUN: %empty-directory(%t)

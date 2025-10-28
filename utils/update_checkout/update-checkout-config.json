@@ -15,7 +15,7 @@
         "swift-async-algorithms": {
             "remote": { "id": "apple/swift-async-algorithms" } },
         "swift-atomics": {
-            "remote": { "id": "apple/swift-atomics" } },       
+            "remote": { "id": "apple/swift-atomics" } },
         "swift-collections": {
             "remote": { "id": "apple/swift-collections" } },
         "swift-crypto": {
@@ -29,9 +29,11 @@
         "swift-log": {
             "remote": { "id": "apple/swift-log" } },
         "swift-numerics": {
-            "remote": { "id": "apple/swift-numerics" } },        
+            "remote": { "id": "apple/swift-numerics" } },
         "swift-toolchain-sqlite": {
             "remote": { "id": "swiftlang/swift-toolchain-sqlite" } },
+        "swift-tools-protocols": {
+            "remote": { "id": "swiftlang/swift-tools-protocols" } },
         "swift-tools-support-core": {
             "remote": { "id": "swiftlang/swift-tools-support-core" } },
         "swiftpm": {
@@ -47,13 +49,15 @@
         "swift-corelibs-xctest": {
             "remote": { "id": "swiftlang/swift-corelibs-xctest" } },
         "swift-corelibs-foundation": {
-            "remote": { "id": "swiftlang/swift-corelibs-foundation" } },  
+            "remote": { "id": "swiftlang/swift-corelibs-foundation" } },
         "swift-foundation-icu": {
-            "remote": { "id": "swiftlang/swift-foundation-icu" } },  
+            "remote": { "id": "swiftlang/swift-foundation-icu" } },
         "swift-foundation": {
             "remote": { "id": "swiftlang/swift-foundation" } },
         "swift-corelibs-libdispatch": {
             "remote": { "id": "swiftlang/swift-corelibs-libdispatch" } },
+        "swift-corelibs-blocksruntime": {
+            "remote": { "id": "swiftlang/swift-corelibs-blocksruntime" } },
         "swift-integration-tests": {
             "remote": { "id": "swiftlang/swift-integration-tests" } },
         "swift-xcode-playground-support": {
@@ -118,6 +122,9 @@
         "zlib": {
           "remote": { "id": "madler/zlib" }
         },
+        "brotli": {
+          "remote": { "id": "google/brotli" }
+        },
         "mimalloc": {
           "remote": { "id": "microsoft/mimalloc" },
           "platforms": [ "Windows" ]
@@ -129,15 +136,16 @@
     "default-branch-scheme": "main",
     "branch-schemes": {
         "main": {
-            "aliases": ["swift/main", "main", "stable/20240723"],
+            "aliases": ["swift/main", "main", "stable/21.x"],
             "repos": {
-                "llvm-project": "stable/20240723",
-                "swift-llvm-bindings": "stable/20240723",
+                "llvm-project": "stable/21.x",
+                "swift-llvm-bindings": "stable/21.x",
                 "swift": "main",
                 "cmark": "gfm",
                 "llbuild": "main",
                 "swift-build": "main",
                 "swift-toolchain-sqlite": "1.0.7",
+                "swift-tools-protocols": "0.0.2",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "1.5.1",
@@ -159,9 +167,10 @@
                 "swift-foundation-icu": "main",
                 "swift-foundation": "main",
                 "swift-corelibs-libdispatch": "main",
+                "swift-corelibs-blocksruntime": "main",
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
-                "ninja": "v1.11.1",
+                "ninja": "v1.13.1",
                 "cmake": "v3.30.2",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
@@ -173,15 +182,16 @@
                 "swift-docc-symbolkit": "main",
                 "swift-markdown": "main",
                 "swift-nio": "2.65.0",
-                "swift-experimental-string-processing": "swift/main",
+                "swift-experimental-string-processing": "main",
                 "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-27",
-                "wasmkit": "0.1.2",
+                "wasmkit": "0.1.6",
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
+                "brotli": "v1.1.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.1"
+                "swift-subprocess": "0.2.1"
             }
         },
         "release/6.2": {
@@ -232,7 +242,7 @@
                 "swift-experimental-string-processing": "release/6.2",
                 "swift-sdk-generator": "release/6.2",
                 "wasi-libc": "wasi-sdk-24",
-                "wasmkit": "0.1.2",
+                "wasmkit": "0.1.6",
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
@@ -291,6 +301,7 @@
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
+                "brotli": "v1.1.0",
                 "mimalloc": "v3.0.1"
             }
         },
@@ -342,7 +353,7 @@
                 "swift-experimental-string-processing": "release/6.2.1",
                 "swift-sdk-generator": "release/6.2.1",
                 "wasi-libc": "wasi-sdk-24",
-                "wasmkit": "0.1.2",
+                "wasmkit": "0.1.6",
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
@@ -557,7 +568,7 @@
             }
         },
         "rebranch": {
-            "aliases": ["rebranch", "stable/21.x", "llvm.org/main"],
+            "aliases": ["rebranch", "llvm.org/main"],
             "repos": {
                 "llvm-project": "stable/21.x",
                 "swift-llvm-bindings": "stable/21.x",
@@ -566,6 +577,7 @@
                 "llbuild": "main",
                 "swift-build": "main",
                 "swift-toolchain-sqlite": "1.0.7",
+                "swift-tools-protocols": "0.0.2",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "1.5.1",
@@ -587,9 +599,10 @@
                 "swift-foundation-icu": "main",
                 "swift-foundation": "main",
                 "swift-corelibs-libdispatch": "main",
+                "swift-corelibs-blocksruntime": "main",
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
-                "ninja": "v1.11.1",
+                "ninja": "v1.13.1",
                 "cmake": "v3.30.2",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
@@ -601,15 +614,16 @@
                 "swift-docc-symbolkit": "main",
                 "swift-markdown": "main",
                 "swift-nio": "2.65.0",
-                "swift-experimental-string-processing": "swift/main",
+                "swift-experimental-string-processing": "main",
                 "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-27",
-                "wasmkit": "0.1.2",
+                "wasmkit": "0.1.6",
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
+                "brotli": "v1.1.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.1"
+                "swift-subprocess": "0.2.1"
             }
         },
         "next" : {
@@ -624,6 +638,7 @@
                 "llbuild": "main",
                 "swift-build": "main",
                 "swift-toolchain-sqlite": "1.0.7",
+                "swift-tools-protocols": "0.0.2",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "1.5.1",
@@ -645,9 +660,10 @@
                 "swift-foundation-icu": "main",
                 "swift-foundation": "main",
                 "swift-corelibs-libdispatch": "main",
+                "swift-corelibs-blocksruntime": "main",
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
-                "ninja": "v1.11.1",
+                "ninja": "v1.13.1",
                 "cmake": "v3.30.2",
                 "indexstore-db": "main",
                 "sourcekit-lsp": "main",
@@ -659,15 +675,16 @@
                 "swift-docc-symbolkit": "main",
                 "swift-markdown": "main",
                 "swift-nio": "2.65.0",
-                "swift-experimental-string-processing": "swift/main",
+                "swift-experimental-string-processing": "main",
                 "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-27",
-                "wasmkit": "0.1.2",
+                "wasmkit": "0.1.6",
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
+                "brotli": "v1.1.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.1"
+                "swift-subprocess": "0.2.1"
             }
         }
     }

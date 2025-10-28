@@ -6,9 +6,13 @@ add_custom_command_target(unused_var
     CUSTOM_TARGET_NAME CxxStdlib-apinotes
     COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}"
     COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes" "${output_dir}"
+    COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/std_span.apinotes" "${output_dir}"
+    COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/std_string_view.apinotes" "${output_dir}"
     COMMENT "Copying CxxStdlib API Notes to ${output_dir}"
     OUTPUT "${output_dir}/std.apinotes"
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes")
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std_span.apinotes"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std_string_view.apinotes")
 
 swift_install_in_component(FILES std.apinotes
     DESTINATION "lib/swift/apinotes"

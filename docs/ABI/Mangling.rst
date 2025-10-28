@@ -401,6 +401,8 @@ Entities
   ACCESSOR ::= 'p'                           // pseudo accessor referring to the storage itself
   ACCESSOR ::= 'x'                           // modify
   ACCESSOR ::= 'y'                           // read
+  ACCESSOR ::= 'b'                           // borrow
+  ACCESSOR ::= 'z'                           // mutate
 
   ADDRESSOR-KIND ::= 'u'                     // unsafe addressor (no owner)
   ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner), not used anymore
@@ -703,6 +705,9 @@ Types
   type ::= type 'Bv' NATURAL '_'             // Builtin.Vec<n>x<type>
   type ::= type type 'BV'                    // Builtin.FixedArray<N, T>
   type ::= 'Bw'                              // Builtin.Word
+#if SWIFT_RUNTIME_VERSION >= 6.2
+  type ::= 'BA'                              // Builtin.ImplicitActor
+#endif
   type ::= function-signature 'c'            // function type (escaping)
   type ::= function-signature 'X' FUNCTION-KIND // special function type
   type ::= bound-generic-type
@@ -920,6 +925,9 @@ mangled in to disambiguate.
   RESULT-CONVENTION ::= 'u'                  // unowned inner pointer
   RESULT-CONVENTION ::= 'a'                  // auto-released
   RESULT-CONVENTION ::= 'k'                  // pack
+  RESULT-CONVENTION ::= 'l'                  // guaranteed address
+  RESULT-CONVENTION ::= 'g'                  // guaranteed
+  RESULT-CONVENTION ::= 'm'                  // inout
 
   RESULT-DIFFERENTIABILITY ::= 'w'            // @noDerivative
 
@@ -1360,6 +1368,7 @@ Some kinds need arguments, which precede ``Tf``.
   ARG-SPEC-KIND ::= 'n'                      // Unmodified argument
   ARG-SPEC-KIND ::= 'c'                      // Consumes n 'type' arguments which are closed over types in argument order
                                              // and one 'identifier' argument which is the closure symbol name
+  ARG-SPEC-KIND ::= 'C' NATURAL-ZERO         // the same closure as a previous argument <n>
   ARG-SPEC-KIND ::= 'p' CONST-PROP           // Constant propagated argument
   ARG-SPEC-KIND ::= 'e' 'D'? 'G'? 'X'?       // Generic argument, with optional dead, owned=>guaranteed or exploded-specifier
   ARG-SPEC-KIND ::= 'd' 'G'? 'X'?            // Dead argument, with optional owned=>guaranteed or exploded-specifier

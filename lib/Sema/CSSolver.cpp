@@ -1157,7 +1157,7 @@ void ConstraintSystem::shrink(Expr *expr) {
     ///
     /// \param collection The type of the collection container.
     ///
-    /// \returns Null type, ErrorType or UnresolvedType on failure,
+    /// \returns Null type or ErrorType on failure,
     /// properly constructed type otherwise.
     Type extractElementType(Type collection) {
       auto &ctx = CS.getASTContext();
@@ -1166,8 +1166,7 @@ void ConstraintSystem::shrink(Expr *expr) {
 
       auto base = collection.getPointer();
       auto isInvalidType = [](Type type) -> bool {
-        return type.isNull() || type->hasUnresolvedType() ||
-               type->hasError();
+        return type.isNull() || type->hasError();
       };
 
       // Array type.
@@ -1179,9 +1178,6 @@ void ConstraintSystem::shrink(Expr *expr) {
 
       // Map or Set or any other associated collection type.
       if (auto boundGeneric = dyn_cast<BoundGenericType>(base)) {
-        if (boundGeneric->hasUnresolvedType())
-          return boundGeneric;
-
         // Avoid handling InlineArray, building a tuple would be wrong, and
         // we want to eliminate shrink.
         if (boundGeneric->getDecl() == ctx.getInlineArrayDecl())
@@ -1290,9 +1286,7 @@ void ConstraintSystem::shrink(Expr *expr) {
         auto elementType = extractElementType(contextualType);
         // If we couldn't deduce element type for the collection, let's
         // not attempt to solve it.
-        if (!elementType ||
-            elementType->hasError() ||
-            elementType->hasUnresolvedType())
+        if (!elementType || elementType->hasError())
           return;
 
         contextualType = elementType;
@@ -1583,10 +1577,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   assert(solverState);
 
-  setPhase(ConstraintSystemPhase::Solving);
-
-  SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
-
   // If constraint system failed while trying to
   // genenerate constraints, let's stop right here.
   if (failedConstraint)
@@ -1806,12 +1796,6 @@ ConstraintSystem::filterDisjunction(
     // constraint, so instead let's keep the disjunction, but disable all
     // unviable choices.
     if (choice->getOverloadChoice().isKeyPathDynamicMemberLookup()) {
-      // Early simplification of the "keypath dynamic member lookup" choice
-      // is impossible because it requires constraints associated with
-      // subscript index expression to be present.
-      if (Phase == ConstraintSystemPhase::ConstraintGeneration)
-        return SolutionKind::Unsolved;
-
       for (auto *currentChoice : disjunction->getNestedConstraints()) {
         if (currentChoice->isDisabled())
           continue;

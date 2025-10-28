@@ -22,6 +22,7 @@
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/PlatformKindUtils.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
@@ -32,11 +33,20 @@
 
 namespace swift {
 class ASTContext;
+class AvailabilityDomainAndRange;
 class CustomAvailabilityDomain;
 class DeclContext;
 class FuncDecl;
 class ModuleDecl;
 class ValueDecl;
+
+/// Discriminates whether a version tuple represents the `introduced:`,
+/// `deprecated:`, or `obsoleted:` version of an `@available` attribute.
+enum class AvailabilityVersionKind {
+  Introduced,
+  Deprecated,
+  Obsoleted,
+};
 
 /// Represents a dimension of availability (e.g. macOS platform or Swift
 /// language mode).
@@ -48,7 +58,11 @@ public:
     Universal,
 
     /// Represents availability with respect to Swift language mode.
-    SwiftLanguage,
+    SwiftLanguageMode,
+
+    /// Represents availability with respect to the Swift runtime when it is not
+    /// built-in to the target platform.
+    StandaloneSwiftRuntime,
 
     /// Represents PackageDescription availability.
     PackageDescription,
@@ -126,6 +140,9 @@ private:
                : std::nullopt;
   }
 
+  std::optional<AvailabilityDomain>
+  getRemappedDomainOrNull(const ASTContext &ctx) const;
+
 public:
   AvailabilityDomain() {}
 
@@ -139,8 +156,12 @@ public:
     return AvailabilityDomain(platformKind);
   }
 
-  static AvailabilityDomain forSwiftLanguage() {
-    return AvailabilityDomain(Kind::SwiftLanguage);
+  static AvailabilityDomain forSwiftLanguageMode() {
+    return AvailabilityDomain(Kind::SwiftLanguageMode);
+  }
+
+  static AvailabilityDomain forStandaloneSwiftRuntime() {
+    return AvailabilityDomain(Kind::StandaloneSwiftRuntime);
   }
 
   static AvailabilityDomain forPackageDescription() {
@@ -180,7 +201,13 @@ public:
 
   bool isPlatform() const { return getKind() == Kind::Platform; }
 
-  bool isSwiftLanguage() const { return getKind() == Kind::SwiftLanguage; }
+  bool isSwiftLanguageMode() const {
+    return getKind() == Kind::SwiftLanguageMode;
+  }
+
+  bool isStandaloneSwiftRuntime() const {
+    return getKind() == Kind::StandaloneSwiftRuntime;
+  }
 
   bool isPackageDescription() const {
     return getKind() == Kind::PackageDescription;
@@ -233,6 +260,10 @@ public:
   bool isActivePlatform(const ASTContext &ctx,
                         bool forTargetVariant = false) const;
 
+  /// Returns true if availability in this domain must be specified alone in
+  /// `@available` attributes and `if #available` queries.
+  bool mustBeSpecifiedAlone() const;
+
   /// Returns the domain's minimum available range for type checking. For
   /// example, for the domain of the platform that compilation is targeting,
   /// this version is specified with the `-target` option. For the Swift
@@ -277,17 +308,26 @@ public:
 
   /// Returns the canonical domain that versions in this domain must be remapped
   /// to before making availability comparisons in the current compilation
-  /// context. Sets \p didRemap to `true` if a remap was required.
-  const AvailabilityDomain getRemappedDomain(const ASTContext &ctx,
-                                             bool &didRemap) const;
-
-  /// Returns the canonical domain that versions in this domain must be remapped
-  /// to before making availability comparisons in the current compilation
   /// context.
   const AvailabilityDomain getRemappedDomain(const ASTContext &ctx) const {
-    bool unused;
-    return getRemappedDomain(ctx, unused);
+    auto remappedDomain = getRemappedDomainOrNull(ctx);
+    return remappedDomain ? *remappedDomain : *this;
   }
+
+  /// Converts the domain and the given version into a canonical domain and
+  /// range that can be used for availability comparisons in the current current
+  /// compilation context. If no conversion is necessary or possible, the domain
+  /// and range are returned unmodified.
+  AvailabilityDomainAndRange
+  getRemappedDomainAndRange(const llvm::VersionTuple &version,
+                            AvailabilityVersionKind versionKind,
+                            const ASTContext &ctx) const;
+
+  /// Returns true for a domain that is permanently always available, and
+  /// therefore availability constraints in the domain are effectively the same
+  /// as constraints in the `*` domain. This is used to diagnose unnecessary
+  /// `@available` attributes and `if #available` statements.
+  bool isPermanentlyAlwaysEnabled() const;
 
   bool operator==(const AvailabilityDomain &other) const {
     return storage.getOpaqueValue() == other.storage.getOpaqueValue();
@@ -328,9 +368,10 @@ struct StableAvailabilityDomainComparator {
 };
 
 /// Represents an availability domain that has been defined in a module.
-class CustomAvailabilityDomain : public llvm::FoldingSetNode {
+class alignas(1 << CustomAvailabilityDomainAlignInBits) CustomAvailabilityDomain
+    : public llvm::FoldingSetNode {
 public:
-  enum class Kind {
+  enum class Kind : uint8_t {
     /// A domain that is known to be enabled at compile time.
     Enabled,
     /// A domain that is known to be enabled at compile time and is also assumed
@@ -344,10 +385,20 @@ public:
 
 private:
   Identifier name;
-  Kind kind;
   ModuleDecl *mod;
   ValueDecl *decl;
   FuncDecl *predicateFunc;
+  Kind kind;
+
+  struct {
+    /// Whether the "isPermanentlyEnabled" bit has been computed yet.
+    unsigned isPermanentlyEnabledComputed : 1;
+    /// Whether the domain is permanently enabled, which makes constraints in
+    /// the domain equivalent to those in the `*` domain.
+    unsigned isPermanentlyEnabled : 1;
+  } flags = {};
+
+  friend class IsCustomAvailabilityDomainPermanentlyEnabled;
 
   CustomAvailabilityDomain(Identifier name, Kind kind, ModuleDecl *mod,
                            ValueDecl *decl, FuncDecl *predicateFunc);
@@ -374,6 +425,11 @@ public:
 
   void Profile(llvm::FoldingSetNodeID &ID) const { Profile(ID, name, mod); }
 };
+
+inline void simple_display(llvm::raw_ostream &os,
+                           const CustomAvailabilityDomain *domain) {
+  os << domain->getName();
+}
 
 /// Represents either a resolved availability domain or an identifier written
 /// in source that has not yet been resolved to a domain.

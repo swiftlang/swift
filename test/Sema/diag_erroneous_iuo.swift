@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -verify-additional-prefix swift5-
-// RUN: %target-typecheck-verify-swift -swift-version 4 -verify-additional-prefix swift4-
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 5 -verify-additional-prefix swift5-
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 4 -verify-additional-prefix swift4-
 
 // These are all legal uses of '!'.
 struct Fine {

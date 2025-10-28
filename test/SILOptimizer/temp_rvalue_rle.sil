@@ -499,7 +499,7 @@ sil [ossa] @unhandled_user : $@convention(thin) (@owned Klass) -> @owned Klass {
 bb0(%0 : @owned $Klass):
   %5 = alloc_stack $Klass
   store %0 to [init] %5 : $*Klass
-  %104 = begin_access [read] [static] %5 : $*Klass
+  %104 = begin_access [modify] [static] %5 : $*Klass
   %105 = load [take] %104 : $*Klass
   end_access %104 : $*Klass
   dealloc_stack %5 : $*Klass

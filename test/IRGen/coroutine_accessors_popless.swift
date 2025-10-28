@@ -25,19 +25,48 @@
 // CHECK-SAME:    i32 0
 // CHECK-SAME:  }>
 
+// CHECK-arm64e-LABEL: _swift_coro_task_alloc.ptrauth = private constant {
+// CHECK-arm64e-SAME:    ptr @_swift_coro_task_alloc,
+// CHECK-arm64e-SAME:    i32 0,
+// CHECK-arm64e-SAME:    i64 0,
+// CHECK-arm64e-SAME:    i64 24469 }
+// CHECK-arm64e-SAME:  section "llvm.ptrauth"
+// CHECK-arm64e-SAME:  align 8
+// CHECK-arm64e-LABEL: @_swift_coro_task_dealloc.ptrauth = private constant {
+// CHECK-arm64e-SAME:    ptr @_swift_coro_task_dealloc,
+// CHECK-arm64e-SAME:    i32 0,
+// CHECK-arm64e-SAME:    i64 0,
+// CHECK-arm64e-SAME:    i64 40879 },
+// CHECK-arm64e-SAME:  section "llvm.ptrauth",
+// CHECK-arm64e-SAME:  align 8
 // CHECK-LABEL: _swift_coro_async_allocator = linkonce_odr hidden constant %swift.coro_allocator {
 // CHECK-SAME:      i32 1,
-// CHECK-SAME:      swift_task_alloc,
-// CHECK-SAME:      swift_task_dealloc
+// CHECK-SAME:      _swift_coro_task_alloc
+// CHECK-SAME:      _swift_coro_task_dealloc
 // CHECK-SAME:  }
+// CHECK-arm64e-LABEL: _swift_coro_malloc.ptrauth = private constant {
+// CHECK-arm64e-SAME:    ptr @_swift_coro_malloc,
+// CHECK-arm64e-SAME:    i32 0,
+// CHECK-arm64e-SAME:    i64 0,
+// CHECK-arm64e-SAME:    i64 24469 }
+// CHECK-arm64e-SAME:  section "llvm.ptrauth"
+// CHECK-arm64e-SAME:  align 8
+// CHECK-arm64e-LABEL: _swift_coro_free.ptrauth = private constant {
+// CHECK-arm64e-SAME:    ptr @_swift_coro_free,
+// CHECK-arm64e-SAME:    i32 0,
+// CHECK-arm64e-SAME:    i64 0,
+// CHECK-arm64e-SAME:    i64 40879 },
+// CHECK-arm64e-SAME:  section "llvm.ptrauth",
+// CHECK-arm64e-SAME:  align 8
 // CHECK-LABEL: _swift_coro_malloc_allocator = linkonce_odr hidden constant %swift.coro_allocator {
 // CHECK-SAME:       i32 258,
-// CHECK-SAME:       malloc,
+// CHECK-SAME:       malloc
 // CHECK-SAME:       free
 // CHECK-SAME:  }
 
 // CHECK-LABEL: @_swift_coro_alloc(
-// CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]]
+// CHECK-SAME:      ptr [[FRAME:%[^,]+]]
+// CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]],
 // CHECK-SAME:      i64 [[SIZE:%[^)]+]]
 // CHECK-SAME:  )
 // CHECK-SAME:  {
@@ -56,12 +85,16 @@
 // CHECK-SAME:        i32 0
 // CHECK-SAME:        i32 1
 // CHECK:         [[ALLOCATE_FN:%[^,]+]] = load ptr, ptr [[ALLOCATE_FN_PTR]]
-// CHECK:         [[ALLOCATION:%[^,]+]] = call swiftcc ptr [[ALLOCATE_FN]](i64 [[SIZE]])
+// CHECK-arm64e:  [[ALLOCATE_FN_BITS:%[^,]+]] = ptrtoint ptr [[ALLOCATE_FN]] to i64
+// CHECK-arm64e:  [[ALLOCATE_FN_BITS_AUTHED:%[^,]+]] = call i64 @llvm.ptrauth.auth(i64 [[ALLOCATE_FN_BITS]], i32 0, i64 24469)
+// CHECK-arm64e:  [[ALLOCATE_FN:%[^,]+]] = inttoptr i64 [[ALLOCATE_FN_BITS_AUTHED]]
+// CHECK:         [[ALLOCATION:%[^,]+]] = call swiftcc ptr [[ALLOCATE_FN]](ptr [[FRAME]], ptr swiftcoro [[ALLOCATOR]], [[INT]] [[SIZE]])
 // CHECK:         ret ptr [[ALLOCATION]]
 // CHECK:       }
 
 // CHECK-LABEL: @_swift_coro_dealloc(
-// CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]]
+// CHECK-SAME:      ptr [[FRAME:%[^,]+]]
+// CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]],
 // CHECK-SAME:      ptr [[ADDRESS:%[^)]+]]
 // CHECK-SAME:  )
 // CHECK-SAME:  {
@@ -91,7 +124,10 @@
 // CHECK-SAME:          i32 0
 // CHECK-SAME:          i32 2
 // CHECK:           [[DEALLOCATE_FN:%[^,]+]] = load ptr, ptr [[DEALLOCATE_FN_PTR]]
-// CHECK:           call swiftcc void [[DEALLOCATE_FN]](ptr [[ADDRESS]])
+// CHECK-arm64e:    [[DEALLOCATE_FN_BITS:%[^,]+]] = ptrtoint ptr [[DEALLOCATE_FN]] to i64
+// CHECK-arm64e:    [[DEALLOCATE_FN_BITS_AUTHED:%[^,]+]] = call i64 @llvm.ptrauth.auth(i64 [[DEALLOCATE_FN_BITS]], i32 0, i64 40879)
+// CHECK-arm64e:    [[DEALLOCATE_FN:%[^,]+]] = inttoptr i64 [[DEALLOCATE_FN_BITS_AUTHED]]
+// CHECK:           call swiftcc void [[DEALLOCATE_FN]](ptr [[FRAME]], ptr swiftcoro [[ALLOCATOR]], ptr [[ADDRESS]])
 // CHECK:         ret void
 // CHECK:       }
 
@@ -221,7 +257,7 @@ public var force_yield_once_convention : () {
 // CHECK-SAME:        _swift_coro_malloc_allocator
 // CHECK-SAME:    )
 // CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
-// CHECK:         call void @llvm.coro.alloca.free(token [[ALLOCATION]])
+// CHECK:         call void @llvm.coro.alloca.free.frame(token [[ALLOCATION]])
 // CHECK:       }
   @_silgen_name("increment_i_yield_once")
   _modify {
@@ -250,7 +286,7 @@ public var force_yield_once_2_convention : () {
 //           :            i32 1
 //           :        )
 // CHECK:         [[SIZE:%[^,]+]] = zext i32 {{%[^,]+}} to i64
-// CHECK:         [[ALLOCATION:%[^,]+]] = call token @llvm.coro.alloca.alloc.i64(i64 [[SIZE]], i32 16)
+// CHECK:         [[ALLOCATION:%[^,]+]] = call token @llvm.coro.alloca.alloc.frame.i64(i64 [[SIZE]], i32 16)
 // CHECK:         [[FRAME:%[^,]+]] = call ptr @llvm.coro.alloca.get(token [[ALLOCATION]])
 // CHECK:         call void @llvm.lifetime.start.p0(i64 -1, ptr [[FRAME]])
 // CHECK:         [[RAMP:%[^,]+]] = call ptr @llvm.coro.prepare.retcon(ptr @"$s27coroutine_accessors_popless1iSivx")
@@ -268,7 +304,7 @@ public var force_yield_once_2_convention : () {
 // CHECK-SAME:        [[ALLOCATOR]]
 // CHECK-SAME:    )
 // CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
-// CHECK:         call void @llvm.coro.alloca.free(token [[ALLOCATION]])
+// CHECK:         call void @llvm.coro.alloca.free.frame(token [[ALLOCATION]])
 // CHECK:       }
   @_silgen_name("increment_i_yield_once_2")
   modify {

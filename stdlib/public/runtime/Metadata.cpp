@@ -7903,6 +7903,8 @@ std::tuple<const void *, size_t> MetadataAllocator::InitialPoolLocation() {
 
 bool swift::_swift_debug_metadataAllocationIterationEnabled = false;
 const void * const swift::_swift_debug_allocationPoolPointer = &AllocationPool;
+const size_t swift::_swift_debug_allocationPoolSize = InitialPoolSize;
+const size_t swift::_swift_debug_metadataAllocatorPageSize = PoolRange::PageSize;
 std::atomic<const void *> swift::_swift_debug_metadataAllocationBacktraceList;
 
 static void recordBacktrace(void *allocation) {

@@ -63,6 +63,18 @@ def emit_module_semantic_info_path
   : Separate<["-"], "emit-module-semantic-info-path">, MetaVarName<"<path>">,
     HelpText<"Output semantic info of current module to <path>">;
 
+def sil_output_path
+  : Separate<["-"], "sil-output-path">, MetaVarName<"<path>">,
+    Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+           SupplementaryOutput, CacheInvariant]>,
+    HelpText<"Output SIL to <path> as additional output during compilation">;
+
+def ir_output_path
+  : Separate<["-"], "ir-output-path">, MetaVarName<"<path>">,
+    Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+           SupplementaryOutput, CacheInvariant]>,
+    HelpText<"Output LLVM IR to <path> as additional output during compilation">;
+
 def diagnostic_documentation_path
   : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
   HelpText<"Path to diagnostic documentation resources">;
@@ -165,6 +177,10 @@ def verify_apply_fixes : Flag<["-"], "verify-apply-fixes">,
   HelpText<"Like -verify, but updates the original source file">;
 def verify_ignore_unknown: Flag<["-"], "verify-ignore-unknown">,
   HelpText<"Allow diagnostics for '<unknown>' location in verify mode">;
+def verify_ignore_unrelated: Flag<["-"], "verify-ignore-unrelated">,
+  HelpText<"Allow diagnostics in files outside those with expected diagnostics in verify mode">;
+def verify_ignore_macro_note: Flag<["-"], "verify-ignore-macro-note">,
+  HelpText<"Skip verifying notes about macro location">;
 def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
   MetaVarName<"<module-name>">,
   HelpText<"Verify the generic signatures in the given module">;
@@ -266,7 +282,7 @@ def serialize_dependency_scan_cache : Flag<["-"], "serialize-dependency-scan-cac
 
 def reuse_dependency_scan_cache : Flag<["-"], "load-dependency-scan-cache">,
    HelpText<"For performing a dependency scan, deserialize the scanner's internal state from a prior scan.">;
-   
+
 def validate_prior_dependency_scan_cache : Flag<["-"], "validate-prior-dependency-scan-cache">,
    HelpText<"For performing a dependency scan with a prior scanner state, validate module dependencies.">;
 
@@ -282,12 +298,12 @@ def no_parallel_scan : Flag<["-"], "no-parallel-scan">,
    HelpText<"Perform dependency scanning in a single-threaded fashion.">;
 
 def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
-  HelpText<"Run SIL copy propagation with lexical lifetimes to shorten object "
+  HelpText<"Always run SIL copy propagation with lexical lifetimes to shorten object "
            "lifetimes while preserving variable lifetimes.">;
 def copy_propagation_state_EQ :
   Joined<["-"], "enable-copy-propagation=">,
   HelpText<"Whether to enable copy propagation">,
-  MetaVarName<"true|requested-passes-only|false">;
+  MetaVarName<"always|optimizing|requested-passes-only|false">;
 
 def disable_infer_public_concurrent_value : Flag<["-"], "disable-infer-public-sendable">,
     HelpText<"Disable inference of Sendable conformances for public structs and enums">;
@@ -393,10 +409,6 @@ def public_autolink_library :
 // HIDDEN FLAGS
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
 
-def enable_experimental_swift_based_closure_specialization :
-  Flag<["-"], "experimental-swift-based-closure-specialization">,
-  HelpText<"Use the experimental Swift based closure-specialization optimization pass instead of the existing C++ one">;
-
 def checked_async_objc_bridging : Joined<["-"], "checked-async-objc-bridging=">,
   HelpText<"Control whether checked continuations are used when bridging "
            "async calls from Swift to ObjC: 'on', 'off' ">;
@@ -432,6 +444,9 @@ def dump_macro_expansions : Flag<["-"], "dump-macro-expansions">,
   HelpText<"Dumps the results of each macro expansion">;
 def emit_macro_expansion_files : Separate<["-"], "emit-macro-expansion-files">,
   HelpText<"Specify when to emit macro expansion file: 'none', 'debug', or 'diagnostics'">;
+
+def dump_source_file_imports : Flag<["-"], "dump-source-file-imports">,
+  HelpText<"Dumps the list of imports for each source file">;
 
 def analyze_request_evaluator : Flag<["-"], "analyze-request-evaluator">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
@@ -565,7 +580,7 @@ def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
 
 def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
-  HelpText<"Enable speculative devirtualization pass.">;
+  HelpText<"Deprecated, has no effect">;
 
 def enable_async_demotion : Flag<["-"], "enable-experimental-async-demotion">,
   HelpText<"Enables an optimization pass to demote async functions.">;
@@ -687,6 +702,12 @@ def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-valid
 
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
+
+def verbose_asm : Flag<["-"], "verbose-asm">,
+  HelpText<"Generate verbose assembly output with comments">;
+
+def no_verbose_asm : Flag<["-"], "no-verbose-asm">,
+  HelpText<"Disable verbose assembly output (default is enabled)">;
 
 def emit_pch : Flag<["-"], "emit-pch">,
   HelpText<"Emit PCH for imported Objective-C header file">, ModeOpt;
@@ -882,6 +903,12 @@ def solver_scope_threshold_EQ : Joined<["-"], "solver-scope-threshold=">,
 
 def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">,
   HelpText<"Expression type checking trail change limit">;
+
+def solver_disable_prepared_overloads : Flag<["-"], "solver-disable-prepared-overloads">,
+  HelpText<"Disable experimental prepared overloads optimization">;
+
+def solver_enable_prepared_overloads : Flag<["-"], "solver-enable-prepared-overloads">,
+  HelpText<"Enable experimental prepared overloads optimization">;
 
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
@@ -1311,8 +1338,7 @@ def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
 
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
   def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
-    HelpText<"Always serialize SIL in ossa form. If this flag is not passed in, "
-            "when optimizing ownership will be lowered before serializing SIL">;
+    HelpText<"Obsolete. This option is ignored">;
 }
 
 def enable_recompilation_to_ossa_module : Flag<["-"], "enable-recompilation-to-ossa-module">,

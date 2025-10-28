@@ -49,13 +49,14 @@ bool BuiltinInfo::isReadNone() const {
   return strchr(BuiltinExtraInfo[(unsigned)ID].Attributes, 'n') != nullptr;
 }
 
-const llvm::AttributeList &
-IntrinsicInfo::getOrCreateAttributes(ASTContext &Ctx) const {
-  using DenseMapInfo = llvm::DenseMapInfo<llvm::AttributeList>;
-  if (DenseMapInfo::isEqual(Attrs, DenseMapInfo::getEmptyKey())) {
-    Attrs = llvm::Intrinsic::getAttributes(Ctx.getIntrinsicScratchContext(), ID);
+const llvm::AttributeSet &
+IntrinsicInfo::getOrCreateFnAttributes(ASTContext &Ctx) const {
+  using DenseMapInfo = llvm::DenseMapInfo<llvm::AttributeSet>;
+  if (DenseMapInfo::isEqual(FnAttrs, DenseMapInfo::getEmptyKey())) {
+    FnAttrs =
+        llvm::Intrinsic::getFnAttributes(Ctx.getIntrinsicScratchContext(), ID);
   }
-  return Attrs;
+  return FnAttrs;
 }
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
@@ -82,6 +83,7 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
           .Case("Word", BuiltinTypeKind::BuiltinInteger)
           .Case("IntLiteral", BuiltinTypeKind::BuiltinIntegerLiteral)
           .StartsWith("Int", BuiltinTypeKind::BuiltinInteger)
+          .Case("ImplicitActor", BuiltinTypeKind::BuiltinImplicitActor)
           .Default({});
 
   // Handle types that are not BuiltinTypeKinds.
@@ -174,6 +176,8 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheIntegerLiteralType;
   case BuiltinTypeKind::BuiltinUnboundGeneric:
     return Type();
+  case BuiltinTypeKind::BuiltinImplicitActor:
+    return Context.TheImplicitActorType;
   }
 
   return Type();
@@ -510,7 +514,7 @@ static FuncDecl *getBuiltinGenericFunction(
   func->setAccess(AccessLevel::Public);
   func->setGenericSignature(Sig);
   if (Throws == BuiltinThrowsKind::Rethrows)
-    func->getAttrs().add(new (Context) RethrowsAttr(/*ThrowsLoc*/ SourceLoc()));
+    func->addAttribute(new (Context) RethrowsAttr(/*ThrowsLoc*/ SourceLoc()));
 
   return func;
 }
@@ -922,16 +926,14 @@ static ValueDecl *getRefCountingOperation(ASTContext &ctx, Identifier id) {
 static ValueDecl *getLoadOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted,
-                                      _conformsTo(_typeparam(0), _copyable),
-                                      _conformsTo(_typeparam(0), _escapable)),
+                                      _conformsTo(_typeparam(0), _copyable)),
                             _parameters(_rawPointer),
                             _typeparam(0));
 }
 
 static ValueDecl *getTakeOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
-                            _generics(_unrestricted,
-                                      _conformsTo(_typeparam(0), _escapable)),
+                            _generics(_unrestricted),
                             _parameters(_rawPointer),
                             _typeparam(0));
 }
@@ -1011,7 +1013,7 @@ static ValueDecl *getBindMemoryOperation(ASTContext &ctx, Identifier id) {
                                                 _word,
                                                 _metatype(_typeparam(0))),
                                     _word);
-  fd->getAttrs().add(new (ctx) DiscardableResultAttr(/*implicit*/true));
+  fd->addAttribute(new (ctx) DiscardableResultAttr(/*implicit*/ true));
   return fd;
 }
 
@@ -1020,7 +1022,7 @@ static ValueDecl *getRebindMemoryOperation(ASTContext &ctx, Identifier id) {
                                     _parameters(_rawPointer,
                                                 _word),
                                     _word);
-  fd->getAttrs().add(new (ctx) DiscardableResultAttr(/*implicit*/true));
+  fd->addAttribute(new (ctx) DiscardableResultAttr(/*implicit*/ true));
   return fd;
 }
 
@@ -2427,18 +2429,6 @@ bool swift::canBuiltinBeOverloadedForType(BuiltinValueKind ID, Type Ty) {
   return isBuiltinTypeOverloaded(Ty, OverloadedBuiltinKinds[unsigned(ID)]);
 }
 
-/// Table of string intrinsic names indexed by enum value.
-static const char *const IntrinsicNameTable[] = {
-    "not_intrinsic",
-#define GET_INTRINSIC_NAME_TABLE
-#include "llvm/IR/IntrinsicImpl.inc"
-#undef GET_INTRINSIC_NAME_TABLE
-};
-
-#define GET_INTRINSIC_TARGET_DATA
-#include "llvm/IR/IntrinsicImpl.inc"
-#undef GET_INTRINSIC_TARGET_DATA
-
 llvm::Intrinsic::ID swift::getLLVMIntrinsicID(StringRef InName) {
   using namespace llvm;
 
@@ -2454,10 +2444,8 @@ llvm::Intrinsic::ID swift::getLLVMIntrinsicID(StringRef InName) {
     NameS.push_back(C == '_' ? '.' : C);
 
   const char *Name = NameS.c_str();
-  ArrayRef<const char *> NameTable(&IntrinsicNameTable[1],
-                                   TargetInfos[1].Offset);
-  int Idx = Intrinsic::lookupLLVMIntrinsicByName(NameTable, Name);
-  return static_cast<Intrinsic::ID>(Idx + 1);
+
+  return Intrinsic::lookupIntrinsicID(Name);
 }
 
 llvm::Intrinsic::ID
@@ -2543,7 +2531,6 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Metadata:
   case IITDescriptor::ExtendArgument:
   case IITDescriptor::TruncArgument:
-  case IITDescriptor::HalfVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
   case IITDescriptor::VecOfAnyPtrsToElt:
@@ -2552,6 +2539,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Subdivide4Argument:
   case IITDescriptor::PPCQuad:
   case IITDescriptor::AArch64Svcount:
+  case IITDescriptor::OneNthEltsVecArgument:
     // These types cannot be expressed in swift yet.
     return Type();
 
@@ -2649,8 +2637,8 @@ getSwiftFunctionTypeForIntrinsic(llvm::Intrinsic::ID ID,
   // Translate LLVM function attributes to Swift function attributes.
   IntrinsicInfo II;
   II.ID = ID;
-  auto attrs = II.getOrCreateAttributes(Context);
-  if (attrs.hasFnAttr(llvm::Attribute::NoReturn)) {
+  auto &attrs = II.getOrCreateFnAttributes(Context);
+  if (attrs.hasAttribute(llvm::Attribute::NoReturn)) {
     ResultTy = Context.getNeverType();
     if (!ResultTy)
       return false;
@@ -3504,6 +3492,7 @@ bool BuiltinType::isBitwiseCopyable() const {
     return true;
   case BuiltinTypeKind::BuiltinNativeObject:
   case BuiltinTypeKind::BuiltinBridgeObject:
+  case BuiltinTypeKind::BuiltinImplicitActor:
   case BuiltinTypeKind::BuiltinUnsafeValueBuffer:
   case BuiltinTypeKind::BuiltinDefaultActorStorage:
   case BuiltinTypeKind::BuiltinNonDefaultDistributedActorStorage:
@@ -3558,6 +3547,9 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
     break;
   case BuiltinTypeKind::BuiltinBridgeObject:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_BRIDGEOBJECT);
+    break;
+  case BuiltinTypeKind::BuiltinImplicitActor:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_IMPLICITACTOR);
     break;
   case BuiltinTypeKind::BuiltinUnsafeValueBuffer:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(

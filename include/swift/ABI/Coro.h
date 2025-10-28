@@ -56,14 +56,20 @@ public:
                                 setShouldDeallocateImmediately)
 };
 
+struct CoroAllocator;
+
 using CoroAllocation = void *;
-using CoroAllocateFn = CoroAllocation (*)(size_t);
-using CoroDealllocateFn = void (*)(CoroAllocation);
+using CoroAllocateFn = CoroAllocation (*)(CoroAllocator *, size_t);
+using CoroDealllocateFn = void (*)(CoroAllocator *, CoroAllocation);
+using CoroAllocateFrameFn = CoroAllocation (*)(CoroAllocator *, size_t);
+using CoroDealllocateFrameFn = void (*)(CoroAllocator *, CoroAllocation);
 
 struct CoroAllocator {
   CoroAllocatorFlags flags;
   CoroAllocateFn allocate;
   CoroDealllocateFn deallocate;
+  CoroAllocateFrameFn allocateFrame;
+  CoroDealllocateFrameFn deallocateFrame;
 
   /// Whether the allocator should deallocate memory on calls to
   /// swift_coro_dealloc.

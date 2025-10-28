@@ -202,7 +202,7 @@ struct ConformanceDiagnostic {
   ProtocolDecl *ExistingExplicitProtocol;
 };
 
-/// Used in diagnostic %selects.
+/// Used in diagnostic %selects via FRAGILE_FUNC_KIND.
 struct FragileFunctionKind {
   enum Kind : unsigned {
     Transparent,
@@ -211,6 +211,7 @@ struct FragileFunctionKind {
     DefaultArgument,
     PropertyInitializer,
     BackDeploy,
+    EmbeddedAlwaysEmitIntoClient,
     None
   };
 
@@ -218,6 +219,9 @@ struct FragileFunctionKind {
 
   friend bool operator==(FragileFunctionKind lhs, FragileFunctionKind rhs) {
     return lhs.kind == rhs.kind;
+  }
+  friend bool operator!=(FragileFunctionKind lhs, FragileFunctionKind rhs) {
+    return lhs.kind != rhs.kind;
   }
 
   /// Casts to `unsigned` for diagnostic %selects.

@@ -23,11 +23,11 @@ bb2(%5 : $Error):                             // Preds: bb0
   throw %5 : $Error                           // id: %6
 }
 
-//CHECK-LABEL: sil [always_inline] @callee_function
+//CHECK-LABEL: sil [heuristic_always_inline] @callee_function
 //CHECK: return
 
 // main.inner () throws -> ()
-sil [always_inline] @callee_function : $@convention(thin) () -> @error Error {
+sil [heuristic_always_inline] @callee_function : $@convention(thin) () -> @error Error {
 bb0:
   %0 = tuple ()                                   // user: %1
   return %0 : $()                                 // id: %1

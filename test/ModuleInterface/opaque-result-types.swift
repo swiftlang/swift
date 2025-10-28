@@ -2,7 +2,7 @@
 // RUN: %target-swift-emit-module-interface(%t/OpaqueResultTypes.swiftinterface) %s -module-name OpaqueResultTypes
 // RUN: %target-swift-typecheck-module-from-interface(%t/OpaqueResultTypes.swiftinterface) -module-name OpaqueResultTypes
 // RUN: %FileCheck %s < %t/OpaqueResultTypes.swiftinterface
-// RUN: %target-swift-frontend -I %t -typecheck -verify %S/Inputs/opaque-result-types-client.swift
+// RUN: %target-swift-frontend -I %t -typecheck -verify -verify-ignore-unrelated %S/Inputs/opaque-result-types-client.swift
 
 public protocol Foo {}
 extension Int: Foo {}

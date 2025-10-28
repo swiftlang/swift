@@ -74,6 +74,9 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
       M, silLinkage, IsNotSerialized, mangledName, silTy, std::nullopt, gDecl);
   silGlobal->setDeclaration(!forDef);
 
+  if (auto sectionAttr = gDecl->getAttrs().getAttribute<SectionAttr>())
+    silGlobal->setSection(sectionAttr->Name);
+
   return silGlobal;
 }
 

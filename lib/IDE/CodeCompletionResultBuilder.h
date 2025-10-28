@@ -13,11 +13,11 @@
 #ifndef SWIFT_LIB_IDE_CODE_COMPLETION_RESULT_BUILDER_H
 #define SWIFT_LIB_IDE_CODE_COMPLETION_RESULT_BUILDER_H
 
+#include "CodeCompletionStringBuilder.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/IDE/CodeCompletionResult.h"
 #include "swift/IDE/CodeCompletionResultSink.h"
-#include "swift/IDE/CodeCompletionStringBuilder.h"
 
 namespace clang {
 class Module;

@@ -1136,7 +1136,8 @@ namespace {
       ids = StoredSingleEntry::forSerializedDecl(
                                  astWriter.getDeclID(decl).getRawValue());
     } else if (auto *macro = mappedEntry.dyn_cast<clang::MacroInfo *>()) {
-      ids = StoredSingleEntry::forSerializedMacro(astWriter.getMacroID(macro));
+      ids = StoredSingleEntry::forSerializedMacro(
+          astWriter.getMacroRef(macro, /*Name=*/nullptr));
     } else {
       auto *moduleMacro = cast<clang::ModuleMacro *>(mappedEntry);
       StoredSingleEntry::SerializationID nameID =
@@ -2033,30 +2034,6 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
           if (auto def = recordDecl->getDefinition())
             namedMember = def;
         addEntryToLookupTable(table, namedMember, nameImporter);
-      }
-      if (auto linkageSpecDecl =
-              dyn_cast<clang::LinkageSpecDecl>(canonicalMember)) {
-        std::function<void(clang::DeclContext *)> addDeclsFromContext =
-            [&](clang::DeclContext *declContext) {
-              for (auto nestedDecl : declContext->decls()) {
-                if (auto namedMember = dyn_cast<clang::NamedDecl>(nestedDecl))
-                  addEntryToLookupTable(table, namedMember, nameImporter);
-                else if (auto nestedLinkageSpecDecl =
-                             dyn_cast<clang::LinkageSpecDecl>(nestedDecl))
-                  addDeclsFromContext(nestedLinkageSpecDecl);
-              }
-            };
-
-        // HACK: libc++ redeclares lgamma_r in one of its headers, and that
-        // declaration hijacks lgamma_r from math.h where it is originally
-        // defined. This causes deserialization issues when loading the Darwin
-        // overlay on Apple platforms, because Swift cannot find lgamma_r in
-        // module _math.
-        bool shouldSkip = canonicalMember->getOwningModule() &&
-                          canonicalMember->getOwningModule()->Name ==
-                              "std_private_random_binomial_distribution";
-        if (!shouldSkip)
-          addDeclsFromContext(linkageSpecDecl);
       }
     }
   }

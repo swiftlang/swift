@@ -91,6 +91,9 @@ bool SILGlobalVariable::isPossiblyUsedExternally() const {
   if (markedAsUsed())
     return true;
 
+  if (!section().empty())
+    return true;
+
   SILLinkage linkage = getLinkage();
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
 }
@@ -148,7 +151,7 @@ SILInstruction *SILGlobalVariable::getStaticInitializerValue() {
 }
 
 bool SILGlobalVariable::mustBeInitializedStatically() const {
-  if (getSectionAttr())
+  if (!section().empty())
     return true;
 
   auto *decl = getDecl();  

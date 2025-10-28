@@ -369,9 +369,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::ExtensionMacroExpansion:
   case GeneratedSourceInfo::PreambleMacroExpansion:
   case GeneratedSourceInfo::BodyMacroExpansion: {
-    auto decl = cast<Decl *>(ASTNode::getFromOpaqueValue(Info.astNode));
-    auto attr = Info.attachedMacroCustomAttr;
-    if (auto *macroDecl = decl->getResolvedMacro(attr)) {
+    if (auto *macroDecl = Info.attachedMacroCustomAttr->getResolvedMacro()) {
       Result.ExpansionLoc = RegularLocation(macroDecl);
       Result.Name = macroDecl->getBaseName().userFacingName();
       Result.Freestanding = true;
@@ -809,10 +807,16 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // If we have a mutable binding for a 'let', such as 'self' in an
         // 'init' method, load it.
         if (val->getType().isMoveOnly()) {
-          val = B.createMarkUnresolvedNonCopyableValueInst(
-              loc, val,
-              MarkUnresolvedNonCopyableValueInst::CheckKind::
-                  NoConsumeOrAssign);
+          auto *moveOnlyIntroducer =
+              dyn_cast_or_null<MarkUnresolvedNonCopyableValueInst>(val);
+          if (!moveOnlyIntroducer || moveOnlyIntroducer->getCheckKind() !=
+                                         MarkUnresolvedNonCopyableValueInst::
+                                             CheckKind::NoConsumeOrAssign) {
+            val = B.createMarkUnresolvedNonCopyableValueInst(
+                loc, val,
+                MarkUnresolvedNonCopyableValueInst::CheckKind::
+                    NoConsumeOrAssign);
+          }
         }
         val = emitLoad(loc, val, tl, SGFContext(), IsNotTake).forward(*this);
       }
@@ -1544,7 +1548,7 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
         {}, /*async*/ false, /*throws*/ false, /*thrownType*/Type(), {},
         emptyParams,
         getASTContext().getNeverType(), moduleDecl);
-    drainQueueFuncDecl->getAttrs().add(new (getASTContext()) SILGenNameAttr(
+    drainQueueFuncDecl->addAttribute(new (getASTContext()) SILGenNameAttr(
         "swift_task_asyncMainDrainQueue", /*raw*/ false, /*implicit*/ true));
   }
 
@@ -1885,9 +1889,10 @@ SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
     assert(base);
 
     SILValue capturedBase;
-    unsigned argIdx = setterConv.getNumSILArguments() - 1;
+    unsigned argIdx = setterConv.getSILArgIndexOfSelf();
+    auto paramInfo = setterConv.getParamInfoForSILArg(argIdx);
 
-    if (setterConv.getSILArgumentConvention(argIdx).isInoutConvention()) {
+    if (paramInfo.isIndirectMutating()) {
       capturedBase = base.getValue();
     } else if (base.getType().isAddress() &&
                base.getType().getObjectType() ==
@@ -1931,11 +1936,6 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
 
   auto initTy = initFRef->getType().castTo<SILFunctionType>();
 
-  // If there are substitutions we need to emit partial apply to
-  // apply substitutions to the init accessor reference type.
-  initTy = initTy->substGenericArgs(SGM.M, substitutions,
-                                    getTypeExpansionContext());
-
   // Emit partial apply with self metatype argument to produce a substituted
   // init accessor reference.
   auto selfTy = selfValue.getType().getASTType();
@@ -1949,8 +1949,9 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
     selfMetatype = B.createMetatype(loc, getLoweredType(metatypeTy));
   }
 
-  auto expectedSelfTy = initAccessor->getDeclContext()->getSelfInterfaceType()
-      .subst(substitutions);
+  auto expectedSelfTy =
+      initAccessor->getDeclContext()->getSelfInterfaceType().subst(
+          substitutions);
 
   // This should only happen in the invalid case where we attempt to initialize
   // superclass storage from a subclass initializer. However, we shouldn't
@@ -1960,6 +1961,14 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
     selfMetatype = B.createUpcast(loc, selfMetatype,
                              getLoweredType(MetatypeType::get(expectedSelfTy)));
   }
+
+  if (auto invocationSig = initTy->getInvocationGenericSignature()) {
+    if (invocationSig->areAllParamsConcrete())
+      substitutions = SubstitutionMap();
+  } else {
+    substitutions = SubstitutionMap();
+  }
+
   PartialApplyInst *initPAI =
       B.createPartialApply(loc, initFRef, substitutions, selfMetatype,
                            ParameterConvention::Direct_Guaranteed,
@@ -1973,9 +1982,9 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
     SILFunctionConventions initConv(initTy, SGM.M);
 
     auto newValueArgIdx = initConv.getSILArgIndexOfFirstParam();
+    auto newValueParamInfo = initConv.getParamInfoForSILArg(newValueArgIdx);
     // If we need the argument in memory, materialize an address.
-    if (initConv.getSILArgumentConvention(newValueArgIdx)
-            .isIndirectConvention() &&
+    if (initConv.isSILIndirect(newValueParamInfo) &&
         !newValue.getType().isAddress()) {
       newValue = newValue.materialize(*this, loc);
     }

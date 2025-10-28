@@ -1850,7 +1850,7 @@ public:
   ///
   /// This applies only in the Embedded Swift linkage model, and is used for
   /// any symbols that have not been explicitly requested to have unique
-  /// definitions (e.g., with @_used).
+  /// definitions (e.g., with @used).
   bool hasNonUniqueDefinition() const;
 
 #undef LINKENTITY_GET_FIELD

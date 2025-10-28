@@ -58,7 +58,7 @@ void SuperclassDeclRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void SuperclassDeclRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
+  diags.diagnose(decl, diag::through_decl_declared_here_with_kind, decl);
 }
 
 std::optional<ClassDecl *> SuperclassDeclRequest::getCachedResult() const {

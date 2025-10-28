@@ -1405,7 +1405,10 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
   auto bindValue = value.asBorrowedOperand2(SGF, pattern).getFinalManagedValue();
 
   // Borrow bindings of copyable type should still be no-implicit-copy.
-  if (!bindValue.getType().isMoveOnly()) {
+  //
+  // If we're relying on ManualOwnership for explicit-copies enforcement,
+  // we don't need the MoveOnlyWrapper.
+  if (!bindValue.getType().isMoveOnly() && !SGF.B.hasManualOwnershipAttr()) {
     if (bindValue.getType().isAddress()) {
       bindValue = ManagedValue::forBorrowedAddressRValue(
         SGF.B.createCopyableToMoveOnlyWrapperAddr(pattern, bindValue.getValue()));
@@ -3357,6 +3360,10 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
     case AccessorKind::WillSet:
     case AccessorKind::DidSet:
       llvm_unreachable("should not be involved in a read");
+    case AccessorKind::Borrow:
+      llvm_unreachable("borrow accessor is not yet implemented");
+    case AccessorKind::Mutate:
+      llvm_unreachable("mutate accessor is not yet implemented");
     }
     llvm_unreachable("switch not covered?");
     

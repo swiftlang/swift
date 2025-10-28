@@ -19,7 +19,7 @@ public func test(_ a: [Int], _ i: Int) -> Int {
 
 // CHECK:  [[SIZE_ADDR:%.*]] = getelementptr
 // CHECK:  [[SIZE:%.*]] = load i64, ptr [[SIZE_ADDR]]
-// CHECK:  [[C1:%.*]] = icmp ult i64 [[IDX]], [[SIZE]]
+// CHECK:  [[C1:%.*]] = icmp samesign ult i64 [[IDX]], [[SIZE]]
 // CHECK:  br i1 [[C1]], {{.*}}!annotation ![[ARRAY_INDEX_OUT_OF_BOUNDS]]
 
 

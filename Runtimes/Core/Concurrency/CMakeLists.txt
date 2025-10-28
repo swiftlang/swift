@@ -136,6 +136,7 @@ target_link_libraries(swift_Concurrency PRIVATE
   swiftShims
   swiftConcurrencyInternalShims
   $<$<BOOL:${BUILD_SHARED_LIBS}>:swiftThreading>
+  $<$<PLATFORM_ID:Android>:log>
   $<$<PLATFORM_ID:Windows>:Synchronization>
   $<$<PLATFORM_ID:Windows>:mincore>
   # Link to the runtime that we are just building.

@@ -19,6 +19,7 @@
 #include "NonisolatedNonsendingByDefaultMigration.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckEmbedded.h"
 #include "TypeCheckInvertible.h"
 #include "TypeCheckProtocol.h"
 #include "TypeChecker.h"
@@ -234,6 +235,13 @@ Type TypeResolution::resolveDependentMemberType(
     // Record the type we found.
     repr->setValue(nestedType, nullptr);
   } else {
+    // If we have a concrete equivalence to an error type, avoid diagnosing the
+    // missing member.
+    if (auto concreteBase = genericSig->getConcreteType(baseTy)) {
+      if (concreteBase->hasError())
+        return ErrorType::get(baseTy);
+    }
+
     // Resolve the base to a potential archetype.
     // Perform typo correction.
     TypoCorrectionResults corrections(repr->getNameRef(), repr->getNameLoc());
@@ -3194,6 +3202,7 @@ TypeAttrKind TypeAttrSet::getRepresentative(TypeAttrKind kind) {
   case TypeAttrKind::InoutAliasable:
   case TypeAttrKind::Owned:
   case TypeAttrKind::Guaranteed:
+  case TypeAttrKind::GuaranteedAddress:
   case TypeAttrKind::PackOwned:
   case TypeAttrKind::PackGuaranteed:
   case TypeAttrKind::PackInout:
@@ -3410,8 +3419,8 @@ void TypeAttrSet::diagnoseUnclaimed(TypeAttribute *attr,
 
 Type TypeResolver::resolveGlobalActor(SourceLoc loc, TypeResolutionOptions options,
                                       CustomAttr *&attr, TypeAttrSet &attrs) {
-  auto foundGlobalActor = checkGlobalActorAttributes(
-      loc, getDeclContext(), attrs.getCustomAttrs());
+  auto foundGlobalActor =
+      checkGlobalActorAttributes(loc, attrs.getCustomAttrs());
   if (!foundGlobalActor)
     return Type();
 
@@ -3973,8 +3982,9 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     }
 
     // Validate the presence of ownership for a noncopyable parameter.
+    // FIXME: This won't diagnose if the type contains unbound generics.
     if (inStage(TypeResolutionStage::Interface)
-        && !ty->hasUnboundGenericType()) {
+        && !ty->hasUnboundGenericType() && !ty->hasTypeVariable()) {
       diagnoseMissingOwnership(ownership, eltTypeRepr, ty, resolution);
 
       // @_staticExclusiveOnly types cannot be passed as 'inout' in function
@@ -4037,13 +4047,12 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
     builder.getNodeFactory().createNode(Node::Kind::OpaqueReturnTypeOf);
   opaqueNode->addChild(definingDeclNode, builder.getNodeFactory());
   auto *opaqueDecl = builder.resolveOpaqueTypeDecl(opaqueNode);
-
-  auto *ownerDecl = opaqueDecl->getNamingDecl();
-  if (!ownerDecl) {
+  if (!opaqueDecl) {
     diagnose(repr->getLoc(), diag::no_opaque_return_type_of);
     return ErrorType::get(getASTContext());
   }
 
+  auto *ownerDecl = opaqueDecl->getNamingDecl();
   auto genericSig = ownerDecl->getInnermostDeclContext()
     ->getGenericSignatureOfContext();
 
@@ -4428,6 +4437,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
             thrownTy);
       }
     }
+  } else if (repr->getThrowsLoc().isValid()) {
+    diagnoseUntypedThrowsInEmbedded(getDeclContext(), repr->getThrowsLoc());
   }
 
   bool hasSendingResult =
@@ -4997,6 +5008,9 @@ bool TypeResolver::resolveSingleSILResult(
         ERROR(ErrorUnowned, Unowned)
         NORMAL(Out, Indirect)
         NORMAL(Owned, Owned)
+        NORMAL(Guaranteed, Guaranteed)
+        NORMAL(GuaranteedAddress, GuaranteedAddress)
+        NORMAL(Inout, Inout)
         NORMAL(UnownedInnerPointer, UnownedInnerPointer)
         NORMAL(Autoreleased, Autoreleased)
         NORMAL(PackOut, Pack)
@@ -5792,6 +5806,7 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
   }
 
   // do not allow move-only types as the element of a vararg
+  // FIXME: This does not correctly handle type variables and unbound generics.
   if (inStage(TypeResolutionStage::Interface)) {
     auto contextTy = GenericEnvironment::mapTypeIntoContext(
         resolution.getGenericSignature().getGenericEnvironment(), element);
@@ -5978,6 +5993,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     // Track the presence of a noncopyable field for diagnostic purposes only.
     // We don't need to re-diagnose if a tuple contains another tuple, though,
     // since we should've diagnosed the inner tuple already.
+    // FIXME: This won't diagnose if the type contains unbound generics
     if (!ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples) &&
         !options.contains(TypeResolutionFlags::SILMode) &&
         inStage(TypeResolutionStage::Interface) &&
@@ -5987,7 +6003,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
         !isa<TupleTypeRepr>(tyR)) {
       auto contextTy = GenericEnvironment::mapTypeIntoContext(
           resolution.getGenericSignature().getGenericEnvironment(), ty);
-      if (contextTy->isNoncopyable())
+      if (!contextTy->hasError() && contextTy->isNoncopyable())
         moveOnlyElementIndex = i;
     }
 
@@ -6925,12 +6941,7 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
   // Property delegates allow their type to be an unbound generic.
   if (typeKind == CustomAttrTypeKind::PropertyWrapper) {
-    unboundTyOpener = [](auto unboundTy) {
-      // FIXME: Don't let unbound generic types
-      // escape type resolution. For now, just
-      // return the unbound generic type.
-      return unboundTy;
-    };
+    unboundTyOpener = TypeResolution::defaultUnboundTypeOpener;
   }
 
   const auto type = TypeResolution::resolveContextualType(
@@ -6993,7 +7004,7 @@ Type ExplicitCaughtTypeRequest::evaluate(
 
     return TypeResolution::forInterface(func, options,
                                         /*unboundTyOpener*/ nullptr,
-                                        PlaceholderType::get,
+                                        /*placeholderOpener*/ nullptr,
                                         /*packElementOpener*/ nullptr)
         .resolveType(thrownTypeRepr);
   }
@@ -7005,12 +7016,13 @@ Type ExplicitCaughtTypeRequest::evaluate(
       return TypeResolution::resolveContextualType(
                thrownTypeRepr, closure,
                TypeResolutionOptions(TypeResolverContext::None),
-               /*unboundTyOpener*/ nullptr, PlaceholderType::get,
+               /*unboundTyOpener*/ nullptr, /*placeholderOpener*/ nullptr,
                /*packElementOpener*/ nullptr);
     }
 
     // Explicit 'throws' implies that this throws 'any Error'.
     if (closure->getThrowsLoc().isValid()) {
+      diagnoseUntypedThrowsInEmbedded(closure, closure->getThrowsLoc());
       return ctx.getErrorExistentialType();
     }
 
@@ -7030,13 +7042,15 @@ Type ExplicitCaughtTypeRequest::evaluate(
 
     // If there is no explicitly-specified thrown error type, it's 'any Error'.
     if (!typeRepr) {
+      diagnoseUntypedThrowsInEmbedded(doCatch->getDeclContext(),
+                                      doCatch->getThrowsLoc());
       return ctx.getErrorExistentialType();
     }
 
     return TypeResolution::resolveContextualType(
         typeRepr, doCatch->getDeclContext(),
         TypeResolutionOptions(TypeResolverContext::None),
-        /*unboundTyOpener*/ nullptr, PlaceholderType::get,
+        /*unboundTyOpener*/ nullptr, /*placeholderOpener*/ nullptr,
         /*packElementOpener*/ nullptr);
   }
 

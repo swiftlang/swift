@@ -395,6 +395,9 @@ RequirementMachine::buildRequirementsFromRules(
     bool reconstituteSugar,
     std::vector<Requirement> &reqs,
     std::vector<ProtocolTypeAlias> &aliases) const {
+  if (Failed)
+    return;
+
   RequirementBuilder builder(System, Map, genericParams, reconstituteSugar);
 
   builder.addRequirementRules(requirementRules);

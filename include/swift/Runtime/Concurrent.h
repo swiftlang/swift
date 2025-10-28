@@ -593,6 +593,51 @@ private:
     }
   }
 
+  // Common implementation for `getOrInsert` and `GetOrInsertManyScope`
+  template <class KeyTy, typename Call>
+  void getOrInsertExternallyLocked(KeyTy key, const Call &call) {
+    auto indices = IndexStorage{Indices.load(std::memory_order_relaxed)};
+    auto indicesCapacityLog2 = indices.getCapacityLog2();
+    auto elementCount = ElementCount.load(std::memory_order_relaxed);
+    auto *elements = Elements.load(std::memory_order_relaxed);
+    auto *elementsPtr = elements ? elements->data() : nullptr;
+
+    
+    auto found = this->find(key, indices, elementCount, elementsPtr);
+    if (found.first) {
+      call(found.first, false);
+      return;
+    }
+
+    auto indicesCapacity = 1UL << indicesCapacityLog2;
+
+    // The number of slots in use is elementCount + 1, since the capacity also
+    // takes a slot.
+    auto emptyCount = indicesCapacity - (elementCount + 1);
+    auto proportion = indicesCapacity / emptyCount;
+    if (proportion >= ResizeProportion) {
+      indices = resize(indices, indicesCapacityLog2, elementsPtr);
+      found = find(key, indices, elementCount, elementsPtr);
+      assert(!found.first && "Shouldn't suddenly find the key after rehashing");
+    }
+
+    if (!elements || elementCount >= elements->Capacity) {
+      elements = resize(elements, elementCount);
+    }
+    auto *element = &elements->data()[elementCount];
+
+    // Order matters: fill out the element, then update the count,
+    // then update the index.
+    bool keep = call(element, true);
+    if (keep) {
+      assert(hash_value(key) == hash_value(*element) &&
+            "Element must have the same hash code as its key.");
+      ElementCount.store(elementCount + 1, std::memory_order_release);
+      indices.storeIndexAt(&Indices, elementCount + 1, found.second,
+                          std::memory_order_release);
+    }
+  }
+
 public:
   // Implicitly trivial constructor/destructor.
   ConcurrentReadableHashMap() = default;
@@ -684,6 +729,48 @@ public:
     return Snapshot(this, indices, elementsPtr, elementCount);
   }
 
+  /// A wrapper that allows performing several `getOrInsert` operations under
+  /// the same lock.
+  class GetOrInsertManyScope {
+    GetOrInsertManyScope() = delete;
+    GetOrInsertManyScope(const GetOrInsertManyScope &) = delete;
+    GetOrInsertManyScope &operator=(const GetOrInsertManyScope &) = delete;
+    GetOrInsertManyScope(GetOrInsertManyScope &&) = delete;
+    GetOrInsertManyScope &operator=(GetOrInsertManyScope &&) = delete;
+
+    ConcurrentReadableHashMap &Map;
+
+  public:
+    GetOrInsertManyScope(ConcurrentReadableHashMap &map) : Map(map) {
+      Map.WriterLock.lock();
+    }
+
+    ~GetOrInsertManyScope() {
+      Map.deallocateFreeListIfSafe();
+      Map.WriterLock.unlock();
+    }
+
+    /// Get an element by key, or insert a new element for that key if one is
+    /// not already present. Invoke `call` with the pointer to the element.
+    ///
+    /// `call` is passed the following parameters:
+    ///   - `element`: the pointer to the element corresponding to `key`
+    ///   - `created`: true if the element is newly created, false if it already
+    ///                exists
+    /// `call` returns a `bool`. When `created` is `true`, the return values
+    /// mean:
+    ///   - `true` the new entry is to be kept
+    ///   - `false` indicates that the new entry is discarded
+    /// If the new entry is kept, then the new element MUST be initialized, and
+    /// have a hash value that matches the hash value of `key`.
+    ///
+    /// The return value is ignored when `created` is `false`.
+    template <class KeyTy, typename Call>
+    void getOrInsert(KeyTy key, const Call &call) {
+      Map.getOrInsertExternallyLocked(key, call);
+    }
+  };
+
   /// Get an element by key, or insert a new element for that key if one is not
   /// already present. Invoke `call` with the pointer to the element. BEWARE:
   /// `call` is invoked with the internal writer lock held, keep work to a
@@ -703,48 +790,7 @@ public:
   template <class KeyTy, typename Call>
   void getOrInsert(KeyTy key, const Call &call) {
     typename MutexTy::ScopedLock guard(WriterLock);
-
-    auto indices = IndexStorage{Indices.load(std::memory_order_relaxed)};
-    auto indicesCapacityLog2 = indices.getCapacityLog2();
-    auto elementCount = ElementCount.load(std::memory_order_relaxed);
-    auto *elements = Elements.load(std::memory_order_relaxed);
-    auto *elementsPtr = elements ? elements->data() : nullptr;
-
-    auto found = this->find(key, indices, elementCount, elementsPtr);
-    if (found.first) {
-      call(found.first, false);
-      deallocateFreeListIfSafe();
-      return;
-    }
-
-    auto indicesCapacity = 1UL << indicesCapacityLog2;
-
-    // The number of slots in use is elementCount + 1, since the capacity also
-    // takes a slot.
-    auto emptyCount = indicesCapacity - (elementCount + 1);
-    auto proportion = indicesCapacity / emptyCount;
-    if (proportion >= ResizeProportion) {
-      indices = resize(indices, indicesCapacityLog2, elementsPtr);
-      found = find(key, indices, elementCount, elementsPtr);
-      assert(!found.first && "Shouldn't suddenly find the key after rehashing");
-    }
-
-    if (!elements || elementCount >= elements->Capacity) {
-      elements = resize(elements, elementCount);
-    }
-    auto *element = &elements->data()[elementCount];
-
-    // Order matters: fill out the element, then update the count,
-    // then update the index.
-    bool keep = call(element, true);
-    if (keep) {
-      assert(hash_value(key) == hash_value(*element) &&
-             "Element must have the same hash code as its key.");
-      ElementCount.store(elementCount + 1, std::memory_order_release);
-      indices.storeIndexAt(&Indices, elementCount + 1, found.second,
-                           std::memory_order_release);
-    }
-
+    getOrInsertExternallyLocked(key, call);
     deallocateFreeListIfSafe();
   }
 

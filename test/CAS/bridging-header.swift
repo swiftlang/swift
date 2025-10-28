@@ -41,9 +41,9 @@
 // RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json bridgingHeader > %t/header.cmd
-// RUN: %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules -O -o %t/bridging.pch
+// RUN: %target-swift-frontend @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
-// RUN:   %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules -O -o %t/bridging.pch > %t/keys.json
+// RUN:   %target-swift-frontend @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch > %t/keys.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json > %t/key
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd

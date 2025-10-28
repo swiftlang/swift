@@ -450,7 +450,7 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         if (!insertion.second) {
           newAttr->setInvalid();
         } else {
-          witness->getAttrs().add(newAttr);
+          witness->addAttribute(newAttr);
           success = true;
           // Register derivative function configuration.
           auto *resultIndices =
@@ -1047,7 +1047,8 @@ findMissingGenericRequirementForSolutionFix(
 
       return env->mapTypeIntoContext(gp);
     },
-    LookUpConformanceInModule());
+    LookUpConformanceInModule(),
+    SubstFlags::PreservePackExpansionLevel);
   };
 
   type = getTypeInConformanceContext(type);
@@ -1156,6 +1157,15 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       getOrCreateRequirementEnvironment(reqEnvCache, dc, reqSig, proto,
                                         covariantSelf, conformance);
 
+  auto reqSubMap = reqEnvironment.getRequirementToWitnessThunkSubs();
+
+  Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
+  if (selfTy->hasError()) {
+    return RequirementMatch(witness, MatchKind::WitnessInvalid,
+                            witnessType, reqEnvironment,
+                            /*optionalAdjustments*/ {});
+  }
+
   // Set up the constraint system for matching.
   auto setup =
       [&]() -> std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type> {
@@ -1163,26 +1173,23 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     // the required type and the witness type.
     cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
 
-    auto reqSubMap = reqEnvironment.getRequirementToWitnessThunkSubs();
-
-    Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
-
     // Open up the type of the requirement.
-    SmallVector<OpenedType, 4> reqReplacements;
-
     reqLocator =
         cs->getConstraintLocator(req, ConstraintLocator::ProtocolRequirement);
-    reqType =
-        cs->getTypeOfMemberReference(selfTy, req, dc,
-                                     /*isDynamicResult=*/false,
-                                     FunctionRefInfo::doubleBaseNameApply(),
-                                     reqLocator, &reqReplacements)
-            .adjustedReferenceType;
+    auto reqChoice = OverloadChoice::getDecl(
+        selfTy, req, FunctionRefInfo::doubleBaseNameApply());
+    auto reqTypeInfo =
+        cs->getTypeOfMemberReference(reqChoice, dc, reqLocator,
+                                     /*preparedOverload=*/nullptr);
+
+    reqType = reqTypeInfo.adjustedReferenceType;
     reqType = reqType->getRValueType();
+
+    Type reqThrownError = reqTypeInfo.thrownErrorTypeOnAccess;
 
     // For any type parameters we replaced in the witness, map them
     // to the corresponding archetypes in the witness's context.
-    for (const auto &replacement : reqReplacements) {
+    for (const auto &replacement : cs->getOpenedTypes(reqLocator)) {
       auto replacedInReq = Type(replacement.first).subst(reqSubMap);
 
       // If substitution failed, skip the requirement. This only occurs in
@@ -1200,55 +1207,30 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     }
 
     // Open up the witness type.
-    SmallVector<OpenedType, 4> witnessReplacements;
-
     witnessType = witness->getInterfaceType();
     witnessLocator =
         cs->getConstraintLocator(req, LocatorPathElt::Witness(witness));
+    DeclReferenceType openWitnessTypeInfo;
+
     if (witness->getDeclContext()->isTypeContext()) {
-      openWitnessType =
-          cs->getTypeOfMemberReference(selfTy, witness, dc,
-                                       /*isDynamicResult=*/false,
-                                       FunctionRefInfo::doubleBaseNameApply(),
-                                       witnessLocator, &witnessReplacements)
-              .adjustedReferenceType;
+      auto witnessChoice = OverloadChoice::getDecl(
+          selfTy, witness, FunctionRefInfo::doubleBaseNameApply());
+      openWitnessTypeInfo =
+          cs->getTypeOfMemberReference(witnessChoice, dc, witnessLocator,
+                                       /*preparedOverload=*/nullptr);
     } else {
-      openWitnessType =
+      auto witnessChoice = OverloadChoice::getDecl(
+          witness, FunctionRefInfo::doubleBaseNameApply());
+      openWitnessTypeInfo =
           cs->getTypeOfReference(
-                witness, FunctionRefInfo::doubleBaseNameApply(), witnessLocator,
-                /*useDC=*/nullptr, /*preparedOverload=*/nullptr)
-              .adjustedReferenceType;
+                witnessChoice, /*useDC=*/nullptr, witnessLocator,
+                /*preparedOverload=*/nullptr);
     }
+
+    openWitnessType = openWitnessTypeInfo.adjustedReferenceType;
     openWitnessType = openWitnessType->getRValueType();
 
-    Type reqThrownError;
-    Type witnessThrownError;
-
-    if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
-      auto *reqASD = cast<AbstractStorageDecl>(req);
-
-      // Dig out the thrown error types from the getter so we can compare them
-      // later.
-      auto getThrownErrorType = [](AbstractStorageDecl *asd) -> Type {
-        if (auto getter = asd->getEffectfulGetAccessor()) {
-          if (Type thrownErrorType = getter->getThrownInterfaceType()) {
-            return thrownErrorType;
-          } else if (getter->hasThrows()) {
-            return asd->getASTContext().getErrorExistentialType();
-          }
-        }
-
-        return asd->getASTContext().getNeverType();
-      };
-
-      reqThrownError = getThrownErrorType(reqASD);
-      reqThrownError = cs->openType(reqThrownError, reqReplacements,
-                                    reqLocator, /*preparedOverload=*/nullptr);
-
-      witnessThrownError = getThrownErrorType(witnessASD);
-      witnessThrownError = cs->openType(witnessThrownError, witnessReplacements,
-                                        witnessLocator, /*preparedOverload=*/nullptr);
-    }
+    Type witnessThrownError = openWitnessTypeInfo.thrownErrorTypeOnAccess;
 
     return std::make_tuple(std::nullopt, reqType, openWitnessType,
                            reqThrownError, witnessThrownError);
@@ -5277,7 +5259,8 @@ diagnoseTypeWitnessAvailability(NormalProtocolConformance *conformance,
 
   switch (domain.getKind()) {
   case AvailabilityDomain::Kind::Universal:
-  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
   case AvailabilityDomain::Kind::PackageDescription:
   case AvailabilityDomain::Kind::Platform:
     break;
@@ -6517,8 +6500,8 @@ static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl) {
   }
 
   // Infer @_staticInitializeObjCMetadata.
-  classDecl->getAttrs().add(
-            new (ctx) StaticInitializeObjCMetadataAttr(/*implicit=*/true));
+  classDecl->addAttribute(
+      new (ctx) StaticInitializeObjCMetadataAttr(/*implicit=*/true));
 }
 
 static void
@@ -7120,6 +7103,8 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
     case AccessorKind::Init:
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
       // These accessors are never exposed to Objective-C.
       return result;
     case AccessorKind::DidSet:

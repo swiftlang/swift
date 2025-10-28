@@ -902,7 +902,11 @@ _swift_backtraceSetupEnvironment()
 
     size_t nameLen = std::strlen(name);
     size_t valueLen = std::strlen(value);
-    size_t totalLen = nameLen + 1 + valueLen + 1;
+    size_t totalLen;
+
+    if (__builtin_add_overflow(nameLen + 1, valueLen + 1, &totalLen)) {
+      break;
+    }
 
     if (remaining > totalLen) {
       std::memcpy(penv, name, nameLen);

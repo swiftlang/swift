@@ -50,6 +50,9 @@
     },
     {
        "name": "Isystem"
+    },
+    {
+       "name": "internal-import-bridging-header"
     }
   ]
 }

@@ -25,6 +25,7 @@
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -810,6 +811,37 @@ ConcreteDeclRef TypeChecker::getReferencedDeclForHasSymbolCondition(Expr *E) {
   return ConcreteDeclRef();
 }
 
+static bool typeCheckAvailableStmtConditionElement(StmtConditionElement &elt,
+                                                   bool &isFalseable,
+                                                   DeclContext *dc) {
+  auto info = elt.getAvailability();
+  if (info->isInvalid()) {
+    isFalseable = true;
+    return false;
+  }
+
+  auto &diags = dc->getASTContext().Diags;
+  bool isConditionAlwaysTrue = false;
+
+  if (auto query = info->getAvailabilityQuery()) {
+    auto domain = query->getDomain();
+    if (query->isConstant() && domain.isPermanentlyAlwaysEnabled()) {
+      isConditionAlwaysTrue = *query->getConstantResult();
+
+      diags
+        .diagnose(elt.getStartLoc(),
+                  diag::availability_query_useless_always_true, domain,
+                  isConditionAlwaysTrue)
+        .highlight(elt.getSourceRange());
+    }
+  }
+
+  if (!isConditionAlwaysTrue)
+    isFalseable = true;
+
+  return false;
+}
+
 static bool typeCheckHasSymbolStmtConditionElement(StmtConditionElement &elt,
                                                    DeclContext *dc) {
   auto Info = elt.getHasSymbolInfo();
@@ -874,10 +906,6 @@ typeCheckPatternBindingStmtConditionElement(StmtConditionElement &elt,
   // provide type information.
   auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
   Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-  if (patternType->hasError()) {
-    typeCheckPatternFailed();
-    return true;
-  }
 
   // If the pattern didn't get a type, it's because we ran into some
   // unknown types along the way. We'll need to check the initializer.
@@ -895,8 +923,7 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
                                                 DeclContext *dc) {
   switch (elt.getKind()) {
   case StmtConditionElement::CK_Availability:
-    isFalsable = true;
-    return false;
+    return typeCheckAvailableStmtConditionElement(elt, isFalsable, dc);
   case StmtConditionElement::CK_HasSymbol:
     isFalsable = true;
     return typeCheckHasSymbolStmtConditionElement(elt, dc);
@@ -924,8 +951,9 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
         TypeChecker::typeCheckStmtConditionElement(elt, hadAnyFalsable, dc);
   }
 
-  // If the binding is not refutable, and there *is* an else, reject it as
-  // unreachable.
+  // If none of the statement's conditions can be false, diagnose.
+  // FIXME: Also diagnose if none of the statements conditions can be true.
+  // FIXME: Offer a fix-it to remove the unreachable code.
   if (!hadAnyFalsable && !hadError) {
     auto &diags = dc->getASTContext().Diags;
     Diag<> msg = diag::invalid_diagnostic;
@@ -1085,8 +1113,26 @@ public:
       return RS;
     }
 
+    auto *accessor = TheFunc->getAccessorDecl();
+    auto *exprToCheck = RS->getResult();
+    InOutExpr *inout = nullptr;
+
+    if (accessor && accessor->isMutateAccessor()) {
+      // Check that the returned expression is a &.
+      if ((inout = dyn_cast<InOutExpr>(exprToCheck))) {
+        ResultTy = InOutType::get(ResultTy);
+      } else {
+        getASTContext()
+            .Diags
+            .diagnose(exprToCheck->getLoc(), diag::missing_address_of_return)
+            .highlight(exprToCheck->getSourceRange());
+        inout = new (getASTContext()) InOutExpr(
+            exprToCheck->getStartLoc(), exprToCheck, Type(), /*implicit*/ true);
+      }
+    }
     using namespace constraints;
-    auto target = SyntacticElementTarget::forReturn(RS, ResultTy, DC);
+    auto target =
+        SyntacticElementTarget::forReturn(RS, exprToCheck, ResultTy, DC);
     auto resultTarget = TypeChecker::typeCheckTarget(target);
     if (resultTarget) {
       RS->setResult(resultTarget->getAsExpr());
@@ -1280,6 +1326,22 @@ public:
                            nominalType)
             .fixItRemove(DS->getSourceRange());
         diagnosed = true;
+      // if the type is public and not frozen, then the method must not be
+      // inlinable.
+      } else if (auto fragileKind = fn->getFragileFunctionKind();
+                 !nominalDecl->getAttrs().hasAttribute<FrozenAttr>()
+                 && fragileKind != FragileFunctionKind{FragileFunctionKind::None}) {
+        ctx.Diags.diagnose(DS->getDiscardLoc(),
+                           // Code in ABI stable SDKs has already used the `@inlinable`
+                           // attribute on functions using `discard self`.
+                           // Phase this in as a warning until those APIs
+                           // can be updated.
+                           fragileKind == FragileFunctionKind{FragileFunctionKind::Inlinable}
+                             ? diag::discard_in_inlinable_method_warning
+                             : diag::discard_in_inlinable_method,
+                           fragileKind.getSelector(), nominalType)
+            .fixItRemove(DS->getSourceRange());
+        diagnosed = true;
       } else {
         // Set the contextual type for the sub-expression before we typecheck.
         contextualInfo = {nominalType, CTP_DiscardStmt};
@@ -1436,7 +1498,15 @@ public:
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    TypeChecker::typeCheckForEachPreamble(DC, S);
+    // If we're performing IDE inspection, we also want to skip the where
+    // clause if we're leaving the body unchecked.
+    // FIXME: This is a hack to avoid cycles through NamingPatternRequest when
+    // doing lazy type-checking, we ought to fix the request to be granular in
+    // the type-checking work it kicks.
+    bool skipWhere = LeaveBraceStmtBodyUnchecked &&
+      Ctx.SourceMgr.hasIDEInspectionTargetBuffer();
+
+    TypeChecker::typeCheckForEachPreamble(DC, S, skipWhere);
 
     // Type-check the body of the loop.
     auto sourceFile = DC->getParentSourceFile();
@@ -1770,9 +1840,14 @@ static bool isDiscardableType(Type type) {
   if (auto *expansion = type->getAs<PackExpansionType>())
     return isDiscardableType(expansion->getPatternType());
 
-  return (type->hasError() ||
-          type->isUninhabited() ||
-          type->lookThroughAllOptionalTypes()->isVoid());
+  if (type->hasError())
+    return true;
+
+  // Look through optionality and check if the type is either `Void` or
+  // 'structurally uninhabited'. Treat either as discardable.
+  auto nonOptionalType = type->lookThroughAllOptionalTypes();
+  return (nonOptionalType->isStructurallyUninhabited() ||
+          nonOptionalType->isVoid());
 }
 
 static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
@@ -1919,9 +1994,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     }
   }
 
-  // If the result of this expression is of type "Never" or "()"
-  // (the latter potentially wrapped in optionals) then it is
-  // safe to ignore.
+  // If the result of this expression is either "structurally uninhabited" or
+  // `Void`, (potentially wrapped in optionals) then it is safe to ignore.
   if (isDiscardableType(valueE->getType()))
     return;
   
@@ -3196,6 +3270,12 @@ IsSingleValueStmtRequest::evaluate(Evaluator &eval, const Stmt *S,
     SmallVector<Stmt *, 4> scratch;
     return areBranchesValidForSingleValueStmt(ctx, DCS,
                                               DCS->getBranches(scratch));
+  }
+  if (auto *FS = dyn_cast<ForEachStmt>(S)) {
+    if (!ctx.LangOpts.hasFeature(Feature::ForExpressions))
+      return IsSingleValueStmtResult::unhandledStmt();
+
+    return areBranchesValidForSingleValueStmt(ctx, FS, FS->getBody());
   }
   return IsSingleValueStmtResult::unhandledStmt();
 }

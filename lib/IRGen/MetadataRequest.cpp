@@ -494,12 +494,8 @@ CanType IRGenModule::getRuntimeReifiedType(CanType type) {
 Type IRGenModule::substOpaqueTypesWithUnderlyingTypes(Type type) {
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
-  if (type->hasOpaqueArchetype()) {
-    auto context = getMaximalTypeExpansionContext();
-    return swift::substOpaqueTypesWithUnderlyingTypes(type, context);
-  }
-
-  return type;
+  auto context = getMaximalTypeExpansionContext();
+  return swift::substOpaqueTypesWithUnderlyingTypes(type, context);
 }
 
 CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
@@ -507,33 +503,20 @@ CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
       ->getCanonicalType();
 }
 
-SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(
-    SILType type, CanGenericSignature genericSig) {
+SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(SILType type) {
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
-  if (type.getASTType()->hasOpaqueArchetype()) {
-    auto context = getMaximalTypeExpansionContext();
-    return SILType::getPrimitiveType(
-      swift::substOpaqueTypesWithUnderlyingTypes(type.getASTType(), context),
-      type.getCategory());
-  }
-
-  return type;
+  auto context = getMaximalTypeExpansionContext();
+  return SILType::getPrimitiveType(
+    swift::substOpaqueTypesWithUnderlyingTypes(type.getASTType(), context),
+    type.getCategory());
 }
 
-std::pair<CanType, ProtocolConformanceRef>
-IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type,
-                                           ProtocolConformanceRef conformance) {
-  // Substitute away opaque types whose underlying types we're allowed to
-  // assume are constant.
-  if (type->hasOpaqueArchetype()) {
-    auto context = getMaximalTypeExpansionContext();
-    return std::make_pair(
-       swift::substOpaqueTypesWithUnderlyingTypes(type, context),
-       swift::substOpaqueTypesWithUnderlyingTypes(conformance, context));
-  }
-
-  return std::make_pair(type, conformance);
+ProtocolConformanceRef
+IRGenModule::substOpaqueTypesWithUnderlyingTypes(
+    ProtocolConformanceRef conformance) {
+  auto context = getMaximalTypeExpansionContext();
+  return swift::substOpaqueTypesWithUnderlyingTypes(conformance, context);
 }
 
 
@@ -750,7 +733,7 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
             theDecl, genericArgs.Types, NotForDefinition);
 
     response = IGF.emitGenericTypeMetadataAccessFunctionCall(
-        accessor, genericArgs.Values, request);
+        accessor, genericArgs.Values, request, genericArgs.hasPacks);
   }
 
   IGF.setScopedLocalTypeMetadata(theType, response);
@@ -1799,6 +1782,11 @@ namespace {
       return emitDirectMetadataRef(type);
     }
 
+    MetadataResponse visitBuiltinImplicitActor(CanBuiltinImplicitActorType type,
+                                               DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
     MetadataResponse
     visitBuiltinBridgeObjectType(CanBuiltinBridgeObjectType type,
                                  DynamicMetadataRequest request) {
@@ -1832,6 +1820,12 @@ namespace {
     MetadataResponse
     visitBuiltinExecutorType(CanBuiltinExecutorType type,
                              DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinImplicitActorType(CanBuiltinImplicitActorType type,
+                                  DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
     }
 
@@ -2462,11 +2456,9 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM, llvm::Function *accessor,
   IGF.Builder.CreateRet(ret);
 }
 
-MetadataResponse
-IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
-                                              llvm::Function *accessFunction,
-                                              ArrayRef<llvm::Value *> args,
-                                              DynamicMetadataRequest request) {
+MetadataResponse IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
+    llvm::Function *accessFunction, ArrayRef<llvm::Value *> args,
+    DynamicMetadataRequest request, bool hasPacks) {
 
   SmallVector<llvm::Value *, 8> callArgs;
 
@@ -2490,7 +2482,7 @@ IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
                                  accessFunction, callArgs);
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
-  call->setMemoryEffects(allocatedArgsBuffer
+  call->setMemoryEffects(hasPacks || allocatedArgsBuffer
                              ? llvm::MemoryEffects::inaccessibleOrArgMemOnly()
                              : llvm::MemoryEffects::none());
 
@@ -3592,8 +3584,8 @@ IRGenFunction::emitTypeMetadataRefForLayout(SILType ty,
 
 llvm::Value *IRGenFunction::emitValueGenericRef(CanType type) {
   if (auto integer = type->getAs<IntegerType>()) {
-    return llvm::ConstantInt::get(IGM.SizeTy,
-                    integer->getValue().zextOrTrunc(IGM.SizeTy->getBitWidth()));
+    auto value = integer->getValue().sextOrTrunc(IGM.SizeTy->getBitWidth());
+    return llvm::ConstantInt::get(IGM.SizeTy, value);
   }
 
   return tryGetLocalTypeData(type, LocalTypeDataKind::forValue());

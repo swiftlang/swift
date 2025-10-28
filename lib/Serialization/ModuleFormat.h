@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 960; // SILGlobalVariable parent module
+const uint16_t SWIFTMODULE_VERSION_MINOR = 970; // return_borrow
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -208,7 +208,11 @@ enum class ReadImplKind : uint8_t {
   Address,
   Read,
   Read2,
+  Borrow,
+  LastReadImplKind = Borrow,
 };
+static_assert(countBitsUsed(static_cast<unsigned>(
+                  ReadImplKind::LastReadImplKind)) <= 3);
 using ReadImplKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
@@ -222,8 +226,12 @@ enum class WriteImplKind : uint8_t {
   MutableAddress,
   Modify,
   Modify2,
+  Mutate,
+  LastWriteImplKind = Mutate,
 };
-using WriteImplKindField = BCFixed<3>;
+static_assert(countBitsUsed(static_cast<unsigned>(
+                  WriteImplKind::LastWriteImplKind)) <= 4);
+using WriteImplKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -236,8 +244,12 @@ enum class ReadWriteImplKind : uint8_t {
   Modify2,
   StoredWithDidSet,
   InheritedWithDidSet,
+  Mutate,
+  LastReadWriteImplKind = Mutate,
 };
-using ReadWriteImplKindField = BCFixed<3>;
+static_assert(countBitsUsed(static_cast<unsigned>(
+                  ReadWriteImplKind::LastReadWriteImplKind)) <= 4);
+using ReadWriteImplKindField = BCFixed<4>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -344,6 +356,8 @@ enum AccessorKind : uint8_t {
   Modify2,
   Init,
   DistributedGet,
+  Borrow,
+  Mutate,
 };
 using AccessorKindField = BCFixed<4>;
 
@@ -428,8 +442,11 @@ enum class ResultConvention : uint8_t {
   UnownedInnerPointer,
   Autoreleased,
   Pack,
+  GuaranteedAddress,
+  Guaranteed,
+  Inout
 };
-using ResultConventionField = BCFixed<3>;
+using ResultConventionField = BCFixed<4>;
 
 /// These IDs must \em not be renumbered or reordered without incrementing the
 /// module version.
@@ -764,11 +781,12 @@ using GenericParamKindField = BCFixed<2>;
 // the module version.
 enum class AvailabilityDomainKind : uint8_t {
   Universal = 0,
-  SwiftLanguage,
+  SwiftLanguageMode,
   PackageDescription,
   Embedded,
   Platform,
   Custom,
+  StandaloneSwiftRuntime,
 };
 using AvailabilityDomainKindField = BCFixed<3>;
 
@@ -898,7 +916,6 @@ namespace control_block {
     TARGET,
     SDK_NAME,
     REVISION,
-    IS_OSSA,
     ALLOWABLE_CLIENT_NAME,
     CHANNEL,
     SDK_VERSION,
@@ -935,11 +952,6 @@ namespace control_block {
   using RevisionLayout = BCRecordLayout<
     REVISION,
     BCBlob
-  >;
-
-  using IsOSSALayout = BCRecordLayout<
-    IS_OSSA,
-    BCFixed<1>
   >;
 
   using AllowableClientLayout = BCRecordLayout<
@@ -1119,6 +1131,7 @@ namespace input_block {
     DEPENDENCY_DIRECTORY,
     MODULE_INTERFACE_PATH,
     IMPORTED_MODULE_SPIS,
+    IMPORTED_MODULE_PATH,
     EXTERNAL_MACRO,
   };
 
@@ -1127,14 +1140,20 @@ namespace input_block {
     ImportControlField, // import kind
     BCFixed<1>,         // scoped?
     BCFixed<1>,         // has spis?
-    BCBlob // module name, with submodule path pieces separated by \0s.
-           // If the 'scoped' flag is set, the final path piece is an access
-           // path within the module.
+    BCFixed<1>,         // has path?
+    BCBlob //  module name, with submodule path pieces separated by \0s.  If the
+           // 'scoped' flag is set, the final path piece is an access path
+           // within the module.
   >;
 
-  using ImportedModuleLayoutSPI = BCRecordLayout<
+  using ImportedModuleSPILayout = BCRecordLayout<
     IMPORTED_MODULE_SPIS,
     BCBlob // SPI names, separated by \0s
+  >;
+
+  using ImportedModulePathLayout = BCRecordLayout<
+    IMPORTED_MODULE_PATH,
+    BCBlob // Module file path
   >;
 
   using ExternalMacroLayout = BCRecordLayout<
@@ -1745,6 +1764,7 @@ namespace decls_block {
     BCFixed<1>,              // isConst?
     BCFixed<1>,              // isSending?
     BCFixed<1>,              // isCallerIsolated?
+    BCFixed<1>,              // isAddressable?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type
     ActorIsolationField,     // default argument isolation

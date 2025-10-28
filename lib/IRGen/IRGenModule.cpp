@@ -772,18 +772,26 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   CoroFunctionPointerTy = createStructType(*this, "swift.coro_func_pointer",
                                            {RelativeAddressTy, Int32Ty}, true);
-  CoroAllocateFnTy =
-      llvm::FunctionType::get(CoroAllocationTy, SizeTy, /*isVarArg*/ false);
-  CoroDeallocateFnTy =
-      llvm::FunctionType::get(VoidTy, CoroAllocationTy, /*isVarArg*/ false);
+  CoroAllocateFnTy = llvm::FunctionType::get(
+      CoroAllocationTy, {CoroAllocationTy, CoroAllocatorPtrTy, SizeTy}, /*isVarArg*/ false);
+  CoroDeallocateFnTy = llvm::FunctionType::get(
+      VoidTy, {CoroAllocationTy, CoroAllocatorPtrTy, CoroAllocationTy}, /*isVarArg*/ false);
   CoroAllocatorFlagsTy = Int32Ty;
   // swift/ABI/Coro.h : CoroAllocator
   CoroAllocatorTy = createStructType(*this, "swift.coro_allocator",
                                      {
                                          Int32Ty, // CoroAllocator.Flags
-                                         PtrTy,
-                                         PtrTy,
+                                         PtrTy, // allocate
+                                         PtrTy, // deallocate
+                                         PtrTy, // allocateFrame
+                                         PtrTy, // deallocateFrame
                                      });
+  SwiftImplicitActorType =
+      createStructType(*this, "swift.implicit_isolated_actor_type",
+                       {
+                           IntPtrTy, // ref counted pointer
+                           IntPtrTy, // witness table pointer
+                       });
 }
 
 IRGenModule::~IRGenModule() {
@@ -896,6 +904,14 @@ namespace RuntimeConstants {
 
   RuntimeAvailability TaskExecutorAvailability(ASTContext &context) {
     auto featureAvailability = context.getTaskExecutorAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability TypedCoroAllocAvailability(ASTContext &context) {
+    auto featureAvailability = context.getTypedCoroAllocAvailability();
     if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
@@ -2411,7 +2427,7 @@ bool swift::writeEmptyOutputFilesFor(
     auto *clangImporter = static_cast<ClangImporter *>(
       Context.getClangModuleLoader());
     llvmModule->setTargetTriple(
-      clangImporter->getTargetInfo().getTargetOpts().Triple);
+        llvm::Triple(clangImporter->getTargetInfo().getTargetOpts().Triple));
 
     // Add LLVM module flags.
     auto &clangASTContext = clangImporter->getClangASTContext();

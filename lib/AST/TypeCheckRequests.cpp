@@ -217,7 +217,7 @@ void EnumRawTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void EnumRawTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
+  diags.diagnose(decl, diag::through_decl_declared_here_with_kind, decl);
 }
 
 //----------------------------------------------------------------------------//
@@ -248,7 +248,7 @@ void ProtocolRequiresClassRequest::diagnoseCycle(DiagnosticEngine &diags) const 
 
 void ProtocolRequiresClassRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *proto = std::get<0>(getStorage());
-  diags.diagnose(proto, diag::decl_declared_here_with_kind, proto);
+  diags.diagnose(proto, diag::through_decl_declared_here_with_kind, proto);
 }
 
 std::optional<bool> ProtocolRequiresClassRequest::getCachedResult() const {
@@ -272,7 +272,7 @@ void ExistentialConformsToSelfRequest::diagnoseCycle(DiagnosticEngine &diags) co
 
 void ExistentialConformsToSelfRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *proto = std::get<0>(getStorage());
-  diags.diagnose(proto, diag::decl_declared_here_with_kind, proto);
+  diags.diagnose(proto, diag::through_decl_declared_here_with_kind, proto);
 }
 
 std::optional<bool> ExistentialConformsToSelfRequest::getCachedResult() const {
@@ -298,7 +298,7 @@ void HasSelfOrAssociatedTypeRequirementsRequest::diagnoseCycle(
 void HasSelfOrAssociatedTypeRequirementsRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   auto *proto = std::get<0>(getStorage());
-  diags.diagnose(proto, diag::decl_declared_here_with_kind, proto);
+  diags.diagnose(proto, diag::through_decl_declared_here_with_kind, proto);
 }
 
 std::optional<bool>
@@ -331,7 +331,8 @@ void IsFinalRequest::cacheResult(bool value) const {
 
   // Add an attribute for printing
   if (value && !decl->getAttrs().hasAttribute<FinalAttr>())
-    decl->getAttrs().add(new (decl->getASTContext()) FinalAttr(/*Implicit=*/true));
+    decl->addAttribute(new (decl->getASTContext())
+                           FinalAttr(/*Implicit=*/true));
 }
 
 //----------------------------------------------------------------------------//
@@ -353,7 +354,8 @@ void IsDynamicRequest::cacheResult(bool value) const {
   // Add an attribute for printing
   if (value && !decl->getAttrs().hasAttribute<DynamicAttr>() &&
         ABIRoleInfo(decl).providesAPI())
-    decl->getAttrs().add(new (decl->getASTContext()) DynamicAttr(/*Implicit=*/true));
+    decl->addAttribute(new (decl->getASTContext())
+                           DynamicAttr(/*Implicit=*/true));
 }
 
 //----------------------------------------------------------------------------//
@@ -687,6 +689,9 @@ void swift::simple_display(llvm::raw_ostream &out,
   case FragileFunctionKind::BackDeploy:
     out << "backDeploy";
     return;
+  case FragileFunctionKind::EmbeddedAlwaysEmitIntoClient:
+    out << "embeddedAlwaysEmitIntoClient";
+    return;
   case FragileFunctionKind::None:
     out << "none";
     return;
@@ -867,10 +872,9 @@ void IsAccessorTransparentRequest::cacheResult(bool value) const {
 
   // For interface printing, API diff, etc.
   if (value) {
-    auto &attrs = accessor->getAttrs();
-    if (!attrs.hasAttribute<TransparentAttr>()) {
+    if (!accessor->getAttrs().hasAttribute<TransparentAttr>()) {
       auto &ctx = accessor->getASTContext();
-      attrs.add(new (ctx) TransparentAttr(/*IsImplicit=*/true));
+      accessor->addAttribute(new (ctx) TransparentAttr(/*IsImplicit=*/true));
     }
   }
 }
@@ -1222,11 +1226,16 @@ std::optional<Type> InterfaceTypeRequest::getCachedResult() const {
 void InterfaceTypeRequest::cacheResult(Type type) const {
   auto *decl = std::get<0>(getStorage());
   if (type) {
-    assert(!type->hasTypeVariable() && "Type variable in interface type");
-    assert(!type->is<InOutType>() && "Interface type must be materializable");
-    assert(!type->hasPrimaryArchetype() && "Archetype in interface type");
-    assert(decl->getDeclContext()->isLocalContext() || !type->hasLocalArchetype() &&
+    ASSERT(!type->hasTypeVariable() && "Type variable in interface type");
+    ASSERT(!type->is<InOutType>() && "Interface type must be materializable");
+    ASSERT(!type->hasPrimaryArchetype() && "Archetype in interface type");
+    ASSERT(decl->getDeclContext()->isLocalContext() || !type->hasLocalArchetype() &&
            "Local archetype in interface type of non-local declaration");
+    // Placeholders are only permitted in closure parameters.
+    if (!(isa<ParamDecl>(decl) &&
+          isa<AbstractClosureExpr>(decl->getDeclContext()))) {
+      ASSERT(!type->hasPlaceholder() && "Placeholder in interface type");
+    }
   }
   decl->TypeAndAccess.setPointer(type);
 }
@@ -1443,7 +1452,7 @@ void HasCircularInheritedProtocolsRequest::diagnoseCycle(
 void HasCircularInheritedProtocolsRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
+  diags.diagnose(decl, diag::through_decl_declared_here_with_kind, decl);
 }
 
 //----------------------------------------------------------------------------//
@@ -1457,7 +1466,7 @@ void HasCircularRawValueRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void HasCircularRawValueRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
+  diags.diagnose(decl, diag::through_decl_declared_here_with_kind, decl);
 }
 
 //----------------------------------------------------------------------------//
@@ -2327,6 +2336,14 @@ ArgumentList *UnresolvedMacroReference::getArgs() const {
   llvm_unreachable("Unhandled case");
 }
 
+DeclContext *UnresolvedMacroReference::getDeclContext() const {
+  if (auto *expansion = pointer.dyn_cast<FreestandingMacroExpansion *>())
+    return expansion->getDeclContext();
+  if (auto *attr = pointer.dyn_cast<CustomAttr *>())
+    return attr->getOwner().getDeclContext();
+  llvm_unreachable("Unhandled case");
+}
+
 MacroRoles UnresolvedMacroReference::getMacroRoles() const {
   if (isa<FreestandingMacroExpansion *>(pointer))
     return getFreestandingMacroRoles();
@@ -2861,4 +2878,24 @@ void AvailabilityDomainForDeclRequest::cacheResult(
   }
 
   decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(domain));
+}
+
+//----------------------------------------------------------------------------//
+// IsCustomAvailabilityDomainPermanentlyEnabled computation.
+//----------------------------------------------------------------------------//
+std::optional<bool>
+IsCustomAvailabilityDomainPermanentlyEnabled::getCachedResult() const {
+  auto *domain = std::get<0>(getStorage());
+
+  if (domain->flags.isPermanentlyEnabledComputed)
+    return domain->flags.isPermanentlyEnabled;
+  return std::nullopt;
+}
+
+void IsCustomAvailabilityDomainPermanentlyEnabled::cacheResult(
+    bool isPermanentlyEnabled) const {
+  auto *domain = const_cast<CustomAvailabilityDomain *>(std::get<0>(getStorage()));
+
+  domain->flags.isPermanentlyEnabledComputed = true;
+  domain->flags.isPermanentlyEnabled = isPermanentlyEnabled;
 }

@@ -124,7 +124,6 @@ class SwiftPM(product.Product):
             host_target,
             additional_params=[
                 "--reconfigure",
-                "--verbose",
             ],
         )
 
@@ -137,7 +136,6 @@ class SwiftPM(product.Product):
             host_target,
             compile_only_for_running_host_architecture=True,
             additional_params=[
-                '--verbose'
             ]
         )
 
@@ -155,7 +153,6 @@ class SwiftPM(product.Product):
         install_prefix = install_destdir + self.args.install_prefix
 
         self.run_bootstrap_script('install', host_target, [
-            '--verbose',
             '--prefix', install_prefix
         ])
 

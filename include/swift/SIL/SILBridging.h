@@ -107,7 +107,10 @@ enum class BridgedResultConvention {
   Unowned,
   UnownedInnerPointer,
   Autoreleased,
-  Pack
+  Pack,
+  GuaranteedAddress,
+  Guaranteed,
+  Inout
 };
 
 struct BridgedResultInfo {
@@ -240,8 +243,6 @@ SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
 BridgedParameterInfoArray SILFunctionType_getParameters(BridgedCanType);
 
 BRIDGED_INLINE bool SILFunctionType_hasSelfParam(BridgedCanType);
-
-BRIDGED_INLINE bool SILFunctionType_isTrivialNoescape(BridgedCanType);
 
 SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
 BridgedYieldInfoArray SILFunctionType_getYields(BridgedCanType);
@@ -461,12 +462,14 @@ struct BridgedFunction {
     NoLocks = 2,
     NoRuntime = 3,
     NoExistentials = 4,
-    NoObjCBridging = 5
+    NoObjCBridging = 5,
+    ManualOwnership = 6,
   };
 
   enum class InlineStrategy {
     InlineDefault,
     NoInline,
+    HeuristicAlwaysInline,
     AlwaysInline
   };
 
@@ -505,6 +508,9 @@ struct BridgedFunction {
   BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLocation getLocation() const;
   BRIDGED_INLINE bool isAccessor() const;
+  BRIDGED_INLINE bool isInitializer() const;
+  BRIDGED_INLINE bool isDeinitializer() const;
+  BRIDGED_INLINE bool isImplicit() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getAccessorName() const;
   BRIDGED_INLINE bool hasOwnership() const;
   BRIDGED_INLINE bool hasLoweredAddresses() const;
@@ -557,6 +563,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool isSpecialization() const;
   bool isTrapNoReturn() const;
   bool isConvertPointerToPointerArgument() const;
+  bool isAddressor() const;
   bool isAutodiffVJP() const;
   SwiftInt specializationLevel() const;
   SWIFT_IMPORT_UNSAFE BridgedSubstitutionMap getMethodSubstitutions(BridgedSubstitutionMap contextSubs,
@@ -812,6 +819,8 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSpecializationInformation ApplyInst_getSpecializationInfo() const;
   BRIDGED_INLINE bool TryApplyInst_getNonAsync() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSpecializationInformation TryApplyInst_getSpecializationInfo() const;
+  BRIDGED_INLINE bool BeginApplyInst_getNonThrowing() const;
+  BRIDGED_INLINE bool BeginApplyInst_getNonAsync() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclRef ClassMethodInst_getMember() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclRef WitnessMethodInst_getMember() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType WitnessMethodInst_getLookupType() const;
@@ -1194,7 +1203,8 @@ struct BridgedBuilder{
                                           BridgedValueArray arguments) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCondFail(BridgedValue condition,
                                                                        BridgedStringRef message) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createIntegerLiteral(BridgedType type, SwiftInt value) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createIntegerLiteral(
+      BridgedType type, SwiftInt value, bool treatAsSigned) const;
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createAllocRef(BridgedType type,
     bool objc, bool canAllocOnStack, bool isBare,
@@ -1224,6 +1234,8 @@ struct BridgedBuilder{
                                                                                BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedAddrCast(BridgedValue op,
                                                                                 BridgedType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedValueCast(BridgedValue op,
+                                                                                 BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUpcast(BridgedValue op, BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCheckedCastAddrBranch(
       BridgedValue source, BridgedCanType sourceFormalType,
@@ -1540,6 +1552,7 @@ struct BridgedCloner {
   void recordClonedInstruction(BridgedInstruction origInst, BridgedInstruction clonedInst) const;
   void recordFoldedValue(BridgedValue orig, BridgedValue mapped) const;
   BridgedInstruction clone(BridgedInstruction inst) const;
+  void setInsertionBlockIfNotSet(BridgedBasicBlock block) const;
 };
 
 struct BridgedTypeSubstCloner {

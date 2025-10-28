@@ -616,6 +616,8 @@ public:
 
   bool isBeginApplyToken() const;
 
+  bool isBorrowAccessorResult() const;
+
   /// Unsafely eliminate moveonly from this value's type. Returns true if the
   /// value's underlying type was move only and thus was changed. Returns false
   /// otherwise.

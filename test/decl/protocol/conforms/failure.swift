@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 protocol P1 {
   func foo() // expected-note {{protocol requires function 'foo()'}}

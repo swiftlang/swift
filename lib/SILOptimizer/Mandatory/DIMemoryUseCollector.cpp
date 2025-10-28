@@ -39,17 +39,22 @@ static bool isVariableOrResult(MarkUninitializedInst *MUI) {
 static void gatherDestroysOfContainer(const DIMemoryObjectInfo &memoryInfo,
                                       DIElementUseInfo &useInfo) {
   auto *uninitMemory = memoryInfo.getUninitializedValue();
+  auto origUninitMemory = uninitMemory;
+
+  if (auto mui = dyn_cast<MarkUnresolvedNonCopyableValueInst>(uninitMemory)) {
+    origUninitMemory = cast<SingleValueInstruction>(mui->getOperand());
+  }
 
   // The uninitMemory must be used on an alloc_box, alloc_stack, or global_addr.
   // If we have an alloc_stack or a global_addr, there is nothing further to do.
-  if (isa<AllocStackInst>(uninitMemory->getOperand(0)) ||
-      isa<GlobalAddrInst>(uninitMemory->getOperand(0)) ||
-      isa<SILArgument>(uninitMemory->getOperand(0)) ||
+  if (isa<AllocStackInst>(origUninitMemory->getOperand(0)) ||
+      isa<GlobalAddrInst>(origUninitMemory->getOperand(0)) ||
+      isa<SILArgument>(origUninitMemory->getOperand(0)) ||
       // FIXME: We only support pointer to address here to not break LLDB. It is
       // important that long term we get rid of this since this is a situation
       // where LLDB is breaking SILGen/DI invariants by not creating a new
       // independent stack location for the pointer to address.
-      isa<PointerToAddressInst>(uninitMemory->getOperand(0))) {
+      isa<PointerToAddressInst>(origUninitMemory->getOperand(0))) {
     return;
   }
 
@@ -58,8 +63,8 @@ static void gatherDestroysOfContainer(const DIMemoryObjectInfo &memoryInfo,
   //
   // TODO: This should really be tracked separately from other destroys so that
   // we distinguish the lifetime of the container from the value itself.
-  assert(isa<ProjectBoxInst>(uninitMemory));
-  auto value = uninitMemory->getOperand(0);
+  assert(isa<ProjectBoxInst>(origUninitMemory));
+  auto value = origUninitMemory->getOperand(0);
   if (auto *bbi = dyn_cast<BeginBorrowInst>(value)) {
     value = bbi->getOperand();
   }
@@ -181,17 +186,23 @@ SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
 
 static SingleValueInstruction *
 getUninitializedValue(MarkUninitializedInst *MemoryInst) {
-  SILValue inst = MemoryInst;
-  if (auto *bbi = MemoryInst->getSingleUserOfType<BeginBorrowInst>()) {
-    inst = bbi;
+  SingleValueInstruction *inst = MemoryInst;
+  SILValue projectBoxUser = inst;
+  
+  // Check for a project_box instruction (possibly via a borrow).
+  if (auto *bbi = projectBoxUser->getSingleUserOfType<BeginBorrowInst>()) {
+    projectBoxUser = bbi;
+  }
+  if (auto pbi = projectBoxUser->getSingleUserOfType<ProjectBoxInst>()) {
+    inst = pbi;
   }
 
-  if (SingleValueInstruction *svi =
-          inst->getSingleUserOfType<ProjectBoxInst>()) {
-    return svi;
+  // Access move-only values through their marker.
+  if (auto mui = inst->getSingleUserOfType<MarkUnresolvedNonCopyableValueInst>()) {
+    inst = mui;
   }
 
-  return MemoryInst;
+  return inst;
 }
 
 SingleValueInstruction *DIMemoryObjectInfo::getUninitializedValue() const {

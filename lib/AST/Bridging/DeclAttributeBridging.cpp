@@ -197,12 +197,15 @@ BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
 }
 
 BridgedCustomAttr BridgedCustomAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedTypeRepr cType,
+    SourceLoc atLoc, BridgedTypeRepr cType, BridgedDeclContext cDeclContext,
     BridgedNullableCustomAttributeInitializer cInitContext,
     BridgedNullableArgumentList cArgumentList) {
-  ASTContext &context = cContext.unbridged();
+  DeclContext *DC = cDeclContext.unbridged();
+  ASTContext &context = DC->getASTContext();
+  // Note we set a DeclContext as the owner, which we'll change to the attached
+  // Decl if necessary when attaching the attributes.
   return CustomAttr::create(
-      context, atLoc, new (context) TypeExpr(cType.unbridged()),
+      context, atLoc, new (context) TypeExpr(cType.unbridged()), /*owner*/ DC,
       cInitContext.unbridged(), cArgumentList.unbridged());
 }
 
@@ -258,10 +261,11 @@ BridgedDifferentiableAttr BridgedDifferentiableAttr_createParsed(
 BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceLoc attrNameLoc,
     SourceLoc lParenLoc, BridgedDeclNameRef cReplacedFunction,
-    SourceLoc rParenLoc) {
+    BridgedDeclNameLoc cReplacedFunctionLoc, swift::SourceLoc rParenLoc) {
   return DynamicReplacementAttr::create(
       cContext.unbridged(), atLoc, attrNameLoc, lParenLoc,
-      cReplacedFunction.unbridged(), rParenLoc);
+      cReplacedFunction.unbridged(), cReplacedFunctionLoc.unbridged(),
+      rParenLoc);
 }
 
 BridgedDocumentationAttr BridgedDocumentationAttr_createParsed(
@@ -686,7 +690,8 @@ BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedNullableTrailingWhereClause cWhereClause, bool exported,
     BridgedSpecializationKind cKind, BridgedDeclNameRef cTargetFunction,
-    BridgedArrayRef cSPIGroups, BridgedArrayRef cAvailableAttrs) {
+    BridgedDeclNameLoc cTargetFunctionLoc, BridgedArrayRef cSPIGroups,
+    BridgedArrayRef cAvailableAttrs) {
   auto spiGroups = cSPIGroups.unbridged<Identifier>();
   SmallVector<AvailableAttr *, 2> availableAttrs;
   for (auto bridging : cAvailableAttrs.unbridged<BridgedAvailableAttr>())
@@ -694,14 +699,16 @@ BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
 
   return SpecializeAttr::create(
       cContext.unbridged(), atLoc, range, cWhereClause.unbridged(), exported,
-      unbridge(cKind), cTargetFunction.unbridged(), spiGroups, availableAttrs);
+      unbridge(cKind), cTargetFunction.unbridged(),
+      cTargetFunctionLoc.unbridged(), spiGroups, availableAttrs);
 }
 
 BridgedSpecializedAttr BridgedSpecializedAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedNullableTrailingWhereClause cWhereClause, bool exported,
     BridgedSpecializationKind cKind, BridgedDeclNameRef cTargetFunction,
-    BridgedArrayRef cSPIGroups, BridgedArrayRef cAvailableAttrs) {
+    BridgedDeclNameLoc cTargetFunctionLoc, BridgedArrayRef cSPIGroups,
+    BridgedArrayRef cAvailableAttrs) {
   auto spiGroups = cSPIGroups.unbridged<Identifier>();
   SmallVector<AvailableAttr *, 2> availableAttrs;
   for (auto bridging : cAvailableAttrs.unbridged<BridgedAvailableAttr>())
@@ -709,7 +716,8 @@ BridgedSpecializedAttr BridgedSpecializedAttr_createParsed(
 
   return SpecializedAttr::create(
       cContext.unbridged(), atLoc, range, cWhereClause.unbridged(), exported,
-      unbridge(cKind), cTargetFunction.unbridged(), spiGroups, availableAttrs);
+      unbridge(cKind), cTargetFunction.unbridged(),
+      cTargetFunctionLoc.unbridged(), spiGroups, availableAttrs);
 }
 
 BridgedSPIAccessControlAttr

@@ -11,6 +11,11 @@ struct S : ~Copyable {
   deinit {}
 }
 
+struct S2 : ~Copyable {
+  @_hasStorage var a: Int { get set }
+  @_hasStorage var b: Int { get set }
+}
+
 struct FileDescriptor: ~Copyable {
   var fd: Builtin.Int64
 
@@ -169,3 +174,40 @@ bb0:
   %13 = tuple ()
   return %13
 }
+
+// CHECK-LABEL: sil [ossa] @dont_remove_destructure_struct_of_non_copyable :
+// CHECK:         destructure_struct
+// CHECK-LABEL: } // end sil function 'dont_remove_destructure_struct_of_non_copyable'
+sil [ossa] @dont_remove_destructure_struct_of_non_copyable : $@convention(method) (@owned S2) -> () {
+bb0(%0 : @owned $S2):
+  (%1, %2) = destructure_struct %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_fold_destroy_of_take_enum_with_deinit_ossa :
+// CHECK:       bb0(%0 : $*MaybeFileDescriptor):
+// CHECK-NEXT:    %1 = unchecked_take_enum_data_addr %0
+// CHECK-NEXT:    destroy_addr %1
+// CHECK:       } // end sil function 'dont_fold_destroy_of_take_enum_with_deinit_ossa'
+sil [ossa] @dont_fold_destroy_of_take_enum_with_deinit_ossa : $@convention(thin) (@in MaybeFileDescriptor) -> () {
+bb0(%0 : $*MaybeFileDescriptor):
+  %1 = unchecked_take_enum_data_addr %0, #MaybeFileDescriptor.some!enumelt
+  destroy_addr %1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_fold_destroy_of_take_enum_with_deinit :
+// CHECK:       bb0(%0 : $*MaybeFileDescriptor):
+// CHECK-NEXT:    %1 = unchecked_take_enum_data_addr %0
+// CHECK-NEXT:    destroy_addr %1
+// CHECK:       } // end sil function 'dont_fold_destroy_of_take_enum_with_deinit'
+sil @dont_fold_destroy_of_take_enum_with_deinit : $@convention(thin) (@in MaybeFileDescriptor) -> () {
+bb0(%0 : $*MaybeFileDescriptor):
+  %1 = unchecked_take_enum_data_addr %0, #MaybeFileDescriptor.some!enumelt
+  destroy_addr %1
+  %r = tuple ()
+  return %r : $()
+}
+

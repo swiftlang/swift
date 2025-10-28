@@ -407,15 +407,12 @@ private:
       auto &log = getDebugLogger();
       log << "Type variables in scope = "
           << "[";
-      auto typeVars = CS.getTypeVariables();
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
-      interleave(typeVars, [&](TypeVariableType *typeVar) {
-                   Type(typeVar).print(log, PO);
-                 },
-                 [&] {
-                   log << ", ";
-                 });
+      interleave(
+          CS.getTypeVariables(),
+          [&](TypeVariableType *typeVar) {
+            Type(typeVar).print(log, PrintOptions::forDebugging());
+          },
+          [&] { log << ", "; });
       log << "]" << '\n';
     }
 
@@ -553,9 +550,8 @@ public:
   StepResult resume(bool prevFailed) override;
 
   void print(llvm::raw_ostream &Out) override {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-    Out << "TypeVariableStep for " << TypeVar->getString(PO) << '\n';
+    Out << "TypeVariableStep for ";
+    Out << TypeVar->getString(PrintOptions::forDebugging()) << '\n';
   }
 
 protected:

@@ -187,9 +187,15 @@ struct BridgedPassContext {
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
+
+  struct ClosureArgMangling {
+    SwiftInt argIdx;
+    OptionalBridgedInstruction inst;
+    SwiftInt otherArgIdx;
+  };
+
   BridgedOwnedString mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices, BridgedFunction function) const;
-  BridgedOwnedString mangleWithClosureArgs(BridgedArrayRef closureArgIndices,
-                                                               BridgedFunction applySiteCallee) const;
+  BridgedOwnedString mangleWithClosureArgs(BridgedArrayRef closureArgManglings, BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithConstCaptureArgs(BridgedArrayRef bridgedConstArgs,
                                                 BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithBoxToStackPromotedArgs(BridgedArrayRef bridgedPromotedArgIndices,
