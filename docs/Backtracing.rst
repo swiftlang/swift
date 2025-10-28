@@ -119,7 +119,8 @@ follows:
 |                 |         | sometimes useful for testing.                    |
 +-----------------+---------+--------------------------------------------------+
 
-(*) On macOS, this defaults to ``tty`` rather than ``yes``.
+(*) On macOS 26 and later, this defaults to ``tty`` rather than ``yes``. On
+    earlier versions, the default is ``no``.
 
 Backtrace limits
 ----------------
