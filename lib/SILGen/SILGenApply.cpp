@@ -5483,6 +5483,9 @@ ManagedValue SILGenFunction::applyBorrowMutateAccessor(
   if (fn.getFunction()->getConventions().hasGuaranteedResult()) {
     auto selfArg = args.back().getValue();
     if (isa<LoadBorrowInst>(selfArg)) {
+      // unchecked_ownership is used to silence the ownership verifier for
+      // returning a value produced within a load_borrow scope. SILGenCleanup
+      // eliminates it and introduces return_borrow appropriately.
       rawResult = B.createUncheckedOwnership(loc, rawResult);
     }
   }
