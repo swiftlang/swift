@@ -684,3 +684,14 @@ extension String.UTF8View {
     return unsafe try _guts.withFastUTF8(body)
   }
 }
+
+extension String.UTF8View {
+  /// Returns a boolean value indicating whether this UTF8 view
+  /// is trivially identical to `other`.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._guts.rawBits == other._guts.rawBits
+  }
+}
