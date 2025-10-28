@@ -882,6 +882,18 @@ extension Substring.UTF8View {
 #endif // !(os(watchOS) && _pointerBitWidth(_32))
 }
 
+extension Substring.UTF8View {
+  /// Returns a boolean value indicating whether this UTF8 view
+  /// is trivially identical to `other`.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._base.isTriviallyIdentical(to: other._base)
+    && self._bounds == other._bounds
+  }
+}
+
 extension Substring {
   @inlinable
   public var utf8: UTF8View {
@@ -1034,6 +1046,18 @@ extension Substring.UTF16View: BidirectionalCollection {
   public subscript(r: Range<Index>) -> Substring.UTF16View {
     let r = _wholeGuts.validateSubscalarRange(r, in: _bounds)
     return Substring.UTF16View(_slice.base, _bounds: r)
+  }
+}
+
+extension Substring.UTF16View {
+  /// Returns a boolean value indicating whether this UTF16 view
+  /// is trivially identical to `other`.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._base.isTriviallyIdentical(to: other._base)
+    && self._bounds == other._bounds
   }
 }
 
@@ -1278,6 +1302,18 @@ extension Substring.UnicodeScalarView: RangeReplaceableCollection {
       with: { $0.replaceSubrange(subrange, with: replacement) })
 
     _invariantCheck()
+  }
+}
+
+extension Substring.UnicodeScalarView {
+  /// Returns a boolean value indicating whether this unicode scalar view
+  /// is trivially identical to `other`.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._slice._base.isTriviallyIdentical(to: other._slice._base)
+    && self._bounds == other._bounds
   }
 }
 
