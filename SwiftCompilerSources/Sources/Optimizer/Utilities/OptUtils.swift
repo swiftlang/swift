@@ -880,7 +880,7 @@ private struct EscapesToValueVisitor : EscapeVisitor {
     if operand.value == target.value && path.projectionPath.mayOverlap(with: target.path) {
       return .abort
     }
-    if operand.instruction is ReturnInst {
+    if operand.instruction is ReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }

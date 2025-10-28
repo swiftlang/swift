@@ -730,7 +730,7 @@ extension LifetimeDependenceDefUseWalker {
     if let apply = operand.instruction as? FullApplySite {
       return visitAppliedUse(of: operand, by: apply)
     }
-    if operand.instruction is ReturnInst, !operand.value.isEscapable {
+    if operand.instruction is ReturnInstruction, !operand.value.isEscapable {
       return returnedDependence(result: operand)
     }
     if operand.instruction is YieldInst, !operand.value.isEscapable {

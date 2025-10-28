@@ -121,9 +121,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     blocks.reversed().lazy.flatMap { $0.instructions.reversed() }
   }
   
-  public var returnInstruction: ReturnInst? {
+  public var returnInstruction: ReturnInstruction? {
     for block in blocks.reversed() {
-      if let retInst = block.terminator as? ReturnInst { return retInst }
+      if let retInst = block.terminator as? ReturnInstruction { return retInst }
     }
     return nil
   }

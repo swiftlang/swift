@@ -254,7 +254,7 @@ private struct CollectedEffects {
       // effect, it would not give any significant benefit in any of our current optimizations.
       addEffects(.destroy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
 
-    case is ReturnInst:
+    case is ReturnInstruction:
       if inst.parentFunction.convention.hasAddressResult {
         addEffects(.read, to: inst.operands[0].value)
       }
@@ -532,7 +532,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
     case is CopyValueInst, is RetainValueInst, is StrongRetainInst,
          is DestroyValueInst, is ReleaseValueInst, is StrongReleaseInst,
          is DebugValueInst, is UnconditionalCheckedCastInst,
-         is ReturnInst:
+         is ReturnInstruction:
       return .continueWalk
 
     case let apply as ApplySite:
@@ -620,7 +620,7 @@ private extension PartialApplyInst {
           // Any escape to apply - regardless if it's an argument or the callee operand - might cause
           // the closure to be called.
           return .abort
-        case is ReturnInst:
+        case is ReturnInstruction:
           return .ignore
         default:
           return .continueWalk
