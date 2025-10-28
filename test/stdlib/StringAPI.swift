@@ -522,6 +522,94 @@ StringTests.test("_isIdentical(to:)") {
   expectTrue(g._isIdentical(to: g))
 }
 
+StringTests.test("String.UnicodeScalarView.isTriviallyIdentical(to:)") {
+  let a = "Hello".unicodeScalars
+  let b = "Hello".unicodeScalars
+  expectTrue(a.isTriviallyIdentical(to: a))
+  expectTrue(b.isTriviallyIdentical(to: b))
+  expectTrue(a.isTriviallyIdentical(to: b))
+  expectTrue(b.isTriviallyIdentical(to: a))
+  
+  let c = "Abcde".unicodeScalars
+  expectFalse(a.isTriviallyIdentical(to: c))
+  expectFalse(c.isTriviallyIdentical(to: a))
+}
+StringTests.test("String.UTF8View.isTriviallyIdentical(to:)") {
+  let a = "Hello".utf8
+  let b = "Hello".utf8
+  expectTrue(a.isTriviallyIdentical(to: a))
+  expectTrue(b.isTriviallyIdentical(to: b))
+  expectTrue(a.isTriviallyIdentical(to: b))
+  expectTrue(b.isTriviallyIdentical(to: a))
+  
+  
+  let c = "Abcde".utf8
+  expectFalse(a.isTriviallyIdentical(to: c))
+  expectFalse(c.isTriviallyIdentical(to: a))
+}
+StringTests.test("String.UTF16View.isTriviallyIdentical(to:)") {
+  let a = "Hello".utf16
+  let b = "Hello".utf16
+  expectTrue(a.isTriviallyIdentical(to: a))
+  expectTrue(b.isTriviallyIdentical(to: b))
+  expectTrue(a.isTriviallyIdentical(to: b))
+  expectTrue(b.isTriviallyIdentical(to: a))
+  
+  
+  let c = "Abcde".utf16
+  expectFalse(a.isTriviallyIdentical(to: c))
+  expectFalse(c.isTriviallyIdentical(to: a))
+}
+
+StringTests.test("Substring.UnicodeScalarView.isTriviallyIdentical(to:)") {
+  let base1 = "Test String"
+  let a = base1[base1.index(base1.startIndex, offsetBy: 5)..<base1.endIndex]
+    .unicodeScalars
+  let b = base1[base1.index(base1.startIndex, offsetBy: 5)..<base1.endIndex]
+    .unicodeScalars
+  expectTrue(a.isTriviallyIdentical(to: a))
+  expectTrue(b.isTriviallyIdentical(to: b))
+  expectTrue(a.isTriviallyIdentical(to: b))
+  expectTrue(b.isTriviallyIdentical(to: a))
+  
+  let c = base1[base1.startIndex..<base1.index(base1.startIndex, offsetBy: 5)]
+    .unicodeScalars
+  expectFalse(a.isTriviallyIdentical(to: c))
+  expectFalse(c.isTriviallyIdentical(to: a))
+}
+StringTests.test("Substring.UTF8View.isTriviallyIdentical(to:)") {
+  let base1 = "Test String"
+  let a = base1[base1.index(base1.startIndex, offsetBy: 5)..<base1.endIndex]
+    .utf8
+  let b = base1[base1.index(base1.startIndex, offsetBy: 5)..<base1.endIndex]
+    .utf8
+  expectTrue(a.isTriviallyIdentical(to: a))
+  expectTrue(b.isTriviallyIdentical(to: b))
+  expectTrue(a.isTriviallyIdentical(to: b))
+  expectTrue(b.isTriviallyIdentical(to: a))
+  
+  let c = base1[base1.startIndex..<base1.index(base1.startIndex, offsetBy: 5)]
+    .utf8
+  expectFalse(a.isTriviallyIdentical(to: c))
+  expectFalse(c.isTriviallyIdentical(to: a))
+}
+StringTests.test("Substring.UTF16View.isTriviallyIdentical(to:)") {
+  let base1 = "Test String"
+  let a = base1[base1.index(base1.startIndex, offsetBy: 5)..<base1.endIndex]
+    .utf16
+  let b = base1[base1.index(base1.startIndex, offsetBy: 5)..<base1.endIndex]
+    .utf16
+  expectTrue(a.isTriviallyIdentical(to: a))
+  expectTrue(b.isTriviallyIdentical(to: b))
+  expectTrue(a.isTriviallyIdentical(to: b))
+  expectTrue(b.isTriviallyIdentical(to: a))
+  
+  let c = base1[base1.startIndex..<base1.index(base1.startIndex, offsetBy: 5)]
+    .utf16
+  expectFalse(a.isTriviallyIdentical(to: c))
+  expectFalse(c.isTriviallyIdentical(to: a))
+}
+
 StringTests.test("hasPrefix/hasSuffix vs Character boundaries") {
   // https://github.com/apple/swift/issues/67427
   let s1 = "\r\n"
