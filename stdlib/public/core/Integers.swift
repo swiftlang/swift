@@ -1377,27 +1377,29 @@ extension BinaryInteger {
 //===--- CustomStringConvertible conformance ------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal func _UInt64ToASCII(
-  value: UInt64,
-  radix: UInt64,
-  uppercase: Bool,
+/// This internal function does not validate `radix` or the size of `buffer`.
+/// It is an unsafe operation.
+///
+/// The behavior is undefined if `radix` is not between `2` and `36` (inclusive)
+/// or if there are insufficient bytes in `buffer` for the output.
+@_specialize(where T == UInt64)
+@_specialize(where T == Int64)
+@unsafe
+internal func _BinaryIntegerToASCII<T: BinaryInteger>(
   negative: Bool,
+  magnitude: T.Magnitude,
+  radix: T,
+  uppercase: Bool,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
 ) -> Range<Int> {
-  _precondition(
-    radix >= 2 && radix <= 36,
-    "invalid radix for string conversion")
+  var value = magnitude
+  let radix = radix.magnitude
 
   // We need a `MutableRawSpan` to use wide store/load operations.
   var buffer = utf8Buffer.mutableBytes
-  _precondition(
-    buffer.byteCount >= (radix >= 10 ? 21 : 65),
-    "insufficient buffer size")
-
-  var value = value
   var offset = buffer.byteCount
 
-  if value == 0 {
+  if value == (0 as T.Magnitude) {
     unsafe buffer.storeBytes(
       of: 0x30 /* "0" */,
       toUncheckedByteOffset: 0,
@@ -1406,7 +1408,7 @@ internal func _UInt64ToASCII(
     return 0..<1
   }
 
-  if radix == 10 {
+  if radix == (10 as T.Magnitude) {
     // Look up two digits at once.
     let lookup: _InlineArray<100, (UInt8, UInt8)> = [
       (0x30, 0x30), (0x30, 0x31), (0x30, 0x32), (0x30, 0x33), (0x30, 0x34),
@@ -1430,53 +1432,53 @@ internal func _UInt64ToASCII(
       (0x39, 0x30), (0x39, 0x31), (0x39, 0x32), (0x39, 0x33), (0x39, 0x34),
       (0x39, 0x35), (0x39, 0x36), (0x39, 0x37), (0x39, 0x38), (0x39, 0x39)
     ]
-    while value >= 10 {
+    while value >= (10 as T.Magnitude) {
       offset &-= 2
       unsafe buffer.storeBytes(
-        of: lookup[Int(truncatingIfNeeded: value % 100)],
+        of: lookup[unchecked: Int(truncatingIfNeeded: value % 100)],
         toUncheckedByteOffset: offset,
         as: (UInt8, UInt8).self)
       value /= 100
     }
-    if value != 0 {
+    if value != (0 as T.Magnitude) {
       offset &-= 1
       unsafe buffer.storeBytes(
         of: UInt8(truncatingIfNeeded: value) | 0x30,
         toUncheckedByteOffset: offset,
         as: UInt8.self)
     }
-  } else if radix == 16 {
+  } else if radix == (16 as T.Magnitude) {
     let lookup: _InlineArray<16, UInt8> = [
       0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39,
       0x41, 0x42, 0x43, 0x44, 0x45, 0x46
     ]
     let adjustment: UInt8 = uppercase ? 0 : 0x20
 
-    while value != 0 {
+    while value != (0 as T.Magnitude) {
       offset &-= 1
       unsafe buffer.storeBytes(
-        of: lookup[Int(truncatingIfNeeded: value & 0xf)] | adjustment,
+        of: lookup[unchecked: Int(truncatingIfNeeded: value & 0xf)] | adjustment,
         toUncheckedByteOffset: offset,
         as: UInt8.self)
-      value &>>= 4
+      value >>= 4
     }
-  } else if radix == 8 {
-    while value != 0 {
+  } else if radix == (8 as T.Magnitude) {
+    while value != (0 as T.Magnitude) {
       offset &-= 1
       unsafe buffer.storeBytes(
         of: UInt8(truncatingIfNeeded: value & 0x7) | 0x30,
         toUncheckedByteOffset: offset,
         as: UInt8.self)
-      value &>>= 3
+      value >>= 3
     }
-  } else if radix == 2 {
-    while value != 0 {
+  } else if radix == (2 as T.Magnitude) {
+    while value != (0 as T.Magnitude) {
       offset &-= 1
       unsafe buffer.storeBytes(
         of: UInt8(truncatingIfNeeded: value & 1) | 0x30,
         toUncheckedByteOffset: offset,
         as: UInt8.self)
-      value &>>= 1
+      value >>= 1
     }
   } else {
     let lookup: _InlineArray<36, UInt8> = [
@@ -1487,7 +1489,7 @@ internal func _UInt64ToASCII(
     ]
     let adjustment: UInt8 = uppercase ? 0 : 0x20
 
-    while value != 0 {
+    while value != (0 as T.Magnitude) {
       offset &-= 1
       unsafe buffer.storeBytes(
         of: lookup[Int(truncatingIfNeeded: value % radix)] | adjustment,
@@ -1508,19 +1510,143 @@ internal func _UInt64ToASCII(
   return offset..<buffer.byteCount
 }
 
+// Support legacy ABI on top of new implementation:
+// ================================================
+
+// Returns a UInt64, but that value is the length of the string, so it's
+// guaranteed to fit into an Int. This is part of the ABI, so we can't
+// trivially change it to Int. Callers can safely convert the result
+// to any integer type without checks, however.
+@_silgen_name("swift_int64ToString")
+internal func _int64ToStringImpl(
+  _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  _ bufferLength: UInt,
+  _ value: Int64,
+  _ radix: Int64,
+  _ uppercase: Bool
+) -> UInt64 {
+  _precondition(radix >= 2 && radix <= 36, "Radix must be between 2 and 36")
+  _precondition(bufferLength >= (radix >= 10 ? 21 : 65), "Insufficient buffer size")
+  unsafe textBuffer.initialize(repeating: 0x30, count: Int(bufferLength))
+
+  var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
+    _unchecked: textBuffer,
+    count: Int(bufferLength))
+  let textRange = unsafe _BinaryIntegerToASCII(
+    negative: value < 0,
+    magnitude: value.magnitude,
+    radix: radix,
+    uppercase: uppercase,
+    buffer: &buffer)
+  _ = consume buffer
+  let byteCount = textRange.upperBound &- textRange.lowerBound
+
+  // Move text to start of buffer.
+  if textRange.lowerBound != 0 {
+    unsafe _memmove(
+      dest: textBuffer,
+      src: textBuffer + textRange.lowerBound,
+      size: UInt(truncatingIfNeeded: byteCount))
+  }
+  return UInt64(truncatingIfNeeded: byteCount)
+}
+
+// Returns a UInt64, but that value is the length of the string, so it's
+// guaranteed to fit into an Int. This is part of the ABI, so we can't
+// trivially change it to Int. Callers can safely convert the result
+// to any integer type without checks, however.
+@_silgen_name("swift_uint64ToString")
+internal func _uint64ToStringImpl(
+  _ textBuffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  _ bufferLength: UInt,
+  _ value: UInt64,
+  _ radix: Int64,
+  _ uppercase: Bool
+) -> UInt64 {
+  _precondition(radix >= 2 && radix <= 36, "Radix must be between 2 and 36")
+  _precondition(bufferLength >= (radix >= 10 ? 20 : 64), "Insufficient buffer size")
+  unsafe textBuffer.initialize(repeating: 0x30, count: Int(bufferLength))
+
+  var buffer = unsafe MutableSpan<UTF8.CodeUnit>(
+    _unchecked: textBuffer,
+    count: Int(bufferLength))
+  let textRange = unsafe _BinaryIntegerToASCII(
+    negative: false,
+    magnitude: value,
+    radix: radix,
+    uppercase: uppercase,
+    buffer: &buffer)
+  _ = consume buffer
+  let byteCount = textRange.upperBound &- textRange.lowerBound
+
+  // Move text to start of buffer.
+  if textRange.lowerBound != 0 {
+    unsafe _memmove(
+      dest: textBuffer,
+      src: textBuffer + textRange.lowerBound,
+      size: UInt(truncatingIfNeeded: byteCount))
+  }
+  return UInt64(truncatingIfNeeded: byteCount)
+}
+
+public // @testable
+func _uint64ToString(
+  _ value: UInt64,
+  radix: Int64 = 10,
+  uppercase: Bool = false
+) -> String {
+  _precondition(radix >= 2 && radix <= 36, "Radix must be between 2 and 36")
+
+  if radix >= 10 {
+    var buffer = _InlineArray<20, UTF8.CodeUnit>(repeating: 0x30)
+    var span = buffer.mutableSpan
+    let textRange = unsafe _BinaryIntegerToASCII(
+      negative: false,
+      magnitude: value,
+      radix: radix,
+      uppercase: uppercase,
+      buffer: &span)
+    let textStart =
+      unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self)
+        + textRange.lowerBound
+    let byteCount = textRange.upperBound &- textRange.lowerBound
+    let textBuffer =
+      unsafe UnsafeBufferPointer<UTF8.CodeUnit>(
+        _uncheckedStart: textStart, count: byteCount)
+    return unsafe String._fromASCII(textBuffer)
+  }
+
+  var buffer = _InlineArray<64, UTF8.CodeUnit>(repeating: 0x30)
+  var span = buffer.mutableSpan
+  let textRange = unsafe _BinaryIntegerToASCII(
+    negative: false,
+    magnitude: value,
+    radix: radix,
+    uppercase: false, // When radix < 10, case is irrelevant.
+    buffer: &span)
+  let textStart =
+    unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self)
+      + textRange.lowerBound
+  let byteCount = textRange.upperBound &- textRange.lowerBound
+  let textBuffer =
+    unsafe UnsafeBufferPointer<UTF8.CodeUnit>(
+      _uncheckedStart: textStart, count: byteCount)
+  return unsafe String._fromASCII(textBuffer)
+}
+
 extension BinaryInteger {
   internal func _description(radix: Int, uppercase: Bool) -> String {
-    _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
+    _precondition(radix >= 2 && radix <= 36, "Radix must be between 2 and 36")
 
-    if _fastPath(bitWidth <= 64) {
+    if _fastPath(bitWidth <= 64 || magnitude < UInt64.max) {
       if radix >= 10 {
         var buffer = _InlineArray<21, UTF8.CodeUnit>(repeating: 0x30)
         var span = buffer.mutableSpan
-        let textRange = _UInt64ToASCII(
-          value: UInt64(truncatingIfNeeded: magnitude),
+        let textRange = unsafe _BinaryIntegerToASCII(
+          negative: Self.isSigned && self < 0,
+          magnitude: UInt64(truncatingIfNeeded: magnitude),
           radix: UInt64(truncatingIfNeeded: radix),
           uppercase: uppercase,
-          negative: Self.isSigned && self < 0,
           buffer: &span)
         let textStart =
           unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self)
@@ -1534,11 +1660,11 @@ extension BinaryInteger {
 
       var buffer = _InlineArray<65, UTF8.CodeUnit>(repeating: 0x30)
       var span = buffer.mutableSpan
-      let textRange = _UInt64ToASCII(
-        value: UInt64(truncatingIfNeeded: magnitude),
+      let textRange = unsafe _BinaryIntegerToASCII(
+        negative: Self.isSigned && self < 0,
+        magnitude: UInt64(truncatingIfNeeded: magnitude),
         radix: UInt64(truncatingIfNeeded: radix),
         uppercase: false, // When radix < 10, case is irrelevant.
-        negative: Self.isSigned && self < 0,
         buffer: &span)
       let textStart =
         unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self)
@@ -1550,51 +1676,40 @@ extension BinaryInteger {
       return unsafe String._fromASCII(textBuffer)
     }
 
-    if self == (0 as Self) { return "0" }
+    // The decimal representation of an unsigned value of bit width `i` requires
+    // `ceil(log2(10) * i)` bytes. Here, we use 5/16 as a known overestimate,
+    // with the division computed using a bit shift. Since integer division or
+    // bit shift is a truncating (flooring) operation, we add 15 to adjust for
+    // off-by-one results when bit width isn't a multiple of 16. Finally, we add
+    // 1 to leave room for the '-' sign or, in the case of zero, '0'.
+    let capacity = radix >= 10 ? (bitWidth * 5 + 15) &>> 4 + 1 : bitWidth + 1
+    return unsafe withUnsafeTemporaryAllocation(
+      of: UTF8.CodeUnit.self,
+      capacity: capacity
+    ) {
+      // It's our responsibility to initialize and deinitialize memory.
+      // A larger buffer pointer than requested may be allocated, but it's
+      // undefined behavior to access the excess allocation.
+      let buffer =
+        unsafe UnsafeMutableBufferPointer<UTF8.CodeUnit>(
+          start: $0.baseAddress, count: capacity)
+      unsafe buffer.initialize(repeating: 0x30)
+      defer { unsafe buffer.deinitialize() }
 
-    // Bit shifting can be faster than division when `radix` is a power of two
-    // (although not necessarily the case for builtin types).
-    let isRadixPowerOfTwo = radix.nonzeroBitCount == 1
-    let radix_ = Magnitude(radix)
-    func _quotientAndRemainder(_ value: Magnitude) -> (Magnitude, Magnitude) {
-      return isRadixPowerOfTwo
-        ? (value >> radix.trailingZeroBitCount, value & (radix_ - 1))
-        : value.quotientAndRemainder(dividingBy: radix_)
-    }
-
-    let hasLetters = radix > 10
-    func _ascii(_ digit: UInt8) -> UInt8 {
-      let base: UInt8
-      if !hasLetters || digit < 10 {
-        base = UInt8(("0" as Unicode.Scalar).value)
-      } else if uppercase {
-        base = UInt8(("A" as Unicode.Scalar).value) &- 10
-      } else {
-        base = UInt8(("a" as Unicode.Scalar).value) &- 10
-      }
-      return base &+ digit
-    }
-
-    let isNegative = Self.isSigned && self < (0 as Self)
-    var value = magnitude
-
-    // TODO(FIXME JIRA): All current stdlib types fit in small. Use a stack
-    // buffer instead of an array on the heap.
-
-    var result: [UInt8] = []
-    while value != 0 {
-      let (quotient, remainder) = _quotientAndRemainder(value)
-      result.append(_ascii(UInt8(truncatingIfNeeded: remainder)))
-      value = quotient
-    }
-
-    if isNegative {
-      result.append(UInt8(("-" as Unicode.Scalar).value))
-    }
-
-    result.reverse()
-    return unsafe result.withUnsafeBufferPointer {
-      return unsafe String._fromASCII($0)
+      var span = unsafe buffer.mutableSpan
+      let textRange = unsafe _BinaryIntegerToASCII(
+        negative: Self.isSigned && self < 0,
+        magnitude: magnitude,
+        radix: Magnitude(truncatingIfNeeded: radix),
+        uppercase: uppercase,
+        buffer: &span)
+      _ = consume span
+      let textStart = unsafe buffer.baseAddress! + textRange.lowerBound
+      let byteCount = textRange.upperBound &- textRange.lowerBound
+      let textBuffer =
+        unsafe UnsafeBufferPointer<UTF8.CodeUnit>(
+          _uncheckedStart: textStart, count: byteCount)
+      return unsafe String._fromASCII(textBuffer)
     }
   }
 
