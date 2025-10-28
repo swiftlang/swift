@@ -8789,11 +8789,13 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
 
 /// Check whether the given Clang type involves an unsafe type.
 static bool hasUnsafeType(Evaluator &evaluator, clang::QualType clangType) {
-
-  auto safety =
-      evaluateOrDefault(evaluator, ClangTypeExplicitSafety({clangType}),
-                        ExplicitSafety::Unspecified);
-  return safety == ExplicitSafety::Unsafe;
+  auto req = ClangTypeExplicitSafety({clangType});
+  if (evaluator.hasActiveRequest(req))
+    // If there is a cycle in a type, assume ExplicitSafety is Unspecified,
+    // i.e., not unsafe:
+    return false;
+  return evaluateOrDefault(evaluator, req, ExplicitSafety::Unspecified) ==
+         ExplicitSafety::Unsafe;
 }
 
 ExplicitSafety
