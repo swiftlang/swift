@@ -49,8 +49,8 @@ follows:
 | demangle        | yes     | Set to ``no`` to disable demangling.             |
 +-----------------+---------+--------------------------------------------------+
 | interactive     | tty     | Set to ``no`` to disable interaction, or ``yes`` |
-|                 |         | to enable always. `tty`` to enable only if       |
-|                 |         | stdin and stdout are are both a terminal.        |
+|                 |         | to enable always, or `tty`` to enable only if    |
+|                 |         | stdin and stdout are both a terminal.            |
 +-----------------+---------+--------------------------------------------------+
 | color           | tty     | Set to ``yes`` to enable always, or ``no`` to    |
 |                 |         | disable.  Uses ANSI escape sequences.            |
