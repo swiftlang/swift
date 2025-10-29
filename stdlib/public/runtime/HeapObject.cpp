@@ -186,6 +186,9 @@ static HeapObject *_swift_tryRetain_(HeapObject *object)
 #define CALL_IMPL(name, args) \
     return _ ## name ## _ args;
 
+#define CALL_IMPL_SWIFT_REFCOUNT_CC(name, args) \
+    return _ ## name ## _ args;
+
 #define CALL_IMPL_CHECK(name, args) \
     return _ ## name ## _ args;
 
