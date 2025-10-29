@@ -487,7 +487,7 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1+1+1+1,
     /// Encodes whether this is a 'let' binding.
     Introducer : 2,
 
@@ -511,7 +511,11 @@ protected:
     NoAttachedPropertyWrappers : 1,
 
     /// Whether this variable has no property wrapper auxiliary variables.
-    NoPropertyWrapperAuxiliaryVariables : 1
+    NoPropertyWrapperAuxiliaryVariables : 1,
+
+    /// Whether this variable is a placeholder that is introducing during
+    /// type-checking that has its type inferred from its use.
+    IsPlaceholderVar : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1+2+NumDefaultArgumentKindBits,
@@ -6724,13 +6728,18 @@ public:
     Bits.VarDecl.IsDebuggerVar = IsDebuggerVar;
   }
 
-  /// Visit all auxiliary declarations to this VarDecl.
+  /// Visit all auxiliary variables for this VarDecl.
   ///
-  /// An auxiliary declaration is a declaration synthesized by the compiler to support
-  /// this VarDecl, such as synthesized property wrapper variables.
+  /// An auxiliary variable is one that is synthesized by the compiler to
+  /// support this VarDecl, such as synthesized property wrapper variables.
   ///
-  /// \note this function only visits auxiliary decls that are not part of the AST.
-  void visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)>) const;
+  /// \param forNameLookup If \c true, will only visit auxiliary variables that
+  /// may appear in name lookup results.
+  ///
+  /// \note this function only visits auxiliary variables that are not part of
+  /// the AST.
+  void visitAuxiliaryVars(bool forNameLookup,
+                          llvm::function_ref<void(VarDecl *)>) const;
 
   /// Is this the synthesized storage for a 'lazy' property?
   bool isLazyStorageProperty() const {
@@ -6738,6 +6747,15 @@ public:
   }
   void setLazyStorageProperty(bool IsLazyStorage) {
     Bits.VarDecl.IsLazyStorageProperty = IsLazyStorage;
+  }
+
+  /// Whether this variable is a placeholder that is introducing during
+  /// type-checking that has its type inferred from its use.
+  bool isPlaceholderVar() const {
+    return Bits.VarDecl.IsPlaceholderVar;
+  }
+  void setIsPlaceholderVar() {
+    Bits.VarDecl.IsPlaceholderVar = true;
   }
 
   /// Retrieve the backing storage property for a lazy property.

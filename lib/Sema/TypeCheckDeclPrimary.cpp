@@ -2388,7 +2388,7 @@ public:
     checkGlobalIsolation(VD);
 
     // Visit auxiliary decls first
-    VD->visitAuxiliaryDecls([&](VarDecl *var) {
+    VD->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *var) {
       this->visitBoundVariable(var);
     });
 
@@ -4125,9 +4125,10 @@ void TypeChecker::checkParameterList(ParameterList *params,
 
     if (!param->isInvalid()) {
       auto *SF = owner->getParentSourceFile();
-      param->visitAuxiliaryDecls([&](VarDecl *auxiliaryDecl) {
-        if (!isa<ParamDecl>(auxiliaryDecl))
-          DeclChecker(SF->getASTContext(), SF).visitBoundVariable(auxiliaryDecl);
+      auto &ctx = SF->getASTContext();
+      param->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *auxVar) {
+        if (!isa<ParamDecl>(auxVar))
+          DeclChecker(ctx, SF).visitBoundVariable(auxVar);
       });
     }
 

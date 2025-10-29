@@ -80,6 +80,24 @@ func nested_scope_3() {
   }
 }
 
+func captureInClosure() {
+  let x = { (i: Int) in
+    currentTotal += i // expected-error {{use of local variable 'currentTotal' before its declaration}}
+  }
+
+  var currentTotal = 0 // expected-note {{'currentTotal' declared here}}
+
+  _ = x
+}
+
+class class77933460 {}
+
+func func77933460() {
+  var obj: class77933460 = { obj }()
+  // expected-error@-1 {{use of local variable 'obj' before its declaration}}
+  // expected-note@-2 {{'obj' declared here}}
+}
+
 //===----------------------------------------------------------------------===//
 // Type scope
 //===----------------------------------------------------------------------===//
