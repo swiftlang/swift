@@ -1631,7 +1631,6 @@ public:
 
     /// Get the continuation function pointer
     ///
-    auto sig = Signature::forCoroutineContinuation(subIGF.IGM, origType);
     auto schemaAndEntity =
       getCoroutineResumeFunctionPointerAuth(subIGF.IGM, origType);
     auto pointerAuth = PointerAuthInfo::emit(subIGF, schemaAndEntity.first,
