@@ -3752,7 +3752,11 @@ namespace {
       return expr;
     }
 
-    Expr *visitAnyTryExpr(AnyTryExpr *expr) {
+    Expr *visitTryExpr(TryExpr *expr) {
+      return simplifyExprType(expr);
+    }
+
+    Expr *visitForceTryExpr(ForceTryExpr *expr) {
       auto *subExpr = expr->getSubExpr();
       auto type = simplifyType(cs.getType(subExpr));
 
