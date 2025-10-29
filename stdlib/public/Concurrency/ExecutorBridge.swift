@@ -78,6 +78,10 @@ internal func _jobDeallocate(_ job: Builtin.Job,
 internal func _jobGetPriority(_ job: Builtin.Job) -> UInt8
 
 @available(StdlibDeploymentTarget 6.2, *)
+@_silgen_name("swift_job_setPriority")
+internal func _jobSetPriority(_ job: Builtin.Job, _ priority: UInt8)
+
+@available(StdlibDeploymentTarget 6.2, *)
 @_silgen_name("swift_job_getKind")
 internal func _jobGetKind(_ job: Builtin.Job) -> UInt8
 
@@ -91,16 +95,22 @@ internal func _jobGetExecutorPrivateData(
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(StdlibDeploymentTarget 6.2, *)
 @_silgen_name("swift_getMainExecutor")
-internal func _getMainExecutorAsSerialExecutor() -> (any SerialExecutor)? {
-  return MainActor.executor
+internal func _getMainExecutorAsSerialExecutor() -> UnownedSerialExecutor {
+  return unsafe MainActor.unownedExecutor
 }
 #else
 // For task-to-thread model, this is implemented in C++
 @available(StdlibDeploymentTarget 6.2, *)
 @_silgen_name("swift_getMainExecutor")
-internal func _getMainExecutorAsSerialExecutor() -> (any SerialExecutor)?
+internal func _getMainExecutorAsSerialExecutor() -> UnownedSerialExecutor
 #endif // SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 #endif // !$Embedded
+
+@available(StdlibDeploymentTarget 6.2, *)
+@_silgen_name("swift_getDefaultExecutor")
+internal func _getDefaultExecutorAsTaskExecutor() -> UnownedTaskExecutor {
+  return unsafe Task.unownedDefaultExecutor
+}
 
 @available(StdlibDeploymentTarget 6.2, *)
 @_silgen_name("swift_dispatchMain")
@@ -128,10 +138,10 @@ internal func _dispatchEnqueueWithDeadline(_ global: CBool,
 @_silgen_name("swift_dispatchAssertMainQueue")
 internal func _dispatchAssertMainQueue()
 
+@_silgen_name("swift_createDefaultExecutorsOnce")
+func _createDefaultExecutorsOnce()
+
 @_silgen_name("swift_getDispatchQueueForExecutor")
 internal func _getDispatchQueueForExecutor(
   _ executor: UnownedSerialExecutor
 ) -> OpaquePointer?
-
-@_silgen_name("swift_createDefaultExecutorsOnce")
-func _createDefaultExecutorsOnce()

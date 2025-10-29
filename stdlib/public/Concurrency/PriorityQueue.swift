@@ -40,6 +40,15 @@ struct PriorityQueue<T> {
     self.compare = compare
   }
 
+  /// Take the queue.
+  ///
+  /// This returns a copy of the queue, and empties the original.
+  mutating func take() -> PriorityQueue<T> {
+    var q = PriorityQueue(compare: self.compare)
+    swap(&self, &q)
+    return q
+  }
+
   /// Push an item onto the queue.
   ///
   /// Parameters:
@@ -49,6 +58,11 @@ struct PriorityQueue<T> {
   mutating func push(_ value: T) {
     storage.append(value)
     upHeap(ndx: storage.count - 1)
+  }
+
+  /// Return `true` if the queue is empty
+  var isEmpty: Bool {
+    return storage.isEmpty
   }
 
   /// The highest priority item from the queue, or `nil` if none.
