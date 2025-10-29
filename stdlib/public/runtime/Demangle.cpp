@@ -1112,21 +1112,18 @@ namespace swift {
 
           if (outputBufferSize) {
             bufferSize = *outputBufferSize;
-            *outputBufferSize = resultLen;
+            if (!outputBuffer) {
+              // cxa_demangle always \0 terminates the strings, however since we're relying on the initialized 
+              // count when forming Spans around the results from this func, we don't need to rely on null-terminated strings.
+              *outputBufferSize = resultLen - 1; 
+              return result;
+            } else {
+              *outputBufferSize = resultLen - 1; // ignore the trailing
+            }
           }
 
-          if (outputBuffer == nullptr) {
-            return result;
-          }
-
-          size_t toCopy = std::min(
-            shouldNullTerminateString ? (bufferSize - 1) : bufferSize, 
-            shouldNullTerminateString ? (resultLen - 1) : resultLen
-          );
+          size_t toCopy = std::min(bufferSize, resultLen);
           ::memcpy(outputBuffer, result, toCopy);
-          if (shouldNullTerminateString) {
-            outputBuffer[toCopy] = '\0';
-          }
 
           free(result);
 
