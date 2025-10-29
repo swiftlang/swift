@@ -1586,9 +1586,9 @@ WARNING(coercion_may_fail_warning,none,
         "coercion from %0 to %1 may fail; use 'as?' or 'as!' instead",
         (Type, Type))
 
-WARNING(tuple_label_mismatch_warning,none,
-        "tuple conversion from %0 to %1 mismatches labels",
-        (Type, Type))
+ERROR(tuple_label_mismatch,none,
+      "tuple conversion from %0 to %1 mismatches labels",
+      (Type, Type))
 
 ERROR(missing_explicit_conversion,none,
       "%0 is not implicitly convertible to %1; "
@@ -7833,9 +7833,14 @@ ERROR(result_builder_buildpartialblock_accumulated_not_accessible,none,
 // MARK: Tuple Shuffle Diagnostics
 //------------------------------------------------------------------------------
 
- WARNING(warn_reordering_tuple_shuffle_deprecated,Deprecation,
-        "expression shuffles the elements of this tuple; "
-        "this behavior is deprecated", ())
+ERROR(reordering_tuple_shuffle,none,
+      "cannot implicitly reorder tuple elements from '%0' to '%1'",
+      (StringRef, StringRef))
+
+WARNING(warn_reordering_tuple_shuffle_deprecated,Deprecation,
+        "implicit reordering of tuple elements from '%0' to '%1' is deprecated"
+        "; this will be an error in a future Swift language mode",
+        (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Implicit conversion diagnostics
