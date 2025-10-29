@@ -2269,8 +2269,6 @@ static void swift_job_run_on_serial_and_task_executorImpl(Job *job,
   }
 }
 
-
-// FIXME(xxx): we enter here
 SWIFT_CC(swift)
 static void swift_job_run_on_task_executorImpl(Job *job,
                                                TaskExecutorRef taskExecutor) {
@@ -2436,9 +2434,8 @@ public:
   }
 };
 
-
-
-static bool canRunFastpathInline_OLD(SerialExecutorRef currentSerialExecutor,
+// FIXME: remove, this is not used in new impl
+static bool canRunFastpathInline(SerialExecutorRef currentSerialExecutor,
                                  SerialExecutorRef newSerialExecutor,
                                  TaskExecutorRef currentTaskExecutor,
                                  TaskExecutorRef newTaskExecutor) {
@@ -2458,74 +2455,16 @@ static bool canRunFastpathInline_OLD(SerialExecutorRef currentSerialExecutor,
   return currentTaskExecutor.getIdentity() == newTaskExecutor.getIdentity();
 }
 
-
-// If the physical executors are different, you have to suspend.
-// If the logical executors are the same, the switch is trivial.
-// Otherwise, the serial executors should either be switchable or equal to the current task executor.  If
-// the context lets you switch (including the yield check), and
-// acquiring the new serial executor succeeds (it always succeeds if it's the current task executor), then
-// you release the current serial executor (if it's not the current task executor).
-// Otherwise you suspend.
-// A serial executor is switchable if it's default or nil
-static bool canRunFastpathInline(SerialExecutorRef currentSerialExecutor,
-                                 SerialExecutorRef newSerialExecutor,
-                                 TaskExecutorRef currentTaskExecutor,
-                                 TaskExecutorRef newTaskExecutor) {
-  // // Determine the current physical executor, i.e. the executor which provided the thread we are executing on.
-  // AnyExecutorRef currentPhysicalExecutor = (currentSerialExecutor.isDefaultActor() || currentSerialExecutor.isGeneric()) ?
-  //   AnyExecutorRef(currentTaskExecutor) :
-  //   AnyExecutorRef(currentSerialExecutor);
-
-  // // AnyExecutorRef newPhysicalExecutor = !newSerialExecutor.isGeneric() ?
-  // //   AnyExecutorRef(newSerialExecutor) :
-  // //   AnyExecutorRef(newTaskExecutor);
-  // AnyExecutorRef newPhysicalExecutor = (newSerialExecutor.isDefaultActor() || newSerialExecutor.isGeneric()) ?
-  //   AnyExecutorRef(newTaskExecutor) :
-  //   AnyExecutorRef(newSerialExecutor);
-
-  // // The logical executor is the serial executor, if it exists (regardless of whether it's default),
-  // // and otherwise the task executor.
-  // AnyExecutorRef currentLogicalExecutor = currentSerialExecutor.isGeneric() ?
-  //   AnyExecutorRef(currentSerialExecutor) :
-  //   AnyExecutorRef(currentTaskExecutor);
-
-  // AnyExecutorRef newLogicalExecutor = newSerialExecutor.isGeneric() ?
-  //   AnyExecutorRef(newSerialExecutor) :
-  //   AnyExecutorRef(newTaskExecutor);
-
-  if (currentSerialExecutor.getIdentity() != newSerialExecutor.getIdentity()) {
-    SWIFT_TASK_DEBUG_LOG("task_switch: Cannot fastpath, Must switch to new serial executor for isolation (current:%p, new:%p)", 
-      currentSerialExecutor.getIdentity(), newSerialExecutor.getIdentity());
-    return false; 
-  }
-
-  // if (currentPhysicalExecutor.getIdentity() != newPhysicalExecutor.getIdentity()) {
-  //   SWIFT_TASK_DEBUG_LOG("task_switch: Cannot fastpath, current %p and new %p physical excutors are different", 
-  //     currentPhysicalExecutor.getIdentity(), newPhysicalExecutor.getIdentity());
-  //   return false;
-  // }
-
-  if (currentTaskExecutor.isDefined() && newTaskExecutor.isDefined()) {
-    assert(currentSerialExecutor.getIdentity() != newSerialExecutor.getIdentity());
-    return currentTaskExecutor.getIdentity() == currentTaskExecutor.getIdentity();
-  }
-
-  // Otherwise, the consider task executors; since they may be undefined, get the global executor which would be used by default then.
-  auto currentEffectiveTaskExecutor = currentTaskExecutor.isDefined() ?
-    currentTaskExecutor : swift_getDefaultExecutor();
-  auto newEffectiveTaskExecutor = newTaskExecutor.isDefined() ?
-    newTaskExecutor : swift_getDefaultExecutor();
-
-  return currentEffectiveTaskExecutor.getIdentity() == newEffectiveTaskExecutor.getIdentity();
-}
-
 /// Given that we've assumed control of an executor on this thread,
 /// continue to run the given task on it.
 SWIFT_CC(swiftasync)
-static void runOnAssumedThread(AsyncTask *task, SerialExecutorRef serialExecutor,
+static void runOnAssumedThread(AsyncTask *task, 
+                               SerialExecutorRef serialExecutor,
+                               TaskExecutorRef taskExecutor,
                                ExecutorTrackingInfo *oldTracking) {
   // Note that this doesn't change the active task and so doesn't
   // need to either update ActiveTask or flagAsRunning/flagAsSuspended.
+  assert(task->getPreferredTaskExecutor().getIdentity() == taskExecutor.getIdentity());
 
   // If there's already tracking info set up, just change the executor
   // there and tail-call the task.  We don't want these frames to
@@ -2566,7 +2505,7 @@ static void runOnAssumedThread(AsyncTask *task, SerialExecutorRef serialExecutor
 
 
 
-/// OLD IMPL OLD IMPL OLD IMPL OLD IMPL OLD IMPL OLD IMPL OLD IMPL OLD IMPL OLD IMPL OLD IMPL OLD IMPL OLD IMPL 
+// FIXME: remove this OLD switch implementation, only keeping it here as a reference while moving to the new one during development
 SWIFT_CC(swiftasync)
 static void swift_task_switchImpl_OLD(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
                                   TaskContinuationFunction *resumeFunction,
@@ -2634,13 +2573,7 @@ static void swift_task_switchImpl_OLD(SWIFT_ASYNC_CONTEXT AsyncContext *resumeCo
 }
 
 
-
-
-
-
-
-/// -------------------------------------------- NEW NEW NEW NEW
-/// Implements NEW "task switching" logic
+/// Implements revised "task switching" logic, which takes into account task and global executors.
 SWIFT_CC(swiftasync)
 static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
                                   TaskContinuationFunction *resumeFunction,
@@ -2655,8 +2588,17 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
     SerialExecutorRef::generic();
 
   if (!trackingInfo) {
-    SWIFT_TASK_DEBUG_LOG("Missing executor tracking, assume currentSerialExecutor = %s.", "generic");
+    SWIFT_TASK_DEBUG_LOG("Missing executor tracking, assume currentSerialExecutor = %p %s.", SerialExecutorRef::generic().getIdentity(), "generic");
   }
+
+  // If the physical executors are different, you have to suspend.
+  // If the logical executors are the same, the switch is trivial.
+  // Otherwise, the serial executors should either be switchable or equal to the current task executor.  If
+  // the context lets you switch (including the yield check), and
+  // acquiring the new serial executor succeeds (it always succeeds if it's the current task executor), then
+  // you release the current serial executor (if it's not the current task executor).
+  // Otherwise you suspend.
+  // A serial executor is switchable if it's default or nil
 
   TaskExecutorRef currentTaskExecutor = (trackingInfo ? trackingInfo->getTaskExecutor()
                                         : TaskExecutorRef::undefined());
@@ -2695,18 +2637,8 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
                        currentLogicalExecutor.getIdentity(), newLogicalExecutor.getIdentity());
 
   // === Decisions that will influence if and how to switch the task
-  // - Decision 1: Do we need to perform any actor locking? 
-
-  // Determine if there is any locking of DefaultActors involved we have to perform
-  bool mustUnlockSourceDefaultActor = currentSerialExecutor.isDefaultActor();
-  bool mustLockTargetDefaultActor = newSerialExecutor.isDefaultActor();
-
-  SWIFT_TASK_DEBUG_LOG("task_switch: Task %p must unlock source default actor = %s",
-                       task, mustUnlockSourceDefaultActor ? "yes" : "no");
-  SWIFT_TASK_DEBUG_LOG("task_switch: Task %p must lock target default actor = %s",
-                       task, mustLockTargetDefaultActor ? "yes" : "no");
-
-  // - Decision 2: Can we fastpath execute 'inline' immediately?
+  
+  // - Decision 1: Can we fastpath execute 'inline' immediately?
   bool canFastpathExecuteInline = false;
   
   // Determine if the current and new "physical" executor, which provides the thread we run on,
@@ -2739,10 +2671,10 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
     // }
   } 
   
-  // Last attempt
-  if (!canFastpathExecuteInline && 
-      currentSerialExecutor.getIdentity() == newSerialExecutor.getIdentity()) {
-    // Otherwise, the consider task executors, however if any of them is not defined, 
+  // Last attempt, perhaps we are on the same actor isolation, and even though the task executors are not defined,
+  // we _are_ effectively on the same physical executor, because we're going to enqueue on the default global executor.
+  if (!canFastpathExecuteInline && currentSerialExecutor.getIdentity() == newSerialExecutor.getIdentity()) {
+    // The consider task executors, however if any of them is not defined, 
     // fallback to the global executor as the source of threads.
     auto currentEffectiveTaskExecutor = currentTaskExecutor.isDefined() ?
       currentTaskExecutor : swift_getDefaultExecutor();
@@ -2761,131 +2693,90 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   if (canFastpathExecuteInline) {
     SWIFT_TASK_DEBUG_LOG("task_switch: Task %p can fastpath, run inline.", task);
     
-    // assert(!mustUnlockSourceDefaultActor && "Inline fastpath task execution, however unlocking source actor required? This should not happen.");
-    // assert(!mustLockTargetDefaultActor && "Inline fastpath task execution, however locking target actor required? This should not happen.");
     return resumeFunction(resumeContext); // 'return' forces tail call
   }
 
   // --- We could not fast-path, let's consider our alternative options.
+
+  // - Decision 2: Do we need to perform any actor locking? 
+
+  // // Since we may need to switch actor contexts, we may need to either unlock the actor we're leaving (if there is one),
+  // // and/or lock the target actor (if there is one). This can only be done for default actors.
+  // bool mustUnlockSourceDefaultActor = currentSerialExecutor.isDefaultActor();
+  // bool mustLockTargetDefaultActor = newSerialExecutor.isDefaultActor();
+
+  // SWIFT_TASK_DEBUG_LOG("task_switch: Task %p must unlock source default actor = %s",
+  //                      task, mustUnlockSourceDefaultActor ? "yes" : "no");
+  // SWIFT_TASK_DEBUG_LOG("task_switch: Task %p must lock target default actor = %s",
+  //                      task, mustLockTargetDefaultActor ? "yes" : "no");
 
   // Park the task for simplicity instead of trying to thread the
   // initial resumption information into everything below.
   task->ResumeContext = resumeContext;
   task->ResumeTask = resumeFunction;
 
-  // --- Decision: Can the source serial executor "give up" its thread?
-  bool sourceCanGiveUpThread = false;
-  if (trackingInfo && !trackingInfo->allowsSwitching()) {
-    // Some contexts don't allow switching at all.
-    SWIFT_TASK_DEBUG_LOG("task_switch: Can not give up thread; TrackingInfo %p does not allow switching (from serial executor %p)", trackingInfo, currentSerialExecutor);
-    sourceCanGiveUpThread = false;
-  } else if (currentSerialExecutor.isForSynchronousStart()) {
-    // A synchronous start promises that it will not enqueue, and therefore must not give up the thread.
-    SWIFT_TASK_DEBUG_LOG("task_switch: Can not give up thread; synchronous start (immediate) serial executor %p", currentSerialExecutor.getIdentity());
-    sourceCanGiveUpThread = false;
-  } else if (currentSerialExecutor.isGeneric()) {
-    // We certainly can "give up" a generic executor to try to run a task for an actor.
-    SWIFT_TASK_DEBUG_LOG("task_switch: Can give up thread; source executor is generic %p", currentSerialExecutor.getIdentity());
-    sourceCanGiveUpThread = true;
-  } else if (currentSerialExecutor.isDefaultActor()) {
-    // If the current executor is a default actor, we know how to make it give up its thread.
-    SWIFT_TASK_DEBUG_LOG("task_switch: Can give up thread, source executor is default actor %p", currentSerialExecutor.getIdentity());
-    assert(mustUnlockSourceDefaultActor);
-    sourceCanGiveUpThread = true;
-  }
-
-  // 3. 
   // Otherwise, the serial executors should either be switchable or equal to the current task executor.  
   //   - If the context lets you switch (including the yield check), 
   //   - and acquiring the new serial executor succeeds (it always succeeds if it's the current task executor), 
   //   >>> then you release the current serial executor (if it's not the current task executor).
   // Otherwise you suspend.
-  // if (currentPhysicalExecutor.getIdentity() == newPhysicalExecutor.getIdentity() && 
-  //     currentPhysicalExecutor.getIdentity() == newTaskExecutor.getIdentity()) {
-  //   SWIFT_TASK_DEBUG_LOG("task_switch: Task %p attempt to take over source thread, logical executors are the same %p", task, currentLogicalExecutor.getIdentity());
-    
-  //   // // --- Decision: Can the source serial executor "give up" its thread?
-  //   // bool sourceCanGiveUpThread = false;
-  //   // if (trackingInfo && !trackingInfo->allowsSwitching()) {
-  //   //   // Some contexts don't allow switching at all.
-  //   //   SWIFT_TASK_DEBUG_LOG("task_switch: Can not give up thread; TrackingInfo %p does not allow switching (from serial executor %p)", trackingInfo, currentSerialExecutor);
-  //   //   sourceCanGiveUpThread = false;
-  //   // } else if (currentSerialExecutor.isForSynchronousStart()) {
-  //   //   // A synchronous start promises that it will not enqueue, and therefore must not give up the thread.
-  //   //   SWIFT_TASK_DEBUG_LOG("task_switch: Can not give up thread; synchronous start (immediate) serial executor %p", currentSerialExecutor.getIdentity());
-  //   //   sourceCanGiveUpThread = false;
-  //   // } else if (currentSerialExecutor.isGeneric()) {
-  //   //   // We certainly can "give up" a generic executor to try to run a task for an actor.
-  //   //   SWIFT_TASK_DEBUG_LOG("task_switch: Can give up thread; source executor is generic %p", currentSerialExecutor.getIdentity());
-  //   //   sourceCanGiveUpThread = true;
-  //   // } else if (currentSerialExecutor.isDefaultActor()) {
-  //   //   // If the current executor is a default actor, we know how to make it give up its thread.
-  //   //   SWIFT_TASK_DEBUG_LOG("task_switch: Can give up thread, source executor is default actor %p", currentSerialExecutor.getIdentity());
-  //   //   assert(mustUnlockSourceDefaultActor);
-  //   //   sourceCanGiveUpThread = true;
-  //   // }
 
-  // // // if (canGiveUpThreadForSwitch(trackingInfo, currentSerialExecutor)) {
-  // //   if (sourceCanGiveUpThread) {
-  // //     SWIFT_TASK_DEBUG_LOG("task_switch: Task %p may be able to give up thread...", task);
+  // --- Decision: Can the source serial executor "give up" its thread?
+  auto sourceCanGiveUpThread = [&]() -> bool {
+    if (trackingInfo && !trackingInfo->allowsSwitching()) {
+      // Some contexts don't allow switching at all.
+      SWIFT_TASK_DEBUG_LOG("task_switch: Can not give up thread; TrackingInfo %p does not allow switching (from serial executor %p)", trackingInfo, currentSerialExecutor);
+      return false;
+    } 
     
-  // //     if (!shouldYieldThread()) {
-  // //       SWIFT_TASK_DEBUG_LOG("task_switch: Task %p succeeded '!shouldYieldThread()', no need to yield", task);
+    if (currentSerialExecutor.isForSynchronousStart()) {
+      // A synchronous start promises that it will not enqueue, and therefore must not give up the thread.
+      SWIFT_TASK_DEBUG_LOG("task_switch: Can not give up thread; synchronous start (immediate) serial executor %p", currentSerialExecutor.getIdentity());
+      return false;
+    }
     
-  // //       if (tryAssumeThreadForSwitch(newSerialExecutor, newTaskExecutor)) { // FIXME: this doesn't make sense when it's not a default actor; and it isn't, it's a task executor
-  // //         SWIFT_TASK_DEBUG_LOG("task_switch: Task %p succeeded 'tryAssumeThreadForSwitch(newSerialExecutor, newTaskExecutor)'", task);
-  // //         SWIFT_TASK_DEBUG_LOG("task_switch: switch succeeded, task %p assumed thread for executor %p", task, newSerialExecutor.getIdentity());
+    if (currentSerialExecutor.isGeneric()) {
+      // We certainly can "give up" a generic executor to try to run a task for an actor.
+      SWIFT_TASK_DEBUG_LOG("task_switch: Can give up thread; source executor is generic %p", currentSerialExecutor.getIdentity());
+      return true;
+    } 
     
-  // //         return resumeFunction(resumeContext); // 'return' forces tail call
+    if (currentSerialExecutor.isDefaultActor()) {
+      // If the current executor is a default actor, we know how to make it give up its thread.
+      SWIFT_TASK_DEBUG_LOG("task_switch: Can give up thread, source executor is default actor %p", currentSerialExecutor.getIdentity());
+      assert(mustUnlockSourceDefaultActor);
+      return true;
+    }
 
-  // //         giveUpThreadForSwitch(currentSerialExecutor);
-  // //         // 'return' forces tail call
-  // //         return runOnAssumedThread(task, newSerialExecutor, trackingInfo);
-  // //       } else {
-  // //         SWIFT_TASK_DEBUG_LOG("task_switch: Task %p failed 'tryAssumeThreadForSwitch(newSerialExecutor, newTaskExecutor)'", task);
-  // //       }
-  // //     } else {
-  // //       SWIFT_TASK_DEBUG_LOG("task_switch: Task %p cannot switch, must yield thread", task);
-  // //     }
-  // //   } else {
-  // //     SWIFT_TASK_DEBUG_LOG("task_switch: Task %p failed 'canGiveUpThreadForSwitch'", task);
-  // //   }
+    return false;
+  };
 
-  // } else {
-  //   SWIFT_TASK_DEBUG_LOG("task_switch: Task %p cannot take over calling thread", task);
-  // }
-
-  // ===== OLD: Attempt to take over the thread
+  // ===== Attempt to take over the thread
   // If the current executor can give up its thread, and the new executor
   // can take over a thread, try to do so; but don't do this if we've
   // been asked to yield the thread.
-  SWIFT_TASK_DEBUG_LOG("task_switch Can task %p give up thread?", task);
+  SWIFT_TASK_DEBUG_LOG("task_switch: Can task %p give up thread?", task);
   if (
-      currentTaskExecutor.isUndefined() &&
+      // currentTaskExecutor.isUndefined() &&
       canGiveUpThreadForSwitch(trackingInfo, currentSerialExecutor) &&
-      sourceCanGiveUpThread && 
+      sourceCanGiveUpThread() && 
       !shouldYieldThread() &&
       tryAssumeThreadForSwitch(newSerialExecutor, newTaskExecutor)) {
-    SWIFT_TASK_DEBUG_LOG(
-        "task_switch: switch succeeded, task %p assumed thread for executor %p", task,
-        newSerialExecutor.getIdentity());
+    SWIFT_TASK_DEBUG_LOG("task_switch: switch succeeded, task %p assumed thread for executor %p", 
+        task, newSerialExecutor.getIdentity());
     giveUpThreadForSwitch(currentSerialExecutor);
     // 'return' forces tail call
-    return runOnAssumedThread(task, newSerialExecutor, trackingInfo);
+    return runOnAssumedThread(task, newSerialExecutor, newTaskExecutor, trackingInfo);
   }
 
   // [ENQUEUE] Otherwise, just asynchronously enqueue the task on the given executor.
   SWIFT_TASK_DEBUG_LOG(
-      "switch failed, task %p enqueue on serial executor %p (task executor: %p)",
+      "task_switch: switch failed, task %p enqueue on serial executor %p (task executor: %p)",
       task, newSerialExecutor.getIdentity(), newTaskExecutor.getIdentity());
 
   _swift_task_clearCurrent();
   task->flagAsAndEnqueueOnExecutor(newSerialExecutor);
 }
-
-
-
-
 
 SWIFT_CC(swift)
 static void
