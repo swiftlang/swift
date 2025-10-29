@@ -7833,9 +7833,9 @@ ERROR(result_builder_buildpartialblock_accumulated_not_accessible,none,
 // MARK: Tuple Shuffle Diagnostics
 //------------------------------------------------------------------------------
 
- WARNING(warn_reordering_tuple_shuffle_deprecated,Deprecation,
-        "expression shuffles the elements of this tuple; "
-        "this behavior is deprecated", ())
+WARNING(warn_reordering_tuple_shuffle_deprecated,Deprecation,
+        "implicit reordering of tuple elements from '%0' to '%1' is deprecated",
+        (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Implicit conversion diagnostics
