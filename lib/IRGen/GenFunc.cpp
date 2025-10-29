@@ -904,6 +904,13 @@ llvm::Constant *irgen::getCoroFrameAllocStubFn(IRGenModule &IGM) {
       /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::C);
 }
 
+FunctionPointer irgen::getCoroFrameAllocStubFunctionPointer(IRGenModule &IGM) {
+  auto *fn = cast<llvm::Function>(getCoroFrameAllocStubFn(IGM));
+  auto sig = Signature::forFunction(fn);
+  return FunctionPointer::forDirect(FunctionPointerKind::Function, fn, nullptr,
+                                    sig);
+}
+
 static Size getOffsetOfOpaqueIsolationField(IRGenModule &IGM,
                                       const LoadableTypeInfo &isolationTI) {
   auto offset = IGM.RefCountedStructSize;
