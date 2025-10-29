@@ -424,7 +424,12 @@ RewriteContext::getRelativeTermForType(CanType typeWitness,
   // Get the substitution S corresponding to τ_0_n.
   unsigned index = getGenericParamIndex(typeWitness->getRootGenericParam());
   result = MutableTerm(substitutions[index]);
-  ASSERT(!result.hasShape());
+  bool hasShape = false;
+
+  if (result.hasShape()) {
+    hasShape = true;
+    result.removeShape();
+  }
 
   // If the substitution is a term consisting of a single protocol symbol
   // [P], save P for later.
@@ -462,6 +467,9 @@ RewriteContext::getRelativeTermForType(CanType typeWitness,
   // Add the member type names.
   for (auto iter = symbols.rbegin(), end = symbols.rend(); iter != end; ++iter)
     result.add(*iter);
+
+  if (hasShape)
+    result.add(Symbol::forShape(*this));
 
   return result;
 }
@@ -571,8 +579,6 @@ RewriteContext::getRelativeSubstitutionSchemaFromType(
         //
         // τ_0_0 := T
         // τ_0_1 := U.[shape]
-        ASSERT(pos != TypePosition::Shape && "Not implemented");
-
         unsigned index = result.size();
 
         result.push_back(Term::get(term, *this));
