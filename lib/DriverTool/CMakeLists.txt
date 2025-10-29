@@ -13,14 +13,15 @@ set(driver_sources_and_options
                 swift_cache_tool_main.cpp
                 swift_symbolgraph_extract_main.cpp
                 swift_synthesize_interface_main.cpp
-                swift_parse_test_main.cpp)
+                swift_parse_test_main.cpp
+  LLVM_LINK_COMPONENTS
+                BitstreamReader)
 
 set(driver_common_libs
                 swiftAPIDigester
                 swiftDriver
                 swiftFrontendTool
-                swiftSymbolGraphGen
-                LLVMBitstreamReader)
+                swiftSymbolGraphGen)
 
 add_swift_host_library(swiftDriverTool STATIC
   ${driver_sources_and_options}
