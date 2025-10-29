@@ -30,9 +30,9 @@ final class NaiveQueueExecutor: TaskExecutor, SerialExecutor {
     }
   }
 
-  public func checkIsolated() {
-    print("\(Self.self).\(#function)")
+  public func isIsolatingCurrentContext() -> Bool? {
     dispatchPrecondition(condition: .onQueue(self.queue))
+    return true
   }
 
   @inlinable
@@ -47,7 +47,13 @@ final class NaiveQueueExecutor: TaskExecutor, SerialExecutor {
 }
 
 nonisolated func nonisolatedFunc(expectedExecutor: NaiveQueueExecutor) async {
+  // we are on the serial queue
   dispatchPrecondition(condition: .onQueue(expectedExecutor.queue))
+
+  // This will trigger isIsolatingCurrentContext on the serial executor.
+  //
+  // In this specific test we are in 'legacy' mode which means "can not crash",
+  // therefore checkIsolated cannot be invoked.
   expectedExecutor.preconditionIsolated()
 }
 

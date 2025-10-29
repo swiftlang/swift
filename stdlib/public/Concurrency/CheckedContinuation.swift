@@ -44,7 +44,7 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
     let tailPtr = unsafe UnsafeMutableRawPointer(
       Builtin.projectTailElems(self, (UnsafeRawPointer?, String).self))
 
-    let functionPtr = unsafe tailPtr 
+    let functionPtr = unsafe tailPtr
         + MemoryLayout<(UnsafeRawPointer?, String)>.offset(of: \(UnsafeRawPointer?, String).1)!
 
     return unsafe functionPtr.assumingMemoryBound(to: String.self)
@@ -125,7 +125,7 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
 @available(SwiftStdlib 5.1, *)
 public struct CheckedContinuation<T, E: Error>: Sendable {
   private let canary: CheckedContinuationCanary
-  
+
   /// Creates a checked continuation from an unsafe continuation.
   ///
   /// Instead of calling this initializer,
@@ -148,7 +148,7 @@ public struct CheckedContinuation<T, E: Error>: Sendable {
       continuation: continuation,
       function: function)
   }
-  
+
   /// Resume the task awaiting the continuation by having it return normally
   /// from its suspension point.
   ///
@@ -172,7 +172,7 @@ public struct CheckedContinuation<T, E: Error>: Sendable {
       #endif
     }
   }
-  
+
   /// Resume the task awaiting the continuation by having it throw an error
   /// from its suspension point.
   ///
@@ -291,11 +291,34 @@ extension CheckedContinuation {
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
 @inlinable
+@_alwaysEmitIntoClient
+@available(SwiftStdlib 5.1, *)
+// ABI Note: We need to use @abi here because the ABI of this function otherwise conflicts with the legacy
+// @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit
+@abi(
+  nonisolated(nonsending) func withCheckedContinuationNonisolatedNonsending<T>(
+    function: String,
+    _ body: (CheckedContinuation<T, Never>) -> Void
+  ) async -> sending T
+)
+public nonisolated(nonsending) func withCheckedContinuation<T>(
+  function: String = #function,
+_ body: (CheckedContinuation<T, Never>) -> Void
+) async -> sending T {
+  return await Builtin.withUnsafeContinuation {
+    let unsafeContinuation = unsafe UnsafeContinuation<T, Never>($0)
+    return body(unsafe CheckedContinuation(continuation: unsafeContinuation,
+                                           function: function))
+  }
+}
+
+@inlinable
 @available(SwiftStdlib 5.1, *)
 #if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
 #endif
-public func withCheckedContinuation<T>(
+@available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
+func withCheckedContinuation<T>(
   isolation: isolated (any Actor)? = #isolation,
   function: String = #function,
   _ body: (CheckedContinuation<T, Never>) -> Void
@@ -354,6 +377,28 @@ public func _unsafeInheritExecutor_withCheckedContinuation<T>(
 /// - SeeAlso: `withCheckedContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
+@inlinable
+@_alwaysEmitIntoClient
+@available(SwiftStdlib 5.1, *)
+// ABI Note: We need to use @abi here because the ABI of this function otherwise conflicts with the legacy
+// @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit
+@abi(
+  nonisolated(nonsending) func withCheckedThrowingContinuationNonisolatedNonsending<T>(
+    function: String,
+    _ body: (CheckedContinuation<T, Error>) -> Void
+  ) async throws -> sending T
+)
+public nonisolated(nonsending)  func withCheckedThrowingContinuation<T>(
+  function: String = #function,
+  _ body: (CheckedContinuation<T, Error>) -> Void
+) async throws -> sending T {
+  return try await Builtin.withUnsafeThrowingContinuation {
+    let unsafeContinuation = unsafe UnsafeContinuation<T, Error>($0)
+    return body(unsafe CheckedContinuation(continuation: unsafeContinuation,
+                                           function: function))
+  }
+}
+
 @inlinable
 @available(SwiftStdlib 5.1, *)
 #if !$Embedded
