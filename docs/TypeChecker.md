@@ -252,7 +252,7 @@ expression, and each different kind of expression---function
 application, member access, etc.---generates a specific set of
 constraints. Here, we enumerate the primary expression kinds in the
 language and describe the type assigned to the expression and the
-constraints generated from such as expression. We use `T(a)` to
+constraints generated from such an expression. We use `T(a)` to
 refer to the type assigned to the subexpression `a`. The constraints
 and types generated from the primary expression kinds are:
 
@@ -631,9 +631,9 @@ on the type variable are categorized. Given a relational constraint of the form
 `A` is some concrete type, `A` is said to be  "above"
 `T0`. Similarly, given a constraint of the form `B <? T0` for a
 concrete type `B`, `B` is said to be "below" `T0`. The
-above/below terminologies comes from a visualization of the lattice of
+above/below terminology comes from a visualization of the lattice of
 types formed by the conversion relationship, e.g., there is an edge
-`A -> B` in the latter if `A` is convertible to `B`. `B` would
+`A -> B` in the lattice if `A` is convertible to `B`. `B` would
 therefore be higher in the lattice than `A`, and the topmost element
 of the lattice is the element to which all types can be converted,
 `Any` (often called "top").
@@ -764,7 +764,7 @@ checking problem::
 ```
 This constraint system generates the constraints "`T(f)` ==Fn `T0 -> T1`"
 (for fresh variables `T0` and `T1`), "`(T2, X) <c T0`" (for fresh variable `T2`)
-and "`T2` conforms to`ExpressibleByFloatLiteral`". As part of the solution,
+and "`T2` conforms to `ExpressibleByFloatLiteral`". As part of the solution,
 after `T0` is replaced with `(i : Int, s : String)`, the second of
 these constraints is broken down into "`T2 <c Int`" and "`X <c String`".
 These two constraints are interesting for different
@@ -875,7 +875,7 @@ locator::
 When we simplify this locator, we start with `f(g())`. The "apply
 argument" derivation step takes us to the argument expression
 `g()`. Here, however, there is no subexpression for the first tuple
-element of `g()`, because it's simple part of the tuple returned
+element of `g()`, because it's simply part of the tuple returned
 from `g`. At this point, simplification ceases, and creates the
 simplified locator::
 ```
@@ -982,7 +982,7 @@ in detail in this
 ## Footnotes
 
 [1]: More accurately, as of this writing, "will compute". The solver
-  doesn't current compute meets and joins properly. Rather, it
+  doesn't currently compute meets and joins properly. Rather, it
   arbitrarily picks one of the constraints "below" to start with.
 
 [2]: Again, as of this writing, the solver doesn't actually compute
