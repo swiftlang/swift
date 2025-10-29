@@ -4,10 +4,8 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_DeferredCodeGen
-// REQUIRES: swift_feature_CDecl
-// REQUIRES: swift_feature_CImplementation
 
-// RUN: %target-swift-frontend -emit-ir -o - %s -I %S/Inputs -package-name MyPackage -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -enable-experimental-feature CDecl -enable-experimental-feature CImplementation -parse-as-library | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -o - %s -I %S/Inputs -package-name MyPackage -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library | %FileCheck %s
 
 import MyModuleExports
 

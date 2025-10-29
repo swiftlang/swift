@@ -1,9 +1,7 @@
 // RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -typecheck %s -import-objc-header %S/Inputs/objc_implementation.h > %t 2>&1
 // RUN: %FileCheck --input-file %t --check-prefixes YES,CHECK %s
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -typecheck %s -import-objc-header %S/Inputs/objc_implementation.h -enable-experimental-feature CImplementation > %t 2>&1
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -typecheck %s -import-objc-header %S/Inputs/objc_implementation.h > %t 2>&1
 // RUN: %FileCheck --input-file %t --check-prefixes YES,C,CHECK %s
-
-// REQUIRES: swift_feature_CImplementation
 
 // YES-DAG: cdecl_implementation_features.swift:[[@LINE+1]]:{{[0-9]+}}: warning: global function 'CImplFunc1' of type '(Double) -> ()' does not match type '(Int32) -> Void' declared by the header; this will become an error after adopting '@implementation'
 @_objcImplementation @_cdecl("CImplFunc1") func CImplFunc1(_: Double) {}

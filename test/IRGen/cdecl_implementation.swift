@@ -1,14 +1,9 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
-// RUN:   -enable-experimental-feature CImplementation \
-// RUN:   -enable-experimental-feature CDecl \
 // RUN:   -disable-objc-interop \
 // RUN:   -F %clang-importer-sdk-path/frameworks %s \
 // RUN:   -import-objc-header %S/Inputs/objc_implementation.h -emit-ir \
 // RUN:   -target %target-future-triple > %t.ir
 // RUN: %FileCheck --input-file %t.ir %s
-
-// REQUIRES: swift_feature_CImplementation
-// REQUIRES: swift_feature_CDecl
 
 @implementation @c
 public func implFunc(_ param: Int32) {}

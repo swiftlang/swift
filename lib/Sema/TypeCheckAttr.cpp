@@ -1841,9 +1841,6 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     }
   }
   else if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    if (!hasObjCImplementationFeature(D, attr, Feature::CImplementation))
-      return;
-
     if (!attr->CategoryName.empty()) {
       auto diagnostic =
           diagnose(attr->getLocation(),

@@ -1,7 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s \
-// RUN:   -enable-experimental-feature CDecl
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s
 
-// REQUIRES: swift_feature_CDecl
 // REQUIRES: objc_interop
 
 import Foundation

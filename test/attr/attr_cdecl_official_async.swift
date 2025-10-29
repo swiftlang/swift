@@ -1,9 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-objc-interop \
-// RUN:   -disable-availability-checking \
-// RUN:   -enable-experimental-feature CDecl
+// RUN:   -disable-availability-checking
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_CDecl
 
 @_cdecl("async") // expected-error{{@_cdecl global function cannot be asynchronous}}
 func asynchronous() async { }

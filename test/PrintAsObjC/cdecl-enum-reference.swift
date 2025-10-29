@@ -4,15 +4,13 @@
 /// Build CoreLib defining a @c enum.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   %t/CoreLib.swift -emit-module -verify -o %t \
-// RUN:   -emit-clang-header-path %t/CoreLib.h \
-// RUN:   -enable-experimental-feature CDecl
+// RUN:   -emit-clang-header-path %t/CoreLib.h
 // RUN: %check-in-clang-c %t/CoreLib.h -I %t
 
 /// Build MiddleLib using the @c enum in API.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   %t/MiddleLib.swift -emit-module -verify -o %t -I %t \
-// RUN:   -emit-clang-header-path %t/MiddleLib.h \
-// RUN:   -enable-experimental-feature CDecl
+// RUN:   -emit-clang-header-path %t/MiddleLib.h
 // RUN: %FileCheck %s --input-file %t/MiddleLib.h
 // RUN: %check-in-clang-c %t/MiddleLib.h -I %t
 
@@ -21,8 +19,6 @@
 // RUN:   -F %S/../Inputs/clang-importer-sdk-path/frameworks \
 // RUN:   -I %clang-include-dir -Werror \
 // RUN:   -isysroot %S/../Inputs/clang-importer-sdk
-
-// REQUIRES: swift_feature_CDecl
 
 //--- CoreLib.swift
 @c(CEnum)
