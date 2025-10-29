@@ -71,11 +71,6 @@ enum AllowsTaskAlloc_t : bool {
   AllowsTaskAlloc = true,
 };
 
-enum IsForCalleeCoroutineFrame_t : bool {
-  IsNotForCalleeCoroutineFrame,
-  IsForCalleeCoroutineFrame,
-};
-
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.
 class IRGenFunction {
@@ -315,8 +310,7 @@ public:
   StackAddress
   emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize, Alignment align,
                     AllowsTaskAlloc_t allowTaskAlloc = AllowsTaskAlloc,
-                    IsForCalleeCoroutineFrame_t forCalleeCoroutineFrame =
-                        IsNotForCalleeCoroutineFrame,
+                    llvm::Value *mallocTypeId = nullptr,
                     const llvm::Twine &name = "");
   void emitDeallocateDynamicAlloca(StackAddress address,
                                    bool allowTaskDealloc = true,
