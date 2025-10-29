@@ -40,12 +40,12 @@ WARNING(warning_upcoming_feature_on_by_default, none,
         "upcoming feature '%0' is already enabled as of Swift version %1",
         (StringRef, unsigned))
 
-GROUPED_WARNING(unrecognized_feature, StrictLanguageFeatures, DefaultIgnore,
+GROUPED_WARNING(unrecognized_feature, UnrecognizedStrictLanguageFeatures, none,
                 "'%0' is not a recognized "
                 "%select{experimental|upcoming}1 feature",
                 (StringRef, bool))
 
-GROUPED_WARNING(feature_not_experimental, StrictLanguageFeatures, DefaultIgnore,
+GROUPED_WARNING(feature_not_experimental, UnrecognizedStrictLanguageFeatures, none,
                 "'%0' is not an experimental feature, "
                 "use -%select{disable|enable}1-upcoming-feature instead",
                 (StringRef, bool))

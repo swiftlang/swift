@@ -2859,7 +2859,7 @@ WARNING(add_predates_concurrency_import,none,
      "'Sendable'-related %select{warnings|errors}0 from module %1"
      "%select{| as warnings}0", (bool, Identifier))
 GROUPED_WARNING(remove_predates_concurrency_import,PreconcurrencyImport,
-                DefaultIgnore,
+                none,
                 "'@preconcurrency' on module %0 has no effect", (Identifier))
 WARNING(remove_public_import,none,
         "public import of %0 was not used in public declarations or inlinable code",
@@ -8662,18 +8662,18 @@ GROUPED_ERROR(weak_unowned_in_embedded_swift, EmbeddedRestrictions, none,
               (ReferenceOwnership))
 
 GROUPED_WARNING(untyped_throws_in_embedded_swift, EmbeddedRestrictions,
-                DefaultIgnore,
+                none,
                 "untyped throws is not available in Embedded Swift; add a thrown error type with '(type)'", ())
 GROUPED_WARNING(generic_nonfinal_in_embedded_swift, EmbeddedRestrictions,
-                DefaultIgnore,
+                none,
                 "generic %kind0 in a class %select{must be 'final'|cannot be 'required'}1 in Embedded Swift",
                 (const Decl *, bool))
 GROUPED_WARNING(use_generic_member_of_existential_in_embedded_swift,
-                EmbeddedRestrictions, DefaultIgnore,
+                EmbeddedRestrictions, none,
                 "cannot use generic %kind0 on a value of type %1 in Embedded Swift",
                 (const Decl *, Type))
 GROUPED_WARNING(dynamic_cast_involving_protocol_in_embedded_swift,
-                EmbeddedRestrictions, DefaultIgnore,
+                EmbeddedRestrictions, none,
                 "cannot perform a dynamic cast to a type involving %kind0 in Embedded Swift",
                 (const Decl *))
 
@@ -8992,33 +8992,33 @@ ERROR(conformance_repression_only_on_struct_class_enum,none,
 // MARK: Swift Performance hints
 //===----------------------------------------------------------------------===//
 
-GROUPED_WARNING(perf_hint_function_returns_array,ReturnTypeImplicitCopy,DefaultIgnore,
+GROUPED_WARNING(perf_hint_function_returns_array,ReturnTypeImplicitCopy,none,
                 "Performance: %0 returns a%select{ dictionary|n array}1, leading to implicit copies. "
                 "Consider using an 'inout' parameter instead.", (const FuncDecl *, bool))
-GROUPED_WARNING(perf_hint_closure_returns_array,ReturnTypeImplicitCopy,DefaultIgnore,
+GROUPED_WARNING(perf_hint_closure_returns_array,ReturnTypeImplicitCopy,none,
                 "Performance: closure returns a%select{ dictionary|n array}0, leading to implicit copies. "
                 "Consider using an 'inout' parameter instead.", (bool))
 
-GROUPED_WARNING(perf_hint_param_expects_existential,ExistentialType,DefaultIgnore,
+GROUPED_WARNING(perf_hint_param_expects_existential,ExistentialType,none,
                 "Performance: %0 expects an existential, leading to heap allocation, reference counting, "
                 "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
                 (const ParamDecl*))
-GROUPED_WARNING(perf_hint_func_returns_existential,ExistentialType,DefaultIgnore,
+GROUPED_WARNING(perf_hint_func_returns_existential,ExistentialType,none,
                 "Performance: %0 returns an existential, leading to heap allocation, reference counting, "
                 "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
                 (const FuncDecl*))
-GROUPED_WARNING(perf_hint_closure_returns_existential,ExistentialType,DefaultIgnore,
+GROUPED_WARNING(perf_hint_closure_returns_existential,ExistentialType,none,
                 "Performance: closure returns an existential, leading to heap allocation, reference counting, "
                 "and dynamic dispatch. Consider using generic constraints or concrete types instead.", ())
-GROUPED_WARNING(perf_hint_var_uses_existential,ExistentialType,DefaultIgnore,
+GROUPED_WARNING(perf_hint_var_uses_existential,ExistentialType,none,
                 "Performance: %0 uses an existential, leading to heap allocation, reference counting, "
                 "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
                 (const VarDecl *))
-GROUPED_WARNING(perf_hint_any_pattern_uses_existential,ExistentialType,DefaultIgnore,
+GROUPED_WARNING(perf_hint_any_pattern_uses_existential,ExistentialType,none,
                 "Performance: declaration uses an existential, leading to heap allocation, reference counting, "
                 "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
                 ())
-GROUPED_WARNING(perf_hint_typealias_uses_existential,ExistentialType,DefaultIgnore,
+GROUPED_WARNING(perf_hint_typealias_uses_existential,ExistentialType,none,
                 "Performance: %0 aliases an existential type, leading to heap allocation, reference counting, "
                 "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
                 (const TypeAliasDecl *))
