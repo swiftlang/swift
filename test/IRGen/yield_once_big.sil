@@ -57,7 +57,7 @@ entry:
   %1000 = integer_literal $Builtin.Int32, 1000
   apply %marker(%1000) : $@convention(thin) (Builtin.Int32) -> ()
 
-  // CHECK-NEXT:    call swiftcc void @make_big(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} [[TEMP]], ptr %C)
+  // CHECK-NEXT:    call swiftcc void @make_big(ptr noalias sret({{.*}}) captures(none) [[TEMP]], ptr %C)
   %make = function_ref @make_big : $@convention(thin) <T: SomeClass> () -> (@owned Big<T>)
   %value = apply %make<C>() : $@convention(thin) <T: SomeClass> () -> (@owned Big<T>)
 
@@ -171,8 +171,8 @@ cont:
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @test_simple_guaranteed
-// CHECK-32-SAME:  (ptr noalias dereferenceable([[BUFFER_SIZE:16]]) %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable(32) %1, ptr %C)
-// CHECK-64-SAME:  (ptr noalias dereferenceable([[BUFFER_SIZE:32]]) %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable(64) %1, ptr %C)
+// CHECK-32-SAME:  (ptr noalias dereferenceable([[BUFFER_SIZE:16]]) %0, ptr noalias captures(none) dereferenceable(32) %1, ptr %C)
+// CHECK-64-SAME:  (ptr noalias dereferenceable([[BUFFER_SIZE:32]]) %0, ptr noalias captures(none) dereferenceable(64) %1, ptr %C)
 sil [ossa] @test_simple_guaranteed : $@yield_once <C: SomeClass> (@in_guaranteed BigWrapper<C>) -> (@yields @guaranteed Big<C>) {
 entry(%arg : $*BigWrapper<C>):
   //   Allocate space for the return value of make_big.

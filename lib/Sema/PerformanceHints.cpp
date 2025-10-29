@@ -21,6 +21,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Expr.h"
@@ -30,22 +31,7 @@
 using namespace swift;
 
 bool swift::performanceHintDiagnosticsEnabled(ASTContext &ctx) {
-  return !ctx.Diags.isIgnoredDiagnostic(
-             diag::perf_hint_closure_returns_array.ID) ||
-         !ctx.Diags.isIgnoredDiagnostic(
-             diag::perf_hint_function_returns_array.ID) ||
-         !ctx.Diags.isIgnoredDiagnostic(
-             diag::perf_hint_param_expects_existential.ID) ||
-         !ctx.Diags.isIgnoredDiagnostic(
-             diag::perf_hint_func_returns_existential.ID) ||
-         !ctx.Diags.isIgnoredDiagnostic(
-             diag::perf_hint_closure_returns_existential.ID) ||
-         !ctx.Diags.isIgnoredDiagnostic(
-             diag::perf_hint_var_uses_existential.ID) ||
-         !ctx.Diags.isIgnoredDiagnostic(
-             diag::perf_hint_any_pattern_uses_existential.ID) ||
-         !ctx.Diags.isIgnoredDiagnostic(
-             diag::perf_hint_typealias_uses_existential.ID);
+  return !ctx.Diags.isIgnoredDiagnosticGroupTree(DiagGroupID::PerformanceHints);
 }
 
 namespace {

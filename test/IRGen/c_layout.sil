@@ -32,7 +32,7 @@ bb0:
 // CHECK-x86_64:   [[RESULT:%.*]] = alloca %TSo11BitfieldOneV, align 8
 // CHECK-x86_64:   [[ARG:%.*]] = alloca %TSo11BitfieldOneV, align 8
 //   Make the first call and pull all the values out of the indirect result.
-// CHECK-x86_64:   call void @createBitfieldOne(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} [[RESULT]])
+// CHECK-x86_64:   call void @createBitfieldOne(ptr noalias sret({{.*}}) captures(none) [[RESULT]])
 // CHECK-x86_64:   [[ADDR_A:%.*]] = getelementptr inbounds{{.*}} %TSo11BitfieldOneV, ptr [[RESULT]], i32 0, i32 0
 // CHECK-x86_64:   [[ADDR_A_V:%.*]] = getelementptr inbounds{{.*}} %Ts6UInt32V, ptr [[ADDR_A]], i32 0, i32 0
 // CHECK-x86_64:   [[A:%.*]] = load i32, ptr [[ADDR_A_V]], align 8
@@ -102,7 +102,7 @@ sil public_external @consumeSIMDStruct : $@convention(c) (SIMDStruct) -> ()
 
 // CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testSIMDStruct()
 // CHECK-SYSV-x86_64:        call <3 x float> @createSIMDStruct
-// CHECK-WIN-x86_64:         call void @createSIMDStruct(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %
+// CHECK-WIN-x86_64:         call void @createSIMDStruct(ptr noalias sret({{.*}}) captures(none) %
 // CHECK-SYSV-x86_64:        call void @consumeSIMDStruct(<3 x float>
 // CHECK-WIN-x86_64:         call void @consumeSIMDStruct(ptr %
 sil @testSIMDStruct : $() -> () {
@@ -389,8 +389,8 @@ entry(%b : $@convention(block) (CChar) -> CChar, %c : $CChar):
 }
 
 // CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testBitfieldInBlock
-// CHECK-SYSV-x86_64:        call void {{%.*}}(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} {{%.*}}, ptr {{%.*}}, ptr byval({{.*}}) align 8 {{%.*}})
-// CHECK-WIN-x86_64:         call void {{%.*}}(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} {{%.*}}, ptr {{%.*}}, ptr {{%.*}})
+// CHECK-SYSV-x86_64:        call void {{%.*}}(ptr noalias sret({{.*}}) captures(none) {{%.*}}, ptr {{%.*}}, ptr byval({{.*}}) align 8 {{%.*}})
+// CHECK-WIN-x86_64:         call void {{%.*}}(ptr noalias sret({{.*}}) captures(none) {{%.*}}, ptr {{%.*}}, ptr {{%.*}})
 sil @testBitfieldInBlock : $@convention(thin) (@owned @convention(block) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
 entry(%b : $@convention(block) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):
   %r = apply %b(%x) : $@convention(block) (BitfieldOne) -> BitfieldOne
