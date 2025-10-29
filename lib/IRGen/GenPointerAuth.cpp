@@ -772,6 +772,12 @@ void ConstantAggregateBuilderBase::addSignedPointer(llvm::Constant *pointer,
 }
 
 llvm::ConstantInt *IRGenModule::getMallocTypeId(llvm::Function *fn) {
+  if (!getOptions().EmitTypeMallocForCoroFrame) {
+    // Even when typed malloc isn't enabled, a type id may be required for ABI
+    // reasons (e.g. as an argument to swift_coro_alloc).  Use a cheaply
+    // materialized value.
+    return llvm::ConstantInt::get(Int64Ty, 0);
+  }
   return getDiscriminatorForString(*this, fn->getName());
 }
 
