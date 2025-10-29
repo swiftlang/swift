@@ -1586,9 +1586,9 @@ WARNING(coercion_may_fail_warning,none,
         "coercion from %0 to %1 may fail; use 'as?' or 'as!' instead",
         (Type, Type))
 
-WARNING(tuple_label_mismatch_warning,none,
-        "tuple conversion from %0 to %1 mismatches labels",
-        (Type, Type))
+ERROR(tuple_label_mismatch,none,
+      "tuple conversion from %0 to %1 mismatches labels",
+      (Type, Type))
 
 ERROR(missing_explicit_conversion,none,
       "%0 is not implicitly convertible to %1; "
