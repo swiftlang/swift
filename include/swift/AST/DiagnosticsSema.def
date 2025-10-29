@@ -7833,8 +7833,13 @@ ERROR(result_builder_buildpartialblock_accumulated_not_accessible,none,
 // MARK: Tuple Shuffle Diagnostics
 //------------------------------------------------------------------------------
 
+ERROR(reordering_tuple_shuffle,none,
+      "cannot implicitly reorder tuple elements from '%0' to '%1'",
+      (StringRef, StringRef))
+
 WARNING(warn_reordering_tuple_shuffle_deprecated,Deprecation,
-        "implicit reordering of tuple elements from '%0' to '%1' is deprecated",
+        "implicit reordering of tuple elements from '%0' to '%1' is deprecated"
+        "; this will be an error in a future Swift language mode",
         (StringRef, StringRef))
 
 //------------------------------------------------------------------------------

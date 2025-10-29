@@ -5867,9 +5867,15 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
     SmallString<16> toLabelStr;
     concatLabels(labels, toLabelStr);
 
-    ctx.Diags.diagnose(expr->getLoc(),
-                       diag::warn_reordering_tuple_shuffle_deprecated,
-                       fromLabelStr, toLabelStr);
+    using namespace version;
+    if (ctx.isSwiftVersionAtLeast(Version::getFutureMajorLanguageVersion())) {
+      ctx.Diags.diagnose(expr->getLoc(), diag::reordering_tuple_shuffle,
+                         fromLabelStr, toLabelStr);
+    } else {
+      ctx.Diags.diagnose(expr->getLoc(),
+                         diag::warn_reordering_tuple_shuffle_deprecated,
+                         fromLabelStr, toLabelStr);
+    }
   }
 
   // Create the result tuple, written in terms of the destructured
