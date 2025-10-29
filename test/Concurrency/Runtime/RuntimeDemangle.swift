@@ -16,7 +16,7 @@ var DemangleTests = TestSuite("Demangle")
 
 if #available(SwiftStdlib 6.3, *) {
   DemangleTests.test("basic string return API") {
-    // First, test that we get back the mangled name with invalid input.
+    // First, test that we get back 'nil' with invalid input.
     expectEqual(demangle("abc123"), nil)
     expectEqual(demangle("Si"), nil)
     expectEqual(demangle("Swift is super cool!"), nil)
@@ -117,26 +117,23 @@ if #available(SwiftStdlib 6.3, *) {
     // Test the return of demangle into with a smaller buffer.
     // Swift.Int requires 9 bytes, give this 8
     let smolBuffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: 8)
-    var outputSpan = OutputSpan<UTF8.CodeUnit>(buffer: smolBuffer, initializedCount: 0)
+    var smolOutputSpan = OutputSpan<UTF8.CodeUnit>(buffer: smolBuffer, initializedCount: 0)
     defer { smolBuffer.deallocate() }
 
-    let smolPtr = smolBuffer.baseAddress!
-
-    let fail = demangle("$sSi".utf8Span, into: &outputSpan)
+    let fail = demangle("$sSi".utf8Span, into: &smolOutputSpan)
     expectEqual(fail, .truncated(9))
-    expectEqual(String(cString: smolPtr), "Swift.In")
+    expectEqual(String(copying: try! UTF8Span(validating: smolOutputSpan.span)), "Swift.In")
   }
 
   DemangleTests.test("Span API - small buffer, success") {
     let smolBuffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: 9)
-    var outputSpan = OutputSpan<UTF8.CodeUnit>(buffer: smolBuffer, initializedCount: 0)
+    var smolOutputSpan = OutputSpan<UTF8.CodeUnit>(buffer: smolBuffer, initializedCount: 0)
     defer { smolBuffer.deallocate() }
 
-    let smolPtr = smolBuffer.baseAddress!
     // Test nil return on successful demangle.
-    let success = demangle("$s4Smol3IntV".utf8Span, into: &outputSpan)
+    let success = demangle("$s4Smol3IntV".utf8Span, into: &smolOutputSpan)
     expectEqual(success, .success)
-    expectEqual(String(cString: smolPtr), "Smol.Int")
+    expectEqual(String(copying: try! UTF8Span(validating: smolOutputSpan.span)), "Smol.Int")
   }
 
 }

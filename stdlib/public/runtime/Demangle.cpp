@@ -1050,11 +1050,13 @@ namespace swift {
                             size_t *outputBufferSize,
                             uint32_t flags) {
       if (flags > 1) {
-        swift::fatalError(0, "Only 'flags' value of '0' and '1' is currently supported.");
+        // ignore not supported flags
+        return nullptr;
       }
-      if (outputBuffer != nullptr && outputBufferSize == nullptr) {
-        swift::fatalError(0, "'outputBuffer' is passed but the size is 'nullptr'.");
-      }
+
+      // Very simple flags parsing, move to something more proper once we support more flags
+      bool shouldNullTerminateString = flags & 1;
+      bool shouldUseSimplifiedUIDemangleOptions = flags & 1;
 
       llvm::StringRef name = llvm::StringRef(mangledName, mangledNameLength);
 
@@ -1066,7 +1068,7 @@ namespace swift {
       if (Demangle::isSwiftSymbol(name)) {
         // Determine demangling/formatting options:
         auto options = DemangleOptions();
-        if (flags == 1) {
+        if (shouldUseSimplifiedUIDemangleOptions) {
           // simplified display options, for backtraces
           options = DemangleOptions::SimplifiedUIDemangleOptions();
         }
@@ -1080,12 +1082,19 @@ namespace swift {
         }
 
         if (outputBuffer == nullptr) {
-          outputBuffer = (char *)::malloc(result.length());
+          auto totalLength = shouldNullTerminateString ? (result.length() + 1) : result.length();
+          outputBuffer = (char *)::malloc(totalLength);
           bufferSize = result.length();
         }
 
-        size_t toCopy = std::min(bufferSize, result.length());
+        size_t toCopy = std::min(
+          shouldNullTerminateString ? (bufferSize - 1) : bufferSize, 
+          shouldNullTerminateString ? (result.length() - 1) : result.length()
+        );
         ::memcpy(outputBuffer, result.data(), toCopy);
+        if (shouldNullTerminateString) {
+          outputBuffer[toCopy] = '\0';
+        }
 
         return outputBuffer;
     #ifndef _WIN32
@@ -1110,8 +1119,14 @@ namespace swift {
             return result;
           }
 
-          size_t toCopy = std::min(bufferSize, resultLen);
+          size_t toCopy = std::min(
+            shouldNullTerminateString ? (bufferSize - 1) : bufferSize, 
+            shouldNullTerminateString ? (resultLen - 1) : resultLen
+          );
           ::memcpy(outputBuffer, result, toCopy);
+          if (shouldNullTerminateString) {
+            outputBuffer[toCopy] = '\0';
+          }
 
           free(result);
 
@@ -1123,7 +1138,9 @@ namespace swift {
     #endif
       }
 
-      *outputBufferSize = 0; // indicate we did not write to buffer
+      if (outputBufferSize) {
+        *outputBufferSize = 0; // indicate we did not write to buffer
+      }
       return nullptr;
     }
   }

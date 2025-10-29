@@ -29,7 +29,7 @@ internal import BacktracingImpl.Runtime
 
 // - MARK: Demangling
 
-/// Given a mangled Swift symbol, demangle it into a human readable format.
+/// Given a mangled Swift, or C++, symbol, demangle it into a human readable format.
 ///
 /// If the provided bytes are not a valid mangled swift name, the output span will be initialized with zero elements.
 /// If mangling succeeds the output span will contain the resulting demangled string.
@@ -52,6 +52,8 @@ internal import BacktracingImpl.Runtime
 ///   ├─────────────────────╫────────┤
 ///   │ Swift 5+            ║   $s   │
 ///   └─────────────────────╨────────┘
+/// 
+/// This function also attempts to demangle C++ symbols starting with `_Z`.
 ///
 /// - Parameters:
 ///   - mangledName: A mangled Swift symbol.
@@ -62,7 +64,7 @@ internal import BacktracingImpl.Runtime
 public func demangle(_ mangledName: String) -> String? {
   var length: size_t = 0
 
-  let demangled: UnsafeMutablePointer<Int8>? = _swift_runtime_demangle(
+  let demangled: UnsafeMutablePointer<CChar>? = _swift_runtime_demangle(
     mangledName, mangledName.utf8.count,
     nil, &length,
     /*flags=*/0

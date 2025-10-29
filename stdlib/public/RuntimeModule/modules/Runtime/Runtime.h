@@ -33,8 +33,6 @@ void swift_reportWarning(uint32_t flags, const char *message);
 bool _swift_backtrace_isThunkFunction(const char *rawName);
 
 // Demangle the given raw name (supports Swift and C++)
-//
-// The demangled string IS a null-terminated c-string.
 char *_swift_backtrace_demangle(const char *rawName,
                                 size_t rawNameLength,
                                 char *outputBuffer,
@@ -46,9 +44,14 @@ char *_swift_backtrace_demangle(const char *rawName,
 // If null is passed as the 'outputBuffer' the runtime function will allocate a buffer and return it.
 // If an 'outputBuffer' is passed, the output will be written into it, and the same buffer will be returned from this
 //
-// The demangled result String is NOT null-terminated. 
+// The demangled result string is NOT null-terminated. 
 // The demangled string length is indicated through the outputBufferSize parameter.
 // 
+// Currently supported flags:
+//  - 0: 'default'
+//  - 1: '_swift_backtrace_demangle compatible mode', uses SimplifiedUIDemangleOptions for formatting
+//  - *: unsupported values, result in immediate demangling failure.
+
 // Introduced in Swift 6.3.
 char *_swift_runtime_demangle(const char *rawName,
                               size_t rawNameLength,
