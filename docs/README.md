@@ -8,6 +8,8 @@ It is divided into the following sections:
   while assuming minimal background knowledge.
 - [How-To Guides](#how-to-guides)
   help you complete specific tasks in a step-by-step fashion.
+- [Long Reads](#long-reads)
+  are regularly maintained documents that specify compiler subsystems in detail.
 - [Explanations](#explanations)
   discuss key subsystems and concepts, at a high level.
   They also provide background information and talk about design tradeoffs.
@@ -84,6 +86,16 @@ documentation, please create a thread on the Swift forums under the
   Describes how to run [include-what-you-use](https://include-what-you-use.org)
   on the Swift project.
 
+## Long Reads
+
+- [EmbeddedSwift/](/docs/EmbeddedSwift/):
+  A guide to all things Embedded Swift.
+- [Generics/](/docs/Generics/): "Compiling Swift Generics", a book about
+  the implementation of parameteric polymorphism in the Swift compiler.
+  Also covers the compilation pipeline, request evaluator, and type system in
+  general.
+- [SIL/](/docs/SIL/): Documentation about SIL, the Swift intermediate language.
+
 ## Explanations
 
 - [WebAssembly.md](/docs/WebAssembly.md):
@@ -124,9 +136,7 @@ documentation, please create a thread on the Swift forums under the
   - [StableBitcode.md](/docs/StableBitcode.md):
     Describes how to maintain compatibility when changing the serialization
     format.
-- SIL and SIL Optimizations:
-  - [SILFunctionConventions.md](/docs/SIL/SILFunctionConventions.md):
-  - [SILMemoryAccess.md](/docs/SIL/SILMemoryAccess.md):
+- SIL Optimizations:
   - [OptimizerDesign.md](/docs/OptimizerDesign.md):
     Describes the design of the optimizer pipeline.
   - [HighLevelSILOptimizations.rst](/docs/HighLevelSILOptimizations.rst):
@@ -195,11 +205,6 @@ documentation, please create a thread on the Swift forums under the
 	A concise summary of the calling conventions used for C/C++, Objective-C
 	and Swift on Apple platforms.  Contains references to source documents,
 	where further detail is required.
-- [CallingConvention.rst](/docs/ABI/CallingConvention.rst):
-  Describes in detail the Swift calling convention.
-- [GenericSignature.md](/docs/ABI/GenericSignature.md):
-  Describes what generic signatures are and how they are used in the ABI,
-  including the algorithms for minimization and canonicalization.
 - [KeyPaths.md](/docs/ABI/KeyPaths.md):
   Describes the layout of key path objects (instantiated by the runtime,
   and therefore not strictly ABI). \
@@ -232,8 +237,6 @@ documentation, please create a thread on the Swift forums under the
   Provides guidelines for working code in the stdlib.
 - [OptimizationTips.rst](/docs/OptimizationTips.rst):
   Provides guidelines for writing high-performance Swift code.
-
-### Diagnostics
 
 ## Project Information
 
@@ -296,7 +299,10 @@ They are preserved mostly for historical interest.
 - [AccessControl.md](/docs/AccessControl.md)
 - [Arrays.md](/docs/Arrays.md)
   <!-- Has additional notes on bridging that may be of general interest? -->
-- [Generics.rst](/docs/archive/Generics.rst)
+- [Generics.rst](/docs/archive/Generics.rst):
+  Superceded by **Compiling Swift Generics**, see [Long Reads](#long-reads).
+- [GenericSignature.md](/docs/ABI/GenericSignature.md):
+  Superceded by **Compiling Swift Generics**, see [Long Reads](#long-reads).
 - [ErrorHandling.md](/docs/ErrorHandling.md)
 - [StringDesign.rst](/docs/StringDesign.rst)
 - [TextFormatting.rst](/docs/TextFormatting.rst)
