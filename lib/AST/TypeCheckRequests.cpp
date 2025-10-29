@@ -774,18 +774,19 @@ void IsSetterMutatingRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
-// OpaqueReadOwnershipRequest computation.
+// DirectOpaqueReadOwnershipRequest computation.
 //----------------------------------------------------------------------------//
 
 std::optional<OpaqueReadOwnership>
-OpaqueReadOwnershipRequest::getCachedResult() const {
+DirectOpaqueReadOwnershipRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
   if (storage->LazySemanticInfo.OpaqueReadOwnershipComputed)
     return OpaqueReadOwnership(storage->LazySemanticInfo.OpaqueReadOwnership);
   return std::nullopt;
 }
 
-void OpaqueReadOwnershipRequest::cacheResult(OpaqueReadOwnership value) const {
+void DirectOpaqueReadOwnershipRequest::cacheResult(
+    OpaqueReadOwnership value) const {
   auto *storage = std::get<0>(getStorage());
   storage->setOpaqueReadOwnership(value);
 }
