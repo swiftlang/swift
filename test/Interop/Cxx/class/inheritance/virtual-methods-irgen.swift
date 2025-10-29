@@ -23,7 +23,7 @@ d4.f()
 // CHECK: call swiftcc {{.*}} @"$sSo8Derived4V1fs5Int32VyF"
 
 // CHECK: define {{.*}} @"$sSo8Derived4V1fs5Int32VyF"(ptr swiftself dereferenceable
-// CHECK: call {{.*}}  @{{_ZN8Derived423__synthesizedBaseCall_fEv|"\?__synthesizedBaseCall_f@Derived4@@QEAAHXZ"}}
+// CHECK: call {{.*}}  @{{_ZN8Derived434__synthesizedBaseCall_f__ZTS5Base3Ev|"\?__synthesizedBaseCall_ZTS5Base3Ev@@QEAAHXZ"}}
 
 // CHECK: define {{.*}}void @{{_ZN7DerivedIiE3fooEv|"\?foo@\?\$Derived@H@@UEAAXXZ"}}
 // CHECK:   call void @{{_Z21testFunctionCollectedv|"\?testFunctionCollected@@YAXXZ"}}
