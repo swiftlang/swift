@@ -771,6 +771,10 @@ void ConstantAggregateBuilderBase::addSignedPointer(llvm::Constant *pointer,
                    llvm::ConstantInt::get(IGM().Int64Ty, otherDiscriminator));
 }
 
+llvm::ConstantInt *IRGenModule::getMallocTypeId(llvm::Function *fn) {
+  return getDiscriminatorForString(*this, fn->getName());
+}
+
 llvm::ConstantInt* IRGenFunction::getMallocTypeId() {
-  return getDiscriminatorForString(IGM, CurFn->getName());
+  return IGM.getMallocTypeId(CurFn);
 }
