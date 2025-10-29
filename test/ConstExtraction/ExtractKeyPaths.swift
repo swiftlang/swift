@@ -1,8 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: echo "[MyProto]" > %t/protocols.json
 
-// RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/ExtractKeyPaths.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s
+// RUN: %target-swift-frontend -enable-upcoming-feature InferSendableFromCaptures -typecheck -emit-const-values-path %t/ExtractKeyPaths.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s
 // RUN: cat %t/ExtractKeyPaths.swiftconstvalues 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_feature_InferSendableFromCaptures
 
 protocol MyProto {}
 
@@ -59,7 +61,7 @@ public struct KeyPaths: MyProto {
 // CHECK-NEXT:        "isStatic": "true",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractKeyPaths.swift",
-// CHECK-NEXT:       "line": 31,
+// CHECK-NEXT:       "line": 33,
 // CHECK-NEXT:        "valueKind": "KeyPath",
 // CHECK-NEXT:        "value": {
 // CHECK-NEXT:          "path": "foo",
@@ -79,7 +81,7 @@ public struct KeyPaths: MyProto {
 // CHECK-NEXT:        "isStatic": "true",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractKeyPaths.swift",
-// CHECK-NEXT:        "line": 32,
+// CHECK-NEXT:        "line": 34,
 // CHECK-NEXT:        "valueKind": "KeyPath",
 // CHECK-NEXT:        "value": {
 // CHECK-NEXT:          "path": "foo",
@@ -99,7 +101,7 @@ public struct KeyPaths: MyProto {
 // CHECK-NEXT:        "isStatic": "true",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractKeyPaths.swift",
-// CHECK-NEXT:        "line": 33,
+// CHECK-NEXT:        "line": 35,
 // CHECK-NEXT:        "valueKind": "KeyPath",
 // CHECK-NEXT:        "value": {
 // CHECK-NEXT:          "path": "foo",
@@ -119,7 +121,7 @@ public struct KeyPaths: MyProto {
 // CHECK-NEXT:        "isStatic": "true",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractKeyPaths.swift",
-// CHECK-NEXT:        "line": 34,
+// CHECK-NEXT:        "line": 36,
 // CHECK-NEXT:        "valueKind": "KeyPath",
 // CHECK-NEXT:        "value": {
 // CHECK-NEXT:          "path": "bar",
@@ -139,7 +141,7 @@ public struct KeyPaths: MyProto {
 // CHECK-NEXT:        "isStatic": "true",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractKeyPaths.swift",
-// CHECK-NEXT:        "line": 35,
+// CHECK-NEXT:        "line": 37,
 // CHECK-NEXT:        "valueKind": "KeyPath",
 // CHECK-NEXT:        "value": {
 // CHECK-NEXT:          "path": "bar",
@@ -154,12 +156,12 @@ public struct KeyPaths: MyProto {
 // CHECK-NEXT:      },
 // CHECK-NEXT:       {
 // CHECK-NEXT:        "label": "nestedKeyPath",
-// CHECK-NEXT:        "type": "Swift.WritableKeyPath<ExtractKeyPaths.MyType, Swift.String>",
+// CHECK-NEXT:        "type": "any Swift.WritableKeyPath<ExtractKeyPaths.MyType, Swift.String> & Swift.Sendable",
 // CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "true",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractKeyPaths.swift",
-// CHECK-NEXT:        "line": 36,
+// CHECK-NEXT:        "line": 38,
 // CHECK-NEXT:        "valueKind": "KeyPath",
 // CHECK-NEXT:        "value": {
 // CHECK-NEXT:         "path": "nested.foo.bar.baz",
