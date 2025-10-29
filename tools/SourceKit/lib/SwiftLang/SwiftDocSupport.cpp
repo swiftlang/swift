@@ -208,13 +208,9 @@ public:
     initDefaultMapToUse(D);
     // If D is declared in the extension, then the synthesized target is valid.
     TypeOrExtensionDecl SynthesizedTarget;
-    // FIXME: the if-below used to be: assert(D->getDeclContext()->isModuleScopeContext() == EntitiesStack.empty());
-    //        Resolve once https://github.com/swiftlang/swift/issues/85030 is fixed.
-    if (D->getDeclContext()->isModuleScopeContext() == EntitiesStack.empty()) {
-      if (D->getDeclContext() == SynthesizedExtensionInfo.first) {
-        SynthesizedTarget = SynthesizedExtensionInfo.second;
-      }
-    }
+    assert(D->getDeclContext()->isModuleScopeContext() == EntitiesStack.empty());
+    if (D->getDeclContext() == SynthesizedExtensionInfo.first)
+      SynthesizedTarget = SynthesizedExtensionInfo.second;
     EntitiesStack.emplace_back(D, SynthesizedTarget,
                                getDefaultImplementation(D), StartOffset, false);
   }

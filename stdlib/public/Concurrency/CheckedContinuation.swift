@@ -294,7 +294,7 @@ extension CheckedContinuation {
 @_alwaysEmitIntoClient
 @available(SwiftStdlib 5.1, *)
 // ABI Note: We need to use @abi here because the ABI of this function otherwise conflicts with the legacy
-// @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit
+// @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit actor parameter
 @abi(
   nonisolated(nonsending) func withCheckedContinuationNonisolatedNonsending<T>(
     function: String,
@@ -303,7 +303,7 @@ extension CheckedContinuation {
 )
 public nonisolated(nonsending) func withCheckedContinuation<T>(
   function: String = #function,
-_ body: (CheckedContinuation<T, Never>) -> Void
+  _ body: (CheckedContinuation<T, Never>) -> Void
 ) async -> sending T {
   return await Builtin.withUnsafeContinuation {
     let unsafeContinuation = unsafe UnsafeContinuation<T, Never>($0)
@@ -381,14 +381,14 @@ public func _unsafeInheritExecutor_withCheckedContinuation<T>(
 @_alwaysEmitIntoClient
 @available(SwiftStdlib 5.1, *)
 // ABI Note: We need to use @abi here because the ABI of this function otherwise conflicts with the legacy
-// @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit
+// @_unsafeInheritExecutor declaration, as none of them have (or mangle) the implicit actor parameter
 @abi(
   nonisolated(nonsending) func withCheckedThrowingContinuationNonisolatedNonsending<T>(
     function: String,
     _ body: (CheckedContinuation<T, Error>) -> Void
   ) async throws -> sending T
 )
-public nonisolated(nonsending)  func withCheckedThrowingContinuation<T>(
+public nonisolated(nonsending) func withCheckedThrowingContinuation<T>(
   function: String = #function,
   _ body: (CheckedContinuation<T, Error>) -> Void
 ) async throws -> sending T {
