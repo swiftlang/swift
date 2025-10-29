@@ -128,8 +128,9 @@ bool DeclRefExprAnalysis::compute(Expr *expr) {
         return Action::Stop();
       }
 
-      if (isa<CoerceExpr, MemberRefExpr, ImplicitConversionExpr, IdentityExpr>(
-              expr)) {
+      // TODO: is this right?
+      if (isa<CoerceExpr, MemberRefExpr, ImplicitConversionExpr, IdentityExpr,
+              LoadExpr, SubscriptExpr, InOutExpr>(expr)) {
         parentAnalysis.lookThroughExprs.push_back(expr);
         return Action::Continue(expr);
       }
