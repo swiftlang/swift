@@ -110,10 +110,6 @@ static void verifyUSRToDeclReconstruction(const Decl *D) {
   if (!shouldCopyAssociatedUSRForDecl(VD))
     return;
 
-  // FIXME(gh#85030): We don't currently handle `@abi` correctly.
-  if (D->getAttrs().hasAttribute<ABIAttr>())
-    return;
-
   SmallString<128> SwiftUSR;
 
   llvm::raw_svector_ostream OS(SwiftUSR);
