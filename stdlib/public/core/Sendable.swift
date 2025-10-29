@@ -66,10 +66,6 @@
 /// A thread-safe type whose values can be shared across arbitrary concurrent
 /// contexts without introducing a risk of data races.
 ///
-/// Values of the type may have no shared mutable state,
-/// or they may protect that state with a lock
-/// or by forcing it to only be accessed from a specific actor.
-///
 /// You can safely pass values of a sendable type
 /// from one concurrency domain to another ---
 /// for example, you can pass a sendable value as the argument
@@ -83,6 +79,14 @@
 /// - Reference types that internally manage access to their state
 ///
 /// - Functions and closures (by marking them with `@Sendable`)
+///
+/// To make a type sendable, you do one of the following:
+///
+/// - Ensure that values of the type don't have any shared mutable state.
+///
+/// - Protect shared mutable state with a lock
+///
+/// - Isolate shared mutable state to a specific actor
 ///
 /// Although this protocol doesn't have any required methods or properties,
 /// it does have semantic requirements that are enforced at compile time.
