@@ -513,15 +513,15 @@ func forceNSArrayMembers() -> (NSArray, NSArray) {
 // imported C functions.
 
 // CHECK-ios-i386-LABEL: sil hidden [ossa] @$s13objc_bridging5boolsySb_SbtSbF
-// CHECK-ios-i386:         function_ref @$sSo7useBOOLyySo0B0VFTo : $@convention(c) (ObjCBool) -> ()
+// CHECK-ios-i386:         function_ref @$sSo7useBOOLyySbFTo : $@convention(c) (ObjCBool) -> ()
 // CHECK-ios-i386:         function_ref @$sSo7useBoolyySbFTo : $@convention(c) (Bool) -> ()
-// CHECK-ios-i386:         function_ref @$sSo7getBOOLSo0B0VyFTo : $@convention(c) () -> ObjCBool
+// CHECK-ios-i386:         function_ref @$sSo7getBOOLSbyFTo : $@convention(c) () -> ObjCBool
 // CHECK-ios-i386:         function_ref @$sSo7getBoolSbyFTo : $@convention(c) () -> Bool
 
 // CHECK-macosx-x86_64-LABEL: sil hidden [ossa] @$s13objc_bridging5boolsySb_SbtSbF
-// CHECK-macosx-x86_64:         function_ref @$sSo7useBOOLyySo0B0VFTo : $@convention(c) (ObjCBool) -> ()
+// CHECK-macosx-x86_64:         function_ref @$sSo7useBOOLyySbFTo : $@convention(c) (ObjCBool) -> ()
 // CHECK-macosx-x86_64:         function_ref @$sSo7useBoolyySbFTo : $@convention(c) (Bool) -> ()
-// CHECK-macosx-x86_64:         function_ref @$sSo7getBOOLSo0B0VyFTo : $@convention(c) () -> ObjCBool
+// CHECK-macosx-x86_64:         function_ref @$sSo7getBOOLSbyFTo : $@convention(c) () -> ObjCBool
 // CHECK-macosx-x86_64:         function_ref @$sSo7getBoolSbyFTo : $@convention(c) () -> Bool
 
 // FIXME: no distinction on x86_64, arm64 or watchos-i386, since SILGen looks

@@ -1,6 +1,6 @@
 // RUN: %target-swiftxx-frontend -I %S/Inputs -Xllvm -sil-print-types -emit-silgen %s | %FileCheck --dump-input-filter=all %s
 
-// REQUIRES: OS=macosx || OS=linux-android
+// REQUIRES: OS=macosx || OS=linux-android || OS=windows-msvc
 
 import TypeClassification
 

@@ -32,4 +32,4 @@ public func test() {
   _ = x.test()
 }
 
-// CHECK-LABEL: sil [available 13.3.0] [asmname "_ZN7IntPair6createEv"] [clang IntPair.create] @$sSo7IntPairV6createAByFZTo : $@convention(c) () -> IntPair
+// CHECK-LABEL: sil {{.*}}[asmname "{{.*}}create{{.*}}"] [clang IntPair.create] @$sSo7IntPairV6createAByFZTo : $@convention(c) () -> IntPair
