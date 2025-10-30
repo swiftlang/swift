@@ -778,7 +778,9 @@ llvm::ConstantInt *IRGenModule::getMallocTypeId(llvm::Function *fn) {
     // materialized value.
     return llvm::ConstantInt::get(Int64Ty, 0);
   }
-  return getDiscriminatorForString(*this, fn->getName());
+  uint64_t hash = llvm::getStableSipHash(fn->getName());
+  uint32_t hash32 = (hash % std::numeric_limits<uint32_t>::max()) + 1;
+  return llvm::ConstantInt::get(Int64Ty, hash32);
 }
 
 llvm::ConstantInt* IRGenFunction::getMallocTypeId() {
