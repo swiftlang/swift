@@ -136,6 +136,11 @@ SILType SILType::getBuiltinImplicitActorType(const ASTContext &ctx) {
   return getPrimitiveObjectType(ctx.TheImplicitActorType->getCanonicalType());
 }
 
+SILType SILType::getUnsafeRawPointer(const ASTContext &ctx) {
+  return getPrimitiveObjectType(
+      ctx.getUnsafeRawPointerType()->getCanonicalType());
+}
+
 bool SILType::isTrivial(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
   
