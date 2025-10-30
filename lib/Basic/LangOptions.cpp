@@ -42,6 +42,8 @@ LangOptions::LangOptions() {
 #define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"
 
+  enableFeature(Feature::ExcludePrivateFromMemberwiseInit);
+
   // Special case: remove macro support if the compiler wasn't built with a
   // host Swift.
 #if !SWIFT_BUILD_SWIFT_SYNTAX

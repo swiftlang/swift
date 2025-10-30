@@ -1485,7 +1485,7 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
   auto &ctx = decl->getASTContext();
   if (initKind == MemberwiseInitKind::Compatibility) {
     // Only generate the default initializer if the feature is disabled.
-    if (!ctx.LangOpts.hasFeature(Feature::ExcludePrivateFromMemberwiseInit))
+    if (true || !ctx.LangOpts.hasFeature(Feature::ExcludePrivateFromMemberwiseInit))
       return false;
 
     // In the next language mode we should stop creating the compatibility
