@@ -744,15 +744,51 @@ possible that it will find multiple solutions to the constraint system
 as given. Such cases are not necessarily ambiguities, because the
 solver can then compare the solutions to determine whether one of
 the solutions is better than all of the others. To do so, it computes
-a "score" for each solution based on a number of factors:
+a "score" for each solution. The score is an integer vector with the
+following components:
 
-- How many user-defined conversions were applied.
-- How many non-trivial function conversions were applied.
-- How many literals were given "non-default" types.
+- Number of fixes applied. Fixes generally only appear in "salvage mode"
+  when emitting diagnostics.
+- Number of holes introduced. This is another diagnostic phenomenon.
+- Number of unavailable declarations referenced.
+- Number of declarations referenced from modules that were not imported.
+- Number of async declarations referenced from a sync context.
+- Number of sync declarations referenced from an async context.
+- Number of times "forward" scan for a trailing closure was performed.
+- Number of `@_disfavoredOverload` declarations referenced.
+- Number of members found via leading-dot syntax with unwrapped optional base.
+- Number of implicitly unwrapped optionals.
+- Number of implicit value conversions. Some but not all non-trivial subtype relations
+  fall into this category.
+- Number of implicit conversions. Some but not all non-trivial subtype relations
+  fall into this category.
+- Number of function conversions performed.
+- Number of literals with non-default types.
+- Number of collection conversions. (`Array<X>` to `Array<Y>`, etc. See below.)
+- Number of value-to-optional conversions (`X` to `Optional<X>`, etc. See below.)
+- Number of conversions to `Any`.
+- Number of keypath subscript applications (`foo[keyPath: \.bar`).
+- Number of pointer conversions where the destination is a function parameter
+  with type parameter type.
+- Number of function to autoclosure conversions (usually, an argument of type `X`
+  is "injected" into the `@autoclosure () -> X` parameter, which does not increase
+  the score).
+- Number of missing conformances that we might only warn about later. (For example,
+  missing `Sendable` conformance in Swift 5 language mode. Such a solution is valid,
+  but has a higher score.)
+- Number of unapplied function references. (For example, if you have a `var count`
+  and a `func count(...)` member on a type, `foo.count` will prefer the former,
+  because the latter solution has a higher score.)
 
-Solutions with smaller scores are considered better solutions. When
-two solutions have the same score, the type variables and overload
-choices of the two systems are compared to produce a relative score:
+Most fields in the score are expected to be zero at any given time. Two scores
+are compared by comparing their elements lexicographically from left to right.
+A smaller score is "better" than a larger score.
+
+### Solution Ranking
+
+When two solutions have the same score, a further ranking step considers all
+type variables and overload choices. This computes an integer for each
+solution, called the "solution rank":
 
 - If the two solutions have selected different type variable bindings
   for a type variable where a "more specific" type variable is a
@@ -765,8 +801,7 @@ choices of the two systems are compared to produce a relative score:
   the overload picked in the other solution, then first solution earns
   +1.
 
-The solution with the greater relative score is considered to be
-better than the other solution.
+The highest-ranked solution is considered to be better than the other solution.
 
 ### Solution Application
 
