@@ -185,6 +185,22 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return EnumCases(enumType: self, function: function)
   }
 
+  public func getEnumCase(in function: Function, at index: Int) -> EnumCase? {
+    guard let enumCases = getEnumCases(in: function) else {
+      return nil
+    }
+
+    var enumCaseIndex = 0
+    for enumCase in enumCases {
+      if index == enumCaseIndex {
+        return enumCase
+      }
+      enumCaseIndex += 1
+    }
+
+    return nil
+  }
+
   public func getIndexOfEnumCase(withName name: String) -> Int? {
     let idx = name._withBridgedStringRef {
       bridged.getCaseIdxOfEnumType($0)
@@ -213,6 +229,10 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
       return cases.contains { $0.payload?.aggregateIsOrContains(otherType, in: function) ?? false }
     }
     return false
+  }
+
+  public func mapTypeOutOfContext(in function: Function) -> Type {
+    rawType.mapTypeOutOfContext().canonical.loweredType(in: function)
   }
 }
 
@@ -266,6 +286,7 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
 }
 
 public struct EnumCase {
+  public let enumElementDecl : EnumElementDecl
   public let payload: Type?
   public let index: Int
 }
@@ -288,7 +309,8 @@ public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
         caseIterator = caseIterator.getNext()
         caseIndex += 1
       }
-      return EnumCase(payload: enumType.bridged.getEnumCasePayload(caseIterator, function.bridged).typeOrNil,
+      return EnumCase(enumElementDecl: enumType.bridged.getEnumElementDecl(caseIterator).getAs(EnumElementDecl.self),
+                      payload: enumType.bridged.getEnumCasePayload(caseIterator, function.bridged).typeOrNil,
                       index: caseIndex)
     }
     return nil
@@ -303,6 +325,10 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
 
   public subscript(_ index: Int) -> Type {
     type.bridged.getTupleElementType(index).type
+  }
+
+  public func label(at index: Int) -> Identifier {
+    type.bridged.getTupleElementLabel(index)
   }
 }
 

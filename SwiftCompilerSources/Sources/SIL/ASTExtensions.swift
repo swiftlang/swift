@@ -36,6 +36,10 @@ extension CanonicalType {
     precondition(isBox)
     return BoxFieldsArray(boxType: self, function: function)
   }
+
+  public func loweredType(in function: Function) -> Type {
+    function.bridged.getLoweredType(bridged).type
+  }
 }
 
 extension Decl {
