@@ -339,6 +339,9 @@ extension GUID: @retroactive Equatable {
   @_transparent
   @_implements(Equatable, ==(_:_:))
   public static func __equals(lhs: Self, rhs: Self) -> Bool {
+  // When C++ interop is enabled, Swift imports a == operator from guiddef.h
+  // that conflicts with the definition of == here, so we've renamed it to
+  // __equals to avoid the conflict.
     lhs.uint128Value == rhs.uint128Value
   }
 }
