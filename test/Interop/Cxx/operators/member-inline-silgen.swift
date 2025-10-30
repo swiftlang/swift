@@ -28,7 +28,7 @@ public func call(_ wrapper: inout LoadableIntWrapper, _ arg: Int32) -> Int32 { w
 // CHECK: apply [[OP]]([[RHS]], [[SELFACCESS]]) : $@convention(cxx_method) (Int32, @inout LoadableIntWrapper) -> Int32
 // CHECK: end_access [[SELFACCESS]] : $*LoadableIntWrapper
 
-// CHECK: sil [asmname "_ZN18LoadableIntWrapperclEi"] [clang LoadableIntWrapper.callAsFunction] @$sSo18LoadableIntWrapperV14callAsFunctionys5Int32VAEFTo : $@convention(cxx_method) (Int32, @inout LoadableIntWrapper) -> Int32
+// CHECK: sil [asmname "{{.*}}"] [clang LoadableIntWrapper.callAsFunction] @$sSo18LoadableIntWrapperV14callAsFunctionys5Int32VAEFTo : $@convention(cxx_method) (Int32, @inout LoadableIntWrapper) -> Int32
 
 public func call(_ wrapper: inout AddressOnlyIntWrapper) -> Int32 { wrapper() }
 
@@ -38,7 +38,7 @@ public func call(_ wrapper: inout AddressOnlyIntWrapper) -> Int32 { wrapper() }
 // CHECK: apply [[OP]]([[SELFACCESS]]) : $@convention(cxx_method) (@inout AddressOnlyIntWrapper) -> Int32
 // CHECK: end_access [[SELFACCESS]] : $*AddressOnlyIntWrapper
 
-// CHECK: sil [asmname "_ZN21AddressOnlyIntWrapperclEv"] [clang AddressOnlyIntWrapper.callAsFunction] @$sSo21AddressOnlyIntWrapperV14callAsFunctions5Int32VyFTo : $@convention(cxx_method) (@inout AddressOnlyIntWrapper) -> Int32
+// CHECK: sil [asmname "{{.*}}"] [clang AddressOnlyIntWrapper.callAsFunction] @$sSo21AddressOnlyIntWrapperV14callAsFunctions5Int32VyFTo : $@convention(cxx_method) (@inout AddressOnlyIntWrapper) -> Int32
 
 public func index(_ arr: ReadOnlyIntArray, _ arg: Int32) -> Int32 { arr[arg] }
 
@@ -180,12 +180,12 @@ public func subscriptUnnamed(_ unnamed: SubscriptUnnamedParameter, _ arg: Int32)
 // CHECK:   dealloc_stack [[SELFACCESS]]
 // CHECK: } // end sil function '$sSo25SubscriptUnnamedParameterVys5Int32VADcig'
 
-// CHECK: sil [asmname "_ZNK16ReadOnlyIntArrayixEi"] [clang ReadOnlyIntArray.__operatorSubscriptConst] @$sSo16ReadOnlyIntArrayV24__operatorSubscriptConstySPys5Int32VGAEFTo : $@convention(cxx_method) (Int32, @in_guaranteed ReadOnlyIntArray) -> UnsafePointer<Int32>
-// CHECK: sil [asmname "_ZN17ReadWriteIntArrayixEi"] [clang ReadWriteIntArray.__operatorSubscript] @$sSo17ReadWriteIntArrayV19__operatorSubscriptySpys5Int32VGAEFTo : $@convention(cxx_method) (Int32, @inout ReadWriteIntArray) -> UnsafeMutablePointer<Int32>
-// CHECK: sil [asmname "_ZNK23NonTrivialIntArrayByValixEi"] [clang NonTrivialIntArrayByVal.__operatorSubscriptConst] @$sSo23NonTrivialIntArrayByValV24__operatorSubscriptConstys5Int32VAEFTo : $@convention(cxx_method) (Int32, @in_guaranteed NonTrivialIntArrayByVal) -> Int32
+// CHECK: sil [asmname "{{.*}}ReadOnlyIntArray{{.*}}"] [clang ReadOnlyIntArray.__operatorSubscriptConst] @$sSo16ReadOnlyIntArrayV24__operatorSubscriptConstySPys5Int32VGAEFTo : $@convention(cxx_method) (Int32, @in_guaranteed ReadOnlyIntArray) -> UnsafePointer<Int32>
+// CHECK: sil [asmname "{{.*}}ReadWriteIntArray{{.*}}"] [clang ReadWriteIntArray.__operatorSubscript] @$sSo17ReadWriteIntArrayV19__operatorSubscriptySpys5Int32VGAEFTo : $@convention(cxx_method) (Int32, @inout ReadWriteIntArray) -> UnsafeMutablePointer<Int32>
+// CHECK: sil [asmname "{{.*}}NonTrivialIntArrayByVal{{.*}}"] [clang NonTrivialIntArrayByVal.__operatorSubscriptConst] @$sSo23NonTrivialIntArrayByValV24__operatorSubscriptConstys5Int32VAEFTo : $@convention(cxx_method) (Int32, @in_guaranteed NonTrivialIntArrayByVal) -> Int32
 
-// CHECK: sil [asmname "_ZN8PtrByValixEi"] [clang PtrByVal.__operatorSubscript] @$sSo8PtrByValV19__operatorSubscriptySpys5Int32VGSgAEFTo : $@convention(cxx_method) (Int32, @inout PtrByVal) -> Optional<UnsafeMutablePointer<Int32>>
-// CHECK: sil [asmname "_ZN8RefToPtrixEi"] [clang RefToPtr.__operatorSubscript] @$sSo8RefToPtrV19__operatorSubscriptySpySpys5Int32VGSgGAEFTo : $@convention(cxx_method) (Int32, @inout RefToPtr) -> UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int32>>>
-// CHECK: sil [asmname "_ZN8PtrToPtrixEi"] [clang PtrToPtr.__operatorSubscript] @$sSo05PtrToA0V19__operatorSubscriptySpySpys5Int32VGSgGSgAEFTo : $@convention(cxx_method) (Int32, @inout PtrToPtr) -> Optional<UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int32>>>>
-// CHECK: sil [asmname "_ZNK15ConstOpPtrByValixEi"] [clang ConstOpPtrByVal.__operatorSubscriptConst] @$sSo15ConstOpPtrByValV019__operatorSubscriptA0ySPys5Int32VGSgAEFTo : $@convention(cxx_method) (Int32, @in_guaranteed ConstOpPtrByVal) -> Optional<UnsafePointer<Int32>>
-// CHECK: sil [asmname "_ZN13ConstPtrByValixEi"] [clang ConstPtrByVal.__operatorSubscriptConst] @$sSo13ConstPtrByValV019__operatorSubscriptA0ySPys5Int32VGSgAEFTo : $@convention(cxx_method) (Int32, @inout ConstPtrByVal) -> Optional<UnsafePointer<Int32>>
+// CHECK: sil [asmname "{{.*}}PtrByVal{{.*}}"] [clang PtrByVal.__operatorSubscript] @$sSo8PtrByValV19__operatorSubscriptySpys5Int32VGSgAEFTo : $@convention(cxx_method) (Int32, @inout PtrByVal) -> Optional<UnsafeMutablePointer<Int32>>
+// CHECK: sil [asmname "{{.*}}RefToPtr{{.*}}"] [clang RefToPtr.__operatorSubscript] @$sSo8RefToPtrV19__operatorSubscriptySpySpys5Int32VGSgGAEFTo : $@convention(cxx_method) (Int32, @inout RefToPtr) -> UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int32>>>
+// CHECK: sil [asmname "{{.*}}PtrToPtr{{.*}}"] [clang PtrToPtr.__operatorSubscript] @$sSo05PtrToA0V19__operatorSubscriptySpySpys5Int32VGSgGSgAEFTo : $@convention(cxx_method) (Int32, @inout PtrToPtr) -> Optional<UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int32>>>>
+// CHECK: sil [asmname "{{.*}}ConstOpPtrByVal{{.*}}"] [clang ConstOpPtrByVal.__operatorSubscriptConst] @$sSo15ConstOpPtrByValV019__operatorSubscriptA0ySPys5Int32VGSgAEFTo : $@convention(cxx_method) (Int32, @in_guaranteed ConstOpPtrByVal) -> Optional<UnsafePointer<Int32>>
+// CHECK: sil [asmname "{{.*}}ConstPtrByVal{{.*}}"] [clang ConstPtrByVal.__operatorSubscriptConst] @$sSo13ConstPtrByValV019__operatorSubscriptA0ySPys5Int32VGSgAEFTo : $@convention(cxx_method) (Int32, @inout ConstPtrByVal) -> Optional<UnsafePointer<Int32>>

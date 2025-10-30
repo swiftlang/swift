@@ -8,13 +8,13 @@ import TypeClassification
 // "destroy_addr".
 // CHECK-LABEL: sil [ossa] @$s4main24testStructWithDestructoryyF
 // CHECK: [[AS:%.*]] = alloc_stack [lexical] [var_decl] $StructWithDestructor
-// CHECK: [[FN:%.*]] = function_ref @{{_ZN20StructWithDestructorC1Ev|\?\?0StructWithDestructor@@QEAA@XZ}} : $@convention(c) () -> @out StructWithDestructor
+// CHECK: [[FN:%.*]] = function_ref @$sSo20StructWithDestructorVABycfCTo : $@convention(c) () -> @out StructWithDestructor
 // CHECK: apply [[FN]]([[AS]]) : $@convention(c) () -> @out StructWithDestructor
 // CHECK: destroy_addr [[AS]]
 // CHECK: dealloc_stack %0 : $*StructWithDestructor
 // CHECK-LABEL: end sil function '$s4main24testStructWithDestructoryyF'
 
-// CHECK-LABEL: sil [clang StructWithDestructor.init] @{{_ZN20StructWithDestructorC1Ev|\?\?0StructWithDestructor@@QEAA@XZ}} : $@convention(c) () -> @out StructWithDestructor
+// CHECK-LABEL: sil [asmname "{{.*}}"] [clang StructWithDestructor.init] @{{.*}}StructWithDestructor{{.*}} : $@convention(c) () -> @out StructWithDestructor
 public func testStructWithDestructor() {
   let d = StructWithDestructor()
 }

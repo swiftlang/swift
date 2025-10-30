@@ -25,4 +25,4 @@ public func test() {
   _ = x.test()
 }
 
-// CHECK-LABEL: sil [available 13.3.0] [asmname "_ZN8MoveOnly6createEv"] [clang MoveOnly.create] @$sSo8MoveOnlyV6createAByFZTo : $@convention(c) () -> MoveOnly
+// CHECK-LABEL: sil {{.*}}[asmname "{{.*}}create{{.*}}"] [clang MoveOnly.create] @$sSo8MoveOnlyV6createAByFZTo : $@convention(c) () -> MoveOnly

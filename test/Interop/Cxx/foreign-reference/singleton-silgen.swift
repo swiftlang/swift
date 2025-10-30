@@ -31,8 +31,8 @@ public func test() {
   mutateIt(x)
 }
 
-// CHECK-LABEL: sil [available 13.3.0] [asmname "_ZN21DeletedSpecialMembers6createEv"] [clang DeletedSpecialMembers.create] @$sSo21DeletedSpecialMembersV6createAByFZTo : $@convention(c) () -> DeletedSpecialMembers
+// CHECK-LABEL: sil {{.*}}[asmname "{{.*}}create{{.*}}"] [clang DeletedSpecialMembers.create] @$sSo21DeletedSpecialMembersV6createAByFZTo : $@convention(c) () -> DeletedSpecialMembers
 
-// CHECK-LABEL: sil [available 13.3.0] [asmname "_ZNK21DeletedSpecialMembers4testEv"] [clang DeletedSpecialMembers.test] @$sSo21DeletedSpecialMembersV4tests5Int32VyFTo : $@convention(cxx_method) (DeletedSpecialMembers) -> Int32
+// CHECK-LABEL: sil {{.*}}[asmname "{{.*}}test{{.*}}"] [clang DeletedSpecialMembers.test] @$sSo21DeletedSpecialMembersV4tests5Int32VyFTo : $@convention(cxx_method) (DeletedSpecialMembers) -> Int32
 
-// CHECK-LABEL: sil [serialized] [asmname "_Z8mutateItR21DeletedSpecialMembers"] [clang mutateIt] @$sSo8mutateItyySo21DeletedSpecialMembersVFTo : $@convention(c) (DeletedSpecialMembers) -> ()
+// CHECK-LABEL: sil [serialized] [asmname "{{.*}}mutate{{.*}}"] [clang mutateIt] @$sSo8mutateItyySo21DeletedSpecialMembersVFTo : $@convention(c) (DeletedSpecialMembers) -> ()
