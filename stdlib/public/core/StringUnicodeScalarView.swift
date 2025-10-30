@@ -535,6 +535,6 @@ extension String.UnicodeScalarView {
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.3, *)
   public func isTriviallyIdentical(to other: Self) -> Bool {
-    self._guts.rawBits == other._guts.rawBits
+    self._guts.isTriviallyIdentical(to: other._guts)
   }
 }
