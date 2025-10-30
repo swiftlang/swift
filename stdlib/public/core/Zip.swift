@@ -154,6 +154,12 @@ extension Zip2Sequence: Sequence {
   }
 }
 
+extension Zip2Sequence: BitwiseCopyable where Sequence1: BitwiseCopyable,
+                                              Sequence2: BitwiseCopyable { }
+extension Zip2Sequence.Iterator: BitwiseCopyable
+  where Sequence1.Iterator: BitwiseCopyable,
+        Sequence2.Iterator: BitwiseCopyable { }
+
 extension Zip2Sequence: Sendable where Sequence1: Sendable,
                                        Sequence2: Sendable { }
 extension Zip2Sequence.Iterator: Sendable where Sequence1.Iterator: Sendable,
