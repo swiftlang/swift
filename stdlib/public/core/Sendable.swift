@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type whose metatype can be shared across arbitrary concurrent contexts
+/// A type whose metatype can be shared across arbitrary isolation domains
 /// without introducing a risk of data races.
 ///
 /// When a generic type `T` conforms
@@ -63,8 +63,8 @@
 /// `T: SendableMetatype`.
 @_marker public protocol SendableMetatype: ~Copyable, ~Escapable { }
 
-/// A thread-safe type whose values can be shared across arbitrary concurrent
-/// contexts without introducing a risk of data races.
+/// A thread-safe type whose values can be shared across arbitrary isolation
+/// domains without introducing a risk of data races.
 ///
 /// You can safely pass values of a sendable type
 /// from one concurrency domain to another ---
