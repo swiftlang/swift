@@ -5492,9 +5492,14 @@ ManagedValue SILGenFunction::applyBorrowMutateAccessor(
 
   if (rawResult->getType().isMoveOnly()) {
     if (rawResult->getType().isAddress()) {
+      SILFunctionConventions substFnConv(substFnType, SGM.M);
       auto result = B.createMarkUnresolvedNonCopyableValueInst(
           loc, rawResult,
-          MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+          substFnConv.hasInoutResult()
+              ? MarkUnresolvedNonCopyableValueInst::CheckKind::
+                    AssignableButNotConsumable
+              : MarkUnresolvedNonCopyableValueInst::CheckKind::
+                    NoConsumeOrAssign);
       return ManagedValue::forRValueWithoutOwnership(result);
     }
     auto result = emitManagedCopy(loc, rawResult);

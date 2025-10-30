@@ -352,6 +352,14 @@ public:
     return resultConvention == ResultConvention::GuaranteedAddress;
   }
 
+  bool hasInoutResult() const {
+    if (funcTy->getNumResults() != 1) {
+      return false;
+    }
+    auto resultConvention = funcTy->getResults()[0].getConvention();
+    return resultConvention == ResultConvention::Inout;
+  }
+
   struct SILResultTypeFunc;
 
   // Gratuitous template parameter is to delay instantiating `mapped_iterator`
