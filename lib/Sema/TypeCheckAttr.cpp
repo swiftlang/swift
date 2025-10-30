@@ -7989,6 +7989,14 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
     }
   }
 
+  // `nonisolated` on an actor declaration is contradictory.
+  if (auto *classDecl = dyn_cast<ClassDecl>(D);
+      classDecl && classDecl->isExplicitActor()) {
+    diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr)
+        .fixItRemove(attr->getRange());
+    return;
+  }
+
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     //'nonisolated(unsafe)' is meaningless for computed properties, functions etc.
     auto var = dyn_cast<VarDecl>(VD);
