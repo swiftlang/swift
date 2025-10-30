@@ -3014,6 +3014,10 @@ void BridgedContext::copyInstructionBefore(BridgedInstruction inst, BridgedInstr
   inst.unbridged()->clone(beforeInst.unbridged());
 }
 
+void BridgedContext::salvageDebugInfo(BridgedInstruction inst) {
+  swift::salvageDebugInfo(inst.unbridged());
+}
+
 OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef name) const {
   return {context->lookupStdlibFunction(name.unbridged())};
 }

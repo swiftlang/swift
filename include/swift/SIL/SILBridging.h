@@ -81,6 +81,12 @@ class NodeSet;
 class OperandSet;
 class FixedSizeSlabPayload;
 class FixedSizeSlab;
+// Including DebugOptUtils.h causes a call to eraseFromParentWithDebugInsts to
+// become ambiguous, due to the near-identical function defined in
+// DebugUtils.h.
+//
+// We currently only need this declaration from DebugOptUtils.h.
+void salvageDebugInfo(SILInstruction * _Nonnull I);
 }
 
 struct BridgedLoop {
@@ -1499,6 +1505,7 @@ struct BridgedContext {
   BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
   static BRIDGED_INLINE void moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
   static BRIDGED_INLINE void copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
+  static BRIDGED_INLINE void salvageDebugInfo(BridgedInstruction inst);
 
     // SSAUpdater
 

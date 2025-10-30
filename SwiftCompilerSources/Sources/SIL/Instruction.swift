@@ -102,6 +102,11 @@ public class Instruction : CustomStringConvertible, Hashable {
     context.notifyInstructionsChanged()
   }
 
+  public final func salvageDebugInfo(_ context: some MutatingContext) {
+    BridgedContext.salvageDebugInfo(self.bridged)
+    context.notifyInstructionsChanged()
+  }
+
   public var mayTrap: Bool { false }
 
   final public var mayHaveSideEffects: Bool {
