@@ -86,7 +86,8 @@ UnexpectedClangTypeError::checkClangType(SILFunctionTypeRepresentation silRep,
     if (isBlock && !type->isBlockPointerType())
       return {{Kind::NotBlockPointer, type}};
     if (!isBlock && !(type->isFunctionPointerType()
-                      || type->isFunctionReferenceType()))
+                      || type->isFunctionReferenceType()
+                      || type->isFunctionType()))
       return {{Kind::NotFunctionPointerOrReference, type}};
     return std::nullopt;
   }
@@ -121,8 +122,8 @@ void UnexpectedClangTypeError::dump() {
     return;
   }
   case Kind::NotFunctionPointerOrReference: {
-    e << ("Expected function pointer/reference type for @convention(c) function"
-          " but found:\n");
+    e << ("Expected function or function pointer/reference type for "
+          "@convention(c) function but found:\n");
     type->dump();
     return;
   }
