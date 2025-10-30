@@ -1072,6 +1072,8 @@ extension LifetimeDependenceDefUseWalker {
         return loadedAddressUse(of: localAccess.operand!, intoValue: load)
       case let copyAddr as SourceDestAddrInstruction:
         return loadedAddressUse(of: localAccess.operand!, intoAddress: copyAddr.destinationOperand)
+      case let castAddr as CheckedCastAddrBranchInst:
+        return loadedAddressUse(of: localAccess.operand!, intoAddress: castAddr.destinationOperand)
       case is SwitchEnumAddrInst:
         // switch_enum_addr does not produce any values. Subsequent uses of the address (unchecked_enum_data_addr)
         // directly use the original address.

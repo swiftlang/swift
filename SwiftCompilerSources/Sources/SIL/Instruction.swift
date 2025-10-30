@@ -2027,8 +2027,11 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
 }
 
 final public class CheckedCastAddrBranchInst : TermInst {
-  public var source: Value { operands[0].value }
-  public var destination: Value { operands[1].value }
+  public var sourceOperand: Operand { return operands[0] }
+  public var destinationOperand: Operand { return operands[1] }
+
+  public var source: Value { sourceOperand.value }
+  public var destination: Value { destinationOperand.value }
 
   public var sourceFormalType: CanonicalType {
     CanonicalType(bridged: bridged.CheckedCastAddrBranch_getSourceFormalType())
