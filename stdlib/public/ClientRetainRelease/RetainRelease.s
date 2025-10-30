@@ -36,6 +36,11 @@
 // offset so that it's still correct when the weak reference resolves to zero.
 .weak_reference __swift_retainRelease_slowpath_mask_v1
 
+// preservemost retain/release entrypoints in the runtime
+.weak_reference _swift_retain_preservemost
+.weak_reference _swift_release_preservemost
+
+
 // Grab our own copy of the slowpath mask. This mask is a value which indicates
 // when we must call into the runtime slowpath. If the object's refcount field
 // has any bits set that are in the mask, then we must take the slow path. The
@@ -87,57 +92,13 @@ ret
 // limits, in addition to the usual x19 and up. Any calls to functions that use
 // the standard calling convention need to save/restore x9-x15.
 
-.globl _swift_retain_preservemost
-.weak_definition _swift_retain_preservemost
-_swift_retain_preservemost:
-  maybe_pacibsp
-  stp   x0, x9, [sp, #-0x50]!
-  stp   x10, x11, [sp, #0x10]
-  stp   x12, x13, [sp, #0x20]
-  stp   x14, x15, [sp, #0x30]
-  stp   fp, lr, [sp, #0x40];
-  add   fp, sp, #0x40
-
-  // Clear the unused bits from the pointer
-  and   x0, x0, #BRIDGEOBJECT_POINTER_BITS
-  bl    _swift_retain
-
-  ldp   fp, lr, [sp, #0x40]
-  ldp   x14, x15, [sp, #0x30]
-  ldp   x12, x13, [sp, #0x20]
-  ldp   x10, x11, [sp, #0x10]
-  ldp   x0, x9, [sp], #0x50
-  ret_maybe_ab
-
-.globl _swift_release_preservemost
-.weak_definition _swift_release_preservemost
-_swift_release_preservemost:
-  maybe_pacibsp
-  str   x9, [sp, #-0x50]!
-  stp   x10, x11, [sp, #0x10]
-  stp   x12, x13, [sp, #0x20]
-  stp   x14, x15, [sp, #0x30]
-  stp   fp, lr, [sp, #0x40];
-  add   fp, sp, #0x40
-
-  // Clear the unused bits from the pointer
-  and   x0, x0, #BRIDGEOBJECT_POINTER_BITS
-  bl    _swift_release
-
-  ldp   fp, lr, [sp, #0x40]
-  ldp   x14, x15, [sp, #0x30]
-  ldp   x12, x13, [sp, #0x20]
-  ldp   x10, x11, [sp, #0x10]
-  ldr   x9, [sp], #0x50
-  ret_maybe_ab
-
 .private_extern _swift_bridgeObjectReleaseClient
 #if SWIFT_OBJC_INTEROP
 _swift_bridgeObjectReleaseClient:
   tbz  x0, #63, LbridgeObjectReleaseNotTagged
   ret
 LbridgeObjectReleaseNotTagged:
-  tbnz  x0, #62, _bridgeObjectReleaseClientObjC
+  tbnz  x0, #62, LbridgeObjectReleaseClientObjC
   and   x0, x0, 0x0ffffffffffffff8
 
 #else
@@ -221,10 +182,35 @@ Lrelease_ret:
 Lslowpath_release:
   CONDITIONAL USE_LDX_STX, \
     clrex
+// If the weak preservemost symbol is NULL, call our helper. Otherwise call the
+// runtime directly.
+  adrp x17, _swift_release_preservemost@GOTPAGE
+  ldr  x17, [x17, _swift_release_preservemost@GOTPAGEOFF]
+  cbz x17, Lcall_swift_release
   b _swift_release_preservemost
 
-.alt_entry _bridgeObjectReleaseClientObjC
-_bridgeObjectReleaseClientObjC:
+// Save/restore the preservemost registers and call swift_retain.
+Lcall_swift_release:
+  maybe_pacibsp
+  str   x9, [sp, #-0x50]!
+  stp   x10, x11, [sp, #0x10]
+  stp   x12, x13, [sp, #0x20]
+  stp   x14, x15, [sp, #0x30]
+  stp   fp, lr, [sp, #0x40];
+  add   fp, sp, #0x40
+
+  // Clear the unused bits from the pointer
+  and   x0, x0, #BRIDGEOBJECT_POINTER_BITS
+  bl    _swift_release
+
+  ldp   fp, lr, [sp, #0x40]
+  ldp   x14, x15, [sp, #0x30]
+  ldp   x12, x13, [sp, #0x20]
+  ldp   x10, x11, [sp, #0x10]
+  ldr   x9, [sp], #0x50
+  ret_maybe_ab
+
+LbridgeObjectReleaseClientObjC:
   maybe_pacibsp
   stp   x0, x9, [sp, #-0x50]!
   stp   x10, x11, [sp, #0x10]
@@ -252,7 +238,7 @@ _swift_bridgeObjectRetainClient:
   tbz  x0, #63, LbridgeObjectRetainNotTagged
   ret
 LbridgeObjectRetainNotTagged:
-  tbnz  x0, #62, _swift_bridgeObjectRetainClientObjC
+  tbnz  x0, #62, Lswift_bridgeObjectRetainClientObjC
 
 .alt_entry _swift_retainClient
 #else
@@ -334,10 +320,35 @@ Lretain_ret:
 Lslowpath_retain:
   CONDITIONAL USE_LDX_STX, \
     clrex
+// If the weak preservemost symbol is NULL, call our helper. Otherwise call the
+// runtime directly.
+  adrp x17, _swift_retain_preservemost@GOTPAGE
+  ldr  x17, [x17, _swift_retain_preservemost@GOTPAGEOFF]
+  cbz x17, Lcall_swift_retain
   b _swift_retain_preservemost
 
-.alt_entry _swift_bridgeObjectRetainClientObjC
-_swift_bridgeObjectRetainClientObjC:
+// Save/restore the preservemost registers and call swift_retain.
+Lcall_swift_retain:
+  maybe_pacibsp
+  stp   x0, x9, [sp, #-0x50]!
+  stp   x10, x11, [sp, #0x10]
+  stp   x12, x13, [sp, #0x20]
+  stp   x14, x15, [sp, #0x30]
+  stp   fp, lr, [sp, #0x40];
+  add   fp, sp, #0x40
+
+  // Clear the unused bits from the pointer
+  and   x0, x0, #BRIDGEOBJECT_POINTER_BITS
+  bl    _swift_retain
+
+  ldp   fp, lr, [sp, #0x40]
+  ldp   x14, x15, [sp, #0x30]
+  ldp   x12, x13, [sp, #0x20]
+  ldp   x10, x11, [sp, #0x10]
+  ldp   x0, x9, [sp], #0x50
+  ret_maybe_ab
+
+Lswift_bridgeObjectRetainClientObjC:
   maybe_pacibsp
   stp   x0, x9, [sp, #-0x50]!
   stp   x10, x11, [sp, #0x10]

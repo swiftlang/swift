@@ -1147,5 +1147,4 @@ Added: __swift_debug_metadataAllocatorPageSize
 // New symbols to support emit-into-client retain/release.
 Added: __swift_retainRelease_slowpath_mask_v1
 Added: _swift_release_preservemost
-Added: _swift_release_preservemost_weak_placeholder
 Added: _swift_retain_preservemost
