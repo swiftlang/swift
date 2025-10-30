@@ -8315,16 +8315,39 @@ bool importer::isViewType(const clang::CXXRecordDecl *decl) {
   return !hasOwnedValueAttr(decl) && hasPointerInSubobjects(decl);
 }
 
-static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
-  if (decl->hasSimpleCopyConstructor())
-    return true;
+const clang::CXXConstructorDecl *
+importer::findCopyConstructor(const clang::CXXRecordDecl *decl) {
+  for (auto ctor : decl->ctors()) {
+    if (ctor->isCopyConstructor() &&
+        // FIXME: Support default arguments (rdar://142414553)
+        ctor->getNumParams() == 1 && ctor->getAccess() == clang::AS_public &&
+        !ctor->isDeleted() && !ctor->isIneligibleOrNotSelected())
+      return ctor;
+  }
+  return nullptr;
+}
 
-  return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-    return ctor->isCopyConstructor() && !ctor->isDeleted() &&
-           !ctor->isIneligibleOrNotSelected() &&
-           // FIXME: Support default arguments (rdar://142414553)
-           ctor->getNumParams() == 1 &&
-           ctor->getAccess() == clang::AccessSpecifier::AS_public;
+static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl,
+                                  ClangImporter::Implementation *importerImpl) {
+  if (!decl->hasSimpleCopyConstructor()) {
+    auto *copyCtor = findCopyConstructor(decl);
+    if (!copyCtor)
+      return false;
+
+    if (!copyCtor->isDefaulted())
+      return true;
+  }
+
+  // If the copy constructor is defaulted or implicitly declared, we should only
+  // import the type as copyable if all its fields are also copyable
+  // FIXME: we should also look at the bases
+  return llvm::none_of(decl->fields(), [&](clang::FieldDecl *field) {
+    if (const auto *rd = field->getType()->getAsRecordDecl()) {
+      return (!field->getType()->isReferenceType() &&
+              !field->getType()->isPointerType() &&
+              recordHasMoveOnlySemantics(rd, importerImpl));
+    }
+    return false;
   });
 }
 
@@ -8523,8 +8546,8 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
     return CxxValueSemanticsKind::Copyable;
   }
 
-  bool isCopyable = !hasNonCopyableAttr(cxxRecordDecl) && 
-                    hasCopyTypeOperations(cxxRecordDecl);
+  bool isCopyable = !hasNonCopyableAttr(cxxRecordDecl) &&
+                    hasCopyTypeOperations(cxxRecordDecl, importerImpl);
   bool isMovable = hasMoveTypeOperations(cxxRecordDecl);
 
   if (!hasDestroyTypeOperations(cxxRecordDecl) || (!isCopyable && !isMovable)) {
