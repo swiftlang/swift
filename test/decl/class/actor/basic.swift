@@ -54,4 +54,4 @@ extension A2 {
   init(doesNotDelegate: ()) {} // expected-error {{designated initializer cannot be declared in an extension of 'A2'}}
 }
 
-nonisolated actor A3 {} // expected-warning {{'nonisolated' modifier cannot be applied to this declaration; this will be an error in a future Swift language mode}}{{1-13=}}
+nonisolated actor A3 {} // expected-error {{'nonisolated' modifier cannot be applied to this declaration}}{{1-13=}}

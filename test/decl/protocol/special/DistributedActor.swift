@@ -65,7 +65,7 @@ distributed actor D5: P1 {
   // expected-note@-1{{non-distributed instance method 'dist()'}}
 }
 
-nonisolated distributed actor D6 {} // expected-warning {{'nonisolated' modifier cannot be applied to this declaration; this will be an error in a future Swift language mode}}{{1-13=}}
+nonisolated distributed actor D6 {} // expected-error {{'nonisolated' modifier cannot be applied to this declaration}}{{1-13=}}
 
 // ==== Tests ------------------------------------------------------------------
 

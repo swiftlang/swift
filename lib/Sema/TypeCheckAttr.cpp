@@ -7986,7 +7986,6 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   if (auto *classDecl = dyn_cast<ClassDecl>(D);
       classDecl && classDecl->isExplicitActor()) {
     diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr)
-        .warnUntilFutureSwiftVersion()
         .fixItRemove(attr->getRange());
     return;
   }
