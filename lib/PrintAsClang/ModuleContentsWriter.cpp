@@ -542,16 +542,10 @@ public:
     assert(ED->isCCompatibleEnum() || ED->hasClangNode());
     
     forwardDeclare(ED, [&]{
-      if (ED->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
-        // Forward declare in a way to be compatible with older C standards.
-        os << "typedef SWIFT_ENUM_FWD_DECL(";
-        printer.print(ED->getRawType());
-        os << ", " << getNameForObjC(ED) << ")\n";
-      } else {
-        os << "enum " << getNameForObjC(ED) << " : ";
-        printer.print(ED->getRawType());
-        os << ";\n";
-      }
+      // Forward declare in a way to be compatible with older C standards.
+      os << "typedef SWIFT_ENUM_FWD_DECL(";
+      printer.print(ED->getRawType());
+      os << ", " << getNameForObjC(ED) << ")\n";
     });
   }
 

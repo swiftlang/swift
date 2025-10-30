@@ -2114,9 +2114,6 @@ ERROR(cdecl_throws,none,
 ERROR(cdecl_incompatible_with_objc,none,
       "cannot apply both '@c' and '@objc' to %kindonly0",
       (const Decl *))
-ERROR(cdecl_feature_required,none,
-      "'@c' requires '-enable-experimental-feature CDecl'",
-      ())
 
 // @used and @section
 ERROR(section_empty_name,none,
@@ -6704,8 +6701,6 @@ NOTE(not_objc_swift_class,none,
 NOTE(not_objc_swift_struct,none,
       "Swift structs cannot be represented in %" FOREIGN_LANG_SELECT "0",
      (ForeignLanguage))
-NOTE(not_objc_swift_enum,none,
-      "non-'@objc' enums cannot be represented in Objective-C", ())
 NOTE(not_cdecl_or_objc_swift_enum,none,
      "Swift enums not marked '@c'%select{| or '@objc'}0 cannot be "
      "represented in %" FOREIGN_LANG_SELECT "0",

@@ -1,7 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature StrictMemorySafety -enable-experimental-feature Lifetimes -enable-experimental-feature CImplementation -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -debugger-support
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature StrictMemorySafety -enable-experimental-feature Lifetimes -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -debugger-support
 
 // REQUIRES: swift_feature_AddressableParameters
-// REQUIRES: swift_feature_CImplementation
 // REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_NoImplicitCopy

@@ -277,7 +277,6 @@ UNINTERESTING_FEATURE(IsolatedAny2)
 UNINTERESTING_FEATURE(GlobalActorIsolatedTypesUsability)
 UNINTERESTING_FEATURE(ObjCImplementation)
 UNINTERESTING_FEATURE(ObjCImplementationWithResilientStorage)
-UNINTERESTING_FEATURE(CImplementation)
 UNINTERESTING_FEATURE(Sensitive)
 UNINTERESTING_FEATURE(DebugDescriptionMacro)
 UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
@@ -320,11 +319,6 @@ static bool usesFeatureCompileTimeValuesPreview(Decl *decl) {
 
 static bool usesFeatureClosureBodyMacro(Decl *decl) {
   return false;
-}
-
-static bool usesFeatureCDecl(Decl *decl) {
-  auto attr = decl->getAttrs().getAttribute<CDeclAttr>();
-  return attr && !attr->Underscored;
 }
 
 UNINTERESTING_FEATURE(StrictMemorySafety)
