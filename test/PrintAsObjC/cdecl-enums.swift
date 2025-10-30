@@ -6,14 +6,12 @@
 // RUN:   -emit-module -emit-module-doc -o %t %s \
 // RUN:   -import-objc-header %S/Inputs/enums.h \
 // RUN:   -emit-objc-header-path %t/enums.h \
-// RUN:   -disable-objc-attr-requires-foundation-module \
-// RUN:   -enable-experimental-feature CDecl
+// RUN:   -disable-objc-attr-requires-foundation-module
 
 // RUN: %FileCheck %s --input-file %t/enums.h
 // RUN: %FileCheck -check-prefix=NEGATIVE %s --input-file %t/enums.h
 // RUN: %check-in-clang %t/enums.h
 
-// REQUIRES: swift_feature_CDecl
 // REQUIRES: objc_interop
 
 import Foundation

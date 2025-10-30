@@ -4,7 +4,6 @@
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
-// RUN:   -enable-experimental-feature CDecl \
 // RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only \
 // RUN:   -enable-experimental-feature ParserASTGen \
@@ -14,7 +13,6 @@
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
-// RUN:   -enable-experimental-feature CDecl \
 // RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only \
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
@@ -27,7 +25,6 @@
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
-// RUN:   -enable-experimental-feature CDecl \
 // RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only
 
@@ -37,7 +34,6 @@
 // REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_RawLayout
-// REQUIRES: swift_feature_CDecl
 
 // rdar://116686158
 // UNSUPPORTED: asan

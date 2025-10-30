@@ -9,8 +9,7 @@
 // RUN:   -emit-module -verify -o %t -I %t \
 // RUN:   -import-bridging-header %t/BridgingHeader.h \
 // RUN:   -emit-clang-header-path %t/cdecl.h \
-// RUN:   -disable-objc-interop \
-// RUN:   -enable-experimental-feature CDecl
+// RUN:   -disable-objc-interop
 
 /// Check compatibility header directly
 // RUN: %FileCheck %s --input-file %t/cdecl.h
@@ -20,8 +19,6 @@
 /// Compile a client against the compatibility header
 // RUN: %clang-no-modules -c %t/Client.c -I %t -Werror \
 // RUN:   -isysroot %S/../Inputs/clang-importer-sdk
-
-// REQUIRES: swift_feature_CDecl
 
 //--- module.modulemap
 
