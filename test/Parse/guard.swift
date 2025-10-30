@@ -10,7 +10,7 @@ func noCondition() {
 // RUN: %target-typecheck-verify-swift
 
 func guardRecovery() {
-  guard x = let {} // expected-error {{expected condition in 'guard' statement}} expected-error {{expected 'else' after 'guard' condition}}
+  guard x = else {} // expected-error {{missing condition in 'guard' statement}}
 }
 
 // RUN: %target-typecheck-verify-swift
