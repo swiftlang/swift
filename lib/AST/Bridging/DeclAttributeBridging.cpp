@@ -492,21 +492,22 @@ BridgedWarnAttr_createParsed(BridgedASTContext cContext,
                              SourceLoc atLoc,
                              SourceRange range,
                              Identifier diagGroupName,
-                             BridgedWarningGroupBehavior behavior,
+                             WarningGroupBehavior behavior,
                              BridgedStringRef reason) {
   ASTContext &context = cContext.unbridged();
   auto diagGroupID = getDiagGroupIDByName(diagGroupName.str());
   
-  WarnAttr::Behavior attrBehavior;
+  WarningGroupBehavior attrBehavior;
   switch (behavior) {
-    case WarningGroupBehaviorError:
-      attrBehavior = WarnAttr::Behavior::Error;
+    case None:
+    case AsWarning:
+      attrBehavior = WarningGroupBehavior::AsWarning;
       break;
-    case WarningGroupBehaviorWarning:
-      attrBehavior = WarnAttr::Behavior::Warning;
+    case AsError:
+      attrBehavior = WarningGroupBehavior::AsError;
       break;
-    case WarningGroupBehaviorIgnored:
-      attrBehavior = WarnAttr::Behavior::Ignored;
+    case Ignored:
+      attrBehavior = WarningGroupBehavior::Ignored;
       break;
   }
   

@@ -61,11 +61,13 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/APIntMap.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/BlockList.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -2645,6 +2647,19 @@ void ASTContext::getVisibleTopLevelModuleNames(
 bool ASTContext::shouldPerformTypoCorrection() {
   NumTypoCorrections += 1;
   return NumTypoCorrections <= LangOpts.TypoCorrectionLimit;
+}
+
+bool ASTContext::isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID groupID) const {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  auto ruleRefArray = Diags.getWarningGroupBehaviorControlRefArray();
+  return swift_ASTGen_isWarningGroupEnabledInFile(
+          sf->getExportedSourceFile(),
+          BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
+          StringRef(getDiagGroupInfoByID(groupID).name));
+#else
+  // Fallback to checking only the command-line configuration
+  return !Diags.isIgnoredDiagnosticGroupTree(groupID);
+#endif
 }
 
 static bool isClangModuleVersion(const ModuleLoader::ModuleVersionInfo &info) {

@@ -385,7 +385,7 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       CheckInconsistentWeakLinkedImportsRequest{SF->getParentModule()}, {});
 
   // Opt-in performance hint diagnostics for performance-critical code.
-  if (performanceHintDiagnosticsEnabled(Ctx))
+  if (performanceHintDiagnosticsEnabled(Ctx, SF))
     evaluateOrDefault(Ctx.evaluator, EmitPerformanceHints{SF}, {});
 
   // Perform various AST transforms we've been asked to perform.
