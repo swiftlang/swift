@@ -3224,7 +3224,11 @@ public:
   /// GenericSignature inside the type.
   Type getInterfaceType() const;
   bool hasInterfaceType() const;
-
+  
+  // Retrieve the "interface" type, but remove any curried Self type references
+  Type getInterfaceTypeNoSelfParam() const;
+  Type getInterfaceTypeNoSelfParam(Type existingInterfaceType) const;
+  
   /// Set the interface type for the given value.
   void setInterfaceType(Type type);
   

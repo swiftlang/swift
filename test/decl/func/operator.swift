@@ -131,8 +131,8 @@ infix operator +-+=
 infix func +-+ (x: Int, y: Int) -> Int {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}}
 prefix func +-+ (x: Int) -> Int {}
 
-prefix func -+- (y: inout Int) -> Int {} // expected-note 2{{found this candidate}}
-postfix func -+- (x: inout Int) -> Int {} // expected-note 2{{found this candidate}}
+prefix func -+- (y: inout Int) -> Int {} // expected-note 2{{found candidate with type '(inout Int) -> Int'}}
+postfix func -+- (x: inout Int) -> Int {} // expected-note 2{{found candidate with type '(inout Int) -> Int'}}
 
 infix func +-+= (x: inout Int, y: Int) -> Int {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}}
 
