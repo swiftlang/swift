@@ -1,32 +1,32 @@
 // RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s | %FileCheck %s
 
 struct Point {
-// CHECK: [[@LINE-1]]:8 | struct/Swift | Point | {{.*}} | Def | rel: 0
+// CHECK: [[@LINE-1]]:8 | struct(internal)/Swift | Point | {{.*}} | Def | rel: 0
   var x: Int
-// CHECK: [[@LINE-1]]:7 | instance-property/Swift | x | [[PX_USR:s:.*]] | Def,RelChild | rel: 1
+// CHECK: [[@LINE-1]]:7 | instance-property(internal)/Swift | x | [[PX_USR:s:.*]] | Def,RelChild | rel: 1
 // CHECK: [[@LINE-2]]:7 | instance-method/acc-get/Swift | getter:x | [[PX_GET_USR:s:.*]] | Def,Impl,RelChild,RelAcc | rel: 1
 // CHECK: [[@LINE-3]]:7 | instance-method/acc-set/Swift | setter:x | [[PX_SET_USR:s:.*]] | Def,Impl,RelChild,RelAcc | rel: 1
   var y: Int
-// CHECK: [[@LINE-1]]:7 | instance-property/Swift | y | [[PY_USR:s:.*]] | Def,RelChild | rel: 1
+// CHECK: [[@LINE-1]]:7 | instance-property(internal)/Swift | y | [[PY_USR:s:.*]] | Def,RelChild | rel: 1
 // CHECK: [[@LINE-2]]:7 | instance-method/acc-get/Swift | getter:y | [[PY_GET_USR:s:.*]] | Def,Impl,RelChild,RelAcc | rel: 1
 // CHECK: [[@LINE-3]]:7 | instance-method/acc-set/Swift | setter:y | [[PY_SET_USR:s:.*]] | Def,Impl,RelChild,RelAcc | rel: 1
 }
 
 struct Rectangle {
-// CHECK: [[@LINE-1]]:8 | struct/Swift | Rectangle | {{.*}} | Def | rel: 0
+// CHECK: [[@LINE-1]]:8 | struct(internal)/Swift | Rectangle | {{.*}} | Def | rel: 0
   var topLeft: Point
-// CHECK: [[@LINE-1]]:7 | instance-property/Swift | topLeft | [[TL_USR:s:.*]] | Def,RelChild | rel: 1
+// CHECK: [[@LINE-1]]:7 | instance-property(internal)/Swift | topLeft | [[TL_USR:s:.*]] | Def,RelChild | rel: 1
 // CHECK: [[@LINE-2]]:7 | instance-method/acc-get/Swift | getter:topLeft | [[TL_GET_USR:s:.*]] | Def,Impl,RelChild,RelAcc | rel: 1
 // CHECK: [[@LINE-3]]:7 | instance-method/acc-set/Swift | setter:topLeft | [[TL_SET_USR:s:.*]] | Def,Impl,RelChild,RelAcc | rel: 1
   var bottomRight: Point
-// CHECK: [[@LINE-1]]:7 | instance-property/Swift | bottomRight | [[BR_USR:s:.*]] | Def,RelChild | rel: 1
+// CHECK: [[@LINE-1]]:7 | instance-property(internal)/Swift | bottomRight | [[BR_USR:s:.*]] | Def,RelChild | rel: 1
 // CHECK: [[@LINE-2]]:7 | instance-method/acc-get/Swift | getter:bottomRight | [[BR_GET_USR:s:.*]] | Def,Impl,RelChild,RelAcc | rel: 1
 // CHECK: [[@LINE-3]]:7 | instance-method/acc-set/Swift | setter:bottomRight | [[BR_SET_USR:s:.*]] | Def,Impl,RelChild,RelAcc | rel: 1
 }
 
 @dynamicMemberLookup
 struct Lens<T> {
-// CHECK: [[@LINE-1]]:8 | struct/Swift | Lens | {{.*}} | Def | rel: 0
+// CHECK: [[@LINE-1]]:8 | struct(internal)/Swift | Lens | {{.*}} | Def | rel: 0
   var obj: T
 
   init(_ obj: T) {
@@ -34,7 +34,7 @@ struct Lens<T> {
   }
 
   subscript<U>(dynamicMember member: WritableKeyPath<T, U>) -> Lens<U> {
-// CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR:s:.*]] | Def,RelChild | rel: 1
+// CHECK: [[@LINE-1]]:3 | instance-property/subscript(internal)/Swift | subscript(dynamicMember:) | [[SUB_USR:s:.*]] | Def,RelChild | rel: 1
     get { return Lens<U>(obj[keyPath: member]) }
 // CHECK: [[@LINE-1]]:5 | instance-method/acc-get/Swift | getter:subscript(dynamicMember:) | [[SUB_GET_USR:s:.*]] | Def,RelChild,RelAcc | rel: 1
     set { obj[keyPath: member] = newValue.obj }
@@ -145,14 +145,14 @@ func testExplicit(r: Lens<Rectangle>, a: Lens<[Int]>) {
 @dynamicMemberLookup
 protocol Foo {
   var prop: Bar {get}
-  // CHECK: [[@LINE-1]]:7 | instance-property/Swift | prop | [[PROP_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:7 | instance-property(internal)/Swift | prop | [[PROP_USR:.*]] | Def,RelChild | rel: 1
 }
 struct Bar {
   let enabled = false
 }
 extension Foo {
   subscript<T>(dynamicMember keyPath: KeyPath<Bar,T>) -> T {
-  // CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB2_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:3 | instance-property/subscript(internal)/Swift | subscript(dynamicMember:) | [[SUB2_USR:.*]] | Def,RelChild | rel: 1
   // CHECK: [[@LINE-2]]:60 | instance-method/acc-get/Swift | getter:subscript(dynamicMember:) | {{.*}} | Def,Dyn,RelChild,RelAcc | rel: 1
   // CHECK-NEXT: RelChild,RelAcc | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB2_USR]]
 

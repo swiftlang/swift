@@ -1901,16 +1901,20 @@ bool IndexSwiftASTWalker::reportImplicitConformance(ValueDecl *witness, ValueDec
     loc = container->getLoc(/*SerializedOK*/false);
 
   IndexSymbol info;
-  if (initIndexSymbol(witness, loc, /*IsRef=*/true, info))
+  bool initFailed = initIndexSymbol(
+      witness, loc, /*IsRef=*/true, info, [](IndexSymbol &info) {
+        // Remove the 'ref' role that \c initIndexSymbol introduces. This isn't
+        // actually a 'reference', but an 'implicit' override.
+        info.roles &= ~(SymbolRoleSet)SymbolRole::Reference;
+        info.roles |= (SymbolRoleSet)SymbolRole::Implicit;
+        return false;
+      });
+  if (initFailed)
     return true;
   if (addRelation(info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, requirement))
     return true;
   if (addRelation(info, (SymbolRoleSet) SymbolRole::RelationContainedBy, container))
     return true;
-  // Remove the 'ref' role that \c initIndexSymbol introduces. This isn't
-  // actually a 'reference', but an 'implicit' override.
-  info.roles &= ~(SymbolRoleSet)SymbolRole::Reference;
-  info.roles |= (SymbolRoleSet)SymbolRole::Implicit;
 
   if (!startEntity(witness, info, /*IsRef=*/true))
     return true;
@@ -1930,6 +1934,44 @@ bool IndexSwiftASTWalker::hasImplicitRole(Decl *D) {
     return true;
 
   return false;
+}
+
+bool shouldOutputEffectiveAccessOfValueSymbol(SymbolInfo Info) {
+  SymbolKind Kind = Info.Kind;
+  SymbolSubKind SubKind = Info.SubKind;
+  switch (SubKind) {
+  case SymbolSubKind::AccessorGetter:
+  case SymbolSubKind::AccessorSetter:
+  case SymbolSubKind::SwiftAccessorWillSet:
+  case SymbolSubKind::SwiftAccessorDidSet:
+  case SymbolSubKind::SwiftAccessorAddressor:
+  case SymbolSubKind::SwiftAccessorMutableAddressor:
+  case SymbolSubKind::SwiftGenericTypeParam:
+    return false;
+  default:
+    break;
+  }
+  switch (Kind) {
+  case SymbolKind::Enum:
+  case SymbolKind::Struct:
+  case SymbolKind::Class:
+  case SymbolKind::Protocol:
+  case SymbolKind::Constructor:
+  case SymbolKind::EnumConstant:
+  case SymbolKind::Function:
+  case SymbolKind::StaticMethod:
+  case SymbolKind::Variable:
+  case SymbolKind::InstanceMethod:
+  case SymbolKind::ClassMethod:
+  case SymbolKind::InstanceProperty:
+  case SymbolKind::ClassProperty:
+  case SymbolKind::StaticProperty:
+  case SymbolKind::TypeAlias:
+  case SymbolKind::Macro:
+    return true;
+  default:
+    return false;
+  }
 }
 
 bool IndexSwiftASTWalker::initIndexSymbol(
@@ -1976,6 +2018,30 @@ bool IndexSwiftASTWalker::initIndexSymbol(
 
   if (updateInfo(Info)) {
     return true;
+  }
+
+  if (shouldOutputEffectiveAccessOfValueSymbol(Info.symInfo) &&
+      (Info.roles & (SymbolRoleSet)SymbolRole::Reference) == 0 &&
+      !isLocalSymbol(D)) {
+    AccessScope Scope = D->getFormalAccessScope();
+    if (Scope.isPublic()) {
+      if (D->isSPI()) {
+        Info.symInfo.Properties |= SymbolProperty::SwiftAccessControlSPI;
+      } else {
+        Info.symInfo.Properties |= SymbolProperty::SwiftAccessControlPublic;
+      }
+    } else if (Scope.isPackage()) {
+      Info.symInfo.Properties |= SymbolProperty::SwiftAccessControlPackage;
+    } else if (Scope.isInternal()) {
+      Info.symInfo.Properties |= SymbolProperty::SwiftAccessControlInternal;
+    } else if (Scope.isFileScope()) {
+      Info.symInfo.Properties |= SymbolProperty::SwiftAccessControlFilePrivate;
+    } else if (Scope.isPrivate()) {
+      Info.symInfo.Properties |=
+          SymbolProperty::SwiftAccessControlLessThanFilePrivate;
+    } else {
+      llvm_unreachable("Unsupported access scope");
+    }
   }
 
   return false;
