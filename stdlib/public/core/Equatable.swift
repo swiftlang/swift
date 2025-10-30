@@ -164,7 +164,7 @@
 ///     let c = a
 ///     print(c === a, c === b, separator: ", ")
 ///     // Prints "true, false"
-public protocol Equatable {
+public protocol Equatable: ~Copyable {
   /// Returns a Boolean value indicating whether two values are equal.
   ///
   /// Equality is the inverse of inequality. For any values `a` and `b`,
@@ -173,10 +173,10 @@ public protocol Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  static func == (lhs: Self, rhs: Self) -> Bool
+  static func == (lhs: borrowing Self, rhs: borrowing Self) -> Bool
 }
 
-extension Equatable {
+extension Equatable where Self: ~Copyable {
   /// Returns a Boolean value indicating whether two values are not equal.
   ///
   /// Inequality is the inverse of equality. For any values `a` and `b`, `a != b`
@@ -190,8 +190,9 @@ extension Equatable {
   ///   - rhs: Another value to compare.
   // transparent because sometimes types that use this generate compile-time
   // warnings, e.g. that an expression always evaluates to true
+  @_preInverseGenerics
   @_transparent
-  public static func != (lhs: Self, rhs: Self) -> Bool {
+  public static func != (lhs: borrowing Self, rhs: borrowing Self) -> Bool {
     return !(lhs == rhs)
   }
 }
