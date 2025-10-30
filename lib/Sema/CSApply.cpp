@@ -3752,26 +3752,12 @@ namespace {
       return expr;
     }
 
-    Expr *visitTryExpr(TryExpr *expr) {
-      return simplifyExprType(expr);
-    }
+    Expr *visitAnyTryExpr(AnyTryExpr *expr) {
+      simplifyExprType(expr);
 
-    Expr *visitForceTryExpr(ForceTryExpr *expr) {
       auto *subExpr = expr->getSubExpr();
-      auto type = simplifyType(cs.getType(subExpr));
-
-      // Let's load the value associated with this try.
-      if (type->hasLValueType()) {
-        subExpr = coerceToType(subExpr, type->getRValueType(),
-                               cs.getConstraintLocator(subExpr));
-
-        if (!subExpr)
-          return nullptr;
-      }
-
-      cs.setType(expr, cs.getType(subExpr));
-      expr->setSubExpr(subExpr);
-
+      expr->setSubExpr(coerceToType(subExpr, cs.getType(expr),
+                                    cs.getConstraintLocator(subExpr)));
       return expr;
     }
 
