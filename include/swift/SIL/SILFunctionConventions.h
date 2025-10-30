@@ -338,15 +338,18 @@ public:
   }
 
   bool hasAddressResult() const {
+    return hasGuaranteedAddressResult() || hasInoutResult();
+  }
+
+  bool hasGuaranteedAddressResult() const {
     if (funcTy->getNumResults() != 1) {
       return false;
     }
-    auto resultConvention = funcTy->getResults()[0].getConvention();
-    if (silConv.loweredAddresses) {
-      return resultConvention == ResultConvention::GuaranteedAddress ||
-             resultConvention == ResultConvention::Inout;
+    if (!silConv.loweredAddresses) {
+      return false;
     }
-    return resultConvention == ResultConvention::Inout;
+    auto resultConvention = funcTy->getResults()[0].getConvention();
+    return resultConvention == ResultConvention::GuaranteedAddress;
   }
 
   struct SILResultTypeFunc;
