@@ -5617,15 +5617,16 @@ public:
     printFieldRaw([&](raw_ostream &out) { out << diagGroupInfo.name; },
                   Label::always("diagGroupID:"));
     switch (Attr->DiagnosticBehavior) {
-    case WarnAttr::Behavior::Error:
-      printFieldRaw([&](raw_ostream &out) { out << "error"; },
-                    Label::always("as:"));
-      break;
-    case WarnAttr::Behavior::Warning:
+    case WarningGroupBehavior::None:
+    case WarningGroupBehavior::AsWarning:
       printFieldRaw([&](raw_ostream &out) { out << "warning"; },
                     Label::always("as:"));
       break;
-    case WarnAttr::Behavior::Ignored:
+    case WarningGroupBehavior::AsError:
+      printFieldRaw([&](raw_ostream &out) { out << "error"; },
+                    Label::always("as:"));
+      break;
+    case WarningGroupBehavior::Ignored:
         printFieldRaw([&](raw_ostream &out) { out << "ignored"; },
                       Label::always("as:"));
         break;

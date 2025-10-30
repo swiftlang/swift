@@ -43,6 +43,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/WarningGroupBehavior.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -3681,20 +3682,18 @@ public:
 
 class WarnAttr : public DeclAttribute {
 public:
-  enum class Behavior : uint8_t { Error, Warning, Ignored };
-
-  WarnAttr(DiagGroupID DiagnosticGroupID, Behavior Behavior,
+  WarnAttr(DiagGroupID DiagnosticGroupID, WarningGroupBehavior Behavior,
            std::optional<StringRef> Reason, SourceLoc AtLoc, SourceRange Range,
            bool Implicit)
       : DeclAttribute(DeclAttrKind::Warn, AtLoc, Range, Implicit),
         DiagnosticBehavior(Behavior), DiagnosticGroupID(DiagnosticGroupID),
         Reason(Reason) {}
 
-  WarnAttr(DiagGroupID DiagnosticGroupID, Behavior Behavior, bool Implicit)
+  WarnAttr(DiagGroupID DiagnosticGroupID, WarningGroupBehavior Behavior, bool Implicit)
       : WarnAttr(DiagnosticGroupID, Behavior, std::nullopt, SourceLoc(),
                  SourceRange(), Implicit) {}
 
-  Behavior DiagnosticBehavior;
+  WarningGroupBehavior DiagnosticBehavior;
   DiagGroupID DiagnosticGroupID;
   const std::optional<StringRef> Reason;
 

@@ -30,9 +30,11 @@
 
 using namespace swift;
 
-bool swift::performanceHintDiagnosticsEnabled(ASTContext &ctx) {
-  return !ctx.Diags.isIgnoredDiagnosticGroupTree(DiagGroupID::PerformanceHints) &&
-         (ctx.TypeCheckerOpts.SkipFunctionBodies == FunctionBodySkipping::None);
+bool swift::performanceHintDiagnosticsEnabled(ASTContext &ctx, SourceFile *sf) {
+  return ctx.TypeCheckerOpts.SkipFunctionBodies == FunctionBodySkipping::None &&
+         (ctx.Diags.isDiagnosticGroupEnabled(sf, DiagGroupID::PerformanceHints) ||
+          ctx.Diags.isDiagnosticGroupEnabled(sf, DiagGroupID::ReturnTypeImplicitCopy) ||
+          ctx.Diags.isDiagnosticGroupEnabled(sf, DiagGroupID::ExistentialType));
 }
 
 namespace {

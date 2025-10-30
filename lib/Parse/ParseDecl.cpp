@@ -3280,11 +3280,11 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
     auto BehaviorSpecifier =
-        llvm::StringSwitch<std::optional<WarnAttr::Behavior>>(
+        llvm::StringSwitch<std::optional<WarningGroupBehavior>>(
             ParsedBehaviorIdentifier)
-            .Case("error", WarnAttr::Behavior::Error)
-            .Case("warning", WarnAttr::Behavior::Warning)
-            .Case("ignored", WarnAttr::Behavior::Ignored)
+            .Case("error", WarningGroupBehavior::AsError)
+            .Case("warning", WarningGroupBehavior::AsWarning)
+            .Case("ignored", WarningGroupBehavior::Ignored)
             .Default(std::nullopt);
     if (!BehaviorSpecifier) {
       diagnose(Loc, diag::attr_warn_expected_known_behavior,

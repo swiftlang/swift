@@ -92,7 +92,7 @@ constexpr const auto diagnosticGroupConnections = [] {
 #include "swift/AST/DiagnosticsAll.def"
 
   // Produce the resulting structure with all the edges
-#define GROUP(Name, Option, DocsFile)                                         \
+#define GROUP(Name, Option, DocsFile)                                          \
   GroupConnections(Name##_supergroups, Name##_subgroups, Name##_diagnostics),
   return std::tuple{
 #include "swift/AST/DiagnosticGroups.def"
