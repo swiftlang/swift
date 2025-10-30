@@ -106,6 +106,7 @@ import HTTP2StateMachine
 import IndexPathTest
 import InsertCharacter
 import IntegerParsing
+import IntegerToString
 import Integrate
 import IterateData
 import Join
@@ -306,6 +307,7 @@ register(HTTP2StateMachine.benchmarks)
 register(IndexPathTest.benchmarks)
 register(InsertCharacter.benchmarks)
 register(IntegerParsing.benchmarks)
+register(IntegerToString.benchmarks)
 register(Integrate.benchmarks)
 register(IterateData.benchmarks)
 register(Join.benchmarks)
