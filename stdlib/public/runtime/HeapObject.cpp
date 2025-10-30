@@ -86,14 +86,6 @@ asm(R"(
   .set _swift_retain_preservemost, _swift_retain
   .globl _swift_release_preservemost
   .set _swift_release_preservemost, _swift_release
-
-// A weak definition can only be overridden by a strong definition if the
-// library with the strong definition contains at least one weak definition.
-// Create a placeholder weak definition here to allow that to work.
-  .weak_definition _swift_release_preservemost_weak_placeholder
-  .globl _swift_release_preservemost_weak_placeholder
-  _swift_release_preservemost_weak_placeholder:
-    .byte 0
 )");
 #endif
 #endif
