@@ -1108,12 +1108,19 @@ private:
   /// Whether the given decl should be marked implicit in the index data.
   bool hasImplicitRole(Decl *D);
 
-  bool initIndexSymbol(ValueDecl *D, SourceLoc Loc, bool IsRef,
-                       IndexSymbol &Info);
+  bool initIndexSymbol(
+      ValueDecl *D, SourceLoc Loc, bool IsRef, IndexSymbol &Info,
+      llvm::function_ref<bool(IndexSymbol &)> updateInfo = [](IndexSymbol &) {
+        return false;
+      });
   bool initIndexSymbol(ExtensionDecl *D, ValueDecl *ExtendedD, SourceLoc Loc,
                        IndexSymbol &Info);
   bool initFuncDeclIndexSymbol(FuncDecl *D, IndexSymbol &Info);
-  bool initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc, IndexSymbol &Info);
+  bool initFuncRefIndexSymbol(
+      ValueDecl *D, SourceLoc Loc, IndexSymbol &Info,
+      llvm::function_ref<bool(IndexSymbol &)> updateInfo = [](IndexSymbol &) {
+        return false;
+      });
   bool initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, SourceLoc Loc,
                               IndexSymbol &Info,
                               std::optional<AccessKind> AccKind);
@@ -1663,22 +1670,18 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
     // AbstractStorageDecl.
     assert(getParentDecl() == D);
     auto PreviousTop = EntitiesStack.pop_back_val();
-    bool initFailed = initFuncRefIndexSymbol(D, Loc, Info);
+    bool initFailed = initFuncRefIndexSymbol(D, Loc, Info, updateInfo);
     EntitiesStack.push_back(PreviousTop);
 
     if (initFailed)
       return true; // continue walking.
-    if (updateInfo(Info))
-      return true;
 
     if (!IdxConsumer.startSourceEntity(Info) || !IdxConsumer.finishSourceEntity(Info.symInfo, Info.roles))
       Cancelled = true;
   } else {
     IndexSymbol Info;
-    if (initIndexSymbol(D, Loc, IsRef, Info))
+    if (initIndexSymbol(D, Loc, IsRef, Info, updateInfo))
       return true; // continue walking.
-    if (updateInfo(Info))
-      return true;
     if (addRelation(Info, (SymbolRoleSet)SymbolRole::RelationAccessorOf |
                     (SymbolRoleSet)SymbolRole::RelationChildOf , D))
       return true;
@@ -1929,8 +1932,9 @@ bool IndexSwiftASTWalker::hasImplicitRole(Decl *D) {
   return false;
 }
 
-bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
-                                          bool IsRef, IndexSymbol &Info) {
+bool IndexSwiftASTWalker::initIndexSymbol(
+    ValueDecl *D, SourceLoc Loc, bool IsRef, IndexSymbol &Info,
+    llvm::function_ref<bool(IndexSymbol &)> updateInfo) {
   assert(D);
 
   auto MappedLoc = getMappedLocation(Loc);
@@ -1968,6 +1972,10 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
 
   if (MappedLoc->IsGenerated) {
     Info.roles |= (unsigned)SymbolRole::Implicit;
+  }
+
+  if (updateInfo(Info)) {
+    return true;
   }
 
   return false;
@@ -2036,10 +2044,11 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
   return false;
 }
 
-bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
-                                                 IndexSymbol &Info) {
+bool IndexSwiftASTWalker::initFuncRefIndexSymbol(
+    ValueDecl *D, SourceLoc Loc, IndexSymbol &Info,
+    llvm::function_ref<bool(IndexSymbol &)> updateInfo) {
 
-  if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
+  if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info, updateInfo))
     return true;
 
   if (!isa<AbstractStorageDecl>(D) && !ide::isBeingCalled(ExprStack))
