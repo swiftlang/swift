@@ -1335,13 +1335,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printText(diagGroupInfo.name);
     Printer << ", ";
     switch (cast<WarnAttr>(this)->DiagnosticBehavior) {
-      case WarnAttr::Behavior::Error:
-        Printer << "as: error";
-        break;
-      case WarnAttr::Behavior::Warning:
+      case WarningGroupBehavior::None:
+      case WarningGroupBehavior::AsWarning:
         Printer << "as: warning";
         break;
-      case WarnAttr::Behavior::Ignored:
+      case WarningGroupBehavior::AsError:
+        Printer << "as: error";
+        break;
+      case WarningGroupBehavior::Ignored:
         Printer << "as: ignored";
         break;
     }

@@ -2217,15 +2217,15 @@ extension ASTGenVisitor {
       return nil
     }
     
-    guard let behavior: BridgedWarningGroupBehavior = self.generateWithLabeledExprListArguments(attribute: node, { args in
+    guard let behavior: swift.WarningGroupBehavior = self.generateWithLabeledExprListArguments(attribute: node, { args in
       self.generateConsumingAttrOption(args: &args, label: "as") { expr in
         guard let declRefExpr = expr.as(DeclReferenceExprSyntax.self) else {
           return nil
         }
         switch declRefExpr.baseName.text {
-        case "error": return BridgedWarningGroupBehavior.WarningGroupBehaviorError
-        case "warning": return BridgedWarningGroupBehavior.WarningGroupBehaviorWarning
-        case "ignored": return BridgedWarningGroupBehavior.WarningGroupBehaviorIgnored
+        case "error": return swift.WarningGroupBehavior.error
+        case "warning": return swift.WarningGroupBehavior.warning
+        case "ignored": return swift.WarningGroupBehavior.ignored
         default: return nil
         }
       }
