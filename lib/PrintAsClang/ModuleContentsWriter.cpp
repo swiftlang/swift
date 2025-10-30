@@ -582,6 +582,10 @@ public:
   }
 
   void forwardDeclareCxxValueTypeIfNeeded(const NominalTypeDecl *NTD) {
+    // Zero sized enums are exported as namespaces, no forward declaration is
+    // required.
+    if (printer.isZeroSized(NTD) && isa<EnumDecl>(NTD))
+      return;
     forwardDeclare(NTD, [&]() {
       ClangValueTypePrinter::forwardDeclType(os, NTD, printer);
     });
