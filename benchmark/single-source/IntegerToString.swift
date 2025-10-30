@@ -18,46 +18,40 @@ import TestsUtils
 public var benchmarks: [BenchmarkInfo] {
   var result = [
     BenchmarkInfo(
-      name: "IntegerToString_Int_decimal",
+      name: "IntegerToString.Int.decimal",
       runFunction: run_IntegerToString_Int_decimal,
-      tags: [.validation, .api, .runtime, .String],
-      legacyFactor: 100
+      tags: [.validation, .api, .runtime, .String]
     ),
     BenchmarkInfo(
-      name: "IntegerToString_Int_hex",
+      name: "IntegerToString.Int.hex",
       runFunction: run_IntegerToString_Int_hex,
-      tags: [.validation, .api, .runtime, .String],
-      legacyFactor: 100
+      tags: [.validation, .api, .runtime, .String]
     ),
     BenchmarkInfo(
-      name: "IntegerToString_UInt64_decimal",
+      name: "IntegerToString.UInt64.decimal",
       runFunction: run_IntegerToString_UInt64_decimal,
-      tags: [.validation, .api, .runtime, .String],
-      legacyFactor: 100
+      tags: [.validation, .api, .runtime, .String]
     ),
     BenchmarkInfo(
-      name: "IntegerToString_UInt64_hex",
+      name: "IntegerToString.UInt64.hex",
       runFunction: run_IntegerToString_UInt64_hex,
-      tags: [.validation, .api, .runtime, .String],
-      legacyFactor: 100
+      tags: [.validation, .api, .runtime, .String]
     ),
   ]
 
   if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
     result.append(
       BenchmarkInfo(
-        name: "IntegerToString_UInt128_decimal",
+        name: "IntegerToString.UInt128.decimal",
         runFunction: run_IntegerToString_UInt128_decimal,
-        tags: [.validation, .api, .runtime, .String],
-        legacyFactor: 100
+        tags: [.validation, .api, .runtime, .String]
       )
     )
     result.append(
       BenchmarkInfo(
-        name: "IntegerToString_UInt128_hex",
+        name: "IntegerToString.UInt128.hex",
         runFunction: run_IntegerToString_UInt128_hex,
-        tags: [.validation, .api, .runtime, .String],
-        legacyFactor: 100
+        tags: [.validation, .api, .runtime, .String]
       )
     )
   }
@@ -580,44 +574,36 @@ extension UInt128 {
 
 @inline(never)
 public func run_IntegerToString_Int_decimal(n: Int) {
-  for _ in 0..<n {
-    for _ in 1...100 {
-      for x in intValues {
-        blackHole(String(x, radix: 10))
-      }
+  for _ in 0..<(n*10) {
+    for x in intValues {
+      blackHole(String(x, radix: 10))
     }
   }
 }
 
 @inline(never)
 public func run_IntegerToString_Int_hex(n: Int) {
-  for _ in 0..<n {
-    for _ in 1...100 {
-      for x in intValues {
-        blackHole(String(x, radix: 16))
-      }
+  for _ in 0..<(n*10) {
+    for x in intValues {
+      blackHole(String(x, radix: 16))
     }
   }
 }
 
 @inline(never)
 public func run_IntegerToString_UInt64_decimal(n: Int) {
-  for _ in 0..<n {
-    for _ in 1...100 {
-      for x in uint64Values {
-        blackHole(String(x, radix: 10))
-      }
+  for _ in 0..<(n*10) {
+    for x in uint64Values {
+      blackHole(String(x, radix: 10))
     }
   }
 }
 
 @inline(never)
 public func run_IntegerToString_UInt64_hex(n: Int) {
-  for _ in 0..<n {
-    for _ in 1...100 {
-      for x in uint64Values {
-        blackHole(String(x, radix: 16))
-      }
+  for _ in 0..<(n*10) {
+    for x in uint64Values {
+      blackHole(String(x, radix: 16))
     }
   }
 }
@@ -627,10 +613,8 @@ public func run_IntegerToString_UInt64_hex(n: Int) {
 public func run_IntegerToString_UInt128_decimal(n: Int) {
   let uint128Values = UInt128._values
   for _ in 0..<n {
-    for _ in 1...100 {
-      for x in uint128Values {
-        blackHole(String(x, radix: 10))
-      }
+    for x in uint128Values {
+      blackHole(String(x, radix: 10))
     }
   }
 }
@@ -640,10 +624,8 @@ public func run_IntegerToString_UInt128_decimal(n: Int) {
 public func run_IntegerToString_UInt128_hex(n: Int) {
   let uint128Values = UInt128._values
   for _ in 0..<n {
-    for _ in 1...100 {
-      for x in uint128Values {
-        blackHole(String(x, radix: 16))
-      }
+    for x in uint128Values {
+      blackHole(String(x, radix: 16))
     }
   }
 }
