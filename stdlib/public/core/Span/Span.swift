@@ -751,6 +751,15 @@ extension Span where Element: ~Copyable {
     unsafe (self._pointer == other._pointer) && (self._count == other._count)
   }
 
+  /// Returns a Boolean value indicating whether two instances refer to the same
+  /// memory region.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    unsafe (self._pointer == other._pointer) && (self._count == other._count)
+  }
+
   /// Returns the indices within `self` where the memory represented by `other`
   /// is located, or `nil` if `other` is not located within `self`.
   ///
