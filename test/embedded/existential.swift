@@ -70,9 +70,70 @@ func test() {
     let _: any Any = (StructWithClass(), StructWithClass())
 }
 
+protocol Basic  {
+  func a()
+}
+
+protocol Derived : Basic {
+  func b()
+}
+
+class Implementor : Derived {
+  func a() { print("a") }
+  func b() { print("b") }
+}
+
+extension Int : Derived {
+  func a() { print("a Int \(self)") }
+  func b() { print("b Int \(self)") }
+}
+
+struct MyStruct : Derived {
+  var x = 5
+  func a() { print("a MyStruct \(self.x)") }
+  func b() { print("b MyStruct") }
+}
+
+enum MyEnum : Derived {
+    case a
+    case b(Int)
+
+  func a() {
+    print("a MyEnum ")
+    switch self  {
+      case .a: break
+      case .b(let x):
+        print(x)
+    }
+  }
+
+  func b() {
+    print("b MyEnum ")
+  }
+}
+
+func test2(_ p: any Derived) {
+  p.a()
+  p.b()
+}
+
 @main
 struct Main {
-    static func main() {
-        test()
-    }
+  static func main() {
+    test()
+
+// OUTPUT: a
+// OUTPUT: b
+// OUTPUT: a Int 5
+// OUTPUT: b Int 5
+// OUTPUT: a MyStruct 5
+// OUTPUT: b MyStruct
+// OUTPUT: a MyEnum
+// OUTPUT: 5
+// OUTPUT: b MyEnum
+    test2(Implementor())
+    test2(5)
+    test2(MyStruct())
+    test2(MyEnum.b(5))
+  }
 }

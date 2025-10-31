@@ -126,6 +126,11 @@ inline bool isEmbedded(const ProtocolConformance *c) {
   return c->getType()->getASTContext().LangOpts.hasFeature(Feature::Embedded);
 }
 
+inline bool isEmbeddedWithoutEmbeddedExitentials(const ProtocolConformance *c) {
+  return isEmbedded(c) && !c->getType()->getASTContext().
+    LangOpts.hasFeature(Feature::EmbeddedExistentials);
+}
+
 /// A link entity is some sort of named declaration, combined with all
 /// the information necessary to distinguish specific implementations
 /// of the declaration from each other.
@@ -1137,7 +1142,7 @@ public:
   }
 
   static LinkEntity forProtocolWitnessTable(const ProtocolConformance *C) {
-    if (isEmbedded(C)) {
+    if (isEmbeddedWithoutEmbeddedExitentials(C)) {
       assert(C->getProtocol()->requiresClass());
     }
 

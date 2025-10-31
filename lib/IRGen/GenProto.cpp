@@ -2731,7 +2731,8 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
     // In Embedded Swift, only class-bound wtables are allowed.
-    if (!wt->getConformance()->getProtocol()->requiresClass())
+    if (!wt->getConformance()->getProtocol()->requiresClass() &&
+        !Context.LangOpts.hasFeature(Feature::EmbeddedExistentials))
       return;
   }
 
@@ -3752,7 +3753,9 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   auto proto = conformance.getProtocol();
 
   // In Embedded Swift, only class-bound wtables are allowed.
-  if (srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+  auto &langOpts = srcType->getASTContext().LangOpts;
+  if (langOpts.hasFeature(Feature::Embedded) &&
+      !langOpts.hasFeature(Feature::EmbeddedExistentials)) {
     assert(proto->requiresClass());
   }
 
