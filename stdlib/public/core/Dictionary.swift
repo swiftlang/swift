@@ -916,6 +916,7 @@ extension Dictionary {
     }
   }
 
+  @available(SwiftStdlib 9999, *)
   public mutating func _index(
     forKey key: Key,
     default defaultValue: @autoclosure () -> Value
@@ -929,6 +930,7 @@ extension Dictionary {
     )
   }
 
+  @available(SwiftStdlib 9999, *)
   public mutating func _addValue(_ value: Value, forKey key: Key) -> Bool {
     let (bucket, found) = _variant.mutatingFind(key)
     if !found {

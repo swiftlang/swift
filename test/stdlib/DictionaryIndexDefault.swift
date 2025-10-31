@@ -16,6 +16,8 @@ tests.test("DefaultValueSubscript") {
 }
 
 tests.test("DefaultValueIndexForKey") {
+  guard #available(SwiftStdlib 9999, *) else { return }
+
   var d = ["a": [1], "c": [3]]
   let r = Int.random(in: 0..<1000)
   let i = d._index(forKey: "b", default: [])
@@ -28,6 +30,8 @@ tests.test("DefaultValueIndexForKey") {
 }
 
 tests.test("DictionaryInsertIfNil") {
+  guard #available(SwiftStdlib 9999, *) else { return }
+
   var d = ["a": [1], "c": [3]]
   var inserted: Bool
   let r = Int.random(in: 0..<1000)
