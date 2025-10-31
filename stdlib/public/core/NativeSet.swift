@@ -177,7 +177,7 @@ extension _NativeSet { // Low-level lookup operations
       if unsafe uncheckedElement(at: bucket) == element {
         return (bucket, true)
       }
-      bucket = unsafe hashTable.bucket(wrappedAfter: bucket)
+      unsafe bucket = unsafe hashTable.bucket(wrappedAfter: bucket)
     }
     return (bucket, false)
   }
