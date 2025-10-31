@@ -1822,7 +1822,8 @@ reevaluate_if_taskgroup_has_results:;
     // We're going back to running the task, so if we suspended before,
     // we need to flag it as running again.
     if (hasSuspended) {
-      waitingTask->flagAsRunning();
+      // Continuting execution inline so we shouldn't have to reset priority here
+      assert(waitingTask->flagAsRunning() == 0);
     }
 
     // Success! We are allowed to poll.
