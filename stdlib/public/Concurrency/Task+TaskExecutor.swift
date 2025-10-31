@@ -146,7 +146,7 @@ public func withTaskExecutorPreference<T, Failure>(
   }
 
   let taskExecutorBuiltin: Builtin.Executor =
-    unsafe taskExecutor.asUnownedTaskExecutor().executor
+    taskExecutor.asUnownedTaskExecutor().executor
 
   let record = unsafe _pushTaskExecutorPreference(taskExecutorBuiltin)
   defer {
