@@ -290,13 +290,9 @@ extension CheckedContinuation {
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
-@inlinable
 @available(SwiftStdlib 5.1, *)
-#if !$Embedded
-@backDeployed(before: SwiftStdlib 6.0)
-#endif
-public func withCheckedContinuation<T>(
-  isolation: isolated (any Actor)? = #isolation,
+@_alwaysEmitIntoClient
+nonisolated(nonsending) public func withCheckedContinuation<T>(
   function: String = #function,
   _ body: (CheckedContinuation<T, Never>) -> Void
 ) async -> sending T {
@@ -313,17 +309,17 @@ public func withCheckedContinuation<T>(
 //
 // This function also doubles as an ABI-compatibility shim predating the
 // introduction of #isolation.
-@available(SwiftStdlib 5.1, *)
-@_unsafeInheritExecutor // ABI compatibility with Swift 5.1
-@_silgen_name("$ss23withCheckedContinuation8function_xSS_yScCyxs5NeverOGXEtYalF")
-public func _unsafeInheritExecutor_withCheckedContinuation<T>(
-  function: String = #function,
-  _ body: (CheckedContinuation<T, Never>) -> Void
-) async -> T {
-  return await unsafe withUnsafeContinuation {
-    body(unsafe CheckedContinuation(continuation: $0, function: function))
-  }
-}
+//@available(SwiftStdlib 5.1, *)
+//@_unsafeInheritExecutor // ABI compatibility with Swift 5.1
+//@_silgen_name("$ss23withCheckedContinuation8function_xSS_yScCyxs5NeverOGXEtYalF")
+//public func _unsafeInheritExecutor_withCheckedContinuation<T>(
+//  function: String = #function,
+//  _ body: (CheckedContinuation<T, Never>) -> Void
+//) async -> T {
+//  return await unsafe withUnsafeContinuation {
+//    body(unsafe CheckedContinuation(continuation: $0, function: function))
+//  }
+//}
 
 
 /// Invokes the passed in closure with a checked continuation for the current task.
@@ -356,14 +352,16 @@ public func _unsafeInheritExecutor_withCheckedContinuation<T>(
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
 @inlinable
 @available(SwiftStdlib 5.1, *)
-#if !$Embedded
-@backDeployed(before: SwiftStdlib 6.0)
-#endif
-public func withCheckedThrowingContinuation<T>(
-  isolation: isolated (any Actor)? = #isolation,
+@_alwaysEmitIntoClient
+nonisolated(nonsending) public func withCheckedThrowingContinuation<T>(
   function: String = #function,
   _ body: (CheckedContinuation<T, Error>) -> Void
 ) async throws -> sending T {
+  // ABI NOTE: Interestingly enough the 'nonisolated(nonsending)' version of this func has the same ABI
+  // as the initial implementation, that was '@_unsafeInheritExecutor'. So we can remove the "ABI shim"
+  // as the current correct impl and the previous impl are both one and the same.
+  //
+  // We need to keep around the isolated parameter ABI for compatibility though.
   return try await Builtin.withUnsafeThrowingContinuation {
     let unsafeContinuation = unsafe UnsafeContinuation<T, Error>($0)
     return body(unsafe CheckedContinuation(continuation: unsafeContinuation,
@@ -377,17 +375,17 @@ public func withCheckedThrowingContinuation<T>(
 //
 // This function also doubles as an ABI-compatibility shim predating the
 // introduction of #isolation.
-@available(SwiftStdlib 5.1, *)
-@_unsafeInheritExecutor // ABI compatibility with Swift 5.1
-@_silgen_name("$ss31withCheckedThrowingContinuation8function_xSS_yScCyxs5Error_pGXEtYaKlF")
-public func _unsafeInheritExecutor_withCheckedThrowingContinuation<T>(
-  function: String = #function,
-  _ body: (CheckedContinuation<T, Error>) -> Void
-) async throws -> T {
-  return try await unsafe withUnsafeThrowingContinuation {
-    body(unsafe CheckedContinuation(continuation: $0, function: function))
-  }
-}
+//@available(SwiftStdlib 5.1, *)
+//@_unsafeInheritExecutor // ABI compatibility with Swift 5.1
+//@_silgen_name("$ss31withCheckedThrowingContinuation8function_xSS_yScCyxs5Error_pGXEtYaKlF")
+//public func _unsafeInheritExecutor_withCheckedThrowingContinuation<T>(
+//  function: String = #function,
+//  _ body: (CheckedContinuation<T, Error>) -> Void
+//) async throws -> T {
+//  return try await unsafe withUnsafeThrowingContinuation {
+//    body(unsafe CheckedContinuation(continuation: $0, function: function))
+//  }
+//}
 
 #if _runtime(_ObjC)
 
