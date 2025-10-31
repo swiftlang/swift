@@ -401,7 +401,7 @@ public:
       auto begin = getNanosecondsOnSuspendingClock();
       ResumeTask(ResumeContext);
       auto end = getNanosecondsOnSuspendingClock();
-      ranForNanoseconds(end - start);
+      ranForNanoseconds(end - begin);
     } else {
       return ResumeTask(ResumeContext); // 'return' forces tail call
     }
