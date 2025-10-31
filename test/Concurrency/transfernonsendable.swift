@@ -2001,3 +2001,36 @@ nonisolated(nonsending) func testCallNonisolatedNonsending(_ x: NonSendableKlass
   // expected-ni-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to nonisolated global function 'useValueAsyncConcurrent' risks causing data races between nonisolated and nonisolated(nonsending) task-isolated uses}}
   // expected-ni-ns-note @-2 {{sending task-isolated 'x' to @concurrent global function 'useValueAsyncConcurrent' risks causing data races between @concurrent and task-isolated uses}}
 }
+
+enum RequireSrcWhenStoringEvenWhenSendable {
+  func test<T: Sendable>(t: T) {
+    var result: T = t
+    Task { // expected-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+      // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
+      result = t
+    }
+    useValue(result) // expected-note {{access can happen concurrently}}
+  }
+
+  func test2() {
+    var result: Any = 0
+    Task { // expected-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+      // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
+      result = 0
+    }
+    useValue(result) // expected-note {{access can happen concurrently}}
+  }
+
+  protocol Initializable {
+    init()
+  }
+
+  func test3<T: Initializable & SendableMetatype>(type: T.Type) {
+    var result = type.init()
+    Task { // expected-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+      // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
+      result = type.init()
+    }
+    useValue(result) // expected-note {{access can happen concurrently}}
+  }
+}
