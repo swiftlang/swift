@@ -1652,12 +1652,43 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         string(APPEND stdlib_target_triple ${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
         set(stdlib_deployment_version_flag -DCMAKE_OSX_DEPLOYMENT_TARGET=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
       endif()
+      set(compatibility_target_triple ${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}${COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_${sdk}})
 
       if(sdk STREQUAL "OSX" AND SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION VERSION_LESS "10.15")
         set(build_concurrency NO)
       else()
         set(build_concurrency YES)
       endif()
+
+      ExternalProject_Add("${stdlib_target}-retainreleaseclient"
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/toolchain/ClientRetainRelease"
+        # TODO: Add this once we're ready to start swapping out the libraries
+        #       for testing
+        # INSTALL_DIR "${CMAKE_BINARY_DIR}/"
+
+        DEPENDS PopulateRuntimeSourceDir
+        # To ensure incremental builds work as expected
+        BUILD_ALWAYS 1
+        CMAKE_ARGS
+          -DCMAKE_INSTALL_LIBDIR:FILEPATH=lib
+          # Compiler will see mismatched swift modules and fail initial checks
+          -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
+          -DBUILD_SHARED_LIBS:BOOLEAN=YES # TODO: Make this configurable
+          ${stdlib_cache_file_flag}
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=${COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_${sdk}}
+          -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+          -DCMAKE_INSTALL_PREFIX:FILEPATH=<INSTALL_DIR>
+          -DCMAKE_Swift_COMPILER:FILEPATH=$<IF:$<BOOL:${CMAKE_CROSSCOMPILING}>,${CMAKE_Swift_COMPILER},$<PATH:REPLACE_FILENAME,$<TARGET_FILE:swift-frontend>,swiftc>>
+          -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
+          -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
+          -DCMAKE_ASM_COMPILER:FILEPATH=${CMAKE_ASM_COMPILER}
+          -DCMAKE_Swift_COMPILER_TARGET:STRING=${compatibility_target_triple}
+          -DCMAKE_C_COMPILER_TARGET:STRING=${compatibility_target_triple}
+          -DCMAKE_CXX_COMPILER_TARGET:STRING=${compatibility_target_triple}
+          -DCMAKE_ASM_COMPILER_TARGET:STRING=${compatibility_target_triple}
+          -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
+          -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+          -DSwiftCore_INSTALL_NESTED_SUBDIR=YES)
 
       ExternalProject_Add("${stdlib_target}-core"
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Core"
@@ -1735,6 +1766,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_Swift_COMPILER:FILEPATH=$<IF:$<BOOL:${CMAKE_CROSSCOMPILING}>,${CMAKE_Swift_COMPILER},$<PATH:REPLACE_FILENAME,$<TARGET_FILE:swift-frontend>,swiftc>>
           -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
           -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
+          -DCMAKE_ASM_COMPILER:FILEPATH=${CMAKE_ASM_COMPILER}
           -DCMAKE_Swift_COMPILER_TARGET:STRING=${stdlib_target_triple}
           -DCMAKE_C_COMPILER_TARGET:STRING=${stdlib_target_triple}
           -DCMAKE_CXX_COMPILER_TARGET:STRING=${stdlib_target_triple}
