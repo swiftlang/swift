@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -target %target-swift-5.1-abi-triple
-// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -target %target-swift-5.1-abi-triple -enable-upcoming-feature NonisolatedNonsendingByDefault
+// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -verify-additional-prefix ni- -target %target-swift-5.1-abi-triple
+// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -verify-additional-prefix ni-ns- -target %target-swift-5.1-abi-triple -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -61,8 +61,12 @@ extension MyActor {
         _ = self
         _ = sc
 
-        Task { // expected-error {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-          // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
+        Task {
+          // expected-ni-error @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+          // expected-ni-note @-2 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
+          // expected-ni-ns-error @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
+          // expected-ni-ns-note @-4 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
+
           _ = sc
         }
 
