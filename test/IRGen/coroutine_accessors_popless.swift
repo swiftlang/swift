@@ -58,16 +58,17 @@
 // CHECK-arm64e-SAME:    i64 40879 },
 // CHECK-arm64e-SAME:  section "llvm.ptrauth",
 // CHECK-arm64e-SAME:  align 8
-// CHECK-LABEL: _swift_coro_malloc_allocator = linkonce_odr hidden constant %swift.coro_allocator {
-// CHECK-SAME:       i32 258,
-// CHECK-SAME:       malloc
-// CHECK-SAME:       free
-// CHECK-SAME:  }
+// CHECK-apple-LABEL: _swift_coro_typed_malloc_allocator = linkonce_odr hidden constant %swift.coro_allocator {
+// CHECK-apple-SAME:       i32 259,
+// CHECK-apple-SAME:       _swift_coro_typed_malloc
+// CHECK-apple-SAME:       _swift_coro_free 
+// CHECK-apple-SAME:  }
 
 // CHECK-LABEL: @_swift_coro_alloc(
 // CHECK-SAME:      ptr [[FRAME:%[^,]+]]
 // CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]],
-// CHECK-SAME:      i64 [[SIZE:%[^)]+]]
+// CHECK-SAME:      i64 [[SIZE:%[^,]+]]
+// CHECK-SAME:      i64 [[TYPE_ID:%[^)]+]]
 // CHECK-SAME:  )
 // CHECK-SAME:  {
 // CHECK:       entry:
@@ -88,7 +89,12 @@
 // CHECK-arm64e:  [[ALLOCATE_FN_BITS:%[^,]+]] = ptrtoint ptr [[ALLOCATE_FN]] to i64
 // CHECK-arm64e:  [[ALLOCATE_FN_BITS_AUTHED:%[^,]+]] = call i64 @llvm.ptrauth.auth(i64 [[ALLOCATE_FN_BITS]], i32 0, i64 24469)
 // CHECK-arm64e:  [[ALLOCATE_FN:%[^,]+]] = inttoptr i64 [[ALLOCATE_FN_BITS_AUTHED]]
-// CHECK:         [[ALLOCATION:%[^,]+]] = call swiftcc ptr [[ALLOCATE_FN]](ptr [[FRAME]], ptr swiftcoro [[ALLOCATOR]], [[INT]] [[SIZE]])
+// CHECK:         [[ALLOCATION:%[^,]+]] = call swiftcc ptr [[ALLOCATE_FN]](
+// CHECK-SAME:        ptr [[FRAME]],
+// CHECK-SAME:        ptr swiftcoro [[ALLOCATOR]],
+// CHECK-SAME:        [[INT]] [[SIZE]],
+// CHECK-SAME:        [[INT]] [[TYPE_ID]]
+// CHECK-SAME:    )
 // CHECK:         ret ptr [[ALLOCATION]]
 // CHECK:       }
 
@@ -100,7 +106,7 @@
 // CHECK-SAME:  {
 // CHECK:       entry:
 // CHECK:         [[BAIL:%[^,]+]] = icmp eq ptr [[ALLOCATOR]], null
-// CHECK:         br i1 [[USE_POPLESS]],
+// CHECK:         br i1 [[BAIL]],
 // CHECK-SAME:        label %null_allocator
 // CHECK-SAME:        label %nonnull_allocator
 // CHECK:       null_allocator:
@@ -238,14 +244,15 @@ public var force_yield_once_convention : () {
 //           :            i32 0
 //           :            i32 1
 //           :        )
+// CHECK:         [[TYPE_ID:%[^,]+]] = load i64
 // CHECK:         [[SIZE:%[^,]+]] = zext i32 {{%[^,]+}} to i64
-// CHECK:         [[ALLOCATION:%[^,]+]] = call token @llvm.coro.alloca.alloc.i64(i64 [[SIZE]], i32 16)
+// CHECK:         [[ALLOCATION:%[^,]+]] = call token{{.*}} @llvm.coro.alloca.alloc.frame.i64(i64 [[SIZE]], i32 16, i64 [[TYPE_ID]])
 // CHECK:         [[FRAME:%[^,]+]] = call ptr @llvm.coro.alloca.get(token [[ALLOCATION]])
 // CHECK:         call void @llvm.lifetime.start.p0(i64 -1, ptr [[FRAME]])
 // CHECK:         [[RAMP:%[^,]+]] = call ptr @llvm.coro.prepare.retcon(ptr @"$s27coroutine_accessors_popless1iSivx")
 // CHECK:         [[RETVAL:%[^,]+]] = call swiftcorocc { ptr, ptr } [[RAMP]](
 // CHECK-SAME:         [[FRAME]],
-// CHECK-SAME:         _swift_coro_malloc_allocator
+// CHECK-apple-SAME:         _swift_coro_typed_malloc_allocator
 // CHECK-SAME:    )
 // CHECK:         [[CONTINUATION:%[^,]+]] = extractvalue { ptr, ptr } [[RETVAL]], 0
 // CHECK:         [[YIELD:%[^,]+]] = extractvalue { ptr, ptr } [[RETVAL]], 1
@@ -254,7 +261,7 @@ public var force_yield_once_convention : () {
 // CHECK-SAME:    )
 // CHECK:         call swiftcorocc void [[CONTINUATION]](
 // CHECK-SAME:        [[FRAME]],
-// CHECK-SAME:        _swift_coro_malloc_allocator
+// CHECK-apple-SAME:        _swift_coro_typed_malloc_allocator
 // CHECK-SAME:    )
 // CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
 // CHECK:         call void @llvm.coro.alloca.free.frame(token [[ALLOCATION]])
@@ -285,8 +292,9 @@ public var force_yield_once_2_convention : () {
 //           :            i32 0
 //           :            i32 1
 //           :        )
+// CHECK:         [[TYPE_ID:%[^,]+]] = load i64
 // CHECK:         [[SIZE:%[^,]+]] = zext i32 {{%[^,]+}} to i64
-// CHECK:         [[ALLOCATION:%[^,]+]] = call token @llvm.coro.alloca.alloc.frame.i64(i64 [[SIZE]], i32 16)
+// CHECK:         [[ALLOCATION:%[^,]+]] = call token{{.*}} @llvm.coro.alloca.alloc.frame.i64(i64 [[SIZE]], i32 16, i64 [[TYPE_ID]])
 // CHECK:         [[FRAME:%[^,]+]] = call ptr @llvm.coro.alloca.get(token [[ALLOCATION]])
 // CHECK:         call void @llvm.lifetime.start.p0(i64 -1, ptr [[FRAME]])
 // CHECK:         [[RAMP:%[^,]+]] = call ptr @llvm.coro.prepare.retcon(ptr @"$s27coroutine_accessors_popless1iSivx")

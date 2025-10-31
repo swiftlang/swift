@@ -771,10 +771,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
 
-  CoroFunctionPointerTy = createStructType(*this, "swift.coro_func_pointer",
-                                           {RelativeAddressTy, Int32Ty}, true);
+  CoroFunctionPointerTy =
+      createStructType(*this, "swift.coro_func_pointer",
+                       {RelativeAddressTy, Int32Ty, Int64Ty}, true);
   CoroAllocateFnTy = llvm::FunctionType::get(
-      CoroAllocationTy, {CoroAllocationTy, CoroAllocatorPtrTy, SizeTy}, /*isVarArg*/ false);
+      CoroAllocationTy, {CoroAllocationTy, CoroAllocatorPtrTy, SizeTy, Int64Ty},
+      /*isVarArg*/ false);
   CoroDeallocateFnTy = llvm::FunctionType::get(
       VoidTy, {CoroAllocationTy, CoroAllocatorPtrTy, CoroAllocationTy}, /*isVarArg*/ false);
   CoroAllocatorFlagsTy = Int32Ty;

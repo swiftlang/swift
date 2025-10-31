@@ -7677,6 +7677,9 @@ llvm::GlobalValue *irgen::emitCoroFunctionPointer(IRGenModule &IGM,
       initBuilder.beginStruct(IGM.CoroFunctionPointerTy));
   builder.addCompactFunctionReference(function);
   builder.addInt32(size.getValue());
+  auto *typeId = IGM.getMallocTypeId(function);
+  ASSERT(typeId->getIntegerType() == IGM.Int64Ty);
+  builder.addInt64(typeId->getLimitedValue());
   return cast<llvm::GlobalValue>(
       IGM.defineCoroFunctionPointer(entity, builder.finishAndCreateFuture()));
 }
