@@ -4148,7 +4148,7 @@ SILGlobalVariable *SILDeserializer::lookupSILGlobalVariable(StringRef name,
 
 SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
                                                   bool byAsmName) {
-  // If we're looking up the function by its AsmName, check that table.
+  // If we're looking up the variable by its AsmName, check that table.
   if (byAsmName) {
     if (!AsmNameTable)
       return nullptr;

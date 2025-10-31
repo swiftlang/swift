@@ -451,7 +451,7 @@ public:
   llvm::DenseMap<SILInstruction *, llvm::SmallVector<StackPackAlloc, 2>>
       StackPackAllocs;
 
-  IRGenSILFunction(IRGenModule &IGM, SILFunction *f);
+  IRGenSILFunction(IRGenModule &IGM, SILFunction *f, llvm::Function *llvmF);
   ~IRGenSILFunction();
   
   /// Generate IR for the SIL Function.
@@ -1887,10 +1887,9 @@ llvm::Value *LoweredValue::getSingletonExplosion(IRGenFunction &IGF,
   llvm_unreachable("bad kind");
 }
 
-IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
-    : IRGenFunction(IGM,
-                    IGM.getAddrOfSILFunction(f, ForDefinition,
-                                             f->isDynamicallyReplaceable()),
+IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f,
+                                   llvm::Function *llvmF)
+    : IRGenFunction(IGM, llvmF,
                     f->isPerformanceConstraint(),
                     f->getOptimizationMode(), f->getDebugScope(),
                     f->getLocation()),
@@ -2558,7 +2557,17 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
     noteUseOfMetadataByCXXInterop(IRGen, f, TypeExpansionContext(*f));
 
   PrettyStackTraceSILFunction stackTrace("emitting IR", f);
-  IRGenSILFunction(*this, f).emitSILFunction();
+
+  // Get the LLVM function we will emit. If it has already been defined, error.
+  auto llvmF = getAddrOfSILFunction(f, ForDefinition,
+                                    f->isDynamicallyReplaceable());
+  if (!llvmF->empty()) {
+    auto &diags = Context.Diags;
+    diags.diagnose(f->getLocation().getSourceLoc(), diag::ir_function_redefinition_external, llvmF->getName());
+    return;
+  }
+
+  IRGenSILFunction(*this, f, llvmF).emitSILFunction();
 }
 
 void IRGenSILFunction::emitSILFunction() {

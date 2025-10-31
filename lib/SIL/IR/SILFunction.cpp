@@ -443,7 +443,7 @@ bool SILFunction::hasForeignBody() const {
 }
 
 void SILFunction::setAsmName(StringRef value) {
-  assert((AsmName.empty() || value == AsmName) && "Cannot change asmname");
+  ASSERT((AsmName.empty() || value == AsmName) && "Cannot change asmname");
   AsmName = value;
 
   if (!value.empty()) {
