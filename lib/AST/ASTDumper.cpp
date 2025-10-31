@@ -680,12 +680,22 @@ static StringRef getDumpString(StringRef s) {
 static unsigned getDumpString(unsigned value) {
   return value;
 }
-static size_t getDumpString(size_t value) {
-  return value;
-}
-static void *getDumpString(void *value) { return value; }
+static size_t getDumpString(size_t value) { return value; }
 
 static StringRef getDumpString(Identifier ident) { return ident.str(); }
+
+// If you are reading this comment because a compiler error directed you
+// here, it's probably because you have tried to pass a pointer directly
+// into a function like `printField`. Please do not do this -- it makes
+// the output nondeterministic. For the default S-expression output this
+// is not typically an issue (as it is used mainly for debugging), but
+// this is particularly problematic for the JSON format since build
+// systems may want to cache those outputs based on the content hash.
+//
+// Please call `printPointerField` instead. The output format will be
+// the same for the default formatter, but the JSON formatter will
+// replace those pointers with unique deterministic identifiers.
+static void *getDumpString(void *value) = delete;
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.
@@ -813,6 +823,10 @@ namespace {
     virtual void printSourceRange(const SourceRange R, const ASTContext *Ctx,
                                   Label label) = 0;
 
+    /// Prints the given pointer to an output stream, transforming the pointer
+    /// if necessary to make it safe for the output format.
+    virtual void printPointerToStream(void *pointer, llvm::raw_ostream &OS) = 0;
+
     /// Indicates whether the output format is meant to be parsable. Parsable
     /// output should use structure rather than stringification to convey
     /// detailed information, and generally provides more information than the
@@ -906,6 +920,12 @@ namespace {
       }, label, RangeColor);
     }
 
+    void printPointerToStream(void *pointer, llvm::raw_ostream &OS) override {
+      // The default S-expression format leaves the pointer as-is, since this
+      // is useful when dumping AST nodes in the debugger.
+      OS << pointer;
+    }
+
     bool isParsable() const override { return false; }
   };
 
@@ -914,8 +934,12 @@ namespace {
     llvm::json::OStream OS;
     std::vector<bool> InObjectStack;
 
+    llvm::DenseMap<void *, int> DeterministicPointerIDs;
+    int NextPointerID;
+
   public:
-    JSONWriter(raw_ostream &os, unsigned indent = 0) : OS(os, indent) {}
+    JSONWriter(raw_ostream &os, unsigned indent = 0)
+        : OS(os, indent), NextPointerID(1) {}
 
     void printRecArbitrary(std::function<void(Label)> body,
                            Label label) override {
@@ -1014,6 +1038,21 @@ namespace {
 
       OS.objectEnd();
       OS.attributeEnd();
+    }
+
+    void printPointerToStream(void *pointer, llvm::raw_ostream &OS) override {
+      // JSON output may be used by build systems that want deterministic
+      // output for caching purposes. Generate a unique ID the first time
+      // we see a new pointer.
+      int pointerID;
+      if (auto it = DeterministicPointerIDs.find(pointer);
+          it != DeterministicPointerIDs.end()) {
+        pointerID = it->second;
+      } else {
+        pointerID = NextPointerID++;
+        DeterministicPointerIDs[pointer] = pointerID;
+      }
+      OS << "replaced-pointer-" << pointerID;
     }
 
     bool isParsable() const override { return true; }
@@ -1495,6 +1534,18 @@ namespace {
                     label, color);
     }
 
+    /// Print a field that is a bare pointer as a short keyword-style value.
+    /// For parsable output formats that need to be deterministic, each
+    /// pointer will be replaced by a unique ID. The same pointer will be
+    /// mapped to the same ID, so such nodes can still be related to each
+    /// other across the tree.
+    void printPointerField(void *value, Label label,
+                           TerminalColor color = FieldLabelColor) {
+      printFieldRaw(
+          [&](raw_ostream &OS) { Writer.printPointerToStream(value, OS); },
+          label, color);
+    }
+
     /// Print a field with a long value that will be automatically quoted and
     /// escaped, printing the value by passing a closure that takes a
     /// \c raw_ostream.
@@ -1668,8 +1719,8 @@ namespace {
 
     template <typename T>
     void printDeclContext(const T *D) {
-      printField(static_cast<void *>(D->getDeclContext()),
-                 Label::always("decl_context"));
+      printPointerField(static_cast<void *>(D->getDeclContext()),
+                        Label::always("decl_context"));
     }
 
     /// Prints a field containing the name or the USR (based on parsability of
@@ -2704,8 +2755,8 @@ namespace {
                   printHead("pattern_entry", FieldLabelColor, label);
 
                   if (PBD->getInitContext(idx))
-                    printField(PBD->getInitContext(idx),
-                               Label::always("init_context"));
+                    printPointerField(PBD->getInitContext(idx),
+                                      Label::always("init_context"));
 
                   printRec(PBD->getPattern(idx), Label::optional("pattern"));
                   if (PBD->getOriginalInit(idx)) {
@@ -4158,8 +4209,7 @@ public:
 
   void visitOpaqueValueExpr(OpaqueValueExpr *E, Label label) {
     printCommon(E, "opaque_value_expr", label);
-    printNameRaw([&](raw_ostream &OS) { OS << (void*)E; },
-                 Label::optional("identity"));
+    printPointerField(static_cast<void *>(E), Label::optional("identity"));
     printFoot();
   }
 
@@ -5163,7 +5213,7 @@ public:
   void visitCustomAttr(CustomAttr *Attr, Label label) {
     printCommon(Attr, "custom_attr", label);
 
-    printField(
+    printPointerField(
         static_cast<void *>(static_cast<DeclContext *>(Attr->getInitContext())),
         Label::always("init_context"));
 
@@ -6323,7 +6373,7 @@ namespace {
                               Label label) {
       printCommon(className, label);
 
-      printField(static_cast<void *>(T), Label::always("address"));
+      printPointerField(static_cast<void *>(T), Label::always("address"));
       printFlag(T->requiresClass(), "class");
       if (auto layout = T->getLayoutConstraint()) {
         printFieldRaw([&](raw_ostream &OS) {
