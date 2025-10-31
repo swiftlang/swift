@@ -622,6 +622,9 @@ extension LifetimeDependence.Scope {
 ///   walkDown(dependence: LifetimeDependence)
 ///
 /// Note: this may visit values that are not dominated by `dependence` because of dependent phi operands.
+///
+/// WARNING: Do not return .abortWalk at this level or below. .abortWalk may only be returned by an overridden callback
+/// or the default implementation of unknownAddressUse().
 protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
                                           OwnershipUseVisitor,
                                           AddressUseVisitor {
@@ -1069,12 +1072,14 @@ extension LifetimeDependenceDefUseWalker {
         return loadedAddressUse(of: localAccess.operand!, intoValue: load)
       case let copyAddr as SourceDestAddrInstruction:
         return loadedAddressUse(of: localAccess.operand!, intoAddress: copyAddr.destinationOperand)
+      case let castAddr as CheckedCastAddrBranchInst:
+        return loadedAddressUse(of: localAccess.operand!, intoAddress: castAddr.destinationOperand)
       case is SwitchEnumAddrInst:
         // switch_enum_addr does not produce any values. Subsequent uses of the address (unchecked_enum_data_addr)
         // directly use the original address.
         return .continueWalk
       default:
-        return .abortWalk
+        return unknownAddressUse(of: localAccess.operand!)
       }
     case .dependenceSource:
       switch localAccess.instruction! {
@@ -1086,7 +1091,7 @@ extension LifetimeDependenceDefUseWalker {
       case let md as MarkDependenceAddrInst:
         return loadedAddressUse(of: localAccess.operand!, intoAddress: md.addressOperand)
       default:
-        return .abortWalk
+        return unknownAddressUse(of: localAccess.operand!)
       }
     case .dependenceDest:
       // Simply a marker that indicates the start of an in-memory dependent value. If this was a mark_dependence, uses
