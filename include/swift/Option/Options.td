@@ -2275,6 +2275,10 @@ def cache_compile_job:  Flag<["-"], "cache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Enable compiler caching">;
 
+def no_cache_compile_job:  Flag<["-"], "no-cache-compile-job">,
+  Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
+  HelpText<"Disable compiler caching">;
+
 def cache_remarks:  Flag<["-"], "Rcache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Show remarks for compiler caching">;

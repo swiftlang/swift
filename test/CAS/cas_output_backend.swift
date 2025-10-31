@@ -2,6 +2,7 @@
 // RUN: mkdir -p %t/cas
 
 // RUN: not %target-swift-frontend -c -cache-compile-job -cas-path %t/cas %s -o %t/test.o 2>&1 | %FileCheck %s --check-prefix=NO-CASFS
+// RUN: not %target-swift-frontend -c -no-cache-compile-job -cache-compile-job -cas-path %t/cas %s -o %t/test.o 2>&1 | %FileCheck %s --check-prefix=NO-CASFS
 // NO-CASFS: caching is enabled without CAS file-system options
 
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test -O \
