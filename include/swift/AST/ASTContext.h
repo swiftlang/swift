@@ -1613,6 +1613,10 @@ public:
   }
 
 private:
+  friend class BuiltinGenericType;
+  GenericSignature &getCachedBuiltinGenericTypeSignature(TypeKind kind);
+
+private:
   friend Decl;
 
   std::optional<ExternalSourceLocs *> getExternalSourceLocs(const Decl *D);

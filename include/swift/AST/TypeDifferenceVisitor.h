@@ -134,13 +134,28 @@ public:
                                       CanBuiltinUnboundGenericType type2) {
     return asImpl().visitDifferentTypeStructure(type1, type2);
   }
-  
-  bool visitBuiltinFixedArrayType(CanBuiltinFixedArrayType type1,
-                                  CanBuiltinFixedArrayType type2) {
-    if (asImpl().visit(type1->getSize(), type2->getSize())) {
+
+  bool visitBuiltinGenericType(CanBuiltinGenericType type1,
+                               CanBuiltinGenericType type2) {
+    if (type1->getBuiltinTypeKind() != type2->getBuiltinTypeKind()) {
       return true;
     }
-    return asImpl().visit(type1->getElementType(), type2->getElementType());
+
+    auto subs1 = type1->getSubstitutions();
+    auto subs2 = type2->getSubstitutions();
+
+    for (unsigned i : indices(subs1.getReplacementTypes())) {
+      if (asImpl().visit(CanType(subs1.getReplacementTypes()[i]),
+                         CanType(subs2.getReplacementTypes()[i]))) {
+        return true;
+      }
+    }
+    for (unsigned i : indices(subs1.getConformances())) {
+      if (subs1.getConformances()[i] != subs2.getConformances()[i]) {
+        return true;
+      }
+    }
+    return false;
   }
 
   bool visitPackType(CanPackType type1, CanPackType type2) {
