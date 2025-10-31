@@ -646,7 +646,7 @@ const void *AsyncTask::getResumeFunctionForLogging(bool isStarting) {
   return __ptrauth_swift_runtime_function_entry_strip(result);
 }
 
-constinit std::atomic<bool> AsyncTask::_isTimeSpentRunningTracked { false };
+std::atomic<bool> AsyncTask::_isTimeSpentRunningTracked { false };
 
 __attribute__((cold)) uint64_t AsyncTask::getTimeSpentRunning(void) {
   uint64_t result = 0;

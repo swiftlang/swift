@@ -811,7 +811,7 @@ private:
 
   /// Whether or not the concurrency library is tracking the time spent running
   /// tasks.
-  static constinit std::atomic<bool> _isTimeSpentRunningTracked;
+  static std::atomic<bool> _isTimeSpentRunningTracked;
 
   /// Record that the task spent an additional `ns` nanoseconds running.
   void ranForNanoseconds(uint64_t ns);
