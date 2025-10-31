@@ -22,37 +22,58 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
         super(CloneTestCase, self).__init__(*args, **kwargs)
 
     def test_simple_clone(self):
-        self.call([self.update_checkout_path,
-                   '--config', self.config_path,
-                   '--source-root', self.source_root,
-                   '--clone'])
+        self.call(
+            [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--source-root",
+                self.source_root,
+                "--clone",
+            ]
+        )
 
         for repo in self.get_all_repos():
             repo_path = os.path.join(self.source_root, repo)
             self.assertTrue(os.path.isdir(repo_path))
 
     def test_clone_with_additional_scheme(self):
-        output = self.call([self.update_checkout_path,
-                            '--config', self.config_path,
-                            '--config', self.additional_config_path,
-                            '--source-root', self.source_root,
-                            '--clone',
-                            '--scheme', 'extra',
-                            '--verbose'])
+        output = self.call(
+            [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--config",
+                self.additional_config_path,
+                "--source-root",
+                self.source_root,
+                "--clone",
+                "--scheme",
+                "extra",
+                "--verbose",
+            ]
+        )
 
         # Test that we're actually checking out the 'extra' scheme based on the output
         self.assertIn("git checkout refs/heads/main", output.decode("utf-8"))
 
     def test_manager_not_called_on_long_socket(self):
-        fake_tmpdir = '/tmp/very/' + '/long' * 20 + '/tmp'
+        fake_tmpdir = "/tmp/very/" + "/long" * 20 + "/tmp"
 
-        with mock.patch('tempfile.gettempdir', return_value=fake_tmpdir), \
-            mock.patch('multiprocessing.Manager') as mock_manager:
+        with mock.patch("tempfile.gettempdir", return_value=fake_tmpdir), mock.patch(
+            "multiprocessing.Manager"
+        ) as mock_manager:
 
-            self.call([self.update_checkout_path,
-                    '--config', self.config_path,
-                    '--source-root', self.source_root,
-                    '--clone'])
+            self.call(
+                [
+                    self.update_checkout_path,
+                    "--config",
+                    self.config_path,
+                    "--source-root",
+                    self.source_root,
+                    "--clone",
+                ]
+            )
             # Ensure that we do not try to create a Manager when the tempdir
             # is too long.
             mock_manager.assert_not_called()
@@ -85,9 +106,7 @@ class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):
     def test_clone(self):
         self.call(self.base_args + ["--scheme", self.scheme_name, "--clone"])
 
-        missing_repo_path = os.path.join(
-            self.source_root, self.get_all_repos().pop()
-        )
+        missing_repo_path = os.path.join(self.source_root, self.get_all_repos().pop())
         self.assertFalse(os.path.isdir(missing_repo_path))
 
     # Test that we do not update a repository that is not listed in the given
