@@ -697,7 +697,9 @@ public:
 
   /// Set the builtin initializer that will be used to construct the
   /// literal.
-  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer);
+  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
+    BuiltinInitializer = builtinInitializer;
+  }
 };
 
 /// The 'nil' literal.
