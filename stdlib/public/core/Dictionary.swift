@@ -937,6 +937,16 @@ extension Dictionary {
 #endif
   }
 
+  public mutating func _addValue(_ value: Value, forKey key: Key) -> Bool {
+    let (bucket, found) = _variant.mutatingFind(key)
+    if !found {
+      _variant.asNative._insert(at: bucket, key: key, value: value)
+      return true
+    } else {
+      return false
+    }
+  }
+
   /// Returns a new dictionary containing the keys of this dictionary with the
   /// values transformed by the given closure.
   ///
