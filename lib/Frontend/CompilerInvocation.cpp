@@ -782,7 +782,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
                          DiagnosticEngine &Diags,
                          const FrontendOptions &FrontendOpts) {
   using namespace options;
-  Opts.EnableCaching |= Args.hasArg(OPT_cache_compile_job);
+  Opts.EnableCaching |= Args.hasFlag(
+      OPT_cache_compile_job, OPT_no_cache_compile_job, /*Default=*/false);
   Opts.EnableCachingRemarks |= Args.hasArg(OPT_cache_remarks);
   Opts.CacheSkipReplay |= Args.hasArg(OPT_cache_disable_replay);
   if (const Arg *A = Args.getLastArg(OPT_cas_path))
@@ -2637,9 +2638,11 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   // If no style options are specified, default to Swift style, unless it is
   // under swift caching, which llvm style is preferred because LLVM style
   // replays a lot faster.
-  Opts.PrintedFormattingStyle = Args.hasArg(OPT_cache_compile_job)
-                                    ? DiagnosticOptions::FormattingStyle::LLVM
-                                    : DiagnosticOptions::FormattingStyle::Swift;
+  Opts.PrintedFormattingStyle =
+      Args.hasFlag(OPT_cache_compile_job, OPT_no_cache_compile_job,
+                   /*Default=*/false)
+          ? DiagnosticOptions::FormattingStyle::LLVM
+          : DiagnosticOptions::FormattingStyle::Swift;
   if (const Arg *arg = Args.getLastArg(OPT_diagnostic_style)) {
     StringRef contents = arg->getValue();
     if (contents == "llvm") {
@@ -3389,6 +3392,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            const FrontendOptions &FrontendOpts,
                            const SILOptions &SILOpts,
                            const LangOptions &LangOpts,
+                           const CASOptions &CASOpts,
                            StringRef SDKPath,
                            StringRef ResourceDir,
                            const llvm::Triple &Triple) {
@@ -3628,8 +3632,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
   // Always producing all outputs when caching is enabled.
-  Opts.AlwaysCompile |= Args.hasArg(OPT_always_compile_output_files) ||
-                        Args.hasArg(OPT_cache_compile_job);
+  Opts.AlwaysCompile |=
+      Args.hasArg(OPT_always_compile_output_files) || CASOpts.EnableCaching;
 
   Opts.EnableDynamicReplacementChaining |=
       Args.hasArg(OPT_enable_dynamic_replacement_chaining);
@@ -4204,8 +4208,8 @@ bool CompilerInvocation::parseArgs(
   }
 
   if (ParseIRGenArgs(IRGenOpts, ParsedArgs, Diags, FrontendOpts, SILOpts,
-                     LangOpts, getSDKPath(), SearchPathOpts.RuntimeResourcePath,
-                     LangOpts.Target)) {
+                     LangOpts, CASOpts, getSDKPath(),
+                     SearchPathOpts.RuntimeResourcePath, LangOpts.Target)) {
     return true;
   }
 
