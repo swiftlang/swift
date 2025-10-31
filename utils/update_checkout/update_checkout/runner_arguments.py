@@ -3,12 +3,14 @@ from typing import Any, Dict, List, Optional
 
 from .cli_arguments import CliArguments
 
+
 @dataclass
 class RunnerArguments:
     repo_name: str
     scheme_name: str
     output_prefix: str
     verbose: bool
+
 
 @dataclass
 class UpdateArguments(RunnerArguments):
@@ -21,6 +23,7 @@ class UpdateArguments(RunnerArguments):
     clean: bool
     stash: bool
     cross_repos_pr: Dict[str, str]
+
 
 @dataclass
 class AdditionalSwiftSourcesArguments(RunnerArguments):

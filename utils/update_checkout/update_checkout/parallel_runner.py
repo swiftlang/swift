@@ -8,7 +8,11 @@ import shutil
 
 from .git_command import GitException
 
-from .runner_arguments import RunnerArguments, AdditionalSwiftSourcesArguments, UpdateArguments
+from .runner_arguments import (
+    RunnerArguments,
+    AdditionalSwiftSourcesArguments,
+    UpdateArguments,
+)
 
 
 class TaskTracker:
@@ -71,7 +75,7 @@ class MonitoredFunction:
             return result
 
 
-class ParallelRunner():
+class ParallelRunner:
     def __init__(
         self,
         fn: Callable[..., None],
@@ -111,7 +115,9 @@ class ParallelRunner():
             monitor_thread = Thread(target=self._monitor, daemon=True)
             monitor_thread.start()
             with ThreadPoolExecutor(max_workers=self._n_threads) as pool:
-                results = list(pool.map(self._monitored_fn, self._pool_args, timeout=1800))
+                results = list(
+                    pool.map(self._monitored_fn, self._pool_args, timeout=1800)
+                )
             self._stop_event.set()
             monitor_thread.join()
         return results
@@ -121,7 +127,10 @@ class ParallelRunner():
         while not self._stop_event.is_set():
             current_line, updated_repos = self._task_tracker.status()
             if current_line != last_output:
-                truncated = f"{self._output_prefix} [{updated_repos}/{self._nb_repos}] ({current_line})"
+                truncated = (
+                    f"{self._output_prefix} [{updated_repos}/{self._nb_repos}] "
+                    f"({current_line})"
+                )
                 if len(truncated) > self._terminal_width:
                     ellipsis_marker = " ..."
                     truncated = (
