@@ -14,7 +14,7 @@
 // DEPS-FS: /^src/test/CAS/module_path_remap.swift
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json deps bridgingHeader | %FileCheck %s -check-prefix DEPS-BRIDGING
-// DEPS-BRIDGING: -fmodule-file=F=/^tmp/clang-module-cache/F-{{.*}}.pcm
+// DEPS-BRIDGING: -fmodule-file=F=F-{{.*}}.pcm
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json F casFSRootID > %t/F.fs.casid
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/F.fs.casid | %FileCheck %s -check-prefix F-FS
@@ -22,7 +22,7 @@
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json F commandLine | %FileCheck %s -check-prefix F-CMD
 // F-CMD: /^src/test/CAS/../ScanDependencies/Inputs/Swift/F.swiftinterface
-// F-CMD: -fmodule-file=SwiftShims=/^tmp/clang-module-cache/SwiftShims-{{.*}}.pcm
+// F-CMD: -fmodule-file=SwiftShims=SwiftShims-{{.*}}.pcm
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:F clangIncludeTree > %t/tree.casid
 // RUN: clang-cas-test --cas %t/cas --print-include-tree @%t/tree.casid | %FileCheck %s -check-prefix TREE
