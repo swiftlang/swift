@@ -161,6 +161,11 @@ bool SILType::isOrContainsPack(const SILFunction &F) const {
   return F.getTypeProperties(contextType).isOrContainsPack();
 }
 
+bool SILType::isPackElementAddress() const {
+  SILPackType *packTy = castTo<SILPackType>();
+  return packTy->isElementAddress();
+}
+
 bool SILType::isEmpty(const SILFunction &F) const {
   // Infinite types are never empty.
   if (F.getTypeProperties(*this).isInfinite()) {
