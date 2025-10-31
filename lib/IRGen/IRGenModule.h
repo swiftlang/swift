@@ -1674,6 +1674,8 @@ public:
   llvm::AttributeList constructInitialAttributes();
   StackProtectorMode shouldEmitStackProtector(SILFunction *f);
 
+  llvm::ConstantInt *getMallocTypeId(llvm::Function *fn);
+
   void emitProtocolDecl(ProtocolDecl *D);
   void emitEnumDecl(EnumDecl *D);
   void emitStructDecl(StructDecl *D);

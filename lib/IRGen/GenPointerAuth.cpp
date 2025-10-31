@@ -771,6 +771,18 @@ void ConstantAggregateBuilderBase::addSignedPointer(llvm::Constant *pointer,
                    llvm::ConstantInt::get(IGM().Int64Ty, otherDiscriminator));
 }
 
+llvm::ConstantInt *IRGenModule::getMallocTypeId(llvm::Function *fn) {
+  if (!getOptions().EmitTypeMallocForCoroFrame) {
+    // Even when typed malloc isn't enabled, a type id may be required for ABI
+    // reasons (e.g. as an argument to swift_coro_alloc).  Use a cheaply
+    // materialized value.
+    return llvm::ConstantInt::get(Int64Ty, 0);
+  }
+  uint64_t hash = llvm::getStableSipHash(fn->getName());
+  uint32_t hash32 = (hash % std::numeric_limits<uint32_t>::max()) + 1;
+  return llvm::ConstantInt::get(Int64Ty, hash32);
+}
+
 llvm::ConstantInt* IRGenFunction::getMallocTypeId() {
-  return getDiscriminatorForString(IGM, CurFn->getName());
+  return IGM.getMallocTypeId(CurFn);
 }
