@@ -429,3 +429,22 @@ extension MutableSpan {
     return false
   }
 }
+
+// =============================================================================
+// Local variable analysis - address uses
+// =============================================================================
+
+func dynamicCastGood<T>(_ span: Span<T>) {
+  if let intSpan = span as? Span<Int> {
+    _ = intSpan
+  }
+}
+
+@_lifetime(immortal)
+func dynamicCastBad<T>(_ span: Span<T>) -> Span<Int> {
+  if let intSpan = span as? Span<Int> { // expected-error{{lifetime-dependent variable 'intSpan' escapes its scope}}
+    // expected-note @-2{{it depends on the lifetime of argument 'span'}}
+    return intSpan // expected-note{{this use causes the lifetime-dependent value to escape}}
+  }
+  return Span<Int>()
+}

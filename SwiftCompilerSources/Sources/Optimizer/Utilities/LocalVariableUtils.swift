@@ -525,6 +525,13 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
       // switch_enum_addr is truly a leaf address use. It does not produce a new value. But in every other respect it is
       // like a load.
       visit(LocalVariableAccess(.load, operand))
+    case let castBr as CheckedCastAddrBranchInst:
+      if operand == castBr.sourceOperand {
+        visit(LocalVariableAccess(.load, operand))
+      } else {
+        assert(operand == castBr.destinationOperand)
+        visit(LocalVariableAccess(.store, operand))
+      }
     case is DeallocStackInst:
       break
     default:

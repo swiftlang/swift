@@ -128,26 +128,35 @@ private func analyze(dependence: LifetimeDependence, _ context: FunctionPassCont
   var range = dependence.computeRange(context)
   defer { range?.deinitialize() }
 
-  var error = false
-  let diagnostics =
-    DiagnoseDependence(dependence: dependence, range: range,
-                       onError: { error = true }, context: context)
+  let diagnostics = DiagnoseDependence(dependence: dependence, range: range, context: context)
 
   // Check each lifetime-dependent use via a def-use visitor
   var walker = DiagnoseDependenceWalker(diagnostics, context)
   defer { walker.deinitialize() }
   let result = walker.walkDown(dependence: dependence)
-  // The walk may abort without a diagnostic error.
-  assert(!error || result == .abortWalk)
+  assert(result == .continueWalk || diagnostics.errorStatus != nil,
+         "Lifetime diagnostics failed without raising an error")
   return result == .continueWalk
 }
 
 /// Analyze and diagnose a single LifetimeDependence.
-private struct DiagnoseDependence {
+private class DiagnoseDependence {
+  enum ErrorStatus {
+    case diagnostic
+    case unresolvedDependence
+  }
+
   let dependence: LifetimeDependence
   let range: InstructionRange?
-  let onError: ()->()
   let context: FunctionPassContext
+
+  init(dependence: LifetimeDependence, range: InstructionRange?, context: FunctionPassContext) {
+    self.dependence = dependence
+    self.range = range
+    self.context = context
+  }
+
+  var errorStatus: ErrorStatus? = nil
 
   var function: Function { dependence.function }
 
@@ -266,9 +275,10 @@ private struct DiagnoseDependence {
   func reportError(escapingValue: Value, user: Instruction, diagID: DiagID) {
     // If the dependent value is Escapable, then mark_dependence resolution fails, but this is not a diagnostic error.
     if dependence.dependentValue.isEscapable {
+      errorStatus = .unresolvedDependence
       return
     }
-    onError()
+    errorStatus = .diagnostic
 
     // Identify the escaping variable.
     let escapingVar = LifetimeVariable(definedBy: escapingValue, user: user, context)
@@ -598,10 +608,10 @@ extension DiagnoseDependenceWalker : LifetimeDependenceDefUseWalker {
     return .continueWalk
   }
 
-  // Override AddressUseVisitor here because LifetimeDependenceDefUseWalker
-  // returns .abortWalk, and we want a more useful crash report.
+  // Override AddressUseVisitor here because LifetimeDependenceDefUseWalker returns .abortWalk and
+  // DiagnoseDependenceWalker requires a diagnostic error for all aborts.
   mutating func unknownAddressUse(of operand: Operand) -> WalkResult {
     diagnostics.reportUnknown(operand: operand)
-    return .continueWalk
+    return .abortWalk
   }
 }
