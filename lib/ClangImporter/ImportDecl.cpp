@@ -1870,6 +1870,10 @@ namespace {
       }
 
       const clang::EnumDecl *canonicalClangDecl = decl->getCanonicalDecl();
+      auto alreadyImported =
+          Impl.ImportedDecls.find({canonicalClangDecl, getVersion()});
+      if (alreadyImported != Impl.ImportedDecls.end())
+        return alreadyImported->second;
       Impl.ImportedDecls[{canonicalClangDecl, getVersion()}] = result;
 
       // Import each of the enumerators.
