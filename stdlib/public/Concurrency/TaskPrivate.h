@@ -796,6 +796,13 @@ struct AsyncTask::PrivateStorage {
   // The lock used to protect more complicated operations on the task status.
   RecursiveMutex statusLock;
 
+  /// If explicitly enabled at runtime, the total duration for which this task
+  /// has been scheduled and running since it was created (in nanoseconds).
+  ///
+  /// Time tracking is not free, so by default we don't do it. It can be enabled
+  /// by setting `AsyncTask::isTimeSpentRunningTracked` to `true`.
+  std::atomic<uint64_t> TimeSpentRunning = { 0 };
+
   // Always create an async task with max priority in ActiveTaskStatus = base
   // priority. It will be updated later if needed.
   PrivateStorage(JobPriority basePri)

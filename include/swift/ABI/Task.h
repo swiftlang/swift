@@ -320,10 +320,11 @@ public:
 #endif
 
     // Private storage is currently 6 pointers, 16 bytes of non-pointer data,
-    // 8 bytes of padding, the ActiveTaskStatus, and a RecursiveMutex.
+    // 8 bytes of padding, the ActiveTaskStatus, a RecursiveMutex, and an atomic
+    // uint64_t.
     static constexpr size_t PrivateStorageSize =
       6 * sizeof(void *) + 16 + 8 + ActiveTaskStatusSize
-      + sizeof(RecursiveMutex);
+      + sizeof(RecursiveMutex) + sizeof(std::atomic<uint64_t>);
 
     char Storage[PrivateStorageSize];
 
@@ -391,13 +392,37 @@ public:
   /// resume context may not be valid and just return the wrapper.
   const void *getResumeFunctionForLogging(bool isStarting);
 
+  /// Whether or not the concurrency library is tracking the time spent running
+  /// tasks.
+  static inline bool isTimeSpentRunningTracked(void) {
+    return _isTimeSpentRunningTracked.load(std::memory_order_relaxed);
+  }
+
+  /// Set whether or not the concurrency library is tracking the time spent
+  /// running tasks. Returns the old value.
+  static inline bool setTimeSpentRunningTracked(bool isTracked) {
+    return _isTimeSpentRunningTracked.exchange(isTracked,
+                                               std::memory_order_relaxed);
+  }
+
+  /// Get the number of nanoseconds spent running this task so far, or `0` if
+  /// task duration tracking isn't enabled.
+  __attribute__((cold)) uint64_t getTimeSpentRunning(void);
+
   /// Given that we've already fully established the job context
   /// in the current thread, start running this task.  To establish
   /// the job context correctly, call swift_job_run or
   /// runInExecutorContext.
   SWIFT_CC(swiftasync)
   void runInFullyEstablishedContext() {
-    return ResumeTask(ResumeContext); // 'return' forces tail call
+    if (SWIFT_UNLIKELY(isTimeSpentRunningTracked())) {
+      auto begin = getNanosecondsOnSuspendingClock();
+      ResumeTask(ResumeContext);
+      auto end = getNanosecondsOnSuspendingClock();
+      Private.ranForNanoseconds(end - start);
+    } else {
+      return ResumeTask(ResumeContext); // 'return' forces tail call
+    }
   }
 
   /// A task can have the following states:
@@ -779,6 +804,17 @@ private:
     return reinterpret_cast<AsyncTask *&>(
         SchedulerPrivate[NextWaitingTaskIndex]);
   }
+
+  /// Whether or not the concurrency library is tracking the time spent running
+  /// tasks.
+  static constinit std::atomic<bool> _isTimeSpentRunningTracked;
+
+  /// Record that the task spent an additional `ns` nanoseconds running.
+  void ranForNanoseconds(uint64_t ns);
+
+  /// Get the current instant on the system's suspending clock to use when
+  /// tracking the time spent running tasks.
+  static inline uint64_t getNanosecondsOnSuspendingClock(void);
 };
 
 // The compiler will eventually assume these.

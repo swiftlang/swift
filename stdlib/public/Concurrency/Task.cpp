@@ -646,6 +646,31 @@ const void *AsyncTask::getResumeFunctionForLogging(bool isStarting) {
   return __ptrauth_swift_runtime_function_entry_strip(result);
 }
 
+constinit std::atomic<bool> AsyncTask::_isTimeSpentRunningTracked { false };
+
+__attribute__((cold)) uint64_t AsyncTask::getTimeSpentRunning(void) {
+  return _private().TimeSpentRunning.load();
+}
+
+void AsyncTask::ranForNanoseconds(uint64_t ns) {
+  _private().TimeSpentRunning.fetch_add(end - start);
+  if (hasChildFragment()) {
+    if (auto parent = childFragment()->getParent()) {
+      parent->ranForNanoseconds(ns);
+    }
+  }
+}
+
+static inline uint64_t AsyncTask::getNanosecondsOnSuspendingClock(void) {
+  long long seconds = 0;
+  long long nanoseconds = 0;
+  swift_get_time(&seconds, &nanoseconds, swift_clock_id_suspending);
+
+  uint64_t result = static_cast<uint64_t>(seconds) * UINT64_C(1'000'000'000);
+  result += static_cast<uint64_t>(nanoseconds);
+  return result;
+}
+
 JobPriority swift::swift_task_currentPriority(AsyncTask *task) {
   // This is racey but this is to be used in an API is inherently racey anyways.
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
