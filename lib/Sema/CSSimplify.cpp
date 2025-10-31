@@ -7471,21 +7471,28 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Error:
       return getTypeMatchFailure(locator);
 
+    // BuiltinGenericType subclasses
     case TypeKind::BuiltinFixedArray: {
-      auto *fixed1 = cast<BuiltinFixedArrayType>(desugar1);
-      auto *fixed2 = cast<BuiltinFixedArrayType>(desugar2);
+      auto *fixed1 = cast<BuiltinGenericType>(desugar1);
+      auto *fixed2 = cast<BuiltinGenericType>(desugar2);
+      if (fixed1->getBuiltinTypeKind() != fixed2->getBuiltinTypeKind()) {
+        return getTypeMatchFailure(locator);
+      }
 
-      auto result = matchTypes(fixed1->getSize(), fixed2->getSize(),
-                               ConstraintKind::Bind, subflags,
-                               locator.withPathElement(
-                                   LocatorPathElt::GenericArgument(0)));
-      if (result.isFailure())
-        return result;
+      auto result = ConstraintSystem::TypeMatchResult::success();
+      for (unsigned i
+            : indices(fixed1->getSubstitutions().getReplacementTypes())) {
+        result = matchTypes(fixed1->getSubstitutions().getReplacementTypes()[i],
+                            fixed2->getSubstitutions().getReplacementTypes()[i],
+                            ConstraintKind::Bind, subflags,
+                            locator.withPathElement(
+                                   LocatorPathElt::GenericArgument(i)));
+        if (result.isFailure()) {
+          return result;
+        }
+      }
 
-      return matchTypes(fixed1->getElementType(), fixed2->getElementType(),
-                        ConstraintKind::Bind, subflags,
-                        locator.withPathElement(
-                            LocatorPathElt::GenericArgument(0)));
+      return result;
     }
 
     case TypeKind::Placeholder: {

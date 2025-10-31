@@ -538,6 +538,13 @@ struct ASTContext::Implementation {
   /// Local and closure discriminators per context.
   llvm::DenseMap<const DeclContext *, unsigned> NextDiscriminator;
 
+  /// Cached generic signatures for generic builtin types.
+  static const unsigned NumBuiltinGenericTypes
+    = unsigned(TypeKind::Last_BuiltinGenericType)
+        - unsigned(TypeKind::First_BuiltinGenericType) + 1;
+  std::array<GenericSignature, NumBuiltinGenericTypes>
+  BuiltinGenericTypeSignatures = {};
+
   /// Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -7356,4 +7363,14 @@ AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
 
   // Fall back to the universal domain for triples without a platform.
   return AvailabilityDomain::forUniversal();
+}
+
+GenericSignature &
+ASTContext::getCachedBuiltinGenericTypeSignature(TypeKind kind) {
+  ASSERT(kind >= TypeKind::First_BuiltinGenericType
+         && kind <= TypeKind::Last_BuiltinGenericType
+         && "not a builtin generic type kind");
+
+  return getImpl().BuiltinGenericTypeSignatures
+    [unsigned(kind) - unsigned(TypeKind::First_BuiltinGenericType)];
 }
