@@ -320,11 +320,10 @@ public:
 #endif
 
     // Private storage is currently 6 pointers, 16 bytes of non-pointer data,
-    // 8 bytes of padding, the ActiveTaskStatus, a RecursiveMutex, and an atomic
-    // uint64_t.
+    // 8 bytes of padding, the ActiveTaskStatus, and a RecursiveMutex.
     static constexpr size_t PrivateStorageSize =
       6 * sizeof(void *) + 16 + 8 + ActiveTaskStatusSize
-      + sizeof(RecursiveMutex) + sizeof(std::atomic<uint64_t>);
+      + sizeof(RecursiveMutex);
 
     char Storage[PrivateStorageSize];
 
@@ -391,23 +390,6 @@ public:
   /// to pull out a wrapped resume function. If isStarting is false, assume the
   /// resume context may not be valid and just return the wrapper.
   const void *getResumeFunctionForLogging(bool isStarting);
-
-  /// Whether or not the concurrency library is tracking the time spent running
-  /// tasks.
-  static inline bool isTimeSpentRunningTracked(void) {
-    return _isTimeSpentRunningTracked.load(std::memory_order_relaxed);
-  }
-
-  /// Set whether or not the concurrency library is tracking the time spent
-  /// running tasks. Returns the old value.
-  static inline bool setTimeSpentRunningTracked(bool isTracked) {
-    return _isTimeSpentRunningTracked.exchange(isTracked,
-                                               std::memory_order_relaxed);
-  }
-
-  /// Get the number of nanoseconds spent running this task so far, or `0` if
-  /// task duration tracking isn't enabled.
-  __attribute__((cold)) uint64_t getTimeSpentRunning(void);
 
   /// Given that we've already fully established the job context
   /// in the current thread, start running this task.  To establish
@@ -522,6 +504,28 @@ public:
   /// `swift_task_pushTaskExecutorPreference`, and
   /// `swift_task_popTaskExecutorPreference(record)` method pair.
   void dropInitialTaskExecutorPreferenceRecord();
+
+  // ==== Tracking Time Spent Running ------------------------------------------
+
+  /// Whether or not the concurrency library is tracking the time spent running
+  /// tasks.
+  static inline bool isTimeSpentRunningTracked(void) {
+    return _isTimeSpentRunningTracked.load(std::memory_order_relaxed);
+  }
+
+  /// Set whether or not the concurrency library is tracking the time spent
+  /// running tasks. Returns the old value.
+  static inline bool setTimeSpentRunningTracked(bool isTracked) {
+    return _isTimeSpentRunningTracked.exchange(isTracked,
+                                               std::memory_order_relaxed);
+  }
+
+  /// Get the number of nanoseconds spent running this task so far, or `0` if
+  /// task duration tracking isn't enabled.
+  __attribute__((cold)) uint64_t getTimeSpentRunning(void);
+
+  void pushTimeSpentRunningRecord(void);
+  void popTimeSpentRunningRecord(void);
 
   // ==== Task Local Values ----------------------------------------------------
 
@@ -814,7 +818,7 @@ private:
 
   /// Get the current instant on the system's suspending clock to use when
   /// tracking the time spent running tasks.
-  static inline uint64_t getNanosecondsOnSuspendingClock(void);
+  static uint64_t getNanosecondsOnSuspendingClock(void);
 };
 
 // The compiler will eventually assume these.

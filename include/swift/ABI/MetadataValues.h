@@ -2897,6 +2897,9 @@ enum class TaskStatusRecordKind : uint8_t {
   /// A human-readable task name.
   TaskName = 6,
 
+  // The total time the task has spent running.
+  TimeSpentRunning = 7,
+
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,
   Private_RecordLock = 192
