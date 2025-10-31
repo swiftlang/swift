@@ -920,13 +920,6 @@ extension Dictionary {
     forKey key: Key,
     default defaultValue: @autoclosure () -> Value
   ) -> Index {
-#if SILLY // silly inefficient implementation
-    if let index = _variant.index(forKey: key) {
-      return index
-    }
-    _variant[key] = defaultValue()
-    return _variant.index(forKey: key)!
-#else
     let (bucket, found) = _variant.mutatingFind(key)
     if !found {
       _variant.asNative._insert(at: bucket, key: key, value: defaultValue())
@@ -934,7 +927,6 @@ extension Dictionary {
     return unsafe Index(
       _native: _HashTable.Index(bucket: bucket, age: _variant.asNative.age)
     )
-#endif
   }
 
   public mutating func _addValue(_ value: Value, forKey key: Key) -> Bool {
