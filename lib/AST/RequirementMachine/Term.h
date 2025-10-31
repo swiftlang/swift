@@ -76,6 +76,11 @@ public:
     return begin()->getRootProtocol();
   }
 
+  bool isShapeTerm() {
+    auto kind = back().getKind();
+    return kind == Symbol::Kind::Shape;
+  }
+  
   bool containsNameSymbols() const;
 
   void dump(llvm::raw_ostream &out) const;
@@ -159,12 +164,19 @@ public:
   const ProtocolDecl *getRootProtocol() const {
     return begin()->getRootProtocol();
   }
-
+  
+  bool isShapeTerm() {
+    auto kind = back().getKind();
+    return kind == Symbol::Kind::Shape;
+  }
+  
   const Symbol *begin() const { return Symbols.begin(); }
   const Symbol *end() const { return Symbols.end(); }
 
   Symbol *begin() { return Symbols.begin(); }
   Symbol *end() { return Symbols.end(); }
+  
+  Symbol removeEnd() { return Symbols.pop_back_val();}
 
   std::reverse_iterator<const Symbol *> rbegin() const { return Symbols.rbegin(); }
   std::reverse_iterator<const Symbol *> rend() const { return Symbols.rend(); }

@@ -159,11 +159,9 @@ namespace {
                   Type sugaredFirstType) {
       bool lhsAbstract = lhsType->isTypeParameter();
       bool rhsAbstract = rhsType->isTypeParameter();
-
+      
       if (lhsAbstract && rhsAbstract) {
-        // FIXME: same-element requirements
-        ASSERT(lhsType->isParameterPack() == rhsType->isParameterPack());
-
+        
         unsigned lhsIndex = RewriteContext::getGenericParamIndex(lhsType);
         unsigned rhsIndex = RewriteContext::getGenericParamIndex(rhsType);
 
@@ -183,6 +181,7 @@ namespace {
 
       if (lhsAbstract) {
         ASSERT(!rhsAbstract);
+
         unsigned lhsIndex = RewriteContext::getGenericParamIndex(lhsType);
 
         SmallVector<Term, 2> result;
@@ -307,15 +306,37 @@ swift::rewriting::buildTypeDifference(
   auto nextSubstitution = [&](Term t) -> Type {
     unsigned index = resultSubstitutions.size();
     resultSubstitutions.push_back(t);
-    return GenericTypeParamType::getType(/*depth=*/0, index, astCtx);
+    if (t.isShapeTerm())
+      return GenericTypeParamType::getPack(0, index, astCtx);
+    else
+      return GenericTypeParamType::getType(/*depth=*/0, index, astCtx);
+  };
+
+  auto packRootType = [&](PackExpansionType* t) -> std::optional<GenericTypeParamType*> {
+    auto pattern = t->getPatternType();
+    while(pattern->is<PackExpansionType>()) {
+      pattern = pattern->getAs<PackExpansionType>()->getPatternType();
+    }
+    if (pattern->is<GenericTypeParamType>()) {
+      return pattern->getAs<GenericTypeParamType>();
+    } else return std::nullopt;
   };
 
   auto type = symbol.getConcreteType();
   auto substitutions = symbol.getSubstitutions();
-
+  
   Type resultType = type.transformRec([&](Type t) -> std::optional<Type> {
-    if (t->is<GenericTypeParamType>()) {
-      unsigned index = RewriteContext::getGenericParamIndex(t);
+    if (ctx.getDebugOptions().contains(DebugFlags::Add)) {
+      llvm::dbgs() << "buildTypeDifference transformRec " << t << "\n";
+      llvm::dbgs() << "What type is t?" << t->is<GenericTypeParamType>() << " -< Generic " << t->is<PackExpansionType>() << " -< PackExpansion or other\n\n";
+    }
+    if (t->is<GenericTypeParamType>() || t->is<PackExpansionType>()) {
+
+      auto base = t->is<GenericTypeParamType>() ? t->getAs<GenericTypeParamType>() : packRootType(t->getAs<PackExpansionType>());
+      if (!base)
+        return std::nullopt;
+
+      unsigned index = RewriteContext::getGenericParamIndex(base.value());
 
       for (const auto &pair : sameTypes) {
         if (pair.first == index)
@@ -327,20 +348,22 @@ swift::rewriting::buildTypeDifference(
           auto concreteSymbol = pair.second;
           auto concreteType = concreteSymbol.getConcreteType();
 
-          return concreteType.transformRec([&](Type t) -> std::optional<Type> {
-            if (t->is<GenericTypeParamType>()) {
-              unsigned index = RewriteContext::getGenericParamIndex(t);
-              Term substitution = concreteSymbol.getSubstitutions()[index];
+          return concreteType.transformRec([&](Type tWithin) -> std::optional<Type> {
+            if (tWithin->is<GenericTypeParamType>()) {
+              unsigned indexWithin = RewriteContext::getGenericParamIndex(tWithin);
+              Term substitution = concreteSymbol.getSubstitutions()[indexWithin];
               return nextSubstitution(substitution);
+            }
+            if (tWithin->is<PackExpansionType>()) {
+              return nextSubstitution(substitutions[index]);
             }
 
             // DependentMemberType with ErrorType base is OK.
-            ASSERT(!t->isTypeParameter());
+            ASSERT(!tWithin->isTypeParameter());
             return std::nullopt;
           });
         }
       }
-
       return nextSubstitution(substitutions[index]);
     }
 
@@ -369,6 +392,9 @@ swift::rewriting::buildTypeDifference(
     llvm_unreachable("Bad symbol kind");
   }();
 
+  if (ctx.getDebugOptions().contains(DebugFlags::Add)) {
+    llvm::dbgs() << "\n buildTypeDifference: \nbaseTerm: " << baseTerm << " \n resultSymbol: " << resultSymbol << " \n symbol: " << symbol << "\n";
+  }
   return {baseTerm, symbol, resultSymbol, sameTypes, concreteTypes};
 }
 
@@ -462,6 +488,7 @@ bool RewriteSystem::computeTypeDifference(
   if (!isConflict) {
     // The meet operation should be commutative.
     if (lhsMeetRhs.RHS != rhsMeetLhs.RHS) {
+      llvm::dbgs() << lhsMeetRhs.RHS << " != " << rhsMeetLhs.RHS << "\n";
       ABORT([&](auto &out) {
         out << "Meet operation was not commutative:\n\n";
 
