@@ -1360,6 +1360,7 @@ Some kinds need arguments, which precede ``Tf``.
   PASSID ::= '5'                             // GenericSpecializer,
   PASSID ::= '6'                             // MoveDiagnosticInOutToOut,
   PASSID ::= '7'                             // AsyncDemotion,
+  PASSID ::= '8'                             // PackSpecialization,
 
   FRAGILE ::= 'q'
 

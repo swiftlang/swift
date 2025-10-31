@@ -143,6 +143,7 @@ import ObserverPartiallyAppliedMethod
 import ObserverUnappliedMethod
 import OpaqueConsumingUsers
 import OpenClose
+import ParameterPacks
 import Phonebook
 import PointerArithmetics
 import PolymorphicCalls
@@ -343,6 +344,7 @@ register(ObserverPartiallyAppliedMethod.benchmarks)
 register(ObserverUnappliedMethod.benchmarks)
 register(OpaqueConsumingUsers.benchmarks)
 register(OpenClose.benchmarks)
+register(ParameterPacks.benchmarks)
 register(Phonebook.benchmarks)
 register(PointerArithmetics.benchmarks)
 register(PolymorphicCalls.benchmarks)
