@@ -2,7 +2,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/mods)
-// RUN: split-file %s %t
+// RUN: split-file --leading-lines %s %t
 
 // RUN: %target-swift-ide-test -print-indexed-symbols -enable-objc-interop -source-filename %t/ObjcUser.swift -Xcc -fmodule-map-file=%t/module.modulemap | %FileCheck -dump-input=always %t/ObjcUser.swift
 
@@ -41,7 +41,7 @@ module objc_decls {
 
 //--- ObjcUser.swift
 import objc_decls
-func test() { // CHECK: [[@LINE]]:6 | function/Swift | test() | [[s:.*]] | Def | rel: 0
+func test() { // CHECK: [[@LINE]]:6 | function(internal)/Swift | test() | [[s:.*]] | Def | rel: 0
   let c = ObjCClass()
   let _ = c.baseClassProperty
   // CHECK: [[@LINE-1]]:13 | instance-property/Swift | baseClassProperty | c:objc(cs)ObjCClass(py)baseClassProperty | Ref,Read,Dyn,RelRec,RelCont | rel: 2
@@ -56,7 +56,7 @@ func test() { // CHECK: [[@LINE]]:6 | function/Swift | test() | [[s:.*]] | Def |
 }
 class SubObjCClass: ObjCClass {
   override func protocolAddedMethod() {}
-  // CHECK: [[@LINE-1]]:17 | instance-method/Swift | protocolAddedMethod() | c:@M@swift_ide_test@objc(cs)SubObjCClass(im)protocolAddedMethod | Def,Dyn,RelChild,RelOver | rel: 2
+  // CHECK: [[@LINE-1]]:17 | instance-method(internal)/Swift | protocolAddedMethod() | c:@M@swift_ide_test@objc(cs)SubObjCClass(im)protocolAddedMethod | Def,Dyn,RelChild,RelOver | rel: 2
   // CHECK-NEXT: RelOver | instance-method/Swift | protocolAddedMethod() | c:objc(pl)MemberAdding(im)protocolAddedMethod
   // CHECK-NEXT: RelChild | class/Swift | SubObjCClass | c:@M@swift_ide_test@objc(cs)SubObjCClass
 }

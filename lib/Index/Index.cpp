@@ -1108,12 +1108,19 @@ private:
   /// Whether the given decl should be marked implicit in the index data.
   bool hasImplicitRole(Decl *D);
 
-  bool initIndexSymbol(ValueDecl *D, SourceLoc Loc, bool IsRef,
-                       IndexSymbol &Info);
+  bool initIndexSymbol(
+      ValueDecl *D, SourceLoc Loc, bool IsRef, IndexSymbol &Info,
+      llvm::function_ref<bool(IndexSymbol &)> updateInfo = [](IndexSymbol &) {
+        return false;
+      });
   bool initIndexSymbol(ExtensionDecl *D, ValueDecl *ExtendedD, SourceLoc Loc,
                        IndexSymbol &Info);
   bool initFuncDeclIndexSymbol(FuncDecl *D, IndexSymbol &Info);
-  bool initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc, IndexSymbol &Info);
+  bool initFuncRefIndexSymbol(
+      ValueDecl *D, SourceLoc Loc, IndexSymbol &Info,
+      llvm::function_ref<bool(IndexSymbol &)> updateInfo = [](IndexSymbol &) {
+        return false;
+      });
   bool initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, SourceLoc Loc,
                               IndexSymbol &Info,
                               std::optional<AccessKind> AccKind);
@@ -1663,22 +1670,18 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
     // AbstractStorageDecl.
     assert(getParentDecl() == D);
     auto PreviousTop = EntitiesStack.pop_back_val();
-    bool initFailed = initFuncRefIndexSymbol(D, Loc, Info);
+    bool initFailed = initFuncRefIndexSymbol(D, Loc, Info, updateInfo);
     EntitiesStack.push_back(PreviousTop);
 
     if (initFailed)
       return true; // continue walking.
-    if (updateInfo(Info))
-      return true;
 
     if (!IdxConsumer.startSourceEntity(Info) || !IdxConsumer.finishSourceEntity(Info.symInfo, Info.roles))
       Cancelled = true;
   } else {
     IndexSymbol Info;
-    if (initIndexSymbol(D, Loc, IsRef, Info))
+    if (initIndexSymbol(D, Loc, IsRef, Info, updateInfo))
       return true; // continue walking.
-    if (updateInfo(Info))
-      return true;
     if (addRelation(Info, (SymbolRoleSet)SymbolRole::RelationAccessorOf |
                     (SymbolRoleSet)SymbolRole::RelationChildOf , D))
       return true;
@@ -1898,16 +1901,20 @@ bool IndexSwiftASTWalker::reportImplicitConformance(ValueDecl *witness, ValueDec
     loc = container->getLoc(/*SerializedOK*/false);
 
   IndexSymbol info;
-  if (initIndexSymbol(witness, loc, /*IsRef=*/true, info))
+  bool initFailed = initIndexSymbol(
+      witness, loc, /*IsRef=*/true, info, [](IndexSymbol &info) {
+        // Remove the 'ref' role that \c initIndexSymbol introduces. This isn't
+        // actually a 'reference', but an 'implicit' override.
+        info.roles &= ~(SymbolRoleSet)SymbolRole::Reference;
+        info.roles |= (SymbolRoleSet)SymbolRole::Implicit;
+        return false;
+      });
+  if (initFailed)
     return true;
   if (addRelation(info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, requirement))
     return true;
   if (addRelation(info, (SymbolRoleSet) SymbolRole::RelationContainedBy, container))
     return true;
-  // Remove the 'ref' role that \c initIndexSymbol introduces. This isn't
-  // actually a 'reference', but an 'implicit' override.
-  info.roles &= ~(SymbolRoleSet)SymbolRole::Reference;
-  info.roles |= (SymbolRoleSet)SymbolRole::Implicit;
 
   if (!startEntity(witness, info, /*IsRef=*/true))
     return true;
@@ -1929,8 +1936,47 @@ bool IndexSwiftASTWalker::hasImplicitRole(Decl *D) {
   return false;
 }
 
-bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
-                                          bool IsRef, IndexSymbol &Info) {
+bool shouldOutputEffectiveAccessOfValueSymbol(SymbolInfo Info) {
+  SymbolKind Kind = Info.Kind;
+  SymbolSubKind SubKind = Info.SubKind;
+  switch (SubKind) {
+  case SymbolSubKind::AccessorGetter:
+  case SymbolSubKind::AccessorSetter:
+  case SymbolSubKind::SwiftAccessorWillSet:
+  case SymbolSubKind::SwiftAccessorDidSet:
+  case SymbolSubKind::SwiftAccessorAddressor:
+  case SymbolSubKind::SwiftAccessorMutableAddressor:
+  case SymbolSubKind::SwiftGenericTypeParam:
+    return false;
+  default:
+    break;
+  }
+  switch (Kind) {
+  case SymbolKind::Enum:
+  case SymbolKind::Struct:
+  case SymbolKind::Class:
+  case SymbolKind::Protocol:
+  case SymbolKind::Constructor:
+  case SymbolKind::EnumConstant:
+  case SymbolKind::Function:
+  case SymbolKind::StaticMethod:
+  case SymbolKind::Variable:
+  case SymbolKind::InstanceMethod:
+  case SymbolKind::ClassMethod:
+  case SymbolKind::InstanceProperty:
+  case SymbolKind::ClassProperty:
+  case SymbolKind::StaticProperty:
+  case SymbolKind::TypeAlias:
+  case SymbolKind::Macro:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool IndexSwiftASTWalker::initIndexSymbol(
+    ValueDecl *D, SourceLoc Loc, bool IsRef, IndexSymbol &Info,
+    llvm::function_ref<bool(IndexSymbol &)> updateInfo) {
   assert(D);
 
   auto MappedLoc = getMappedLocation(Loc);
@@ -1968,6 +2014,34 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
 
   if (MappedLoc->IsGenerated) {
     Info.roles |= (unsigned)SymbolRole::Implicit;
+  }
+
+  if (updateInfo(Info)) {
+    return true;
+  }
+
+  if (shouldOutputEffectiveAccessOfValueSymbol(Info.symInfo) &&
+      (Info.roles & (SymbolRoleSet)SymbolRole::Reference) == 0 &&
+      !isLocalSymbol(D)) {
+    AccessScope Scope = D->getFormalAccessScope();
+    if (Scope.isPublic()) {
+      if (D->isSPI()) {
+        Info.symInfo.Properties |= SymbolProperty::SwiftAccessControlSPI;
+      } else {
+        Info.symInfo.Properties |= SymbolProperty::SwiftAccessControlPublic;
+      }
+    } else if (Scope.isPackage()) {
+      Info.symInfo.Properties |= SymbolProperty::SwiftAccessControlPackage;
+    } else if (Scope.isInternal()) {
+      Info.symInfo.Properties |= SymbolProperty::SwiftAccessControlInternal;
+    } else if (Scope.isFileScope()) {
+      Info.symInfo.Properties |= SymbolProperty::SwiftAccessControlFilePrivate;
+    } else if (Scope.isPrivate()) {
+      Info.symInfo.Properties |=
+          SymbolProperty::SwiftAccessControlLessThanFilePrivate;
+    } else {
+      llvm_unreachable("Unsupported access scope");
+    }
   }
 
   return false;
@@ -2036,10 +2110,11 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
   return false;
 }
 
-bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
-                                                 IndexSymbol &Info) {
+bool IndexSwiftASTWalker::initFuncRefIndexSymbol(
+    ValueDecl *D, SourceLoc Loc, IndexSymbol &Info,
+    llvm::function_ref<bool(IndexSymbol &)> updateInfo) {
 
-  if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
+  if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info, updateInfo))
     return true;
 
   if (!isa<AbstractStorageDecl>(D) && !ide::isBeingCalled(ExprStack))

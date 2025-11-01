@@ -6,5 +6,5 @@
 
 #sourceLocation(file: "some_file.swift", line: 1)
 func testFunc() {}
-// CHECK: [[@LINE-1]]:6 | function/Swift | testFunc() | s:14swift_ide_test0C4FuncyyF | Def | rel: 0
+// CHECK: [[@LINE-1]]:6 | function(internal)/Swift | testFunc() | s:14swift_ide_test0C4FuncyyF | Def | rel: 0
 #sourceLocation()
