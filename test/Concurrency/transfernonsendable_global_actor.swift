@@ -12,7 +12,9 @@
 class NonSendableKlass {}
 final class SendableKlass : Sendable {}
 
-actor CustomActorInstance {}
+actor CustomActorInstance {
+  func acceptValue(_ x: NonSendableKlass) {}
+}
 
 @globalActor
 struct CustomActor {
@@ -377,5 +379,19 @@ actor PreferIsolationOfFieldToIsolationOfActor {
       let data = data
       _ = data
     }
+  }
+}
+
+// We need to error on this below since ns becomes main actor isolated and then
+// we send it into a different actor.
+@MainActor
+class SetterAssignmentMustInferGlobalIsolationTest {
+  var nsField = NonSendableKlass()
+
+  func send() async {
+    let ns = NonSendableKlass()
+    nsField = ns
+    await CustomActor.shared.acceptValue(ns) // expected-warning {{sending 'ns' risks causing data races}}
+    // expected-note @-1 {{sending main actor-isolated 'ns' to actor-isolated instance method 'acceptValue' risks causing data races between actor-isolated and main actor-isolated uses}}
   }
 }
