@@ -278,6 +278,9 @@ class IRGenOptions {
 public:
   std::string ModuleName;
 
+  /// The path to the main binary swiftmodule for the debug info.
+  std::string DebugModulePath;
+
   /// The compilation directory for the debug info.
   std::string DebugCompilationDir;
 
