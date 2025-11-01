@@ -164,7 +164,7 @@ param
 
   # Dependencies
   [ValidatePattern('^\d+(\.\d+)*$')]
-  [string] $PythonVersion = "3.10.1",
+  [string] $PythonVersion = "3.11.9",
 
   # Toolchain Version Info
   [string] $ProductVersion = "0.0.0",
@@ -419,7 +419,25 @@ $KnownPythons = @{
       URL = "https://www.nuget.org/api/v2/package/pythonarm64/3.10.1";
       SHA256 = "16becfccedf1269ff0b8695a13c64fac2102a524d66cecf69a8f9229a43b10d3";
     };
+    Source = @{
+      URL = "https://www.python.org/ftp/python/3.10.1/Python-3.10.1.tgz";
+      SHA256 = "b76117670e7c5064344b9c138e141a377e686b9063f3a8a620ff674fa8ec90d3"
+    };
   };
+  "3.11.9" = @{
+    AMD64 = @{
+      URL = "https://www.nuget.org/api/v2/package/python/3.11.9";
+      SHA256 = "9283876d58c017e0e846f95b490da3bca0fc0a6ee1134b2870677cfb7eec3c67";
+    };
+    ARM64 = @{
+      URL = "https://www.nuget.org/api/v2/package/pythonarm64/3.11.9";
+      SHA256 = "2f5b3bee38850fdde1b44227a23b8130d329839558376d2eb11099ce2b2cc33c";
+    };
+    Source = @{
+      URL = "https://www.python.org/ftp/python/3.11.9/Python-3.11.9.tgz";
+      SHA256 = "e7de3240a8bc2b1e1ba5c81bf943f06861ff494b69fda990ce2722a504c6153d";
+    }
+  }
 }
 
 $PythonModules = @{
@@ -741,6 +759,10 @@ function Get-SCCache {
 
 function Get-PythonPath([Hashtable] $Platform) {
   return [IO.Path]::Combine("$BinaryCache\", "Python$($Platform.Architecture.CMakeName)-$PythonVersion")
+}
+
+function Get-PythonSourcePath() {
+  return [IO.Path]::Combine("$BinaryCache\", "Python-$PythonVersion-Source")
 }
 
 function Get-PythonExecutable {
@@ -1268,6 +1290,15 @@ function Get-Dependencies {
       }
     }
 
+    function Install-PythonSource() {
+      $PythonSource = $KnownPythons[$PythonVersion]["Source"]
+      $Destination = Get-PythonSourcePath
+      New-Item -ItemType Directory -ErrorAction Ignore -Path $Destination | Out-Null
+      $Source = "$BinaryCache\Python-$PythonVersion-Source.tgz"
+      DownloadAndVerify $PythonSource.URL $Source $PythonSource.SHA256
+      tar -xvf $Source -C $Destination | Out-Null
+    }
+
     function Install-PIPIfNeeded {
       try {
         Invoke-Program -Silent "$(Get-PythonExecutable)" -m pip
@@ -1322,6 +1353,7 @@ function Get-Dependencies {
       Install-Python $BuildArchName
     }
     Install-PythonModules
+    Install-PythonSource
 
     if ($SkipBuild -and $SkipPackaging) { return }
 
@@ -4039,6 +4071,16 @@ function Build-Installer([Hashtable] $Platform) {
   Build-WiXProject bundle\installer.wixproj -Platform $Platform -Bundle -Properties $Properties
 }
 
+function Build-PythonInstaller([Hashtable] $Platform) {
+  Invoke-IsolatingEnvVars {
+    Invoke-VsDevShell $Platform
+
+    Push-Location "$(Get-PythonSourcePath)\Tools\msi"
+    Start-Process -Wait -WindowStyle Hidden -FilePath "buildrelease.bat" -ArgumentList @("-${Platform.Architecture.ShortName}", "-b", "-D", "--skip-zip", "--skip-nuget")
+    Pop-Location
+  }
+}
+
 function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.cab" $Stage
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.msi" $Stage
@@ -4360,6 +4402,7 @@ if (-not $SkipBuild) {
 }
 
 if (-not $SkipPackaging) {
+  Invoke-BuildStep Build-PythonInstaller $HostPlatform
   Invoke-BuildStep Build-Installer $HostPlatform
 }
 
