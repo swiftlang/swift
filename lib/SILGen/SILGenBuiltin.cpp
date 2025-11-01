@@ -507,11 +507,9 @@ static ManagedValue emitBuiltinAddressOfBorrowBuiltins(SILGenFunction &SGF,
     auto borrow = SGF.emitRValue(argument, SGFContext::AllowGuaranteedPlusZero)
        .getAsSingleValue(SGF, argument);
     if (!SGF.F.getConventions().useLoweredAddresses()) {
-      auto &context = SGF.getASTContext();
-      auto identifier =
-          stackProtected
-              ? context.getIdentifier("addressOfBorrowOpaque")
-              : context.getIdentifier("unprotectedAddressOfBorrowOpaque");
+      auto identifier = stackProtected
+                            ? BuiltinNames::AddressOfBorrowOpaque
+                            : BuiltinNames::UnprotectedAddressOfBorrowOpaque;
       auto builtin = SGF.B.createBuiltin(loc, identifier, rawPointerType,
                                          substitutions, {borrow.getValue()});
       return ManagedValue::forObjectRValueWithoutOwnership(builtin);
@@ -1173,8 +1171,7 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
   case TypeTraitResult::CanBe: {
     auto &C = SGF.getASTContext();
     auto int8Ty = BuiltinIntegerType::get(8, C)->getCanonicalType();
-    auto apply = SGF.B.createBuiltin(loc,
-                                     C.getIdentifier(getBuiltinName(Kind)),
+    auto apply = SGF.B.createBuiltin(loc, getBuiltinName(Kind),
                                      SILType::getPrimitiveObjectType(int8Ty),
                                      substitutions, args[0].getValue());
 
@@ -1357,8 +1354,7 @@ emitBuiltinGlobalStringTablePointer(SILGenFunction &SGF, SILLocation loc,
 
   SILValue argValue = args[0].getValue();
   auto &astContext = SGF.getASTContext();
-  Identifier builtinId = astContext.getIdentifier(
-      getBuiltinName(BuiltinValueKind::GlobalStringTablePointer));
+  auto builtinId = BuiltinNames::GlobalStringTablePointer;
 
   auto resultVal = SGF.B.createBuiltin(loc, builtinId,
                                        SILType::getRawPointerType(astContext),
@@ -1479,10 +1475,9 @@ static ManagedValue emitBuiltinGetCurrentAsyncTask(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     PreparedArguments &&preparedArgs, SGFContext C) {
   ASTContext &ctx = SGF.getASTContext();
-  auto apply = SGF.B.createBuiltin(
-      loc,
-      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::GetCurrentAsyncTask)),
-      SGF.getLoweredType(ctx.TheNativeObjectType), SubstitutionMap(), { });
+  auto apply = SGF.B.createBuiltin(loc, BuiltinNames::GetCurrentAsyncTask,
+                                   SGF.getLoweredType(ctx.TheNativeObjectType),
+                                   SubstitutionMap(), {});
   return SGF.emitManagedRValueWithEndLifetimeCleanup(apply);
 }
 
@@ -1524,24 +1519,21 @@ static ManagedValue emitBuiltinSizeof(
     PreparedArguments &&preparedArgs, SGFContext C) {
   auto &ctx = SGF.getASTContext();
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.B.createBuiltin(
-      loc, ctx.getIdentifier(getBuiltinName(BuiltinValueKind::Sizeof)),
-      SILType::getBuiltinWordType(ctx), subs, {}));
+      loc, BuiltinNames::Sizeof, SILType::getBuiltinWordType(ctx), subs, {}));
 }
 static ManagedValue emitBuiltinStrideof(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     PreparedArguments &&preparedArgs, SGFContext C) {
   auto &ctx = SGF.getASTContext();
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.B.createBuiltin(
-      loc, ctx.getIdentifier(getBuiltinName(BuiltinValueKind::Strideof)),
-      SILType::getBuiltinWordType(ctx), subs, {}));
+      loc, BuiltinNames::Strideof, SILType::getBuiltinWordType(ctx), subs, {}));
 }
 static ManagedValue emitBuiltinAlignof(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     PreparedArguments &&preparedArgs, SGFContext C) {
   auto &ctx = SGF.getASTContext();
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.B.createBuiltin(
-      loc, ctx.getIdentifier(getBuiltinName(BuiltinValueKind::Alignof)),
-      SILType::getBuiltinWordType(ctx), subs, {}));
+      loc, BuiltinNames::Alignof, SILType::getBuiltinWordType(ctx), subs, {}));
 }
 
 enum class CreateTaskOptions {
@@ -1704,8 +1696,7 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     functionValue.forward(SGF)
   };
 
-  auto builtinID =
-    ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CreateAsyncTask));
+  auto builtinID = BuiltinNames::CreateAsyncTask;
   auto resultTy = SGF.getLoweredType(getAsyncTaskAndContextType(ctx));
 
   auto apply = SGF.B.createBuiltin(loc, builtinID, resultTy, subs, builtinArgs);
@@ -1787,9 +1778,8 @@ static ManagedValue emitBuiltinCreateTaskGroup(SILGenFunction &SGF,
                                                SGFContext C) {
   auto &ctx = SGF.getASTContext();
   auto resultType = SILType::getRawPointerType(ctx);
-  auto value = SGF.B.createBuiltin(
-      loc, ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CreateTaskGroup)),
-      resultType, subs, {});
+  auto value = SGF.B.createBuiltin(loc, BuiltinNames::CreateTaskGroup,
+                                   resultType, subs, {});
   return ManagedValue::forObjectRValueWithoutOwnership(value);
 }
 
@@ -1801,11 +1791,8 @@ static ManagedValue emitBuiltinCreateTaskGroupWithFlags(
     ArrayRef<ManagedValue> args, SGFContext C) {
   auto &ctx = SGF.getASTContext();
   auto resultType = SILType::getRawPointerType(ctx);
-  auto value = SGF.B.createBuiltin(
-      loc,
-      ctx.getIdentifier(
-          getBuiltinName(BuiltinValueKind::CreateTaskGroupWithFlags)),
-      resultType, subs, {args[0].getValue()});
+  auto value = SGF.B.createBuiltin(loc, BuiltinNames::CreateTaskGroupWithFlags,
+                                   resultType, subs, {args[0].getValue()});
   return ManagedValue::forObjectRValueWithoutOwnership(value);
 }
 
@@ -1933,9 +1920,7 @@ static ManagedValue emitBuiltinAutoDiffCreateLinearMapContextWithType(
     ArrayRef<ManagedValue> args, SGFContext C) {
   ASTContext &ctx = SGF.getASTContext();
   auto *builtinApply = SGF.B.createBuiltin(
-      loc,
-      ctx.getIdentifier(getBuiltinName(
-          BuiltinValueKind::AutoDiffCreateLinearMapContextWithType)),
+      loc, BuiltinNames::AutoDiffCreateLinearMapContextWithType,
       SILType::getNativeObjectType(ctx), subs,
       /*args*/ {args[0].getValue()});
   return SGF.emitManagedRValueWithCleanup(builtinApply);
@@ -1945,13 +1930,10 @@ static ManagedValue emitBuiltinAutoDiffProjectTopLevelSubcontext(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
   ASTContext &ctx = SGF.getASTContext();
-  auto *builtinApply = SGF.B.createBuiltin(
-      loc,
-      ctx.getIdentifier(
-          getBuiltinName(BuiltinValueKind::AutoDiffProjectTopLevelSubcontext)),
-      SILType::getRawPointerType(ctx),
-      subs,
-      /*args*/ {args[0].borrow(SGF, loc).getValue()});
+  auto *builtinApply =
+      SGF.B.createBuiltin(loc, BuiltinNames::AutoDiffProjectTopLevelSubcontext,
+                          SILType::getRawPointerType(ctx), subs,
+                          /*args*/ {args[0].borrow(SGF, loc).getValue()});
   return ManagedValue::forObjectRValueWithoutOwnership(builtinApply);
 }
 
@@ -1960,9 +1942,7 @@ static ManagedValue emitBuiltinAutoDiffAllocateSubcontextWithType(
     ArrayRef<ManagedValue> args, SGFContext C) {
   ASTContext &ctx = SGF.getASTContext();
   auto *builtinApply = SGF.B.createBuiltin(
-      loc,
-      ctx.getIdentifier(
-          getBuiltinName(BuiltinValueKind::AutoDiffAllocateSubcontextWithType)),
+      loc, BuiltinNames::AutoDiffAllocateSubcontextWithType,
       SILType::getRawPointerType(ctx), subs,
       /*args*/ {args[0].borrow(SGF, loc).getValue(), args[1].getValue()});
   return ManagedValue::forObjectRValueWithoutOwnership(builtinApply);
@@ -2041,10 +2021,9 @@ static ManagedValue emitBuiltinGetEnumTag(SILGenFunction &SGF, SILLocation loc,
                                           SGFContext C) {
   auto &ctx = SGF.getASTContext();
 
-  auto bi = SGF.B.createBuiltin(
-    loc, ctx.getIdentifier(getBuiltinName(BuiltinValueKind::GetEnumTag)),
-    SILType::getBuiltinIntegerType(32, ctx), subs,
-    { args[0].getValue() });
+  auto bi = SGF.B.createBuiltin(loc, BuiltinNames::GetEnumTag,
+                                SILType::getBuiltinIntegerType(32, ctx), subs,
+                                {args[0].getValue()});
 
   return ManagedValue::forObjectRValueWithoutOwnership(bi);
 }
@@ -2055,10 +2034,9 @@ static ManagedValue emitBuiltinInjectEnumTag(SILGenFunction &SGF, SILLocation lo
                                              SGFContext C) {
   auto &ctx = SGF.getASTContext();
 
-  auto bi = SGF.B.createBuiltin(
-    loc, ctx.getIdentifier(getBuiltinName(BuiltinValueKind::InjectEnumTag)),
-    SILType::getEmptyTupleType(ctx), subs,
-    { args[0].getValue(), args[1].getValue() });
+  auto bi = SGF.B.createBuiltin(loc, BuiltinNames::InjectEnumTag,
+                                SILType::getEmptyTupleType(ctx), subs,
+                                {args[0].getValue(), args[1].getValue()});
 
   return ManagedValue::forObjectRValueWithoutOwnership(bi);
 }
@@ -2088,10 +2066,9 @@ static ManagedValue emitBuiltinAddressOfRawLayout(SILGenFunction &SGF,
                                                   SGFContext C) {
   auto &ctx = SGF.getASTContext();
 
-  auto bi = SGF.B.createBuiltin(
-    loc, ctx.getIdentifier(getBuiltinName(BuiltinValueKind::AddressOfRawLayout)),
-    SILType::getRawPointerType(ctx), subs,
-    { args[0].getValue() });
+  auto bi = SGF.B.createBuiltin(loc, BuiltinNames::AddressOfRawLayout,
+                                SILType::getRawPointerType(ctx), subs,
+                                {args[0].getValue()});
 
   return ManagedValue::forObjectRValueWithoutOwnership(bi);
 }
@@ -2148,7 +2125,7 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
   
   // Mark the buffer as initializedto communicate to DI that the memory
   // is considered initialized from this point.
-  auto markInit = getBuiltinValueDecl(Ctx, Ctx.getIdentifier("prepareInitialization"));
+  auto markInit = getBuiltinValueDecl(Ctx, BuiltinNames::PrepareInitialization);
   SGF.B.createBuiltin(loc, markInit->getBaseIdentifier(),
                        SILType::getEmptyTupleType(Ctx),
                        SubstitutionMap(),
