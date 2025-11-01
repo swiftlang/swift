@@ -3105,14 +3105,13 @@ namespace {
         // instantiate its copy constructor.
         bool isExplicitlyNonCopyable = hasNonCopyableAttr(decl);
 
-        clang::CXXConstructorDecl *moveCtor = nullptr;
         clang::CXXConstructorDecl *defaultCtor = nullptr;
         if (decl->needsImplicitCopyConstructor() && !isExplicitlyNonCopyable) {
           clangSema.DeclareImplicitCopyConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
         }
         if (decl->needsImplicitMoveConstructor()) {
-          moveCtor = clangSema.DeclareImplicitMoveConstructor(
+          clangSema.DeclareImplicitMoveConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
         }
         if (decl->needsImplicitDefaultConstructor()) {
@@ -3129,19 +3128,12 @@ namespace {
                 // Note: we use "doesThisDeclarationHaveABody" here because
                 // that's what "DefineImplicitCopyConstructor" checks.
                 !declCtor->doesThisDeclarationHaveABody()) {
-              if (declCtor->isMoveConstructor()) {
-                if (!moveCtor)
-                  moveCtor = declCtor;
-              } else if (declCtor->isDefaultConstructor()) {
+              if (declCtor->isDefaultConstructor()) {
                 if (!defaultCtor)
                   defaultCtor = declCtor;
               }
             }
           }
-        }
-        if (moveCtor && !decl->isAnonymousStructOrUnion()) {
-          clangSema.DefineImplicitMoveConstructor(clang::SourceLocation(),
-                                                  moveCtor);
         }
         if (defaultCtor) {
           clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
@@ -3151,7 +3143,8 @@ namespace {
         if (decl->needsImplicitDestructor()) {
           auto dtor = clangSema.DeclareImplicitDestructor(
               const_cast<clang::CXXRecordDecl *>(decl));
-          clangSema.DefineImplicitDestructor(clang::SourceLocation(), dtor);
+          if (!dtor->isDeleted() && !dtor->isIneligibleOrNotSelected())
+            clangSema.DefineImplicitDestructor(clang::SourceLocation(), dtor);
         }
       }
 

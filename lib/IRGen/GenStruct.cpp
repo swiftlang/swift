@@ -625,12 +625,19 @@ namespace {
       if (copyConstructor->isDefaulted() &&
           copyConstructor->getAccess() == clang::AS_public &&
           !copyConstructor->isDeleted() &&
+          !copyConstructor->isIneligibleOrNotSelected() &&
+          !copyConstructor->getParent()->isAnonymousStructOrUnion() &&
           // Note: we use "doesThisDeclarationHaveABody" here because
           // that's what "DefineImplicitCopyConstructor" checks.
           !copyConstructor->doesThisDeclarationHaveABody()) {
-        importer->getClangSema().DefineImplicitCopyConstructor(
-            clang::SourceLocation(),
-            const_cast<clang::CXXConstructorDecl *>(copyConstructor));
+        if (copyConstructor->isCopyConstructor())
+          importer->getClangSema().DefineImplicitCopyConstructor(
+              clang::SourceLocation(),
+              const_cast<clang::CXXConstructorDecl *>(copyConstructor));
+        else
+          importer->getClangSema().DefineImplicitMoveConstructor(
+              clang::SourceLocation(),
+              const_cast<clang::CXXConstructorDecl *>(copyConstructor));
       }
 
       auto &diagEngine = importer->getClangSema().getDiagnostics();
