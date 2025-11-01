@@ -1058,19 +1058,32 @@ bb0(%0 : $Int, %another: $Array<Int>):
   return %24 : $()
 }
 
-
+//   The input to StackNesting seems sketchy here; it isn't really
+//   obeying joint post-dominance, and is just skating by under the
+//   laxer rules for blocks that don't exit.
 // CHECK-LABEL: sil @promote_with_unreachable_block_nest_bug
-// CHECK: bb3:
-// CHECK: dealloc_stack_ref %{{.*}}
-// CHECK: bb4:
-// CHECK: br bb5
-// CHECK: bb5:
-// CHECK: dealloc_stack_ref %{{.*}}
-// CHECK: bb6:
-// CHECK: dealloc_stack_ref %{{.*}}
-// CHECK: bb11:
-// CHECK: alloc_ref [stack] $XX
-// CHECK: return
+// CHECK:      bb3:
+// CHECK-NEXT:   strong_release [[APPLY_RESULT:%[0-9]+]]
+// CHECK-NEXT:   dealloc_stack_ref [[ALLOC:%[0-9]+]]
+// CHECK-NEXT:   br bb6
+// CHECK:      bb4:
+// CHECK-NEXT:   integer_literal
+// CHECK-NEXT:   struct
+// CHECK-NEXT:   br bb13
+// CHECK:      bb5:
+// CHECK-NEXT:   strong_release [[APPLY_RESULT]]
+// CHECK-NEXT:   dealloc_stack_ref [[ALLOC]]
+// CHECK-NEXT:   br bb6
+// CHECK:      bb10:
+// CHECK-NEXT:   [[ALLOC]] = alloc_ref [stack] $XX
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   function_ref
+// CHECK-NEXT:   [[APPLY_RESULT]] = apply
+// CHECK-NEXT:   ref_element_addr
+// CHECK-NEXT:   load
+// CHECK-NEXT:   cond_br undef, bb2, bb4
+// CHECK:      bb13(
+// CHECK-NEXT:   unreachable
 sil @promote_with_unreachable_block_nest_bug : $@convention(thin) () -> Int32 {
 bb0:
   %0 = alloc_stack $Builtin.Int32                 // user: %30
