@@ -49,20 +49,23 @@ public:
   };
 
   ValueKind getKind() const { return Kind; }
+  SourceLoc getLoc() const { return Loc; }
 
 protected:
-  CompileTimeValue(ValueKind ValueKind) : Kind(ValueKind) {}
+  CompileTimeValue(ValueKind ValueKind, SourceLoc L = {}) : Kind(ValueKind), Loc(L) {}
 
 private:
   ValueKind Kind;
+  SourceLoc Loc;
 };
 
 /// A string representation of a raw literal value,
 /// for example an integer or string or float literal.
 class RawLiteralValue : public CompileTimeValue {
 public:
-  RawLiteralValue(std::string Value)
-  : CompileTimeValue(ValueKind::RawLiteral), Value(Value) {}
+  RawLiteralValue(std::string Value,
+                  SourceLoc Loc)
+  : CompileTimeValue(ValueKind::RawLiteral, Loc), Value(Value) {}
 
   std::string getValue() const { return Value; }
 
@@ -83,7 +86,7 @@ private:
 
 class NilLiteralValue : public CompileTimeValue {
 public:
-  NilLiteralValue() : CompileTimeValue(ValueKind::NilLiteral) {}
+  NilLiteralValue(SourceLoc Loc) : CompileTimeValue(ValueKind::NilLiteral, Loc) {}
 
   static bool classof(const CompileTimeValue *T) {
     return T->getKind() == ValueKind::NilLiteral;
@@ -100,8 +103,8 @@ struct FunctionParameter {
 /// with a collection of (potentially compile-time-known) parameters
 class InitCallValue : public CompileTimeValue {
 public:
-  InitCallValue(swift::Type Type, std::vector<FunctionParameter> Parameters)
-      : CompileTimeValue(ValueKind::InitCall), Type(Type),
+  InitCallValue(swift::Type Type, std::vector<FunctionParameter> Parameters, SourceLoc Loc)
+      : CompileTimeValue(ValueKind::InitCall, Loc), Type(Type),
         Parameters(Parameters) {}
 
   static bool classof(const CompileTimeValue *T) {
@@ -300,8 +303,9 @@ struct TupleElement {
 /// A representation of a tuple and each tuple-element
 class TupleValue : public CompileTimeValue {
 public:
-  TupleValue(std::vector<TupleElement> Elements)
-      : CompileTimeValue(ValueKind::Tuple), Elements(Elements) {}
+  TupleValue(std::vector<TupleElement> Elements,
+             SourceLoc Loc)
+      : CompileTimeValue(ValueKind::Tuple, Loc), Elements(Elements) {}
 
   static bool classof(const CompileTimeValue *T) {
     return T->getKind() == ValueKind::Tuple;
@@ -316,8 +320,9 @@ private:
 /// An array literal value representation
 class ArrayValue : public CompileTimeValue {
 public:
-  ArrayValue(std::vector<std::shared_ptr<CompileTimeValue>> Elements)
-      : CompileTimeValue(ValueKind::Array), Elements(Elements) {}
+  ArrayValue(std::vector<std::shared_ptr<CompileTimeValue>> Elements,
+             SourceLoc Loc)
+      : CompileTimeValue(ValueKind::Array, Loc), Elements(Elements) {}
 
   static bool classof(const CompileTimeValue *T) {
     return T->getKind() == ValueKind::Array;
@@ -333,8 +338,9 @@ private:
 /// A dictionary literal value representation
 class DictionaryValue : public CompileTimeValue {
 public:
-  DictionaryValue(std::vector<std::shared_ptr<TupleValue>> elements)
-      : CompileTimeValue(ValueKind::Dictionary), Elements(elements) {}
+  DictionaryValue(std::vector<std::shared_ptr<TupleValue>> elements,
+                  SourceLoc Loc)
+      : CompileTimeValue(ValueKind::Dictionary, Loc), Elements(elements) {}
 
   static bool classof(const CompileTimeValue *T) {
     return T->getKind() == ValueKind::Dictionary;
@@ -352,8 +358,9 @@ private:
 class EnumValue : public CompileTimeValue {
 public:
   EnumValue(std::string Identifier,
-            std::optional<std::vector<FunctionParameter>> Parameters)
-      : CompileTimeValue(ValueKind::Enum), Identifier(Identifier),
+            std::optional<std::vector<FunctionParameter>> Parameters,
+            SourceLoc Loc)
+      : CompileTimeValue(ValueKind::Enum, Loc), Identifier(Identifier),
         Parameters(Parameters) {}
 
   std::string getIdentifier() const { return Identifier; }
@@ -373,7 +380,9 @@ private:
 /// A type value representation
 class TypeValue : public CompileTimeValue {
 public:
-  TypeValue(swift::Type Type) : CompileTimeValue(ValueKind::Type), Type(Type) {}
+  TypeValue(swift::Type Type,
+            SourceLoc Loc)
+      : CompileTimeValue(ValueKind::Type, Loc), Type(Type) {}
 
   swift::Type getType() const { return Type; }
 
@@ -394,8 +403,8 @@ public:
   };
   KeyPathValue(std::string Path,
                swift::Type RootType,
-               std::vector<Component> Components)
-  : CompileTimeValue(ValueKind::KeyPath), Path(Path), RootType(RootType), Components(Components) {}
+               std::vector<Component> Components, SourceLoc Loc)
+        : CompileTimeValue(ValueKind::KeyPath, Loc), Path(Path), RootType(RootType), Components(Components) {}
 
   std::string getPath() const { return Path; }
   swift::Type getRootType() const { return RootType; }
@@ -418,8 +427,9 @@ private:
 class FunctionCallValue : public CompileTimeValue {
 public:
   FunctionCallValue(std::string Identifier,
-                    std::optional<std::vector<FunctionParameter>> Parameters)
-      : CompileTimeValue(ValueKind::FunctionCall), Identifier(Identifier),
+                    std::optional<std::vector<FunctionParameter>> Parameters,
+                    SourceLoc Loc)
+      : CompileTimeValue(ValueKind::FunctionCall, Loc), Identifier(Identifier),
         Parameters(Parameters) {}
 
   std::string getIdentifier() const { return Identifier; }
@@ -442,8 +452,9 @@ private:
 class StaticFunctionCallValue : public CompileTimeValue {
 public:
   StaticFunctionCallValue(std::string Label, swift::Type Type,
-                          std::vector<FunctionParameter> Parameters)
-      : CompileTimeValue(ValueKind::StaticFunctionCall), Label(Label),
+                          std::vector<FunctionParameter> Parameters,
+                          SourceLoc Loc)
+      : CompileTimeValue(ValueKind::StaticFunctionCall, Loc), Label(Label),
         Type(Type), Parameters(Parameters) {}
 
   static bool classof(const CompileTimeValue *T) {
@@ -464,8 +475,10 @@ private:
 /// let foo = MyStruct.bar
 class MemberReferenceValue : public CompileTimeValue {
 public:
-  MemberReferenceValue(swift::Type BaseType, std::string MemberLabel)
-      : CompileTimeValue(ValueKind::MemberReference), BaseType(BaseType),
+  MemberReferenceValue(swift::Type BaseType,
+                       std::string MemberLabel,
+                       SourceLoc Loc)
+      : CompileTimeValue(ValueKind::MemberReference, Loc), BaseType(BaseType),
         MemberLabel(MemberLabel) {}
 
   std::string getMemberLabel() const { return MemberLabel; }
@@ -484,8 +497,9 @@ private:
 class InterpolatedStringLiteralValue : public CompileTimeValue {
 public:
   InterpolatedStringLiteralValue(
-      std::vector<std::shared_ptr<CompileTimeValue>> Segments)
-      : CompileTimeValue(ValueKind::InterpolatedString), Segments(Segments) {}
+      std::vector<std::shared_ptr<CompileTimeValue>> Segments,
+      SourceLoc Loc)
+      : CompileTimeValue(ValueKind::InterpolatedString, Loc), Segments(Segments) {}
 
   std::vector<std::shared_ptr<CompileTimeValue>> getSegments() const {
     return Segments;
