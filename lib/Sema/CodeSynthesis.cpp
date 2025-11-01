@@ -1466,6 +1466,9 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
   case ImplicitMemberAction::ResolveDistributedActorID:
     (void)target->getDistributedActorIDProperty();
     break;
+  case ImplicitMemberAction::ResolveDistributedActorSystem:
+    (void)target->getDistributedActorSystemProperty();
+    break;
   }
   return std::make_tuple<>();
 }

@@ -665,39 +665,6 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
   return false;
 }
 
-void swift::checkDistributedActorProperties(const NominalTypeDecl *decl) {
-  auto &C = decl->getASTContext();
-
-  if (!decl->getDeclContext()->getParentSourceFile()) {
-    // Don't diagnose when checking without source file (e.g. from module, importer etc).
-    return;
-  }
-
-  if (decl->getDeclContext()->isInSwiftinterface()) {
-    // Don't diagnose properties in swiftinterfaces.
-    return;
-  }
-
-  if (isa<ProtocolDecl>(decl)) {
-    // protocols don't matter for stored property checking
-    return;
-  }
-
-  for (auto member : decl->getMembers()) {
-    if (auto prop = dyn_cast<VarDecl>(member)) {
-      if (prop->isSynthesized())
-        continue;
-
-      auto id = prop->getName();
-      if (id == C.Id_actorSystem || id == C.Id_id) {
-        prop->diagnose(diag::distributed_actor_user_defined_special_property,
-                      id);
-        prop->setInvalid();
-      }
-    }
-  }
-}
-
 // ==== ------------------------------------------------------------------------
 
 void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal) {
@@ -763,9 +730,6 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
       }
     }
   }
-
-  // ==== Properties
-  checkDistributedActorProperties(nominal);
 }
 
 bool TypeChecker::checkDistributedFunc(FuncDecl *func) {

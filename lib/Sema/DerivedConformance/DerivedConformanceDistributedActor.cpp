@@ -29,19 +29,6 @@
 
 using namespace swift;
 
-bool DerivedConformance::canDeriveIdentifiable(
-    NominalTypeDecl *nominal, DeclContext *dc) {
-  // we only synthesize for concrete 'distributed actor' decls (which are class)
-  if (!isa<ClassDecl>(nominal))
-    return false;
-
-  auto &C = nominal->getASTContext();
-  if (!C.getLoadedModule(C.Id_Distributed))
-    return false;
-
-  return nominal->isDistributedActor();
-}
-
 bool DerivedConformance::canDeriveDistributedActor(
     NominalTypeDecl *nominal, DeclContext *dc) {
   auto &C = nominal->getASTContext();
@@ -452,77 +439,6 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
 }
 
 /******************************************************************************/
-/******************************* PROPERTIES ***********************************/
-/******************************************************************************/
-
-static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
-  assert(derived.Nominal->isDistributedActor());
-  auto &C = derived.Context;
-
-  // ```
-  // nonisolated let id: Self.ID // Self.ActorSystem.ActorID
-  // ```
-  auto propertyType = getDistributedActorIDType(derived.Nominal);
-
-  VarDecl *propDecl;
-  PatternBindingDecl *pbDecl;
-  std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      DerivedConformance::SynthesizedIntroducer::Let, C.Id_id, propertyType,
-      /*isStatic=*/false, /*isFinal=*/true);
-
-  // mark as nonisolated, allowing access to it from everywhere
-  propDecl->addAttribute(NonisolatedAttr::createImplicit(C));
-
-  derived.addMemberToConformanceContext(pbDecl, /*insertAtHead=*/true);
-  derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
-  return propDecl;
-}
-
-static ValueDecl *deriveDistributedActor_actorSystem(
-    DerivedConformance &derived) {
-  auto &C = derived.Context;
-
-  auto classDecl = dyn_cast<ClassDecl>(derived.Nominal);
-  assert(classDecl && derived.Nominal->isDistributedActor());
-
-  if (!C.getLoadedModule(C.Id_Distributed))
-    return nullptr;
-
-  // ```
-  // nonisolated let actorSystem: ActorSystem
-  // ```
-  // (no need for @actorIndependent because it is an immutable let)
-  auto propertyType = getDistributedActorSystemType(classDecl);
-
-  VarDecl *propDecl;
-  PatternBindingDecl *pbDecl;
-  std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      DerivedConformance::SynthesizedIntroducer::Let, C.Id_actorSystem,
-      propertyType, /*isStatic=*/false, /*isFinal=*/true);
-
-  // mark as nonisolated, allowing access to it from everywhere
-  propDecl->addAttribute(NonisolatedAttr::createImplicit(C));
-
-  // IMPORTANT: `id` MUST be the first field of a distributed actor, and
-  // `actorSystem` MUST be the second field, because for a remote instance
-  // we don't allocate memory after those two fields, so their order is very
-  // important. The `hint` below makes sure the system is inserted right after.
-  if (auto id = derived.Nominal->getDistributedActorIDProperty()) {
-    derived.addMemberToConformanceContext(propDecl, /*hint=*/id);
-    derived.addMemberToConformanceContext(pbDecl, /*hint=*/id);
-  } else {
-    // `id` will be synthesized next, and will insert at head,
-    // so in order for system to be SECOND (as it must be),
-    // we'll insert at head right now and as id gets synthesized we'll get
-    // the correct order: id, actorSystem.
-    derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
-    derived.addMemberToConformanceContext(pbDecl, /*insertAtHead==*/true);
-  }
-
-  return propDecl;
-}
-
-/******************************************************************************/
 /***************************** ASSOC TYPES ************************************/
 /******************************************************************************/
 
@@ -849,11 +765,7 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   if (auto var = dyn_cast<VarDecl>(requirement)) {
     ValueDecl *derivedValue = nullptr;
-    if (var->getName() == Context.Id_id) {
-      derivedValue = deriveDistributedActor_id(*this);
-    } else if (var->getName() == Context.Id_actorSystem) {
-      derivedValue = deriveDistributedActor_actorSystem(*this);
-    } else if (var->getName() == Context.Id_unownedExecutor) {
+    if (var->getName() == Context.Id_unownedExecutor) {
       derivedValue = deriveDistributedActor_unownedExecutor(*this);
     }
 

@@ -6469,6 +6469,8 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
       action.emplace(ImplicitMemberAction::ResolveCodingKeys);
     } else if (baseName.getIdentifier() == Context.Id_id) {
       action.emplace(ImplicitMemberAction::ResolveDistributedActorID);
+    } else if (baseName.getIdentifier() == Context.Id_actorSystem) {
+      action.emplace(ImplicitMemberAction::ResolveDistributedActorSystem);
     }
   } else {
     auto argumentNames = member.getArgumentNames();
@@ -7556,8 +7558,6 @@ ProtocolDecl::getKnownDerivableProtocolKind() const {
     return KnownDerivableProtocolKind::AdditiveArithmetic;
   case KnownProtocolKind::Differentiable:
     return KnownDerivableProtocolKind::Differentiable;
-  case KnownProtocolKind::Identifiable:
-    return KnownDerivableProtocolKind::Identifiable;
   case KnownProtocolKind::Actor:
     return KnownDerivableProtocolKind::Actor;
   case KnownProtocolKind::DistributedActor:
