@@ -1,20 +1,19 @@
-// Ensure that we do not export any unwanted weak symbols from the dylibs.
+// Ensure that we do not export any weak symbols from the dylibs.
 //
 // Weak symbols require additional work from the loader to resolve the symbol at
 // load time and can cause ODR violations as well as unexpected symbol
 // satisfaction because the weak symbol may be used from a separate module.
 //
-// The _swift_release_preservemost_weak_placeholder symbol is present to allow
-// strong symbols from swiftCore to override weak symbols in other libraries,
-// to allow back-deployment usage of the swift_retain_preservemost and
-// swift_release_preservemost entrypoints.
+// Weak symbols in the runtime also conflict with the use of weak symbols in
+// embedded Swift. The presence of any weak symbol in swiftCore will allow its
+// strong symbols to override the weak symbols in the embedded runtime, and they
+// are not compatible.
 
 // RUN: %empty-directory(%t)
 
 // RUN: %llvm-nm --defined-only --extern-only --demangle %platform-dylib-dir/%target-library-name(swiftCore) > %t/swiftCore-all.txt
 // RUN: %llvm-nm --defined-only --extern-only --no-weak --demangle %platform-dylib-dir/%target-library-name(swiftCore) > %t/swiftCore-no-weak.txt
-// RUN: grep -v _swift_release_preservemost_weak_placeholder < %t/swiftCore-all.txt > %t/swiftCore-all-filtered.txt
-// RUN: diff -u %t/swiftCore-all-filtered.txt %t/swiftCore-no-weak.txt
+// RUN: diff -u %t/swiftCore-all.txt %t/swiftCore-no-weak.txt
 
 // RUN: %llvm-nm --defined-only --extern-only --demangle %platform-dylib-dir/%target-library-name(swiftRemoteMirror) > %t/swiftRemoteMirror-all.txt
 // RUN: %llvm-nm --defined-only --extern-only --no-weak --demangle %platform-dylib-dir/%target-library-name(swiftRemoteMirror) > %t/swiftRemoteMirror-no-weak.txt
