@@ -684,9 +684,10 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
     if (!version)
       return false;
 
+    auto diagLoc = sourceRange.isValid() ? sourceRange.Start : attrLoc;
     if (!VersionRange::isValidVersion(*version)) {
       diags
-          .diagnose(attrLoc, diag::availability_unsupported_version_number,
+          .diagnose(diagLoc, diag::availability_unsupported_version_number,
                     *version)
           .highlight(sourceRange);
       return true;
@@ -696,7 +697,7 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
     // 17 will never exist.
     if (domain->isVersioned() && !domain->isVersionValid(*version)) {
       diags
-          .diagnose(attrLoc,
+          .diagnose(diagLoc,
                     diag::availability_invalid_version_number_for_domain,
                     *version, *domain)
           .highlight(sourceRange);
