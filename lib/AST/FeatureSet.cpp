@@ -463,6 +463,7 @@ static bool usesFeatureTildeSendable(Decl *decl) {
       });
 }
 
+UNINTERESTING_FEATURE(AnyAppleOSAvailability)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
