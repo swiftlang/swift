@@ -109,6 +109,7 @@ set(SWIFT_BENCH_MODULES
     single-source/IndexPathTest
     single-source/InsertCharacter
     single-source/IntegerParsing
+    single-source/IntegerToString
     single-source/Integrate
     single-source/IterateData
     single-source/Join
