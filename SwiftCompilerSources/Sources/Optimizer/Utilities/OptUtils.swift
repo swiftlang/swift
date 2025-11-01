@@ -839,6 +839,7 @@ extension SimplifyContext {
       }
     }
 
+    first.salvageDebugInfo(self)
     second.replace(with: replacement, self)
 
     if canEraseFirst {
