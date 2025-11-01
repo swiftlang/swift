@@ -6465,8 +6465,10 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
     action.emplace(ImplicitMemberAction::ResolveImplicitInit);
 
   if (member.isSimpleName() && !baseName.isSpecial()) {
-    if (baseName.getIdentifier() == getASTContext().Id_CodingKeys) {
+    if (baseName.getIdentifier() == Context.Id_CodingKeys) {
       action.emplace(ImplicitMemberAction::ResolveCodingKeys);
+    } else if (baseName.getIdentifier() == Context.Id_id) {
+      action.emplace(ImplicitMemberAction::ResolveDistributedActorID);
     }
   } else {
     auto argumentNames = member.getArgumentNames();
@@ -6475,7 +6477,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
         if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
           action.emplace(ImplicitMemberAction::ResolveDecodable);
         } else if (argumentNames.front() == Context.Id_system) {
-          action.emplace(ImplicitMemberAction::ResolveDistributedActorSystem);
+          action.emplace(ImplicitMemberAction::ResolveDistributedActor);
         }
       } else if (!baseName.isSpecial() &&
                  baseName.getIdentifier() == Context.Id_encode &&
