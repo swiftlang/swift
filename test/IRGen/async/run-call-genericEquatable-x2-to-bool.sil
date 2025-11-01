@@ -25,7 +25,7 @@ sil public_external @printBool : $@convention(thin) (Bool) -> ()
 sil hidden @genericEquatableAndGenericEquatableToBool : $@async @convention(thin) <T where T : Equatable> (@in_guaranteed T, @in_guaranteed T) -> Bool {
 bb0(%0 : $*T, %1 : $*T):
   %4 = metatype $@thick T.Type
-  %5 = witness_method $T, #Equatable."==" : <Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
+  %5 = witness_method $T, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   %6 = apply %5<T>(%0, %1, %4) : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   return %6 : $Bool
 }
