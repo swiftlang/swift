@@ -3973,21 +3973,17 @@ public:
   isRepresentativeFor(TypeVariableType *typeVar,
                       ConstraintLocator::PathElementKind kind) const;
 
-  /// Gets the VarDecl associated with resolvedOverload, and the type of the
-  /// projection if the decl has an associated property wrapper with a projectedValue.
-  std::optional<std::pair<VarDecl *, Type>>
-  getPropertyWrapperProjectionInfo(SelectedOverload resolvedOverload);
+  /// Gets the the type of the projection if the decl has an associated property
+  /// wrapper with a projectedValue.
+  Type getPropertyWrapperProjectionType(SelectedOverload resolvedOverload);
 
-  /// Gets the VarDecl associated with resolvedOverload, and the type of the
-  /// backing storage if the decl has an associated property wrapper.
-  std::optional<std::pair<VarDecl *, Type>>
-  getPropertyWrapperInformation(SelectedOverload resolvedOverload);
-
-  /// Gets the VarDecl, and the type of the type property that it wraps if
-  /// resolved overload has a decl which is the backing storage for a
+  /// Gets the type of the backing storage if the decl has an associated
   /// property wrapper.
-  std::optional<std::pair<VarDecl *, Type>>
-  getWrappedPropertyInformation(SelectedOverload resolvedOverload);
+  Type getPropertyWrapperBackingType(SelectedOverload resolvedOverload);
+
+  /// Gets the type of a wrapped property if resolved overload has
+  /// a decl which is the backing storage for a property wrapper.
+  Type getWrappedPropertyType(SelectedOverload resolvedOverload);
 
   /// Merge the equivalence sets of the two type variables.
   ///

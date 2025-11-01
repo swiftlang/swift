@@ -1,13 +1,11 @@
 // {"kind":"typecheck","signature":"swift::constraints::ConstraintSystem::getClosureType(swift::ClosureExpr const*) const","signatureAssert":"Assertion failed: (result), function getClosureType"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
-@propertyWrapper struct a<b {
-  wrappedValue: b
+// RUN: not %target-swift-frontend -typecheck %s
+@propertyWrapper struct a {
 }
-func c( Bool)d {
-  @a var e: Bool? =
-    if .random() {
+{
+  @a var x =
+    if <#expression#> {
       return
-    } else {
-      true
     }
-  c(e
+  _x
+}
