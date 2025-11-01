@@ -1020,16 +1020,36 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   if (fArg->isSending())
     return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
 
+  // Check if we have a closure captured parameter that is nonisolated(unsafe)
+  // at its original declaration sign. In such a case, we want to propagate that
+  // bit.
+  bool isClosureCapturedNonisolatedUnsafe = [&]() -> bool {
+    if (!fArg->isClosureCapture())
+      return false;
+    auto *decl = fArg->getDecl();
+    if (!decl)
+      return false;
+    auto *attr = decl->getAttrs().getAttribute<NonisolatedAttr>();
+    if (!attr)
+      return false;
+    return attr->isUnsafe();
+  }();
+
   // If we have a closure capture that is not an indirect result or indirect
   // result error, we want to treat it as sending so that we properly handle
   // async lets.
   //
   // This pattern should only come up with async lets. See comment in
-  // isTransferrableFunctionArgument.
+  // canFunctionArgumentBeSent in RegionAnalysis.cpp. This code needs to stay in
+  // sync with that code.
   if (!fArg->isIndirectResult() && !fArg->isIndirectErrorResult() &&
-      fArg->isClosureCapture() &&
-      fArg->getFunction()->getLoweredFunctionType()->isSendable())
-    return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
+      fArg->isClosureCapture()) {
+    if (auto declRef = arg->getFunction()->getDeclRef();
+        declRef && declRef.isAsyncLetClosure) {
+      return SILIsolationInfo::getDisconnected(
+          isClosureCapturedNonisolatedUnsafe);
+    }
+  }
 
   // Before we do anything further, see if we have an isolated parameter. This
   // handles isolated self and specifically marked isolated.
@@ -1040,12 +1060,20 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
     if (auto funcIsolation = fArg->getFunction()->getActorIsolation();
         funcIsolation && funcIsolation->isCallerIsolationInheriting()) {
       return SILIsolationInfo::getTaskIsolated(fArg)
-          .withNonisolatedNonsendingTaskIsolated(true);
+          .withNonisolatedNonsendingTaskIsolated(true)
+          .withUnsafeNonIsolated(isClosureCapturedNonisolatedUnsafe);
     }
 
     auto astType = isolatedArg->getType().getASTType();
     if (astType->lookThroughAllOptionalTypes()->getAnyActor()) {
-      return SILIsolationInfo::getActorInstanceIsolated(fArg, isolatedArg);
+      if (auto isolation =
+              SILIsolationInfo::getActorInstanceIsolated(fArg, isolatedArg)) {
+        return isolation.withUnsafeNonIsolated(
+            isClosureCapturedNonisolatedUnsafe);
+      }
+      // If we had an isolated parameter that was an actor type, but we did not
+      // find any isolation for the actor instance... return {}.
+      return {};
     }
   }
 
@@ -1087,12 +1115,14 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   }
 
   // Otherwise, if we do not have an isolated argument and are not in an
-  // allocator, then we might be isolated via global isolation.
+  // allocator, then we might be isolated via global isolation or in a global
+  // actor isolated initializer.
   if (auto functionIsolation = fArg->getFunction()->getActorIsolation()) {
     if (functionIsolation->isActorIsolated()) {
       if (functionIsolation->isGlobalActor()) {
         return SILIsolationInfo::getGlobalActorIsolated(
-            fArg, functionIsolation->getGlobalActor());
+                   fArg, functionIsolation->getGlobalActor())
+            .withUnsafeNonIsolated(isClosureCapturedNonisolatedUnsafe);
       }
 
       return SILIsolationInfo::getActorInstanceIsolated(
@@ -1101,7 +1131,8 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
     }
   }
 
-  return SILIsolationInfo::getTaskIsolated(fArg);
+  return SILIsolationInfo::getTaskIsolated(fArg).withUnsafeNonIsolated(
+      isClosureCapturedNonisolatedUnsafe);
 }
 
 /// Infer isolation region from the set of protocol conformances.
