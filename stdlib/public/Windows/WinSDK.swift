@@ -14,6 +14,8 @@
 @_exported import _GUIDDef
 @_exported import WinSDK // Clang module
 
+public typealias _GUID = GUID
+
 // WinBase.h
 @inlinable
 public var HANDLE_FLAG_INHERIT: DWORD {
@@ -333,10 +335,13 @@ extension GUID {
 
 // These conformances are marked @retroactive because the GUID type nominally
 // comes from the _GUIDDef clang module rather than the WinSDK clang module.
-
 extension GUID: @retroactive Equatable {
   @_transparent
-  public static func ==(lhs: Self, rhs: Self) -> Bool {
+  @_implements(Equatable, ==(_:_:))
+  public static func __equals(lhs: Self, rhs: Self) -> Bool {
+  // When C++ interop is enabled, Swift imports a == operator from guiddef.h
+  // that conflicts with the definition of == here, so we've renamed it to
+  // __equals to avoid the conflict.
     lhs.uint128Value == rhs.uint128Value
   }
 }
