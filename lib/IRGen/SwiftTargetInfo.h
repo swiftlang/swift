@@ -114,8 +114,8 @@ public:
   /// "negative" pointer values.
   bool SwiftRetainIgnoresNegativeValues = false;
 
-  /// True if the swiftClientRetainRelease static library is available.
-  bool HasSwiftClientRRLibrary = false;
+  /// True if the swiftClientFastPaths static library is available.
+  bool HasSwiftClientFastPathsLibrary = false;
 
   bool UsableSwiftAsyncContextAddrIntrinsic = false;
 };

@@ -1733,9 +1733,9 @@ void IRGenModule::addLinkLibraries() {
     registerLinkLibrary(
         LinkLibrary{"objc", LibraryKind::Library, /*static=*/false});
 
-  if (TargetInfo.HasSwiftClientRRLibrary &&
+  if (TargetInfo.HasSwiftClientFastPathsLibrary &&
       getOptions().EnableClientRetainRelease)
-    registerLinkLibrary(LinkLibrary{"swiftClientRetainRelease",
+    registerLinkLibrary(LinkLibrary{"swiftClientFastPaths",
                                     LibraryKind::Library, /*static=*/true});
 
   // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
