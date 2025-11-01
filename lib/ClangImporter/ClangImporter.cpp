@@ -1563,9 +1563,20 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
   importer->Impl.setObjectForKeyedSubscript
     = clangContext.Selectors.getSelector(2, setObjectForKeyedSubscriptIdents);
 
+  // Can't inherit implicit modules from main module, because it isn't loaded yet.
+  // Add the Swift module, because it is important for safe interop wrappers.
+  Identifier stdlibName =
+      importer->Impl.SwiftContext.getIdentifier(STDLIB_NAME);
+  ImportPath::Raw path =
+      importer->Impl.SwiftContext.AllocateCopy<Located<Identifier>>(
+          Located<Identifier>(stdlibName, SourceLoc()));
+  ImplicitImportInfo implicitImportInfo;
+  implicitImportInfo.AdditionalUnloadedImports.emplace_back(
+      UnloadedImportedModule(ImportPath(path), ImportKind::Module));
+
   // Set up the imported header module.
   auto *importedHeaderModule = ModuleDecl::create(
-      ctx.getIdentifier(CLANG_HEADER_MODULE_NAME), ctx,
+      ctx.getIdentifier(CLANG_HEADER_MODULE_NAME), ctx, implicitImportInfo,
       [&](ModuleDecl *importedHeaderModule, auto addFile) {
         importer->Impl.ImportedHeaderUnit = new (ctx)
             ClangModuleUnit(*importedHeaderModule, importer->Impl, nullptr);
