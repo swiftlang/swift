@@ -441,12 +441,10 @@ func forward_declared_let_captures_local_fn() {
   }
 }
 
-// FIXME: should/could these be diagnosed instead of accepted?
 func forward_declared_local_lazy_captures() {
-  // runtime stack overflow, maybe UB?
+  // runtime stack overflow
   lazy var infiniteRecurse: Any = { infiniteRecurse }()
 
-  // ??? not entirely sure what's going on here...
-  // this can be called and doesn't seem to trip the sanitizers...
+  // function that returns itself
   lazy var hmm: () -> Any = { hmm }
 }
