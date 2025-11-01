@@ -5,7 +5,7 @@
 
 import FunctionsObjC
 
-// CHECK: define linkonce_odr {{.*}}ptr @_ZNK7Derived36__synthesizedBaseCall_virtual_methodEv(ptr {{.*}}%[[THIS:.*]])
+// CHECK: define linkonce_odr {{.*}}ptr @_ZNK7Derived46__synthesizedBaseCall_virtual_method__ZTS4BaseEv(ptr {{.*}}%[[THIS:.*]])
 // CHECK: %[[THIS_ADDR:.*]] = alloca ptr,
 // CHECK: store ptr %[[THIS]], ptr %[[THIS_ADDR]],
 // CHECK: %[[THIS1:.*]] = load ptr, ptr %[[THIS_ADDR]],
@@ -15,7 +15,7 @@ import FunctionsObjC
 // CHECK: %[[CALL:.*]] = call {{.*}}ptr %[[V0]](ptr {{.*}}%[[THIS1]])
 // CHECK: ret ptr %[[CALL]]
 
-// CHECK: define linkonce_odr {{.*}}ptr @_ZNK7Derived40__synthesizedBaseCall_non_virtual_methodEv(ptr {{.*}}%[[THIS:.*]])
+// CHECK: define linkonce_odr {{.*}}ptr @_ZNK7Derived50__synthesizedBaseCall_non_virtual_method__ZTS4BaseEv(ptr {{.*}}%[[THIS:.*]])
 // CHECK: %[[THIS_ADDR:.*]] = alloca ptr,
 // CHECK: store ptr %[[THIS]], ptr %[[THIS_ADDR]],
 // CHECK: %[[THIS1:.*]] = load ptr, ptr %[[THIS_ADDR]],

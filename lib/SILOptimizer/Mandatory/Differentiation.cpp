@@ -983,6 +983,13 @@ DifferentiationTransformer::emitDerivativeFunctionReference(
 // `SILDifferentiabilityWitness` processing
 //===----------------------------------------------------------------------===//
 
+static StringRef getIRName(SILFunction *F) {
+  if (!F->asmName().empty())
+    return F->asmName();
+
+  return F->getName();
+}
+
 static SILFunction *createEmptyVJP(ADContext &context,
                                    SILDifferentiabilityWitness *witness,
                                    SerializedKind_t isSerialized) {
@@ -990,7 +997,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
   auto config = witness->getConfig();
   LLVM_DEBUG({
     auto &s = getADDebugStream();
-    s << "Creating VJP for " << original->getName() << ":\n\t";
+    s << "Creating VJP for " << getIRName(original) << ":\n\t";
     s << "Original type: " << original->getLoweredFunctionType() << "\n\t";
     s << "Config: " << config << "\n\t";
   });
@@ -1001,7 +1008,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
   // === Create an empty VJP. ===
   Mangle::DifferentiationMangler mangler(context.getASTContext());
   auto vjpName = mangler.mangleDerivativeFunction(
-      original->getName(), AutoDiffDerivativeFunctionKind::VJP, config);
+      getIRName(original), AutoDiffDerivativeFunctionKind::VJP, config);
   auto vjpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   GenericEnvironment *vjpGenericEnv = nullptr;
   if (vjpCanGenSig && !vjpCanGenSig->areAllParamsConcrete())
@@ -1035,7 +1042,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
   auto config = witness->getConfig();
   LLVM_DEBUG({
     auto &s = getADDebugStream();
-    s << "Creating JVP for " << original->getName() << ":\n\t";
+    s << "Creating JVP for " << getIRName(original) << ":\n\t";
     s << "Original type: " << original->getLoweredFunctionType() << "\n\t";
     s << "Config: " << config << "\n\t";
   });
@@ -1045,7 +1052,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
 
   Mangle::DifferentiationMangler mangler(context.getASTContext());
   auto jvpName = mangler.mangleDerivativeFunction(
-      original->getName(), AutoDiffDerivativeFunctionKind::JVP, config);
+      getIRName(original), AutoDiffDerivativeFunctionKind::JVP, config);
   auto jvpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   GenericEnvironment *jvpGenericEnv = nullptr;
   if (jvpCanGenSig && !jvpCanGenSig->areAllParamsConcrete())
@@ -1174,7 +1181,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
                      "_fatalErrorForwardModeDifferentiationDisabled");
       LLVM_DEBUG(getADDebugStream()
                  << "Generated empty JVP for "
-                 << orig->getName() << ":\n"
+                 << getIRName(orig) << ":\n"
                  << *jvp);
     }
   }
@@ -1245,7 +1252,7 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
   // Create a new curry thunk.
   AutoDiffConfig desiredConfig(parameterIndices, resultIndices);
   // TODO(TF-685): Use more principled mangling for thunks.
-  auto newThunkName = "AD__" + thunk->getName().str() +
+  auto newThunkName = "AD__" + getIRName(thunk).str() +
                       "__differentiable_curry_thunk_" + desiredConfig.mangle();
 
   // Construct new curry thunk type with `@differentiable` function

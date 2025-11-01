@@ -477,6 +477,13 @@ void SILModule::eraseFunction(SILFunction *F) {
   FunctionTable.erase(F->getName());
   F->setName(zombieName);
 
+  // Remove from the asmname table.
+  if (!F->asmName().empty()) {
+    auto known = FunctionByAsmNameTable.find(F->asmName());
+    if (known != FunctionByAsmNameTable.end() && known->second == F)
+      FunctionByAsmNameTable.erase(known);
+  }
+
   // The function is dead, but we need it later (at IRGen) for debug info
   // or vtable stub generation. So we move it into the zombie list.
   getFunctionList().remove(F);
@@ -501,6 +508,13 @@ void SILModule::invalidateFunctionInSILCache(SILFunction *F) {
 void SILModule::eraseGlobalVariable(SILGlobalVariable *gv) {
   getSILLoader()->invalidateGlobalVariable(gv);
   GlobalVariableMap.erase(gv->getName());
+
+  if (gv->asmName().empty()) {
+    auto known = GlobalVariableByAsmNameMap.find(gv->asmName());
+    if (known != GlobalVariableByAsmNameMap.end() && known->second == gv)
+      GlobalVariableByAsmNameMap.erase(known);
+  }
+
   getSILGlobalList().erase(gv);
 }
 

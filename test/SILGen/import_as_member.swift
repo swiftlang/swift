@@ -42,24 +42,27 @@ public func returnNullableStringGlobalVar() -> String? {
 // CHECK-LABEL: sil {{.*}}useClass{{.*}}
 // CHECK: bb0([[D:%[0-9]+]] : $Double, [[OPTS:%[0-9]+]] : $SomeClass.Options):
 public func useClass(d: Double, opts: SomeClass.Options) {
-  // CHECK: [[CTOR:%[0-9]+]] = function_ref @MakeIAMSomeClass : $@convention(c) (Double) -> @autoreleased SomeClass
+  // CHECK: [[CTOR:%[0-9]+]] = function_ref @$sSo12IAMSomeClassC5valueABSd_tcfCTo : $@convention(c) (Double) -> @autoreleased SomeClass
   // CHECK: [[OBJ:%[0-9]+]] = apply [[CTOR]]([[D]])
   let o = SomeClass(value: d)
 
   // CHECK: [[MOVED_OBJ:%.*]] = move_value [lexical] [var_decl] [[OBJ]]
   // CHECK: [[BORROWED_OBJ:%.*]] = begin_borrow [[MOVED_OBJ]]
-  // CHECK: [[APPLY_FN:%[0-9]+]] = function_ref @IAMSomeClassApplyOptions : $@convention(c) (SomeClass, SomeClass.Options) -> ()
+  // CHECK: [[APPLY_FN:%[0-9]+]] = function_ref @$sSo12IAMSomeClassC12applyOptionsyySo0abD0VFTo : $@convention(c) (SomeClass, SomeClass.Options) -> ()
   // CHECK: apply [[APPLY_FN]]([[BORROWED_OBJ]], [[OPTS]])
   // CHECK: end_borrow [[BORROWED_OBJ]]
   // CHECK: destroy_value [[MOVED_OBJ]]
   o.applyOptions(opts)
 }
 
+// CHECK: sil [asmname "MakeIAMSomeClass"] [clang SomeClass.init] @$sSo12IAMSomeClassC5valueABSd_tcfCTo : $@convention(c) (Double) -> @autoreleased SomeClass
+// CHECK: sil [asmname "IAMSomeClassApplyOptions"] [clang SomeClass.applyOptions] @$sSo12IAMSomeClassC12applyOptionsyySo0abD0VFTo
+
 extension SomeClass {
   // CHECK-LABEL: sil hidden [ossa] @$sSo12IAMSomeClassC16import_as_memberE6doubleABSd_tcfC
   // CHECK: bb0([[DOUBLE:%[0-9]+]] : $Double
   // CHECK-NOT: value_metatype
-  // CHECK: [[FNREF:%[0-9]+]] = function_ref @MakeIAMSomeClass
+  // CHECK: [[FNREF:%[0-9]+]] = function_ref @$sSo12IAMSomeClassC5valueABSd_tcfCTo
   // CHECK: apply [[FNREF]]([[DOUBLE]])
   convenience init(double: Double) {
     self.init(value: double)

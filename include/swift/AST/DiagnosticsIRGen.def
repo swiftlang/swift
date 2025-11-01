@@ -117,5 +117,9 @@ NOTE(maybe_missing_parameter, none,
      "%select{constraint|parameter}0",
      (bool, const clang::NamedDecl *))
 
+ERROR(ir_function_redefinition_external,none,
+      "multiple definitions of symbol '%0'",
+      (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

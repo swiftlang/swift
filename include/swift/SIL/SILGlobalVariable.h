@@ -160,7 +160,7 @@ public:
 
   /// Return custom assembler name, otherwise empty.
   StringRef asmName() const { return AsmName; }
-  void setAsmName(StringRef value) { AsmName = value; }
+  void setAsmName(StringRef value);
 
   /// Return custom section name if @section was used, otherwise empty
   StringRef section() const { return Section; }

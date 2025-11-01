@@ -24,7 +24,7 @@ import Foundation
 // CHECK:  convert_escape_to_noescape %
 // CHECK:  strong_release
 // CHECK: bb10
-// CHECK:  [[F:%.*]] = function_ref @noescapeBlock3
+// CHECK:  [[F:%.*]] = function_ref @$sSo14noescapeBlock3yyySSSgXESg_AcBtFTo
 // CHECK:  apply [[F]]
 // CHECK:  release_value {{.*}} : $Optional<NSString>
 // CHECK:  release_value %1 : $Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>
@@ -77,7 +77,7 @@ public func returnOptionalEscape() -> (() ->())?
 // CHECK:   br bb5([[NONE_BLOCK]] : {{.*}}, [[NONE]] :
 //
 // CHECK: bb5([[BLOCK_PHI:%.*]] : $Optional<{{.*}}>, [[SWIFT_CLOSURE_PHI:%.*]] :
-// CHECK:  [[F:%.*]] = function_ref @noescapeBlock
+// CHECK:  [[F:%.*]] = function_ref @$sSo13noescapeBlockyyyyXESgFTo
 // CHECK:  apply [[F]]([[BLOCK_PHI]])
 // CHECK:  release_value [[BLOCK_PHI]]
 // CHECK:  release_value [[SWIFT_CLOSURE_PHI]]
@@ -110,8 +110,7 @@ public func returnOptionalEscape() -> (() ->())?
 // NOPEEPHOLE:   br bb5
 //
 // NOPEEPHOLE: bb5([[BLOCK_PHI:%.*]] : $Optional<{{.*}}>, [[SWIFT_CLOSURE_PHI:%.*]] :
-// NOPEEPHOLE-NEXT: function_ref noescapeBlock
-// NOPEEPHOLE-NEXT:  [[F:%.*]] = function_ref @noescapeBlock :
+// NOPEEPHOLE:  [[F:%.*]] = function_ref @$sSo13noescapeBlockyyyyXESgFTo :
 // NOPEEPHOLE-NEXT:  apply [[F]]([[BLOCK_PHI]])
 // NOPEEPHOLE-NEXT:  release_value [[BLOCK_PHI]]
 // NOPEEPHOLE-NEXT:  tuple
