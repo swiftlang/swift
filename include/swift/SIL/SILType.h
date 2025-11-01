@@ -1067,6 +1067,9 @@ public:
   /// Return Builtin.ImplicitActor.
   static SILType getBuiltinImplicitActorType(const ASTContext &ctx);
 
+  /// Return UnsafeRawPointer.
+  static SILType getUnsafeRawPointer(const ASTContext &ctx);
+
   //
   // Utilities for treating SILType as a pointer-like type.
   //
