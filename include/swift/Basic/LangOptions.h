@@ -677,7 +677,7 @@ namespace swift {
     /// Whether or not to allow experimental features that are only available
     /// in "production".
 #ifdef NDEBUG
-    bool RestrictNonProductionExperimentalFeatures = true;
+    bool RestrictNonProductionExperimentalFeatures = false;
 #else
     bool RestrictNonProductionExperimentalFeatures = false;
 #endif

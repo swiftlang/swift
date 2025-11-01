@@ -1483,6 +1483,10 @@ public:
   /// the language options.
   bool shouldPerformTypoCorrection();
 
+  /// Whether the specified SourceFile enables a given diagnostic group
+  /// either syntactically, or via command-line flags.
+  bool isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID groupID) const;
+
 private:
   friend class IntrinsicInfo;
   /// Retrieve an LLVMContext that is used for scratch space for intrinsic lookup.
