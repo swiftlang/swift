@@ -26,6 +26,7 @@
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/DispatchShims.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Error.h"
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/HeapObject.h"
@@ -748,10 +749,31 @@ static_assert(sizeof(ActiveTaskStatus) == ACTIVE_TASK_STATUS_SIZE,
 /// 1024-byte malloc quantum. We subtract off the slab header size, plus a
 /// little extra to stay within our limits even when there's overhead from
 /// malloc stack logging.
-static constexpr size_t SlabCapacity = 1024 - StackAllocator<0, nullptr>::slabHeaderSize() - 8;
+static constexpr size_t SlabCapacity =
+    1024 - StackAllocator<0, nullptr, nullptr>::slabHeaderSize() - 8;
 extern Metadata TaskAllocatorSlabMetadata;
 
-using TaskAllocator = StackAllocator<SlabCapacity, &TaskAllocatorSlabMetadata>;
+static bool enableTaskSlabAllocator() {
+  enum class EnableState : uint8_t {
+    Uninitialized,
+    Enabled,
+    Disabled,
+  };
+  static std::atomic<EnableState> savedState = {EnableState::Uninitialized};
+
+  auto state = savedState.load(std::memory_order_relaxed);
+  if (SWIFT_UNLIKELY(state == EnableState::Uninitialized)) {
+    state = runtime::environment::concurrencyEnableTaskSlabAllocator()
+                ? EnableState::Enabled
+                : EnableState::Disabled;
+    savedState.store(state, std::memory_order_relaxed);
+  }
+
+  return SWIFT_UNLIKELY(state == EnableState::Enabled);
+}
+
+using TaskAllocator = StackAllocator<SlabCapacity, &TaskAllocatorSlabMetadata,
+                                     enableTaskSlabAllocator>;
 
 /// Private storage in an AsyncTask object.
 struct AsyncTask::PrivateStorage {

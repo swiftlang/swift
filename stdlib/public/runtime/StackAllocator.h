@@ -57,7 +57,14 @@ namespace swift {
 ///
 /// SlabMetadataPtr specifies a fake metadata pointer to place at the beginning
 /// of slab allocations, so analysis tools can identify them.
-template <size_t SlabCapacity, Metadata *SlabMetadataPtr>
+///
+/// EnableSlabAllocator is a function that controls whether the slab allocator
+/// is enabled. If it returns false, then the stack allocator directly calls
+/// malloc/free for each allocation. If true, the stack allocator uses the slab
+/// allocator. This function MUST return the same value throughout the lifetime
+/// of a StackAllocator instance.
+template <size_t SlabCapacity, Metadata *SlabMetadataPtr,
+          bool(EnableSlabAllocator)()>
 class StackAllocator {
 private:
 
@@ -313,6 +320,9 @@ public:
 
   /// Allocate a memory buffer of \p size.
   void *alloc(size_t size) {
+    if (SWIFT_UNLIKELY(EnableSlabAllocator()))
+      return malloc(size);
+
     if (guardAllocations)
       size += sizeof(uintptr_t);
     size_t alignedSize = llvm::alignTo(size, llvm::Align(alignment));
@@ -326,6 +336,11 @@ public:
 
   /// Deallocate memory \p ptr.
   void dealloc(void *ptr) {
+    if (SWIFT_UNLIKELY(EnableSlabAllocator())) {
+      free(ptr);
+      return;
+    }
+
     if (!lastAllocation || lastAllocation->getAllocatedMemory() != ptr) {
       SWIFT_FATAL_ERROR(0, "freed pointer was not the last allocation");
     }
