@@ -1,12 +1,12 @@
 ---
-Name: bionic
+Name: glibc
 Functions:
-- Name: posix_spawnattr_init
-  Parameters:
-  - Position: 0
-    Type: "posix_spawnattr_t _Nullable * _Nonnull"
 - Name: posix_spawn
   Parameters:
+  - Position: 0
+    Type: "pid_t * _Nonnull"
+  - Position: 1
+    type: "const char * _Nonnull"
   - Position: 2
     Type: "const posix_spawn_file_actions_t _Nonnull * _Nullable"
   - Position: 3
@@ -15,7 +15,3 @@ Functions:
     Type: "char * const _Nullable __argv[_Nonnull]"
   - Position: 5
     Type: "char * const _Nullable __argv[_Nonnull]"
-- Name: posix_spawn_file_actions_init
-  Parameters:
-  - Position: 0
-    Type: "posix_spawn_file_actions_t _Nullable * _Nonnull"

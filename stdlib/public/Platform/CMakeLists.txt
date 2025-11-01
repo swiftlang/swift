@@ -236,7 +236,14 @@ foreach(sdk ${SWIFT_SDKS})
         COMMAND
           "${CMAKE_COMMAND}" "-E" "copy"
             ${glibc_header_out} ${glibc_header_out_static}
-        OUTPUT ${glibc_modulemap_out_static} ${glibc_header_out_static}
+        COMMAND
+          ${CMAKE_COMMAND} -E make_directory "${module_dir}/apinotes"
+        COMMAND
+          ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/SwiftGlibc.apinotes" "${module_dir}/apinotes"
+        OUTPUT
+          ${glibc_modulemap_out_static}
+          ${glibc_header_out_static}
+          "${module_dir}/apinotes/SwiftGlibc.apinotes"
         DEPENDS
           "${glibc_modulemap_target}"
           "${glibc_header_target}"
