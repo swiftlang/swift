@@ -457,7 +457,7 @@ public:
 class TimeSpentRunningStatusRecord : public TaskStatusRecord {
 public:
   TimeSpentRunningStatusRecord()
-      : TaskOptionRecord(TaskStatusRecordKind::TimeSpentRunning) {}
+      : TaskStatusRecord(TaskStatusRecordKind::TimeSpentRunning) {}
 
   uint64_t TimeSpentRunning = 0;
 
