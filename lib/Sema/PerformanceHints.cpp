@@ -31,7 +31,8 @@
 using namespace swift;
 
 bool swift::performanceHintDiagnosticsEnabled(ASTContext &ctx) {
-  return !ctx.Diags.isIgnoredDiagnosticGroupTree(DiagGroupID::PerformanceHints);
+  return !ctx.Diags.isIgnoredDiagnosticGroupTree(DiagGroupID::PerformanceHints) &&
+         (ctx.TypeCheckerOpts.SkipFunctionBodies == FunctionBodySkipping::None);
 }
 
 namespace {
