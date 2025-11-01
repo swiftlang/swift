@@ -92,23 +92,23 @@ ret
 // limits, in addition to the usual x19 and up. Any calls to functions that use
 // the standard calling convention need to save/restore x9-x15.
 
-.private_extern _swift_bridgeObjectReleaseClient
+.private_extern _swift_bridgeObjectReleaseDirect
 #if SWIFT_OBJC_INTEROP
-_swift_bridgeObjectReleaseClient:
+_swift_bridgeObjectReleaseDirect:
   tbz  x0, #63, LbridgeObjectReleaseNotTagged
   ret
 LbridgeObjectReleaseNotTagged:
-  tbnz  x0, #62, LbridgeObjectReleaseClientObjC
+  tbnz  x0, #62, LbridgeObjectReleaseDirectObjC
   and   x0, x0, 0x0ffffffffffffff8
 
 #else
-_swift_bridgeObjectReleaseClient:
+_swift_bridgeObjectReleaseDirect:
   and   x0, x0, 0x0ffffffffffffff8
 #endif
 
-.alt_entry _swift_releaseClient
-.private_extern _swift_releaseClient
-_swift_releaseClient:
+.alt_entry _swift_releaseDirect
+.private_extern _swift_releaseDirect
+_swift_releaseDirect:
 // RR of NULL or values with high bit set is a no-op.
   cmp   x0, #0
   b.le  Lrelease_ret
@@ -210,7 +210,7 @@ Lcall_swift_release:
   ldr   x9, [sp], #0x50
   ret_maybe_ab
 
-LbridgeObjectReleaseClientObjC:
+LbridgeObjectReleaseDirectObjC:
   maybe_pacibsp
   stp   x0, x9, [sp, #-0x50]!
   stp   x10, x11, [sp, #0x10]
@@ -232,21 +232,21 @@ LbridgeObjectReleaseObjCRet:
   ret_maybe_ab
 
 
-.private_extern _swift_bridgeObjectRetainClient
+.private_extern _swift_bridgeObjectRetainDirect
 #if SWIFT_OBJC_INTEROP
-_swift_bridgeObjectRetainClient:
+_swift_bridgeObjectRetainDirect:
   tbz  x0, #63, LbridgeObjectRetainNotTagged
   ret
 LbridgeObjectRetainNotTagged:
-  tbnz  x0, #62, Lswift_bridgeObjectRetainClientObjC
+  tbnz  x0, #62, Lswift_bridgeObjectRetainDirectObjC
 
-.alt_entry _swift_retainClient
+.alt_entry _swift_retainDirect
 #else
-.set _swift_bridgeObjectRetainClient, _swift_retainClient
+.set _swift_bridgeObjectRetainDirect, _swift_retainDirect
 #endif
 
-.private_extern _swift_retainClient
-_swift_retainClient:
+.private_extern _swift_retainDirect
+_swift_retainDirect:
 // RR of NULL or values with high bit set is a no-op.
   cmp   x0, #0
   b.le  Lretain_ret
@@ -348,7 +348,7 @@ Lcall_swift_retain:
   ldp   x0, x9, [sp], #0x50
   ret_maybe_ab
 
-Lswift_bridgeObjectRetainClientObjC:
+Lswift_bridgeObjectRetainDirectObjC:
   maybe_pacibsp
   stp   x0, x9, [sp, #-0x50]!
   stp   x10, x11, [sp, #0x10]

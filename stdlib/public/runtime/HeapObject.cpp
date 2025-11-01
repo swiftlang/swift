@@ -62,26 +62,26 @@ using namespace swift;
 #endif
 
 #if SWIFT_REFCOUNT_CC_PRESERVEMOST
-// These assembly definitions support the swiftClientRetainRelease library which
-// is currently implemented for ARM64 Mach-O.
+// These assembly definitions support the retain/release fast paths in the
+// swiftSwiftDirectRuntime library which is currently implemented for ARM64 Mach-O.
 #if __arm64__ && __LP64__ && defined(__APPLE__) && defined(__MACH__)
 asm(R"(
-// Define a mask used by ClientRetainRelease to determine when it must call into
-// the runtime. The symbol's address is used as the mask, rather than its
-// contents, to eliminate one load instruction when using it. This is imported
-// weakly, which makes its address zero when running against older runtimes.
-// ClientRetainRelease references it using an addend of 0x8000000000000000,
-// which produces the appropriate mask in that case. Since the mask is still
-// unchanged in this version of the runtime, we export this symbol as zero. If a
-// different mask is ever needed, the address of this symbol needs to be set to
-// 0x8000000000000000 less than that value so that it comes out right in
-// ClientRetainRelease.
+// Define a mask used by swift_retain/releaseDirect in the SwiftDirectRuntime
+// library to determine when it must call into the runtime. The symbol's address
+// is used as the mask, rather than its contents, to eliminate one load
+// instruction when using it. This is imported weakly, which makes its address
+// zero when running against older runtimes. SwiftDirectRuntime references it using
+// an addend of 0x8000000000000000, which produces the appropriate mask in that
+// case. Since the mask is still unchanged in this version of the runtime, we
+// export this symbol as zero. If a different mask is ever needed, the address
+// of this symbol needs to be set to 0x8000000000000000 less than that value so
+// that it comes out right in SwiftDirectRuntime.
   .globl __swift_retainRelease_slowpath_mask_v1
   .set __swift_retainRelease_slowpath_mask_v1, 0
 
 // Define aliases for swift_retain/release that indicate they use preservemost.
-// ClientRetainRelease will reference these so that it can fall back to a
-// register-preserving register on older runtimes.
+// SwiftDirectRuntime will reference these so that it can fall back to a
+// register-preserving shim on older runtimes.
   .globl _swift_retain_preservemost
   .set _swift_retain_preservemost, _swift_retain
   .globl _swift_release_preservemost
