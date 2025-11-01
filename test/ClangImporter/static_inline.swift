@@ -6,7 +6,7 @@
 // RUN: %FileCheck < %t/static_inline.sil %s
 // RUN: %target-swift-frontend -parse-as-library -module-name=static_inline -O -emit-ir %t/static_inline.sil -enable-objc-interop -import-objc-header %S/Inputs/static_inline.h | %FileCheck --check-prefix=CHECK-IR %s
 
-// CHECK: sil shared [clang c_inline_func] @c_inline_func : $@convention(c) (Int32) -> Int32
+// CHECK: sil shared [asmname "c_inline_func"] [clang c_inline_func] @$sSo13c_inline_funcys5Int32VACFTo : $@convention(c) (Int32) -> Int32
 
 // CHECK-IR-LABEL: define{{.*}} i32 @"$s13static_inline6testit1xs5Int32VAE_tF"(i32 %0)
 // CHECK-IR: = add {{.*}}, 27

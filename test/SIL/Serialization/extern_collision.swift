@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-experimental-feature Extern -o %t %S/Inputs/extern_with_nullable.swift
-// RUN: %target-swift-frontend -emit-module -enable-experimental-feature Extern -o %t %S/Inputs/extern_with_nonnull.swift
+// RUN: %target-swift-frontend -emit-module -DUSE_EXTERN -enable-experimental-feature Extern -o %t %S/Inputs/extern_with_nullable.swift
+// RUN: %target-swift-frontend -emit-module -DUSE_EXTERN -enable-experimental-feature Extern -o %t %S/Inputs/extern_with_nonnull.swift
 // RUN: %target-swift-frontend -emit-sil -o %t -I %t -primary-file %s -module-name main -O
 
 // REQUIRES: swift_feature_Extern

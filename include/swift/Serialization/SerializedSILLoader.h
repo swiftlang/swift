@@ -62,8 +62,10 @@ public:
 
   SILFunction *lookupSILFunction(SILFunction *Callee, bool onlyUpdateLinkage);
   SILFunction *lookupSILFunction(StringRef Name,
-                                 std::optional<SILLinkage> linkage);
-  SILGlobalVariable *lookupSILGlobalVariable(StringRef Name);
+                                 std::optional<SILLinkage> linkage,
+                                 bool byAsmName = false);
+  SILGlobalVariable *lookupSILGlobalVariable(StringRef Name,
+                                             bool byAsmName = false);
   bool hasSILFunction(StringRef Name,
                       std::optional<SILLinkage> linkage = std::nullopt);
   SILVTable *lookupVTable(const ClassDecl *C);

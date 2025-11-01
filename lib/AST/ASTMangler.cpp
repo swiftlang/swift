@@ -669,6 +669,19 @@ void ASTMangler::beginManglingWithAutoDiffOriginalFunction(
     beginManglingClangDecl(typedefType->getDecl());
     return;
   }
+
+  if (auto *EA = ExternAttr::find(afd->getAttrs(), ExternKind::C)) {
+    beginManglingWithoutPrefix();
+    appendOperator(EA->getCName(afd));
+    return;
+  }
+
+  if (afd->getAttrs().hasAttribute<CDeclAttr>()) {
+    beginManglingWithoutPrefix();
+    appendOperator(afd->getCDeclName());
+    return;
+  }
+
   beginMangling();
   if (auto *cd = dyn_cast<ConstructorDecl>(afd))
     appendConstructorEntity(cd, /*isAllocating*/ !cd->isConvenienceInit());

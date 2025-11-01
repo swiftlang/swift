@@ -157,6 +157,42 @@ namespace {
     }
   };
 
+  class StringTableInfo {
+  public:
+    using key_type = StringRef;
+    using key_type_ref = key_type;
+    using data_type = StringRef;
+    using data_type_ref = const data_type &;
+    using hash_value_type = uint32_t;
+    using offset_type = uint32_t;
+
+    hash_value_type ComputeHash(key_type_ref key) {
+      assert(!key.empty());
+      return llvm::djbHash(key, SWIFTMODULE_HASH_SEED);
+    }
+
+    std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
+                                                    key_type_ref key,
+                                                    data_type_ref data) {
+      offset_type keyLength = static_cast<offset_type>(key.size());
+      llvm::support::endian::write<offset_type>(out, keyLength,
+                                                llvm::endianness::little);
+      offset_type dataLength = static_cast<offset_type>(data.size());
+      llvm::support::endian::write<offset_type>(out, dataLength,
+                                                llvm::endianness::little);
+      return {keyLength, dataLength};
+    }
+
+    void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+      out << key;
+    }
+
+    void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                  unsigned len) {
+      out << data;
+    }
+  };
+
   class SILSerializer {
     using TypeID = serialization::TypeID;
     using DebugScopeID = DeclID;
@@ -181,6 +217,7 @@ namespace {
   public:
     using TableData = FuncTableInfo::data_type;
     using Table = llvm::MapVector<FuncTableInfo::key_type, TableData>;
+    using StringMapTable = llvm::MapVector<StringRef, std::string>;
   private:
     /// FuncTable maps function name to an ID.
     Table FuncTable;
@@ -232,6 +269,10 @@ namespace {
     /// Holds the list of SIL differentiability witnesses.
     std::vector<BitOffset> DifferentiabilityWitnessOffset;
     uint32_t /*DeclID*/ NextDifferentiabilityWitnessID = 1;
+
+    /// Maps asmname of SIL functions and global variables to their SIL names,
+    /// which will generally be mangled names.
+    StringMapTable AsmNameTable;
 
     llvm::DenseMap<PointerUnion<const SILDebugScope *, SILFunction *>, DeclID>
         DebugScopeMap;
@@ -559,8 +600,14 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   // Each extra string emitted below needs to update the trailing record
   // count here.
-  if (!F.asmName().empty())
+  if (!F.asmName().empty()) {
     ++numTrailingRecords;
+
+    // Record asmname mapping.
+    if (F.asmName() != F.getName()) {
+      AsmNameTable[F.asmName()] = F.getName();
+    }
+  }
   if (!F.section().empty())
     ++numTrailingRecords;
 
@@ -3086,8 +3133,31 @@ static void writeIndexTable(Serializer &S,
   List.emit(scratch, kind, tableOffset, hashTableBlob);
 }
 
+static void writeStringTable(Serializer &S,
+                             const sil_index_block::ListLayout &List,
+                             sil_index_block::RecordKind kind,
+                             const SILSerializer::StringMapTable &table) {
+  assert((kind == sil_index_block::SIL_ASM_NAMES) &&
+         "Only SIL asm names table is supported");
+  llvm::SmallString<4096> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::OnDiskChainedHashTableGenerator<StringTableInfo> generator;
+    StringTableInfo tableInfo;
+    for (auto &entry : table)
+      generator.insert(entry.first, entry.second, tableInfo);
+
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0.
+    endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
+    tableOffset = generator.Emit(blobStream, tableInfo);
+  }
+  SmallVector<uint64_t, 8> scratch;
+  List.emit(scratch, kind, tableOffset, hashTableBlob);
+}
+
 void SILSerializer::writeIndexTables() {
-  BCBlockRAII restoreBlock(Out, SIL_INDEX_BLOCK_ID, 4);
+  BCBlockRAII restoreBlock(Out, SIL_INDEX_BLOCK_ID, 5);
 
   sil_index_block::ListLayout List(Out);
   sil_index_block::OffsetLayout Offset(Out);
@@ -3153,6 +3223,9 @@ void SILSerializer::writeIndexTables() {
                 DifferentiabilityWitnessOffset);
   }
 
+  if (!AsmNameTable.empty()) {
+    writeStringTable(S, List, sil_index_block::SIL_ASM_NAMES, AsmNameTable);
+  }
 }
 
 void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
@@ -3169,8 +3242,14 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
 
   // Each extra string emitted below needs to update the trailing record
   // count here.
-  if (!g.asmName().empty())
+  if (!g.asmName().empty()) {
     ++numTrailingRecords;
+
+    // Record asmname mapping.
+    if (g.asmName() != g.getName()) {
+      AsmNameTable[g.asmName()] = g.getName();
+    }
+  }
   if (!g.section().empty())
     ++numTrailingRecords;
 
