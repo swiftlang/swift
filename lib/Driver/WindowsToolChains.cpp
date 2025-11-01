@@ -147,7 +147,8 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
 
   if (!context.Args.hasArg(options::OPT_nostartfiles)) {
     SmallString<128> SharedResourceDirPath;
-    getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+    getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true,
+                       context.OI.SDKPath);
 
     SmallString<128> swiftrtPath = SharedResourceDirPath;
     llvm::sys::path::append(swiftrtPath,

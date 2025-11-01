@@ -214,7 +214,8 @@ protected:
   /// Get the resource dir link path, which is platform-specific and found
   /// relative to the compiler.
   void getResourceDirPath(SmallVectorImpl<char> &runtimeLibPath,
-                          const llvm::opt::ArgList &args, bool shared) const;
+                          const llvm::opt::ArgList &args, bool shared,
+                          StringRef SDKPath) const;
 
   /// Get the secondary runtime library link path given the primary path.
   void getSecondaryResourceDirPath(
