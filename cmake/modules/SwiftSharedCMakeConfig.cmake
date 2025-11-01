@@ -338,6 +338,12 @@ endmacro()
 # configuration in LLVM.  ('llvm_config()' selects the same build configuration
 # in LLVM as we have for Swift.)
 function(swift_common_llvm_config target)
+  if (LLVM_LINK_LLVM_DYLIB)
+    # Link against the LLVM shared library and ignore the individual components.
+    target_link_libraries(${target} PRIVATE LLVM)
+    return()
+  endif()
+
   set(link_components ${ARGN})
 
   if((SWIFT_BUILT_STANDALONE OR SOURCEKIT_BUILT_STANDALONE) AND NOT "${CMAKE_CFG_INTDIR}" STREQUAL ".")
