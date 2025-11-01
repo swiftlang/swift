@@ -342,47 +342,22 @@ bool HasInitAccessorRequest::evaluate(Evaluator &evaluator,
 }
 
 ArrayRef<VarDecl *>
-InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
-                                        NominalTypeDecl *decl) const {
-  SmallVector<VarDecl *, 4> results;
-  for (auto var : decl->getMemberwiseInitProperties()) {
-    if (var->hasInitAccessor())
-      results.push_back(var);
-  }
-
-  return decl->getASTContext().AllocateCopy(results);
-}
-
-ArrayRef<VarDecl *>
-MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
-                                        NominalTypeDecl *decl) const {
+InitializablePropertiesRequest::evaluate(Evaluator &evaluator,
+                                         NominalTypeDecl *decl) const {
   IterableDeclContext *implDecl = decl->getImplementationContext();
 
   if (!hasStoredProperties(decl, implDecl))
     return ArrayRef<VarDecl *>();
 
-  // Make sure we expand what we need to to get all of the properties.
+  SmallVector<VarDecl *, 4> results;
   computeLoweredProperties(decl, implDecl, LoweredPropertiesReason::Memberwise);
 
-  SmallVector<VarDecl *, 4> results;
-  SmallPtrSet<VarDecl *, 4> subsumedViaInitAccessor;
-
   auto maybeAddProperty = [&](VarDecl *var) {
-    // We only care about properties that are memberwise initialized.
-    if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+    if (!var->getDeclContext()->isTypeContext() || var->isStatic())
       return;
 
-    // Add this property.
-    results.push_back(var);
-
-    // If this property has an init accessor, it subsumes all of the stored properties
-    // that the accessor initializes. Mark those stored properties as being subsumed; we'll
-    // get back to them later.
-    if (auto initAccessor = var->getAccessor(AccessorKind::Init)) {
-      for (auto subsumed : initAccessor->getInitializedProperties()) {
-        subsumedViaInitAccessor.insert(subsumed);
-      }
-    }
+    if (var->hasStorageOrWrapsStorage() || var->hasInitAccessor())
+      results.push_back(var);
   };
 
   for (auto *member : decl->getCurrentMembers()) {
@@ -395,6 +370,56 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
     });
   }
 
+  return decl->getASTContext().AllocateCopy(results);
+}
+
+ArrayRef<VarDecl *>
+InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
+                                        NominalTypeDecl *decl) const {
+  auto initableVars =
+      evaluateOrDefault(evaluator, InitializablePropertiesRequest{decl}, {});
+  if (initableVars.empty())
+    return {};
+
+  SmallVector<VarDecl *, 4> results;
+  for (auto *var : initableVars) {
+    if (var->hasInitAccessor())
+      results.push_back(var);
+  }
+
+  return decl->getASTContext().AllocateCopy(results);
+}
+
+ArrayRef<VarDecl *>
+MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
+                                          NominalTypeDecl *decl,
+                                          MemberwiseInitKind initKind) const {
+  auto initableVars =
+      evaluateOrDefault(evaluator, InitializablePropertiesRequest{decl}, {});
+  if (initableVars.empty())
+    return {};
+
+  SmallVector<VarDecl *, 4> results;
+  SmallPtrSet<VarDecl *, 4> subsumedViaInitAccessor;
+
+  for (auto *var : initableVars) {
+    // If this property has an init accessor, it subsumes all of the stored properties
+    // that the accessor initializes. Mark those stored properties as being subsumed; we'll
+    // get back to them later.
+    if (auto initAccessor = var->getAccessor(AccessorKind::Init)) {
+      for (auto subsumed : initAccessor->getInitializedProperties()) {
+        subsumedViaInitAccessor.insert(subsumed);
+      }
+    }
+
+    // We only care about properties that are memberwise initialized.
+    if (!var->isMemberwiseInitialized(initKind, /*preferDeclared=*/true))
+      continue;
+
+    // Add this property.
+    results.push_back(var);
+  }
+
   // If any properties were subsumed via init accessors, drop them from the list.
   if (!subsumedViaInitAccessor.empty()) {
     results.erase(std::remove_if(results.begin(), results.end(), [&](VarDecl *var) {
@@ -404,6 +429,48 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
   }
 
   return decl->getASTContext().AllocateCopy(results);
+}
+
+evaluator::SideEffect WarnOnCompatMemberwiseInitRequest::evaluate(
+    Evaluator &evaluator, WarnOnCompatMemberwiseInitDescriptor desc) const {
+  auto *init = desc.compatInit;
+  ASSERT(init->isMemberwiseInitializer() == MemberwiseInitKind::Compatibility);
+
+  auto *NTD = cast<NominalTypeDecl>(init->getDeclContext());
+  auto &ctx = NTD->getASTContext();
+
+  NTD->diagnose(diag::warn_use_of_compat_memberwise_init);
+
+  // Emit a fix-it that inserts the initializer.
+  if (auto braceRange = NTD->getBraces()) {
+    // Insert after the last VarDecl.
+    SourceLoc insertLoc;
+    for (auto *member : NTD->getParsedMembers()) {
+      if (isa<VarDecl>(member) || isa<PatternBindingDecl>(member))
+        continue;
+
+      auto loc = member->getSourceRangeIncludingAttrs().Start;
+      if (!loc)
+        continue;
+
+      insertLoc = loc;
+      break;
+    }
+    if (!insertLoc)
+      insertLoc = braceRange.End;
+
+    llvm::SmallString<64> insertText;
+    llvm::raw_svector_ostream out(insertText);
+    out << "private ";
+    printMemberwiseInit(NTD, MemberwiseInitKind::Compatibility, out);
+    out << "\n";
+
+    NTD->diagnose(diag::insert_compat_memberwise_init)
+        .fixItInsert(insertLoc, insertText);
+  }
+
+  ctx.Diags.diagnose(desc.firstUseLoc, diag::compat_memberwise_init_used_here);
+  return {};
 }
 
 /// Validate the \c entryNumber'th entry in \c binding.
@@ -2993,7 +3060,7 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
                                         VD->getLoc(), StorageName,
                                         VD->getDeclContext());
   Storage->setInterfaceType(StorageInterfaceTy);
-  Storage->setLazyStorageProperty(true);
+  Storage->setLazyStorageFor(VD);
   Storage->setUserAccessible(false);
 
   // The storage is implicit and private.

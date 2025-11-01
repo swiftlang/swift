@@ -1950,6 +1950,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Request to obtain a list of properties that can be initalized.
+class InitializablePropertiesRequest
+    : public SimpleRequest<InitializablePropertiesRequest,
+                           ArrayRef<VarDecl *>(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<VarDecl *> evaluate(Evaluator &evaluator,
+                               NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Request to obtain a list of computed properties with init accesors
 /// in the given nominal type.
 class InitAccessorPropertiesRequest :
@@ -1962,11 +1981,9 @@ public:
 private:
   friend SimpleRequest;
 
+  // Evaluation.
   ArrayRef<VarDecl *>
   evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -1974,21 +1991,69 @@ public:
 
 /// Request to obtain a list of properties that will be reflected in the parameters of a
 /// memberwise initializer.
-class MemberwiseInitPropertiesRequest :
-    public SimpleRequest<MemberwiseInitPropertiesRequest,
-                         ArrayRef<VarDecl *>(NominalTypeDecl *),
-                         RequestFlags::Cached> {
+class MemberwiseInitPropertiesRequest
+    : public SimpleRequest<MemberwiseInitPropertiesRequest,
+                           ArrayRef<VarDecl *>(NominalTypeDecl *,
+                                               MemberwiseInitKind),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  ArrayRef<VarDecl *>
-  evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+  // Evaluation.
+  ArrayRef<VarDecl *> evaluate(Evaluator &evaluator, NominalTypeDecl *decl,
+                               MemberwiseInitKind initKind) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+struct WarnOnCompatMemberwiseInitDescriptor {
+  const ConstructorDecl *compatInit;
+  SourceLoc firstUseLoc;
+
+  using Self = WarnOnCompatMemberwiseInitDescriptor;
+
+  friend llvm::hash_code hash_value(const Self &desc) {
+    return llvm::hash_combine(desc.compatInit);
+  }
+
+  friend bool operator==(const Self &lhs, const Self &rhs) {
+    // Only the initializer itself contributes, the SourceLoc is for the
+    // first use of the declaration.
+    return lhs.compatInit == rhs.compatInit;
+  }
+
+  friend bool operator!=(const Self &lhs, const Self &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend void simple_display(llvm::raw_ostream &out, const Self &desc) {
+    simple_display(out, desc.compatInit);
+  }
+
+  friend SourceLoc extractNearestSourceLoc(const Self &desc) {
+    return desc.firstUseLoc;
+  }
+};
+
+class WarnOnCompatMemberwiseInitRequest
+    : public SimpleRequest<WarnOnCompatMemberwiseInitRequest,
+                           evaluator::SideEffect(
+                               WarnOnCompatMemberwiseInitDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator,
+           WarnOnCompatMemberwiseInitDescriptor desc) const;
 
 public:
   bool isCached() const { return true; }
@@ -2829,7 +2894,8 @@ public:
 
 /// Checks whether this type has a synthesized memberwise initializer.
 class HasMemberwiseInitRequest
-    : public SimpleRequest<HasMemberwiseInitRequest, bool(StructDecl *),
+    : public SimpleRequest<HasMemberwiseInitRequest,
+                           bool(StructDecl *, MemberwiseInitKind),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2838,7 +2904,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, StructDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, StructDecl *decl,
+                MemberwiseInitKind initKind) const;
 
 public:
   // Caching.
@@ -2848,7 +2915,8 @@ public:
 /// Synthesizes a memberwise initializer for a given type.
 class SynthesizeMemberwiseInitRequest
     : public SimpleRequest<SynthesizeMemberwiseInitRequest,
-                           ConstructorDecl *(NominalTypeDecl *),
+                           ConstructorDecl *(NominalTypeDecl *,
+                                             MemberwiseInitKind),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2857,7 +2925,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *decl,
+                            MemberwiseInitKind initKind) const;
 
 public:
   // Caching.

@@ -5946,13 +5946,12 @@ NominalTypeDecl::getInitAccessorProperties() const {
       {});
 }
 
-ArrayRef<VarDecl *>
-NominalTypeDecl::getMemberwiseInitProperties() const {
+ArrayRef<VarDecl *> NominalTypeDecl::getMemberwiseInitProperties(
+    MemberwiseInitKind initKind) const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(
-      ctx.evaluator,
-      MemberwiseInitPropertiesRequest{mutableThis},
+      ctx.evaluator, MemberwiseInitPropertiesRequest{mutableThis, initKind},
       {});
 }
 
@@ -6386,7 +6385,8 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
   Bits.StructDecl.IsCxxNonTrivial = false;
 }
 
-bool NominalTypeDecl::hasMemberwiseInitializer() const {
+bool NominalTypeDecl::hasMemberwiseInitializer(
+    MemberwiseInitKind initKind) const {
   // Currently only structs can have memberwise initializers.
   auto *sd = dyn_cast<StructDecl>(this);
   if (!sd)
@@ -6394,18 +6394,20 @@ bool NominalTypeDecl::hasMemberwiseInitializer() const {
 
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<StructDecl *>(sd);
-  return evaluateOrDefault(ctx.evaluator, HasMemberwiseInitRequest{mutableThis},
-                           false);
+  return evaluateOrDefault(
+      ctx.evaluator, HasMemberwiseInitRequest{mutableThis, initKind}, false);
 }
 
-ConstructorDecl *NominalTypeDecl::getMemberwiseInitializer() const {
-  if (!hasMemberwiseInitializer())
+ConstructorDecl *
+NominalTypeDecl::getMemberwiseInitializer(MemberwiseInitKind initKind) const {
+  if (!hasMemberwiseInitializer(initKind))
     return nullptr;
 
   auto &ctx = getASTContext();
   auto *mutableThis = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(
-      ctx.evaluator, SynthesizeMemberwiseInitRequest{mutableThis}, nullptr);
+      ctx.evaluator, SynthesizeMemberwiseInitRequest{mutableThis, initKind},
+      nullptr);
 }
 
 ConstructorDecl *NominalTypeDecl::getEffectiveMemberwiseInitializer() {
@@ -8394,20 +8396,8 @@ bool VarDecl::isActorSelf() const {
   return nominal && nominal->isActor();
 }
 
-/// Whether the given variable is the backing storage property for
-/// a declared property that is either `lazy` or has an attached
-/// property wrapper.
-static bool isBackingStorageForDeclaredProperty(const VarDecl *var) {
-  if (var->isLazyStorageProperty())
-    return true;
-
-  if (var->getOriginalWrappedProperty())
-    return true;
-
-  return false;
-}
-
-/// Whether the given variable is a declared property that has separate backing storage.
+/// Whether the given variable is a declared property that has separate backing
+/// storage.
 static bool isDeclaredPropertyWithBackingStorage(const VarDecl *var) {
   if (var->getAttrs().hasAttribute<LazyAttr>())
     return true;
@@ -8418,26 +8408,68 @@ static bool isDeclaredPropertyWithBackingStorage(const VarDecl *var) {
   return false;
 }
 
-bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
+static bool isMemberwiseInitExcludedPrivateVar(const VarDecl *VD,
+                                               MemberwiseInitKind initKind) {
+  // We only care about fileprivate and private properties.
+  if (VD->getFormalAccess() > AccessLevel::FilePrivate)
+    return false;
+
+  if (VD->hasAttachedPropertyWrapper()) {
+    if (VD->isParentInitialized())
+      return true;
+    auto *PBD = VD->getParentPatternBinding();
+    if (PBD && PBD->isDefaultInitializable())
+      return true;
+  }
+
+  // We only exclude private VarDecls in the default overload, not the
+  // compatibility overload.
+  if (initKind != MemberwiseInitKind::Default)
+    return false;
+
+  // Must have the feature enabled.
+  auto &ctx = VD->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::ExcludePrivateFromMemberwiseInit))
+    return false;
+
+  // The variable must have an initial value or be default initialized.
+  if (VD->hasInitialValue())
+    return true;
+
+  if (auto *PBD = VD->getParentPatternBinding()) {
+    auto entry = PBD->getPatternEntryIndexForVarDecl(VD);
+    if (PBD->isDefaultInitializable(entry))
+      return true;
+  }
+  return false;
+}
+
+bool VarDecl::isMemberwiseInitialized(MemberwiseInitKind initKind,
+                                      bool preferDeclaredProperties) const {
   // Only non-static properties in type context can be part of a memberwise
   // initializer.
   if (!getDeclContext()->isTypeContext() || isStatic())
     return false;
 
-  // If this is a stored property, and not a backing property in a case where
-  // we only want to see the declared properties, it can be memberwise
-  // initialized.
-  if (hasStorage() && preferDeclaredProperties &&
-      isBackingStorageForDeclaredProperty(this))
+  // If this is a backing property in a case where we only want to see the
+  // declared properties, it can't be memberwise initialized. Otherwise it can
+  // be memberwise initialized if the original can be.
+  if (auto *original = getOriginalVarForBackingStorage()) {
+    if (preferDeclaredProperties)
+      return false;
+
+    return original->isMemberwiseInitialized(initKind, /*preferDeclared*/ true);
+  }
+
+  // Check whether this is an initialized private var that should be excluded.
+  if (isMemberwiseInitExcludedPrivateVar(this, initKind))
     return false;
 
   // If this is a computed property with `init` accessor, it's
   // memberwise initializable when it could be used to initialize
   // other stored properties.
-  if (hasInitAccessor()) {
-    if (getAccessor(AccessorKind::Init))
-      return true;
-  }
+  if (hasInitAccessor() && getAccessor(AccessorKind::Init))
+    return true;
 
   // If this is a computed property, it's not memberwise initialized unless
   // the caller has asked for the declared properties and it is either a
@@ -8451,20 +8483,6 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   // to the memberwise initializer since they already have an initial
   // value that cannot be overridden.
   if (isLet() && isParentInitialized())
-    return false;
-
-  // Properties with attached wrappers that have an access level < internal
-  // but do have an initializer don't participate in the memberwise
-  // initializer, because they would arbitrarily lower the access of the
-  // memberwise initializer.
-  auto origVar = this;
-  if (auto origWrapped = getOriginalWrappedProperty())
-    origVar = origWrapped;
-  if (origVar->getFormalAccess() < AccessLevel::Internal &&
-      origVar->hasAttachedPropertyWrapper() &&
-      (origVar->isParentInitialized() ||
-       (origVar->getParentPatternBinding() &&
-        origVar->getParentPatternBinding()->isDefaultInitializable())))
     return false;
 
   return true;
@@ -12988,6 +13006,70 @@ MacroDiscriminatorContext
 MacroDiscriminatorContext::getParentOf(FreestandingMacroExpansion *expansion) {
   return getParentOf(
       expansion->getPoundLoc(), expansion->getDeclContext());
+}
+
+void swift::printMemberwiseInit(NominalTypeDecl *nominal,
+                                MemberwiseInitKind initKind,
+                                llvm::raw_ostream &out) {
+  auto &ctx = nominal->getASTContext();
+  auto &SM = ctx.SourceMgr;
+
+  SmallVector<VarDecl *, 4> propsToPrint;
+  for (auto *prop : nominal->getMemberwiseInitProperties(
+           MemberwiseInitKind::Compatibility)) {
+    auto varDecl = dyn_cast<VarDecl>(prop);
+    if (!varDecl)
+      continue;
+
+    // Skip printing lazy properties since we don't have a way of spelling
+    // their initialization in source (since we'd be initializing the backing
+    // variable).
+    if (varDecl->getAttrs().hasAttribute<LazyAttr>())
+      continue;
+
+    propsToPrint.push_back(varDecl);
+  }
+
+  out << "init(";
+
+  // Process the list of members, inserting commas as appropriate.
+  for (const auto &[idx, prop] : llvm::enumerate(propsToPrint)) {
+    if (idx > 0)
+      out << ", ";
+
+    auto name = prop->getName();
+    out << name << ": ";
+
+    // Unconditionally print '@escaping' if we print out a function type -
+    // the assignments we generate below will escape this parameter.
+    auto ty = prop->getTypeInContext();
+    if (ty->is<AnyFunctionType>())
+      out << "@" << TypeAttribute::getAttrName(TypeAttrKind::Escaping) << " ";
+
+    out << ty.getString();
+
+    bool hasAddedDefault = false;
+    if (auto *PBD = prop->getParentPatternBinding()) {
+      auto idx = PBD->getPatternEntryIndexForVarDecl(prop);
+      auto *init = PBD->getOriginalInit(idx);
+      if (auto range = init ? init->getSourceRange() : SourceRange()) {
+        auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, range);
+        out << " = " << SM.extractText(charRange);
+        hasAddedDefault = true;
+      }
+    }
+    if (!hasAddedDefault && ty->isOptional())
+      out << " = nil";
+  }
+
+  // Print the body.
+  out << ") {\n";
+  for (auto *prop : propsToPrint) {
+    // self.<property> = <property>
+    auto name = prop->getName();
+    out << "self." << name << " = " << name << "\n";
+  }
+  out << "}";
 }
 
 std::optional<Type>
