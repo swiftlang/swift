@@ -1451,20 +1451,24 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     (void)evaluateTargetConformanceTo(decodableProto);
   }
     break;
-  case ImplicitMemberAction::ResolveDistributedActor:
-  case ImplicitMemberAction::ResolveDistributedActorSystem:
-  case ImplicitMemberAction::ResolveDistributedActorID: {
+  case ImplicitMemberAction::ResolveDistributedActor: {
     // init(transport:) and init(resolve:using:) may be synthesized as part of
     // derived conformance to the DistributedActor protocol.
     // If the target should conform to the DistributedActor protocol, check the
     // conformance here to attempt synthesis.
     // FIXME(distributed): invoke the requirement adding explicitly here
-     TypeChecker::addImplicitConstructors(target);
+    TypeChecker::addImplicitConstructors(target);
     auto *distributedActorProto =
         Context.getProtocol(KnownProtocolKind::DistributedActor);
     (void)evaluateTargetConformanceTo(distributedActorProto);
     break;
   }
+  case ImplicitMemberAction::ResolveDistributedActorID:
+    (void)target->getDistributedActorIDProperty();
+    break;
+  case ImplicitMemberAction::ResolveDistributedActorSystem:
+    (void)target->getDistributedActorSystemProperty();
+    break;
   }
   return std::make_tuple<>();
 }

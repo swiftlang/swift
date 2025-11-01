@@ -1669,6 +1669,18 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
     });
   }
 
+  // The `id` and `actorSystem` DistributedActor properties are never viable
+  // for type witness inference since their synthesis relies on the type
+  // witnesses already being resolved.
+  if (auto *nominal = dc->getSelfNominalTypeDecl()) {
+    if (nominal->isDistributedActor() &&
+        req->isSpecialDistributedProperty(/*onlyCheckName*/ true)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "DistributedActor property not viable for inference\n");
+      return {};
+    }
+  }
+
   TypeReprCycleCheckWalker cycleCheck(dc->getASTContext(), allUnresolved);
 
   InferredAssociatedTypesByWitnesses result;

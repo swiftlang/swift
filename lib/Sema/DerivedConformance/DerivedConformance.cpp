@@ -99,8 +99,6 @@ bool DerivedConformance::derivesProtocolConformance(
   if (*derivableKind == KnownDerivableProtocolKind::Actor)
     return canDeriveActor(DC, Nominal);
 
-  if (*derivableKind == KnownDerivableProtocolKind::Identifiable)
-    return canDeriveIdentifiable(Nominal, DC);
   if (*derivableKind == KnownDerivableProtocolKind::DistributedActor)
     return canDeriveDistributedActor(Nominal, DC);
   if (*derivableKind == KnownDerivableProtocolKind::DistributedActorSystem)
@@ -352,14 +350,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
         return getRequirement(KnownProtocolKind::Actor);
       }
     }
-
-    // DistributedActor.id
-    if (name.isSimpleName(ctx.Id_id))
-      return getRequirement(KnownProtocolKind::DistributedActor);
-
-    // DistributedActor.actorSystem
-    if (name.isSimpleName(ctx.Id_actorSystem))
-      return getRequirement(KnownProtocolKind::DistributedActor);
 
     return nullptr;
   }

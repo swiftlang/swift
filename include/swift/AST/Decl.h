@@ -374,6 +374,10 @@ bool conflicting(ASTContext &ctx,
                  bool *wouldConflictInSwift5 = nullptr,
                  bool skipProtocolExtensionCheck = false);
 
+enum class SpecialDistributedProperty {
+  Id, ActorSystem
+};
+
 /// The kind of artificial main to generate.
 enum class ArtificialMainKind : uint8_t {
   NSApplicationMain,
@@ -3056,6 +3060,12 @@ public:
   /// `distributed var get { }` accessors.
   bool isDistributedGetAccessor() const;
 
+  /// Whether this is the special synthesized 'id' or 'actorSystem' property
+  /// of a distributed actor. If \p onlyCheckName is set, then any
+  /// matching user-defined property with the name is also considered.
+  std::optional<SpecialDistributedProperty>
+  isSpecialDistributedProperty(bool onlyCheckName = false) const;
+
   bool hasName() const { return bool(Name); }
   bool isOperator() const { return Name.isOperator(); }
 
@@ -5430,7 +5440,6 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Decodable,
   AdditiveArithmetic,
   Differentiable,
-  Identifiable,
   Actor,
   DistributedActor,
   DistributedActorSystem,

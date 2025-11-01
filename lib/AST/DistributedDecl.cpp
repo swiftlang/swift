@@ -1367,6 +1367,35 @@ bool ValueDecl::isDistributedGetAccessor() const {
   return false;
 }
 
+std::optional<SpecialDistributedProperty>
+ValueDecl::isSpecialDistributedProperty(bool onlyCheckName) const {
+  if (!onlyCheckName && !isSynthesized())
+    return std::nullopt;
+
+  if (!isa<VarDecl>(this))
+    return std::nullopt;
+
+  auto &ctx = getASTContext();
+
+  auto kind = [&]() -> std::optional<SpecialDistributedProperty> {
+    auto name = getName();
+    if (name.isSimpleName(ctx.Id_id))
+      return SpecialDistributedProperty::Id;
+    if (name.isSimpleName(ctx.Id_actorSystem))
+      return SpecialDistributedProperty::ActorSystem;
+
+    return std::nullopt;
+  }();
+  if (!kind || onlyCheckName)
+    return kind;
+
+  auto *NTD = getDeclContext()->getSelfNominalTypeDecl();
+  if (!NTD || !NTD->isDistributedActor())
+    return std::nullopt;
+
+  return kind;
+}
+
 ConstructorDecl *
 NominalTypeDecl::getDistributedRemoteCallTargetInitFunction() const {
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
