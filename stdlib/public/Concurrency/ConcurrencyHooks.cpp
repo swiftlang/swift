@@ -225,3 +225,14 @@ swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
   else
     return swift_task_donateThreadToGlobalExecutorUntilOrig(condition, context);
 }
+
+__attribute__((__cold__)) bool
+_swift_task_setTimeSpentRunningTracked(bool isTracked) {
+  return AsyncTask::setTimeSpentRunningTracked(isTracked);
+}
+
+__attribute__((__cold__)) bool
+_swift_task_getTimeSpentRunning(AsyncTask *task, uint64_t *outNanoseconds) {
+  *outNanoseconds = task->getTimeSpentRunning();
+  return AsyncTask::timeSpentRunningTracked();
+}

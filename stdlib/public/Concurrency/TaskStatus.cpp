@@ -1100,5 +1100,27 @@ void TaskDependencyStatusRecord::performEscalationAction(
   }
 }
 
+/**************************************************************************/
+/*************************** TIME SPENT RUNNING ***************************/
+/**************************************************************************/
+
+void AsyncTask::pushTimeSpentRunningRecord(void) {
+  void *allocation = _swift_task_alloc_specific(
+      this, sizeof(class TimeSpentRunningStatusRecord));
+  auto record = ::new (allocation) TimeSpentRunningStatusRecord();
+
+  addStatusRecord(this, record,
+                  [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+                    return true; // always add the record
+                  });
+}
+
+void AsyncTask::popTimeSpentRunningRecord(void) {
+  if (auto record = popStatusRecordOfType<TimeSpentRunningStatusRecord>(this)) {
+    record->~TimeSpentRunningStatusRecord();
+    _swift_task_dealloc_specific(this, record);
+  }
+}
+
 #define OVERRIDE_TASK_STATUS COMPATIBILITY_OVERRIDE
 #include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
