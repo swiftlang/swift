@@ -448,8 +448,8 @@ if(TARGET libSwiftScan)
 endif()
 
 set(stdlib_link_libraries)
-if(SWIFT_BUILD_CLIENT_RETAIN_RELEASE)
-  list(APPEND stdlib_link_libraries swiftClientRetainRelease)
+if(SWIFT_BUILD_CLIENT_FAST_PATHS)
+  list(APPEND stdlib_link_libraries swiftClientFastPaths)
 endif()
 
 add_swift_target_library(swiftCore

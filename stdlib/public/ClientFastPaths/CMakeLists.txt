@@ -1,4 +1,8 @@
-add_swift_target_library(swiftClientRetainRelease
+# swiftClientFastPaths is a static library that provides implementations of the
+# fast paths of Swift runtime functions that are suitable for being embedded
+# directly into clients.
+
+add_swift_target_library(swiftClientFastPaths
   STATIC DONT_EMBED_BITCODE NOSWIFTRT
   RetainRelease.s
   C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS}
