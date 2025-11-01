@@ -147,4 +147,9 @@ VARIABLE(SWIFT_DUMP_ACCESSIBLE_FUNCTIONS, bool, false,
          "record names, e.g. by the Distributed runtime to invoke distributed "
          "functions.")
 
+VARIABLE(SWIFT_DEBUG_ENABLE_TASK_SLAB_ALLOCATOR, bool, true,
+         "Use a slab allocator for the async stack. If not enabled, directly "
+         "call malloc/free. Direct use of malloc/free enables use of memory "
+         "debugging tools for async stack allocations.")
+
 #undef VARIABLE

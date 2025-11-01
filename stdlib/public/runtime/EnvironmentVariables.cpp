@@ -319,3 +319,7 @@ SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations() {
 SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyIsCurrentExecutorLegacyModeOverride() {
   return runtime::environment::SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE();
 }
+
+SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableTaskSlabAllocator() {
+  return runtime::environment::SWIFT_DEBUG_ENABLE_TASK_SLAB_ALLOCATOR();
+}
