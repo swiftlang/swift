@@ -449,19 +449,6 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
 }
 
 /******************************************************************************/
-/******************************* PROPERTIES ***********************************/
-/******************************************************************************/
-
-static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
-  return derived.Nominal->getDistributedActorIDProperty();
-}
-
-static ValueDecl *deriveDistributedActor_actorSystem(
-    DerivedConformance &derived) {
-  return derived.Nominal->getDistributedActorSystemProperty();
-}
-
-/******************************************************************************/
 /***************************** ASSOC TYPES ************************************/
 /******************************************************************************/
 
@@ -788,13 +775,8 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   if (auto var = dyn_cast<VarDecl>(requirement)) {
     ValueDecl *derivedValue = nullptr;
-    if (var->getName() == Context.Id_id) {
-      derivedValue = deriveDistributedActor_id(*this);
-    } else if (var->getName() == Context.Id_actorSystem) {
-      derivedValue = deriveDistributedActor_actorSystem(*this);
-    } else if (var->getName() == Context.Id_unownedExecutor) {
+    if (var->getName() == Context.Id_unownedExecutor)
       derivedValue = deriveDistributedActor_unownedExecutor(*this);
-    }
 
     if (derivedValue) {
       assertRequiredSynthesizedPropertyOrder(Context, Nominal);

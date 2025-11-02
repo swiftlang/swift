@@ -723,15 +723,6 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
       }
     }
   }
-
-  // ==== Properties
-  // --- Synthesize the 'id' property here rather than via derived conformance
-  //     because the 'DerivedConformanceDistributedActor' won't trigger for 'id'
-  //     because it has a default impl via 'Identifiable' (ObjectIdentifier)
-  //     which we do not want.
-  // Also, the 'id' var must be added before the 'actorSystem'.
-  // See NOTE (id-before-actorSystem) for more details.
-  (void)nominal->getDistributedActorIDProperty();
 }
 
 bool TypeChecker::checkDistributedFunc(FuncDecl *func) {

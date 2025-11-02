@@ -353,14 +353,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       }
     }
 
-    // DistributedActor.id
-    if (name.isSimpleName(ctx.Id_id))
-      return getRequirement(KnownProtocolKind::DistributedActor);
-
-    // DistributedActor.actorSystem
-    if (name.isSimpleName(ctx.Id_actorSystem))
-      return getRequirement(KnownProtocolKind::DistributedActor);
-
     return nullptr;
   }
 
