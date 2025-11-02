@@ -873,6 +873,10 @@ static void performCancellationAction(TaskStatusRecord *record) {
   case TaskStatusRecordKind::TaskName:
     break;
 
+  // Cancellation has no impact on the time a task spends running.
+  case TaskStatusRecord::TimeSpentRunning:
+    break;
+
   // This should never be found, but the compiler complains if we don't check.
   case TaskStatusRecordKind::First_Reserved:
     break;
@@ -971,6 +975,9 @@ static void performEscalationAction(TaskStatusRecord *record,
     return;
   /// Task names don't matter to priority escalation.
   case TaskStatusRecordKind::TaskName:
+    return;
+  // Time spent running doesn't affect priority (outside the scheduler, anyway.)
+  case TaskStatusRecord::TimeSpentRunning:
     return;
   // This should never be found, but the compiler complains if we don't check.
   case TaskStatusRecordKind::First_Reserved:
