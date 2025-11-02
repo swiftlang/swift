@@ -36,44 +36,6 @@
 using namespace swift;
 
 /******************************************************************************/
-/************************ PROPERTY SYNTHESIS **********************************/
-/******************************************************************************/
-
-static VarDecl*
- lookupDistributedActorProperty(NominalTypeDecl *decl, DeclName name) {
-   assert(decl && "decl was null");
-   auto &C = decl->getASTContext();
-
-   auto clazz = dyn_cast<ClassDecl>(decl);
-   if (!clazz)
-     return nullptr;
-
-   auto refs = decl->lookupDirect(name);
-   if (refs.size() != 1)
-     return nullptr;
-
-   auto var = dyn_cast<VarDecl>(refs.front());
-   if (!var)
-     return nullptr;
-
-   Type expectedType = Type();
-   if (name == C.Id_id) {
-     expectedType = getDistributedActorIDType(decl);
-   } else if (name == C.Id_actorSystem) {
-     expectedType = getDistributedActorSystemType(decl);
-   } else {
-     llvm_unreachable("Unexpected distributed actor property lookup!");
-   }
-   if (!expectedType)
-     return nullptr;
-
-   if (!var->getInterfaceType()->isEqual(expectedType))
-     return nullptr;
-
-   return var;
- }
-
-/******************************************************************************/
 /*********************** DISTRIBUTED THUNK SYNTHESIS **************************/
 /******************************************************************************/
 
@@ -838,6 +800,23 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("Unable to synthesize distributed thunk");
 }
 
+static VarDecl *lookupDistributedActorProperty(NominalTypeDecl *decl,
+                                               DeclName name) {
+  VarDecl *result = nullptr;
+  for (auto *ref : decl->lookupDirect(name)) {
+    auto *prop = dyn_cast<VarDecl>(ref);
+    if (!prop || prop->getDeclContext() != decl)
+      continue;
+
+    if (!result) {
+      result = prop;
+      continue;
+    }
+    return nullptr;
+  }
+  return result;
+}
+
 VarDecl *
 GetDistributedActorIDPropertyRequest::evaluate(Evaluator &evaluator,
                                                NominalTypeDecl *nominal) const {
@@ -850,12 +829,11 @@ GetDistributedActorIDPropertyRequest::evaluate(Evaluator &evaluator,
   if (!isa<ClassDecl>(nominal) || !nominal->isDistributedActor())
     return nullptr;
 
-  // We may enter this request multiple times, e.g. in multi-file projects,
-  // so in order to avoid synthesizing a property many times, first perform
-  // a lookup and return if it already exists.
-  if (auto existingProp = lookupDistributedActorProperty(nominal, C.Id_id)) {
-    return existingProp;
-  }
+  // If we're in a deserialized module or swift interface we expect to be able
+  // to find this through name lookup.
+  auto *DC = nominal->getDeclContext();
+  if (!DC->getParentSourceFile() || DC->isInSwiftinterface())
+    return lookupDistributedActorProperty(nominal, C.Id_id);
 
   // ==== Synthesize and add 'id' property to the actor decl
   Type propertyType = getDistributedActorIDType(nominal);
@@ -908,16 +886,11 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
   if (!isa<ClassDecl>(nominal) || !nominal->isDistributedActor())
     return nullptr;
 
-  // We may be triggered after synthesis was handled via `DerivedConformances`,
-  // in which case we should locate the existing property, rather than add
-  // another one. Generally derived conformances are triggered early and are right
-  // but for some reason sometimes we get a request before synthesis was triggered
-  // there... so this is to workaround that issue, and ensure we're always
-  // synthesising correctly, regardless of entry-point.
-  if (auto existingProp =
-          lookupDistributedActorProperty(nominal, C.Id_actorSystem)) {
-    return existingProp;
-  }
+  // If we're in a deserialized module or swift interface we expect to be able
+  // to find this through name lookup.
+  auto *DC = nominal->getDeclContext();
+  if (!DC->getParentSourceFile() || DC->isInSwiftinterface())
+    return lookupDistributedActorProperty(nominal, C.Id_actorSystem);
 
   // ==== Synthesize and add 'actorSystem' property to the actor decl
   Type propertyType = getDistributedActorSystemType(nominal);
