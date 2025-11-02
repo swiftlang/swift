@@ -6482,21 +6482,12 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
       if (baseName.isConstructor()) {
         if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
           action.emplace(ImplicitMemberAction::ResolveDecodable);
-        } else if (argumentNames.front() == Context.Id_system) {
-          action.emplace(ImplicitMemberAction::ResolveDistributedActor);
         }
       } else if (!baseName.isSpecial() &&
                  baseName.getIdentifier() == Context.Id_encode &&
                  (member.isSimpleName() ||
                   argumentNames.front() == Context.Id_to)) {
         action.emplace(ImplicitMemberAction::ResolveEncodable);
-      }
-    } else if (member.isSimpleName() || argumentNames.size() == 2) {
-      if (baseName.isConstructor()) {
-        if (argumentNames[0] == Context.Id_resolve &&
-            argumentNames[1] == Context.Id_using) {
-          action.emplace(ImplicitMemberAction::ResolveDistributedActor);
-        }
       }
     }
   }

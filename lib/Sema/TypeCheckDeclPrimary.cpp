@@ -461,13 +461,6 @@ static void installCodingKeysIfNecessary(NominalTypeDecl *NTD) {
   (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, {});
 }
 
-// TODO(distributed): same ugly hack as Codable does...
-static void installDistributedActorIfNecessary(NominalTypeDecl *NTD) {
-  auto req =
-    ResolveImplicitMemberRequest{NTD, ImplicitMemberAction::ResolveDistributedActor};
-  (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, {});
-}
-
 // Check for static properties that produce empty option sets
 // using a rawValue initializer with a value of '0'
 static void checkForEmptyOptionSet(const VarDecl *VD) {
@@ -3089,7 +3082,6 @@ public:
     TypeChecker::addImplicitConstructors(SD);
 
     installCodingKeysIfNecessary(SD);
-    installDistributedActorIfNecessary(SD);
 
     TypeChecker::checkDeclAttributes(SD);
 
