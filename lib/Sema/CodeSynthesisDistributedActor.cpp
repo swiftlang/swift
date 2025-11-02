@@ -73,112 +73,6 @@ static VarDecl*
    return var;
  }
 
-// Note: This would be nice to implement in DerivedConformanceDistributedActor,
-// but we can't since those are lazily triggered and an implementation exists
-// for the 'id' property because 'Identifiable.id' has an extension that impls
-// it for ObjectIdentifier, and we have to instead emit this stored property.
-//
-// The "derived" mechanisms are not really geared towards emitting for
-// what already has a witness.
-static VarDecl *addImplicitDistributedActorIDProperty(
-    ClassDecl *nominal) {
-  if (!nominal || !nominal->isDistributedActor())
-    return nullptr;
-
-  auto &C = nominal->getASTContext();
-
-  // ==== Synthesize and add 'id' property to the actor decl
-  Type propertyType = getDistributedActorIDType(nominal);
-  if (propertyType->hasError())
-    return nullptr;
-
-  auto *propDecl = new (C)
-      VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-              SourceLoc(), C.Id_id, nominal);
-  propDecl->setImplicit();
-  propDecl->setSynthesized();
-  propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  propDecl->setInterfaceType(propertyType);
-
-  auto propContextTy = nominal->mapTypeIntoContext(propertyType);
-
-  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propContextTy);
-  propPat = TypedPattern::createImplicit(C, propPat, propContextTy);
-
-  PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
-      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
-      nominal);
-
-  // mark as nonisolated, allowing access to it from everywhere
-  propDecl->addAttribute(NonisolatedAttr::createImplicit(C));
-  // mark as @_compilerInitialized, since we synthesize the initializing
-  // assignment during SILGen.
-  propDecl->addAttribute(new (C) CompilerInitializedAttr(/*IsImplicit=*/true));
-
-  // IMPORTANT: The `id` MUST be the first field of any distributed actor,
-  // because when we allocate remote proxy instances, we don't allocate memory
-  // for anything except the first two fields: id and actorSystem, so they
-  // MUST be those fields.
-  //
-  // Their specific order also matters, because it is enforced this way in IRGen
-  // and how we emit them in AST MUST match what IRGen expects or cross-module
-  // things could be using wrong offsets and manifest as reading trash memory on
-  // id or system accesses.
-  nominal->addMember(propDecl, /*hint=*/nullptr, /*insertAtHead=*/true);
-  nominal->addMember(pbDecl, /*hint=*/nullptr, /*insertAtHead=*/true);
-  return propDecl;
-}
-
-static VarDecl *addImplicitDistributedActorActorSystemProperty(
-    ClassDecl *nominal) {
-  if (!nominal)
-    return nullptr;
-  if (!nominal->isDistributedActor())
-    return nullptr;
-
-  auto &C = nominal->getASTContext();
-
-  // ==== Synthesize and add 'actorSystem' property to the actor decl
-  Type propertyType = getDistributedActorSystemType(nominal);
-
-  auto *propDecl = new (C)
-      VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-              SourceLoc(), C.Id_actorSystem, nominal);
-  propDecl->setImplicit();
-  propDecl->setSynthesized();
-  propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  propDecl->setInterfaceType(propertyType);
-
-  auto propContextTy = nominal->mapTypeIntoContext(propertyType);
-
-  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propContextTy);
-  propPat = TypedPattern::createImplicit(C, propPat, propContextTy);
-
-  PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
-      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
-      nominal);
-
-  // mark as nonisolated, allowing access to it from everywhere
-  propDecl->addAttribute(NonisolatedAttr::createImplicit(C));
-
-  auto idProperty = nominal->getDistributedActorIDProperty();
-  // If the id was not yet synthesized, we need to ensure that eventually
-  // the order of fields will be: id, actorSystem (because IRGen needs the
-  // layouts to match with the AST we produce). We do this by inserting FIRST,
-  // and then as the ID gets synthesized, it'll also force FIRST and therefore
-  // the order will be okey -- ID and then system.
-  auto insertAtHead = idProperty == nullptr;
-
-  // IMPORTANT: The `id` MUST be the first field of any distributed actor.
-  // So we find the property and add the system AFTER it using the hint.
-  //
-  // If the `id` was not synthesized yet, we'll end up inserting at head,
-  // but the id synthesis will force itself to be FIRST anyway, so it works out.
-  nominal->addMember(propDecl, /*hint=*/idProperty, /*insertAtHead=*/insertAtHead);
-  nominal->addMember(pbDecl, /*hint=*/idProperty, /*insertAtHead=*/insertAtHead);
-  return propDecl;
-}
-
 /******************************************************************************/
 /*********************** DISTRIBUTED THUNK SYNTHESIS **************************/
 /******************************************************************************/
@@ -944,46 +838,74 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("Unable to synthesize distributed thunk");
 }
 
-VarDecl *GetDistributedActorIDPropertyRequest::evaluate(
-    Evaluator &evaluator, NominalTypeDecl *actor) const {
-  if (!actor->isDistributedActor())
-    return nullptr;
-
-  auto &C = actor->getASTContext();
-
+VarDecl *
+GetDistributedActorIDPropertyRequest::evaluate(Evaluator &evaluator,
+                                               NominalTypeDecl *nominal) const {
   // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
   // we won't be emitting the offending decl after all.
+  auto &C = nominal->getASTContext();
   if (!C.getLoadedModule(C.Id_Distributed))
     return nullptr;
 
-  auto classDecl = dyn_cast<ClassDecl>(actor);
-  if (!classDecl)
+  if (!isa<ClassDecl>(nominal) || !nominal->isDistributedActor())
     return nullptr;
 
   // We may enter this request multiple times, e.g. in multi-file projects,
   // so in order to avoid synthesizing a property many times, first perform
   // a lookup and return if it already exists.
-  if (auto existingProp = lookupDistributedActorProperty(classDecl, C.Id_id)) {
+  if (auto existingProp = lookupDistributedActorProperty(nominal, C.Id_id)) {
     return existingProp;
   }
 
-  return addImplicitDistributedActorIDProperty(classDecl);
+  // ==== Synthesize and add 'id' property to the actor decl
+  Type propertyType = getDistributedActorIDType(nominal);
+  if (propertyType->hasError())
+    return nullptr;
+
+  auto *propDecl = new (C) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
+                                   SourceLoc(), C.Id_id, nominal);
+  propDecl->setImplicit();
+  propDecl->setSynthesized();
+  propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
+  propDecl->setInterfaceType(propertyType);
+
+  auto propContextTy = nominal->mapTypeIntoContext(propertyType);
+
+  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propContextTy);
+  propPat = TypedPattern::createImplicit(C, propPat, propContextTy);
+
+  PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, nominal);
+
+  // mark as nonisolated, allowing access to it from everywhere
+  propDecl->addAttribute(NonisolatedAttr::createImplicit(C));
+  // mark as @_compilerInitialized, since we synthesize the initializing
+  // assignment during SILGen.
+  propDecl->addAttribute(new (C) CompilerInitializedAttr(/*IsImplicit=*/true));
+
+  // IMPORTANT: The `id` MUST be the first field of any distributed actor,
+  // because when we allocate remote proxy instances, we don't allocate memory
+  // for anything except the first two fields: id and actorSystem, so they
+  // MUST be those fields.
+  //
+  // Their specific order also matters, because it is enforced this way in IRGen
+  // and how we emit them in AST MUST match what IRGen expects or cross-module
+  // things could be using wrong offsets and manifest as reading trash memory on
+  // id or system accesses.
+  nominal->addMember(propDecl, /*hint=*/nullptr, /*insertAtHead=*/true);
+  nominal->addMember(pbDecl, /*hint=*/nullptr, /*insertAtHead=*/true);
+  return propDecl;
 }
 
 VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
-  auto &C = nominal->getASTContext();
-
   // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
   // we won't be emitting the offending decl after all.
+  auto &C = nominal->getASTContext();
   if (!C.getLoadedModule(C.Id_Distributed))
     return nullptr;
 
-  if (!nominal->isDistributedActor())
-    return nullptr;
-
-  auto classDecl = dyn_cast<ClassDecl>(nominal);
-  if (!classDecl)
+  if (!isa<ClassDecl>(nominal) || !nominal->isDistributedActor())
     return nullptr;
 
   // We may be triggered after synthesis was handled via `DerivedConformances`,
@@ -992,11 +914,48 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
   // but for some reason sometimes we get a request before synthesis was triggered
   // there... so this is to workaround that issue, and ensure we're always
   // synthesising correctly, regardless of entry-point.
-  if (auto existingProp = lookupDistributedActorProperty(classDecl, C.Id_actorSystem)) {
+  if (auto existingProp =
+          lookupDistributedActorProperty(nominal, C.Id_actorSystem)) {
     return existingProp;
   }
 
-  return addImplicitDistributedActorActorSystemProperty(classDecl);
+  // ==== Synthesize and add 'actorSystem' property to the actor decl
+  Type propertyType = getDistributedActorSystemType(nominal);
+
+  auto *propDecl = new (C) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
+                                   SourceLoc(), C.Id_actorSystem, nominal);
+  propDecl->setImplicit();
+  propDecl->setSynthesized();
+  propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
+  propDecl->setInterfaceType(propertyType);
+
+  auto propContextTy = nominal->mapTypeIntoContext(propertyType);
+
+  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propContextTy);
+  propPat = TypedPattern::createImplicit(C, propPat, propContextTy);
+
+  PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, nominal);
+
+  // mark as nonisolated, allowing access to it from everywhere
+  propDecl->addAttribute(NonisolatedAttr::createImplicit(C));
+
+  auto idProperty = nominal->getDistributedActorIDProperty();
+  // If the id was not yet synthesized, we need to ensure that eventually
+  // the order of fields will be: id, actorSystem (because IRGen needs the
+  // layouts to match with the AST we produce). We do this by inserting FIRST,
+  // and then as the ID gets synthesized, it'll also force FIRST and therefore
+  // the order will be okey -- ID and then system.
+  auto insertAtHead = idProperty == nullptr;
+
+  // IMPORTANT: The `id` MUST be the first field of any distributed actor.
+  // So we find the property and add the system AFTER it using the hint.
+  //
+  // If the `id` was not synthesized yet, we'll end up inserting at head,
+  // but the id synthesis will force itself to be FIRST anyway, so it works out.
+  nominal->addMember(propDecl, /*hint=*/idProperty, insertAtHead);
+  nominal->addMember(pbDecl, /*hint=*/idProperty, insertAtHead);
+  return propDecl;
 }
 
 NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
