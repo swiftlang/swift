@@ -2905,6 +2905,10 @@ static ArrayRef<Decl *> evaluateMembersRequest(
       ResolveImplicitMemberRequest{nominal,
                  ImplicitMemberAction::ResolveCodingKeys},
       {});
+
+    // Synthesize distributed actor 'id' and 'actorSystem' if needed.
+    (void)nominal->getDistributedActorIDProperty();
+    (void)nominal->getDistributedActorSystemProperty();
   }
 
   // Expand synthesized member macros.
@@ -2940,14 +2944,11 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     if (auto *vd = dyn_cast<ValueDecl>(member)) {
       // Add synthesized members to a side table and sort them by their mangled
       // name, since they could have been added to the class in any order.
-      if (vd->isSynthesized() &&
-          // FIXME: IRGen requires the distributed actor synthesized
-          // properties to be in a specific order that is different
-          // from ordering by their mangled name, so preserve the order
-          // they were added in.
-          !(nominal &&
-            (vd == nominal->getDistributedActorIDProperty() ||
-             vd == nominal->getDistributedActorSystemProperty()))) {
+      // FIXME: IRGen requires the distributed actor synthesized properties to
+      // be in a specific order that is different from ordering by their
+      // mangled name, so preserve the order
+      // they were added in.
+      if (vd->isSynthesized() && !vd->isSpecialDistributedProperty()) {
         synthesizedMembers.add(vd);
         return;
       }
