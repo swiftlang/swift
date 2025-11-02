@@ -21,6 +21,7 @@
 #include "swift/AST/AccessRequests.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignAsyncConvention.h"
@@ -197,7 +198,7 @@ Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
 
   auto DA = C.getDistributedActorDecl();
   if (!DA)
-    return ErrorType::get(C); // FIXME(distributed): just use Type()
+    return ErrorType::get(C);
 
   // Dig out the actor system type.
   Type selfType = actor->getSelfInterfaceType();
@@ -228,17 +229,16 @@ Type swift::getDistributedActorSerializationType(
   auto resultTy = getAssociatedTypeOfDistributedSystemOfActor(
       actorOrExtension,
       ctx.Id_SerializationRequirement);
+  if (resultTy->hasError())
+    return resultTy;
 
   // Protocols are allowed to either not provide a `SerializationRequirement`
   // at all or provide it in a conformance requirement.
-  if ((!resultTy || resultTy->hasDependentMember()) &&
+  if (resultTy->hasDependentMember() &&
       actorOrExtension->getSelfProtocolDecl()) {
     auto sig = actorOrExtension->getGenericSignatureOfContext();
 
     auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
-    if (!actorProtocol)
-      return Type();
-
     auto serializationTy =
         actorProtocol->getAssociatedType(ctx.Id_SerializationRequirement)
             ->getDeclaredInterfaceType();
@@ -330,29 +330,40 @@ swift::getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
 Type swift::getAssociatedTypeOfDistributedSystemOfActor(
     DeclContext *actorOrExtension, Identifier member) {
   auto &ctx = actorOrExtension->getASTContext();
+  auto getLoc = [&]() { return extractNearestSourceLoc(actorOrExtension); };
 
   auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
-  if (!actorProtocol)
-    return Type();
+  if (!actorProtocol) {
+    ctx.Diags.diagnose(getLoc(), diag::broken_stdlib_type, "DistributedActor");
+    return ErrorType::get(ctx);
+  }
 
   AssociatedTypeDecl *actorSystemDecl =
       actorProtocol->getAssociatedType(ctx.Id_ActorSystem);
-  if (!actorSystemDecl)
-    return Type();
+  if (!actorSystemDecl) {
+    ctx.Diags.diagnose(getLoc(), diag::broken_distributed_actor_requirement);
+    return ErrorType::get(ctx);
+  }
 
   auto actorSystemProtocol = ctx.getDistributedActorSystemDecl();
-  if (!actorSystemProtocol)
-    return Type();
+  if (!actorSystemProtocol) {
+    ctx.Diags.diagnose(getLoc(), diag::broken_stdlib_type,
+                       "DistributedActorSystem");
+    return ErrorType::get(ctx);
+  }
 
   AssociatedTypeDecl *memberTypeDecl =
       actorSystemProtocol->getAssociatedType(member);
-  if (!memberTypeDecl)
-    return Type();
+  if (!memberTypeDecl) {
+    ctx.Diags.diagnose(getLoc(),
+                       diag::broken_distributed_actor_system_requirement);
+    return ErrorType::get(ctx);
+  }
 
   Type memberTy = DependentMemberType::get(
-    DependentMemberType::get(actorProtocol->getSelfInterfaceType(),
-                             actorSystemDecl),
-    memberTypeDecl);
+      DependentMemberType::get(actorProtocol->getSelfInterfaceType(),
+                               actorSystemDecl),
+      memberTypeDecl);
 
   auto sig = actorOrExtension->getGenericSignatureOfContext();
 
@@ -364,7 +375,7 @@ Type swift::getAssociatedTypeOfDistributedSystemOfActor(
       lookupConformance(
           actorType->getDeclaredInterfaceType(), actorProtocol);
   if (actorConformance.isInvalid())
-    return Type();
+    return ErrorType::get(ctx);
 
   auto subs = SubstitutionMap::getProtocolSubstitutions(actorConformance);
 
@@ -431,11 +442,7 @@ swift::getDistributedSerializationRequirements(
 }
 
 bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
-    ASTContext &C,
-    Type type) {
-  if (!type)
-    return false;
-
+    ASTContext &C, Type type) {
   if (type->hasError())
     return false;
 

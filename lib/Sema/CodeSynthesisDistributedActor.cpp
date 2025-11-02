@@ -89,7 +89,7 @@ static VarDecl *addImplicitDistributedActorIDProperty(
 
   // ==== Synthesize and add 'id' property to the actor decl
   Type propertyType = getDistributedActorIDType(nominal);
-  if (!propertyType || propertyType->hasError())
+  if (propertyType->hasError())
     return nullptr;
 
   auto *propDecl = new (C)
@@ -879,7 +879,7 @@ static bool canSynthesizeDistributedThunk(AbstractFunctionDecl *distributedTarge
 
   auto serializationTy =
       getDistributedActorSerializationType(distributedTarget->getDeclContext());
-  return serializationTy && !serializationTy->hasDependentMember();
+  return !serializationTy->hasError() && !serializationTy->hasDependentMember();
 }
 
 /******************************************************************************/

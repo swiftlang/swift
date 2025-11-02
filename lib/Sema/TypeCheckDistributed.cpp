@@ -410,12 +410,8 @@ static bool checkDistributedTargetResultType(
     bool diagnose) {
   auto &C = valueDecl->getASTContext();
 
-  if (serializationRequirement && serializationRequirement->hasError()) {
-    return false;
-  }
-  if (!serializationRequirement || serializationRequirement->hasError()) {
+  if (serializationRequirement->hasError())
     return false; // error of the type would be diagnosed elsewhere
-  }
 
   Type resultType;
   if (auto func = dyn_cast<FuncDecl>(valueDecl)) {
@@ -434,11 +430,8 @@ static bool checkDistributedTargetResultType(
 
   SmallVector<ProtocolDecl *, 4> serializationRequirements;
   // Collect extra "SerializationRequirement: SomeProtocol" requirements
-  if (serializationRequirement && !serializationRequirement->hasError()) {
-    auto srl = serializationRequirement->getExistentialLayout();
-    llvm::copy(srl.getProtocols(),
-               std::back_inserter(serializationRequirements));
-  }
+  auto srl = serializationRequirement->getExistentialLayout();
+  llvm::copy(srl.getProtocols(), std::back_inserter(serializationRequirements));
 
   auto isCodableRequirement =
       checkDistributedSerializationRequirementIsExactlyCodable(
@@ -470,7 +463,7 @@ static bool checkDistributedTargetResultType(
     }
   }
 
-    return false;
+  return false;
 }
 
 bool swift::checkDistributedActorSystem(const NominalTypeDecl *system) {
@@ -551,7 +544,7 @@ bool CheckDistributedFunctionRequest::evaluate(
 
   for (auto param: *func->getParameters()) {
     // --- Check the parameter conforming to serialization requirements
-    if (serializationReqType && !serializationReqType->hasError()) {
+    if (!serializationReqType->hasError()) {
       // If the requirement is exactly `Codable` we diagnose it ia bit nicer.
       auto serializationRequirementIsCodable =
           checkDistributedSerializationRequirementIsExactlyCodable(
@@ -861,7 +854,7 @@ GetDistributedActorInvocationDecoderRequest::evaluate(Evaluator &evaluator,
   auto &ctx = actor->getASTContext();
   auto decoderTy = getAssociatedTypeOfDistributedSystemOfActor(
       actor, ctx.Id_InvocationDecoder);
-  return decoderTy ? decoderTy->getAnyNominal() : nullptr;
+  return decoderTy->getAnyNominal();
 }
 
 FuncDecl *
@@ -886,7 +879,7 @@ GetDistributedActorConcreteArgumentDecodingMethodRequest::evaluate(
     auto serializationTy = getAssociatedTypeOfDistributedSystemOfActor(
         actor, ctx.Id_SerializationRequirement);
 
-    if (!serializationTy || !serializationTy->is<ExistentialType>())
+    if (!serializationTy->is<ExistentialType>())
       return nullptr;
 
     SmallVector<ProtocolDecl *, 4> serializationRequirements;
