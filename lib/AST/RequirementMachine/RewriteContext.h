@@ -173,6 +173,7 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   static unsigned getGenericParamIndex(Type type);
+  static unsigned getGenericParamIndex(GenericTypeParamType* type);
 
   MutableTerm getMutableTermForType(CanType paramType,
                                     const ProtocolDecl *proto);

@@ -182,6 +182,8 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   ASSERT(!lhs.empty());
   ASSERT(!rhs.empty());
+  
+  
 
   if (Debug.contains(DebugFlags::Add)) {
     llvm::dbgs() << "# Adding rule " << lhs << " == " << rhs << "\n\n";

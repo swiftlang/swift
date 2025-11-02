@@ -322,7 +322,15 @@ void RuleBuilder::addRequirement(const Requirement &req,
     auto *proto = req.getProtocolDecl();
 
     constraintTerm = subjectTerm;
+    bool shapePattern = false;
+    if (constraintTerm.back().getKind() == Symbol::Kind::Shape) {
+      shapePattern = true;
+      constraintTerm.removeEnd();
+    }
     constraintTerm.add(Symbol::forProtocol(proto, Context));
+    if (shapePattern) {
+      constraintTerm.add(Symbol::forShape(Context));
+    }
     break;
   }
 
@@ -398,7 +406,6 @@ void RuleBuilder::addRequirement(const Requirement &req,
         constraintTerm.prepend(Symbol::forPackElement(Context));
       }
     }
-
     break;
   }
   }
@@ -503,7 +510,6 @@ void RuleBuilder::collectPackShapeRules(ArrayRef<GenericTypeParamType *> generic
   if (Dump) {
     llvm::dbgs() << "adding shape rules\n";
   }
-
   if (!llvm::any_of(genericParams,
                     [](GenericTypeParamType *t) {
                       return t->isParameterPack();
