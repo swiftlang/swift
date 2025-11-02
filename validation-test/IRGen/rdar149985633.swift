@@ -2,7 +2,7 @@
 
 // REQUIRES: PTRSIZE=64
 
-// CHECK: define {{.*}}swiftcc void @"$s13rdar1499856334DateV1a1b1c1d1e1fACSiSg_A5JtcfC"(ptr noalias{{( nocapture)?}} writeonly sret(%T13rdar1499856334DateV){{( captures\(none\))?}}{{.*}} %0, i64 %1, i8 %2, i64 %3, i8 %4, i64 %5, i8 %6, i64 %7, i8 %8, i64 %9, i8 %10, i64 %11, i8 %12)
+// CHECK: define {{.*}}swiftcc void @"$s13rdar1499856334DateV1a1b1c1d1e1fACSiSg_A5JtcfC"(ptr noalias writeonly sret(%T13rdar1499856334DateV) captures(none){{.*}} %0, i64 %1, i8 %2, i64 %3, i8 %4, i64 %5, i8 %6, i64 %7, i8 %8, i64 %9, i8 %10, i64 %11, i8 %12)
 // CHECK: entry:
 // CHECK:   store i64 %1
 // CHECK:   getelementptr inbounds{{.*}} i8, ptr %0, i64 8
