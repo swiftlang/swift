@@ -648,38 +648,6 @@ const void *AsyncTask::getResumeFunctionForLogging(bool isStarting) {
 
 std::atomic<bool> AsyncTask::_isTimeSpentRunningTracked { false };
 
-__attribute__((cold)) uint64_t AsyncTask::getTimeSpentRunning(void) {
-  uint64_t result = 0;
-
-  withStatusRecordLock(this, [&](ActiveTaskStatus status) {
-    for (auto record : status.records()) {
-      if (auto timeRecord = dyn_cast<TimeSpentRunningStatusRecord>(record)) {
-        result = timeRecord->TimeSpentRunning;
-        break;
-      }
-    }
-  });
-
-  return result;
-}
-
-void AsyncTask::ranForNanoseconds(uint64_t ns) {
-  withStatusRecordLock(this, [&](ActiveTaskStatus status) {
-    for (auto record : status.records()) {
-      if (auto timeRecord = dyn_cast<TimeSpentRunningStatusRecord>(record)) {
-        timeRecord->TimeSpentRunning += ns;
-        break;
-      }
-    }
-  });
-
-  if (hasChildFragment()) {
-    if (auto parent = childFragment()->getParent()) {
-      parent->ranForNanoseconds(ns);
-    }
-  }
-}
-
 static uint64_t AsyncTask::getNanosecondsOnSuspendingClock(void) {
   long long seconds = 0;
   long long nanoseconds = 0;

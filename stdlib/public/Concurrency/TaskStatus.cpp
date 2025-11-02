@@ -1122,5 +1122,37 @@ void AsyncTask::popTimeSpentRunningRecord(void) {
   }
 }
 
+__attribute__((cold)) uint64_t AsyncTask::getTimeSpentRunning(void) {
+  uint64_t result = 0;
+
+  withStatusRecordLock(this, [&](ActiveTaskStatus status) {
+    for (auto record : status.records()) {
+      if (auto timeRecord = dyn_cast<TimeSpentRunningStatusRecord>(record)) {
+        result = timeRecord->TimeSpentRunning;
+        break;
+      }
+    }
+  });
+
+  return result;
+}
+
+void AsyncTask::ranForNanoseconds(uint64_t ns) {
+  withStatusRecordLock(this, [&](ActiveTaskStatus status) {
+    for (auto record : status.records()) {
+      if (auto timeRecord = dyn_cast<TimeSpentRunningStatusRecord>(record)) {
+        timeRecord->TimeSpentRunning += ns;
+        break;
+      }
+    }
+  });
+
+  if (hasChildFragment()) {
+    if (auto parent = childFragment()->getParent()) {
+      parent->ranForNanoseconds(ns);
+    }
+  }
+}
+
 #define OVERRIDE_TASK_STATUS COMPATIBILITY_OVERRIDE
 #include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

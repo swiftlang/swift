@@ -234,5 +234,5 @@ _swift_task_setTimeSpentRunningTracked(bool isTracked) {
 __attribute__((__cold__)) bool
 _swift_task_getTimeSpentRunning(AsyncTask *task, uint64_t *outNanoseconds) {
   *outNanoseconds = task->getTimeSpentRunning();
-  return AsyncTask::timeSpentRunningTracked();
+  return AsyncTask::isTimeSpentRunningTracked();
 }
