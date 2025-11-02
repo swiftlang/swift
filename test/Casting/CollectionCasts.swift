@@ -45,7 +45,14 @@ import Foundation
 @objc
 class Root: NSObject {}
 #else
-class Root {}
+class Root: Hashable {
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self))
+  }
+}
+func ==(_ lhs: Root, _ rhs: Root) -> Bool {
+  return lhs === rhs
+}
 #endif
 
 @objc
@@ -79,6 +86,37 @@ extension TestSuite {
 }
 
 let ArrayCasts = TestSuite("ArrayCasts")
+
+ArrayCasts.testSync("Derived to Base") {
+  typealias X = [Derived]
+  typealias Y = [Base]
+
+  let a: X = [
+    Derived(42),
+    Derived(-1),
+    Derived(37)
+  ]
+
+  let b: Y = a
+  expectEqual(b.count, 3)
+  expectEqual(b[0].k, 42)
+  expectEqual(b[1].k, -1)
+  expectEqual(b[2].k, 37)
+
+  // Indeed succeeds
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Array<Derived>') to 'Y' (aka 'Array<Base>') always succeeds}}
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectEqual(c![0].k, 42)
+  expectEqual(c![1].k, -1)
+  expectEqual(c![2].k, 37)
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectEqual(d![0].k, 42)
+  expectEqual(d![1].k, -1)
+  expectEqual(d![2].k, 37)
+}
 
 ArrayCasts.testSync("Funtion Conversion: covariant result") {
   typealias X = [() -> Derived]
@@ -652,6 +690,37 @@ ArrayCasts.testSync("Preconcurrency") {
 
 let DictionaryCasts = TestSuite("DictionaryCasts")
 
+DictionaryCasts.testSync("Derived to Base") {
+  typealias X = [String: Derived]
+  typealias Y = [String: Base]
+
+  let a: X = [
+    "a": Derived(42),
+    "b": Derived(-1),
+    "c": Derived(37)
+  ]
+
+  let b: Y = a
+  expectEqual(b.count, 3)
+  expectEqual(b["a"]!.k, 42)
+  expectEqual(b["b"]!.k, -1)
+  expectEqual(b["c"]!.k, 37)
+
+  // Indeed succeeds
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Dictionary<String, Derived>') to 'Y' (aka 'Dictionary<String, Base>') always succeeds}}
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectEqual(c!["a"]!.k, 42)
+  expectEqual(c!["b"]!.k, -1)
+  expectEqual(c!["c"]!.k, 37)
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectEqual(d!["a"]!.k, 42)
+  expectEqual(d!["b"]!.k, -1)
+  expectEqual(d!["c"]!.k, 37)
+}
+
 DictionaryCasts.testSync("Funtion Conversion: covariant result") {
   typealias X = [String: () -> Derived]
   typealias Y = [String: () -> Base]
@@ -1213,7 +1282,6 @@ DictionaryCasts.testSync("Covariant nested") {
 }
 
 DictionaryCasts.testSync("Preconcurrency") {
-
   typealias X = [String: () -> String]
   typealias Y = [AnyHashable: @MainActor @Sendable () -> String]
 
@@ -1237,6 +1305,194 @@ DictionaryCasts.testSync("Preconcurrency") {
 
   let d = (a as Any) as? Y
   expectNil(d)
+}
+
+let SetCasts = TestSuite("SetCasts")
+
+SetCasts.testSync("Derived to Base") {
+  typealias X = Set<Derived>
+  typealias Y = Set<Base>
+
+  let x = Derived(42)
+  let y = Derived(-1)
+  let z = Derived(37)
+
+  let a: X = [x, y, z]
+  let b: Y = a
+  expectEqual(b.count, 3)
+  expectTrue(b.contains(x))
+  expectTrue(b.contains(y))
+  expectTrue(b.contains(z))
+
+  // Indeed succeeds
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Set<Derived>') to 'Y' (aka 'Set<Base>') always succeeds}}
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectTrue(c!.contains(x))
+  expectTrue(c!.contains(y))
+  expectTrue(c!.contains(z))
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectTrue(d!.contains(x))
+  expectTrue(d!.contains(y))
+  expectTrue(d!.contains(z))
+}
+
+SetCasts.testSync("AnyHashable erasure") {
+  typealias X = Set<String>
+  typealias Y = Set<AnyHashable>
+
+  let a: X = [
+    "abc",
+    "xyz",
+    "ijk"
+  ]
+
+  let b: Y = a
+  expectEqual(b.count, 3)
+  expectTrue(b.contains(AnyHashable("abc")))
+  expectTrue(b.contains(AnyHashable("xyz")))
+  expectTrue(b.contains(AnyHashable("ijk")))
+
+  // Indeed succeeds
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Set<String>') to 'Y' (aka 'Set<AnyHashable>') always succeeds}}
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectTrue(c!.contains(AnyHashable("abc")))
+  expectTrue(c!.contains(AnyHashable("xyz")))
+  expectTrue(c!.contains(AnyHashable("ijk")))
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectTrue(d!.contains(AnyHashable("abc")))
+  expectTrue(d!.contains(AnyHashable("xyz")))
+  expectTrue(d!.contains(AnyHashable("ijk")))
+}
+
+#if _runtime(_ObjC)
+SetCasts.testSync("Bridge To ObjC 1") {
+  typealias X = Set<String>
+  typealias Y = Set<NSObject>
+
+  let a: X = [
+    "abc",
+    "xyz",
+    "ijk"
+  ]
+
+  let b = a as Y
+  expectEqual(b.count, 3)
+  expectTrue(b.contains("abc" as NSString))
+  expectTrue(b.contains("xyz" as NSString))
+  expectTrue(b.contains("ijk" as NSString))
+
+  // Indeed succeeds
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Set<String>') to 'Y' (aka 'Set<NSObject>') always succeeds}}
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectTrue(c!.contains("abc" as NSString))
+  expectTrue(c!.contains("xyz" as NSString))
+  expectTrue(c!.contains("ijk" as NSString))
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectTrue(d!.contains("abc" as NSString))
+  expectTrue(d!.contains("xyz" as NSString))
+  expectTrue(d!.contains("ijk" as NSString))
+}
+
+SetCasts.testSync("Bridge To ObjC 2") {
+  typealias X = Set<String>
+  typealias Y = Set<NSString>
+
+  let a: X = [
+    "abc",
+    "xyz",
+    "ijk"
+  ]
+
+  let b = a as Y
+  expectEqual(b.count, 3)
+  expectTrue(b.contains("abc" as NSString))
+  expectTrue(b.contains("xyz" as NSString))
+  expectTrue(b.contains("ijk" as NSString))
+
+  // Indeed succeeds
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Set<String>') to 'Y' (aka 'Set<NSString>') always succeeds}}
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectTrue(c!.contains("abc" as NSString))
+  expectTrue(c!.contains("xyz" as NSString))
+  expectTrue(c!.contains("ijk" as NSString))
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectTrue(d!.contains("abc" as NSString))
+  expectTrue(d!.contains("xyz" as NSString))
+  expectTrue(d!.contains("ijk" as NSString))
+}
+
+SetCasts.testSync("Bridge To ObjC 3") {
+  typealias X = Set<String>
+  typealias Y = Set<CFString>
+
+  let a: X = [
+    "abc",
+    "xyz",
+    "ijk"
+  ]
+
+  let b = a as Y
+  expectEqual(b.count, 3)
+  expectTrue(b.contains("abc" as CFString))
+  expectTrue(b.contains("xyz" as CFString))
+  expectTrue(b.contains("ijk" as CFString))
+
+  // Indeed succeeds
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Set<String>') to 'Y' (aka 'Set<CFString>') always succeeds}}
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectTrue(c!.contains("abc" as CFString))
+  expectTrue(c!.contains("xyz" as CFString))
+  expectTrue(c!.contains("ijk" as CFString))
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectTrue(d!.contains("abc" as CFString))
+  expectTrue(d!.contains("xyz" as CFString))
+  expectTrue(d!.contains("ijk" as CFString))
+}
+#endif
+
+SetCasts.testSync("Nested") {
+  typealias X = Set<Set<String>>
+  typealias Y = Set<Set<AnyHashable>>
+
+  let a: X = [
+    ["xyz", "abc"],
+    ["ijk"],
+    []
+  ]
+
+  let b = a as Y
+  expectEqual(b.count, 3)
+  expectTrue(b.contains([AnyHashable("xyz"), AnyHashable("abc")]))
+  expectTrue(b.contains([AnyHashable("ijk")]))
+  expectTrue(b.contains([]))
+
+  // Indeed succeeds
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Set<Set<String>>') to 'Y' (aka 'Set<Set<AnyHashable>>') always succeeds}}
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectTrue(c!.contains([AnyHashable("xyz"), AnyHashable("abc")]))
+  expectTrue(c!.contains([AnyHashable("ijk")]))
+  expectTrue(c!.contains([]))
+
+  let d = (a as Any) as? Y
+  expectTrue(d!.contains([AnyHashable("xyz"), AnyHashable("abc")]))
+  expectTrue(d!.contains([AnyHashable("ijk")]))
+  expectTrue(d!.contains([]))
 }
 
 await runAllTestsAsync()
