@@ -648,7 +648,7 @@ const void *AsyncTask::getResumeFunctionForLogging(bool isStarting) {
 
 std::atomic<bool> AsyncTask::_isTimeSpentRunningTracked { false };
 
-static uint64_t AsyncTask::getNanosecondsOnSuspendingClock(void) {
+uint64_t AsyncTask::getNanosecondsOnSuspendingClock(void) {
   long long seconds = 0;
   long long nanoseconds = 0;
   swift_get_time(&seconds, &nanoseconds, swift_clock_id_suspending);
