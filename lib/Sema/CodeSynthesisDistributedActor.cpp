@@ -974,8 +974,6 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
   auto &C = nominal->getASTContext();
 
-  auto DAS = C.getDistributedActorSystemDecl();
-
   // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
   // we won't be emitting the offending decl after all.
   if (!C.getLoadedModule(C.Id_Distributed))
@@ -983,24 +981,6 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
 
   if (!nominal->isDistributedActor())
     return nullptr;
-
-  if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-    auto DistributedActorProto = C.getDistributedActorDecl();
-    for (auto system : DistributedActorProto->lookupDirect(C.Id_actorSystem)) {
-      if (auto var = dyn_cast<VarDecl>(system)) {
-        auto conformance = checkConformance(
-            proto->mapTypeIntoContext(var->getInterfaceType()),
-            DAS);
-
-        if (conformance.isInvalid())
-          continue;
-
-        return var;
-      }
-    }
-
-    return nullptr;
-  }
 
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   if (!classDecl)
