@@ -551,8 +551,8 @@ set(SWIFT_SDK_LINUX_ARCHITECTURES "" CACHE STRING
 # User-configurable Android specific options.
 #
 
-set(SWIFT_ANDROID_API_LEVEL "" CACHE STRING
-  "Version number for the Android API")
+set(SWIFT_ANDROID_API_LEVEL "28" CACHE STRING
+  "Version number for the Android API (default: 28)")
 
 set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android NDK tools that are executable on the build machine")
