@@ -151,10 +151,9 @@ if #available(SwiftStdlib 5.8, *) {
     expectEqual(d1.virtualMethod(), 111)
     expectEqual(d1.swiftBarRename(), 113)
     expectEqual(d1.swiftParamsRename(a1: 42), 42)
-    // FIXME the method calls below return incorrect values
-    expectEqual(d1.swiftVirtualMethod(), 111)     // should be 121
-    expectEqual(d1.A2BarRename(), 113)            // should be 123
-    expectEqual(d1.swiftParamsRename(a2: 42), 42) // should be 43
+    expectEqual(d1.swiftVirtualMethod(), 121)
+    expectEqual(d1.A2BarRename(), 123)
+    expectEqual(d1.swiftParamsRename(a2: 42), 43)
   } 
 }
 

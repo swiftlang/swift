@@ -3126,8 +3126,8 @@ public:
   }
 
   /// Returns the C name of the given declaration.
-  /// \p forDecl is the func decl that the attribute belongs to.
-  StringRef getCName(const FuncDecl *forDecl) const;
+  /// \p forDecl is the decl that the attribute belongs to.
+  StringRef getCName(const ValueDecl *forDecl) const;
 
   /// Find an ExternAttr with the given kind in the given DeclAttributes.
   static const ExternAttr *find(const DeclAttributes &attrs, ExternKind kind);

@@ -8,8 +8,8 @@ func testit() {
   _ = normal_function()
 }
 
-// CHECK: sil [readnone] [clang const_function] @const_function : $@convention(c) () -> Int32
-// CHECK: sil [readonly] [clang pure_function] @pure_function : $@convention(c) () -> Int32
-// CHECK: sil [clang normal_function] @normal_function : $@convention(c) () -> Int32
+// CHECK: sil [readnone] [asmname "const_function"] [clang const_function] @$sSo14const_functions5Int32VyFTo : $@convention(c) () -> Int32
+// CHECK: sil [readonly] [asmname "pure_function"] [clang pure_function] @$sSo13pure_functions5Int32VyFTo : $@convention(c) () -> Int32
+// CHECK: sil [asmname "normal_function"] [clang normal_function] @$sSo15normal_functions5Int32VyFTo : $@convention(c) () -> Int32
 
 

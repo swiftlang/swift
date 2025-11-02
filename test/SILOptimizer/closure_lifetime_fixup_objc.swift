@@ -92,7 +92,7 @@ public func couldActuallyEscapeWithLoop(_ closure: @escaping () -> (), _ villain
 // CHECK:   [[SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt, [[MDI]]
 // CHECK:   [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
 // CHECK:   destroy_addr [[BLOCK_PROJ]]
-// CHECK:   [[DISPATCH_SYNC_FUNC:%.*]] = function_ref @dispatch_sync :
+// CHECK:   [[DISPATCH_SYNC_FUNC:%.*]] = function_ref @$sSo17OS_dispatch_queueC4sync7executeyyyXE_tFTo :
 // CHECK:   apply [[DISPATCH_SYNC_FUNC]]({{%.*}}, [[BLOCK_COPY]])
 // CHECK:   strong_release [[BLOCK_COPY]]
 // CHECK:   destroy_not_escaped_closure [objc] [[SOME]]
