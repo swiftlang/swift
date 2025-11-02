@@ -1075,12 +1075,11 @@ private:
         CanonicalName.clear();
     }
 
-    bool IsTypeOriginallyDefinedIn =
-        containsOriginallyDefinedIn(DbgTy.getType());
-    // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
+    bool IsTypeOriginallyDefinedIn = containsOriginallyDefinedIn(DbgTy.getType());
+    bool IsCxxType = containsCxxType(DbgTy.getType());
     // There's no way to round trip when respecting @_originallyDefinedIn for a type.
-    if (!Opts.DisableRoundTripDebugTypes &&
-        !Ty->getASTContext().LangOpts.EnableCXXInterop && !IsTypeOriginallyDefinedIn) {
+    // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
+    if (!Opts.DisableRoundTripDebugTypes && !IsTypeOriginallyDefinedIn && !IsCxxType) {
       // Make sure we can reconstruct mangled types for the debugger.
       auto &Ctx = Ty->getASTContext();
       Type Reconstructed = Demangle::getTypeForMangling(Ctx, SugaredName, Sig);
@@ -2502,6 +2501,42 @@ private:
     OriginallyDefinedInFinder Walker;
     T.walk(Walker);
     return Walker.visitedOriginallyDefinedIn;
+  }
+
+  /// Returns true if the type contains an imported C++ type. Due to
+  /// various unimplemented features these cannot round-trip through
+  /// the ASTDemangler.
+  ///
+  /// FIXME: Get these cases working with the ASTDemangler instead.
+  bool containsCxxType(Type T) {
+    return T.findIf([&](Type t) -> bool {
+      if (auto *decl = t->getAnyNominal()) {
+        if (auto *clangDecl = decl->getClangDecl()) {
+          // Lookup of template instantiations is not implemented.
+          if (isa<clang::ClassTemplateSpecializationDecl>(clangDecl))
+            return true;
+
+          // Lookup of types in weird contexts is not implemented.
+          if (isa<clang::EnumDecl>(clangDecl) ||
+              isa<clang::CXXRecordDecl>(clangDecl)) {
+            auto *dc = clangDecl->getDeclContext();
+            while (!isa<clang::TranslationUnitDecl>(dc)) {
+              // ... in namespaces,
+              if (isa<clang::NamespaceDecl>(dc))
+                return true;
+
+              // ... or inside other types.
+              if (isa<clang::CXXRecordDecl>(dc))
+                return true;
+
+              dc = dc->getParent();
+            }
+          }
+        }
+      }
+
+      return false;
+    });
   }
 
   /// Returns the decl of the type's parent chain annotated by
