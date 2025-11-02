@@ -836,21 +836,13 @@ GetDistributedActorIDPropertyRequest::evaluate(Evaluator &evaluator,
     return lookupDistributedActorProperty(nominal, C.Id_id);
 
   // ==== Synthesize and add 'id' property to the actor decl
-  Type propertyType = getDistributedActorIDType(nominal);
-  if (propertyType->hasError())
-    return nullptr;
-
   auto *propDecl = new (C) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
                                    SourceLoc(), C.Id_id, nominal);
   propDecl->setImplicit();
   propDecl->setSynthesized();
   propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  propDecl->setInterfaceType(propertyType);
 
-  auto propContextTy = nominal->mapTypeIntoContext(propertyType);
-
-  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propContextTy);
-  propPat = TypedPattern::createImplicit(C, propPat, propContextTy);
+  Pattern *propPat = NamedPattern::createImplicit(C, propDecl);
 
   PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, nominal);
@@ -893,19 +885,13 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     return lookupDistributedActorProperty(nominal, C.Id_actorSystem);
 
   // ==== Synthesize and add 'actorSystem' property to the actor decl
-  Type propertyType = getDistributedActorSystemType(nominal);
-
   auto *propDecl = new (C) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
                                    SourceLoc(), C.Id_actorSystem, nominal);
   propDecl->setImplicit();
   propDecl->setSynthesized();
   propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  propDecl->setInterfaceType(propertyType);
 
-  auto propContextTy = nominal->mapTypeIntoContext(propertyType);
-
-  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propContextTy);
-  propPat = TypedPattern::createImplicit(C, propPat, propContextTy);
+  Pattern *propPat = NamedPattern::createImplicit(C, propDecl);
 
   PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, nominal);
