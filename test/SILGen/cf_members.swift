@@ -6,7 +6,7 @@ func makeMetatype() -> Struct1.Type { return Struct1.self }
 
 // CHECK-LABEL: sil [ossa] @$s10cf_members17importAsUnaryInityyF :
 public func importAsUnaryInit() {
-  // CHECK: function_ref @CCPowerSupplyCreateDangerous : $@convention(c) () -> @owned CCPowerSupply
+  // CHECK: function_ref @$sSo16CCPowerSupplyRefa9dangerousAByt_tcfCTo : $@convention(c) () -> @owned CCPowerSupply
   var a = CCPowerSupply(dangerous: ())
   let f: (()) -> CCPowerSupply = CCPowerSupply.init(dangerous:)
   a = f(())
@@ -27,14 +27,14 @@ public func foo(_ x: Double) {
 
   // CHECK: [[Z:%.*]] = project_box
 
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1CreateSimple
+  // CHECK: [[FN:%.*]] = function_ref @$sSo10IAMStruct1V5valueABSd_tcfCTo : $@convention(c) (Double) -> Struct1
   // CHECK: apply [[FN]]([[X]])
   var z = Struct1(value: x)
   // The metatype expression should still be evaluated even if it isn't
   // used.
   // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @$s10cf_members12makeMetatype{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[MAKE_METATYPE]]()
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1CreateSimple
+  // CHECK: [[FN:%.*]] = function_ref @$sSo10IAMStruct1V5valueABSd_tcfCTo : $@convention(c) (Double) -> Struct1
   // CHECK: apply [[FN]]([[X]])
   z = makeMetatype().init(value: x)
 
@@ -57,14 +57,14 @@ public func foo(_ x: Double) {
   // z = b(x)
 
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[Z]] : $*Struct1
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1InvertInPlace
+  // CHECK: [[FN:%.*]] = function_ref @$sSo10IAMStruct1V6invertyyFTo : $@convention(c) (@inout Struct1) -> ()
   // CHECK: apply [[FN]]([[WRITE]])
   z.invert()
 
   // CHECK: [[WRITE:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[WRITE]]
   // CHECK: store [[ZVAL]] to [trivial] [[ZTMP:%.*]] :
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1Rotate : $@convention(c) (@in Struct1, Double) -> Struct1
+  // CHECK: [[FN:%.*]] = function_ref @$sSo10IAMStruct1V9translate7radiansABSd_tFTo : $@convention(c) (@in Struct1, Double) -> Struct1
   // CHECK: apply [[FN]]([[ZTMP]], [[X]])
   z = z.translate(radians: x)
 
@@ -102,7 +102,7 @@ public func foo(_ x: Double) {
 
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1Scale
+  // CHECK: [[FN:%.*]] = function_ref @$sSo10IAMStruct1V5scaleyABSdFTo : $@convention(c) (Struct1, Double) -> Struct1
   // CHECK: apply [[FN]]([[ZVAL]], [[X]])
   z = z.scale(x)
 
@@ -133,32 +133,32 @@ public func foo(_ x: Double) {
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: store [[ZVAL]] to [trivial] [[ZTMP:%.*]] :
-  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetRadius : $@convention(c) (@in Struct1) -> Double
+  // CHECK: [[GET:%.*]] = function_ref @$sSo10IAMStruct1V6radiusSdvgTo : $@convention(c) (@in Struct1) -> Double
   // CHECK: apply [[GET]]([[ZTMP]])
   _ = z.radius
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
-  // CHECK: [[SET:%.*]] = function_ref @IAMStruct1SetRadius : $@convention(c) (Struct1, Double) -> ()
+  // CHECK: [[SET:%.*]] = function_ref @$sSo10IAMStruct1V6radiusSdvsTo : $@convention(c) (Struct1, Double) -> ()
   // CHECK: apply [[SET]]([[ZVAL]], [[X]])
   z.radius = x
 
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
-  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetAltitude : $@convention(c) (Struct1) -> Double
+  // CHECK: [[GET:%.*]] = function_ref @$sSo10IAMStruct1V8altitudeSdvgTo : $@convention(c) (Struct1) -> Double
   // CHECK: apply [[GET]]([[ZVAL]])
   _ = z.altitude
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[Z]] : $*Struct1
-  // CHECK: [[SET:%.*]] = function_ref @IAMStruct1SetAltitude : $@convention(c) (@inout Struct1, Double) -> ()
+  // CHECK: [[SET:%.*]] = function_ref @$sSo10IAMStruct1V8altitudeSdvsTo : $@convention(c) (@inout Struct1, Double) -> ()
   // CHECK: apply [[SET]]([[WRITE]], [[X]])
   z.altitude = x
   
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
-  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetMagnitude : $@convention(c) (Struct1) -> Double
+  // CHECK: [[GET:%.*]] = function_ref @$sSo10IAMStruct1V9magnitudeSdvgTo : $@convention(c) (Struct1) -> Double
   // CHECK: apply [[GET]]([[ZVAL]])
   _ = z.magnitude
 
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1StaticMethod
+  // CHECK: [[FN:%.*]] = function_ref @$sSo10IAMStruct1V12staticMethods5Int32VyFZTo : $@convention(c) () -> Int32
   // CHECK: apply [[FN]]()
   var y = Struct1.staticMethod()
   // CHECK: [[THUNK:%.*]] = function_ref @$s10cf_members3fooyySdFs5Int32Vycfu8_ : $@convention(thin) () -> Int32 
@@ -175,35 +175,35 @@ public func foo(_ x: Double) {
   // let j: @convention(c) () -> Int32 = Struct1.staticMethod
   // y = j()
 
-  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1StaticGetProperty
+  // CHECK: [[GET:%.*]] = function_ref @$sSo10IAMStruct1V8propertys5Int32VvgZTo : $@convention(c) () -> Int32
   // CHECK: apply [[GET]]()
   _ = Struct1.property
-  // CHECK: [[SET:%.*]] = function_ref @IAMStruct1StaticSetProperty
+  // CHECK: [[SET:%.*]] = function_ref @$sSo10IAMStruct1V8propertys5Int32VvsZTo : $@convention(c) (Int32) -> Int32
   // CHECK: apply [[SET]](%{{[0-9]+}})
   Struct1.property = y
-  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1StaticGetOnlyProperty
+  // CHECK: [[GET:%.*]] = function_ref @$sSo10IAMStruct1V15getOnlyPropertys5Int32VvgZTo : $@convention(c) () -> Int32
   // CHECK: apply [[GET]]()
   _ = Struct1.getOnlyProperty
 
   // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @$s10cf_members12makeMetatype{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[MAKE_METATYPE]]()
-  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1StaticGetProperty
+  // CHECK: [[GET:%.*]] = function_ref @$sSo10IAMStruct1V8propertys5Int32VvgZTo : $@convention(c) () -> Int32
   // CHECK: apply [[GET]]()
   _ = makeMetatype().property
   // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @$s10cf_members12makeMetatype{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[MAKE_METATYPE]]()
-  // CHECK: [[SET:%.*]] = function_ref @IAMStruct1StaticSetProperty
+  // CHECK: [[SET:%.*]] = function_ref @$sSo10IAMStruct1V8propertys5Int32VvsZTo : $@convention(c) (Int32) -> Int32
   // CHECK: apply [[SET]](%{{[0-9]+}})
   makeMetatype().property = y
   // CHECK: [[MAKE_METATYPE:%.*]] = function_ref @$s10cf_members12makeMetatype{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[MAKE_METATYPE]]()
-  // CHECK: [[GET:%.*]] = function_ref @IAMStruct1StaticGetOnlyProperty
+  // CHECK: [[GET:%.*]] = function_ref @$sSo10IAMStruct1V15getOnlyPropertys5Int32VvgZTo : $@convention(c) () -> Int32
   // CHECK: apply [[GET]]()
   _ = makeMetatype().getOnlyProperty
 
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1SelfComesLast : $@convention(c) (Double, Struct1) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$sSo10IAMStruct1V13selfComesLast1xySd_tFTo : $@convention(c) (Double, Struct1) -> ()
   // CHECK: apply [[FN]]([[X]], [[ZVAL]])
   z.selfComesLast(x: x)
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
@@ -221,7 +221,7 @@ public func foo(_ x: Double) {
 
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
-  // CHECK: [[FN:%.*]] = function_ref @IAMStruct1SelfComesThird : $@convention(c) (Int32, Float, Struct1, Double) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$sSo10IAMStruct1V14selfComesThird1a1b1xys5Int32V_SfSdtFTo : $@convention(c) (Int32, Float, Struct1, Double) -> ()
   // CHECK: apply [[FN]]({{.*}}, {{.*}}, [[ZVAL]], [[X]])
   z.selfComesThird(a: y, b: 0, x: x)
   let n: (Int32, Float, Double) -> () = z.selfComesThird(a:b:x:)
@@ -239,50 +239,50 @@ public func foo(_ x: Double) {
 
 // CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFSo10IAMStruct1VSdcfu_ : $@convention(thin) (Double) -> Struct1 {
 // CHECK:       bb0([[X:%.*]] : $Double):
-// CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1CreateSimple
+// CHECK:         [[CFUNC:%.*]] = function_ref @$sSo10IAMStruct1V5valueABSd_tcfCTo : $@convention(c) (Double) -> Struct1
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[X]])
 // CHECK:         return [[RET]]
 
 // CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu0_ADSdcfu1_ : $@convention(thin) (Double, Struct1) -> Struct1 {
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
 // CHECK:         store [[SELF]] to [trivial] [[TMP:%.*]] :
-// CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Rotate
+// CHECK:         [[CFUNC:%.*]] = function_ref @$sSo10IAMStruct1V9translate7radiansABSd_tFTo : $@convention(c) (@in Struct1, Double) -> Struct1
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[TMP]], [[X]])
 // CHECK:         return [[RET]]
 
 // CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFSo10IAMStruct1VSdcADcfu4_ADSdcfu5_ : $@convention(thin) (Double, Struct1) -> Struct1 {
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
-// CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1Scale
+// CHECK:         [[CFUNC:%.*]] = function_ref @$sSo10IAMStruct1V5scaleyABSdFTo : $@convention(c) (Struct1, Double) -> Struct1
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]([[SELF]], [[X]])
 // CHECK:         return [[RET]]
 
-// CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFs5Int32Vycfu8_ : $@convention(thin) () -> Int32 
+// CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFs5Int32Vycfu8_ : $@convention(thin) () -> Int32
 // CHECK:       bb0:
-// CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1StaticMethod
+// CHECK:         [[CFUNC:%.*]] = function_ref @$sSo10IAMStruct1V12staticMethods5Int32VyFZTo : $@convention(c) () -> Int32
 // CHECK:         [[RET:%.*]] = apply [[CFUNC]]()
 // CHECK:         return [[RET]]
 
 // CHECK-LABEL:sil private [ossa] @$s10cf_members3fooyySdFySdcSo10IAMStruct1Vcfu11_ySdcfu12_ : $@convention(thin) (Double, Struct1) -> () {
 // CHECK:       bb0([[X:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
-// CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesLast
+// CHECK:         [[CFUNC:%.*]] = function_ref @$sSo10IAMStruct1V13selfComesLast1xySd_tFTo : $@convention(c) (Double, Struct1) -> ()
 // CHECK:         apply [[CFUNC]]([[X]], [[SELF]])
 
 // CHECK-LABEL: sil private [ossa] @$s10cf_members3fooyySdFys5Int32V_SfSdtcSo10IAMStruct1Vcfu13_yAD_SfSdtcfu14_ : $@convention(thin) (Int32, Float, Double, Struct1) -> () {
 // CHECK:       bb0([[X:%.*]] : $Int32, [[Y:%.*]] : $Float, [[Z:%.*]] : $Double, [[SELF:%.*]] : @closureCapture $Struct1):
-// CHECK:         [[CFUNC:%.*]] = function_ref @IAMStruct1SelfComesThird
+// CHECK:         [[CFUNC:%.*]] = function_ref @$sSo10IAMStruct1V14selfComesThird1a1b1xys5Int32V_SfSdtFTo : $@convention(c) (Int32, Float, Struct1, Double) -> ()
 // CHECK:         apply [[CFUNC]]([[X]], [[Y]], [[SELF]], [[Z]])
 
 // CHECK-LABEL: sil [ossa] @$s10cf_members3bar{{[_0-9a-zA-Z]*}}F
 public func bar(_ x: Double) {
-  // CHECK: function_ref @CCPowerSupplyCreate : $@convention(c) (Double) -> @owned CCPowerSupply
+  // CHECK: function_ref @$sSo16CCPowerSupplyRefa5wattsABSd_tcfCTo : $@convention(c) (Double) -> @owned CCPowerSupply
   let ps = CCPowerSupply(watts: x)
-  // CHECK: function_ref @CCRefrigeratorCreate : $@convention(c) (CCPowerSupply) -> @owned CCRefrigerator
+  // CHECK: function_ref @$sSo17CCRefrigeratorRefa11powerSupplyABSo07CCPowerdB0a_tcfCTo : $@convention(c) (CCPowerSupply) -> @owned CCRefrigerator
   let fridge = CCRefrigerator(powerSupply: ps)
-  // CHECK: function_ref @CCRefrigeratorOpen : $@convention(c) (CCRefrigerator) -> ()
+  // CHECK: function_ref @$sSo17CCRefrigeratorRefa4openyyFTo : $@convention(c) (CCRefrigerator) -> ()
   fridge.open()
-  // CHECK: function_ref @CCRefrigeratorGetPowerSupply : $@convention(c) (CCRefrigerator) -> @autoreleased CCPowerSupply
+  // CHECK: function_ref @$sSo17CCRefrigeratorRefa11powerSupplySo07CCPowerdB0avgTo : $@convention(c) (CCRefrigerator) -> @autoreleased CCPowerSupply
   let ps2 = fridge.powerSupply
-  // CHECK: function_ref @CCRefrigeratorSetPowerSupply : $@convention(c) (CCRefrigerator, CCPowerSupply) -> ()
+  // CHECK: function_ref @$sSo17CCRefrigeratorRefa11powerSupplySo07CCPowerdB0avsTo : $@convention(c) (CCRefrigerator, CCPowerSupply) -> ()
   fridge.powerSupply = ps2
 
   let a: (Double) -> CCPowerSupply = CCPowerSupply.init(watts:)

@@ -2066,34 +2066,91 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
 
   // Create a new method in the derived class that calls the base method.
   clang::DeclarationName name = method->getNameInfo().getName();
+  std::string newName;
+  llvm::raw_string_ostream os(newName);
+  bool useExistingName = false;
   if (name.isIdentifier()) {
-    std::string newName;
-    llvm::raw_string_ostream os(newName);
     os << (forwardingMethodKind == ForwardingMethodKind::Virtual
                ? "__synthesizedVirtualCall_"
                : "__synthesizedBaseCall_")
        << name.getAsIdentifierInfo()->getName();
+  } else {
+    switch (auto op = name.getCXXOverloadedOperator()) {
+      case clang::OO_Subscript:
+        os << (forwardingMethodKind == ForwardingMethodKind::Virtual
+                 ? "__synthesizedVirtualCall_operatorSubscript"
+                 : "__synthesizedBaseCall_operatorSubscript");
+        if (forceConstQualifier)
+          os << "C";
+        break;
+
+      case clang::OO_Star:
+        os << (forwardingMethodKind == ForwardingMethodKind::Virtual
+                 ? "__synthesizedVirtualCall_operatorStar"
+                 : "__synthesizedBaseCall_operatorStar");
+        if (forceConstQualifier)
+          os << "C";
+        break;
+
+      case clang::OO_Call:
+        assert(forwardingMethodKind != ForwardingMethodKind::Virtual);
+        os << "__synthesizedBaseCall_operatorCall";
+        if (forceConstQualifier)
+          os << "C";
+        break;
+
+      case clang::OO_Plus:
+      case clang::OO_Minus:
+      case clang::OO_Slash:
+      case clang::OO_PlusEqual:
+      case clang::OO_MinusEqual:
+      case clang::OO_StarEqual:
+      case clang::OO_SlashEqual:
+      case clang::OO_Percent:
+      case clang::OO_Caret:
+      case clang::OO_Amp:
+      case clang::OO_Pipe:
+      case clang::OO_Tilde:
+      case clang::OO_Exclaim:
+      case clang::OO_Less:
+      case clang::OO_Greater:
+      case clang::OO_LessLess:
+      case clang::OO_GreaterGreater:
+      case clang::OO_EqualEqual:
+      case clang::OO_PlusPlus:
+      case clang::OO_ExclaimEqual:
+      case clang::OO_LessEqual:
+      case clang::OO_GreaterEqual:
+      case clang::OO_AmpAmp:
+      case clang::OO_PipePipe:
+        os << importer::getOperatorName(ImporterImpl.SwiftContext, op).str();
+        break;
+
+      default:
+        useExistingName = true;
+        break;
+    }
+  }
+
+  if (!useExistingName) {
+    // The created method is inside the derived class already. If that's
+    // different from the base class, also include the base class in the
+    // mangling to keep this separate from other similar functions cloned from
+    // other base classes.
+    if (derivedClass != baseClass) {
+      os << "_";
+      std::unique_ptr<clang::ItaniumMangleContext> mangler{
+          clang::ItaniumMangleContext::create(clangCtx, clangCtx.getDiagnostics())};
+      auto derivedType = clangCtx.getTypeDeclType(baseClass)
+        .getCanonicalType();
+      mangler->mangleCanonicalTypeName(derivedType, os);
+    }
+
     name = clang::DeclarationName(
         &ImporterImpl.getClangPreprocessor().getIdentifierTable().get(
             os.str()));
-  } else if (name.getCXXOverloadedOperator() == clang::OO_Subscript) {
-    name = clang::DeclarationName(
-        &ImporterImpl.getClangPreprocessor().getIdentifierTable().get(
-            (forwardingMethodKind == ForwardingMethodKind::Virtual
-                 ? "__synthesizedVirtualCall_operatorSubscript"
-                 : "__synthesizedBaseCall_operatorSubscript")));
-  } else if (name.getCXXOverloadedOperator() == clang::OO_Star) {
-    name = clang::DeclarationName(
-        &ImporterImpl.getClangPreprocessor().getIdentifierTable().get(
-            (forwardingMethodKind == ForwardingMethodKind::Virtual
-                 ? "__synthesizedVirtualCall_operatorStar"
-                 : "__synthesizedBaseCall_operatorStar")));
-  } else if (name.getCXXOverloadedOperator() == clang::OO_Call) {
-    assert(forwardingMethodKind != ForwardingMethodKind::Virtual);
-    name = clang::DeclarationName(
-        &ImporterImpl.getClangPreprocessor().getIdentifierTable().get(
-            "__synthesizedBaseCall_operatorCall"));
   }
+
   auto methodType = method->getType();
   // Check if we need to drop the reference from the return type
   // of the new method. This is needed when a synthesized `operator []`
