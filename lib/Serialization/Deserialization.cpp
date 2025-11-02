@@ -2013,7 +2013,8 @@ namespace {
       return TypeComparison::Equal;
 
     if (nearMatchOk) {
-      TypeMatchOptions options = TypeMatchFlags::AllowTopLevelOptionalMismatch;
+      TypeMatchOptions options = TypeMatchFlags::RequireMatchingParameterLabels;
+      options |= TypeMatchFlags::AllowTopLevelOptionalMismatch;
       options |= TypeMatchFlags::AllowNonOptionalForIUOParam;
       options |= TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam;
       options |= TypeMatchFlags::IgnoreFunctionSendability;
