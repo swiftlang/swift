@@ -29,19 +29,6 @@
 
 using namespace swift;
 
-bool DerivedConformance::canDeriveIdentifiable(
-    NominalTypeDecl *nominal, DeclContext *dc) {
-  // we only synthesize for concrete 'distributed actor' decls (which are class)
-  if (!isa<ClassDecl>(nominal))
-    return false;
-
-  auto &C = nominal->getASTContext();
-  if (!C.getLoadedModule(C.Id_Distributed))
-    return false;
-
-  return nominal->isDistributedActor();
-}
-
 bool DerivedConformance::canDeriveDistributedActor(
     NominalTypeDecl *nominal, DeclContext *dc) {
   auto &C = nominal->getASTContext();
@@ -485,26 +472,6 @@ deriveDistributedActorType_ActorSystem(
 }
 
 static Type
-deriveDistributedActorType_ID(
-    DerivedConformance &derived) {
-  if (!derived.Nominal->isDistributedActor())
-    return nullptr;
-
-  // Look for a type DefaultDistributedActorSystem within the parent context.
-  auto systemTy = getDistributedActorSystemType(derived.Nominal);
-
-  // There is no known actor system type, so fail to synthesize.
-  if (!systemTy || systemTy->hasError())
-    return nullptr;
-
-  if (auto systemNominal = systemTy->getAnyNominal()) {
-    return getDistributedActorSystemActorIDType(systemNominal);
-  }
-
-  return nullptr;
-}
-
-static Type
 deriveDistributedActorType_SerializationRequirement(
     DerivedConformance &derived) {
   if (!derived.Nominal->isDistributedActor())
@@ -808,10 +775,6 @@ std::pair<Type, TypeDecl *> DerivedConformance::deriveDistributedActor(
   if (assocType->getName() == Context.Id_SerializationRequirement) {
     return std::make_pair(
         deriveDistributedActorType_SerializationRequirement(*this), nullptr);
-  }
-
-  if (assocType->getName() == Context.Id_ID) {
-    return std::make_pair(deriveDistributedActorType_ID(*this), nullptr);
   }
 
   Context.Diags.diagnose(assocType->getLoc(),

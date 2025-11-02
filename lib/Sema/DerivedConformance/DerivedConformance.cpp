@@ -99,8 +99,6 @@ bool DerivedConformance::derivesProtocolConformance(
   if (*derivableKind == KnownDerivableProtocolKind::Actor)
     return canDeriveActor(DC, Nominal);
 
-  if (*derivableKind == KnownDerivableProtocolKind::Identifiable)
-    return canDeriveIdentifiable(Nominal, DC);
   if (*derivableKind == KnownDerivableProtocolKind::DistributedActor)
     return canDeriveDistributedActor(Nominal, DC);
   if (*derivableKind == KnownDerivableProtocolKind::DistributedActorSystem)
