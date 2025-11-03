@@ -6,9 +6,6 @@
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: OS=macosx
 
-// rdar://163511959 error: circular reference
-// XFAIL: *
-
 //--- Inputs/module.modulemap
 module Test {
     header "nonescapable.h"
