@@ -15,7 +15,7 @@ import re
 import sys
 import traceback
 from multiprocessing import freeze_support
-from typing import Any, Dict, Hashable, Optional, Set, List, Union
+from typing import Any, Dict, Hashable, Optional, Set, List, Tuple, Union
 
 from .cli_arguments import CliArguments
 from .git_command import Git, GitException
@@ -394,7 +394,7 @@ def update_all_repositories(
     scheme_name: str,
     scheme_map: Optional[Dict[str, Any]],
     cross_repos_pr: Dict[str, str],
-):
+) -> Tuple[List[SkippedReason], List[Union[Exception, None]]]:
     skipped_repositories = []
     pool_args: List[UpdateArguments] = []
     timestamp = get_timestamp_to_match(args.match_timestamp, args.source_root)
@@ -439,7 +439,7 @@ def update_all_repositories(
 
     locked_repositories: set[str] = _is_any_repository_locked(pool_args)
     if len(locked_repositories) > 0:
-        return [
+        return skipped_repositories, [
             Exception(f"'{repo_name}' is locked by git. Cannot update it.")
             for repo_name in locked_repositories
         ]
