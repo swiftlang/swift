@@ -1688,9 +1688,12 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_ASM_COMPILER_TARGET:STRING=${compatibility_target_triple}
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
-          -DSwiftCore_INSTALL_NESTED_SUBDIR=YES)
+          -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
+          -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
 
-      ExternalProject_Add("${stdlib_target}-core"
+      ExternalProject_Get_Property("${stdlib_target}-retainreleaseclient" INSTALL_DIR)
+
+      ExternalProject_Add("${stdlib_target}-core" "${stdlib_target}-retainreleaseclient"
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Core"
         # TODO: Add this once we're ready to start swapping out the libraries
         #       for testing
@@ -1718,7 +1721,9 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
           -DSwiftCore_ENABLE_CONCURRENCY=${build_concurrency}
-          -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
+          -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}
+          -DSwiftClientRetainRelease_DIR=${INSTALL_DIR}/lib/cmake/SwiftClientRetainRelease
+          --trace-expand)
       if(NOT ${CMAKE_CROSSCOMPILING})
         add_dependencies("${stdlib_target}-core" swift-frontend)
       endif()

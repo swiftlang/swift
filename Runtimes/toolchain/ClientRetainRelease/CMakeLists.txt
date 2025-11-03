@@ -71,21 +71,21 @@ install(TARGETS swiftClientRetainRelease
 
 # Inter-project install info
 export(EXPORT SwiftClientRetainReleaseTargets
-  FILE "cmake/SwiftClientRetainRelease/SwiftOverlayTargets.cmake")
+  FILE "cmake/SwiftClientRetainRelease/SwiftClientRetainReleaseTargets.cmake")
 install(EXPORT SwiftClientRetainReleaseTargets
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftClientRetainRelease"
   FILE "SwiftClientRetainReleaseTargets.cmake"
   COMPONENT SwiftClientRetainReleaseCMake)
 include(CMakePackageConfigHelpers)
 configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/interface/SwiftClientRetainReleaseConfig.cmake.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftClientRetainRelease/SwiftOverlayConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftClientRetainRelease/SwiftClientRetainReleaseConfig.cmake"
   INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftClientRetainRelease")
-write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftClientRetainRelease/SwiftOverlayConfigVersion.cmake"
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftClientRetainRelease/SwiftClientRetainReleaseConfigVersion.cmake"
   VERSION "${PROJECT_VERSION}"
   COMPATIBILITY ExactVersion)
 install(FILES
-  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftClientRetainRelease/SwiftOverlayConfig.cmake"
-  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftClientRetainRelease/SwiftOverlayConfigVersion.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftClientRetainRelease/SwiftClientRetainReleaseConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftClientRetainRelease/SwiftClientRetainReleaseConfigVersion.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftClientRetainRelease")
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/swiftClientRetainRelease.cmake" OPTIONAL)

@@ -373,6 +373,15 @@ if(NOT ANDROID AND NOT APPLE AND NOT LINUX AND NOT WIN32 AND UNIX)
   target_link_libraries(swiftCore PRIVATE "${EXECINFO_LIBRARY}")
 endif()
 
+if(APPLE)
+  find_package(SwiftClientRetainRelease)
+
+  if(SwiftClientRetainRelease_FOUND)
+    target_compile_options(swiftCore PRIVATE "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-client-retain-release>")
+    target_link_libraries(swiftCore PRIVATE swiftClientRetainRelease)
+  endif()
+endif()
+
 if(APPLE AND BUILD_SHARED_LIBS)
   target_link_options(swiftCore PRIVATE "SHELL:-Xlinker -headerpad_max_install_names")
 endif()
