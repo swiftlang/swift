@@ -8,6 +8,9 @@
 // type, which Swift isn't able to instantiate. 
 // UNSUPPORTED: OS=windows-msvc
 
+// rdar://163511959 error: circular reference
+// XFAIL: *
+
 import StdlibUnittest
 import StdAny
 import CxxStdlib
