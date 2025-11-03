@@ -1074,7 +1074,7 @@ void swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
 
 /// Set whether or not the concurrency library is tracking the time spent
 /// running tasks. Returns the old value.
-SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 __attribute__((__cold__)) bool
 _swift_task_setTimeSpentRunningTracked(bool isTracked);
 
