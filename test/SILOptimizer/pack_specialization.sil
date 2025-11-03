@@ -387,31 +387,31 @@ bb0(%0 : $*Pack{any P}, %1 : $*Pack{any P}):
 // elements from packs. These tests focus primarily on the positions of the
 // mapped arguments and result values.
 
-// CHECK-LABEL: sil shared [ossa] @$s18interleave_unownedTf8xnxn_n : $@convention(thin) (Builtin.Int64, Builtin.Int32, Builtin.Int64) -> (Builtin.Int64, Builtin.Int32, Builtin.Int64) {
-// CHECK:       bb0([[A1:%[0-9]+]] : $Builtin.Int64, [[A2:%[0-9]+]] : $Builtin.Int32, [[A3:%[0-9]+]] : $Builtin.Int64):
-// CHECK:         [[IN_PACK:%[0-9]+]] = alloc_pack $Pack{Builtin.Int32}
+// CHECK-LABEL: sil shared [ossa] @$s18interleave_unownedTf8xnxn_n : $@convention(thin) (Builtin.Int32, Builtin.Int16, Builtin.Int32) -> (Builtin.Int32, Builtin.Int16, Builtin.Int32) {
+// CHECK:       bb0([[A1:%[0-9]+]] : $Builtin.Int32, [[A2:%[0-9]+]] : $Builtin.Int16, [[A3:%[0-9]+]] : $Builtin.Int32):
+// CHECK:         [[IN_PACK:%[0-9]+]] = alloc_pack $Pack{Builtin.Int16}
 // CHECK:         store [[A2]] to [trivial] [[IN_STACK:%[0-9]+]]
 // CHECK:         pack_element_set [[IN_STACK]] into [[IN_IDX:%[0-9]+]] of [[IN_PACK]]
-// CHECK:         [[OUT_PACK:%[0-9]+]] = alloc_pack $Pack{Builtin.Int32}
-// CHECK:         [[OUT_ADDR:%[0-9]+]] = alloc_stack $Builtin.Int32
+// CHECK:         [[OUT_PACK:%[0-9]+]] = alloc_pack $Pack{Builtin.Int16}
+// CHECK:         [[OUT_ADDR:%[0-9]+]] = alloc_stack $Builtin.Int16
 // CHECK:         [[ORIGINAL_RESULT:%[0-9]+]] = tuple ([[A1]], [[A3]])
 // CHECK:         ([[R1:%[0-9]+]], [[R3:%[0-9]+]]) = destructure_tuple [[ORIGINAL_RESULT]]
 // CHECK:         [[R2:%[0-9]+]] = load [trivial] [[OUT_ADDR]]
 // CHECK:         [[RESULT:%[0-9]+]] = tuple ([[R1]], [[R2]], [[R3]])
 // CHECK:         return [[RESULT]]
 // CHECK-LABEL: } // end sil function '$s18interleave_unownedTf8xnxn_n'
-sil [ossa] @interleave_unowned : $@convention(thin) (Builtin.Int64, @pack_guaranteed Pack{Builtin.Int32}, Builtin.Int64) -> (Builtin.Int64, @pack_out Pack{Builtin.Int32}, Builtin.Int64) {
-bb0(%0 : $*Pack{Builtin.Int32}, %1 : $Builtin.Int64, %2 : $*Pack{Builtin.Int32}, %3 : $Builtin.Int64):
-  %7 = scalar_pack_index 0 of $Pack{Builtin.Int32}
-  %8 = pack_element_get %7 of %0 as $*Builtin.Int32
-  %9 = pack_element_get %7 of %2 as $*Builtin.Int32
+sil [ossa] @interleave_unowned : $@convention(thin) (Builtin.Int32, @pack_guaranteed Pack{Builtin.Int16}, Builtin.Int32) -> (Builtin.Int32, @pack_out Pack{Builtin.Int16}, Builtin.Int32) {
+bb0(%0 : $*Pack{Builtin.Int16}, %1 : $Builtin.Int32, %2 : $*Pack{Builtin.Int16}, %3 : $Builtin.Int32):
+  %7 = scalar_pack_index 0 of $Pack{Builtin.Int16}
+  %8 = pack_element_get %7 of %0 as $*Builtin.Int16
+  %9 = pack_element_get %7 of %2 as $*Builtin.Int16
   copy_addr %9 to [init] %8
   %12 = tuple (%1, %3)
   return %12
 }
 
-// CHECK-LABEL: sil [ossa] @call_interleave_unowned  : $@convention(thin) (@pack_owned Pack{Builtin.Int32}) -> (Builtin.Int64, @pack_out Pack{Builtin.Int32}, Builtin.Int64) {
-// CHECK:       bb0(%0 : $*Pack{Builtin.Int32}, %1 : $*Pack{Builtin.Int32}):
+// CHECK-LABEL: sil [ossa] @call_interleave_unowned  : $@convention(thin) (@pack_owned Pack{Builtin.Int16}) -> (Builtin.Int32, @pack_out Pack{Builtin.Int16}, Builtin.Int32) {
+// CHECK:       bb0(%0 : $*Pack{Builtin.Int16}, %1 : $*Pack{Builtin.Int16}):
 // CHECK:         [[FNREF:%[0-9]+]] = function_ref @$s18interleave_unownedTf8xnxn_n
 // CHECK-NEXT:    [[RESULT:%[0-9]+]] = apply [[FNREF]]
 // CHECK:         ([[R1:%[0-9]+]], [[R2:%[0-9]+]], [[R3:%[0-9]+]]) = destructure_tuple [[RESULT]]
@@ -419,25 +419,25 @@ bb0(%0 : $*Pack{Builtin.Int32}, %1 : $Builtin.Int64, %2 : $*Pack{Builtin.Int32},
 // CHECK-NEXT:    [[ORIGINAL_RESULT:%[0-9]+]] = tuple ([[R1:%[0-9]+]], [[R3:%[0-9]+]])
 // CHECK-NEXT:    return [[ORIGINAL_RESULT]]
 // CHECK-LABEL: } // end sil function 'call_interleave_unowned'
-sil [ossa] @call_interleave_unowned : $@convention(thin) (@pack_owned Pack{Builtin.Int32}) -> (Builtin.Int64, @pack_out Pack{Builtin.Int32}, Builtin.Int64) {
-bb0(%0 : $*Pack{Builtin.Int32}, %1 : $*Pack{Builtin.Int32}):
-  %6 = integer_literal $Builtin.Int64, 1
-  %12 = integer_literal $Builtin.Int64, 3
-  %14 = function_ref @interleave_unowned : $@convention(thin) (Builtin.Int64, @pack_guaranteed Pack{Builtin.Int32}, Builtin.Int64) -> (Builtin.Int64, @pack_out Pack{Builtin.Int32}, Builtin.Int64)
-  %15 = apply %14(%0, %6, %1, %12) : $@convention(thin) (Builtin.Int64, @pack_guaranteed Pack{Builtin.Int32}, Builtin.Int64) -> (Builtin.Int64, @pack_out Pack{Builtin.Int32}, Builtin.Int64)
+sil [ossa] @call_interleave_unowned : $@convention(thin) (@pack_owned Pack{Builtin.Int16}) -> (Builtin.Int32, @pack_out Pack{Builtin.Int16}, Builtin.Int32) {
+bb0(%0 : $*Pack{Builtin.Int16}, %1 : $*Pack{Builtin.Int16}):
+  %6 = integer_literal $Builtin.Int32, 1
+  %12 = integer_literal $Builtin.Int32, 3
+  %14 = function_ref @interleave_unowned : $@convention(thin) (Builtin.Int32, @pack_guaranteed Pack{Builtin.Int16}, Builtin.Int32) -> (Builtin.Int32, @pack_out Pack{Builtin.Int16}, Builtin.Int32)
+  %15 = apply %14(%0, %6, %1, %12) : $@convention(thin) (Builtin.Int32, @pack_guaranteed Pack{Builtin.Int16}, Builtin.Int32) -> (Builtin.Int32, @pack_out Pack{Builtin.Int16}, Builtin.Int32)
   return %15
 }
 
 
-// CHECK-LABEL: sil shared [ossa] @$s17interleave_directTf8xnxn_n : $@convention(thin) (Builtin.Int64, @guaranteed C, Builtin.Int64) -> (Builtin.Int64, @owned C, Builtin.Int64) {
-// CHECK:       bb0(%0 : $Builtin.Int64, %1 : @guaranteed $C, %2 : $Builtin.Int64):
+// CHECK-LABEL: sil shared [ossa] @$s17interleave_directTf8xnxn_n : $@convention(thin) (Builtin.Int32, @guaranteed C, Builtin.Int32) -> (Builtin.Int32, @owned C, Builtin.Int32) {
+// CHECK:       bb0(%0 : $Builtin.Int32, %1 : @guaranteed $C, %2 : $Builtin.Int32):
 // CHECK:         ([[R1:%[0-9]+]], [[R3:%[0-9]+]]) = destructure_tuple
 // CHECK:         [[R2:%[0-9]+]] = load [take]
 // CHECK-NEXT:    [[RESULT:%[0-9]+]] = tuple ([[R1]], [[R2]], [[R3]])
 // CHECK:         return [[RESULT]]
 // CHECK-LABEL: } // end sil function '$s17interleave_directTf8xnxn_n'
-sil [ossa] @interleave_direct : $@convention(thin) (Builtin.Int64, @pack_guaranteed Pack{C}, Builtin.Int64) -> (Builtin.Int64, @pack_out Pack{C}, Builtin.Int64) {
-bb0(%0 : $*Pack{C}, %1 : $Builtin.Int64, %2 : $*Pack{C}, %3 : $Builtin.Int64):
+sil [ossa] @interleave_direct : $@convention(thin) (Builtin.Int32, @pack_guaranteed Pack{C}, Builtin.Int32) -> (Builtin.Int32, @pack_out Pack{C}, Builtin.Int32) {
+bb0(%0 : $*Pack{C}, %1 : $Builtin.Int32, %2 : $*Pack{C}, %3 : $Builtin.Int32):
   %7 = scalar_pack_index 0 of $Pack{C}
   %8 = pack_element_get %7 of %0 as $*C
   %9 = pack_element_get %7 of %2 as $*C
@@ -446,7 +446,7 @@ bb0(%0 : $*Pack{C}, %1 : $Builtin.Int64, %2 : $*Pack{C}, %3 : $Builtin.Int64):
   return %12
 }
 
-// CHECK-LABEL: sil [ossa] @call_interleave_direct  : $@convention(thin) (@pack_owned Pack{C}) -> (Builtin.Int64, @pack_out Pack{C}, Builtin.Int64) {
+// CHECK-LABEL: sil [ossa] @call_interleave_direct  : $@convention(thin) (@pack_owned Pack{C}) -> (Builtin.Int32, @pack_out Pack{C}, Builtin.Int32) {
 // CHECK:       bb0(%0 : $*Pack{C}, %1 : $*Pack{C}):
 // CHECK:         [[FNREF:%[0-9]+]] = function_ref @$s17interleave_directTf8xnxn_n
 // CHECK-NEXT:    [[RESULT:%[0-9]+]] = apply [[FNREF]]
@@ -455,18 +455,18 @@ bb0(%0 : $*Pack{C}, %1 : $Builtin.Int64, %2 : $*Pack{C}, %3 : $Builtin.Int64):
 // CHECK-NEXT:    [[ORIGINAL_RESULT:%[0-9]+]] = tuple ([[R1:%[0-9]+]], [[R3:%[0-9]+]])
 // CHECK:         return [[ORIGINAL_RESULT]]
 // CHECK-LABEL: } // end sil function 'call_interleave_direct'
-sil [ossa] @call_interleave_direct : $@convention(thin) (@pack_owned Pack{C}) -> (Builtin.Int64, @pack_out Pack{C}, Builtin.Int64) {
+sil [ossa] @call_interleave_direct : $@convention(thin) (@pack_owned Pack{C}) -> (Builtin.Int32, @pack_out Pack{C}, Builtin.Int32) {
 bb0(%0 : $*Pack{C}, %1 : $*Pack{C}):
-  %6 = integer_literal $Builtin.Int64, 1
-  %12 = integer_literal $Builtin.Int64, 3
-  %14 = function_ref @interleave_direct : $@convention(thin) (Builtin.Int64, @pack_guaranteed Pack{C}, Builtin.Int64) -> (Builtin.Int64, @pack_out Pack{C}, Builtin.Int64)
-  %15 = apply %14(%0, %6, %1, %12) : $@convention(thin) (Builtin.Int64, @pack_guaranteed Pack{C}, Builtin.Int64) -> (Builtin.Int64, @pack_out Pack{C}, Builtin.Int64)
+  %6 = integer_literal $Builtin.Int32, 1
+  %12 = integer_literal $Builtin.Int32, 3
+  %14 = function_ref @interleave_direct : $@convention(thin) (Builtin.Int32, @pack_guaranteed Pack{C}, Builtin.Int32) -> (Builtin.Int32, @pack_out Pack{C}, Builtin.Int32)
+  %15 = apply %14(%0, %6, %1, %12) : $@convention(thin) (Builtin.Int32, @pack_guaranteed Pack{C}, Builtin.Int32) -> (Builtin.Int32, @pack_out Pack{C}, Builtin.Int32)
   return %15
 }
 
 
-// CHECK-LABEL: sil shared [ossa] @$s19interleave_indirectTf8xnxn_n : $@convention(thin) (Builtin.Int64, @in_guaranteed any P, Builtin.Int64) -> (Builtin.Int64, @out any P, Builtin.Int64) {
-// CHECK:       bb0(%0 : $*any P, %1 : $Builtin.Int64, %2 : $*any P, %3 : $Builtin.Int64):
+// CHECK-LABEL: sil shared [ossa] @$s19interleave_indirectTf8xnxn_n : $@convention(thin) (Builtin.Int32, @in_guaranteed any P, Builtin.Int32) -> (Builtin.Int32, @out any P, Builtin.Int32) {
+// CHECK:       bb0(%0 : $*any P, %1 : $Builtin.Int32, %2 : $*any P, %3 : $Builtin.Int32):
 // CHECK:         pack_element_set %2 into
 // CHECK:         pack_element_set %0 into
 // CHECK:         pack_element_get [[INDEX:%[0-9]+]] of [[OUT_PACK:%[0-9]+]]
@@ -474,8 +474,8 @@ bb0(%0 : $*Pack{C}, %1 : $*Pack{C}):
 // CHECK:         [[RESULT:%[0-9]+]] = tuple ([[R1:%[0-9]+]], [[R3:%[0-9]+]])
 // CHECK:         return [[RESULT]]
 // CHECK-LABEL: } // end sil function '$s19interleave_indirectTf8xnxn_n'
-sil [ossa] @interleave_indirect : $@convention(thin) (Builtin.Int64, @pack_guaranteed Pack{any P}, Builtin.Int64) -> (Builtin.Int64, @pack_out Pack{any P}, Builtin.Int64) {
-bb0(%0 : $*Pack{any P}, %1 : $Builtin.Int64, %2 : $*Pack{any P}, %3 : $Builtin.Int64):
+sil [ossa] @interleave_indirect : $@convention(thin) (Builtin.Int32, @pack_guaranteed Pack{any P}, Builtin.Int32) -> (Builtin.Int32, @pack_out Pack{any P}, Builtin.Int32) {
+bb0(%0 : $*Pack{any P}, %1 : $Builtin.Int32, %2 : $*Pack{any P}, %3 : $Builtin.Int32):
   %7 = scalar_pack_index 0 of $Pack{any P}
   %8 = pack_element_get %7 of %0 as $*any P
   %9 = pack_element_get %7 of %2 as $*any P
@@ -484,38 +484,38 @@ bb0(%0 : $*Pack{any P}, %1 : $Builtin.Int64, %2 : $*Pack{any P}, %3 : $Builtin.I
   return %11
 }
 
-// CHECK-LABEL: sil [ossa] @call_interleave_indirect  : $@convention(thin) (@pack_owned Pack{any P}) -> (Builtin.Int64, @pack_out Pack{any P}, Builtin.Int64) {
+// CHECK-LABEL: sil [ossa] @call_interleave_indirect  : $@convention(thin) (@pack_owned Pack{any P}) -> (Builtin.Int32, @pack_out Pack{any P}, Builtin.Int32) {
 // CHECK:       bb0(%0 : $*Pack{any P}, %1 : $*Pack{any P}):
 // CHECK:         [[FNREF:%[0-9]+]] = function_ref @$s19interleave_indirectTf8xnxn_n
 // CHECK-NEXT:    [[RESULT:%[0-9]+]] = apply [[FNREF]]
 // CHECK:         return [[RESULT]]
 // CHECK-LABEL: } // end sil function 'call_interleave_indirect'
-sil [ossa] @call_interleave_indirect : $@convention(thin) (@pack_owned Pack{any P}) -> (Builtin.Int64, @pack_out Pack{any P}, Builtin.Int64) {
+sil [ossa] @call_interleave_indirect : $@convention(thin) (@pack_owned Pack{any P}) -> (Builtin.Int32, @pack_out Pack{any P}, Builtin.Int32) {
 bb0(%0 : $*Pack{any P}, %1 : $*Pack{any P}):
-  %6 = integer_literal $Builtin.Int64, 1
-  %12 = integer_literal $Builtin.Int64, 3
-  %14 = function_ref @interleave_indirect : $@convention(thin) (Builtin.Int64, @pack_guaranteed Pack{any P}, Builtin.Int64) -> (Builtin.Int64, @pack_out Pack{any P}, Builtin.Int64)
-  %15 = apply %14(%0, %6, %1, %12) : $@convention(thin) (Builtin.Int64, @pack_guaranteed Pack{any P}, Builtin.Int64) -> (Builtin.Int64, @pack_out Pack{any P}, Builtin.Int64)
+  %6 = integer_literal $Builtin.Int32, 1
+  %12 = integer_literal $Builtin.Int32, 3
+  %14 = function_ref @interleave_indirect : $@convention(thin) (Builtin.Int32, @pack_guaranteed Pack{any P}, Builtin.Int32) -> (Builtin.Int32, @pack_out Pack{any P}, Builtin.Int32)
+  %15 = apply %14(%0, %6, %1, %12) : $@convention(thin) (Builtin.Int32, @pack_guaranteed Pack{any P}, Builtin.Int32) -> (Builtin.Int32, @pack_out Pack{any P}, Builtin.Int32)
   return %15
 }
 
 // MULTI-ELEMENT PACK TESTS:
 
 // Since the pack elements are the same type, ensure they are inserted in the correct order.
-// CHECK-LABEL: sil shared [ossa] @$s09copy_int_B0Tf8xx_n : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int64) {
-// CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
-// CHECK: [[IN_PACK:%[0-9]+]] = alloc_pack $Pack{Builtin.Int64, Builtin.Int64}
-// CHECK: [[IN_IDX_0:%[0-9]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64, Builtin.Int64}
-// CHECK: [[IN_ADDR_0:%[0-9]+]] = alloc_stack $Builtin.Int64
+// CHECK-LABEL: sil shared [ossa] @$s09copy_int_B0Tf8xx_n : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> (Builtin.Int32, Builtin.Int32) {
+// CHECK: bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+// CHECK: [[IN_PACK:%[0-9]+]] = alloc_pack $Pack{Builtin.Int32, Builtin.Int32}
+// CHECK: [[IN_IDX_0:%[0-9]+]] = scalar_pack_index 0 of $Pack{Builtin.Int32, Builtin.Int32}
+// CHECK: [[IN_ADDR_0:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK: store %0 to [trivial] [[IN_ADDR_0]]
 // CHECK: pack_element_set [[IN_ADDR_0]] into [[IN_IDX_0]] of [[IN_PACK]]
-// CHECK: [[IN_IDX_1:%[0-9]+]] = scalar_pack_index 1 of $Pack{Builtin.Int64, Builtin.Int64}
-// CHECK: [[IN_ADDR_1:%[0-9]+]] = alloc_stack $Builtin.Int64
+// CHECK: [[IN_IDX_1:%[0-9]+]] = scalar_pack_index 1 of $Pack{Builtin.Int32, Builtin.Int32}
+// CHECK: [[IN_ADDR_1:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK: store %1 to [trivial] [[IN_ADDR_1]]
 // CHECK: pack_element_set [[IN_ADDR_1]] into [[IN_IDX_1]] of [[IN_PACK]]
-// CHECK: [[OUT_PACK:%[0-9]+]] = alloc_pack $Pack{Builtin.Int64, Builtin.Int64}
-// CHECK: [[OUT_ADDR_0:%[0-9]+]] = alloc_stack $Builtin.Int64
-// CHECK: [[OUT_ADDR_1:%[0-9]+]] = alloc_stack $Builtin.Int64
+// CHECK: [[OUT_PACK:%[0-9]+]] = alloc_pack $Pack{Builtin.Int32, Builtin.Int32}
+// CHECK: [[OUT_ADDR_0:%[0-9]+]] = alloc_stack $Builtin.Int32
+// CHECK: [[OUT_ADDR_1:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK: copy_addr [[IN_PACK]] to [init] [[OUT_PACK]]
 // CHECK: [[ORIGINAL_RESULT:%[0-9]+]] = tuple ()
 // CHECK: [[OUT_0:%[0-9]+]] = load [trivial] [[OUT_ADDR_0]]
@@ -523,77 +523,77 @@ bb0(%0 : $*Pack{any P}, %1 : $*Pack{any P}):
 // CHECK: [[RESULT:%[0-9]+]] = tuple ([[OUT_0]], [[OUT_1]])
 // CHECK: return [[RESULT]]
 // CHECK-LABEL: } // end sil function '$s09copy_int_B0Tf8xx_n'
-sil [ossa] @copy_int_int : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int64, Builtin.Int64}) -> @pack_out Pack{Builtin.Int64, Builtin.Int64} {
-bb0(%0 : $*Pack{Builtin.Int64, Builtin.Int64}, %1 : $*Pack{Builtin.Int64, Builtin.Int64}):
+sil [ossa] @copy_int_int : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int32, Builtin.Int32}) -> @pack_out Pack{Builtin.Int32, Builtin.Int32} {
+bb0(%0 : $*Pack{Builtin.Int32, Builtin.Int32}, %1 : $*Pack{Builtin.Int32, Builtin.Int32}):
   copy_addr %1 to [init] %0
   %13 = tuple ()
   return %13
 }
 
-// CHECK-LABEL: sil [ossa] @call_copy_int_int : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int64, Builtin.Int64}) ->  @pack_out Pack{Builtin.Int64, Builtin.Int64} {
+// CHECK-LABEL: sil [ossa] @call_copy_int_int : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int32, Builtin.Int32}) ->  @pack_out Pack{Builtin.Int32, Builtin.Int32} {
 // CHECK-LABEL: } // end sil function 'call_copy_int_int'
-sil [ossa] @call_copy_int_int : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int64, Builtin.Int64}) -> @pack_out Pack{Builtin.Int64, Builtin.Int64} {
-bb0(%0 : $*Pack{Builtin.Int64, Builtin.Int64}, %1: $*Pack{Builtin.Int64, Builtin.Int64}):
-  %2 = function_ref @copy_int_int : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int64, Builtin.Int64}) -> @pack_out Pack{Builtin.Int64, Builtin.Int64}
-  %3 = apply %2(%0, %1) : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int64, Builtin.Int64}) -> @pack_out Pack{Builtin.Int64, Builtin.Int64}
+sil [ossa] @call_copy_int_int : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int32, Builtin.Int32}) -> @pack_out Pack{Builtin.Int32, Builtin.Int32} {
+bb0(%0 : $*Pack{Builtin.Int32, Builtin.Int32}, %1: $*Pack{Builtin.Int32, Builtin.Int32}):
+  %2 = function_ref @copy_int_int : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int32, Builtin.Int32}) -> @pack_out Pack{Builtin.Int32, Builtin.Int32}
+  %3 = apply %2(%0, %1) : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int32, Builtin.Int32}) -> @pack_out Pack{Builtin.Int32, Builtin.Int32}
   %4 = tuple ()
   return %4
 }
 
-// CHECK-LABEL: sil shared [ossa] @$s10copy_int_pTf8xx_n : $@convention(thin) (Builtin.Int64, @in_guaranteed any P) -> (Builtin.Int64, @out any P) {
-// CHECK:       bb0(%0 : $*any P, %1 : $Builtin.Int64, %2 : $*any P):
-// CHECK:         [[IN_PACK:%[0-9]+]] = alloc_pack $Pack{Builtin.Int64, any P}
-// CHECK:         [[IN_ADDR_0:%[0-9]+]] = alloc_stack $Builtin.Int64
+// CHECK-LABEL: sil shared [ossa] @$s10copy_int_pTf8xx_n : $@convention(thin) (Builtin.Int32, @in_guaranteed any P) -> (Builtin.Int32, @out any P) {
+// CHECK:       bb0(%0 : $*any P, %1 : $Builtin.Int32, %2 : $*any P):
+// CHECK:         [[IN_PACK:%[0-9]+]] = alloc_pack $Pack{Builtin.Int32, any P}
+// CHECK:         [[IN_ADDR_0:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK:         store %1 to [trivial] [[IN_ADDR_0]]
-// CHECK:         [[OUT_PACK:%[0-9]+]] = alloc_pack $Pack{Builtin.Int64, any P}
-// CHECK:         [[OUT_ADDR_0:%[0-9]+]] = alloc_stack $Builtin.Int64
+// CHECK:         [[OUT_PACK:%[0-9]+]] = alloc_pack $Pack{Builtin.Int32, any P}
+// CHECK:         [[OUT_ADDR_0:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK:         copy_addr [[IN_PACK]] to [init] [[OUT_PACK]]
 // CHECK:         [[ORIGINAL_RESULT:%[0-9]+]] = tuple ()
 // CHECK:         [[OUT_0:%[0-9]+]] = load [trivial] [[OUT_ADDR_0]]
 // CHECK:         return [[OUT_0]]
 // CHECK-LABEL: } // end sil function '$s10copy_int_pTf8xx_n'
-sil [ossa] @copy_int_p : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int64, any P}) -> @pack_out Pack{Builtin.Int64, any P} {
-bb0(%0 : $*Pack{Builtin.Int64, any P}, %1 : $*Pack{Builtin.Int64, any P}):
+sil [ossa] @copy_int_p : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int32, any P}) -> @pack_out Pack{Builtin.Int32, any P} {
+bb0(%0 : $*Pack{Builtin.Int32, any P}, %1 : $*Pack{Builtin.Int32, any P}):
   copy_addr %1 to [init] %0
   %12 = tuple ()
   return %12
 }
 
-// CHECK-LABEL: sil [ossa] @call_copy_int_p : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int64, any P}) ->  @pack_out Pack{Builtin.Int64, any P} {
+// CHECK-LABEL: sil [ossa] @call_copy_int_p : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int32, any P}) ->  @pack_out Pack{Builtin.Int32, any P} {
 // CHECK-LABEL: } // end sil function 'call_copy_int_p'
-sil [ossa] @call_copy_int_p : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int64, any P}) -> @pack_out Pack{Builtin.Int64, any P} {
-bb0(%0 : $*Pack{Builtin.Int64, any P}, %1: $*Pack{Builtin.Int64, any P}):
-  %2 = function_ref @copy_int_p : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int64, any P}) -> @pack_out Pack{Builtin.Int64, any P}
-  %3 = apply %2(%0, %1) : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int64, any P}) -> @pack_out Pack{Builtin.Int64, any P}
+sil [ossa] @call_copy_int_p : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int32, any P}) -> @pack_out Pack{Builtin.Int32, any P} {
+bb0(%0 : $*Pack{Builtin.Int32, any P}, %1: $*Pack{Builtin.Int32, any P}):
+  %2 = function_ref @copy_int_p : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int32, any P}) -> @pack_out Pack{Builtin.Int32, any P}
+  %3 = apply %2(%0, %1) : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int32, any P}) -> @pack_out Pack{Builtin.Int32, any P}
   %4 = tuple ()
   return %4
 }
 
-// CHECK-LABEL: sil shared [ossa] @$s10copy_p_intTf8xx_n : $@convention(thin) (@in_guaranteed any P, Builtin.Int64) -> (@out any P, Builtin.Int64) {
-// CHECK:       bb0(%0 : $*any P, %1 : $*any P, %2 : $Builtin.Int64):
-// CHECK:         [[IN_PACK:%[0-9]+]] = alloc_pack $Pack{any P, Builtin.Int64}
-// CHECK:         [[IN_ADDR_1:%[0-9]+]] = alloc_stack $Builtin.Int64
+// CHECK-LABEL: sil shared [ossa] @$s10copy_p_intTf8xx_n : $@convention(thin) (@in_guaranteed any P, Builtin.Int32) -> (@out any P, Builtin.Int32) {
+// CHECK:       bb0(%0 : $*any P, %1 : $*any P, %2 : $Builtin.Int32):
+// CHECK:         [[IN_PACK:%[0-9]+]] = alloc_pack $Pack{any P, Builtin.Int32}
+// CHECK:         [[IN_ADDR_1:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK:         store %2 to [trivial] [[IN_ADDR_1]]
-// CHECK:         [[OUT_PACK:%[0-9]+]] = alloc_pack $Pack{any P, Builtin.Int64}
-// CHECK:         [[OUT_ADDR_0:%[0-9]+]] = alloc_stack $Builtin.Int64
+// CHECK:         [[OUT_PACK:%[0-9]+]] = alloc_pack $Pack{any P, Builtin.Int32}
+// CHECK:         [[OUT_ADDR_0:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK:         copy_addr [[IN_PACK]] to [init] [[OUT_PACK]]
 // CHECK:         [[ORIGINAL_RESULT:%[0-9]+]] = tuple ()
 // CHECK:         [[OUT_0:%[0-9]+]] = load [trivial] [[OUT_ADDR_0]]
 // CHECK:         return [[OUT_0]]
 // CHECK-LABEL: } // end sil function '$s10copy_p_intTf8xx_n'
-sil [ossa] @copy_p_int : $@convention(thin) (@pack_guaranteed Pack{any P, Builtin.Int64}) -> @pack_out Pack{any P, Builtin.Int64} {
-bb0(%0 : $*Pack{any P, Builtin.Int64}, %1 : $*Pack{any P, Builtin.Int64}):
+sil [ossa] @copy_p_int : $@convention(thin) (@pack_guaranteed Pack{any P, Builtin.Int32}) -> @pack_out Pack{any P, Builtin.Int32} {
+bb0(%0 : $*Pack{any P, Builtin.Int32}, %1 : $*Pack{any P, Builtin.Int32}):
   copy_addr %1 to [init] %0
   %12 = tuple ()
   return %12
 }
 
-// CHECK-LABEL: sil [ossa] @call_copy_p_int : $@convention(thin) (@pack_guaranteed Pack{any P, Builtin.Int64}) ->  @pack_out Pack{any P, Builtin.Int64} {
+// CHECK-LABEL: sil [ossa] @call_copy_p_int : $@convention(thin) (@pack_guaranteed Pack{any P, Builtin.Int32}) ->  @pack_out Pack{any P, Builtin.Int32} {
 // CHECK-LABEL: } // end sil function 'call_copy_p_int'
-sil [ossa] @call_copy_p_int : $@convention(thin) (@pack_guaranteed Pack{any P, Builtin.Int64}) -> @pack_out Pack{any P, Builtin.Int64} {
-bb0(%0 : $*Pack{any P, Builtin.Int64}, %1: $*Pack{any P, Builtin.Int64}):
-  %2 = function_ref @copy_p_int : $@convention(thin) (@pack_guaranteed Pack{any P, Builtin.Int64}) -> @pack_out Pack{any P, Builtin.Int64}
-  %3 = apply %2(%0, %1) : $@convention(thin) (@pack_guaranteed Pack{any P, Builtin.Int64}) -> @pack_out Pack{any P, Builtin.Int64}
+sil [ossa] @call_copy_p_int : $@convention(thin) (@pack_guaranteed Pack{any P, Builtin.Int32}) -> @pack_out Pack{any P, Builtin.Int32} {
+bb0(%0 : $*Pack{any P, Builtin.Int32}, %1: $*Pack{any P, Builtin.Int32}):
+  %2 = function_ref @copy_p_int : $@convention(thin) (@pack_guaranteed Pack{any P, Builtin.Int32}) -> @pack_out Pack{any P, Builtin.Int32}
+  %3 = apply %2(%0, %1) : $@convention(thin) (@pack_guaranteed Pack{any P, Builtin.Int32}) -> @pack_out Pack{any P, Builtin.Int32}
   %4 = tuple ()
   return %4
 }
@@ -635,26 +635,26 @@ bb0(%0 : $*Pack{any P, any P}, %1: $*Pack{any P, any P}):
 // EDGE CASE TESTS:
 
 // Deallocation code should not be emitted at the end of a non-exiting terminator block.
-// CHECK-LABEL: sil shared [ossa] @$s9crashableTf8x_n : $@convention(thin) (Builtin.Int64) -> () {
-// CHECK:       bb0(%0 : $Builtin.Int64):
-// CHECK-NEXT:    [[IN_PACK:%[0-9]+]] = alloc_pack $Pack{Builtin.Int64}
-// CHECK-NEXT:    [[IN_IDX:%[0-9]+]] = scalar_pack_index 0 of $Pack{Builtin.Int64}
-// CHECK-NEXT:    [[IN_ADDR:%[0-9]+]] = alloc_stack $Builtin.Int64
+// CHECK-LABEL: sil shared [ossa] @$s9crashableTf8x_n : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK:       bb0(%0 : $Builtin.Int32):
+// CHECK-NEXT:    [[IN_PACK:%[0-9]+]] = alloc_pack $Pack{Builtin.Int32}
+// CHECK-NEXT:    [[IN_IDX:%[0-9]+]] = scalar_pack_index 0 of $Pack{Builtin.Int32}
+// CHECK-NEXT:    [[IN_ADDR:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK-NEXT:    store %0 to [trivial] [[IN_ADDR]]
 // CHECK-NEXT:    pack_element_set [[IN_ADDR]] into [[IN_IDX]] of [[IN_PACK]]
 // CHECK-NEXT:    unreachable
 // CHECK-LABEL: } // end sil function '$s9crashableTf8x_n'
-sil [ossa] @crashable : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int64}) -> () {
-bb0(%0 : $*Pack{Builtin.Int64}):
+sil [ossa] @crashable : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int32}) -> () {
+bb0(%0 : $*Pack{Builtin.Int32}):
   unreachable
 }
 
-// CHECK-LABEL: sil [ossa] @call_crashable : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int64}) -> () {
+// CHECK-LABEL: sil [ossa] @call_crashable : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int32}) -> () {
 // CHECK-LABEL: } // end sil function 'call_crashable'
-sil [ossa] @call_crashable : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int64}) -> () {
-bb0(%0 : $*Pack{Builtin.Int64}):
-  %1 = function_ref @crashable : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int64}) -> ()
-  %2 = apply %1(%0) : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int64}) -> ()
+sil [ossa] @call_crashable : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int32}) -> () {
+bb0(%0 : $*Pack{Builtin.Int32}):
+  %1 = function_ref @crashable : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int32}) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@pack_guaranteed Pack{Builtin.Int32}) -> ()
   unreachable
 }
 
