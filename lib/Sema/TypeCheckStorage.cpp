@@ -213,30 +213,10 @@ static void enumerateStoredPropertiesAndMissing(
   // If we have a distributed actor, find the id and actorSystem
   // properties. We always want them first, and in a specific
   // order.
-  if (decl->isDistributedActor()) {
-    VarDecl *distributedActorId = nullptr;
-    VarDecl *distributedActorSystem = nullptr;
-    ASTContext &ctx = decl->getASTContext();
-    for (auto *member : implDecl->getMembers()) {
-      if (auto *var = dyn_cast<VarDecl>(member)) {
-        if (!var->isStatic() && var->hasStorage()) {
-          if (var->getName() == ctx.Id_id) {
-            distributedActorId = var;
-          } else if (var->getName() == ctx.Id_actorSystem) {
-            distributedActorSystem = var;
-          }
-        }
-
-        if (distributedActorId && distributedActorSystem)
-          break;
-      }
-    }
-
-    if (distributedActorId)
-      addStoredProperty(distributedActorId);
-    if (distributedActorSystem)
-      addStoredProperty(distributedActorSystem);
-  }
+  if (auto idVar = decl->getDistributedActorIDProperty())
+    addStoredProperty(idVar);
+  if (auto actorSystemVar = decl->getDistributedActorSystemProperty())
+    addStoredProperty(actorSystemVar);
 
   for (auto *member : implDecl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {

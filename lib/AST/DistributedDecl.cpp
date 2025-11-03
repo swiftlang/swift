@@ -1375,13 +1375,11 @@ bool ValueDecl::isDistributedGetAccessor() const {
 
 std::optional<SpecialDistributedProperty>
 ValueDecl::isSpecialDistributedProperty(bool onlyCheckName) const {
-  if (!onlyCheckName && !isSynthesized())
-    return std::nullopt;
-
   if (!isa<VarDecl>(this))
     return std::nullopt;
 
-  auto &ctx = getASTContext();
+  auto *DC = getDeclContext();
+  auto &ctx = DC->getASTContext();
 
   auto kind = [&]() -> std::optional<SpecialDistributedProperty> {
     auto name = getName();
@@ -1395,9 +1393,18 @@ ValueDecl::isSpecialDistributedProperty(bool onlyCheckName) const {
   if (!kind || onlyCheckName)
     return kind;
 
-  auto *NTD = getDeclContext()->getSelfNominalTypeDecl();
-  if (!NTD || !NTD->isDistributedActor())
+  // The properties can only be synthesized in the nominal itself.
+  auto *CD = dyn_cast<ClassDecl>(DC);
+  if (!CD || !CD->isDistributedActor())
     return std::nullopt;
+
+  // The synthesized bit doesn't get preserved by serialization or module
+  // interfaces, we only need to check it when compiling a SourceFile though
+  // since we'll diagnose any conflicting user-defined versions.
+  if (!isSynthesized() && DC->getParentSourceFile() &&
+      !DC->isInSwiftinterface()) {
+    return std::nullopt;
+  }
 
   return kind;
 }
