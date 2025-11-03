@@ -453,21 +453,6 @@ bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
       std::count(protocols.begin(), protocols.end(), decodable) == 1;
 }
 
-// TODO(distributed): probably can be removed?
-llvm::ArrayRef<ValueDecl *>
-AbstractFunctionDecl::getDistributedMethodWitnessedProtocolRequirements() const {
-  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
-
-  // Only a 'distributed' decl can witness 'distributed' protocol
-  if (!isDistributed()) {
-    return llvm::ArrayRef<ValueDecl *>();
-  }
-
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      GetDistributedMethodWitnessedProtocolRequirements(mutableThis), {});
-}
-
 /******************************************************************************/
 /********************* Ad-hoc protocol requirement checks *********************/
 /******************************************************************************/
