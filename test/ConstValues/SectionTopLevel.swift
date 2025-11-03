@@ -1,5 +1,6 @@
 // Constant globals using @section
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature ParserASTGen | %FileCheck %s
 
 // integer literals
 @section("mysection") let intLiteral1 = 42 // ok

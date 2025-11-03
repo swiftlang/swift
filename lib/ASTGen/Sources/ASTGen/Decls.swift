@@ -610,8 +610,12 @@ extension ASTGenVisitor {
       // TODO: Diagnostics
       fatalError("invalid pattern binding introducer")
     }
+
+    // @const/@section globals are not top-level, per SE-0492.
+    let isConst = attrs.attributes.hasAttribute(.Section) || attrs.attributes.hasAttribute(.ConstVal)
+
     let topLevelDecl: BridgedTopLevelCodeDecl?
-    if self.declContext.isModuleScopeContext, self.declContext.parentSourceFile.isScriptMode {
+    if self.declContext.isModuleScopeContext, self.declContext.parentSourceFile.isScriptMode, !isConst {
       topLevelDecl = BridgedTopLevelCodeDecl.create(self.ctx, declContext: self.declContext)
     } else {
       topLevelDecl = nil
