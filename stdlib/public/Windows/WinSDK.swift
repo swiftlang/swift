@@ -333,6 +333,7 @@ extension GUID {
 
 // These conformances are marked @retroactive because the GUID type nominally
 // comes from the _GUIDDef clang module rather than the WinSDK clang module.
+
 extension GUID: @retroactive Equatable {
   @_transparent
   @_implements(Equatable, ==(_:_:))
