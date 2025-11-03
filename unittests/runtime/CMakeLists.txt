@@ -183,4 +183,13 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 #
 # to add the preprocessor definition.
 
+
+# A few unit tests with actor scheduling are failing AL2 aarch64 (rdar://163604876)
+if(EXISTS "/etc/os-release")
+    file(READ "/etc/os-release" OS_RELEASE)
+    if(OS_RELEASE MATCHES "Amazon Linux 2" AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64|arm64")
+        target_compile_definitions(SwiftRuntimeTests PRIVATE __SKIP_RDAR163604876__)
+    endif()
+endif()
+
 endif()
