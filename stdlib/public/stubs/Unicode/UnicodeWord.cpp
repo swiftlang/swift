@@ -15,7 +15,7 @@
 #else
 #include "swift/Runtime/Debug.h"
 #endif
-#include "swift/shims/UnicodeData.h"
+#include "swift/shims/Visibility.h"
 #include <stdint.h>
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
