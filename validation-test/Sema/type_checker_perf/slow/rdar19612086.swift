@@ -11,8 +11,8 @@ struct rdar19612086 {
   let x = 1.0
 
   var description : String {
-    return "\(i)" + Stringly(format: "%.2f", x) +   // expected-error {{reasonable time}}
-           "\(i+1)" + Stringly(format: "%.2f", x) +
+    return "\(i)" + Stringly(format: "%.2f", x) +
+           "\(i+1)" + Stringly(format: "%.2f", x) +   // expected-error {{reasonable time}}
            "\(i+2)" + Stringly(format: "%.2f", x) +
            "\(i+3)" + Stringly(format: "%.2f", x) +
            "\(i+4)" + Stringly(format: "%.2f", x) +

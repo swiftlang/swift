@@ -867,8 +867,7 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
 
   /// The number of milliseconds until outer constraint system
   /// is considered "too complex" if timer is enabled.
-  std::optional<std::pair<ExpressionTimer::AnchorType, unsigned>>
-      OuterTimeRemaining = std::nullopt;
+  std::optional<unsigned> OuterTimeRemaining = std::nullopt;
 
   /// Conjunction constraint associated with this step.
   Constraint *Conjunction;
@@ -910,7 +909,7 @@ public:
 
     if (cs.Timer) {
       auto remainingTime = cs.Timer->getRemainingProcessTimeInSeconds();
-      OuterTimeRemaining.emplace(cs.Timer->getAnchor(), remainingTime);
+      OuterTimeRemaining.emplace(remainingTime);
     }
   }
 
@@ -925,11 +924,8 @@ public:
     if (HadFailure)
       restoreBestScore();
 
-    if (OuterTimeRemaining) {
-      auto anchor = OuterTimeRemaining->first;
-      auto remainingTime = OuterTimeRemaining->second;
-      CS.Timer.emplace(anchor, CS, remainingTime);
-    }
+    if (OuterTimeRemaining)
+      CS.Timer.emplace(CS, *OuterTimeRemaining);
   }
 
   StepResult resume(bool prevFailed) override;
