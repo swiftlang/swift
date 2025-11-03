@@ -30,7 +30,7 @@
 ///     let b: InlineArray<_, Int> = [1, 2, 3]
 ///     let c: InlineArray<3, _>   = [1, 2, 3]
 ///     let d: InlineArray         = [1, 2, 3]
-///     
+///
 ///     let e: [3 of Int]          = [1, 2, 3]
 ///     let f: [_ of Int]          = [1, 2, 3]
 ///     let g: [3 of _]            = [1, 2, 3]
@@ -604,5 +604,23 @@ extension InlineArray where Element: ~Copyable {
       )
       return unsafe _overrideLifetime(span, mutating: &self)
     }
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension InlineArray: Iterable where Element: ~Copyable {
+  public typealias BorrowIterator = Span<Element>.BorrowIterator
+
+  @_alwaysEmitIntoClient
+  @_transparent
+  public var estimatedCount: EstimatedCount {
+    .exactly(count)
+  }
+
+  @_alwaysEmitIntoClient
+  @_lifetime(borrow self)
+  @_transparent
+  public func startBorrowIteration() -> Span<Element> {
+    span
   }
 }
