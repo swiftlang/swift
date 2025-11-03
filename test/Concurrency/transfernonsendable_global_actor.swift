@@ -359,3 +359,23 @@ func inferLocationOfCapturedActorIsolatedSelfCorrectly() {
     func c() {}
   }
 }
+
+// We shouldn't emit any diagnostic here and shouldn't emit a compiler doesn't
+// know how to process error.
+actor PreferIsolationOfFieldToIsolationOfActor {
+  final class C {
+    func foo(_ block: () -> Void) {}
+  }
+
+  @MainActor let c: C = C()
+  private var data: UInt8 = 0
+
+  @MainActor
+  func bar() async {
+    let data = await self.data
+    c.foo {
+      let data = data
+      _ = data
+    }
+  }
+}

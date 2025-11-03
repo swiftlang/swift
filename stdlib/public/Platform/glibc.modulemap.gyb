@@ -49,6 +49,14 @@ module SwiftGlibc [system] {
   export *
 }
 
+% if CMAKE_SDK == "FREEBSD":
+module signal_h [system] {
+  config_macros _BSD_VISIBLE, _POSIX_VISIBLE
+  header "signal.h"
+  export *
+}
+% end
+
 module CUUID [system] {
   header "uuid/uuid.h"
   link "uuid"

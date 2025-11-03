@@ -515,6 +515,9 @@ public:
                                          - getNumIndirectSILErrorResults()];
   }
 
+  /// WARNING: Do not use this from SILGen!
+  /// Use methods such as `isSILIndirect` or query the ParameterInfo instead.
+  ///
   /// Return the SIL argument convention of apply/entry argument at
   /// the given argument index.
   SILArgumentConvention getSILArgumentConvention(unsigned index) const;

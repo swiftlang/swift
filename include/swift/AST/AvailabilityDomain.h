@@ -33,11 +33,20 @@
 
 namespace swift {
 class ASTContext;
+class AvailabilityDomainAndRange;
 class CustomAvailabilityDomain;
 class DeclContext;
 class FuncDecl;
 class ModuleDecl;
 class ValueDecl;
+
+/// Discriminates whether a version tuple represents the `introduced:`,
+/// `deprecated:`, or `obsoleted:` version of an `@available` attribute.
+enum class AvailabilityVersionKind {
+  Introduced,
+  Deprecated,
+  Obsoleted,
+};
 
 /// Represents a dimension of availability (e.g. macOS platform or Swift
 /// language mode).
@@ -130,6 +139,9 @@ private:
                      cast<InlineDomainPtr>(storage))
                : std::nullopt;
   }
+
+  std::optional<AvailabilityDomain>
+  getRemappedDomainOrNull(const ASTContext &ctx) const;
 
 public:
   AvailabilityDomain() {}
@@ -296,17 +308,20 @@ public:
 
   /// Returns the canonical domain that versions in this domain must be remapped
   /// to before making availability comparisons in the current compilation
-  /// context. Sets \p didRemap to `true` if a remap was required.
-  const AvailabilityDomain getRemappedDomain(const ASTContext &ctx,
-                                             bool &didRemap) const;
-
-  /// Returns the canonical domain that versions in this domain must be remapped
-  /// to before making availability comparisons in the current compilation
   /// context.
   const AvailabilityDomain getRemappedDomain(const ASTContext &ctx) const {
-    bool unused;
-    return getRemappedDomain(ctx, unused);
+    auto remappedDomain = getRemappedDomainOrNull(ctx);
+    return remappedDomain ? *remappedDomain : *this;
   }
+
+  /// Converts the domain and the given version into a canonical domain and
+  /// range that can be used for availability comparisons in the current current
+  /// compilation context. If no conversion is necessary or possible, the domain
+  /// and range are returned unmodified.
+  AvailabilityDomainAndRange
+  getRemappedDomainAndRange(const llvm::VersionTuple &version,
+                            AvailabilityVersionKind versionKind,
+                            const ASTContext &ctx) const;
 
   /// Returns true for a domain that is permanently always available, and
   /// therefore availability constraints in the domain are effectively the same

@@ -18,7 +18,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityConstraint.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"

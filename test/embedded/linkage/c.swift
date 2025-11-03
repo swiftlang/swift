@@ -4,11 +4,8 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_DeferredCodeGen
-// REQUIRES: swift_feature_CDecl
-// REQUIRES: swift_feature_CImplementation
-// REQUIRES: swift_feature_SymbolLinkageMarkers
 
-// RUN: %target-swift-frontend -emit-ir -o - %s -I %S/Inputs -package-name MyPackage -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -enable-experimental-feature CDecl -enable-experimental-feature CImplementation -enable-experimental-feature SymbolLinkageMarkers -parse-as-library | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -o - %s -I %S/Inputs -package-name MyPackage -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -parse-as-library | %FileCheck %s
 
 import MyModuleExports
 
@@ -29,7 +26,7 @@ package func f2() { }
 internal func f3() { }
 
 // CHECK: define hidden void @lib_publicCDeclFunc4
-@c("lib_publicCDeclFunc4")
+@c(lib_publicCDeclFunc4)
 internal func f4() { }
 
 // CHECK-NOT: lib_publicCDeclFunc5
@@ -37,7 +34,7 @@ internal func f4() { }
 private func f5() { }
 
 // CHECK-NOT: lib_publicCDeclFunc6
-@c("lib_publicCDeclFunc6")
+@c(lib_publicCDeclFunc6)
 private func f6() { }
 
 // ---------------------------------------------------------------------------
@@ -61,21 +58,21 @@ internal func clib_func3() -> Double { 0 }
 internal func clib_func4() -> Double { 0 }
 
 // ---------------------------------------------------------------------------
-// @_section causes symbol emission
+// @section causes symbol emission
 // ---------------------------------------------------------------------------
 
 // CHECK: define {{(protected |dllexport )?}}swiftcc void @"$e1c15symbolInSectionyyF"
-@_section("__TEXT,__mysection")
+@section("__TEXT,__mysection")
 public func symbolInSection() { }
 
 // CHECK: define hidden swiftcc void @"$e1c23internalSymbolInSectionyyF"
-@_section("__TEXT,__mysection")
+@section("__TEXT,__mysection")
 func internalSymbolInSection() { }
 
 // ---------------------------------------------------------------------------
-// @_used causes symbol emission
+// @used causes symbol emission
 // ---------------------------------------------------------------------------
 
 // CHECK: define hidden swiftcc void @"$e1c10usedSymbolyyF"
-@_used
+@used
 func usedSymbol() { }

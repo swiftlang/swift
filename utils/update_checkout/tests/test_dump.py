@@ -22,16 +22,28 @@ class DumpTestCase(scheme_mock.SchemeMockTestCase):
 
     def test_dump_hashes_json(self):
         # First do the clone.
-        self.call([self.update_checkout_path,
-                   '--config', self.config_path,
-                   '--source-root', self.source_root,
-                   '--clone'])
+        self.call(
+            [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--source-root",
+                self.source_root,
+                "--clone",
+            ]
+        )
 
         # Then dump the hashes.
-        output = self.call([self.update_checkout_path,
-                            '--config', self.config_path,
-                            '--source-root', self.source_root,
-                            '--dump-hashes'])
+        output = self.call(
+            [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--source-root",
+                self.source_root,
+                "--dump-hashes",
+            ]
+        )
         # The output should be valid JSON
         result = json.loads(output)
 

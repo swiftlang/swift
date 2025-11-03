@@ -106,6 +106,12 @@ protected:
   /// defined in.
   bool RespectOriginallyDefinedIn = true;
 
+  /// Whether to always mangle using the declaration's API, ignoring e.g
+  /// attached `@abi` attributes. This is necessary for USR mangling since for
+  /// semantic functionality we're only concerned about the API entity, and need
+  /// to be able to do name lookups to find the original decl based on the USR.
+  bool UseAPIMangling = false;
+
 public:
   class SymbolicReferent {
   public:
@@ -187,15 +193,24 @@ public:
     HasSymbolQuery,
   };
 
-  /// lldb overrides the defaulted argument to 'true'.
-  ASTMangler(const ASTContext &Ctx, bool DWARFMangling = false) : Context(Ctx) {
+  /// lldb overrides \p DWARFMangling to 'true'.
+  ASTMangler(const ASTContext &Ctx, bool DWARFMangling = false,
+             bool UseAPIMangling = false)
+      : Context(Ctx) {
     if (DWARFMangling) {
-      DWARFMangling = true;
+      this->DWARFMangling = true;
       RespectOriginallyDefinedIn = false;
     }
+    this->UseAPIMangling = UseAPIMangling;
     Flavor = Ctx.LangOpts.hasFeature(Feature::Embedded)
                  ? ManglingFlavor::Embedded
                  : ManglingFlavor::Default;
+  }
+
+  /// Create an ASTMangler suitable for mangling a USR for use in semantic
+  /// functionality.
+  static ASTMangler forUSR(const ASTContext &Ctx) {
+    return ASTMangler(Ctx, /*DWARFMangling*/ true, /*UseAPIMangling*/ true);
   }
 
   const ASTContext &getASTContext() { return Context; }
@@ -392,9 +407,8 @@ public:
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
   void appendAnyDecl(const ValueDecl *Decl);
-  std::string mangleAnyDecl(const ValueDecl *Decl, bool prefix,
-                            bool respectOriginallyDefinedIn = false);
-  std::string mangleDeclAsUSR(const ValueDecl *Decl, StringRef USRPrefix);
+  std::string mangleAnyDecl(const ValueDecl *decl, bool addPrefix);
+  std::string mangleDeclWithPrefix(const ValueDecl *decl, StringRef prefix);
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
                                         const AbstractStorageDecl *decl,
@@ -791,6 +805,28 @@ protected:
                                     const ValueDecl *forDecl);
 
   void appendLifetimeDependence(LifetimeDependenceInfo info);
+
+  void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
+                                     ParameterizedProtocolType *PPT) const;
+
+  /// Extracts a list of inverse requirements from a PCT serving as the
+  /// constraint type of an existential.
+  void extractExistentialInverseRequirements(
+      SmallVectorImpl<InverseRequirement> &inverses,
+      ProtocolCompositionType *PCT) const;
+
+  template <typename DeclType>
+  DeclType *getABIDecl(DeclType *D) const {
+    if (!D || UseAPIMangling)
+      return nullptr;
+
+    auto abiRole = ABIRoleInfo(D);
+    if (!abiRole.providesABI())
+      return abiRole.getCounterpart();
+    return nullptr;
+  }
+
+  std::optional<SymbolicReferent> getABIDecl(SymbolicReferent ref) const;
 };
 
 } // end namespace Mangle

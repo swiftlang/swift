@@ -620,6 +620,18 @@ bool SubstitutionMap::isIdentity() const {
 
 SubstitutionMap swift::substOpaqueTypesWithUnderlyingTypes(
     SubstitutionMap subs, TypeExpansionContext context) {
+  if (!context.shouldLookThroughOpaqueTypeArchetypes())
+    return subs;
+
+  if (!subs.getRecursiveProperties().hasOpaqueArchetype() &&
+      !llvm::any_of(subs.getConformances(),
+                    [&](ProtocolConformanceRef ref) {
+                      return (!ref.isInvalid() &&
+                              ref.getType()->hasOpaqueArchetype());
+                    })) {
+    return subs;
+  }
+
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());

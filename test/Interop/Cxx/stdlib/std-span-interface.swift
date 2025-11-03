@@ -9,6 +9,8 @@
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: std_span
 
+// REQUIRES: rdar163085444
+
 #if !BRIDGING_HEADER
 import StdSpan
 #endif

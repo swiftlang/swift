@@ -12,10 +12,10 @@ public func testIfAvailableEnabledDomain() {
   // CHECK:   cond_br [[PRED]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
 
   // CHECK: [[TRUE_BB]]:
-  // CHECK:   function_ref @available_in_enabled_domain
+  // CHECK:   function_ref @$sSo27available_in_enabled_domainyyFTo
 
   // CHECK: [[FALSE_BB]]:
-  // CHECK:   function_ref @unavailable_in_enabled_domain
+  // CHECK:   function_ref @$sSo29unavailable_in_enabled_domainyyFTo
   if #available(EnabledDomain) {
     available_in_enabled_domain()
   } else {
@@ -31,10 +31,10 @@ public func testIfUnavailableEnabledDomain() {
   // CHECK:   cond_br [[PRED]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
 
   // CHECK: [[TRUE_BB]]:
-  // CHECK:   function_ref @unavailable_in_enabled_domain
+  // CHECK:   function_ref @$sSo29unavailable_in_enabled_domainyyFTo
 
   // CHECK: [[FALSE_BB]]:
-  // CHECK:   function_ref @available_in_enabled_domain
+  // CHECK:   function_ref @$sSo27available_in_enabled_domainyyFTo
   if #unavailable(EnabledDomain) {
     unavailable_in_enabled_domain()
   } else {
@@ -50,10 +50,10 @@ public func testIfAvailableDisabledDomain() {
   // CHECK:   cond_br [[PRED]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
 
   // CHECK: [[TRUE_BB]]:
-  // CHECK:   function_ref @available_in_disabled_domain
+  // CHECK:   function_ref @$sSo28available_in_disabled_domainyyFTo
 
   // CHECK: [[FALSE_BB]]:
-  // CHECK:   function_ref @unavailable_in_disabled_domain
+  // CHECK:   function_ref @$sSo30unavailable_in_disabled_domainyyFTo
   if #available(DisabledDomain) {
     available_in_disabled_domain()
   } else {
@@ -69,10 +69,10 @@ public func testIfUnavailableDisabledDomain() {
   // CHECK:   cond_br [[PRED]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
 
   // CHECK: [[TRUE_BB]]:
-  // CHECK:   function_ref @unavailable_in_disabled_domain
+  // CHECK:   function_ref @$sSo30unavailable_in_disabled_domainyyFTo
 
   // CHECK: [[FALSE_BB]]:
-  // CHECK:   function_ref @available_in_disabled_domain
+  // CHECK:   function_ref @$sSo28available_in_disabled_domainyyFTo
   if #unavailable(DisabledDomain) {
     unavailable_in_disabled_domain()
   } else {
@@ -89,10 +89,10 @@ public func testIfAvailableDynamicDomain() {
   // CHECK:   cond_br [[QUERY_RESULT]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
 
   // CHECK: [[TRUE_BB]]:
-  // CHECK:   function_ref @available_in_dynamic_domain
+  // CHECK:   function_ref @$sSo27available_in_dynamic_domainyyFTo
 
   // CHECK: [[FALSE_BB]]:
-  // CHECK:   function_ref @unavailable_in_dynamic_domain
+  // CHECK:   function_ref @$sSo29unavailable_in_dynamic_domainyyFTo
   if #available(DynamicDomain) {
     available_in_dynamic_domain()
   } else {
@@ -103,7 +103,7 @@ public func testIfAvailableDynamicDomain() {
 
 // CHECK-LABEL: sil non_abi [serialized] [ossa] @$sSC33__swift_DynamicDomain_isAvailableBi1_yF : $@convention(thin) () -> Builtin.Int1
 // CHECK: bb0:
-// CHECK:   [[QUERY_FUNC:%.*]] = function_ref @__DynamicDomain_isAvailable : $@convention(c) () -> Bool
+// CHECK:   [[QUERY_FUNC:%.*]] = function_ref @$sSo27__DynamicDomain_isAvailableSbyFTo : $@convention(c) () -> Bool
 // CHECK:   [[QUERY_RESULT:%.*]] = apply [[QUERY_FUNC]]() : $@convention(c) () -> Bool
 // CHECK:   [[RESULT:%.*]] = struct_extract [[QUERY_RESULT]], #Bool._value
 // CHECK:   return [[RESULT]]
@@ -119,10 +119,10 @@ public func testIfUnavailableDynamicDomain() {
   // CHECK:   cond_br [[QUERY_INVERSION]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
 
   // CHECK: [[TRUE_BB]]:
-  // CHECK:   function_ref @unavailable_in_dynamic_domain
+  // CHECK:   function_ref @$sSo29unavailable_in_dynamic_domainyyFTo
 
   // CHECK: [[FALSE_BB]]:
-  // CHECK:   function_ref @available_in_dynamic_domain
+  // CHECK:   function_ref @$sSo27available_in_dynamic_domainyyFTo
   if #unavailable(DynamicDomain) {
     unavailable_in_dynamic_domain()
   } else {

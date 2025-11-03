@@ -77,11 +77,6 @@ enum class DiagnosticOptions {
 
   /// A diagnostic warning about an unused element.
   NoUsage,
-
-  /// The diagnostic should be ignored by default, but will be re-enabled
-  /// by various warning options (-Wwarning, -Werror). This only makes sense
-  /// for warnings.
-  DefaultIgnore,
 };
 struct StoredDiagnosticInfo {
   DiagnosticKind kind : 2;
@@ -90,17 +85,16 @@ struct StoredDiagnosticInfo {
   bool isAPIDigesterBreakage : 1;
   bool isDeprecation : 1;
   bool isNoUsage : 1;
-  bool defaultIgnore : 1;
   DiagGroupID groupID;
 
   constexpr StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken,
                                  bool fatal, bool isAPIDigesterBreakage,
                                  bool deprecation, bool noUsage,
-                                 bool defaultIgnore, DiagGroupID groupID)
+                                 DiagGroupID groupID)
       : kind(k), pointsToFirstBadToken(firstBadToken), isFatal(fatal),
         isAPIDigesterBreakage(isAPIDigesterBreakage),
         isDeprecation(deprecation), isNoUsage(noUsage),
-        defaultIgnore(defaultIgnore), groupID(groupID) {}
+        groupID(groupID) {}
   constexpr StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts,
                                  DiagGroupID groupID)
       : StoredDiagnosticInfo(k,
@@ -109,7 +103,6 @@ struct StoredDiagnosticInfo {
                              opts == DiagnosticOptions::APIDigesterBreakage,
                              opts == DiagnosticOptions::Deprecation,
                              opts == DiagnosticOptions::NoUsage,
-                             opts == DiagnosticOptions::DefaultIgnore,
                              groupID) {}
 };
 } // end anonymous namespace
@@ -154,14 +147,29 @@ static constexpr const char *const fixItStrings[] = {
 };
 
 DiagnosticState::DiagnosticState() {
-  // Initialize our ignored diagnostics to defaults
-  ignoredDiagnostics.reserve(NumDiagIDs);
-  for (const auto &info : storedDiagnosticInfos) {
-    ignoredDiagnostics.push_back(info.defaultIgnore);
-  }
+  // Initialize ignored diagnostic groups to defaults
+  ignoredDiagnosticGroups.resize(DiagGroupsCount);
+  // Ensure that for each `DefaultIgnoreWarnings` group,
+  // we propagate this behavior to its child groups.
+  for (const auto &groupInfo : diagnosticGroupsInfo)
+    if (groupInfo.defaultIgnoreWarnings)
+      getDiagGroupInfoByID(groupInfo.id).traverseDepthFirst([&](auto group) {
+        ignoredDiagnosticGroups[(unsigned)group.id] = true;
+      });
 
   // Initialize warningsAsErrors to default
   warningsAsErrors.resize(DiagGroupsCount);
+
+  // Initialize compilerIgnoredDiagnostics
+  compilerIgnoredDiagnostics.resize(NumDiagIDs);
+}
+
+bool DiagnosticState::isIgnoredDiagnosticGroupTree(DiagGroupID id) const {
+  bool anyEnabled = false;
+  getDiagGroupInfoByID(id).traverseDepthFirst([&](auto group) {
+    anyEnabled |= !isIgnoredDiagnosticGroup(group.id);
+  });
+  return !anyEnabled;
 }
 
 Diagnostic::Diagnostic(DiagID ID)
@@ -597,10 +605,8 @@ void DiagnosticEngine::setWarningsAsErrorsRules(
       if (auto groupID = getDiagGroupIDByName(name);
           groupID && *groupID != DiagGroupID::no_group) {
         getDiagGroupInfoByID(*groupID).traverseDepthFirst([&](auto group) {
-          state.setWarningsAsErrorsForDiagGroupID(*groupID, isEnabled);
-          for (DiagID diagID : group.diagnostics) {
-            state.setIgnoredDiagnostic(diagID, false);
-          }
+          state.setWarningsAsErrorsForDiagGroupID(group.id, isEnabled);
+          state.setIgnoredDiagnosticGroup(group.id, false);
         });
       } else {
         unknownGroups.push_back(std::string(name));
@@ -1343,14 +1349,16 @@ DiagnosticState::determineBehavior(const Diagnostic &diag) const {
     if (!showDiagnosticsAfterFatalError && lvl != DiagnosticBehavior::Note)
       lvl = DiagnosticBehavior::Ignore;
 
-  //   3) If the user ignored this specific diagnostic, follow that
-  if (ignoredDiagnostics[(unsigned)diag.getID()])
-    lvl = DiagnosticBehavior::Ignore;
+  // Handle compiler-internal ignored diagnostics
+  if (compilerIgnoredDiagnostics[(unsigned)diag.getID()])
+      lvl = DiagnosticBehavior::Ignore;
 
-  //   4) If the user substituted a different behavior for this behavior, apply
+  //   3) If the user substituted a different behavior for this warning, apply
   //      that change
   if (lvl == DiagnosticBehavior::Warning) {
-    if (getWarningsAsErrorsForDiagGroupID(diag.getGroupID()))
+    if (isIgnoredDiagnosticGroup(diag.getGroupID()))
+      lvl = DiagnosticBehavior::Ignore;
+    else if (getWarningsAsErrorsForDiagGroupID(diag.getGroupID()))
       lvl = DiagnosticBehavior::Error;
     if (suppressWarnings)
       lvl = DiagnosticBehavior::Ignore;

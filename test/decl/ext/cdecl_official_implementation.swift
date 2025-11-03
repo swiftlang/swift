@@ -1,12 +1,7 @@
 // RUN: %target-typecheck-verify-swift -target %target-stable-abi-triple \
 // RUN:   -import-bridging-header %S/Inputs/objc_implementation.h \
 // RUN:   -I %S/Inputs \
-// RUN:   -disable-objc-interop \
-// RUN:   -enable-experimental-feature CImplementation \
-// RUN:   -enable-experimental-feature CDecl
-
-// REQUIRES: swift_feature_CImplementation
-// REQUIRES: swift_feature_CDecl
+// RUN:   -disable-objc-interop
 
 import ToBeImplemented
 

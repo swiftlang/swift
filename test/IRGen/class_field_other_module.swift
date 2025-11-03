@@ -7,7 +7,7 @@
 
 import other_class
 
-// CHECK-LABEL: define {{(protected )?}}{{(dllexport )?}}swiftcc i32 @"$s24class_field_other_module12getSubclassXys5Int32V0c1_A00F0CF"(ptr{{( nocapture)?}} readonly{{( captures\(none\))?}} %0)
+// CHECK-LABEL: define {{(protected )?}}{{(dllexport )?}}swiftcc i32 @"$s24class_field_other_module12getSubclassXys5Int32V0c1_A00F0CF"(ptr readonly captures(none) %0)
 // CHECK-NEXT: entry:
 // An Int32 after the heap object header
 // CHECK-NEXT: [[GEP:%.*]] = getelementptr inbounds{{.*}} i8, ptr %0, i64 16
@@ -17,7 +17,7 @@ public func getSubclassX(_ o: Subclass) -> Int32 {
   return o.x
 }
 
-// CHECK-LABEL: define {{(protected )?}}{{(dllexport )?}}swiftcc i32 @"$s24class_field_other_module12getSubclassYys5Int32V0c1_A00F0CF"(ptr{{( nocapture)?}} readonly{{( captures\(none\))?}} %0)
+// CHECK-LABEL: define {{(protected )?}}{{(dllexport )?}}swiftcc i32 @"$s24class_field_other_module12getSubclassYys5Int32V0c1_A00F0CF"(ptr readonly captures(none) %0)
 // CHECK-NEXT: entry:
 // An Int32 after an Int32 after the heap object header
 // CHECK-NEXT: [[GEP:%.*]] = getelementptr inbounds{{.*}} i8, ptr %0, i64 20

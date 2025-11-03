@@ -40,6 +40,10 @@ namespace swift {
     using SerializedFuncTable =
       llvm::OnDiskIterableChainedHashTable<FuncTableInfo>;
 
+    class StringTableInfo;
+    using SerializedStringTable =
+      llvm::OnDiskIterableChainedHashTable<StringTableInfo>;
+
     //-----
     // Deserialization Caches
     //
@@ -82,6 +86,9 @@ namespace swift {
     MutableArrayRef<
         ModuleFile::PartiallySerialized<SILDifferentiabilityWitness *>>
         DifferentiabilityWitnesses;
+
+    /// asmname -> SIL entity name
+    std::unique_ptr<SerializedStringTable> AsmNameTable;
 
     //-----
     // End Deserialization Caches
@@ -133,6 +140,10 @@ namespace swift {
     std::unique_ptr<SerializedFuncTable>
     readFuncTable(ArrayRef<uint64_t> fields, StringRef blobData);
 
+    /// Read a string -> string mapping table.
+    std::unique_ptr<SerializedStringTable>
+    readStringTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
     /// When an instruction or block argument is defined, this method is used to
     /// register it and update our symbol table.
     void setLocalValue(ValueBase *Value, serialization::ValueID Id);
@@ -163,8 +174,9 @@ namespace swift {
     SILFunction *getFuncForReference(StringRef Name, bool forDebugScope = false);
     SILVTable *readVTable(serialization::DeclID);
     SILMoveOnlyDeinit *readMoveOnlyDeinit(serialization::DeclID);
-    SILGlobalVariable *getGlobalForReference(StringRef Name);
-    SILGlobalVariable *readGlobalVar(StringRef Name);
+    SILGlobalVariable *getGlobalForReference(StringRef Name,
+                                             bool byAsmName = false);
+    SILGlobalVariable *readGlobalVar(StringRef Name, bool byAsmName = false);
 
     /// Read and return the witness table identified with \p WId.
     SILWitnessTable *readWitnessTable(serialization::DeclID WId,
@@ -205,8 +217,10 @@ namespace swift {
     }
     SILFunction *lookupSILFunction(SILFunction *InFunc, bool onlyUpdateLinkage);
     SILFunction *lookupSILFunction(StringRef Name,
-                                   bool declarationOnly = false);
-    SILGlobalVariable *lookupSILGlobalVariable(StringRef Name);
+                                   bool declarationOnly = false,
+                                   bool byAsmName = false);
+    SILGlobalVariable *lookupSILGlobalVariable(StringRef Name,
+                                               bool byAsmName = false);
     bool hasSILFunction(StringRef Name,
                         std::optional<SILLinkage> Linkage = std::nullopt);
     SILVTable *lookupVTable(StringRef MangledClassName);

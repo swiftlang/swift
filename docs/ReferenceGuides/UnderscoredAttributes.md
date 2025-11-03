@@ -1117,12 +1117,6 @@ if it is never explicitly bound using a typed pointer method like
 bound, it must only be used with compatible typed memory accesses for as long
 as the binding is active.
 
-## `@_section("section_name")`
-
-Places a global variable or a top-level function into a section of the object
-file with the given name. It's the equivalent of clang's
-`__attribute__((section))`.
-
 ## `@_semantics("uniquely.recognized.id")`
 
 Allows the optimizer to make use of some key invariants in performance critical
@@ -1319,12 +1313,6 @@ for more details.
 ## `@_unsafeInheritExecutor`
 
 This `async` function uses the pre-SE-0338 semantics of unsafely inheriting the caller's executor.  This is an underscored feature because the right way of inheriting an executor is to pass in the required executor and switch to it.  Unfortunately, there are functions in the standard library which need to inherit their caller's executor but cannot change their ABI because they were not defined as `@_alwaysEmitIntoClient` in the initial release.
-
-## `@_used`
-
-Marks a global variable or a top-level function as "used externally" even if it
-does not have visible users in the compilation unit. It's the equivalent of
-clang's `__attribute__((used))`.
 
 ## `@_weakLinked`
 

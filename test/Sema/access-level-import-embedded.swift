@@ -17,10 +17,9 @@
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: embedded_stdlib_cross_compiling
 
-@_implementationOnly internal import directs
-// expected-warning @-1 {{using '@_implementationOnly' without enabling library evolution for 'main' may lead to instability during execution}}
-// expected-note @-2 19 {{struct 'StructFromDirect' imported as 'internal' from 'directs' here}}
-// expected-note @-3 12 {{initializer 'init()' imported as 'internal' from 'directs' here}}
+internal import directs
+// expected-note @-1 11 {{struct 'StructFromDirect' imported as 'internal' from 'directs' here}}
+// expected-note @-2 6 {{initializer 'init()' imported as 'internal' from 'directs' here}}
 import indirects
 
 internal func localInternalFunc() {} // expected-note {{global function 'localInternalFunc()' is not '@usableFromInline' or public}}
@@ -50,27 +49,23 @@ public func explicitlyInlinable(arg: StructFromDirect = StructFromDirect()) {
 
   explicitlyInlinable()
   implicitlyInlinablePublic()
-  implicitlyInlinablePrivate() // expected-error {{global function 'implicitlyInlinablePrivate(arg:)' is private and cannot be referenced from an '@inlinable' function}}
+  implicitlyInlinablePrivate() // expected-error {{global function 'implicitlyInlinablePrivate(arg:)' is internal and cannot be referenced from an '@inlinable' function}}
   explicitNonInliable()
 }
 
 public func implicitlyInlinablePublic(arg: StructFromDirect = StructFromDirect()) {
 // expected-error @-1 {{initializer 'init()' is internal and cannot be referenced from a default argument value}}
 // expected-error @-2 {{struct 'StructFromDirect' is internal and cannot be referenced from a default argument value}}
-// expected-error @-3 {{struct 'StructFromDirect' is internal and cannot be referenced from an embedded function not marked '@_neverEmitIntoClient'}}
-// expected-error @-4 {{function cannot be declared public because its parameter uses an internal type}}
-// expected-note @-5 {{struct 'StructFromDirect' is imported by this file as 'internal' from 'directs'}}
-  _ = StructFromDirect() // expected-error {{initializer 'init()' is internal and cannot be referenced from an embedded function not marked '@_neverEmitIntoClient'}}
-  // expected-error@-1 {{struct 'StructFromDirect' is internal and cannot be referenced from an embedded function not marked '@_neverEmitIntoClient'}}
+// expected-error @-3 {{function cannot be declared public because its parameter uses an internal type}}
+// expected-note @-4 {{struct 'StructFromDirect' is imported by this file as 'internal' from 'directs'}}
+  _ = StructFromDirect()
 
   if (true) {
-    _ = StructFromDirect() // expected-error {{initializer 'init()' is internal and cannot be referenced from an embedded function not marked '@_neverEmitIntoClient'}}
-    // expected-error@-1 {{struct 'StructFromDirect' is internal and cannot be referenced from an embedded function not marked '@_neverEmitIntoClient'}}
+    _ = StructFromDirect()
   }
 
   func nested() {
-    _ = StructFromDirect() // expected-error {{initializer 'init()' is internal and cannot be referenced from an embedded function not marked '@_neverEmitIntoClient'}}
-    // expected-error@-1 {{struct 'StructFromDirect' is internal and cannot be referenced from an embedded function not marked '@_neverEmitIntoClient'}}
+    _ = StructFromDirect()
   }
   nested()
 
@@ -82,20 +77,16 @@ public func implicitlyInlinablePublic(arg: StructFromDirect = StructFromDirect()
   explicitNonInliable()
 }
 
-private func implicitlyInlinablePrivate(arg: StructFromDirect = StructFromDirect()) {
-// expected-error @-1 {{struct 'StructFromDirect' is internal and cannot be referenced from an embedded function not marked '@_neverEmitIntoClient'}}
-// expected-note @-2 {{global function 'implicitlyInlinablePrivate(arg:)' is not '@usableFromInline' or public}}
-  _ = StructFromDirect() // expected-error {{initializer 'init()' is internal and cannot be referenced from an embedded function not marked '@_neverEmitIntoClient'}}
-  // expected-error@-1 {{struct 'StructFromDirect' is internal and cannot be referenced from an embedded function not marked '@_neverEmitIntoClient'}}
+internal func implicitlyInlinablePrivate(arg: StructFromDirect = StructFromDirect()) {
+// expected-note @-1 {{global function 'implicitlyInlinablePrivate(arg:)' is not '@usableFromInline' or public}}
+  _ = StructFromDirect()
 
   if (true) {
-    _ = StructFromDirect() // expected-error {{initializer 'init()' is internal and cannot be referenced from an embedded function not marked '@_neverEmitIntoClient'}}
-    // expected-error@-1 {{struct 'StructFromDirect' is internal and cannot be referenced from an embedded function not marked '@_neverEmitIntoClient'}}
+    _ = StructFromDirect()
   }
 
   func nested() {
-    _ = StructFromDirect() // expected-error {{initializer 'init()' is internal and cannot be referenced from an embedded function not marked '@_neverEmitIntoClient'}}
-    // expected-error@-1 {{struct 'StructFromDirect' is internal and cannot be referenced from an embedded function not marked '@_neverEmitIntoClient'}}
+    _ = StructFromDirect()
   }
   nested()
 
@@ -111,9 +102,8 @@ private func implicitlyInlinablePrivate(arg: StructFromDirect = StructFromDirect
 public func explicitNonInliable(arg: StructFromDirect = StructFromDirect()) {
 // expected-error @-1 {{initializer 'init()' is internal and cannot be referenced from a default argument value}}
 // expected-error @-2 {{struct 'StructFromDirect' is internal and cannot be referenced from a default argument value}}
-// expected-error @-3 {{cannot use struct 'StructFromDirect' here; 'directs' has been imported as implementation-only}}
-// expected-error @-4 {{function cannot be declared public because its parameter uses an internal type}}
-// expected-note @-5 {{struct 'StructFromDirect' is imported by this file as 'internal' from 'directs'}}
+// expected-error @-3 {{function cannot be declared public because its parameter uses an internal type}}
+// expected-note @-4 {{struct 'StructFromDirect' is imported by this file as 'internal' from 'directs'}}
   _ = StructFromDirect()
 
   if (true) {
@@ -171,12 +161,11 @@ public func legalAccessToIndirect(arg: StructFromIndirect = StructFromIndirect()
 
 public struct ExposedLayoutPublic {
   public var publicField: StructFromDirect // expected-error {{property cannot be declared public because its type uses an internal type}}
-  // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
-  // expected-note @-2 {{struct 'StructFromDirect' is imported by this file as 'internal' from 'directs'}}
+  // expected-note @-1 {{struct 'StructFromDirect' is imported by this file as 'internal' from 'directs'}}
 
-  private var privateField: StructFromDirect
+  internal var privateField: StructFromDirect
 }
 
-private struct ExposedLayoutPrivate {
-  private var privateField: StructFromDirect
+internal struct ExposedLayoutPrivate {
+  internal var privateField: StructFromDirect
 }

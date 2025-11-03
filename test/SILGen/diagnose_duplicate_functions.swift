@@ -11,11 +11,11 @@ func b(_ x: Int) -> Int { // expected-error {{multiple definitions of symbol 'fo
 }
 
 @_cdecl("bar")
-func c(_ x: Int) -> Int { // expected-note {{other definition here}}
+func c(_ x: Int) -> Int { // duplication only detected at the LLVM IR level
   return x
 }
 
 @_cdecl("bar")
-func d(_ x: Int) -> Int { // expected-error {{multiple definitions of symbol 'bar'}}
+func d(_ x: Int) -> Int { // duplication only detected at the LLVM IR level
   return x
 }

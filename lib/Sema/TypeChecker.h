@@ -95,9 +95,14 @@ class LookupTypeResult {
   SmallVector<LookupTypeResultEntry, 4> Results;
 
 public:
+  using const_iterator = SmallVectorImpl<LookupTypeResultEntry>::const_iterator;
+  const_iterator begin() const { return Results.begin(); }
+  const_iterator end() const { return Results.end(); }
+
   using iterator = SmallVectorImpl<LookupTypeResultEntry>::iterator;
   iterator begin() { return Results.begin(); }
   iterator end() { return Results.end(); }
+
   unsigned size() const { return Results.size(); }
 
   LookupTypeResultEntry operator[](unsigned index) const {
@@ -297,6 +302,44 @@ public:
   }
 
   CheckRequirementsResult getKind() const { return Kind; }
+};
+
+/// Helper type for diagnosing a lookup that failed merely because it was
+/// restricted by a module selector.
+///
+/// To use this, perform the lookup again without its module selector and
+/// construct a \c ModuleSelectorCorrection from the lookup result. If
+/// there are any results, the \c diagnose() method will emit an error and a
+/// set of fix-it notes.
+class ModuleSelectorCorrection {
+  enum class CandidateKind {
+    /// A declaration that is found without depending on context.
+    /// Usually either a top-level type or a member with an explicit base type.
+    ContextFree,
+    /// A member declaration accessed via implicit \c self .
+    MemberViaSelf,
+    /// A member declaration not accessed via implicit \c self (usually a static
+    /// member of an enclosing type).
+    MemberViaContext,
+    /// A local declaration.
+    Local
+  };
+
+  using CandidateModule = std::pair<Identifier, CandidateKind>;
+  SmallSetVector<CandidateModule, 4> candidateModules;
+
+public:
+  ModuleSelectorCorrection(const LookupResult &candidates);
+  ModuleSelectorCorrection(const LookupTypeResult &candidates);
+  ModuleSelectorCorrection(const SmallVectorImpl<ValueDecl *> &candidates);
+  ModuleSelectorCorrection(const SmallVectorImpl<constraints::OverloadChoice> &candidates);
+
+  /// Emit an error and warnings if there were any candidates.
+  ///
+  /// \returns \c true if an error was diagnosed.
+  bool diagnose(ASTContext &ctx,
+                DeclNameLoc nameLoc,
+                DeclNameRef originalName) const;
 };
 
 /// Describes the kind of checked cast operation being performed.

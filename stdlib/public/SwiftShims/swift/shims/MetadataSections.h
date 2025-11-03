@@ -58,24 +58,15 @@ struct MetadataSections {
   /// symbol in the image that contains these sections.
   ///
   /// For Mach-O images, set this field to \c __dso_handle (i.e. the Mach header
-  /// for the image.) For ELF images, set it to \c __dso_handle (the runtime
-  /// will adjust it to the start of the ELF image when the image is loaded.)
-  /// For COFF images, set this field to \c __ImageBase.
+  /// for the image.) For ELF images, set it to \c __ehdr_start. For COFF
+  /// images, set this field to \c __ImageBase.
   ///
   /// For platforms that have a single statically-linked image or no dynamic
-  /// loader (i.e. no equivalent of \c __dso_handle or \c __ImageBase), this
-  /// field is ignored and should be set to \c nullptr.
-  ///
-  /// \bug When imported into Swift, this field is not atomic.
+  /// loader (i.e. no equivalent of \c __dso_handle, \c __ehdr_start, or
+  /// \c __ImageBase), this field is ignored and should be set to \c nullptr.
   ///
   /// \sa swift_addNewDSOImage()
-#if defined(__swift__) || defined(__STDC_NO_ATOMICS__)
   const void *baseAddress;
-#elif defined(__cplusplus)
-  std::atomic<const void *> baseAddress;
-#else
-  _Atomic(const void *) baseAddress;
-#endif
 
   /// Unused.
   ///

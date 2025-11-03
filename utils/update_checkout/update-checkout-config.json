@@ -191,7 +191,7 @@
                 "zlib": "v1.3.1",
                 "brotli": "v1.1.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.2"
+                "swift-subprocess": "0.2.1"
             }
         },
         "release/6.2": {
@@ -623,7 +623,7 @@
                 "zlib": "v1.3.1",
                 "brotli": "v1.1.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.2"
+                "swift-subprocess": "0.2.1"
             }
         },
         "next" : {
@@ -684,7 +684,7 @@
                 "zlib": "v1.3.1",
                 "brotli": "v1.1.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.2"
+                "swift-subprocess": "0.2.1"
             }
         }
     }

@@ -90,9 +90,9 @@ testSwiftClassInClass()
 #endif
 
 // SIL-LABEL: @$s8SwiftMod04testa14ClassFromCxxInA0yyF : $@convention(thin) () -> ()
-// SIL: function_ref @{{_Z21createSwiftClassInCxxv|"\?createSwiftClassInCxx@@YA?AVExposedToCxx@SwiftMod@@XZ"}} : $@convention(c) () -> @owned ExposedToCxx
+// SIL: function_ref @$sSo21createSwiftClassInCxx0B3Mod09ExposedToE0CyFTo : $@convention(c) () -> @owned ExposedToCxx
 // SIL: apply {{.*}} : $@convention(c) () -> @owned ExposedToCxx
-// SIL: function_ref @{{_Z19passSwiftClassToCxxN8SwiftMod12ExposedToCxxE|"\?passSwiftClassToCxx@@YAXVExposedToCxx@SwiftMod@@@Z"}} : $@convention(c) (@in_guaranteed ExposedToCxx) -> ()
+// SIL: function_ref @$sSo19passSwiftClassToCxxyy0B3Mod07ExposeddE0CFTo : $@convention(c) (@in_guaranteed ExposedToCxx) -> ()
 // SIL: apply {{.*}} : $@convention(c) (@in_guaranteed ExposedToCxx) -> ()
 
 // SIL-LABEL: @$s8SwiftMod04testa7ClassInD0yyF : $@convention(thin) () -> () {

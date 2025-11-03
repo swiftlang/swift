@@ -377,6 +377,16 @@ def pch_output_dir: Separate<["-"], "pch-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Directory to persist automatically created precompiled bridging headers">;
 
+def sil_output_dir: Separate<["-"], "sil-output-dir">,
+  Flags<[ArgumentIsPath, SupplementaryOutput]>,
+  HelpText<"Output SIL files to directory <dir> as additional output during compilation">,
+  MetaVarName<"<dir>">;
+
+def ir_output_dir: Separate<["-"], "ir-output-dir">,
+  Flags<[ArgumentIsPath, SupplementaryOutput]>,
+  HelpText<"Output LLVM IR files to directory <dir> as additional output during compilation">,
+  MetaVarName<"<dir>">;
+
 def auto_bridging_header_chaining: Flag<["-"], "auto-bridging-header-chaining">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Automatically chaining all the bridging headers">;
@@ -2274,6 +2284,10 @@ def experimental_clang_importer_direct_cc1_scan:
 def cache_compile_job:  Flag<["-"], "cache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Enable compiler caching">;
+
+def no_cache_compile_job:  Flag<["-"], "no-cache-compile-job">,
+  Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
+  HelpText<"Disable compiler caching">;
 
 def cache_remarks:  Flag<["-"], "Rcache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,

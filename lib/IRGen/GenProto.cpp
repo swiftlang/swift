@@ -3761,8 +3761,8 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
 
   // Look through any opaque types we're allowed to.
   if (srcType->hasOpaqueArchetype()) {
-    std::tie(srcType, conformance) =
-      IGF.IGM.substOpaqueTypesWithUnderlyingTypes(srcType, conformance);
+    srcType = IGF.IGM.substOpaqueTypesWithUnderlyingTypes(srcType);
+    conformance = IGF.IGM.substOpaqueTypesWithUnderlyingTypes(conformance);
   }
   
   // If we don't have concrete conformance information, the type must be

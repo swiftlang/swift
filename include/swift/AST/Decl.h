@@ -1134,8 +1134,7 @@ public:
   /// Returns the active `@backDeployed` attribute and the `AvailabilityRange`
   /// in which the decl is available as ABI.
   std::optional<std::pair<const BackDeployedAttr *, AvailabilityRange>>
-  getBackDeployedAttrAndRange(ASTContext &Ctx,
-                              bool forTargetVariant = false) const;
+  getBackDeployedAttrAndRange(bool forTargetVariant = false) const;
 
   /// Returns true if the decl has a valid and active `@backDeployed` attribute.
   bool isBackDeployed() const;
@@ -3072,11 +3071,10 @@ public:
     return Name.getBaseIdentifier();
   }
 
-  /// Generates a DeclNameRef referring to this declaration with as much
-  /// specificity as possible.
-  DeclNameRef createNameRef() const {
-    return DeclNameRef(Name);
-  }
+  /// Generates a DeclNameRef referring to this declaration.
+  ///
+  /// \param moduleSelector If true, the name ref includes the module name.
+  DeclNameRef createNameRef(bool moduleSelector = false) const;
 
   /// Retrieve the C declaration name that names this function, or empty
   /// string if it has none.
@@ -8119,15 +8117,6 @@ public:
     return getBodyKind() == BodyKind::SILSynthesize &&
            getSILSynthesizeKind() == SILSynthesizeKind::DistributedActorFactory;
   }
-
-  /// Return a vector of distributed requirements that this distributed method
-  /// is implementing.
-  ///
-  /// If the method is witness to multiple requirements this is incorrect and
-  /// should be diagnosed during type-checking as it may make remoteCalls
-  /// ambiguous.
-  llvm::ArrayRef<ValueDecl *>
-  getDistributedMethodWitnessedProtocolRequirements() const;
 
   /// Determines whether this function is a 'remoteCall' function,
   /// which is used as ad-hoc protocol requirement by the

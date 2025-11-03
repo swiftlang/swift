@@ -18,7 +18,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AvailabilityDomain.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1323,7 +1322,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DeclAttrKind::Section:
-    Printer.printAttrName("@_section");
+    Printer.printAttrName("@section");
     Printer << "(\"" << cast<SectionAttr>(this)->Name << "\")";
     break;
 
@@ -1977,7 +1976,7 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::Expose:
     return "_expose";
   case DeclAttrKind::Section:
-    return "_section";
+    return "section";
   case DeclAttrKind::Documentation:
     return "_documentation";
   case DeclAttrKind::Nonisolated:
@@ -3274,11 +3273,11 @@ bool MacroRoleAttr::hasNameKind(MacroIntroducedDeclNameKind kind) const {
   }) != getNames().end();
 }
 
-StringRef ExternAttr::getCName(const FuncDecl *D) const {
+StringRef ExternAttr::getCName(const ValueDecl *D) const {
   if (auto cName = this->Name)
     return cName.value();
   // If no name was specified, fall back on the Swift base name without mangling.
-  // Base name is always available and non-empty for FuncDecl.
+  // Base name is always available and non-empty for functions and variables.
   return D->getBaseIdentifier().str();
 }
 

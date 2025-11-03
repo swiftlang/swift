@@ -1248,7 +1248,11 @@ suite.test("String index debugDescription backdeployment") {
     str.startIndex.debugDescription == "0[any]" ||
     str.startIndex.debugDescription == "0[unknown]"
   )
-  expectEqual(str.endIndex.debugDescription, "3[utf8]")
+  // Result can be `utf8` or `unknown` depending on inlining behavior
+  expectTrue(
+    str.endIndex.debugDescription == "3[utf8]" ||
+    str.endIndex.debugDescription == "3[unknown]"
+  )
 }
 
 

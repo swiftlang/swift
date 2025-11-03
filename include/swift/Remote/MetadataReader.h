@@ -457,18 +457,20 @@ public:
         swift::Demangle::NodePointer {
       // Resolve the reference to a remote address.
       auto offsetInMangledName =
-            (const char *)base - mangledName.getLocalBuffer();
-      auto remoteAddress =
-          mangledName.getRemoteAddress() + offsetInMangledName + offset;
+          (const char *)base - mangledName.getLocalBuffer();
+      auto offsetAddress = mangledName.getRemoteAddress() + offsetInMangledName;
 
       RemoteAbsolutePointer resolved;
       if (directness == Directness::Indirect) {
+        auto remoteAddress = Reader->resolveIndirectAddressAtOffset(
+            offsetAddress, offset, /*directnessEncodedInOffset=*/false);
         if (auto indirectAddress = readPointer(remoteAddress)) {
           resolved = stripSignedPointer(*indirectAddress);
         } else {
           return nullptr;
         }
       } else {
+        auto remoteAddress = offsetAddress + offset;
         resolved = Reader->getSymbol(remoteAddress);
       }
 
@@ -2084,17 +2086,19 @@ protected:
     
     using SignedPointer = typename std::make_signed<StoredPointer>::type;
 
-    RemoteAddress resultAddress = getAddress(fieldRef) + (SignedPointer)offset;
-
     // Low bit set in the offset indicates that the offset leads to the absolute
     // address in memory.
     if (indirect) {
+      RemoteAddress resultAddress = Reader->resolveIndirectAddressAtOffset(
+          getAddress(fieldRef), (SignedPointer)offset,
+          /*directnessEncodedInOffset=*/true);
       if (auto ptr = readPointer(resultAddress)) {
         return stripSignedPointer(*ptr);
       }
       return std::nullopt;
     }
 
+    RemoteAddress resultAddress = getAddress(fieldRef) + (SignedPointer)offset;
     return RemoteAbsolutePointer(resultAddress);
   }
 

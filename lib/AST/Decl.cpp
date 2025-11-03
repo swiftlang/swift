@@ -597,32 +597,31 @@ Decl::getIntroducedOSVersion(PlatformKind Kind) const {
 }
 
 std::optional<std::pair<const BackDeployedAttr *, AvailabilityRange>>
-Decl::getBackDeployedAttrAndRange(ASTContext &Ctx,
-                                  bool forTargetVariant) const {
-  if (auto *attr = getAttrs().getBackDeployed(Ctx, forTargetVariant)) {
-    auto version = attr->getVersion();
-    AvailabilityDomain ignoredDomain;
-    AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
-        attr, getASTContext(), ignoredDomain, version);
+Decl::getBackDeployedAttrAndRange(bool forTargetVariant) const {
+  auto &ctx = getASTContext();
+  if (auto *attr = getAttrs().getBackDeployed(ctx, forTargetVariant)) {
+    auto remappedDomainAndRange =
+        attr->getAvailabilityDomain().getRemappedDomainAndRange(
+            attr->getVersion(), AvailabilityVersionKind::Introduced, ctx);
 
-    // If the remap for fallback resulted in 1.0, then the
-    // backdeployment prior to that is not meaningful.
-    if (version == llvm::VersionTuple(1, 0, 0, 0))
+    // If the before version was remapped to '1.0', then this decl has
+    // effectively always been available on the current platform and does not
+    // qualify as back deployed.
+    if (remappedDomainAndRange.getRange().getRawMinimumVersion() ==
+        llvm::VersionTuple(1, 0, 0, 0))
       return std::nullopt;
 
-    return std::make_pair(attr, AvailabilityRange(version));
+    return std::make_pair(attr, remappedDomainAndRange.getRange());
   }
 
   // Accessors may inherit `@backDeployed`.
   if (auto *AD = dyn_cast<AccessorDecl>(this))
-    return AD->getStorage()->getBackDeployedAttrAndRange(Ctx, forTargetVariant);
+    return AD->getStorage()->getBackDeployedAttrAndRange(forTargetVariant);
 
   return std::nullopt;
 }
 
 bool Decl::isBackDeployed() const {
-  auto &Ctx = getASTContext();
-
   // A function declared in a local context can never be back-deployed.
   if (getDeclContext()->isLocalContext())
     return false;
@@ -636,11 +635,11 @@ bool Decl::isBackDeployed() const {
       return false;
   }
 
-  if (getBackDeployedAttrAndRange(Ctx))
+  if (getBackDeployedAttrAndRange())
     return true;
 
-  if (Ctx.LangOpts.TargetVariant) {
-    if (getBackDeployedAttrAndRange(Ctx, /*forTargetVariant=*/true))
+  if (getASTContext().LangOpts.TargetVariant) {
+    if (getBackDeployedAttrAndRange(/*forTargetVariant=*/true))
       return true;
   }
 
@@ -1342,7 +1341,7 @@ bool AbstractStorageDecl::isCompileTimeLiteral() const {
 }
 
 bool AbstractStorageDecl::isConstValue() const {
-  return getAttrs().hasAttribute<ConstValAttr>();
+  return getAttrs().hasAttribute<ConstValAttr>() || getAttrs().hasAttribute<SectionAttr>();
 }
 
 bool AbstractStorageDecl::isTransparent() const {
@@ -1482,7 +1481,7 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
 
   // When computing availability for linkage, use the "before" version from
   // the @backDeployed attribute, if present.
-  if (auto backDeployedAttrAndRange = getBackDeployedAttrAndRange(ctx))
+  if (auto backDeployedAttrAndRange = getBackDeployedAttrAndRange())
     return backDeployedAttrAndRange->second;
 
   auto containingContext = AvailabilityInference::annotatedAvailableRange(this);
@@ -2935,6 +2934,14 @@ SourceRange TopLevelCodeDecl::getSourceRange() const {
   return Body? Body->getSourceRange() : SourceRange();
 }
 
+DeclNameRef ValueDecl::createNameRef(bool moduleSelector) const {
+  if (moduleSelector)
+    return DeclNameRef(getASTContext(), getModuleContext()->getName(),
+                       getName());
+
+  return DeclNameRef(getName());
+}
+
 static bool isPolymorphic(const AbstractStorageDecl *storage) {
   if (storage->shouldUseObjCDispatch())
     return true;
@@ -3264,6 +3271,10 @@ static AccessStrategy getOpaqueReadAccessStrategy(
     return AccessStrategy::getAccessor(AccessorKind::Read2, dispatch);
   if (storage->requiresOpaqueReadCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
+
+  if (storage->getParsedAccessor(AccessorKind::Borrow)) {
+    return AccessStrategy::getAccessor(AccessorKind::Borrow, dispatch);
+  }
   return AccessStrategy::getAccessor(AccessorKind::Get, dispatch);
 }
 
@@ -3435,11 +3446,6 @@ bool AbstractStorageDecl::requiresOpaqueSetter() const {
   if (!supportsMutation()) {
     return false;
   }
-
-  // If a mutate accessor is present, we don't need a setter.
-  if (getAccessor(AccessorKind::Mutate)) {
-    return false;
-  }
   return true;
 }
 
@@ -3450,7 +3456,7 @@ bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
         AccessorKind::Read2);
 
   // If a borrow accessor is present, we don't need a read coroutine.
-  if (getAccessor(AccessorKind::Borrow)) {
+  if (getParsedAccessor(AccessorKind::Borrow)) {
     return false;
   }
   return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
@@ -3462,7 +3468,7 @@ bool AbstractStorageDecl::requiresOpaqueRead2Coroutine() const {
     return false;
 
   // If a borrow accessor is present, we don't need a read coroutine.
-  if (getAccessor(AccessorKind::Borrow)) {
+  if (getParsedAccessor(AccessorKind::Borrow)) {
     return false;
   }
   return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
@@ -5567,10 +5573,18 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
     access = AccessLevel::FilePrivate;
 
   // Only certain declarations can be 'open'.
-  if (access == AccessLevel::Open && !isSyntacticallyOverridable()) {
-    assert(!isa<ClassDecl>(this) &&
-           "copying 'open' onto a class has complications");
-    access = AccessLevel::Public;
+  if (access == AccessLevel::Open) {
+    auto classDecl = dyn_cast<ClassDecl>(source);
+    if (classDecl && classDecl->isDistributedActor()) {
+      // don't copy 'public'; an 'open distributed actor' is illegal to begin with
+      return;
+    }
+
+    if (!isSyntacticallyOverridable()) {
+      assert(!isa<ClassDecl>(this) &&
+             "copying 'open' onto a class has complications");
+      access = AccessLevel::Public;
+    }
   }
 
   setAccess(access);
@@ -7595,7 +7609,7 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
   case AccessorKind::Init:
     return article ? "an init accessor" : "init accessor";
   case AccessorKind::Borrow:
-    return article ? " a 'borrow' accessor" : "borrow accessor";
+    return article ? "a 'borrow' accessor" : "borrow accessor";
   case AccessorKind::Mutate:
     return article ? "a 'mutate' accessor" : "mutate accessor";
   }

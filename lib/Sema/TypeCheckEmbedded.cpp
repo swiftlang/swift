@@ -17,6 +17,7 @@
 #include "TypeCheckEmbedded.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/Expr.h"
@@ -46,11 +47,11 @@ swift::shouldDiagnoseEmbeddedLimitations(const DeclContext *dc, SourceLoc loc,
     return defaultEmbeddedLimitationForError(dc, loc);
   }
 
-  // Check one of the Embedded restriction diagnostics that is ignored by
-  // default. If it's still ignored, we won't diagnose anything.
-  // limitations.
+  // Check if the Embedded restriction diagnostics, which are ignored by
+  // default, have been enabled. If it's still ignored, we won't diagnose
+  // anything. limitations.
   auto &diags = dc->getASTContext().Diags;
-  if (diags.isIgnoredDiagnostic(diag::untyped_throws_in_embedded_swift.ID))
+  if (diags.isIgnoredDiagnosticGroup(DiagGroupID::EmbeddedRestrictions))
     return std::nullopt;
 
 #if SWIFT_BUILD_SWIFT_SYNTAX

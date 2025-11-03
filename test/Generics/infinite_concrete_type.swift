@@ -56,3 +56,13 @@ protocol TooManyDifferences {
   associatedtype B
   associatedtype C
 }
+
+struct G2<T> {
+    func f2<each A>()
+// expected-error@-1 {{cannot build rewrite system for generic signature; concrete type nesting limit exceeded}}
+// expected-note@-2 {{failed rewrite rule is }}
+// expected-error@-3 {{generic parameter 'A' is not used in function signature}}
+  where (repeat each A, T) == T {}
+// expected-error@-1 {{tuple with noncopyable element type 'repeat each A' is not supported}}
+
+}

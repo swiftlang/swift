@@ -161,3 +161,66 @@ func useCallerIsolatedDefaultArg() async {
 // CHECK:         // function_ref default argument 0 of
 // CHECK-NEXT:    [[GEN:%.*]] = function_ref @$s4test24callerIsolatedDefaultArg1xySi_tYaFfA_ :
 // CHECK-NEXT:    [[ARG:%.*]] = apply [[GEN]]()
+
+// The following tests failed due to a book-keeping error when processing delayed
+// isolated arguments in methods with:
+//
+//  - a `self` parameter
+//  - delayed arguments that expanded to zero or greater than one value
+//  - a subsequent delayed argument
+//
+// https://github.com/swiftlang/swift/issues/84647
+
+@MainActor
+enum E {
+  static func tupleIsolatedDefaultArgStatic(
+    _: Int,
+    x: Int = main_actor_int_x(),
+    // need not be isolated defaults
+    tup: (Int, Int) = (1, 2),
+    i: Int = 0
+  ) {}
+
+  static func voidIsolatedDefaultArgStatic(
+    _: Int,
+    v: Void = main_actor_void(),
+    // need not be isolated defaults
+    tup: (Int, Int) = (1, 2),
+    i: Int = 0
+  ) {}
+}
+
+func testTupleIsolatedDefaultArgStatic() async {
+  await E.tupleIsolatedDefaultArgStatic(0)
+}
+
+func testVoidIsolatedDefaultArgStatic() async {
+  await E.voidIsolatedDefaultArgStatic(0)
+}
+
+@MainActor
+final class Klazz {
+  func tupleIsolatedDefaultArgInstanceMethod(
+    _: Int,
+    x: Int = main_actor_int_x(),
+    // need not be isolated defaults
+    tup: (Int, Int) = (1, 2),
+    i: Int = 0
+  ) {}
+
+  func voidIsolatedDefaultArgInstanceMethod(
+    _: Int,
+    v: Void = main_actor_void(),
+    // need not be isolated defaults
+    tup: (Int, Int) = (1, 2),
+    i: Int = 0
+  ) {}
+}
+
+func testTupleIsolatedDefaultArgInstanceMethod(_ klazz: Klazz) async {
+  await klazz.tupleIsolatedDefaultArgInstanceMethod(0)
+}
+
+func testVoidIsolatedDefaultArgInstanceMethod(_ klazz: Klazz) async {
+  await klazz.voidIsolatedDefaultArgInstanceMethod(0)
+}

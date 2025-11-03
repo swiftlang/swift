@@ -156,6 +156,48 @@ public:
   }
 };
 
+/// Used to deserialize string -> string mappings in on-disk hash tables.
+class SILDeserializer::StringTableInfo {
+public:
+  using internal_key_type = StringRef;
+  using external_key_type = internal_key_type;
+  using data_type = StringRef;
+  using hash_value_type = uint32_t;
+  using offset_type = uint32_t;
+
+  internal_key_type GetInternalKey(external_key_type ID) { return ID; }
+
+  external_key_type GetExternalKey(internal_key_type ID) { return ID; }
+
+  hash_value_type ComputeHash(internal_key_type key) {
+    return llvm::djbHash(key, SWIFTMODULE_HASH_SEED);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    offset_type keyLength =
+        llvm::support::endian::readNext<offset_type, llvm::endianness::little,
+                                        llvm::support::unaligned>(data);
+    offset_type dataLength =
+        llvm::support::endian::readNext<offset_type, llvm::endianness::little,
+                                        llvm::support::unaligned>(data);
+
+    return { keyLength, dataLength };
+  }
+
+  internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    return internal_key_type((const char *)data, length);
+  }
+
+  static data_type ReadData(internal_key_type key, const uint8_t *data,
+                            unsigned length) {
+    return data_type((const char *)data, length);
+  }
+};
+
 SILDeserializer::SILDeserializer(
     ModuleFile *MF, SILModule &M,
     DeserializationNotificationHandlerSet *callback)
@@ -195,10 +237,11 @@ SILDeserializer::SILDeserializer(
              kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES ||
              kind == sil_index_block::SIL_DEFAULT_OVERRIDE_TABLE_NAMES ||
              kind == sil_index_block::SIL_PROPERTY_OFFSETS ||
-             kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES)) &&
+             kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES ||
+             kind == sil_index_block::SIL_ASM_NAMES)) &&
            "Expect SIL_FUNC_NAMES, SIL_VTABLE_NAMES, SIL_GLOBALVAR_NAMES, \
           SIL_WITNESS_TABLE_NAMES, SIL_DEFAULT_WITNESS_TABLE_NAMES, \
-          SIL_PROPERTY_OFFSETS, SIL_MOVEONLYDEINIT_NAMES, or SIL_DIFFERENTIABILITY_WITNESS_NAMES.");
+          SIL_PROPERTY_OFFSETS, SIL_MOVEONLYDEINIT_NAMES, SIL_DIFFERENTIABILITY_WITNESS_NAMES, or SIL_ASM_NAMES.");
     (void)prevKind;
 
     if (kind == sil_index_block::SIL_FUNC_NAMES)
@@ -217,10 +260,14 @@ SILDeserializer::SILDeserializer(
       DefaultOverrideTableList = readFuncTable(scratch, blobData);
     else if (kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES)
       DifferentiabilityWitnessList = readFuncTable(scratch, blobData);
-    else if (kind == sil_index_block::SIL_PROPERTY_OFFSETS) {
+    else if (kind == sil_index_block::SIL_ASM_NAMES) {
+      // No matching offset block.
+      AsmNameTable = readStringTable(scratch, blobData);
+      continue;
+    } else if (kind == sil_index_block::SIL_PROPERTY_OFFSETS) {
       // No matching 'names' block for property descriptors needed yet.
       MF->allocateBuffer(Properties, scratch);
-      return;
+      continue;
     }
 
     // Read SIL_FUNC|VTABLE|GLOBALVAR_OFFSETS record.
@@ -285,6 +332,19 @@ SILDeserializer::readFuncTable(ArrayRef<uint64_t> fields, StringRef blobData) {
                                                 base + sizeof(uint32_t), base,
                                                 FuncTableInfo(*MF)));
 }
+
+std::unique_ptr<SILDeserializer::SerializedStringTable>
+SILDeserializer::readStringTable(ArrayRef<uint64_t> fields, StringRef blobData){
+  uint32_t tableOffset;
+  sil_index_block::ListLayout::readRecord(fields, tableOffset);
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+  using OwnedTable = std::unique_ptr<SerializedStringTable>;
+  return OwnedTable(SerializedStringTable::Create(base + tableOffset,
+                                                  base + sizeof(uint32_t), base,
+                                                  StringTableInfo()));
+}
+
 
 /// A high-level overview of how forward references work in serializer and
 /// deserializer:
@@ -625,9 +685,10 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name,
 /// Helper function to find a SILGlobalVariable given its name. It first checks
 /// in the module. If we cannot find it in the module, we attempt to
 /// deserialize it.
-SILGlobalVariable *SILDeserializer::getGlobalForReference(StringRef name) {
+SILGlobalVariable *
+SILDeserializer::getGlobalForReference(StringRef name, bool byAsmName) {
   // Check to see if we have a global by this name already.
-  if (SILGlobalVariable *g = SILMod.lookUpGlobalVariable(name))
+  if (SILGlobalVariable *g = SILMod.lookUpGlobalVariable(name, byAsmName))
     return g;
 
   // Otherwise, look for a global with this name in the module.
@@ -4042,7 +4103,21 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
 }
 
 SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
-                                                bool declarationOnly) {
+                                                bool declarationOnly,
+                                                bool byAsmName) {
+  // If we're looking up the function by its AsmName, check that table.
+  if (byAsmName) {
+    if (!AsmNameTable)
+      return nullptr;
+
+    auto iter = AsmNameTable->find(name);
+    if (iter == AsmNameTable->end())
+      return nullptr;
+
+    // Now look for this name in the function table.
+    name = *iter;
+  }
+
   if (!FuncTable)
     return nullptr;
   auto iter = FuncTable->find(name);
@@ -4066,11 +4141,26 @@ SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
   return maybeFunc.get();
 }
 
-SILGlobalVariable *SILDeserializer::lookupSILGlobalVariable(StringRef name) {
-  return getGlobalForReference(name);
+SILGlobalVariable *SILDeserializer::lookupSILGlobalVariable(StringRef name,
+                                                            bool byAsmName) {
+  return getGlobalForReference(name, byAsmName);
 }
 
-SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
+SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
+                                                  bool byAsmName) {
+  // If we're looking up the variable by its AsmName, check that table.
+  if (byAsmName) {
+    if (!AsmNameTable)
+      return nullptr;
+
+    auto iter = AsmNameTable->find(Name);
+    if (iter == AsmNameTable->end())
+      return nullptr;
+
+    // Now look for this name in the global variable table.
+    Name = *iter;
+  }
+
   if (!GlobalVarList)
     return nullptr;
 

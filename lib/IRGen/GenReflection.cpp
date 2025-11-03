@@ -583,8 +583,7 @@ std::pair<llvm::Constant *, unsigned>
 IRGenModule::getLoweredTypeRef(SILType loweredType,
                                CanGenericSignature genericSig,
                                MangledTypeRefRole role) {
-  auto substTy =
-    substOpaqueTypesWithUnderlyingTypes(loweredType, genericSig);
+  auto substTy = substOpaqueTypesWithUnderlyingTypes(loweredType);
   auto type = substTy.getASTType();
   return getTypeRefImpl(*this, type, genericSig, role);
 }
@@ -600,8 +599,8 @@ IRGenModule::emitWitnessTableRefString(CanType type,
                                       ProtocolConformanceRef conformance,
                                       GenericSignature origGenericSig,
                                       bool shouldSetLowBit) {
-  std::tie(type, conformance)
-    = substOpaqueTypesWithUnderlyingTypes(type, conformance);
+  type = substOpaqueTypesWithUnderlyingTypes(type);
+  conformance = substOpaqueTypesWithUnderlyingTypes(conformance);
   
   auto origType = type;
   auto genericSig = origGenericSig.getCanonicalSignature();

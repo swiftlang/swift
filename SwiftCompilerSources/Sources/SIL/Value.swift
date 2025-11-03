@@ -101,6 +101,10 @@ public enum Ownership {
     }
   }
 
+  public init(in function: Function, of type: Type, with convention: ArgumentConvention) {
+    self = Ownership(bridged: BridgedValueOwnership_init(function.bridged, type.bridged, convention.bridged))
+  }
+
   public var _bridged: BridgedValue.Ownership {
     switch self {
       case .unowned:    return BridgedValue.Ownership.Unowned

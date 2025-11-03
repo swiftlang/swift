@@ -222,17 +222,11 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   // Special diagnostic for enums.
   if (T->is<EnumType>()) {
-    if (DC->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
-      // New dialog mentioning @c.
-      diags.diagnose(TypeRange.Start, diag::not_cdecl_or_objc_swift_enum,
-                     language)
-          .highlight(TypeRange)
-          .limitBehavior(behavior);
-    } else {
-      diags.diagnose(TypeRange.Start, diag::not_objc_swift_enum)
-          .highlight(TypeRange)
-          .limitBehavior(behavior);
-    }
+    // New dialog mentioning @c.
+    diags.diagnose(TypeRange.Start, diag::not_cdecl_or_objc_swift_enum,
+                   language)
+        .highlight(TypeRange)
+        .limitBehavior(behavior);
     return;
   }
 
@@ -4191,15 +4185,6 @@ public:
     // Only encourage adoption if the corresponding language feature is enabled.
     if (isa<ExtensionDecl>(decl) &&
         !decl->getASTContext().LangOpts.hasFeature(Feature::ObjCImplementation))
-      return;
-
-    if (isa<AbstractFunctionDecl>(decl) &&
-        !decl->getASTContext().LangOpts.hasFeature(Feature::CImplementation))
-      return;
-
-    // Only encourage @_objcImplementation *extension* adopters to adopt
-    // @implementation; @_objcImplementation @_cdecl hasn't been stabilized yet.
-    if (!isa<ExtensionDecl>(decl))
       return;
 
     auto diag = diagnose(getAttr()->getLocation(),

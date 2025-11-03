@@ -68,6 +68,17 @@ Symbol Term::back() const {
   return Ptr->getElements().back();
 }
 
+bool Term::hasShape() const {
+  return back().getKind() == Symbol::Kind::Shape;
+}
+
+MutableTerm Term::termWithoutShape() const {
+  if (hasShape())
+    return MutableTerm(begin(), end() - 1);
+  else
+    return MutableTerm(begin(), end());
+}
+
 Symbol Term::operator[](size_t index) const {
   return Ptr->getElements()[index];
 }
@@ -222,6 +233,15 @@ std::optional<int> Term::compare(Term other, RewriteContext &ctx) const {
 std::optional<int> MutableTerm::compare(const MutableTerm &other,
                                         RewriteContext &ctx) const {
   return compareImpl(begin(), end(), other.begin(), other.end(), ctx);
+}
+
+bool MutableTerm::hasShape() const {
+  return back().getKind() == Symbol::Kind::Shape;
+}
+
+void MutableTerm::removeShape() {
+  if (hasShape())
+    Symbols.pop_back();
 }
 
 /// Replace the subterm in the range [from,to) of this term with \p rhs.

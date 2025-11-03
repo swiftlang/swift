@@ -5,10 +5,10 @@ func callClosure<R>(_ body: () -> R) -> R {
 }
 
 // Check that after removing a copy_block, no retains+releases are inserted for the block.
-// CHECK-LABEL: sil {{.*}}@testit :
+// CHECK-LABEL: sil {{.*}} [asmname "testit"] {{.*}} :
 // CHECK-NOT:     retain
 // CHECK-NOT:     release
-// CHECK:       } // end sil function 'testit'
+// CHECK:       } // end sil function
 @_cdecl("testit")
 public func testit(_ block: (_ index: Int) -> Int) -> Bool {
   @inline(never)

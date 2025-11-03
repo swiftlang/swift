@@ -335,7 +335,7 @@ struct SILDeclRef {
 
   /// If the symbol has a specific name for use at the LLVM IR level,
   /// produce that name. This may be different than the mangled name in SIL.
-  std::optional<StringRef> getAsmName() const;
+  std::optional<std::string> getAsmName() const;
 
   /// True if the SILDeclRef references a function.
   bool isFunc() const {

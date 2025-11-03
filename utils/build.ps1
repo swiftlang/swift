@@ -1131,6 +1131,7 @@ function Get-Dependencies {
       Write-Host " $Description"
     }
 
+    $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
     Write-Host "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies ..." -ForegroundColor Cyan
     $ProgressPreference = "SilentlyContinue"
 
@@ -1141,7 +1142,7 @@ function Get-Dependencies {
         return
       }
 
-      Write-Output "$Destination not found. Downloading ..."
+      # Write-Output "$Destination not found. Downloading ..."
       if ($ToBatch) {
         Write-Output "md `"$(Split-Path -Path $Destination -Parent)`""
         Write-Output "curl.exe -sL $URL -o $Destination"
@@ -1174,7 +1175,7 @@ function Get-Dependencies {
           $ExtractedLastWriteTime = (Get-Item $Destination).LastWriteTime
           # Compare the last write times
           if ($ZipLastWriteTime -le $ExtractedLastWriteTime) {
-              Write-Output "'$ZipFileName' is already extracted and up to date."
+              # Write-Output "'$ZipFileName' is already extracted and up to date."
               return
           }
       }
@@ -1279,7 +1280,7 @@ function Get-Dependencies {
 
     function Test-PythonModuleInstalled([string] $ModuleName) {
       try {
-        Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import $ModuleName"
+        Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('$ModuleName') else 1)"
         return $true
       } catch {
         return $false

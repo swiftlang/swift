@@ -1,11 +1,10 @@
 // Test doesn't pass on all platforms (rdar://101420862)
 // REQUIRES: OS=macosx
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-feature CImplementation -I %S/Inputs/abi -F %clang-importer-sdk-path/frameworks %s -import-objc-header %S/Inputs/objc_implementation.h -emit-ir -target %target-future-triple > %t.ir
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi -F %clang-importer-sdk-path/frameworks %s -import-objc-header %S/Inputs/objc_implementation.h -emit-ir -target %target-future-triple > %t.ir
 // RUN: %FileCheck --input-file %t.ir %s
 // RUN: %FileCheck --input-file %t.ir --check-prefix NEGATIVE %s
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_CImplementation
 
 // CHECK-DAG: @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE9beforeInts5Int32VvpWvd" = hidden global i64 8, align 8
 // CHECK-DAG: @"$sSo36ImplClassWithResilientStoredPropertyC19objc_implementationE6mirrors6MirrorVSgvpWvd" = hidden global i64 0, align 8

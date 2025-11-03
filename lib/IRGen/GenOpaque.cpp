@@ -559,14 +559,15 @@ irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
 StackAddress IRGenFunction::emitDynamicAlloca(SILType T,
                                               const llvm::Twine &name) {
   llvm::Value *size = emitLoadOfSize(*this, T);
-  return emitDynamicAlloca(IGM.Int8Ty, size, Alignment(16), true, name);
+  return emitDynamicAlloca(IGM.Int8Ty, size, Alignment(16), AllowsTaskAlloc,
+                           IsNotForCalleeCoroutineFrame, name);
 }
 
-StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
-                                              llvm::Value *arraySize,
-                                              Alignment align,
-                                              bool allowTaskAlloc,
-                                              const llvm::Twine &name) {
+StackAddress IRGenFunction::emitDynamicAlloca(
+    llvm::Type *eltTy, llvm::Value *arraySize, Alignment align,
+    AllowsTaskAlloc_t allowTaskAlloc,
+    IsForCalleeCoroutineFrame_t forCalleeCoroutineFrame,
+    const llvm::Twine &name) {
   // Async functions call task alloc.
   if (allowTaskAlloc && isAsync()) {
     llvm::Value *byteCount;
@@ -600,9 +601,10 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
     auto alignment = llvm::ConstantInt::get(IGM.Int32Ty, align.getValue());
 
     // Allocate memory.  This produces an abstract token.
-    auto allocToken =
-        Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_alloca_alloc,
-                                    {IGM.SizeTy}, {byteCount, alignment});
+    auto *allocToken = Builder.CreateIntrinsicCall(
+        forCalleeCoroutineFrame ? llvm::Intrinsic::coro_alloca_alloc_frame
+                                : llvm::Intrinsic::coro_alloca_alloc,
+        {IGM.SizeTy}, {byteCount, alignment});
 
     // Get the allocation result.
     auto ptr = Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_alloca_get,
@@ -642,7 +644,8 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
 /// location before the dynamic alloca's call.
 void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
                                                 bool allowTaskDealloc,
-                                                bool useTaskDeallocThrough) {
+                                                bool useTaskDeallocThrough,
+                                                bool forCalleeCoroutineFrame) {
   // Async function use taskDealloc.
   if (allowTaskDealloc && isAsync() && address.getAddress().isValid()) {
     if (useTaskDeallocThrough) {
@@ -670,7 +673,10 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
 #endif
       return;
     }
-    Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_alloca_free, allocToken);
+    Builder.CreateIntrinsicCall(forCalleeCoroutineFrame
+                                    ? llvm::Intrinsic::coro_alloca_free_frame
+                                    : llvm::Intrinsic::coro_alloca_free,
+                                allocToken);
     return;
   }
   // Otherwise, call llvm.stackrestore if an address was saved.

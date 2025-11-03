@@ -753,12 +753,12 @@ DECL_ATTR(attached, MacroRole,
   142)
 DECL_ATTR_ALIAS(freestanding, MacroRole)
 
-SIMPLE_DECL_ATTR(_used, Used,
+SIMPLE_DECL_ATTR(used, Used,
   OnAbstractFunction | OnVar,
   UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
   143)
 
-DECL_ATTR(_section, Section,
+DECL_ATTR(section, Section,
   OnAbstractFunction | OnVar,
   UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
   144)
@@ -815,7 +815,7 @@ SIMPLE_DECL_ATTR(_noObjCBridging, NoObjCBridging,
   UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   155)
 
-SIMPLE_DECL_ATTR(_manualOwnership, ManualOwnership,
+SIMPLE_DECL_ATTR(_noManualOwnership, NoManualOwnership,
   OnAbstractFunction | OnSubscript,
   UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   156)

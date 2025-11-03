@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 /// A type whose metatype can be shared across arbitrary concurrent contexts
-/// without introducing a risk of data races. When a generic type `T` conforms
+/// without introducing a risk of data races.
+///
+/// When a generic type `T` conforms
 /// to `SendableMetatype`, its metatype `T.Type` conforms to `Sendable`. All
 /// concrete types implicitly conform to the `SendableMetatype` protocol, so its
 /// primary purpose is in generic code to prohibit the use of isolated
