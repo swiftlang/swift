@@ -342,15 +342,15 @@ function(_add_target_variant_swift_compile_flags
   if(SWIFT_STDLIB_OS_VERSIONING)
     list(APPEND result "-D" "SWIFT_RUNTIME_OS_VERSIONING")
   endif()
-  
+
   if(SWIFT_STDLIB_STATIC_PRINT)
     list(APPEND result "-D" "SWIFT_STDLIB_STATIC_PRINT")
   endif()
-  
+
   if(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
     list(APPEND result "-D" "SWIFT_STDLIB_ENABLE_UNICODE_DATA")
   endif()
-  
+
   if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
     list(APPEND result "-D" "SWIFT_STDLIB_ENABLE_VECTOR_TYPES")
   endif()
@@ -612,7 +612,7 @@ function(_compile_swift_files
     list(APPEND swift_flags "-autolink-force-load")
   endif()
 
-  # Don't need to link runtime compatibility libraries for older runtimes 
+  # Don't need to link runtime compatibility libraries for older runtimes
   # into the new runtime.
   if (SWIFTFILE_IS_STDLIB OR SWIFTFILE_IS_SDK_OVERLAY)
     list(APPEND swift_flags "-runtime-compatibility-version" "none")
@@ -640,6 +640,7 @@ function(_compile_swift_files
   list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependence")
   list(APPEND swift_flags "-enable-experimental-feature" "InoutLifetimeDependence")
   list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependenceMutableAccessors")
+  list(APPEND swift_flags "-enable-experimental-feature" "Lifetimes")
 
   list(APPEND swift_flags "-enable-upcoming-feature" "MemberImportVisibility")
 

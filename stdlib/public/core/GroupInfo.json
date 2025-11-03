@@ -211,7 +211,7 @@
     "RawSpan.swift",
     "Span.swift"
   ],
-  "UTF8Span": [ 
+  "UTF8Span": [
     "UTF8EncodingError.swift",
     "UTF8Span.swift",
     "UTF8SpanBits.swift",
@@ -276,7 +276,9 @@
     "EmbeddedStubs.swift",
     "EmbeddedPrint.swift",
     "InlineArray.swift",
-    "_InlineArray.swift"
+    "_InlineArray.swift",
+    "Iterable.swift",
+    "BorrowIteratorProtocol.swift"
   ],
   "Result": [
     "Result.swift"

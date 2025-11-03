@@ -498,7 +498,7 @@ extension Array: _ArrayProtocol {
     @inlinable // FIXME(inline-always)
     @inline(__always)
     get {
-      return _buffer.owner      
+      return _buffer.owner
     }
   }
 
@@ -814,7 +814,7 @@ extension Array: RandomAccessCollection, MutableCollection {
       }
     }
   }
-  
+
   /// The number of elements in the array.
   @inlinable
   @_semantics("array.get_count")
@@ -1249,14 +1249,14 @@ extension Array: RangeReplaceableCollection {
     let oldCount = _buffer.mutableCount
     let startNewElements = unsafe _buffer.mutableFirstElementAddress + oldCount
     let buf = unsafe UnsafeMutableBufferPointer(
-                start: startNewElements, 
+                start: startNewElements,
                 count: _buffer.mutableCapacity - oldCount)
 
     var (remainder,writtenUpTo) = unsafe buf.initialize(from: newElements)
-    
+
     // trap on underflow from the sequence's underestimate:
     let writtenCount = unsafe buf.distance(from: buf.startIndex, to: writtenUpTo)
-    _precondition(newElementsCount <= writtenCount, 
+    _precondition(newElementsCount <= writtenCount,
       "newElements.underestimatedCount was an overestimate")
     // can't check for overflow as sequences can underestimate
 
@@ -1440,7 +1440,7 @@ extension Array: RangeReplaceableCollection {
       return try unsafe body(bufferPointer)
     }
   }
-  
+
   @inlinable
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {
@@ -1799,7 +1799,7 @@ extension Array {
     // a precondition and Array never lies about its count.
     guard var p = buffer.baseAddress
       else { _preconditionFailure("Attempt to copy contents into nil buffer pointer") }
-    _precondition(self.count <= buffer.count, 
+    _precondition(self.count <= buffer.count,
       "Insufficient space allocated to copy array contents")
 
     if let s = unsafe _baseAddressIfContiguous {
@@ -2160,3 +2160,25 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
 }
 
 extension Array: @unchecked Sendable where Element: Sendable { }
+
+// FIXME: This should be accepted, but we get the following:
+// error: type 'Array<Element>' does not conform to protocol 'Iterable'
+// note: multiple matching functions named '_customContainsEquatableElement' with type '(borrowing Array<Element>.Element) -> Bool?' (aka '(borrowing Element) -> Optional<Bool>')
+
+// @available(SwiftStdlib 6.3, *)
+// extension Array: Iterable {
+//   public typealias BorrowIterator = Span<Element>.BorrowIterator
+
+//   @_alwaysEmitIntoClient
+//   @_transparent
+//   public var estimatedCount: EstimatedCount {
+//     .exactly(count)
+//   }
+
+//   @_alwaysEmitIntoClient
+//   @_lifetime(borrow self)
+//   @_transparent
+//   public func startBorrowIteration() -> Span<Element> {
+//     self.span
+//   }
+// }
