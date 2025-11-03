@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -wmo) | %FileCheck %s
 
 // https://github.com/swiftlang/swift/issues/85272
-// XFAIL: *
+// UNSUPPORTED: *
 
 // REQUIRES: executable_test
 // REQUIRES: OS=wasip1
