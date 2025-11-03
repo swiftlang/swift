@@ -1001,14 +1001,13 @@ internal func _getTimeSpentRunning(
 ) -> Bool
 
 @available(SwiftStdlib 6.3, *)
+@unsafe
 private func _getTimeSpentRunning(_ task: Builtin.NativeObject) -> Duration? {
-  unsafe withUnsafeCurrentTask { task in
-    var result = UInt64(0)
-    guard let task, unsafe _getTimeSpentRunning(task, &result) else {
-      return nil
-    }
-    return .nanoseconds(result)
+  var result = UInt64(0)
+  guard unsafe _getTimeSpentRunning(task, &result) else {
+    return nil
   }
+  return .nanoseconds(result)
 }
 
 @available(SwiftStdlib 6.3, *)
