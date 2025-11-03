@@ -2655,6 +2655,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::DestroyDefaultActor:
     case BuiltinValueKind::GetCurrentExecutor:
     case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
+    case BuiltinValueKind::FinishAsyncLet:
     case BuiltinValueKind::EndAsyncLetLifetime:
     case BuiltinValueKind::CreateTaskGroup:
     case BuiltinValueKind::CreateTaskGroupWithFlags:

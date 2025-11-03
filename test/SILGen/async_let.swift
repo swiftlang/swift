@@ -25,8 +25,7 @@ func testAsyncLetInt() async -> Int {
   // CHECK: [[INT_RESULT_VALUE:%.*]] = load [trivial] [[ADDR]] : $*Int
   return await i
 
-  // CHECK: [[FINISH:%.*]] = function_ref @swift_asyncLet_finish
-  // CHECK: apply [[FINISH]]([[ASYNC_LET_START]], [[BUFFER]])
+  // CHECK: builtin "finishAsyncLet"([[ASYNC_LET_START]] : $Builtin.RawPointer, [[BUFFER]] : $Builtin.RawPointer)
   // CHECK: builtin "endAsyncLetLifetime"([[ASYNC_LET_START]] : $Builtin.RawPointer)
 }
 
@@ -70,7 +69,6 @@ func testDecomposeAwait(cond: Bool) async -> Int {
   // CHECK: [[ELT:%.*]] = tuple_element_addr [[ADDR]] : $*(Int, String), 0
   // CHECK: load [trivial] [[ELT]] : $*Int
   return await i
-  // CHECK: [[FINISH:%.*]] = function_ref @swift_asyncLet_finish
-  // CHECK: apply [[FINISH]]([[ASYNC_LET_START]], [[BUFFER]])
+  // CHECK: builtin "finishAsyncLet"([[ASYNC_LET_START]] : $Builtin.RawPointer, [[BUFFER]] : $Builtin.RawPointer)
   // CHECK: builtin "endAsyncLetLifetime"([[ASYNC_LET_START]] : $Builtin.RawPointer)
 }

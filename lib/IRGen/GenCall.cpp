@@ -6430,6 +6430,32 @@ Callee irgen::getCFunctionPointerCallee(IRGenFunction &IGF,
   return Callee(std::move(calleeInfo), fn);
 }
 
+Callee Callee::forBuiltinRuntimeFunction(IRGenModule &IGM,
+                                         llvm::Constant *fnPtr,
+                                         BuiltinValueKind builtin,
+                                         SubstitutionMap subs,
+                                         FunctionPointerKind fpKind) {
+  auto &ctx = IGM.Context;
+  auto builtinDecl =
+    getBuiltinValueDecl(ctx, ctx.getIdentifier(getBuiltinName(builtin)));
+
+  auto loweredFnType = IGM.getSILTypes().getConstantFunctionType(
+                         TypeExpansionContext::minimal(),
+                         SILDeclRef(builtinDecl, SILDeclRef::Kind::Func));
+  auto signature = IGM.getSignature(loweredFnType, fpKind);
+
+  auto fp = FunctionPointer::forDirect(fpKind, fnPtr, nullptr, signature);
+
+  auto substFnType = loweredFnType;
+  if (subs) {
+    substFnType = loweredFnType->substGenericArgs(IGM.getSILModule(), subs,
+                                            TypeExpansionContext::minimal());
+  }
+  CalleeInfo calleeInfo(loweredFnType, substFnType, subs);
+
+  return Callee(std::move(calleeInfo), fp);
+}
+
 FunctionPointer FunctionPointer::forDirect(IRGenModule &IGM,
                                            llvm::Constant *fnPtr,
                                            llvm::Constant *secondaryValue,

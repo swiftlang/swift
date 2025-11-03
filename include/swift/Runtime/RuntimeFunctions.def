@@ -2578,6 +2578,28 @@ FUNCTION(AsyncLetBegin,
          EFFECT(RuntimeEffect::Concurrency),
          MEMEFFECTS(ArgMemOnly))
 
+/// void swift_asyncLet_finish(
+///     AsyncLet *alet,
+///     TaskOptionRecord *options,
+///     const Metadata *futureResultType,
+///     void *closureEntryPoint,
+///     HeapObject *closureContext,
+///     void *resultBuffer
+/// );
+FUNCTION(AsyncLetFinish,
+         _Concurrency, swift_asyncLet_finish, SwiftAsyncCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(SwiftContextPtrTy,          // current context
+              SwiftAsyncLetPtrTy,         // AsyncLet*
+              Int8PtrTy,                  // resultBuffer
+              TaskContinuationFunctionPtrTy, // continuation
+              SwiftContextPtrTy           // temp context
+         ),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         MEMEFFECTS(ArgMemOnly))
+
 /// void swift_task_run_inline(
 ///     OpaqueValue *result,
 ///     void *closureAFP,

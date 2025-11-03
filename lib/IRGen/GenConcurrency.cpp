@@ -18,6 +18,7 @@
 #include "GenConcurrency.h"
 
 #include "BitPatternBuilder.h"
+#include "CallEmission.h"
 #include "ExtraInhabitants.h"
 #include "GenCall.h"
 #include "GenPointerAuth.h"
@@ -310,6 +311,28 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   call->setCallingConv(IGF.IGM.SwiftCC);
 
   return alet;
+}
+
+void irgen::emitFinishAsyncLet(IRGenFunction &IGF,
+                               llvm::Value *asyncLet,
+                               llvm::Value *resultBuffer) {
+  llvm::Constant *function = IGF.IGM.getAsyncLetFinishFn();
+  auto callee = Callee::forBuiltinRuntimeFunction(IGF.IGM, function,
+                        BuiltinValueKind::FinishAsyncLet, SubstitutionMap(),
+                        FunctionPointerKind::SpecialKind::AsyncLetFinish);
+  auto emission = getCallEmission(IGF, nullptr, std::move(callee));
+
+  emission->begin();
+
+  Explosion args;
+  args.add(asyncLet);
+  args.add(resultBuffer);
+  emission->setArgs(args, /*outlined*/ false, /*witness metadata*/ nullptr);
+
+  Explosion result;
+  emission->emitToExplosion(result, false);
+
+  emission->end();
 }
 
 llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,

@@ -926,6 +926,12 @@ BUILTIN_MISC_OPERATION(FlowSensitiveSelfIsolation, "flowSensitiveSelfIsolation",
 BUILTIN_MISC_OPERATION(FlowSensitiveDistributedSelfIsolation,
                        "flowSensitiveDistributedSelfIsolation", "", Special)
 
+/// finishAsyncLet(Builtin.RawPointer, Builtin.RawPointer) -> Void
+///
+/// End the scope of an async let. An async operation. Deallocates stack
+/// memory that was allocated by startAsyncLetWithLocalBuffer.
+BUILTIN_MISC_OPERATION(FinishAsyncLet, "finishAsyncLet", "", Special)
+
 /// endAsyncLetLifetime(): (Builtin.RawPointer) -> Void
 ///
 /// Marks the end of an async-let's lifetime.

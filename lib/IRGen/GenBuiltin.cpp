@@ -300,6 +300,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  case BuiltinValueKind::FinishAsyncLet: {
+    auto asyncLet = args.claimNext();
+    auto resultBuffer = args.claimNext();
+    emitFinishAsyncLet(IGF, asyncLet, resultBuffer);
+    return;
+  }
+
   case BuiltinValueKind::EndAsyncLetLifetime: {
     IGF.Builder.CreateLifetimeEnd(args.claimNext());
     // Ignore a second operand which is inserted by ClosureLifetimeFixup and
