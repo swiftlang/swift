@@ -864,7 +864,7 @@ private:
   llvm::DIModule *getOrCreateModule(const void *Key, llvm::DIScope *Parent,
                                     StringRef Name, StringRef IncludePath,
                                     uint64_t Signature = ~1ULL,
-                                    StringRef ASTFile = StringRef()) {
+                                    StringRef ASTFile = {}) {
     // Look in the cache first.
     auto Val = DIModuleCache.find(Key);
     if (Val != DIModuleCache.end())
@@ -2823,8 +2823,12 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
 
   // Create a module for the current compile unit.
   auto *MDecl = IGM.getSwiftModule();
-  llvm::sys::path::remove_filename(SourcePath);
-  MainModule = getOrCreateModule(MDecl, TheCU, Opts.ModuleName, SourcePath);
+  StringRef Path = Opts.DebugModulePath;
+  if (Path.empty()) {
+    llvm::sys::path::remove_filename(SourcePath);
+    Path = SourcePath;
+  }
+  MainModule = getOrCreateModule(MDecl, TheCU, Opts.ModuleName, Path);
   DBuilder.createImportedModule(MainFile, MainModule, MainFile, 0);
 
   // Macro definitions that were defined by the user with "-Xcc -D" on the
