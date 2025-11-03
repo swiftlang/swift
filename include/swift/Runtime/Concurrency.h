@@ -1082,7 +1082,7 @@ _swift_task_setTimeSpentRunningTracked(bool isTracked);
 ///
 /// If `AsyncTask::isTimeSpentRunningTracked()` is `false` (the common case),
 /// task duration isn't tracked and this function returns `false`.
-SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 __attribute__((__cold__)) bool
 _swift_task_getTimeSpentRunning(AsyncTask *task, uint64_t *outNanoseconds);
 
