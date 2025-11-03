@@ -3604,6 +3604,11 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
                      OptionalUnwrapping::None)) {
           return false;
         }
+
+        if (matchMode.contains(TypeMatchFlags::RequireMatchingParameterLabels)&&
+            fn1Params[i].getLabel() != fn2Params[i].getLabel()) {
+          return false;
+        }
       }
 
       // Results are covariant.
