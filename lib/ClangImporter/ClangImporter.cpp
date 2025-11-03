@@ -8759,14 +8759,9 @@ ExplicitSafety ClangTypeExplicitSafety::evaluate(
   if (auto recordDecl = clangType->getAsTagDecl()) {
     // If we reached this point the types is not imported as a shared reference,
     // so we don't need to check the bases whether they are shared references.
-    auto req = ClangDeclExplicitSafety({recordDecl, false});
-    if (evaluator.hasActiveRequest(req))
-      // Cycles are allowed in templates, e.g.:
-      //   template <typename>   class Foo { ... }; // throws away template arg
-      //   template <typename T> class Bar : Foo<Bar<T>> { ... };
-      // We need to avoid them here.
-      return ExplicitSafety::Unspecified;
-    return evaluateOrDefault(evaluator, req, ExplicitSafety::Unspecified);
+    return evaluateOrDefault(evaluator,
+                             ClangDeclExplicitSafety({recordDecl, false}),
+                             ExplicitSafety::Unspecified);
   }
 
   // Everything else is safe.
