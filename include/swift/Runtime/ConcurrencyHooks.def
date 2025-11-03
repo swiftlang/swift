@@ -67,7 +67,7 @@ SWIFT_CONCURRENCY_HOOK(void, swift_task_donateThreadToGlobalExecutorUntil,
 SWIFT_CONCURRENCY_HOOK(bool, _swift_task_setTimeSpentRunningTracked,
                        bool isTracked);
 
-SWIFT_CONCURRENCY_HOOK(bool, _swift_task_getTimeSpentRunning
+SWIFT_CONCURRENCY_HOOK(bool, _swift_task_getTimeSpentRunning,
                        AsyncTask *task, uint64_t *outNanoseconds);
 
 // .............................................................................
