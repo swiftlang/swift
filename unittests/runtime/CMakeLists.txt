@@ -159,4 +159,28 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     swiftThreading${SWIFT_PRIMARY_VARIANT_SUFFIX}
     ${PLATFORM_TARGET_LINK_LIBRARIES}
     )
+
+###
+# GTEST_SKIP conditions.
+#
+# Sometimes, we need to skip running a unit test due to some bug on a specific
+# platform. You can add a skip like this to the test:
+#
+#  #ifdef __SKIP_RDAR123__
+#    GTEST_SKIP() << "Skipping due to rdar://123";
+#  #endif
+#
+# and use CMake to detect the OS, such as via
+#  
+#  if(EXISTS "/etc/os-release")
+#    file(READ "/etc/os-release" OS_RELEASE)
+#     if(OS_RELEASE MATCHES "Amazon Linux 2")
+#       ...
+#
+# and use 
+#   
+#    target_compile_definitions(SwiftRuntimeTests PRIVATE __SKIP_RDAR123__)
+#
+# to add the preprocessor definition.
+
 endif()
