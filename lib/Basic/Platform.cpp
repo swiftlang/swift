@@ -150,7 +150,10 @@ bool swift::tripleRequiresRPathForSwiftLibrariesInOS(
 }
 
 bool swift::tripleBTCFIByDefaultInOpenBSD(const llvm::Triple &triple) {
-  return triple.isOSOpenBSD() && triple.getArch() == llvm::Triple::aarch64;
+  return triple.isOSOpenBSD() && (
+     triple.getArch() == llvm::Triple::aarch64 ||
+     triple.getArch() == llvm::Triple::x86_64);
+
 }
 
 DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {

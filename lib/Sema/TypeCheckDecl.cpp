@@ -32,7 +32,6 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -577,8 +576,8 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
         auto loc = declRef->getLoc();
         if (name.isSimpleName(ctx.Id_self)) {
           auto *otherSelfDecl =
-            ASTScope::lookupSingleLocalDecl(Decl->getParentSourceFile(),
-                                            name.getFullName(), loc);
+            ASTScope::lookupSingleLocalDecl(Decl->getParentSourceFile(), name,
+                                            loc);
           if (otherSelfDecl == Decl->getImplicitSelfDecl())
             myKind = BodyInitKind::Delegating;
         }

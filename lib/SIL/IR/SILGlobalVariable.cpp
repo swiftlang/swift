@@ -84,6 +84,16 @@ SILGlobalVariable::~SILGlobalVariable() {
   clear();
 }
 
+void SILGlobalVariable::setAsmName(StringRef value) {
+  ASSERT((AsmName.empty() || value == AsmName) && "Cannot change asmname");
+  AsmName = value;
+
+  if (!value.empty()) {
+    // Update the variable-by-asm-name-table.
+    getModule().GlobalVariableByAsmNameMap.insert({AsmName, this});
+  }
+}
+
 bool SILGlobalVariable::isPossiblyUsedExternally() const {
   if (shouldBePreservedForDebugger())
     return true;

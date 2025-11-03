@@ -19,7 +19,6 @@ class TriangleClass {
 // CHECK-NEXT:    destroy_value [[SHAPE]]
 // CHECK-NEXT:    return [[COPY]]
 // CHECK-NEXT:  } // end sil function 'basic_access_of_loadable'
-@_manualOwnership
 @_silgen_name("basic_access_of_loadable")
 func basic_access_of_loadable(_ t: TriangleClass) -> ShapeClass {
   return copy t.shape
@@ -41,7 +40,6 @@ func basic_access_of_loadable(_ t: TriangleClass) -> ShapeClass {
 // CHECK-NEXT:      end_access [[ADDR2]]
 // CHECK:           return [[X_COPY]]
 // CHECK-NEXT:    } // end sil function 'var_assign'
-@_manualOwnership
 @_silgen_name("var_assign")
 func var_assign(_ t: TriangleClass, _ b: Bool) -> TriangleClass {
   var x = TriangleClass()
@@ -55,7 +53,6 @@ func var_assign(_ t: TriangleClass, _ b: Bool) -> TriangleClass {
 // CHECK-NEXT:     [[IMPL_COPY:%.*]] = copy_value %0
 // CHECK-NEXT:     return [[IMPL_COPY]]
 // CHECK-NEXT:  } // end sil function 'return_borrowed'
-@_manualOwnership
 @_silgen_name("return_borrowed")
 func return_borrowed(_ t: borrowing TriangleClass) -> TriangleClass {
   return t
@@ -74,7 +71,6 @@ func return_borrowed(_ t: borrowing TriangleClass) -> TriangleClass {
 // CHECK-NEXT:     destroy_value
 // CHECK-NEXT:     return [[IMPL_COPY]]
 // CHECK-NEXT:  } // end sil function 'return_consumingParam'
-@_manualOwnership
 @_silgen_name("return_consumingParam")
 func return_consumingParam(_ t: consuming TriangleClass) -> TriangleClass {
   return t
@@ -89,7 +85,6 @@ func return_consumingParam(_ t: consuming TriangleClass) -> TriangleClass {
 // CHECK-NEXT:     destroy_value %0
 // CHECK-NEXT:     return [[IMPL_COPY]]
 // CHECK-NEXT:  } // end sil function 'return_owned'
-@_manualOwnership
 @_silgen_name("return_owned")
 func return_owned(_ t: __owned TriangleClass) -> TriangleClass {
   return t

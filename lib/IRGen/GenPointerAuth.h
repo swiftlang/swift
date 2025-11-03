@@ -70,6 +70,8 @@ public:
     TypeLayoutString,
     CoroAllocationFunction,
     CoroDeallocationFunction,
+    CoroFrameAllocationFunction,
+    CoroFrameDeallocationFunction,
   };
 
 private:

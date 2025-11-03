@@ -17,6 +17,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
@@ -301,17 +302,16 @@ class Traversal : public TypeVisitor<Traversal, bool>
     }
     return false;
   }
-  
-  bool visitBuiltinFixedArrayType(BuiltinFixedArrayType *ty) {
-    if (ty->getSize() && doIt(ty->getSize()))  {
-      return true;
-    }
-    if (ty->getElementType() && doIt(ty->getElementType())) {
-      return true;
+
+  bool visitBuiltinGenericType(BuiltinGenericType *ty) {
+    for (auto replacement : ty->getSubstitutions().getReplacementTypes()) {
+      if (replacement && doIt(replacement)) {
+        return true;
+      }
     }
     return false;
   }
-
+  
 public:
   explicit Traversal(TypeWalker &walker) : Walker(walker) {}
 

@@ -194,7 +194,7 @@ func test5() {
 
 
   let c: (a: Int, b: Int) = (1,2)
-  let _: (b: Int, a: Int) = c  // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated}}
+  let _: (b: Int, a: Int) = c  // expected-warning {{implicit reordering of tuple elements from 'a:b:' to 'b:a:' is deprecated; this will be an error in a future Swift language mode}}
 }
 
 

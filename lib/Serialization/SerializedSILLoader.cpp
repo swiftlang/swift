@@ -62,9 +62,11 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee,
 
 SILFunction *
 SerializedSILLoader::lookupSILFunction(StringRef Name,
-                                       std::optional<SILLinkage> Linkage) {
+                                       std::optional<SILLinkage> Linkage,
+                                       bool byAsmName) {
   for (auto &Des : LoadedSILSections) {
-    if (auto *Func = Des->lookupSILFunction(Name, /*declarationOnly*/ true)) {
+    if (auto *Func = Des->lookupSILFunction(Name, /*declarationOnly*/ true,
+                                            byAsmName)) {
       LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
                  << Des->getModuleIdentifier().str() << "\n");
       if (Linkage) {
@@ -85,9 +87,10 @@ SerializedSILLoader::lookupSILFunction(StringRef Name,
   return nullptr;
 }
 
-SILGlobalVariable *SerializedSILLoader::lookupSILGlobalVariable(StringRef Name) {
+SILGlobalVariable *
+SerializedSILLoader::lookupSILGlobalVariable(StringRef Name, bool byAsmName) {
   for (auto &Des : LoadedSILSections) {
-    if (auto *G = Des->lookupSILGlobalVariable(Name)) {
+    if (auto *G = Des->lookupSILGlobalVariable(Name, byAsmName)) {
       return G;
     }
   }

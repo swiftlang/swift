@@ -60,6 +60,7 @@ namespace {
   class LookupResultBuilder {
     LookupResult &Result;
     DeclContext *DC;
+    Identifier ModuleSelector;
     NameLookupOptions Options;
 
     /// The vector of found declarations.
@@ -72,8 +73,9 @@ namespace {
 
   public:
     LookupResultBuilder(LookupResult &result, DeclContext *dc,
-                        NameLookupOptions options)
-      : Result(result), DC(dc), Options(options) {
+                        Identifier moduleSelector, NameLookupOptions options)
+      : Result(result), DC(dc), ModuleSelector(moduleSelector), Options(options)
+    {
       if (dc->getASTContext().isAccessControlDisabled())
         Options |= NameLookupFlags::IgnoreAccessControl;
     }
@@ -82,6 +84,11 @@ namespace {
       // Remove any overridden declarations from the found-declarations set.
       removeOverriddenDecls(FoundDecls);
       removeOverriddenDecls(FoundOuterDecls);
+
+      // Remove any declarations excluded by the module selector from the
+      // found-declarations set.
+      removeOutOfModuleDecls(FoundDecls, ModuleSelector, DC);
+      removeOutOfModuleDecls(FoundOuterDecls, ModuleSelector, DC);
 
       // Remove any shadowed declarations from the found-declarations set.
       removeShadowedDecls(FoundDecls, DC);
@@ -290,7 +297,10 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
                                   UnqualifiedLookupRequest{descriptor}, {});
 
   LookupResult result;
-  LookupResultBuilder builder(result, dc, options);
+  // Disable module selector filtering--UnqualifiedLookupRequest should have
+  // done it.
+  LookupResultBuilder builder(result, dc, /*moduleSelector=*/Identifier(),
+                              options);
   for (auto idx : indices(lookup.allResults())) {
     const auto &found = lookup[idx];
     // Determine which type we looked through to find this result.
@@ -381,7 +391,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   // Make sure we've resolved implicit members, if we need them.
   namelookup::installSemanticMembersIfNeeded(type, name);
 
-  LookupResultBuilder builder(result, dc, options);
+  LookupResultBuilder builder(result, dc, name.getModuleSelector(), options);
   SmallVector<ValueDecl *, 4> lookupResults;
   dc->lookupQualified(type, name, loc, subOptions, lookupResults);
 
@@ -1142,4 +1152,117 @@ void swift::diagnoseMissingImports(SourceFile &sf) {
                                            fixItCache);
     }
   }
+}
+
+ModuleSelectorCorrection::
+ModuleSelectorCorrection(const LookupResult &candidates) {
+  // Produce a list of *unique* module selector diagnostics so we don't
+  // emit a bunch of duplicates.
+  for (auto result : candidates) {
+    ValueDecl * decl = result.getValueDecl();
+
+    CandidateKind kind;
+    if (!result.getDeclContext()) {
+      if (decl->getDeclContext()->isLocalContext())
+        kind = CandidateKind::Local;
+      else
+        kind = CandidateKind::ContextFree;
+    } else {
+      if (result.getDeclContext()->isTypeContext())
+        kind = CandidateKind::MemberViaContext;
+      else // found through result.getDeclContext()'s implicit `self`
+        kind = CandidateKind::MemberViaSelf;
+    }
+
+    auto owningModule = decl->getModuleContext();
+    candidateModules.insert(
+      { owningModule->getNameForModuleSelector(), kind });
+  }
+}
+
+ModuleSelectorCorrection::
+ModuleSelectorCorrection(const LookupTypeResult &candidates) {
+  // Produce a list of *unique* module selector diagnostics so we don't
+  // emit a bunch of duplicates.
+  for (auto result : candidates) {
+    auto owningModule = result.Member->getModuleContext();
+    candidateModules.insert(
+      { owningModule->getNameForModuleSelector(), CandidateKind::ContextFree });
+  }
+}
+
+ModuleSelectorCorrection::
+ModuleSelectorCorrection(const SmallVectorImpl<ValueDecl *> &candidates) {
+  for (auto result : candidates) {
+    auto owningModule = result->getModuleContext();
+    candidateModules.insert(
+      { owningModule->getName(), CandidateKind::ContextFree });
+  }
+}
+
+ModuleSelectorCorrection::
+ModuleSelectorCorrection(const SmallVectorImpl<constraints::OverloadChoice> &candidates) {
+  for (auto result : candidates) {
+    auto owningModule = result.getDecl()->getModuleContext();
+    candidateModules.insert(
+      { owningModule->getNameForModuleSelector(), CandidateKind::ContextFree });
+  }
+}
+
+bool ModuleSelectorCorrection::diagnose(ASTContext &ctx,
+                                        DeclNameLoc nameLoc,
+                                        DeclNameRef originalName) const {
+  if (candidateModules.empty())
+    return false;
+
+  ctx.Diags.diagnose(nameLoc, diag::wrong_module_selector,
+                     originalName.getFullName(),
+                     originalName.getModuleSelector());
+
+  SourceLoc moduleSelectorLoc = nameLoc.getModuleSelectorLoc();
+
+  for (auto pair : candidateModules) {
+    Identifier moduleName = pair.first;
+    switch (pair.second) {
+    case CandidateKind::ContextFree:
+      ctx.Diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
+                         moduleName)
+          .fixItReplace(moduleSelectorLoc, moduleName.str());
+      break;
+
+    case CandidateKind::MemberViaSelf: {
+      SmallString<64> replacement("self.");
+      if (moduleName != originalName.getModuleSelector()) {
+        // The module selector specified the wrong module; replace it.
+        replacement += moduleName.str();
+
+        ctx.Diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
+                           moduleName)
+            .fixItReplace(moduleSelectorLoc, replacement);
+      } else {
+        // The module selector specified the right module, but we need to
+        // make the `self.` explicit.
+        ctx.Diags.diagnose(moduleSelectorLoc,
+                           diag::note_add_explicit_self_with_module_selector)
+            .fixItInsert(moduleSelectorLoc, replacement);
+      }
+      break;
+    }
+    case CandidateKind::MemberViaContext:
+      // FIXME: If we had more info here, we could construct a reference
+      //        to the outer type in question.
+      ctx.Diags.diagnose(moduleSelectorLoc,
+                         diag::note_remove_module_selector_outer_type)
+          .fixItRemoveChars(moduleSelectorLoc, nameLoc.getBaseNameLoc());
+      break;
+
+    case CandidateKind::Local:
+      ctx.Diags.diagnose(moduleSelectorLoc,
+                         diag::note_remove_module_selector_local_decl)
+          .fixItRemoveChars(moduleSelectorLoc, nameLoc.getBaseNameLoc());
+      break;
+    }
+  }
+
+  return true;
 }

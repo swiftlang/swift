@@ -242,7 +242,10 @@ private func isCalleeSpecializable(of apply: ApplySite) -> Bool {
      // might no longer have 'self' as the last parameter.
      //
      // TODO: Keep the self argument the last when appending arguments.
-     !callee.mayBindDynamicSelf
+     !callee.mayBindDynamicSelf,
+
+     // Don't support self-recursive functions because that would result in duplicate mapping of values when cloning.
+     callee != apply.parentFunction
   {
     return true
   }

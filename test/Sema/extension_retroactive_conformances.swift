@@ -24,15 +24,20 @@ public struct Sample3 {}
 public struct Sample4 {}
 public struct Sample5 {}
 public struct Sample6 {}
+public struct Sample6a {}
+public struct Sample6b {}
+public struct Sample6c {}
 public struct Sample7 {}
 public struct Sample8 {}
+public struct Sample8a {}
 
 public struct SampleAlreadyConforms: SampleProtocol1 {}
 
 public struct GenericSample1<T> {}
 
 public struct Sample9 {}
-public struct Sample10 {}
+public struct Sample9a {}
+public struct Sample9b {}
 
 #else
 
@@ -83,9 +88,13 @@ typealias MySample6 = Sample6
 extension MySample6: SampleProtocol1 {} // expected-warning {{extension declares a conformance of imported type 'Sample6' to imported protocol 'SampleProtocol1'}}
 // expected-note @-1 {{add '@retroactive' to silence this warning}} {{22-37=@retroactive SampleProtocol1}}
 
-// Ensure module-qualifying both types still silences the warning
+// Ensure module-qualifying the protocol silences the warning
 
-extension Library.Sample6: Library.SampleProtocol2 {} // ok, module-qualified.
+extension Library.Sample6: Library.SampleProtocol2 {} // ok, both types are module-qualified.
+extension Sample6a: Library.SampleProtocol2 {} // ok, protocol is module qualified.
+extension Library.Sample6b: SampleProtocol2 {} // expected-warning {{extension declares a conformance of imported type 'Sample6b' to imported protocol 'SampleProtocol2'; this will not behave correctly if the owners of 'Library' introduce this conformance in the future}}
+// expected-note @-1 {{add '@retroactive' to silence this warning}}
+extension Sample6c: Library.SampleProtocol1a {} // ok, protocol is module qualified.
 
 protocol ClientProtocol {}
 
@@ -125,10 +134,20 @@ extension Sample7: SampleProtocol1 & SampleProtocol2 {}
 
 extension Sample8: @retroactive SampleProtocol1 & SampleProtocol2 {}  // ok
 
+// FIXME: Module qualification should suppress this warning
+extension Sample8a: Library.SampleProtocol1 & Library.SampleProtocol2 {}  // ok
+// expected-warning@-1 {{extension declares a conformance of imported type 'Sample8a' to imported protocols 'SampleProtocol1', 'SampleProtocol2'; this will not behave correctly if the owners of 'Library' introduce this conformance in the future}}
+// expected-note@-2 {{add '@retroactive' to silence this warning}}
+
 extension Sample9: SampleProtocol3<Int> {}
 // expected-warning@-1 {{extension declares a conformance of imported type 'Sample9' to imported protocol 'SampleProtocol3'; this will not behave correctly if the owners of 'Library' introduce this conformance in the future}}
 // expected-note@-2 {{add '@retroactive' to silence this warning}}
 
-extension Sample10: @retroactive SampleProtocol3<Int> {}
+extension Sample9a: @retroactive SampleProtocol3<Int> {}
+
+// FIXME: Module qualification should suppress this warning
+extension Sample9b: Library.SampleProtocol3<Int> {}
+// expected-warning@-1 {{extension declares a conformance of imported type 'Sample9b' to imported protocol 'SampleProtocol3'; this will not behave correctly if the owners of 'Library' introduce this conformance in the future}}
+// expected-note@-2 {{add '@retroactive' to silence this warning}}
 
 #endif

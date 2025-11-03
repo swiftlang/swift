@@ -1426,7 +1426,8 @@ bool Parser::parseDifferentiableAttributeArguments(
     if (!consumeIf(tok::comma)) return false;
     // Diagnose trailing comma before 'where' or ')'.
     if (Tok.is(tok::kw_where) || Tok.is(tok::r_paren)) {
-      diagnose(Tok, diag::unexpected_separator, ",");
+      diagnose(Tok, diag::unexpected_separator, ",")
+        .fixItRemove(PreviousLoc);
       return true;
     }
     // Check that token after comma is 'wrt'.
@@ -1668,14 +1669,16 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
       // If comma is required but does not exist and ')' has not been reached,
       // diagnose missing comma.
       if (requireComma && !Tok.is(tok::r_paren)) {
-        diagnose(getEndOfPreviousLoc(), diag::expected_separator, ",");
+        diagnose(getEndOfPreviousLoc(), diag::expected_separator, ",")
+          .fixItInsertAfter(PreviousLoc, ",");
         return true;
       }
       return false;
     }
     // Diagnose trailing comma before ')'.
     if (Tok.is(tok::r_paren)) {
-      diagnose(Tok, diag::unexpected_separator, ",");
+      diagnose(Tok, diag::unexpected_separator, ",")
+        .fixItRemove(PreviousLoc);
       return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     }
     // Check that token after comma is 'wrt:'.
@@ -1748,14 +1751,16 @@ ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
       // If comma is required but does not exist and ')' has not been reached,
       // diagnose missing comma.
       if (requireComma && !Tok.is(tok::r_paren)) {
-        diagnose(Tok, diag::expected_separator, ",");
+        diagnose(Tok, diag::expected_separator, ",")
+          .fixItInsertAfter(PreviousLoc, ",");
         return true;
       }
       return false;
     }
     // Diagnose trailing comma before ')'.
     if (Tok.is(tok::r_paren)) {
-      diagnose(Tok, diag::unexpected_separator, ",");
+      diagnose(Tok, diag::unexpected_separator, ",")
+        .fixItRemove(PreviousLoc);
       return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     }
     // Check that token after comma is 'wrt:'.
@@ -3027,14 +3032,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
 
   case DeclAttrKind::CDecl: {
-    if (!AttrName.starts_with("_") &&
-
-        // Backwards support for @c("stringId"). Remove before enabling in
-        // production so we accept only the identifier format.
-        lookahead(1, [&](CancellableBacktrackingScope &) {
-           return Tok.isNot(tok::string_literal);
-        })) {
-
+    if (AttrName == "c") {
       std::optional<StringRef> CName;
       if (consumeIfAttributeLParen()) {
         // Custom C name.
@@ -3211,7 +3209,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
-    // @_section in a local scope is not allowed.
+    // @section in a local scope is not allowed.
     if (CurDeclContext->isLocalContext()) {
       diagnose(Loc, diag::attr_name_only_at_non_local_scope, AttrName);
     }
@@ -4259,8 +4257,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
         .warnUntilSwiftVersion(6);
   }
 
-  bool hasModuleSelector = Context.LangOpts.hasFeature(Feature::ModuleSelector)
-                              && peekToken().is(tok::colon_colon);
+  bool hasModuleSelector = peekToken().is(tok::colon_colon);
 
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
@@ -4348,6 +4345,12 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
   // Historical name for result builders.
   checkInvalidAttrName("_functionBuilder", "resultBuilder",
                        DeclAttrKind::ResultBuilder, diag::attr_renamed_warning);
+
+  // Historical name for @section and @used
+  checkInvalidAttrName("_section", "section", DeclAttrKind::Section,
+                       diag::attr_renamed_warning);
+  checkInvalidAttrName("_used", "used", DeclAttrKind::Used,
+                       diag::attr_renamed_warning);
 
   // Historical name for 'nonisolated'.
   if (!DK && Tok.getText() == "actorIndependent") {

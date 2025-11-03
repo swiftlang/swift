@@ -1348,9 +1348,9 @@ void PrintAST::printAttributes(const Decl *D) {
   if (Options.PrintSyntheticSILGenName
         && !D->getAttrs().hasAttribute<SILGenNameAttr>()) {
     if (canPrintSyntheticSILGenName(D)) {
-      auto mangledName = Mangle::ASTMangler(D->getASTContext())
-                            .mangleAnyDecl(cast<ValueDecl>(D), /*prefix=*/true,
-                                           /*respectOriginallyDefinedIn=*/true);
+      auto mangledName =
+          Mangle::ASTMangler(D->getASTContext())
+              .mangleAnyDecl(cast<ValueDecl>(D), /*addPrefix*/ true);
       Printer.printAttrName("@_silgen_name");
       Printer << "(";
       Printer.printEscapedStringLiteral(mangledName);
@@ -2726,8 +2726,8 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   bool needsDisambiguationAttr = false;
   if (auto *VD = dyn_cast<VarDecl>(ASD)) {
     if (auto *PBD = VD->getParentPatternBinding()) {
-      AccessorDecl *firstAccessor = *accessorsToPrint.begin();
-      if (!firstAccessor->isObservingAccessor()) {
+      if (accessorsToPrint.empty() ||
+          !accessorsToPrint.front()->isObservingAccessor()) {
         const auto i = PBD->getPatternEntryIndexForVarDecl(VD);
         if (Options.PrintExprs) {
           needsDisambiguationAttr |= bool(PBD->getInit(i));

@@ -49,7 +49,7 @@ extension UnsafePointer: @unsafe AtomicRepresentable where Pointee: ~Copyable {
   ///   representation used in atomic operations back into the logical type for
   ///   normal use, `Self`.
   ///
-  /// - Parameter storage: The storage representation for `Self` that's used
+  /// - Parameter representation: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
@@ -101,7 +101,7 @@ extension UnsafePointer: @unsafe AtomicOptionalRepresentable where Pointee: ~Cop
   ///   representation used in atomic operations on `Optional` back into the
   ///   logical type for normal use, `Self?`.
   ///
-  /// - Parameter storage: The optional storage representation for `Self?`
+  /// - Parameter representation: The optional storage representation for `Self?`
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
@@ -155,7 +155,7 @@ extension UnsafeMutablePointer: @unsafe AtomicRepresentable where Pointee: ~Copy
   ///   representation used in atomic operations back into the logical type for
   ///   normal use, `Self`.
   ///
-  /// - Parameter storage: The storage representation for `Self` that's used
+  /// - Parameter representation: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
@@ -208,7 +208,7 @@ where Pointee: ~Copyable {
   ///   representation used in atomic operations on `Optional` back into the
   ///   logical type for normal use, `Self?`.
   ///
-  /// - Parameter storage: The optional storage representation for `Self?`
+  /// - Parameter representation: The optional storage representation for `Self?`
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
@@ -262,7 +262,7 @@ extension UnsafeRawPointer: @unsafe AtomicRepresentable {
   ///   representation used in atomic operations back into the logical type for
   ///   normal use, `Self`.
   ///
-  /// - Parameter storage: The storage representation for `Self` that's used
+  /// - Parameter representation: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
@@ -314,7 +314,7 @@ extension UnsafeRawPointer: @unsafe AtomicOptionalRepresentable {
   ///   representation used in atomic operations on `Optional` back into the
   ///   logical type for normal use, `Self?`.
   ///
-  /// - Parameter storage: The optional storage representation for `Self?`
+  /// - Parameter representation: The optional storage representation for `Self?`
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
@@ -368,7 +368,7 @@ extension UnsafeMutableRawPointer: @unsafe AtomicRepresentable {
   ///   representation used in atomic operations back into the logical type for
   ///   normal use, `Self`.
   ///
-  /// - Parameter storage: The storage representation for `Self` that's used
+  /// - Parameter representation: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
@@ -420,7 +420,7 @@ extension UnsafeMutableRawPointer: @unsafe AtomicOptionalRepresentable {
   ///   representation used in atomic operations on `Optional` back into the
   ///   logical type for normal use, `Self?`.
   ///
-  /// - Parameter storage: The optional storage representation for `Self?`
+  /// - Parameter representation: The optional storage representation for `Self?`
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
@@ -474,7 +474,7 @@ extension Unmanaged: @unsafe AtomicRepresentable {
   ///   representation used in atomic operations back into the logical type for
   ///   normal use, `Self`.
   ///
-  /// - Parameter storage: The storage representation for `Self` that's used
+  /// - Parameter representation: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
@@ -534,7 +534,7 @@ extension Unmanaged: @unsafe AtomicOptionalRepresentable {
   ///   representation used in atomic operations on `Optional` back into the
   ///   logical type for normal use, `Self?`.
   ///
-  /// - Parameter storage: The optional storage representation for `Self?`
+  /// - Parameter representation: The optional storage representation for `Self?`
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
@@ -588,7 +588,7 @@ extension OpaquePointer: @unsafe AtomicRepresentable {
   ///   representation used in atomic operations back into the logical type for
   ///   normal use, `Self`.
   ///
-  /// - Parameter storage: The storage representation for `Self` that's used
+  /// - Parameter representation: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
@@ -640,7 +640,7 @@ extension OpaquePointer: @unsafe AtomicOptionalRepresentable {
   ///   representation used in atomic operations on `Optional` back into the
   ///   logical type for normal use, `Self?`.
   ///
-  /// - Parameter storage: The optional storage representation for `Self?`
+  /// - Parameter representation: The optional storage representation for `Self?`
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
@@ -694,7 +694,7 @@ extension ObjectIdentifier: AtomicRepresentable {
   ///   representation used in atomic operations back into the logical type for
   ///   normal use, `Self`.
   ///
-  /// - Parameter storage: The storage representation for `Self` that's used
+  /// - Parameter representation: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
@@ -750,7 +750,7 @@ extension ObjectIdentifier: AtomicOptionalRepresentable {
   ///   representation used in atomic operations on `Optional` back into the
   ///   logical type for normal use, `Self?`.
   ///
-  /// - Parameter storage: The optional storage representation for `Self?`
+  /// - Parameter representation: The optional storage representation for `Self?`
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
@@ -813,7 +813,7 @@ extension UnsafeBufferPointer: @unsafe AtomicRepresentable where Element: ~Copya
   ///   representation used in atomic operations back into the logical type for
   ///   normal use, `Self`.
   ///
-  /// - Parameter storage: The storage representation for `Self` that's used
+  /// - Parameter representation: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
@@ -881,7 +881,7 @@ where Element: ~Copyable
   ///   representation used in atomic operations back into the logical type for
   ///   normal use, `Self`.
   ///
-  /// - Parameter storage: The storage representation for `Self` that's used
+  /// - Parameter representation: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
@@ -947,7 +947,7 @@ extension UnsafeRawBufferPointer: @unsafe AtomicRepresentable {
   ///   representation used in atomic operations back into the logical type for
   ///   normal use, `Self`.
   ///
-  /// - Parameter storage: The storage representation for `Self` that's used
+  /// - Parameter representation: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
@@ -1013,7 +1013,7 @@ extension UnsafeMutableRawBufferPointer: @unsafe AtomicRepresentable {
   ///   representation used in atomic operations back into the logical type for
   ///   normal use, `Self`.
   ///
-  /// - Parameter storage: The storage representation for `Self` that's used
+  /// - Parameter representation: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)

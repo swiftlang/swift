@@ -23,8 +23,41 @@ class NonSendableKlass {
 
 actor MyActor {
   var ns: NonSendableKlass
+  @MainActor var globalActorNS: NonSendableKlass
+  nonisolated(unsafe) var nsNonisolatedUnsafe: NonSendableKlass
 
   func doSomething() async -> NonSendableKlass
+}
+
+actor CustomActorInstance {}
+
+@globalActor
+struct CustomActor {
+  static let shared = CustomActorInstance()
+}
+
+@MainActor class MainActorIsolatedKlass {
+  var ns: NonSendableKlass
+  @CustomActor var globalActorNS: NonSendableKlass
+  nonisolated(unsafe) var nsNonisolatedUnsafe: NonSendableKlass
+}
+
+class NonisolatedKlass {
+  var ns: NonSendableKlass
+  @CustomActor var globalActorNS: NonSendableKlass
+  nonisolated(unsafe) var nsNonisolatedUnsafe: NonSendableKlass
+}
+
+@MainActor struct MainActorIsolatedStruct {
+  var ns: NonSendableKlass
+  @CustomActor var globalActorNS: NonSendableKlass
+  nonisolated(unsafe) var nsNonisolatedUnsafe: NonSendableKlass
+}
+
+struct NonisolatedStruct {
+  var ns: NonSendableKlass
+  @CustomActor var globalActorNS: NonSendableKlass
+  nonisolated(unsafe) var nsNonisolatedUnsafe: NonSendableKlass
 }
 
 sil @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
@@ -892,6 +925,304 @@ bb0(%0 : @guaranteed $Optional<MyActor>):
   debug_value [trace] %1d
   end_borrow %1b
   destroy_value %1a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+//////////////////////////////////////////////
+// MARK: Global Actor On Static Field Tests //
+//////////////////////////////////////////////
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_actor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $MyActor, #MyActor.ns
+// CHECK: Isolation: 'self'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_actor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_actor : $@convention(thin) (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MyActor, let, name "self"
+  %1 = ref_element_addr %0 : $MyActor, #MyActor.ns
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_actor_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $MyActor, #MyActor.globalActorNS
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_actor_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_actor_globalactor : $@convention(thin) (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MyActor, let, name "self"
+  %1 = ref_element_addr %0 : $MyActor, #MyActor.globalActorNS
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_actor_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $MyActor, #MyActor.nsNonisolatedUnsafe
+// CHECK: Isolation: 'self'-isolated: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_actor_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_actor_nonisolated_unsafe : $@convention(thin) (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MyActor, let, name "self"
+  %1 = ref_element_addr %0 : $MyActor, #MyActor.nsNonisolatedUnsafe
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorklass: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.ns
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorklass: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorklass : $@convention(thin) (@guaranteed MainActorIsolatedKlass) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedKlass, let, name "self"
+  %1 = ref_element_addr %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.ns
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorklass_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.globalActorNS
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorklass_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorklass_globalactor : $@convention(thin) (@guaranteed MainActorIsolatedKlass) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedKlass, let, name "self"
+  %1 = ref_element_addr %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.globalActorNS
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorklass_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.nsNonisolatedUnsafe
+// CHECK: Isolation: main actor-isolated: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorklass_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorklass_nonisolated_unsafe : $@convention(thin) (@guaranteed MainActorIsolatedKlass) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedKlass, let, name "self"
+  %1 = ref_element_addr %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.nsNonisolatedUnsafe
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedklass: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $NonisolatedKlass, #NonisolatedKlass.ns
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedklass: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedklass : $@convention(thin) (@guaranteed NonisolatedKlass) -> () {
+bb0(%0 : @guaranteed $NonisolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedKlass, let, name "self"
+  %1 = ref_element_addr %0 : $NonisolatedKlass, #NonisolatedKlass.ns
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedklass_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $NonisolatedKlass, #NonisolatedKlass.globalActorNS
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedklass_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedklass_globalactor : $@convention(thin) (@guaranteed NonisolatedKlass) -> () {
+bb0(%0 : @guaranteed $NonisolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedKlass, let, name "self"
+  %1 = ref_element_addr %0 : $NonisolatedKlass, #NonisolatedKlass.globalActorNS
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedklass_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $NonisolatedKlass, #NonisolatedKlass.nsNonisolatedUnsafe
+// CHECK: Isolation: disconnected: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedklass_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedklass_nonisolated_unsafe : $@convention(thin) (@guaranteed NonisolatedKlass) -> () {
+bb0(%0 : @guaranteed $NonisolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedKlass, let, name "self"
+  %1 = ref_element_addr %0 : $NonisolatedKlass, #NonisolatedKlass.nsNonisolatedUnsafe
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorstruct : $@convention(thin) (@guaranteed MainActorIsolatedStruct) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedStruct, let, name "self"
+  %1 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.globalActorNS
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorstruct_globalactor : $@convention(thin) (@guaranteed MainActorIsolatedStruct) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedStruct, let, name "self"
+  %1 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.globalActorNS
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.nsNonisolatedUnsafe
+// CHECK: Isolation: main actor-isolated: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorstruct_nonisolated_unsafe : $@convention(thin) (@guaranteed MainActorIsolatedStruct) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedStruct, let, name "self"
+  %1 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.nsNonisolatedUnsafe
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_addr: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_addr: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorstruct_addr : $@convention(thin) (@in_guaranteed MainActorIsolatedStruct) -> () {
+bb0(%0 : $*MainActorIsolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $*MainActorIsolatedStruct, let, name "self"
+  %1 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_addr_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.globalActorNS
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_addr_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorstruct_addr_globalactor : $@convention(thin) (@in_guaranteed MainActorIsolatedStruct) -> () {
+bb0(%0 : $*MainActorIsolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $*MainActorIsolatedStruct, let, name "self"
+  %1 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.globalActorNS
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_addr_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.nsNonisolatedUnsafe
+// CHECK: Isolation: main actor-isolated: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_addr_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorstruct_addr_nonisolated_unsafe : $@convention(thin) (@in_guaranteed MainActorIsolatedStruct) -> () {
+bb0(%0 : $*MainActorIsolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $*MainActorIsolatedStruct, let, name "self"
+  %1 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.nsNonisolatedUnsafe
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_extract %0 : $NonisolatedStruct, #NonisolatedStruct.ns
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedstruct : $@convention(thin) (@guaranteed NonisolatedStruct) -> () {
+bb0(%0 : @guaranteed $NonisolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedStruct, let, name "self"
+  %1 = struct_extract %0 : $NonisolatedStruct, #NonisolatedStruct.ns
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_extract %0 : $NonisolatedStruct, #NonisolatedStruct.globalActorNS
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedstruct_globalactor : $@convention(thin) (@guaranteed NonisolatedStruct) -> () {
+bb0(%0 : @guaranteed $NonisolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedStruct, let, name "self"
+  %1 = struct_extract %0 : $NonisolatedStruct, #NonisolatedStruct.globalActorNS
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_extract %0 : $NonisolatedStruct, #NonisolatedStruct.nsNonisolatedUnsafe
+// CHECK: Isolation: disconnected: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedstruct_nonisolated_unsafe : $@convention(thin) (@guaranteed NonisolatedStruct) -> () {
+bb0(%0 : @guaranteed $NonisolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedStruct, let, name "self"
+  %1 = struct_extract %0 : $NonisolatedStruct, #NonisolatedStruct.nsNonisolatedUnsafe
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %0 : $*NonisolatedStruct, #NonisolatedStruct.ns
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr : $@convention(thin) (@in_guaranteed NonisolatedStruct) -> () {
+bb0(%0 : $*NonisolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $*NonisolatedStruct, let, name "self"
+  %1 = struct_element_addr %0 : $*NonisolatedStruct, #NonisolatedStruct.ns
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %0 : $*NonisolatedStruct, #NonisolatedStruct.globalActorNS
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr_globalactor : $@convention(thin) (@in_guaranteed NonisolatedStruct) -> () {
+bb0(%0 : $*NonisolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $*NonisolatedStruct, let, name "self"
+  %1 = struct_element_addr %0 : $*NonisolatedStruct, #NonisolatedStruct.globalActorNS
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %0 : $*NonisolatedStruct, #NonisolatedStruct.nsNonisolatedUnsafe
+// CHECK: Isolation: disconnected: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr_nonisolated_unsafe : $@convention(thin) (@in_guaranteed NonisolatedStruct) -> () {
+bb0(%0 : $*NonisolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $*NonisolatedStruct, let, name "self"
+  %1 = struct_element_addr %0 : $*NonisolatedStruct, #NonisolatedStruct.nsNonisolatedUnsafe
+  debug_value [trace] %1
   %9999 = tuple ()
   return %9999 : $()
 }

@@ -209,10 +209,11 @@ BUILTIN_BINARY_PREDICATE(FCMP_ULE, "fcmp_ule", "n", FloatOrVector)
 BUILTIN_BINARY_PREDICATE(FCMP_UNE, "fcmp_une", "n", FloatOrVector)
 BUILTIN_BINARY_PREDICATE(FCMP_UNO, "fcmp_uno", "n", FloatOrVector)
 
-// BUILTIN_SIL_OPERATION - Operations that can be lowered to SIL instructions.
-// These have various types.
-// Since these operations will be lowered to SIL Instructions, we do not
-// assign any attributes on them.
+// BUILTIN_SIL_OPERATION - Operations that can be lowered to SIL
+// instructions. They can never be invoked via a BuiltinInst and are instead
+// expected to just be used by SILGen to emit sequences of non-BuiltinInst
+// instructions. These have various types. Since these operations will be
+// lowered to SIL Instructions, we do not assign any attributes on them.
 #ifndef BUILTIN_SIL_OPERATION
 #define BUILTIN_SIL_OPERATION(Id, Name, Overload) BUILTIN(Id, Name, "")
 #endif
@@ -558,8 +559,9 @@ BUILTIN_RUNTIME_CALL(ErrorInMain, "errorInMain", "")
 /// nominal type is Optional.
 BUILTIN_RUNTIME_CALL(IsOptionalType, "isOptional", "")
 
-// BUILTIN_MISC_OPERATION - Miscellaneous operations without a unifying class.
-// These have various types.
+/// BUILTIN_MISC_OPERATION - Miscellaneous operations without a unifying class.
+/// These have various types. They are emitted as BuiltinInst in a standard way
+/// by SILGen.
 #ifndef BUILTIN_MISC_OPERATION
 #define BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload) \
           BUILTIN(Id, Name, Attrs)

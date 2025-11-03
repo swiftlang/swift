@@ -206,8 +206,8 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
 
       auto inLocalContext =
           inst->getProperty()->getDeclContext()->isLocalContext();
-      auto selfOrLocalValue = inst->getSelfOrLocalOperand();
-      bool isRefSelf =
+      const auto selfOrLocalValue = inst->getSelfOrLocalOperand();
+      const bool isRefSelf =
           selfOrLocalValue->getType().getASTType()->mayHaveSuperclass();
 
       auto emitFieldReference = [&](SILValue selfRef, VarDecl *field,
@@ -225,40 +225,58 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
         return fieldRef;
       };
 
-      SmallVector<SILValue> arguments;
+      /// Returns the reference of self ready for modification, and a flag
+      /// indicating whether a begin_access was emitted that must be ended.
+      auto emitBeginModifyOfSelf = [&]() -> std::pair<SILValue, bool> {
+        if (isRefSelf)
+          return {b.emitBeginBorrowOperation(loc, selfOrLocalValue), false};
 
-      // First, emit all of the properties listed in `initializes`. They
-      // are passed as indirect results.
-      SILValue selfRef = nullptr;
-      bool needInsertEndAccess = false;
-      if (inLocalContext) {
-        // add the local projection which is for the _x backing local storage
-        arguments.push_back(selfOrLocalValue);
-      } else {
-        if (isRefSelf) {
-          selfRef = b.emitBeginBorrowOperation(loc, selfOrLocalValue);
-        } else if (isa<BeginAccessInst>(selfOrLocalValue)) {
-          // Don't insert an access scope if there is already one. This avoids
-          // inserting a dynamic access check when the parent is static (and therefore
-          // can be statically enforced).
-          selfRef = selfOrLocalValue;
-        } 
-        else {
-          selfRef =
-              b.createBeginAccess(loc, selfOrLocalValue, SILAccessKind::Modify,
-                                  SILAccessEnforcement::Dynamic,
-                                  /*noNestedConflict=*/false,
-                                  /*fromBuiltin=*/false);
-          needInsertEndAccess = true;
+        // Don't insert an access scope if there is already one. This avoids
+        // inserting a dynamic access check when the parent is static (and
+        // therefore can be statically enforced).
+        if (auto *bai = dyn_cast<BeginAccessInst>(selfOrLocalValue)) {
+          bai->setAccessKind(SILAccessKind::Modify);
+          return {selfOrLocalValue, false};
         }
 
-        unsigned index = 0;
-        inst->forEachInitializedProperty([&](VarDecl *property) {
-          arguments.push_back(emitFieldReference(
-              selfRef, property,
-              /*emitDestroy=*/inst->isPropertyAlreadyInitialized(index)));
-          index++;
-        });
+        return {b.createBeginAccess(loc, selfOrLocalValue,
+                                    SILAccessKind::Modify,
+                                    SILAccessEnforcement::Dynamic,
+                                    /*noNestedConflict=*/false,
+                                    /*fromBuiltin=*/false),
+                /*needsEndAccess=*/true};
+      };
+
+      auto initializeAddress = [&b](SILLocation loc, SILValue src, SILValue dest) {
+        ASSERT(dest->getType().isAddress());
+        auto qualifier = src->getType().isTrivial(b.getFunction())
+                             ? StoreOwnershipQualifier::Trivial
+                             : StoreOwnershipQualifier::Init;
+        b.createStore(loc, src, dest, qualifier);
+      };
+
+      // Set-up the arguments for the apply.
+      SmallVector<SILValue> arguments;
+      SILValue selfRef = nullptr;
+      bool needInsertEndAccess = false;
+
+      if (convention.useLoweredAddresses()) {
+        // First, emit all of the properties listed in `initializes`. They
+        // are passed as indirect results.
+        if (inLocalContext) {
+          // add the local projection which is for the _x backing local storage
+          arguments.push_back(selfOrLocalValue);
+        } else {
+          std::tie(selfRef, needInsertEndAccess) = emitBeginModifyOfSelf();
+
+          unsigned index = 0;
+          inst->forEachInitializedProperty([&](VarDecl *property) {
+            arguments.push_back(emitFieldReference(
+                selfRef, property,
+                /*emitDestroy=*/inst->isPropertyAlreadyInitialized(index)));
+            index++;
+          });
+        }
       }
 
       // Now emit `initialValue` which is the only argument specified
@@ -270,7 +288,40 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
       for (auto *property : inst->getAccessedProperties())
         arguments.push_back(emitFieldReference(selfRef, property));
 
-      b.createApply(loc, initFn, SubstitutionMap(), arguments);
+
+      // Actually emit the apply.
+      auto apply = b.createApply(loc, initFn, SubstitutionMap(), arguments);
+      ASSERT(apply->getNumResults() == 1 && "multi-result not handled yet");
+
+
+      // Handle direct results in the case of -enable-sil-opaque-values
+      if (!convention.useLoweredAddresses()) {
+        // Write the result(s) to the field(s) to be initialized.
+        if (inLocalContext) {
+          initializeAddress(loc, apply->getResult(0), selfOrLocalValue);
+        } else {
+          std::tie(selfRef, needInsertEndAccess) = emitBeginModifyOfSelf();
+
+          SILValue result = apply->getResult(0);
+
+          ASSERT(!result->getType().isTuple() && "insert destructure_tuple?");
+
+          SmallVector<SILValue> results;
+          results.push_back(result);
+
+          ASSERT(results.size() == inst->getNumInitializedProperties());
+
+          unsigned index = 0;
+          inst->forEachInitializedProperty([&](VarDecl *property) {
+            auto fieldRef = emitFieldReference(
+                selfRef, property,
+                /*emitDestroy=*/inst->isPropertyAlreadyInitialized(index));
+
+            initializeAddress(loc, results[index], fieldRef);
+            index++;
+          });
+        }
+      }
 
       if (selfRef) {
         if (isRefSelf) {

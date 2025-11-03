@@ -109,6 +109,7 @@ import HTTP2StateMachine
 import IndexPathTest
 import InsertCharacter
 import IntegerParsing
+import IntegerToString
 import Integrate
 import IterateData
 import Join
@@ -146,6 +147,7 @@ import ObserverPartiallyAppliedMethod
 import ObserverUnappliedMethod
 import OpaqueConsumingUsers
 import OpenClose
+import ParameterPacks
 import Phonebook
 import PointerArithmetics
 import PolymorphicCalls
@@ -312,6 +314,7 @@ register(HTTP2StateMachine.benchmarks)
 register(IndexPathTest.benchmarks)
 register(InsertCharacter.benchmarks)
 register(IntegerParsing.benchmarks)
+register(IntegerToString.benchmarks)
 register(Integrate.benchmarks)
 register(IterateData.benchmarks)
 register(Join.benchmarks)
@@ -349,6 +352,7 @@ register(ObserverPartiallyAppliedMethod.benchmarks)
 register(ObserverUnappliedMethod.benchmarks)
 register(OpaqueConsumingUsers.benchmarks)
 register(OpenClose.benchmarks)
+register(ParameterPacks.benchmarks)
 register(Phonebook.benchmarks)
 register(PointerArithmetics.benchmarks)
 register(PolymorphicCalls.benchmarks)

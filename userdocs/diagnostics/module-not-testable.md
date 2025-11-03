@@ -1,4 +1,6 @@
-# Module not testable
+# Module not testable (ModuleNotTestable)
+
+## Overview
 
 Modules imported using `@testable import` must have been compiled using the `-enable-testing` compiler flag.
 

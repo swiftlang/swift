@@ -68,7 +68,7 @@ void OutliningMetadataCollector::collectTypeMetadata(SILType ty) {
   }
 
   // Substitute opaque types if allowed.
-  ty = IGF.IGM.substOpaqueTypesWithUnderlyingTypes(ty, CanGenericSignature());
+  ty = IGF.IGM.substOpaqueTypesWithUnderlyingTypes(ty);
 
   collectTypeMetadataForLayout(ty);
   collectTypeMetadataForDeinit(ty);

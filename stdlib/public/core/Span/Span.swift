@@ -292,7 +292,7 @@ extension Span where Element: BitwiseCopyable {
   ///
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized element.
-  ///   - byteCount: the number of initialized elements in the span.
+  ///   - byteCount: the number of bytes in the span.
   @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
   @unsafe

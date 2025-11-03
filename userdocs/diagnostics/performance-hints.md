@@ -1,3 +1,3 @@
-# Swift Performance Hint: Function returning Array or Dictionary type
+# Performance hints (PerformanceHints)
 
-- TODO: Docs
+## Overview

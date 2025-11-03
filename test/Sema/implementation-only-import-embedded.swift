@@ -11,7 +11,7 @@
 // RUN:   -enable-experimental-feature Embedded
 
 // RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %s -I %t \
-// RUN:   -swift-version 5 -target arm64-apple-none-macho \
+// RUN:   -swift-version 6 -target arm64-apple-none-macho \
 // RUN:   -define-availability "availMacro:macOS 26.0, iOS 26.0" \
 // RUN:   -enable-experimental-feature Embedded
 
@@ -20,9 +20,11 @@
 
 @_implementationOnly import directs
 // expected-warning @-1 {{using '@_implementationOnly' without enabling library evolution for 'main' may lead to instability during execution}}
-import indirects
+@_spi(S) @_spiOnly import indirects
 
 internal func localInternalFunc() {} // expected-note {{global function 'localInternalFunc()' is not '@usableFromInline' or public}}
+
+@_spi(S) public func localSPI() {}
 
 @inlinable
 public func explicitlyInlinable(arg: StructFromDirect = StructFromDirect()) {
@@ -77,6 +79,9 @@ public func implicitlyInlinablePublic(arg: StructFromDirect = StructFromDirect()
   explicitNonInliable()
 
   if #available(availMacro, *) { }
+
+  localSPI()
+  spiFunctionFromDirect()
 }
 
 private func implicitlyInlinablePrivate(arg: StructFromDirect = StructFromDirect()) {
@@ -186,6 +191,7 @@ struct Accessors {
   }
 }
 
+@_spi(S)
 public func legalAccessToIndirect(arg: StructFromIndirect = StructFromIndirect()) {
   _ = StructFromIndirect()
 

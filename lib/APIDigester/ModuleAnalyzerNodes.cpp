@@ -1120,8 +1120,7 @@ static StringRef calculateMangledName(SDKContext &Ctx, ValueDecl *VD) {
     return Ctx.buffer(attr->Name);
   }
   Mangle::ASTMangler NewMangler(VD->getASTContext());
-  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, true,
-                                    /*bool respectOriginallyDefinedIn*/true));
+  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, /*addPrefix*/ true));
 }
 
 static StringRef calculateLocation(SDKContext &SDKCtx, Decl *D) {

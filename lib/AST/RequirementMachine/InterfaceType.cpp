@@ -424,7 +424,12 @@ RewriteContext::getRelativeTermForType(CanType typeWitness,
   // Get the substitution S corresponding to τ_0_n.
   unsigned index = getGenericParamIndex(typeWitness->getRootGenericParam());
   result = MutableTerm(substitutions[index]);
-  ASSERT(result.back().getKind() != Symbol::Kind::Shape);
+  bool hasShape = false;
+
+  if (result.hasShape()) {
+    hasShape = true;
+    result.removeShape();
+  }
 
   // If the substitution is a term consisting of a single protocol symbol
   // [P], save P for later.
@@ -463,6 +468,9 @@ RewriteContext::getRelativeTermForType(CanType typeWitness,
   for (auto iter = symbols.rbegin(), end = symbols.rend(); iter != end; ++iter)
     result.add(*iter);
 
+  if (hasShape)
+    result.add(Symbol::forShape(*this));
+
   return result;
 }
 
@@ -485,7 +493,7 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
           auto substitution = substitutions[index];
 
           bool isShapePosition = (pos == TypePosition::Shape);
-          bool isShapeTerm = (substitution.back() == Symbol::forShape(Context));
+          bool isShapeTerm = substitution.hasShape();
           if (isShapePosition != isShapeTerm) {
             ABORT([&](auto &out) {
               out << "Shape vs. type mixup\n\n";
@@ -504,8 +512,8 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
           // Undo the thing where the count type of a PackExpansionType
           // becomes a shape term.
           if (isShapeTerm) {
-            MutableTerm mutTerm(substitution.begin(), substitution.end() - 1);
-            substitution = Term::get(mutTerm, Context);
+            MutableTerm noShape = substitution.termWithoutShape();
+            substitution = Term::get(noShape, Context);
           }
 
           // Prepend the prefix of the lookup key to the substitution.
@@ -571,8 +579,6 @@ RewriteContext::getRelativeSubstitutionSchemaFromType(
         //
         // τ_0_0 := T
         // τ_0_1 := U.[shape]
-        ASSERT(pos != TypePosition::Shape && "Not implemented");
-
         unsigned index = result.size();
 
         result.push_back(Term::get(term, *this));

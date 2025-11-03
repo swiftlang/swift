@@ -126,3 +126,9 @@ func sameTypeMatch1<T: PP, each U: PP, each V: PP>(t: T, u: repeat each U, v: re
 // CHECK-NEXT: <T, each U, each V where T : PP, repeat each U : PP, (repeat (each U, each V)) : Any, repeat each V : PP, T.[PP]A == (/* shape: each U */ repeat ())>
 func sameTypeMatch2<T: PP, each U: PP, each V: PP>(t: T, u: repeat each U, v: repeat each V)
   where T.A == Shape<repeat each U>, T.A == Shape<repeat each V> {}
+
+// CHECK-LABEL: PackTupleNesting
+// CHECK-NEXT: <T, U, V, each W where T == ((repeat each W), (repeat each W)), U == (repeat each W), V == (repeat each W)>
+struct PackTupleNesting<T, U, V, each W>
+  where T == ((repeat each W), U),
+        T == (V, (repeat each W)) {} // expected-warning 3{{same-type requirement makes generic parameter}}

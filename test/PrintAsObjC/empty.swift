@@ -41,6 +41,13 @@
 // CHECK-NEXT: #endif
 // CHECK-NEXT: #endif
 
+// CHECK: #if defined(__cplusplus)
+// CHECK-NEXT: extern "C" {
+// CHECK-NEXT: #endif
+
+// CHECK: #if defined(__cplusplus)
+// CHECK-NEXT: } // extern "C"
+// CHECK-NEXT: #endif
 
 // CHECK-NOT: {{[@;{}]}}
 

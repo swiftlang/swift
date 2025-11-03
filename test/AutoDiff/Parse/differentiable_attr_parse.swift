@@ -149,7 +149,7 @@ func two(x: Float, y: Float) -> Float {
   return x + y
 }
 
-// expected-error @+1 {{unexpected ',' separator}}
+// expected-error @+1 {{unexpected ',' separator}} {{32-33=}}
 @differentiable(reverse, wrt: 0,)
 func two(x: Float, y: Float) -> Float {
   return x + y
@@ -173,13 +173,13 @@ func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-// expected-error @+1 {{unexpected ',' separator}}
+// expected-error @+1 {{unexpected ',' separator}} {{34-35=}}
 @differentiable(reverse, wrt: (x),)
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-// expected-error @+1 {{unexpected ',' separator}}
+// expected-error @+1 {{unexpected ',' separator}} {{34-35=}}
 @differentiable(reverse, wrt: (x), where T)
 func bar<T : Numeric>(_ x: T, _: T) -> T {
     return 1 + x
