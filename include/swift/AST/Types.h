@@ -372,6 +372,8 @@ enum class TypeMatchFlags {
   IgnoreSendability = 1 << 7,
   /// Ignore global actor isolation attributes on functions when matching types.
   IgnoreFunctionGlobalActorIsolation = 1 << 8,
+  /// Require parameter labels to match.
+  RequireMatchingParameterLabels = 1 << 9,
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
