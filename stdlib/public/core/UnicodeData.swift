@@ -191,3 +191,13 @@ extension Unicode {
     }
   }
 }
+
+// Implemented in the C++ Unicode tables
+@_extern(c)
+func _swift_stdlib_getNormData(_ scalar: UInt32) -> UInt16
+
+@_extern(c)
+func _swift_stdlib_getDecompositionEntry(_ scalar: UInt32) -> UInt32
+
+@_extern(c)
+func _swift_stdlib_getComposition(_ x: UInt32, _ y: UInt32) -> UInt32
