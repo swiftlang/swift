@@ -14,8 +14,6 @@
 @_exported import _GUIDDef
 @_exported import WinSDK // Clang module
 
-public typealias _GUID = GUID
-
 // WinBase.h
 @inlinable
 public var HANDLE_FLAG_INHERIT: DWORD {
