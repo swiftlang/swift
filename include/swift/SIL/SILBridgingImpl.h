@@ -406,6 +406,10 @@ BridgedASTType BridgedType::getRawLayoutSubstitutedCountType() const {
   return {unbridged().getRawLayoutSubstitutedCountType().getPointer()};
 }
 
+bool BridgedType::mayHaveCustomDeinit(BridgedFunction f) const {
+  return unbridged().mayHaveCustomDeinit(*f.getFunction());
+}
+
 SwiftInt BridgedType::getCaseIdxOfEnumType(BridgedStringRef name) const {
   return unbridged().getCaseIdxOfEnumType(name.unbridged());
 }

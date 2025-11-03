@@ -1373,6 +1373,13 @@ SILType::getConcurrencyDiagnosticBehavior(SILFunction *fn) const {
   return getASTType()->getConcurrencyDiagnosticBehaviorLimit(fromDC);
 }
 
+bool SILType::mayHaveCustomDeinit(const SILFunction &function) const {
+  auto contextType =
+    hasTypeParameter() ? function.mapTypeIntoContext(*this) : *this;
+  auto properties = function.getTypeProperties(contextType);
+  return properties.mayHaveCustomDeinit();
+}
+
 namespace swift::test {
 // Arguments:
 // - SILValue: value
