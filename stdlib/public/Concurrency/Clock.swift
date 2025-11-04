@@ -190,7 +190,7 @@ internal func _getClockRes(
   nanoseconds: UnsafeMutablePointer<Int64>,
   clock: CInt)
 
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 @_silgen_name("swift_sleep")
 internal func _sleep(
   seconds: Int64,
