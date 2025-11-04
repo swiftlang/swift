@@ -14,6 +14,7 @@ distributed actor MyActor {
   // expected-note@-2{{you can provide a module-wide default actor system by declaring:}}
   // expected-error@-3{{type 'MyActor' does not conform to protocol 'DistributedActor'}}
   // expected-note@-4 {{add stubs for conformance}}
+  // expected-error@-5 {{type 'MyActor' does not conform to protocol 'Identifiable'}}
 
   distributed var foo: String {
     return "xyz"
@@ -25,6 +26,7 @@ distributed actor BadSystemActor {
   // expected-note@-2{{you can provide a module-wide default actor system by declaring:}}
   // expected-error@-3{{type 'BadSystemActor' does not conform to protocol 'DistributedActor'}}
   // expected-note@-4 {{add stubs for conformance}}
+  // expected-error@-5 {{type 'BadSystemActor' does not conform to protocol 'Identifiable'}}
 
   // This system does not exist: but we should not crash, but just diagnose about it:
   typealias ActorSystem = ClusterSystem // expected-error{{cannot find type 'ClusterSystem' in scope}}
