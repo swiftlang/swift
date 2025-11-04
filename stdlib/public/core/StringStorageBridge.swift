@@ -166,7 +166,12 @@ extension _AbstractStringStorage {
       // CFString will only give us ASCII bytes here, but that's fine.
       // We already handled non-ASCII UTF8 strings earlier since they're Swift.
       if let asciiEqual = unsafe withCocoaASCIIPointer(other, work: { (ascii) -> Bool in
-        return unsafe (start == ascii || (memcmp(start, ascii, self.count) == 0))
+        // otherUTF16Length is the same as the byte count here IFF it's ASCII
+        // self.count could still be utf8
+        if count != otherUTF16Length {
+          return 0
+        }
+        return unsafe (start == ascii || (memcmp(start, ascii, otherUTF16Length) == 0))
       }) {
         return asciiEqual ? 1 : 0
       }
