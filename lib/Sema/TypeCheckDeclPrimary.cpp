@@ -1065,7 +1065,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
                   });
             }
             auto *conflictDecl = current == declToDiagnose ? other : current;
-            if (conflictDecl->isSpecialDistributedProperty()) {
+            if (conflictDecl->isSpecialDistributedActorProperty()) {
               declToDiagnose->diagnose(
                   diag::distributed_actor_user_defined_special_property,
                   other->getName());

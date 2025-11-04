@@ -7852,7 +7852,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         // The synthesized "id" and "actorSystem" are the only exceptions,
         // because the implementation mirrors them.
         if (nominal->isDistributedActor() &&
-            !var->isSpecialDistributedProperty()) {
+            !var->isSpecialDistributedActorProperty()) {
           diagnoseAndRemoveAttr(attr,
                                 diag::nonisolated_distributed_actor_storage);
           return;

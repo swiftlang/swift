@@ -74,7 +74,7 @@ void SILGenFunction::emitDistributedRemoteActorDeinit(
           continue;
 
         // Just to double-check, we only want to destroy `id` and `actorSystem`
-        if (vd->isSpecialDistributedProperty())
+        if (vd->isSpecialDistributedActorProperty())
           destroyClassMember(cleanupLoc, borrowedSelf, vd);
       }
 
