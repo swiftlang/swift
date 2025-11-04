@@ -15,12 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DistributedDecl.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessRequests.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTWalker.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignAsyncConvention.h"
@@ -29,7 +30,6 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -39,9 +39,10 @@
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
-#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h" // FIXME: Bad dependency
 #include "clang/Lex/MacroInfo.h"
@@ -51,7 +52,6 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
-#include "swift/Basic/StringExtras.h"
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
@@ -198,7 +198,7 @@ Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
 
   auto DA = C.getDistributedActorDecl();
   if (!DA)
-    return ErrorType::get(C); // FIXME(distributed): just use Type()
+    return ErrorType::get(C);
 
   // Dig out the actor system type.
   Type selfType = actor->getSelfInterfaceType();
@@ -229,17 +229,16 @@ Type swift::getDistributedActorSerializationType(
   auto resultTy = getAssociatedTypeOfDistributedSystemOfActor(
       actorOrExtension,
       ctx.Id_SerializationRequirement);
+  if (resultTy->hasError())
+    return resultTy;
 
   // Protocols are allowed to either not provide a `SerializationRequirement`
   // at all or provide it in a conformance requirement.
-  if ((!resultTy || resultTy->hasDependentMember()) &&
+  if (resultTy->hasDependentMember() &&
       actorOrExtension->getSelfProtocolDecl()) {
     auto sig = actorOrExtension->getGenericSignatureOfContext();
 
     auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
-    if (!actorProtocol)
-      return Type();
-
     auto serializationTy =
         actorProtocol->getAssociatedType(ctx.Id_SerializationRequirement)
             ->getDeclaredInterfaceType();
@@ -331,29 +330,40 @@ swift::getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
 Type swift::getAssociatedTypeOfDistributedSystemOfActor(
     DeclContext *actorOrExtension, Identifier member) {
   auto &ctx = actorOrExtension->getASTContext();
+  auto getLoc = [&]() { return extractNearestSourceLoc(actorOrExtension); };
 
   auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
-  if (!actorProtocol)
-    return Type();
+  if (!actorProtocol) {
+    ctx.Diags.diagnose(getLoc(), diag::broken_stdlib_type, "DistributedActor");
+    return ErrorType::get(ctx);
+  }
 
   AssociatedTypeDecl *actorSystemDecl =
       actorProtocol->getAssociatedType(ctx.Id_ActorSystem);
-  if (!actorSystemDecl)
-    return Type();
+  if (!actorSystemDecl) {
+    ctx.Diags.diagnose(getLoc(), diag::broken_distributed_actor_requirement);
+    return ErrorType::get(ctx);
+  }
 
   auto actorSystemProtocol = ctx.getDistributedActorSystemDecl();
-  if (!actorSystemProtocol)
-    return Type();
+  if (!actorSystemProtocol) {
+    ctx.Diags.diagnose(getLoc(), diag::broken_stdlib_type,
+                       "DistributedActorSystem");
+    return ErrorType::get(ctx);
+  }
 
   AssociatedTypeDecl *memberTypeDecl =
       actorSystemProtocol->getAssociatedType(member);
-  if (!memberTypeDecl)
-    return Type();
+  if (!memberTypeDecl) {
+    ctx.Diags.diagnose(getLoc(),
+                       diag::broken_distributed_actor_system_requirement);
+    return ErrorType::get(ctx);
+  }
 
   Type memberTy = DependentMemberType::get(
-    DependentMemberType::get(actorProtocol->getSelfInterfaceType(),
-                             actorSystemDecl),
-    memberTypeDecl);
+      DependentMemberType::get(actorProtocol->getSelfInterfaceType(),
+                               actorSystemDecl),
+      memberTypeDecl);
 
   auto sig = actorOrExtension->getGenericSignatureOfContext();
 
@@ -365,7 +375,7 @@ Type swift::getAssociatedTypeOfDistributedSystemOfActor(
       lookupConformance(
           actorType->getDeclaredInterfaceType(), actorProtocol);
   if (actorConformance.isInvalid())
-    return Type();
+    return ErrorType::get(ctx);
 
   auto subs = SubstitutionMap::getProtocolSubstitutions(actorConformance);
 
@@ -432,11 +442,7 @@ swift::getDistributedSerializationRequirements(
 }
 
 bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
-    ASTContext &C,
-    Type type) {
-  if (!type)
-    return false;
-
+    ASTContext &C, Type type) {
   if (type->hasError())
     return false;
 
@@ -1350,6 +1356,42 @@ bool ValueDecl::isDistributedGetAccessor() const {
   }
 
   return false;
+}
+
+std::optional<SpecialDistributedProperty>
+ValueDecl::isSpecialDistributedProperty(bool onlyCheckName) const {
+  if (!isa<VarDecl>(this))
+    return std::nullopt;
+
+  auto *DC = getDeclContext();
+  auto &ctx = DC->getASTContext();
+
+  auto kind = [&]() -> std::optional<SpecialDistributedProperty> {
+    auto name = getName();
+    if (name.isSimpleName(ctx.Id_id))
+      return SpecialDistributedProperty::Id;
+    if (name.isSimpleName(ctx.Id_actorSystem))
+      return SpecialDistributedProperty::ActorSystem;
+
+    return std::nullopt;
+  }();
+  if (!kind || onlyCheckName)
+    return kind;
+
+  // The properties can only be synthesized in the nominal itself.
+  auto *CD = dyn_cast<ClassDecl>(DC);
+  if (!CD || !CD->isDistributedActor())
+    return std::nullopt;
+
+  // The synthesized bit doesn't get preserved by serialization or module
+  // interfaces, we only need to check it when compiling a SourceFile though
+  // since we'll diagnose any conflicting user-defined versions.
+  if (!isSynthesized() && DC->getParentSourceFile() &&
+      !DC->isInSwiftinterface()) {
+    return std::nullopt;
+  }
+
+  return kind;
 }
 
 ConstructorDecl *

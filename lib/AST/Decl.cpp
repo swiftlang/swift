@@ -6449,6 +6449,16 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   if (isa<ProtocolDecl>(this))
     return;
 
+  auto baseName = member.getBaseName();
+  auto &Context = getASTContext();
+
+  // For a distributed actor `id` and `actorSystem` can be synthesized without
+  // causing cycles so do them above the cycle guard.
+  if (member.isSimpleName(Context.Id_id))
+    (void)getDistributedActorIDProperty();
+  if (member.isSimpleName(Context.Id_actorSystem))
+    (void)getDistributedActorSystemProperty();
+
   // Silently break cycles here because we can't be sure when and where a
   // request to synthesize will come from yet.
   // FIXME: rdar://56844567
@@ -6458,14 +6468,12 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   Bits.NominalTypeDecl.IsComputingSemanticMembers = true;
   SWIFT_DEFER { Bits.NominalTypeDecl.IsComputingSemanticMembers = false; };
 
-  auto baseName = member.getBaseName();
-  auto &Context = getASTContext();
   std::optional<ImplicitMemberAction> action = std::nullopt;
   if (baseName.isConstructor())
     action.emplace(ImplicitMemberAction::ResolveImplicitInit);
 
   if (member.isSimpleName() && !baseName.isSpecial()) {
-    if (baseName.getIdentifier() == getASTContext().Id_CodingKeys) {
+    if (baseName.getIdentifier() == Context.Id_CodingKeys) {
       action.emplace(ImplicitMemberAction::ResolveCodingKeys);
     }
   } else {
@@ -6474,21 +6482,12 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
       if (baseName.isConstructor()) {
         if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
           action.emplace(ImplicitMemberAction::ResolveDecodable);
-        } else if (argumentNames.front() == Context.Id_system) {
-          action.emplace(ImplicitMemberAction::ResolveDistributedActorSystem);
         }
       } else if (!baseName.isSpecial() &&
                  baseName.getIdentifier() == Context.Id_encode &&
                  (member.isSimpleName() ||
                   argumentNames.front() == Context.Id_to)) {
         action.emplace(ImplicitMemberAction::ResolveEncodable);
-      }
-    } else if (member.isSimpleName() || argumentNames.size() == 2) {
-      if (baseName.isConstructor()) {
-        if (argumentNames[0] == Context.Id_resolve &&
-            argumentNames[1] == Context.Id_using) {
-          action.emplace(ImplicitMemberAction::ResolveDistributedActor);
-        }
       }
     }
   }
@@ -7554,8 +7553,6 @@ ProtocolDecl::getKnownDerivableProtocolKind() const {
     return KnownDerivableProtocolKind::AdditiveArithmetic;
   case KnownProtocolKind::Differentiable:
     return KnownDerivableProtocolKind::Differentiable;
-  case KnownProtocolKind::Identifiable:
-    return KnownDerivableProtocolKind::Identifiable;
   case KnownProtocolKind::Actor:
     return KnownDerivableProtocolKind::Actor;
   case KnownProtocolKind::DistributedActor:

@@ -29,6 +29,7 @@
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -212,30 +213,10 @@ static void enumerateStoredPropertiesAndMissing(
   // If we have a distributed actor, find the id and actorSystem
   // properties. We always want them first, and in a specific
   // order.
-  if (decl->isDistributedActor()) {
-    VarDecl *distributedActorId = nullptr;
-    VarDecl *distributedActorSystem = nullptr;
-    ASTContext &ctx = decl->getASTContext();
-    for (auto *member : implDecl->getMembers()) {
-      if (auto *var = dyn_cast<VarDecl>(member)) {
-        if (!var->isStatic() && var->hasStorage()) {
-          if (var->getName() == ctx.Id_id) {
-            distributedActorId = var;
-          } else if (var->getName() == ctx.Id_actorSystem) {
-            distributedActorSystem = var;
-          }
-        }
-
-        if (distributedActorId && distributedActorSystem)
-          break;
-      }
-    }
-
-    if (distributedActorId)
-      addStoredProperty(distributedActorId);
-    if (distributedActorSystem)
-      addStoredProperty(distributedActorSystem);
-  }
+  if (auto idVar = decl->getDistributedActorIDProperty())
+    addStoredProperty(idVar);
+  if (auto actorSystemVar = decl->getDistributedActorSystemProperty())
+    addStoredProperty(actorSystemVar);
 
   for (auto *member : implDecl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
@@ -406,16 +387,58 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
   return decl->getASTContext().AllocateCopy(results);
 }
 
+static Type getLazyInterfaceTypeForSynthesizedVar(VarDecl *var) {
+  // For DistributedActor, the `id` and `actorSystem` properties have their
+  // types computed lazily.
+  if (auto distPropKind = var->isSpecialDistributedProperty()) {
+    auto *NTD = var->getDeclContext()->getSelfNominalTypeDecl();
+    ASSERT(NTD);
+    switch (distPropKind.value()) {
+    case SpecialDistributedProperty::Id:
+      return getDistributedActorIDType(NTD);
+    case SpecialDistributedProperty::ActorSystem:
+      return getDistributedActorSystemType(NTD);
+    }
+    llvm_unreachable("Unhandled case in switch!");
+  }
+  return Type();
+}
+
+static Pattern *
+getLazilySynthesizedPattern(PatternBindingDecl *PBD, Pattern *P) {
+  // Check to see if we have a pattern that binds a single synthesized var.
+  auto *NP = dyn_cast<NamedPattern>(P->getSemanticsProvidingPattern());
+  if (!NP)
+    return P;
+
+  auto *var = NP->getDecl();
+  if (!var->isSynthesized())
+    return P;
+
+  auto interfaceTy = getLazyInterfaceTypeForSynthesizedVar(var);
+  if (!interfaceTy)
+    return P;
+
+  auto *DC = var->getDeclContext();
+  auto &ctx = DC->getASTContext();
+  auto patternTy = DC->mapTypeIntoContext(interfaceTy);
+  return TypedPattern::createImplicit(ctx, P, patternTy);
+}
+
 /// Validate the \c entryNumber'th entry in \c binding.
 const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     Evaluator &eval, PatternBindingDecl *binding, unsigned entryNumber) const {
   const auto &pbe = binding->getPatternList()[entryNumber];
   auto &Context = binding->getASTContext();
 
+  // Resolve a lazily synthesized pattern if necessary.
+  auto *pattern = binding->getPattern(entryNumber);
+  pattern = getLazilySynthesizedPattern(binding, pattern);
+  binding->setPattern(entryNumber, pattern);
+
   // Resolve the pattern.
-  auto *pattern = TypeChecker::resolvePattern(binding->getPattern(entryNumber),
-                                              binding->getDeclContext(),
-                                              /*isStmtCondition*/ true);
+  pattern = TypeChecker::resolvePattern(pattern, binding->getDeclContext(),
+                                        /*isStmtCondition*/ true);
   if (!pattern) {
     binding->setInvalid();
     binding->getPattern(entryNumber)->setType(ErrorType::get(Context));
