@@ -436,7 +436,8 @@ public:
   static std::optional<UIdent>
   getUIDForDeclAttribute(const swift::DeclAttribute *Attr);
 
-  static SourceKit::UIdent getUIDForFormalAccessScope(const swift::AccessScope Scope);
+  static SourceKit::UIdent
+  getUIDForAccessLevel(const clang::index::SymbolProperty Scope);
 
   static std::vector<UIdent> UIDsFromDeclAttributes(const swift::DeclAttributes &Attrs);
 

@@ -85,6 +85,8 @@ static UIdent Attr_Setter_Package("source.decl.attribute.setter_access.package")
 static UIdent Attr_Setter_Public("source.decl.attribute.setter_access.public");
 static UIdent Attr_Setter_Open("source.decl.attribute.setter_access.open");
 static UIdent EffectiveAccess_Public("source.decl.effective_access.public");
+static UIdent EffectiveAccess_SPI("source.decl.effective_access.spi");
+static UIdent EffectiveAccess_Package("source.decl.effective_access.package");
 static UIdent EffectiveAccess_Internal("source.decl.effective_access.internal");
 static UIdent EffectiveAccess_FilePrivate("source.decl.effective_access.fileprivate");
 static UIdent EffectiveAccess_LessThanFilePrivate("source.decl.effective_access.less_than_fileprivate");
@@ -864,17 +866,32 @@ SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttribute *Attr) {
   return std::nullopt;
 }
 
-UIdent SwiftLangSupport::getUIDForFormalAccessScope(const swift::AccessScope Scope) {
-  if (Scope.isPublic()) {
-    return EffectiveAccess_Public;
-  } else if (Scope.isInternal()) {
-    return EffectiveAccess_Internal;
-  } else if (Scope.isFileScope()) {
-    return EffectiveAccess_FilePrivate;
-  } else if (Scope.isPrivate()) {
+UIdent SwiftLangSupport::getUIDForAccessLevel(
+    const clang::index::SymbolProperty Scope) {
+  switch (Scope) {
+  case clang::index::SymbolProperty::Generic:
+  case clang::index::SymbolProperty::TemplatePartialSpecialization:
+  case clang::index::SymbolProperty::TemplateSpecialization:
+  case clang::index::SymbolProperty::UnitTest:
+  case clang::index::SymbolProperty::IBAnnotated:
+  case clang::index::SymbolProperty::IBOutletCollection:
+  case clang::index::SymbolProperty::GKInspectable:
+  case clang::index::SymbolProperty::Local:
+  case clang::index::SymbolProperty::ProtocolInterface:
+  case clang::index::SymbolProperty::SwiftAsync:
+    llvm_unreachable("Not an access level");
+  case clang::index::SymbolProperty::SwiftAccessControlLessThanFilePrivate:
     return EffectiveAccess_LessThanFilePrivate;
-  } else {
-    llvm_unreachable("Unsupported access scope");
+  case clang::index::SymbolProperty::SwiftAccessControlFilePrivate:
+    return EffectiveAccess_FilePrivate;
+  case clang::index::SymbolProperty::SwiftAccessControlInternal:
+    return EffectiveAccess_Internal;
+  case clang::index::SymbolProperty::SwiftAccessControlPackage:
+    return EffectiveAccess_Package;
+  case clang::index::SymbolProperty::SwiftAccessControlSPI:
+    return EffectiveAccess_SPI;
+  case clang::index::SymbolProperty::SwiftAccessControlPublic:
+    return EffectiveAccess_Public;
   }
 }
 

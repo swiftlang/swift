@@ -3,17 +3,17 @@
 struct Adder {
     var base: Int
     func callAsFunction(_ x: Int) -> Int {
-// CHECK: [[@LINE-1]]:10 | instance-method/Swift | callAsFunction(_:) | [[callAsFunc1:.*]] | Def
+// CHECK: [[@LINE-1]]:10 | instance-method(internal)/Swift | callAsFunction(_:) | [[callAsFunc1:.*]] | Def
         return base + x
     }
     func callAsFunction(x: Int, y: Int) -> Adder {
-// CHECK: [[@LINE-1]]:10 | instance-method/Swift | callAsFunction(x:y:) | [[callAsFunc2:.*]] | Def
+// CHECK: [[@LINE-1]]:10 | instance-method(internal)/Swift | callAsFunction(x:y:) | [[callAsFunc2:.*]] | Def
         return base + x + y
     }
 }
 
 let add3 = Adder(base: 3)
-// CHECK: [[@LINE-1]]:5 | variable/Swift | add3 | [[add3:.*]] | Def
+// CHECK: [[@LINE-1]]:5 | variable(internal)/Swift | add3 | [[add3:.*]] | Def
 let global = 1
 
 add3(global)
@@ -26,7 +26,7 @@ add3(x: 10, y: 11)
 // CHECK: [[@LINE-2]]:5 | instance-method/Swift | callAsFunction(x:y:) | [[callAsFunc2]] | Ref,Call | rel: 0
 
 func getAdder(_ base: Int) -> Adder { return Adder(base: base) }
-// CHECK: [[@LINE-1]]:6 | function/Swift | getAdder(_:) | [[getAdder:.*]] | Def | rel: 0
+// CHECK: [[@LINE-1]]:6 | function(internal)/Swift | getAdder(_:) | [[getAdder:.*]] | Def | rel: 0
 
 getAdder(5)(10)
 // CHECK: [[@LINE-1]]:1 | function/Swift | getAdder(_:) | [[getAdder]] | Ref,Call | rel: 0
