@@ -3162,6 +3162,8 @@ public:
   bool hasAddressResult() const {
     return getSubstCalleeConv().hasAddressResult();
   }
+
+  bool hasInoutResult() const { return getSubstCalleeConv().hasInoutResult(); }
 };
 
 /// PartialApplyInst - Represents the creation of a closure object by partial
