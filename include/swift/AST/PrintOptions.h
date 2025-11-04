@@ -580,6 +580,9 @@ public:
   /// with types sharing a name with a module.
   bool AliasModuleNames = false;
 
+  /// Use module selectors when printing names.
+  bool UseModuleSelectors = false;
+
   /// Name of the modules that have been aliased in AliasModuleNames mode.
   /// Ideally we would use something other than a string to identify a module,
   /// but since one alias can apply to more than one module, strings happen
@@ -769,6 +772,7 @@ public:
   ///
   /// \see swift::emitSwiftInterface
   static PrintOptions printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
+                                              bool useModuleSelectors,
                                               bool preferTypeRepr,
                                               bool printFullConvention,
                                               InterfaceMode interfaceMode,

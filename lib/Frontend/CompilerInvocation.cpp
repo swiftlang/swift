@@ -536,7 +536,8 @@ static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
 }
 
 static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
-                                     ArgList &Args) {
+                                     ArgList &Args,
+                                     DiagnosticEngine &diags) {
   using namespace options;
 
   Opts.PreserveTypesAsWritten |=
@@ -545,6 +546,7 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasFlag(OPT_alias_module_names_in_module_interface,
                  OPT_disable_alias_module_names_in_module_interface,
                  ::getenv("SWIFT_ALIAS_MODULE_NAMES_IN_INTERFACES"));
+
   Opts.PrintFullConvention |=
     Args.hasArg(OPT_experimental_print_full_convention);
   Opts.DebugPrintInvalidSyntax |=
@@ -557,6 +559,21 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     if (contents == "spi") {
       Opts.setInterfaceMode(PrintOptions::InterfaceMode::Private);
     }
+  }
+
+  if (Args.hasArgNoClaim(OPT_enable_module_selectors_in_module_interface)
+      || Args.hasArgNoClaim(OPT_disable_module_selectors_in_module_interface)) {
+    Opts.UseModuleSelectors =
+      Args.hasFlag(OPT_enable_module_selectors_in_module_interface,
+                   OPT_disable_module_selectors_in_module_interface,
+                   false);
+  } else if (auto envValue = ::getenv("SWIFT_MODULE_SELECTORS_IN_INTERFACES")) {
+    Opts.UseModuleSelectors = llvm::StringSwitch<bool>(envValue)
+        .CasesLower("false", "no", "off", "0", false)
+        .Default(true);
+  } else {
+    // Any heuristics we might add would go here.
+    Opts.UseModuleSelectors = false;
   }
 }
 
@@ -4174,7 +4191,7 @@ bool CompilerInvocation::parseArgs(
     setMainExecutablePath(mainExecutablePath);
   }
 
-  ParseModuleInterfaceArgs(ModuleInterfaceOpts, ParsedArgs);
+  ParseModuleInterfaceArgs(ModuleInterfaceOpts, ParsedArgs, Diags);
   SaveModuleInterfaceArgs(ModuleInterfaceOpts, FrontendOpts, ParsedArgs, Diags);
 
   if (ParseCASArgs(CASOpts, ParsedArgs, Diags, FrontendOpts)) {

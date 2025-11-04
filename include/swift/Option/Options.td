@@ -752,6 +752,16 @@ def emit_variant_package_module_interface_path :
   MetaVarName<"<path>">,
   HelpText<"Output package module interface file for the target variant to <path>">;
 
+def enable_module_selectors_in_module_interface :
+  Flag<["-"], "enable-module-selectors-in-module-interface">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"When emitting module interface files, use module selectors to avoid name collisions">;
+
+def disable_module_selectors_in_module_interface :
+  Flag<["-"], "disable-module-selectors-in-module-interface">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"When emitting module interface files, do not use module selectors to avoid name collisions">;
+
 def verify_emitted_module_interface :
   Flag<["-"], "verify-emitted-module-interface">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
