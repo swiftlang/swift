@@ -19,6 +19,7 @@ add_swift_target_library(swiftObservation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   ObservationRegistrar.swift
   ObservationTracking.swift
   Observations.swift
+  ThreadingError.cpp
   ThreadLocal.cpp
   ThreadLocal.swift
 
