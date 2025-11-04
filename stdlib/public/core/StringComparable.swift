@@ -12,6 +12,7 @@
 
 import SwiftShims
 
+@available(UnicodeNormalization)
 extension StringProtocol {
   @inlinable
   @_specialize(where Self == String, RHS == String)
@@ -64,6 +65,7 @@ extension StringProtocol {
   }
 }
 
+@available(UnicodeNormalization)
 extension String: Equatable {
   @inlinable @inline(__always) // For the bitwise comparison
   @_effects(readonly)
@@ -73,6 +75,7 @@ extension String: Equatable {
   }
 }
 
+@available(UnicodeNormalization)
 extension String: Comparable {
   @inlinable @inline(__always) // For the bitwise comparison
   @_effects(readonly)
@@ -81,11 +84,13 @@ extension String: Comparable {
   }
 }
 
+@available(UnicodeNormalization)
 extension Substring: Equatable {}
 
 // TODO: Generalize `~=` over `StringProtocol` (https://github.com/apple/swift/issues/54896)
 // Below are concrete overloads to give us most of the benefit without potential
 // harm to expression type checking performance.
+@available(UnicodeNormalization)
 extension String {
   @_alwaysEmitIntoClient
   @inline(__always)
@@ -94,6 +99,8 @@ extension String {
     return lhs == rhs
   }
 }
+
+@available(UnicodeNormalization)
 extension Substring {
   @_alwaysEmitIntoClient
   @inline(__always)

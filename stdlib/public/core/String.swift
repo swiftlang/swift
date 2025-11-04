@@ -954,6 +954,7 @@ extension BidirectionalCollection where Element == String {
   /// - Parameter separator: A string to insert between each of the elements
   ///   in this sequence. The default separator is an empty string.
   /// - Returns: A single, concatenated string.
+  @available(UnicodeNormalization)
   @_specialize(where Self == Array<String>)
   public func joined(separator: String = "") -> String {
     return _joined(separator: separator)
@@ -1096,6 +1097,7 @@ extension String: CustomStringConvertible {
   public var description: String { return self }
 }
 
+@available(UnicodeNormalization)
 extension String {
   public // @testable
   var _nfcCodeUnits: [UInt8] {

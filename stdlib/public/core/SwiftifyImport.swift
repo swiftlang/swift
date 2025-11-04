@@ -59,6 +59,7 @@ public enum _SwiftifyInfo {
 /// Parameter paramInfo: information about how the function uses the pointer passed to it. The
 /// safety of the generated wrapper function depends on this info being extensive and accurate.
 #if hasFeature(Macros)
+@available(UnicodeNormalization)
 @attached(peer, names: overloaded)
 public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo...,
                              spanAvailability: String? = nil,
@@ -81,6 +82,7 @@ public enum _SwiftifyProtocolMethodInfo {
 /// function, this macro supports feeding info about multiple methods and generating safe overloads
 /// for all of them at once.
 #if hasFeature(Macros)
+  @available(UnicodeNormalization)
   @attached(extension, names: arbitrary)
   public macro _SwiftifyImportProtocol(
     _ methodInfo: _SwiftifyProtocolMethodInfo...,
