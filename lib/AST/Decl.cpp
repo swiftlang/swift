@@ -2753,7 +2753,7 @@ bool VarDecl::isInitExposedToClients() const {
   return hasInitialValue() && isLayoutExposedToClients();
 }
 
-bool VarDecl::isLayoutExposedToClients() const {
+bool VarDecl::isLayoutExposedToClients(bool applyImplicit) const {
   auto parent = dyn_cast<NominalTypeDecl>(getDeclContext());
   if (!parent) return false;
   if (isStatic()) return false;
@@ -2763,9 +2763,11 @@ bool VarDecl::isLayoutExposedToClients() const {
     parent->getFormalAccessScope(/*useDC=*/nullptr,
                                  /*treatUsableFromInlineAsPublic=*/true);
 
-  // Resilient modules hide layouts by default.
-  if (!getASTContext().LangOpts.hasFeature(Feature::CheckImplementationOnly) ||
-      M->getResilienceStrategy() == ResilienceStrategy::Resilient) {
+  // Resilient modules and classes hide layouts by default.
+  bool layoutIsHiddenByDefault = !applyImplicit ||
+    !getASTContext().LangOpts.hasFeature(Feature::CheckImplementationOnly) ||
+    M->getResilienceStrategy() == ResilienceStrategy::Resilient;
+  if (layoutIsHiddenByDefault) {
     if (!nominalAccess.isPublic())
       return false;
 

@@ -1006,7 +1006,7 @@ bool swift::isExported(const ValueDecl *VD) {
 
   // Is this a stored property in a @frozen struct or class?
   if (auto *property = dyn_cast<VarDecl>(VD))
-    if (property->isLayoutExposedToClients())
+    if (property->isLayoutExposedToClients(/*applyImplicit=*/true))
       return true;
 
   return false;

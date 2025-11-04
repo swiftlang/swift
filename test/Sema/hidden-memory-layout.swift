@@ -62,9 +62,11 @@ public struct ExposedLayoutPublic {
   public init() { fatalError() }
 }
 
+internal struct ExposedLayoutInternal {
+}
+
 private struct ExposedLayoutPrivate {
 // expected-note @-1 2 {{struct 'ExposedLayoutPrivate' is not '@usableFromInline' or public}}
-// expected-opt-in-note @-2 {{type declared here}}
   init() { fatalError() } // expected-note {{initializer 'init()' is not '@usableFromInline' or public}}
 }
 
@@ -74,7 +76,7 @@ private struct HiddenLayout {
 // expected-opt-in-note @-1 2 {{struct 'HiddenLayout' is not '@usableFromInline' or public}}
 // expected-opt-in-note @-2 1 {{initializer 'init()' is not '@usableFromInline' or public}}
 // expected-opt-in-note @-3 2 {{struct declared here}}
-// expected-opt-in-note @-4 {{type declared here}}
+// expected-opt-in-note @-4 {{struct declared here}}
 }
 #else
 private struct HiddenLayout {
@@ -163,12 +165,26 @@ public struct ExposedLayoutPublicUser {
   // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
 
   private var a: ExposedLayoutPublic
+  private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
-  // expected-opt-in-error @-1 {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
 
   private var c: HiddenLayout
   // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is a struct marked '@_implementationOnly'}}
-  // expected-opt-in-error @-2 {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
+
+  private func privateFunc(h: HiddenLayout) {}
+  // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because it is a struct marked '@_implementationOnly'}}
+}
+
+private struct ExposedLayoutInternalUser {
+
+  private var privateField: StructFromDirect
+  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
+
+  private var a: ExposedLayoutPublic
+  private var aa: ExposedLayoutInternal
+  private var b: ExposedLayoutPrivate
+  private var c: HiddenLayout
+  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is a struct marked '@_implementationOnly'}}
 
   private func privateFunc(h: HiddenLayout) {}
   // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because it is a struct marked '@_implementationOnly'}}
@@ -180,6 +196,7 @@ private struct ExposedLayoutPrivateUser {
   // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
 
   private var a: ExposedLayoutPublic
+  private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
   // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is a struct marked '@_implementationOnly'}}
@@ -194,6 +211,7 @@ private struct HiddenLayoutUser {
   public var publicField: StructFromDirect
   private var privateField: StructFromDirect
   private var a: ExposedLayoutPublic
+  private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
 
