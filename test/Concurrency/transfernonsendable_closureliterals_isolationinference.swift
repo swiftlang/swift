@@ -170,8 +170,11 @@ func test_CallerSyncNormal_CalleeAsyncMainActorIsolated() async {
 
     // CHECK-LABEL: // closure #1 in test_CallerSyncNormal_CalleeAsyncMainActorIsolated()
     // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
-    await normalGlobalActorAcceptsAsyncClosure { } // expected-error {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-    // expected-note @-1 {{sending global actor 'CustomActor'-isolated value of non-Sendable type '() async -> ()' to main actor-isolated global function 'normalGlobalActorAcceptsAsyncClosure' risks causing races in between global actor 'CustomActor'-isolated and main actor-isolated uses}}
+    await normalGlobalActorAcceptsAsyncClosure { }
+    // expected-ni-error @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+    // expected-ni-note @-2 {{sending global actor 'CustomActor'-isolated value of non-Sendable type '() async -> ()' to main actor-isolated global function 'normalGlobalActorAcceptsAsyncClosure' risks causing races in between global actor 'CustomActor'-isolated and main actor-isolated uses}}
+    // expected-ni-ns-error @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
+    // expected-ni-ns-note @-4 {{sending global actor 'CustomActor'-isolated value of non-Sendable type '@concurrent () async -> ()' to main actor-isolated global function 'normalGlobalActorAcceptsAsyncClosure' risks causing races in between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 
     // CHECK-LABEL: // closure #2 in test_CallerSyncNormal_CalleeAsyncMainActorIsolated()
     // CHECK-NEXT: // Isolation: nonisolated
@@ -286,8 +289,11 @@ func test_CallerAsyncNormal_CalleeAsyncMainActorIsolated() async {
 
     // CHECK-LABEL: // closure #1 in test_CallerAsyncNormal_CalleeAsyncMainActorIsolated()
     // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
-    await asyncNormalGlobalActorAcceptsAsyncClosure { } // expected-error {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-    // expected-note @-1 {{sending global actor 'CustomActor'-isolated value of non-Sendable type '() async -> ()' to main actor-isolated global function 'asyncNormalGlobalActorAcceptsAsyncClosure' risks causing races in between global actor 'CustomActor'-isolated and main actor-isolated uses}}
+    await asyncNormalGlobalActorAcceptsAsyncClosure { }
+    // expected-ni-error @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+    // expected-ni-note @-2 {{sending global actor 'CustomActor'-isolated value of non-Sendable type '() async -> ()' to main actor-isolated global function 'asyncNormalGlobalActorAcceptsAsyncClosure' risks causing races in between global actor 'CustomActor'-isolated and main actor-isolated uses}}
+    // expected-ni-ns-error @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
+    // expected-ni-ns-note @-4 {{sending global actor 'CustomActor'-isolated value of non-Sendable type '@concurrent () async -> ()' to main actor-isolated global function 'asyncNormalGlobalActorAcceptsAsyncClosure' risks causing races in between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 
     // CHECK-LABEL: // closure #2 in test_CallerAsyncNormal_CalleeAsyncMainActorIsolated()
     // CHECK-NEXT: // Isolation: nonisolated
@@ -397,8 +403,11 @@ extension MyActor {
 
         // CHECK-LABEL: // closure #1 in MyActor.test_CallerSyncNormal_CalleeAsyncMainActorIsolated()
         // CHECK-NEXT: // Isolation: actor_instance. name: 'self'
-        await normalGlobalActorAcceptsAsyncClosure { print(self) } // expected-error {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-        // expected-note @-1 {{sending 'self'-isolated value of non-Sendable type '() async -> ()' to main actor-isolated global function 'normalGlobalActorAcceptsAsyncClosure' risks causing races in between 'self'-isolated and main actor-isolated uses}}
+        await normalGlobalActorAcceptsAsyncClosure { print(self) }
+        // expected-ni-error @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+        // expected-ni-note @-2 {{sending 'self'-isolated value of non-Sendable type '() async -> ()' to main actor-isolated global function 'normalGlobalActorAcceptsAsyncClosure' risks causing races in between 'self'-isolated and main actor-isolated uses}}
+        // expected-ni-ns-error @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
+        // expected-ni-ns-note @-4 {{sending 'self'-isolated value of non-Sendable type '@concurrent () async -> ()' to main actor-isolated global function 'normalGlobalActorAcceptsAsyncClosure' risks causing races in between 'self'-isolated and main actor-isolated uses}}
 
         // CHECK-LABEL: // closure #2 in MyActor.test_CallerSyncNormal_CalleeAsyncMainActorIsolated()
         // CHECK-NEXT: // Isolation: nonisolated
@@ -513,8 +522,11 @@ extension MyActor {
 
         // CHECK-LABEL: // closure #1 in MyActor.test_CallerAsyncNormal_CalleeAsyncMainActorIsolated()
         // CHECK-NEXT: // Isolation: actor_instance. name: 'self'
-        await asyncNormalGlobalActorAcceptsAsyncClosure { print(self) } // expected-error {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-        // expected-note @-1 {{sending 'self'-isolated value of non-Sendable type '() async -> ()' to main actor-isolated global function 'asyncNormalGlobalActorAcceptsAsyncClosure' risks causing races in between 'self'-isolated and main actor-isolated uses}}
+        await asyncNormalGlobalActorAcceptsAsyncClosure { print(self) }
+        // expected-ni-error @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+        // expected-ni-note @-2 {{sending 'self'-isolated value of non-Sendable type '() async -> ()' to main actor-isolated global function 'asyncNormalGlobalActorAcceptsAsyncClosure' risks causing races in between 'self'-isolated and main actor-isolated uses}}
+        // expected-ni-ns-error @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
+        // expected-ni-ns-note @-4 {{sending 'self'-isolated value of non-Sendable type '@concurrent () async -> ()' to main actor-isolated global function 'asyncNormalGlobalActorAcceptsAsyncClosure' risks causing races in between 'self'-isolated and main actor-isolated uses}}
 
         // CHECK-LABEL: // closure #2 in MyActor.test_CallerAsyncNormal_CalleeAsyncMainActorIsolated()
         // CHECK-NEXT: // Isolation: nonisolated
