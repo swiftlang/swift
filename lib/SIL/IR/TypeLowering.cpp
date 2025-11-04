@@ -416,6 +416,12 @@ namespace {
                   getBuiltinFixedArrayProperties(type, origType, isSensitive));
     }
 
+    RetTy visitBuiltinBorrowType(CanBuiltinBorrowType type,
+                                     AbstractionPattern origType,
+                                     IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("todo");
+    }
+
     RetTy visitPackType(CanPackType type,
                         AbstractionPattern origType,
                         IsTypeExpansionSensitive_t isSensitive) {
@@ -2474,6 +2480,12 @@ namespace {
       
       return handleAggregateByProperties<MiscNontrivialTypeLowering>(faType,
                  getBuiltinFixedArrayProperties(faType, origType, isSensitive));
+    }
+
+    TypeLowering *visitBuiltinBorrowType(CanBuiltinBorrowType faType,
+                                       AbstractionPattern origType,
+                                       IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("todo");
     }
 
     bool handleResilience(CanType type, NominalTypeDecl *D,

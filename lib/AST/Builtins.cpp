@@ -67,6 +67,7 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   auto kind =
       llvm::StringSwitch<std::optional<BuiltinTypeKind>>(Name)
           .Case("FixedArray", BuiltinTypeKind::BuiltinFixedArray)
+          .Case("Borrow", BuiltinTypeKind::BuiltinBorrow)
           .StartsWith("Vec", BuiltinTypeKind::BuiltinVector)
           .Case("RawPointer", BuiltinTypeKind::BuiltinRawPointer)
           .Case("RawUnsafeContinuation",
@@ -103,6 +104,9 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   switch (*kind) {
   case BuiltinTypeKind::BuiltinFixedArray:
     return BuiltinUnboundGenericType::get(TypeKind::BuiltinFixedArray, Context);
+
+  case BuiltinTypeKind::BuiltinBorrow:
+    return BuiltinUnboundGenericType::get(TypeKind::BuiltinBorrow, Context);
 
   case BuiltinTypeKind::BuiltinVector: {
     // Vectors are VecNxT, where "N" is the number of elements and
@@ -3582,6 +3586,7 @@ bool BuiltinType::isBitwiseCopyable() const {
   case BuiltinTypeKind::BuiltinExecutor:
   case BuiltinTypeKind::BuiltinJob:
   case BuiltinTypeKind::BuiltinRawUnsafeContinuation:
+  case BuiltinTypeKind::BuiltinBorrow:
     return true;
   case BuiltinTypeKind::BuiltinNativeObject:
   case BuiltinTypeKind::BuiltinBridgeObject:
@@ -3713,6 +3718,9 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
   case BuiltinTypeKind::BuiltinFixedArray:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FIXEDARRAY);
     break;
+  case BuiltinTypeKind::BuiltinBorrow:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_BORROW);
+    break;
   case BuiltinTypeKind::BuiltinUnboundGeneric: {
     auto bug = cast<BuiltinUnboundGenericType>(this);
     printer << MAYBE_GET_NAMESPACED_BUILTIN(bug->getBuiltinTypeName());
@@ -3729,6 +3737,8 @@ BuiltinUnboundGenericType::getBuiltinTypeName() const {
   switch (BoundGenericTypeKind) {
   case TypeKind::BuiltinFixedArray:
     return BUILTIN_TYPE_NAME_FIXEDARRAY;
+  case TypeKind::BuiltinBorrow:
+    return BUILTIN_TYPE_NAME_BORROW;
   case TypeKind::BuiltinInteger:
     return BUILTIN_TYPE_NAME_INT;
     
@@ -3754,6 +3764,13 @@ getBuiltinGenericSignature(ASTContext &C,
                                              GenericTypeParamKind::Type,
                                              0, 1, Type(), C);
     return GenericSignature::get({Count, Element}, {});
+  }
+
+  case TypeKind::BuiltinBorrow: {
+    auto Referent = GenericTypeParamType::get(C.getIdentifier("Referent"),
+                                             GenericTypeParamKind::Type,
+                                             0, 0, Type(), C);
+    return GenericSignature::get({Referent}, {});
   }
 
   case TypeKind::BuiltinInteger: {
@@ -3800,6 +3817,14 @@ getBuiltinBoundGenericType(ASTContext &C,
     }
     
     return BuiltinFixedArrayType::get(size, element);
+  }
+  
+  case TypeKind::BuiltinBorrow: {
+    auto types = subs.getReplacementTypes();
+  
+    auto referent = types[0]->getCanonicalType();
+
+    return BuiltinBorrowType::get(referent);
   }
   
   case TypeKind::BuiltinInteger: {
@@ -3863,6 +3888,7 @@ BuiltinGenericType::getSubstitutions() const {
     }
   
     BUILTIN_GENERIC_SUBCLASS(BuiltinFixedArrayType)
+    BUILTIN_GENERIC_SUBCLASS(BuiltinBorrowType)
     llvm_unreachable("unhandled BuiltinGenericType subclass");
   };
 
@@ -3875,6 +3901,13 @@ SubstitutionMap
 BuiltinFixedArrayType::buildSubstitutions() const {
   return SubstitutionMap::get(getGenericSignature(),
                               {getSize(), getElementType()},
+                              ArrayRef<ProtocolConformanceRef>{});
+}
+
+SubstitutionMap
+BuiltinBorrowType::buildSubstitutions() const {
+  return SubstitutionMap::get(getGenericSignature(),
+                              {getReferentType()},
                               ArrayRef<ProtocolConformanceRef>{});
 }
 

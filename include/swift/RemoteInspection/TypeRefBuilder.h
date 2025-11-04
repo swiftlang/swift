@@ -963,6 +963,10 @@ public:
     return BuiltinFixedArrayTypeRef::create(*this, size, element);
   }
 
+  const TypeRef *createBuiltinBorrowType(const TypeRef *referent) {
+    return BuiltinBorrowTypeRef::create(*this, referent);
+  }
+
   // Construct a bound generic type ref along with the parent type info
   // The parent list contains every parent type with at least 1 generic
   // type parameter.

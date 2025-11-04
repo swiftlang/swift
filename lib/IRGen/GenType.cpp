@@ -2322,6 +2322,11 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return convertBuiltinFixedArrayType(cast<BuiltinFixedArrayType>(ty));
   }
 
+  case TypeKind::BuiltinBorrow: {
+    llvm_unreachable("todo");
+    //return convertBuiltinBorrowType(cast<BuiltinBorrowType>(ty));
+  }
+
   case TypeKind::PrimaryArchetype:
   case TypeKind::ExistentialArchetype:
   case TypeKind::OpaqueTypeArchetype:

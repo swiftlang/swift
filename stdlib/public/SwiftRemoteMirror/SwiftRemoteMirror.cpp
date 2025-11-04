@@ -561,6 +561,10 @@ swift_layout_kind_t getTypeInfoKind(const TypeInfo &TI) {
   case TypeInfoKind::Array: {
     return SWIFT_ARRAY;
   }
+
+  case TypeInfoKind::Borrow: {
+    swift_unreachable("not implemented");
+  }
   }
 
   swift_unreachable("Unhandled TypeInfoKind in switch");

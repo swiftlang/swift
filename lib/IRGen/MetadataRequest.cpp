@@ -1872,6 +1872,12 @@ namespace {
     }
 
     MetadataResponse
+    visitBuiltinBorrowType(CanBuiltinBorrowType type,
+                               DynamicMetadataRequest request) {
+      llvm_unreachable("todo");
+    }
+    
+    MetadataResponse
     visitBuiltinFixedArrayType(CanBuiltinFixedArrayType type,
                                DynamicMetadataRequest request) {
       if (auto cached = tryGetLocal(type, request))

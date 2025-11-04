@@ -7488,6 +7488,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return getTypeMatchFailure(locator);
 
     // BuiltinGenericType subclasses
+    case TypeKind::BuiltinBorrow:
     case TypeKind::BuiltinFixedArray: {
       auto *fixed1 = cast<BuiltinGenericType>(desugar1);
       auto *fixed2 = cast<BuiltinGenericType>(desugar2);

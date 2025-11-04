@@ -5754,6 +5754,14 @@ public:
         S.addTypeRef(ty->getElementType()));
   }
 
+  void visitBuiltinBorrowType(BuiltinBorrowType *ty) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[BuiltinBorrowTypeLayout::Code];
+    BuiltinBorrowTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        S.addTypeRef(ty->getReferentType()));
+  }
+
   void visitSILTokenType(SILTokenType *ty) {
     // This is serialized like a BuiltinType, even though it isn't one.
     visitBuiltinTypeImpl(ty);
@@ -6464,6 +6472,7 @@ void Serializer::writeAllDeclsAndTypes() {
   using namespace decls_block;
   registerDeclTypeAbbr<BuiltinAliasTypeLayout>();
   registerDeclTypeAbbr<BuiltinFixedArrayTypeLayout>();
+  registerDeclTypeAbbr<BuiltinBorrowTypeLayout>();
   registerDeclTypeAbbr<TypeAliasTypeLayout>();
   registerDeclTypeAbbr<GenericTypeParamDeclLayout>();
   registerDeclTypeAbbr<AssociatedTypeDeclLayout>();

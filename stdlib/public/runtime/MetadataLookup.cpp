@@ -2480,6 +2480,12 @@ public:
                                                      size.getValue(),
                                                      element.getMetadata()));
   }
+
+  TypeLookupErrorOr<BuiltType> createBuiltinBorrowType(BuiltType referent) {
+    llvm_unreachable("not implemented");
+    // return BuiltType(swift_getBorrowTypeMetadata(MetadataState::Abstract,
+    //                                                  referent.getValue());
+  }
 };
 
 }
