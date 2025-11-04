@@ -1443,14 +1443,47 @@ bool CompilerInstance::createFilesForMainModule(
   return false;
 }
 
-static void configureAvailabilityDomains(const ASTContext &ctx,
+static void configureAvailabilityDomains(const ASTContext &constCtx,
                                          const FrontendOptions &opts,
                                          ModuleDecl *mainModule) {
+  ASTContext &ctx = const_cast<ASTContext &>(constCtx);
   llvm::SmallDenseMap<Identifier, const CustomAvailabilityDomain *> domainMap;
   auto createAndInsertDomain = [&](const std::string &name,
                                    CustomAvailabilityDomain::Kind kind) {
+
+    auto var = new (ctx) VarDecl(/*isStatic=*/false,
+                                 VarDecl::Introducer::Let,
+                                 SourceLoc(), ctx.getIdentifier(name),
+                                 mainModule);
+    var->setAccess(AccessLevel::Public);
+
+    bool initValue;
+    switch (kind) {
+      case CustomAvailabilityDomain::Kind::AlwaysEnabled:
+        // The value will not change.
+        var->getAttrs().add(
+            ConstValAttr::createSimple(ctx, DeclAttrKind::ConstVal,
+            SourceLoc(), SourceLoc()));
+        initValue = true;
+        break;
+
+      case CustomAvailabilityDomain::Kind::Enabled:
+        initValue = true;
+        break;
+
+      case CustomAvailabilityDomain::Kind::Disabled:
+      case CustomAvailabilityDomain::Kind::Dynamic:
+        initValue = false;
+        break;
+    }
+
+    Expr *initExpr = new (ctx) BooleanLiteralExpr(initValue, SourceLoc());
+    (void)PatternBindingDecl::createImplicit(
+        ctx, StaticSpellingKind::None, NamedPattern::createImplicit(ctx, var),
+        initExpr, mainModule);
+
     auto *domain = CustomAvailabilityDomain::get(name, kind, mainModule,
-                                                 nullptr, nullptr, ctx);
+                                                 var, nullptr, ctx);
     bool inserted = domainMap.insert({domain->getName(), domain}).second;
     ASSERT(inserted); // Domains must be unique.
   };

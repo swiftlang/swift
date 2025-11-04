@@ -85,8 +85,17 @@ AvailabilityDomainForDeclRequest::evaluate(Evaluator &evaluator,
   if (decl->hasClangNode()) {
     if (auto *customDomain = customDomainForClangDecl(decl))
       return AvailabilityDomain::forCustom(customDomain);
-  } else {
-    // FIXME: [availability] Handle Swift availability domains decls.
+  } else if (auto var = dyn_cast<VarDecl>(decl)) {
+    // Look for an availability domain in the main module first.
+    // FIXME: [availability] This is bogus, but we need a complete story for
+    // declarations to make it work.
+    ASTContext &ctx = decl->getASTContext();
+    if (ctx.MainModule) {
+      SmallVector<AvailabilityDomain, 1> found;
+      ctx.MainModule->lookupAvailabilityDomains(var->getName(), found);
+      if (found.size() > 0)
+        return found[0];
+    }
   }
 
   return std::nullopt;
