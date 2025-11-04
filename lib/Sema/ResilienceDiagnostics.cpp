@@ -442,7 +442,7 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
       });
 
   auto originKind = getDisallowedOriginKind(ext, where);
-  if (originKind == DisallowedOriginKind::None)
+  if (where.canReferenceOrigin(originKind))
     return false;
 
   auto reason = where.getExportabilityReason();

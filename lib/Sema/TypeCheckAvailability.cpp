@@ -16,6 +16,7 @@
 
 #include "TypeCheckAvailability.h"
 #include "MiscDiagnostics.h"
+#include "TypeCheckAccess.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
@@ -232,6 +233,20 @@ ExportContext ExportContext::withRefinedAvailability(
 
 bool ExportContext::mustOnlyReferenceExportedDecls() const {
   return Exported || FragileKind.kind != FragileFunctionKind::None;
+}
+
+bool ExportContext::canReferenceOrigin(DisallowedOriginKind originKind) const {
+  if (originKind == DisallowedOriginKind::None)
+    return true;
+
+  // Non public imports aren't hidden dependencies in embedded  mode,
+  // don't enforce them on implicitly always emit into client code.
+  if (originKind == DisallowedOriginKind::NonPublicImport &&
+      getFragileFunctionKind().kind ==
+        FragileFunctionKind::EmbeddedAlwaysEmitIntoClient)
+    return true;
+
+  return false;
 }
 
 std::optional<ExportabilityReason>
