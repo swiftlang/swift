@@ -120,7 +120,7 @@ public func implicitlyInlinablePublic() {
   let _: ExposedLayoutPublic = ExposedLayoutPublic()
   let _: ExposedLayoutPrivate = ExposedLayoutPrivate()
   let _: HiddenLayout = HiddenLayout()
-  // expected-embedded-opt-in-error @-1 2 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because it is a struct marked '@_implementationOnly'}}
+  // expected-embedded-opt-in-error @-1 2 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'HiddenLayout' is marked '@_implementationOnly'}}
 
   let _: ExposedEnumPublic = ExposedEnumPublic.A
   let _: ExposedEnumPrivate = ExposedEnumPrivate.A
@@ -130,7 +130,7 @@ private func implicitlyInlinablePrivate() {
   let _: ExposedLayoutPublic = ExposedLayoutPublic()
   let _: ExposedLayoutPrivate = ExposedLayoutPrivate()
   let _: HiddenLayout = HiddenLayout()
-  // expected-embedded-opt-in-error @-1 2 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because it is a struct marked '@_implementationOnly'}}
+  // expected-embedded-opt-in-error @-1 2 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'HiddenLayout' is marked '@_implementationOnly'}}
 
   let _: ExposedEnumPublic = ExposedEnumPublic.A
   let _: ExposedEnumPrivate = ExposedEnumPrivate.A
@@ -169,10 +169,10 @@ public struct ExposedLayoutPublicUser {
   private var b: ExposedLayoutPrivate
 
   private var c: HiddenLayout
-  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is a struct marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private func privateFunc(h: HiddenLayout) {}
-  // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because it is a struct marked '@_implementationOnly'}}
+  // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'HiddenLayout' is marked '@_implementationOnly'}}
 }
 
 internal struct ExposedLayoutInternalUser {
@@ -184,10 +184,10 @@ internal struct ExposedLayoutInternalUser {
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
-  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is a struct marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private func privateFunc(h: HiddenLayout) {}
-  // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because it is a struct marked '@_implementationOnly'}}
+  // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'HiddenLayout' is marked '@_implementationOnly'}}
 }
 
 private struct ExposedLayoutPrivateUser {
@@ -199,10 +199,10 @@ private struct ExposedLayoutPrivateUser {
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
-  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is a struct marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private func privateFunc(h: HiddenLayout) {}
-  // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because it is a struct marked '@_implementationOnly'}}
+  // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'HiddenLayout' is marked '@_implementationOnly'}}
 }
 
 #if UseImplementationOnly
