@@ -158,6 +158,10 @@ param
   [ValidatePattern('^\d+(\.\d+)*$')]
   [string] $SCCacheVersion = "0.10.0",
 
+  # Build with CAS
+  [switch] $EnableCAS = $false,
+  [string] $CASPath = "$ImageRoot\cas",
+
   # SBoM Support
   [switch] $IncludeSBoM = $false,
   [string] $SyftVersion = "1.29.1",
@@ -559,6 +563,10 @@ if (-not $PinnedBuild) {
 }
 
 $PinnedToolchain = [IO.Path]::GetFileNameWithoutExtension($PinnedBuild)
+
+if ($EnableCAS -and ($UseHostToolchain -or ($PinnedVersion -ne "0.0.0"))) {
+  throw "CAS currently requires using a main-branch pinned toolchain."
+}
 
 $HostPlatform = switch ($HostArchName) {
   "AMD64" { $KnownPlatforms[$HostOS.ToString() + "X64"] }
@@ -1616,6 +1624,14 @@ function Build-CMakeProject {
             @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline")
           }
 
+          if ($EnableCAS -and $UsePinnedCompilers.Contains("C")) {
+            $CFLAGS += if ($UseGNUDriver) {
+              @("-fdepscan=inline", "-fdepscan-include-tree", "-Xclang", "-fcas-path", "-Xclang", $CASPath)
+            } else {
+              @("/clang:-fdepscan=inline", "/clang:-fdepscan-include-tree", "-Xclang", "-fcas-path", "-Xclang", $CASPath)
+            }
+          }
+
           if ($DebugInfo) {
             if ($UsePinnedCompilers.Contains("C") -or $UseBuiltCompilers.Contains("C")) {
               if ($CDebugFormat -eq "dwarf") {
@@ -1654,6 +1670,14 @@ function Build-CMakeProject {
           } else {
             # clang-cl does not support the /Zc:preprocessor flag.
             @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:__cplusplus")
+          }
+
+          if ($EnableCAS -and $UsePinnedCompilers.Contains("CXX")) {
+            $CXXFLAGS += if ($UseGNUDriver) {
+              @("-fdepscan=inline", "-fdepscan-include-tree", "-Xclang", "-fcas-path", "-Xclang", $CASPath)
+            } else {
+              @("/clang:-fdepscan=inline", "/clang:-fdepscan-include-tree", "-Xclang", "-fcas-path", "-Xclang", $CASPath)
+            }
           }
 
           if ($DebugInfo) {
@@ -2203,6 +2227,12 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     $SwiftFlags += @("-use-ld=lld");
   }
 
+  $CMakeStaticLibPrefixSwiftDefine = if ((Get-PinnedToolchainVersion) -eq "0.0.0") {
+    @{ CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib"; }
+  } else {
+    @{}
+  }
+
   return $TestDefines + $DebugDefines + @{
     CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
@@ -2254,7 +2284,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     SWIFT_STDLIB_ASSERTIONS = "NO";
     SWIFTSYNTAX_ENABLE_ASSERTIONS = "NO";
     "cmark-gfm_DIR" = "$($Platform.ToolchainInstallRoot)\usr\lib\cmake";
-  }
+  } + $CMakeStaticLibPrefixSwiftDefine
 }
 
 function Build-Compilers([Hashtable] $Platform, [string] $Variant) {
