@@ -68,11 +68,6 @@ ERROR(error_unknown_library_level, none,
       "unknown library level '%0', "
       "expected one of 'api', 'spi', 'ipi', or 'other'", (StringRef))
 
-ERROR(error_old_spi_only_import_unsupported, none,
-      "'-experimental-spi-imports' is unsupported in Swift 6, "
-      "use '@_spiOnly' instead",
-      ())
-
 ERROR(error_unknown_require_explicit_availability, none,
       "unknown argument '%0', passed to -require-explicit-availability, "
       "expected 'error', 'warn' or 'ignore'",
@@ -305,26 +300,9 @@ REMARK(remark_indexing_system_module,none,
        "%select{|; skipping because of a broken swiftinterface}1",
        (StringRef, bool))
 
-ERROR(error_create_symbolic_interfaces_dir,none,
-      "creating symbolic interfaces directory: %0", (StringRef))
-ERROR(error_symbolic_interfaces_failed_status_check,none,
-      "failed file status check: %0", (StringRef))
-ERROR(error_write_symbolic_interface,none,
-      "writing symbolic interface file: %0", (StringRef))
-REMARK(remark_emitting_symbolic_interface_module,none,
-       "emitting symbolic interface at %0"
-       "%select{|; skipping because it's up to date}1",
-       (StringRef, bool))
-
 ERROR(error_wrong_number_of_arguments,none,
       "wrong number of '%0' arguments (expected %1, got %2)",
       (StringRef, int, int))
-
-ERROR(error_formatting_multiple_file_ranges,none,
-      "file ranges don't support multiple input files", ())
-
-ERROR(error_formatting_invalid_range,none,
-      "file range is invalid", ())
 
 WARNING(stats_disabled,none,
         "compiler was not built with support for collecting statistics", ())
@@ -517,7 +495,6 @@ REMARK(matching_output_produced,none,
 // Caching related diagnostics
 GROUPED_ERROR(error_caching_no_cas_fs, CompilationCaching, none,
     "caching is enabled without CAS file-system options, input is not immutable", ())
-ERROR(error_prefix_mapping, none, "cannot create scanner prefix mapping: '%0'", (StringRef))
 
 REMARK(replay_output, none, "replay output file '%0': key '%1'", (StringRef, StringRef))
 REMARK(output_cache_miss, none, "cache miss for input file '%0': key '%1'", (StringRef, StringRef))
