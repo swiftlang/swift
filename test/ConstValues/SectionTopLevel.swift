@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature ParserASTGen | %FileCheck %s
 
+// REQUIRES: swift_feature_ParserASTGen
+
 // integer literals
 @section("mysection") let intLiteral1 = 42 // ok
 @section("mysection") let intLiteral2: Int8 = 127 // ok
