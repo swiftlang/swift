@@ -1469,18 +1469,12 @@ static void configureAvailabilityDomains(const ASTContext &ctx,
   for (auto dynamic : opts.AvailabilityDomains.DynamicDomains)
     createAndInsertDomain(dynamic, CustomAvailabilityDomain::Kind::Dynamic);
 
-  // If we didn't see the UnicodeNormalization availability domain, set it
-  // appropriately.
-  if (domainMap.count(ctx.getIdentifier("UnicodeNormalization")) == 0) {
-    if (ctx.LangOpts.hasFeature(Feature::Embedded)) {
-      // Embedded Swift disables this domain by default.
-      createAndInsertDomain("UnicodeNormalization",
-                            CustomAvailabilityDomain::Kind::Enabled);
-    } else {
-      // Non-Embedded Swift always enables the Unicode tables.
-      createAndInsertDomain("UnicodeNormalization",
-                            CustomAvailabilityDomain::Kind::AlwaysEnabled);
-    }
+  // If we didn't see the Unicode availability domain, always
+  // enable the availability domain.
+  if (domainMap.count(ctx.getIdentifier("Unicode")) == 0) {
+    // Non-Embedded Swift always enables the Unicode tables.
+    createAndInsertDomain("Unicode",
+                          CustomAvailabilityDomain::Kind::AlwaysEnabled);
   }
 
 

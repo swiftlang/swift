@@ -22,6 +22,9 @@ extension Unicode.Scalar {
   // produce new sub-segments.
 
   // Quick check if a scalar is an NFC segment starter.
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   internal var _isNFCStarter: Bool {
     // Fast path: All scalars up to U+300 are NFC_QC and have boundaries
     // before them.
@@ -31,6 +34,9 @@ extension Unicode.Scalar {
 }
 
 extension UnsafeBufferPointer where Element == UInt8 {
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   internal func hasNormalizationBoundary(before offset: Int) -> Bool {
     if offset == 0 || offset == count {
       return true
@@ -53,6 +59,9 @@ extension UnsafeBufferPointer where Element == UInt8 {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 internal func _isScalarNFCQC(
   _ scalar: Unicode.Scalar,
   _ prevCCC: inout UInt8
@@ -71,6 +80,9 @@ internal func _isScalarNFCQC(
   return true
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension _StringGutsSlice {
   internal func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
     let substring = String(_guts)[range]
@@ -132,6 +144,9 @@ extension _StringGutsSlice {
 }
 
 /// Run the Unicode NFC quick check algorithm, returns
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 internal func _nfcQuickCheck(
   _ utf8: UnsafeBufferPointer<UInt8>,
   prevCCC: inout UInt8

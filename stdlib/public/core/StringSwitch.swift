@@ -16,6 +16,9 @@
 
 /// The compiler intrinsic which is called to lookup a string in a table
 /// of static string case values.
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_semantics("findStringSwitchCase")
 public // COMPILER_INTRINSIC
 func _findStringSwitchCase(
@@ -39,8 +42,14 @@ struct _OpaqueStringSwitchCache {
   var b: Builtin.Word
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 internal typealias _StringSwitchCache = Dictionary<String, Int>
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @unsafe
 internal struct _StringSwitchContext {
   internal let cases: [StaticString]
@@ -62,6 +71,9 @@ internal struct _StringSwitchContext {
 /// in \p cache. Consecutive calls use the cache for faster lookup.
 /// The \p cases array must not change between subsequent calls with the
 /// same \p cache.
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_semantics("findStringSwitchCaseWithCache")
 public // COMPILER_INTRINSIC
 func _findStringSwitchCaseWithCache(
@@ -90,6 +102,9 @@ func _findStringSwitchCaseWithCache(
 }
 
 /// Builds the string switch case.
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 internal func _createStringTableCache(_ cacheRawPtr: Builtin.RawPointer) {
   let context = unsafe UnsafePointer<_StringSwitchContext>(cacheRawPtr).pointee
   var cache = _StringSwitchCache()
@@ -105,4 +120,3 @@ internal func _createStringTableCache(_ cacheRawPtr: Builtin.RawPointer) {
   }
   unsafe context.cachePtr.initialize(to: cache)
 }
-

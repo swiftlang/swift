@@ -46,6 +46,9 @@ extension UTF8Span {
   /// Whether this span has the same `Character`s as `other`.
   ///
   /// - Complexity: O(n)
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   @_unavailableInEmbedded
   @_alwaysEmitIntoClient
   public func charactersEqual(
@@ -65,6 +68,9 @@ extension UTF8Span {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @available(SwiftStdlib 6.2, *)
 extension UTF8Span {
   /// Whether `self` is equivalent to `other` under Unicode Canonical

@@ -1096,6 +1096,9 @@ extension String: CustomStringConvertible {
   public var description: String { return self }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension String {
   public // @testable
   var _nfcCodeUnits: [UInt8] {

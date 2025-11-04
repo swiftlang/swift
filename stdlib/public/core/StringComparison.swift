@@ -12,6 +12,9 @@
 
 import SwiftShims
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @inlinable @inline(__always) // top-level fastest-paths
 @_effects(readonly)
 internal func _stringCompare(
@@ -21,6 +24,9 @@ internal func _stringCompare(
   return _stringCompareWithSmolCheck(lhs, rhs, expecting: expecting)
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @usableFromInline
 @_effects(readonly)
 internal func _stringCompareWithSmolCheck(
@@ -42,6 +48,9 @@ internal func _stringCompareWithSmolCheck(
   return _stringCompareInternal(lhs, rhs, expecting: expecting)
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @inline(never) // Keep `_stringCompareWithSmolCheck` fast-path fast
 @usableFromInline
 @_effects(readonly)
@@ -61,6 +70,9 @@ internal func _stringCompareInternal(
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @inlinable @inline(__always) // top-level fastest-paths
 @_effects(readonly)
 internal func _stringCompare(
@@ -75,6 +87,9 @@ internal func _stringCompare(
     lhs, lhsRange, rhs, rhsRange, expecting: expecting)
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @usableFromInline
 @_effects(readonly)
 internal func _stringCompareInternal(
@@ -96,6 +111,9 @@ internal func _stringCompareInternal(
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_effects(readonly)
 internal func _stringCompareFastUTF8(
   _ utf8Left: UnsafeBufferPointer<UInt8>,
@@ -123,6 +141,9 @@ internal func _stringCompareFastUTF8(
     utf8Left, utf8Right, expecting: expecting)
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_effects(readonly)
 private func _stringCompareFastUTF8Abnormal(
   _ utf8Left: UnsafeBufferPointer<UInt8>,
@@ -177,6 +198,9 @@ private func _stringCompareFastUTF8Abnormal(
     expecting: expecting)
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_effects(readonly)
 private func _stringCompareSlow(
   _ lhs: _StringGuts, _ rhs: _StringGuts, expecting: _StringComparisonResult
@@ -185,6 +209,9 @@ private func _stringCompareSlow(
     lhs, 0..<lhs.count, rhs, 0..<rhs.count, expecting: expecting)
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_effects(readonly)
 private func _stringCompareSlow(
   _ lhs: _StringGuts, _ lhsRange: Range<Int>,
@@ -198,6 +225,9 @@ private func _stringCompareSlow(
     expecting: expecting)
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_effects(readonly)
 private func _stringCompareSlow(
   _ leftUTF8: UnsafeBufferPointer<UInt8>,
@@ -236,6 +266,9 @@ private func _lexicographicalCompare<I: FixedWidthInteger>(
   return expecting == .equal ? lhs == rhs : lhs < rhs
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_effects(readonly)
 private func _findBoundary(
   _ utf8: UnsafeBufferPointer<UInt8>, before: Int
@@ -310,6 +343,9 @@ internal func _binaryCompare<UInt8>(
 }
 
 // Double dispatch functions
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension _StringGutsSlice {
   @_effects(readonly)
   internal func compare(

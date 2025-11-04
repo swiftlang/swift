@@ -64,6 +64,9 @@ extension Unicode {
       rawValue & 0x1 == 0
     }
 
+    #if hasFeature(CustomAvailability)
+    @available(Unicode)
+    #endif
     init(_ scalar: Unicode.Scalar, fastUpperbound: UInt32 = 0xC0) {
       if _fastPath(scalar.value < fastUpperbound) {
         // CCC = 0, NFC_QC = Yes, NFD_QC = Yes
@@ -159,6 +162,9 @@ extension Unicode {
   //                decomposition entry so that we can guard against scalars
   //                who happen to hash to the same index.
   //
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   internal struct _DecompositionEntry {
     let rawValue: UInt32
 
@@ -186,6 +192,9 @@ extension Unicode {
       )
     }
 
+    #if hasFeature(CustomAvailability)
+    @available(Unicode)
+    #endif
     init(_ scalar: Unicode.Scalar) {
       rawValue = _swift_stdlib_getDecompositionEntry(scalar.value)
     }
@@ -199,38 +208,29 @@ extension Unicode.Scalar {
 }
 
 //===----------------------------------------------------------------------===//
-// Utilities
-//===----------------------------------------------------------------------===//
-
-@_extern(c)
-func _swift_stdlib_getMphIdx(
-  _ scalar: UInt32,
-  _ levels: Int,
-  _ keys: UnsafePointer<UInt64>,
-  _ ranks: UnsafePointer<UInt16>,
-  _ sizes: UnsafePointer<UInt16>
-) -> Int
-
-@_extern(c)
-func _swift_stdlib_getScalarBitArrayIdx(
-  _ scalar: UInt32,
-  _ bitArrays: UnsafePointer<UInt64>,
-  _ ranks: UnsafePointer<UInt16>
-) -> Int
-
-//===----------------------------------------------------------------------===//
 // Normalization
 //===----------------------------------------------------------------------===//
-
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getNormData(_ scalar: UInt32) -> UInt16
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getDecompositionEntry(_ scalar: UInt32) -> UInt32
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getComposition(_ x: UInt32, _ y: UInt32) -> UInt32
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 var _swift_stdlib_nfd_decompositions: UnsafePointer<UInt8>?
 
