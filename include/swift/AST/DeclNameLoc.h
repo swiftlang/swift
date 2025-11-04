@@ -60,8 +60,11 @@ class DeclNameLoc {
   /// Retrieve a pointer to either the only source location that was
   /// stored or to the array of source locations that was stored.
   SourceLoc const * getSourceLocs() const {
-    if (NumArgumentLabels == 0 && !HasModuleSelectorLoc)
+    if (NumArgumentLabels == 0 && !HasModuleSelectorLoc) {
+      if (LocationInfo == nullptr)
+        return nullptr;
       return reinterpret_cast<SourceLoc const *>(&LocationInfo);
+    }
 
     return reinterpret_cast<SourceLoc const *>(LocationInfo);
   }
@@ -110,7 +113,10 @@ public:
 
   /// Retrieve the location of the base name.
   SourceLoc getBaseNameLoc() const {
-    return getSourceLocs()[BaseNameIndex];
+    const SourceLoc *SourceLocs = getSourceLocs();
+    if (SourceLocs == nullptr)
+      return SourceLoc();
+    return SourceLocs[BaseNameIndex];
   }
 
   /// Retrieve the location of the left parentheses.
