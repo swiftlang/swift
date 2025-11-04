@@ -245,9 +245,6 @@ namespace swift {
     // Availability macros definitions to be expanded at parsing.
     SmallVector<std::string, 4> AvailabilityMacros;
 
-    /// Require public declarations to declare that they are Sendable (or not).
-    bool RequireExplicitSendable = false;
-
     /// Detect and automatically import modules' cross-import overlays.
     bool EnableCrossImportOverlays = false;
 
