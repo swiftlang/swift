@@ -174,7 +174,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
   auto ignoredDowngradeToWarning = DowngradeToWarning::No;
   auto originKind =
       getDisallowedOriginKind(D, where, ignoredDowngradeToWarning);
-  if (originKind == DisallowedOriginKind::None)
+  if (where.canReferenceOrigin(originKind))
     return false;
 
   // As an exception, if the import of the module that defines the desugared
