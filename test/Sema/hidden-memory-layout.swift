@@ -175,7 +175,7 @@ public struct ExposedLayoutPublicUser {
   // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because it is a struct marked '@_implementationOnly'}}
 }
 
-private struct ExposedLayoutInternalUser {
+internal struct ExposedLayoutInternalUser {
 
   private var privateField: StructFromDirect
   // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
