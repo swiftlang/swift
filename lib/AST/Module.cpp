@@ -1011,7 +1011,18 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   } else if (privateDiscriminator.empty()) {
     auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
                                  [](const ValueDecl *VD) -> bool {
-      return VD->getFormalAccess() <= AccessLevel::FilePrivate;
+      // FIXME: The ClangImporter sometimes generates private declarations but
+      // doesn't give their file unit a private discriminator so they mangle
+      // incorrectly.
+      //
+      // The hasClangNode() carveout makes the ASTDemangler work properly in
+      // this case.
+      //
+      // We should fix things up so that such declarations also mangle with a
+      // a private discriminator, in which case this entry point will be called
+      // with the right parameters so that this isn't needed.
+      return (VD->getFormalAccess() <= AccessLevel::FilePrivate &&
+              !VD->hasClangNode());
     });
     results.erase(newEnd, results.end());
 
