@@ -6660,7 +6660,18 @@ public:
 
     auto isolation = info.getIsolation();
     switch (isolation.getKind()) {
-    case FunctionTypeIsolation::Kind::NonIsolated:
+    case FunctionTypeIsolation::Kind::NonIsolated: {
+      // When `NonisolatedNonsendingByDefault` is enabled and async
+      // function type is nonisolated it could only mean that it is
+      // either explicitly `@concurrent` or inferred to be one and
+      // it should be printed accordingly.
+      if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
+          fnType->isAsync()) {
+        Printer << "@concurrent ";
+      }
+      break;
+    }
+
     case FunctionTypeIsolation::Kind::Parameter:
       break;
 
