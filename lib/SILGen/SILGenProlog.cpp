@@ -1064,7 +1064,7 @@ private:
   void emitParam(ParamDecl *PD) {
     // Register any auxiliary declarations for the parameter to be
     // visited later.
-    PD->visitAuxiliaryDecls([&](VarDecl *localVar) {
+    PD->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *localVar) {
       SGF.LocalAuxiliaryDecls.push_back(localVar);
     });
 
