@@ -273,6 +273,10 @@ extension TypeProperties {
   public var isSILPackElementAddress: Bool {
     return rawType.bridged.isSILPackElementAddress()
   }
+
+  public func getPackElementType(_ index: Int) -> Type {
+    return Type(bridged: rawType.bridged.getPackElementType(index));
+  }
 }
 
 public struct TypeArray : RandomAccessCollection, CustomReflectable {

@@ -656,6 +656,11 @@ bool BridgedASTType::isSILPackElementAddress() const {
   return unbridged()->castTo<swift::SILPackType>()->isElementAddress();
 }
 
+BridgedASTType BridgedASTType::getPackElementType(SwiftInt index) const {
+    ASSERT(index >= 0);
+    return {unbridged()->castTo<swift::PackType>()->getElementType(index).getPointer()};
+}
+
 static_assert((int)BridgedASTType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);
 static_assert((int)BridgedASTType::TraitResult::CanBe == (int)swift::TypeTraitResult::CanBe);
 static_assert((int)BridgedASTType::TraitResult::Is == (int)swift::TypeTraitResult::Is);

@@ -16,6 +16,7 @@ import SIL
 extension WitnessMethodInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     _ = tryReplaceExistentialArchetype(of: self, context)
+    _ = tryReplacePackElementArchetype(of: self, context)
   }
 }
 
@@ -31,6 +32,34 @@ extension WitnessMethodInst : Simplifiable, SILCombineSimplifiable {
 /// ```
 private func tryReplaceExistentialArchetype(of witnessMethod: WitnessMethodInst, _ context: SimplifyContext) -> Bool {
   guard let concreteType = witnessMethod.concreteTypeOfDependentExistentialArchetype else {
+    return false
+  }
+  let conf = concreteType.checkConformance(to: witnessMethod.lookupProtocol)
+  guard conf.isValid else {
+    return false
+  }
+
+  let builder = Builder(before: witnessMethod, context)
+  let newWmi = builder.createWitnessMethod(lookupType: concreteType,
+                                           conformance: conf,
+                                           member: witnessMethod.member,
+                                           methodType: witnessMethod.type)
+  witnessMethod.replace(with: newWmi, context)
+  return true
+}
+
+/// If the witness_method operates on a pack element archetype (`@pack_element("...")`) and the concrete
+/// type is known, replace the pack element archetype with the concrete type.
+/// For example:
+/// ```
+///   %3 = witness_method $@pack_element("...") Self, #P.foo, %2
+/// ```
+/// ->
+/// ```
+///   %3 = witness_method $ConcreteType, #P.foo, %2
+/// ```
+private func tryReplacePackElementArchetype(of witnessMethod: WitnessMethodInst, _ context: SimplifyContext) -> Bool {
+  guard let concreteType = witnessMethod.concreteTypeOfDependentPackElementArchetype else {
     return false
   }
   let conf = concreteType.checkConformance(to: witnessMethod.lookupProtocol)

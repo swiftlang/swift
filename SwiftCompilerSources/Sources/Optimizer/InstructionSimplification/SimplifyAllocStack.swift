@@ -19,6 +19,7 @@ extension AllocStackInst : Simplifiable, SILCombineSimplifiable {
       return
     }
     _ = optimizeExistential(context)
+    _ = optimizePackElement(context)
   }
 }
 
@@ -302,4 +303,37 @@ private extension AllocStackInst {
     }
     return concreteType
   }
+
+  /// Replaces an alloc_stack of an Pack Element by an alloc_stack of the concrete type.
+  ///
+  /// For example:
+  /// ```
+  ///   %0 = alloc_stack $@pack_element(...) ...
+  ///   use %1
+  /// ```
+  /// is transformed to
+  /// ```
+  ///   %0 = alloc_stack $T
+  ///   use %0
+  /// ```
+  ///
+  private func optimizePackElement(_ context: SimplifyContext) -> Bool {
+    guard let concreteType = concreteTypeOfDependentPackElementArchetype else {
+      return false
+    }
+
+    let builder = Builder(before: self, context)
+    let newAlloc = builder.createAllocStack(concreteType.loweredType(in: parentFunction),
+                                            hasDynamicLifetime: hasDynamicLifetime,
+                                            isLexical: isLexical,
+                                            isFromVarDecl: isFromVarDecl,
+                                            usesMoveableValueDebugInfo: usesMoveableValueDebugInfo)    
+    for use in uses {
+        // FIXME: Are there any specific cases to handle?
+        use.set(to: newAlloc, context)
+    }
+    context.erase(instruction: self)
+    return true
+  }
+
 }
