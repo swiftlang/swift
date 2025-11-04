@@ -625,11 +625,9 @@ void simple_display(llvm::raw_ostream &out, CxxValueSemanticsDescriptor desc);
 SourceLoc extractNearestSourceLoc(CxxValueSemanticsDescriptor desc);
 
 struct ClangTypeExplicitSafetyDescriptor final {
-  clang::CanQualType type;
+  clang::QualType type;
 
-  ClangTypeExplicitSafetyDescriptor(clang::CanQualType type) : type(type) {}
-  ClangTypeExplicitSafetyDescriptor(clang::QualType type)
-      : type(type->getCanonicalTypeUnqualified()) {}
+  ClangTypeExplicitSafetyDescriptor(clang::QualType type) : type(type) {}
 
   friend llvm::hash_code
   hash_value(const ClangTypeExplicitSafetyDescriptor &desc) {

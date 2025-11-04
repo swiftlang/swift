@@ -8725,8 +8725,8 @@ SourceLoc swift::extractNearestSourceLoc(SafeUseOfCxxDeclDescriptor desc) {
 
 void swift::simple_display(llvm::raw_ostream &out,
                            ClangTypeExplicitSafetyDescriptor desc) {
-  auto qt = static_cast<clang::QualType>(desc.type);
-  out << "Checking if type '" << qt.getAsString() << "' is explicitly safe.\n";
+  out << "Checking if type '" << desc.type.getAsString()
+      << "' is explicitly safe.\n";
 }
 
 SourceLoc swift::extractNearestSourceLoc(ClangTypeExplicitSafetyDescriptor desc) {
@@ -8735,7 +8735,7 @@ SourceLoc swift::extractNearestSourceLoc(ClangTypeExplicitSafetyDescriptor desc)
 
 ExplicitSafety ClangTypeExplicitSafety::evaluate(
     Evaluator &evaluator, ClangTypeExplicitSafetyDescriptor desc) const {
-  auto clangType = static_cast<clang::QualType>(desc.type);
+  auto clangType = desc.type;
 
   // Handle pointers.
   auto pointeeType = clangType->getPointeeType();
