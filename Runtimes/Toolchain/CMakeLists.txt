@@ -29,7 +29,7 @@ include(GNUInstallDirs)
 include(PlatformInfo)
 include(CatalystSupport)
 
-set(SwiftCore_SWIFTC_SOURCE_DIR
+set(SwiftToolchain_SWIFTC_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/../../"
   CACHE FILEPATH "Path to the root source directory of the Swift compiler")
 

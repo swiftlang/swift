@@ -8,7 +8,7 @@ add_library(swiftClientRetainRelease
 #        We should split out the parts that are needed by the runtime
 #        to avoid pulling in headers from the compiler.
 target_include_directories(swiftClientRetainRelease PRIVATE
-  "${SwiftCore_SWIFTC_SOURCE_DIR}/include"
+  "${SwiftToolchain_SWIFTC_SOURCE_DIR}/include"
   "${CMAKE_SOURCE_DIR}/../Core/SwiftShims")
 
 target_compile_options(swiftClientRetainRelease PRIVATE
