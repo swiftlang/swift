@@ -373,7 +373,7 @@ if(NOT ANDROID AND NOT APPLE AND NOT LINUX AND NOT WIN32 AND UNIX)
   target_link_libraries(swiftCore PRIVATE "${EXECINFO_LIBRARY}")
 endif()
 
-if(APPLE)
+if(SwiftCore_ENABLE_CLIENT_RETAIN_RELEASE)
   find_package(SwiftClientRetainRelease)
 
   if(SwiftClientRetainRelease_FOUND)

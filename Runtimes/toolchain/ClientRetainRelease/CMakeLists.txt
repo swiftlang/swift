@@ -1,55 +1,4 @@
-cmake_minimum_required(VERSION 3.26...3.29)
-# TODO before requiring CMake 4.1 or later
-# and/or enforcing CMP0195, please check/update
-# the implementation  of `emit_swift_interface`
-# in `EmitSwiftInterface.cmake`
-# to ensure it keeps laying down nested swiftmodule folders
-
-set(CMAKE_C_VISIBILITY_PRESET "hidden")
-set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
-set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
-
-list(APPEND CMAKE_MODULE_PATH
-  "${CMAKE_SOURCE_DIR}/cmake/modules"
-  "${CMAKE_SOURCE_DIR}/../../cmake/modules")
-
-if(POLICY CMP0157 AND CMAKE_Swift_COMPILER_USE_OLD_DRIVER)
-  cmake_policy(SET CMP0157 OLD)
-endif()
-
-include(SwiftProjectVersion)
-project(SwiftClientRetainRelease
-  LANGUAGES ASM
-  VERSION ${SWIFT_RUNTIME_VERSION})
-
-
-set(${PROJECT_NAME}_VENDOR_MODULE_DIR "${CMAKE_SOURCE_DIR}/cmake/modules/vendor"
-  CACHE FILEPATH "Location for private build system extension")
-
-include(GNUInstallDirs)
-
-include(PlatformInfo)
-include(CatalystSupport)
-
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
-
-add_compile_options(
-  $<$<BOOL:${SwiftRetainReleaseClient_STDLIB_ENABLE_OBJC_INTEROP}>:-DSWIFT_OBJC_INTEROP=1>)
-
-# LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
-# LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
-# LNK4217: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj' in function 'function'
-#
-# We cannot selectively filter the linker warnings as we do not use the MSVC
-# frontned and `clang-cl` (and `clang`) currently do not support `/WX:nnnn`. As
-# a compromise, treat all linker warnings as errors.
-add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
-# Ensure all symbols are fully resolved on Linux
-add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
-
-set(SwiftCore_SWIFTC_SOURCE_DIR
-  "${PROJECT_SOURCE_DIR}/../../../"
-  CACHE FILEPATH "Path to the root source directory of the Swift compiler")
 
 add_library(swiftClientRetainRelease
   STATIC  RetainRelease.s)
@@ -60,7 +9,10 @@ add_library(swiftClientRetainRelease
 #        to avoid pulling in headers from the compiler.
 target_include_directories(swiftClientRetainRelease PRIVATE
   "${SwiftCore_SWIFTC_SOURCE_DIR}/include"
-  "${CMAKE_SOURCE_DIR}/../../Core/SwiftShims")
+  "${CMAKE_SOURCE_DIR}/../Core/SwiftShims")
+
+target_compile_options(swiftClientRetainRelease PRIVATE
+  $<$<BOOL:${SwiftRetainReleaseClient_ENABLE_OBJC_INTEROP}>:-DSWIFT_OBJC_INTEROP=1>)
 
 install(TARGETS swiftClientRetainRelease
   EXPORT SwiftClientRetainReleaseTargets

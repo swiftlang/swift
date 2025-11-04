@@ -1660,8 +1660,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         set(build_concurrency YES)
       endif()
 
-      ExternalProject_Add("${stdlib_target}-retainreleaseclient"
-        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/toolchain/ClientRetainRelease"
+      ExternalProject_Add("${stdlib_target}-toolchain"
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/toolchain"
         # TODO: Add this once we're ready to start swapping out the libraries
         #       for testing
         # INSTALL_DIR "${CMAKE_BINARY_DIR}/"
@@ -1689,17 +1689,18 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
-          -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
+          -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}
+          -DSwiftToolchain_ENABLE_CLIENT_RETAIN_RELEASE=${SWIFT_BUILD_CLIENT_RETAIN_RELEASE})
 
-      ExternalProject_Get_Property("${stdlib_target}-retainreleaseclient" INSTALL_DIR)
+      ExternalProject_Get_Property("${stdlib_target}-toolchain" INSTALL_DIR)
 
-      ExternalProject_Add("${stdlib_target}-core" "${stdlib_target}-retainreleaseclient"
+      ExternalProject_Add("${stdlib_target}-core" 
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Core"
         # TODO: Add this once we're ready to start swapping out the libraries
         #       for testing
         # INSTALL_DIR "${CMAKE_BINARY_DIR}/"
 
-        DEPENDS PopulateRuntimeSourceDir
+        DEPENDS PopulateRuntimeSourceDir "${stdlib_target}-toolchain"
         # To ensure incremental builds work as expected
         BUILD_ALWAYS 1
         CMAKE_ARGS
@@ -1723,6 +1724,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DSwiftCore_ENABLE_CONCURRENCY=${build_concurrency}
           -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}
           -DSwiftClientRetainRelease_DIR=${INSTALL_DIR}/lib/cmake/SwiftClientRetainRelease
+          -DSwiftCore_ENABLE_CLIENT_RETAIN_RELEASE=${SWIFT_BUILD_CLIENT_RETAIN_RELEASE}
           --trace-expand)
       if(NOT ${CMAKE_CROSSCOMPILING})
         add_dependencies("${stdlib_target}-core" swift-frontend)
