@@ -196,7 +196,7 @@ StringBridgeTests.test("lengthOfBytes(using:)") {
 }
 
 StringBridgeTests.test("Equal UTF16 lengths but unequal UTF8") {
-  let utf8 = "aaaaaaaaaaaaaaü" //Native, UTF16 count: 31, UTF8 count: 58
+  let utf8 = "чебурашка@ящик-с-апельсинами.рф" //Native, UTF16 count: 31, UTF8 count: 58
   let nsascii = "2166002315@874404110.1042078977" as NSString //Non-native, UTF16 count: 31, UTF8 count: 31
   let nsutf8 = String(decoding: utf8.utf8, as: UTF8.self) as NSString //bridged native
   expectTrue(nsutf8.isEqual(nsascii))
