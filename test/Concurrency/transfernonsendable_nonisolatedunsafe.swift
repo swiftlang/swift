@@ -329,6 +329,18 @@ func useAfterTransferLetSquelchedIndirectAddressOnly<T : ProvidesStaticValue>(_ 
   print(ns4)
 }
 
+func testNonisolatedUnsafeForwardDeclaredVar<T: Sendable>(_ body: @escaping @Sendable () async throws -> T) throws -> T {
+  nonisolated(unsafe) var result: Result<T, Error>!
+  Task {
+    do {
+      result = .success(try await body())
+    } catch {
+      result = .failure(error)
+    }
+  }
+  return try result.get()
+}
+
 ////////////////////////
 // MARK: Global Tests //
 ////////////////////////

@@ -965,6 +965,19 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
   }
 
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(inst)) {
+    if (bbi->isFromVarDecl()) {
+      // See if we have the actual AST information on our instruction.
+      if (auto *varDecl = bbi->getLoc().getAsASTNode<VarDecl>()) {
+        auto isolation = swift::getActorIsolation(varDecl);
+        if (isolation.getKind() == ActorIsolation::NonisolatedUnsafe) {
+          return SILIsolationInfo::getDisconnected(
+              true /*is nonisolated(unsafe)*/);
+        }
+      }
+    }
+  }
+
   /// Consider non-Sendable metatypes to be task-isolated, so they cannot cross
   /// into another isolation domain.
   if (auto *mi = dyn_cast<MetatypeInst>(inst)) {
