@@ -1661,7 +1661,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
       endif()
 
       ExternalProject_Add("${stdlib_target}-toolchain"
-        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/toolchain"
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Toolchain"
         # TODO: Add this once we're ready to start swapping out the libraries
         #       for testing
         # INSTALL_DIR "${CMAKE_BINARY_DIR}/"
