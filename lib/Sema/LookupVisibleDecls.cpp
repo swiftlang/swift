@@ -1224,8 +1224,8 @@ private:
           // auxiliary variables (unless 'var' is a closure param).
           (void)var->getPropertyWrapperBackingPropertyType();
         }
-        var->visitAuxiliaryDecls(
-            [&](VarDecl *auxVar) { foundDecl(auxVar); });
+        var->visitAuxiliaryVars(/*forNameLookup*/ true,
+                                [&](VarDecl *auxVar) { foundDecl(auxVar); });
       }
       // NOTE: We don't call Decl::visitAuxiliaryDecls here since peer decls of
       // local decls should not show up in lookup results.

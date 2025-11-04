@@ -153,7 +153,7 @@ namespace {
 
       // Auxiliary decls need to have their contexts adjusted too.
       if (auto *VD = dyn_cast<VarDecl>(D)) {
-        VD->visitAuxiliaryDecls([&](VarDecl *D) {
+        VD->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *D) {
           D->setDeclContext(ParentDC);
         });
       }
