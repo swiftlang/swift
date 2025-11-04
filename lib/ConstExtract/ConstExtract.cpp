@@ -519,6 +519,11 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       return extractCompileTimeValue(openExistentialExpr->getExistentialValue(), declContext);
     }
 
+    case ExprKind::VarargExpansion: {
+      auto varargExpansionExpr = cast<VarargExpansionExpr>(expr);
+      return extractCompileTimeValue(varargExpansionExpr->getSubExpr(), declContext);
+    }
+
     case ExprKind::ForceValue: {
       auto forceValueExpr = cast<ForceValueExpr>(expr);
       return extractCompileTimeValue(forceValueExpr->getSubExpr(), declContext);
