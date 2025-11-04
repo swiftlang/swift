@@ -98,6 +98,11 @@ void BridgedDeclAttributes_add(BridgedDeclAttributes *cAttrs,
   *cAttrs = attrs;
 }
 
+bool BridgedDeclAttributes_hasAttribute(
+    const BridgedDeclAttributes *_Nonnull attrs, swift::DeclAttrKind kind) {
+  return attrs->unbridged().getAttribute(kind) != nullptr;
+}
+
 static AvailableAttr::Kind unbridge(BridgedAvailableAttrKind value) {
   switch (value) {
   case BridgedAvailableAttrKindDefault:
