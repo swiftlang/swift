@@ -842,6 +842,10 @@ GetDistributedActorIDPropertyRequest::evaluate(Evaluator &evaluator,
   propDecl->setSynthesized();
   propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
+  // NOTE: The type for this property is lazily computed by
+  // `getLazilySynthesizedPattern` when type-checking, which ensures this
+  // request does not trigger any semantic requests since it's called by name
+  // lookup.
   Pattern *propPat = NamedPattern::createImplicit(C, propDecl);
 
   PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
@@ -891,6 +895,10 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
   propDecl->setSynthesized();
   propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
+  // NOTE: The type for this property is lazily computed by
+  // `getLazilySynthesizedPattern` when type-checking, which ensures this
+  // request does not trigger any semantic requests since it's called by name
+  // lookup.
   Pattern *propPat = NamedPattern::createImplicit(C, propDecl);
 
   PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
