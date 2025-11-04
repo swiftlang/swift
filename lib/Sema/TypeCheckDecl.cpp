@@ -2948,7 +2948,7 @@ static ArrayRef<Decl *> evaluateMembersRequest(
       // be in a specific order that is different from ordering by their
       // mangled name, so preserve the order
       // they were added in.
-      if (vd->isSynthesized() && !vd->isSpecialDistributedProperty()) {
+      if (vd->isSynthesized() && !vd->isSpecialDistributedActorProperty()) {
         synthesizedMembers.add(vd);
         return;
       }

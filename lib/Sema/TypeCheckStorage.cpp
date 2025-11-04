@@ -390,13 +390,13 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
 static Type getLazyInterfaceTypeForSynthesizedVar(VarDecl *var) {
   // For DistributedActor, the `id` and `actorSystem` properties have their
   // types computed lazily.
-  if (auto distPropKind = var->isSpecialDistributedProperty()) {
+  if (auto distPropKind = var->isSpecialDistributedActorProperty()) {
     auto *NTD = var->getDeclContext()->getSelfNominalTypeDecl();
     ASSERT(NTD);
     switch (distPropKind.value()) {
-    case SpecialDistributedProperty::Id:
+    case SpecialDistributedActorProperty::Id:
       return getDistributedActorIDType(NTD);
-    case SpecialDistributedProperty::ActorSystem:
+    case SpecialDistributedActorProperty::ActorSystem:
       return getDistributedActorSystemType(NTD);
     }
     llvm_unreachable("Unhandled case in switch!");

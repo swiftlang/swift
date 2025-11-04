@@ -376,7 +376,7 @@ bool conflicting(ASTContext &ctx,
 
 /// The kind of special compiler synthesized property in a \c distributed actor,
 /// currently this includes \c id and \c actorSystem.
-enum class SpecialDistributedProperty {
+enum class SpecialDistributedActorProperty {
   Id, ActorSystem
 };
 
@@ -3065,8 +3065,8 @@ public:
   /// Whether this is the special synthesized 'id' or 'actorSystem' property
   /// of a distributed actor. If \p onlyCheckName is set, then any
   /// matching user-defined property with the name is also considered.
-  std::optional<SpecialDistributedProperty>
-  isSpecialDistributedProperty(bool onlyCheckName = false) const;
+  std::optional<SpecialDistributedActorProperty>
+  isSpecialDistributedActorProperty(bool onlyCheckName = false) const;
 
   bool hasName() const { return bool(Name); }
   bool isOperator() const { return Name.isOperator(); }
