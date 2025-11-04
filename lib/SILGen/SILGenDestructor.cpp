@@ -58,8 +58,6 @@ void SILGenFunction::emitDistributedRemoteActorDeinit(
 
     auto cleanupLoc = CleanupLocation(loc);
 
-    auto &C = cd->getASTContext();
-
     {
       FullExpr CleanupScope(Cleanups, cleanupLoc);
       ManagedValue borrowedSelf = emitManagedBeginBorrow(loc, selfValue);
