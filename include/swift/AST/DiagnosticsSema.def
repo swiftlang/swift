@@ -686,9 +686,6 @@ ERROR(expr_keypath_mutating_getter,none,
       "%select{key path|dynamic key path member lookup}1 cannot refer to %0, "
       "which has a mutating getter",
       (const ValueDecl *, bool))
-ERROR(expr_keypath_static_member,none,
-      "%select{key path|dynamic key path member lookup}1 cannot refer to static member %0",
-      (const ValueDecl *, bool))
 ERROR(keypath_static_member_access_from_unsupported_module,none,
      "%select{key path|dynamic key path member lookup}3 cannot refer "
      "to static member %1 of type %0 from module %2",
@@ -1318,10 +1315,6 @@ REMARK(transitive_dependency_behavior,none,
        "%1 has %select{a required|an optional|an ignored}2 "
        "transitive dependency on '%0'",
        (StringRef, Identifier, unsigned))
-       
-REMARK(explicit_interface_build_skipped,none,
-       "Skipped rebuilding module at %0 - up-to-date",
-       (StringRef))
 
 GROUPED_WARNING(cannot_find_module_version,ModuleVersionMissing,none,
         "cannot find user version number for%select{| Clang}1 module '%0';"
@@ -2223,8 +2216,6 @@ ERROR(expose_protocol_to_cxx_unsupported,none,
       "protocol %0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_move_only_to_cxx,none,
       "noncopyable %kind0 can not yet be represented in C++", (ValueDecl *))
-ERROR(expose_nested_type_to_cxx,none,
-      "nested %kind0 can not yet be represented in C++", (ValueDecl *))
 ERROR(expose_macro_to_cxx,none,
       "Swift macro can not yet be represented in C++", (ValueDecl *))
 GROUPED_WARNING(warn_unannotated_cxx_func_returning_frt, ForeignReferenceType, none,
@@ -5986,11 +5977,6 @@ ERROR(non_sendable_result_in_objc,none,
       "actor boundary",
       (Type, const ValueDecl *, ActorIsolation))
 
-ERROR(non_sendable_call_result_type,none,
-      "non-Sendable result type %0 cannot be sent from %1 context in call "
-      "to async function",
-      (Type, ActorIsolation))
-
 ERROR(non_sendable_property_exits_actor,none,
       "non-Sendable type %0 of %kind1 cannot exit %2 context",
       (Type, const ValueDecl *, ActorIsolation))
@@ -6410,9 +6396,6 @@ ERROR(invalid_ownership_with_optional,none,
 ERROR(invalid_ownership_not_optional,none,
       "%0 variable should have optional type %1",
       (ReferenceOwnership, Type))
-ERROR(invalid_ownership_is_let,none,
-      "%0 must be a mutable variable, because it may change at runtime",
-      (ReferenceOwnership))
 ERROR(ownership_invalid_in_protocols,none,
       "%0 cannot be applied to a property declaration in a protocol",
       (ReferenceOwnership))
@@ -8331,11 +8314,6 @@ ERROR(noimplicitcopy_attr_valid_only_on_local_let_params,
       none, "'@_noImplicitCopy' attribute can only be applied to local lets and params", ())
 ERROR(noimplicitcopy_attr_not_allowed_on_moveonlytype,none,
       "'@_noImplicitCopy' has no effect when applied to a noncopyable type", ())
-ERROR(noncopyable_types_cannot_be_resilient, none,
-      "noncopyable %kind0 must be '@frozen' in library evolution mode; "
-      "non-'@frozen' public and '@usableFromInline' noncopyable types are not "
-      "supported",
-      (const ValueDecl *))
 ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))

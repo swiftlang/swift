@@ -1358,20 +1358,20 @@ bool ValueDecl::isDistributedGetAccessor() const {
   return false;
 }
 
-std::optional<SpecialDistributedProperty>
-ValueDecl::isSpecialDistributedProperty(bool onlyCheckName) const {
+std::optional<SpecialDistributedActorProperty>
+ValueDecl::isSpecialDistributedActorProperty(bool onlyCheckName) const {
   if (!isa<VarDecl>(this))
     return std::nullopt;
 
   auto *DC = getDeclContext();
   auto &ctx = DC->getASTContext();
 
-  auto kind = [&]() -> std::optional<SpecialDistributedProperty> {
+  auto kind = [&]() -> std::optional<SpecialDistributedActorProperty> {
     auto name = getName();
     if (name.isSimpleName(ctx.Id_id))
-      return SpecialDistributedProperty::Id;
+      return SpecialDistributedActorProperty::Id;
     if (name.isSimpleName(ctx.Id_actorSystem))
-      return SpecialDistributedProperty::ActorSystem;
+      return SpecialDistributedActorProperty::ActorSystem;
 
     return std::nullopt;
   }();

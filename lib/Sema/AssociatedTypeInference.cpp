@@ -1661,7 +1661,7 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
   // witnesses already being resolved.
   if (auto *nominal = dc->getSelfNominalTypeDecl()) {
     if (nominal->isDistributedActor() &&
-        req->isSpecialDistributedProperty(/*onlyCheckName*/ true)) {
+        req->isSpecialDistributedActorProperty(/*onlyCheckName*/ true)) {
       LLVM_DEBUG(llvm::dbgs() << "skipping special distributed property\n");
       return {};
     }
