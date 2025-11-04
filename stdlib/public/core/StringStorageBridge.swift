@@ -169,7 +169,7 @@ extension _AbstractStringStorage {
         // otherUTF16Length is the same as the byte count here IFF it's ASCII
         // self.count could still be utf8
         if count != otherUTF16Length {
-          return 0
+          return false
         }
         return unsafe (start == ascii || (memcmp(start, ascii, otherUTF16Length) == 0))
       }) {
