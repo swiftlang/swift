@@ -17,7 +17,6 @@
 
 #include "GenKeyPath.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/ExtInfo.h"
@@ -29,19 +28,16 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeExpansionContext.h"
-#include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/IRGen/GenericRequirement.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -58,7 +54,6 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Constant.h"
@@ -73,7 +68,6 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
-#include "llvm/Support/SaveAndRestore.h"
 
 #include "CallEmission.h"
 #include "EntryPointArgumentEmission.h"
@@ -1565,6 +1559,13 @@ public:
   void visitHasSymbolInst(HasSymbolInst *i);
 
   void visitTypeValueInst(TypeValueInst *i);
+
+  void visitMakeBorrowInst(MakeBorrowInst *i) { llvm_unreachable("todo"); }
+  void visitDereferenceBorrowInst(DereferenceBorrowInst *i) { llvm_unreachable("todo"); }
+  void visitMakeAddrBorrowInst(MakeAddrBorrowInst *i) { llvm_unreachable("todo"); }
+  void visitDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *i) { llvm_unreachable("todo"); }
+  void visitInitBorrowAddrInst(InitBorrowAddrInst *i) { llvm_unreachable("todo"); }
+  void visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) { llvm_unreachable("todo"); }
 
   void visitWeakCopyValueInst(swift::WeakCopyValueInst *i);
   void visitUnownedCopyValueInst(swift::UnownedCopyValueInst *i);

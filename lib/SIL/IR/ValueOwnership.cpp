@@ -72,6 +72,7 @@ CONSTANT_OWNERSHIP_INST(Owned, WeakCopyValue)
   CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
 
+CONSTANT_OWNERSHIP_INST(Guaranteed, DereferenceBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, BorrowedFrom)
 CONSTANT_OWNERSHIP_INST(Guaranteed, LoadBorrow)
@@ -182,6 +183,10 @@ CONSTANT_OWNERSHIP_INST(None, TuplePackElementAddr)
 CONSTANT_OWNERSHIP_INST(None, Object)
 CONSTANT_OWNERSHIP_INST(None, Vector)
 CONSTANT_OWNERSHIP_INST(None, TypeValue)
+CONSTANT_OWNERSHIP_INST(None, MakeBorrow)
+CONSTANT_OWNERSHIP_INST(None, MakeAddrBorrow)
+CONSTANT_OWNERSHIP_INST(None, DereferenceAddrBorrow)
+CONSTANT_OWNERSHIP_INST(None, DereferenceBorrowAddr)
 
 #undef CONSTANT_OWNERSHIP_INST
 

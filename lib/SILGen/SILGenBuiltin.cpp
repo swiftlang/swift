@@ -18,7 +18,6 @@
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
-#include "Scope.h"
 #include "SILGenFunction.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
@@ -29,11 +28,10 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferenceCounting.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/AST/TypeCheckRequests.h" // FIXME: Temporary
-#include "swift/AST/NameLookupRequests.h" // FIXME: Temporary
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -2205,6 +2203,24 @@ static ManagedValue emitBuiltinTaskAddPriorityEscalationHandler(
                           SILType::getUnsafeRawPointer(SGF.getASTContext()),
                           subs, {args[0].getValue()});
   return ManagedValue::forRValueWithoutOwnership(b);
+}
+
+static ManagedValue emitBuiltinMakeBorrow(SILGenFunction &SGF,
+                                       SILLocation loc,
+                                       SubstitutionMap subs,
+                                       ArrayRef<ManagedValue> args,
+                                       SGFContext C) {
+  #warning "todo"
+  llvm_unreachable("todo");
+}
+
+static ManagedValue emitBuiltinDereferenceBorrow(SILGenFunction &SGF,
+                                       SILLocation loc,
+                                       SubstitutionMap subs,
+                                       ArrayRef<ManagedValue> args,
+                                       SGFContext C) {
+  #warning "todo"
+  llvm_unreachable("todo");
 }
 
 std::optional<SpecializedEmitter>

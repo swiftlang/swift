@@ -18,13 +18,11 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTSynthesis.h"
 #include "swift/AST/ConformanceLookup.h"
-#include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -32,8 +30,6 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/ManagedStatic.h"
-#include <tuple>
 
 using namespace swift;
 
@@ -478,7 +474,7 @@ enum class BuiltinThrowsKind : uint8_t {
   Rethrows
 };
 
-}
+} // anonymous namespace
 
 /// Build a builtin function declaration.
 static FuncDecl *getBuiltinGenericFunction(
@@ -918,6 +914,17 @@ template <class T>
 static BuiltinFunctionBuilder::PackExpansionGenerator<T>
 makePackExpansion(const T &object) {
   return { object };
+}
+
+template <class G>
+static BuiltinFunctionBuilder::LambdaGenerator
+makeBuiltinBorrowType(const G &referentGenerator) {
+  return {
+    [=](BuiltinFunctionBuilder &builder) -> Type {
+      auto referent = referentGenerator.build(builder)->getCanonicalType();
+      return BuiltinBorrowType::get(referent);
+    },
+  };
 }
 
 /// Create a function with type <T> T -> ().
@@ -2431,6 +2438,28 @@ static ValueDecl *getTaskLocalValuePop(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
 }
 
+static ValueDecl *getMakeBorrow(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
+
+  auto T = makeGenericParam(0);
+
+  builder.addParameter(T, ParamSpecifier::Borrowing);
+  builder.setResult(makeBuiltinBorrowType(T));
+
+  return builder.build(id);
+}
+
+static ValueDecl *getDereferenceBorrow(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
+
+  auto T = makeGenericParam(0);
+
+  builder.addParameter(makeBuiltinBorrowType(T), ParamSpecifier::Borrowing);
+  builder.setResult(T);
+
+  return builder.build(id);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -2466,7 +2495,7 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 };
 
 /// Determines if a builtin type falls within the given category.
-inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
+static bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
   switch (OK) {
   case OverloadedBuiltinKind::None:
     return false;  // always fail. 
@@ -3538,6 +3567,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TaskLocalValuePop:
     return getTaskLocalValuePop(Context, Id);
+
+  case BuiltinValueKind::MakeBorrow:
+    return getMakeBorrow(Context, Id);
+
+  case BuiltinValueKind::DereferenceBorrow:
+    return getDereferenceBorrow(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");

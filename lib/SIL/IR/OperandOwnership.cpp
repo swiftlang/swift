@@ -210,6 +210,11 @@ OPERAND_OWNERSHIP(TrivialUse, PackElementGet)
 OPERAND_OWNERSHIP(TrivialUse, PackElementSet)
 OPERAND_OWNERSHIP(TrivialUse, TuplePackElementAddr)
 OPERAND_OWNERSHIP(TrivialUse, GlobalAddr)
+OPERAND_OWNERSHIP(TrivialUse, MakeAddrBorrow)
+OPERAND_OWNERSHIP(TrivialUse, InitBorrowAddr)
+OPERAND_OWNERSHIP(TrivialUse, DereferenceBorrow)
+OPERAND_OWNERSHIP(TrivialUse, DereferenceAddrBorrow)
+OPERAND_OWNERSHIP(TrivialUse, DereferenceBorrowAddr)
 
 // The dealloc_stack_ref operand needs to have NonUse ownership because
 // this use comes after the last consuming use (which is usually a dealloc_ref).
@@ -427,6 +432,12 @@ AGGREGATE_OWNERSHIP(UncheckedOwnership)
 // A begin_borrow is conditionally nested.
 OperandOwnership
 OperandOwnershipClassifier::visitBeginBorrowInst(BeginBorrowInst *borrow) {
+  return OperandOwnership::Borrow;
+}
+
+// A make_borrow is nested in the referent's scope.
+OperandOwnership
+OperandOwnershipClassifier::visitMakeBorrowInst(MakeBorrowInst *borrow) {
   return OperandOwnership::Borrow;
 }
 
