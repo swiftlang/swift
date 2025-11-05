@@ -1974,11 +1974,6 @@ namespace importer {
 bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
                                  ClangImporter::Implementation *importerImpl);
 
-/// Returns true if the given C/C++ record should be imported as non-copyable into
-/// Swift.
-bool recordHasMoveOnlySemantics(const clang::RecordDecl *decl,
-                                ClangImporter::Implementation *importerImpl);
-
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
 bool isForwardDeclOfType(const clang::Decl *decl);
