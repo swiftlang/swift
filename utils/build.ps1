@@ -3924,8 +3924,9 @@ function Test-SourceKitLSP {
     # Tell the tests where to find the just-built plugins.
     $env:SOURCEKIT_LSP_TEST_PLUGIN_PATHS="$($HostPlatform.ToolchainInstallRoot)\usr\lib"
 
+    # FIXME: TestParallel has issues: https://github.com/swiftlang/swift/issues/85337
     Build-SPMProject `
-      -Action TestParallel `
+      -Action Test `
       -Src "$SourceCache\sourcekit-lsp" `
       -Bin "$BinaryCache\$($HostPlatform.Triple)\SourceKitLSPTests" `
       -Platform $BuildPlatform `
