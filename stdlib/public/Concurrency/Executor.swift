@@ -374,7 +374,7 @@ public protocol SerialExecutor: Executor {
   /// The default implementation returns `nil` is used to indicate that it is "unknown" if the current context is
   /// isolated by this serial executor. The runtime then _may_ proceed to invoke `checkIsolated()` as a last-resort
   /// attempt to verify the isolation of the current context.
-  @available(StdlibDeploymentTarget 6.3, *)
+  @available(StdlibDeploymentTarget 6.2, *)
   func isIsolatingCurrentContext() -> Bool?
 
 }
