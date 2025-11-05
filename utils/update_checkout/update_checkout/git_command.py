@@ -78,7 +78,7 @@ class Git:
                     f"status {str(e.returncode)}, aborting"
                 )
             raise GitException(
-                e.returncode, command, os.path.dirname(repo_path), output
+                e.returncode, command, os.path.basename(repo_path), output
             )
         except OSError as e:
             if fatal:
