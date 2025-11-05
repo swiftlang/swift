@@ -2753,20 +2753,33 @@ bool VarDecl::isInitExposedToClients() const {
   return hasInitialValue() && isLayoutExposedToClients();
 }
 
-bool VarDecl::isLayoutExposedToClients() const {
+bool VarDecl::isLayoutExposedToClients(bool applyImplicit) const {
   auto parent = dyn_cast<NominalTypeDecl>(getDeclContext());
   if (!parent) return false;
   if (isStatic()) return false;
 
-
+  auto M = getDeclContext()->getParentModule();
   auto nominalAccess =
     parent->getFormalAccessScope(/*useDC=*/nullptr,
                                  /*treatUsableFromInlineAsPublic=*/true);
-  if (!nominalAccess.isPublic()) return false;
 
-  if (!parent->getAttrs().hasAttribute<FrozenAttr>() &&
-      !parent->getAttrs().hasAttribute<FixedLayoutAttr>())
+  // Resilient modules and classes hide layouts by default.
+  bool layoutIsHiddenByDefault = !applyImplicit ||
+    !getASTContext().LangOpts.hasFeature(Feature::CheckImplementationOnly) ||
+    M->getResilienceStrategy() == ResilienceStrategy::Resilient;
+  if (layoutIsHiddenByDefault) {
+    if (!nominalAccess.isPublic())
+      return false;
+
+    if (!parent->getAttrs().hasAttribute<FrozenAttr>() &&
+        !parent->getAttrs().hasAttribute<FixedLayoutAttr>())
     return false;
+  } else {
+    // Non-resilient module: layouts are exposed by default unless marked
+    // otherwise.
+    if (parent->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+      return false;
+  }
 
   if (!hasStorage() &&
       !getAttrs().hasAttribute<LazyAttr>() &&

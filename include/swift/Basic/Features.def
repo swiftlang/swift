@@ -558,6 +558,9 @@ EXPERIMENTAL_FEATURE(EmbeddedExistentials, false)
 /// Allow use of the 'anyAppleOS' availability domain.
 EXPERIMENTAL_FEATURE(AnyAppleOSAvailability, true)
 
+/// Check @_implementationOnly imports in non-library-evolution mode.
+EXPERIMENTAL_FEATURE(CheckImplementationOnly, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

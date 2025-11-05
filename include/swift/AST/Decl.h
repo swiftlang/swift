@@ -6727,7 +6727,10 @@ public:
   ///
   /// From the standpoint of access control and exportability checking, this
   /// var will behave as if it was public, even if it is internal or private.
-  bool isLayoutExposedToClients() const;
+  ///
+  /// If \p applyImplicit, consider implicitly exposed layouts as well.
+  /// This applies to non-resilient modules.
+  bool isLayoutExposedToClients(bool applyImplicit = false) const;
 
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }
