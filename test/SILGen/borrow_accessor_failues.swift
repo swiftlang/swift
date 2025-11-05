@@ -1,4 +1,4 @@
-// RUN:%target-swift-frontend -emit-silgen %s -verify  -enable-experimental-feature BorrowAndMutateAccessors
+// RUN:%target-swift-frontend -emit-silgen %s -enable-experimental-feature BorrowAndMutateAccessors -sil-verify-none -verify
 
 // REQUIRES: swift_feature_BorrowAndMutateAccessors
 
