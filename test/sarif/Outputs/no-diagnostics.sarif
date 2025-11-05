@@ -1,0 +1,22 @@
+{
+  "$schema" : "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs" : [
+    {
+      "artifacts" : [
+
+      ],
+      "results" : [
+
+      ],
+      "tool" : {
+        "driver" : {
+          "informationUri" : "https://swift.org",
+          "name" : "Swift Compiler",
+          "organization" : "Swift Project",
+          "version" : "6.3"
+        }
+      }
+    }
+  ],
+  "version" : "2.1.0"
+}

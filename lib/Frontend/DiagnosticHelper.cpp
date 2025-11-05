@@ -23,6 +23,7 @@
 #include "swift/Frontend/AccumulatingDiagnosticConsumer.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/Frontend/SARIFDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/Migrator/FixitFilter.h"
 #include "llvm/Support/raw_ostream.h"
@@ -190,6 +191,15 @@ createSerializedDiagnosticConsumerIfNeeded(
         auto serializedDiagnosticsPath = input.getSerializedDiagnosticsPath();
         if (serializedDiagnosticsPath.empty())
           return nullptr;
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+        // Check if SARIF format is requested
+        llvm::StringRef path(serializedDiagnosticsPath);
+        if (path.ends_with(".sarif") || path.ends_with(".sarif.json")) {
+          return sarif_diagnostics::createConsumer(serializedDiagnosticsPath);
+        }
+#endif
+
         return serialized_diagnostics::createConsumer(serializedDiagnosticsPath,
                                                       emitMacroExpansionFiles);
       });
