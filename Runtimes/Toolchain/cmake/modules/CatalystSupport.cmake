@@ -24,25 +24,27 @@ if(${PROJECT_NAME}_COMPILER_VARIANT_TARGET)
 
   # TODO: Once we are guaranteed to have a driver with the variant module path
   #       support everywhere, we should integrate this into PlatformInfo.cmake
-  check_compiler_flag(Swift "-emit-variant-module-path ${CMAKE_CURRENT_BINARY_DIR}/CompilerID/variant.swiftmodule" HAVE_Swift_VARIANT_MODULE_PATH_FLAG)
-  if(HAVE_Swift_VARIANT_MODULE_PATH_FLAG)
-    # Get variant module triple
-    set(module_triple_command "${CMAKE_Swift_COMPILER}" -print-target-info -target ${${PROJECT_NAME}_COMPILER_VARIANT_TARGET})
-    execute_process(COMMAND ${module_triple_command} OUTPUT_VARIABLE target_info_json)
-    message(CONFIGURE_LOG "Swift target variant info: ${target_info_json}")
+  if(CMAKE_Swift_COMPILER_LOADED)
+    check_compiler_flag(Swift "-emit-variant-module-path ${CMAKE_CURRENT_BINARY_DIR}/CompilerID/variant.swiftmodule" HAVE_Swift_VARIANT_MODULE_PATH_FLAG)
+    if(HAVE_Swift_VARIANT_MODULE_PATH_FLAG)
+      # Get variant module triple
+      set(module_triple_command "${CMAKE_Swift_COMPILER}" -print-target-info -target ${${PROJECT_NAME}_COMPILER_VARIANT_TARGET})
+      execute_process(COMMAND ${module_triple_command} OUTPUT_VARIABLE target_info_json)
+      message(CONFIGURE_LOG "Swift target variant info: ${target_info_json}")
 
 
-    string(JSON module_triple GET "${target_info_json}" "target" "moduleTriple")
-    set(${PROJECT_NAME}_VARIANT_MODULE_TRIPLE "${module_triple}" CACHE STRING "Triple used for installed swift{module,interface} files for the target variant")
-    mark_as_advanced(${PROJECT_NAME}_VARIANT_MODULE_TRIPLE)
-    message(CONFIGURE_LOG "Swift target variant module triple: ${module_triple}")
-  endif()
+      string(JSON module_triple GET "${target_info_json}" "target" "moduleTriple")
+      set(${PROJECT_NAME}_VARIANT_MODULE_TRIPLE "${module_triple}" CACHE STRING "Triple used for installed swift{module,interface} files for the target variant")
+      mark_as_advanced(${PROJECT_NAME}_VARIANT_MODULE_TRIPLE)
+      message(CONFIGURE_LOG "Swift target variant module triple: ${module_triple}")
+    endif()
 
-  if(${PROJECT_NAME}_EXPERIMENTAL_EMIT_VARIANT_MODULE)
-    check_compiler_flag(Swift "-experimental-emit-variant-module" HAVE_Swift_EMIT_VARIANT_MODULE_FLAG)
-    if(HAVE_Swift_EMIT_VARIANT_MODULE_FLAG)
-    add_compile_options(
-        "$<$<COMPILE_LANGUAGE:Swift>:-experimental-emit-variant-module>")
+    if(${PROJECT_NAME}_EXPERIMENTAL_EMIT_VARIANT_MODULE)
+      check_compiler_flag(Swift "-experimental-emit-variant-module" HAVE_Swift_EMIT_VARIANT_MODULE_FLAG)
+      if(HAVE_Swift_EMIT_VARIANT_MODULE_FLAG)
+      add_compile_options(
+          "$<$<COMPILE_LANGUAGE:Swift>:-experimental-emit-variant-module>")
+      endif()
     endif()
   endif()
 endif()
