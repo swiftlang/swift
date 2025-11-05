@@ -3064,11 +3064,6 @@ FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
     if (name == "swift_task_future_wait_throwing")
       return SpecialKind::TaskFutureWaitThrowing;
 
-    if (name == "swift_asyncLet_wait")
-      return SpecialKind::AsyncLetWait;
-    if (name == "swift_asyncLet_wait_throwing")
-      return SpecialKind::AsyncLetWaitThrowing;
-
     if (name == "swift_asyncLet_get")
       return SpecialKind::AsyncLetGet;
     if (name == "swift_asyncLet_get_throwing")
@@ -3966,11 +3961,6 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
         !subMap.getRecursiveProperties().hasPrimaryArchetype()) {
       emission->useProfilingThunk();
     }
-  }
-
-  if (calleeFP.shouldPassContinuationDirectly()) {
-    llArgs.add(emission->getResumeFunctionPointer());
-    llArgs.add(emission->getAsyncContext());
   }
 
   // Add all those arguments.

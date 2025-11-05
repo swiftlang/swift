@@ -7941,7 +7941,7 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
     ->castTo<FunctionType>()->getResult();
   Type replacementTypes[] = {resultType};
   auto startBuiltin = cast<FuncDecl>(
-      getBuiltinValueDecl(ctx, ctx.getIdentifier("startAsyncLet")));
+      getBuiltinValueDecl(ctx, ctx.getIdentifier("startAsyncLetWithLocalBuffer")));
   auto subs = SubstitutionMap::get(startBuiltin->getGenericSignature(),
                                    replacementTypes,
                                    ArrayRef<ProtocolConformanceRef>{});
@@ -8084,16 +8084,19 @@ void SILGenFunction::emitFinishAsyncLet(
     SILLocation loc, SILValue asyncLet, SILValue resultPtr) {
   // This runtime function cancels the task, awaits its completion, and
   // destroys the value in the result buffer if necessary.
-  emitApplyOfLibraryIntrinsic(
-      loc, SGM.getFinishAsyncLet(), {},
-      {ManagedValue::forObjectRValueWithoutOwnership(asyncLet),
-       ManagedValue::forObjectRValueWithoutOwnership(resultPtr)},
-      SGFContext());
-  // This builtin ends the lifetime of the allocation for the async let.
   auto &ctx = getASTContext();
   B.createBuiltin(loc,
+    ctx.getIdentifier(getBuiltinName(BuiltinValueKind::FinishAsyncLet)),
+    SILType::getEmptyTupleType(ctx), {},
+    {asyncLet, resultPtr});
+
+  // Return to the correct executor.
+  ExecutorBreadcrumb(true).emit(*this, loc);
+
+  // This builtin ends the lifetime of the allocation for the async let.
+  B.createBuiltin(loc,
     ctx.getIdentifier(getBuiltinName(BuiltinValueKind::EndAsyncLetLifetime)),
-    getLoweredType(ctx.TheEmptyTupleType), {},
+    SILType::getEmptyTupleType(ctx), {},
     {asyncLet});
 }
 

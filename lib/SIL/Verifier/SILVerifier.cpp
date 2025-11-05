@@ -2540,6 +2540,20 @@ public:
       require(false, "this builtin is pre-SIL-only");
     }
 
+    if (builtinKind == BuiltinValueKind::FinishAsyncLet) {
+      requireType(BI->getType(), _object(_tuple()),
+                  "result of finishAsyncLet");
+      require(arguments.size() == 2, "finishAsyncLet requires two arguments");
+      requireType(arguments[0]->getType(), _object(_rawPointer),
+                  "first argument of finishAsyncLet");
+      requireType(arguments[1]->getType(), _object(_rawPointer),
+                  "second argument of finishAsyncLet");
+
+      require((bool)isBuiltinInst(arguments[0],
+                              BuiltinValueKind::StartAsyncLetWithLocalBuffer),
+              "first argument of finishAsyncLet must be a startAsyncLet");
+    }
+
     // Validate all "SIL builtins" never show up as BuiltinInst since they
     // should just result in sequences of non-builtin inst SIL instructions
     // being emitted and should never show up as a BuiltinInst.
@@ -7002,6 +7016,44 @@ public:
     };
   };
 
+  static bool isScopeInst(SILInstruction *i) {
+    if (isa<BeginAccessInst>(i) ||
+        isa<BeginApplyInst>(i) ||
+        isa<StoreBorrowInst>(i)) {
+      return true;
+    } else if (auto bi = dyn_cast<BuiltinInst>(i)) {
+      if (auto bk = bi->getBuiltinKind()) {
+        switch (*bk) {
+        case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
+          return true;
+
+        default:
+          return false;
+        }
+      }
+    }
+    return false;
+  }
+
+  static bool isScopeEndingInst(SILInstruction *i) {
+    if (isa<EndAccessInst>(i) ||
+        isa<AbortApplyInst>(i) ||
+        isa<EndApplyInst>(i)) {
+      return true;
+    } else if (auto bi = dyn_cast<BuiltinInst>(i)) {
+      if (auto bk = bi->getBuiltinKind()) {
+        switch (*bk) {
+        case BuiltinValueKind::FinishAsyncLet:
+          return true;
+
+        default:
+          return false;
+        }
+      }
+    }
+    return false;
+  }
+
   /// Verify the various control-flow-sensitive rules of SIL:
   ///
   /// - stack allocations and deallocations must obey a stack discipline
@@ -7078,14 +7130,11 @@ public:
               // The deallocation is printed out as the focus of the failure.
             });
           }
-        } else if (isa<BeginAccessInst>(i) || isa<BeginApplyInst>(i) ||
-                   isa<StoreBorrowInst>(i)) {
+        } else if (isScopeInst(&i)) {
           bool notAlreadyPresent = state.ActiveOps.insert(&i).second;
           require(notAlreadyPresent,
                   "operation was not ended before re-beginning it");
-
-        } else if (isa<EndAccessInst>(i) || isa<AbortApplyInst>(i) ||
-                   isa<EndApplyInst>(i)) {
+        } else if (isScopeEndingInst(&i)) {
           if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
             bool present = state.ActiveOps.erase(beginOp);
             require(present, "operation has already been ended");

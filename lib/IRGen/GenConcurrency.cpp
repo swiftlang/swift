@@ -18,6 +18,7 @@
 #include "GenConcurrency.h"
 
 #include "BitPatternBuilder.h"
+#include "CallEmission.h"
 #include "ExtraInhabitants.h"
 #include "GenCall.h"
 #include "GenPointerAuth.h"
@@ -234,7 +235,8 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   localContextInfo = IGF.Builder.CreateBitCast(localContextInfo,
                                                IGF.IGM.OpaquePtrTy);
   
-  // stack allocate AsyncLet, and begin lifetime for it (until EndAsyncLet)
+  // Stack allocate the AsyncLet structure and begin lifetime for it.
+  // This will be balanced in EndAsyncLetLifetime.
   auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_AsyncLet);
   auto address = IGF.createAlloca(ty, Alignment(Alignment_AsyncLet));
   auto alet = IGF.Builder.CreateBitCast(address.getAddress(),
@@ -298,32 +300,39 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   taskOptions =
     maybeAddEmbeddedSwiftResultTypeInfo(IGF, taskOptions, futureResultType);
   
-  llvm::CallInst *call;
-  if (localResultBuffer) {
-    // This is @_silgen_name("swift_asyncLet_begin")
-    call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetBeginFunctionPointer(),
-                                  {alet, taskOptions, futureResultTypeMetadata,
-                                   taskFunction, localContextInfo,
-                                   localResultBuffer});
-  } else {
-    // This is @_silgen_name("swift_asyncLet_start")
-    call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetStartFunctionPointer(),
-                                  {alet, taskOptions, futureResultTypeMetadata,
-                                   taskFunction, localContextInfo});
-  }
+  // Call swift_asyncLet_begin. We no longer use swift_asyncLet_start.
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall(IGF.IGM.getAsyncLetBeginFunctionPointer(),
+                           {alet, taskOptions, futureResultTypeMetadata,
+                            taskFunction, localContextInfo,
+                            localResultBuffer});
+
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 
   return alet;
 }
 
-void irgen::emitEndAsyncLet(IRGenFunction &IGF, llvm::Value *alet) {
-  auto *call =
-      IGF.Builder.CreateCall(IGF.IGM.getEndAsyncLetFunctionPointer(), {alet});
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.SwiftCC);
+void irgen::emitFinishAsyncLet(IRGenFunction &IGF,
+                               llvm::Value *asyncLet,
+                               llvm::Value *resultBuffer) {
+  llvm::Constant *function = IGF.IGM.getAsyncLetFinishFn();
+  auto callee = Callee::forBuiltinRuntimeFunction(IGF.IGM, function,
+                        BuiltinValueKind::FinishAsyncLet, SubstitutionMap(),
+                        FunctionPointerKind::SpecialKind::AsyncLetFinish);
+  auto emission = getCallEmission(IGF, nullptr, std::move(callee));
 
-  IGF.Builder.CreateLifetimeEnd(alet);
+  emission->begin();
+
+  Explosion args;
+  args.add(asyncLet);
+  args.add(resultBuffer);
+  emission->setArgs(args, /*outlined*/ false, /*witness metadata*/ nullptr);
+
+  Explosion result;
+  emission->emitToExplosion(result, false);
+
+  emission->end();
 }
 
 llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
