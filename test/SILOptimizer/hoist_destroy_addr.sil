@@ -89,6 +89,9 @@ struct UnsafeMutablePointer<T> {
 }
 
 sil @unknown : $@convention(thin) () -> ()
+sil @nobarrier : $@convention(thin) () -> () {
+  [global:]
+}
 sil @use_S : $@convention(thin) (@in_guaranteed S) -> ()
 
 // This function is not a synchronization point.
@@ -99,6 +102,9 @@ sil @empty : $@convention(thin) () -> () {
 
 sil @f_out : $@convention(thin) <T> () -> @out T
 sil @f_bool : $@convention(thin) () -> Builtin.Int1
+sil @f_bool_no_barrier : $@convention(thin) () -> Builtin.Int1 {
+  [global:]
+}
 sil [ossa] @take_trivial_struct : $@convention(thin) (TrivialStruct) -> ()
 sil [ossa] @get_change_out : $@convention(thin) () -> @out Change
 sil [ossa] @coro : $@yield_once @convention(thin) (@inout X) -> @yields ()
@@ -283,7 +289,7 @@ bb0(%0 : $*T, %1 : $Builtin.Int1):
   cond_br %1, bb1, bb2
 
 bb1:
-  %8 = function_ref @unknown : $@convention(thin) () -> ()
+  %8 = function_ref @nobarrier : $@convention(thin) () -> ()
   %9 = apply %8() : $@convention(thin) () -> ()
   br bb3
 
@@ -356,7 +362,7 @@ bb0(%0 : $*T):
   br bb1
 
 bb1:
-  %f = function_ref @f_bool : $@convention(thin) () -> Builtin.Int1
+  %f = function_ref @f_bool_no_barrier : $@convention(thin) () -> Builtin.Int1
   %c = apply %f() : $@convention(thin) () -> Builtin.Int1
   cond_br %c, bb2, bb3
 
@@ -492,7 +498,8 @@ entry(%instance : @owned $S):
   br applier
 
 applier:
-  apply undef() : $@convention(thin) () -> ()
+  %f = function_ref @nobarrier : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
   br good
 
 good:
@@ -731,7 +738,7 @@ entry(%instance : @owned $S):
   end_access %store_scope : $*S
   %load_scope = begin_access [modify] [static] %addr : $*S
   %value = load [copy] %load_scope : $*S
-  %unknown = function_ref @unknown : $@convention(thin) () -> ()
+  %unknown = function_ref @nobarrier : $@convention(thin) () -> ()
   apply %unknown() : $@convention(thin) () -> ()
   end_access %load_scope : $*S
   destroy_addr %addr : $*S
