@@ -624,53 +624,6 @@ private:
 void simple_display(llvm::raw_ostream &out, CxxValueSemanticsDescriptor desc);
 SourceLoc extractNearestSourceLoc(CxxValueSemanticsDescriptor desc);
 
-struct ClangTypeExplicitSafetyDescriptor final {
-  clang::CanQualType type;
-
-  ClangTypeExplicitSafetyDescriptor(clang::CanQualType type) : type(type) {}
-  ClangTypeExplicitSafetyDescriptor(clang::QualType type)
-      : type(type->getCanonicalTypeUnqualified()) {}
-
-  friend llvm::hash_code
-  hash_value(const ClangTypeExplicitSafetyDescriptor &desc) {
-    return llvm::hash_combine(desc.type.getTypePtrOrNull());
-  }
-
-  friend bool operator==(const ClangTypeExplicitSafetyDescriptor &lhs,
-                         const ClangTypeExplicitSafetyDescriptor &rhs) {
-    return lhs.type == rhs.type;
-  }
-
-  friend bool operator!=(const ClangTypeExplicitSafetyDescriptor &lhs,
-                         const ClangTypeExplicitSafetyDescriptor &rhs) {
-    return !(lhs == rhs);
-  }
-};
-
-void simple_display(llvm::raw_ostream &out,
-                    ClangTypeExplicitSafetyDescriptor desc);
-SourceLoc extractNearestSourceLoc(ClangTypeExplicitSafetyDescriptor desc);
-
-/// Determine the safety of the given Clang declaration.
-class ClangTypeExplicitSafety
-    : public SimpleRequest<ClangTypeExplicitSafety,
-                           ExplicitSafety(ClangTypeExplicitSafetyDescriptor),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-  // Source location
-  SourceLoc getNearestLoc() const { return SourceLoc(); };
-  bool isCached() const { return true; }
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  ExplicitSafety evaluate(Evaluator &evaluator,
-                          ClangTypeExplicitSafetyDescriptor desc) const;
-};
-
 struct CxxDeclExplicitSafetyDescriptor final {
   const clang::Decl *decl;
   bool isClass;
