@@ -274,10 +274,9 @@ option(SWIFT_BUILD_STDLIB_CXX_MODULE
 # The swiftClientRetainRelease library is currently only available for Darwin
 # platforms.
 if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-  # Off by default everywhere for now.
   option(SWIFT_BUILD_CLIENT_RETAIN_RELEASE
     "Build the swiftClientRetainRelease library"
-    FALSE)
+    TRUE)
 else()
   option(SWIFT_BUILD_CLIENT_RETAIN_RELEASE
     "Build the swiftClientRetainRelease library"
