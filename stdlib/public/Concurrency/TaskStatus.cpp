@@ -1112,8 +1112,7 @@ void TaskDependencyStatusRecord::performEscalationAction(
 /**************************************************************************/
 
 void AsyncTask::pushTimeSpentRunningRecord(void) {
-  void *allocation = _swift_task_alloc_specific(
-      this, sizeof(class TimeSpentRunningStatusRecord));
+  void *allocation = std::malloc(sizeof(class TimeSpentRunningStatusRecord));
   auto record = ::new (allocation) TimeSpentRunningStatusRecord();
 
   addStatusRecord(this, record,
@@ -1125,7 +1124,7 @@ void AsyncTask::pushTimeSpentRunningRecord(void) {
 void AsyncTask::popTimeSpentRunningRecord(void) {
   if (auto record = popStatusRecordOfType<TimeSpentRunningStatusRecord>(this)) {
     record->~TimeSpentRunningStatusRecord();
-    _swift_task_dealloc_specific(this, record);
+    std::free(record);
   }
 }
 
