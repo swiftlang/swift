@@ -385,20 +385,12 @@ static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C, StringRef name) {
       /*default=*/nullptr);
 }
 
-FuncDecl *SILGenModule::getAsyncLetStart() {
-  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLetStart");
-}
-
 FuncDecl *SILGenModule::getAsyncLetGet() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_get");
 }
 
 FuncDecl *SILGenModule::getAsyncLetGetThrowing() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_get_throwing");
-}
-
-FuncDecl *SILGenModule::getFinishAsyncLet() {
-  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_finish");
 }
 
 FuncDecl *SILGenModule::getTaskFutureGet() {
