@@ -95,11 +95,11 @@ func use(_ o : borrowing View) {}
 // CHECK:   ([[VIEW:%.*]], [[TOKEN2:%.*]]) = begin_apply %{{.*}}([[MDI]]) : $@yield_once @convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0) @yields @guaranteed View
 // CHECK:   retain_value [[VIEW]]
 // CHECK:   end_apply [[TOKEN2]] as $()
+// CHECK:   release_value [[MDI]]
 // CHECK:   debug_value [[VIEW]], let, name "view"
 //       use(view)
 // CHECK:   apply %{{.*}}([[VIEW]]) : $@convention(thin) (@guaranteed View) -> ()
 // CHECK:   release_value [[VIEW]]
-// CHECK:   release_value [[MDI]]
 // CHECK:   end_apply [[TOKEN1]] as $()
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   destroy_addr [[NC]]

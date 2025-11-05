@@ -71,6 +71,8 @@ PASS(BooleanLiteralFolding, "boolean-literal-folding",
      "Constant folds initializers of boolean literals")
 PASS(DestroyHoisting, "destroy-hoisting",
      "Hoist destroy_value instructions")
+PASS(MandatoryDestroyHoisting, "mandatory-destroy-hoisting",
+     "Hoist destroy_value instructions for non-lexical values")
 PASS(DeadEndBlockDumper, "dump-deadendblocks",
      "Tests the DeadEndBlocks utility")
 PASS(EscapeInfoDumper, "dump-escape-info",
