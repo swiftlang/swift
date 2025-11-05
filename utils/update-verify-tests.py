@@ -1,6 +1,6 @@
 import sys
 import argparse
-from UpdateVerifyTests.core import check_expectations
+from update_verify_tests.core import check_expectations
 
 """
  Pipe output from clang's -verify into this script to have the test case updated to expect the actual diagnostic output.
@@ -27,11 +27,12 @@ Example usage:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--prefix", default="expected", help="The prefix passed to -verify"
+        "--prefix", default="", help="The prefix passed to -verify"
     )
     args = parser.parse_args()
-    output = check_expectations(sys.stdin.readlines(), args.prefix)
+    (ret_code, output) = check_expectations(sys.stdin.readlines(), args.prefix)
     print(output)
+    sys.exit(ret_code)
 
 
 if __name__ == "__main__":

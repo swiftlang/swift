@@ -34,19 +34,6 @@ def parse_error_category(s, prefix):
     return (diag_category, seen)
 
 
-diag_error_re = re.compile(r"File (\S+) Line (\d+): (.+)")
-diag_error_re2 = re.compile(r"File \S+ Line \d+ \(directive at (\S+):(\d+)\): (.+)")
-
-
-def parse_diag_error(s):
-    m = diag_error_re2.match(s)
-    if not m:
-        m = diag_error_re.match(s)
-    if not m:
-        return None
-    return (m.group(1), int(m.group(2)), m.group(3))
-
-
 class Line:
     def __init__(self, content, line_n):
         self.content = content
@@ -171,15 +158,15 @@ class Diag:
             been parsed as whitespace3_s.
             """
             whitespace2_s = ""
-        return f"//{whitespace1_s}{self.prefix}-{self.category}{re_s}{line_location_s}{whitespace2_s}{count_s}{whitespace3_s}{{{{{self.diag_content}}}}}"
+        return f"//{whitespace1_s}expected-{self.prefix}{self.category}{re_s}{line_location_s}{whitespace2_s}{count_s}{whitespace3_s}{{{{{self.diag_content}}}}}"
 
 
 expected_diag_re = re.compile(
-    r"//(\s*)([a-zA-Z]+)-(note|warning|error)(-re)?(@[+-]?\d+)?(?:(\s*)(\d+))?(\s*)\{\{(.*)\}\}"
+    r"//(\s*)expected-([a-zA-Z-]*)(note|warning|error)(-re)?(@[+-]?\d+)?(?:(\s*)(\d+))?(\s*)\{\{(.*)\}\}"
 )
 
 
-def parse_diag(line, filename, lines, prefix):
+def parse_diag(line, filename, prefix):
     s = line.content
     ms = expected_diag_re.findall(s)
     if not ms:
@@ -199,7 +186,7 @@ def parse_diag(line, filename, lines, prefix):
         whitespace3_s,
         diag_s,
     ] = ms[0]
-    if check_prefix != prefix:
+    if check_prefix != prefix and check_prefix != "":
         return None
     if not target_line_s:
         target_line_n = 0
@@ -217,7 +204,7 @@ def parse_diag(line, filename, lines, prefix):
     line.content = expected_diag_re.sub("{{DIAG}}", s)
 
     return Diag(
-        prefix,
+        check_prefix,
         diag_s,
         category_s,
         target_line_n,
@@ -333,20 +320,6 @@ def remove_dead_diags(lines):
                 remove_line(other_diag.line, lines)
 
 
-def has_live_diags(lines):
-    for line in lines:
-        if line.diag and line.diag.count > 0:
-            return True
-    return False
-
-
-def get_expected_no_diags_line_n(lines, prefix):
-    for line in lines:
-        if f"{prefix}-no-diagnostics" in line.content:
-            return line.line_n
-    return None
-
-
 def update_test_file(filename, diag_errors, prefix, updated_test_files):
     dprint(f"updating test file {filename}")
     if filename in updated_test_files:
@@ -354,63 +327,60 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
     else:
         updated_test_files.add(filename)
     with open(filename, "r") as f:
-        lines = [Line(line, i + 1) for i, line in enumerate(f.readlines())]
+        lines = [Line(line, i + 1) for i, line in enumerate(f.readlines() + [''])]
     orig_lines = list(lines)
-    expected_no_diags_line_n = get_expected_no_diags_line_n(orig_lines, prefix)
 
     for line in lines:
-        diag = parse_diag(line, filename, lines, prefix)
+        diag = parse_diag(line, filename, prefix)
         if diag:
             line.diag = diag
             diag.set_target(lines[diag.absolute_target() - 1])
 
-    for line_n, diag_s, diag_category, seen in diag_errors:
-        if seen:
+    for diag_error in diag_errors:
+        if not isinstance(diag_error, NotFoundDiag):
             continue
         # this is a diagnostic expected but not seen
+        line_n = diag_error.line
         assert lines[line_n - 1].diag
-        if diag_s != lines[line_n - 1].diag.diag_content:
+        if not lines[line_n - 1].diag or diag_error.content != lines[line_n - 1].diag.diag_content:
             raise KnownException(
-                f"{filename}:{line_n} - found diag {lines[line_n - 1].diag.diag_content} but expected {diag_s}"
+                f"{filename}:{line_n} - found diag {lines[line_n - 1].diag.diag_content} but expected {diag_error.content}"
             )
-        if diag_category != lines[line_n - 1].diag.category:
+        if diag_error.category != lines[line_n - 1].diag.category:
             raise KnownException(
-                f"{filename}:{line_n} - found {lines[line_n - 1].diag.category} diag but expected {diag_category}"
+                f"{filename}:{line_n} - found {lines[line_n - 1].diag.category} diag but expected {diag_error.category}"
             )
         lines[line_n - 1].diag.decrement_count()
-    diag_errors_left = []
-    diag_errors.sort(reverse=True, key=lambda t: t[0])
-    for line_n, diag_s, diag_category, seen in diag_errors:
-        if not seen:
+
+    diag_errors.sort(reverse=True, key=lambda t: t.line)
+    for diag_error in diag_errors:
+        if not isinstance(diag_error, ExtraDiag):
             continue
+        line_n = diag_error.line
         target = orig_lines[line_n - 1]
         other_diags = [
             d
             for d in target.targeting_diags
-            if d.diag_content == diag_s and d.category == diag_category
+            if d.diag_content == diag_error.content and d.category == diag_error.category
         ]
         other_diag = other_diags[0] if other_diags else None
         if other_diag:
             other_diag.increment_count()
         else:
-            add_diag(line_n, diag_s, diag_category, lines, orig_lines, prefix)
+            add_diag(line_n, diag_error.content, diag_error.category, lines, orig_lines, diag_error.prefix)
     remove_dead_diags(lines)
-    has_diags = has_live_diags(lines)
     with open(filename, "w") as f:
-        if not has_diags and expected_no_diags_line_n is None:
-            f.write("// expected-no-diagnostics\n")
         for line in lines:
-            if has_diags and line.line_n == expected_no_diags_line_n:
-                continue
             f.write(line.render())
 
 
 def update_test_files(errors, prefix):
     errors_by_file = {}
-    for (filename, line, diag_s), (diag_category, seen) in errors:
+    for error in errors:
+        filename = error.file
         if filename not in errors_by_file:
             errors_by_file[filename] = []
-        errors_by_file[filename].append((line, diag_s, diag_category, seen))
+        errors_by_file[filename].append(error)
     updated_test_files = set()
     for filename, diag_errors in errors_by_file.items():
         try:
@@ -425,29 +395,115 @@ def update_test_files(errors, prefix):
     return "updated files:\n\t{updated_files_s}"
 
 
+"""
+ex:
+test.swift:2:6: error: expected error not produced
+  // expected-error@+1{{asdf}}
+~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
+"""
+diag_error_re = re.compile(r"(\S+):(\d+):(\d+): error: expected (\S+) not produced")
+
+
+"""
+ex:
+test.swift:2:3: error: unexpected error produced: cannot find 'a' in scope
+  a = 2
+  ^
+"""
+diag_error_re2 = re.compile(r"(\S+):(\d+):(\d+): error: unexpected (\S+) produced: (.*)")
+
+
+"""
+ex:
+test.swift:2:43: error: incorrect message found
+  bar = 2  // expected-error{{asdf}}
+                              ^~~~
+                              cannot find 'bar' in scope
+"""
+diag_error_re3 = re.compile(r"(\S+):(\d+):(\d+): error: incorrect message found")
+
+
+"""
+ex:
+test.swift:2:15: error: expected warning, not error
+  // expected-warning@+1{{cannot find 'bar' in scope}}
+              ^~~~~~~
+              error
+"""
+diag_error_re4 = re.compile(r"(\S+):(\d+):(\d+): error: expected (\S+), not (\S+)")
+
+
+class NotFoundDiag:
+    def __init__(self, file, line, col, category, content, prefix):
+        self.file = file
+        self.line = line
+        self.col = col
+        self.category = category
+        self.content = content
+        self.prefix = prefix
+
+    def __str__(self):
+        return f"{self.file}:{self.line}:{self.col}: error expected {self.category} not produced (expected {self.content})"
+
+
+class ExtraDiag:
+    def __init__(self, file, line, col, category, content, prefix):
+        self.file = file
+        self.line = line
+        self.col = col
+        self.category = category
+        self.content = content
+        self.prefix = prefix
+
+    def __str__(self):
+        return f"{self.file}:{self.line}:{self.col}: error unexpected {self.category} produced: {self.content}"
+
+
 def check_expectations(tool_output, prefix):
     """
     The entry point function.
     Called by the stand-alone update-verify-tests.py as well as litplugin.py.
     """
     curr = []
-    curr_category = None
     try:
-        for line in tool_output:
-            if line.startswith("error: "):
-                curr_category = parse_error_category(line[len("error: ") :], prefix)
-                continue
+        i = 0
+        while i < len(tool_output):
+            line = tool_output[i].strip()
 
-            diag_error = parse_diag_error(line.strip())
-            if diag_error:
-                curr.append((diag_error, curr_category))
+            if not "error:" in line:
+                pass
+            elif m := diag_error_re.match(line):
+                diag = parse_diag(Line(tool_output[i+1], int(m.group(2))), m.group(1), prefix)
+                i += 2
+                curr.append(NotFoundDiag(m.group(1), int(m.group(2)), int(m.group(3)), m.group(4), diag.diag_content, diag.prefix))
+            elif m := diag_error_re2.match(line):
+                curr.append(ExtraDiag(m.group(1), int(m.group(2)), int(m.group(3)), m.group(4), m.group(5), prefix))
+                i += 2
+            # Create two mirroring mismatches when the compiler reports that the category or diagnostic is incorrect.
+            # This makes it easier to handle cases where the same diagnostic is mentioned both in an incorrect message/category
+            # diagnostic, as well as in an error not produced diagnostic. This can happen for things like 'expected-error 2{{foo}}'
+            # if only one diagnostic is emitted on that line, and the content of that diagnostic is actually 'bar'.
+            elif m := diag_error_re3.match(line):
+                diag = parse_diag(Line(tool_output[i+1], int(m.group(2))), m.group(1), prefix)
+                curr.append(NotFoundDiag(m.group(1), int(m.group(2)), int(m.group(3)), diag.category, diag.diag_content, diag.prefix))
+                curr.append(ExtraDiag(m.group(1), diag.absolute_target(), int(m.group(3)), diag.category, tool_output[i+3].strip(), diag.prefix))
+                i += 3
+            elif m := diag_error_re4.match(line):
+                diag = parse_diag(Line(tool_output[i+1], int(m.group(2))), m.group(1), prefix)
+                assert diag.category == m.group(4)
+                assert tool_output[i+3].strip() == m.group(5)
+                curr.append(NotFoundDiag(m.group(1), int(m.group(2)), int(m.group(3)), diag.category, diag.diag_content, diag.prefix))
+                curr.append(ExtraDiag(m.group(1), diag.absolute_target(), int(m.group(3)), m.group(5), diag.diag_content, diag.prefix))
+                i += 3
             else:
                 dprint("no match")
                 dprint(line.strip())
+            i += 1
+
     except KnownException as e:
-        return f"Error in update-verify-tests while parsing tool output: {e}"
+        return (1, f"Error in update-verify-tests while parsing tool output: {e}")
     if curr:
-        return update_test_files(curr, prefix)
+        return (0, update_test_files(curr, prefix))
     else:
-        return "no mismatching diagnostics found"
+        return (1, "no mismatching diagnostics found")
 
