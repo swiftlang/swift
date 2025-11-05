@@ -132,3 +132,17 @@ func testClosures(_ g: Gen) {
     return g.IG.#^RETURN_TR3_CLOSURE?check=RETURN_TR3^#
   }
 }
+
+// Make sure we can do a completion in an out-of-place return
+do {
+  return TestStruct.#^COMPLETE_IN_INVALID_RETURN^#
+  // COMPLETE_IN_INVALID_RETURN: Decl[StaticMethod]/CurrNominal: testTR1_static()[#Int?#]; name=testTR1_static()
+  // COMPLETE_IN_INVALID_RETURN: Decl[StaticMethod]/CurrNominal: testTR2_static({#(g): Gen#})[#Int?#]; name=testTR2_static(:)
+  // COMPLETE_IN_INVALID_RETURN: Decl[StaticMethod]/CurrNominal: testTR3_static({#(g): Gen#})[#Int?#]; name=testTR3_static(:)
+}
+
+struct TestReturnInInit {
+  init() {
+    return TestStruct.#^COMPLETE_IN_INVALID_INIT_RETURN?check=COMPLETE_IN_INVALID_RETURN^#
+  }
+}
