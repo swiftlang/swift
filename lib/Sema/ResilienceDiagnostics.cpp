@@ -338,6 +338,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
 
   case DisallowedOriginKind::ImplementationOnly:
   case DisallowedOriginKind::FragileCxxAPI:
+  case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
     break;
   }
 
