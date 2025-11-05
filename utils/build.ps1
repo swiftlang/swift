@@ -3842,6 +3842,8 @@ function Build-SourceKitLSP([Hashtable] $Platform) {
       SwiftPM_DIR = (Get-ProjectCMakeModules $Platform PackageManager);
       LMDB_DIR = (Get-ProjectCMakeModules $Platform LMDB);
       IndexStoreDB_DIR = (Get-ProjectCMakeModules $Platform IndexStoreDB);
+      SwiftMarkdown_DIR = (Get-ProjectCMakeModules $Platform Markdown);
+      "cmark-gfm_DIR" = "$($Platform.ToolchainInstallRoot)\usr\lib\cmake";
     }
 }
 
@@ -3884,7 +3886,7 @@ function Test-SourceKitLSP {
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\lib",
     # swift-markdown
-    "-Xswiftc", "-I$SourceCache\swift-markdown\Sources\CAtomic\inclde",
+    "-Xswiftc", "-I$SourceCache\swift-markdown\Sources\CAtomic\include",
     "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform Markdown)\lib\CAtomic.lib",
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Markdown)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform Markdown)\lib",
