@@ -73,6 +73,9 @@ struct StructScopeC {
 
     @_extern(c, "static_member_decl")
     static func staticMemberDecl()
+
+    @_extern(c, "global_static_variable")
+    static var globalVariable: Int
 }
 
 struct GenericStruct<T> {
