@@ -586,13 +586,15 @@ extension Optional: Equatable where Wrapped: Equatable & ~Copyable {
   }
 }
 
-extension Optional: Hashable where Wrapped: Hashable {
+@_preInverseGenerics
+extension Optional: Hashable where Wrapped: Hashable & ~Copyable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
   @inlinable
+  @_preInverseGenerics
   public func hash(into hasher: inout Hasher) {
     switch self {
     case .none:
@@ -601,6 +603,13 @@ extension Optional: Hashable where Wrapped: Hashable {
       hasher.combine(1 as UInt8)
       hasher.combine(wrapped)
     }
+  }
+
+  @_preInverseGenerics
+  public var hashValue: Int {
+    var hasher = Hasher()
+    hash(into: &hasher)
+    return hasher.finalize()
   }
 }
 
