@@ -801,6 +801,11 @@ private:
     auto wrapperTy = cs.simplifyType(cs.getType(wrapperTypeExpr));
     if (auto *projectedVal = wrappedVar->getPropertyWrapperProjectionVar()) {
       auto projectedTy = computeProjectedValueType(wrappedVar, wrapperTy);
+      // The projected type may have an error, make sure we turn it into a hole
+      // if necessary.
+      ASSERT(!projectedTy->hasUnboundGenericType() &&
+             !projectedTy->hasPlaceholder());
+      projectedTy = cs.replaceInferableTypesWithTypeVars(projectedTy, locator);
       cs.setType(projectedVal, projectedTy);
     }
     if (auto *backing = wrappedVar->getPropertyWrapperBackingProperty())
