@@ -774,7 +774,7 @@ DECL_ATTR(_rawLayout, RawLayout,
   146)
 
 DECL_ATTR(_extern, Extern,
-  OnFunc,
+  OnFunc | OnVar,
   AllowMultipleAttributes | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   147)
 

@@ -6071,9 +6071,7 @@ public:
 
   /// Return true if this is a property that either has storage
   /// or init accessor associated with it.
-  bool supportsInitialization() const {
-    return hasStorage() || hasInitAccessor();
-  }
+  bool supportsInitialization() const;
 
   /// Return true if this storage has the basic accessors/capability
   /// to be mutated.  This is generally constant after the accessors are

@@ -2538,58 +2538,78 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
   }
 }
 
-bool IsCCompatibleFuncDeclRequest::evaluate(Evaluator &evaluator,
-                                            FuncDecl *FD) const {
-  if (FD->isInvalid())
+bool IsCCompatibleDeclRequest::evaluate(Evaluator &evaluator,
+                                        ValueDecl *VD) const {
+  if (VD->isInvalid())
     return false;
 
-  bool foundError = false;
+  if (auto FD = dyn_cast<FuncDecl>(VD)) {
+    bool foundError = false;
 
-  if (FD->hasAsync()) {
-    FD->diagnose(diag::c_func_async);
-    foundError = true;
-  }
-
-  if (FD->hasThrows()) {
-    FD->diagnose(diag::c_func_throws);
-    foundError = true;
-  }
-
-  // --- Check for unsupported result types.
-  Type resultTy = FD->getResultInterfaceType();
-  if (!resultTy->isVoid() && !resultTy->isRepresentableIn(ForeignLanguage::C, FD)) {
-    FD->diagnose(diag::c_func_unsupported_type, resultTy);
-    foundError = true;
-  }
-
-  for (auto *param : *FD->getParameters()) {
-    // --- Check for unsupported specifiers.
-    if (param->isVariadic()) {
-      FD->diagnose(diag::c_func_variadic, param->getName(), FD);
-      foundError = true;
-    }
-    if (param->getSpecifier() != ParamSpecifier::Default) {
-      param
-          ->diagnose(diag::c_func_unsupported_specifier,
-                     ParamDecl::getSpecifierSpelling(param->getSpecifier()),
-                     param->getName(), FD)
-          .fixItRemove(param->getSpecifierLoc());
+    if (FD->hasAsync()) {
+      FD->diagnose(diag::c_func_async);
       foundError = true;
     }
 
-    // --- Check for unsupported parameter types.
-    auto paramTy = param->getTypeInContext();
-    if (!paramTy->isRepresentableIn(ForeignLanguage::C, FD)) {
-      param->diagnose(diag::c_func_unsupported_type, paramTy);
+    if (FD->hasThrows()) {
+      FD->diagnose(diag::c_func_throws);
       foundError = true;
     }
+
+    // --- Check for unsupported result types.
+    Type resultTy = FD->getResultInterfaceType();
+    if (!resultTy->isVoid() && !resultTy->isRepresentableIn(ForeignLanguage::C, FD)) {
+      FD->diagnose(diag::c_unsupported_type, resultTy);
+      foundError = true;
+    }
+
+    for (auto *param : *FD->getParameters()) {
+      // --- Check for unsupported specifiers.
+      if (param->isVariadic()) {
+        FD->diagnose(diag::c_func_variadic, param->getName(), FD);
+        foundError = true;
+      }
+      if (param->getSpecifier() != ParamSpecifier::Default) {
+        param
+            ->diagnose(diag::c_func_unsupported_specifier,
+                       ParamDecl::getSpecifierSpelling(param->getSpecifier()),
+                       param->getName(), FD)
+            .fixItRemove(param->getSpecifierLoc());
+        foundError = true;
+      }
+
+      // --- Check for unsupported parameter types.
+      auto paramTy = param->getTypeInContext();
+      if (!paramTy->isRepresentableIn(ForeignLanguage::C, FD)) {
+        param->diagnose(diag::c_unsupported_type, paramTy);
+        foundError = true;
+      }
+    }
+    return !foundError;
   }
-  return !foundError;
+
+  if (auto var = dyn_cast<VarDecl>(VD)) {
+    Type varType = var->getInterfaceType();
+    if (!varType->isRepresentableIn(ForeignLanguage::C,
+                                    var->getDeclContext())) {
+      var->diagnose(diag::c_unsupported_type, varType);
+      return true;
+    }
+
+    if (!var->hasStorage()) {
+      var->diagnose(diag::c_var_computed);
+      return false;
+    }
+
+    return true;
+  }
+
+  return false;
 }
 
-static bool isCCompatibleFuncDecl(FuncDecl *FD) {
-  return evaluateOrDefault(FD->getASTContext().evaluator,
-                           IsCCompatibleFuncDeclRequest{FD}, {});
+static bool isCCompatibleDecl(ValueDecl *VD) {
+  return evaluateOrDefault(VD->getASTContext().evaluator,
+                           IsCCompatibleDeclRequest{VD}, {});
 }
 
 void AttributeChecker::visitExternAttr(ExternAttr *attr) {
@@ -2598,17 +2618,27 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::attr_extern_experimental);
     return;
   }
-  
-  // Only top-level func or static func decls are currently supported.
-  auto *FD = dyn_cast<FuncDecl>(D);
-  if (!FD || (FD->getDeclContext()->isTypeContext() && !FD->isStatic())) {
-    diagnose(attr->getLocation(), diag::extern_not_at_top_level_func);
-  }
 
+  auto VD = dyn_cast<ValueDecl>(D);
+  if (!VD)
+    return;
+
+  // Check the declaration context.
+  // FIXME: Unify this with @c / @_cdecl checking.
+  if (VD->getDeclContext()->isModuleScopeContext()) {
+    // Top-level declarations are okay.
+  } else if (VD->getDeclContext()->isTypeContext() &&
+             !VD->getDeclContext()->getGenericSignatureOfContext() &&
+             ((isa<FuncDecl>(VD) && cast<FuncDecl>(VD)->isStatic()) ||
+              (isa<VarDecl>(VD) && cast<VarDecl>(VD)->isStatic()))) {
+    // Static members of non-generic types are okay.
+  } else {
+    diagnose(attr->getLocation(), diag::extern_not_at_top_level);
+  }
 
   // C name must not be empty.
   if (attr->getExternKind() == ExternKind::C) {
-    StringRef cName = attr->getCName(FD);
+    StringRef cName = attr->getCName(VD);
     if (cName.empty()) {
       diagnose(attr->getLocation(), diag::extern_empty_c_name);
     } else if (!attr->Name.has_value() && !clang::isValidAsciiIdentifier(cName)) {
@@ -2630,10 +2660,10 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
     }
 
     // Ensure the decl has C compatible interface. Otherwise it produces diagnostics.
-    if (!isCCompatibleFuncDecl(FD)) {
+    if (!isCCompatibleDecl(VD)) {
       attr->setInvalid();
       // Mark the decl itself invalid not to require body even with invalid ExternAttr.
-      FD->setInvalid();
+      VD->setInvalid();
     }
   }
 
@@ -5697,7 +5727,9 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D,
 static bool shouldBlockImplicitDynamic(Decl *D) {
   if (D->getAttrs().hasAttribute<SILGenNameAttr>() ||
       D->getAttrs().hasAttribute<TransparentAttr>() ||
-      D->getAttrs().hasAttribute<InlinableAttr>())
+      D->getAttrs().hasAttribute<InlinableAttr>() ||
+      D->getAttrs().hasAttribute<CDeclAttr>() ||
+      D->getAttrs().hasAttribute<ExternAttr>())
     return true;
   return false;
 }

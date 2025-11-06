@@ -7977,6 +7977,13 @@ bool AbstractStorageDecl::hasInitAccessor() const {
       HasInitAccessorRequest{const_cast<AbstractStorageDecl *>(this)}, false);
 }
 
+bool AbstractStorageDecl::supportsInitialization() const {
+  if (getAttrs().hasAttribute<ExternAttr>())
+    return false;
+
+  return hasStorage() || hasInitAccessor();
+}
+
 VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
                  SourceLoc nameLoc, Identifier name,
                  DeclContext *dc, StorageIsMutable_t supportsMutation)
@@ -8143,6 +8150,10 @@ bool VarDecl::isLazilyInitializedGlobal() const {
     return false;
 
   if (getAttrs().hasAttribute<SILGenNameAttr>())
+    return false;
+
+  // @_extern declarations are not initialized.
+  if (getAttrs().hasAttribute<ExternAttr>())
     return false;
 
   // Top-level global variables in the main source file and in the REPL are not
