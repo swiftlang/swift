@@ -515,8 +515,14 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
   }
 
   auto supportsInitialization = [&] {
-    auto *var = binding->getSingleVar();
-    return var && var->supportsInitialization();
+    bool anySupportsInitialization = false;
+    pattern->forEachVariable([&](VarDecl *var) {
+      if (var->supportsInitialization()) {
+        anySupportsInitialization = true;
+      }
+    });
+
+    return anySupportsInitialization;
   };
 
   // If we have a type but no initializer, check whether the type is
