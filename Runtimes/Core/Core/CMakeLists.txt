@@ -337,6 +337,7 @@ target_link_libraries(swiftCore
     swiftStdlibStubs
     swiftThreading
     $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt$<$<PLATFORM_ID:Windows>:T>>
+    $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>
   PUBLIC
     swiftShims
   INTERFACE
