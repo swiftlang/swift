@@ -128,7 +128,7 @@ Next, [create a pull request][] (PR). Usually, if you navigate to
 https://github.com/swiftlang/swift right after pushing your change, GitHub will
 show a helpful "Compare & Pull Request" button.
 
-![Compare & Pull Request button in GitHub UI](/docs/GitHubCreatePRScreenshot.png)
+![Compare & Pull Request button in GitHub UI](/docs/SwiftGitHubPRScreenshot.png)
 
 [draft-pr]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests#draft-pull-requests
 [create a pull request]: https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request#creating-the-pull-request
