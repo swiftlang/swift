@@ -3172,7 +3172,7 @@ bool CustomAttr::shouldPreferPropertyWrapperOverMacro() const {
   // if one exists. This is necessary since we don't properly support peer
   // declarations in local contexts, so want to use a property wrapper if one
   // exists.
-  if (auto *D = owner.getAsDecl()) {
+  if (auto *D = getOwner().getAsDecl()) {
     if ((isa<VarDecl>(D) || isa<PatternBindingDecl>(D)) &&
         D->getDeclContext()->isLocalContext()) {
       return true;
