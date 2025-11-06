@@ -217,6 +217,12 @@ class Product(object):
         return targets.toolchain_path(install_destdir,
                                       self.args.install_prefix)
 
+    def native_clang_tools_path(self, host_target):
+        if self.args.native_clang_tools_path is not None:
+            return os.path.split(self.args.native_clang_tools_path)[0]
+        else:
+            return self.install_toolchain_path(host_target)
+
     def native_toolchain_path(self, host_target):
         if self.args.native_swift_tools_path is not None:
             return os.path.split(self.args.native_swift_tools_path)[0]
