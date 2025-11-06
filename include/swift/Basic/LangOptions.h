@@ -1015,7 +1015,7 @@ namespace swift {
     bool SolverDisableSplitter = false;
 
     /// Enable the experimental "prepared overloads" optimization.
-    bool SolverEnablePreparedOverloads = false;
+    bool SolverEnablePreparedOverloads = true;
   };
 
   /// Options for controlling the behavior of the Clang importer.
