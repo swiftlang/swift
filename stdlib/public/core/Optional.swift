@@ -523,7 +523,7 @@ func _diagnoseUnexpectedNilOptional(
 }
 
 @_preInverseGenerics
-extension Optional: Equatable where Wrapped: Equatable & ~Copyable {
+extension Optional: Equatable where Wrapped: Equatable & ~Copyable & ~Escapable {
   /// Returns a Boolean value indicating whether two optional instances are
   /// equal.
   ///
@@ -587,7 +587,7 @@ extension Optional: Equatable where Wrapped: Equatable & ~Copyable {
 }
 
 @_preInverseGenerics
-extension Optional: Hashable where Wrapped: Hashable & ~Copyable {
+extension Optional: Hashable where Wrapped: Hashable & ~Copyable & ~Escapable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///

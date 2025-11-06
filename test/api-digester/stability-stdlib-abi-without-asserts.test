@@ -606,9 +606,9 @@ Func Optional.!=(_:_:) has mangled name changing from 'static Swift.Optional.!= 
 Func Optional.!=(_:_:) has parameter 0 changing from Default to Shared
 Func Optional.!=(_:_:) has parameter 1 changing from Default to Shared
 Func Optional.!=(_:_:) is now with @_preInverseGenerics
-Func Optional.==(_:_:) has generic signature change from <Wrapped where Wrapped : Swift.Equatable> to <Wrapped where Wrapped : Swift.Equatable, Wrapped : ~Copyable>
+Func Optional.==(_:_:) has generic signature change from <Wrapped where Wrapped : Swift.Equatable> to <Wrapped where Wrapped : Swift.Equatable, Wrapped : ~Copyable, Wrapped : ~Escapable>
 Func Optional.==(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
-Func Optional.==(_:_:) has mangled name changing from 'static (extension in Swift):Swift.Optional<A where A: Swift.Equatable>.== infix(Swift.Optional<A>, Swift.Optional<A>) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: Swift.Equatable, A: ~Swift.Copyable>.== infix(Swift.Optional<A>, Swift.Optional<A>) -> Swift.Bool'
+Func Optional.==(_:_:) has mangled name changing from 'static (extension in Swift):Swift.Optional<A where A: Swift.Equatable>.== infix(Swift.Optional<A>, Swift.Optional<A>) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: Swift.Equatable, A: ~Swift.Copyable, A: ~Swift.Escapable>.== infix(Swift.Optional<A>, Swift.Optional<A>) -> Swift.Bool'
 Func Optional.==(_:_:) has mangled name changing from 'static Swift.Optional.== infix(Swift.Optional<A>, Swift._OptionalNilComparisonType) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: ~Swift.Copyable, A: ~Swift.Escapable>.== infix(Swift.Optional<A>, Swift._OptionalNilComparisonType) -> Swift.Bool'
 Func Optional.==(_:_:) has mangled name changing from 'static Swift.Optional.== infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool' to 'static (extension in Swift):Swift.Optional< where A: ~Swift.Copyable, A: ~Swift.Escapable>.== infix(Swift._OptionalNilComparisonType, Swift.Optional<A>) -> Swift.Bool'
 Func Optional.==(_:_:) has parameter 0 changing from Default to Shared
@@ -885,22 +885,21 @@ Accessor Optional.unsafelyUnwrapped.Get() has generic signature change from <Wra
 Accessor Optional.unsafelyUnwrapped.Get() has mangled name changing from 'Swift.Optional.unsafelyUnwrapped.getter : A' to '(extension in Swift):Swift.Optional< where A: ~Swift.Escapable>.unsafelyUnwrapped.getter : A'
 Var Optional.unsafelyUnwrapped has mangled name changing from 'Swift.Optional.unsafelyUnwrapped : A' to '(extension in Swift):Swift.Optional< where A: ~Swift.Escapable>.unsafelyUnwrapped : A'
 Var Optional.unsafelyUnwrapped is now with @_preInverseGenerics
-Var Optional.hashValue has mangled name changing from '(extension in Swift):Swift.Optional<A where A: Swift.Hashable>.hashValue : Swift.Int' to '(extension in Swift):Swift.Optional< where A: Swift.Hashable, A: ~Swift.Copyable>.hashValue : Swift.Int'
+Accessor Optional.hashValue.Get() has generic signature change from <Wrapped where Wrapped : Swift.Hashable> to <Wrapped where Wrapped : Swift.Hashable, Wrapped : ~Copyable, Wrapped : ~Escapable>
+Accessor Optional.hashValue.Get() has mangled name changing from '(extension in Swift):Swift.Optional<A where A: Swift.Hashable>.hashValue.getter : Swift.Int' to '(extension in Swift):Swift.Optional< where A: Swift.Hashable, A: ~Swift.Copyable, A: ~Swift.Escapable>.hashValue.getter : Swift.Int'
 Var Optional.hashValue is now with @_preInverseGenerics
 Accessor Optional._unsafelyUnwrappedUnchecked.Get() has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Escapable>
 Accessor Optional._unsafelyUnwrappedUnchecked.Get() has mangled name changing from 'Swift.Optional._unsafelyUnwrappedUnchecked.getter : A' to '(extension in Swift):Swift.Optional< where A: ~Swift.Escapable>._unsafelyUnwrappedUnchecked.getter : A'
-Accessor Optional.hashValue.Get() has generic signature change from <Wrapped where Wrapped : Swift.Hashable> to <Wrapped where Wrapped : Swift.Hashable, Wrapped : ~Copyable>
-Accessor Optional.hashValue.Get() has mangled name changing from '(extension in Swift):Swift.Optional<A where A: Swift.Hashable>.hashValue.getter : Swift.Int' to '(extension in Swift):Swift.Optional< where A: Swift.Hashable, A: ~Swift.Copyable>.hashValue.getter : Swift.Int'
 Func Hashable._rawHashValue(seed:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable, Self : ~Escapable>
 Func Hashable._rawHashValue(seed:) has mangled name changing from '(extension in Swift):Swift.Hashable._rawHashValue(seed: Swift.Int) -> Swift.Int' to '(extension in Swift):Swift.Hashable< where A: ~Swift.Copyable, A: ~Swift.Escapable>._rawHashValue(seed: Swift.Int) -> Swift.Int'
 Func Hashable._rawHashValue(seed:) is now with @_preInverseGenerics
-Func Hashable.hash(into:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable, Self : ~Escapable>
-Func Hasher.combine(_:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable, H : ~Escapable>
 Func Hasher.combine(_:) has mangled name changing from 'Swift.Hasher.combine<A where A: Swift.Hashable>(A) -> ()' to 'Swift.Hasher.combine<A where A: Swift.Hashable, A: ~Swift.Copyable, A: ~Swift.Escapable>(A) -> ()'
 Func Hasher.combine(_:) has parameter 0 changing from Default to Shared
 Func Hasher.combine(_:) is now with @_preInverseGenerics
-Func Optional.hash(into:) has generic signature change from <Wrapped where Wrapped : Swift.Hashable> to <Wrapped where Wrapped : Swift.Hashable, Wrapped : ~Copyable>
-Func Optional.hash(into:) has mangled name changing from '(extension in Swift):Swift.Optional<A where A: Swift.Hashable>.hash(into: inout Swift.Hasher) -> ()' to '(extension in Swift):Swift.Optional< where A: Swift.Hashable, A: ~Swift.Copyable>.hash(into: inout Swift.Hasher) -> ()'
+Func Hashable.hash(into:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable, Self : ~Escapable>
+Func Hasher.combine(_:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable, H : ~Escapable>
+Func Optional.hash(into:) has generic signature change from <Wrapped where Wrapped : Swift.Hashable> to <Wrapped where Wrapped : Swift.Hashable, Wrapped : ~Copyable, Wrapped : ~Escapable>
+Func Optional.hash(into:) has mangled name changing from '(extension in Swift):Swift.Optional<A where A: Swift.Hashable>.hash(into: inout Swift.Hasher) -> ()' to '(extension in Swift):Swift.Optional< where A: Swift.Hashable, A: ~Swift.Copyable, A: ~Swift.Escapable>.hash(into: inout Swift.Hasher) -> ()'
 Func Optional.hash(into:) is now with @_preInverseGenerics
 Func _hashValue(for:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable>
 Func _hashValue(for:) has mangled name changing from 'Swift._hashValue<A where A: Swift.Hashable>(for: A) -> Swift.Int' to 'Swift._hashValue<A where A: Swift.Hashable, A: ~Swift.Copyable>(for: A) -> Swift.Int'
@@ -908,6 +907,7 @@ Func _hashValue(for:) has parameter 0 changing from Default to Shared
 Func _hashValue(for:) is now with @_preInverseGenerics
 Var Optional._unsafelyUnwrappedUnchecked has mangled name changing from 'Swift.Optional._unsafelyUnwrappedUnchecked : A' to '(extension in Swift):Swift.Optional< where A: ~Swift.Escapable>._unsafelyUnwrappedUnchecked : A'
 Var Optional._unsafelyUnwrappedUnchecked is now with @_preInverseGenerics
+Var Optional.hashValue has mangled name changing from '(extension in Swift):Swift.Optional<A where A: Swift.Hashable>.hashValue : Swift.Int' to '(extension in Swift):Swift.Optional< where A: Swift.Hashable, A: ~Swift.Copyable, A: ~Swift.Escapable>.hashValue : Swift.Int'
 Accessor UnsafeBufferPointer.indices.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Accessor UnsafeBufferPointer.indices.Get() has mangled name changing from 'Swift.UnsafeBufferPointer.indices.getter : Swift.Range<Swift.Int>' to '(extension in Swift):Swift.UnsafeBufferPointer< where A: ~Swift.Copyable>.indices.getter : Swift.Range<Swift.Int>'
 Var UnsafeBufferPointer.indices has mangled name changing from 'Swift.UnsafeBufferPointer.indices : Swift.Range<Swift.Int>' to '(extension in Swift):Swift.UnsafeBufferPointer< where A: ~Swift.Copyable>.indices : Swift.Range<Swift.Int>'

@@ -194,7 +194,7 @@ Accessor ManagedBufferPointer.header.Set() has generic signature change from <He
 Accessor MemoryLayout.alignment.Get() has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
 Accessor MemoryLayout.size.Get() has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
 Accessor MemoryLayout.stride.Get() has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
-Accessor Optional.hashValue.Get() has generic signature change from <Wrapped where Wrapped : Swift.Hashable> to <Wrapped where Wrapped : Swift.Hashable, Wrapped : ~Copyable>
+Accessor Optional.hashValue.Get() has generic signature change from <Wrapped where Wrapped : Swift.Hashable> to <Wrapped where Wrapped : Swift.Hashable, Wrapped : ~Copyable, Wrapped : ~Escapable>
 Accessor UnsafeBufferPointer.baseAddress.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Accessor UnsafeBufferPointer.count.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Accessor UnsafeBufferPointer.endIndex.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
@@ -269,12 +269,12 @@ Func Optional.!=(_:_:) has generic signature change from <Wrapped> to <Wrapped w
 Func Optional.!=(_:_:) has parameter 0 changing from Default to Shared
 Func Optional.!=(_:_:) has parameter 1 changing from Default to Shared
 Func Optional.==(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
-Func Optional.==(_:_:) has generic signature change from <Wrapped where Wrapped : Swift.Equatable> to <Wrapped where Wrapped : Swift.Equatable, Wrapped : ~Copyable>
+Func Optional.==(_:_:) has generic signature change from <Wrapped where Wrapped : Swift.Equatable> to <Wrapped where Wrapped : Swift.Equatable, Wrapped : ~Copyable, Wrapped : ~Escapable>
 Func Optional.==(_:_:) has parameter 0 changing from Default to Shared
 Func Optional.==(_:_:) has parameter 1 changing from Default to Shared
 Func Optional.~=(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
 Func Optional.~=(_:_:) has parameter 1 changing from Default to Shared
-Func Optional.hash(into:) has generic signature change from <Wrapped where Wrapped : Swift.Hashable> to <Wrapped where Wrapped : Swift.Hashable, Wrapped : ~Copyable>
+Func Optional.hash(into:) has generic signature change from <Wrapped where Wrapped : Swift.Hashable> to <Wrapped where Wrapped : Swift.Hashable, Wrapped : ~Copyable, Wrapped : ~Escapable>
 Func Result.==(_:_:) has generic signature change from <Success, Failure where Success : Swift.Equatable, Failure : Swift.Equatable, Failure : Swift.Error> to <Success, Failure where Success : Swift.Equatable, Failure : Swift.Equatable, Failure : Swift.Error, Success : ~Copyable>
 Func Result.==(_:_:) has parameter 0 changing from Default to Shared
 Func Result.==(_:_:) has parameter 1 changing from Default to Shared
