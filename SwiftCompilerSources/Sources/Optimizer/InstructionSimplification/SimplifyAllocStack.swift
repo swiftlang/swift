@@ -18,7 +18,9 @@ extension AllocStackInst : Simplifiable, SILCombineSimplifiable {
     if optimizeEnum(context) {
       return
     }
-    _ = optimizeExistential(context)
+    if optimizeExistential(context) {
+      return
+    }
     _ = optimizePackElement(context)
   }
 }
@@ -308,8 +310,10 @@ private extension AllocStackInst {
   ///
   /// For example:
   /// ```
-  ///   %0 = alloc_stack $@pack_element(...) ...
-  ///   use %1
+  ///  %1 = dynamic_pack_index %0 of $Pack{T, U}
+  ///  %2 = open_pack_element %1 of <...> at <Pack{T, U}> ...
+  ///  %3 = alloc_stack $@pack_element(...) ...
+  ///  use %3
   /// ```
   /// is transformed to
   /// ```

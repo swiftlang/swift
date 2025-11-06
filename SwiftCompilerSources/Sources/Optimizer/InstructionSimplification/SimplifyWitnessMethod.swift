@@ -15,7 +15,9 @@ import SIL
 
 extension WitnessMethodInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
-    _ = tryReplaceExistentialArchetype(of: self, context)
+    if tryReplaceExistentialArchetype(of: self, context) {
+      return
+    }
     _ = tryReplacePackElementArchetype(of: self, context)
   }
 }

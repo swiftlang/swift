@@ -44,17 +44,21 @@ extension UncheckedAddrCastInst : OnoneSimplifiable, SILCombineSimplifiable {
     // ```
     //   %1 = vector_base_addr %0 : $*Builtin.FixedArray<N, Element>
     // ```
-    _ = optimizeVectorBaseCast(context)
+    if optimizeVectorBaseCast(context) {
+      return
+    }
 
     // ```
-    //   %1 = unchecked_addr_cast %0 to $*pack_element("...") ...
+    //   %2 = dynamic_pack_index %1 of $Pack{T, U}
+    //   %3 = open_pack_element %2 of <...> at <Pack{T, U}> ...
+    //   %4 = pack_element_get %3 of %11 as $*Int
+    //   %5 = unchecked_addr_cast %4 to $*@pack_element(..)
     // ```
     // ->
     // ```
     //   %1 = unchecked_addr_cast %0 to $T
     // ```
     _ = optimizePackElement(context)
-
   }
 }
 
@@ -96,7 +100,7 @@ private extension UncheckedAddrCastInst {
 
     let builder = Builder(before: self, context)
     let newCast = builder.createUncheckedAddrCast(from: fromAddress,
-    to:concreteType.loweredType(in: parentFunction).addressType)
+      to: concreteType.loweredType(in: parentFunction).addressType)
     self.replace(with: newCast, context)
     return true
   }

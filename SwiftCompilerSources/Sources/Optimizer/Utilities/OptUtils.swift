@@ -560,7 +560,7 @@ extension Instruction {
        let ili = dpi.operands.first?.value as? IntegerLiteralInst,
        let index = ili.value
     {
-      return dpi.indexedPackType.getPackElementType(index).canonical
+      return dpi.indexedPackType.packElementTypes[index].canonical
     }
     return nil
   }

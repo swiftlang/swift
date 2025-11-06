@@ -274,8 +274,8 @@ extension TypeProperties {
     return rawType.bridged.isSILPackElementAddress()
   }
 
-  public func getPackElementType(_ index: Int) -> Type {
-    return Type(bridged: rawType.bridged.getPackElementType(index));
+  public var packElementTypes: TypeArray {
+    return TypeArray(bridged: rawType.bridged.getPackElementTypes())
   }
 }
 
