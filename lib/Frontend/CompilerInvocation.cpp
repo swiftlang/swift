@@ -1272,6 +1272,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.getLastArg(OPT_debug_cycles))
     Opts.DebugDumpCycles = true;
 
+  // Enable request evaluator cycle debugging in asserts builds.
+  if (CONDITIONAL_ASSERT_enabled())
+    Opts.DebugDumpCycles = true;
+
   Opts.RequireExplicitSendable |= Args.hasArg(OPT_require_explicit_sendable);
   for (const Arg *A : Args.filtered(OPT_define_availability)) {
     Opts.AvailabilityMacros.push_back(A->getValue());
