@@ -332,11 +332,10 @@ private extension AllocStackInst {
                                             isLexical: isLexical,
                                             isFromVarDecl: isFromVarDecl,
                                             usesMoveableValueDebugInfo: usesMoveableValueDebugInfo)    
-    for use in uses {
-        // FIXME: Are there any specific cases to handle?
-        use.set(to: newAlloc, context)
-    }
-    context.erase(instruction: self)
+    let builderAfter = Builder(after: self, context)
+    let addrCast = builderAfter.createUncheckedAddrCast(from: newAlloc, to: self.type.addressType)
+    uses.replaceAll(with: addrCast, context)
+    self.replace(with: newAlloc, context)
     return true
   }
 
