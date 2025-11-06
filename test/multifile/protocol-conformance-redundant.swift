@@ -4,7 +4,7 @@
 // RUN: %target-build-swift -I%t -L%t -lDef -o %t/main %target-rpath(%t) %s
 // RUN: %target-codesign %t/main %t/%target-library-name(Def) %t/%target-library-name(Ext)
 // RUN: %target-run %t/main %t/%target-library-name(Def) %t/%target-library-name(Ext) 2> %t/stderr.txt | %FileCheck %s
-// RUN: %FileCheck %s -check-prefix=CHECK-STDERR < %t/stderr.txt
+// RUN: %FileCheck %s -check-prefix=CHECK-STDERR --input-file=%t/stderr.txt
 
 // REQUIRES: executable_test
 // XFAIL: OS=windows-msvc
@@ -44,7 +44,7 @@ extension GenericStruct: @retroactive Hello where T == String {
   }
 }
 
-// CHECK-STDERR: Warning: 'main.GenericSubClass<Swift.String>' conforms to protocol 'Hello', but it also inherits conformance from 'Def.GenericSuperClass<Swift.String>'. Relying on a particular conformance is undefined behaviour.
+// CHECK-STDERR: Warning: 'main.GenericSubClass<Swift.{{Int|String}}>' conforms to protocol 'Hello', but it also inherits conformance from 'Def.GenericSuperClass<Swift.{{Int|String}}>'. Relying on a particular conformance is undefined behaviour.
 // CHECK: Hello from main
 (GenericStruct<String>() as Any as! Hello).hello()
 
