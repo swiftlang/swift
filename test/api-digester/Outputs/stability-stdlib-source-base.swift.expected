@@ -111,8 +111,8 @@ Protocol FixedWidthInteger has added inherited protocol Copyable
 Protocol FixedWidthInteger has added inherited protocol Escapable
 Protocol FloatingPoint has added inherited protocol Copyable
 Protocol FloatingPoint has added inherited protocol Escapable
-Protocol Hashable has added inherited protocol Copyable
 Protocol Hashable has added inherited protocol Escapable
+Protocol Hashable has generic signature change from <Self : Swift.Equatable> to <Self : Swift.Equatable, Self : ~Copyable>
 Protocol Identifiable has added inherited protocol Copyable
 Protocol Identifiable has added inherited protocol Escapable
 Protocol IteratorProtocol has added inherited protocol Copyable
@@ -182,8 +182,9 @@ Protocol UnsignedInteger has added inherited protocol Escapable
 Protocol _AppendKeyPath has added inherited protocol Copyable
 Protocol _AppendKeyPath has added inherited protocol Escapable
 
-Accessor CustomDebugStringConvertible.debugDescription.Get() has generic signature change from <Self where Self : Swift.CustomDebugStringConvertible> to <Self where Self : Swift.CustomDebugStringConvertible, Self : ~Copyable, Self : ~Escapable>
-Accessor CustomStringConvertible.description.Get() has generic signature change from <Self where Self : Swift.CustomStringConvertible> to <Self where Self : Swift.CustomStringConvertible, Self : ~Copyable, Self : ~Escapable>
+Accessor CustomDebugStringConvertible.debugDescription.Get() has generic signature change from <Self where Self : Swift.CustomDebugStringConvertible> to <Self where Self : Swift.CustomDebugStringConvertible, Self : ~Copyable>
+Accessor CustomStringConvertible.description.Get() has generic signature change from <Self where Self : Swift.CustomStringConvertible> to <Self where Self : Swift.CustomStringConvertible, Self : ~Copyable>
+Accessor Hashable.hashValue.Get() has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable>
 Accessor ManagedBuffer.capacity.Get() has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Accessor ManagedBuffer.header.Get() has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Accessor ManagedBuffer.header.Set() has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
@@ -194,6 +195,7 @@ Accessor ManagedBufferPointer.header.Set() has generic signature change from <He
 Accessor MemoryLayout.alignment.Get() has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
 Accessor MemoryLayout.size.Get() has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
 Accessor MemoryLayout.stride.Get() has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Accessor Optional.hashValue.Get() has generic signature change from <Wrapped where Wrapped : Swift.Hashable> to <Wrapped where Wrapped : Swift.Hashable, Wrapped : ~Copyable>
 Accessor UnsafeBufferPointer.baseAddress.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Accessor UnsafeBufferPointer.count.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Accessor UnsafeBufferPointer.endIndex.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
@@ -253,6 +255,9 @@ Func Comparable.>(_:_:) has parameter 1 changing from Default to Shared
 Func Comparable.>=(_:_:) has generic signature change from <Self where Self : Swift.Comparable> to <Self where Self : Swift.Comparable, Self : ~Copyable, Self : ~Escapable>
 Func Comparable.>=(_:_:) has parameter 0 changing from Default to Shared
 Func Comparable.>=(_:_:) has parameter 1 changing from Default to Shared
+Func Hashable.hash(into:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable>
+Func Hasher.combine(_:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable>
+Func Hasher.combine(_:) has parameter 0 changing from Default to Shared
 Func ManagedBuffer.create(minimumCapacity:makingHeaderWith:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Func ManagedBufferPointer.isUniqueReference() has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Func MemoryLayout.alignment(ofValue:) has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
@@ -270,6 +275,7 @@ Func Optional.==(_:_:) has parameter 0 changing from Default to Shared
 Func Optional.==(_:_:) has parameter 1 changing from Default to Shared
 Func Optional.~=(_:_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
 Func Optional.~=(_:_:) has parameter 1 changing from Default to Shared
+Func Optional.hash(into:) has generic signature change from <Wrapped where Wrapped : Swift.Hashable> to <Wrapped where Wrapped : Swift.Hashable, Wrapped : ~Copyable>
 Func Result.==(_:_:) has generic signature change from <Success, Failure where Success : Swift.Equatable, Failure : Swift.Equatable, Failure : Swift.Error> to <Success, Failure where Success : Swift.Equatable, Failure : Swift.Equatable, Failure : Swift.Error, Success : ~Copyable>
 Func Result.==(_:_:) has parameter 0 changing from Default to Shared
 Func Result.==(_:_:) has parameter 1 changing from Default to Shared

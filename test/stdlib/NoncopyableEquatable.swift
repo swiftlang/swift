@@ -124,6 +124,26 @@ extension Noncopyable {
     }
 }
 
+extension Noncopyable: Hashable { }
+
+NoncopyableEquatableTests.test("hashing noncopyables") {
+    let o1: Noncopyable = .init(i: 1)
+    let o2: Noncopyable = .init(i: 1)
+    let o3: Noncopyable = .init(i: 2)
+
+    expectTrue(o1.hashValue == o2.hashValue)
+    expectFalse(o2.hashValue == o3.hashValue)
+}
+
+NoncopyableEquatableTests.test("hashing noncopyables") {
+    let o1: Noncopyable? = .init(i: 1)
+    let o2: Noncopyable? = .init(i: 1)
+    let o3: Noncopyable? = nil
+
+    expectTrue(o1.hashValue == o2.hashValue)
+    expectFalse(o2.hashValue == o3.hashValue)
+}
+
 NoncopyableEquatableTests.test("equating optional noncopyables") {
     let o1: Noncopyable? = Noncopyable(i: 1)
     let o2: Noncopyable = .init(i: 1)
