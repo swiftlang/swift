@@ -2857,9 +2857,9 @@ WARNING(remove_public_import,none,
 WARNING(remove_package_import,none,
         "package import of %0 was not used in package declarations",
         (Identifier))
-WARNING(public_decl_needs_sendable,none,
-        "public %kind0 does not specify whether it is 'Sendable' or not",
-        (const ValueDecl *))
+GROUPED_WARNING(public_decl_needs_sendable,ExplicitSendable,none,
+                "public %kind0 does not specify whether it is 'Sendable' or not",
+                (const ValueDecl *))
 NOTE(explicit_disable_sendable,none,
      "make %kind0 explicitly non-Sendable to suppress this warning",
      (const ValueDecl *))

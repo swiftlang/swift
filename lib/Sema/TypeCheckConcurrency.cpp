@@ -25,6 +25,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Concurrency.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1376,7 +1377,7 @@ static bool checkSendableInstanceStorage(
 void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
   // Only diagnose when explicitly requested.
   ASTContext &ctx = nominal->getASTContext();
-  if (!ctx.LangOpts.RequireExplicitSendable)
+  if (ctx.Diags.isIgnoredDiagnosticGroupTree(DiagGroupID::ExplicitSendable))
     return;
 
   if (nominal->getLoc().isInvalid())
