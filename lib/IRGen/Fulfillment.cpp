@@ -374,13 +374,44 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
 
   bool hadFulfillment = false;
 
-  auto subs = type->getContextSubstitutionMap();
+  std::optional<SubstitutionMap> subs = type->getContextSubstitutionMap();
+
+  // FIXME: Today, the type is either a contextual type for a generic
+  // environment (in which case the substitution map's replacement types
+  // do not contain any type parameters), or it is *exactly* the declared
+  // interface type of its nominal type declaration (in which case we can
+  // skip the substitution and use the original type parameter as the
+  // lookup key in our fulfillment map).
+  //
+  // If this invariant no longer holds in the future and we legitimately
+  // end up here with a substitution map whose replacement types also
+  // contain type parameters, please do not comment out the assertion,
+  // because if it fails to hold, the lookup below will no longer work.
+  // Indeed, types that contain type parameters might be equivalent with
+  // respect to a generic signature, but not equal as canonical types.
+  //
+  // The correct fix in that case would be to plumb through the generic
+  // signature that describes the substitution map's replacement types
+  // (*not* the substitution map's input generic signature), so that we can
+  // reduce the result of the call to subst() below with respect to this
+  // signature before forming the key.
+  if (type->hasTypeParameter()) {
+    ASSERT(subs->isIdentity());
+    subs = std::nullopt;
+  }
 
   GenericTypeRequirements requirements(IGM, nominal);
 
   for (unsigned reqtIndex : indices(requirements.getRequirements())) {
     auto requirement = requirements.getRequirements()[reqtIndex];
-    auto arg = requirement.getTypeParameter().subst(subs)->getCanonicalType();
+    auto arg = requirement.getTypeParameter();
+    // Only substitute if we have to.
+    if (subs) {
+      arg = arg.subst(*subs)->getCanonicalType();
+      // Otherwise, we cannot guarantee that two equivalent types
+      // are actually going to be canonically equal.
+      ASSERT(!arg->hasTypeParameter());
+    }
 
     // Skip uninteresting type arguments.
     if (!keys.hasInterestingType(arg))
