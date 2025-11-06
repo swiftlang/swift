@@ -3167,6 +3167,20 @@ ASTContext &CustomAttr::getASTContext() const {
   return getOwner().getDeclContext()->getASTContext();
 }
 
+bool CustomAttr::shouldPreferPropertyWrapperOverMacro() const {
+  // If we have a VarDecl in a local context, prefer to use a property wrapper
+  // if one exists. This is necessary since we don't properly support peer
+  // declarations in local contexts, so want to use a property wrapper if one
+  // exists.
+  if (auto *D = owner.getAsDecl()) {
+    if ((isa<VarDecl>(D) || isa<PatternBindingDecl>(D)) &&
+        D->getDeclContext()->isLocalContext()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 NominalTypeDecl *CustomAttr::getNominalDecl() const {
   auto &eval = getASTContext().evaluator;
   auto *mutThis = const_cast<CustomAttr *>(this);
