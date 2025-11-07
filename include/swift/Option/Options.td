@@ -2343,7 +2343,7 @@ def scanner_prefix_map_paths : MultiArg<["-"], "scanner-prefix-map-paths", 2>,
   HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix> <replacement>">;
 
 def scanner_prefix_map : Separate<["-"], "scanner-prefix-map">,
-  Flags<[NewDriverOnlyOption]>,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix=replacement>">;
 
 def scanner_prefix_map_sdk : Separate<["-"], "scanner-prefix-map-sdk">,
