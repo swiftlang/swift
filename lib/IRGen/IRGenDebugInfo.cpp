@@ -929,10 +929,10 @@ private:
         // Note: The implementation here assumes that all clang submodules
         //       belong to the same PCM file.
         ASTSourceDescriptor ParentDescriptor(*ClangModule->Parent);
-        Parent = getOrCreateModule({ParentDescriptor.getModuleName(),
-                                    ParentDescriptor.getPath(),
-                                    Desc.getASTFile(), Desc.getSignature()},
-                                   ClangModule->Parent);
+        Parent = getOrCreateModule(
+            {ParentDescriptor.getModuleName(), ParentDescriptor.getPath(),
+             Desc.getASTFile(), Desc.getSignature(), /*CASID=*/""},
+            ClangModule->Parent);
       }
       return getOrCreateModule(ClangModule, Parent, Desc.getModuleName(),
                                IncludePath, Signature, Desc.getASTFile());
@@ -2629,11 +2629,11 @@ private:
           // Describe the submodule, but substitute the cached ASTFile from
           // the toplevel module. The ASTFile pointer in SubModule may be
           // dangling and cant be trusted.
-          Scope = getOrCreateModule({SubModuleDesc->getModuleName(),
-                                     SubModuleDesc->getPath(),
-                                     TopLevelModuleDesc->getASTFile(),
-                                     TopLevelModuleDesc->getSignature()},
-                                    SubModuleDesc->getModuleOrNull());
+          Scope = getOrCreateModule(
+              {SubModuleDesc->getModuleName(), SubModuleDesc->getPath(),
+               TopLevelModuleDesc->getASTFile(),
+               TopLevelModuleDesc->getSignature(), /*CASID=*/""},
+              SubModuleDesc->getModuleOrNull());
         else if (SubModuleDesc->getModuleOrNull() == nullptr)
           // This is (bridging header) PCH.
           Scope = getOrCreateModule(*SubModuleDesc, nullptr);
