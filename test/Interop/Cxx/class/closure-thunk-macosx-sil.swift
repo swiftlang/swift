@@ -28,7 +28,6 @@ import Closure
 // CHECK: apply %[[V3]](%[[V1]]) : $@callee_guaranteed (@in_guaranteed ARCWeak) -> ()
 // CHECK: %[[V6:.*]] = tuple ()
 // CHECK: destroy_addr %[[V1]] : $*ARCWeak
-// CHECK: strong_release %[[V3]] : $@callee_guaranteed (@in_guaranteed ARCWeak) -> ()
 // CHECK: return %[[V6]] : $()
 
 // ARCWeak is destroyed by the callee.

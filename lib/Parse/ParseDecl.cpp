@@ -8747,12 +8747,14 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
   SourceLoc VarLoc = newBindingContext.getIntroducer() ? consumeToken() : Tok.getLoc();
 
   bool IsConst = Attributes.hasAttribute<SectionAttr>() ||
-                 Attributes.hasAttribute<ConstValAttr>();
+                 Attributes.hasAttribute<ConstValAttr>() ||
+                 Attributes.hasAttribute<ExternAttr>();
 
   // If this is a var in the top-level of script/repl source file, wrap the
   // PatternBindingDecl in a TopLevelCodeDecl, since it represents executable
   // code.  The VarDecl and any accessor decls (for computed properties) go in
   // CurDeclContext.  @const/@section globals are not top-level, per SE-0492.
+  // We follow the same rule for @_extern.
   TopLevelCodeDecl *topLevelDecl = nullptr;
   if (allowTopLevelCode() && CurDeclContext->isModuleScopeContext() &&
       !IsConst) {
