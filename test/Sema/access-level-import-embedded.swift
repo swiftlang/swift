@@ -24,6 +24,8 @@ import indirects
 
 internal func localInternalFunc() {} // expected-note {{global function 'localInternalFunc()' is not '@usableFromInline' or public}}
 
+typealias AliasToDirect = StructFromDirect
+
 @inlinable
 public func explicitlyInlinable(arg: StructFromDirect = StructFromDirect()) {
 // expected-error @-1 {{initializer 'init()' is internal and cannot be referenced from a default argument value}}
@@ -75,6 +77,8 @@ public func implicitlyInlinablePublic(arg: StructFromDirect = StructFromDirect()
   implicitlyInlinablePublic()
   implicitlyInlinablePrivate()
   explicitNonInliable()
+
+  let _: AliasToDirect
 }
 
 internal func implicitlyInlinablePrivate(arg: StructFromDirect = StructFromDirect()) {
