@@ -11,31 +11,6 @@
 
 import _Concurrency
 
-@usableFromInline
-@available(SwiftStdlib 5.1, *)
-@_silgen_name("swift_task_addCancellationHandler")
-func _taskAddCancellationHandler(handler: () -> Void) -> UnsafeRawPointer /*CancellationNotificationStatusRecord*/
-
-@usableFromInline
-@available(SwiftStdlib 5.1, *)
-@_silgen_name("swift_task_removeCancellationHandler")
-func _taskRemoveCancellationHandler(
-  record: UnsafeRawPointer /*CancellationNotificationStatusRecord*/
-)
-
-func withIsolatedTaskCancellationHandler<T: Sendable>(
-  operation: @isolated(any) () async throws -> T,
-  onCancel handler: @Sendable () -> Void,
-  isolation: isolated (any Actor)? = #isolation
-) async rethrows -> T {
-  // unconditionally add the cancellation record to the task.
-  // if the task was already cancelled, it will be executed right away.
-  let record = _taskAddCancellationHandler(handler: handler)
-  defer { _taskRemoveCancellationHandler(record: record) }
-
-  return try await operation()
-}
-
 /// An asychronous sequence generated from a closure that tracks the transactional changes of `@Observable` types.
 ///
 /// `Observations` conforms to `AsyncSequence`, providing a intutive and safe mechanism to track changes to
@@ -260,7 +235,7 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
           // this will mean our next await for the emission will ensure the suspension return of the willChange context
           // back to the trailing edges of the mutations. In short, this enables the transactionality bounded by the
           // isolation of the mutation.
-          await withIsolatedTaskCancellationHandler(operation: {
+          await withTaskCancellationHandler(operation: {
             await State.willChange(isolation: iterationIsolation, state: state, id: id)
           }, onCancel: {
             // ensure to clean out our continuation uon cancellation

@@ -664,6 +664,13 @@ CONSTANT_OWNERSHIP_BUILTIN(Owned, DistributedActorAsAnyActor)
 CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, ExtractFunctionIsolation) // unreachable
 CONSTANT_OWNERSHIP_BUILTIN(None, AddressOfRawLayout)
 
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddCancellationHandler)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemoveCancellationHandler)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddPriorityEscalationHandler)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemovePriorityEscalationHandler)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskLocalValuePush)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskLocalValuePop)
+
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
 // Check all of these...

@@ -2364,6 +2364,52 @@ static ValueDecl *getEmplace(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getTaskAddCancellationHandler(ASTContext &ctx,
+                                                Identifier id) {
+  auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
+  auto fnType = FunctionType::get({}, ctx.TheEmptyTupleType, extInfo);
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_label("handler", fnType)),
+                            _unsafeRawPointer);
+}
+
+static ValueDecl *getTaskRemoveCancellationHandler(ASTContext &ctx,
+                                                   Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
+}
+
+static ValueDecl *getTaskAddPriorityEscalationHandler(ASTContext &ctx,
+                                                      Identifier id) {
+  std::array<AnyFunctionType::Param, 2> params = {
+      AnyFunctionType::Param(ctx.getUInt8Type()),
+      AnyFunctionType::Param(ctx.getUInt8Type()),
+  };
+  // (UInt8, UInt8) -> ()
+  auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
+  auto *functionType =
+      FunctionType::get(params, ctx.TheEmptyTupleType, extInfo);
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_label("handler", functionType)),
+                            _unsafeRawPointer);
+}
+
+static ValueDecl *getTaskRemovePriorityEscalationHandler(ASTContext &ctx,
+                                                         Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
+}
+
+static ValueDecl *getTaskLocalValuePush(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
+                            _parameters(_rawPointer, _consuming(_typeparam(0))),
+                            _void);
+}
+
+static ValueDecl *getTaskLocalValuePop(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -3452,6 +3498,24 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     
   case BuiltinValueKind::Emplace:
     return getEmplace(Context, Id);
+
+  case BuiltinValueKind::TaskAddCancellationHandler:
+    return getTaskAddCancellationHandler(Context, Id);
+
+  case BuiltinValueKind::TaskRemoveCancellationHandler:
+    return getTaskRemoveCancellationHandler(Context, Id);
+
+  case BuiltinValueKind::TaskAddPriorityEscalationHandler:
+    return getTaskAddPriorityEscalationHandler(Context, Id);
+
+  case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
+    return getTaskRemovePriorityEscalationHandler(Context, Id);
+
+  case BuiltinValueKind::TaskLocalValuePush:
+    return getTaskLocalValuePush(Context, Id);
+
+  case BuiltinValueKind::TaskLocalValuePop:
+    return getTaskLocalValuePop(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");
@@ -3814,4 +3878,8 @@ BuiltinFixedArrayType::isFixedNegativeSize() const {
     return intSize->getValue().isNegative();
   }
   return false;
+}
+
+ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, StringRef Name) {
+  return getBuiltinValueDecl(Context, Context.getIdentifier(Name));
 }
