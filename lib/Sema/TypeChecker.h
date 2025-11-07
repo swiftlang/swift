@@ -882,6 +882,12 @@ Expr *addImplicitLoadExpr(
     std::function<void(Expr *, Type)> setType =
         [](Expr *E, Type type) { E->setType(type); });
 
+Expr *addImplicitBorrowExpr(
+    ASTContext &Context, Expr *expr,
+    std::function<Type(Expr *)> getType = [](Expr *E) { return E->getType(); },
+    std::function<void(Expr *, Type)> setType =
+        [](Expr *E, Type type) { E->setType(type); });
+
 /// Determine whether the given type either conforms to, or itself an
 /// existential subtype of, the given protocol.
 ///

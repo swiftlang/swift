@@ -468,6 +468,7 @@ namespace {
 
     RValue visitStringLiteralExpr(StringLiteralExpr *E, SGFContext C);
     RValue visitLoadExpr(LoadExpr *E, SGFContext C);
+    RValue visitBorrowExpr(BorrowExpr *E, SGFContext C);
     RValue visitDerivedToBaseExpr(DerivedToBaseExpr *E, SGFContext C);
     RValue visitMetatypeConversionExpr(MetatypeConversionExpr *E,
                                        SGFContext C);
@@ -1101,6 +1102,24 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   // we loaded.
   return SGF.emitLoadOfLValue(E->getSubExpr(), std::move(lv),
                               C.withFollowingSideEffects());
+}
+
+RValue RValueEmitter::visitBorrowExpr(BorrowExpr *E, SGFContext C_Ignored) {
+  // NOTE: You should NOT add an evaluation scope here!
+  //
+  // The callers of this visitor should have established a scope already that
+  // encompasses the use of the borrowed RValue that we return.
+  ASSERT(SGF.isInFormalEvaluationScope() && "emit borrow_expr without scope?");
+
+  auto accessKind =
+      SGF.getTypeLowering(E->getType()).isAddress()
+        ? SGFAccessKind::BorrowedAddressRead
+        : SGFAccessKind::BorrowedObjectRead;
+
+  LValue lv = SGF.emitLValue(E->getSubExpr(), accessKind);
+  auto substFormalType = lv.getSubstFormalType();
+  ManagedValue mv = SGF.emitBorrowedLValue(E, std::move(lv));
+  return RValue(SGF, E, substFormalType, mv);
 }
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
