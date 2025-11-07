@@ -214,6 +214,12 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AddressOfBorrowOpaque:
     case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
     case BuiltinValueKind::DistributedActorAsAnyActor:
+    case BuiltinValueKind::TaskAddCancellationHandler:
+    case BuiltinValueKind::TaskRemoveCancellationHandler:
+    case BuiltinValueKind::TaskAddPriorityEscalationHandler:
+    case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
+    case BuiltinValueKind::TaskLocalValuePush:
+    case BuiltinValueKind::TaskLocalValuePop:
       return true;
     }
   }

@@ -611,6 +611,12 @@ public:
                                       Subs, Args, getInstructionContext()));
   }
 
+  BuiltinInst *createBuiltin(SILLocation Loc, StringRef Name, SILType ResultTy,
+                             SubstitutionMap Subs, ArrayRef<SILValue> Args) {
+    return createBuiltin(Loc, getASTContext().getIdentifier(Name), ResultTy,
+                         Subs, Args);
+  }
+
   /// Create a binary function with the signature: OpdTy, OpdTy -> ResultTy.
   BuiltinInst *createBuiltinBinaryFunction(SILLocation Loc, StringRef Name,
                                            SILType OpdTy, SILType ResultTy,

@@ -313,6 +313,61 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   return alet;
 }
 
+llvm::Value *irgen::emitBuiltinTaskAddHandler(IRGenFunction &IGF,
+                                              BuiltinValueKind kind,
+                                              llvm::Value *func,
+                                              llvm::Value *context) {
+  auto callee = [&]() -> FunctionPointer {
+    if (kind == BuiltinValueKind::TaskAddCancellationHandler) {
+      return IGF.IGM.getTaskAddCancellationHandlerFunctionPointer();
+    }
+    if (kind == BuiltinValueKind::TaskAddPriorityEscalationHandler) {
+      return IGF.IGM.getTaskAddPriorityEscalationHandlerFunctionPointer();
+    }
+    llvm::report_fatal_error("Unhandled builtin");
+  }();
+  auto *call = IGF.Builder.CreateCall(callee, {func, context});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return call;
+}
+
+void irgen::emitBuiltinTaskRemoveHandler(IRGenFunction &IGF,
+                                         BuiltinValueKind kind,
+                                         llvm::Value *record) {
+  auto callee = [&]() -> FunctionPointer {
+    if (kind == BuiltinValueKind::TaskRemoveCancellationHandler) {
+      return IGF.IGM.getTaskRemoveCancellationHandlerFunctionPointer();
+    }
+    if (kind == BuiltinValueKind::TaskRemovePriorityEscalationHandler) {
+      return IGF.IGM.getTaskRemovePriorityEscalationHandlerFunctionPointer();
+    }
+    llvm::report_fatal_error("Unhandled builtin");
+  }();
+  auto *call = IGF.Builder.CreateCall(callee, {record});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
+void irgen::emitBuiltinTaskLocalValuePush(IRGenFunction &IGF, llvm::Value *key,
+                                          llvm::Value *value,
+                                          llvm::Value *valueMetatype) {
+  auto callee = IGF.IGM.getTaskLocalValuePushFunctionPointer();
+
+  // We pass in Value at +1, but we are luckily given the value already at +1,
+  // so the end lifetime is performed for us.
+  auto *call = IGF.Builder.CreateCall(callee, {key, value, valueMetatype});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
+void irgen::emitBuiltinTaskLocalValuePop(IRGenFunction &IGF) {
+  auto *call =
+      IGF.Builder.CreateCall(IGF.IGM.getTaskLocalValuePopFunctionPointer(), {});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
 void irgen::emitFinishAsyncLet(IRGenFunction &IGF,
                                llvm::Value *asyncLet,
                                llvm::Value *resultBuffer) {
