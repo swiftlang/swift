@@ -256,8 +256,9 @@ protected:
       kind : NumExternKindBits
     );
 
-    SWIFT_INLINE_BITFIELD(SynthesizedProtocolAttr, DeclAttribute, 1,
-      isUnchecked : 1
+    SWIFT_INLINE_BITFIELD(SynthesizedProtocolAttr, DeclAttribute, 2,
+      isUnchecked : 1,
+      isSuppressed: 1
     );
 
     SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 3,
@@ -1754,12 +1755,13 @@ class SynthesizedProtocolAttr : public DeclAttribute {
 
 public:
   SynthesizedProtocolAttr(ProtocolDecl *protocol, LazyConformanceLoader *Loader,
-                          bool isUnchecked)
+                          bool isUnchecked, bool isSuppressed)
       : DeclAttribute(DeclAttrKind::SynthesizedProtocol, SourceLoc(),
                       SourceRange(),
                       /*Implicit=*/true),
         Loader(Loader), protocol(protocol) {
     Bits.SynthesizedProtocolAttr.isUnchecked = unsigned(isUnchecked);
+    Bits.SynthesizedProtocolAttr.isSuppressed = unsigned(isSuppressed);
   }
 
   /// Retrieve the known protocol kind naming the protocol to be
@@ -1772,6 +1774,10 @@ public:
     return bool(Bits.SynthesizedProtocolAttr.isUnchecked);
   }
 
+  bool isSuppressed() const {
+    return bool(Bits.SynthesizedProtocolAttr.isSuppressed);
+  }
+
   /// Retrieve the lazy loader that will be used to populate the
   /// synthesized conformance.
   LazyConformanceLoader *getLazyLoader() const { return Loader; }
@@ -1782,12 +1788,13 @@ public:
 
   SynthesizedProtocolAttr *clone(ASTContext &ctx) const {
     return new (ctx) SynthesizedProtocolAttr(
-        protocol, getLazyLoader(), isUnchecked());
+        protocol, getLazyLoader(), isUnchecked(), isSuppressed());
   }
 
   bool isEquivalent(const SynthesizedProtocolAttr *other,
                     Decl *attachedTo) const {
     return isUnchecked() == other->isUnchecked()
+            && isSuppressed() == other->isSuppressed()
             && getProtocol() == other->getProtocol()
             && getLazyLoader() == other->getLazyLoader();
   }
