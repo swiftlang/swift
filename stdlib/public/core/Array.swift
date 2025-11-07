@@ -1422,41 +1422,23 @@ extension Array: RangeReplaceableCollection {
   }
 
   @inlinable
-  public mutating func withContiguousMutableStorageIfAvailable<R, E>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
-  ) throws(E) -> R? {
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
     return unsafe try withUnsafeMutableBufferPointer {
-      (bufferPointer) throws(E) -> R in
+      (bufferPointer) -> R in
       return try unsafe body(&bufferPointer)
     }
   }
-  
-  // ABI-only
-  @inlinable
-  @_silgen_name("$sSa39withContiguousMutableStorageIfAvailableyqd__Sgqd__SryxGzKXEKlF")
-  mutating func __rethrows_withContiguousMutableStorageIfAvailable<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    unsafe try withContiguousMutableStorageIfAvailable(body)
-  }
 
   @inlinable
-  public func withContiguousStorageIfAvailable<R, E>(
-    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
-  ) throws(E) -> R? {
-    return unsafe try withUnsafeBufferPointer {
-      (bufferPointer) throws(E) -> R in
-      return try unsafe body(bufferPointer)
-    }
-  }
-  
-  // ABI-only
-  @inlinable
-  @_silgen_name("$sSa32withContiguousStorageIfAvailableyqd__Sgqd__SRyxGKXEKlF")
-  func __rethrows_withContiguousStorageIfAvailable<R>(
+  public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    unsafe try withContiguousStorageIfAvailable(body)
+    return unsafe try withUnsafeBufferPointer {
+      (bufferPointer) -> R in
+      return try unsafe body(bufferPointer)
+    }
   }
   
   @inlinable
