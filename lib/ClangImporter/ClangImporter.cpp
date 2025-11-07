@@ -8702,7 +8702,7 @@ SourceLoc swift::extractNearestSourceLoc(SafeUseOfCxxDeclDescriptor desc) {
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           CxxDeclExplicitSafetyDescriptor desc) {
+                           ClangDeclExplicitSafetyDescriptor desc) {
   out << "Checking if '";
   if (auto namedDecl = dyn_cast<clang::NamedDecl>(desc.decl))
     out << namedDecl->getNameAsString();
@@ -8711,7 +8711,7 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "' is explicitly safe.\n";
 }
 
-SourceLoc swift::extractNearestSourceLoc(CxxDeclExplicitSafetyDescriptor desc) {
+SourceLoc swift::extractNearestSourceLoc(ClangDeclExplicitSafetyDescriptor desc) {
   return SourceLoc();
 }
 
@@ -8770,9 +8770,8 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
   return {CustomRefCountingOperationResult::tooManyFound, nullptr, name};
 }
 
-ExplicitSafety
-ClangDeclExplicitSafety::evaluate(Evaluator &evaluator,
-                                  CxxDeclExplicitSafetyDescriptor desc) const {
+ExplicitSafety ClangDeclExplicitSafety::evaluate(
+    Evaluator &evaluator, ClangDeclExplicitSafetyDescriptor desc) const {
   // FIXME: Also similar to hasPointerInSubobjects
   // FIXME: should probably also subsume IsSafeUseOfCxxDecl
 
