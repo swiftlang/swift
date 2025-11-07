@@ -803,8 +803,7 @@ private:
       auto projectedTy = computeProjectedValueType(wrappedVar, wrapperTy);
       // The projected type may have an error, make sure we turn it into a hole
       // if necessary.
-      ASSERT(!projectedTy->hasUnboundGenericType() &&
-             !projectedTy->hasPlaceholder());
+      ASSERT(!projectedTy->hasUnboundGenericType());
       projectedTy = cs.replaceInferableTypesWithTypeVars(projectedTy, locator);
       cs.setType(projectedVal, projectedTy);
     }
