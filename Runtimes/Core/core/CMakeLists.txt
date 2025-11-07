@@ -21,9 +21,6 @@ gyb_expand(UnsafeBufferPointer.swift.gyb UnsafeBufferPointer.swift
 gyb_expand(UnsafeRawBufferPointer.swift.gyb UnsafeRawBufferPointer.swift
   FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
 
-gyb_expand(Tuple.swift.gyb Tuple.swift
-  FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
-
 # These sources are not strictly sorted alphabetically because the compiler
 # crashes if they are.
 add_library(swiftCore
@@ -194,6 +191,7 @@ add_library(swiftCore
   SwiftNativeNSArray.swift
   TemporaryAllocation.swift
   ThreadLocalStorage.swift
+  Tuple.swift
   UIntBuffer.swift
   UnavailableStringAPIs.swift
   UnicodeData.swift

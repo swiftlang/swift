@@ -248,6 +248,7 @@ split_embedded_sources(
     NORMAL CommandLine.swift
   EMBEDDED SliceBuffer.swift
   EMBEDDED StaticBigInt.swift
+  EMBEDDED Tuple.swift
   EMBEDDED UInt128.swift
   EMBEDDED UnfoldSequence.swift
   EMBEDDED UnsafeBufferPointerSlice.swift
@@ -268,7 +269,6 @@ split_embedded_sources(
   EMBEDDED LegacyInt128.swift.gyb
   EMBEDDED UnsafeBufferPointer.swift.gyb
   EMBEDDED UnsafeRawBufferPointer.swift.gyb
-  EMBEDDED Tuple.swift.gyb
   )
 
 if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
