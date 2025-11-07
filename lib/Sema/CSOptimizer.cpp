@@ -658,11 +658,20 @@ static void findFavoredChoicesBasedOnArity(
           return;
         }
 
-        if (overloadType->getNumParams() == argumentList->size() ||
-            llvm::count_if(*decl->getParameterList(), [](auto *param) {
-              return !param->isDefaultArgument();
-            }) == argumentList->size())
+        if (overloadType->getNumParams() == argumentList->size()) {
           favored.push_back(choice);
+          return;
+        }
+
+        if (auto *paramList = decl->getParameterList()) {
+          auto numNonDefaulted = llvm::count_if(*paramList, [](auto *param) {
+            return !param->isDefaultArgument();
+          });
+          if (numNonDefaulted == argumentList->size()) {
+            favored.push_back(choice);
+            return;
+          }
+        }
       });
 
   if (hasVariadicGenerics)
