@@ -733,6 +733,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   context.Args.AddLastArg(Arguments, options::OPT_emit_extension_block_symbols,
                           options::OPT_omit_extension_block_symbols);
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_minimum_access_level);
+  context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_shorten_output_names);
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_skip_synthesized_members);
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_skip_inherited_docs);
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_pretty_print);
@@ -1272,6 +1273,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   context.Args.AddLastArg(Arguments, options::OPT_emit_extension_block_symbols,
                           options::OPT_omit_extension_block_symbols);
   context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_minimum_access_level);
+  context.Args.AddLastArg(Arguments, options::OPT_symbol_graph_shorten_output_names);
 
   context.Args.AddLastArg(Arguments, options::OPT_import_bridging_header,
                           options::OPT_internal_import_bridging_header);
