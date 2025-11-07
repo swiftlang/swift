@@ -2589,6 +2589,10 @@ public:
         if (!var->hasStorage())
           return;
 
+        // If the variable is @_extern, it never needs an initializer.
+        if (var->getAttrs().hasAttribute<ExternAttr>())
+          return;
+
         if (var->getAttrs().hasAttribute<SILGenNameAttr>()
               || !ABIRoleInfo(var).providesAPI())
           return;

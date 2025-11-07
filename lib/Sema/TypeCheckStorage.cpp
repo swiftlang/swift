@@ -514,16 +514,22 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     }
   }
 
-  auto isInitAccessorProperty = [](Pattern *pattern) {
-    auto *var = pattern->getSingleVar();
-    return var && var->getAccessor(AccessorKind::Init);
+  auto supportsInitialization = [&] {
+    bool anySupportsInitialization = false;
+    pattern->forEachVariable([&](VarDecl *var) {
+      if (var->supportsInitialization()) {
+        anySupportsInitialization = true;
+      }
+    });
+
+    return anySupportsInitialization;
   };
 
   // If we have a type but no initializer, check whether the type is
   // default-initializable. If so, do it.
   if (!pbe.isInitialized() &&
       binding->isDefaultInitializable(entryNumber) &&
-      (pattern->hasStorage() || isInitAccessorProperty(pattern))) {
+      supportsInitialization()) {
     if (auto defaultInit = TypeChecker::buildDefaultInitializer(patternType)) {
       // If we got a default initializer, install it and re-type-check it
       // to make sure it is properly coerced to the pattern type.
@@ -598,7 +604,16 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     Context.Diags.diagnose(binding->getPattern(entryNumber)->getLoc(),
                            diag::destructuring_let_struct_stored_property_unsupported);
   }
-  
+
+  // Extern declarations are not permitted to have initializers.
+  if (auto singleVar = binding->getSingleVar()) {
+    if (singleVar->getAttrs().hasAttribute<ExternAttr>() &&
+        pbe.isInitialized()) {
+      singleVar->diagnose(diag::extern_variable_initializer)
+          .highlight(pbe.getOriginalInitRange());
+    }
+  }
+
   return &pbe;
 }
 
