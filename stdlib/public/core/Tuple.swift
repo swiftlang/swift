@@ -157,217 +157,217 @@ public func >= <each B: Comparable>(lhs: (repeat each B), rhs: (repeat each B)) 
 // MARK: - Old vestigial ABI symbols for old variadic tuple methods.
 
 @usableFromInline
-@abi(func ==(lhs: (), rhs: ()) -> Bool)
-internal func _abi_tupleEqual(lhs: (), rhs: ()) -> Bool {
+@_disfavoredOverload
+internal func == (lhs: (), rhs: ()) -> Bool {
   return true
 }
 
 @usableFromInline
-@abi(func !=(lhs: (), rhs: ()) -> Bool)
-internal func _abi_tupleNotEqual(lhs: (), rhs: ()) -> Bool {
+@_disfavoredOverload
+internal func != (lhs: (), rhs: ()) -> Bool {
     return false
 }
 
 @usableFromInline
-@abi(func <(lhs: (), rhs: ()) -> Bool)
-internal func _abi_tupleLessThan(lhs: (), rhs: ()) -> Bool {
+@_disfavoredOverload
+internal func < (lhs: (), rhs: ()) -> Bool {
     return false
 }
 
 @usableFromInline
-@abi(func <=(lhs: (), rhs: ()) -> Bool)
-internal func _abi_tupleLessThanOrEqual(lhs: (), rhs: ()) -> Bool {
+@_disfavoredOverload
+internal func <= (lhs: (), rhs: ()) -> Bool {
     return true
 }
 
 @usableFromInline
-@abi(func >(lhs: (), rhs: ()) -> Bool)
-internal func _abi_tupleGreaterThan(lhs: (), rhs: ()) -> Bool {
+@_disfavoredOverload
+internal func > (lhs: (), rhs: ()) -> Bool {
     return false
 }
 
 @usableFromInline
-@abi(func >=(lhs: (), rhs: ()) -> Bool)
-internal func _abi_tupleGreaterThanOrEqual(lhs: (), rhs: ()) -> Bool {
+@_disfavoredOverload
+internal func >=(lhs: (), rhs: ()) -> Bool {
     return true
 }
 
 @usableFromInline
-@abi(func == <A: Equatable, B: Equatable>(lhs: (A,B), rhs: (A,B)) -> Bool)
-internal func _abi_tupleEqual <A: Equatable, B: Equatable>(lhs: (A,B), rhs: (A,B)) -> Bool {
+@_disfavoredOverload
+internal func ==  <A: Equatable, B: Equatable>(lhs: (A,B), rhs: (A,B)) -> Bool {
   lhs == rhs
 }
 
 @usableFromInline
-@abi(func != <A: Equatable, B: Equatable>(lhs: (A,B), rhs: (A,B)) -> Bool)
-internal func _abi_tupleNotEqual <A: Equatable, B: Equatable>(lhs: (A,B), rhs: (A,B)) -> Bool {
+@_disfavoredOverload
+internal func !=  <A: Equatable, B: Equatable>(lhs: (A,B), rhs: (A,B)) -> Bool {
   lhs != rhs
 }
 
 @usableFromInline
-@abi(func < <A: Comparable, B: Comparable>(lhs: (A,B), rhs: (A,B)) -> Bool)
-internal func _abi_tupleLessThan <A: Comparable, B: Comparable>(lhs: (A,B), rhs: (A,B)) -> Bool {
+@_disfavoredOverload
+internal func <  <A: Comparable, B: Comparable>(lhs: (A,B), rhs: (A,B)) -> Bool {
   lhs < rhs
 }
 
 @usableFromInline
-@abi(func <= <A: Comparable, B: Comparable>(lhs: (A,B), rhs: (A,B)) -> Bool)
-internal func _abi_tupleLessThanOrEqual <A: Comparable, B: Comparable>(lhs: (A,B), rhs: (A,B)) -> Bool {
+@_disfavoredOverload
+internal func <=  <A: Comparable, B: Comparable>(lhs: (A,B), rhs: (A,B)) -> Bool {
   lhs <= rhs
 }
 
 @usableFromInline
-@abi(func > <A: Comparable, B: Comparable>(lhs: (A,B), rhs: (A,B)) -> Bool)
-internal func _abi_tupleGreaterThan <A: Comparable, B: Comparable>(lhs: (A,B), rhs: (A,B)) -> Bool {
+@_disfavoredOverload
+internal func >  <A: Comparable, B: Comparable>(lhs: (A,B), rhs: (A,B)) -> Bool {
   lhs > rhs
 }
 
 @usableFromInline
-@abi(func >= <A: Comparable, B: Comparable>(lhs: (A,B), rhs: (A,B)) -> Bool)
-internal func _abi_tupleGreaterThanOrEqual <A: Comparable, B: Comparable>(lhs: (A,B), rhs: (A,B)) -> Bool {
+@_disfavoredOverload
+internal func >= <A: Comparable, B: Comparable>(lhs: (A,B), rhs: (A,B)) -> Bool {
   lhs >= rhs
 }
 
 @usableFromInline
-@abi(func == <A: Equatable, B: Equatable, C: Equatable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool)
-internal func _abi_tupleEqual <A: Equatable, B: Equatable, C: Equatable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool {
+@_disfavoredOverload
+internal func ==  <A: Equatable, B: Equatable, C: Equatable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool {
   lhs == rhs
 }
 
 @usableFromInline
-@abi(func != <A: Equatable, B: Equatable, C: Equatable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool)
-internal func _abi_tupleNotEqual <A: Equatable, B: Equatable, C: Equatable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool {
+@_disfavoredOverload
+internal func !=  <A: Equatable, B: Equatable, C: Equatable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool {
   lhs != rhs
 }
 
 @usableFromInline
-@abi(func < <A: Comparable, B: Comparable, C: Comparable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool)
-internal func _abi_tupleLessThan <A: Comparable, B: Comparable, C: Comparable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool {
+@_disfavoredOverload
+internal func <  <A: Comparable, B: Comparable, C: Comparable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool {
   lhs < rhs
 }
 
 @usableFromInline
-@abi(func <= <A: Comparable, B: Comparable, C: Comparable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool)
-internal func __abi_3TupleLessThanOrEqual <A: Comparable, B: Comparable, C: Comparable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool {
+@_disfavoredOverload
+internal func <= <A: Comparable, B: Comparable, C: Comparable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool {
   lhs <= rhs
 }
 
 @usableFromInline
-@abi(func > <A: Comparable, B: Comparable, C: Comparable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool)
-internal func __abi_3TupleGreaterThan <A: Comparable, B: Comparable, C: Comparable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool {
+@_disfavoredOverload
+internal func > <A: Comparable, B: Comparable, C: Comparable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool {
   lhs > rhs
 }
 
 @usableFromInline
-@abi(func >= <A: Comparable, B: Comparable, C: Comparable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool)
-internal func __abi_3TupleGreaterThanOrEqual <A: Comparable, B: Comparable, C: Comparable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool {
+@_disfavoredOverload
+internal func >= <A: Comparable, B: Comparable, C: Comparable>(lhs: (A,B,C), rhs: (A,B,C)) -> Bool {
   lhs >= rhs
 }
 
 @usableFromInline
-@abi(func == <A: Equatable, B: Equatable, C: Equatable, D: Equatable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool)
-internal func __abi_4TupleEqual <A: Equatable, B: Equatable, C: Equatable, D: Equatable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool {
+@_disfavoredOverload
+internal func == <A: Equatable, B: Equatable, C: Equatable, D: Equatable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool {
   lhs == rhs
 }
 
 @usableFromInline
-@abi(func != <A: Equatable, B: Equatable, C: Equatable, D: Equatable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool)
-internal func _abi_tupleNotEqual <A: Equatable, B: Equatable, C: Equatable, D: Equatable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool {
+@_disfavoredOverload
+internal func !=  <A: Equatable, B: Equatable, C: Equatable, D: Equatable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool {
   lhs != rhs
 }
 
 @usableFromInline
-@abi(func < <A: Comparable, B: Comparable, C: Comparable, D: Comparable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool)
-internal func _abi_tupleLessThan <A: Comparable, B: Comparable, C: Comparable, D: Comparable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool {
+@_disfavoredOverload
+internal func <  <A: Comparable, B: Comparable, C: Comparable, D: Comparable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool {
   lhs < rhs
 }
 
 @usableFromInline
-@abi(func <= <A: Comparable, B: Comparable, C: Comparable, D: Comparable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool)
-internal func _abi_tupleLessThanOrEqual <A: Comparable, B: Comparable, C: Comparable, D: Comparable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool {
+@_disfavoredOverload
+internal func <=  <A: Comparable, B: Comparable, C: Comparable, D: Comparable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool {
   lhs <= rhs
 }
 
 @usableFromInline
-@abi(func > <A: Comparable, B: Comparable, C: Comparable, D: Comparable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool)
-internal func _abi_tupleGreaterThan <A: Comparable, B: Comparable, C: Comparable, D: Comparable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool {
+@_disfavoredOverload
+internal func >  <A: Comparable, B: Comparable, C: Comparable, D: Comparable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool {
   lhs > rhs
 }
 
 @usableFromInline
-@abi(func >= <A: Comparable, B: Comparable, C: Comparable, D: Comparable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool)
-internal func _abi_tupleGreaterThanOrEqual <A: Comparable, B: Comparable, C: Comparable, D: Comparable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool {
+@_disfavoredOverload
+internal func >= <A: Comparable, B: Comparable, C: Comparable, D: Comparable>(lhs: (A,B,C,D), rhs: (A,B,C,D)) -> Bool {
   lhs >= rhs
 }
 
 @usableFromInline
-@abi(func == <A: Equatable, B: Equatable, C: Equatable, D: Equatable, E: Equatable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool)
-internal func _abi_tupleEqual <A: Equatable, B: Equatable, C: Equatable, D: Equatable, E: Equatable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool {
+@_disfavoredOverload
+internal func ==  <A: Equatable, B: Equatable, C: Equatable, D: Equatable, E: Equatable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool {
   lhs == rhs
 }
 
 @usableFromInline
-@abi(func != <A: Equatable, B: Equatable, C: Equatable, D: Equatable, E: Equatable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool)
-internal func _abi_tupleNotEqual <A: Equatable, B: Equatable, C: Equatable, D: Equatable, E: Equatable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool {
+@_disfavoredOverload
+internal func !=  <A: Equatable, B: Equatable, C: Equatable, D: Equatable, E: Equatable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool {
   lhs != rhs
 }
 
 @usableFromInline
-@abi(func < <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool)
-internal func _abi_tupleLessThan <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool {
+@_disfavoredOverload
+internal func <  <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool {
   lhs < rhs
 }
 
 @usableFromInline
-@abi(func <= <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool)
-internal func _abi_tupleLessThanOrEqual <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool {
+@_disfavoredOverload
+internal func <=  <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool {
   lhs <= rhs
 }
 
 @usableFromInline
-@abi(func > <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool)
-internal func _abi_tupleGreaterThan <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool {
+@_disfavoredOverload
+internal func >  <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool {
   lhs > rhs
 }
 
 @usableFromInline
-@abi(func >= <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool)
-internal func _abi_tupleGreaterThanOrEqual <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool {
+@_disfavoredOverload
+internal func >= <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable>(lhs: (A,B,C,D,E), rhs: (A,B,C,D,E)) -> Bool {
   lhs >= rhs
 }
 
 @usableFromInline
-@abi(func == <A: Equatable, B: Equatable, C: Equatable, D: Equatable, E: Equatable, F: Equatable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool)
-internal func _abi_tupleEqual <A: Equatable, B: Equatable, C: Equatable, D: Equatable, E: Equatable, F: Equatable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool {
+@_disfavoredOverload
+internal func ==  <A: Equatable, B: Equatable, C: Equatable, D: Equatable, E: Equatable, F: Equatable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool {
   lhs == rhs
 }
 
 @usableFromInline
-@abi(func != <A: Equatable, B: Equatable, C: Equatable, D: Equatable, E: Equatable, F: Equatable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool)
-internal func _abi_tupleNotEqual <A: Equatable, B: Equatable, C: Equatable, D: Equatable, E: Equatable, F: Equatable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool {
+@_disfavoredOverload
+internal func !=  <A: Equatable, B: Equatable, C: Equatable, D: Equatable, E: Equatable, F: Equatable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool {
   lhs != rhs
 }
 
 @usableFromInline
-@abi(func < <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable, F: Comparable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool)
-internal func _abi_tupleLessThan <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable, F: Comparable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool {
+@_disfavoredOverload
+internal func <  <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable, F: Comparable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool {
   lhs < rhs
 }
 
 @usableFromInline
-@abi(func <= <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable, F: Comparable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool)
-internal func _abi_tupleLessThanOrEqual <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable, F: Comparable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool {
+@_disfavoredOverload
+internal func <=  <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable, F: Comparable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool {
   lhs <= rhs
 }
 
 @usableFromInline
-@abi(func > <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable, F: Comparable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool)
-internal func _abi_tupleGreaterThan <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable, F: Comparable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool {
+@_disfavoredOverload
+internal func >  <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable, F: Comparable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool {
   lhs > rhs
 }
 
 @usableFromInline
-@abi(func >= <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable, F: Comparable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool)
-internal func _abi_tupleGreaterThanOrEqual <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable, F: Comparable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool {
+@_disfavoredOverload
+internal func >= <A: Comparable, B: Comparable, C: Comparable, D: Comparable, E: Comparable, F: Comparable>(lhs: (A,B,C,D,E,F), rhs: (A,B,C,D,E,F)) -> Bool {
   lhs >= rhs
 }
