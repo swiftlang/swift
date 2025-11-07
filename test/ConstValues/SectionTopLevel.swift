@@ -53,5 +53,5 @@ func bar(x: Int) -> String { return "test" }
 // CHECK: @"$s15SectionTopLevel8funcRef1Siycvp" = {{.*}}constant %swift.function { ptr @"$s15SectionTopLevel3fooSiyF{{.*}}", ptr null }, section "mysection"
 // CHECK: @"$s15SectionTopLevel8funcRef2ySSSicvp" = {{.*}}constant %swift.function { ptr @"$s15SectionTopLevel3bar1xSSSi_tF{{.*}}", ptr null }, section "mysection"
 // CHECK: @"$s15SectionTopLevel6tuple1Si_S2iSdSbtvp" = {{.*}}constant <{ %TSi, %TSi, %TSi, {{.*}} }> <{ %TSi <{ {{i64|i32}} 1 }>, %TSi <{ {{i64|i32}} 2 }>, %TSi <{ {{i64|i32}} 3 }>, {{.*}} }>, section "mysection"
-// CHECK: @"$s15SectionTopLevel6tuple2Si_SfSbtvp" = {{.*}}constant <{ %TSi, %TSf, %TSb }> <{ %TSi <{ {i64|i32}} 42 }>, %TSf <{ float 0x40091EB860000000 }>, %TSb zeroinitializer }>, section "mysection"
+// CHECK: @"$s15SectionTopLevel6tuple2Si_SfSbtvp" = {{.*}}constant <{ %TSi, %TSf, %TSb }> <{ %TSi <{ {{i64|i32}} 42 }>, %TSf <{ float 0x40091EB860000000 }>, %TSb zeroinitializer }>, section "mysection"
 // CHECK: @"$s15SectionTopLevel6tuple3Siyc_SSSictvp" = {{.*}}constant <{ %swift.function, %swift.function }> <{ %swift.function { ptr @"$s15SectionTopLevel3fooSiyF{{.*}}", ptr null }, %swift.function { ptr @"$s15SectionTopLevel3bar1xSSSi_tF{{.*}}", ptr null } }>, section "mysection"
